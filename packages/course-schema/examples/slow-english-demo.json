@@ -1,0 +1,55 @@
+{
+  "id": "slow-english-demo",
+  "title": "Slow English Demo",
+  "titleZh": "慢速英语演示",
+  "description": "Demo course pack for AcquireEnglish MVP. Replace media with licensed assets.",
+  "coverUrl": "https://cdn.example.com/courses/slow-english-demo/cover.jpg",
+  "level": "A2",
+  "tags": ["slow", "daily", "demo"],
+  "lessons": [
+    {
+      "id": "slow-english-demo-01",
+      "title": "Walking on the Path",
+      "index": 1,
+      "durationSec": 96,
+      "videoUrl": "https://cdn.example.com/courses/slow-english-demo/01.mp4",
+      "subtitles": {
+        "en": "https://cdn.example.com/courses/slow-english-demo/01.en.srt",
+        "zh": "https://cdn.example.com/courses/slow-english-demo/01.zh.srt"
+      }
+    },
+    {
+      "id": "slow-english-demo-02",
+      "title": "Plants Either Side",
+      "index": 2,
+      "durationSec": 96,
+      "videoUrl": "https://cdn.example.com/courses/slow-english-demo/02.mp4",
+      "subtitles": {
+        "en": "https://cdn.example.com/courses/slow-english-demo/02.en.srt",
+        "zh": "https://cdn.example.com/courses/slow-english-demo/02.zh.srt"
+      }
+    },
+    {
+      "id": "slow-english-demo-03",
+      "title": "Coming Out",
+      "index": 3,
+      "durationSec": 90,
+      "videoUrl": "https://cdn.example.com/courses/slow-english-demo/03.mp4",
+      "subtitles": {
+        "en": "https://cdn.example.com/courses/slow-english-demo/03.en.srt",
+        "zh": "https://cdn.example.com/courses/slow-english-demo/03.zh.srt"
+      }
+    },
+    {
+      "id": "slow-english-demo-04",
+      "title": "Looking Around",
+      "index": 4,
+      "durationSec": 88,
+      "videoUrl": "https://cdn.example.com/courses/slow-english-demo/04.mp4",
+      "subtitles": {
+        "en": "https://cdn.example.com/courses/slow-english-demo/04.en.srt",
+        "zh": "https://cdn.example.com/courses/slow-english-demo/04.zh.srt"
+      }
+    }
+  ]
+}

@@ -1,0 +1,83 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://acquireenglish.local/schemas/course.schema.json",
+  "title": "AcquireEnglishCourse",
+  "type": "object",
+  "required": ["id", "title", "lessons"],
+  "additionalProperties": false,
+  "properties": {
+    "id": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Stable course id, e.g. slow-english-01"
+    },
+    "title": {
+      "type": "string",
+      "minLength": 1
+    },
+    "titleZh": {
+      "type": "string"
+    },
+    "description": {
+      "type": "string"
+    },
+    "coverUrl": {
+      "type": "string",
+      "format": "uri"
+    },
+    "level": {
+      "type": "string",
+      "enum": ["A1", "A2", "B1", "B2", "C1", "C2", "unknown"],
+      "default": "unknown"
+    },
+    "tags": {
+      "type": "array",
+      "items": { "type": "string" },
+      "default": []
+    },
+    "lessons": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/lesson" }
+    }
+  },
+  "$defs": {
+    "lesson": {
+      "type": "object",
+      "required": ["id", "title", "index", "videoUrl", "subtitles"],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "title": { "type": "string", "minLength": 1 },
+        "index": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "1-based lesson index for UI like 2/4"
+        },
+        "durationSec": {
+          "type": "number",
+          "minimum": 0
+        },
+        "videoUrl": {
+          "type": "string",
+          "description": "HTTPS CDN URL or relative path inside a course pack"
+        },
+        "subtitles": {
+          "type": "object",
+          "required": ["en"],
+          "additionalProperties": false,
+          "properties": {
+            "en": {
+              "type": "string",
+              "description": "URL or path to English .srt / .vtt"
+            },
+            "zh": {
+              "type": "string",
+              "description": "URL or path to Chinese .srt / .vtt"
+            }
+          }
+        }
+      }
+    }
+  }
+}

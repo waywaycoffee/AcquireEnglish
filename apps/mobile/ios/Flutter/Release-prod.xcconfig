@@ -1,0 +1,5 @@
+﻿#include "Release.xcconfig"
+BUNDLE_ID = com.acquire.english
+APP_DISPLAY_NAME = AcquireEnglish
+APP_NAME = AcquireEnglish
+FLAVOR = prod

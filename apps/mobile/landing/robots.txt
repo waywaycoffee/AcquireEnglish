@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://tidesparrow.github.io/shadowing-english/sitemap.xml
