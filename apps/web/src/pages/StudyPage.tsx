@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { api, type Course, type Lesson } from "../api";
 import { useAuth } from "../auth";
+import { CueText } from "../components/CueText";
 import { DEMO_EN_SRT, DEMO_ZH_SRT } from "../data/demoSubtitles";
 import { findActiveCueIndex, formatTime, parseSrt, type Cue } from "../lib/srt";
 
@@ -32,6 +33,8 @@ export default function StudyPage() {
   const { token } = useAuth();
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const listRef = useRef<HTMLDivElement | null>(null);
+  const userScrollingRef = useRef(false);
+  const userScrollTimer = useRef<number | null>(null);
 
   const [course, setCourse] = useState<Course | null>(null);
   const [lesson, setLesson] = useState<Lesson | null>(null);
@@ -52,6 +55,30 @@ export default function StudyPage() {
   const [practiceAnswered, setPracticeAnswered] = useState(false);
   const [generatingSubs, setGeneratingSubs] = useState(false);
   const [generateMsg, setGenerateMsg] = useState<string | null>(null);
+  const [learnerLevel, setLearnerLevel] = useState("A2");
+  const [knownWords, setKnownWords] = useState<Set<string>>(() => new Set());
+  const [highlightWords, setHighlightWords] = useState(true);
+  /** Seekable study media from API cache (not iframe). */
+  const [studyMediaSrc, setStudyMediaSrc] = useState<string | null>(null);
+  const [studyMediaKind, setStudyMediaKind] = useState<"audio" | "video">("audio");
+  const [preparingMedia, setPreparingMedia] = useState(false);
+  const [mediaMsg, setMediaMsg] = useState<string | null>(null);
+
+  const importId = useMemo(() => {
+    const m = courseId.match(/^link-(\d+)$/);
+    return m ? Number(m[1]) : null;
+  }, [courseId]);
+
+  const ytId = lesson?.videoUrl ? youtubeIdFromUrl(lesson.videoUrl) : null;
+  const biliId = lesson?.videoUrl ? biliBvidFromUrl(lesson.videoUrl) : null;
+  const isEmbed = !!ytId || !!biliId;
+  const hasDirectVideo =
+    !!lesson?.videoUrl?.startsWith("http") &&
+    !lesson.videoUrl.includes("cdn.example.com") &&
+    !isEmbed;
+  /** True subtitle follow only with controllable HTML media — never iframe clocks. */
+  const canTrueSync = !!studyMediaSrc || hasDirectVideo;
+  const realMediaSrc = studyMediaSrc ?? (hasDirectVideo ? lesson!.videoUrl : null);
 
   useEffect(() => {
     api
@@ -62,6 +89,16 @@ export default function StudyPage() {
       })
       .catch((err) => setError(err instanceof Error ? err.message : "Failed to load course"));
   }, [courseId, token]);
+
+  useEffect(() => {
+    if (!token) return;
+    void api.getPreferences(token).then((p) => {
+      if (p.level) setLearnerLevel(p.level);
+    });
+    void api.listVocab(token).then((rows) => {
+      setKnownWords(new Set(rows.map((r) => r.word.toLowerCase())));
+    });
+  }, [token]);
 
   useEffect(() => {
     let cancelled = false;
@@ -111,50 +148,73 @@ export default function StudyPage() {
     };
   }, [lesson?.id, lesson?.subtitles?.en, lesson?.subtitles?.zh, token]);
 
+  // Check cached study media; do not auto-prepare (can be slow) — user opts in.
+  useEffect(() => {
+    if (!token || importId == null) {
+      setStudyMediaSrc(null);
+      setMediaMsg(null);
+      return;
+    }
+    let cancelled = false;
+    void api
+      .getPlayback(token, importId, false)
+      .then((info) => {
+        if (cancelled) return;
+        if (info.ready && info.media_path) {
+          setStudyMediaSrc(api.studyMediaSrc(importId, token));
+          setStudyMediaKind(info.kind === "video" ? "video" : "audio");
+          setMediaMsg(null);
+        } else {
+          setStudyMediaSrc(null);
+          setMediaMsg(info.detail ?? null);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) setStudyMediaSrc(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [token, importId]);
+
   useEffect(() => {
     if (videoRef.current) videoRef.current.playbackRate = rate;
   }, [rate]);
 
   useEffect(() => {
+    if (!canTrueSync) return;
     const idx = findActiveCueIndex(enCues, currentTime);
     if (idx >= 0 && idx !== activeIndex) setActiveIndex(idx);
-  }, [currentTime, enCues, activeIndex]);
+  }, [currentTime, enCues, activeIndex, canTrueSync]);
 
   useEffect(() => {
+    if (!canTrueSync) return;
+    if (tab !== "字幕") return;
+    if (userScrollingRef.current) return;
     const el = listRef.current?.querySelector(`[data-cue="${activeIndex}"]`);
-    el?.scrollIntoView({ block: "nearest", behavior: "smooth" });
-  }, [activeIndex]);
+    el?.scrollIntoView({ block: "center", behavior: "smooth" });
+  }, [activeIndex, tab, canTrueSync]);
 
   useEffect(() => {
-    if (!playing) return;
+    if (!canTrueSync || !playing) return;
     const cue = enCues[activeIndex];
     if (!cue) return;
     if (loopSentence && currentTime >= cue.end - 0.05) {
       if (videoRef.current) {
         videoRef.current.currentTime = cue.start;
         void videoRef.current.play();
-      } else {
-        setCurrentTime(cue.start);
       }
       return;
     }
     if (pauseAtEnd && !loopSentence && currentTime >= cue.end - 0.05) {
-      if (videoRef.current) videoRef.current.pause();
+      videoRef.current?.pause();
       setPlaying(false);
       setCurrentTime(cue.end);
     }
-  }, [currentTime, loopSentence, pauseAtEnd, playing, enCues, activeIndex]);
-
-  const ytId = lesson?.videoUrl ? youtubeIdFromUrl(lesson.videoUrl) : null;
-  const biliId = lesson?.videoUrl ? biliBvidFromUrl(lesson.videoUrl) : null;
-  const isEmbed = !!ytId || !!biliId;
-  const hasRealVideo =
-    !!lesson?.videoUrl?.startsWith("http") &&
-    !lesson.videoUrl.includes("cdn.example.com") &&
-    !isEmbed;
+  }, [currentTime, loopSentence, pauseAtEnd, playing, enCues, activeIndex, canTrueSync]);
 
   useEffect(() => {
-    if (!token || !course || !lesson) return;
+    if (!token || !course || !lesson || !canTrueSync) return;
     const timer = window.setTimeout(() => {
       void api.upsertProgress(
         {
@@ -167,10 +227,10 @@ export default function StudyPage() {
       );
     }, 1500);
     return () => window.clearTimeout(timer);
-  }, [token, course, lesson, currentTime]);
+  }, [token, course, lesson, currentTime, canTrueSync]);
 
   useEffect(() => {
-    if (!token || !lesson) return;
+    if (!token || !lesson || !canTrueSync) return;
     void api.listProgress(token).then((rows) => {
       const row = rows.find((r) => r.lesson_id === lesson.id);
       if (row && row.position_sec > 1) {
@@ -178,23 +238,7 @@ export default function StudyPage() {
         if (videoRef.current) videoRef.current.currentTime = row.position_sec;
       }
     });
-  }, [token, lesson?.id]);
-
-  useEffect(() => {
-    if ((hasRealVideo && !isEmbed) || !playing) return;
-    const id = window.setInterval(() => {
-      setCurrentTime((t) => {
-        const next = t + 0.25 * rate;
-        const last = enCues[enCues.length - 1];
-        if (last && next > last.end + 0.5) {
-          setPlaying(false);
-          return last.end;
-        }
-        return next;
-      });
-    }, 250);
-    return () => window.clearInterval(id);
-  }, [hasRealVideo, isEmbed, playing, rate, enCues]);
+  }, [token, lesson?.id, canTrueSync]);
 
   const lessonLabel = useMemo(() => {
     if (!course || !lesson) return "";
@@ -225,21 +269,18 @@ export default function StudyPage() {
     setDictationResult(null);
     setPracticeChoice(null);
     setPracticeAnswered(false);
-    if (videoRef.current) {
+    setCurrentTime(cue.start);
+    if (canTrueSync && videoRef.current) {
       videoRef.current.currentTime = cue.start;
       void videoRef.current.play();
       setPlaying(true);
-    } else {
-      setCurrentTime(cue.start);
     }
   }
 
   function togglePlay() {
+    if (!canTrueSync) return;
     const v = videoRef.current;
-    if (!v) {
-      setPlaying((p) => !p);
-      return;
-    }
+    if (!v) return;
     if (v.paused) {
       void v.play();
       setPlaying(true);
@@ -249,6 +290,14 @@ export default function StudyPage() {
     }
   }
 
+  function onListScroll() {
+    userScrollingRef.current = true;
+    if (userScrollTimer.current != null) window.clearTimeout(userScrollTimer.current);
+    userScrollTimer.current = window.setTimeout(() => {
+      userScrollingRef.current = false;
+    }, 1200);
+  }
+
   function checkDictation() {
     const expected = normalize(enCues[activeIndex]?.text ?? "");
     setDictationResult(normalize(dictation) === expected);
@@ -256,26 +305,21 @@ export default function StudyPage() {
 
   async function collectWord(word: string) {
     if (!token || !word) return;
+    const norm = word.toLowerCase();
     await api.upsertVocab(token, {
-      word: word.toLowerCase(),
+      word: norm,
       context: enCues[activeIndex]?.text,
       mastery: "new",
     });
+    setKnownWords((prev) => new Set(prev).add(norm));
   }
-
-  const importId = useMemo(() => {
-    const m = courseId.match(/^link-(\d+)$/);
-    return m ? Number(m[1]) : null;
-  }, [courseId]);
 
   async function generateAiSubtitles() {
     if (!token || importId == null) return;
     setGeneratingSubs(true);
     const durationSec = Math.ceil(lesson?.durationSec ?? 0);
     const maxSeconds =
-      durationSec > 0
-        ? Math.min(durationSec + 90, 3 * 60 * 60)
-        : 60 * 60;
+      durationSec > 0 ? Math.min(durationSec + 90, 3 * 60 * 60) : 60 * 60;
     const minutes = Math.ceil(maxSeconds / 60);
     setGenerateMsg(`正在提取音频并调用阿里云百炼识别（约前 ${minutes} 分钟，可能较久）…`);
     setError(null);
@@ -292,6 +336,29 @@ export default function StudyPage() {
       setError(err instanceof Error ? err.message : "AI 字幕生成失败");
     } finally {
       setGeneratingSubs(false);
+    }
+  }
+
+  async function prepareStudyMedia() {
+    if (!token || importId == null) return;
+    setPreparingMedia(true);
+    setMediaMsg("正在准备可同步音轨（首次可能较久）…");
+    setError(null);
+    try {
+      const info = await api.getPlayback(token, importId, true);
+      if (info.ready && info.media_path) {
+        setStudyMediaSrc(api.studyMediaSrc(importId, token));
+        setStudyMediaKind(info.kind === "video" ? "video" : "audio");
+        setMediaMsg("已启用真实音轨跟播（非 iframe）");
+      } else {
+        setStudyMediaSrc(null);
+        setMediaMsg(info.detail || "无法准备可同步媒体；请使用 App 精听/跟读");
+      }
+    } catch (err) {
+      setStudyMediaSrc(null);
+      setMediaMsg(err instanceof Error ? err.message : "准备媒体失败");
+    } finally {
+      setPreparingMedia(false);
     }
   }
 
@@ -317,11 +384,21 @@ export default function StudyPage() {
       <div className="study-layout">
         <section className="card">
           <div className="video-frame">
-            {ytId ? (
+            {canTrueSync && realMediaSrc ? (
+              <video
+                ref={videoRef}
+                src={realMediaSrc}
+                controls
+                playsInline
+                onTimeUpdate={(e) => setCurrentTime(e.currentTarget.currentTime)}
+                onPlay={() => setPlaying(true)}
+                onPause={() => setPlaying(false)}
+                style={{ width: "100%", borderRadius: 12, background: "#000" }}
+              />
+            ) : ytId ? (
               <iframe
                 title={lesson?.title ?? "YouTube"}
                 src={`https://www.youtube.com/embed/${ytId}?rel=0`}
-                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
                 allowFullScreen
                 style={{ width: "100%", aspectRatio: "16 / 9", border: 0, borderRadius: 12 }}
               />
@@ -332,28 +409,48 @@ export default function StudyPage() {
                 allowFullScreen
                 style={{ width: "100%", aspectRatio: "16 / 9", border: 0, borderRadius: 12 }}
               />
-            ) : hasRealVideo ? (
-              <video
-                ref={videoRef}
-                src={lesson!.videoUrl}
-                onTimeUpdate={(e) => setCurrentTime(e.currentTarget.currentTime)}
-                onPlay={() => setPlaying(true)}
-                onPause={() => setPlaying(false)}
-              />
             ) : (
               <div style={{ textAlign: "center", padding: 24 }}>
                 <div style={{ fontSize: 18, color: "#dbeafe", marginBottom: 8 }}>
                   {lesson?.title ?? "课段预览"}
                 </div>
-                <div className="muted">演示课视频待替换 CDN；字幕卡片与控制已可用</div>
-                <div className="muted" style={{ marginTop: 8 }}>
-                  {formatTime(currentTime)}
-                </div>
+                <div className="muted">演示课视频待替换 CDN；可浏览字幕与重点词</div>
               </div>
             )}
-            {isEmbed ? (
+
+            {isEmbed && !canTrueSync ? (
+              <div className="embed-sync">
+                <div style={{ fontSize: 13, color: "#fde68a", marginBottom: 8, lineHeight: 1.5 }}>
+                  网页内嵌（B 站 / YouTube）无法做真正的字幕跟播。精听、跟读、句级 seek
+                  请用 <strong>AcquireEnglish App</strong>。
+                </div>
+                {importId != null ? (
+                  <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+                    <button
+                      type="button"
+                      className="btn"
+                      disabled={preparingMedia}
+                      onClick={() => void prepareStudyMedia()}
+                    >
+                      {preparingMedia ? "准备中…" : "尝试准备网页可同步音轨"}
+                    </button>
+                    <span className="muted" style={{ fontSize: 12 }}>
+                      可选：服务端缓存音轨后用真实 &lt;video&gt; 跟播（仍推荐 App）
+                    </span>
+                  </div>
+                ) : null}
+                {mediaMsg ? (
+                  <div className="muted" style={{ marginTop: 8, fontSize: 12 }}>
+                    {mediaMsg}
+                  </div>
+                ) : null}
+              </div>
+            ) : null}
+
+            {canTrueSync ? (
               <div className="muted" style={{ marginTop: 8, fontSize: 12 }}>
-                外链嵌入播放 · 字幕轴用下方控制同步精听（循环/听写/练习）
+                真实媒体跟播已启用（{studyMediaKind === "audio" && studyMediaSrc ? "音轨" : "视频"} ·{" "}
+                {formatTime(currentTime)}）· 绿线为重点/难词
               </div>
             ) : null}
           </div>
@@ -372,7 +469,12 @@ export default function StudyPage() {
           </div>
 
           {tab === "字幕" ? (
-            <div ref={listRef} style={{ maxHeight: 360, overflow: "auto" }}>
+            <div
+              ref={listRef}
+              className="cue-list"
+              style={{ maxHeight: 360, overflow: "auto" }}
+              onScroll={onListScroll}
+            >
               {importId != null ? (
                 <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 12, alignItems: "center" }}>
                   <button
@@ -384,11 +486,24 @@ export default function StudyPage() {
                     {generatingSubs ? "生成中…" : enCues.length ? "重新 AI 生成字幕" : "AI 生成字幕"}
                   </button>
                   <Link className="muted" to="/" style={{ fontSize: 12 }}>
-                    按整课时长识别（最长 3 小时）· 服务器已可使用全局百炼 Key
+                    按整课时长识别（最长 3 小时）
                   </Link>
                 </div>
               ) : null}
               {generateMsg ? <div className="muted" style={{ marginBottom: 10 }}>{generateMsg}</div> : null}
+              <div style={{ display: "flex", gap: 8, marginBottom: 10, flexWrap: "wrap" }}>
+                <button
+                  type="button"
+                  className={`chip ${highlightWords ? "on" : ""}`}
+                  onClick={() => setHighlightWords((v) => !v)}
+                >
+                  重点词高亮
+                </button>
+                <span className="muted" style={{ fontSize: 12, alignSelf: "center" }}>
+                  绿线 = 相对 {learnerLevel} 的重点/难词 · 点词可加入生词本
+                  {!canTrueSync ? " · 自动滚动需真实媒体或 App" : ""}
+                </span>
+              </div>
               {enCues.length === 0 ? (
                 <div className="cue">
                   <div className="en">暂无字幕</div>
@@ -411,7 +526,15 @@ export default function StudyPage() {
                     <div className="muted" style={{ fontSize: 12, marginBottom: 6 }}>
                       {formatTime(cue.start)}
                     </div>
-                    <div className="en">{cue.text}</div>
+                    <div className="en">
+                      <CueText
+                        text={cue.text}
+                        level={learnerLevel}
+                        knownWords={knownWords}
+                        highlight={highlightWords}
+                        onWordClick={(w) => void collectWord(w)}
+                      />
+                    </div>
                     {bilingual ? <div className="zh">{zhCues[index]?.text ?? ""}</div> : null}
                   </button>
                 ))
@@ -421,14 +544,28 @@ export default function StudyPage() {
 
           {tab === "跟读" ? (
             <div>
+              {!canTrueSync ? (
+                <p style={{ color: "#fde68a", fontSize: 13, marginTop: 0 }}>
+                  跟读需要真实播放进度。请使用 App，或先准备网页可同步音轨。
+                </p>
+              ) : null}
               <div className="cue active">
-                <div className="en">{activeEn}</div>
+                <div className="en">
+                  <CueText
+                    text={activeEn}
+                    level={learnerLevel}
+                    knownWords={knownWords}
+                    highlight={highlightWords}
+                    onWordClick={(w) => void collectWord(w)}
+                  />
+                </div>
                 {bilingual ? <div className="zh">{activeZh}</div> : null}
               </div>
               <label className="muted" style={{ display: "flex", gap: 8, marginTop: 12, alignItems: "center" }}>
                 <input
                   type="checkbox"
                   checked={pauseAtEnd}
+                  disabled={!canTrueSync}
                   onChange={(e) => {
                     setPauseAtEnd(e.target.checked);
                     if (e.target.checked) setLoopSentence(false);
@@ -436,13 +573,18 @@ export default function StudyPage() {
                 />
                 句末暂停（Echo）
               </label>
-              <p className="muted">播完当前句自动暂停，便于跟读。PC 可用系统麦克风录音（完整评测在 App）。</p>
+              <p className="muted">播完当前句自动暂停，便于跟读。完整评测在 App。</p>
             </div>
           ) : null}
 
           {tab === "听写" ? (
             <div>
-              <button type="button" className="chip" onClick={() => seekToCue(activeIndex)}>
+              <button
+                type="button"
+                className="chip"
+                disabled={!canTrueSync}
+                onClick={() => seekToCue(activeIndex)}
+              >
                 重播本句
               </button>
               <textarea
@@ -459,13 +601,23 @@ export default function StudyPage() {
                 <button type="button" className="btn" onClick={checkDictation}>
                   核对
                 </button>
-                <button type="button" className="chip" onClick={() => seekToCue(Math.max(0, activeIndex - 1))}>
+                <button
+                  type="button"
+                  className="chip"
+                  onClick={() => {
+                    setActiveIndex(Math.max(0, activeIndex - 1));
+                    seekToCue(Math.max(0, activeIndex - 1));
+                  }}
+                >
                   上一句
                 </button>
                 <button
                   type="button"
                   className="chip"
-                  onClick={() => seekToCue(Math.min(enCues.length - 1, activeIndex + 1))}
+                  onClick={() => {
+                    const next = Math.min(enCues.length - 1, activeIndex + 1);
+                    seekToCue(next);
+                  }}
                 >
                   下一句
                 </button>
@@ -517,16 +669,24 @@ export default function StudyPage() {
             <button
               type="button"
               className="chip"
+              disabled={!canTrueSync}
               onClick={() => setRate((r) => (r >= 1.5 ? 0.75 : Number((r + 0.25).toFixed(2))))}
             >
               {rate}x
             </button>
-            <button type="button" className="play" onClick={togglePlay}>
-              {playing ? "暂停" : "播放"}
+            <button
+              type="button"
+              className={`play ${playing ? "on" : ""}`}
+              disabled={!canTrueSync}
+              onClick={togglePlay}
+              title={canTrueSync ? undefined : "内嵌页无法真正跟播，请用 App 或准备音轨"}
+            >
+              {canTrueSync ? (playing ? "暂停" : "播放") : "跟播请用 App"}
             </button>
             <button
               type="button"
               className={`chip ${loopSentence ? "on" : ""}`}
+              disabled={!canTrueSync}
               onClick={() => {
                 setLoopSentence((v) => !v);
                 setPauseAtEnd(false);
@@ -543,7 +703,7 @@ export default function StudyPage() {
         <aside className="card">
           <h3 style={{ marginTop: 0, fontFamily: "var(--font-display)" }}>课段列表</h3>
           <div className="muted" style={{ marginBottom: 12 }}>
-            与 App 共用 course-schema · 进度自动同步
+            真正精听/跟读优先使用 App · 网页仅在真实媒体可用时同步
           </div>
           {(course?.lessons ?? []).map((item) => (
             <button

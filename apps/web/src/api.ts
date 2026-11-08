@@ -106,6 +106,18 @@ export const api = {
       },
       token,
     ),
+  getPlayback: (token: string, importId: number, prepare = false) =>
+    request<{
+      ready: boolean;
+      kind: string;
+      mime: string;
+      media_path: string | null;
+      detail?: string | null;
+      app_recommended?: boolean;
+    }>(`/api/imports/${importId}/playback${prepare ? "?prepare=1" : ""}`, {}, token),
+  /** Absolute URL for <audio>/<video src> (token query; media elements cannot set Authorization). */
+  studyMediaSrc: (importId: number, token: string) =>
+    `${API_BASE}/api/imports/${importId}/media?token=${encodeURIComponent(token)}`,
   fetchText: async (path: string, token?: string | null) => {
     const headers = new Headers();
     if (token) headers.set("Authorization", `Bearer ${token}`);

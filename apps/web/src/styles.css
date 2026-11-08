@@ -201,6 +201,59 @@ input {
   color: var(--muted);
 }
 
+.word-focus {
+  color: #e8eef8;
+  text-decoration: underline;
+  text-decoration-color: #58cc02;
+  text-decoration-thickness: 2px;
+  text-underline-offset: 3px;
+  font-weight: 650;
+}
+
+.word-known {
+  color: #93c5fd;
+  text-decoration: underline;
+  text-decoration-color: rgba(96, 165, 250, 0.7);
+  text-decoration-thickness: 1.5px;
+  text-underline-offset: 3px;
+}
+
+.word-btn {
+  display: inline;
+  padding: 0;
+  margin: 0;
+  border: 0;
+  background: transparent;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+  text-decoration: inherit;
+  text-decoration-color: inherit;
+  text-decoration-thickness: inherit;
+  text-underline-offset: inherit;
+  font-weight: inherit;
+}
+
+.word-btn:hover {
+  filter: brightness(1.12);
+}
+
+.embed-sync {
+  margin-top: 10px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  background: rgba(15, 23, 42, 0.45);
+}
+
+.embed-sync input[type="range"] {
+  accent-color: #58cc02;
+}
+
+.play.on {
+  box-shadow: 0 0 0 2px rgba(88, 204, 2, 0.35);
+}
+
 .auth-wrap {
   min-height: 100vh;
   display: grid;

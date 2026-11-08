@@ -14,11 +14,13 @@ Future<void> waitForVideoInitialization(
 Future<void> waitForPlayerReady(
   Player player, {
   Duration timeout = const Duration(seconds: 8),
+  /// Remote audio-only streams never report video size; duration is enough.
+  bool requireVideoSize = true,
 }) async {
   bool hasDuration = player.state.duration > Duration.zero;
   bool hasVideoSize =
       (player.state.width ?? 0) > 0 && (player.state.height ?? 0) > 0;
-  if (hasDuration && hasVideoSize) {
+  if (hasDuration && (!requireVideoSize || hasVideoSize)) {
     return;
   }
 
@@ -28,7 +30,9 @@ Future<void> waitForPlayerReady(
   StreamSubscription<int?>? heightSubscription;
 
   void completeIfReady() {
-    if (!completer.isCompleted && hasDuration && hasVideoSize) {
+    if (!completer.isCompleted &&
+        hasDuration &&
+        (!requireVideoSize || hasVideoSize)) {
       completer.complete();
     }
   }

@@ -31,12 +31,12 @@ import 'learning_resume_provider.dart';
 import 'player_course_lookup.dart';
 import 'player_fullscreen_video_screen.dart';
 import 'player_graphics_cache.dart';
-import 'player_media_source.dart';
 import 'player_mock_state.dart';
 import 'player_native_subtitles.dart';
 import 'player_subtitle_loader.dart';
 import 'player_system_media_controls.dart';
 import 'player_video_init.dart';
+import 'remote_playback_resolver.dart';
 import 'pronunciation_target_selection.dart';
 import 'subtitle_reference_review.dart';
 import 'transcript_reader_session.dart';
@@ -269,11 +269,25 @@ class _PadPortraitPlayerScreenState
         ),
       );
       _videoController = controller;
-      await waitForVideoInitialization(() async {
-        await player.open(Media(createPlayerMediaUri(_videoAsset!)));
-      });
+      final bool remoteWatch = isRemoteWatchPage(_videoAsset!);
+      await waitForVideoInitialization(
+        () async {
+          final Media media = await resolvePlayerMedia(_videoAsset!);
+          if (!mounted || !identical(_videoPlayer, player)) return;
+          await player.open(media);
+        },
+        timeout: remoteWatch
+            ? const Duration(seconds: 45)
+            : const Duration(seconds: 8),
+      );
       if (!mounted || !identical(_videoPlayer, player)) return;
-      await waitForPlayerReady(player);
+      await waitForPlayerReady(
+        player,
+        timeout: remoteWatch
+            ? const Duration(seconds: 30)
+            : const Duration(seconds: 8),
+        requireVideoSize: !remoteWatch,
+      );
       if (!mounted || !identical(_videoPlayer, player)) return;
       await player.setSubtitleTrack(SubtitleTrack.no());
       await player.setRate(state.playbackRate);

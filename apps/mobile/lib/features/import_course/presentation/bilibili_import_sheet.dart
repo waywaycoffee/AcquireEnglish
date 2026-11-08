@@ -121,7 +121,7 @@ class _BilibiliImportFormState extends ConsumerState<_BilibiliImportForm> {
         SnackBar(
           content: Text(
             ok
-                ? '已加入书库。$subtitleHint播放页链接可能需本地下载视频后精听。'
+                ? '已加入书库。$subtitleHint打开播放页将尝试直链精听/跟读。'
                 : '该书库中已有此 Bilibili 课程',
           ),
         ),
@@ -153,7 +153,7 @@ class _BilibiliImportFormState extends ConsumerState<_BilibiliImportForm> {
         ),
         const SizedBox(height: 8),
         const Text(
-          '支持 BV / av 链接。有字幕则写入学习轴；无字幕可 ASR。直链播放大多需另存本地视频。',
+          '支持 BV / av 链接。有字幕则写入学习轴；无字幕可 ASR。打开后会解析 B 站直链，用真实进度驱动精听/跟读。',
           style: TextStyle(color: StudyShellTokens.textSecondary),
         ),
         const SizedBox(height: 12),

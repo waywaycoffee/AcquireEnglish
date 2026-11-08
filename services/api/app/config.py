@@ -16,6 +16,8 @@ class Settings(BaseSettings):
     # Optional global DashScope / 百炼 API key for web AI subtitles.
     dashscope_api_key: str = ""
     asr_model: str = "qwen3-asr-flash-filetrans"
+    # Cached seekable study audio/video for imported links (Web real <audio>/<video>).
+    media_cache_dir: str = "./media"
 
     @property
     def cors_origin_list(self) -> list[str]:
