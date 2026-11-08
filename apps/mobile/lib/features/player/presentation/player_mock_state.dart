@@ -549,6 +549,9 @@ class PlayerMockState {
     return (900 + words * 360).clamp(1400, 5200);
   }
 
+  static int? parseTimestampToMsPublic(String? value) =>
+      _parseTimestampToMs(value);
+
   static int? _parseTimestampToMs(String? value) {
     if (value == null) {
       return null;

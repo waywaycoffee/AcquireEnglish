@@ -20,6 +20,7 @@ class User(Base):
     preference: Mapped["UserPreference | None"] = relationship(
         back_populates="user", uselist=False
     )
+    link_courses: Mapped[list["UserLinkCourse"]] = relationship(back_populates="user")
 
 
 class LessonProgress(Base):
@@ -78,3 +79,26 @@ class UserPreference(Base):
     )
 
     user: Mapped[User] = relationship(back_populates="preference")
+
+
+class UserLinkCourse(Base):
+    """YouTube / Bilibili paste-link imports owned by a user."""
+
+    __tablename__ = "user_link_courses"
+    __table_args__ = (
+        UniqueConstraint("user_id", "source", "external_id", name="uq_user_link_source_ext"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    source: Mapped[str] = mapped_column(String(32), index=True)  # youtube | bilibili
+    external_id: Mapped[str] = mapped_column(String(64), index=True)
+    title: Mapped[str] = mapped_column(String(512))
+    author: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    watch_url: Mapped[str] = mapped_column(String(1024))
+    duration_sec: Mapped[int] = mapped_column(Integer, default=60)
+    subtitle_en_srt: Mapped[str | None] = mapped_column(Text, nullable=True)
+    subtitle_zh_srt: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+    user: Mapped[User] = relationship(back_populates="link_courses")

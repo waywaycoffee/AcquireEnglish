@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../library/presentation/library_catalog_provider.dart';
 import '../../library/presentation/library_mock_data.dart';
 import '../../player/presentation/widgets/study_shell_tokens.dart';
+import '../data/youtube_import_service.dart';
 import '../domain/youtube_import.dart';
 
 Future<void> showYoutubeImportSheet(BuildContext context, WidgetRef ref) {
@@ -34,6 +35,7 @@ class _YoutubeImportForm extends ConsumerStatefulWidget {
 
 class _YoutubeImportFormState extends ConsumerState<_YoutubeImportForm> {
   final TextEditingController _controller = TextEditingController();
+  final YoutubeImportService _service = const YoutubeImportService();
   String? _error;
   bool _busy = false;
 
@@ -53,54 +55,83 @@ class _YoutubeImportFormState extends ConsumerState<_YoutubeImportForm> {
       _busy = true;
       _error = null;
     });
-    final String courseId = 'youtube-$id';
-    final LibraryCourseData course = LibraryCourseData(
-      id: courseId,
-      title: 'YouTube $id',
-      description: YoutubeImport.watchUrl(id),
-      sourceLabel: 'YouTube',
-      coverImage: 'assets/img/app_icon.png',
-      level: 'A2',
-      category: 'youtube',
-      progressPercent: 0,
-      totalWords: 0,
-      completedEpisodes: 0,
-      totalEpisodes: 1,
-      lastStudiedStr: '未学习',
-      rating: 0,
-      episodes: <LibraryEpisodeItem>[
-        LibraryEpisodeItem(
-          id: '$courseId-01',
-          numberStr: '01',
-          title: 'YouTube 课段',
-          durationMinutes: 1,
-          hasChineseSubtitles: false,
-          hasEnglishSubtitles: false,
-          completed: false,
-          progressPercent: 0,
-          coverImage: 'assets/img/app_icon.png',
-          videoAsset: YoutubeImport.watchUrl(id),
-          videoMissing: false,
+    try {
+      final YoutubeImportResult meta = await _service.fetch(id);
+      final String courseId = 'youtube-${meta.videoId}';
+      final bool hasEn = meta.enSubtitlePath != null;
+      final bool hasZh = meta.cnSubtitlePath != null;
+      final LibraryCourseData course = LibraryCourseData(
+        id: courseId,
+        title: meta.title,
+        description: meta.author == null
+            ? meta.watchUrl
+            : '${meta.author} · ${meta.watchUrl}',
+        sourceLabel: 'YouTube',
+        coverImage: 'assets/img/app_icon.png',
+        level: 'A2',
+        category: 'youtube',
+        progressPercent: 0,
+        totalWords: 0,
+        completedEpisodes: 0,
+        totalEpisodes: 1,
+        lastStudiedStr: '未学习',
+        rating: 0,
+        episodes: <LibraryEpisodeItem>[
+          LibraryEpisodeItem(
+            id: '$courseId-01',
+            numberStr: '01',
+            title: meta.title,
+            durationMinutes: meta.durationMinutes,
+            hasChineseSubtitles: hasZh,
+            hasEnglishSubtitles: hasEn,
+            completed: false,
+            progressPercent: 0,
+            coverImage: 'assets/img/app_icon.png',
+            videoAsset: meta.watchUrl,
+            enSubtitleAsset: meta.enSubtitlePath,
+            cnSubtitleAsset: meta.cnSubtitlePath,
+            subtitleTracks: <LibrarySubtitleTrackItem>[
+              if (hasEn)
+                LibrarySubtitleTrackItem(
+                  languageCode: 'en',
+                  languageLabel: 'English',
+                  path: meta.enSubtitlePath!,
+                ),
+              if (hasZh)
+                LibrarySubtitleTrackItem(
+                  languageCode: 'zh',
+                  languageLabel: '中文',
+                  path: meta.cnSubtitlePath!,
+                ),
+            ],
+          ),
+        ],
+      );
+      final bool ok = await ref
+          .read(libraryCatalogProvider.notifier)
+          .importCourse(course);
+      if (!mounted) {
+        return;
+      }
+      setState(() => _busy = false);
+      Navigator.of(context).pop();
+      final String subtitleHint = hasEn
+          ? '已拉取英文字幕，可直接跟播。'
+          : '未找到字幕，打开后可用语音识别生成。';
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(ok ? '已加入书库。$subtitleHint' : '该书库中已有此 YouTube 课程'),
         ),
-      ],
-    );
-    final bool ok = await ref
-        .read(libraryCatalogProvider.notifier)
-        .importCourse(course);
-    if (!mounted) {
-      return;
+      );
+    } catch (e) {
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _busy = false;
+        _error = '导入失败：$e';
+      });
     }
-    setState(() => _busy = false);
-    Navigator.of(context).pop();
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          ok
-              ? '已加入书库。打开后可语音识别生成字幕（需可播流/ASR）。'
-              : '该书库中已有此 YouTube 课程',
-        ),
-      ),
-    );
   }
 
   @override
@@ -119,7 +150,7 @@ class _YoutubeImportFormState extends ConsumerState<_YoutubeImportForm> {
         ),
         const SizedBox(height: 8),
         const Text(
-          '粘贴链接后进入学习页。有自动字幕时可跟播；否则用语音识别生成字幕。',
+          '粘贴链接后自动拉取标题与字幕轴；无字幕则进入学习页用 ASR。',
           style: TextStyle(color: StudyShellTokens.textSecondary),
         ),
         const SizedBox(height: 12),
@@ -141,7 +172,7 @@ class _YoutubeImportFormState extends ConsumerState<_YoutubeImportForm> {
           style: FilledButton.styleFrom(
             backgroundColor: StudyShellTokens.accent,
           ),
-          child: Text(_busy ? '导入中…' : '加入书库'),
+          child: Text(_busy ? '拉取中…' : '加入书库'),
         ),
       ],
     );

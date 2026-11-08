@@ -85,6 +85,30 @@ def _synthetic_pool() -> list[CourseOut]:
                 _lesson("business-b2", 2, "Client Call"),
             ],
         ),
+        CourseOut(
+            id="slow-stories-a1",
+            title="Slow Stories A1",
+            titleZh="慢速故事 A1",
+            description="超慢讲述短故事，适合入门精听。",
+            level="A1",
+            tags=["slow", "daily"],
+            lessons=[
+                _lesson("slow-stories-a1", 1, "The Red Balloon", duration=80),
+                _lesson("slow-stories-a1", 2, "A Rainy Day", duration=85),
+            ],
+        ),
+        CourseOut(
+            id="science-c1",
+            title="Science Digest C1",
+            titleZh="科学摘要 C1",
+            description="科普短片，挑战高级词汇。",
+            level="C1",
+            tags=["news", "ted"],
+            lessons=[
+                _lesson("science-c1", 1, "Quantum Basics", duration=130),
+                _lesson("science-c1", 2, "Climate Signals", duration=125),
+            ],
+        ),
     ]
 
 

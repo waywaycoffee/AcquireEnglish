@@ -29,3 +29,5 @@ apps/mobile.zip
 apps/_tmp_mobile/
 
 services/api/body.json
+
+analyze_out.txt

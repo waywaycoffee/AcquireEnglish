@@ -1,4 +1,4 @@
-﻿name: common_learn_english
+name: common_learn_english
 description: AcquireEnglish mobile client — video-based English learning (fork of shadowing-english).
 
 # The following line prevents the package from being accidentally published to
@@ -88,6 +88,9 @@ dependencies:
   share_plus: 11.1.0
   record: ^7.1.2
   flutter_secure_storage: ^10.3.4
+  youtube_explode_dart: ^3.1.0
+  workmanager: ^0.10.10
+  flutter_local_notifications: ^23.0.0
 
 
 dev_dependencies:

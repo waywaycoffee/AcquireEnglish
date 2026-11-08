@@ -7,6 +7,26 @@ import { findActiveCueIndex, formatTime, parseSrt, type Cue } from "../lib/srt";
 
 type TabName = "字幕" | "跟读" | "听写" | "练习";
 
+function normalize(value: string) {
+  return value
+    .toLowerCase()
+    .replace(/[^a-z0-9\s']/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function youtubeIdFromUrl(url: string): string | null {
+  const m = url.match(
+    /(?:youtu\.be\/|youtube\.com\/(?:watch\?v=|embed\/|shorts\/|live\/))([A-Za-z0-9_-]{6,})/i,
+  );
+  return m?.[1] ?? null;
+}
+
+function biliBvidFromUrl(url: string): string | null {
+  const m = url.match(/bilibili\.com\/video\/(BV[0-9A-Za-z]+)/i);
+  return m?.[1] ?? null;
+}
+
 export default function StudyPage() {
   const { courseId = "" } = useParams();
   const { token } = useAuth();
@@ -23,23 +43,71 @@ export default function StudyPage() {
   const [playing, setPlaying] = useState(false);
   const [bilingual, setBilingual] = useState(true);
   const [loopSentence, setLoopSentence] = useState(false);
+  const [pauseAtEnd, setPauseAtEnd] = useState(false);
   const [rate, setRate] = useState(1);
   const [activeIndex, setActiveIndex] = useState(0);
+  const [dictation, setDictation] = useState("");
+  const [dictationResult, setDictationResult] = useState<boolean | null>(null);
+  const [practiceChoice, setPracticeChoice] = useState<string | null>(null);
+  const [practiceAnswered, setPracticeAnswered] = useState(false);
 
   useEffect(() => {
     api
-      .course(courseId)
+      .course(courseId, token)
       .then((c) => {
         setCourse(c);
         setLesson(c.lessons[0] ?? null);
       })
       .catch((err) => setError(err instanceof Error ? err.message : "Failed to load course"));
-  }, [courseId]);
+  }, [courseId, token]);
 
   useEffect(() => {
-    setEnCues(parseSrt(DEMO_EN_SRT));
-    setZhCues(parseSrt(DEMO_ZH_SRT));
-  }, [lesson?.id]);
+    let cancelled = false;
+    async function loadSubs() {
+      setDictation("");
+      setDictationResult(null);
+      setPracticeChoice(null);
+      setPracticeAnswered(false);
+      if (!lesson) return;
+      try {
+        const enPath = lesson.subtitles?.en;
+        const zhPath = lesson.subtitles?.zh;
+        if (enPath?.startsWith("/api/")) {
+          const enText = await api.fetchText(enPath, token);
+          if (!cancelled) setEnCues(parseSrt(enText));
+        } else if (enPath?.startsWith("http") && !enPath.includes("cdn.example.com")) {
+          const res = await fetch(enPath);
+          const enText = await res.text();
+          if (!cancelled) setEnCues(parseSrt(enText));
+        } else if (!enPath) {
+          if (!cancelled) setEnCues([]);
+        } else {
+          if (!cancelled) setEnCues(parseSrt(DEMO_EN_SRT));
+        }
+        if (zhPath?.startsWith("/api/")) {
+          const zhText = await api.fetchText(zhPath, token);
+          if (!cancelled) setZhCues(parseSrt(zhText));
+        } else if (zhPath?.startsWith("http") && !zhPath.includes("cdn.example.com")) {
+          const res = await fetch(zhPath);
+          const zhText = await res.text();
+          if (!cancelled) setZhCues(parseSrt(zhText));
+        } else if (!zhPath) {
+          if (!cancelled) setZhCues([]);
+        } else {
+          if (!cancelled) setZhCues(parseSrt(DEMO_ZH_SRT));
+        }
+      } catch {
+        if (!cancelled) {
+          setEnCues(parseSrt(DEMO_EN_SRT));
+          setZhCues(parseSrt(DEMO_ZH_SRT));
+        }
+      }
+    }
+    void loadSubs();
+    return () => {
+      cancelled = true;
+    };
+  }, [lesson?.id, lesson?.subtitles?.en, lesson?.subtitles?.zh, token]);
 
   useEffect(() => {
     if (videoRef.current) videoRef.current.playbackRate = rate;
@@ -56,17 +124,32 @@ export default function StudyPage() {
   }, [activeIndex]);
 
   useEffect(() => {
-    if (!loopSentence || !playing) return;
+    if (!playing) return;
     const cue = enCues[activeIndex];
-    if (!cue || !videoRef.current) return;
-    if (currentTime >= cue.end - 0.05) {
-      videoRef.current.currentTime = cue.start;
-      void videoRef.current.play();
+    if (!cue) return;
+    if (loopSentence && currentTime >= cue.end - 0.05) {
+      if (videoRef.current) {
+        videoRef.current.currentTime = cue.start;
+        void videoRef.current.play();
+      } else {
+        setCurrentTime(cue.start);
+      }
+      return;
     }
-  }, [currentTime, loopSentence, playing, enCues, activeIndex]);
+    if (pauseAtEnd && !loopSentence && currentTime >= cue.end - 0.05) {
+      if (videoRef.current) videoRef.current.pause();
+      setPlaying(false);
+      setCurrentTime(cue.end);
+    }
+  }, [currentTime, loopSentence, pauseAtEnd, playing, enCues, activeIndex]);
 
+  const ytId = lesson?.videoUrl ? youtubeIdFromUrl(lesson.videoUrl) : null;
+  const biliId = lesson?.videoUrl ? biliBvidFromUrl(lesson.videoUrl) : null;
+  const isEmbed = !!ytId || !!biliId;
   const hasRealVideo =
-    !!lesson?.videoUrl?.startsWith("http") && !lesson.videoUrl.includes("cdn.example.com");
+    !!lesson?.videoUrl?.startsWith("http") &&
+    !lesson.videoUrl.includes("cdn.example.com") &&
+    !isEmbed;
 
   useEffect(() => {
     if (!token || !course || !lesson) return;
@@ -84,9 +167,19 @@ export default function StudyPage() {
     return () => window.clearTimeout(timer);
   }, [token, course, lesson, currentTime]);
 
-  // Demo clock when CDN video is not available yet.
   useEffect(() => {
-    if (hasRealVideo || !playing) return;
+    if (!token || !lesson) return;
+    void api.listProgress(token).then((rows) => {
+      const row = rows.find((r) => r.lesson_id === lesson.id);
+      if (row && row.position_sec > 1) {
+        setCurrentTime(row.position_sec);
+        if (videoRef.current) videoRef.current.currentTime = row.position_sec;
+      }
+    });
+  }, [token, lesson?.id]);
+
+  useEffect(() => {
+    if ((hasRealVideo && !isEmbed) || !playing) return;
     const id = window.setInterval(() => {
       setCurrentTime((t) => {
         const next = t + 0.25 * rate;
@@ -99,17 +192,37 @@ export default function StudyPage() {
       });
     }, 250);
     return () => window.clearInterval(id);
-  }, [hasRealVideo, playing, rate, enCues]);
+  }, [hasRealVideo, isEmbed, playing, rate, enCues]);
 
   const lessonLabel = useMemo(() => {
     if (!course || !lesson) return "";
     return `${lesson.index}/${course.lessons.length}`;
   }, [course, lesson]);
 
+  const practice = useMemo(() => {
+    const line = enCues[activeIndex]?.text ?? "";
+    const words = line
+      .split(/\s+/)
+      .map((w) => w.replace(/[^A-Za-z']/g, ""))
+      .filter((w) => w.length > 3);
+    if (!words.length) {
+      return { masked: line, answer: "", options: [] as string[] };
+    }
+    const answer = words[activeIndex % words.length];
+    const masked = line.replace(new RegExp(`\\b${answer}\\b`, "i"), "______");
+    const distractors = words.filter((w) => w.toLowerCase() !== answer.toLowerCase()).slice(0, 2);
+    const options = [answer, ...distractors].sort();
+    return { masked, answer, options };
+  }, [enCues, activeIndex]);
+
   function seekToCue(index: number) {
     const cue = enCues[index];
     if (!cue) return;
     setActiveIndex(index);
+    setDictation("");
+    setDictationResult(null);
+    setPracticeChoice(null);
+    setPracticeAnswered(false);
     if (videoRef.current) {
       videoRef.current.currentTime = cue.start;
       void videoRef.current.play();
@@ -134,6 +247,23 @@ export default function StudyPage() {
     }
   }
 
+  function checkDictation() {
+    const expected = normalize(enCues[activeIndex]?.text ?? "");
+    setDictationResult(normalize(dictation) === expected);
+  }
+
+  async function collectWord(word: string) {
+    if (!token || !word) return;
+    await api.upsertVocab(token, {
+      word: word.toLowerCase(),
+      context: enCues[activeIndex]?.text,
+      mastery: "new",
+    });
+  }
+
+  const activeEn = enCues[activeIndex]?.text ?? "";
+  const activeZh = zhCues[activeIndex]?.text ?? "";
+
   return (
     <div className="shell">
       <header className="topbar">
@@ -153,7 +283,22 @@ export default function StudyPage() {
       <div className="study-layout">
         <section className="card">
           <div className="video-frame">
-            {hasRealVideo ? (
+            {ytId ? (
+              <iframe
+                title={lesson?.title ?? "YouTube"}
+                src={`https://www.youtube.com/embed/${ytId}?rel=0`}
+                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                allowFullScreen
+                style={{ width: "100%", aspectRatio: "16 / 9", border: 0, borderRadius: 12 }}
+              />
+            ) : biliId ? (
+              <iframe
+                title={lesson?.title ?? "Bilibili"}
+                src={`https://player.bilibili.com/player.html?bvid=${biliId}&high_quality=1&danmaku=0`}
+                allowFullScreen
+                style={{ width: "100%", aspectRatio: "16 / 9", border: 0, borderRadius: 12 }}
+              />
+            ) : hasRealVideo ? (
               <video
                 ref={videoRef}
                 src={lesson!.videoUrl}
@@ -172,6 +317,11 @@ export default function StudyPage() {
                 </div>
               </div>
             )}
+            {isEmbed ? (
+              <div className="muted" style={{ marginTop: 8, fontSize: 12 }}>
+                外链嵌入播放 · 字幕轴用下方控制同步精听（循环/听写/练习）
+              </div>
+            ) : null}
           </div>
 
           <div className="tabs">
@@ -202,15 +352,102 @@ export default function StudyPage() {
                     {formatTime(cue.start)}
                   </div>
                   <div className="en">{cue.text}</div>
-                  {bilingual ? (
-                    <div className="zh">{zhCues[index]?.text ?? ""}</div>
-                  ) : null}
+                  {bilingual ? <div className="zh">{zhCues[index]?.text ?? ""}</div> : null}
                 </button>
               ))}
             </div>
-          ) : (
-            <div className="muted">{tab} 模式将在 P2 接入完整能力；当前为占位。</div>
-          )}
+          ) : null}
+
+          {tab === "跟读" ? (
+            <div>
+              <div className="cue active">
+                <div className="en">{activeEn}</div>
+                {bilingual ? <div className="zh">{activeZh}</div> : null}
+              </div>
+              <label className="muted" style={{ display: "flex", gap: 8, marginTop: 12, alignItems: "center" }}>
+                <input
+                  type="checkbox"
+                  checked={pauseAtEnd}
+                  onChange={(e) => {
+                    setPauseAtEnd(e.target.checked);
+                    if (e.target.checked) setLoopSentence(false);
+                  }}
+                />
+                句末暂停（Echo）
+              </label>
+              <p className="muted">播完当前句自动暂停，便于跟读。PC 可用系统麦克风录音（完整评测在 App）。</p>
+            </div>
+          ) : null}
+
+          {tab === "听写" ? (
+            <div>
+              <button type="button" className="chip" onClick={() => seekToCue(activeIndex)}>
+                重播本句
+              </button>
+              <textarea
+                value={dictation}
+                onChange={(e) => {
+                  setDictation(e.target.value);
+                  setDictationResult(null);
+                }}
+                placeholder="听写英文句子…"
+                rows={3}
+                style={{ width: "100%", marginTop: 12, borderRadius: 12, padding: 12 }}
+              />
+              <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
+                <button type="button" className="btn" onClick={checkDictation}>
+                  核对
+                </button>
+                <button type="button" className="chip" onClick={() => seekToCue(Math.max(0, activeIndex - 1))}>
+                  上一句
+                </button>
+                <button
+                  type="button"
+                  className="chip"
+                  onClick={() => seekToCue(Math.min(enCues.length - 1, activeIndex + 1))}
+                >
+                  下一句
+                </button>
+              </div>
+              {dictationResult !== null ? (
+                <div style={{ marginTop: 10 }}>
+                  <div className={dictationResult ? "muted" : "error"}>
+                    {dictationResult ? "正确" : "再听一遍"}
+                  </div>
+                  <div className="en" style={{ marginTop: 6 }}>
+                    {activeEn}
+                  </div>
+                </div>
+              ) : null}
+            </div>
+          ) : null}
+
+          {tab === "练习" ? (
+            <div>
+              <div className="en">{practice.masked || "本句暂无可挖空词"}</div>
+              <div style={{ display: "grid", gap: 8, marginTop: 12 }}>
+                {practice.options.map((option) => (
+                  <button
+                    key={option}
+                    type="button"
+                    className={`chip ${practiceAnswered && option === practice.answer ? "on" : ""}`}
+                    onClick={() => {
+                      setPracticeChoice(option);
+                      setPracticeAnswered(true);
+                      void collectWord(option === practice.answer ? option : practice.answer);
+                    }}
+                  >
+                    {option}
+                  </button>
+                ))}
+              </div>
+              {practiceAnswered ? (
+                <p className="muted" style={{ marginTop: 10 }}>
+                  {practiceChoice === practice.answer ? "答对了" : `答案：${practice.answer}`}
+                </p>
+              ) : null}
+            </div>
+          ) : null}
 
           <div className="controls">
             <button type="button" className={`chip ${bilingual ? "on" : ""}`} onClick={() => setBilingual((v) => !v)}>
@@ -229,7 +466,10 @@ export default function StudyPage() {
             <button
               type="button"
               className={`chip ${loopSentence ? "on" : ""}`}
-              onClick={() => setLoopSentence((v) => !v)}
+              onClick={() => {
+                setLoopSentence((v) => !v);
+                setPauseAtEnd(false);
+              }}
             >
               循环
             </button>

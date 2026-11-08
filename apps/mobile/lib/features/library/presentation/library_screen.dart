@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../router/app_router.dart';
+import '../../import_course/presentation/bilibili_import_sheet.dart';
 import '../../import_course/presentation/import_course_screen.dart';
 import '../../import_course/presentation/widgets/import_course_flow.dart';
 import '../../import_course/presentation/youtube_import_sheet.dart';
@@ -23,6 +24,7 @@ import '../../shared/presentation/pad/app_design_tokens.dart';
 import '../../shared/presentation/pad/pad_compact.dart';
 import '../../shared/presentation/pad/pad_scaffold.dart';
 import '../../shared/presentation/pad/pad_top_bar.dart';
+import '../../sync/presentation/daily_feed_provider.dart';
 import '../../words/data/offline_word_dictionary.dart';
 import 'library_catalog_provider.dart';
 import 'library_mock_data.dart';
@@ -779,6 +781,30 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
                       onPressed: editMode
                           ? null
                           : () {
+                              unawaited(showBilibiliImportSheet(context, ref));
+                            },
+                      style: FilledButton.styleFrom(
+                        backgroundColor: const Color(0xFFFB7299),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(999),
+                        ),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 18,
+                        ),
+                        elevation: 0,
+                      ),
+                      icon: const Icon(Icons.smart_display_rounded, size: 18),
+                      label: const Text(
+                        'B站',
+                        style: TextStyle(fontWeight: FontWeight.w900),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    FilledButton.icon(
+                      onPressed: editMode
+                          ? null
+                          : () {
                         openImportCourseExperience(context);
                       },
                       style: FilledButton.styleFrom(
@@ -806,6 +832,8 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
                   ],
                 ),
                 const SizedBox(height: 24),
+                const _LibraryTodayFeed(),
+                const SizedBox(height: 16),
                 if (filteredCourses.isEmpty)
                   _EmptyLibraryState(query: query)
                 else if (viewMode == LibraryCourseViewMode.grid)
@@ -1474,6 +1502,59 @@ class _LibraryDetailTopStatus extends StatelessWidget {
           ],
         ],
       ),
+    );
+  }
+}
+
+class _LibraryTodayFeed extends ConsumerWidget {
+  const _LibraryTodayFeed();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final List<LibraryCourseData> feed = ref.watch(dailyFeedProvider);
+    if (feed.isEmpty) {
+      return const SizedBox.shrink();
+    }
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: <Widget>[
+        const Text(
+          '今日更新',
+          style: TextStyle(
+            fontSize: 18,
+            fontWeight: FontWeight.w900,
+            color: AppDesignTokens.textPrimary,
+          ),
+        ),
+        const SizedBox(height: 10),
+        ...feed.map(
+          (LibraryCourseData course) => Padding(
+            padding: const EdgeInsets.only(bottom: 8),
+            child: ListTile(
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+                side: const BorderSide(color: AppDesignTokens.borderGray),
+              ),
+              tileColor: Colors.white,
+              title: Text(
+                course.title,
+                style: const TextStyle(fontWeight: FontWeight.w800),
+              ),
+              subtitle: Text(
+                '${course.level} · ${course.totalEpisodes} 课段',
+              ),
+              trailing: const Icon(Icons.chevron_right_rounded),
+              onTap: () => context.goNamed(
+                SGRoute.library.name,
+                queryParameters: <String, String>{
+                  'view': 'detail',
+                  'courseId': course.id,
+                },
+              ),
+            ),
+          ),
+        ),
+      ],
     );
   }
 }

@@ -16,6 +16,7 @@ import '../../settings/presentation/settings_provider.dart';
 import '../../shared/data/word_lookup_service.dart';
 import '../../shared/data/word_pronunciation_service.dart';
 import '../../shared/presentation/app_loading_overlay.dart';
+import '../../sync/data/acquire_api_client.dart';
 import '../../sync/data/progress_sync_service.dart';
 import '../../words/data/offline_word_dictionary.dart';
 import '../../words/presentation/word_book_provider.dart';
@@ -158,12 +159,31 @@ class _PadPortraitPlayerScreenState
       courses: courses,
       episodeId: widget.episodeId,
     );
-    final String? initialStartTime =
+    String? initialStartTime =
         widget.initialStartTime ??
         ((resource.episode?.completed ?? false)
             ? null
             : resource.episode?.progressTimeStr);
     _videoAsset = resource.videoAsset;
+
+    // Cloud progress last-write-wins: prefer remote position when newer/farther.
+    try {
+      final Map<String, AcquireProgressDto> remote = await ref
+          .read(progressSyncServiceProvider)
+          .pullIndexed();
+      final AcquireProgressDto? row = remote[widget.episodeId];
+      if (row != null && row.positionSec > 1) {
+        final String cloudTime = StudyBottomControls.formatClock(
+          Duration(milliseconds: (row.positionSec * 1000).round()),
+        );
+        final int localMs =
+            PlayerMockState.parseTimestampToMsPublic(initialStartTime) ?? 0;
+        final int cloudMs = (row.positionSec * 1000).round();
+        if (cloudMs > localMs + 1500) {
+          initialStartTime = cloudTime;
+        }
+      }
+    } catch (_) {}
 
     List<PlayerSubtitleLine> resolvedLines = const <PlayerSubtitleLine>[];
     if ((resource.englishSubtitleAsset ?? '').isNotEmpty) {

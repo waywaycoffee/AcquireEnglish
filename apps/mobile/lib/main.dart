@@ -13,6 +13,7 @@ import 'constants/strings.dart';
 import 'features/import_course/domain/video_cover_extractor.dart';
 import 'features/player/presentation/player_backend.dart';
 import 'features/player/presentation/transcript_reader_window.dart';
+import 'features/sync/presentation/daily_feed_background.dart';
 import 'flavors/app_flavor.dart';
 import 'hive/hive.dart';
 import 'my_app.dart';
@@ -34,6 +35,7 @@ Future<void> bootstrap({List<String> args = const <String>[]}) async {
   await EasyLocalization.ensureInitialized();
   initializeVideoPlayerBackend();
   await initHive();
+  await registerDailyFeedBackground();
   await initializeVideoCoverExtractor();
   await setPreferredOrientations();
   await SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
