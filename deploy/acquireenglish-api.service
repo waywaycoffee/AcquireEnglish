@@ -1,0 +1,15 @@
+[Unit]
+Description=AcquireEnglish FastAPI
+After=network.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/opt/acquireenglish/services/api
+Environment=PATH=/opt/acquireenglish/services/api/.venv/bin:/usr/local/bin:/usr/bin:/bin
+ExecStart=/opt/acquireenglish/services/api/.venv/bin/uvicorn app.main:app --host 127.0.0.1 --port 5200
+Restart=always
+RestartSec=3
+
+[Install]
+WantedBy=multi-user.target

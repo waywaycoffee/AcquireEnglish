@@ -74,6 +74,10 @@ class UserPreference(Base):
     tags_json: Mapped[str] = mapped_column(Text, default='["slow","daily"]')
     daily_quota: Mapped[int] = mapped_column(Integer, default=2)
     notify_daily_feed: Mapped[int] = mapped_column(Integer, default=1)
+    # Optional user-provided Bilibili cookie for login-gated CC/AI subtitles.
+    bilibili_cookie: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # Optional per-user DashScope / 百炼 API key for web AI subtitles.
+    asr_api_key: Mapped[str | None] = mapped_column(Text, nullable=True)
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
     )

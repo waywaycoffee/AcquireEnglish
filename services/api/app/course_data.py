@@ -3,15 +3,53 @@
 from pathlib import Path
 import json
 
+from app.config import settings
 from app.schemas import CourseOut, LessonOut, SubtitlesOut
 
-_SCHEMA_EXAMPLE = (
-    Path(__file__).resolve().parents[3]
-    / "packages"
-    / "course-schema"
-    / "examples"
-    / "slow-english-demo.json"
-)
+def _schema_example_path() -> Path:
+    env = Path(__file__).resolve()
+    candidates = [
+        env.parents[3] / "packages" / "course-schema" / "examples" / "slow-english-demo.json",
+        Path("/opt/acquireenglish/packages/course-schema/examples/slow-english-demo.json"),
+        Path("/packages/course-schema/examples/slow-english-demo.json"),
+    ]
+    for path in candidates:
+        if path.exists():
+            return path
+    return candidates[0]
+
+
+_SCHEMA_EXAMPLE = _schema_example_path()
+
+
+def _media_base() -> str:
+    return settings.media_public_base.rstrip("/")
+
+
+def _rewrite_media_urls(course: CourseOut) -> CourseOut:
+    """Swap placeholder cdn.example.com hosts for the configured public base."""
+    data = course.model_dump()
+    base = _media_base()
+    old = "https://cdn.example.com"
+
+    def fix(url: str | None) -> str | None:
+        if not url:
+            return url
+        if url.startswith(old):
+            return base + url[len(old) :]
+        return url
+
+    if data.get("coverUrl"):
+        data["coverUrl"] = fix(data["coverUrl"])
+    for lesson in data.get("lessons") or []:
+        lesson["videoUrl"] = fix(lesson.get("videoUrl")) or lesson.get("videoUrl")
+        subs = lesson.get("subtitles") or {}
+        if subs.get("en"):
+            subs["en"] = fix(subs["en"])
+        if subs.get("zh"):
+            subs["zh"] = fix(subs["zh"])
+        lesson["subtitles"] = subs
+    return CourseOut.model_validate(data)
 
 
 def _lesson(
@@ -22,15 +60,16 @@ def _lesson(
     duration: float = 96,
 ) -> LessonOut:
     lid = f"{course_id}-{index:02d}"
+    base = _media_base()
     return LessonOut(
         id=lid,
         title=title,
         index=index,
         durationSec=duration,
-        videoUrl=f"https://cdn.example.com/courses/{course_id}/{index:02d}.mp4",
+        videoUrl=f"{base}/media/courses/{course_id}/{index:02d}.mp4",
         subtitles=SubtitlesOut(
-            en=f"https://cdn.example.com/courses/{course_id}/{index:02d}.en.srt",
-            zh=f"https://cdn.example.com/courses/{course_id}/{index:02d}.zh.srt",
+            en=f"{base}/media/courses/{course_id}/{index:02d}.en.srt",
+            zh=f"{base}/media/courses/{course_id}/{index:02d}.zh.srt",
         ),
     )
 
@@ -114,9 +153,10 @@ def _synthetic_pool() -> list[CourseOut]:
 
 def load_courses() -> list[CourseOut]:
     courses: list[CourseOut] = []
-    if _SCHEMA_EXAMPLE.exists():
-        raw = json.loads(_SCHEMA_EXAMPLE.read_text(encoding="utf-8"))
-        courses.append(CourseOut.model_validate(raw))
+    schema_path = _schema_example_path()
+    if schema_path.exists():
+        raw = json.loads(schema_path.read_text(encoding="utf-8"))
+        courses.append(_rewrite_media_urls(CourseOut.model_validate(raw)))
     else:
         courses.append(
             CourseOut(

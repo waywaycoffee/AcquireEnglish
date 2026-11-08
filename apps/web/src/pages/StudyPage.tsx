@@ -50,6 +50,8 @@ export default function StudyPage() {
   const [dictationResult, setDictationResult] = useState<boolean | null>(null);
   const [practiceChoice, setPracticeChoice] = useState<string | null>(null);
   const [practiceAnswered, setPracticeAnswered] = useState(false);
+  const [generatingSubs, setGeneratingSubs] = useState(false);
+  const [generateMsg, setGenerateMsg] = useState<string | null>(null);
 
   useEffect(() => {
     api
@@ -261,6 +263,38 @@ export default function StudyPage() {
     });
   }
 
+  const importId = useMemo(() => {
+    const m = courseId.match(/^link-(\d+)$/);
+    return m ? Number(m[1]) : null;
+  }, [courseId]);
+
+  async function generateAiSubtitles() {
+    if (!token || importId == null) return;
+    setGeneratingSubs(true);
+    const durationSec = Math.ceil(lesson?.durationSec ?? 0);
+    const maxSeconds =
+      durationSec > 0
+        ? Math.min(durationSec + 90, 3 * 60 * 60)
+        : 60 * 60;
+    const minutes = Math.ceil(maxSeconds / 60);
+    setGenerateMsg(`正在提取音频并调用阿里云百炼识别（约前 ${minutes} 分钟，可能较久）…`);
+    setError(null);
+    try {
+      const updated = await api.generateSubtitles(token, importId, {
+        language: "en",
+        max_seconds: maxSeconds,
+      });
+      setCourse(updated);
+      setLesson(updated.lessons[0] ?? null);
+      setGenerateMsg("字幕已生成");
+    } catch (err) {
+      setGenerateMsg(null);
+      setError(err instanceof Error ? err.message : "AI 字幕生成失败");
+    } finally {
+      setGeneratingSubs(false);
+    }
+  }
+
   const activeEn = enCues[activeIndex]?.text ?? "";
   const activeZh = zhCues[activeIndex]?.text ?? "";
 
@@ -339,22 +373,49 @@ export default function StudyPage() {
 
           {tab === "字幕" ? (
             <div ref={listRef} style={{ maxHeight: 360, overflow: "auto" }}>
-              {enCues.map((cue, index) => (
-                <button
-                  key={cue.id}
-                  type="button"
-                  data-cue={index}
-                  className={`cue ${index === activeIndex ? "active" : ""}`}
-                  style={{ width: "100%", textAlign: "left", cursor: "pointer" }}
-                  onClick={() => seekToCue(index)}
-                >
-                  <div className="muted" style={{ fontSize: 12, marginBottom: 6 }}>
-                    {formatTime(cue.start)}
+              {importId != null ? (
+                <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 12, alignItems: "center" }}>
+                  <button
+                    type="button"
+                    className="btn"
+                    disabled={generatingSubs}
+                    onClick={() => void generateAiSubtitles()}
+                  >
+                    {generatingSubs ? "生成中…" : enCues.length ? "重新 AI 生成字幕" : "AI 生成字幕"}
+                  </button>
+                  <Link className="muted" to="/" style={{ fontSize: 12 }}>
+                    按整课时长识别（最长 3 小时）· 服务器已可使用全局百炼 Key
+                  </Link>
+                </div>
+              ) : null}
+              {generateMsg ? <div className="muted" style={{ marginBottom: 10 }}>{generateMsg}</div> : null}
+              {enCues.length === 0 ? (
+                <div className="cue">
+                  <div className="en">暂无字幕</div>
+                  <div className="zh" style={{ marginTop: 8 }}>
+                    {importId != null
+                      ? "可点击上方「AI 生成字幕」用语音识别生成；或先配置 B 站 Cookie 再重新导入以拉取官方字幕。"
+                      : "云课程需在媒资中提供字幕文件。"}
                   </div>
-                  <div className="en">{cue.text}</div>
-                  {bilingual ? <div className="zh">{zhCues[index]?.text ?? ""}</div> : null}
-                </button>
-              ))}
+                </div>
+              ) : (
+                enCues.map((cue, index) => (
+                  <button
+                    key={cue.id}
+                    type="button"
+                    data-cue={index}
+                    className={`cue ${index === activeIndex ? "active" : ""}`}
+                    style={{ width: "100%", textAlign: "left", cursor: "pointer" }}
+                    onClick={() => seekToCue(index)}
+                  >
+                    <div className="muted" style={{ fontSize: 12, marginBottom: 6 }}>
+                      {formatTime(cue.start)}
+                    </div>
+                    <div className="en">{cue.text}</div>
+                    {bilingual ? <div className="zh">{zhCues[index]?.text ?? ""}</div> : null}
+                  </button>
+                ))
+              )}
             </div>
           ) : null}
 

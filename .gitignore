@@ -29,5 +29,20 @@ apps/mobile.zip
 apps/_tmp_mobile/
 
 services/api/body.json
+services/api/*.db
+services/api/check_prefs.py
+services/api/test_*.py
+services/api/verify_*.py
+
+# Local deploy staging / probes
+_deploy_stage/
+_acquireenglish_deploy.tar.gz
+**/tsconfig.tsbuildinfo
+deploy/probe_*.py
+deploy/test_*.py
+deploy/check_prefs.py
+deploy/extract_bili_cookie.py
+deploy/set_*.py
+deploy/verify_*.py
 
 analyze_out.txt

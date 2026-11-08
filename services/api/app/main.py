@@ -8,10 +8,27 @@ from app.database import Base, engine
 from app.routers import auth, courses, feed, imports, preferences, progress, vocab
 
 
+def _migrate_sqlite(connection) -> None:
+    """Add columns introduced after first deploy (SQLite has no auto-alter)."""
+    from sqlalchemy import text
+
+    rows = connection.execute(text("PRAGMA table_info(user_preferences)")).fetchall()
+    cols = {row[1] for row in rows}
+    if "bilibili_cookie" not in cols:
+        connection.execute(
+            text("ALTER TABLE user_preferences ADD COLUMN bilibili_cookie TEXT")
+        )
+    if "asr_api_key" not in cols:
+        connection.execute(
+            text("ALTER TABLE user_preferences ADD COLUMN asr_api_key TEXT")
+        )
+
+
 @asynccontextmanager
 async def lifespan(_: FastAPI):
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
+        await conn.run_sync(_migrate_sqlite)
     yield
 
 

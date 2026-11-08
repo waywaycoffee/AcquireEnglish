@@ -16,7 +16,10 @@ export default function HomePage() {
     tags: ["slow", "daily"],
     daily_quota: 2,
     notify_daily_feed: true,
+    has_bilibili_cookie: false,
   });
+  const [biliCookieDraft, setBiliCookieDraft] = useState("");
+  const [asrKeyDraft, setAsrKeyDraft] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [importUrl, setImportUrl] = useState("");
@@ -50,8 +53,17 @@ export default function HomePage() {
     if (!token) return;
     setSaving(true);
     try {
-      const next = await api.putPreferences(token, prefs);
+      const payload: Preferences = { ...prefs };
+      if (biliCookieDraft.trim()) {
+        payload.bilibili_cookie = biliCookieDraft.trim();
+      }
+      if (asrKeyDraft.trim()) {
+        payload.asr_api_key = asrKeyDraft.trim();
+      }
+      const next = await api.putPreferences(token, payload);
       setPrefs(next);
+      setBiliCookieDraft("");
+      setAsrKeyDraft("");
       setFeed(await api.dailyFeed(token));
     } catch (err) {
       setError(err instanceof Error ? err.message : "保存偏好失败");
@@ -113,6 +125,45 @@ export default function HomePage() {
           <button className="btn" type="button" disabled={importing} onClick={() => void importLink()}>
             {importing ? "导入中…" : "导入并学习"}
           </button>
+        </div>
+        <div style={{ marginTop: 16 }}>
+          <div className="muted" style={{ marginBottom: 8 }}>
+            B 站登录 Cookie（部分视频字幕需登录）
+            {prefs.has_bilibili_cookie ? " · 已保存" : " · 未配置"}
+          </div>
+          <textarea
+            value={biliCookieDraft}
+            onChange={(e) => setBiliCookieDraft(e.target.value)}
+            placeholder="B 站 AI 字幕必须登录才能拉取。F12 → Application → Cookies → bilibili.com → 复制 SESSDATA=...; bili_jct=...; buvid3=... 粘贴后点「保存偏好」，再重新导入视频"
+            rows={2}
+            style={{
+              width: "100%",
+              borderRadius: 12,
+              border: "1px solid var(--border)",
+              background: "rgba(0,0,0,0.25)",
+              color: "var(--text)",
+              padding: "12px 14px",
+              resize: "vertical",
+            }}
+          />
+          <div className="muted" style={{ margin: "14px 0 8px" }}>
+            阿里云百炼 ASR Key（网页「AI 生成字幕」用）
+            {prefs.has_asr_api_key ? " · 已保存" : " · 未配置"}
+          </div>
+          <input
+            type="password"
+            value={asrKeyDraft}
+            onChange={(e) => setAsrKeyDraft(e.target.value)}
+            placeholder="sk-…（DashScope API Key）"
+            style={{
+              width: "100%",
+              borderRadius: 12,
+              border: "1px solid var(--border)",
+              background: "rgba(0,0,0,0.25)",
+              color: "var(--text)",
+              padding: "12px 14px",
+            }}
+          />
         </div>
       </section>
 

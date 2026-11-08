@@ -37,6 +37,12 @@ export type Preferences = {
   tags: string[];
   daily_quota: number;
   notify_daily_feed: boolean;
+  has_bilibili_cookie?: boolean;
+  has_asr_api_key?: boolean;
+  /** Write-only: sent on save; never returned by API. */
+  bilibili_cookie?: string | null;
+  /** Write-only DashScope / 百炼 key. */
+  asr_api_key?: string | null;
 };
 
 export type VocabItem = {
@@ -87,6 +93,19 @@ export const api = {
     request<Course>(`/api/courses/${id}`, {}, token),
   importLink: (token: string, url: string) =>
     request<Course>("/api/imports/link", { method: "POST", body: JSON.stringify({ url }) }, token),
+  generateSubtitles: (
+    token: string,
+    importId: number,
+    payload?: { language?: string; max_seconds?: number },
+  ) =>
+    request<Course>(
+      `/api/imports/${importId}/generate-subtitles`,
+      {
+        method: "POST",
+        body: JSON.stringify(payload ?? { language: "en" }),
+      },
+      token,
+    ),
   fetchText: async (path: string, token?: string | null) => {
     const headers = new Headers();
     if (token) headers.set("Authorization", `Bearer ${token}`);

@@ -1,0 +1,19 @@
+services:
+  api:
+    build:
+      context: /opt/acquireenglish
+      dockerfile: deploy/Dockerfile.api
+    image: acquireenglish-api:latest
+    container_name: acquireenglish-api
+    restart: unless-stopped
+    working_dir: /app
+    env_file:
+      - /opt/acquireenglish/services/api/.env
+    volumes:
+      - /opt/acquireenglish/services/api:/app
+      - /opt/acquireenglish/packages:/packages
+      - /opt/acquireenglish/data:/data
+    environment:
+      DATABASE_URL: sqlite+aiosqlite:////data/acquire_english.db
+    ports:
+      - "127.0.0.1:5200:5200"

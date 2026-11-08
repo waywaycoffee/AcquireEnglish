@@ -147,6 +147,10 @@ class AcquirePreferencesDto {
     this.tags = const <String>['slow', 'daily'],
     this.dailyQuota = 2,
     this.notifyDailyFeed = true,
+    this.hasBilibiliCookie = false,
+    this.hasAsrApiKey = false,
+    this.bilibiliCookie,
+    this.asrApiKey,
   });
 
   factory AcquirePreferencesDto.fromJson(Map<String, dynamic> json) =>
@@ -157,18 +161,26 @@ class AcquirePreferencesDto {
             .toList(growable: false),
         dailyQuota: json['daily_quota'] as int? ?? 2,
         notifyDailyFeed: json['notify_daily_feed'] as bool? ?? true,
+        hasBilibiliCookie: json['has_bilibili_cookie'] as bool? ?? false,
+        hasAsrApiKey: json['has_asr_api_key'] as bool? ?? false,
       );
 
   final String level;
   final List<String> tags;
   final int dailyQuota;
   final bool notifyDailyFeed;
+  final bool hasBilibiliCookie;
+  final bool hasAsrApiKey;
+  final String? bilibiliCookie;
+  final String? asrApiKey;
 
   Map<String, dynamic> toJson() => <String, dynamic>{
     'level': level,
     'tags': tags,
     'daily_quota': dailyQuota,
     'notify_daily_feed': notifyDailyFeed,
+    if (bilibiliCookie != null) 'bilibili_cookie': bilibiliCookie,
+    if (asrApiKey != null) 'asr_api_key': asrApiKey,
   };
 
   AcquirePreferencesDto copyWith({
@@ -176,11 +188,19 @@ class AcquirePreferencesDto {
     List<String>? tags,
     int? dailyQuota,
     bool? notifyDailyFeed,
+    bool? hasBilibiliCookie,
+    bool? hasAsrApiKey,
+    String? bilibiliCookie,
+    String? asrApiKey,
   }) => AcquirePreferencesDto(
     level: level ?? this.level,
     tags: tags ?? this.tags,
     dailyQuota: dailyQuota ?? this.dailyQuota,
     notifyDailyFeed: notifyDailyFeed ?? this.notifyDailyFeed,
+    hasBilibiliCookie: hasBilibiliCookie ?? this.hasBilibiliCookie,
+    hasAsrApiKey: hasAsrApiKey ?? this.hasAsrApiKey,
+    bilibiliCookie: bilibiliCookie ?? this.bilibiliCookie,
+    asrApiKey: asrApiKey ?? this.asrApiKey,
   );
 }
 
@@ -233,6 +253,11 @@ class AcquireApiClient {
 
   final Dio _dio;
 
+  bool get hasAuthorization {
+    final Object? value = _dio.options.headers['Authorization'];
+    return value is String && value.startsWith('Bearer ') && value.length > 20;
+  }
+
   Future<AcquireTokenResult> login({
     required String email,
     required String password,
@@ -266,6 +291,59 @@ class AcquireApiClient {
         .cast<Map<String, dynamic>>()
         .map(AcquireCourseDto.fromJson)
         .toList(growable: false);
+  }
+
+  Future<AcquireCourseDto> importLink(String url) async {
+    final Response<dynamic> response = await _dio.post(
+      Endpoints.importLink,
+      data: <String, String>{'url': url},
+    );
+    return AcquireCourseDto.fromJson(response.data as Map<String, dynamic>);
+  }
+
+  Future<AcquireCourseDto> generateSubtitles({
+    required int importId,
+    String language = 'en',
+    int? maxSeconds,
+  }) async {
+    final Response<dynamic> response = await _dio.post(
+      Endpoints.generateSubtitles(importId),
+      data: <String, dynamic>{
+        'language': language,
+        if (maxSeconds != null) 'max_seconds': maxSeconds,
+      },
+      options: Options(
+        sendTimeout: const Duration(minutes: 2),
+        receiveTimeout: const Duration(minutes: 45),
+      ),
+    );
+    return AcquireCourseDto.fromJson(response.data as Map<String, dynamic>);
+  }
+
+  Future<String> fetchText(String pathOrUrl) async {
+    if (pathOrUrl.startsWith('http://') || pathOrUrl.startsWith('https://')) {
+      final Response<String> response = await _dio.get<String>(
+        pathOrUrl,
+        options: Options(responseType: ResponseType.plain),
+      );
+      return response.data ?? '';
+    }
+    final String path = pathOrUrl.startsWith('/')
+        ? pathOrUrl.substring(1)
+        : pathOrUrl;
+    final Response<String> response = await _dio.get<String>(
+      path,
+      options: Options(responseType: ResponseType.plain),
+    );
+    return response.data ?? '';
+  }
+
+  Future<void> ensureAsrApiKey(String apiKey) async {
+    final AcquirePreferencesDto current = await getPreferences();
+    if (current.hasAsrApiKey) {
+      return;
+    }
+    await putPreferences(current.copyWith(asrApiKey: apiKey));
   }
 
   Future<List<AcquireProgressDto>> listProgress() async {

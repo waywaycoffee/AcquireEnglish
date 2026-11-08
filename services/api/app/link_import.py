@@ -26,6 +26,125 @@ _HEADERS = {
     "Accept": "application/json, text/plain, */*",
 }
 
+# Bilibili WAF on cloud IPs often returns HTTP/JSON 412 for browser/httpx UAs.
+# A plain curl UA is currently accepted from the Guangzhou ECS.
+_BILI_HEADERS = {
+    "User-Agent": "curl/8.5.0",
+    "Accept": "*/*",
+}
+
+
+def _bilibili_headers(cookie: str | None = None) -> dict[str, str]:
+    from app.config import settings
+
+    headers = dict(_BILI_HEADERS)
+    resolved = (cookie or settings.bilibili_cookie or "").strip()
+    if resolved:
+        headers["Cookie"] = resolved
+        # Cookie requests look more legitimate with a normal Referer.
+        headers["Referer"] = "https://www.bilibili.com"
+        headers["User-Agent"] = (
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+            "(KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"
+        )
+    return headers
+
+
+def _classify_bili_lan(lan: str, lan_doc: str = "") -> str | None:
+    """Return 'en' | 'zh' | None for a Bilibili subtitle track (incl. AI)."""
+    text = f"{lan} {lan_doc}".lower()
+    if any(k in text for k in ("en", "eng", "english", "英")):
+        return "en"
+    if any(k in text for k in ("zh", "中", "chinese", "ai-zh", "chs", "cht")):
+        return "zh"
+    return None
+
+
+async def _download_bili_subtitle_json(client: httpx.AsyncClient, sub_url: str) -> str | None:
+    if sub_url.startswith("//"):
+        sub_url = "https:" + sub_url
+    sub_res = await client.get(sub_url)
+    if sub_res.status_code >= 400:
+        return None
+    content_type = sub_res.headers.get("content-type", "")
+    body = (
+        sub_res.json()
+        if content_type.startswith("application/json")
+        else json.loads(sub_res.text)
+    )
+    cues = [
+        (
+            float(c.get("from") or 0),
+            float(c.get("to") or 0),
+            str(c.get("content") or ""),
+        )
+        for c in (body.get("body") or [])
+    ]
+    return _cues_to_srt(cues)
+
+
+async def _fetch_bilibili_subtitles(
+    client: httpx.AsyncClient,
+    *,
+    bvid: str | None,
+    aid: str | None,
+    cid: int | str,
+) -> tuple[str | None, str | None, bool]:
+    """Fetch EN/ZH SRT including AI tracks. Returns (en, zh, need_login)."""
+    params: dict[str, str | int] = {"cid": cid}
+    if bvid:
+        params["bvid"] = bvid
+    if aid:
+        params["aid"] = aid
+
+    need_login = False
+    tracks: list[dict] = []
+    for path in (
+        "https://api.bilibili.com/x/player/wbi/v2",
+        "https://api.bilibili.com/x/player/v2",
+    ):
+        player = await client.get(path, params=params)
+        if player.status_code >= 400:
+            continue
+        root = player.json()
+        if root.get("code") != 0:
+            continue
+        data = root.get("data") or {}
+        need_login = need_login or bool(data.get("need_login_subtitle"))
+        subs = ((data.get("subtitle") or {}).get("subtitles")) or []
+        if subs:
+            tracks = [s for s in subs if isinstance(s, dict)]
+            break
+
+    # Prefer official tracks over AI when both exist; keep AI as fallback.
+    def sort_key(item: dict) -> tuple[int, int]:
+        lan = (item.get("lan") or "").lower()
+        is_ai = "ai" in lan or "ai" in str(item.get("lan_doc") or "").lower()
+        return (1 if is_ai else 0, 0)
+
+    en_srt = None
+    zh_srt = None
+    for item in sorted(tracks, key=sort_key):
+        kind = _classify_bili_lan(
+            str(item.get("lan") or ""),
+            str(item.get("lan_doc") or ""),
+        )
+        if kind is None:
+            continue
+        sub_url = item.get("subtitle_url") or ""
+        if not sub_url:
+            continue
+        srt = await _download_bili_subtitle_json(client, sub_url)
+        if not srt:
+            continue
+        if kind == "en" and en_srt is None:
+            en_srt = srt
+        if kind == "zh" and zh_srt is None:
+            zh_srt = srt
+        if en_srt and zh_srt:
+            break
+    return en_srt, zh_srt, need_login
+
 
 @dataclass
 class LinkImportPayload:
@@ -71,12 +190,12 @@ def _cues_to_srt(cues: list[tuple[float, float, str]]) -> str | None:
     return "\n".join(lines) if lines else None
 
 
-async def import_link(url: str) -> LinkImportPayload:
+async def import_link(url: str, *, bilibili_cookie: str | None = None) -> LinkImportPayload:
     source = detect_source(url)
     if source == "youtube":
         return await _import_youtube(url)
     if source == "bilibili":
-        return await _import_bilibili(url)
+        return await _import_bilibili(url, cookie=bilibili_cookie)
     raise ValueError("仅支持 YouTube 或 Bilibili 链接")
 
 
@@ -167,7 +286,7 @@ def _parse_vtt_ts(value: str) -> float:
     return int(h) * 3600 + int(m) * 60 + float(s)
 
 
-async def _import_bilibili(raw: str) -> LinkImportPayload:
+async def _import_bilibili(raw: str, *, cookie: str | None = None) -> LinkImportPayload:
     text = raw.strip()
     params: dict[str, str] = {}
     bv = _BV.search(text)
@@ -181,13 +300,21 @@ async def _import_bilibili(raw: str) -> LinkImportPayload:
             raise ValueError("无效的 Bilibili 链接")
         params["aid"] = av.group(1)
 
-    async with httpx.AsyncClient(headers=_HEADERS, timeout=25.0, follow_redirects=True) as client:
+    async with httpx.AsyncClient(
+        headers=_bilibili_headers(cookie),
+        timeout=25.0,
+        follow_redirects=True,
+    ) as client:
         view = await client.get(
             "https://api.bilibili.com/x/web-interface/view",
             params=params,
         )
+        if view.status_code == 412:
+            raise ValueError("Bilibili 拒绝了服务器请求（412），请稍后重试或换一条视频")
         view.raise_for_status()
         root = view.json()
+        if root.get("code") == -412:
+            raise ValueError("Bilibili 风控拦截（request was banned），请稍后重试")
         if root.get("code") != 0:
             raise ValueError(root.get("message") or "无法获取 Bilibili 视频")
         data = root.get("data") or {}
@@ -196,47 +323,39 @@ async def _import_bilibili(raw: str) -> LinkImportPayload:
         title = (data.get("title") or "").strip() or (bvid or f"av{aid}")
         author = (data.get("owner") or {}).get("name")
         duration = int(data.get("duration") or 60)
+        pages = data.get("pages") or []
         cid = data.get("cid")
-        if not cid and data.get("pages"):
-            cid = data["pages"][0].get("cid")
+        if not cid and pages:
+            cid = pages[0].get("cid")
         watch = f"https://www.bilibili.com/video/{bvid}" if bvid else f"https://www.bilibili.com/video/av{aid}"
         external_id = bvid or f"av{aid}"
 
         en_srt = None
         zh_srt = None
-        if cid and bvid:
+        need_login_subtitle = False
+        if cid and (bvid or aid):
             try:
-                player = await client.get(
-                    "https://api.bilibili.com/x/player/v2",
-                    params={"bvid": bvid, "cid": cid},
+                en_srt, zh_srt, need_login_subtitle = await _fetch_bilibili_subtitles(
+                    client,
+                    bvid=bvid or None,
+                    aid=str(aid) if aid else None,
+                    cid=cid,
                 )
-                player_root = player.json()
-                subs = (((player_root.get("data") or {}).get("subtitle") or {}).get("subtitles")) or []
-                for item in subs:
-                    lan = (item.get("lan") or "").lower()
-                    sub_url = item.get("subtitle_url") or ""
-                    if not sub_url:
-                        continue
-                    if sub_url.startswith("//"):
-                        sub_url = "https:" + sub_url
-                    is_zh = "zh" in lan or "中" in lan
-                    is_en = lan.startswith("en") or "英" in lan
-                    if not is_zh and not is_en:
-                        continue
-                    sub_res = await client.get(sub_url)
-                    body = sub_res.json() if sub_res.headers.get("content-type", "").startswith("application/json") else json.loads(sub_res.text)
-                    cues = [
-                        (float(c.get("from") or 0), float(c.get("to") or 0), str(c.get("content") or ""))
-                        for c in (body.get("body") or [])
-                    ]
-                    srt = _cues_to_srt(cues)
-                    if is_en and en_srt is None:
-                        en_srt = srt
-                    if is_zh and zh_srt is None:
-                        zh_srt = srt
             except Exception:
                 pass
 
+    if not en_srt and not zh_srt:
+        # Keep title intact; callers can surface this via description.
+        has_cookie = bool((cookie or "").strip())
+        if need_login_subtitle and not has_cookie:
+            note = "有 AI/登录字幕但未配置 B 站 Cookie（首页粘贴 SESSDATA 后重新导入）"
+        elif need_login_subtitle and has_cookie:
+            note = "已带 Cookie 仍无字幕轨，请确认 Cookie 未过期"
+        else:
+            note = "无公开字幕"
+        if len(pages) > 1:
+            note = f"{note} · 合集共 {len(pages)} 个分 P，当前仅导入 P1"
+        author = f"{author + ' · ' if author else ''}{note}"
     return LinkImportPayload(
         source="bilibili",
         external_id=external_id,

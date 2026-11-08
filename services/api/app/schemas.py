@@ -103,6 +103,9 @@ class PreferencesUpdate(BaseModel):
     tags: list[str] = Field(default_factory=lambda: ["slow", "daily"])
     daily_quota: int = Field(default=2, ge=1, le=10)
     notify_daily_feed: bool = True
+    # Empty string clears; omit/null leaves unchanged when using partial-friendly clients.
+    bilibili_cookie: str | None = Field(default=None, max_length=4096)
+    asr_api_key: str | None = Field(default=None, max_length=512)
 
 
 class PreferencesOut(BaseModel):
@@ -110,3 +113,5 @@ class PreferencesOut(BaseModel):
     tags: list[str]
     daily_quota: int
     notify_daily_feed: bool
+    has_bilibili_cookie: bool = False
+    has_asr_api_key: bool = False

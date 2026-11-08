@@ -4,7 +4,7 @@ class Endpoints {
   /// Override with `--dart-define=API_BASE=http://...`
   static const String baseUrl = String.fromEnvironment(
     'API_BASE',
-    defaultValue: 'http://127.0.0.1:8001/',
+    defaultValue: 'https://acquireenglish.curlhairai.com/',
   );
 
   static const int receiveTimeout = 15000;
@@ -18,6 +18,10 @@ class Endpoints {
   static const String vocab = 'api/vocab';
   static const String preferences = 'api/preferences';
   static const String dailyFeed = 'api/feed/daily';
+  static const String importLink = 'api/imports/link';
+
+  static String generateSubtitles(int importId) =>
+      'api/imports/$importId/generate-subtitles';
 
   /// Kept for Dio header compatibility; AcquireEnglish API ignores it.
   static const String apiKey = '';

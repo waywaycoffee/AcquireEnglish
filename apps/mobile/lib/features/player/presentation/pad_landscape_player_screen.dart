@@ -19,6 +19,7 @@ import '../../shared/data/word_lookup_service.dart';
 import '../../shared/data/word_pronunciation_service.dart';
 import '../../shared/presentation/app_loading_overlay.dart';
 import '../../shared/presentation/pad/pad_scaffold.dart';
+import '../../sync/data/cloud_ai_subtitle_service.dart';
 import '../../words/data/offline_word_dictionary.dart';
 import '../../words/presentation/word_book_provider.dart';
 import '../domain/pronunciation_assessment.dart';
@@ -1194,6 +1195,9 @@ class PadLandscapePlayerScreenState
     _showMessage(_isMuted ? '已静音' : '已恢复声音');
   }
 
+  bool _isRemoteMedia(String path) =>
+      path.startsWith('http://') || path.startsWith('https://');
+
   Future<void> _handleGenerateAiSubtitles({
     bool forceRegenerate = false,
   }) async {
@@ -1203,6 +1207,10 @@ class PadLandscapePlayerScreenState
     final String? videoPath = _videoAsset;
     if (videoPath == null || videoPath.isEmpty) {
       _showMessage('当前视频不可用');
+      return;
+    }
+    if (_isRemoteMedia(videoPath)) {
+      await _handleGenerateAiSubtitlesViaCloud(watchUrl: videoPath);
       return;
     }
     final LearningSettingsState settings = ref.read(learningSettingsProvider);
@@ -1321,6 +1329,85 @@ class PadLandscapePlayerScreenState
         _aiSubtitleCancellationToken = null;
       }
       if (progressDialogFuture != null && mounted) {
+        Navigator.of(context, rootNavigator: true).pop();
+        await progressDialogFuture;
+      }
+      dialogProgress.dispose();
+      if (mounted) {
+        setState(() {
+          _generatingAiSubtitles = false;
+          _aiSubtitleProgressValue = null;
+          _aiSubtitleProgressText = null;
+          _aiSubtitlePreviewText = null;
+        });
+      }
+    }
+  }
+
+  Future<void> _handleGenerateAiSubtitlesViaCloud({
+    required String watchUrl,
+  }) async {
+    setState(() {
+      _generatingAiSubtitles = true;
+      _aiSubtitleProgressValue = null;
+      _aiSubtitleProgressText = '正在云端提取音频并识别字幕…';
+      _aiSubtitlePreviewText = null;
+      _aiSubtitleErrorText = null;
+    });
+    final ValueNotifier<AsrSubtitleProgress> dialogProgress =
+        ValueNotifier<AsrSubtitleProgress>(
+          const AsrSubtitleProgress(
+            completedChunks: 0,
+            totalChunks: 1,
+            phase: AsrSubtitlePhase.recognizing,
+            previewText: '云端 AI 字幕生成中（按整课时长，最长 3 小时）',
+          ),
+        );
+    final Future<void> progressDialogFuture =
+        showAiSubtitleGenerationProgressDialog(
+          context: context,
+          progress: dialogProgress,
+        );
+    try {
+      final List<LibraryCourseData> courses = ref.read(libraryCatalogProvider);
+      final PlayerCourseLookupResult lookup = resolvePlayerCourseForEpisode(
+        courses: courses,
+        episodeId: widget.episodeId,
+      );
+      final LearningSettingsState settings = ref.read(learningSettingsProvider);
+      final String raw = await ref
+          .read(cloudAiSubtitleServiceProvider)
+          .generateEnglishSrt(
+            watchUrl: watchUrl,
+            existingLinkCourseId: lookup.course?.id,
+            asrApiKey: settings.asrApiKey,
+          );
+      final List<PlayerSubtitleLine> lines = parseSubtitleLines(raw);
+      if (!mounted) {
+        return;
+      }
+      if (lines.isEmpty) {
+        throw StateError('云端未识别到有效字幕');
+      }
+      setState(() {
+        state.loadLines(lines, wordDefinitions: parseSubtitleGlossary(raw));
+        _usingAiSubtitles = true;
+      });
+      _showMessage('云端 AI 字幕已生成');
+    } catch (error) {
+      if (!mounted) {
+        return;
+      }
+      final String message = error.toString().replaceFirst(
+        RegExp(r'^Bad state:\s*'),
+        '',
+      );
+      setState(() {
+        _aiSubtitleErrorText = message;
+      });
+      _showMessage('AI 字幕生成失败：$message');
+    } finally {
+      if (mounted) {
         Navigator.of(context, rootNavigator: true).pop();
         await progressDialogFuture;
       }
