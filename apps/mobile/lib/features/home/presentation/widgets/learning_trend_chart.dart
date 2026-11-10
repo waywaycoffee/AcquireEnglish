@@ -30,7 +30,7 @@ class LearningTrendChart extends StatelessWidget {
               ? 1
               : (maxMinutes / 3).ceilToDouble(),
           getDrawingHorizontalLine: (_) =>
-              const FlLine(color: AppDesignTokens.softGray, strokeWidth: 1),
+              FlLine(color: AppDesignTokens.softGray, strokeWidth: 1),
         ),
         titlesData: FlTitlesData(
           topTitles: const AxisTitles(),
@@ -52,7 +52,7 @@ class LearningTrendChart extends StatelessWidget {
                   meta: meta,
                   child: Text(
                     trend[index].label,
-                    style: const TextStyle(
+                    style: TextStyle(
                       color: AppDesignTokens.textSecondary,
                       fontSize: 11,
                       fontWeight: FontWeight.w700,
@@ -70,7 +70,7 @@ class LearningTrendChart extends StatelessWidget {
                 .map(
                   (LineBarSpot spot) => LineTooltipItem(
                     '${trend[spot.x.round()].studyMinutes} 分钟',
-                    const TextStyle(
+                    TextStyle(
                       color: AppDesignTokens.appWhite,
                       fontWeight: FontWeight.w800,
                     ),

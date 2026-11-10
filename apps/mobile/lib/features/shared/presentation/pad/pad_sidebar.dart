@@ -182,7 +182,7 @@ class _PadSidebarState extends ConsumerState<PadSidebar> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: <Widget>[
                           Text(
-                            '语言避难所',
+                            '爱可儿英语',
                             style: TextStyle(
                               fontSize: compact ? 16 : 18,
                               fontWeight: FontWeight.w900,
@@ -191,7 +191,7 @@ class _PadSidebarState extends ConsumerState<PadSidebar> {
                           ),
                           const SizedBox(height: 2),
                           Text(
-                            '放映室入口',
+                            'AcquireEnglish',
                             style: TextStyle(
                               fontSize: compact ? 11 : 12,
                               color: AppDesignTokens.textSecondary,
@@ -242,7 +242,7 @@ class _PadSidebarState extends ConsumerState<PadSidebar> {
                               DecoratedBox(
                                 decoration: BoxDecoration(
                                   color: selected
-                                      ? AppDesignTokens.appWhite
+                                      ? AppDesignTokens.onAccent
                                       : Colors.transparent,
                                   borderRadius: BorderRadius.circular(16),
                                 ),
@@ -270,7 +270,7 @@ class _PadSidebarState extends ConsumerState<PadSidebar> {
                                         ? FontWeight.w800
                                         : FontWeight.w700,
                                     color: selected
-                                        ? AppDesignTokens.appWhite
+                                        ? AppDesignTokens.onAccent
                                         : AppDesignTokens.textPrimary,
                                   ),
                                 ),
@@ -451,7 +451,7 @@ class _DailyEnglishBubble extends StatelessWidget {
                         const SizedBox(height: 5),
                         Text(
                           phrase!.english,
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 13,
                             fontWeight: FontWeight.w800,
                             color: AppDesignTokens.textPrimary,
@@ -460,7 +460,7 @@ class _DailyEnglishBubble extends StatelessWidget {
                         const SizedBox(height: 6),
                         Text(
                           phrase!.translation,
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 12,
                             color: AppDesignTokens.textSecondary,
                           ),

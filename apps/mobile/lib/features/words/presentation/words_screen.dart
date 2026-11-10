@@ -3,14 +3,15 @@ import 'dart:async';
 import 'package:alphabet_list_view/alphabet_list_view.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
+import '../../../router/app_router.dart';
 import '../../anki_export/presentation/anki_export_sheet.dart';
 import '../../navigation/presentation/navigation_destination.dart';
 import '../../shared/presentation/pad/app_design_tokens.dart';
 import '../../shared/presentation/pad/pad_scaffold.dart';
 import '../../shared/presentation/pad/pad_top_bar.dart';
 import '../../shared/presentation/pill_segmented_control.dart';
-import 'sm2_daily_session_screen.dart';
 import 'word_book_provider.dart';
 import 'word_detail_screen.dart';
 
@@ -135,15 +136,10 @@ class _WordsScreenState extends ConsumerState<WordsScreen> {
         actions: <Widget>[
           TextButton.icon(
             onPressed: () {
-              Navigator.of(context).push(
-                MaterialPageRoute<void>(
-                  builder: (BuildContext context) =>
-                      const Sm2DailySessionScreen(),
-                ),
-              );
+              context.push(SGRoute.reviewSession.route);
             },
             icon: const Icon(Icons.style_rounded),
-            label: const Text('今日背词'),
+            label: const Text('今日复习'),
           ),
           const AnkiExportButton(),
         ],
@@ -423,7 +419,7 @@ class _WordCard extends ConsumerWidget {
                     ),
                     Text(
                       '${entry.videoCount} 个视频',
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 11,
                         color: AppDesignTokens.textSecondary,
                       ),
@@ -470,7 +466,7 @@ class _WordCard extends ConsumerWidget {
                         child: Text('删除'),
                       ),
                     ],
-                icon: const Icon(
+                icon: Icon(
                   Icons.more_vert_rounded,
                   color: AppDesignTokens.textSecondary,
                 ),

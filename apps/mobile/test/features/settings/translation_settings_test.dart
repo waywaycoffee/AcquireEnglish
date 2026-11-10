@@ -340,8 +340,13 @@ void main() {
       final LearningSettingsState state = container.read(
         learningSettingsProvider,
       );
-      expect(asrProviderOptions, <String>['阿里云百炼', '腾讯云']);
+      expect(asrProviderOptions, <String>[
+        '本地 Whisper',
+        '阿里云百炼',
+        '腾讯云',
+      ]);
       expect(asrProviderPresets.containsKey('OpenAI'), isFalse);
+      expect(asrProviderPresets['本地 Whisper']?.model, 'base.en');
       expect(state.asrProvider, '阿里云百炼');
       expect(state.asrApiKey, isEmpty);
       expect(state.asrBaseUrl, 'https://dashscope.aliyuncs.com');

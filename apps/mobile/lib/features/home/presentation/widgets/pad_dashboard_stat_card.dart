@@ -9,19 +9,22 @@ class PadDashboardStatCard extends StatelessWidget {
     required this.title,
     required this.value,
     super.key,
-    this.accentColor = AppDesignTokens.primaryBlue,
-    this.accentBackground = AppDesignTokens.skyLight,
+    this.accentColor,
+    this.accentBackground,
   });
 
   final IconData icon;
   final String title;
   final String value;
-  final Color accentColor;
-  final Color accentBackground;
+  final Color? accentColor;
+  final Color? accentBackground;
 
   @override
   Widget build(BuildContext context) {
     final bool compact = context.isPadCompact;
+    final Color resolvedAccent = accentColor ?? AppDesignTokens.primaryBlue;
+    final Color resolvedAccentBg =
+        accentBackground ?? AppDesignTokens.skyLight;
 
     return Container(
       padding: EdgeInsets.all(compact ? 18 : 22),
@@ -35,13 +38,13 @@ class PadDashboardStatCard extends StatelessWidget {
         children: <Widget>[
           DecoratedBox(
             decoration: BoxDecoration(
-              color: accentBackground,
+              color: resolvedAccentBg,
               borderRadius: BorderRadius.circular(18),
             ),
             child: SizedBox(
               width: compact ? 42 : 48,
               height: compact ? 42 : 48,
-              child: Icon(icon, color: accentColor, size: compact ? 24 : 28),
+              child: Icon(icon, color: resolvedAccent, size: compact ? 24 : 28),
             ),
           ),
           SizedBox(height: compact ? 14 : 16),

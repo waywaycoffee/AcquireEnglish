@@ -50,7 +50,7 @@ final class NetworkRepositoryProvider
   }
 }
 
-String _$networkRepositoryHash() => r'1faa007371d8b7b744768f0613bedb57565f201f';
+String _$networkRepositoryHash() => r'9a0f998970b55d0fda33980448d875e1621e248b';
 
 /// A repository class that extends _$NetworkRepository to handle network-related operations.
 /// This class serves as an abstraction layer for managing network requests and responses,

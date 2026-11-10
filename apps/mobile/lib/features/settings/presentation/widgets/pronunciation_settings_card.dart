@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../utils/url_utils.dart';
 import '../../../player/domain/pronunciation_assessment.dart';
+import '../../../shared/presentation/pad/app_design_tokens.dart';
 import '../../data/pronunciation_credentials.dart';
 import 'settings_group_card.dart';
 
@@ -90,7 +91,7 @@ class _PronunciationSettingsCardState
                     _statusText(credentials),
                     style: TextStyle(
                       color: _saveError == null
-                          ? const Color(0xFF53625A)
+                          ? AppDesignTokens.textSecondary
                           : const Color(0xFFC62828),
                       fontSize: 12,
                     ),
@@ -208,7 +209,7 @@ class _SettingsIntro extends StatelessWidget {
     padding: EdgeInsets.fromLTRB(18, 14, 18, isLast ? 16 : 10),
     child: Text(
       text,
-      style: const TextStyle(fontSize: 12, color: Color(0xFF53625A)),
+      style: TextStyle(fontSize: 12, color: AppDesignTokens.textSecondary),
     ),
   );
 }
@@ -241,11 +242,16 @@ class _CredentialField extends StatelessWidget {
       obscureText: obscureText,
       keyboardType: keyboardType,
       onChanged: onChanged,
+      style: TextStyle(color: AppDesignTokens.textPrimary),
       decoration: InputDecoration(
         labelText: title,
         hintText: hint,
+        labelStyle: TextStyle(color: AppDesignTokens.textSecondary),
+        hintStyle: TextStyle(color: AppDesignTokens.textSecondary),
         filled: true,
-        fillColor: Colors.white,
+        fillColor: AppDesignTokens.isDark
+            ? AppDesignTokens.softGray
+            : Colors.white,
         contentPadding: const EdgeInsets.symmetric(
           horizontal: 14,
           vertical: 13,
@@ -253,7 +259,7 @@ class _CredentialField extends StatelessWidget {
         border: OutlineInputBorder(borderRadius: BorderRadius.circular(14)),
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(14),
-          borderSide: const BorderSide(color: Color(0xFFB9CDBE)),
+          borderSide: BorderSide(color: AppDesignTokens.borderGray),
         ),
       ),
     ),
@@ -300,7 +306,9 @@ class _SettingsLink extends StatelessWidget {
         ],
       ),
       style: OutlinedButton.styleFrom(
-        foregroundColor: const Color(0xFF17456B),
+        foregroundColor: AppDesignTokens.isDark
+            ? AppDesignTokens.primaryBlue
+            : const Color(0xFF17456B),
         alignment: Alignment.centerLeft,
         minimumSize: const Size.fromHeight(48),
       ),

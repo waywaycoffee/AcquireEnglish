@@ -4,8 +4,10 @@ import 'package:file_selector/file_selector.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:hive_ce/hive.dart';
 
 import '../../../router/app_router.dart';
+import '../../import_course/data/bilibili_cover_refresh.dart';
 import '../../import_course/presentation/bilibili_import_sheet.dart';
 import '../../import_course/presentation/import_course_screen.dart';
 import '../../import_course/presentation/widgets/import_course_flow.dart';
@@ -24,8 +26,10 @@ import '../../shared/presentation/pad/app_design_tokens.dart';
 import '../../shared/presentation/pad/pad_compact.dart';
 import '../../shared/presentation/pad/pad_scaffold.dart';
 import '../../shared/presentation/pad/pad_top_bar.dart';
+import '../../shared/presentation/widgets/bilibili_brand_icon.dart';
 import '../../sync/presentation/daily_feed_provider.dart';
 import '../../words/data/offline_word_dictionary.dart';
+import 'library_browse.dart';
 import 'library_catalog_provider.dart';
 import 'library_mock_data.dart';
 import 'widgets/course_overview_card.dart';
@@ -33,6 +37,13 @@ import 'widgets/course_resource_directory_dialog.dart';
 import 'widgets/episode_list_item.dart';
 import 'widgets/library_course_card.dart';
 import 'widgets/library_course_list_item.dart';
+import 'widgets/library_feed_card.dart';
+
+export 'library_browse.dart'
+    show LibraryCourseSort, LibraryCourseViewMode;
+
+const String _libraryViewModePrefsKey = 'library_course_view_mode_v1';
+const String _librarySortPrefsKey = 'library_course_sort_v1';
 
 class LibraryScreen extends ConsumerStatefulWidget {
   const LibraryScreen({
@@ -58,8 +69,6 @@ class LibraryScreen extends ConsumerStatefulWidget {
 }
 enum LibraryScreenView { list, detail, import }
 
-enum LibraryCourseViewMode { grid, list }
-
 class _LibraryScreenState extends ConsumerState<LibraryScreen> {
   final TranscriptReaderSession transcriptReaderSession =
       TranscriptReaderSession();
@@ -71,6 +80,7 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
   late final ScrollController listScrollController;
   bool appliedInitialSelection = false;
   LibraryCourseViewMode viewMode = LibraryCourseViewMode.grid;
+  LibraryCourseSort courseSort = LibraryCourseSort.recent;
   String query = '';
   bool editMode = false;
   bool showScrollToTop = false;
@@ -86,6 +96,7 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
     super.initState();
     showImport = widget.initialView == LibraryScreenView.import;
     showDetail = widget.initialView == LibraryScreenView.detail;
+    _restoreBrowsePrefs();
     queryController = TextEditingController()
       ..addListener(() {
         setState(() {});
@@ -99,6 +110,28 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
           });
         }
       });
+  }
+
+  void _restoreBrowsePrefs() {
+    if (!Hive.isBoxOpen('prefs')) {
+      return;
+    }
+    final Box<String> box = Hive.box<String>('prefs');
+    viewMode = LibraryCourseViewModeLabel.fromStorage(
+      box.get(_libraryViewModePrefsKey),
+    );
+    courseSort = LibraryCourseSortLabel.fromStorage(
+      box.get(_librarySortPrefsKey),
+    );
+  }
+
+  void _persistBrowsePrefs() {
+    if (!Hive.isBoxOpen('prefs')) {
+      return;
+    }
+    Hive.box<String>('prefs')
+      ..put(_libraryViewModePrefsKey, viewMode.storageValue)
+      ..put(_librarySortPrefsKey, courseSort.storageValue);
   }
 
   @override
@@ -203,6 +236,7 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
 
   @override
   Widget build(BuildContext context) {
+    ref.watch(bilibiliCoverRefreshProvider);
     final bool compact = context.isPadCompact;
     final double pagePadding = context.padPagePadding;
     final List<LibraryCourseData> courses = ref.watch(libraryCatalogProvider);
@@ -226,15 +260,13 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
     );
     selectedCourse = currentCourse;
 
-    final List<LibraryCourseData> filteredCourses = courses
-        .where((LibraryCourseData course) {
-          final String keyword = query.trim().toLowerCase();
-          if (keyword.isEmpty) {
-            return true;
-          }
-          return course.title.toLowerCase().contains(keyword) ||
-              course.description.toLowerCase().contains(keyword);
-        })
+    final List<LibraryCourseMatch> browsedCourses = browseLibraryCourses(
+      courses: courses,
+      query: query,
+      sort: courseSort,
+    );
+    final List<LibraryCourseData> filteredCourses = browsedCourses
+        .map((LibraryCourseMatch match) => match.course)
         .toList(growable: false);
     selectedCourseIds.removeWhere(
       (String id) => !courses.any((LibraryCourseData course) => course.id == id),
@@ -292,7 +324,7 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
                         foregroundColor: AppDesignTokens.brandGreenDark,
                         minimumSize: const Size(44, 44),
                         padding: EdgeInsets.zero,
-                        side: const BorderSide(
+                        side: BorderSide(
                           color: AppDesignTokens.borderGray,
                         ),
                         shape: RoundedRectangleBorder(
@@ -319,7 +351,7 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
                     foregroundColor: AppDesignTokens.brandGreenDark,
                     minimumSize: const Size(44, 44),
                     padding: EdgeInsets.zero,
-                    side: const BorderSide(
+                    side: BorderSide(
                       color: AppDesignTokens.borderGray,
                     ),
                     shape: RoundedRectangleBorder(
@@ -448,7 +480,7 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
                                 ),
                                 child: Text(
                                   '${visibleEpisodes.length} 集',
-                                  style: const TextStyle(
+                                  style: TextStyle(
                                     fontSize: 13,
                                     fontWeight: FontWeight.w800,
                                     color: AppDesignTokens.textPrimary,
@@ -487,7 +519,7 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
                                   });
                                 },
                                 style: OutlinedButton.styleFrom(
-                                  side: const BorderSide(
+                                  side: BorderSide(
                                     color: AppDesignTokens.borderGray,
                                   ),
                                   padding: const EdgeInsets.symmetric(
@@ -504,7 +536,7 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
                                   size: 18,
                                   color: AppDesignTokens.primaryBlueDark,
                                 ),
-                                label: const Text(
+                                label: Text(
                                   '手动重排',
                                   style: TextStyle(
                                     fontWeight: FontWeight.w800,
@@ -553,7 +585,7 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
                                         ),
                                     trailing: ReorderableDragStartListener(
                                       index: index,
-                                      child: const Icon(
+                                      child: Icon(
                                         Icons.drag_indicator_rounded,
                                         color: AppDesignTokens.textSecondary,
                                       ),
@@ -635,13 +667,29 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
           : LayoutBuilder(
               builder: (BuildContext context, BoxConstraints constraints) {
                 final double contentWidth = constraints.maxWidth - pagePadding * 2;
-                final int gridColumns = contentWidth >= 900
-                    ? 3
-                    : contentWidth >= 560
-                    ? 2
-                    : 1;
+                final bool useCompactGrid =
+                    viewMode == LibraryCourseViewMode.compact;
+                final int gridColumns = useCompactGrid
+                    ? (contentWidth >= 1100
+                          ? 5
+                          : contentWidth >= 820
+                          ? 4
+                          : contentWidth >= 560
+                          ? 3
+                          : 2)
+                    : (contentWidth >= 900
+                          ? 3
+                          : contentWidth >= 560
+                          ? 2
+                          : 1);
+                final double gridGap = useCompactGrid ? 14.0 : 20.0;
                 final double gridItemWidth =
-                    (contentWidth - 20 * (gridColumns - 1)) / gridColumns;
+                    (contentWidth - gridGap * (gridColumns - 1)) /
+                    gridColumns;
+                final bool hasActiveQuery = query.trim().isNotEmpty;
+                final int episodeHitCount = browsedCourses
+                    .where((LibraryCourseMatch match) => match.matchedByEpisode)
+                    .length;
 
                 return Stack(
                   children: <Widget>[
@@ -649,75 +697,86 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
                   controller: listScrollController,
                   padding: EdgeInsets.all(pagePadding),
                   children: <Widget>[
-                Row(
-                  children: <Widget>[
-                    Expanded(
-                      child: DecoratedBox(
-                        decoration: BoxDecoration(
-                          color: AppDesignTokens.appWhite.withValues(alpha: 0.9),
-                          borderRadius: BorderRadius.circular(999),
-                          boxShadow: AppDesignTokens.toyCardShadow,
-                        ),
-                        child: TextField(
-                          controller: queryController,
-                          onChanged: (String value) {
-                            setState(() {
-                              query = value;
-                            });
-                          },
-                          onSubmitted: (_) => _applySearch(),
-                          decoration: InputDecoration(
-                            hintText: '搜索想继续看的内容...',
-                            hintStyle: const TextStyle(
-                              fontWeight: FontWeight.w600,
-                              color: AppDesignTokens.textSecondary,
+                DecoratedBox(
+                  decoration: BoxDecoration(
+                    color: AppDesignTokens.appWhite.withValues(alpha: 0.9),
+                    borderRadius: BorderRadius.circular(999),
+                    boxShadow: AppDesignTokens.toyCardShadow,
+                  ),
+                  child: TextField(
+                    controller: queryController,
+                    onChanged: (String value) {
+                      setState(() {
+                        query = value;
+                      });
+                    },
+                    onSubmitted: (_) => _applySearch(),
+                    textInputAction: TextInputAction.search,
+                    decoration: InputDecoration(
+                      hintText: '搜索课程、剧集、分类或来源...',
+                      hintStyle: TextStyle(
+                        fontWeight: FontWeight.w600,
+                        color: AppDesignTokens.textSecondary,
+                      ),
+                      prefixIcon: const Icon(
+                        Icons.search_rounded,
+                        color: AppDesignTokens.primaryBlueDark,
+                      ),
+                      filled: true,
+                      fillColor: Colors.transparent,
+                      contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 20,
+                        vertical: 18,
+                      ),
+                      suffixIcon: queryController.text.isEmpty
+                          ? null
+                          : IconButton(
+                              onPressed: _clearSearch,
+                              icon: Icon(
+                                Icons.close_rounded,
+                                color: AppDesignTokens.textSecondary,
+                              ),
+                              tooltip: '清空搜索',
                             ),
-                            prefixIcon: const Icon(
-                              Icons.search_rounded,
-                              color: AppDesignTokens.primaryBlueDark,
-                            ),
-                            filled: true,
-                            fillColor: Colors.transparent,
-                            contentPadding: const EdgeInsets.symmetric(
-                              horizontal: 20,
-                              vertical: 18,
-                            ),
-                            suffixIcon: queryController.text.isEmpty
-                                ? null
-                                : IconButton(
-                                    onPressed: _clearSearch,
-                                    icon: const Icon(
-                                      Icons.close_rounded,
-                                      color: AppDesignTokens.textSecondary,
-                                    ),
-                                    tooltip: '清空搜索',
-                                  ),
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(999),
-                              borderSide: BorderSide.none,
-                            ),
-                            enabledBorder: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(999),
-                              borderSide: BorderSide.none,
-                            ),
-                            focusedBorder: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(999),
-                              borderSide: BorderSide.none,
-                            ),
-                          ),
-                        ),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(999),
+                        borderSide: BorderSide.none,
+                      ),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(999),
+                        borderSide: BorderSide.none,
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(999),
+                        borderSide: BorderSide.none,
                       ),
                     ),
-                    const SizedBox(width: 14),
+                  ),
+                ),
+                const SizedBox(height: 14),
+                Wrap(
+                  spacing: 10,
+                  runSpacing: 10,
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  children: <Widget>[
+                    _CourseSortMenu(
+                      value: courseSort,
+                      onChanged: (LibraryCourseSort nextValue) {
+                        setState(() {
+                          courseSort = nextValue;
+                        });
+                        _persistBrowsePrefs();
+                      },
+                    ),
                     _CourseViewModeToggle(
                       value: viewMode,
                       onChanged: (LibraryCourseViewMode nextValue) {
                         setState(() {
                           viewMode = nextValue;
                         });
+                        _persistBrowsePrefs();
                       },
                     ),
-                    const SizedBox(width: 12),
                     if (editMode)
                       _LibraryEditToolbar(
                         selectedCount: selectedCourseIds.length,
@@ -729,9 +788,10 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
                             : _confirmDeleteSelectedCourses,
                         onDone: _exitEditMode,
                       )
-                    else ...<Widget>[
+                    else
                       FilledButton.tonal(
-                        onPressed: filteredCourses.isEmpty ? null : _enterEditMode,
+                        onPressed:
+                            filteredCourses.isEmpty ? null : _enterEditMode,
                         style: FilledButton.styleFrom(
                           backgroundColor: AppDesignTokens.appWhite.withValues(
                             alpha: 0.92,
@@ -742,7 +802,7 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
                           ),
                           padding: const EdgeInsets.symmetric(
                             horizontal: 18,
-                            vertical: 18,
+                            vertical: 16,
                           ),
                           elevation: 0,
                         ),
@@ -751,126 +811,206 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
                           style: TextStyle(fontWeight: FontWeight.w800),
                         ),
                       ),
-                      const SizedBox(width: 8),
-                    ],
-                    FilledButton.icon(
-                      onPressed: editMode
-                          ? null
-                          : () {
-                              unawaited(showYoutubeImportSheet(context, ref));
-                            },
-                      style: FilledButton.styleFrom(
-                        backgroundColor: AppDesignTokens.primaryBlueDark,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(999),
+                  ],
+                ),
+                const SizedBox(height: 10),
+                // Keep import actions on their own full-width row so B站 is
+                // never clipped by the phone's right edge.
+                Row(
+                  children: <Widget>[
+                    Expanded(
+                      child: FilledButton.icon(
+                        onPressed: editMode
+                            ? null
+                            : () {
+                                unawaited(
+                                  showYoutubeImportSheet(context, ref),
+                                );
+                              },
+                        style: FilledButton.styleFrom(
+                          backgroundColor: AppDesignTokens.primaryBlueDark,
+                          foregroundColor: Colors.white,
+                          visualDensity: VisualDensity.standard,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(999),
+                          ),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 10,
+                            vertical: 14,
+                          ),
+                          elevation: 0,
                         ),
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 16,
-                          vertical: 18,
+                        icon: const Icon(
+                          Icons.ondemand_video_rounded,
+                          size: 18,
                         ),
-                        elevation: 0,
-                      ),
-                      icon: const Icon(Icons.ondemand_video_rounded, size: 18),
-                      label: const Text(
-                        'YouTube',
-                        style: TextStyle(fontWeight: FontWeight.w900),
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    FilledButton.icon(
-                      onPressed: editMode
-                          ? null
-                          : () {
-                              unawaited(showBilibiliImportSheet(context, ref));
-                            },
-                      style: FilledButton.styleFrom(
-                        backgroundColor: const Color(0xFFFB7299),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(999),
+                        label: const Text(
+                          'YouTube',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(fontWeight: FontWeight.w900),
                         ),
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 16,
-                          vertical: 18,
-                        ),
-                        elevation: 0,
-                      ),
-                      icon: const Icon(Icons.smart_display_rounded, size: 18),
-                      label: const Text(
-                        'B站',
-                        style: TextStyle(fontWeight: FontWeight.w900),
                       ),
                     ),
                     const SizedBox(width: 8),
-                    FilledButton.icon(
-                      onPressed: editMode
-                          ? null
-                          : () {
-                        openImportCourseExperience(context);
-                      },
-                      style: FilledButton.styleFrom(
-                        backgroundColor: AppDesignTokens.brandGreen,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(999),
+                    Expanded(
+                      child: FilledButton.icon(
+                        onPressed: editMode
+                            ? null
+                            : () {
+                                unawaited(
+                                  showBilibiliImportSheet(context, ref),
+                                );
+                              },
+                        style: FilledButton.styleFrom(
+                          backgroundColor: const Color(0xFFFB7299),
+                          foregroundColor: Colors.white,
+                          visualDensity: VisualDensity.standard,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(999),
+                          ),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 10,
+                            vertical: 14,
+                          ),
+                          elevation: 0,
                         ),
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 20,
-                          vertical: 18,
+                        icon: const BilibiliBrandIcon(size: 18),
+                        label: const Text(
+                          'B站',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(fontWeight: FontWeight.w900),
                         ),
-                        elevation: 0,
                       ),
-                      icon: const DecoratedBox(
-                        decoration: BoxDecoration(
-                          boxShadow: AppDesignTokens.toyButtonShadow,
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: FilledButton.icon(
+                        onPressed: editMode
+                            ? null
+                            : () {
+                                openImportCourseExperience(context);
+                              },
+                        style: FilledButton.styleFrom(
+                          backgroundColor: AppDesignTokens.brandGreen,
+                          foregroundColor: Colors.white,
+                          visualDensity: VisualDensity.standard,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(999),
+                          ),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 10,
+                            vertical: 14,
+                          ),
+                          elevation: 0,
                         ),
-                        child: Icon(Icons.add_rounded, size: 18),
-                      ),
-                      label: const Text(
-                        '导入新课程',
-                        style: TextStyle(fontWeight: FontWeight.w900),
+                        icon: const Icon(Icons.add_rounded, size: 18),
+                        label: const Text(
+                          '导入',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(fontWeight: FontWeight.w900),
+                        ),
                       ),
                     ),
                   ],
                 ),
+                if (hasActiveQuery) ...<Widget>[
+                  const SizedBox(height: 14),
+                  Text(
+                    episodeHitCount > 0
+                        ? '找到 ${filteredCourses.length} 门课程，其中 $episodeHitCount 门命中剧集'
+                        : '找到 ${filteredCourses.length} 门课程',
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w700,
+                      color: AppDesignTokens.textSecondary,
+                    ),
+                  ),
+                ],
                 const SizedBox(height: 24),
                 const _LibraryTodayFeed(),
                 const SizedBox(height: 16),
                 if (filteredCourses.isEmpty)
                   _EmptyLibraryState(query: query)
-                else if (viewMode == LibraryCourseViewMode.grid)
+                else if (viewMode == LibraryCourseViewMode.grid ||
+                    viewMode == LibraryCourseViewMode.compact)
                   Wrap(
-                    spacing: 20,
-                    runSpacing: 20,
-                    children: filteredCourses
-                        .map((LibraryCourseData course) {
+                    spacing: gridGap,
+                    runSpacing: gridGap,
+                    children: browsedCourses
+                        .map((LibraryCourseMatch match) {
                           return SizedBox(
                             width: gridItemWidth,
-                            child: LibraryCourseCard(
-                              course: course,
-                              selected: selectedCourseIds.contains(course.id),
-                              selectionMode: editMode,
-                              onTap: () => _handleCourseTap(course),
-                              onResourceDirectory: () => _showResourceDirectory(course),
+                            child: _LibraryCourseMatchShell(
+                              match: match,
+                              showEpisodeHint: hasActiveQuery,
+                              child: LibraryCourseCard(
+                                course: match.course,
+                                selected: selectedCourseIds.contains(
+                                  match.course.id,
+                                ),
+                                selectionMode: editMode,
+                                onTap: () => _handleCourseTap(match.course),
+                                onResourceDirectory: () =>
+                                    _showResourceDirectory(match.course),
+                              ),
                             ),
                           );
                         })
                         .toList(growable: false),
                   )
-                else
+                else if (viewMode == LibraryCourseViewMode.rows)
                   Column(
-                    children: filteredCourses
-                        .map((LibraryCourseData course) {
-                          return Padding(
-                            padding: const EdgeInsets.only(bottom: 18),
-                            child: LibraryCourseListItem(
-                              course: course,
-                              selected: selectedCourseIds.contains(course.id),
-                              selectionMode: editMode,
-                              onTap: () => _handleCourseTap(course),
-                              onResourceDirectory: () => _showResourceDirectory(course),
+                    children: <Widget>[
+                      for (int i = 0; i < browsedCourses.length; i++) ...<Widget>[
+                        if (i > 0) const SizedBox(height: 14),
+                        _LibraryCourseMatchShell(
+                          match: browsedCourses[i],
+                          showEpisodeHint: hasActiveQuery,
+                          child: LibraryCourseListItem(
+                            course: browsedCourses[i].course,
+                            selected: selectedCourseIds.contains(
+                              browsedCourses[i].course.id,
                             ),
-                          );
-                        })
-                        .toList(growable: false),
+                            selectionMode: editMode,
+                            onTap: () =>
+                                _handleCourseTap(browsedCourses[i].course),
+                            onResourceDirectory: () => _showResourceDirectory(
+                              browsedCourses[i].course,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ],
+                  )
+                else
+                  DecoratedBox(
+                    decoration: const BoxDecoration(
+                      color: Color(0xFF16181E),
+                      borderRadius: BorderRadius.all(Radius.circular(24)),
+                    ),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 8),
+                      child: Column(
+                        children: <Widget>[
+                          for (int i = 0; i < browsedCourses.length; i++)
+                            _LibraryCourseMatchShell(
+                              match: browsedCourses[i],
+                              showEpisodeHint: hasActiveQuery,
+                              darkSurface: true,
+                              child: LibraryFeedCard(
+                                course: browsedCourses[i].course,
+                                index: i,
+                                onTap: () => _handleCourseTap(
+                                  browsedCourses[i].course,
+                                ),
+                              ),
+                            ),
+                        ],
+                      ),
+                    ),
                   ),
                   const SizedBox(height: 88),
                 ],
@@ -890,7 +1030,7 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
                             );
                           },
                           backgroundColor: AppDesignTokens.primaryBlue,
-                          foregroundColor: AppDesignTokens.appWhite,
+                          foregroundColor: AppDesignTokens.onAccent,
                           elevation: 6,
                           child: const Icon(Icons.keyboard_arrow_up_rounded),
                         ),
@@ -1028,7 +1168,7 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
                         alignment: Alignment.centerLeft,
                         child: Text(
                           selectedCoverImage.split(RegExp(r'[\\/]')).last,
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 12,
                             fontWeight: FontWeight.w700,
                             color: AppDesignTokens.textSecondary,
@@ -1242,7 +1382,7 @@ class _EmptyLibraryState extends StatelessWidget {
         children: <Widget>[
           Text(
             hasQuery ? '没有找到匹配课程' : '还没有导入任何课程',
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 22,
               fontWeight: FontWeight.w900,
               color: AppDesignTokens.textPrimary,
@@ -1251,15 +1391,121 @@ class _EmptyLibraryState extends StatelessWidget {
           const SizedBox(height: 10),
           Text(
             hasQuery
-                ? '换个关键词试试，或者直接导入你自己的视频和字幕资源。'
+                ? '试试课程名、剧集标题、分类或来源关键词；也可以直接导入新视频。'
                 : '先导入你自己的视频和字幕资源，再开始精听。',
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 14,
               height: 1.55,
               color: AppDesignTokens.textSecondary,
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _LibraryCourseMatchShell extends StatelessWidget {
+  const _LibraryCourseMatchShell({
+    required this.match,
+    required this.child,
+    this.showEpisodeHint = false,
+    this.darkSurface = false,
+  });
+
+  final LibraryCourseMatch match;
+  final Widget child;
+  final bool showEpisodeHint;
+  final bool darkSurface;
+
+  @override
+  Widget build(BuildContext context) {
+    if (!showEpisodeHint || !match.matchedByEpisode) {
+      return child;
+    }
+    final String hint =
+        '剧集命中：${match.matchedEpisodeTitles.join(' · ')}';
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: <Widget>[
+        child,
+        Padding(
+          padding: const EdgeInsets.fromLTRB(12, 8, 12, 4),
+          child: Text(
+            hint,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w700,
+              height: 1.35,
+              color: darkSurface
+                  ? Colors.white70
+                  : AppDesignTokens.primaryBlueDark,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _CourseSortMenu extends StatelessWidget {
+  const _CourseSortMenu({
+    required this.value,
+    required this.onChanged,
+  });
+
+  final LibraryCourseSort value;
+  final ValueChanged<LibraryCourseSort> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return PopupMenuButton<LibraryCourseSort>(
+      tooltip: '排序方式',
+      initialValue: value,
+      onSelected: onChanged,
+      itemBuilder: (BuildContext context) {
+        return LibraryCourseSort.values
+            .map(
+              (LibraryCourseSort sort) => PopupMenuItem<LibraryCourseSort>(
+                value: sort,
+                child: Text(sort.label),
+              ),
+            )
+            .toList(growable: false);
+      },
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        decoration: BoxDecoration(
+          color: AppDesignTokens.appWhite.withValues(alpha: 0.9),
+          borderRadius: BorderRadius.circular(999),
+          boxShadow: AppDesignTokens.toyCardShadow,
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: <Widget>[
+            const Icon(
+              Icons.sort_rounded,
+              size: 18,
+              color: AppDesignTokens.primaryBlueDark,
+            ),
+            const SizedBox(width: 8),
+            Text(
+              value.label,
+              style: const TextStyle(
+                fontWeight: FontWeight.w800,
+                color: AppDesignTokens.primaryBlueDark,
+              ),
+            ),
+            const SizedBox(width: 4),
+            const Icon(
+              Icons.expand_more_rounded,
+              size: 18,
+              color: AppDesignTokens.primaryBlueDark,
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -1288,14 +1534,30 @@ class _CourseViewModeToggle extends StatelessWidget {
         children: <Widget>[
           _CourseViewModeButton(
             icon: Icons.grid_view_rounded,
+            tooltip: LibraryCourseViewMode.grid.label,
             selected: value == LibraryCourseViewMode.grid,
             onTap: () => onChanged(LibraryCourseViewMode.grid),
           ),
           const SizedBox(width: 6),
           _CourseViewModeButton(
+            icon: Icons.apps_rounded,
+            tooltip: LibraryCourseViewMode.compact.label,
+            selected: value == LibraryCourseViewMode.compact,
+            onTap: () => onChanged(LibraryCourseViewMode.compact),
+          ),
+          const SizedBox(width: 6),
+          _CourseViewModeButton(
+            icon: Icons.view_list_rounded,
+            tooltip: LibraryCourseViewMode.rows.label,
+            selected: value == LibraryCourseViewMode.rows,
+            onTap: () => onChanged(LibraryCourseViewMode.rows),
+          ),
+          const SizedBox(width: 6),
+          _CourseViewModeButton(
             icon: Icons.view_agenda_rounded,
-            selected: value == LibraryCourseViewMode.list,
-            onTap: () => onChanged(LibraryCourseViewMode.list),
+            tooltip: LibraryCourseViewMode.feed.label,
+            selected: value == LibraryCourseViewMode.feed,
+            onTap: () => onChanged(LibraryCourseViewMode.feed),
           ),
         ],
       ),
@@ -1308,20 +1570,22 @@ class _CourseViewModeButton extends StatelessWidget {
     required this.icon,
     required this.selected,
     required this.onTap,
+    this.tooltip,
   });
 
   final IconData icon;
   final bool selected;
   final VoidCallback onTap;
+  final String? tooltip;
 
   @override
   Widget build(BuildContext context) {
-    return InkWell(
+    final Widget button = InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(999),
       child: Container(
-        width: 44,
-        height: 44,
+        width: 40,
+        height: 40,
         decoration: BoxDecoration(
           color: selected ? AppDesignTokens.brandGreen : AppDesignTokens.skyLight,
           borderRadius: BorderRadius.circular(999),
@@ -1329,13 +1593,18 @@ class _CourseViewModeButton extends StatelessWidget {
         ),
         child: Icon(
           icon,
-          size: 20,
+          size: 18,
           color: selected
-              ? AppDesignTokens.appWhite
+              ? AppDesignTokens.onAccent
               : AppDesignTokens.primaryBlueDark,
         ),
       ),
     );
+    final String? tip = tooltip;
+    if (tip == null || tip.isEmpty) {
+      return button;
+    }
+    return Tooltip(message: tip, child: button);
   }
 }
 
@@ -1518,7 +1787,7 @@ class _LibraryTodayFeed extends ConsumerWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: <Widget>[
-        const Text(
+        Text(
           '今日更新',
           style: TextStyle(
             fontSize: 18,
@@ -1533,7 +1802,7 @@ class _LibraryTodayFeed extends ConsumerWidget {
             child: ListTile(
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(16),
-                side: const BorderSide(color: AppDesignTokens.borderGray),
+                side: BorderSide(color: AppDesignTokens.borderGray),
               ),
               tileColor: Colors.white,
               title: Text(
@@ -1572,7 +1841,7 @@ class _EmptyEpisodesState extends StatelessWidget {
         borderRadius: BorderRadius.circular(24),
         border: Border.all(color: AppDesignTokens.borderGray),
       ),
-      child: const Column(
+      child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
           Text(

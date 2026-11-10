@@ -214,7 +214,7 @@ class _ModalHeader extends StatelessWidget {
                 ),
               ),
               const SizedBox(width: 12),
-              const Expanded(
+              Expanded(
                 child: Text(
                   '导入影视',
                   style: TextStyle(
@@ -259,7 +259,7 @@ class _IconAction extends StatelessWidget {
           foregroundColor: AppDesignTokens.brandGreenDark,
           minimumSize: const Size(44, 44),
           padding: EdgeInsets.zero,
-          side: const BorderSide(color: AppDesignTokens.borderGray),
+          side: BorderSide(color: AppDesignTokens.borderGray),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(14),
           ),

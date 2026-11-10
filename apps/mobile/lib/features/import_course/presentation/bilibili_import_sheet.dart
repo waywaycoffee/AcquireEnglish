@@ -4,6 +4,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../library/presentation/library_catalog_provider.dart';
 import '../../library/presentation/library_mock_data.dart';
 import '../../player/presentation/widgets/study_shell_tokens.dart';
+import '../../settings/presentation/bilibili_login_sheet.dart';
+import '../../settings/presentation/settings_provider.dart';
+import '../data/bilibili_course_builder.dart';
 import '../data/bilibili_import_service.dart';
 import '../domain/bilibili_import.dart';
 
@@ -35,9 +38,10 @@ class _BilibiliImportForm extends ConsumerStatefulWidget {
 
 class _BilibiliImportFormState extends ConsumerState<_BilibiliImportForm> {
   final TextEditingController _controller = TextEditingController();
-  final BilibiliImportService _service = BilibiliImportService();
   String? _error;
   bool _busy = false;
+  double? _progress;
+  String _status = '';
 
   @override
   void dispose() {
@@ -45,67 +49,49 @@ class _BilibiliImportFormState extends ConsumerState<_BilibiliImportForm> {
     super.dispose();
   }
 
+  BilibiliImportService _serviceForSettings() {
+    final LearningSettingsState settings = ref.read(learningSettingsProvider);
+    return BilibiliImportService.withCookie(
+      settings.resolvedBilibiliCookieHeader,
+    );
+  }
+
   Future<void> _submit() async {
-    if (!BilibiliImport.isBilibiliUrl(_controller.text)) {
-      setState(() => _error = '请输入有效的 Bilibili 链接、BVxxx 或 av 号');
+    final String cleaned = BilibiliImport.normalizeInput(_controller.text);
+    if (cleaned != _controller.text) {
+      _controller.value = TextEditingValue(
+        text: cleaned,
+        selection: TextSelection.collapsed(offset: cleaned.length),
+      );
+    }
+    if (!BilibiliImport.looksLikeBilibiliInput(cleaned)) {
+      setState(() => _error = '识别不到 B 站链接。可粘贴完整分享文案，或 b23.tv / BV / av');
       return;
     }
     setState(() {
       _busy = true;
       _error = null;
+      _progress = null;
+      _status = '正在解析链接…';
     });
     try {
-      final BilibiliImportResult meta = await _service.fetch(_controller.text);
-      final String courseId = 'bilibili-${meta.idKey}';
-      final bool hasEn = meta.enSubtitlePath != null;
-      final bool hasZh = meta.cnSubtitlePath != null;
-      final LibraryCourseData course = LibraryCourseData(
-        id: courseId,
-        title: meta.title,
-        description: meta.author == null
-            ? meta.watchUrl
-            : '${meta.author} · ${meta.watchUrl}',
-        sourceLabel: 'Bilibili',
-        coverImage: 'assets/img/app_icon.png',
-        level: 'A2',
-        category: 'bilibili',
-        progressPercent: 0,
-        totalWords: 0,
-        completedEpisodes: 0,
-        totalEpisodes: 1,
-        lastStudiedStr: '未学习',
-        rating: 0,
-        episodes: <LibraryEpisodeItem>[
-          LibraryEpisodeItem(
-            id: '$courseId-01',
-            numberStr: '01',
-            title: meta.title,
-            durationMinutes: meta.durationMinutes,
-            hasChineseSubtitles: hasZh,
-            hasEnglishSubtitles: hasEn,
-            completed: false,
-            progressPercent: 0,
-            coverImage: 'assets/img/app_icon.png',
-            videoAsset: meta.watchUrl,
-            enSubtitleAsset: meta.enSubtitlePath,
-            cnSubtitleAsset: meta.cnSubtitlePath,
-            subtitleTracks: <LibrarySubtitleTrackItem>[
-              if (hasEn)
-                LibrarySubtitleTrackItem(
-                  languageCode: 'en',
-                  languageLabel: 'English',
-                  path: meta.enSubtitlePath!,
-                ),
-              if (hasZh)
-                LibrarySubtitleTrackItem(
-                  languageCode: 'zh',
-                  languageLabel: '中文',
-                  path: meta.cnSubtitlePath!,
-                ),
-            ],
-          ),
-        ],
+      final BilibiliImportService service = _serviceForSettings();
+      final BilibiliImportResult meta = await service.fetchAndDownloadLocal(
+        cleaned,
+        onProgress: (double? progress, String message) {
+          if (!mounted) {
+            return;
+          }
+          setState(() {
+            _progress = progress;
+            _status = message;
+          });
+        },
       );
+      if (meta.localVideoPath == null || meta.localVideoPath!.isEmpty) {
+        throw StateError('视频未能下载到本地');
+      }
+      final LibraryCourseData course = buildLibraryCourseFromBilibiliImport(meta);
       final bool ok = await ref
           .read(libraryCatalogProvider.notifier)
           .importCourse(course);
@@ -114,15 +100,12 @@ class _BilibiliImportFormState extends ConsumerState<_BilibiliImportForm> {
       }
       setState(() => _busy = false);
       Navigator.of(context).pop();
-      final String subtitleHint = (hasEn || hasZh)
-          ? '已拉取${hasEn ? '英' : ''}${hasEn && hasZh ? '/' : ''}${hasZh ? '中' : ''}字幕。'
-          : '未找到字幕，打开后可用语音识别生成。';
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
             ok
-                ? '已加入书库。$subtitleHint播放页链接可能需本地下载视频后精听。'
-                : '该书库中已有此 Bilibili 课程',
+                ? '已加入书库。${bilibiliImportSuccessHint(meta)}'
+                : '导入未完成，请重试',
           ),
         ),
       );
@@ -132,6 +115,8 @@ class _BilibiliImportFormState extends ConsumerState<_BilibiliImportForm> {
       }
       setState(() {
         _busy = false;
+        _progress = null;
+        _status = '';
         _error = '导入失败：$e';
       });
     }
@@ -139,6 +124,8 @@ class _BilibiliImportFormState extends ConsumerState<_BilibiliImportForm> {
 
   @override
   Widget build(BuildContext context) {
+    final LearningSettingsState settings = ref.watch(learningSettingsProvider);
+    final bool hasCookie = settings.hasBilibiliCookie;
     return Column(
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -152,19 +139,54 @@ class _BilibiliImportFormState extends ConsumerState<_BilibiliImportForm> {
           ),
         ),
         const SizedBox(height: 8),
-        const Text(
-          '支持 BV / av 链接。有字幕则写入学习轴；无字幕可 ASR。直链播放大多需另存本地视频。',
-          style: TextStyle(color: StudyShellTokens.textSecondary),
+        Text(
+          hasCookie
+              ? '粘贴分享文案后会先下载视频与官方字幕到本地，再加入书库。'
+              : '粘贴分享文案后会先下载视频到本地。官方字幕需先登录 B 站（扫码即可）。',
+          style: const TextStyle(color: StudyShellTokens.textSecondary),
         ),
+        if (!hasCookie) ...<Widget>[
+          const SizedBox(height: 8),
+          OutlinedButton.icon(
+            onPressed: _busy
+                ? null
+                : () async {
+                    final bool ok = await showBilibiliLoginSheet(context, ref);
+                    if (!mounted || !ok) {
+                      return;
+                    }
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('B 站登录成功，可继续导入')),
+                    );
+                  },
+            icon: const Icon(Icons.qr_code_2_rounded),
+            label: const Text('扫码登录哔哩哔哩'),
+          ),
+        ],
         const SizedBox(height: 12),
         TextField(
           controller: _controller,
+          enabled: !_busy,
           style: const TextStyle(color: StudyShellTokens.textPrimary),
+          minLines: 1,
+          maxLines: 4,
           decoration: const InputDecoration(
-            hintText: 'https://www.bilibili.com/video/BVxxxx',
+            hintText: '【标题-哔哩哔哩】 https://b23.tv/xxxxx',
             hintStyle: TextStyle(color: StudyShellTokens.textMuted),
           ),
         ),
+        if (_busy) ...<Widget>[
+          const SizedBox(height: 12),
+          if (_progress != null)
+            LinearProgressIndicator(value: _progress)
+          else
+            const LinearProgressIndicator(),
+          const SizedBox(height: 8),
+          Text(
+            _status.isEmpty ? '处理中…' : _status,
+            style: const TextStyle(color: StudyShellTokens.textSecondary),
+          ),
+        ],
         if (_error != null) ...<Widget>[
           const SizedBox(height: 8),
           Text(_error!, style: const TextStyle(color: Colors.redAccent)),
@@ -175,7 +197,7 @@ class _BilibiliImportFormState extends ConsumerState<_BilibiliImportForm> {
           style: FilledButton.styleFrom(
             backgroundColor: const Color(0xFFFB7299),
           ),
-          child: Text(_busy ? '拉取中…' : '加入书库'),
+          child: Text(_busy ? '下载中…' : '下载并加入书库'),
         ),
       ],
     );

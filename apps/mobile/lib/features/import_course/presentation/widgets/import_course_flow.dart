@@ -291,7 +291,7 @@ class _ImportCourseFlowState extends ConsumerState<ImportCourseFlow> {
       ],
     ),
     SizedBox(height: context.isPadCompact ? 8 : 10),
-    const Text(
+    Text(
       '把本地视频和字幕整理成新的学习片库。',
       style: TextStyle(
         fontSize: 14,
@@ -798,7 +798,7 @@ class _ImportDestinationStep extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 8),
-        const Text(
+        Text(
           '可新建一个季/系列，也可以继续追加到已有课程。',
           style: TextStyle(
             fontSize: 14,
@@ -997,7 +997,7 @@ class _BottomActions extends StatelessWidget {
             style: FilledButton.styleFrom(
               backgroundColor: AppDesignTokens.brandGreenDark,
               disabledBackgroundColor: const Color(0xFFE2E0DF),
-              foregroundColor: AppDesignTokens.appWhite,
+              foregroundColor: AppDesignTokens.onAccent,
               disabledForegroundColor: const Color(0xFF9F9A96),
               padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
               shape: RoundedRectangleBorder(
@@ -1011,7 +1011,7 @@ class _BottomActions extends StatelessWidget {
                     height: 18,
                     child: CircularProgressIndicator(
                       strokeWidth: 2,
-                      color: AppDesignTokens.appWhite,
+                      color: AppDesignTokens.onAccent,
                     ),
                   )
                 : Icon(primaryAction!.icon, size: 18),
@@ -1068,7 +1068,7 @@ class _HeaderIconButton extends StatelessWidget {
           foregroundColor: AppDesignTokens.brandGreenDark,
           minimumSize: const Size(44, 44),
           padding: EdgeInsets.zero,
-          side: const BorderSide(color: AppDesignTokens.borderGray),
+          side: BorderSide(color: AppDesignTokens.borderGray),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(14),
           ),
@@ -1118,7 +1118,7 @@ class _SourceSelectionStep extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 10),
-        const Text(
+        Text(
           '原始字幕会作为课程字幕保存；之后仍可在播放器中生成并切换 AI 字幕。请仅导入你有权保存和学习的媒体。',
           style: TextStyle(
             fontSize: 15,
@@ -1158,7 +1158,7 @@ class _SourceSelectionStep extends StatelessWidget {
               onPressed: selecting ? null : onSelectLocalFolder,
               style: FilledButton.styleFrom(
                 backgroundColor: AppDesignTokens.brandGreenDark,
-                foregroundColor: AppDesignTokens.appWhite,
+                foregroundColor: AppDesignTokens.onAccent,
                 padding: const EdgeInsets.symmetric(
                   horizontal: 22,
                   vertical: 18,
@@ -1171,7 +1171,7 @@ class _SourceSelectionStep extends StatelessWidget {
                       height: 18,
                       child: CircularProgressIndicator(
                         strokeWidth: 2,
-                        color: AppDesignTokens.appWhite,
+                        color: AppDesignTokens.onAccent,
                       ),
                     )
                   : const Icon(Icons.folder_open_rounded, size: 18),
@@ -1201,7 +1201,7 @@ class _SourceSelectionStep extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 12),
-          const Text(
+          Text(
             'm3u8 当前支持未加密分片流；有字幕文件时可在下一步或播放器中补充。',
             style: TextStyle(
               fontSize: 13,
@@ -1215,7 +1215,7 @@ class _SourceSelectionStep extends StatelessWidget {
             const SizedBox(height: 8),
             Text(
               downloadProgressText ?? '正在下载...',
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 13,
                 fontWeight: FontWeight.w700,
                 color: AppDesignTokens.textSecondary,
@@ -1272,7 +1272,7 @@ class _SourceModeCard extends StatelessWidget {
             const SizedBox(height: 12),
             Text(
               title,
-              style: const TextStyle(
+              style: TextStyle(
                 fontWeight: FontWeight.w900,
                 color: AppDesignTokens.textPrimary,
               ),
@@ -1280,7 +1280,7 @@ class _SourceModeCard extends StatelessWidget {
             const SizedBox(height: 5),
             Text(
               body,
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 12,
                 height: 1.35,
                 color: AppDesignTokens.textSecondary,
@@ -1324,7 +1324,7 @@ class _ParsingStep extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 10),
-        const Text(
+        Text(
           '字幕可选。选择字幕文件夹时会按同名规则匹配中英字幕；没有字幕也可以先导入视频，之后在播放器里生成 AI 字幕。',
           style: TextStyle(
             fontSize: 15,
@@ -1347,7 +1347,7 @@ class _ParsingStep extends StatelessWidget {
             onPressed: selectingSubtitle ? null : onSelectSubtitleFolder,
             style: FilledButton.styleFrom(
               backgroundColor: AppDesignTokens.brandGreenDark,
-              foregroundColor: AppDesignTokens.appWhite,
+              foregroundColor: AppDesignTokens.onAccent,
               padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(999),
@@ -1360,7 +1360,7 @@ class _ParsingStep extends StatelessWidget {
                     height: 18,
                     child: CircularProgressIndicator(
                       strokeWidth: 2,
-                      color: AppDesignTokens.appWhite,
+                      color: AppDesignTokens.onAccent,
                     ),
                   )
                 : const Icon(Icons.folder_open_rounded, size: 18),
@@ -1386,7 +1386,7 @@ class _ParsingStep extends StatelessWidget {
                 width: compact ? 52 : 60,
                 height: compact ? 52 : 60,
                 decoration: BoxDecoration(
-                  color: AppDesignTokens.appWhite,
+                  color: AppDesignTokens.onAccent,
                   borderRadius: BorderRadius.circular(20),
                 ),
                 child: Center(
@@ -1410,7 +1410,7 @@ class _ParsingStep extends StatelessWidget {
                   children: <Widget>[
                     Text(
                       parsing ? '正在分析视频和字幕...' : '已准备好开始智能解析',
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.w800,
                         color: AppDesignTokens.textPrimary,
@@ -1421,7 +1421,7 @@ class _ParsingStep extends StatelessWidget {
                       subtitleFolder == null
                           ? '先补充字幕文件夹，再开始扫描匹配。'
                           : '系统会按文件名自动对齐视频、中英字幕和剧集结果。',
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 13,
                         height: 1.45,
                         color: AppDesignTokens.textSecondary,
@@ -1533,7 +1533,7 @@ class _ImportPathRow extends StatelessWidget {
               children: <Widget>[
                 Text(
                   label,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 12,
                     fontWeight: FontWeight.w800,
                     color: AppDesignTokens.textSecondary,
@@ -1542,7 +1542,7 @@ class _ImportPathRow extends StatelessWidget {
                 const SizedBox(height: 6),
                 Text(
                   value,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 14,
                     fontWeight: FontWeight.w700,
                     color: AppDesignTokens.textPrimary,

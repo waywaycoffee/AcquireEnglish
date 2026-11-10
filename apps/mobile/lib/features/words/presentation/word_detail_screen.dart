@@ -370,7 +370,7 @@ class _WordHeader extends StatelessWidget {
                       definition!.phonetic,
                       definition!.partOfSpeech,
                     ].where((String item) => item.isNotEmpty).join(' · '),
-                    style: const TextStyle(
+                    style: TextStyle(
                       color: AppDesignTokens.textSecondary,
                     ),
                   ),
@@ -491,7 +491,7 @@ class _OccurrenceCard extends StatelessWidget {
           const SizedBox(height: 6),
           Text(
             contextItem.chinese,
-            style: const TextStyle(color: AppDesignTokens.textSecondary),
+            style: TextStyle(color: AppDesignTokens.textSecondary),
           ),
         ],
         if (contextItem.apiTranslationCn != null) ...<Widget>[

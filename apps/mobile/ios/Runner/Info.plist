@@ -28,6 +28,10 @@
 	<string>LaunchScreen</string>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>录制您的跟读，用于与视频原声进行本地回放和波形对照。</string>
+	<key>NSPhotoLibraryAddUsageDescription</key>
+	<string>将 B 站登录二维码保存到相册，方便用另一台手机扫码。</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>将 B 站登录二维码保存到相册，方便用另一台手机扫码。</string>
 	<key>UIMainStoryboardFile</key>
 	<string>Main</string>
 	<key>UISupportedInterfaceOrientations</key>

@@ -238,27 +238,29 @@ class _InfoChip extends StatelessWidget {
   const _InfoChip({
     required this.icon,
     required this.label,
-    this.backgroundColor = AppDesignTokens.softWhite,
-    this.textColor = AppDesignTokens.textPrimary,
+    this.backgroundColor,
+    this.textColor,
   });
 
   final IconData icon;
   final String label;
-  final Color backgroundColor;
-  final Color textColor;
+  final Color? backgroundColor;
+  final Color? textColor;
 
   @override
   Widget build(BuildContext context) {
+    final Color bg = backgroundColor ?? AppDesignTokens.softWhite;
+    final Color fg = textColor ?? AppDesignTokens.textPrimary;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
       decoration: BoxDecoration(
-        color: backgroundColor,
+        color: bg,
         borderRadius: BorderRadius.circular(999),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: <Widget>[
-          Icon(icon, size: 16, color: textColor),
+          Icon(icon, size: 16, color: fg),
           const SizedBox(width: 6),
           Flexible(
             child: Text(
@@ -266,7 +268,7 @@ class _InfoChip extends StatelessWidget {
               style: TextStyle(
                 fontSize: 13,
                 fontWeight: FontWeight.w700,
-                color: textColor,
+                color: fg,
               ),
             ),
           ),

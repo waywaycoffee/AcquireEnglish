@@ -197,7 +197,7 @@ class _WordLookupPopupCardState extends ConsumerState<WordLookupPopupCard> {
         padding: const EdgeInsets.only(top: 8),
         child: Text(
           _errorMessage!,
-          style: const TextStyle(
+          style: TextStyle(
             height: 1.45,
             color: AppDesignTokens.textSecondary,
           ),
@@ -224,7 +224,7 @@ class _WordLookupPopupCardState extends ConsumerState<WordLookupPopupCard> {
                 _entry?.word ?? widget.rawWord,
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 18,
                   fontWeight: FontWeight.w800,
                   color: AppDesignTokens.textPrimary,
@@ -409,7 +409,7 @@ class _WordLookupPopupBody extends StatelessWidget {
               },
               child: Text(
                 entry.definitionCn,
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 20,
                   fontWeight: FontWeight.w800,
                   height: 1.35,
@@ -439,7 +439,7 @@ class _WordLookupPopupBody extends StatelessWidget {
                     englishDefinition,
                     if (usageNote.isNotEmpty) usageNote,
                   ].join('\n\n'),
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 14,
                     fontWeight: FontWeight.w600,
                     height: 1.45,
@@ -469,7 +469,7 @@ class _WordLookupPopupBody extends StatelessWidget {
                               contextMeaning != entry.definitionCn
                           ? '当前句子里更接近'
                           : '原句上下文',
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 12,
                         fontWeight: FontWeight.w700,
                         color: AppDesignTokens.textSecondary,
@@ -497,7 +497,7 @@ class _WordLookupPopupBody extends StatelessWidget {
                 const SizedBox(height: 6),
                 Text(
                   contextMeaning,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 15,
                     fontWeight: FontWeight.w700,
                     height: 1.4,
@@ -509,7 +509,7 @@ class _WordLookupPopupBody extends StatelessWidget {
                 const SizedBox(height: 8),
                 Text(
                   trimmedContext,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 13,
                     height: 1.5,
                     color: AppDesignTokens.textSecondary,
@@ -520,7 +520,7 @@ class _WordLookupPopupBody extends StatelessWidget {
                 const SizedBox(height: 8),
                 Text(
                   usageNote,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 13,
                     height: 1.5,
                     color: AppDesignTokens.textSecondary,
@@ -531,7 +531,7 @@ class _WordLookupPopupBody extends StatelessWidget {
                 const SizedBox(height: 10),
                 Row(
                   children: <Widget>[
-                    const Expanded(
+                    Expanded(
                       child: Text(
                         '新句子',
                         style: TextStyle(
@@ -556,7 +556,7 @@ class _WordLookupPopupBody extends StatelessWidget {
                 const SizedBox(height: 6),
                 Text(
                   exampleSentence,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 13,
                     height: 1.5,
                     color: AppDesignTokens.textPrimary,
@@ -569,7 +569,7 @@ class _WordLookupPopupBody extends StatelessWidget {
         const SizedBox(height: 8),
         Text(
           '翻译来源：${entry.sourceLabel}',
-          style: const TextStyle(
+          style: TextStyle(
             fontSize: 12,
             color: AppDesignTokens.textSecondary,
           ),

@@ -1,13 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:gap/gap.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../../constants/assets.dart';
 import '../../../../router/app_router.dart';
-import '../../../shared/presentation/continue_learning_button.dart';
+import '../../../shared/presentation/pad/app_design_tokens.dart';
 import '../../domain/login_response.dart';
-import '../register/register_dialog.dart';
 import 'auth_ui_model.dart';
 import 'login_controller.dart';
 
@@ -15,12 +13,14 @@ class LoginScreen extends ConsumerStatefulWidget {
   const LoginScreen({super.key});
 
   @override
-  ConsumerState<ConsumerStatefulWidget> createState() => _LoginScreenState();
+  ConsumerState<LoginScreen> createState() => _LoginScreenState();
 }
 
 class _LoginScreenState extends ConsumerState<LoginScreen> {
+  final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
   late final TextEditingController _emailController;
   late final TextEditingController _passwordController;
+  bool _submitting = false;
 
   @override
   void initState() {
@@ -36,286 +36,255 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     super.dispose();
   }
 
+  Future<void> _submit() async {
+    if (!(_formKey.currentState?.validate() ?? false) || _submitting) {
+      return;
+    }
+    setState(() => _submitting = true);
+    try {
+      final LoginResponse result = await ref
+          .read(loginControllerProvider.notifier)
+          .login(
+            email: _emailController.text,
+            password: _passwordController.text,
+          );
+      if (!mounted) {
+        return;
+      }
+      if (result.token.isNotEmpty) {
+        context.go(SGRoute.home.route);
+      }
+    } catch (error) {
+      if (!mounted) {
+        return;
+      }
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('$error'.replaceFirst('Exception: ', ''))));
+    } finally {
+      if (mounted) {
+        setState(() => _submitting = false);
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-    final AsyncValue<AuthUiModel> authUiModelAsync = ref.watch(
-      loginControllerProvider,
-    ); // Access the state
+    final AsyncValue<AuthUiModel> authAsync = ref.watch(loginControllerProvider);
     ref.listen(loginControllerProvider, (
       AsyncValue<AuthUiModel>? previous,
       AsyncValue<AuthUiModel> next,
     ) {
-      if (next.value?.user != null) {
-        _emailController.text = next.value!.user!.email;
-        _passwordController.text = next.value!.user!.password;
+      final String? email = next.value?.user?.email;
+      if (email != null &&
+          email.isNotEmpty &&
+          _emailController.text.isEmpty) {
+        _emailController.text = email;
       }
     });
+
+    final bool showPassword = authAsync.value?.showPassword ?? false;
+
     return Scaffold(
-      floatingActionButton: const ContinueLearningButton(),
-      extendBodyBehindAppBar: true,
+      backgroundColor: AppDesignTokens.softWhite,
       appBar: AppBar(
-        title: const Text('Login'),
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        foregroundColor: AppDesignTokens.textPrimary,
+        title: const Text('登录'),
         actions: <Widget>[
-          IconButton(
-            icon: const Icon(Icons.person_outline_outlined),
-            onPressed: () async {
-              await showAdaptiveDialog<void>(
-                context: context,
-                builder: (_) {
-                  return const RegisterDialog();
-                },
-              );
-            },
+          TextButton(
+            onPressed: () => context.push(SGRoute.register.route),
+            child: Text(
+              '注册',
+              style: TextStyle(
+                color: AppDesignTokens.brandGreenDark,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
           ),
         ],
-        leading: IconButton(
-          icon: const Icon(Icons.settings_outlined),
-          onPressed: () {
-            throw UnimplementedError();
-          },
-        ),
       ),
-      body: authUiModelAsync.when(
-        data: (AuthUiModel authUiModel) => SafeArea(
-          minimum: const EdgeInsets.symmetric(horizontal: 24),
-          child: CustomScrollView(
-            slivers: <Widget>[
-              SliverFillRemaining(
-                hasScrollBody: false,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: <Widget>[
-                    const Spacer(),
-                    Center(
-                      child: Image.asset(Assets.logo, height: 90, width: 90),
-                    ),
-                    const Spacer(),
-                    Center(
-                      child: Text(
-                        'Welcome to the app',
-                        style: TextStyle(
-                          fontSize: 26,
-                          fontWeight: FontWeight.w600,
-                          color: Theme.of(context).colorScheme.primary,
-                        ),
-                      ),
-                    ),
-                    const Gap(10),
-                    const Text(
-                      'You can login with your email and password',
-                      textAlign: TextAlign.center,
-                      style: TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.w400,
-                      ),
-                    ),
-                    const Spacer(),
-                    const Text(
-                      'Login',
-                      style: TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                    const Gap(10),
-                    TextFormField(
-                      controller: _emailController,
-                      keyboardType: TextInputType.emailAddress,
-                      textInputAction: TextInputAction.next,
-                      autofillHints: const <String>[AutofillHints.email],
-                      autovalidateMode: AutovalidateMode.onUnfocus,
-                      validator: (String? value) {
-                        if (value == null || value.isEmpty) {
-                          return 'Please enter an email address';
-                        }
-                        // Regex for validating email format
-                        final RegExp emailRegex = RegExp(
-                          r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$',
-                        );
-                        if (!emailRegex.hasMatch(value)) {
-                          return 'Please enter a valid email address';
-                        }
-                        return null;
-                      },
-                      decoration: const InputDecoration(
-                        contentPadding: EdgeInsets.symmetric(
-                          vertical: 10,
-                          horizontal: 15,
-                        ),
-                        hintText: 'Enter your email',
-                        hintStyle: TextStyle(color: Colors.black54),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.all(Radius.circular(10)),
-                        ),
-                      ),
-                    ),
-                    const Gap(15),
-                    const Text(
-                      'Password',
-                      style: TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                    const Gap(10),
-                    TextFormField(
-                      controller: _passwordController,
-                      obscureText: !authUiModelAsync.value!.showPassword,
-                      enableSuggestions: false,
-                      autocorrect: false,
-                      autofillHints: const <String>[AutofillHints.password],
-                      textInputAction: TextInputAction.done,
-                      keyboardType: TextInputType.visiblePassword,
-                      // validator: (String? value) {
-                      //   /// Password validation logic
-                      //   if (value != null && value.isNotEmpty) {
-                      //     return 'Check letter case carefully.';
-                      //   }
-                      //   return null;
-                      // },
-                      autovalidateMode: AutovalidateMode.onUserInteraction,
-                      onFieldSubmitted: (String value) {
-                        FocusScope.of(context).unfocus();
-                        ref
-                            .read(loginControllerProvider.notifier)
-                            .login(
-                              email: _emailController.text,
-                              password: _passwordController.text,
-                            );
-                      },
-                      decoration: InputDecoration(
-                        contentPadding: const EdgeInsets.symmetric(
-                          vertical: 10,
-                          horizontal: 15,
-                        ),
-                        border: const OutlineInputBorder(
-                          borderRadius: BorderRadius.all(Radius.circular(10)),
-                        ),
-                        hintText: 'Enter your password',
-                        hintStyle: const TextStyle(color: Colors.black54),
-                        suffixIcon: IconButton(
-                          icon: Icon(
-                            authUiModel.showPassword
-                                ? Icons.visibility_outlined
-                                : Icons.visibility_off_outlined,
-                          ),
-                          onPressed: () => ref
-                              .read(loginControllerProvider.notifier)
-                              .updateShowPassword(
-                                showPassword: !authUiModel.showPassword,
-                              ),
-                        ),
-                      ),
-                    ),
-                    const Gap(10),
-                    Row(
-                      children: <Widget>[
-                        SizedBox(
-                          height: 20,
-                          width: 20,
-                          child: Checkbox(
-                            value: authUiModel.rememberMe,
-                            onChanged: (bool? value) {
-                              ref
-                                  .read(loginControllerProvider.notifier)
-                                  .updateRememberMe(rememberMe: value ?? false);
-                            },
-                            materialTapTargetSize:
-                                MaterialTapTargetSize.shrinkWrap,
-                          ),
-                        ),
-                        const Gap(5),
-                        const Text(
-                          'Remember me',
-                          style: TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.w400,
-                          ),
-                        ),
-                        const Spacer(),
-                        TextButton(
-                          style: TextButton.styleFrom(
-                            // ignore: use_named_constants since they dont allow constant values
-                            minimumSize: const Size(0, 0),
-                            // ignore: use_named_constants
-                            padding: const EdgeInsets.all(0),
-                            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                          ),
-                          child: const Text(
-                            'Create an account',
-                            style: TextStyle(
-                              decoration: TextDecoration.underline,
-                            ),
-                          ),
-                          onPressed: () async {
-                            await showAdaptiveDialog<void>(
-                              context: context,
-                              barrierDismissible: true,
-                              barrierColor: Colors.black54,
-                              builder: (_) {
-                                return const RegisterDialog();
-                              },
-                            );
-                          },
-                        ),
-                      ],
-                    ),
-                    const Spacer(flex: 2),
-                    TextButton(
-                      style: TextButton.styleFrom(
-                        minimumSize: const Size.fromHeight(50),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                        side: BorderSide(
-                          color: Theme.of(context).colorScheme.primary,
-                        ),
-                      ),
-                      onPressed: () {
-                        ref
-                            .read(loginControllerProvider.notifier)
-                            .login(
-                              email: _emailController.text,
-                              password: _passwordController.text,
-                            )
-                            .catchError((dynamic error, StackTrace stackTrace) {
-                              // Handle error here
-                              if (context.mounted) {
-                                // Show error message to the user
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  SnackBar(content: Text(error.toString())),
-                                );
-                              }
-                              return const LoginResponse(token: '');
-                            })
-                            .then((LoginResponse loginResponse) {
-                              // Check for token and also context.mounted
-                              // to avoid context access after dispose
-                              if (loginResponse.token.isNotEmpty &&
-                                  context.mounted) {
-                                // Handle successful login
-                                context.push(SGRoute.home.route);
-                              }
-                            });
-                      },
-                      child: authUiModelAsync.isLoading
-                          ? const CircularProgressIndicator()
-                          : const Text('Login'),
-                    ),
-                    const Spacer(flex: 4),
-                  ],
-                ),
+      body: SafeArea(
+        child: ListView(
+          padding: const EdgeInsets.fromLTRB(24, 12, 24, 32),
+          children: <Widget>[
+            const SizedBox(height: 18),
+            Center(
+              child: Image.asset(
+                Assets.logoLockup,
+                height: 148,
+                fit: BoxFit.contain,
               ),
-            ],
-          ),
+            ),
+            const SizedBox(height: 18),
+            Text(
+              '登录后可同步学习进度、词库与偏好',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 14,
+                color: AppDesignTokens.textSecondary,
+              ),
+            ),
+            const SizedBox(height: 28),
+            Form(
+              key: _formKey,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: <Widget>[
+                  Text(
+                    '邮箱',
+                    style: TextStyle(
+                      fontWeight: FontWeight.w800,
+                      color: AppDesignTokens.textPrimary,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  TextFormField(
+                    controller: _emailController,
+                    keyboardType: TextInputType.emailAddress,
+                    textInputAction: TextInputAction.next,
+                    autofillHints: const <String>[AutofillHints.email],
+                    style: TextStyle(color: AppDesignTokens.textPrimary),
+                    validator: (String? value) {
+                      final String text = value?.trim() ?? '';
+                      if (text.isEmpty) {
+                        return '请输入邮箱';
+                      }
+                      if (!RegExp(
+                        r'^[^\s@]+@[^\s@]+\.[^\s@]+$',
+                      ).hasMatch(text)) {
+                        return '邮箱格式不正确';
+                      }
+                      return null;
+                    },
+                    decoration: _fieldDecoration('name@example.com'),
+                  ),
+                  const SizedBox(height: 16),
+                  Text(
+                    '密码',
+                    style: TextStyle(
+                      fontWeight: FontWeight.w800,
+                      color: AppDesignTokens.textPrimary,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  TextFormField(
+                    controller: _passwordController,
+                    obscureText: !showPassword,
+                    textInputAction: TextInputAction.done,
+                    autofillHints: const <String>[AutofillHints.password],
+                    style: TextStyle(color: AppDesignTokens.textPrimary),
+                    onFieldSubmitted: (_) => _submit(),
+                    validator: (String? value) {
+                      if (value == null || value.isEmpty) {
+                        return '请输入密码';
+                      }
+                      return null;
+                    },
+                    decoration: _fieldDecoration('请输入密码').copyWith(
+                      suffixIcon: IconButton(
+                        onPressed: () {
+                          ref
+                              .read(loginControllerProvider.notifier)
+                              .updateShowPassword(showPassword: !showPassword);
+                        },
+                        icon: Icon(
+                          showPassword
+                              ? Icons.visibility_outlined
+                              : Icons.visibility_off_outlined,
+                          color: AppDesignTokens.textSecondary,
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+                  SizedBox(
+                    width: double.infinity,
+                    height: 52,
+                    child: FilledButton(
+                      onPressed: _submitting ? null : _submit,
+                      style: FilledButton.styleFrom(
+                        backgroundColor: AppDesignTokens.brandGreen,
+                        foregroundColor: AppDesignTokens.onAccent,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(16),
+                        ),
+                      ),
+                      child: _submitting
+                          ? const SizedBox(
+                              width: 22,
+                              height: 22,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2.4,
+                                color: Colors.white,
+                              ),
+                            )
+                          : const Text(
+                              '登录',
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w900,
+                              ),
+                            ),
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+                  Center(
+                    child: TextButton(
+                      onPressed: () => context.push(SGRoute.register.route),
+                      child: Text(
+                        '还没有账号？去注册',
+                        style: TextStyle(
+                          color: AppDesignTokens.primaryBlue,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Center(
+                    child: TextButton(
+                      onPressed: () => context.go(SGRoute.home.route),
+                      child: Text(
+                        '先逛逛，稍后再登录',
+                        style: TextStyle(
+                          color: AppDesignTokens.textSecondary,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
         ),
-        error: (Object error, StackTrace stackTrace) {
-          return Center(child: Text('Error: $error'));
-        },
-        loading: () {
-          return const Center(child: CircularProgressIndicator());
-        },
       ),
     );
   }
+
+  InputDecoration _fieldDecoration(String hint) => InputDecoration(
+    hintText: hint,
+    hintStyle: TextStyle(color: AppDesignTokens.textSecondary),
+    filled: true,
+    fillColor: AppDesignTokens.isDark
+        ? AppDesignTokens.softGray
+        : Colors.white,
+    contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+    border: OutlineInputBorder(
+      borderRadius: BorderRadius.circular(14),
+      borderSide: BorderSide(color: AppDesignTokens.borderGray),
+    ),
+    enabledBorder: OutlineInputBorder(
+      borderRadius: BorderRadius.circular(14),
+      borderSide: BorderSide(color: AppDesignTokens.borderGray),
+    ),
+    focusedBorder: OutlineInputBorder(
+      borderRadius: BorderRadius.circular(14),
+      borderSide: const BorderSide(
+        color: AppDesignTokens.brandGreen,
+        width: 1.4,
+      ),
+    ),
+  );
 }

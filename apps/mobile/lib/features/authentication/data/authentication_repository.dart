@@ -1,10 +1,10 @@
 import 'package:dio/dio.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
-import '../../../data/repository/network_repository.dart';
 import '../../sync/data/acquire_api_client.dart';
 import '../domain/login_response.dart';
 import '../domain/register_response.dart';
+import '../presentation/auth_session.dart';
 
 part 'authentication_repository.g.dart';
 
@@ -14,15 +14,19 @@ abstract class AuthenticationRepository {
   Future<LoginResponse> login(String email, String password);
 
   /// Registers a new user with the given [email] and [password].
-  Future<RegisterResponse> register(String email, String password);
+  Future<RegisterResponse> register(
+    String email,
+    String password, {
+    String? displayName,
+  });
 }
 
 /// AcquireEnglish API auth (JWT access_token).
 class HttpAuthRepository implements AuthenticationRepository {
-  HttpAuthRepository(this._api, this._setToken);
+  HttpAuthRepository(this._api, this._session);
 
   final AcquireApiClient _api;
-  final void Function(String) _setToken;
+  final AuthSession _session;
 
   @override
   Future<LoginResponse> login(String email, String password) async {
@@ -31,33 +35,46 @@ class HttpAuthRepository implements AuthenticationRepository {
         email: email,
         password: password,
       );
-      _setToken(result.accessToken);
+      await _session.signIn(
+        accessToken: result.accessToken,
+        email: result.user.email,
+        displayName: result.user.displayName,
+      );
       return LoginResponse(token: result.accessToken);
     } on DioException catch (e) {
       if (e.response?.statusCode == 401) {
-        throw Exception('Invalid credentials');
+        throw Exception('邮箱或密码不正确');
       }
       if (e.response?.statusCode == 400) {
-        throw Exception('User not found');
+        throw Exception('账号不存在或请求无效');
       }
-      throw Exception('Login failed');
+      throw Exception('登录失败，请检查网络后重试');
     }
   }
 
   @override
-  Future<RegisterResponse> register(String email, String password) async {
+  Future<RegisterResponse> register(
+    String email,
+    String password, {
+    String? displayName,
+  }) async {
     try {
       final AcquireTokenResult result = await _api.register(
         email: email,
         password: password,
+        displayName: displayName,
       );
-      _setToken(result.accessToken);
+      await _session.signIn(
+        accessToken: result.accessToken,
+        email: result.user.email,
+        displayName: result.user.displayName ?? displayName,
+      );
       return RegisterResponse(id: result.user.id, token: result.accessToken);
     } on DioException catch (e) {
       if (e.response?.statusCode == 400) {
-        throw Exception('User already exists');
+        throw Exception('该邮箱已注册');
       }
-      rethrow;
+      throw Exception('注册失败，请检查网络后重试');
     }
   }
 }
@@ -66,7 +83,6 @@ class HttpAuthRepository implements AuthenticationRepository {
 AuthenticationRepository authenticationRepository(Ref ref) {
   return HttpAuthRepository(
     ref.read(acquireApiClientProvider),
-    (String token) =>
-        ref.read(networkRepositoryProvider.notifier).setToken(token),
+    ref.read(authSessionProvider.notifier),
   );
 }

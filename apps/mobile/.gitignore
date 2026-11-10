@@ -75,6 +75,11 @@ docs/
 # Service account files
 svc-keyfile.json
 
+# Local secrets (use .env.example as template)
+.env
+.env.local
+.env.*.local
+
 # Lockfiles
 Podfile.lock
 yarn.lock

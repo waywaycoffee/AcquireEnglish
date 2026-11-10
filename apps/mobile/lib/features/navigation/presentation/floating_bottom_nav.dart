@@ -3,6 +3,7 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../shared/presentation/android_system_inset.dart';
 import '../../shared/presentation/pad/app_design_tokens.dart';
 import 'navigation_destination.dart';
 
@@ -41,12 +42,13 @@ class FloatingBottomNav extends StatelessWidget {
         ? _primaryDestinations
         : destinations;
 
+    final double systemBottom = systemBottomInsetOf(context);
     return Padding(
       padding: EdgeInsets.fromLTRB(
         compact ? 10 : 16,
         compact ? 8 : 12,
         compact ? 10 : 16,
-        compact ? 10 : 16,
+        (compact ? 10 : 16) + systemBottom,
       ),
       child: ClipRRect(
         borderRadius: BorderRadius.circular(compact ? 22 : 28),
@@ -124,7 +126,7 @@ class _MoreNavItem extends StatelessWidget {
               child: selected
                   ? DecoratedBox(
                       decoration: BoxDecoration(
-                        color: AppDesignTokens.appWhite,
+                        color: AppDesignTokens.onAccent,
                         borderRadius: BorderRadius.circular(14),
                       ),
                       child: Icon(
@@ -144,7 +146,7 @@ class _MoreNavItem extends StatelessWidget {
               '更多',
               style: TextStyle(
                 color: selected
-                    ? AppDesignTokens.appWhite
+                    ? AppDesignTokens.onAccent
                     : AppDesignTokens.textSecondary,
                 fontSize: compact ? 10 : 11,
                 fontWeight: selected ? FontWeight.w800 : FontWeight.w700,
@@ -227,7 +229,7 @@ class _NavItem extends StatelessWidget {
               child: selected
                   ? DecoratedBox(
                       decoration: BoxDecoration(
-                        color: AppDesignTokens.appWhite,
+                        color: AppDesignTokens.onAccent,
                         borderRadius: BorderRadius.circular(14),
                       ),
                       child: Icon(
@@ -249,7 +251,7 @@ class _NavItem extends StatelessWidget {
               overflow: TextOverflow.ellipsis,
               style: TextStyle(
                 color: selected
-                    ? AppDesignTokens.appWhite
+                    ? AppDesignTokens.onAccent
                     : AppDesignTokens.textSecondary,
                 fontSize: compact ? 10 : 11,
                 fontWeight: selected ? FontWeight.w800 : FontWeight.w700,

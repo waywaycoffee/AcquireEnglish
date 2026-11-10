@@ -7,9 +7,13 @@ import '../../../shared/presentation/pad/app_design_tokens.dart';
 import '../../../shared/presentation/word_lookup_popup.dart';
 import '../player_mock_state.dart';
 import 'study_shell_tokens.dart';
+import 'subtitle_vocabulary_highlight.dart';
 import 'subtitle_word_highlight_style.dart';
 
-const double _activeFontSize = 20;
+const double _activeEnglishFontSize = 22;
+const double _inactiveEnglishFontSize = 19;
+const double _activeChineseFontSize = 13.5;
+const double _inactiveChineseFontSize = 12.5;
 
 class PlayerSubtitleList extends StatefulWidget {
   const PlayerSubtitleList({
@@ -23,6 +27,8 @@ class PlayerSubtitleList extends StatefulWidget {
     required this.highlightWords,
     this.subtitleWordHighlightStyle = '绿色填充',
     this.subtitleWordHighlightBorderWidth = 2.5,
+    this.savedVocabularyWords = const <String>{},
+    this.keyVocabularyWords = const <String>{},
     required this.onTapLine,
     required this.onCollectWord,
     this.onCollectWordAtTime,
@@ -48,7 +54,14 @@ class PlayerSubtitleList extends StatefulWidget {
     this.onRegenerateAiSubtitles,
     this.onDeleteAiSubtitles,
     this.onRegenerateAiLine,
+    this.bilingualPipelineLabel,
+    this.showAiCompleteButton = false,
+    this.onAiComplete,
+    this.onCancelBilingualPipeline,
     this.studyDarkStyle = false,
+    this.blindListening = false,
+    this.onDictionaryOpened,
+    this.onDictionaryClosed,
     super.key,
   });
 
@@ -62,6 +75,8 @@ class PlayerSubtitleList extends StatefulWidget {
   final bool highlightWords;
   final String subtitleWordHighlightStyle;
   final double subtitleWordHighlightBorderWidth;
+  final Set<String> savedVocabularyWords;
+  final Set<String> keyVocabularyWords;
   final ValueChanged<int> onTapLine;
   final ValueChanged<String> onCollectWord;
   final void Function(String word, String time)? onCollectWordAtTime;
@@ -87,7 +102,14 @@ class PlayerSubtitleList extends StatefulWidget {
   final VoidCallback? onRegenerateAiSubtitles;
   final VoidCallback? onDeleteAiSubtitles;
   final Future<void> Function(int index)? onRegenerateAiLine;
+  final String? bilingualPipelineLabel;
+  final bool showAiCompleteButton;
+  final VoidCallback? onAiComplete;
+  final VoidCallback? onCancelBilingualPipeline;
   final bool studyDarkStyle;
+  final bool blindListening;
+  final VoidCallback? onDictionaryOpened;
+  final VoidCallback? onDictionaryClosed;
 
   @override
   State<PlayerSubtitleList> createState() => _PlayerSubtitleListState();
@@ -96,6 +118,7 @@ class PlayerSubtitleList extends StatefulWidget {
 class _PlayerSubtitleListState extends State<PlayerSubtitleList> {
   final ScrollController _scrollController = ScrollController();
   final Map<int, GlobalKey> _rowKeys = <int, GlobalKey>{};
+  final Set<int> _blindRevealed = <int>{};
   String? _activeDictionaryTokenId;
   OverlayEntry? _dictionaryOverlayEntry;
   bool _autoFollowCurrentLine = true;
@@ -107,14 +130,20 @@ class _PlayerSubtitleListState extends State<PlayerSubtitleList> {
   void initState() {
     super.initState();
     _scrollController.addListener(_dismissDictionary);
-    if (widget.isPlaying) {
-      _scheduleScrollToActiveLine();
-    }
+    // Always bring the resume / active cue into view on first layout.
+    _scheduleScrollToActiveLine();
   }
 
   @override
   void didUpdateWidget(covariant PlayerSubtitleList oldWidget) {
     super.didUpdateWidget(oldWidget);
+    if (oldWidget.blindListening != widget.blindListening) {
+      _blindRevealed.clear();
+    }
+    // Resume auto-follow whenever playback starts again.
+    if (!oldWidget.isPlaying && widget.isPlaying) {
+      _autoFollowCurrentLine = true;
+    }
     final bool listStateChanged =
         oldWidget.activeIndex != widget.activeIndex ||
         oldWidget.lines.length != widget.lines.length ||
@@ -122,9 +151,10 @@ class _PlayerSubtitleListState extends State<PlayerSubtitleList> {
         oldWidget.showCurrentOnly != widget.showCurrentOnly;
     final bool shouldFollowCurrentLine =
         _autoFollowCurrentLine &&
-        widget.isPlaying &&
         (oldWidget.activeIndex != widget.activeIndex ||
-            oldWidget.isPlaying != widget.isPlaying);
+            oldWidget.isPlaying != widget.isPlaying ||
+            oldWidget.lines.length != widget.lines.length ||
+            oldWidget.showCurrentOnly != widget.showCurrentOnly);
 
     if (!listStateChanged && !shouldFollowCurrentLine) {
       return;
@@ -141,10 +171,11 @@ class _PlayerSubtitleListState extends State<PlayerSubtitleList> {
     }
 
     if (activeLineChanged && _dictionaryOverlayEntry != null) {
+      _scheduleScrollToActiveLine();
       return;
     }
 
-    if (shouldFollowCurrentLine) {
+    if (shouldFollowCurrentLine || listStructureChanged) {
       _scheduleScrollToActiveLine();
     }
   }
@@ -166,19 +197,19 @@ class _PlayerSubtitleListState extends State<PlayerSubtitleList> {
     if (_showCurrentOnly || !_scrollController.hasClients) {
       return;
     }
+    if (widget.activeIndex < 0 || widget.activeIndex >= widget.lines.length) {
+      return;
+    }
 
     final BuildContext? activeContext =
         _rowKeys[widget.activeIndex]?.currentContext;
     if (activeContext == null) {
-      final double targetOffset = (widget.activeIndex * 132.0).clamp(
+      final double estimatedExtent = widget.studyDarkStyle ? 118.0 : 132.0;
+      final double targetOffset = (widget.activeIndex * estimatedExtent).clamp(
         0.0,
         _scrollController.position.maxScrollExtent,
       );
-      _scrollController.animateTo(
-        targetOffset,
-        duration: const Duration(milliseconds: 220),
-        curve: Curves.easeOut,
-      );
+      _scrollController.jumpTo(targetOffset);
       return;
     }
 
@@ -186,14 +217,32 @@ class _PlayerSubtitleListState extends State<PlayerSubtitleList> {
       activeContext,
       duration: const Duration(milliseconds: 220),
       curve: Curves.easeOut,
-      alignment: 0.5,
+      alignment: 0.35,
     );
   }
 
-  void _scheduleScrollToActiveLine() {
+  void _scheduleScrollToActiveLine({int attempt = 0}) {
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted && _autoFollowCurrentLine) {
-        _scrollToActiveLine();
+      if (!mounted || !_autoFollowCurrentLine) {
+        return;
+      }
+      if (!_scrollController.hasClients) {
+        if (attempt < 10) {
+          _scheduleScrollToActiveLine(attempt: attempt + 1);
+        }
+        return;
+      }
+      _scrollToActiveLine();
+      // Second pass once the jumped-to row has been built.
+      if (attempt < 2 &&
+          _rowKeys[widget.activeIndex]?.currentContext == null) {
+        _scheduleScrollToActiveLine(attempt: attempt + 1);
+      } else if (attempt < 1) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted && _autoFollowCurrentLine) {
+            _scrollToActiveLine();
+          }
+        });
       }
     });
   }
@@ -213,10 +262,19 @@ class _PlayerSubtitleListState extends State<PlayerSubtitleList> {
     _removeDictionaryOverlay();
   }
 
-  void _removeDictionaryOverlay({bool notify = true}) {
+  void _removeDictionaryOverlay({
+    bool notify = true,
+    bool emitClosed = true,
+  }) {
+    final bool hadOverlay = _dictionaryOverlayEntry != null ||
+        _activeDictionaryTokenId != null;
     _dictionaryOverlayEntry?.remove();
     _dictionaryOverlayEntry = null;
+    if (hadOverlay && emitClosed) {
+      widget.onDictionaryClosed?.call();
+    }
     if (!notify || !mounted || _activeDictionaryTokenId == null) {
+      _activeDictionaryTokenId = null;
       return;
     }
     setState(() {
@@ -236,7 +294,8 @@ class _PlayerSubtitleListState extends State<PlayerSubtitleList> {
       return;
     }
 
-    _removeDictionaryOverlay(notify: false);
+    _removeDictionaryOverlay(notify: false, emitClosed: false);
+    widget.onDictionaryOpened?.call();
 
     final OverlayState overlayState = Overlay.of(context, rootOverlay: true);
     final RenderBox overlayBox =
@@ -426,43 +485,57 @@ class _PlayerSubtitleListState extends State<PlayerSubtitleList> {
                 .pronunciationUnavailableReasonForLine
                 ?.call(originalIndex);
             final bool dark = widget.studyDarkStyle;
+            final StudyShellColors shell = StudyShellColors.of(context);
+            final bool blindHidden = widget.blindListening &&
+                !_blindRevealed.contains(originalIndex);
             final double textOpacity = active ? 1 : (isPast ? 0.84 : 0.60);
+            final double chineseOnlyFontSize =
+                (active ? 18.0 : 16.0) * widget.fontScale;
             final double chineseFontSize =
-                (active ? 19.0 : 17.0) * widget.fontScale;
-            final double subtitleFontSize = 15 * widget.fontScale;
+                (active ? _activeChineseFontSize : _inactiveChineseFontSize) *
+                widget.fontScale;
             final Color inactiveStartTimeColor = dark
-                ? StudyShellTokens.textMuted
+                ? shell.textMuted
                 : const Color(0xFFADB7B0);
             final Color inactiveZhTextColor = dark
-                ? StudyShellTokens.textSecondary
+                ? shell.textSecondary
                 : const Color(0xFFB7C2BA);
 
             return InkWell(
               key: _rowKeyFor(originalIndex),
-              onTap: () => widget.onTapLine(originalIndex),
+              onTap: () {
+                if (blindHidden) {
+                  setState(() => _blindRevealed.add(originalIndex));
+                }
+                widget.onTapLine(originalIndex);
+              },
               onLongPress: () => _openActions(context, line, originalIndex),
               borderRadius: BorderRadius.circular(20),
               child: Ink(
-                padding: const EdgeInsets.all(12),
+                padding: EdgeInsets.all(dark ? 14 : 12),
                 decoration: BoxDecoration(
                   color: dark
-                      ? (active
-                            ? StudyShellTokens.cardActive
-                            : StudyShellTokens.card)
+                      ? (active ? shell.cardActive : shell.card)
                       : (active ? const Color(0xFFEFFFF5) : Colors.white),
-                  borderRadius: BorderRadius.circular(24),
+                  borderRadius: BorderRadius.circular(dark ? 18 : 24),
                   border: Border.all(
                     color: dark
-                        ? (active
-                              ? StudyShellTokens.borderActive
-                              : StudyShellTokens.border)
+                        ? (active ? shell.borderActive : shell.border)
                         : (active
                               ? AppDesignTokens.brandGreen
                               : const Color(0xFFE1E7E1)),
-                    width: active ? 2.5 : 1.5,
+                    width: active ? (dark ? 2 : 2.5) : 1,
                   ),
                   boxShadow: dark
-                      ? const <BoxShadow>[]
+                      ? (active
+                            ? <BoxShadow>[
+                                BoxShadow(
+                                  color: shell.glowAccent,
+                                  blurRadius: 16,
+                                  offset: const Offset(0, 4),
+                                ),
+                              ]
+                            : const <BoxShadow>[])
                       : const <BoxShadow>[
                           BoxShadow(
                             color: Color(0x0F000000),
@@ -486,7 +559,7 @@ class _PlayerSubtitleListState extends State<PlayerSubtitleList> {
                             color: const Color(0xFFFFF7D6),
                             borderRadius: BorderRadius.circular(14),
                           ),
-                          child: const Text(
+                          child: Text(
                             '正在学习',
                             style: TextStyle(
                               color: AppDesignTokens.textPrimary,
@@ -500,40 +573,64 @@ class _PlayerSubtitleListState extends State<PlayerSubtitleList> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: <Widget>[
                         if (dark) ...<Widget>[
-                          if (active)
-                            Center(
-                              child: IconButton(
-                                onPressed: widget.onTogglePlaying,
-                                icon: Icon(
-                                  widget.isPlaying
-                                      ? Icons.pause_rounded
-                                      : Icons.play_arrow_rounded,
-                                  color: StudyShellTokens.textPrimary,
-                                  size: 28,
-                                ),
-                              ),
-                            ),
                           Row(
                             children: <Widget>[
+                              Icon(
+                                Icons.lock_open_rounded,
+                                size: 16,
+                                color: active
+                                    ? shell.textSecondary
+                                    : shell.textMuted.withValues(
+                                        alpha: textOpacity,
+                                      ),
+                              ),
+                              const SizedBox(width: 6),
                               Text(
                                 line.startTime,
                                 style: TextStyle(
                                   fontSize: 12,
                                   fontWeight: FontWeight.w600,
                                   color: active
-                                      ? StudyShellTokens.textSecondary
+                                      ? shell.textSecondary
                                       : inactiveStartTimeColor.withValues(
                                           alpha: textOpacity,
                                         ),
                                 ),
                               ),
-                              const Spacer(),
+                              Expanded(
+                                child: active && widget.onTogglePlaying != null
+                                    ? Center(
+                                        child: IconButton(
+                                          onPressed: widget.onTogglePlaying,
+                                          visualDensity: VisualDensity.compact,
+                                          padding: EdgeInsets.zero,
+                                          constraints: const BoxConstraints(
+                                            minWidth: 36,
+                                            minHeight: 36,
+                                          ),
+                                          icon: Icon(
+                                            widget.isPlaying
+                                                ? Icons.pause_rounded
+                                                : Icons.play_arrow_rounded,
+                                            color: shell.textPrimary,
+                                            size: 26,
+                                          ),
+                                        ),
+                                      )
+                                    : const SizedBox.shrink(),
+                              ),
                               IconButton(
                                 onPressed: () =>
                                     widget.onBookmarkLine(originalIndex),
-                                icon: const Icon(
+                                visualDensity: VisualDensity.compact,
+                                padding: EdgeInsets.zero,
+                                constraints: const BoxConstraints(
+                                  minWidth: 36,
+                                  minHeight: 36,
+                                ),
+                                icon: Icon(
                                   Icons.favorite_border_rounded,
-                                  color: StudyShellTokens.textSecondary,
+                                  color: shell.textSecondary,
                                   size: 20,
                                 ),
                               ),
@@ -676,17 +773,43 @@ class _PlayerSubtitleListState extends State<PlayerSubtitleList> {
                             ],
                           ),
                         SizedBox(height: dark ? 4 : 8),
-                        if (widget.subtitleMode == '单中')
+                        if (blindHidden) ...<Widget>[
+                          Container(
+                            height: 14,
+                            margin: const EdgeInsets.only(bottom: 8),
+                            decoration: BoxDecoration(
+                              color: shell.chipIdle,
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                          ),
+                          Container(
+                            height: 12,
+                            width: 180,
+                            decoration: BoxDecoration(
+                              color: shell.chipIdle.withValues(alpha: 0.7),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                          ),
+                          const SizedBox(height: 10),
+                          Text(
+                            '点击显示',
+                            style: TextStyle(
+                              color: shell.textMuted,
+                              fontSize: 12,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ] else if (widget.subtitleMode == '单中')
                           Text(
                             line.chinese,
                             style: TextStyle(
-                              fontSize: chineseFontSize,
+                              fontSize: chineseOnlyFontSize,
                               fontWeight: active
-                                  ? FontWeight.w800
+                                  ? FontWeight.w700
                                   : FontWeight.w600,
                               color: active
                                   ? (dark
-                                        ? StudyShellTokens.textPrimary
+                                        ? shell.textPrimary
                                         : const Color(0xFF191C1E))
                                   : inactiveZhTextColor.withValues(
                                       alpha: textOpacity,
@@ -705,22 +828,24 @@ class _PlayerSubtitleListState extends State<PlayerSubtitleList> {
                                 : null,
                             active,
                             line.startTime,
+                            shellColors: dark ? shell : null,
                           ),
-                        if (widget.subtitleMode != '单英') ...<Widget>[
+                        if (!blindHidden && widget.subtitleMode != '单英') ...<Widget>[
                           const _SelectableLineBreak(),
-                          const SizedBox(height: 4),
+                          const SizedBox(height: 6),
                           Text(
                             line.chinese,
                             style: TextStyle(
-                              fontSize: subtitleFontSize,
+                              fontSize: chineseFontSize,
+                              fontWeight: FontWeight.w500,
                               color: active
                                   ? (dark
-                                        ? StudyShellTokens.textSecondary
+                                        ? shell.textSecondary
                                         : const Color(0xFF708077))
                                   : inactiveZhTextColor.withValues(
                                       alpha: textOpacity,
                                     ),
-                              height: 1.45,
+                              height: 1.4,
                             ),
                           ),
                         ],
@@ -753,24 +878,113 @@ class _PlayerSubtitleListState extends State<PlayerSubtitleList> {
       ),
     );
     final Color toolbarColor = widget.studyDarkStyle
-        ? StudyShellTokens.textSecondary
+        ? StudyShellColors.of(context).textSecondary
         : AppDesignTokens.textSecondary;
+    final StudyShellColors shell = StudyShellColors.of(context);
+    final bool showBilingualChip =
+        (widget.bilingualPipelineLabel?.trim().isNotEmpty ?? false) ||
+        widget.showAiCompleteButton;
     return Column(
       children: <Widget>[
+        if (showBilingualChip)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(8, 0, 8, 6),
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                color: widget.studyDarkStyle
+                    ? shell.chipIdle
+                    : const Color(0xFFF2F6F3),
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(
+                  color: widget.studyDarkStyle
+                      ? shell.border
+                      : const Color(0xFFE1E7E1),
+                ),
+              ),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                child: Row(
+                  children: <Widget>[
+                    Icon(
+                      Icons.subtitles_outlined,
+                      size: 18,
+                      color: widget.studyDarkStyle
+                          ? shell.textSecondary
+                          : AppDesignTokens.textSecondary,
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        widget.bilingualPipelineLabel?.trim().isNotEmpty ?? false
+                            ? widget.bilingualPipelineLabel!.trim()
+                            : '单语字幕可补全',
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w700,
+                          color: widget.studyDarkStyle
+                              ? shell.textPrimary
+                              : AppDesignTokens.textPrimary,
+                        ),
+                      ),
+                    ),
+                    if (widget.showAiCompleteButton &&
+                        widget.onAiComplete != null) ...<Widget>[
+                      const SizedBox(width: 6),
+                      FilledButton(
+                        key: const ValueKey<String>('bilingual-ai-complete'),
+                        onPressed: widget.onAiComplete,
+                        style: FilledButton.styleFrom(
+                          backgroundColor: shell.accent,
+                          foregroundColor: Colors.white,
+                          minimumSize: const Size(0, 34),
+                          padding: const EdgeInsets.symmetric(horizontal: 12),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                        child: const Text(
+                          'AI 补全',
+                          style: TextStyle(fontWeight: FontWeight.w700),
+                        ),
+                      ),
+                    ],
+                    if (widget.onCancelBilingualPipeline != null) ...<Widget>[
+                      const SizedBox(width: 4),
+                      IconButton(
+                        key: const ValueKey<String>('bilingual-pipeline-cancel'),
+                        tooltip: '取消',
+                        onPressed: widget.onCancelBilingualPipeline,
+                        icon: Icon(
+                          Icons.close_rounded,
+                          color: widget.studyDarkStyle
+                              ? shell.textMuted
+                              : AppDesignTokens.textSecondary,
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+            ),
+          ),
         Align(
           alignment: Alignment.centerRight,
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: <Widget>[
-              if (!widget.studyDarkStyle)
-                TextButton.icon(
-                  onPressed: () {
-                    _autoFollowCurrentLine = true;
-                    _scrollToActiveLine();
-                  },
-                  icon: const Icon(Icons.my_location_rounded),
-                  label: const Text('定位当前'),
+              TextButton.icon(
+                onPressed: () {
+                  _autoFollowCurrentLine = true;
+                  _scheduleScrollToActiveLine();
+                },
+                icon: Icon(Icons.my_location_rounded, color: toolbarColor),
+                label: Text(
+                  '定位当前',
+                  style: TextStyle(color: toolbarColor),
                 ),
+              ),
               if (widget.onRegenerateAiSubtitles != null)
                 TextButton.icon(
                   onPressed: widget.onRegenerateAiSubtitles,
@@ -831,7 +1045,8 @@ class _PlayerSubtitleListState extends State<PlayerSubtitleList> {
                 ),
                 ListTile(
                   leading: const Icon(Icons.auto_awesome_outlined),
-                  title: const Text('AI 解释这句话'),
+                  title: const Text('AI 语法解析'),
+                  subtitle: const Text('分析句子结构、语法点与表达'),
                   onTap: () => Navigator.of(context).pop('ai-explain'),
                 ),
                 if (widget.onRegenerateAiLine != null)
@@ -924,13 +1139,15 @@ class _PlayerSubtitleListState extends State<PlayerSubtitleList> {
     String text,
     int? highlightIndex,
     bool active,
-    String contextTime,
-  ) {
+    String contextTime, {
+    StudyShellColors? shellColors,
+  }) {
     final List<_WordToken> tokens = text
         .split(' ')
         .where((String rawWord) => rawWord.isNotEmpty)
         .map((String rawWord) => _WordToken(value: rawWord))
         .toList(growable: false);
+    final StudyShellColors? shell = shellColors;
 
     return Wrap(
       spacing: 4,
@@ -941,12 +1158,67 @@ class _PlayerSubtitleListState extends State<PlayerSubtitleList> {
           .map((MapEntry<int, _WordToken> entry) {
             final int index = entry.key;
             final _WordToken token = entry.value;
-            final bool highlighted =
+            final bool karaoke =
                 active &&
                 widget.highlightWords &&
                 highlightIndex != null &&
                 index == highlightIndex;
+            final SubtitleVocabMark vocabMark =
+                SubtitleVocabularyHighlight.resolve(
+                  rawToken: token.value,
+                  savedWords: widget.savedVocabularyWords,
+                  keyWords: widget.keyVocabularyWords,
+                );
             final String tokenId = '$text-$index';
+            final Color wordColor = shell?.textPrimary ??
+                AppDesignTokens.textPrimary;
+            final Color vocabFill = SubtitleVocabularyHighlight.fill(
+              vocabMark,
+              onDarkVideo: false,
+            );
+            final Color karaokeFill = shell == null
+                ? SubtitleWordHighlightStyle.background(
+                    widget.subtitleWordHighlightStyle,
+                    highlighted: karaoke,
+                  )
+                : (karaoke
+                      ? shell.highlight.withValues(alpha: 0.22)
+                      : Colors.transparent);
+            final Color highlightFill =
+                karaoke ? karaokeFill : vocabFill;
+            final Color karaokeBorder = shell == null
+                ? SubtitleWordHighlightStyle.borderColor(
+                    widget.subtitleWordHighlightStyle,
+                    highlighted: karaoke,
+                  )
+                : (karaoke ? shell.highlight : Colors.transparent);
+            final Color vocabBorder = SubtitleVocabularyHighlight.border(
+              vocabMark,
+              onDarkVideo: false,
+            );
+            final Color highlightBorder =
+                karaoke ? karaokeBorder : vocabBorder;
+            final TextDecoration? highlightDecoration = shell == null
+                ? SubtitleWordHighlightStyle.textDecoration(
+                    widget.subtitleWordHighlightStyle,
+                    highlighted: karaoke,
+                  )
+                : (karaoke ? TextDecoration.underline : null);
+            final Color? highlightDecorationColor = shell == null
+                ? SubtitleWordHighlightStyle.textDecorationColor(
+                    widget.subtitleWordHighlightStyle,
+                    highlighted: karaoke,
+                  )
+                : (karaoke ? shell.highlight : null);
+            final double borderWidth = karaoke
+                ? (shell == null
+                      ? SubtitleWordHighlightStyle.borderWidth(
+                          widget.subtitleWordHighlightStyle,
+                          highlighted: karaoke,
+                          width: widget.subtitleWordHighlightBorderWidth,
+                        )
+                      : 0)
+                : (vocabMark == SubtitleVocabMark.none ? 0 : 1.2);
 
             return Builder(
               builder: (BuildContext wordContext) {
@@ -966,20 +1238,10 @@ class _PlayerSubtitleListState extends State<PlayerSubtitleList> {
                     ),
                     decoration: BoxDecoration(
                       borderRadius: BorderRadius.circular(8),
-                      color: SubtitleWordHighlightStyle.background(
-                        widget.subtitleWordHighlightStyle,
-                        highlighted: highlighted,
-                      ),
+                      color: highlightFill,
                       border: Border.all(
-                        color: SubtitleWordHighlightStyle.borderColor(
-                          widget.subtitleWordHighlightStyle,
-                          highlighted: highlighted,
-                        ),
-                        width: SubtitleWordHighlightStyle.borderWidth(
-                          widget.subtitleWordHighlightStyle,
-                          highlighted: highlighted,
-                          width: widget.subtitleWordHighlightBorderWidth,
-                        ),
+                        color: highlightBorder,
+                        width: borderWidth,
                       ),
                     ),
                     child: Stack(
@@ -989,30 +1251,23 @@ class _PlayerSubtitleListState extends State<PlayerSubtitleList> {
                           token.value,
                           style: TextStyle(
                             fontSize: active
-                                ? _activeFontSize * widget.fontScale
-                                : (_activeFontSize * widget.fontScale) - 2,
-                            fontWeight: highlighted
-                                ? FontWeight.w800
-                                : FontWeight.w600,
-                            color: widget.studyDarkStyle
-                                ? StudyShellTokens.textPrimary
-                                : AppDesignTokens.textPrimary,
-                            decoration:
-                                SubtitleWordHighlightStyle.textDecoration(
-                                  widget.subtitleWordHighlightStyle,
-                                  highlighted: highlighted,
-                                ),
-                            decorationColor:
-                                SubtitleWordHighlightStyle.textDecorationColor(
-                                  widget.subtitleWordHighlightStyle,
-                                  highlighted: highlighted,
-                                ),
-                            decorationThickness:
-                                highlighted &&
-                                    widget.subtitleWordHighlightStyle == '下划线'
+                                ? _activeEnglishFontSize * widget.fontScale
+                                : _inactiveEnglishFontSize * widget.fontScale,
+                            fontWeight: SubtitleVocabularyHighlight.fontWeight(
+                              vocabMark,
+                              karaoke: karaoke,
+                              activeLine: active,
+                            ),
+                            color: wordColor,
+                            decoration: highlightDecoration,
+                            decorationColor: highlightDecorationColor,
+                            decorationThickness: karaoke &&
+                                    (shell != null ||
+                                        widget.subtitleWordHighlightStyle ==
+                                            '下划线')
                                 ? 2
                                 : null,
-                            height: 1.35,
+                            height: 1.28,
                           ),
                         ),
                         if (index != tokens.length - 1)
@@ -1095,14 +1350,15 @@ class _SubtitlePlaceholder extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final StudyShellColors shell = StudyShellColors.of(context);
     final Color titleColor = studyDarkStyle
-        ? StudyShellTokens.textPrimary
+        ? shell.textPrimary
         : const Color(0xFF53625A);
     final Color bodyColor = studyDarkStyle
-        ? StudyShellTokens.textSecondary
+        ? shell.textSecondary
         : const Color(0xFF7E8A82);
     final Color iconColor = studyDarkStyle
-        ? StudyShellTokens.textMuted
+        ? shell.textMuted
         : const Color(0xFF9AA69E);
 
     return Center(
@@ -1156,8 +1412,8 @@ class _SubtitlePlaceholder extends StatelessWidget {
                   width: 240,
                   child: LinearProgressIndicator(
                     value: progressValue,
-                    color: StudyShellTokens.accent,
-                    backgroundColor: StudyShellTokens.progressTrack,
+                    color: shell.accent,
+                    backgroundColor: shell.progressTrack,
                   ),
                 ),
                 const SizedBox(height: 10),
@@ -1193,7 +1449,7 @@ class _SubtitlePlaceholder extends StatelessWidget {
                 key: const ValueKey<String>('study-asr-generate'),
                 onPressed: generatingAiSubtitles ? null : onGenerateAiSubtitles,
                 style: FilledButton.styleFrom(
-                  backgroundColor: StudyShellTokens.accent,
+                  backgroundColor: shell.accent,
                   foregroundColor: Colors.white,
                   padding: const EdgeInsets.symmetric(
                     horizontal: 18,

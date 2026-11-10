@@ -6,5 +6,12 @@ ImageProvider<Object>? coverImageProviderForPath(String path) {
   if (path.isEmpty) {
     return null;
   }
-  return FileImage(File(path));
+  if (path.startsWith('assets/')) {
+    return AssetImage(path);
+  }
+  final File file = File(path);
+  if (!file.existsSync()) {
+    return null;
+  }
+  return FileImage(file);
 }

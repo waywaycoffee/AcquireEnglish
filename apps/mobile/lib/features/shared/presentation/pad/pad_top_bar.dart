@@ -201,7 +201,7 @@ class PadBackButton extends StatelessWidget {
           foregroundColor: AppDesignTokens.brandGreenDark,
           minimumSize: const Size(44, 44),
           padding: EdgeInsets.zero,
-          side: const BorderSide(color: AppDesignTokens.borderGray),
+          side: BorderSide(color: AppDesignTokens.borderGray),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(14),
           ),
@@ -234,7 +234,9 @@ class _DefaultStatusChips extends StatelessWidget {
           key: const Key('pad-status-streak'),
           icon: Icons.local_fire_department_rounded,
           color: AppDesignTokens.orange,
-          background: const Color(0xFFFFF1D6),
+          background: AppDesignTokens.isDark
+              ? const Color(0xFF3A2E22)
+              : const Color(0xFFFFF1D6),
           label: streakLabel,
           onPressed: onStreakPressed,
         ),

@@ -1,4 +1,3 @@
-import 'package:logger/logger.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import '../../data/authentication_repository.dart';
@@ -6,6 +5,7 @@ import '../../data/hive/user_repository.dart';
 import '../../domain/login_request.dart';
 import '../../domain/login_response.dart';
 import '../../domain/register_response.dart';
+import '../auth_session.dart';
 import 'auth_ui_model.dart';
 
 part 'login_controller.g.dart';
@@ -14,25 +14,36 @@ part 'login_controller.g.dart';
 class LoginController extends _$LoginController {
   @override
   FutureOr<AuthUiModel> build() async {
-    final LoginCredentials? user = await ref.read(
+    final AuthSessionState session = ref.watch(authSessionProvider);
+    final LoginCredentials? cached = await ref.read(
       userRepositoryProvider.future,
     );
-
-    return AuthUiModel(user: user);
+    return AuthUiModel(
+      user: LoginCredentials(
+        email: session.email.isNotEmpty
+            ? session.email
+            : (cached?.email ?? ''),
+        password: '',
+      ),
+      rememberMe: true,
+    );
   }
 
   void updateRememberMe({required bool rememberMe}) {
-    if (rememberMe) {
-      ref.keepAlive();
+    final AuthUiModel? current = state.value;
+    if (current == null) {
+      return;
     }
-    state = AsyncData<AuthUiModel>(
-      state.value!.copyWith(rememberMe: rememberMe),
-    );
+    state = AsyncData<AuthUiModel>(current.copyWith(rememberMe: rememberMe));
   }
 
   void updateShowPassword({required bool showPassword}) {
+    final AuthUiModel? current = state.value;
+    if (current == null) {
+      return;
+    }
     state = AsyncData<AuthUiModel>(
-      state.value!.copyWith(showPassword: showPassword),
+      current.copyWith(showPassword: showPassword),
     );
   }
 
@@ -40,36 +51,23 @@ class LoginController extends _$LoginController {
     required String email,
     required String password,
   }) async {
-    final LoginCredentials user = LoginCredentials(
-      email: email,
-      password: password,
-    );
-    if (user.email.isEmpty || user.password.isEmpty) {
-      throw Exception('Email and password cannot be empty');
+    final String trimmedEmail = email.trim();
+    if (trimmedEmail.isEmpty || password.isEmpty) {
+      throw Exception('请输入邮箱和密码');
     }
     final LoginResponse loginResponse = await ref
         .read(authenticationRepositoryProvider)
-        .login(user.email, user.password)
-        .catchError((dynamic error) {
-          throw Exception('Login failed: $error');
-        });
-    if (loginResponse.token.isNotEmpty) {
-      if (state.value!.rememberMe) {
-        state = AsyncData<AuthUiModel>(
-          state.value!.copyWith(
-            user: state.value!.user?.copyWith(
-              email: user.email,
-              password: user.password,
-            ),
-          ),
-        );
-        await ref
-            .read(userRepositoryProvider.notifier)
-            .cacheUser(user)
-            .catchError((dynamic error) {
-              Logger().e('Failed to cache user: $error');
-            });
-      }
+        .login(trimmedEmail, password);
+    if (loginResponse.token.isEmpty) {
+      throw Exception('登录失败');
+    }
+    final AuthUiModel? current = state.value;
+    if (current?.rememberMe ?? true) {
+      await ref
+          .read(userRepositoryProvider.notifier)
+          .cacheUser(
+            LoginCredentials(email: trimmedEmail, password: ''),
+          );
     }
     return loginResponse;
   }
@@ -77,32 +75,24 @@ class LoginController extends _$LoginController {
   Future<RegisterResponse> register({
     required String email,
     required String password,
+    String? displayName,
   }) async {
-    if (email.isEmpty || password.isEmpty) {
-      throw Exception('Email and password cannot be empty');
+    final String trimmedEmail = email.trim();
+    if (trimmedEmail.isEmpty || password.isEmpty) {
+      throw Exception('请输入邮箱和密码');
+    }
+    if (password.length < 6) {
+      throw Exception('密码至少 6 位');
     }
     final RegisterResponse registerResponse = await ref
         .read(authenticationRepositoryProvider)
-        .register(email, password);
-    if (registerResponse.token.isNotEmpty) {
-      // Handle successful registration
-      state = AsyncData<AuthUiModel>(
-        state.value!.copyWith(
-          user: state.value!.user?.copyWith(email: email, password: password),
-          rememberMe: true,
-        ),
-      );
-      if (state.value!.user != null) {
-        await ref
-            .read(userRepositoryProvider.notifier)
-            .cacheUser(state.value!.user!)
-            .catchError((dynamic error) {
-              throw Exception('Failed to cache user: $error');
-            });
-      }
-    } else {
-      throw Exception('Registration failed');
+        .register(trimmedEmail, password, displayName: displayName);
+    if (registerResponse.token.isEmpty) {
+      throw Exception('注册失败');
     }
+    await ref
+        .read(userRepositoryProvider.notifier)
+        .cacheUser(LoginCredentials(email: trimmedEmail, password: ''));
     return registerResponse;
   }
 }

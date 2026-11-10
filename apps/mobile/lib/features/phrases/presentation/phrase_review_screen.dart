@@ -204,7 +204,7 @@ class _ReviewHeader extends StatelessWidget {
             children: <Widget>[
               PadBackButton(tooltip: '返回短语库', onPressed: onBack),
               const SizedBox(width: 12),
-              const Expanded(
+              Expanded(
                 child: Text(
                   '今日复习',
                   style: TextStyle(
@@ -216,7 +216,7 @@ class _ReviewHeader extends StatelessWidget {
               ),
               Text(
                 '$current / $total',
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 16,
                   fontWeight: FontWeight.w800,
                   color: AppDesignTokens.textSecondary,
@@ -275,7 +275,7 @@ class _ReviewComplete extends StatelessWidget {
               Text(
                 '完成 $reviewedCount 条短语，新的复习时间已经安排好了。',
                 textAlign: TextAlign.center,
-                style: const TextStyle(color: AppDesignTokens.textSecondary),
+                style: TextStyle(color: AppDesignTokens.textSecondary),
               ),
               const SizedBox(height: 24),
               FilledButton(

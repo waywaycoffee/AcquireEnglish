@@ -119,7 +119,7 @@ class _PhrasesScreenState extends ConsumerState<PhrasesScreen> {
               const SizedBox(height: 18),
               Row(
                 children: <Widget>[
-                  const Expanded(
+                  Expanded(
                     child: Text(
                       '短语',
                       style: TextStyle(
@@ -131,7 +131,7 @@ class _PhrasesScreenState extends ConsumerState<PhrasesScreen> {
                   ),
                   Text(
                     '${filtered.length} 条',
-                    style: const TextStyle(
+                    style: TextStyle(
                       color: AppDesignTokens.textSecondary,
                     ),
                   ),
@@ -457,7 +457,7 @@ class _TodayReviewBanner extends StatelessWidget {
               : phone
               ? '约 ${reviewCount * 2} 分钟'
               : '预计 ${reviewCount * 2} 分钟，把看懂变成会用。',
-          style: const TextStyle(color: AppDesignTokens.textSecondary),
+          style: TextStyle(color: AppDesignTokens.textSecondary),
         ),
       ],
     );
@@ -676,7 +676,7 @@ class _EmptyPhraseList extends StatelessWidget {
       ),
       child: Column(
         children: <Widget>[
-          const Icon(
+          Icon(
             Icons.menu_book_rounded,
             size: 44,
             color: AppDesignTokens.textSecondary,

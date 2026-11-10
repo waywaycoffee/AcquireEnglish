@@ -73,7 +73,7 @@ class _LearningHero extends StatelessWidget {
         final Widget copy = Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: <Widget>[
-            const Text(
+            Text(
               '每天 20 分钟，用一部剧练会真实英语',
               style: TextStyle(
                 color: AppDesignTokens.textPrimary,
@@ -83,7 +83,7 @@ class _LearningHero extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 12),
-            const Text(
+            Text(
               '先看懂剧情，再听清表达，最后开口模仿。\n不要求一次全部听懂，只需要比昨天多听懂一点。',
               style: TextStyle(
                 color: AppDesignTokens.textSecondary,
@@ -142,7 +142,7 @@ class _HeroProgressPreview extends StatelessWidget {
       color: AppDesignTokens.skyLight,
       borderRadius: BorderRadius.circular(24),
     ),
-    child: const Column(
+    child: Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: <Widget>[
         Text(
@@ -456,7 +456,7 @@ class _LearningStepCard extends StatelessWidget {
         const SizedBox(height: 8),
         Text(
           step.body,
-          style: const TextStyle(
+          style: TextStyle(
             color: AppDesignTokens.textSecondary,
             height: 1.45,
           ),
@@ -480,7 +480,7 @@ class _StepMeta extends StatelessWidget {
     padding: const EdgeInsets.only(bottom: 6),
     child: Text(
       text,
-      style: const TextStyle(
+      style: TextStyle(
         fontSize: 13,
         color: AppDesignTokens.textSecondary,
       ),
@@ -551,7 +551,7 @@ class _ReasonItem extends StatelessWidget {
         const SizedBox(height: 5),
         Text(
           body,
-          style: const TextStyle(
+          style: TextStyle(
             color: AppDesignTokens.textSecondary,
             height: 1.45,
           ),
@@ -571,7 +571,7 @@ class _LearningExampleSection extends StatelessWidget {
       color: AppDesignTokens.appWhite,
       border: AppDesignTokens.primaryBlue,
     ),
-    child: const Column(
+    child: Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: <Widget>[
         _SectionTitle(title: '一句台词，具体应该怎么学？'),
@@ -666,7 +666,7 @@ class _PreparationChecklist extends StatelessWidget {
   const _PreparationChecklist();
 
   @override
-  Widget build(BuildContext context) => const Column(
+  Widget build(BuildContext context) => Column(
     crossAxisAlignment: CrossAxisAlignment.start,
     children: <Widget>[
       _SectionTitle(title: '开始前，准备好这 4 项'),
@@ -823,7 +823,7 @@ class _LevelCard extends StatelessWidget {
           const SizedBox(height: 10),
           Text(
             resource.resourceHint,
-            style: const TextStyle(
+            style: TextStyle(
               color: AppDesignTokens.textSecondary,
               height: 1.45,
             ),
@@ -889,7 +889,7 @@ class _AdvancedTopicCard extends StatelessWidget {
           color: AppDesignTokens.primaryBlueDark,
         ),
         const SizedBox(width: 12),
-        const Expanded(
+        Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: <Widget>[
@@ -983,7 +983,7 @@ class _SectionTitle extends StatelessWidget {
         const SizedBox(height: 8),
         Text(
           subtitle!,
-          style: const TextStyle(
+          style: TextStyle(
             color: AppDesignTokens.textSecondary,
             fontSize: 16,
           ),
@@ -1046,12 +1046,12 @@ class _Bullet extends StatelessWidget {
 
 BoxDecoration _cardDecoration({
   required Color color,
-  Color border = AppDesignTokens.borderGray,
+  Color? border,
   List<BoxShadow> shadow = const <BoxShadow>[],
 }) => BoxDecoration(
   color: color,
   borderRadius: BorderRadius.circular(26),
-  border: Border.all(color: border),
+  border: Border.all(color: border ?? AppDesignTokens.borderGray),
   boxShadow: shadow,
 );
 

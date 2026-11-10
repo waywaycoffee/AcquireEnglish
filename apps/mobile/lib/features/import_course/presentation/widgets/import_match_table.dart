@@ -35,7 +35,7 @@ class ImportMatchTable extends StatelessWidget {
         const SizedBox(height: 10),
         Text(
           '智能解析匹配剧集 (${rows.length} 组)，确认导入前再检查一次字幕配置。',
-          style: const TextStyle(
+          style: TextStyle(
             fontSize: 15,
             height: 1.5,
             color: AppDesignTokens.textSecondary,
@@ -49,7 +49,7 @@ class ImportMatchTable extends StatelessWidget {
             border: Border.all(color: const Color(0xFFE8E2DB)),
           ),
           child: rows.isEmpty
-              ? const Padding(
+              ? Padding(
                   padding: EdgeInsets.fromLTRB(30, 36, 30, 36),
                   child: Text(
                     '未检测到可匹配的视频或字幕文件',
@@ -169,7 +169,7 @@ class _ImportRow extends StatelessWidget {
               width: 180,
               child: Text(
                 row.episodeName,
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 16,
                   height: 1.45,
                   fontWeight: FontWeight.w700,
@@ -224,7 +224,7 @@ class _HeaderText extends StatelessWidget {
   Widget build(BuildContext context) {
     return Text(
       text,
-      style: const TextStyle(
+      style: TextStyle(
         fontSize: 12,
         fontWeight: FontWeight.w800,
         color: AppDesignTokens.textSecondary,
@@ -248,7 +248,7 @@ class _FileCell extends StatelessWidget {
         Flexible(
           child: Text(
             text,
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 14,
               height: 1.45,
               color: AppDesignTokens.textSecondary,
@@ -331,7 +331,7 @@ class _SubtitleCell extends StatelessWidget {
                   child: Text(
                     ImportMatchRow.subtitleLabel(item.path),
                     overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 14,
                       color: AppDesignTokens.textSecondary,
                     ),

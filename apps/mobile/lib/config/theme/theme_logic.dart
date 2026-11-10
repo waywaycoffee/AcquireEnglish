@@ -12,10 +12,15 @@ part 'theme_logic.g.dart';
 class ThemeLogic extends _$ThemeLogic {
   @override
   ThemeUiModel build() {
-    ThemeMode themeMode = ThemeMode.system;
     final Box<String> prefsBox = Hive.box<String>('prefs');
+    // Product default is dark canvas; re-assert once for the dark redesign.
+    if (prefsBox.get('themeDarkCanvasV4') != '1') {
+      prefsBox.put('themeDarkCanvasV4', '1');
+      prefsBox.put('themeMode', ThemeMode.dark.toString());
+    }
+    ThemeMode themeMode = ThemeMode.dark;
     final String mode =
-        prefsBox.get('themeMode', defaultValue: ThemeMode.system.toString())
+        prefsBox.get('themeMode', defaultValue: ThemeMode.dark.toString())
             as String;
     switch (mode) {
       case 'ThemeMode.dark':

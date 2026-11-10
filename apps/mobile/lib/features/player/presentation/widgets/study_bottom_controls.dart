@@ -1,42 +1,53 @@
 import 'package:flutter/material.dart';
 
+import '../../../shared/presentation/android_system_inset.dart';
 import 'player_video_panel.dart';
 import 'study_shell_tokens.dart';
 
 class StudyBottomControls extends StatelessWidget {
   const StudyBottomControls({
     required this.bilingual,
+    required this.blindListening,
     required this.speed,
     required this.isPlaying,
     required this.isLooping,
     required this.position,
     required this.duration,
-    required this.onToggleBilingual,
+    required this.onToggleBlindListening,
     required this.onCycleSpeed,
     required this.onTogglePlaying,
-    required this.onToggleLoop,
-    required this.onOpenCloseReading,
-    this.onLongPressBilingual,
+    required this.onOpenLoopSheet,
+    required this.onOpenWordCards,
+    this.onToggleBilingual,
+    this.onLongPressBlind,
     this.onSeek,
+    this.onSpeedSelected,
     this.onOpenSpeedSheet,
+    this.onOpenQualitySheet,
+    this.qualityLabel = '超清',
     this.onToggleFullscreen,
     super.key,
   });
 
   final bool bilingual;
+  final bool blindListening;
   final String speed;
   final bool isPlaying;
   final bool isLooping;
   final Duration position;
   final Duration duration;
-  final VoidCallback onToggleBilingual;
+  final VoidCallback onToggleBlindListening;
   final VoidCallback onCycleSpeed;
   final VoidCallback onTogglePlaying;
-  final VoidCallback onToggleLoop;
-  final VoidCallback onOpenCloseReading;
-  final VoidCallback? onLongPressBilingual;
+  final VoidCallback onOpenLoopSheet;
+  final VoidCallback onOpenWordCards;
+  final VoidCallback? onToggleBilingual;
+  final VoidCallback? onLongPressBlind;
   final ValueChanged<double>? onSeek;
+  final ValueChanged<String>? onSpeedSelected;
   final VoidCallback? onOpenSpeedSheet;
+  final VoidCallback? onOpenQualitySheet;
+  final String qualityLabel;
   final VoidCallback? onToggleFullscreen;
 
   static String nextSpeed(String current) {
@@ -64,71 +75,130 @@ class StudyBottomControls extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final double bottomInset = MediaQuery.paddingOf(context).bottom;
+    final StudyShellColors colors = StudyShellColors.of(context);
+    // Keep controls above Android system nav / gesture bar (edge-to-edge).
+    final double bottomInset = systemBottomInsetOf(context);
     final double progress = duration.inMilliseconds <= 0
         ? 0
         : (position.inMilliseconds / duration.inMilliseconds).clamp(0.0, 1.0);
 
     return Material(
-      color: StudyShellTokens.background,
+      color: colors.background,
       child: Padding(
-        padding: EdgeInsets.fromLTRB(12, 4, 12, 8 + bottomInset),
+        padding: EdgeInsets.fromLTRB(12, 6, 12, 6 + bottomInset),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: <Widget>[
             Row(
               children: <Widget>[
                 Expanded(
-                  child:                   _IconAction(
-                    key: const ValueKey<String>('study-chip-bilingual'),
-                    icon: Icons.translate_rounded,
-                    label: '双',
-                    selected: bilingual,
-                    onPressed: onToggleBilingual,
-                    onLongPress: onLongPressBilingual,
+                  child: _IconAction(
+                    key: const ValueKey<String>('study-chip-blind'),
+                    icon: blindListening
+                        ? Icons.visibility_off_rounded
+                        : Icons.visibility_rounded,
+                    label: '盲听',
+                    selected: blindListening,
+                    colors: colors,
+                    onPressed: onToggleBlindListening,
+                    onLongPress: onLongPressBlind ?? onToggleBilingual,
                   ),
                 ),
                 Expanded(
-                  child: _IconAction(
+                  child: PopupMenuButton<String>(
                     key: const ValueKey<String>('study-chip-speed'),
-                    icon: Icons.speed_rounded,
-                    label: _speedLabel,
-                    selected: speed != '1.0×' && speed != '1×',
-                    onPressed: onCycleSpeed,
+                    tooltip: '倍速',
+                    color: colors.card,
+                    onSelected: (String value) {
+                      if (onSpeedSelected != null) {
+                        onSpeedSelected!(value);
+                        return;
+                      }
+                      onCycleSpeed();
+                    },
+                    itemBuilder: (BuildContext context) {
+                      return PlayerVideoPanel.kSpeedOptions
+                          .map(
+                            (String option) => PopupMenuItem<String>(
+                              value: option,
+                              child: Text(
+                                option.replaceAll('×', 'x'),
+                                style: TextStyle(
+                                  fontWeight: option == speed
+                                      ? FontWeight.w800
+                                      : FontWeight.w600,
+                                  color: option == speed
+                                      ? colors.accent
+                                      : colors.textPrimary,
+                                ),
+                              ),
+                            ),
+                          )
+                          .toList(growable: false);
+                    },
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 6),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: <Widget>[
+                          Icon(
+                            Icons.speed_rounded,
+                            size: 22,
+                            color: speed != '1.0×' && speed != '1×'
+                                ? colors.accent
+                                : colors.textSecondary,
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            _speedLabel,
+                            style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w700,
+                              color: speed != '1.0×' && speed != '1×'
+                                  ? colors.accent
+                                  : colors.textSecondary,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
                   ),
                 ),
                 _PlayButton(
                   key: const ValueKey<String>('study-chip-play'),
                   isPlaying: isPlaying,
+                  colors: colors,
                   onPressed: onTogglePlaying,
                 ),
                 Expanded(
                   child: _IconAction(
                     key: const ValueKey<String>('study-chip-loop'),
-                    icon: Icons.repeat_one_rounded,
+                    icon: Icons.repeat_rounded,
                     label: '循环',
                     selected: isLooping,
-                    onPressed: onToggleLoop,
+                    colors: colors,
+                    onPressed: onOpenLoopSheet,
                   ),
                 ),
                 Expanded(
                   child: _IconAction(
-                    key: const ValueKey<String>('study-chip-close-reading'),
-                    icon: Icons.menu_book_rounded,
-                    label: '精读',
+                    key: const ValueKey<String>('study-chip-word-cards'),
+                    icon: Icons.style_rounded,
+                    label: '词卡',
                     selected: false,
-                    onPressed: onOpenCloseReading,
+                    colors: colors,
+                    onPressed: onOpenWordCards,
                   ),
                 ),
               ],
             ),
-            const SizedBox(height: 10),
+            const SizedBox(height: 8),
             Row(
               children: <Widget>[
                 Text(
                   '${formatClock(position)} / ${formatClock(duration)}',
-                  style: const TextStyle(
-                    color: StudyShellTokens.textMuted,
+                  style: TextStyle(
+                    color: colors.textMuted,
                     fontSize: 11,
                     fontWeight: FontWeight.w600,
                   ),
@@ -144,9 +214,9 @@ class StudyBottomControls extends StatelessWidget {
                       overlayShape: const RoundSliderOverlayShape(
                         overlayRadius: 10,
                       ),
-                      activeTrackColor: StudyShellTokens.progressPlayed,
-                      inactiveTrackColor: StudyShellTokens.progressTrack,
-                      thumbColor: Colors.white,
+                      activeTrackColor: colors.progressPlayed,
+                      inactiveTrackColor: colors.progressTrack,
+                      thumbColor: colors.accentOn,
                     ),
                     child: Slider(
                       value: progress,
@@ -158,13 +228,12 @@ class StudyBottomControls extends StatelessWidget {
                 ),
               ],
             ),
-            const SizedBox(height: 2),
             Row(
               children: <Widget>[
                 TextButton(
                   onPressed: onOpenSpeedSheet ?? onCycleSpeed,
                   style: TextButton.styleFrom(
-                    foregroundColor: StudyShellTokens.textSecondary,
+                    foregroundColor: colors.textSecondary,
                     padding: const EdgeInsets.symmetric(horizontal: 8),
                     minimumSize: const Size(0, 32),
                     tapTargetSize: MaterialTapTargetSize.shrinkWrap,
@@ -175,25 +244,45 @@ class StudyBottomControls extends StatelessWidget {
                   ),
                 ),
                 TextButton(
-                  onPressed: () {},
+                  onPressed: onOpenQualitySheet,
                   style: TextButton.styleFrom(
-                    foregroundColor: StudyShellTokens.textSecondary,
+                    foregroundColor: colors.textSecondary,
                     padding: const EdgeInsets.symmetric(horizontal: 8),
                     minimumSize: const Size(0, 32),
                     tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                   ),
-                  child: const Text(
-                    '超清',
-                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+                  child: Text(
+                    qualityLabel,
+                    style: const TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
                 ),
+                if (bilingual)
+                  TextButton(
+                    onPressed: onToggleBilingual,
+                    style: TextButton.styleFrom(
+                      foregroundColor: colors.accent,
+                      padding: const EdgeInsets.symmetric(horizontal: 8),
+                      minimumSize: const Size(0, 32),
+                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    ),
+                    child: const Text(
+                      '双语',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
                 const Spacer(),
                 IconButton(
                   tooltip: '全屏',
                   onPressed: onToggleFullscreen,
-                  icon: const Icon(
+                  icon: Icon(
                     Icons.fullscreen_rounded,
-                    color: StudyShellTokens.textSecondary,
+                    color: colors.textSecondary,
                     size: 22,
                   ),
                 ),
@@ -211,6 +300,7 @@ class _IconAction extends StatelessWidget {
     required this.icon,
     required this.label,
     required this.selected,
+    required this.colors,
     required this.onPressed,
     this.onLongPress,
     super.key,
@@ -219,14 +309,13 @@ class _IconAction extends StatelessWidget {
   final IconData icon;
   final String label;
   final bool selected;
+  final StudyShellColors colors;
   final VoidCallback onPressed;
   final VoidCallback? onLongPress;
 
   @override
   Widget build(BuildContext context) {
-    final Color color = selected
-        ? StudyShellTokens.accent
-        : StudyShellTokens.textSecondary;
+    final Color color = selected ? colors.accent : colors.textSecondary;
     return InkWell(
       borderRadius: BorderRadius.circular(12),
       onTap: onPressed,
@@ -256,32 +345,45 @@ class _IconAction extends StatelessWidget {
 class _PlayButton extends StatelessWidget {
   const _PlayButton({
     required this.isPlaying,
+    required this.colors,
     required this.onPressed,
     super.key,
   });
 
   final bool isPlaying;
+  final StudyShellColors colors;
   final VoidCallback onPressed;
 
   @override
   Widget build(BuildContext context) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 6),
-      child: Material(
-        color: StudyShellTokens.accent,
-        shape: const CircleBorder(),
-        elevation: 4,
-        shadowColor: StudyShellTokens.accent.withValues(alpha: 0.45),
-        child: InkWell(
-          customBorder: const CircleBorder(),
-          onTap: onPressed,
-          child: SizedBox(
-            width: 58,
-            height: 58,
-            child: Icon(
-              isPlaying ? Icons.pause_rounded : Icons.play_arrow_rounded,
-              color: Colors.white,
-              size: 32,
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          boxShadow: <BoxShadow>[
+            BoxShadow(
+              color: colors.playGlow,
+              blurRadius: 18,
+              spreadRadius: 1,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        child: Material(
+          color: colors.accent,
+          shape: const CircleBorder(),
+          child: InkWell(
+            customBorder: const CircleBorder(),
+            onTap: onPressed,
+            child: SizedBox(
+              width: 58,
+              height: 58,
+              child: Icon(
+                isPlaying ? Icons.pause_rounded : Icons.play_arrow_rounded,
+                color: colors.accentOn,
+                size: 32,
+              ),
             ),
           ),
         ),

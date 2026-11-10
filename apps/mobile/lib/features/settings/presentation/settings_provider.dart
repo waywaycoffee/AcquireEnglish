@@ -5,6 +5,7 @@ import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hive_ce/hive.dart';
 
+import '../../../constants/env_config.dart';
 import '../../shared/domain/subtitle_letter_case.dart';
 
 export '../../shared/domain/subtitle_letter_case.dart'
@@ -64,7 +65,20 @@ const List<String> translationProviderOptions = <String>[
   '百度翻译',
   '阿里云翻译',
 ];
-const List<String> asrProviderOptions = <String>['阿里云百炼', '腾讯云'];
+const List<String> asrProviderOptions = <String>[
+  '本地 Whisper',
+  '阿里云百炼',
+  '腾讯云',
+];
+const List<String> localWhisperModelOptions = <String>[
+  'tiny.en',
+  'base.en',
+  'small.en',
+];
+const List<String> oralCoachBackendOptions = <String>[
+  'LiveTalking',
+  '本地 TTS',
+];
 
 const String _learningSettingsStorageKey = 'learning_settings_v1';
 
@@ -121,6 +135,11 @@ const Map<String, TranslationProviderPreset> translationProviderPresets =
 
 const Map<String, TranslationProviderPreset> asrProviderPresets =
     <String, TranslationProviderPreset>{
+      '本地 Whisper': TranslationProviderPreset(
+        name: '本地 Whisper',
+        baseUrl: 'local://whisper',
+        model: 'base.en',
+      ),
       '阿里云百炼': TranslationProviderPreset(
         name: '阿里云百炼',
         baseUrl: 'https://dashscope.aliyuncs.com',
@@ -162,6 +181,10 @@ class LearningSettingsState {
     required this.ttsEngine,
     required this.ttsVoice,
     required this.ttsRate,
+    this.oralCoachBackend = '本地 TTS',
+    this.oralCoachServerUrl = '',
+    this.bilibiliSessdata = '',
+    this.bilibiliUserId = '',
   });
 
   factory LearningSettingsState.defaults() {
@@ -226,6 +249,50 @@ class LearningSettingsState {
   final String ttsEngine;
   final String ttsVoice;
   final double ttsRate;
+  final String oralCoachBackend;
+  final String oralCoachServerUrl;
+  final String bilibiliSessdata;
+  /// DedeUserID from QR login (display only).
+  final String bilibiliUserId;
+
+  bool get usesLiveTalkingCoach =>
+      oralCoachBackend == 'LiveTalking' && oralCoachServerUrl.trim().isNotEmpty;
+
+  bool get isBilibiliLoggedIn => hasBilibiliCookie;
+
+  /// Settings UI key wins; otherwise fall back to `.env` / dart-define.
+  String get resolvedAsrApiKey {
+    final String fromSettings = asrApiKey.trim();
+    if (fromSettings.isNotEmpty) {
+      return fromSettings;
+    }
+    if (asrProvider == '阿里云百炼' || asrProvider == 'Alibaba Cloud') {
+      return EnvConfig.bailianAsrApiKey;
+    }
+    return '';
+  }
+
+  bool get asrApiKeyFromEnv =>
+      asrApiKey.trim().isEmpty &&
+      (asrProvider == '阿里云百炼' || asrProvider == 'Alibaba Cloud') &&
+      EnvConfig.hasBailianAsrApiKey;
+
+  /// Settings SESSDATA wins; otherwise `.env` / dart-define Cookie header.
+  String get resolvedBilibiliCookieHeader {
+    final String fromSettings = bilibiliSessdata.trim();
+    if (fromSettings.isNotEmpty) {
+      if (fromSettings.toLowerCase().contains('sessdata=')) {
+        return fromSettings;
+      }
+      return 'SESSDATA=$fromSettings';
+    }
+    return EnvConfig.bilibiliCookieHeader;
+  }
+
+  bool get bilibiliCookieFromEnv =>
+      bilibiliSessdata.trim().isEmpty && EnvConfig.hasBilibiliCookie;
+
+  bool get hasBilibiliCookie => resolvedBilibiliCookieHeader.isNotEmpty;
 
   LearningSettingsState copyWith({
     String? subtitleMode,
@@ -255,6 +322,10 @@ class LearningSettingsState {
     String? ttsEngine,
     String? ttsVoice,
     double? ttsRate,
+    String? oralCoachBackend,
+    String? oralCoachServerUrl,
+    String? bilibiliSessdata,
+    String? bilibiliUserId,
   }) {
     return LearningSettingsState(
       subtitleMode: subtitleMode ?? this.subtitleMode,
@@ -291,6 +362,10 @@ class LearningSettingsState {
       ttsEngine: ttsEngine ?? this.ttsEngine,
       ttsVoice: ttsVoice ?? this.ttsVoice,
       ttsRate: ttsRate ?? this.ttsRate,
+      oralCoachBackend: oralCoachBackend ?? this.oralCoachBackend,
+      oralCoachServerUrl: oralCoachServerUrl ?? this.oralCoachServerUrl,
+      bilibiliSessdata: bilibiliSessdata ?? this.bilibiliSessdata,
+      bilibiliUserId: bilibiliUserId ?? this.bilibiliUserId,
     );
   }
 
@@ -425,6 +500,14 @@ class LearningSettingsNotifier extends Notifier<LearningSettingsState> {
         ttsEngine: _stringOrNull(json['ttsEngine']),
         ttsVoice: _stringOrNull(json['ttsVoice']),
         ttsRate: _doubleOrNull(json['ttsRate']),
+        oralCoachBackend: oralCoachBackendOptions.contains(
+              json['oralCoachBackend'],
+            )
+            ? json['oralCoachBackend'] as String
+            : null,
+        oralCoachServerUrl: _stringOrNull(json['oralCoachServerUrl']),
+        bilibiliSessdata: _stringOrNull(json['bilibiliSessdata']),
+        bilibiliUserId: _stringOrNull(json['bilibiliUserId']),
       );
     } catch (_) {
       return defaults;
@@ -644,6 +727,40 @@ class LearningSettingsNotifier extends Notifier<LearningSettingsState> {
     _persist();
   }
 
+  void setOralCoachBackend(String value) {
+    if (!oralCoachBackendOptions.contains(value)) {
+      return;
+    }
+    state = state.copyWith(oralCoachBackend: value);
+    _persist();
+  }
+
+  void setOralCoachServerUrl(String value) {
+    state = state.copyWith(oralCoachServerUrl: value.trim());
+    _persist();
+  }
+
+  void setBilibiliSessdata(String value) {
+    state = state.copyWith(bilibiliSessdata: value.trim());
+    _persist();
+  }
+
+  void setBilibiliLogin({
+    required String cookieOrSessdata,
+    String userId = '',
+  }) {
+    state = state.copyWith(
+      bilibiliSessdata: cookieOrSessdata.trim(),
+      bilibiliUserId: userId.trim(),
+    );
+    _persist();
+  }
+
+  void clearBilibiliLogin() {
+    state = state.copyWith(bilibiliSessdata: '', bilibiliUserId: '');
+    _persist();
+  }
+
   void resetToDefaults() {
     state = LearningSettingsState.defaults();
     _persist();
@@ -683,6 +800,10 @@ class LearningSettingsNotifier extends Notifier<LearningSettingsState> {
           'ttsEngine': state.ttsEngine,
           'ttsVoice': state.ttsVoice,
           'ttsRate': state.ttsRate,
+          'oralCoachBackend': state.oralCoachBackend,
+          'oralCoachServerUrl': state.oralCoachServerUrl,
+          'bilibiliSessdata': state.bilibiliSessdata,
+          'bilibiliUserId': state.bilibiliUserId,
         }),
       ),
     );

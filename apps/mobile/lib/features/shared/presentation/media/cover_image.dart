@@ -18,13 +18,33 @@ class CoverImage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final ImageProvider<Object>? provider = _isRemote(path)
-        ? NetworkImage(path)
-        : coverImageProviderForPath(path);
+    final String normalized = _normalizeRemote(path);
+    final ImageProvider<Object>? provider = _isRemote(normalized)
+        ? NetworkImage(
+            normalized,
+            headers: const <String, String>{
+              'Referer': 'https://www.bilibili.com',
+              'User-Agent':
+                  'Mozilla/5.0 (Linux; Android 13) AppleWebKit/537.36 '
+                  '(KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36',
+            },
+          )
+        : coverImageProviderForPath(normalized);
     if (provider == null) {
       return _buildFallback(
         context,
         StateError('Unsupported or empty local cover path: $path'),
+      );
+    }
+
+    // Remote covers: avoid ResizeImage — some Android stacks drop NetworkImage
+    // headers / fail decode when wrapped. Local files still use size buckets.
+    if (_isRemote(normalized)) {
+      return Image(
+        image: provider,
+        fit: fit,
+        errorBuilder: errorBuilder,
+        gaplessPlayback: true,
       );
     }
 
@@ -49,6 +69,7 @@ class CoverImage extends StatelessWidget {
           ),
           fit: fit,
           errorBuilder: errorBuilder,
+          gaplessPlayback: true,
         );
       },
     );
@@ -56,6 +77,17 @@ class CoverImage extends StatelessWidget {
 
   bool _isRemote(String value) {
     return value.startsWith('http://') || value.startsWith('https://');
+  }
+
+  String _normalizeRemote(String value) {
+    final String trimmed = value.trim();
+    if (trimmed.startsWith('//')) {
+      return 'https:$trimmed';
+    }
+    if (trimmed.startsWith('http://')) {
+      return 'https://${trimmed.substring('http://'.length)}';
+    }
+    return trimmed;
   }
 
   Widget _buildFallback(BuildContext context, Object error) {

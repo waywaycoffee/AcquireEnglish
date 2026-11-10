@@ -71,7 +71,7 @@ class AnkiExportService {
         .replaceAll(RegExp('[-:T]'), '');
     return AnkiExportFile(
       bytes: bytes,
-      name: 'Shadowing-English-$stamp.${format.name}',
+      name: 'AcquireEnglish-$stamp.${format.name}',
       mimeType: switch (format) {
         AnkiExportFormat.apkg => 'application/octet-stream',
         AnkiExportFormat.tsv => 'text/tab-separated-values',

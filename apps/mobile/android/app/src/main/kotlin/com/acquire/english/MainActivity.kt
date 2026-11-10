@@ -1,11 +1,13 @@
 ﻿package com.acquire.english
 
 import android.app.Activity
+import android.graphics.Bitmap
 import android.media.AudioFormat
 import android.content.Intent
 import android.media.MediaCodec
 import android.media.MediaExtractor
 import android.media.MediaFormat
+import android.media.MediaMetadataRetriever
 import android.net.Uri
 import android.os.Bundle
 import android.os.Build
@@ -21,6 +23,7 @@ import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodCall
 import io.flutter.plugin.common.MethodChannel
+import java.io.ByteArrayOutputStream
 import java.io.File
 import java.io.FileOutputStream
 import java.io.InputStream
@@ -83,6 +86,7 @@ class MainActivity : FlutterActivity(), MethodChannel.MethodCallHandler {
             "splitAudio" -> handleSplitAudio(call, result)
             "extractPronunciationAudio" -> handlePronunciationAudioExtraction(call, result)
             "cancelPronunciationAudioExtraction" -> handleCancelPronunciationAudioExtraction(call, result)
+            "captureFrameAt" -> handleCaptureFrameAt(call, result)
             else -> result.notImplemented()
         }
     }
@@ -421,6 +425,47 @@ class MainActivity : FlutterActivity(), MethodChannel.MethodCallHandler {
                 postResult(result, splitAudio(sourcePath, chunkMs))
             } catch (exception: Exception) {
                 postError(result, exception)
+            }
+        }.start()
+    }
+
+    private fun handleCaptureFrameAt(call: MethodCall, result: MethodChannel.Result) {
+        val sourcePath = call.argument<String>("sourcePath")
+        val positionMs = call.argument<Number>("positionMs")?.toLong() ?: 0L
+        if (sourcePath.isNullOrEmpty()) {
+            result.error("bad_args", "sourcePath is required.", null)
+            return
+        }
+        Thread {
+            val retriever = MediaMetadataRetriever()
+            try {
+                val source = File(sourcePath)
+                require(source.exists()) { "video file not found" }
+                retriever.setDataSource(source.absolutePath)
+                val frame = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) {
+                    retriever.getFrameAtTime(
+                        positionMs * 1000L,
+                        MediaMetadataRetriever.OPTION_CLOSEST,
+                    )
+                } else {
+                    @Suppress("DEPRECATION")
+                    retriever.getFrameAtTime(
+                        positionMs * 1000L,
+                        MediaMetadataRetriever.OPTION_CLOSEST,
+                    )
+                }
+                require(frame != null) { "unable to capture frame" }
+                val stream = ByteArrayOutputStream()
+                frame.compress(Bitmap.CompressFormat.JPEG, 85, stream)
+                frame.recycle()
+                postResult(result, stream.toByteArray())
+            } catch (exception: Exception) {
+                postError(result, exception)
+            } finally {
+                try {
+                    retriever.release()
+                } catch (_: Exception) {
+                }
             }
         }.start()
     }

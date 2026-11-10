@@ -258,7 +258,7 @@ void main() {
   });
 
   test(
-    'reference subtitles keep authoritative text while ASR supplies word timings',
+    'official English subtitles skip Whisper and keep authoritative text',
     () async {
       final Directory root = Directory.systemTemp.createTempSync(
         'asr-job-reference-',
@@ -270,6 +270,7 @@ void main() {
       final AsrSubtitleCache cache = AsrSubtitleCache(
         appSupportDirectory: () async => root,
       );
+      int asrCalls = 0;
       final AsrSubtitleJobRunner runner = AsrSubtitleJobRunner(
         supportDirectory: () async => root,
         cache: cache,
@@ -282,7 +283,10 @@ void main() {
             ({
               required AsrAudioChunk chunk,
               required LearningSettingsState settings,
-            }) async => _chunkJson('I like go home', 1000),
+            }) async {
+              asrCalls += 1;
+              return _chunkJson('I like go home', 1000);
+            },
       );
 
       final String raw = await runner.run(
@@ -301,12 +305,14 @@ void main() {
         ],
       );
 
+      expect(asrCalls, 0);
       final PlayerSubtitleLine line = parseSubtitleLines(raw).single;
       expect(line.english, 'I would like to go home.');
       expect(line.chinese, '我想回家。');
-      expect(subtitleGenerationWarning(raw), isNull);
+      expect(subtitleGenerationWarning(raw), contains('官方'));
       final Map<String, dynamic> decoded =
           jsonDecode(raw) as Map<String, dynamic>;
+      expect(decoded['source'], 'official');
       expect(decoded['referenceLines'], isA<List<dynamic>>());
       final Map<String, dynamic> storedReference =
           (decoded['referenceLines'] as List<dynamic>).single
@@ -463,11 +469,11 @@ void main() {
         ],
       );
 
-      expect(calls, 2);
+      expect(calls, 0);
       final PlayerSubtitleLine line = parseSubtitleLines(raw).single;
       expect(line.english, 'Authoritative subtitle.');
       expect(line.words, hasLength(2));
-      expect(subtitleGenerationWarning(raw), contains('本地估算'));
+      expect(subtitleGenerationWarning(raw), contains('官方'));
     },
   );
 
@@ -502,7 +508,7 @@ void main() {
     );
 
     expect(parseSubtitleLines(raw).single.english, 'Local fallback works.');
-    expect(subtitleGenerationWarning(raw), contains('本地估算'));
+    expect(subtitleGenerationWarning(raw), contains('官方'));
   });
 
   test(
@@ -543,9 +549,7 @@ void main() {
       final String raw = await runner.run(
         episodeId: 'episode-1',
         videoPath: video.path,
-        settings: LearningSettingsState.defaults().copyWith(
-          generateBilingualAsrSubtitles: true,
-        ),
+        settings: _settings().copyWith(generateBilingualAsrSubtitles: true),
         onProgress: progress.add,
       );
 
@@ -593,9 +597,7 @@ void main() {
       final String raw = await runner.run(
         episodeId: 'episode-1',
         videoPath: video.path,
-        settings: LearningSettingsState.defaults().copyWith(
-          generateBilingualAsrSubtitles: true,
-        ),
+        settings: _settings().copyWith(generateBilingualAsrSubtitles: true),
       );
 
       expect(parseSubtitleLines(raw).single.english, 'Hello there');

@@ -1,11 +1,10 @@
-import 'dart:async';
-
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../router/app_router.dart';
 import '../../growth/presentation/growth_provider.dart';
+import '../../import_course/data/bilibili_cover_refresh.dart';
 import '../../import_course/presentation/import_course_screen.dart';
 import '../../library/presentation/library_catalog_provider.dart';
 import '../../library/presentation/library_mock_data.dart';
@@ -33,15 +32,10 @@ class _PadHomeScreenState extends ConsumerState<PadHomeScreen> {
   bool _isOpeningEpisode = false;
 
   @override
-  void initState() {
-    super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      unawaited(syncCloudCatalogAndFeed(ref));
-    });
-  }
-
-  @override
   Widget build(BuildContext context) {
+    // Provider Refs stay valid across rebuilds (unlike WidgetRef after unmount).
+    ref.watch(cloudCatalogSyncProvider);
+    ref.watch(bilibiliCoverRefreshProvider);
     final LearningDashboardStats stats = ref.watch(learningDashboardProvider);
     final UserGrowth growth = ref.watch(userGrowthProvider);
     final List<LibraryCourseData> courses = ref.watch(
@@ -103,7 +97,10 @@ class _PadHomeScreenState extends ConsumerState<PadHomeScreen> {
       message: '正在打开课程...',
       child: PadScaffold(
         currentDestination: AppNavDestination.home,
-        topBar: const PadTopBar(title: '语言避难所', subtitle: '首页'),
+        topBar: const PadTopBar(
+          title: '爱可儿英语 AcquireEnglish',
+          subtitle: '首页',
+        ),
         body: ListView(
           key: const ValueKey<String>('home-page-scroll'),
           padding: EdgeInsets.all(pagePadding),
@@ -175,11 +172,11 @@ class _TodayFeedSection extends ConsumerWidget {
         width: double.infinity,
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: AppDesignTokens.appWhite,
           borderRadius: BorderRadius.circular(18),
-          border: Border.all(color: const Color(0xFFE2E8F0)),
+          border: Border.all(color: AppDesignTokens.borderGray),
         ),
-        child: const Text(
+        child: Text(
           '登录后按学习偏好每日推送新课。可在设置中配置偏好。',
           style: TextStyle(
             color: AppDesignTokens.textSecondary,
@@ -196,9 +193,9 @@ class _TodayFeedSection extends ConsumerWidget {
               child: ListTile(
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(16),
-                  side: const BorderSide(color: Color(0xFFE2E8F0)),
+                  side: BorderSide(color: AppDesignTokens.borderGray),
                 ),
-                tileColor: Colors.white,
+                tileColor: AppDesignTokens.appWhite,
                 title: Text(
                   course.title,
                   style: const TextStyle(fontWeight: FontWeight.w800),
@@ -234,7 +231,7 @@ class _GreetingHeader extends StatelessWidget {
   Widget build(BuildContext context) {
     return Row(
       children: <Widget>[
-        const Expanded(
+        Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: <Widget>[
@@ -261,7 +258,9 @@ class _GreetingHeader extends StatelessWidget {
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
           decoration: BoxDecoration(
-            color: const Color(0xFFFFF1D6),
+            color: AppDesignTokens.isDark
+                ? const Color(0xFF3D2A1C)
+                : const Color(0xFFFFF1D6),
             borderRadius: BorderRadius.circular(18),
           ),
           child: Column(
@@ -269,15 +268,17 @@ class _GreetingHeader extends StatelessWidget {
             children: <Widget>[
               Text(
                 '🔥 连续 ${stats.streakDays} 天',
-                style: const TextStyle(
+                style: TextStyle(
                   fontWeight: FontWeight.w900,
-                  color: AppDesignTokens.textPrimary,
+                  color: AppDesignTokens.isDark
+                      ? AppDesignTokens.orange
+                      : AppDesignTokens.textPrimary,
                 ),
               ),
               const SizedBox(height: 3),
               Text(
                 'Lv.${growth.level} ${growth.title}',
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 12,
                   fontWeight: FontWeight.w700,
                   color: AppDesignTokens.textSecondary,
@@ -444,7 +445,7 @@ class _MissionProgress extends StatelessWidget {
           const SizedBox(height: 14),
           Text(
             item.label,
-            style: const TextStyle(
+            style: TextStyle(
               fontWeight: FontWeight.w900,
               color: AppDesignTokens.textPrimary,
             ),
@@ -500,19 +501,15 @@ class _EnglishLevelCard extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.all(24),
         decoration: BoxDecoration(
-          gradient: const LinearGradient(
+          gradient: LinearGradient(
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
-            colors: <Color>[Color(0xFFE4F6DD), Color(0xFFE6F0FF)],
+            colors: AppDesignTokens.isDark
+                ? const <Color>[Color(0xFF1C3038), Color(0xFF22252E)]
+                : const <Color>[Color(0xFFE4F6DD), Color(0xFFE6F0FF)],
           ),
           borderRadius: BorderRadius.circular(28),
-          boxShadow: const <BoxShadow>[
-            BoxShadow(
-              color: Color(0x1A24385B),
-              blurRadius: 28,
-              offset: Offset(0, 12),
-            ),
-          ],
+          boxShadow: AppDesignTokens.toyCardShadow,
         ),
         child: Row(
           children: <Widget>[
@@ -527,11 +524,14 @@ class _EnglishLevelCard extends StatelessWidget {
                   ],
                 ),
                 shape: BoxShape.circle,
-                border: Border.all(color: Colors.white, width: 3),
+                border: Border.all(
+                  color: AppDesignTokens.onAccent,
+                  width: 3,
+                ),
               ),
               child: const Icon(
                 Icons.explore_rounded,
-                color: Colors.white,
+                color: AppDesignTokens.onAccent,
                 size: 31,
               ),
             ),
@@ -540,7 +540,7 @@ class _EnglishLevelCard extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: <Widget>[
-                  const Text(
+                  Text(
                     '英语成长',
                     style: TextStyle(
                       color: AppDesignTokens.textSecondary,
@@ -550,7 +550,7 @@ class _EnglishLevelCard extends StatelessWidget {
                   const SizedBox(height: 3),
                   Text(
                     'Lv.${growth.level} ${growth.title}',
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 21,
                       fontWeight: FontWeight.w900,
                       color: AppDesignTokens.textPrimary,
@@ -559,7 +559,7 @@ class _EnglishLevelCard extends StatelessWidget {
                   const SizedBox(height: 3),
                   Text(
                     '下一阶段 · $nextTitle',
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 12,
                       color: AppDesignTokens.textSecondary,
                       fontWeight: FontWeight.w700,
@@ -596,7 +596,7 @@ class _EnglishLevelCard extends StatelessWidget {
                   const SizedBox(height: 8),
                   Text(
                     '还差 $remainingXP XP 升级',
-                    style: const TextStyle(
+                    style: TextStyle(
                       color: AppDesignTokens.textSecondary,
                       fontWeight: FontWeight.w700,
                     ),
@@ -641,7 +641,7 @@ class _SavedCollectionCard extends StatelessWidget {
             children: <Widget>[
               Row(
                 children: <Widget>[
-                  const Text(
+                  Text(
                     '最近收藏，随时温习',
                     style: TextStyle(
                       fontWeight: FontWeight.w800,
@@ -727,14 +727,14 @@ class _CollectionMetric extends StatelessWidget {
           children: <Widget>[
             Text(
               label,
-              style: const TextStyle(
+              style: TextStyle(
                 color: AppDesignTokens.textSecondary,
                 fontWeight: FontWeight.w700,
               ),
             ),
             Text(
               value,
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 17,
                 color: AppDesignTokens.textPrimary,
                 fontWeight: FontWeight.w900,
@@ -835,7 +835,7 @@ class _EmptyCourses extends StatelessWidget {
       color: AppDesignTokens.appWhite,
       borderRadius: BorderRadius.circular(28),
     ),
-    child: const Text(
+    child: Text(
       '导入课程后，这里会保留你的学习足迹。',
       style: TextStyle(color: AppDesignTokens.textSecondary),
     ),
@@ -945,7 +945,7 @@ class _QuickAccessCard extends StatelessWidget {
                   const SizedBox(height: 18),
                   Text(
                     title,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 17,
                       fontWeight: FontWeight.w800,
                       color: AppDesignTokens.textPrimary,
@@ -954,7 +954,7 @@ class _QuickAccessCard extends StatelessWidget {
                   const SizedBox(height: 8),
                   Text(
                     body,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 13,
                       height: 1.55,
                       color: AppDesignTokens.textSecondary,

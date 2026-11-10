@@ -5,6 +5,7 @@
 **/.pytest_cache/
 services/api/acquire_english.db
 services/api/.env
+apps/mobile/.env
 
 # Node
 **/node_modules/
@@ -31,3 +32,9 @@ apps/_tmp_mobile/
 services/api/body.json
 
 analyze_out.txt
+
+# Local release artifacts
+*.apk
+
+# TypeScript incremental
+**/tsconfig.tsbuildinfo

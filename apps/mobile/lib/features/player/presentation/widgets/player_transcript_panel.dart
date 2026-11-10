@@ -15,6 +15,8 @@ class PlayerTranscriptPanel extends StatefulWidget {
     required this.highlightWords,
     required this.subtitleWordHighlightStyle,
     this.subtitleWordHighlightBorderWidth = 2.5,
+    this.savedVocabularyWords = const <String>{},
+    this.keyVocabularyWords = const <String>{},
     required this.onTapLine,
     required this.onCollectWord,
     this.onCollectWordAtTime,
@@ -34,6 +36,7 @@ class PlayerTranscriptPanel extends StatefulWidget {
     this.onDeleteAiSubtitles,
     this.onRegenerateAiLine,
     this.studyDarkStyle = false,
+    this.blindListening = false,
     this.showAiGenerateSubtitles = false,
     this.generatingAiSubtitles = false,
     this.aiSubtitleProgressValue,
@@ -41,6 +44,12 @@ class PlayerTranscriptPanel extends StatefulWidget {
     this.aiSubtitlePreviewText,
     this.aiSubtitleErrorText,
     this.onGenerateAiSubtitles,
+    this.bilingualPipelineLabel,
+    this.showAiCompleteButton = false,
+    this.onAiComplete,
+    this.onCancelBilingualPipeline,
+    this.onDictionaryOpened,
+    this.onDictionaryClosed,
     super.key,
   });
 
@@ -53,6 +62,8 @@ class PlayerTranscriptPanel extends StatefulWidget {
   final bool highlightWords;
   final String subtitleWordHighlightStyle;
   final double subtitleWordHighlightBorderWidth;
+  final Set<String> savedVocabularyWords;
+  final Set<String> keyVocabularyWords;
   final ValueChanged<int> onTapLine;
   final ValueChanged<String> onCollectWord;
   final void Function(String word, String time)? onCollectWordAtTime;
@@ -72,6 +83,7 @@ class PlayerTranscriptPanel extends StatefulWidget {
   final VoidCallback? onDeleteAiSubtitles;
   final Future<void> Function(int index)? onRegenerateAiLine;
   final bool studyDarkStyle;
+  final bool blindListening;
   final bool showAiGenerateSubtitles;
   final bool generatingAiSubtitles;
   final double? aiSubtitleProgressValue;
@@ -79,6 +91,12 @@ class PlayerTranscriptPanel extends StatefulWidget {
   final String? aiSubtitlePreviewText;
   final String? aiSubtitleErrorText;
   final VoidCallback? onGenerateAiSubtitles;
+  final String? bilingualPipelineLabel;
+  final bool showAiCompleteButton;
+  final VoidCallback? onAiComplete;
+  final VoidCallback? onCancelBilingualPipeline;
+  final VoidCallback? onDictionaryOpened;
+  final VoidCallback? onDictionaryClosed;
 
   @override
   State<PlayerTranscriptPanel> createState() => _PlayerTranscriptPanelState();
@@ -101,6 +119,8 @@ class _PlayerTranscriptPanelState extends State<PlayerTranscriptPanel> {
       highlightWords: widget.highlightWords,
       subtitleWordHighlightStyle: widget.subtitleWordHighlightStyle,
       subtitleWordHighlightBorderWidth: widget.subtitleWordHighlightBorderWidth,
+      savedVocabularyWords: widget.savedVocabularyWords,
+      keyVocabularyWords: widget.keyVocabularyWords,
       onCollectWord: widget.onCollectWord,
       onCollectWordAtTime: widget.onCollectWordAtTime,
       onFavoriteWord: widget.onFavoriteWord,
@@ -120,6 +140,7 @@ class _PlayerTranscriptPanelState extends State<PlayerTranscriptPanel> {
       onDeleteAiSubtitles: widget.onDeleteAiSubtitles,
       onRegenerateAiLine: widget.onRegenerateAiLine,
       studyDarkStyle: widget.studyDarkStyle,
+      blindListening: widget.blindListening,
       showAiGenerateSubtitles: widget.showAiGenerateSubtitles,
       generatingAiSubtitles: widget.generatingAiSubtitles,
       aiSubtitleProgressValue: widget.aiSubtitleProgressValue,
@@ -127,6 +148,12 @@ class _PlayerTranscriptPanelState extends State<PlayerTranscriptPanel> {
       aiSubtitlePreviewText: widget.aiSubtitlePreviewText,
       aiSubtitleErrorText: widget.aiSubtitleErrorText,
       onGenerateAiSubtitles: widget.onGenerateAiSubtitles,
+      bilingualPipelineLabel: widget.bilingualPipelineLabel,
+      showAiCompleteButton: widget.showAiCompleteButton,
+      onAiComplete: widget.onAiComplete,
+      onCancelBilingualPipeline: widget.onCancelBilingualPipeline,
+      onDictionaryOpened: widget.onDictionaryOpened,
+      onDictionaryClosed: widget.onDictionaryClosed,
     );
 
     if (widget.studyDarkStyle) {
@@ -171,7 +198,7 @@ class _PanelHeader extends StatelessWidget {
       ),
       child: Row(
         children: <Widget>[
-          const Expanded(
+          Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: <Widget>[

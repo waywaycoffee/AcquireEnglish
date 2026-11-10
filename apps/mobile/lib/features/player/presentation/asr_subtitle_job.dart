@@ -9,6 +9,7 @@ import '../../settings/presentation/settings_provider.dart';
 import '../../shared/data/word_lookup_service.dart';
 import 'asr_subtitle_cache.dart';
 import 'asr_subtitle_service.dart';
+import 'local_whisper_asr.dart';
 import 'player_mock_state.dart';
 import 'player_subtitle_loader.dart';
 import 'subtitle_word_alignment.dart';
@@ -373,18 +374,31 @@ class AsrSubtitleJobRunner {
     bool forceRegenerate = false,
     AsrProgressCallback? onProgress,
     AsrSubtitleCancellationToken? cancellationToken,
+    String? jobPipeline,
   }) async {
-    final File video = File(videoPath);
-    if (!video.existsSync()) {
-      throw StateError('missing-video-file');
-    }
     final List<PlayerSubtitleLine> usableReferenceLines =
         usableReferenceSubtitles(referenceSubtitleLines);
+    // biliSub-style: official/imported English first; Whisper/cloud only if absent.
+    if (usableReferenceLines.isEmpty) {
+      final String? configError = describeAsrConfigurationError(settings);
+      if (configError != null) {
+        throw AsrSubtitleGenerationException(configError);
+      }
+    }
+    final File video = File(videoPath);
+    if (!video.existsSync()) {
+      throw StateError(
+        videoPath.startsWith('http://') || videoPath.startsWith('https://')
+            ? '在线视频尚未缓存到本地，请稍后重试语音识别'
+            : '找不到本地视频文件，请重新打开课程后再试',
+      );
+    }
 
     final String jobKey = _jobKey(
       episodeId: episodeId,
       videoPath: videoPath,
       settings: settings,
+      pipeline: jobPipeline,
     );
     if (!_activeJobs.add(jobKey)) {
       throw const AsrSubtitleGenerationException('这个视频的 AI 字幕正在生成，请等待当前任务完成。');
@@ -402,11 +416,26 @@ class AsrSubtitleJobRunner {
           await previousJob.delete(recursive: true);
         }
       }
+      final String referenceSignature =
+          referenceSignatureOverride?.isNotEmpty ?? false
+          ? referenceSignatureOverride!
+          : subtitleReferenceSignature(usableReferenceLines);
+      if (usableReferenceLines.isNotEmpty) {
+        return await _runFromOfficialSubtitles(
+          episodeId: episodeId,
+          videoPath: videoPath,
+          settings: settings,
+          referenceSubtitleLines: usableReferenceLines,
+          referenceSignature: referenceSignature,
+          onProgress: onProgress,
+          cancellationToken: cancellationToken,
+        );
+      }
       try {
         chunks = await service.prepareAudioChunks(video);
       } catch (_) {
         cancellationToken?.throwIfCancelled();
-        if (usableReferenceLines.isEmpty) rethrow;
+        rethrow;
       }
       cancellationToken?.throwIfCancelled();
       return await _runPrepared(
@@ -415,15 +444,141 @@ class AsrSubtitleJobRunner {
         settings: settings,
         chunks: chunks,
         referenceSubtitleLines: usableReferenceLines,
-        referenceSignature: referenceSignatureOverride?.isNotEmpty ?? false
-            ? referenceSignatureOverride!
-            : subtitleReferenceSignature(usableReferenceLines),
+        referenceSignature: referenceSignature,
         onProgress: onProgress,
         cancellationToken: cancellationToken,
       );
     } finally {
       service.deleteTemporaryAudioChunks(chunks);
       _activeJobs.remove(jobKey);
+    }
+  }
+
+  /// Convert official/imported English cues into word-level follow-along subtitles
+  /// without calling Whisper or cloud ASR (same strategy as biliSub).
+  Future<String> _runFromOfficialSubtitles({
+    required String episodeId,
+    required String videoPath,
+    required LearningSettingsState settings,
+    required List<PlayerSubtitleLine> referenceSubtitleLines,
+    required String referenceSignature,
+    AsrProgressCallback? onProgress,
+    AsrSubtitleCancellationToken? cancellationToken,
+  }) async {
+    final Directory jobDir = await jobDirectory(
+      episodeId: episodeId,
+      videoPath: videoPath,
+      settings: settings,
+    );
+    await jobDir.create(recursive: true);
+    final _SubtitleQualityReport report = _SubtitleQualityReport(
+      '${settings.asrProvider}+official',
+    );
+    await _writeJob(
+      jobDir: jobDir,
+      episodeId: episodeId,
+      videoPath: videoPath,
+      settings: settings,
+      totalChunks: 0,
+      status: 'running',
+      error: '',
+    );
+    onProgress?.call(
+      const AsrSubtitleProgress(
+        completedChunks: 0,
+        totalChunks: 1,
+        previewText: '已找到官方/原有英文字幕，跳过 Whisper…',
+      ),
+    );
+    cancellationToken?.throwIfCancelled();
+
+    final SubtitleWordAlignmentResult aligned = alignReferenceSubtitles(
+      reference: referenceSubtitleLines,
+      recognition: const <PlayerSubtitleLine>[],
+    );
+    String raw = const JsonEncoder.withIndent('  ').convert(<String, Object?>{
+      'version': 1,
+      'language': 'en',
+      'source': 'official',
+      'referenceLines': referenceSubtitleLines
+          .map(_lineToJson)
+          .toList(growable: false),
+      'lines': aligned.lines.map(_lineToJson).toList(growable: false),
+    });
+    raw = _addTimingWarning(raw);
+
+    try {
+      final String translatedRaw = await _addChineseTranslations(
+        raw: raw,
+        settings: settings,
+        jobDir: jobDir,
+        cancellationToken: cancellationToken,
+        onProgress: (int completed, int total, String? previewText) {
+          onProgress?.call(
+            AsrSubtitleProgress(
+              completedChunks: 1,
+              totalChunks: 1,
+              phase: AsrSubtitlePhase.translating,
+              completedTranslations: completed,
+              totalTranslations: total,
+              previewText: previewText ?? '官方英文字幕已就绪，正在补齐中文。',
+            ),
+          );
+        },
+      );
+      onProgress?.call(
+        const AsrSubtitleProgress(
+          completedChunks: 1,
+          totalChunks: 1,
+          phase: AsrSubtitlePhase.finalizing,
+          previewText: '正在整理官方字幕并保存。',
+        ),
+      );
+      final String completedRaw = _repairFinalWordTimelines(
+        translatedRaw,
+        report: report,
+      );
+      _validateFinalResult(completedRaw, allowLineOverlap: true);
+      await cache.write(
+        episodeId: episodeId,
+        videoPath: videoPath,
+        content: completedRaw,
+        settings: settings,
+        referenceSignature: referenceSignature.isEmpty
+            ? null
+            : referenceSignature,
+      );
+      await _writeJob(
+        jobDir: jobDir,
+        episodeId: episodeId,
+        videoPath: videoPath,
+        settings: settings,
+        totalChunks: 0,
+        status: 'completed',
+        error: '',
+      );
+      await report.write(jobDir, 'PASS');
+      onProgress?.call(
+        const AsrSubtitleProgress(
+          completedChunks: 1,
+          totalChunks: 1,
+          phase: AsrSubtitlePhase.completed,
+          previewText: '已使用官方字幕',
+        ),
+      );
+      return completedRaw;
+    } catch (error) {
+      await report.write(jobDir, 'FAILED');
+      await _writeJob(
+        jobDir: jobDir,
+        episodeId: episodeId,
+        videoPath: videoPath,
+        settings: settings,
+        totalChunks: 0,
+        status: 'failed',
+        error: error.toString(),
+      );
+      rethrow;
     }
   }
 
@@ -469,6 +624,23 @@ class AsrSubtitleJobRunner {
         totalMs: totalMs,
       ),
     );
+
+    if (LocalWhisperAsr.isLocalProvider(settings)) {
+      await LocalWhisperAsr.instance.ensureModel(
+        settings.asrModel,
+        onProgress: (double? _, String message) {
+          onProgress?.call(
+            AsrSubtitleProgress(
+              completedChunks: completed,
+              totalChunks: chunks.length,
+              currentMs: 0,
+              totalMs: totalMs,
+              previewText: message,
+            ),
+          );
+        },
+      );
+    }
 
     try {
       for (int index = 0; index < chunks.length; index += 1) {
@@ -672,7 +844,8 @@ class AsrSubtitleJobRunner {
   String _addTimingWarning(String raw) {
     final Map<String, dynamic> decoded =
         jsonDecode(raw) as Map<String, dynamic>;
-    decoded['timingWarning'] = '已使用原字幕保证正文完整；部分单词时间为本地估算，联网后重新生成可提高逐词同步精度。';
+    decoded['timingWarning'] =
+        '已使用官方/原有英文字幕（未调用 Whisper）；词级时间为按句估算。';
     return const JsonEncoder.withIndent('  ').convert(decoded);
   }
 
@@ -1793,12 +1966,14 @@ class AsrSubtitleJobRunner {
     required String episodeId,
     required String videoPath,
     required LearningSettingsState settings,
+    String? pipeline,
   }) {
     final FileStat stat = File(videoPath).statSync();
     final String value =
         '$episodeId|${File(videoPath).absolute.path}|${stat.size}|'
         '${stat.modified.millisecondsSinceEpoch}|${settings.asrProvider}|'
-        '${settings.asrBaseUrl}|${settings.asrModel}';
+        '${settings.asrBaseUrl}|${settings.asrModel}'
+        '${pipeline == null || pipeline.isEmpty ? '' : '|pipeline=$pipeline'}';
     return sha1.convert(utf8.encode(value)).toString();
   }
 

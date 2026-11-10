@@ -52,7 +52,8 @@ class _DailyFeedLifecycleHostState extends ConsumerState<DailyFeedLifecycleHost>
         .read(dailyFeedProvider)
         .map((LibraryCourseData c) => c.id)
         .toSet();
-    await syncCloudCatalogAndFeed(ref);
+    ref.invalidate(cloudCatalogSyncProvider);
+    await ref.read(cloudCatalogSyncProvider.future);
     await ref.read(vocabSyncServiceProvider).pullAndMerge();
     if (!mounted || !showSnack) {
       return;

@@ -68,7 +68,7 @@ class ImportStepHeader extends StatelessWidget {
                             ? AppDesignTokens.brandGreenDark
                             : active
                             ? AppDesignTokens.appWhite
-                            : const Color(0xFFF0EEEC),
+                            : AppDesignTokens.softGray,
                         shape: BoxShape.circle,
                         border: active
                             ? Border.all(
@@ -89,7 +89,7 @@ class ImportStepHeader extends StatelessWidget {
                             ? Icon(
                                 Icons.check_rounded,
                                 size: compact ? 18 : 20,
-                                color: AppDesignTokens.appWhite,
+                                color: AppDesignTokens.onAccent,
                               )
                             : Text(
                                 '$step',

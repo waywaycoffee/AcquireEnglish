@@ -291,7 +291,7 @@ class _DailyReviewScreenState extends ConsumerState<DailyReviewScreen>
                                   key: const Key(
                                     'daily-review-session-progress',
                                   ),
-                                  style: const TextStyle(
+                                  style: TextStyle(
                                     fontWeight: FontWeight.w800,
                                     color: AppDesignTokens.textPrimary,
                                   ),
@@ -300,7 +300,7 @@ class _DailyReviewScreenState extends ConsumerState<DailyReviewScreen>
                                   finished
                                       ? '本轮已完成'
                                       : '还剩 ${keys.length - completed} 张',
-                                  style: const TextStyle(
+                                  style: TextStyle(
                                     color: AppDesignTokens.textSecondary,
                                   ),
                                 ),
@@ -357,7 +357,7 @@ class _DailyReviewScreenState extends ConsumerState<DailyReviewScreen>
                                         )
                                       : '本轮进度已保存，还有到期或新加入的内容可以继续。',
                                   textAlign: TextAlign.center,
-                                  style: const TextStyle(
+                                  style: TextStyle(
                                     height: 1.7,
                                     color: AppDesignTokens.textSecondary,
                                   ),
@@ -398,7 +398,9 @@ class _DailyReviewScreenState extends ConsumerState<DailyReviewScreen>
                                   Expanded(
                                     child: DecoratedBox(
                                       decoration: BoxDecoration(
-                                        color: const Color(0xFFE9F3E0),
+                                        color: AppDesignTokens.isDark
+                                            ? const Color(0xFF1C3038)
+                                            : const Color(0xFFE9F3E0),
                                         borderRadius: BorderRadius.circular(24),
                                       ),
                                     ),
@@ -407,7 +409,9 @@ class _DailyReviewScreenState extends ConsumerState<DailyReviewScreen>
                                   Expanded(
                                     child: DecoratedBox(
                                       decoration: BoxDecoration(
-                                        color: const Color(0xFFE9F3E0),
+                                        color: AppDesignTokens.isDark
+                                            ? const Color(0xFF1C3038)
+                                            : const Color(0xFFE9F3E0),
                                         borderRadius: BorderRadius.circular(24),
                                       ),
                                     ),
@@ -495,7 +499,7 @@ class _DailyReviewScreenState extends ConsumerState<DailyReviewScreen>
                         child: Text(
                           '${index + 1} / ${keys.length}',
                           textAlign: TextAlign.center,
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontWeight: FontWeight.w800,
                             color: AppDesignTokens.textSecondary,
                           ),
@@ -528,7 +532,7 @@ class _DailyReviewScreenState extends ConsumerState<DailyReviewScreen>
     child: Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: <Widget>[
-        const Text(
+        Text(
           '从收藏开始，慢慢记牢',
           style: TextStyle(
             fontSize: 20,
@@ -580,7 +584,7 @@ class _DailyReviewScreenState extends ConsumerState<DailyReviewScreen>
                   children: <Widget>[
                     Text(
                       title,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 15,
                         fontWeight: FontWeight.w800,
                         color: AppDesignTokens.textPrimary,
@@ -634,7 +638,7 @@ class _DailyReviewScreenState extends ConsumerState<DailyReviewScreen>
           const SizedBox(height: 20),
           Text(
             title,
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 27,
               fontWeight: FontWeight.w900,
               color: AppDesignTokens.textPrimary,
@@ -832,7 +836,7 @@ class _DailyReviewScreenState extends ConsumerState<DailyReviewScreen>
                     : source.kind == ReviewKind.phrase
                     ? formatSubtitleLetterCase(source.answer, letterCase)
                     : source.answer,
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 23,
                   height: 1.5,
                   fontWeight: FontWeight.w800,
@@ -1007,7 +1011,7 @@ class _DailyReviewScreenState extends ConsumerState<DailyReviewScreen>
       children: <Widget>[
         Text(
           '新学 ${plan.today.newLearned} / $limit 条 · 待学 ${plan.waiting.length} 条',
-          style: const TextStyle(
+          style: TextStyle(
             fontSize: 14,
             fontWeight: FontWeight.w800,
             color: AppDesignTokens.textPrimary,
@@ -1197,8 +1201,9 @@ class _ReviewSurface extends StatelessWidget {
   Widget build(BuildContext context) => Container(
     padding: EdgeInsets.all(MediaQuery.sizeOf(context).width < 600 ? 22 : 32),
     decoration: BoxDecoration(
-      color: Colors.white,
+      color: AppDesignTokens.appWhite,
       borderRadius: BorderRadius.circular(24),
+      border: Border.all(color: AppDesignTokens.borderGray),
       boxShadow: AppDesignTokens.toyCardShadow,
     ),
     child: child,
@@ -1215,7 +1220,7 @@ class _ReviewMetric extends StatelessWidget {
     children: <Widget>[
       Text(
         value,
-        style: const TextStyle(
+        style: TextStyle(
           fontSize: 28,
           fontWeight: FontWeight.w900,
           color: AppDesignTokens.textPrimary,
@@ -1224,7 +1229,7 @@ class _ReviewMetric extends StatelessWidget {
       const SizedBox(height: 5),
       Text(
         label,
-        style: const TextStyle(fontSize: 13, color: Color(0xFF626262)),
+        style: TextStyle(fontSize: 13, color: AppDesignTokens.textSecondary),
       ),
     ],
   );

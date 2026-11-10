@@ -64,7 +64,7 @@ class PlayerTopBar extends StatelessWidget {
                 foregroundColor: AppDesignTokens.brandGreenDark,
                 minimumSize: Size(tiny ? 38 : 44, tiny ? 38 : 44),
                 padding: EdgeInsets.zero,
-                side: const BorderSide(color: AppDesignTokens.borderGray),
+                side: BorderSide(color: AppDesignTokens.borderGray),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(tiny ? 12 : 14),
                 ),

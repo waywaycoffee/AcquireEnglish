@@ -76,7 +76,49 @@
               "description": "URL or path to Chinese .srt / .vtt"
             }
           }
+        },
+        "vocabulary": {
+          "type": "array",
+          "description": "Optional curated episode word cards (Shadow Talk–style)",
+          "default": [],
+          "items": { "$ref": "#/$defs/vocabularyCard" }
+        },
+        "cefrLevel": {
+          "type": "string",
+          "enum": ["A1", "A2", "B1", "B2", "C1", "C2", "unknown"]
+        },
+        "accent": {
+          "type": "string",
+          "description": "Accent label, e.g. US / UK / CA / AU"
+        },
+        "difficulty": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 5
         }
+      }
+    },
+    "vocabularyCard": {
+      "type": "object",
+      "required": ["text", "kind"],
+      "additionalProperties": false,
+      "properties": {
+        "text": { "type": "string", "minLength": 1 },
+        "kind": {
+          "type": "string",
+          "enum": ["word", "phrase", "sentence"]
+        },
+        "meaningCn": { "type": "string" },
+        "phonetic": { "type": "string" },
+        "exampleEn": { "type": "string" },
+        "exampleCn": { "type": "string" },
+        "tags": {
+          "type": "array",
+          "items": { "type": "string" },
+          "default": []
+        },
+        "startMs": { "type": "integer", "minimum": 0 },
+        "endMs": { "type": "integer", "minimum": 0 }
       }
     }
   }

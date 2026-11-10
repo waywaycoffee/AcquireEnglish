@@ -54,7 +54,7 @@ class LibraryCoursePosterTitle extends StatelessWidget {
       maxLines: 3,
       textAlign: TextAlign.center,
       overflow: TextOverflow.ellipsis,
-      style: const TextStyle(
+      style: TextStyle(
         fontSize: 24,
         fontWeight: FontWeight.w900,
         height: 1.15,

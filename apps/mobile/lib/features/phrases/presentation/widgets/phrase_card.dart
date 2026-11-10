@@ -142,7 +142,7 @@ class _PhraseText extends StatelessWidget {
       children: <Widget>[
         Text(
           phrase.english,
-          style: const TextStyle(
+          style: TextStyle(
             fontSize: 18,
             fontWeight: FontWeight.w800,
             height: 1.35,
@@ -152,7 +152,7 @@ class _PhraseText extends StatelessWidget {
         const SizedBox(height: 5),
         Text(
           phrase.chinese,
-          style: const TextStyle(
+          style: TextStyle(
             fontSize: 14,
             height: 1.45,
             color: AppDesignTokens.textSecondary,
@@ -184,7 +184,7 @@ class _SourceMeta extends StatelessWidget {
   Widget build(BuildContext context) {
     return Text(
       '${phrase.course} · ${phrase.episode}\n${phrase.time}',
-      style: const TextStyle(
+      style: TextStyle(
         fontSize: 12,
         height: 1.45,
         color: AppDesignTokens.textSecondary,

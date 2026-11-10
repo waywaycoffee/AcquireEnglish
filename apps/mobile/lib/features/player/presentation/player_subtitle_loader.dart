@@ -17,6 +17,33 @@ Future<List<PlayerSubtitleLine>> loadSubtitleLines(String source) async {
   return parseSubtitleLines(raw);
 }
 
+/// Official Chinese-only CC/AI tracks parse into [PlayerSubtitleLine.english]
+/// by default; move cue text into [PlayerSubtitleLine.chinese] and keep a
+/// visible fallback copy in english so 单英/双语 still show something until
+/// Whisper fills a real English track.
+List<PlayerSubtitleLine> normalizeChineseOnlySubtitleLines(
+  List<PlayerSubtitleLine> lines,
+) {
+  return lines
+      .map((PlayerSubtitleLine line) {
+        final String text = line.chinese.trim().isNotEmpty
+            ? line.chinese.trim()
+            : line.english.trim();
+        if (text.isEmpty) {
+          return line;
+        }
+        return PlayerSubtitleLine(
+          startTime: line.startTime,
+          english: text,
+          chinese: text,
+          startMs: line.startMs,
+          endMs: line.endMs,
+          words: line.words,
+        );
+      })
+      .toList(growable: false);
+}
+
 List<PlayerSubtitleLine> mergeSubtitleLines({
   required List<PlayerSubtitleLine> englishLines,
   required List<PlayerSubtitleLine> chineseLines,

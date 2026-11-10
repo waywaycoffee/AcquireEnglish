@@ -199,7 +199,7 @@ void main() {
             as Map<String, dynamic>;
     final Map<String, dynamic> model =
         models.values.single as Map<String, dynamic>;
-    expect(model['name'], 'Shadowing English (TideSparrow)');
+    expect(model['name'], 'AcquireEnglish');
     expect(model['id'], '${noteRow['mid']}');
     expect(
       (model['flds'] as List<dynamic>).map(

@@ -12,6 +12,7 @@ import '../../../shared/presentation/pad/app_design_tokens.dart';
 import '../../../shared/presentation/word_lookup_popup.dart';
 import '../player_mock_state.dart';
 import '../player_native_subtitles.dart';
+import 'subtitle_vocabulary_highlight.dart';
 import 'subtitle_word_highlight_style.dart';
 
 class PlayerVideoPanel extends StatefulWidget {
@@ -30,6 +31,8 @@ class PlayerVideoPanel extends StatefulWidget {
     this.highlightWords = false,
     this.subtitleWordHighlightStyle = '绿色填充',
     this.subtitleWordHighlightBorderWidth = 2.5,
+    this.savedVocabularyWords = const <String>{},
+    this.keyVocabularyWords = const <String>{},
     required this.speed,
     required this.isShadowing,
     required this.isLooping,
@@ -80,6 +83,7 @@ class PlayerVideoPanel extends StatefulWidget {
     this.videoErrorText,
     this.showAiGenerateSubtitles = false,
     this.onGenerateAiSubtitles,
+    this.hideOverlayControls = false,
     super.key,
   });
 
@@ -97,6 +101,8 @@ class PlayerVideoPanel extends StatefulWidget {
   final bool highlightWords;
   final String subtitleWordHighlightStyle;
   final double subtitleWordHighlightBorderWidth;
+  final Set<String> savedVocabularyWords;
+  final Set<String> keyVocabularyWords;
   final String speed;
   final bool isShadowing;
   final bool isLooping;
@@ -147,6 +153,9 @@ class PlayerVideoPanel extends StatefulWidget {
   final String? videoErrorText;
   final bool showAiGenerateSubtitles;
   final VoidCallback? onGenerateAiSubtitles;
+
+  /// When true (study shell with bottom controls), hide the on-video transport dock.
+  final bool hideOverlayControls;
 
   static const List<String> kSpeedOptions = <String>[
     '0.5×',
@@ -497,13 +506,24 @@ class _PlayerVideoPanelState extends State<PlayerVideoPanel> {
   }
 
   String? _overlayText() {
+    final String english = widget.line.english.trim();
+    final String chinese = widget.line.chinese.trim();
     switch (widget.subtitleMode) {
       case '双语':
-        return '${widget.line.english}\n${widget.line.chinese}';
+        if (english.isEmpty && chinese.isEmpty) {
+          return null;
+        }
+        if (english.isEmpty) {
+          return chinese;
+        }
+        if (chinese.isEmpty || chinese == english) {
+          return english;
+        }
+        return '$english\n$chinese';
       case '单英':
-        return widget.line.english;
+        return english.isNotEmpty ? english : (chinese.isEmpty ? null : chinese);
       case '单中':
-        return widget.line.chinese;
+        return chinese.isNotEmpty ? chinese : (english.isEmpty ? null : english);
       default:
         return null;
     }
@@ -516,7 +536,9 @@ class _PlayerVideoPanelState extends State<PlayerVideoPanel> {
         overlayText != null &&
         overlayText.contains('\n') &&
         widget.subtitleMode != '单英';
-    final bool showPrimaryButton = _showControls || !widget.isPlaying;
+    final bool showChrome = !widget.hideOverlayControls;
+    final bool showPrimaryButton =
+        showChrome && (_showControls || !widget.isPlaying);
     final Duration safeDuration = widget.videoDuration.isNegative
         ? Duration.zero
         : widget.videoDuration;
@@ -526,7 +548,9 @@ class _PlayerVideoPanelState extends State<PlayerVideoPanel> {
         : (widget.videoPosition.inMilliseconds / safeDuration.inMilliseconds)
               .clamp(0.0, 1.0);
     final double effectiveProgress = _gesturePreviewProgress ?? videoProgress;
-    final double surfaceRadius = widget.isFullscreen ? 0 : 24;
+    final double surfaceRadius = widget.isFullscreen
+        ? 0
+        : (showChrome ? 24 : 14);
     final Widget videoStage = ClipRRect(
       borderRadius: BorderRadius.circular(surfaceRadius),
       child: Material(
@@ -538,6 +562,7 @@ class _PlayerVideoPanelState extends State<PlayerVideoPanel> {
           showPrimaryButton,
           hasVideoDuration,
           effectiveProgress,
+          showChrome: showChrome,
         ),
       ),
     );
@@ -549,6 +574,10 @@ class _PlayerVideoPanelState extends State<PlayerVideoPanel> {
           child: AspectRatio(aspectRatio: 16 / 9, child: videoStage),
         ),
       );
+    }
+
+    if (!showChrome) {
+      return AspectRatio(aspectRatio: 16 / 9, child: videoStage);
     }
 
     return DecoratedBox(
@@ -574,8 +603,9 @@ class _PlayerVideoPanelState extends State<PlayerVideoPanel> {
     bool showChinese,
     bool showPrimaryButton,
     bool hasVideoDuration,
-    double effectiveProgress,
-  ) {
+    double effectiveProgress, {
+    required bool showChrome,
+  }) {
     return LayoutBuilder(
       builder: (BuildContext context, BoxConstraints constraints) {
         final bool compactControls = constraints.maxWidth < 900;
@@ -591,9 +621,11 @@ class _PlayerVideoPanelState extends State<PlayerVideoPanel> {
             : (tinyControls ? 12 : 16);
         final double sceneHeaderTopInset =
             widget.sceneHeaderTopInset ?? topInset;
-        final double subtitleBottom = _showControls
-            ? (tinyControls ? 126 : (compactControls ? 138 : 146))
-            : 40;
+        final double subtitleBottom = !showChrome
+            ? 18
+            : (_showControls
+                  ? (tinyControls ? 126 : (compactControls ? 138 : 146))
+                  : 40);
         return Focus(
           focusNode: _keyboardFocusNode,
           autofocus: true,
@@ -612,22 +644,23 @@ class _PlayerVideoPanelState extends State<PlayerVideoPanel> {
                 fit: StackFit.expand,
                 children: <Widget>[
                   _buildVideoBackdrop(),
-                  const Positioned.fill(
-                    child: DecoratedBox(
-                      decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                          begin: Alignment.topCenter,
-                          end: Alignment.bottomCenter,
-                          colors: <Color>[
-                            Color(0x6B101827),
-                            Color(0x1A101827),
-                            Color(0x1A101827),
-                            Color(0x80101827),
-                          ],
+                  if (showChrome)
+                    const Positioned.fill(
+                      child: DecoratedBox(
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            begin: Alignment.topCenter,
+                            end: Alignment.bottomCenter,
+                            colors: <Color>[
+                              Color(0x6B101827),
+                              Color(0x1A101827),
+                              Color(0x1A101827),
+                              Color(0x80101827),
+                            ],
+                          ),
                         ),
                       ),
                     ),
-                  ),
                   if (widget.showSceneHeader)
                     Positioned(
                       top: sceneHeaderTopInset,
@@ -647,40 +680,69 @@ class _PlayerVideoPanelState extends State<PlayerVideoPanel> {
                         ),
                       ),
                     ),
-                  Positioned(
-                    top: widget.isFullscreen
-                        ? topInset
-                        : (tinyControls ? 12 : 18),
-                    right: widget.isFullscreen ? 20 : (tinyControls ? 12 : 16),
-                    child: AnimatedOpacity(
-                      opacity: _showControls ? 1 : 0,
-                      duration: const Duration(milliseconds: 180),
-                      child: IgnorePointer(
-                        ignoring: !_showControls,
-                        child: _StatusBubble(
-                          compact: tinyControls,
-                          icon: widget.videoErrorText != null
-                              ? Icons.info_outline_rounded
-                              : Icons.menu_book_rounded,
-                          label: widget.videoErrorText ?? '学习模式',
-                          background: widget.isFullscreen
-                              ? const Color(0x33101827)
-                              : (widget.videoErrorText != null
-                                    ? const Color(0xCCFFFBEB)
-                                    : const Color(0xCCFFFFFF)),
-                          foreground: widget.isFullscreen
-                              ? Colors.white
-                              : (widget.videoErrorText != null
-                                    ? AppDesignTokens.textPrimary
-                                    : AppDesignTokens.primaryBlueDark),
+                  if (showChrome || widget.videoErrorText != null)
+                    Positioned(
+                      top: widget.isFullscreen
+                          ? topInset
+                          : (tinyControls ? 12 : 18),
+                      right: widget.isFullscreen
+                          ? 20
+                          : (tinyControls ? 12 : 16),
+                      left: widget.videoErrorText != null
+                          ? (widget.isFullscreen ? 20 : (tinyControls ? 12 : 16))
+                          : null,
+                      child: AnimatedOpacity(
+                        opacity: widget.videoErrorText != null || _showControls
+                            ? 1
+                            : 0,
+                        duration: const Duration(milliseconds: 180),
+                        child: IgnorePointer(
+                          ignoring: widget.videoErrorText == null &&
+                              !_showControls,
+                          child: _StatusBubble(
+                            compact: tinyControls,
+                            icon: widget.videoErrorText != null
+                                ? Icons.info_outline_rounded
+                                : Icons.menu_book_rounded,
+                            label: widget.videoErrorText ?? '学习模式',
+                            background: widget.isFullscreen
+                                ? const Color(0x33101827)
+                                : (widget.videoErrorText != null
+                                      ? const Color(0xCCFFFBEB)
+                                      : const Color(0xCCFFFFFF)),
+                            foreground: widget.isFullscreen
+                                ? Colors.white
+                                : (widget.videoErrorText != null
+                                      ? AppDesignTokens.textPrimary
+                                      : AppDesignTokens.primaryBlueDark),
+                          ),
                         ),
                       ),
                     ),
-                  ),
                   if (widget.videoLoading)
                     const Positioned.fill(
                       child: Align(
                         child: CircularProgressIndicator(color: Colors.white),
+                      ),
+                    ),
+                  if (!widget.videoLoading &&
+                      widget.videoErrorText != null &&
+                      !showChrome)
+                    Positioned.fill(
+                      child: Center(
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 24),
+                          child: Text(
+                            widget.videoErrorText!,
+                            textAlign: TextAlign.center,
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600,
+                              height: 1.35,
+                            ),
+                          ),
+                        ),
                       ),
                     ),
                   if (overlayText != null)
@@ -697,13 +759,18 @@ class _PlayerVideoPanelState extends State<PlayerVideoPanel> {
                             widget.subtitleMode == '单中'
                                 ? overlayText
                                 : formatSubtitleLetterCase(
-                                    widget.line.english,
+                                    widget.line.english.trim().isNotEmpty
+                                        ? widget.line.english
+                                        : widget.line.chinese,
                                     widget.subtitleLetterCase,
                                   ),
                             tinyControls: tinyControls,
                           ),
-                          if (showChinese) ...<Widget>[
-                            SizedBox(height: tinyControls ? 6 : 10),
+                          if (showChinese &&
+                              widget.line.chinese.trim().isNotEmpty &&
+                              widget.line.chinese.trim() !=
+                                  widget.line.english.trim()) ...<Widget>[
+                            SizedBox(height: tinyControls ? 5 : 8),
                             Text(
                               widget.line.chinese,
                               textAlign: TextAlign.center,
@@ -712,12 +779,12 @@ class _PlayerVideoPanelState extends State<PlayerVideoPanel> {
                               style: TextStyle(
                                 fontSize:
                                     (widget.isFullscreen
-                                        ? (tinyControls ? 15 : 18)
-                                        : (tinyControls ? 14 : 16)) *
+                                        ? (tinyControls ? 13 : 15)
+                                        : (tinyControls ? 12 : 13.5)) *
                                     widget.fontScale,
-                                fontWeight: FontWeight.w700,
+                                fontWeight: FontWeight.w500,
                                 height: 1.35,
-                                color: const Color(0xFFF7F7F7),
+                                color: const Color(0xFFE8E8E8),
                                 shadows: const <Shadow>[
                                   Shadow(
                                     color: Color(0xB3000000),
@@ -731,24 +798,26 @@ class _PlayerVideoPanelState extends State<PlayerVideoPanel> {
                         ],
                       ),
                     ),
-                  Center(
-                    child: AnimatedOpacity(
-                      opacity: showPrimaryButton ? 1 : 0,
-                      duration: const Duration(milliseconds: 180),
-                      child: IgnorePointer(
-                        ignoring: !showPrimaryButton,
-                        child: _PrimaryPlayButton(
-                          isPlaying: widget.isPlaying,
-                          compact: compactControls,
-                          tiny: tinyControls,
-                          onPressed: () =>
-                              _handleControlTap(widget.onTogglePlaying),
+                  if (showChrome)
+                    Center(
+                      child: AnimatedOpacity(
+                        opacity: showPrimaryButton ? 1 : 0,
+                        duration: const Duration(milliseconds: 180),
+                        child: IgnorePointer(
+                          ignoring: !showPrimaryButton,
+                          child: _PrimaryPlayButton(
+                            isPlaying: widget.isPlaying,
+                            compact: compactControls,
+                            tiny: tinyControls,
+                            onPressed: () =>
+                                _handleControlTap(widget.onTogglePlaying),
+                          ),
                         ),
                       ),
                     ),
-                  ),
-                  if (widget.onAssessVisibleLine != null ||
-                      widget.assessmentUnavailableReason != null)
+                  if (showChrome &&
+                      (widget.onAssessVisibleLine != null ||
+                          widget.assessmentUnavailableReason != null))
                     Positioned(
                       right: dockInset,
                       bottom: _showControls ? subtitleBottom : 18,
@@ -801,6 +870,7 @@ class _PlayerVideoPanelState extends State<PlayerVideoPanel> {
                         ),
                       ),
                     ),
+                  if (showChrome)
                   Positioned.fill(
                     child: AnimatedOpacity(
                       opacity: _showControls ? 1 : 0,
@@ -1242,11 +1312,11 @@ class _PlayerVideoPanelState extends State<PlayerVideoPanel> {
     final TextStyle style = TextStyle(
       fontSize:
           (widget.isFullscreen
-              ? (tinyControls ? 24 : 34)
-              : (tinyControls ? 22 : 28)) *
+              ? (tinyControls ? 26 : 36)
+              : (tinyControls ? 23 : 30)) *
           widget.fontScale,
       fontWeight: FontWeight.w800,
-      height: 1.25,
+      height: 1.22,
       color: Colors.white,
       shadows: const <Shadow>[
         Shadow(color: Color(0xCC000000), blurRadius: 10, offset: Offset(0, 3)),
@@ -1274,10 +1344,41 @@ class _PlayerVideoPanelState extends State<PlayerVideoPanel> {
           .asMap()
           .entries
           .map((MapEntry<int, String> entry) {
-            final bool highlighted =
+            final bool karaoke =
                 widget.highlightWords &&
                 widget.line.words.isNotEmpty &&
                 entry.key == widget.currentWordIndex;
+            final SubtitleVocabMark vocabMark =
+                SubtitleVocabularyHighlight.resolve(
+                  rawToken: entry.value,
+                  savedWords: widget.savedVocabularyWords,
+                  keyWords: widget.keyVocabularyWords,
+                );
+            final Color vocabFill = SubtitleVocabularyHighlight.fill(
+              vocabMark,
+              onDarkVideo: true,
+            );
+            final Color karaokeFill = SubtitleWordHighlightStyle.background(
+              widget.subtitleWordHighlightStyle,
+              highlighted: karaoke,
+            );
+            final Color fill = karaoke ? karaokeFill : vocabFill;
+            final Color borderColor = karaoke
+                ? SubtitleWordHighlightStyle.borderColor(
+                    widget.subtitleWordHighlightStyle,
+                    highlighted: karaoke,
+                  )
+                : SubtitleVocabularyHighlight.border(
+                    vocabMark,
+                    onDarkVideo: true,
+                  );
+            final double borderWidth = karaoke
+                ? SubtitleWordHighlightStyle.borderWidth(
+                    widget.subtitleWordHighlightStyle,
+                    highlighted: karaoke,
+                    width: widget.subtitleWordHighlightBorderWidth,
+                  )
+                : (vocabMark == SubtitleVocabMark.none ? 0 : 1.4);
             return Builder(
               builder: (BuildContext tokenContext) {
                 return GestureDetector(
@@ -1290,37 +1391,32 @@ class _PlayerVideoPanelState extends State<PlayerVideoPanel> {
                       vertical: 1,
                     ),
                     decoration: BoxDecoration(
-                      color: SubtitleWordHighlightStyle.background(
-                        widget.subtitleWordHighlightStyle,
-                        highlighted: highlighted,
-                      ),
+                      color: fill,
                       borderRadius: BorderRadius.circular(7),
                       border: Border.all(
-                        color: SubtitleWordHighlightStyle.borderColor(
-                          widget.subtitleWordHighlightStyle,
-                          highlighted: highlighted,
-                        ),
-                        width: SubtitleWordHighlightStyle.borderWidth(
-                          widget.subtitleWordHighlightStyle,
-                          highlighted: highlighted,
-                          width: widget.subtitleWordHighlightBorderWidth,
-                        ),
+                        color: borderColor,
+                        width: borderWidth,
                       ),
                     ),
                     child: Text(
                       entry.value,
                       style: style.copyWith(
+                        fontWeight: SubtitleVocabularyHighlight.fontWeight(
+                          vocabMark,
+                          karaoke: karaoke,
+                          activeLine: true,
+                        ),
                         decoration: SubtitleWordHighlightStyle.textDecoration(
                           widget.subtitleWordHighlightStyle,
-                          highlighted: highlighted,
+                          highlighted: karaoke,
                         ),
                         decorationColor:
                             SubtitleWordHighlightStyle.textDecorationColor(
                               widget.subtitleWordHighlightStyle,
-                              highlighted: highlighted,
+                              highlighted: karaoke,
                             ),
                         decorationThickness:
-                            highlighted &&
+                            karaoke &&
                                 widget.subtitleWordHighlightStyle == '下划线'
                             ? 2
                             : null,
@@ -1479,14 +1575,16 @@ class _StatusBubble extends StatelessWidget {
           Icon(icon, size: compact ? 14 : 16, color: foreground),
           SizedBox(width: compact ? 4 : 6),
           ConstrainedBox(
-            constraints: BoxConstraints(maxWidth: compact ? 120 : 180),
+            constraints: BoxConstraints(maxWidth: compact ? 200 : 280),
             child: Text(
               label,
+              maxLines: 3,
               overflow: TextOverflow.ellipsis,
               style: TextStyle(
                 fontSize: compact ? 10 : 11,
                 fontWeight: FontWeight.w800,
                 color: foreground,
+                height: 1.25,
               ),
             ),
           ),

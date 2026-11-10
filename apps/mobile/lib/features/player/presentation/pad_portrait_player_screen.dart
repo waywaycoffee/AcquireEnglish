@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -7,8 +8,13 @@ import 'package:go_router/go_router.dart';
 import 'package:media_kit/media_kit.dart';
 import 'package:media_kit_video/media_kit_video.dart';
 
+import '../../../config/theme/theme_logic.dart';
 import '../../../router/app_router.dart';
 import '../../home/presentation/learning_dashboard_provider.dart';
+import '../../import_course/data/bilibili_episode_prepare.dart';
+import '../../import_course/data/bilibili_import_service.dart';
+import '../../import_course/data/bilibili_multipage.dart';
+import '../../import_course/domain/bilibili_import.dart';
 import '../../library/presentation/library_catalog_provider.dart';
 import '../../library/presentation/library_mock_data.dart';
 import '../../phrases/presentation/phrase_book_provider.dart';
@@ -20,10 +26,13 @@ import '../../sync/data/acquire_api_client.dart';
 import '../../sync/data/progress_sync_service.dart';
 import '../../words/data/offline_word_dictionary.dart';
 import '../../words/presentation/word_book_provider.dart';
+import '../data/dictation_queue_provider.dart';
+import '../domain/episode_word_cards.dart';
 import '../domain/pronunciation_assessment.dart';
 import 'asr_subtitle_cache.dart';
 import 'asr_subtitle_job.dart';
 import 'asr_subtitle_service.dart';
+import 'bilingual_subtitle_pipeline.dart';
 import 'embedded_subtitle_reference.dart';
 import 'full_transcript_reader.dart';
 import 'learning_resume_provider.dart';
@@ -38,19 +47,25 @@ import 'player_system_media_controls.dart';
 import 'player_video_init.dart';
 import 'pronunciation_target_selection.dart';
 import 'subtitle_reference_review.dart';
+import 'subtitle_word_alignment.dart';
 import 'transcript_reader_session.dart';
+import 'widgets/ai_grammar_analysis_sheet.dart';
 import 'widgets/ai_subtitle_generation_progress_dialog.dart';
 import 'widgets/player_subtitle_list.dart';
 import 'widgets/player_transcript_panel.dart';
 import 'widgets/player_video_panel.dart';
+import 'widgets/subtitle_vocabulary_highlight.dart';
 import 'widgets/pronunciation_assessment_dialog.dart';
 import 'widgets/study_bottom_controls.dart';
 import 'widgets/study_dictation_tab.dart';
+import 'widgets/study_loop_sheet.dart';
 import 'widgets/study_mode_tabs.dart';
 import 'widgets/study_practice_tab.dart';
+import 'widgets/study_oral_coach_tab.dart';
 import 'widgets/study_shadowing_tab.dart';
 import 'widgets/study_shell_tokens.dart';
 import 'widgets/study_top_bar.dart';
+import 'widgets/study_word_cards_tab.dart';
 
 class PadPortraitPlayerScreen extends ConsumerStatefulWidget {
   const PadPortraitPlayerScreen({
@@ -109,11 +124,23 @@ class _PadPortraitPlayerScreenState
   String? _aiSubtitlePreviewText;
   String? _aiSubtitleErrorText;
   bool _usingAiSubtitles = false;
+  BilingualSubtitlePipeline? _bilingualPipeline;
+  BilingualPipelinePhase _bilingualPhase = BilingualPipelinePhase.idle;
+  String? _bilingualPipelineLabel;
+  bool _bilingualShowAiComplete = false;
   List<SubtitleTrack> _embeddedSubtitleTracks = const <SubtitleTrack>[];
   String? _selectedEmbeddedSubtitleId;
   List<PlayerSubtitleLine> _referenceSubtitleLines =
       const <PlayerSubtitleLine>[];
   StudyModeTab _studyTab = StudyModeTab.subtitles;
+  bool _dictationQueueMode = false;
+  int _dictationQueueIndex = 0;
+  bool _pausedForLookup = false;
+  bool _episodeFavorited = false;
+  bool _blindListening = false;
+  StudyLoopSettings _loopSettings = const StudyLoopSettings();
+  int _loopCompleted = 0;
+  bool _loopIntervalPending = false;
 
   @override
   void initState() {
@@ -147,6 +174,8 @@ class _PadPortraitPlayerScreenState
   @override
   void dispose() {
     _aiSubtitleCancellationToken?.cancel();
+    unawaited(_bilingualPipeline?.dispose());
+    _bilingualPipeline = null;
     PlayerSystemMediaControls.unbind();
     unawaited(_disposeVideo().whenComplete(_releaseGraphicsCache));
     _transcriptReaderSession.dispose();
@@ -155,7 +184,7 @@ class _PadPortraitPlayerScreenState
 
   Future<void> _loadEpisodeResources() async {
     final List<LibraryCourseData> courses = ref.read(libraryCatalogProvider);
-    final PlayerCourseLookupResult resource = resolvePlayerCourseForEpisode(
+    PlayerCourseLookupResult resource = resolvePlayerCourseForEpisode(
       courses: courses,
       episodeId: widget.episodeId,
     );
@@ -185,23 +214,84 @@ class _PadPortraitPlayerScreenState
       }
     } catch (_) {}
 
+    // Bilibili: pull official subs + force local MP4 before the player opens.
+    String? enSub = resource.englishSubtitleAsset;
+    String? zhSub = resource.chineseSubtitleAsset;
+    if (_needsBilibiliPrepare(resource)) {
+      if (mounted) {
+        setState(() {
+          _videoLoading = true;
+          _videoErrorText = '正在准备 B 站本地视频与字幕…';
+          _isBootstrapping = false;
+        });
+      }
+      final BilibiliEpisodePrepareResult prepared =
+          await _prepareBilibiliEpisodeAssets(resource);
+      if (!mounted) {
+        return;
+      }
+      if ((prepared.enSubtitlePath ?? '').isNotEmpty) {
+        enSub = prepared.enSubtitlePath;
+      }
+      if ((prepared.zhSubtitlePath ?? '').isNotEmpty) {
+        zhSub = prepared.zhSubtitlePath;
+      }
+      if ((prepared.localVideoPath ?? '').isNotEmpty) {
+        _videoAsset = prepared.localVideoPath;
+      }
+      if ((prepared.note ?? '').isNotEmpty) {
+        final String note = prepared.note!;
+        setState(() => _videoErrorText = note);
+        if ((prepared.localVideoPath ?? '').isNotEmpty) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (!mounted) {
+              return;
+            }
+            final ScaffoldMessengerState messenger = ScaffoldMessenger.of(
+              context,
+            );
+            messenger.hideCurrentSnackBar();
+            messenger.showSnackBar(
+              SnackBar(content: Text(note), duration: const Duration(seconds: 4)),
+            );
+          });
+        }
+      }
+      // Refresh resource after catalog persist.
+      resource = resolvePlayerCourseForEpisode(
+        courses: ref.read(libraryCatalogProvider),
+        episodeId: widget.episodeId,
+      );
+    }
+
     List<PlayerSubtitleLine> resolvedLines = const <PlayerSubtitleLine>[];
-    if ((resource.englishSubtitleAsset ?? '').isNotEmpty) {
+    if (isUsableSubtitlePath(enSub)) {
       try {
         final List<PlayerSubtitleLine> englishLines = await loadSubtitleLines(
-          resource.englishSubtitleAsset!,
+          enSub!,
         );
         List<PlayerSubtitleLine> chineseLines = const <PlayerSubtitleLine>[];
-        if ((resource.chineseSubtitleAsset ?? '').isNotEmpty) {
-          chineseLines = await loadSubtitleLines(
-            resource.chineseSubtitleAsset!,
-          );
+        if (isUsableSubtitlePath(zhSub)) {
+          chineseLines = await loadSubtitleLines(zhSub!);
         }
         resolvedLines = mergeSubtitleLines(
           englishLines: englishLines,
           chineseLines: chineseLines,
         );
-      } catch (_) {
+      } catch (e) {
+        // ignore: avoid_print
+        print('bilibili.prepare load en/zh subs error: $e');
+        resolvedLines = const <PlayerSubtitleLine>[];
+      }
+    } else if (isUsableSubtitlePath(zhSub)) {
+      // Chinese-only official track: still show something until Whisper/AI runs.
+      try {
+        resolvedLines = normalizeChineseOnlySubtitleLines(
+          await loadSubtitleLines(zhSub!),
+        );
+      } catch (e) {
+        // ignore: avoid_print
+        print('bilibili.prepare load zh-only subs error: $e');
         resolvedLines = const <PlayerSubtitleLine>[];
       }
     }
@@ -215,6 +305,7 @@ class _PadPortraitPlayerScreenState
         ..isPlaying = widget.autoPlay && (_videoAsset?.isNotEmpty ?? false);
       _usingAiSubtitles = false;
       _referenceSubtitleLines = resolvedLines;
+      _isBootstrapping = false;
     });
     if (resource.episode != null) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -223,12 +314,170 @@ class _PadPortraitPlayerScreenState
       });
     }
     await _initVideo();
-    if (!mounted) {
+  }
+
+  bool _needsBilibiliPrepare(PlayerCourseLookupResult resource) {
+    final LibraryCourseData? course = resource.course;
+    if (course == null) {
+      return false;
+    }
+    final bool isBili =
+        course.category == 'bilibili' ||
+        course.sourceLabel.toLowerCase().contains('bilibili') ||
+        course.id.startsWith('bilibili-');
+    if (!isBili) {
+      return false;
+    }
+    final bool hasLocalVideo = isUsableLocalVideoPath(resource.videoAsset);
+    final bool hasSubs =
+        isUsableSubtitlePath(resource.englishSubtitleAsset) ||
+        isUsableSubtitlePath(resource.chineseSubtitleAsset);
+    return !hasLocalVideo || !hasSubs;
+  }
+
+  Future<void> _persistBilibiliEpisodeAssets({
+    required PlayerCourseLookupResult resource,
+    String? localVideoPath,
+    String? enSubtitlePath,
+    String? zhSubtitlePath,
+  }) async {
+    final LibraryCourseData? course = resource.course;
+    final LibraryEpisodeItem? episode = resource.episode;
+    if (course == null || episode == null) {
       return;
     }
-    setState(() {
-      _isBootstrapping = false;
-    });
+    final bool hasEn = isUsableSubtitlePath(enSubtitlePath);
+    final bool hasZh = isUsableSubtitlePath(zhSubtitlePath);
+    final bool hasVideo = isUsableLocalVideoPath(localVideoPath);
+    if (!hasEn && !hasZh && !hasVideo) {
+      return;
+    }
+    final LibraryEpisodeItem current = resolvePlayerCourseForEpisode(
+      courses: ref.read(libraryCatalogProvider),
+      episodeId: episode.id,
+    ).episode ??
+        episode;
+    await ref.read(libraryCatalogProvider.notifier).importCourse(
+      course.copyWith(
+        episodes: course.episodes
+            .map(
+              (LibraryEpisodeItem item) => item.id == episode.id
+                  ? item.copyWith(
+                      videoAsset: hasVideo
+                          ? localVideoPath
+                          : item.videoAsset,
+                      videoMissing: hasVideo ? false : item.videoMissing,
+                      enSubtitleAsset: hasEn
+                          ? enSubtitlePath
+                          : item.enSubtitleAsset,
+                      cnSubtitleAsset: hasZh
+                          ? zhSubtitlePath
+                          : item.cnSubtitleAsset,
+                      hasEnglishSubtitles: hasEn || item.hasEnglishSubtitles,
+                      hasChineseSubtitles: hasZh || item.hasChineseSubtitles,
+                      subtitleTracks: <LibrarySubtitleTrackItem>[
+                        if (hasEn ||
+                            isUsableSubtitlePath(current.enSubtitleAsset))
+                          LibrarySubtitleTrackItem(
+                            languageCode: 'en',
+                            languageLabel: 'English',
+                            path: hasEn
+                                ? enSubtitlePath!
+                                : current.enSubtitleAsset!,
+                          ),
+                        if (hasZh ||
+                            isUsableSubtitlePath(current.cnSubtitleAsset))
+                          LibrarySubtitleTrackItem(
+                            languageCode: 'zh',
+                            languageLabel: '中文',
+                            path: hasZh
+                                ? zhSubtitlePath!
+                                : current.cnSubtitleAsset!,
+                          ),
+                      ],
+                    )
+                  : item,
+            )
+            .toList(growable: false),
+      ),
+    );
+  }
+
+  Future<BilibiliEpisodePrepareResult> _prepareBilibiliEpisodeAssets(
+    PlayerCourseLookupResult resource,
+  ) async {
+    final BilibiliImportService service = BilibiliImportService.withCookie(
+      ref.read(learningSettingsProvider).resolvedBilibiliCookieHeader,
+    );
+    LibraryCourseData? course = resource.course;
+    if (course != null) {
+      try {
+        final LibraryCourseData? expanded = await expandBilibiliCourseIfNeeded(
+          service: service,
+          course: course,
+        );
+        if (expanded != null) {
+          await ref.read(libraryCatalogProvider.notifier).importCourse(expanded);
+          course = expanded;
+          resource = resolvePlayerCourseForEpisode(
+            courses: ref.read(libraryCatalogProvider),
+            episodeId: widget.episodeId,
+          );
+          // If the old single-episode id vanished, keep preparing against page 1.
+          if (resource.course == null) {
+            resource = resolvePlayerCourseForEpisode(
+              courses: ref.read(libraryCatalogProvider),
+              episodeId: expanded.episodes.first.id,
+            );
+          }
+        }
+      } catch (e) {
+        // ignore: avoid_print
+        print('bilibili.prepare expand pages error: $e');
+      }
+    }
+    final String? source = bilibiliSourceForEpisode(
+          course: resource.course ?? course,
+          episode: resource.episode,
+          videoAsset: resource.videoAsset,
+        ) ??
+        _bilibiliRecoverSource(resource.videoAsset ?? '') ??
+        _bilibiliRecoverSource(resource.course?.description ?? '');
+    if (source == null || source.isEmpty) {
+      return const BilibiliEpisodePrepareResult(
+        note: '无法识别 B 站视频来源',
+      );
+    }
+    final BilibiliEpisodePrepareResult prepared = await prepareBilibiliEpisode(
+      service: service,
+      source: source,
+      currentVideoAsset: resource.videoAsset,
+      onProgress: (String message) {
+        if (!mounted) {
+          return;
+        }
+        setState(() => _videoErrorText = message);
+      },
+      onSubtitlesReady:
+          ({
+            required String? enSubtitlePath,
+            required String? zhSubtitlePath,
+            String? note,
+          }) async {
+            await _persistBilibiliEpisodeAssets(
+              resource: resource,
+              enSubtitlePath: enSubtitlePath,
+              zhSubtitlePath: zhSubtitlePath,
+            );
+          },
+    );
+    await _persistBilibiliEpisodeAssets(
+      resource: resource,
+      localVideoPath: prepared.localVideoPath,
+      enSubtitlePath: prepared.enSubtitlePath,
+      zhSubtitlePath: prepared.zhSubtitlePath,
+    );
+    return prepared;
   }
 
   Future<void> _initVideo() async {
@@ -247,10 +496,11 @@ class _PadPortraitPlayerScreenState
       return;
     }
 
+    final bool isBilibili = BilibiliImport.isWatchPageUrl(_videoAsset!);
     setState(() {
       _videoReady = false;
       _videoLoading = true;
-      _videoErrorText = null;
+      _videoErrorText = isBilibili ? '正在解析 B 站视频…' : null;
     });
 
     final Player player = Player();
@@ -268,11 +518,45 @@ class _PadPortraitPlayerScreenState
         ),
       );
       _videoController = controller;
-      await waitForVideoInitialization(() async {
-        await player.open(Media(createPlayerMediaUri(_videoAsset!)));
-      });
+      final ({String uri, Map<String, String>? headers}) media =
+          await _resolvePlayableMedia(
+            _videoAsset!,
+            onProgress: isBilibili
+                ? (double? _, String message) {
+                    if (!mounted || !identical(_videoPlayer, player)) {
+                      return;
+                    }
+                    setState(() => _videoErrorText = message);
+                  }
+                : null,
+          ).timeout(
+            Duration(minutes: isBilibili ? 8 : 1),
+            onTimeout: () => throw StateError(
+              isBilibili
+                  ? '缓存 B 站视频超时，请检查网络后重试'
+                  : '视频加载超时',
+            ),
+          );
       if (!mounted || !identical(_videoPlayer, player)) return;
-      await waitForPlayerReady(player);
+      setState(() {
+        _videoErrorText = isBilibili ? '正在连接播放器…' : null;
+      });
+      await waitForVideoInitialization(
+        () async {
+          await player.open(
+            Media(
+              createPlayerMediaUri(media.uri),
+              httpHeaders: media.headers ?? const <String, String>{},
+            ),
+          );
+        },
+        timeout: Duration(seconds: isBilibili ? 30 : 8),
+      );
+      if (!mounted || !identical(_videoPlayer, player)) return;
+      await waitForPlayerReady(
+        player,
+        timeout: Duration(seconds: isBilibili ? 30 : 8),
+      );
       if (!mounted || !identical(_videoPlayer, player)) return;
       await player.setSubtitleTrack(SubtitleTrack.no());
       await player.setRate(state.playbackRate);
@@ -310,7 +594,8 @@ class _PadPortraitPlayerScreenState
       }
       if (!mounted) return;
       _applyPlaybackMode();
-    } catch (_) {
+      unawaited(_maybeStartBilingualPipeline());
+    } catch (error) {
       if (identical(_videoPlayer, player)) await _disposeVideo();
       if (!mounted) {
         return;
@@ -320,10 +605,157 @@ class _PadPortraitPlayerScreenState
         _videoController = null;
         _videoReady = false;
         _videoLoading = false;
-        _videoErrorText = '视频加载失败';
+        _videoErrorText = _videoLoadErrorMessage(error, _videoAsset);
       });
       _applyPlaybackMode();
     }
+  }
+
+  Future<({String uri, Map<String, String>? headers})> _resolvePlayableMedia(
+    String source, {
+    void Function(double? progress, String message)? onProgress,
+  }) async {
+    final String trimmed = source.trim();
+    final bool looksLocal =
+        trimmed.isNotEmpty &&
+        !trimmed.startsWith('http://') &&
+        !trimmed.startsWith('https://');
+    if (looksLocal) {
+      final File local = File(trimmed);
+      if (local.existsSync() && local.lengthSync() > 64 * 1024) {
+        return (uri: trimmed, headers: null);
+      }
+    } else if (!BilibiliImport.isWatchPageUrl(trimmed) &&
+        !BilibiliImport.looksLikeBilibiliInput(trimmed)) {
+      return (uri: trimmed, headers: null);
+    }
+
+    final String? biliSource = _bilibiliRecoverSource(trimmed);
+    if (biliSource == null) {
+      if (looksLocal) {
+        throw StateError('本地视频文件不存在，且无法从课程信息恢复 B 站链接');
+      }
+      return (uri: trimmed, headers: null);
+    }
+
+    try {
+      final BilibiliPlayableMedia media =
+          await BilibiliImportService.withCookie(
+            ref.read(learningSettingsProvider).resolvedBilibiliCookieHeader,
+          ).resolvePlayableForPlayback(biliSource, onProgress: onProgress);
+      if (media.isLocalFile) {
+        await _persistLocalBilibiliVideo(media.uri);
+        if (mounted) {
+          setState(() => _videoAsset = media.uri);
+        }
+      }
+      return (uri: media.uri, headers: media.headers);
+    } catch (error) {
+      throw StateError('B站视频无法播放：$error');
+    }
+  }
+
+  String? _bilibiliRecoverSource(String source) {
+    if (BilibiliImport.isWatchPageUrl(source) ||
+        BilibiliImport.looksLikeBilibiliInput(source)) {
+      return source;
+    }
+    final PlayerCourseLookupResult resource = resolvePlayerCourseForEpisode(
+      courses: ref.read(libraryCatalogProvider),
+      episodeId: widget.episodeId,
+    );
+    final LibraryCourseData? course = resource.course;
+    if (course == null) {
+      return null;
+    }
+    final String description = course.description.trim();
+    if (BilibiliImport.looksLikeBilibiliInput(description)) {
+      return description;
+    }
+    if (course.id.startsWith('bilibili-')) {
+      final String idKey = course.id.substring('bilibili-'.length);
+      if (idKey.startsWith('BV') || idKey.startsWith('av')) {
+        return idKey;
+      }
+    }
+    return null;
+  }
+
+  Future<void> _persistLocalBilibiliVideo(String localPath) async {
+    final PlayerCourseLookupResult resource = resolvePlayerCourseForEpisode(
+      courses: ref.read(libraryCatalogProvider),
+      episodeId: widget.episodeId,
+    );
+    final String? courseId = resource.course?.id;
+    if (courseId == null || courseId.isEmpty) {
+      return;
+    }
+    final String? current = resource.episode?.videoAsset?.trim();
+    if (current == localPath) {
+      return;
+    }
+    await ref.read(libraryCatalogProvider.notifier).updateCourseVideoAsset(
+          courseId: courseId,
+          videoAsset: localPath,
+        );
+  }
+
+  Future<String> _resolveAsrVideoPath(String source) async {
+    // Import now downloads first — prefer an existing local file.
+    if (!source.startsWith('http://') &&
+        !source.startsWith('https://') &&
+        File(source).existsSync() &&
+        File(source).lengthSync() > 64 * 1024) {
+      return source;
+    }
+    final bool needsBilibiliCache =
+        BilibiliImport.isWatchPageUrl(source) ||
+        BilibiliImport.looksLikeBilibiliInput(source) ||
+        source.startsWith('http://127.0.0.1');
+    if (!needsBilibiliCache) {
+      return source;
+    }
+    // Proxy streams are not real files — ASR needs a downloaded MP4.
+    final String input = source.startsWith('http://127.0.0.1')
+        ? (_videoAsset ?? source)
+        : source;
+    if (!BilibiliImport.isWatchPageUrl(input) &&
+        !BilibiliImport.looksLikeBilibiliInput(input)) {
+      throw StateError('当前是在线流，请先等待视频缓存完成后再生成字幕');
+    }
+    if (mounted) {
+      setState(() => _aiSubtitleProgressText = '正在下载视频供语音识别…');
+    }
+    return BilibiliImportService.withCookie(
+      ref.read(learningSettingsProvider).resolvedBilibiliCookieHeader,
+    ).ensureLocalCacheForAsr(
+      input,
+      onProgress: (double? _, String message) {
+        if (!mounted) return;
+        setState(() => _aiSubtitleProgressText = message);
+      },
+    );
+  }
+
+  String _videoLoadErrorMessage(Object error, String? source) {
+    String text = error
+        .toString()
+        .replaceFirst('Bad state: ', '')
+        .replaceFirst('Exception: ', '')
+        .replaceFirst('B站视频无法播放：', '');
+    // Collapse noisy DioException walls of text into a short status.
+    final RegExp statusCode = RegExp(r'status code of (\d+)');
+    final Match? codeMatch = statusCode.firstMatch(text);
+    if (text.contains('DioException') && codeMatch != null) {
+      text = '网络错误 HTTP ${codeMatch.group(1)}';
+    } else if (text.length > 80) {
+      text = '${text.substring(0, 77)}...';
+    }
+    if (text.contains('B站') ||
+        (source != null && BilibiliImport.isWatchPageUrl(source))) {
+      return 'B站视频无法播放：$text';
+    }
+    return '视频加载失败：$text';
   }
 
   Future<void> _loadEmbeddedSubtitleReference(
@@ -379,6 +811,130 @@ class _PadPortraitPlayerScreenState
         ..seekToMilliseconds(positionMs)
         ..setSubtitleMode(settings.subtitleMode);
       _usingAiSubtitles = true;
+    });
+  }
+
+  Future<void> _maybeStartBilingualPipeline() async {
+    if (!mounted || _usingAiSubtitles || _generatingAiSubtitles) {
+      return;
+    }
+    final String? videoPath = _videoAsset;
+    if (videoPath == null ||
+        videoPath.isEmpty ||
+        !_videoReady ||
+        !state.hasLines) {
+      return;
+    }
+    if (!BilingualSubtitlePipeline.shouldAutoStart(state.lines)) {
+      return;
+    }
+    await _bilingualPipeline?.dispose();
+    final LearningSettingsState settings = ref.read(learningSettingsProvider);
+    final BilingualSubtitlePipeline pipeline = BilingualSubtitlePipeline(
+      episodeId: widget.episodeId,
+      videoPath: videoPath,
+      settings: settings,
+      player: _videoPlayer,
+      getLines: () => state.lines,
+      setLines: (List<PlayerSubtitleLine> lines) {
+        if (!mounted) {
+          return;
+        }
+        setState(() {
+          state.loadLines(lines);
+        });
+      },
+      onPhaseChanged: (BilingualPipelinePhase phase) {
+        if (!mounted) {
+          return;
+        }
+        setState(() {
+          _bilingualPhase = phase;
+          _bilingualShowAiComplete =
+              phase == BilingualPipelinePhase.ocrSlow;
+          if (phase == BilingualPipelinePhase.completed) {
+            _usingAiSubtitles = true;
+            _bilingualPipelineLabel = null;
+            _bilingualShowAiComplete = false;
+          } else if (phase == BilingualPipelinePhase.cancelled) {
+            _bilingualPipelineLabel = null;
+            _bilingualShowAiComplete = false;
+          }
+        });
+      },
+      onProgress: (String label) {
+        if (!mounted) {
+          return;
+        }
+        setState(() => _bilingualPipelineLabel = label);
+      },
+    );
+    _bilingualPipeline = pipeline;
+    setState(() {
+      _bilingualPhase = BilingualPipelinePhase.ocrRunning;
+      _bilingualPipelineLabel = '正在识别画面字幕…';
+      _bilingualShowAiComplete = false;
+    });
+    await pipeline.startOcr(
+      isPlaying: () => state.isPlaying || _videoIsPlaying,
+      positionMs: () =>
+          _videoPosition.inMilliseconds > 0
+          ? _videoPosition.inMilliseconds
+          : state.positionMs,
+    );
+  }
+
+  Future<void> _handleAiCompleteSubtitles() async {
+    final BilingualSubtitlePipeline? pipeline = _bilingualPipeline;
+    if (pipeline == null || _generatingAiSubtitles) {
+      return;
+    }
+    setState(() {
+      _generatingAiSubtitles = true;
+      _aiSubtitleProgressText = '正在 AI 补全…';
+      _bilingualShowAiComplete = false;
+    });
+    try {
+      await pipeline.runAiComplete();
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _usingAiSubtitles = true;
+        _bilingualPipelineLabel = null;
+        _bilingualShowAiComplete = false;
+      });
+      _showMessage('双语字幕已补全');
+    } catch (error) {
+      if (!mounted) {
+        return;
+      }
+      final String message = humanizeAsrSubtitleError(error);
+      setState(() {
+        _aiSubtitleErrorText = message;
+        _bilingualShowAiComplete = true;
+        _bilingualPipelineLabel = message;
+      });
+      _showMessage(message);
+    } finally {
+      if (mounted) {
+        setState(() {
+          _generatingAiSubtitles = false;
+          _aiSubtitleProgressText = null;
+        });
+      }
+    }
+  }
+
+  Future<void> _handleCancelBilingualPipeline() async {
+    await _bilingualPipeline?.cancel();
+    if (!mounted) {
+      return;
+    }
+    setState(() {
+      _bilingualPhase = BilingualPipelinePhase.cancelled;
+      _bilingualPipelineLabel = null;
+      _bilingualShowAiComplete = false;
     });
   }
 
@@ -438,9 +994,14 @@ class _PadPortraitPlayerScreenState
     _videoCompletedSubscription = player.stream.completed.listen((
       bool completed,
     ) {
-      if (completed) {
-        _stopVideo();
+      if (!completed) {
+        return;
       }
+      if (_loopSettings.mode == StudyLoopMode.full) {
+        unawaited(_applyLoopRestart());
+        return;
+      }
+      _stopVideo();
     });
     _syncTranscriptReader();
     _videoWidthSubscription = player.stream.width.listen((int? width) {
@@ -520,6 +1081,11 @@ class _PadPortraitPlayerScreenState
 
     if (loopRestarted) {
       _lastTrackedVideoPosition = Duration(milliseconds: state.positionMs);
+      if (_loopSettings.mode == StudyLoopMode.sentence &&
+          (_loopSettings.intervalSec > 0 || _loopSettings.countLimit > 0)) {
+        unawaited(_applyLoopRestart());
+        return;
+      }
       unawaited(_videoPlayer?.seek(_videoPosition));
       return;
     }
@@ -787,9 +1353,20 @@ class _PadPortraitPlayerScreenState
 
   @override
   Widget build(BuildContext context) {
+    final ThemeMode themeMode = ref.watch(themeLogicProvider).themeMode;
+    final Brightness platformBrightness =
+        MediaQuery.platformBrightnessOf(context);
+    final Brightness studyBrightness = switch (themeMode) {
+      ThemeMode.light => Brightness.light,
+      ThemeMode.dark => Brightness.dark,
+      ThemeMode.system => platformBrightness,
+    };
+    final StudyShellColors studyColors = studyBrightness == Brightness.light
+        ? StudyShellColors.light
+        : StudyShellColors.dark;
     final double screenWidth = MediaQuery.sizeOf(context).width;
     final bool compactPlayer = screenWidth < 700;
-    final double playerHorizontalPadding = compactPlayer ? 2 : 14;
+    final double playerHorizontalPadding = compactPlayer ? 0 : 12;
     final List<LibraryCourseData> courses = ref.watch(libraryCatalogProvider);
     final PlayerCourseLookupResult courseContext =
         resolvePlayerCourseForEpisode(
@@ -809,6 +1386,14 @@ class _PadPortraitPlayerScreenState
     final LibraryCourseData? course = courseContext.course;
     final LibraryEpisodeItem? episode = courseContext.episode;
     final LearningSettingsState settings = ref.watch(learningSettingsProvider);
+    final Set<String> savedVocabularyWords =
+        SubtitleVocabularyHighlight.savedWordsFromBook(
+          ref.watch(wordBookProvider),
+        );
+    final Set<String> keyVocabularyWords =
+        SubtitleVocabularyHighlight.keyWordsFromGlossary(
+          state.generatedWordDefinitions,
+        );
     final bool canGenerateAiSubtitles =
         (_videoAsset?.isNotEmpty ?? false) && !_usingAiSubtitles;
     if (widget.autoOpenFullscreen &&
@@ -831,39 +1416,43 @@ class _PadPortraitPlayerScreenState
       },
     );
 
-    return Scaffold(
-      backgroundColor: StudyShellTokens.background,
-      body: AppLoadingOverlay(
-        isLoading: _isBootstrapping,
-        message: '正在打开课程...',
-        child: Column(
-          children: <Widget>[
-            StudyTopBar(
-              title: course?.title ?? episode?.title ?? 'AcquireEnglish',
-              lessonBadge: course == null || episode == null
-                  ? null
-                  : '${episode.numberStr}/${course.totalEpisodes}',
-              onBack: () {
-                if (context.canPop()) {
-                  context.pop();
-                  return;
-                }
-                context.go(libraryDetailUri.toString());
-              },
-              onFavorite: () => _showMessage('收藏功能将在后续版本接入'),
-            ),
-            Expanded(
-              child: Padding(
-                padding: EdgeInsets.fromLTRB(0, compactPlayer ? 2 : 6, 0, 0),
-                child: Column(
-                  children: <Widget>[
-                    Padding(
-                      padding: EdgeInsets.symmetric(
-                        horizontal: playerHorizontalPadding,
-                      ),
-                      child: PlayerVideoPanel(
+    return Theme(
+      data: Theme.of(context).copyWith(brightness: studyBrightness),
+      child: Scaffold(
+        backgroundColor: studyColors.background,
+        body: AppLoadingOverlay(
+          isLoading: _isBootstrapping,
+          message: '正在打开课程...',
+          child: Column(
+            children: <Widget>[
+              StudyTopBar(
+                title: course?.title ?? episode?.title ?? 'AcquireEnglish',
+                lessonBadge: course == null || episode == null
+                    ? null
+                    : '${episode.numberStr}/${course.totalEpisodes}',
+                onBack: () {
+                  if (context.canPop()) {
+                    context.pop();
+                    return;
+                  }
+                  context.go(libraryDetailUri.toString());
+                },
+                isFavorite: _episodeFavorited,
+                onFavorite: () => _handleToggleEpisodeFavorite(courseContext),
+              ),
+              Expanded(
+                child: Padding(
+                  padding: EdgeInsets.fromLTRB(0, compactPlayer ? 2 : 6, 0, 0),
+                  child: Column(
+                    children: <Widget>[
+                      Padding(
+                        padding: EdgeInsets.symmetric(
+                          horizontal: playerHorizontalPadding,
+                        ),
+                        child: PlayerVideoPanel(
                         episodeId: widget.episodeId,
                         showSceneHeader: false,
+                        hideOverlayControls: true,
                         line: activeLine,
                         isPlaying: state.isPlaying,
                         speed: state.speed,
@@ -883,6 +1472,8 @@ class _PadPortraitPlayerScreenState
                             settings.subtitleWordHighlightStyle,
                         subtitleWordHighlightBorderWidth:
                             settings.subtitleWordHighlightBorderWidth,
+                        savedVocabularyWords: savedVocabularyWords,
+                        keyVocabularyWords: keyVocabularyWords,
                         isShadowing: state.isShadowing,
                         isLooping: state.isLooping,
                         isMuted: _isMuted,
@@ -910,9 +1501,12 @@ class _PadPortraitPlayerScreenState
                         onToggleMuted: _handleToggleMuted,
                         onVolumeChanged: _handleVolumeChanged,
                         onSubtitleLookupOpen: _stopVideo,
-                        onAssessVisibleLine: visibleAssessment.target == null
-                            ? null
-                            : _handleAssessVisibleLine,
+                        onAssessVisibleLine: () {
+                          setState(() => _studyTab = StudyModeTab.shadowing);
+                          if (!state.pauseAtSentenceEnd) {
+                            setState(() => state.togglePauseAtSentenceEnd());
+                          }
+                        },
                         assessmentUnavailableReason:
                             visibleAssessment.unavailableReason,
                         onCollectWord: (String word) =>
@@ -939,6 +1533,22 @@ class _PadPortraitPlayerScreenState
                             : _handleGenerateAiSubtitles,
                       ),
                     ),
+                    if (_videoErrorText != null &&
+                        !_videoLoading &&
+                        !(_videoErrorText!.startsWith('正在')))
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(12, 8, 12, 0),
+                        child: Text(
+                          _videoErrorText!,
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            color: StudyShellColors.of(context).favorite,
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                            height: 1.35,
+                          ),
+                        ),
+                      ),
                     SizedBox(height: compactPlayer ? 4 : 8),
                     StudyModeTabs(
                       value: _studyTab,
@@ -955,6 +1565,8 @@ class _PadPortraitPlayerScreenState
                           canGenerateAiSubtitles: canGenerateAiSubtitles,
                           visibleAssessment: visibleAssessment,
                           activeLine: activeLine,
+                          savedVocabularyWords: savedVocabularyWords,
+                          keyVocabularyWords: keyVocabularyWords,
                         ),
                       ),
                     ),
@@ -964,40 +1576,34 @@ class _PadPortraitPlayerScreenState
             ),
             StudyBottomControls(
               bilingual: state.subtitleMode == '双语',
+              blindListening: _blindListening,
               speed: state.speed,
               isPlaying: state.isPlaying,
-              isLooping: state.isLooping,
+              isLooping: _loopSettings.isLooping || state.isLooping,
               position: _videoPosition,
               duration: _videoDuration,
+              onToggleBlindListening: () {
+                setState(() => _blindListening = !_blindListening);
+              },
               onToggleBilingual: _handleToggleBilingual,
-              onLongPressBilingual: _handleCycleSubtitleMode,
+              onLongPressBlind: _handleCycleSubtitleMode,
               onCycleSpeed: _handleCycleSpeed,
+              onSpeedSelected: _handleSpeedSelected,
+              onOpenSpeedSheet: _handleOpenSpeedSheet,
+              onOpenQualitySheet: _handleOpenQualitySheet,
               onTogglePlaying: _handleTogglePlaying,
-              onToggleLoop: _handleToggleLoop,
+              onOpenLoopSheet: _handleOpenLoopSheet,
               onSeek: _handleSeek,
               onToggleFullscreen: () => _handleOpenFullscreen(
                 course?.episodes ?? const <LibraryEpisodeItem>[],
               ),
-              onOpenCloseReading: state.hasLines
-                  ? () => unawaited(
-                      _handleOpenTranscriptReader(
-                        courseTitle: course?.title ?? '课程名称',
-                        episodeTitle: episode == null
-                            ? '第 01 集'
-                            : '第 ${episode.numberStr} 集',
-                      ),
-                    )
-                  : () {
-                      if (canGenerateAiSubtitles) {
-                        setState(() => _studyTab = StudyModeTab.subtitles);
-                        unawaited(_handleGenerateAiSubtitles());
-                        return;
-                      }
-                      _showMessage('当前没有可用字幕，无法打开精读');
-                    },
+              onOpenWordCards: () {
+                setState(() => _studyTab = StudyModeTab.wordCards);
+              },
             ),
           ],
         ),
+      ),
       ),
     );
   }
@@ -1008,6 +1614,8 @@ class _PadPortraitPlayerScreenState
     required bool canGenerateAiSubtitles,
     required PronunciationTargetSelection visibleAssessment,
     required PlayerSubtitleLine activeLine,
+    required Set<String> savedVocabularyWords,
+    required Set<String> keyVocabularyWords,
   }) {
     switch (_studyTab) {
       case StudyModeTab.subtitles:
@@ -1024,6 +1632,8 @@ class _PadPortraitPlayerScreenState
             subtitleWordHighlightStyle: settings.subtitleWordHighlightStyle,
             subtitleWordHighlightBorderWidth:
                 settings.subtitleWordHighlightBorderWidth,
+            savedVocabularyWords: savedVocabularyWords,
+            keyVocabularyWords: keyVocabularyWords,
             onTapLine: _goToLine,
             onCollectWord: (String word) =>
                 _handleCollectWord(word, courseContext),
@@ -1053,6 +1663,7 @@ class _PadPortraitPlayerScreenState
                 ? _handleRegenerateAiLine
                 : null,
             studyDarkStyle: true,
+            blindListening: _blindListening,
             showAiGenerateSubtitles: canGenerateAiSubtitles,
             generatingAiSubtitles: _generatingAiSubtitles,
             aiSubtitleProgressValue: _aiSubtitleProgressValue,
@@ -1062,6 +1673,18 @@ class _PadPortraitPlayerScreenState
             onGenerateAiSubtitles: _generatingAiSubtitles
                 ? null
                 : _handleGenerateAiSubtitles,
+            bilingualPipelineLabel: _bilingualPipelineLabel,
+            showAiCompleteButton: _bilingualShowAiComplete,
+            onAiComplete: _bilingualShowAiComplete
+                ? _handleAiCompleteSubtitles
+                : null,
+            onCancelBilingualPipeline:
+                _bilingualPhase == BilingualPipelinePhase.ocrRunning ||
+                    _bilingualPhase == BilingualPipelinePhase.ocrSlow
+                ? _handleCancelBilingualPipeline
+                : null,
+            onDictionaryOpened: _handleDictionaryOpened,
+            onDictionaryClosed: _handleDictionaryClosed,
           );
         }
         if (canGenerateAiSubtitles || _generatingAiSubtitles) {
@@ -1074,6 +1697,8 @@ class _PadPortraitPlayerScreenState
             fontScale: settings.fontScale,
             highlightWords: settings.highlightWords,
             subtitleLetterCase: settings.subtitleLetterCase,
+            savedVocabularyWords: savedVocabularyWords,
+            keyVocabularyWords: keyVocabularyWords,
             onTapLine: (_) {},
             onCollectWord: (_) {},
             onBookmarkLine: (_) {},
@@ -1090,6 +1715,16 @@ class _PadPortraitPlayerScreenState
             onGenerateAiSubtitles: _generatingAiSubtitles
                 ? null
                 : _handleGenerateAiSubtitles,
+            bilingualPipelineLabel: _bilingualPipelineLabel,
+            showAiCompleteButton: _bilingualShowAiComplete,
+            onAiComplete: _bilingualShowAiComplete
+                ? _handleAiCompleteSubtitles
+                : null,
+            onCancelBilingualPipeline:
+                _bilingualPhase == BilingualPipelinePhase.ocrRunning ||
+                    _bilingualPhase == BilingualPipelinePhase.ocrSlow
+                ? _handleCancelBilingualPipeline
+                : null,
             studyDarkStyle: true,
           );
         }
@@ -1109,45 +1744,189 @@ class _PadPortraitPlayerScreenState
         return StudyShadowingTab(
           line: activeLine,
           hasLine: state.hasLines,
+          assessmentTarget: visibleAssessment.target,
           pauseAtSentenceEnd: state.pauseAtSentenceEnd,
           onTogglePauseAtSentenceEnd: () {
             setState(() => state.togglePauseAtSentenceEnd());
           },
-          onAssess: visibleAssessment.target == null
+          onNextSentence: state.hasLines ? _handleNextLine : null,
+          onReplaySentence: state.hasLines ? _handleReplayLine : null,
+          unavailableReason: visibleAssessment.unavailableReason,
+          onOpenFullDialog: visibleAssessment.target == null
               ? null
               : _handleAssessVisibleLine,
-          unavailableReason: visibleAssessment.unavailableReason,
         );
-      case StudyModeTab.dictation:
-        return StudyDictationTab(
+      case StudyModeTab.coach:
+        return StudyOralCoachTab(
           line: activeLine,
           hasLine: state.hasLines,
+          assessmentTarget: visibleAssessment.target,
+          unavailableReason: visibleAssessment.unavailableReason,
+          onReplaySentence: state.hasLines ? _handleReplayLine : null,
+          onNextSentence: state.hasLines ? _handleNextLine : null,
+          onOpenAssessment: visibleAssessment.target == null
+              ? null
+              : _handleAssessVisibleLine,
+        );
+      case StudyModeTab.dictation:
+        final List<DictationQueueItem> queue = ref.watch(dictationQueueProvider);
+        final bool usingQueue = _dictationQueueMode && queue.isNotEmpty;
+        final PlayerSubtitleLine dictationLine;
+        if (usingQueue) {
+          final DictationQueueItem item =
+              queue[_dictationQueueIndex.clamp(0, queue.length - 1)];
+          dictationLine = PlayerSubtitleLine(
+            startTime: item.startTime,
+            english: item.english,
+            chinese: item.chinese,
+            startMs: item.startMs,
+            endMs: item.endMs,
+          );
+        } else {
+          dictationLine = activeLine;
+        }
+        return StudyDictationTab(
+          line: dictationLine,
+          hasLine: usingQueue || state.hasLines,
           isPlaying: state.isPlaying,
+          queue: queue,
+          queueIndex: usingQueue
+              ? _dictationQueueIndex.clamp(0, queue.length - 1)
+              : 0,
+          usingQueue: usingQueue,
+          onSelectQueueIndex: (int index) {
+            if (index < 0 || index >= queue.length) return;
+            setState(() {
+              _dictationQueueMode = true;
+              _dictationQueueIndex = index;
+            });
+            final DictationQueueItem item = queue[index];
+            final int lineIndex = state.lines.indexWhere(
+              (PlayerSubtitleLine line) =>
+                  line.startMs == item.startMs && line.english == item.english,
+            );
+            if (lineIndex >= 0) {
+              _goToLine(lineIndex);
+            }
+          },
+          onClearQueue: () async {
+            await ref.read(dictationQueueProvider.notifier).clear();
+            if (!mounted) return;
+            setState(() {
+              _dictationQueueMode = false;
+              _dictationQueueIndex = 0;
+            });
+            _showMessage('已清空听写队列');
+          },
           onReplay: () {
             if (state.speed != '0.8×') {
               _handleSpeedSelected('0.8×');
             }
             _handleReplayLine();
           },
-          onPrevious: _handlePreviousLine,
-          onNext: _handleNextLine,
-          onMarkDifficult: () {
-            if (!state.hasLines) {
+          onPrevious: () {
+            if (usingQueue && _dictationQueueIndex > 0) {
+              setState(() => _dictationQueueIndex -= 1);
               return;
             }
-            _handleDictationLine(state.activeLineIndex);
-            _showMessage('已标记为困难句，可在听写练习中巩固');
+            _handlePreviousLine();
           },
+          onNext: () {
+            if (usingQueue && _dictationQueueIndex < queue.length - 1) {
+              setState(() => _dictationQueueIndex += 1);
+              return;
+            }
+            _handleNextLine();
+          },
+          onAddToQueue: () => _handleAddDictationQueue(
+            courseContext,
+            difficult: false,
+          ),
+          onMarkDifficult: () => _handleAddDictationQueue(
+            courseContext,
+            difficult: true,
+          ),
         );
       case StudyModeTab.practice:
         return StudyPracticeTab(
           lines: state.lines,
           activeIndex: state.activeLineIndex,
           onCollectWord: (String word) {
-            _handleCollectWord(word, courseContext);
-            _showMessage('已加入单词本：$word');
+            _handleFavoriteWord(word);
+          },
+          onGoToLine: _goToLine,
+          onReplayLine: _handleReplayLine,
+        );
+      case StudyModeTab.wordCards:
+        final List<EpisodeWordCard> cards = buildEpisodeWordCards(
+          episodeId: widget.episodeId,
+          lines: state.lines,
+          words: ref.watch(wordBookProvider),
+          phrases: ref.watch(phraseBookProvider),
+        );
+        return StudyWordCardsTab(
+          cards: cards,
+          onJumpToCard: _handleJumpToWordCard,
+          onFavorite: (EpisodeWordCard card) {
+            _handleFavoriteWord(card.text);
+          },
+          onSpeak: (EpisodeWordCard card) {
+            unawaited(_speakWordCard(card.text));
           },
         );
+    }
+  }
+
+  void _handleJumpToWordCard(EpisodeWordCard card) {
+    if (!state.hasLines) return;
+    int lineIndex = -1;
+    if (card.startMs != null) {
+      lineIndex = state.lines.indexWhere(
+        (PlayerSubtitleLine line) =>
+            line.startMs <= card.startMs! && card.startMs! < line.endMs,
+      );
+      if (lineIndex < 0) {
+        // Nearest line by start time.
+        int best = 0;
+        int bestDelta = 1 << 30;
+        for (int i = 0; i < state.lines.length; i++) {
+          final int delta = (state.lines[i].startMs - card.startMs!).abs();
+          if (delta < bestDelta) {
+            bestDelta = delta;
+            best = i;
+          }
+        }
+        lineIndex = best;
+      }
+    }
+    if (lineIndex < 0 && card.exampleEn != null) {
+      lineIndex = state.lines.indexWhere(
+        (PlayerSubtitleLine line) =>
+            line.english.trim().toLowerCase() ==
+            card.exampleEn!.trim().toLowerCase(),
+      );
+    }
+    if (lineIndex < 0) {
+      final String needle = card.text.toLowerCase();
+      lineIndex = state.lines.indexWhere(
+        (PlayerSubtitleLine line) =>
+            line.english.toLowerCase().contains(needle),
+      );
+    }
+    if (lineIndex >= 0) {
+      setState(() => _studyTab = StudyModeTab.subtitles);
+      _goToLine(lineIndex);
+      _handleReplayLine();
+    } else {
+      _showMessage('未找到对应字幕句');
+    }
+  }
+
+  Future<void> _speakWordCard(String text) async {
+    try {
+      await ref.read(wordPronunciationServiceProvider).speak(text);
+    } on WordPronunciationException catch (error) {
+      if (mounted) _showMessage(error.message);
     }
   }
 
@@ -1202,6 +1981,7 @@ class _PadPortraitPlayerScreenState
 
   void _handleTogglePlaying() {
     if (_pronunciationDialogActive) return;
+    _pausedForLookup = false;
     setState(() {
       state.togglePlaying(
         allowWithoutLines:
@@ -1252,11 +2032,184 @@ class _PadPortraitPlayerScreenState
   }
 
   void _handleToggleShadowing() {
-    setState(state.toggleShadowing);
-    ref
-        .read(learningActivityProvider.notifier)
-        .recordShadowingToggle(enabled: state.isShadowing);
-    _showMessage(state.isShadowing ? '已开启跟读模式' : '已关闭跟读模式');
+    setState(() {
+      state.isShadowing = true;
+      if (!state.pauseAtSentenceEnd) {
+        state.togglePauseAtSentenceEnd();
+      }
+      _studyTab = StudyModeTab.shadowing;
+    });
+    ref.read(learningActivityProvider.notifier).recordShadowingToggle(
+      enabled: true,
+    );
+    _showMessage('已进入跟读模式：句末暂停已开启');
+  }
+
+  void _handleDictionaryOpened() {
+    if (!state.isPlaying || _pronunciationDialogActive) {
+      return;
+    }
+    _pausedForLookup = true;
+    setState(() => state.isPlaying = false);
+    PlayerSystemMediaControls.updatePlaybackState(isPlaying: false);
+    unawaited(_videoPlayer?.pause());
+  }
+
+  void _handleDictionaryClosed() {
+    if (!_pausedForLookup) {
+      return;
+    }
+    _pausedForLookup = false;
+    if (_pronunciationDialogActive || !mounted) {
+      return;
+    }
+    setState(() => state.isPlaying = true);
+    _applyPlaybackMode();
+  }
+
+  void _handleToggleEpisodeFavorite(PlayerCourseLookupResult courseContext) {
+    if (!state.hasLines) {
+      _showMessage('当前没有可收藏的句子');
+      return;
+    }
+    _handleBookmarkLine(state.activeLineIndex, courseContext);
+    setState(() => _episodeFavorited = true);
+  }
+
+  void _handleOpenSpeedSheet() {
+    final StudyShellColors colors = StudyShellColors.of(context);
+    showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: colors.card,
+      builder: (BuildContext context) {
+        final StudyShellColors sheetColors = StudyShellColors.of(context);
+        return SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: <Widget>[
+              ListTile(
+                title: Text(
+                  '选择倍速',
+                  style: TextStyle(
+                    color: sheetColors.textPrimary,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+              for (final String option in PlayerVideoPanel.kSpeedOptions)
+                ListTile(
+                  title: Text(
+                    option,
+                    style: TextStyle(
+                      color: option == state.speed
+                          ? sheetColors.accent
+                          : sheetColors.textPrimary,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  trailing: option == state.speed
+                      ? Icon(
+                          Icons.check_rounded,
+                          color: sheetColors.accent,
+                        )
+                      : null,
+                  onTap: () {
+                    Navigator.of(context).pop();
+                    _handleSpeedSelected(option);
+                  },
+                ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  void _handleOpenQualitySheet() {
+    showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: StudyShellColors.of(context).card,
+      builder: (BuildContext context) {
+        final StudyShellColors colors = StudyShellColors.of(context);
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: <Widget>[
+                Text(
+                  '画质',
+                  style: TextStyle(
+                    color: colors.textPrimary,
+                    fontSize: 16,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                const SizedBox(height: 10),
+                Text(
+                  '本地视频按源文件清晰度播放，当前为「超清」。网络课程的多码率切换将在后续版本接入。',
+                  style: TextStyle(
+                    color: colors.textSecondary,
+                    height: 1.45,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Future<void> _handleAddDictationQueue(
+    PlayerCourseLookupResult courseContext, {
+    required bool difficult,
+  }) async {
+    if (!state.hasLines) {
+      return;
+    }
+    final PlayerSubtitleLine line = state.activeLine;
+    final LibraryCourseData? course = courseContext.course;
+    final LibraryEpisodeItem? episode = courseContext.episode;
+    final DictationQueueItem item = DictationQueueItem(
+      id: DictationQueueItem.buildId(
+        episodeId: episode?.id ?? widget.episodeId,
+        startMs: line.startMs,
+        endMs: line.endMs,
+        english: line.english,
+      ),
+      english: line.english,
+      chinese: line.chinese,
+      startMs: line.startMs,
+      endMs: line.endMs,
+      startTime: line.startTime,
+      episodeId: episode?.id ?? widget.episodeId,
+      courseTitle: course?.title,
+      episodeTitle: episode == null ? null : '第 ${episode.numberStr} 集',
+      difficult: difficult,
+      addedAtMs: DateTime.now().millisecondsSinceEpoch,
+    );
+    final bool added = await ref
+        .read(dictationQueueProvider.notifier)
+        .addOrUpdate(item);
+    if (difficult) {
+      await ref.read(dictationQueueProvider.notifier).markDifficult(item.id);
+    }
+    if (!mounted) return;
+    setState(() {
+      _dictationQueueMode = true;
+      final List<DictationQueueItem> queue = ref.read(dictationQueueProvider);
+      final int index = queue.indexWhere(
+        (DictationQueueItem e) => e.id == item.id,
+      );
+      _dictationQueueIndex = index >= 0 ? index : 0;
+    });
+    if (difficult) {
+      _showMessage(added ? '已加入听写队列并标记困难' : '已标记为困难句');
+    } else {
+      _showMessage(added ? '已加入听写队列' : '该句已在听写队列中');
+    }
   }
 
   void _handleToggleLoop() {
@@ -1266,6 +2219,79 @@ class _PadPortraitPlayerScreenState
     if (state.isLooping && state.hasLines) {
       _seekToActiveLine();
     }
+  }
+
+  Future<void> _handleOpenLoopSheet() async {
+    final StudyLoopSettings? next = await showStudyLoopSheet(
+      context,
+      initial: _loopSettings,
+    );
+    if (!mounted || next == null) {
+      return;
+    }
+    setState(() {
+      _loopSettings = next;
+      _loopCompleted = 0;
+      _loopIntervalPending = false;
+      state.isLooping = next.mode == StudyLoopMode.sentence;
+    });
+    _syncTranscriptReader();
+    switch (next.mode) {
+      case StudyLoopMode.off:
+        _showMessage('已关闭循环');
+      case StudyLoopMode.sentence:
+        _showMessage('已开启单句循环');
+        if (state.hasLines) {
+          _seekToActiveLine();
+        }
+      case StudyLoopMode.full:
+        _showMessage('已开启全片循环');
+    }
+  }
+
+  Future<void> _applyLoopRestart() async {
+    if (_loopSettings.countLimit > 0) {
+      _loopCompleted += 1;
+      if (_loopCompleted >= _loopSettings.countLimit) {
+        setState(() {
+          _loopSettings = _loopSettings.copyWith(mode: StudyLoopMode.off);
+          state.isLooping = false;
+          state.isPlaying = false;
+          _loopCompleted = 0;
+        });
+        await _videoPlayer?.pause();
+        _showMessage('循环次数已完成');
+        return;
+      }
+    }
+    if (_loopSettings.intervalSec > 0) {
+      if (_loopIntervalPending) {
+        return;
+      }
+      _loopIntervalPending = true;
+      setState(() => state.isPlaying = false);
+      await _videoPlayer?.pause();
+      await Future<void>.delayed(
+        Duration(seconds: _loopSettings.intervalSec),
+      );
+      _loopIntervalPending = false;
+      if (!mounted || _loopSettings.mode == StudyLoopMode.off) {
+        return;
+      }
+    }
+    if (_loopSettings.mode == StudyLoopMode.full) {
+      setState(() {
+        state.selectLine(0);
+        state.isPlaying = true;
+        _videoPosition = Duration.zero;
+      });
+      await _videoPlayer?.seek(Duration.zero);
+      await _videoPlayer?.play();
+      return;
+    }
+    _seekToActiveLine();
+    setState(() => state.isPlaying = true);
+    await _videoPlayer?.play();
   }
 
   void _handleToggleMuted() {
@@ -1285,14 +2311,18 @@ class _PadPortraitPlayerScreenState
       _showMessage('当前视频不可用');
       return;
     }
+    await _bilingualPipeline?.cancel();
     final LearningSettingsState settings = ref.read(learningSettingsProvider);
     final bool showProgressDialog = state.hasLines;
     setState(() {
       _generatingAiSubtitles = true;
       _aiSubtitleProgressValue = null;
-      _aiSubtitleProgressText = '正在准备音频...';
+      _aiSubtitleProgressText = '正在检查官方字幕...';
       _aiSubtitlePreviewText = null;
       _aiSubtitleErrorText = null;
+      _bilingualPipelineLabel = null;
+      _bilingualShowAiComplete = false;
+      _bilingualPhase = BilingualPipelinePhase.cancelled;
     });
     final ValueNotifier<AsrSubtitleProgress> dialogProgress =
         ValueNotifier<AsrSubtitleProgress>(
@@ -1308,14 +2338,27 @@ class _PadPortraitPlayerScreenState
         AsrSubtitleCancellationToken();
     _aiSubtitleCancellationToken = cancellationToken;
     try {
+      final List<PlayerSubtitleLine> referenceLines =
+          await _ensureOfficialReferenceSubtitles();
+      final bool hasOfficialEnglish =
+          usableReferenceSubtitles(referenceLines).isNotEmpty;
+      if (!hasOfficialEnglish) {
+        final String? configError = describeAsrConfigurationError(settings);
+        if (configError != null) {
+          setState(() => _aiSubtitleErrorText = configError);
+          _showMessage(configError);
+          return;
+        }
+      }
+      final String asrVideoPath = await _resolveAsrVideoPath(videoPath);
       if (!forceRegenerate && !_usingAiSubtitles) {
         final String? cached = await const AsrSubtitleCache().read(
           episodeId: widget.episodeId,
           videoPath: videoPath,
           settings: settings,
-          referenceSignature: _referenceSubtitleLines.isEmpty
+          referenceSignature: referenceLines.isEmpty
               ? null
-              : subtitleReferenceSignature(_referenceSubtitleLines),
+              : subtitleReferenceSignature(referenceLines),
         );
         if (cached != null) {
           final List<PlayerSubtitleLine> lines = parseSubtitleLines(cached);
@@ -1335,9 +2378,9 @@ class _PadPortraitPlayerScreenState
       const AsrSubtitleJobRunner runner = AsrSubtitleJobRunner();
       final String raw = await runner.run(
         episodeId: widget.episodeId,
-        videoPath: videoPath,
+        videoPath: asrVideoPath,
         settings: settings,
-        referenceSubtitleLines: _referenceSubtitleLines,
+        referenceSubtitleLines: referenceLines,
         forceRegenerate: forceRegenerate,
         cancellationToken: cancellationToken,
         onProgress: (AsrSubtitleProgress progress) {
@@ -1362,7 +2405,7 @@ class _PadPortraitPlayerScreenState
       });
       final SubtitleReferenceReview review = reviewGeneratedSubtitles(
         generated: lines,
-        reference: _referenceSubtitleLines,
+        reference: referenceLines,
       );
       final AsrSubtitleRepairSummary repairSummary = await runner
           .readRepairSummary(
@@ -1371,14 +2414,14 @@ class _PadPortraitPlayerScreenState
             settings: settings,
           );
       final String? warning = subtitleGenerationWarning(raw);
-      if (warning != null) {
+      if (warning != null && warning.contains('官方')) {
+        _showMessage(repairSummary.appendTo('已使用官方字幕生成跟读字幕'));
+      } else if (warning != null) {
         _showMessage(repairSummary.appendTo('AI 字幕已生成；$warning'));
-      } else if (subtitleReferenceSignature(
-        _referenceSubtitleLines,
-      ).isNotEmpty) {
+      } else if (subtitleReferenceSignature(referenceLines).isNotEmpty) {
         _showMessage(repairSummary.appendTo('AI 字幕已生成，已按原字幕校准'));
       } else if (review.comparedLines == 0) {
-        _showMessage(repairSummary.appendTo('AI 字幕已生成'));
+        _showMessage(repairSummary.appendTo('AI 字幕已生成（Whisper/云端识别）'));
       } else if (review.differentLines == 0) {
         _showMessage(repairSummary.appendTo('AI 字幕已生成，已通过参考字幕校对'));
       } else {
@@ -1387,10 +2430,7 @@ class _PadPortraitPlayerScreenState
     } catch (error) {
       if (cancellationToken.isCancelled) return;
       if (mounted) {
-        final String message = error.toString().replaceFirst(
-          RegExp(r'^Bad state:\s*'),
-          '',
-        );
+        final String message = humanizeAsrSubtitleError(error);
         setState(() {
           _aiSubtitleErrorText = message;
         });
@@ -1416,13 +2456,125 @@ class _PadPortraitPlayerScreenState
     }
   }
 
+  Future<List<PlayerSubtitleLine>> _ensureOfficialReferenceSubtitles() async {
+    final List<PlayerSubtitleLine> existing = usableReferenceSubtitles(
+      _referenceSubtitleLines,
+    );
+    if (existing.isNotEmpty) {
+      return existing;
+    }
+    final PlayerCourseLookupResult resource = resolvePlayerCourseForEpisode(
+      courses: ref.read(libraryCatalogProvider),
+      episodeId: widget.episodeId,
+    );
+    final String? source =
+        resource.course?.description ??
+        resource.episode?.videoAsset ??
+        _videoAsset;
+    if (source == null ||
+        (!BilibiliImport.isWatchPageUrl(source) &&
+            !BilibiliImport.looksLikeBilibiliInput(source) &&
+            !(resource.course?.id.startsWith('bilibili-') ?? false))) {
+      return existing;
+    }
+    if (mounted) {
+      setState(() {
+        _aiSubtitleProgressText = '正在拉取 B 站官方字幕…';
+        _aiSubtitlePreviewText = '有官方字幕则跳过 Whisper';
+      });
+    }
+    final String query = resource.course?.id.startsWith('bilibili-') ?? false
+        ? resource.course!.id.substring('bilibili-'.length)
+        : source;
+    final Map<String, String?> tracks = await BilibiliImportService.withCookie(
+      ref.read(learningSettingsProvider).resolvedBilibiliCookieHeader,
+    ).fetchOfficialSubtitleTracks(query);
+    final String? enPath = tracks['en'];
+    final String? zhPath = tracks['zh'];
+    final bool hasEn = enPath != null && enPath.isNotEmpty;
+    final bool hasZh = zhPath != null && zhPath.isNotEmpty;
+    if (!hasEn && !hasZh) {
+      return existing;
+    }
+    final LibraryCourseData? course = resource.course;
+    final LibraryEpisodeItem? episode = resource.episode;
+    if (course != null && episode != null) {
+      unawaited(
+        ref.read(libraryCatalogProvider.notifier).importCourse(
+          course.copyWith(
+            episodes: course.episodes
+                .map(
+                  (LibraryEpisodeItem item) => item.id == episode.id
+                      ? item.copyWith(
+                          enSubtitleAsset: hasEn
+                              ? enPath
+                              : item.enSubtitleAsset,
+                          cnSubtitleAsset: hasZh
+                              ? zhPath
+                              : item.cnSubtitleAsset,
+                          hasEnglishSubtitles:
+                              hasEn || item.hasEnglishSubtitles,
+                          hasChineseSubtitles:
+                              hasZh || item.hasChineseSubtitles,
+                          subtitleTracks: <LibrarySubtitleTrackItem>[
+                            if (hasEn)
+                              LibrarySubtitleTrackItem(
+                                languageCode: 'en',
+                                languageLabel: 'English',
+                                path: enPath,
+                              ),
+                            if (hasZh)
+                              LibrarySubtitleTrackItem(
+                                languageCode: 'zh',
+                                languageLabel: '中文',
+                                path: zhPath,
+                              ),
+                          ],
+                        )
+                      : item,
+                )
+                .toList(growable: false),
+          ),
+        ),
+      );
+    }
+    if (!hasEn) {
+      return existing;
+    }
+    try {
+      final List<PlayerSubtitleLine> englishLines = await loadSubtitleLines(
+        enPath,
+      );
+      List<PlayerSubtitleLine> chineseLines = const <PlayerSubtitleLine>[];
+      if (hasZh) {
+        chineseLines = await loadSubtitleLines(zhPath);
+      }
+      final List<PlayerSubtitleLine> merged = mergeSubtitleLines(
+        englishLines: englishLines,
+        chineseLines: chineseLines,
+      );
+      final List<PlayerSubtitleLine> usable = usableReferenceSubtitles(merged);
+      if (usable.isEmpty) {
+        return existing;
+      }
+      if (mounted) {
+        setState(() => _referenceSubtitleLines = usable);
+      }
+      return usable;
+    } catch (_) {
+      return existing;
+    }
+  }
+
   Future<void> _handleRegenerateAiSubtitles() async {
     final bool confirmed =
         await showDialog<bool>(
           context: context,
           builder: (BuildContext context) => AlertDialog(
             title: const Text('重新生成 AI 字幕？'),
-            content: const Text('这会再次调用已配置的 AI 服务，可能产生费用。生成失败时会保留当前字幕。'),
+            content: const Text(
+              '有官方英文字幕时仍优先使用官方字幕；没有才会调用 Whisper/云端识别。生成失败时会保留当前字幕。',
+            ),
             actions: <Widget>[
               TextButton(
                 onPressed: () => Navigator.of(context).pop(false),
@@ -1453,6 +2605,7 @@ class _PadPortraitPlayerScreenState
     }
     _showMessage('正在重新生成当前句，失败时会保留原句。');
     try {
+      final String asrVideoPath = await _resolveAsrVideoPath(videoPath);
       const AsrSubtitleJobRunner runner = AsrSubtitleJobRunner();
       final LearningSettingsState settings = ref.read(learningSettingsProvider);
       final String referenceSignature = subtitleReferenceSignature(
@@ -1460,7 +2613,7 @@ class _PadPortraitPlayerScreenState
       );
       final AsrRegeneratedLineResult result = await runner.regenerateLine(
         episodeId: widget.episodeId,
-        videoPath: videoPath,
+        videoPath: asrVideoPath,
         settings: settings,
         currentLines: List<PlayerSubtitleLine>.of(state.lines),
         lineIndex: index,
@@ -1699,29 +2852,33 @@ class _PadPortraitPlayerScreenState
   void _handleDictationLine(int index) {
     setState(() {
       state.selectLine(index);
+      _studyTab = StudyModeTab.dictation;
     });
     _seekToActiveLine();
-    _showMessage('已加入听写练习');
+    final PlayerCourseLookupResult courseContext =
+        resolvePlayerCourseForEpisode(
+          courses: ref.read(libraryCatalogProvider),
+          episodeId: widget.episodeId,
+        );
+    unawaited(
+      _handleAddDictationQueue(courseContext, difficult: false),
+    );
   }
 
   void _handleAiExplain(int index) {
+    if (index < 0 || index >= state.lines.length) {
+      return;
+    }
     final PlayerSubtitleLine line = state.lines[index];
-    showDialog<void>(
-      context: context,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          title: const Text('AI 解释'),
-          content: Text(
-            '这是对该句的临时说明：\n${line.english}\n\n后续可接入 AI 接口进行更完整的语法和表达解析。',
-          ),
-          actions: <Widget>[
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(),
-              child: const Text('关闭'),
-            ),
-          ],
-        );
-      },
+    setState(() {
+      state.selectLine(index);
+    });
+    unawaited(
+      showAiGrammarAnalysisSheet(
+        context,
+        english: line.english,
+        chinese: line.chinese,
+      ),
     );
   }
 
@@ -1736,6 +2893,14 @@ class _PadPortraitPlayerScreenState
     final double subtitleWordHighlightBorderWidth = ref
         .read(learningSettingsProvider)
         .subtitleWordHighlightBorderWidth;
+    final Set<String> savedVocabularyWords =
+        SubtitleVocabularyHighlight.savedWordsFromBook(
+          ref.read(wordBookProvider),
+        );
+    final Set<String> keyVocabularyWords =
+        SubtitleVocabularyHighlight.keyWordsFromGlossary(
+          state.generatedWordDefinitions,
+        );
     final PlayerCourseLookupResult courseContext =
         resolvePlayerCourseForEpisode(
           courses: ref.read(libraryCatalogProvider),
@@ -1756,6 +2921,8 @@ class _PadPortraitPlayerScreenState
                 .subtitleLetterCase,
             subtitleWordHighlightStyle: subtitleWordHighlightStyle,
             subtitleWordHighlightBorderWidth: subtitleWordHighlightBorderWidth,
+            savedVocabularyWords: savedVocabularyWords,
+            keyVocabularyWords: keyVocabularyWords,
             isMuted: _isMuted,
             volumeLevel: _volumeLevel,
             onTogglePlaying: _handleTogglePlaying,

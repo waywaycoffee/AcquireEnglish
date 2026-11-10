@@ -59,10 +59,46 @@ class LibraryCatalogNotifier extends Notifier<List<LibraryCourseData>> {
     if (libraryCourses.any((LibraryCourseData item) => item.id == course.id)) {
       return false;
     }
-    state = <LibraryCourseData>[
-      course,
-      ...state.where((LibraryCourseData item) => item.id != course.id),
-    ];
+    final int existingIndex = state.indexWhere(
+      (LibraryCourseData item) => item.id == course.id,
+    );
+    if (existingIndex >= 0) {
+      // Re-importing the same Bilibili / online course should refresh media
+      // paths (local download + cover) while keeping learning progress.
+      final LibraryCourseData previous = state[existingIndex];
+      final LibraryCourseData merged = course.copyWith(
+        progressPercent: previous.progressPercent,
+        completedEpisodes: previous.completedEpisodes,
+        lastStudiedStr: previous.lastStudiedStr,
+        lastStudiedAtMs: previous.lastStudiedAtMs,
+        episodes: <LibraryEpisodeItem>[
+          for (int i = 0; i < course.episodes.length; i++)
+            course.episodes[i].copyWith(
+              completed: i < previous.episodes.length
+                  ? previous.episodes[i].completed
+                  : course.episodes[i].completed,
+              progressPercent: i < previous.episodes.length
+                  ? previous.episodes[i].progressPercent
+                  : course.episodes[i].progressPercent,
+              lastWatchedStr: i < previous.episodes.length
+                  ? previous.episodes[i].lastWatchedStr
+                  : course.episodes[i].lastWatchedStr,
+              progressTimeStr: i < previous.episodes.length
+                  ? previous.episodes[i].progressTimeStr
+                  : course.episodes[i].progressTimeStr,
+              totalTimeStr: i < previous.episodes.length
+                  ? previous.episodes[i].totalTimeStr
+                  : course.episodes[i].totalTimeStr,
+            ),
+        ],
+      );
+      final List<LibraryCourseData> next = <LibraryCourseData>[...state];
+      next[existingIndex] = merged;
+      state = next;
+      await _persistImportedCourses();
+      return true;
+    }
+    state = <LibraryCourseData>[course, ...state];
     await _persistImportedCourses();
     return true;
   }
@@ -165,6 +201,67 @@ class LibraryCatalogNotifier extends Notifier<List<LibraryCourseData>> {
         })
         .toList(growable: false);
     await _persistImportedCourses();
+  }
+
+  /// Update course + episode posters (used after fetching Bilibili covers).
+  Future<void> updateCourseCover({
+    required String courseId,
+    required String coverImage,
+  }) async {
+    final String next = coverImage.trim();
+    if (next.isEmpty) {
+      return;
+    }
+    bool changed = false;
+    state = state.map((LibraryCourseData course) {
+      if (course.id != courseId) {
+        return course;
+      }
+      changed = true;
+      return course.copyWith(
+        coverImage: next,
+        episodes: course.episodes
+            .map(
+              (LibraryEpisodeItem episode) =>
+                  episode.copyWith(coverImage: next),
+            )
+            .toList(growable: false),
+      );
+    }).toList(growable: false);
+    if (changed) {
+      await _persistImportedCourses();
+    }
+  }
+
+  /// Point every episode at a local media file (after Bilibili download).
+  Future<void> updateCourseVideoAsset({
+    required String courseId,
+    required String videoAsset,
+  }) async {
+    final String next = videoAsset.trim();
+    if (next.isEmpty) {
+      return;
+    }
+    bool changed = false;
+    state = state.map((LibraryCourseData course) {
+      if (course.id != courseId) {
+        return course;
+      }
+      changed = true;
+      return course.copyWith(
+        episodes: course.episodes
+            .map(
+              (LibraryEpisodeItem episode) => episode.copyWith(
+                videoAsset: next,
+                videoMissing: false,
+              ),
+            )
+            .toList(growable: false),
+      );
+    }).toList(growable: false);
+    if (changed) {
+      await _persistImportedCourses();
+    }
   }
 
   Future<void> updateEpisodeProgress({

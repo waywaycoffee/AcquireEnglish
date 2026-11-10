@@ -7,10 +7,72 @@ import 'package:flutter/services.dart';
 
 import '../../settings/presentation/settings_provider.dart';
 import 'desktop_ffmpeg.dart';
+import 'local_whisper_asr.dart';
 
 const MethodChannel _audioToolsChannel = MethodChannel(
   'com.shadowing.english/audio_tools',
 );
+
+/// Null when ASR (+ optional bilingual translation) settings are ready.
+String? describeAsrConfigurationError(LearningSettingsState settings) {
+  final bool localWhisper = settings.asrProvider == '本地 Whisper';
+  if (localWhisper) {
+    if (settings.asrModel.trim().isEmpty) {
+      return '请选择本地 Whisper 模型（tiny.en / base.en / small.en）。';
+    }
+  } else {
+    if (settings.resolvedAsrApiKey.isEmpty) {
+      final String field = settings.asrProvider == '腾讯云'
+          ? '腾讯云 SecretId / SecretKey'
+          : '阿里云百炼 API Key（设置页或 apps/mobile/.env 的 BAILIAN_ASR_API_KEY）';
+      return '未配置 ASR 密钥。请填写 $field。';
+    }
+    if (settings.asrProvider == '腾讯云') {
+      final String trimmed = settings.resolvedAsrApiKey;
+      int separator = trimmed.indexOf(':');
+      if (separator < 0) {
+        separator = trimmed.indexOf('：');
+      }
+      if (separator <= 0 || separator >= trimmed.length - 1) {
+        return '腾讯云 ASR 需同时填写 SecretId 和 SecretKey。';
+      }
+    }
+    if (settings.asrBaseUrl.trim().isEmpty || settings.asrModel.trim().isEmpty) {
+      return 'ASR 服务地址或模型为空，请到设置中检查，或关闭“自定义 ASR 接口地址”。';
+    }
+  }
+  // Missing translation keys are handled as a soft warning after English ASR
+  // succeeds, so bilingual can degrade to English-only instead of blocking.
+  return null;
+}
+
+String humanizeAsrSubtitleError(Object error) {
+  final String text = error
+      .toString()
+      .replaceFirst(RegExp(r'^Bad state:\s*'), '')
+      .replaceFirst(RegExp(r'^Exception:\s*'), '')
+      .replaceFirst('AsrSubtitleGenerationException: ', '');
+  final String lower = text.toLowerCase();
+  if (lower.contains('missing-asr') ||
+      lower.contains('missing-api-key') ||
+      lower.contains('no api key') ||
+      lower.contains('no api-key') ||
+      lower.contains('api key not') ||
+      lower.contains('invalid api key') ||
+      lower.contains('incorrect api key') ||
+      (lower.contains('unauthorized') && lower.contains('key'))) {
+    return '未配置或无效的 API Key。请到「更多 → 设置 → AI生成字幕」填写百炼/腾讯云密钥，'
+        '或改用「本地 Whisper」。开启双语时还需填写「翻译」API Key。';
+  }
+  if (lower.contains('whisper') &&
+      (lower.contains('下载') ||
+          lower.contains('download') ||
+          lower.contains('未安装') ||
+          lower.contains('model'))) {
+    return text;
+  }
+  return text;
+}
 
 typedef AsrPostTranscriptionOverride =
     Future<Response<dynamic>> Function({
@@ -152,14 +214,17 @@ class AsrSubtitleService {
     required LearningSettingsState settings,
     AsrProgressCallback? onProgress,
   }) async {
-    if (settings.asrApiKey.trim().isEmpty ||
-        settings.asrBaseUrl.trim().isEmpty ||
-        settings.asrModel.trim().isEmpty) {
-      throw StateError('missing-asr-settings');
+    final String? configError = describeAsrConfigurationError(settings);
+    if (configError != null) {
+      throw StateError(configError);
     }
     final File file = File(videoPath);
     if (!file.existsSync()) {
-      throw StateError('missing-video-file');
+      throw StateError(
+        videoPath.startsWith('http://') || videoPath.startsWith('https://')
+            ? '在线视频尚未缓存到本地，请稍后重试语音识别'
+            : '找不到本地视频文件，请重新打开课程后再试',
+      );
     }
 
     final List<AsrAudioChunk> chunks = await prepareAudioChunks(file);
@@ -173,10 +238,27 @@ class AsrSubtitleService {
       ),
     );
 
+    if (_usesLocalWhisper(settings)) {
+      await LocalWhisperAsr.instance.ensureModel(
+        settings.asrModel,
+        onProgress: (double? _, String message) {
+          onProgress?.call(
+            AsrSubtitleProgress(
+              completedChunks: 0,
+              totalChunks: chunks.length,
+              currentMs: 0,
+              totalMs: totalMs,
+              previewText: message,
+            ),
+          );
+        },
+      );
+    }
+
     final BaseOptions options = BaseOptions(
       baseUrl: settings.asrBaseUrl,
       headers: <String, String>{
-        'Authorization': 'Bearer ${settings.asrApiKey}',
+        'Authorization': 'Bearer ${settings.resolvedAsrApiKey}',
         'Accept': 'application/json',
       },
     );
@@ -222,11 +304,17 @@ class AsrSubtitleService {
         BaseOptions(
           baseUrl: settings.asrBaseUrl,
           headers: <String, String>{
-            'Authorization': 'Bearer ${settings.asrApiKey}',
+            'Authorization': 'Bearer ${settings.resolvedAsrApiKey}',
             'Accept': 'application/json',
           },
         );
-    final Object? normalized = _usesAlibabaCloudAsr(settings)
+    final Object? normalized = _usesLocalWhisper(settings)
+        ? await LocalWhisperAsr.instance.transcribeChunk(
+            file: chunk.file,
+            settings: settings,
+            offsetMs: chunk.offsetMs,
+          )
+        : _usesAlibabaCloudAsr(settings)
         ? await _generateAlibabaQwenChunk(
             file: chunk.file,
             settings: settings,
@@ -307,7 +395,7 @@ class AsrSubtitleService {
     final BaseOptions options = BaseOptions(
       baseUrl: settings.asrBaseUrl,
       headers: <String, String>{
-        'Authorization': 'Bearer ${settings.asrApiKey}',
+        'Authorization': 'Bearer ${settings.resolvedAsrApiKey}',
         'Accept': 'application/json',
         'Content-Type': 'application/json',
       },
@@ -354,7 +442,7 @@ class AsrSubtitleService {
     required int offsetMs,
   }) async {
     final ({String secretId, String secretKey}) credentials =
-        _tencentCredentials(settings.asrApiKey);
+        _tencentCredentials(settings.resolvedAsrApiKey);
     final String audioBase64 = base64Encode(file.readAsBytesSync());
     if (audioBase64.length > 3 * 1024 * 1024) {
       throw StateError('腾讯云单段音频超过 3MB，请缩短分段时长后重试。');
@@ -410,12 +498,12 @@ class AsrSubtitleService {
     final BaseOptions options = BaseOptions(
       baseUrl: settings.asrBaseUrl,
       headers: <String, String>{
-        'Authorization': 'Bearer ${settings.asrApiKey}',
+        'Authorization': 'Bearer ${settings.resolvedAsrApiKey}',
         'Accept': 'application/json',
       },
     );
     final Map<String, String> headers = <String, String>{
-      'Authorization': 'Bearer ${settings.asrApiKey}',
+      'Authorization': 'Bearer ${settings.resolvedAsrApiKey}',
       'Content-Type': 'application/json',
     };
     try {
@@ -999,6 +1087,10 @@ class AsrSubtitleService {
       return (value * 1000).round();
     }
     return null;
+  }
+
+  bool _usesLocalWhisper(LearningSettingsState settings) {
+    return LocalWhisperAsr.isLocalProvider(settings);
   }
 
   bool _usesMimoChatAsr(LearningSettingsState settings) {

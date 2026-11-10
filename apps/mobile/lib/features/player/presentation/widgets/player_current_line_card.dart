@@ -4,6 +4,7 @@ import '../../../shared/domain/subtitle_letter_case.dart';
 import '../../../shared/presentation/pad/app_design_tokens.dart';
 import '../../../shared/presentation/word_lookup_popup.dart';
 import '../player_mock_state.dart';
+import 'subtitle_vocabulary_highlight.dart';
 
 class PlayerCurrentLineCard extends StatefulWidget {
   const PlayerCurrentLineCard({
@@ -13,6 +14,8 @@ class PlayerCurrentLineCard extends StatefulWidget {
     required this.currentWordIndex,
     required this.fontScale,
     required this.highlightWords,
+    this.savedVocabularyWords = const <String>{},
+    this.keyVocabularyWords = const <String>{},
     required this.onBookmark,
     required this.onCollectWord,
     this.onCollectWordAtTime,
@@ -27,6 +30,8 @@ class PlayerCurrentLineCard extends StatefulWidget {
   final int currentWordIndex;
   final double fontScale;
   final bool highlightWords;
+  final Set<String> savedVocabularyWords;
+  final Set<String> keyVocabularyWords;
   final VoidCallback onBookmark;
   final ValueChanged<String> onCollectWord;
   final void Function(String word, String time)? onCollectWordAtTime;
@@ -76,8 +81,8 @@ class _PlayerCurrentLineCardState extends State<PlayerCurrentLineCard> {
     final bool showEnglish = widget.subtitleMode != '单中';
     final bool showChinese = widget.subtitleMode != '单英';
     final bool highlightEnabled = widget.highlightWords;
-    final double englishFontSize = 30 * widget.fontScale;
-    final double chineseFontSize = 18 * widget.fontScale;
+    final double englishFontSize = 32 * widget.fontScale;
+    final double chineseFontSize = 14.5 * widget.fontScale;
 
     return Container(
       padding: const EdgeInsets.fromLTRB(24, 22, 24, 24),
@@ -108,7 +113,7 @@ class _PlayerCurrentLineCardState extends State<PlayerCurrentLineCard> {
                     color: const Color(0xFFFFF7D6),
                     borderRadius: BorderRadius.circular(16),
                   ),
-                  child: const Text(
+                  child: Text(
                     '当前',
                     style: TextStyle(
                       color: AppDesignTokens.textPrimary,
@@ -118,7 +123,7 @@ class _PlayerCurrentLineCardState extends State<PlayerCurrentLineCard> {
                   ),
                 ),
                 const SizedBox(width: 10),
-                const Expanded(
+                Expanded(
                   child: Text(
                     '今日句子 · 点单词可打开学习卡',
                     style: TextStyle(
@@ -155,10 +160,32 @@ class _PlayerCurrentLineCardState extends State<PlayerCurrentLineCard> {
                       final int index = wordEntry.key;
                       final String token = wordEntry.value;
                       final bool selectedToken = selectedWord == token;
-                      final bool highlighted =
+                      final bool karaoke =
                           highlightEnabled &&
                           widget.line.words.isNotEmpty &&
                           index == widget.currentWordIndex;
+                      final SubtitleVocabMark vocabMark =
+                          SubtitleVocabularyHighlight.resolve(
+                            rawToken: token,
+                            savedWords: widget.savedVocabularyWords,
+                            keyWords: widget.keyVocabularyWords,
+                          );
+                      final Color vocabFill = SubtitleVocabularyHighlight.fill(
+                        vocabMark,
+                        onDarkVideo: false,
+                      );
+                      final Color fill = selectedToken || karaoke
+                          ? const Color(0xFFDFF8C8)
+                          : vocabFill;
+                      final Color borderColor = karaoke
+                          ? AppDesignTokens.brandGreen
+                          : SubtitleVocabularyHighlight.border(
+                              vocabMark,
+                              onDarkVideo: false,
+                            );
+                      final double borderWidth = karaoke
+                          ? 1.5
+                          : (vocabMark == SubtitleVocabMark.none ? 0 : 1.2);
 
                       return InkWell(
                         onTap: () {
@@ -173,23 +200,23 @@ class _PlayerCurrentLineCardState extends State<PlayerCurrentLineCard> {
                             vertical: 2,
                           ),
                           decoration: BoxDecoration(
-                            color: selectedToken || highlighted
-                                ? const Color(0xFFDFF8C8)
-                                : Colors.transparent,
+                            color: fill,
                             borderRadius: BorderRadius.circular(8),
                             border: Border.all(
-                              color: highlighted
-                                  ? AppDesignTokens.brandGreen
-                                  : const Color(0x000F7A43),
-                              width: highlighted ? 1.5 : 0,
+                              color: borderColor,
+                              width: borderWidth,
                             ),
                           ),
                           child: Text(
                             token,
                             style: TextStyle(
                               fontSize: englishFontSize,
-                              fontWeight: FontWeight.w800,
-                              height: 1.25,
+                              fontWeight: SubtitleVocabularyHighlight.fontWeight(
+                                vocabMark,
+                                karaoke: karaoke,
+                                activeLine: true,
+                              ),
+                              height: 1.22,
                               color: AppDesignTokens.textPrimary,
                             ),
                           ),
@@ -198,12 +225,13 @@ class _PlayerCurrentLineCardState extends State<PlayerCurrentLineCard> {
                     })
                     .toList(growable: false),
               ),
-            if (showEnglish && showChinese) const SizedBox(height: 14),
+            if (showEnglish && showChinese) const SizedBox(height: 10),
             if (showChinese)
               Text(
                 widget.line.chinese,
                 style: TextStyle(
                   fontSize: chineseFontSize,
+                  fontWeight: FontWeight.w500,
                   height: 1.4,
                   color: AppDesignTokens.textSecondary,
                 ),

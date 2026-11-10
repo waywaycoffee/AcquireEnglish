@@ -100,7 +100,7 @@ class PhraseReviewPanel extends StatelessWidget {
                           ),
                           Text(
                             '${phrase.course} · ${phrase.episode} · ${phrase.time}',
-                            style: const TextStyle(
+                            style: TextStyle(
                               color: AppDesignTokens.textSecondary,
                             ),
                           ),
@@ -223,7 +223,7 @@ class _ReviewActionDock extends StatelessWidget {
     return DecoratedBox(
       decoration: BoxDecoration(
         color: AppDesignTokens.appWhite.withValues(alpha: 0.96),
-        border: const Border(
+        border: Border(
           top: BorderSide(color: AppDesignTokens.borderGray),
         ),
         boxShadow: const <BoxShadow>[

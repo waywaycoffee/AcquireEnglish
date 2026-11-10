@@ -797,13 +797,9 @@ class WordBookNotifier extends Notifier<List<WordEntry>> {
     return updated;
   }
 
-  Future<void> mergeRemoteSrs({
+  /// Import a cloud favorite without overwriting local FSRS scheduling fields.
+  Future<void> mergeRemoteFavorite({
     required String word,
-    required WordMastery mastery,
-    required double ease,
-    required int intervalDays,
-    required int repetitions,
-    int? dueAtMs,
     String? contextSentence,
   }) async {
     final String key = word.trim().toLowerCase();
@@ -815,59 +811,59 @@ class WordBookNotifier extends Notifier<List<WordEntry>> {
     );
     if (index >= 0) {
       final WordEntry existing = state[index];
-      final int localDue = existing.dueAtMs ?? 0;
-      final int remoteDue = dueAtMs ?? 0;
-      if (remoteDue < localDue && existing.repetitions >= repetitions) {
+      if (existing.favorite) {
         return;
       }
       final List<WordEntry> next = List<WordEntry>.from(state);
-      next[index] = existing.copyWith(
-        ease: ease,
-        intervalDays: intervalDays,
-        repetitions: repetitions,
-        dueAtMs: dueAtMs,
-        mastery: mastery,
-        favorite: true,
-      );
+      next[index] = existing.copyWith(favorite: true);
       state = next;
-    } else {
-      state = <WordEntry>[
-        ...state,
-        WordEntry(
-          word: key,
-          favorite: true,
-          occurrences: contextSentence == null || contextSentence.isEmpty
-              ? const <WordOccurrence>[]
-              : <WordOccurrence>[
-                  WordOccurrence(
-                    episodeId: 'remote',
-                    course: '云同步',
-                    episode: '',
-                    time: '',
-                    sentence: contextSentence,
-                    chinese: '',
-                    count: 1,
-                    lineKeys: const <String>['remote'],
-                    contexts: <WordContext>[
-                      WordContext(
-                        lineKey: 'remote',
-                        time: '',
-                        sentence: contextSentence,
-                        chinese: '',
-                        count: 1,
-                      ),
-                    ],
-                  ),
-                ],
-          ease: ease,
-          intervalDays: intervalDays,
-          repetitions: repetitions,
-          dueAtMs: dueAtMs,
-          mastery: mastery,
-        ),
-      ];
+      await _persist();
+      return;
     }
+    state = <WordEntry>[
+      ...state,
+      WordEntry(
+        word: key,
+        favorite: true,
+        occurrences: contextSentence == null || contextSentence.isEmpty
+            ? const <WordOccurrence>[]
+            : <WordOccurrence>[
+                WordOccurrence(
+                  episodeId: 'remote',
+                  course: '云同步',
+                  episode: '',
+                  time: '',
+                  sentence: contextSentence,
+                  chinese: '',
+                  count: 1,
+                  lineKeys: const <String>['remote'],
+                  contexts: <WordContext>[
+                    WordContext(
+                      lineKey: 'remote',
+                      time: '',
+                      sentence: contextSentence,
+                      chinese: '',
+                      count: 1,
+                    ),
+                  ],
+                ),
+              ],
+      ),
+    ];
     await _persist();
+  }
+
+  @Deprecated('Local review uses FSRS; kept for older call sites')
+  Future<void> mergeRemoteSrs({
+    required String word,
+    required WordMastery mastery,
+    required double ease,
+    required int intervalDays,
+    required int repetitions,
+    int? dueAtMs,
+    String? contextSentence,
+  }) {
+    return mergeRemoteFavorite(word: word, contextSentence: contextSentence);
   }
 
   int reviewStreak() {

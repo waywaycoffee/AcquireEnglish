@@ -106,7 +106,7 @@ class LibraryCourseCard extends StatelessWidget {
                         visualDensity: VisualDensity.compact,
                         activeColor: AppDesignTokens.brandGreen,
                         checkColor: AppDesignTokens.appWhite,
-                        side: const BorderSide(
+                        side: BorderSide(
                           color: AppDesignTokens.borderGray,
                         ),
                         shape: RoundedRectangleBorder(
@@ -137,7 +137,7 @@ class LibraryCourseCard extends StatelessWidget {
                           color: AppDesignTokens.yellow,
                           borderRadius: BorderRadius.circular(999),
                         ),
-                        child: const Text(
+                        child: Text(
                           '新',
                           style: TextStyle(
                             fontSize: 10,
@@ -192,7 +192,7 @@ class LibraryCourseCard extends StatelessWidget {
                               const SizedBox(width: 4),
                               Text(
                                 course.rating.toStringAsFixed(1),
-                                style: const TextStyle(
+                                style: TextStyle(
                                   fontSize: 12,
                                   fontWeight: FontWeight.w700,
                                   color: AppDesignTokens.textPrimary,
@@ -223,7 +223,7 @@ class LibraryCourseCard extends StatelessWidget {
                     ),
                     child: Text(
                       course.category,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 10,
                         fontWeight: FontWeight.w800,
                         color: AppDesignTokens.textPrimary,
@@ -233,7 +233,7 @@ class LibraryCourseCard extends StatelessWidget {
                   const SizedBox(height: 10),
                   Text(
                     course.title,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 20,
                       fontWeight: FontWeight.w900,
                       color: AppDesignTokens.textPrimary,
@@ -244,7 +244,7 @@ class LibraryCourseCard extends StatelessWidget {
                     course.description,
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 13,
                       height: 1.5,
                       color: AppDesignTokens.textSecondary,
@@ -255,7 +255,7 @@ class LibraryCourseCard extends StatelessWidget {
                     '来源：${course.sourceLabel}',
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 12,
                       color: AppDesignTokens.textSecondary,
                     ),
@@ -263,7 +263,7 @@ class LibraryCourseCard extends StatelessWidget {
                   const SizedBox(height: 16),
                   Row(
                     children: <Widget>[
-                      const Text(
+                      Text(
                         '学习进度',
                         style: TextStyle(
                           fontSize: 11,
@@ -304,7 +304,7 @@ class LibraryCourseCard extends StatelessWidget {
                       const SizedBox(width: 4),
                       Text(
                         '最近学习：${course.lastStudiedStr}',
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 11,
                           color: AppDesignTokens.textSecondary,
                         ),

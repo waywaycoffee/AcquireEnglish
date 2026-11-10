@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import '../features/authentication/presentation/login/login_screen.dart';
+import '../features/authentication/presentation/register/register_screen.dart';
 import '../features/daily_review/presentation/daily_review_screen.dart';
 import '../features/growth/presentation/growth_screen.dart';
 import '../features/guide/presentation/guide_screen.dart';
@@ -52,6 +53,12 @@ GoRouter goRouter(Ref ref) => GoRouter(
       path: SGRoute.login.route,
       builder: (BuildContext context, GoRouterState state) {
         return const LoginScreen();
+      },
+    ).fade(),
+    GoRoute(
+      path: SGRoute.register.route,
+      builder: (BuildContext context, GoRouterState state) {
+        return const RegisterScreen();
       },
     ).fade(),
     GoRoute(

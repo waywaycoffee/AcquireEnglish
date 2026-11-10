@@ -437,7 +437,7 @@ class _SubtitleCard extends StatelessWidget {
                             _fileName(entry.videoPath),
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
+                            style: TextStyle(
                               fontSize: 18,
                               height: 1.35,
                               fontWeight: FontWeight.w800,
@@ -449,7 +449,7 @@ class _SubtitleCard extends StatelessWidget {
                             '${entry.lineCount} 句 · ${entry.provider} / ${entry.model}',
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
+                            style: TextStyle(
                               fontSize: 14,
                               height: 1.4,
                               fontWeight: FontWeight.w600,
@@ -477,7 +477,7 @@ class _SubtitleCard extends StatelessWidget {
                 ),
                 if (!selectionMode) ...<Widget>[
                   const SizedBox(height: 18),
-                  const Divider(height: 2, color: AppDesignTokens.borderGray),
+                  Divider(height: 2, color: AppDesignTokens.borderGray),
                   const SizedBox(height: 12),
                   Wrap(
                     spacing: 8,
@@ -566,7 +566,7 @@ class _ManagementIntro extends StatelessWidget {
                       children: <Widget>[
                         Text(
                           '已选择 $selectedCount 项',
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 20,
                             fontWeight: FontWeight.w800,
                             color: AppDesignTokens.textPrimary,
@@ -616,14 +616,14 @@ class _ManagementIntro extends StatelessWidget {
                       children: <Widget>[
                         Text(
                           '$count 份 AI 字幕',
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 20,
                             fontWeight: FontWeight.w800,
                             color: AppDesignTokens.textPrimary,
                           ),
                         ),
                         const SizedBox(height: 4),
-                        const Text(
+                        Text(
                           '编辑时会保护单词时间轴；重新生成失败也不会覆盖当前字幕。',
                           style: TextStyle(
                             fontSize: 14,
@@ -707,7 +707,7 @@ class _InfoBadge extends StatelessWidget {
       ),
       child: Text(
         label,
-        style: const TextStyle(
+        style: TextStyle(
           fontSize: 12,
           fontWeight: FontWeight.w700,
           color: AppDesignTokens.textSecondary,
@@ -737,7 +737,7 @@ class _RoundIconButton extends StatelessWidget {
         minimumSize: const Size.square(56),
         backgroundColor: AppDesignTokens.appWhite,
         foregroundColor: AppDesignTokens.primaryBlue,
-        side: const BorderSide(color: AppDesignTokens.borderGray, width: 2),
+        side: BorderSide(color: AppDesignTokens.borderGray, width: 2),
       ),
       icon: Icon(icon),
     );
@@ -767,7 +767,7 @@ class _SecondaryButton extends StatelessWidget {
             ? const Color(0xFFFF4B4B)
             : AppDesignTokens.primaryBlueDark,
         backgroundColor: AppDesignTokens.appWhite,
-        side: const BorderSide(color: AppDesignTokens.borderGray, width: 2),
+        side: BorderSide(color: AppDesignTokens.borderGray, width: 2),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)),
         textStyle: const TextStyle(fontSize: 15, fontWeight: FontWeight.w800),
       ),
@@ -904,7 +904,7 @@ class _AiSubtitleEditorScreenState extends State<AiSubtitleEditorScreen> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: <Widget>[
                         if (wordTexts.isNotEmpty) ...<Widget>[
-                          const Text(
+                          Text(
                             '单词级编辑',
                             style: TextStyle(
                               fontSize: 16,
@@ -913,7 +913,7 @@ class _AiSubtitleEditorScreenState extends State<AiSubtitleEditorScreen> {
                             ),
                           ),
                           const SizedBox(height: 4),
-                          const Text(
+                          Text(
                             '点击单词即可修改文字，原有开始和结束时间会保留。',
                             style: TextStyle(
                               fontSize: 14,
@@ -936,7 +936,7 @@ class _AiSubtitleEditorScreenState extends State<AiSubtitleEditorScreen> {
                                   color: AppDesignTokens.primaryBlueDark,
                                 ),
                                 label: Text(wordTexts[index]),
-                                side: const BorderSide(
+                                side: BorderSide(
                                   color: AppDesignTokens.borderGray,
                                   width: 2,
                                 ),
@@ -1107,7 +1107,7 @@ class _EditorGuide extends StatelessWidget {
           borderRadius: BorderRadius.circular(24),
           border: Border.all(color: const Color(0xFFBDEBFF), width: 2),
         ),
-        child: const Row(
+        child: Row(
           children: <Widget>[
             Icon(
               Icons.touch_app_rounded,
@@ -1205,7 +1205,7 @@ class _EditorLineCard extends StatelessWidget {
                     children: <Widget>[
                       Text(
                         line['english'] as String? ?? '',
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 20,
                           height: 1.45,
                           fontWeight: FontWeight.w700,
@@ -1217,7 +1217,7 @@ class _EditorLineCard extends StatelessWidget {
                         (line['chinese'] as String? ?? '').trim().isEmpty
                             ? '暂无中文翻译'
                             : line['chinese'] as String,
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 16,
                           height: 1.5,
                           fontWeight: FontWeight.w500,

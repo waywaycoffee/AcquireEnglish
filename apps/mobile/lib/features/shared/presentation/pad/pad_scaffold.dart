@@ -76,13 +76,17 @@ class _PadBackdrop extends StatelessWidget {
   Widget build(BuildContext context) {
     final bool compact = MediaQuery.sizeOf(context).width < 840;
     return DecoratedBox(
-      decoration: const BoxDecoration(
+      decoration: BoxDecoration(
         gradient: LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
           colors: <Color>[
-            Color(0xFFF9FBFF),
-            Color(0xFFFFFCF5),
+            AppDesignTokens.isDark
+                ? const Color(0xFF16181E)
+                : const Color(0xFFF7F8FB),
+            AppDesignTokens.isDark
+                ? const Color(0xFF12141A)
+                : const Color(0xFFF0F2F6),
             AppDesignTokens.softWhite,
           ],
         ),

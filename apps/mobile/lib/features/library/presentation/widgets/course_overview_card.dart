@@ -124,7 +124,7 @@ class CourseOverviewCard extends StatelessWidget {
                                   '第 $episodeNumber 集 · ${activeEpisode.title}',
                                   maxLines: 1,
                                   overflow: TextOverflow.ellipsis,
-                                  style: const TextStyle(
+                                  style: TextStyle(
                                     fontSize: 13,
                                     fontWeight: FontWeight.w800,
                                     color: AppDesignTokens.textPrimary,
@@ -157,7 +157,7 @@ class CourseOverviewCard extends StatelessWidget {
                 course.description,
                 maxLines: compact ? 2 : 3,
                 overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 16,
                   height: 1.55,
                   color: AppDesignTokens.textSecondary,
@@ -168,7 +168,7 @@ class CourseOverviewCard extends StatelessWidget {
                 '来源：${course.sourceLabel}',
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 13,
                   color: AppDesignTokens.textSecondary,
                 ),
@@ -186,7 +186,7 @@ class CourseOverviewCard extends StatelessWidget {
                   children: <Widget>[
                     Row(
                       children: <Widget>[
-                        const Text(
+                        Text(
                           '学习进度',
                           style: TextStyle(
                             fontSize: 17,
@@ -263,7 +263,7 @@ class CourseOverviewCard extends StatelessWidget {
                         '当前继续：第 $episodeNumber 集 ${activeEpisode.title}',
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 14,
                           fontWeight: FontWeight.w700,
                           color: AppDesignTokens.textPrimary,
@@ -314,7 +314,7 @@ class _StatBlock extends StatelessWidget {
         children: <Widget>[
           Text(
             label,
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 13,
               fontWeight: FontWeight.w700,
               color: AppDesignTokens.textSecondary,
@@ -323,7 +323,7 @@ class _StatBlock extends StatelessWidget {
           const SizedBox(height: 6),
           Text(
             value,
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 20,
               fontWeight: FontWeight.w900,
               color: AppDesignTokens.textPrimary,

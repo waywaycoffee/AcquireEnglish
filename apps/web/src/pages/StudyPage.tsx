@@ -5,7 +5,135 @@ import { useAuth } from "../auth";
 import { DEMO_EN_SRT, DEMO_ZH_SRT } from "../data/demoSubtitles";
 import { findActiveCueIndex, formatTime, parseSrt, type Cue } from "../lib/srt";
 
-type TabName = "字幕" | "跟读" | "听写" | "练习";
+type TabName = "字幕" | "跟读" | "听写" | "练习" | "词卡";
+
+type WordCardKind = "单词" | "短语" | "短句";
+
+type EpisodeWordCard = {
+  id: string;
+  text: string;
+  kind: WordCardKind;
+  exampleEn: string;
+  exampleZh: string;
+  start: number;
+  favorited: boolean;
+};
+
+const STOP_WORDS = new Set([
+  "a",
+  "an",
+  "the",
+  "and",
+  "or",
+  "but",
+  "to",
+  "of",
+  "in",
+  "on",
+  "at",
+  "for",
+  "with",
+  "is",
+  "are",
+  "was",
+  "were",
+  "be",
+  "i",
+  "you",
+  "he",
+  "she",
+  "it",
+  "we",
+  "they",
+  "this",
+  "that",
+  "my",
+  "your",
+  "his",
+  "her",
+  "our",
+  "their",
+  "as",
+  "by",
+  "from",
+  "so",
+  "if",
+  "not",
+  "do",
+  "does",
+  "did",
+  "have",
+  "has",
+  "had",
+  "just",
+  "now",
+  "can",
+  "will",
+  "would",
+  "should",
+]);
+
+function kindForText(text: string): WordCardKind {
+  const tokens = text.match(/[A-Za-z']+/g) ?? [];
+  if (tokens.length >= 5) return "短句";
+  if (tokens.length >= 2) return "短语";
+  return "单词";
+}
+
+function buildEpisodeWordCards(enCues: Cue[], zhCues: Cue[]): EpisodeWordCard[] {
+  const map = new Map<string, EpisodeWordCard>();
+  for (const cue of enCues) {
+    const tokens = (cue.text.match(/[A-Za-z']+/g) ?? [])
+      .map((t) => t.toLowerCase())
+      .filter((t) => t.length >= 4 && !STOP_WORDS.has(t));
+    for (let i = 0; i < tokens.length; i++) {
+      const token = tokens[i];
+      if (!map.has(token)) {
+        map.set(token, {
+          id: `w:${token}:${cue.start}`,
+          text: token,
+          kind: "单词",
+          exampleEn: cue.text,
+          exampleZh: zhCues.find((z) => Math.abs(z.start - cue.start) < 0.4)?.text ?? "",
+          start: cue.start,
+          favorited: false,
+        });
+      }
+      if (i + 1 < tokens.length) {
+        const phrase = `${token} ${tokens[i + 1]}`;
+        if (!map.has(phrase)) {
+          map.set(phrase, {
+            id: `p:${phrase}:${cue.start}`,
+            text: phrase,
+            kind: "短语",
+            exampleEn: cue.text,
+            exampleZh: zhCues.find((z) => Math.abs(z.start - cue.start) < 0.4)?.text ?? "",
+            start: cue.start,
+            favorited: false,
+          });
+        }
+      }
+    }
+    if (/^(this is|we (do )?say|we don'?t say|it'?s called)/i.test(cue.text.trim())) {
+      const key = cue.text.trim().toLowerCase();
+      if (!map.has(key)) {
+        map.set(key, {
+          id: `s:${cue.start}`,
+          text: cue.text.trim(),
+          kind: "短句",
+          exampleEn: cue.text,
+          exampleZh: zhCues.find((z) => Math.abs(z.start - cue.start) < 0.4)?.text ?? "",
+          start: cue.start,
+          favorited: false,
+        });
+      }
+    }
+  }
+  return [...map.values()]
+    .sort((a, b) => a.start - b.start)
+    .slice(0, 24)
+    .map((card) => ({ ...card, kind: kindForText(card.text) }));
+}
 
 function normalize(value: string) {
   return value
@@ -42,6 +170,8 @@ export default function StudyPage() {
   const [currentTime, setCurrentTime] = useState(0);
   const [playing, setPlaying] = useState(false);
   const [bilingual, setBilingual] = useState(true);
+  const [blindListening, setBlindListening] = useState(false);
+  const [wordCardFilter, setWordCardFilter] = useState<"全部" | WordCardKind>("全部");
   const [loopSentence, setLoopSentence] = useState(false);
   const [pauseAtEnd, setPauseAtEnd] = useState(false);
   const [rate, setRate] = useState(1);
@@ -215,6 +345,18 @@ export default function StudyPage() {
     return { masked, answer, options };
   }, [enCues, activeIndex]);
 
+  const episodeCards = useMemo(
+    () => buildEpisodeWordCards(enCues, zhCues),
+    [enCues, zhCues],
+  );
+  const filteredCards = useMemo(
+    () =>
+      wordCardFilter === "全部"
+        ? episodeCards
+        : episodeCards.filter((card) => card.kind === wordCardFilter),
+    [episodeCards, wordCardFilter],
+  );
+
   function seekToCue(index: number) {
     const cue = enCues[index];
     if (!cue) return;
@@ -325,7 +467,7 @@ export default function StudyPage() {
           </div>
 
           <div className="tabs">
-            {(["字幕", "跟读", "听写", "练习"] as const).map((name) => (
+            {(["字幕", "跟读", "听写", "练习", "词卡"] as const).map((name) => (
               <button
                 key={name}
                 type="button"
@@ -351,8 +493,12 @@ export default function StudyPage() {
                   <div className="muted" style={{ fontSize: 12, marginBottom: 6 }}>
                     {formatTime(cue.start)}
                   </div>
-                  <div className="en">{cue.text}</div>
-                  {bilingual ? <div className="zh">{zhCues[index]?.text ?? ""}</div> : null}
+                  <div className="en">
+                    {blindListening && index === activeIndex ? "（盲听中）" : cue.text}
+                  </div>
+                  {bilingual && !(blindListening && index === activeIndex) ? (
+                    <div className="zh">{zhCues[index]?.text ?? ""}</div>
+                  ) : null}
                 </button>
               ))}
             </div>
@@ -449,9 +595,63 @@ export default function StudyPage() {
             </div>
           ) : null}
 
+          {tab === "词卡" ? (
+            <div>
+              <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 12 }}>
+                {(["全部", "单词", "短语", "短句"] as const).map((name) => (
+                  <button
+                    key={name}
+                    type="button"
+                    className={`chip ${wordCardFilter === name ? "on" : ""}`}
+                    onClick={() => setWordCardFilter(name)}
+                  >
+                    {name}
+                    {name === "全部"
+                      ? ` ${episodeCards.length}`
+                      : ` ${episodeCards.filter((c) => c.kind === name).length}`}
+                  </button>
+                ))}
+              </div>
+              <div style={{ maxHeight: 360, overflow: "auto", display: "grid", gap: 8 }}>
+                {filteredCards.length === 0 ? (
+                  <p className="muted">本集暂无推荐词卡</p>
+                ) : (
+                  filteredCards.map((card, index) => (
+                    <button
+                      key={card.id}
+                      type="button"
+                      className="cue"
+                      style={{ width: "100%", textAlign: "left", cursor: "pointer" }}
+                      onClick={() => {
+                        const idx = enCues.findIndex((c) => Math.abs(c.start - card.start) < 0.35);
+                        seekToCue(idx >= 0 ? idx : activeIndex);
+                        setTab("字幕");
+                        void collectWord(card.text);
+                      }}
+                    >
+                      <div className="muted" style={{ fontSize: 12, marginBottom: 4 }}>
+                        {index + 1} · {card.kind} · {formatTime(card.start)}
+                      </div>
+                      <div className="en">{card.text}</div>
+                      <div className="zh">{card.exampleEn}</div>
+                      {card.exampleZh ? <div className="muted">{card.exampleZh}</div> : null}
+                    </button>
+                  ))
+                )}
+              </div>
+            </div>
+          ) : null}
+
           <div className="controls">
             <button type="button" className={`chip ${bilingual ? "on" : ""}`} onClick={() => setBilingual((v) => !v)}>
               双语
+            </button>
+            <button
+              type="button"
+              className={`chip ${blindListening ? "on" : ""}`}
+              onClick={() => setBlindListening((v) => !v)}
+            >
+              盲听
             </button>
             <button
               type="button"
@@ -473,8 +673,8 @@ export default function StudyPage() {
             >
               循环
             </button>
-            <button type="button" className="chip" onClick={() => setTab("字幕")}>
-              精读
+            <button type="button" className="chip" onClick={() => setTab("词卡")}>
+              词卡
             </button>
           </div>
         </section>

@@ -707,7 +707,7 @@ class _ReaderHeader extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       padding: const EdgeInsets.fromLTRB(24, 16, 18, 14),
-      decoration: const BoxDecoration(
+      decoration: BoxDecoration(
         color: Colors.white,
         border: Border(bottom: BorderSide(color: AppDesignTokens.borderGray)),
       ),
@@ -735,7 +735,7 @@ class _ReaderHeader extends StatelessWidget {
                   courseTitle,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
+                  style: TextStyle(
                     color: AppDesignTokens.textPrimary,
                     fontSize: 17,
                     fontWeight: FontWeight.w900,
@@ -744,7 +744,7 @@ class _ReaderHeader extends StatelessWidget {
                 const SizedBox(height: 2),
                 Text(
                   '$episodeTitle · 逐词全文',
-                  style: const TextStyle(
+                  style: TextStyle(
                     color: AppDesignTokens.textSecondary,
                     fontSize: 12,
                     fontWeight: FontWeight.w700,
@@ -756,7 +756,7 @@ class _ReaderHeader extends StatelessWidget {
           Row(
             mainAxisSize: MainAxisSize.min,
             children: <Widget>[
-              const Text(
+              Text(
                 '翻译',
                 style: TextStyle(
                   color: AppDesignTokens.textSecondary,
@@ -874,7 +874,7 @@ class _ReaderLine extends StatelessWidget {
             children: <Widget>[
               Text(
                 line.startTime,
-                style: const TextStyle(
+                style: TextStyle(
                   color: AppDesignTokens.textSecondary,
                   fontSize: 12,
                   fontWeight: FontWeight.w800,

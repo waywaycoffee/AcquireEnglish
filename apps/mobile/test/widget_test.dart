@@ -76,7 +76,7 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('语言避难所'), findsWidgets);
+    expect(find.textContaining('爱可儿英语'), findsWidgets);
     expect(find.text('晚上好 Mark 👋'), findsOneWidget);
     expect(find.text('导入你的第一套英语视频课程'), findsOneWidget);
     expect(find.text('去导入课程'), findsOneWidget);

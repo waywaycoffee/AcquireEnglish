@@ -1,6 +1,5 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../words/domain/sm2_scheduler.dart';
 import '../../words/presentation/word_book_provider.dart';
 import 'acquire_api_client.dart';
 
@@ -9,40 +8,31 @@ final Provider<VocabSyncService> vocabSyncServiceProvider =
       return VocabSyncService(ref);
     });
 
+/// Cloud vocab is a **favorite mirror** only.
+/// Local FSRS daily review remains the source of truth for scheduling.
 class VocabSyncService {
   VocabSyncService(this._ref);
 
   final Ref _ref;
 
   Future<void> pushEntry(WordEntry entry) async {
+    if (!entry.favorite) {
+      return;
+    }
     try {
       await _ref.read(acquireApiClientProvider).upsertVocab(
         word: entry.word,
         context: entry.occurrences.isEmpty
             ? null
             : entry.occurrences.first.sentence,
-        mastery: _masteryToApi(entry.mastery),
-        ease: entry.ease,
-        intervalDays: entry.intervalDays,
-        repetitions: entry.repetitions,
-        dueAt: entry.dueAtMs == null
-            ? null
-            : DateTime.fromMillisecondsSinceEpoch(entry.dueAtMs!),
+        // Keep API fields populated for older clients, but do not drive local SRS.
+        mastery: 'new',
+        ease: 2.5,
+        intervalDays: 0,
+        repetitions: 0,
+        dueAt: null,
       );
     } catch (_) {}
-  }
-
-  static String _masteryToApi(WordMastery mastery) {
-    switch (mastery) {
-      case WordMastery.fresh:
-        return 'new';
-      case WordMastery.learning:
-        return 'learning';
-      case WordMastery.known:
-        return 'known';
-      case WordMastery.mastered:
-        return 'mastered';
-    }
   }
 
   Future<void> pullAndMerge() async {
@@ -55,13 +45,8 @@ class VocabSyncService {
       }
       final WordBookNotifier book = _ref.read(wordBookProvider.notifier);
       for (final AcquireVocabDto row in remote) {
-        await book.mergeRemoteSrs(
+        await book.mergeRemoteFavorite(
           word: row.word,
-          mastery: Sm2Scheduler.masteryFromName(row.mastery),
-          ease: row.ease,
-          intervalDays: row.intervalDays,
-          repetitions: row.repetitions,
-          dueAtMs: row.dueAt?.millisecondsSinceEpoch,
           contextSentence: row.context,
         );
       }

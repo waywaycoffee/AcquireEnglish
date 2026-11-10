@@ -7,6 +7,9 @@ import 'package:google_fonts/google_fonts.dart';
 
 import 'config/theme/theme_logic.dart';
 import 'config/theme/theme_ui_model.dart';
+import 'features/authentication/presentation/auth_session.dart';
+import 'features/settings/presentation/bilibili_login_sheet.dart';
+import 'features/shared/presentation/pad/app_design_tokens.dart';
 import 'features/sync/presentation/daily_feed_lifecycle.dart';
 import 'flavors/app_flavor.dart';
 import 'router/app_router.dart';
@@ -16,13 +19,27 @@ class MyApp extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    // Restore JWT into Dio as early as possible.
+    ref.watch(authSessionProvider);
     final ThemeUiModel currentTheme = ref.watch(themeLogicProvider);
     final GoRouter router = ref.watch(goRouterProvider);
+    final bool isDark =
+        currentTheme.themeMode == ThemeMode.dark ||
+        (currentTheme.themeMode == ThemeMode.system &&
+            WidgetsBinding.instance.platformDispatcher.platformBrightness ==
+                Brightness.dark);
+    AppDesignTokens.brightness = isDark ? Brightness.dark : Brightness.light;
     return AnnotatedRegion<SystemUiOverlayStyle>(
-      value: const SystemUiOverlayStyle(
+      value: SystemUiOverlayStyle(
         statusBarColor: Colors.transparent,
-        statusBarIconBrightness: Brightness.dark,
-        statusBarBrightness: Brightness.light,
+        statusBarIconBrightness: isDark ? Brightness.light : Brightness.dark,
+        statusBarBrightness: isDark ? Brightness.dark : Brightness.light,
+        systemNavigationBarColor: isDark
+            ? const Color(0xFF12141A)
+            : const Color(0xFFF3F4F7),
+        systemNavigationBarIconBrightness: isDark
+            ? Brightness.light
+            : Brightness.dark,
         systemStatusBarContrastEnforced: false,
         systemNavigationBarContrastEnforced: false,
       ),
@@ -48,7 +65,9 @@ class MyApp extends ConsumerWidget {
                   _textScaleForWidth(mediaQuery.size.width),
                 ),
               ),
-              child: child ?? const SizedBox.shrink(),
+              child: BilibiliLoginGate(
+                child: child ?? const SizedBox.shrink(),
+              ),
             ),
           );
         },

@@ -139,7 +139,7 @@ class _AnkiExportSheetState extends ConsumerState<AnkiExportSheet> {
             children: <Widget>[
               Row(
                 children: <Widget>[
-                  const Expanded(
+                  Expanded(
                     child: Text(
                       '导出',
                       style: TextStyle(
@@ -159,7 +159,7 @@ class _AnkiExportSheetState extends ConsumerState<AnkiExportSheet> {
               const SizedBox(height: 6),
               Text(
                 '导出收藏的单词、短语和台词语境。英文语境和短语大小写：$letterCase（跟随设置）。',
-                style: const TextStyle(
+                style: TextStyle(
                   color: AppDesignTokens.textPrimary,
                   height: 1.5,
                 ),
@@ -228,13 +228,13 @@ class _AnkiExportSheetState extends ConsumerState<AnkiExportSheet> {
                 _format == AnkiExportFormat.apkg
                     ? '自带卡片样式和实时英文朗读，不附带音频文件。需要客户端支持朗读或卡片脚本，且设备有英语语音；重复导入可更新卡片。'
                     : '普通表格，包含英文、音标、释义、原句语境等独立字段。',
-                style: const TextStyle(
+                style: TextStyle(
                   color: AppDesignTokens.textPrimary,
                   height: 1.5,
                 ),
               ),
               const SizedBox(height: 6),
-              const Text(
+              Text(
                 '相同表达合并语境，不会改变应用内的复习进度。',
                 style: TextStyle(
                   fontSize: 12,

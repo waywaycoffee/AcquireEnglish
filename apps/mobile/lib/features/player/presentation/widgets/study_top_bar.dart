@@ -20,10 +20,11 @@ class StudyTopBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final StudyShellColors colors = StudyShellColors.of(context);
     final double topInset = MediaQuery.paddingOf(context).top;
     return Container(
-      color: StudyShellTokens.background,
-      padding: EdgeInsets.fromLTRB(8, topInset + 4, 8, 6),
+      color: colors.background,
+      padding: EdgeInsets.fromLTRB(4, topInset + 2, 4, 4),
       child: SizedBox(
         height: 44,
         child: Row(
@@ -31,9 +32,9 @@ class StudyTopBar extends StatelessWidget {
             IconButton(
               tooltip: '返回',
               onPressed: onBack,
-              icon: const Icon(
+              icon: Icon(
                 Icons.chevron_left_rounded,
-                color: StudyShellTokens.textPrimary,
+                color: colors.textPrimary,
                 size: 30,
               ),
             ),
@@ -46,8 +47,8 @@ class StudyTopBar extends StatelessWidget {
                     textAlign: TextAlign.center,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      color: StudyShellTokens.textPrimary,
+                    style: TextStyle(
+                      color: colors.textPrimary,
                       fontSize: 17,
                       fontWeight: FontWeight.w700,
                     ),
@@ -55,8 +56,8 @@ class StudyTopBar extends StatelessWidget {
                   if (lessonBadge != null)
                     Text(
                       lessonBadge!,
-                      style: const TextStyle(
-                        color: StudyShellTokens.textMuted,
+                      style: TextStyle(
+                        color: colors.textMuted,
                         fontSize: 11,
                         fontWeight: FontWeight.w600,
                       ),
@@ -68,10 +69,10 @@ class StudyTopBar extends StatelessWidget {
               tooltip: '收藏',
               onPressed: onFavorite,
               icon: Icon(
-                isFavorite ? Icons.favorite_rounded : Icons.favorite_border_rounded,
-                color: isFavorite
-                    ? const Color(0xFFFF5A7A)
-                    : StudyShellTokens.textPrimary,
+                isFavorite
+                    ? Icons.favorite_rounded
+                    : Icons.favorite_border_rounded,
+                color: isFavorite ? colors.favorite : colors.textPrimary,
                 size: 22,
               ),
             ),

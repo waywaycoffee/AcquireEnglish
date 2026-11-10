@@ -646,36 +646,32 @@ class _LevelLearningRoute extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        gradient: const LinearGradient(
+        gradient: LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
-          colors: <Color>[Color(0xFFF7F4FF), Color(0xFFEEF7FF)],
+          colors: AppDesignTokens.isDark
+              ? <Color>[AppDesignTokens.appWhite, AppDesignTokens.softGray]
+              : const <Color>[Color(0xFFF7F4FF), Color(0xFFEEF7FF)],
         ),
         borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: Colors.white),
-        boxShadow: const <BoxShadow>[
-          BoxShadow(
-            color: Color(0x142C3570),
-            blurRadius: 18,
-            offset: Offset(0, 8),
-          ),
-        ],
+        border: Border.all(color: AppDesignTokens.borderGray),
+        boxShadow: AppDesignTokens.toyCardShadow,
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
           Text(
             'Lv.$displayedLevel 学习路线',
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 18,
               fontWeight: FontWeight.w900,
-              color: Color(0xFF28183A),
+              color: AppDesignTokens.textPrimary,
             ),
           ),
           const SizedBox(height: 5),
           Text(
             profile.ability,
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 13,
               color: AppDesignTokens.textSecondary,
             ),
@@ -719,11 +715,11 @@ class _LevelLearningRoute extends StatelessWidget {
                       padding: const EdgeInsets.only(top: 3),
                       child: Text(
                         steps[index],
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 13,
                           height: 1.35,
                           fontWeight: FontWeight.w700,
-                          color: Color(0xFF4A3A58),
+                          color: AppDesignTokens.textPrimary,
                         ),
                       ),
                     ),
@@ -1037,34 +1033,30 @@ class _HowToLearn extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        gradient: const LinearGradient(
+        gradient: LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
-          colors: <Color>[Color(0xFFFDF5FF), Color(0xFFF0F6FF)],
+          colors: AppDesignTokens.isDark
+              ? <Color>[AppDesignTokens.appWhite, AppDesignTokens.softGray]
+              : const <Color>[Color(0xFFFDF5FF), Color(0xFFF0F6FF)],
         ),
         borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: Colors.white),
-        boxShadow: const <BoxShadow>[
-          BoxShadow(
-            color: Color(0x142C3570),
-            blurRadius: 18,
-            offset: Offset(0, 8),
-          ),
-        ],
+        border: Border.all(color: AppDesignTokens.borderGray),
+        boxShadow: AppDesignTokens.toyCardShadow,
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
-          const Text(
+          Text(
             '怎么学习',
             style: TextStyle(
               fontSize: 18,
               fontWeight: FontWeight.w900,
-              color: Color(0xFF28183A),
+              color: AppDesignTokens.textPrimary,
             ),
           ),
           const SizedBox(height: 5),
-          const Text(
+          Text(
             '每次只做一个小动作，让学习自然接到下一次。',
             style: TextStyle(
               fontSize: 13,
@@ -1127,10 +1119,16 @@ class _LearningLoopAction extends StatelessWidget {
                 height: 33,
                 alignment: Alignment.center,
                 decoration: BoxDecoration(
-                  color: const Color(0xFFE7DEFF),
+                  color: AppDesignTokens.purpleLight,
                   borderRadius: BorderRadius.circular(11),
                 ),
-                child: Icon(icon, size: 17, color: const Color(0xFF66339C)),
+                child: Icon(
+                  icon,
+                  size: 17,
+                  color: AppDesignTokens.isDark
+                      ? const Color(0xFFC4A8FF)
+                      : const Color(0xFF66339C),
+                ),
               ),
               const SizedBox(width: 10),
               Expanded(
@@ -1139,10 +1137,10 @@ class _LearningLoopAction extends StatelessWidget {
                   children: <Widget>[
                     Text(
                       title,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 13,
                         fontWeight: FontWeight.w900,
-                        color: Color(0xFF39254D),
+                        color: AppDesignTokens.textPrimary,
                       ),
                     ),
                     const SizedBox(height: 3),
@@ -1150,11 +1148,11 @@ class _LearningLoopAction extends StatelessWidget {
                       description,
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 11,
                         height: 1.3,
                         fontWeight: FontWeight.w600,
-                        color: Color(0xFF776C82),
+                        color: AppDesignTokens.textSecondary,
                       ),
                     ),
                   ],
@@ -1178,10 +1176,10 @@ class _SectionHeader extends StatelessWidget {
     children: <Widget>[
       Text(
         title,
-        style: const TextStyle(
+        style: TextStyle(
           fontSize: 23,
           fontWeight: FontWeight.w900,
-          color: Color(0xFF20152E),
+          color: AppDesignTokens.textPrimary,
         ),
       ),
       const Spacer(),
@@ -1233,20 +1231,16 @@ class _TodayGrowthValue extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(10),
       decoration: BoxDecoration(
-        gradient: const LinearGradient(
+        gradient: LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
-          colors: <Color>[Color(0xFFFFFEFF), Color(0xFFF5F8FF)],
+          colors: AppDesignTokens.isDark
+              ? <Color>[AppDesignTokens.appWhite, AppDesignTokens.softGray]
+              : const <Color>[Color(0xFFFFFEFF), Color(0xFFF5F8FF)],
         ),
         borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: const Color(0xFFE3E7F5)),
-        boxShadow: const <BoxShadow>[
-          BoxShadow(
-            color: Color(0x12263166),
-            blurRadius: 18,
-            offset: Offset(0, 9),
-          ),
-        ],
+        border: Border.all(color: AppDesignTokens.borderGray),
+        boxShadow: AppDesignTokens.toyCardShadow,
       ),
       child: Column(
         children: <Widget>[
@@ -1290,9 +1284,11 @@ class _GrowthValueRow extends StatelessWidget {
         height: 64,
         padding: const EdgeInsets.symmetric(horizontal: 12),
         decoration: BoxDecoration(
-          color: Colors.white.withValues(alpha: .72),
+          color: AppDesignTokens.isDark
+              ? AppDesignTokens.softGray
+              : Colors.white.withValues(alpha: .72),
           borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: const Color(0xFFECECF5)),
+          border: Border.all(color: AppDesignTokens.borderGray),
         ),
         child: Row(
           children: <Widget>[
@@ -1301,36 +1297,51 @@ class _GrowthValueRow extends StatelessWidget {
               height: 36,
               alignment: Alignment.center,
               decoration: BoxDecoration(
-                gradient: const LinearGradient(
-                  colors: <Color>[Color(0xFFECE2FF), Color(0xFFD9EEFF)],
+                gradient: LinearGradient(
+                  colors: AppDesignTokens.isDark
+                      ? <Color>[
+                          AppDesignTokens.purpleLight,
+                          AppDesignTokens.skyLight,
+                        ]
+                      : const <Color>[Color(0xFFECE2FF), Color(0xFFD9EEFF)],
                 ),
                 borderRadius: BorderRadius.circular(12),
               ),
-              child: Icon(icon, size: 18, color: const Color(0xFF68409E)),
+              child: Icon(
+                icon,
+                size: 18,
+                color: AppDesignTokens.isDark
+                    ? const Color(0xFFC4A8FF)
+                    : const Color(0xFF68409E),
+              ),
             ),
             const SizedBox(width: 13),
             Expanded(
               child: Text(
                 label,
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 15,
                   fontWeight: FontWeight.w800,
-                  color: Color(0xFF33263F),
+                  color: AppDesignTokens.textPrimary,
                 ),
               ),
             ),
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 6),
               decoration: BoxDecoration(
-                color: const Color(0xFFF0E5FF),
+                color: AppDesignTokens.isDark
+                    ? AppDesignTokens.purpleLight
+                    : const Color(0xFFF0E5FF),
                 borderRadius: BorderRadius.circular(99),
               ),
               child: Text(
                 '+$xp XP',
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 12,
                   fontWeight: FontWeight.w900,
-                  color: Color(0xFF6B31B2),
+                  color: AppDesignTokens.isDark
+                      ? const Color(0xFFC4A8FF)
+                      : const Color(0xFF6B31B2),
                 ),
               ),
             ),
@@ -1487,7 +1498,7 @@ class _Badges extends StatelessWidget {
           ],
         ),
         const SizedBox(height: 6),
-        const Text(
+        Text(
           '点击勋章，查看你为什么获得它，或离它还有多远。',
           style: TextStyle(fontSize: 13, color: AppDesignTokens.textSecondary),
         ),
@@ -1496,20 +1507,16 @@ class _Badges extends StatelessWidget {
           width: double.infinity,
           padding: const EdgeInsets.all(18),
           decoration: BoxDecoration(
-            gradient: const LinearGradient(
+            gradient: LinearGradient(
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
-              colors: <Color>[Color(0xFFFFFCF8), Color(0xFFF6F3FF)],
+              colors: AppDesignTokens.isDark
+                  ? <Color>[AppDesignTokens.appWhite, AppDesignTokens.softGray]
+                  : const <Color>[Color(0xFFFFFCF8), Color(0xFFF6F3FF)],
             ),
             borderRadius: BorderRadius.circular(24),
-            border: Border.all(color: Colors.white),
-            boxShadow: const <BoxShadow>[
-              BoxShadow(
-                color: Color(0x12263166),
-                blurRadius: 18,
-                offset: Offset(0, 9),
-              ),
-            ],
+            border: Border.all(color: AppDesignTokens.borderGray),
+            boxShadow: AppDesignTokens.toyCardShadow,
           ),
           child: Wrap(
             spacing: 13,
@@ -1574,8 +1581,10 @@ class _BadgeView extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final Color foreground = badge.unlocked
-        ? const Color(0xFF9B6812)
-        : const Color(0xFF99919E);
+        ? (AppDesignTokens.isDark
+              ? const Color(0xFFFFD77C)
+              : const Color(0xFF9B6812))
+        : AppDesignTokens.textSecondary;
     return InkWell(
       key: Key('growth-badge-${badge.title}'),
       borderRadius: BorderRadius.circular(14),
@@ -1616,8 +1625,16 @@ class _BadgeView extends StatelessWidget {
                     ? const LinearGradient(
                         colors: <Color>[Color(0xFFFFE6A0), Color(0xFFC18A25)],
                       )
-                    : const LinearGradient(
-                        colors: <Color>[Color(0xFFF0EDF2), Color(0xFFD6D0D8)],
+                    : LinearGradient(
+                        colors: AppDesignTokens.isDark
+                            ? <Color>[
+                                AppDesignTokens.softGray,
+                                AppDesignTokens.borderGray,
+                              ]
+                            : const <Color>[
+                                Color(0xFFF0EDF2),
+                                Color(0xFFD6D0D8),
+                              ],
                       ),
                 border: Border.all(
                   color: badge.unlocked

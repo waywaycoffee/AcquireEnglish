@@ -3,15 +3,23 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import 'package:go_router/go_router.dart';
+
 import '../../../constants/feature_flags.dart';
+import '../../../router/app_router.dart';
 import '../../../utils/url_utils.dart';
+import '../../authentication/presentation/auth_session.dart';
 import '../../navigation/presentation/navigation_destination.dart';
+import '../../player/presentation/local_whisper_asr.dart';
 import '../../shared/data/word_pronunciation_service.dart';
+import '../../shared/presentation/pad/app_design_tokens.dart';
 import '../../shared/presentation/pad/pad_compact.dart';
 import '../../shared/presentation/pad/pad_scaffold.dart';
 import '../../shared/presentation/pad/pad_top_bar.dart';
 import 'ai_subtitle_management_screen.dart';
 import 'app_update_provider.dart';
+import '../../home/presentation/widgets/theme_widget.dart';
+import 'bilibili_login_sheet.dart';
 import 'learning_preferences_screen.dart';
 import 'settings_provider.dart';
 import 'widgets/pronunciation_settings_card.dart';
@@ -36,6 +44,7 @@ class SettingsScreen extends ConsumerWidget {
     );
     final AppUpdateState updateState = ref.watch(appUpdateProvider);
     final AsyncValue<String> appVersion = ref.watch(appVersionProvider);
+    final AuthSessionState authSession = ref.watch(authSessionProvider);
     ref.listen<AppUpdateState>(appUpdateProvider, (
       AppUpdateState? previous,
       AppUpdateState next,
@@ -62,7 +71,7 @@ class SettingsScreen extends ConsumerWidget {
             style: TextStyle(
               fontSize: compact ? 30 : 34,
               fontWeight: FontWeight.w900,
-              color: const Color(0xFF191C1E),
+              color: AppDesignTokens.textPrimary,
             ),
           ),
           SizedBox(height: compact ? 6 : 8),
@@ -70,8 +79,66 @@ class SettingsScreen extends ConsumerWidget {
             '管理您的学习体验',
             style: TextStyle(
               fontSize: compact ? 14 : 15,
-              color: const Color(0xFF53625A),
+              color: AppDesignTokens.textSecondary,
             ),
+          ),
+          SizedBox(height: context.padSectionGap),
+          const SettingsGroupCard(
+            title: '外观',
+            icon: Icons.palette_rounded,
+            children: <Widget>[
+              Padding(
+                padding: EdgeInsets.symmetric(vertical: 4),
+                child: ThemeWidget(),
+              ),
+            ],
+          ),
+          SizedBox(height: context.padSectionGap),
+          SettingsGroupCard(
+            title: '爱可儿账号',
+            icon: Icons.person_rounded,
+            children: <Widget>[
+              if (authSession.isLoggedIn) ...<Widget>[
+                _ActionRow(
+                  title: authSession.displayName.isEmpty
+                      ? authSession.email
+                      : authSession.displayName,
+                  description: authSession.displayName.isEmpty
+                      ? '已登录，可同步学习进度与词库。'
+                      : '${authSession.email}\n已登录，可同步学习进度与词库。',
+                  icon: Icons.verified_user_rounded,
+                  onTap: () {},
+                ),
+                _ActionRow(
+                  title: '退出登录',
+                  description: '退出后云端同步将暂停，本地学习数据仍保留。',
+                  danger: true,
+                  icon: Icons.logout_rounded,
+                  onTap: () async {
+                    await ref.read(authSessionProvider.notifier).signOut();
+                    if (!context.mounted) {
+                      return;
+                    }
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('已退出爱可儿账号')),
+                    );
+                  },
+                ),
+              ] else ...<Widget>[
+                _ActionRow(
+                  title: '登录账号',
+                  description: '登录后可同步进度、词库与学习偏好。',
+                  icon: Icons.login_rounded,
+                  onTap: () => context.push(SGRoute.login.route),
+                ),
+                _ActionRow(
+                  title: '注册新账号',
+                  description: '使用邮箱创建爱可儿英语账号。',
+                  icon: Icons.person_add_alt_1_rounded,
+                  onTap: () => context.push(SGRoute.register.route),
+                ),
+              ],
+            ],
           ),
           SizedBox(height: context.padSectionGap),
           SettingsGroupCard(
@@ -263,6 +330,100 @@ class SettingsScreen extends ConsumerWidget {
             SizedBox(height: compact ? 20 : 24),
           ],
           SettingsGroupCard(
+            title: '口语陪练（数字人）',
+            icon: Icons.record_voice_over_rounded,
+            children: <Widget>[
+              _SelectRow(
+                title: '陪练引擎',
+                description:
+                    'LiveTalking=开源实时数字人（需自建服务）；本地 TTS=无画面语音陪练。 '
+                    'Duix-Mobile 端侧 SDK 可后续替换。',
+                value: oralCoachBackendOptions.contains(settings.oralCoachBackend)
+                    ? settings.oralCoachBackend
+                    : '本地 TTS',
+                options: oralCoachBackendOptions,
+                onChanged: (String? value) {
+                  if (value == null) {
+                    return;
+                  }
+                  ref
+                      .read(learningSettingsProvider.notifier)
+                      .setOralCoachBackend(value);
+                },
+              ),
+              if (settings.oralCoachBackend == 'LiveTalking')
+                _InputRow(
+                  title: 'LiveTalking 服务地址',
+                  description:
+                      '例如 http://192.168.1.8:8010 。服务端： '
+                      'python app.py --transport webrtc --model musetalk',
+                  value: settings.oralCoachServerUrl,
+                  hintText: 'http://127.0.0.1:8010',
+                  onChanged: (String value) {
+                    ref
+                        .read(learningSettingsProvider.notifier)
+                        .setOralCoachServerUrl(value);
+                  },
+                ),
+            ],
+          ),
+          SizedBox(height: compact ? 20 : 24),
+          SettingsGroupCard(
+            title: 'B 站账号',
+            icon: Icons.live_tv_rounded,
+            children: <Widget>[
+              _ActionRow(
+                title: settings.isBilibiliLoggedIn ? '扫码重新登录' : '扫码登录哔哩哔哩',
+                description: settings.isBilibiliLoggedIn
+                    ? (settings.bilibiliUserId.isEmpty
+                          ? '已登录：可用于拉取官方字幕与缓存视频。'
+                          : '已登录 UID ${settings.bilibiliUserId}：可用于拉取官方字幕与缓存视频。')
+                    : settings.bilibiliCookieFromEnv
+                    ? '已从 .env 加载 Cookie；也可扫码覆盖。'
+                    : '推荐：手机哔哩哔哩 App 扫码，确认后自动保存登录态。',
+                icon: Icons.qr_code_2_rounded,
+                onTap: () async {
+                  final bool ok = await showBilibiliLoginSheet(context, ref);
+                  if (!context.mounted || !ok) {
+                    return;
+                  }
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('B 站登录成功')),
+                  );
+                },
+              ),
+              if (settings.isBilibiliLoggedIn)
+                _ActionRow(
+                  title: '退出 B 站登录',
+                  description: '清除后会立即要求重新扫码，才能继续使用本应用。',
+                  danger: true,
+                  icon: Icons.logout_rounded,
+                  onTap: () {
+                    ref
+                        .read(learningSettingsProvider.notifier)
+                        .clearBilibiliLogin();
+                  },
+                ),
+              _InputRow(
+                title: 'SESSDATA（高级）',
+                description: settings.bilibiliCookieFromEnv
+                    ? '已从 apps/mobile/.env 的 BILIBILI_SESSDATA / BILIBILI_COOKIE 加载；此处可覆盖。'
+                    : '也可手动粘贴 Cookie。优先使用上方扫码登录。',
+                value: settings.bilibiliSessdata,
+                hintText: settings.bilibiliCookieFromEnv
+                    ? '（已使用 .env）'
+                    : '粘贴 SESSDATA 或整段 Cookie',
+                obscureText: true,
+                onChanged: (String value) {
+                  ref
+                      .read(learningSettingsProvider.notifier)
+                      .setBilibiliSessdata(value);
+                },
+              ),
+            ],
+          ),
+          SizedBox(height: compact ? 20 : 24),
+          SettingsGroupCard(
             title: '翻译',
             icon: Icons.translate_rounded,
             children: <Widget>[
@@ -450,8 +611,14 @@ class SettingsScreen extends ConsumerWidget {
             children: <Widget>[
               Builder(
                 builder: (BuildContext context) {
+                  final bool isLocalWhisper =
+                      settings.asrProvider == LocalWhisperAsr.providerName;
                   final bool isTencentAsr = settings.asrProvider == '腾讯云';
                   final bool isAlibabaAsr = settings.asrProvider == '阿里云百炼';
+                  final String whisperModel =
+                      localWhisperModelOptions.contains(settings.asrModel)
+                      ? settings.asrModel
+                      : LocalWhisperAsr.defaultModel;
                   final ({String secretId, String secretKey})
                   tencentCredential = _splitTencentCredential(
                     settings.asrApiKey,
@@ -470,7 +637,9 @@ class SettingsScreen extends ConsumerWidget {
                       ),
                       _SelectRow(
                         title: 'ASR 来源',
-                        description: '独立于翻译 API，用于生成视频字幕。',
+                        description: isLocalWhisper
+                            ? '设备端 Whisper.cpp，无需云端 API Key。'
+                            : '独立于翻译 API，用于生成视频字幕。',
                         value: settings.asrProvider,
                         options: asrProviderOptions,
                         onChanged: (String? value) {
@@ -482,105 +651,129 @@ class SettingsScreen extends ConsumerWidget {
                               .setAsrProvider(value);
                         },
                       ),
-                      if (isTencentAsr) ...<Widget>[
-                        _InputRow(
-                          title: '腾讯云 SecretId',
-                          description: '在腾讯云访问密钥页面创建。',
-                          value: tencentCredential.secretId,
-                          hintText: 'AKIDxxxxxxxx',
-                          obscureText: true,
-                          onChanged: (String value) {
-                            ref
-                                .read(learningSettingsProvider.notifier)
-                                .setAsrApiKey(
-                                  _joinTencentCredential(
-                                    secretId: value,
-                                    secretKey: tencentCredential.secretKey,
-                                  ),
-                                );
-                          },
-                        ),
-                        _InputRow(
-                          title: '腾讯云 SecretKey',
-                          description: '与 SecretId 配套的密钥。',
-                          value: tencentCredential.secretKey,
-                          hintText: 'SECRET_KEY',
-                          obscureText: true,
-                          onChanged: (String value) {
-                            ref
-                                .read(learningSettingsProvider.notifier)
-                                .setAsrApiKey(
-                                  _joinTencentCredential(
-                                    secretId: tencentCredential.secretId,
-                                    secretKey: value,
-                                  ),
-                                );
-                          },
-                        ),
-                      ] else
-                        _InputRow(
-                          title: '百炼 API Key',
-                          description: '在阿里云百炼创建 API Key；音频仅临时上传用于转写。',
-                          value: settings.asrApiKey,
-                          hintText: 'YOUR_ASR_API_KEY_HERE',
-                          obscureText: true,
-                          onChanged: (String value) {
-                            ref
-                                .read(learningSettingsProvider.notifier)
-                                .setAsrApiKey(value);
-                          },
-                        ),
-                      if (isAlibabaAsr)
-                        _ActionRow(
-                          title: '申请百炼 API Key',
+                      if (isLocalWhisper) ...<Widget>[
+                        _SelectRow(
+                          title: 'Whisper 模型',
                           description:
-                              '1. 登录阿里云并开通百炼；2. 在 API Key 管理页创建；3. 复制到上方。',
-                          icon: Icons.open_in_new_rounded,
-                          onTap: () {
-                            openUrl(
-                              Uri.parse(
-                                'https://help.aliyun.com/zh/model-studio/get-api-key',
-                              ),
-                            );
+                              '英语课推荐 base.en；弱设备用 tiny.en；small.en 更准但更大。',
+                          value: whisperModel,
+                          options: localWhisperModelOptions,
+                          optionLabel: _whisperModelLabel,
+                          onChanged: (String? value) {
+                            if (value == null) {
+                              return;
+                            }
+                            ref
+                                .read(learningSettingsProvider.notifier)
+                                .setAsrModel(value);
                           },
                         ),
-                      _SwitchRow(
-                        title: '自定义 ASR 接口地址',
-                        description: '关闭时使用内置厂商默认 baseUrl 和 model。',
-                        value: settings.useCustomAsrEndpoint,
-                        onChanged: (bool value) {
-                          ref
-                              .read(learningSettingsProvider.notifier)
-                              .setUseCustomAsrEndpoint(value: value);
-                        },
-                      ),
-                      _InputRow(
-                        title: 'ASR Base URL',
-                        description: '默认已内置，可按需覆盖。',
-                        value: settings.asrBaseUrl,
-                        hintText: 'https://api.example.com/v1',
-                        enabled: settings.useCustomAsrEndpoint,
-                        onChanged: (String value) {
-                          ref
-                              .read(learningSettingsProvider.notifier)
-                              .setAsrBaseUrl(value);
-                        },
-                      ),
-                      _InputRow(
-                        title: 'ASR Model',
-                        description: isTencentAsr
-                            ? '腾讯英文识别使用 16k_en。'
-                            : '默认使用 qwen3-asr-flash-filetrans，提供词级时间戳。',
-                        value: settings.asrModel,
-                        hintText: isTencentAsr
-                            ? '16k_en'
-                            : 'qwen3-asr-flash-filetrans',
-                        onChanged: (String value) {
-                          ref
-                              .read(learningSettingsProvider.notifier)
-                              .setAsrModel(value);
-                        },
-                      ),
+                        _LocalWhisperModelStatusRow(modelId: whisperModel),
+                      ] else ...<Widget>[
+                        if (isTencentAsr) ...<Widget>[
+                          _InputRow(
+                            title: '腾讯云 SecretId',
+                            description: '在腾讯云访问密钥页面创建。',
+                            value: tencentCredential.secretId,
+                            hintText: 'AKIDxxxxxxxx',
+                            obscureText: true,
+                            onChanged: (String value) {
+                              ref
+                                  .read(learningSettingsProvider.notifier)
+                                  .setAsrApiKey(
+                                    _joinTencentCredential(
+                                      secretId: value,
+                                      secretKey: tencentCredential.secretKey,
+                                    ),
+                                  );
+                            },
+                          ),
+                          _InputRow(
+                            title: '腾讯云 SecretKey',
+                            description: '与 SecretId 配套的密钥。',
+                            value: tencentCredential.secretKey,
+                            hintText: 'SECRET_KEY',
+                            obscureText: true,
+                            onChanged: (String value) {
+                              ref
+                                  .read(learningSettingsProvider.notifier)
+                                  .setAsrApiKey(
+                                    _joinTencentCredential(
+                                      secretId: tencentCredential.secretId,
+                                      secretKey: value,
+                                    ),
+                                  );
+                            },
+                          ),
+                        ] else
+                          _InputRow(
+                            title: '百炼 API Key',
+                            description: settings.asrApiKeyFromEnv
+                                ? '已从 apps/mobile/.env 的 BAILIAN_ASR_API_KEY 加载；此处可覆盖。'
+                                : '优先写在 apps/mobile/.env（BAILIAN_ASR_API_KEY）；也可在此临时填写。',
+                            value: settings.asrApiKey,
+                            hintText: settings.asrApiKeyFromEnv
+                                ? '（已使用 .env）'
+                                : 'YOUR_ASR_API_KEY_HERE',
+                            obscureText: true,
+                            onChanged: (String value) {
+                              ref
+                                  .read(learningSettingsProvider.notifier)
+                                  .setAsrApiKey(value);
+                            },
+                          ),
+                        if (isAlibabaAsr)
+                          _ActionRow(
+                            title: '申请百炼 API Key',
+                            description:
+                                '1. 登录阿里云并开通百炼；2. 在 API Key 管理页创建；3. 复制到上方。',
+                            icon: Icons.open_in_new_rounded,
+                            onTap: () {
+                              openUrl(
+                                Uri.parse(
+                                  'https://help.aliyun.com/zh/model-studio/get-api-key',
+                                ),
+                              );
+                            },
+                          ),
+                        _SwitchRow(
+                          title: '自定义 ASR 接口地址',
+                          description: '关闭时使用内置厂商默认 baseUrl 和 model。',
+                          value: settings.useCustomAsrEndpoint,
+                          onChanged: (bool value) {
+                            ref
+                                .read(learningSettingsProvider.notifier)
+                                .setUseCustomAsrEndpoint(value: value);
+                          },
+                        ),
+                        _InputRow(
+                          title: 'ASR Base URL',
+                          description: '默认已内置，可按需覆盖。',
+                          value: settings.asrBaseUrl,
+                          hintText: 'https://api.example.com/v1',
+                          enabled: settings.useCustomAsrEndpoint,
+                          onChanged: (String value) {
+                            ref
+                                .read(learningSettingsProvider.notifier)
+                                .setAsrBaseUrl(value);
+                          },
+                        ),
+                        _InputRow(
+                          title: 'ASR Model',
+                          description: isTencentAsr
+                              ? '腾讯英文识别使用 16k_en。'
+                              : '默认使用 qwen3-asr-flash-filetrans，提供词级时间戳。',
+                          value: settings.asrModel,
+                          hintText: isTencentAsr
+                              ? '16k_en'
+                              : 'qwen3-asr-flash-filetrans',
+                          onChanged: (String value) {
+                            ref
+                                .read(learningSettingsProvider.notifier)
+                                .setAsrModel(value);
+                          },
+                        ),
+                      ],
                     ],
                   );
                 },
@@ -656,7 +849,10 @@ class SettingsScreen extends ConsumerWidget {
                 loading: () => '当前版本',
                 error: (_, _) => '当前版本未知',
               ),
-              style: const TextStyle(fontSize: 12, color: Color(0xFF8C9890)),
+              style: TextStyle(
+                fontSize: 12,
+                color: AppDesignTokens.textSecondary,
+              ),
             ),
           ),
         ],
@@ -780,6 +976,137 @@ String _joinTencentCredential({
   return '$id:$key';
 }
 
+String _whisperModelLabel(String modelId) {
+  switch (modelId) {
+    case 'tiny.en':
+      return 'tiny.en（最快）';
+    case 'base.en':
+      return 'base.en（默认）';
+    case 'small.en':
+      return 'small.en（更准）';
+    default:
+      return modelId;
+  }
+}
+
+class _LocalWhisperModelStatusRow extends StatefulWidget {
+  const _LocalWhisperModelStatusRow({required this.modelId});
+
+  final String modelId;
+
+  @override
+  State<_LocalWhisperModelStatusRow> createState() =>
+      _LocalWhisperModelStatusRowState();
+}
+
+class _LocalWhisperModelStatusRowState
+    extends State<_LocalWhisperModelStatusRow> {
+  bool _ready = false;
+  bool _busy = false;
+  String _status = '正在检查模型…';
+  double? _progress;
+
+  @override
+  void initState() {
+    super.initState();
+    unawaited(_refresh());
+  }
+
+  @override
+  void didUpdateWidget(covariant _LocalWhisperModelStatusRow oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.modelId != widget.modelId) {
+      unawaited(_refresh());
+    }
+  }
+
+  Future<void> _refresh() async {
+    setState(() {
+      _busy = false;
+      _progress = null;
+      _status = '正在检查 ${widget.modelId}…';
+    });
+    final String modelId = widget.modelId;
+    final bool ready = await LocalWhisperAsr.instance.isModelReady(modelId);
+    if (!mounted || widget.modelId != modelId) {
+      return;
+    }
+    setState(() {
+      _ready = ready;
+      _status = ready
+          ? '$modelId 已就绪，可直接生成字幕'
+          : '$modelId 未下载，首次识别时会自动下载';
+    });
+  }
+
+  Future<void> _download() async {
+    if (_busy) {
+      return;
+    }
+    setState(() {
+      _busy = true;
+      _progress = null;
+      _status = '正在下载 ${widget.modelId}…';
+    });
+    try {
+      await LocalWhisperAsr.instance.ensureModel(
+        widget.modelId,
+        onProgress: (double? fraction, String message) {
+          if (!mounted) {
+            return;
+          }
+          setState(() {
+            _progress = fraction;
+            _status = message;
+          });
+        },
+      );
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _ready = true;
+        _busy = false;
+        _progress = 1;
+        _status = '${widget.modelId} 已就绪，可直接生成字幕';
+      });
+    } catch (error) {
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _busy = false;
+        _progress = null;
+        _status = error.toString().replaceFirst(RegExp(r'^Bad state:\s*'), '');
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final String title = _ready
+        ? '模型已下载'
+        : (_busy ? '正在下载模型' : '下载 Whisper 模型');
+    return Column(
+      children: <Widget>[
+        _ActionRow(
+          title: title,
+          description: _status,
+          icon: _ready
+              ? Icons.check_circle_outline_rounded
+              : Icons.download_rounded,
+          onTap: _ready || _busy ? () {} : _download,
+        ),
+        if (_busy)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+            child: LinearProgressIndicator(value: _progress),
+          ),
+      ],
+    );
+  }
+}
+
 class _ModelFetchRow extends StatelessWidget {
   const _ModelFetchRow({
     this.title = '获取模型',
@@ -853,39 +1180,36 @@ class _TtsEngineRow extends StatelessWidget {
             ),
           ),
           const SizedBox(width: 16),
-          DecoratedBox(
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(14),
-              border: Border.all(color: const Color(0xFFB9CDBE)),
-            ),
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 14),
-              child: DropdownButtonHideUnderline(
-                child: DropdownButton<String>(
-                  value: value,
-                  borderRadius: BorderRadius.circular(16),
-                  icon: const Icon(
-                    Icons.keyboard_arrow_down_rounded,
-                    color: Color(0xFF53625A),
-                  ),
-                  items: <DropdownMenuItem<String>>[
-                    DropdownMenuItem<String>(
-                      value: '',
-                      child: Text(_systemDefaultLabel(engines)),
-                    ),
-                    for (final TtsEngineOption engine in engines)
-                      DropdownMenuItem<String>(
-                        value: engine.id,
-                        child: Text(
-                          engine.isDefault
-                              ? '${engine.label}（当前系统）'
-                              : engine.label,
-                        ),
-                      ),
-                  ],
-                  onChanged: isLoading ? null : onChanged,
+          _SettingsSelectShell(
+            child: DropdownButtonHideUnderline(
+              child: DropdownButton<String>(
+                value: value,
+                borderRadius: BorderRadius.circular(16),
+                dropdownColor: AppDesignTokens.appWhite,
+                style: TextStyle(
+                  color: AppDesignTokens.textPrimary,
+                  fontWeight: FontWeight.w600,
                 ),
+                icon: Icon(
+                  Icons.keyboard_arrow_down_rounded,
+                  color: AppDesignTokens.textSecondary,
+                ),
+                items: <DropdownMenuItem<String>>[
+                  DropdownMenuItem<String>(
+                    value: '',
+                    child: Text(_systemDefaultLabel(engines)),
+                  ),
+                  for (final TtsEngineOption engine in engines)
+                    DropdownMenuItem<String>(
+                      value: engine.id,
+                      child: Text(
+                        engine.isDefault
+                            ? '${engine.label}（当前系统）'
+                            : engine.label,
+                      ),
+                    ),
+                ],
+                onChanged: isLoading ? null : onChanged,
               ),
             ),
           ),
@@ -1004,28 +1328,26 @@ class _TtsVoiceRowState extends ConsumerState<_TtsVoiceRow> {
       title: '英语朗读音色',
       description: widget.isLoading ? '正在读取当前引擎的英语音色。' : '选择后可试听，使用下方设置的朗读速度。',
     );
-    final Widget dropdown = DecoratedBox(
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: const Color(0xFFB9CDBE)),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 14),
-        child: DropdownButtonHideUnderline(
-          child: DropdownButton<String>(
-            value: value,
-            isExpanded: true,
-            borderRadius: BorderRadius.circular(16),
-            icon: const Icon(
-              Icons.keyboard_arrow_down_rounded,
-              color: Color(0xFF53625A),
+    final Widget dropdown = _SettingsSelectShell(
+      child: DropdownButtonHideUnderline(
+        child: DropdownButton<String>(
+          value: value,
+          isExpanded: true,
+          borderRadius: BorderRadius.circular(16),
+          dropdownColor: AppDesignTokens.appWhite,
+          style: TextStyle(
+            color: AppDesignTokens.textPrimary,
+            fontWeight: FontWeight.w600,
+          ),
+          icon: Icon(
+            Icons.keyboard_arrow_down_rounded,
+            color: AppDesignTokens.textSecondary,
+          ),
+          items: <DropdownMenuItem<String>>[
+            const DropdownMenuItem<String>(
+              value: '',
+              child: Text('自动选择（优先高质量）'),
             ),
-            items: <DropdownMenuItem<String>>[
-              const DropdownMenuItem<String>(
-                value: '',
-                child: Text('自动选择（优先高质量）'),
-              ),
               for (final TtsVoiceOption voice in voices)
                 DropdownMenuItem<String>(
                   value: voice.id,
@@ -1039,7 +1361,6 @@ class _TtsVoiceRowState extends ConsumerState<_TtsVoiceRow> {
             onChanged: widget.isLoading ? null : widget.onChanged,
           ),
         ),
-      ),
     );
     final Widget preview = OutlinedButton.icon(
       key: const Key('tts-voice-preview'),
@@ -1116,35 +1437,32 @@ class _SubtitleWordHighlightBorderWidthRow extends StatelessWidget {
             ),
           ),
           const SizedBox(width: 16),
-          DecoratedBox(
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(14),
-              border: Border.all(color: const Color(0xFFB9CDBE)),
-            ),
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 14),
-              child: DropdownButtonHideUnderline(
-                child: DropdownButton<double>(
-                  value: value,
-                  borderRadius: BorderRadius.circular(16),
-                  icon: const Icon(
-                    Icons.keyboard_arrow_down_rounded,
-                    color: Color(0xFF53625A),
-                  ),
-                  items: _options.entries
-                      .map(
-                        (MapEntry<double, String> entry) =>
-                            DropdownMenuItem<double>(
-                              value: entry.key,
-                              child: Text(entry.value),
-                            ),
-                      )
-                      .toList(growable: false),
-                  onChanged: (double? nextValue) {
-                    if (nextValue != null) onChanged(nextValue);
-                  },
+          _SettingsSelectShell(
+            child: DropdownButtonHideUnderline(
+              child: DropdownButton<double>(
+                value: value,
+                borderRadius: BorderRadius.circular(16),
+                dropdownColor: AppDesignTokens.appWhite,
+                style: TextStyle(
+                  color: AppDesignTokens.textPrimary,
+                  fontWeight: FontWeight.w600,
                 ),
+                icon: Icon(
+                  Icons.keyboard_arrow_down_rounded,
+                  color: AppDesignTokens.textSecondary,
+                ),
+                items: _options.entries
+                    .map(
+                      (MapEntry<double, String> entry) =>
+                          DropdownMenuItem<double>(
+                            value: entry.key,
+                            child: Text(entry.value),
+                          ),
+                    )
+                    .toList(growable: false),
+                onChanged: (double? nextValue) {
+                  if (nextValue != null) onChanged(nextValue);
+                },
               ),
             ),
           ),
@@ -1174,34 +1492,31 @@ class _TtsRateRow extends StatelessWidget {
             ),
           ),
           const SizedBox(width: 16),
-          DecoratedBox(
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(14),
-              border: Border.all(color: const Color(0xFFB9CDBE)),
-            ),
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 14),
-              child: DropdownButtonHideUnderline(
-                child: DropdownButton<double>(
-                  value: value,
-                  borderRadius: BorderRadius.circular(16),
-                  icon: const Icon(
-                    Icons.keyboard_arrow_down_rounded,
-                    color: Color(0xFF53625A),
-                  ),
-                  items: _rates
-                      .map(
-                        (double rate) => DropdownMenuItem<double>(
-                          value: rate,
-                          child: Text('$rate×'),
-                        ),
-                      )
-                      .toList(growable: false),
-                  onChanged: (double? nextValue) {
-                    if (nextValue != null) onChanged(nextValue);
-                  },
+          _SettingsSelectShell(
+            child: DropdownButtonHideUnderline(
+              child: DropdownButton<double>(
+                value: value,
+                borderRadius: BorderRadius.circular(16),
+                dropdownColor: AppDesignTokens.appWhite,
+                style: TextStyle(
+                  color: AppDesignTokens.textPrimary,
+                  fontWeight: FontWeight.w600,
                 ),
+                icon: Icon(
+                  Icons.keyboard_arrow_down_rounded,
+                  color: AppDesignTokens.textSecondary,
+                ),
+                items: _rates
+                    .map(
+                      (double rate) => DropdownMenuItem<double>(
+                        value: rate,
+                        child: Text('$rate×'),
+                      ),
+                    )
+                    .toList(growable: false),
+                onChanged: (double? nextValue) {
+                  if (nextValue != null) onChanged(nextValue);
+                },
               ),
             ),
           ),
@@ -1247,25 +1562,31 @@ class _InputRow extends StatelessWidget {
             obscureText: obscureText,
             keyboardType: keyboardType,
             onChanged: onChanged,
+            style: TextStyle(color: AppDesignTokens.textPrimary),
             decoration: InputDecoration(
               hintText: hintText,
+              hintStyle: TextStyle(color: AppDesignTokens.textSecondary),
               filled: true,
-              fillColor: enabled ? Colors.white : const Color(0xFFF3F6F4),
+              fillColor: enabled
+                  ? (AppDesignTokens.isDark
+                        ? AppDesignTokens.softGray
+                        : Colors.white)
+                  : AppDesignTokens.softGray,
               contentPadding: const EdgeInsets.symmetric(
                 horizontal: 14,
                 vertical: 14,
               ),
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(14),
-                borderSide: const BorderSide(color: Color(0xFFB9CDBE)),
+                borderSide: BorderSide(color: AppDesignTokens.borderGray),
               ),
               enabledBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(14),
-                borderSide: const BorderSide(color: Color(0xFFB9CDBE)),
+                borderSide: BorderSide(color: AppDesignTokens.borderGray),
               ),
               disabledBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(14),
-                borderSide: const BorderSide(color: Color(0xFFD4DDD7)),
+                borderSide: BorderSide(color: AppDesignTokens.borderGray),
               ),
             ),
           ),
@@ -1301,32 +1622,29 @@ class _SelectRow extends StatelessWidget {
             child: _TitleBlock(title: title, description: description),
           ),
           const SizedBox(width: 16),
-          DecoratedBox(
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(14),
-              border: Border.all(color: const Color(0xFFB9CDBE)),
-            ),
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 14),
-              child: DropdownButtonHideUnderline(
-                child: DropdownButton<String>(
-                  value: value,
-                  borderRadius: BorderRadius.circular(16),
-                  icon: const Icon(
-                    Icons.keyboard_arrow_down_rounded,
-                    color: Color(0xFF53625A),
-                  ),
-                  items: options
-                      .map((String item) {
-                        return DropdownMenuItem<String>(
-                          value: item,
-                          child: Text(optionLabel?.call(item) ?? item),
-                        );
-                      })
-                      .toList(growable: false),
-                  onChanged: onChanged,
+          _SettingsSelectShell(
+            child: DropdownButtonHideUnderline(
+              child: DropdownButton<String>(
+                value: value,
+                borderRadius: BorderRadius.circular(16),
+                dropdownColor: AppDesignTokens.appWhite,
+                style: TextStyle(
+                  color: AppDesignTokens.textPrimary,
+                  fontWeight: FontWeight.w600,
                 ),
+                icon: Icon(
+                  Icons.keyboard_arrow_down_rounded,
+                  color: AppDesignTokens.textSecondary,
+                ),
+                items: options
+                    .map((String item) {
+                      return DropdownMenuItem<String>(
+                        value: item,
+                        child: Text(optionLabel?.call(item) ?? item),
+                      );
+                    })
+                    .toList(growable: false),
+                onChanged: onChanged,
               ),
             ),
           ),
@@ -1374,9 +1692,13 @@ class _SwitchRow extends StatelessWidget {
                 if (states.contains(WidgetState.selected)) {
                   return const Color(0xFF0F7A43);
                 }
-                return const Color(0xFFE4E8E4);
+                return AppDesignTokens.isDark
+                    ? AppDesignTokens.softGray
+                    : const Color(0xFFE4E8E4);
               }),
-              thumbColor: WidgetStateProperty.all<Color>(Colors.white),
+              thumbColor: WidgetStateProperty.all<Color>(
+                AppDesignTokens.onAccent,
+              ),
             ),
             child: Switch(value: value, onChanged: onChanged),
           ),
@@ -1405,13 +1727,13 @@ class _ActionRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final Color titleColor = danger
         ? const Color(0xFFC62828)
-        : const Color(0xFF191C1E);
+        : AppDesignTokens.textPrimary;
     final Color descColor = danger
         ? const Color(0xFFD86A6A)
-        : const Color(0xFF53625A);
+        : AppDesignTokens.textSecondary;
     final Color iconColor = danger
         ? const Color(0xFFC62828)
-        : const Color(0xFF8C9890);
+        : AppDesignTokens.textSecondary;
 
     return InkWell(
       onTap: onTap,
@@ -1479,18 +1801,50 @@ class _TitleBlock extends StatelessWidget {
       children: <Widget>[
         Text(
           title,
-          style: const TextStyle(
+          style: TextStyle(
             fontSize: 14,
             fontWeight: FontWeight.w700,
-            color: Color(0xFF191C1E),
+            color: AppDesignTokens.textPrimary,
           ),
         ),
         const SizedBox(height: 3),
         Text(
           description,
-          style: const TextStyle(fontSize: 12, color: Color(0xFF53625A)),
+          style: TextStyle(
+            fontSize: 12,
+            color: AppDesignTokens.textSecondary,
+          ),
         ),
       ],
+    );
+  }
+}
+
+class _SettingsSelectShell extends StatelessWidget {
+  const _SettingsSelectShell({required this.child});
+
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: AppDesignTokens.isDark
+            ? AppDesignTokens.softGray
+            : Colors.white,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: AppDesignTokens.borderGray),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 14),
+        child: Theme(
+          data: Theme.of(context).copyWith(
+            canvasColor: AppDesignTokens.appWhite,
+            highlightColor: AppDesignTokens.softGray,
+          ),
+          child: child,
+        ),
+      ),
     );
   }
 }

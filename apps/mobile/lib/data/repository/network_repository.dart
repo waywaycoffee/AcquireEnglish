@@ -64,6 +64,10 @@ class NetworkRepository extends _$NetworkRepository {
     ref.cacheFor(const Duration(days: 1));
   }
 
+  void clearToken() {
+    state.options.headers.remove('Authorization');
+  }
+
   Future<Response<T>> get<T>(
     String path, {
     Map<String, dynamic>? queryParameters,
