@@ -414,6 +414,121 @@ void main() {
     expect(rebuilt.single.chinese, '大家好');
   });
 
+  test('workingEnglishMismatchesAsr keeps timeline when only 1/3 cues disagree', () {
+    final List<PlayerSubtitleLine> working = <PlayerSubtitleLine>[
+      const PlayerSubtitleLine(
+        startTime: '00:01',
+        english: 'Hello everyone',
+        chinese: '大家好',
+        startMs: 1000,
+        endMs: 3000,
+      ),
+      const PlayerSubtitleLine(
+        startTime: '00:03',
+        english: 'Welcome back',
+        chinese: '欢迎回来',
+        startMs: 3000,
+        endMs: 5000,
+      ),
+      const PlayerSubtitleLine(
+        startTime: '00:05',
+        english: 'Wrong paraphrase three',
+        chinese: '错三',
+        startMs: 5000,
+        endMs: 7000,
+      ),
+    ];
+    final List<PlayerSubtitleLine> asr = <PlayerSubtitleLine>[
+      const PlayerSubtitleLine(
+        startTime: '00:01',
+        english: 'Hello everyone',
+        chinese: '',
+        startMs: 1000,
+        endMs: 3000,
+      ),
+      const PlayerSubtitleLine(
+        startTime: '00:03',
+        english: 'Welcome back',
+        chinese: '',
+        startMs: 3000,
+        endMs: 5000,
+      ),
+      const PlayerSubtitleLine(
+        startTime: '00:05',
+        english: 'Lets begin now',
+        chinese: '',
+        startMs: 5000,
+        endMs: 7000,
+      ),
+    ];
+    // 1/3 = 33% < 40% ratio — fuse per-cue, do not wholesale rebuild.
+    expect(
+      workingEnglishMismatchesAsr(working: working, asrLines: asr),
+      isFalse,
+    );
+    final List<PlayerSubtitleLine> fused = fuseOcrWithAsrLines(
+      working: working,
+      asrLines: asr,
+    );
+    expect(fused[0].english, 'Hello everyone');
+    expect(fused[1].english, 'Welcome back');
+    expect(fused[2].english, 'Lets begin now');
+    expect(fused[2].chinese, '错三');
+  });
+
+  test('workingEnglishMismatchesAsr rebuilds when 2/3 cues disagree', () {
+    final List<PlayerSubtitleLine> working = <PlayerSubtitleLine>[
+      const PlayerSubtitleLine(
+        startTime: '00:01',
+        english: 'Hello everyone',
+        chinese: '大家好',
+        startMs: 1000,
+        endMs: 3000,
+      ),
+      const PlayerSubtitleLine(
+        startTime: '00:03',
+        english: 'Wrong paraphrase two',
+        chinese: '错二',
+        startMs: 3000,
+        endMs: 5000,
+      ),
+      const PlayerSubtitleLine(
+        startTime: '00:05',
+        english: 'Wrong paraphrase three',
+        chinese: '错三',
+        startMs: 5000,
+        endMs: 7000,
+      ),
+    ];
+    final List<PlayerSubtitleLine> asr = <PlayerSubtitleLine>[
+      const PlayerSubtitleLine(
+        startTime: '00:01',
+        english: 'Hello everyone',
+        chinese: '',
+        startMs: 1000,
+        endMs: 3000,
+      ),
+      const PlayerSubtitleLine(
+        startTime: '00:03',
+        english: 'Welcome back',
+        chinese: '',
+        startMs: 3000,
+        endMs: 5000,
+      ),
+      const PlayerSubtitleLine(
+        startTime: '00:05',
+        english: 'Lets begin now',
+        chinese: '',
+        startMs: 5000,
+        endMs: 7000,
+      ),
+    ];
+    expect(
+      workingEnglishMismatchesAsr(working: working, asrLines: asr),
+      isTrue,
+    );
+  });
+
   test('workingEnglishMismatchesAsr ignores clipped ASR fragment of fuller line', () {
     final List<PlayerSubtitleLine> working = <PlayerSubtitleLine>[
       const PlayerSubtitleLine(
