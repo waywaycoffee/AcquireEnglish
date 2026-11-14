@@ -76,7 +76,9 @@ class LearningStore:
                   status TEXT NOT NULL,
                   created_at TEXT NOT NULL,
                   turns_json TEXT NOT NULL DEFAULT '[]',
-                  feedback_json TEXT
+                  feedback_json TEXT,
+                  user_id INTEGER,
+                  context_json TEXT
                 );
                 CREATE TABLE IF NOT EXISTS wrong_items (
                   id TEXT PRIMARY KEY,
@@ -115,6 +117,14 @@ class LearningStore:
                         task.current_english,
                     ),
                 )
+            cols = {
+                row['name']
+                for row in conn.execute('PRAGMA table_info(sessions)').fetchall()
+            }
+            if 'user_id' not in cols:
+                conn.execute('ALTER TABLE sessions ADD COLUMN user_id INTEGER')
+            if 'context_json' not in cols:
+                conn.execute('ALTER TABLE sessions ADD COLUMN context_json TEXT')
 
     def list_tasks(self) -> list[TaskDefinition]:
         with self._connect() as conn:
@@ -136,6 +146,7 @@ class LearningStore:
         self,
         task_id: str,
         *,
+        user_id: int,
         course_title: str = '',
         current_english: str = '',
     ) -> PracticeSession:
@@ -144,23 +155,38 @@ class LearningStore:
             raise KeyError(f'unknown task: {task_id}')
         sid = uuid.uuid4().hex
         now = utcnow()
-        if task_id == 'video_line' and (course_title or current_english):
-            with self._connect() as conn:
-                conn.execute(
-                    'UPDATE tasks SET course_title=?, current_english=? WHERE id=?',
-                    (course_title, current_english, task_id),
-                )
+        # Keep video line context on the session — never mutate the shared seed task.
+        context = json.dumps(
+            {
+                'course_title': course_title or '',
+                'current_english': current_english or '',
+            },
+            ensure_ascii=False,
+        )
         with self._connect() as conn:
             conn.execute(
-                'INSERT INTO sessions(id,task_id,status,created_at,turns_json) VALUES(?,?,?,?,?)',
-                (sid, task_id, 'active', now.isoformat(), '[]'),
+                'INSERT INTO sessions(id,task_id,status,created_at,turns_json,user_id,context_json) '
+                'VALUES(?,?,?,?,?,?,?)',
+                (sid, task_id, 'active', now.isoformat(), '[]', user_id, context),
             )
         return PracticeSession(id=sid, task_id=task_id, created_at=now)
+
+    def _require_session(self, conn: sqlite3.Connection, session_id: str, user_id: int):
+        row = conn.execute(
+            'SELECT * FROM sessions WHERE id=?', (session_id,)
+        ).fetchone()
+        if row is None:
+            raise KeyError(session_id)
+        owner = row['user_id']
+        if owner is not None and int(owner) != int(user_id):
+            raise KeyError(session_id)
+        return row
 
     def append_turn(
         self,
         session_id: str,
         *,
+        user_id: int,
         role: str,
         text: str,
         machine_transcript: str | None = None,
@@ -168,11 +194,7 @@ class LearningStore:
         scores: dict | None = None,
     ) -> None:
         with self._connect() as conn:
-            row = conn.execute(
-                'SELECT turns_json, status FROM sessions WHERE id=?', (session_id,)
-            ).fetchone()
-            if row is None:
-                raise KeyError(session_id)
+            row = self._require_session(conn, session_id, user_id)
             if row['status'] == 'closed':
                 raise RuntimeError('session closed')
             turns = json.loads(row['turns_json'])
@@ -195,13 +217,11 @@ class LearningStore:
         self,
         session_id: str,
         candidates: list[FeedbackItem],
+        *,
+        user_id: int,
     ) -> list[FeedbackItem]:
         with self._connect() as conn:
-            row = conn.execute(
-                'SELECT turns_json FROM sessions WHERE id=?', (session_id,)
-            ).fetchone()
-            if row is None:
-                raise KeyError(session_id)
+            row = self._require_session(conn, session_id, user_id)
             turns = json.loads(row['turns_json'])
         user_texts = [
             t['text']

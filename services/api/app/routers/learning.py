@@ -66,10 +66,11 @@ async def tasks(_: User = Depends(get_current_user)) -> list[dict]:
 
 
 @router.post("/sessions")
-async def start_session(body: StartIn, _: User = Depends(get_current_user)) -> dict:
+async def start_session(body: StartIn, user: User = Depends(get_current_user)) -> dict:
     try:
         session = get_store().start_session(
             body.task_id,
+            user_id=user.id,
             course_title=body.course_title,
             current_english=body.current_english,
         )
@@ -87,11 +88,12 @@ async def start_session(body: StartIn, _: User = Depends(get_current_user)) -> d
 async def append_turn(
     session_id: str,
     body: TurnIn,
-    _: User = Depends(get_current_user),
+    user: User = Depends(get_current_user),
 ) -> dict:
     try:
         get_store().append_turn(
             session_id,
+            user_id=user.id,
             role=body.role,
             text=body.text,
             machine_transcript=body.machine_transcript,
@@ -109,7 +111,7 @@ async def append_turn(
 async def finalize_feedback(
     session_id: str,
     body: FeedbackIn,
-    _: User = Depends(get_current_user),
+    user: User = Depends(get_current_user),
 ) -> dict:
     candidates = [
         FeedbackItem(
@@ -120,7 +122,9 @@ async def finalize_feedback(
         for i in body.items
     ]
     try:
-        verified = get_store().finalize_feedback(session_id, candidates)
+        verified = get_store().finalize_feedback(
+            session_id, candidates, user_id=user.id
+        )
     except KeyError:
         raise HTTPException(404, "session not found") from None
     return {"items": [i.__dict__ for i in verified], "count": len(verified)}
