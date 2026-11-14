@@ -106,7 +106,8 @@ class SubtitleCompletionWorker {
         onProgress: onProgress,
         cancellationToken: cancellationToken,
       );
-      // Persist may leave a sparse side (partial EN→ZH). Re-queue before done.
+      // Persist may leave a sparse side (partial EN→ZH). Count as a failed
+      // attempt so retries stay bounded by maxAttempts instead of looping forever.
       final ({bool needEnglish, bool needChinese})? still =
           await _remainingNeedAfterJob(job);
       if (still != null && (still.needEnglish || still.needChinese)) {
@@ -120,7 +121,8 @@ class SubtitleCompletionWorker {
           needChinese: still.needChinese,
           force: true,
         );
-        onProgress?.call(job.episodeId, '字幕仍不完整，已重新排队');
+        await queue.markFailed(job.episodeId, '补全后字幕仍不完整');
+        onProgress?.call(job.episodeId, '字幕仍不完整，将有限次重试');
         return true;
       }
       await queue.markDone(job.episodeId);
