@@ -5,7 +5,10 @@
 - API：`https://acquireenglish.curlhairai.com`
 - oral_coach：`https://acquireenglish.curlhairai.com/coach`
 
-本机（5060 Ti）只跑 **LiveKit Agent worker**，不需要再部署整站。
+本机（5060 Ti）跑 **LiveKit Agent worker** + **LiveTalking 数字人**（`:8010`）。  
+经 **Tailscale** 穿透：本机 `100.115.252.55`（MagicDNS `5060ti.tailc30b42.ts.net`）。  
+ECS oral_coach 的 `LIVETALKING_URL` 应设为 `http://100.115.252.55:8010`（ECS 已在同一 tailnet）。  
+App「LiveTalking / 数字人地址」填同一地址；手机也需登录 Tailscale。
 
 ## 1. 拉取仓库
 
@@ -63,6 +66,27 @@ curl -fsS https://acquireenglish.curlhairai.com/api/livekit/status
 ```
 
 保持该进程在线。Cloud 控制台应能看到 worker `acquire-oral-coach`。
+
+### Windows 本机持久化（推荐）
+
+```powershell
+# 前台一次启动
+powershell -File tools/digital_human_coach/scripts/run_agent.ps1
+
+# 注册登录/开机自启 + 崩溃自动重启（计划任务）
+powershell -ExecutionPolicy Bypass -File tools/digital_human_coach/scripts/install_agent_autostart.ps1
+Start-ScheduledTask -TaskName AcquireEnglish-LiveKit-Agent
+```
+
+### Linux systemd（可选）
+
+仓库提供 `deploy/acquireenglish-livekit-agent.service`（工作目录 `/opt/acquireenglish/tools/digital_human_coach`）。在已有 venv + `.env` 的机器上：
+
+```bash
+sudo cp deploy/acquireenglish-livekit-agent.service /etc/systemd/system/
+sudo systemctl daemon-reload
+sudo systemctl enable --now acquireenglish-livekit-agent
+```
 
 ## 5. App
 

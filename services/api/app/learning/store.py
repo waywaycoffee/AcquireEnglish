@@ -267,7 +267,8 @@ class LearningStore:
 
     def save_expression_for_review(self, expression: str, source_quote: str) -> ReviewItem:
         rid = uuid.uuid4().hex
-        due = utcnow() + timedelta(days=1)
+        # First review is due immediately; successful complete_review advances SRS.
+        due = utcnow()
         item = ReviewItem(
             id=rid,
             expression=expression.strip(),

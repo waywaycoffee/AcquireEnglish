@@ -247,7 +247,15 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab> {
           modeNote = 'HTTP 管线（LiveKit 未连上：${_pretty(error)}）';
         }
       }
-      final String liveUrl = settings.oralCoachServerUrl.trim();
+      String liveUrl = settings.oralCoachServerUrl.trim();
+      if (liveUrl.isEmpty) {
+        try {
+          final Map<String, dynamic> health = await _pipelineClient.health(
+            settings.oralCoachPipelineUrl,
+          );
+          liveUrl = '${health['livetalking_url'] ?? ''}'.trim();
+        } catch (_) {}
+      }
       if (liveUrl.isNotEmpty && !_liveClient.isConnected) {
         await _connectLiveTalking(liveUrl);
       }
@@ -422,7 +430,9 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab> {
           ? turn.livetalkingUrl
           : settings.oralCoachServerUrl.trim();
       bool avatarSpoke = false;
-      if (turn.avatarAction == 'livetalking_human' && avatarUrl.isNotEmpty) {
+      final bool wantsLiveTalking =
+          turn.avatarAction.startsWith('livetalking') && avatarUrl.isNotEmpty;
+      if (wantsLiveTalking) {
         if (!_liveClient.isConnected) {
           await _connectLiveTalking(avatarUrl);
         }

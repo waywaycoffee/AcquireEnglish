@@ -43,14 +43,14 @@ cd tools/oral_coach
 
 ```bash
 ASR_PROVIDER=mock          # whisperx | deepgram | mock
-PRON_PROVIDER=mock         # wav2vec2 | phoneme | mock
-LLM_PROVIDER=mock          # openai | ollama | mock
+PRON_PROVIDER=simple       # simple | phoneme | http | wav2vec2 | mock
+LLM_PROVIDER=mock          # deepseek | openai | ollama | mock
 TTS_PROVIDER=mock          # xtts | fishspeech | edge | mock
 AVATAR_PROVIDER=livetalking  # none | livetalking | musetalk | liveportrait
 LIVETALKING_URL=http://127.0.0.1:8010
 ```
 
-非 mock 实现多为 **adapter 壳**：填 API Key / 本机服务地址后启用；权重与模型需自行安装（见各 `providers/*/README` 注释）。
+`PRON_PROVIDER=simple` 为默认真分（词重叠 + 序列 Levenshtein，无需 GPU）。非 simple 实现多为 **adapter 壳**：填 API Key / 本机服务地址后启用。
 
 ## 与 App
 

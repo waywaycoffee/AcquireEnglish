@@ -57,9 +57,9 @@ def health() -> dict[str, Any]:
         'livetalking_url': settings.livetalking_url,
         'stack': {
             'asr': 'WhisperX / Deepgram / mock',
-            'pronunciation': 'wav2vec2 / phoneme / mock',
-            'llm': 'openai / ollama / mock',
-            'tts': 'xtts / fishspeech / edge / mock',
+            'pronunciation': 'simple / phoneme / http / wav2vec2',
+            'llm': 'deepseek / openai / ollama / mock',
+            'tts': 'edge / xtts / fishspeech / mock',
             'avatar': 'livetalking / musetalk / liveportrait / none',
         },
     }
@@ -71,8 +71,8 @@ def providers() -> dict[str, Any]:
         'active': pipeline.provider_map(),
         'options': {
             'asr': ['mock', 'whisperx', 'deepgram'],
-            'pronunciation': ['mock', 'wav2vec2', 'phoneme'],
-            'llm': ['mock', 'openai', 'ollama'],
+            'pronunciation': ['simple', 'phoneme', 'http', 'wav2vec2', 'mock'],
+            'llm': ['mock', 'openai', 'deepseek', 'ollama'],
             'tts': ['mock', 'xtts', 'fishspeech', 'edge'],
             'avatar': ['none', 'livetalking', 'musetalk', 'liveportrait'],
         },

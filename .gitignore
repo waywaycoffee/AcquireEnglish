@@ -45,3 +45,18 @@ analyze_out.txt
 
 # TypeScript incremental
 **/tsconfig.tsbuildinfo
+
+# Local secrets
+.env
+.env.local
+deploy/_qa_web_creds.json
+**/*credentials*
+**/*SESSDATA*
+
+# Local deploy / vendor artifacts (do not push)
+_acquireenglish_deploy.tar.gz
+_deploy_stage/
+deploy/wheels/
+deploy/_openapi_prod.json
+third_party/LiveTalking/
+

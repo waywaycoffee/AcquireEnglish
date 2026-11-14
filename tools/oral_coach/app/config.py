@@ -24,7 +24,7 @@ class Settings:
     allow_lan: bool = True
     data_dir: Path = Path('~/.local/share/acquire-oral-coach')
     asr_provider: str = 'mock'
-    pron_provider: str = 'mock'
+    pron_provider: str = 'simple'
     llm_provider: str = 'mock'
     tts_provider: str = 'mock'
     avatar_provider: str = 'livetalking'
@@ -69,7 +69,7 @@ class Settings:
             allow_lan=_bool('ORAL_COACH_ALLOW_LAN', True),
             data_dir=Path(os.getenv('ORAL_COACH_DATA_DIR', '~/.local/share/acquire-oral-coach')),
             asr_provider=asr_provider,
-            pron_provider=os.getenv('PRON_PROVIDER', 'mock').strip().lower(),
+            pron_provider=os.getenv('PRON_PROVIDER', 'simple').strip().lower(),
             llm_provider=llm_provider,
             tts_provider=os.getenv('TTS_PROVIDER', 'mock').strip().lower(),
             avatar_provider=os.getenv('AVATAR_PROVIDER', 'livetalking').strip().lower(),

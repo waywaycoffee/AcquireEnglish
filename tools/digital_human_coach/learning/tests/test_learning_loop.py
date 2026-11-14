@@ -40,13 +40,9 @@ def test_session_wrong_items_and_review(tmp_path: Path):
 
     review = store.save_expression_for_review('I went hiking with friends', 'I go hiking')
     assert review.interval_days == 1
-    # Force due
-    import sqlite3
-
-    with sqlite3.connect(store.path) as conn:
-        conn.execute("UPDATE reviews SET due_at='2000-01-01T00:00:00+00:00'")
     due = store.due_reviews()
     assert len(due) == 1
+    assert due[0].id == review.id
     store.complete_review(due[0].id, independent_ok=True)
     # next interval 3 days, not immediately due
     assert store.due_reviews() == []

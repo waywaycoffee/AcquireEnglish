@@ -27,11 +27,21 @@ _HEADERS = {
 }
 
 
+def _normalize_bilibili_cookie(cookie: str | None) -> str | None:
+    raw = (cookie or "").strip()
+    if not raw:
+        return None
+    if "sessdata=" not in raw.lower():
+        return f"SESSDATA={raw}"
+    return raw
+
+
 def _bilibili_headers(cookie: str | None = None) -> dict[str, str]:
     """Browser-like headers for Bilibili API / CDN. Cookie unlocks login-gated CC."""
     headers = dict(_HEADERS)
-    if cookie and cookie.strip():
-        headers["Cookie"] = cookie.strip()
+    normalized = _normalize_bilibili_cookie(cookie)
+    if normalized:
+        headers["Cookie"] = normalized
     return headers
 
 
@@ -245,6 +255,7 @@ async def _import_bilibili(raw: str, *, cookie: str | None = None) -> LinkImport
         zh_srt = None
         if cid and bvid:
             try:
+                # Official / AI CC lists often require login Cookie (SESSDATA).
                 player = await client.get(
                     "https://api.bilibili.com/x/player/v2",
                     params={"bvid": bvid, "cid": cid},

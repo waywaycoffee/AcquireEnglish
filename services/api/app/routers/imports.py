@@ -22,7 +22,7 @@ class LinkImportIn(BaseModel):
 
 
 async def _bilibili_cookie_for_user(user: User, db: AsyncSession) -> str | None:
-    """Prefer the synced per-user cookie; fall back to server env."""
+    """Prefer the synced per-user cookie; fall back to server env BILIBILI_COOKIE."""
     result = await db.execute(
         select(UserPreference).where(UserPreference.user_id == user.id)
     )

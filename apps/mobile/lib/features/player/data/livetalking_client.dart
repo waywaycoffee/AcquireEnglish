@@ -20,7 +20,10 @@ class LiveTalkingClient {
   String? get sessionId => _sessionId;
   bool get isConnected => _sessionId != null && _pc != null;
 
-  Future<RTCVideoRenderer> connect(String rawBaseUrl) async {
+  Future<RTCVideoRenderer> connect(
+    String rawBaseUrl, {
+    String? avatar,
+  }) async {
     await disconnect();
     final String baseUrl = _normalizeBaseUrl(rawBaseUrl);
     _baseUrl = baseUrl;
@@ -62,17 +65,31 @@ class LiveTalkingClient {
       throw StateError('LiveTalking 未能生成本地 SDP。');
     }
 
+    final String? avatarId = avatar?.trim();
+    final Map<String, Object?> offerBody = <String, Object?>{
+      'type': 'offer',
+      'sdp': local.sdp,
+    };
+    if (avatarId != null && avatarId.isNotEmpty) {
+      offerBody['avatar'] = avatarId;
+    }
+
     final Response<dynamic> response = await _dio.post<dynamic>(
       '$baseUrl/offer',
-      data: <String, Object?>{'type': 'offer', 'sdp': local.sdp},
+      data: offerBody,
       options: Options(
         contentType: Headers.jsonContentType,
         responseType: ResponseType.json,
         sendTimeout: const Duration(seconds: 20),
-        receiveTimeout: const Duration(seconds: 30),
+        receiveTimeout: const Duration(seconds: 60),
       ),
     );
     final Map<String, dynamic> body = _asMap(response.data);
+    if (body['code'] == -1) {
+      throw StateError(
+        'LiveTalking /offer 拒绝: ${body['msg'] ?? 'unknown'}',
+      );
+    }
     final String? answerSdp = body['sdp'] as String?;
     final String? answerType = body['type'] as String?;
     final Object? session = body['sessionid'];
@@ -104,7 +121,7 @@ class LiveTalkingClient {
     if (trimmed.isEmpty) {
       return;
     }
-    await _dio.post<dynamic>(
+    final Response<dynamic> response = await _dio.post<dynamic>(
       '$baseUrl/human',
       data: <String, Object?>{
         'sessionid': sessionId,
@@ -118,6 +135,12 @@ class LiveTalkingClient {
         receiveTimeout: const Duration(seconds: 20),
       ),
     );
+    final Map<String, dynamic> body = _asMap(response.data);
+    if (body.isNotEmpty && body['code'] == -1) {
+      throw StateError(
+        'LiveTalking /human 失败: ${body['msg'] ?? 'session rejected'}',
+      );
+    }
   }
 
   Future<void> disconnect() async {

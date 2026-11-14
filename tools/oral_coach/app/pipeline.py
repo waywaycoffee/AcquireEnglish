@@ -128,18 +128,19 @@ class OralCoachPipeline:
         if not transcript:
             raise ValueError('confirmed transcript is empty')
         # Re-score lightly against confirmed text for notes consistency.
-        from .providers.pronunciation import _overlap_score
+        from .providers.pronunciation import _blend_score
 
-        score, missing, extra = _overlap_score(draft.get('reference') or '', transcript)
+        overall, missing, extra, f1, seq = _blend_score(
+            draft.get('reference') or '', transcript
+        )
         pron_dict = dict(draft['pronunciation'])
-        pron_dict['overall'] = round(score, 4)
-        notes = []
+        pron_dict['overall'] = round(overall, 4)
+        notes = [f'overlap={f1:.2f}', f'sequence={seq:.2f}']
         if missing:
             notes.append('Missing: ' + ', '.join(list(missing)[:8]))
         if extra:
             notes.append('Extra: ' + ', '.join(list(extra)[:8]))
-        if notes:
-            pron_dict['notes'] = '; '.join(notes)
+        pron_dict['notes'] = '; '.join(notes)
 
         from .providers.base import PronunciationResult
 

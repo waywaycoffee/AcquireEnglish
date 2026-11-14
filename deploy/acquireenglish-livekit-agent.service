@@ -1,0 +1,16 @@
+[Unit]
+Description=AcquireEnglish LiveKit oral-coach agent
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/acquireenglish/tools/digital_human_coach
+EnvironmentFile=/opt/acquireenglish/tools/digital_human_coach/.env
+ExecStart=/opt/acquireenglish/tools/digital_human_coach/.venv/bin/python -m agent.main start
+Restart=always
+RestartSec=5
+# Agent is usually run on a GPU workstation; this unit is optional on ECS.
+
+[Install]
+WantedBy=multi-user.target

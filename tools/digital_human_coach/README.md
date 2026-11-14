@@ -31,6 +31,8 @@ python -m agent.main start
 ./scripts/setup_gpu_agent.sh   # venv + requirements-agent.txt
 # 编辑 .env 填 LIVEKIT_* + OPENAI_API_KEY
 ./scripts/run_agent.sh
+# Windows: powershell -File scripts/run_agent.ps1
+# Persist on Windows: powershell -File scripts/install_agent_autostart.ps1
 ```
 
 App 侧：设置填同一 `wss://`；数字人画面仍可接 LiveTalking WebRTC。

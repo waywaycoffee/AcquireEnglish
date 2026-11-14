@@ -47,10 +47,11 @@ ORAL_COACH_PORT=${PORT_LOCAL}
 ORAL_COACH_ALLOW_LAN=true
 ORAL_COACH_DATA_DIR=/var/lib/acquire-oral-coach
 ASR_PROVIDER=mock
-PRON_PROVIDER=mock
+PRON_PROVIDER=simple
 LLM_PROVIDER=mock
 TTS_PROVIDER=mock
-AVATAR_PROVIDER=none
+AVATAR_PROVIDER=livetalking
+LIVETALKING_URL=http://127.0.0.1:8010
 ENV
 fi
 
@@ -62,6 +63,7 @@ wanted = {
     "ORAL_COACH_PORT": "${PORT_LOCAL}",
     "ORAL_COACH_ALLOW_LAN": "true",
     "ORAL_COACH_DATA_DIR": "/var/lib/acquire-oral-coach",
+    "PRON_PROVIDER": "simple",
 }
 lines = []
 seen = set()

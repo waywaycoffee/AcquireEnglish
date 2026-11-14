@@ -75,6 +75,14 @@ class LearningPreferencesNotifier extends Notifier<AcquirePreferencesDto> {
       }
     } catch (_) {}
   }
+
+  /// Update local cache from a PUT response without issuing another network call.
+  Future<void> applyLocal(AcquirePreferencesDto prefs) async {
+    state = prefs;
+    if (Hive.isBoxOpen('prefs')) {
+      await Hive.box<String>('prefs').put(_prefsKey, jsonEncode(prefs.toJson()));
+    }
+  }
 }
 
 class DailyFeedNotifier extends Notifier<List<LibraryCourseData>> {
