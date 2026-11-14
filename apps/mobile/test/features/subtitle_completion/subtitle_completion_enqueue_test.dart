@@ -65,7 +65,7 @@ void main() {
     expect(job.enPath, en.path);
   });
 
-  test('both official sides skip enqueue', () async {
+  test('both official sides enqueue ASR speech proofread', () async {
     final File video = _fakeVideo(temp, 'c.mp4');
     final File en = File('${temp.path}/official/en.srt')
       ..createSync(recursive: true)
@@ -81,7 +81,9 @@ void main() {
       queue: queue,
       appSupportDirectory: () async => temp,
     );
-    expect(await queue.loadJobs(), isEmpty);
+    final SubtitleCompletionJob job = (await queue.loadJobs()).single;
+    expect(job.needEnglish, isTrue);
+    expect(job.needChinese, isFalse);
   });
 
   test('empty ZH file still enqueues needChinese', () async {

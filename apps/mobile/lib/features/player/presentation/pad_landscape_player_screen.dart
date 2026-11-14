@@ -1162,10 +1162,11 @@ class PadLandscapePlayerScreenState
     final bool needsFill = BilingualSubtitlePipeline.shouldAutoStart(
       state.lines,
     );
+    // ASR proofread must verify even "official" EN — B站 CC / ZH→EN can be
+    // fluent and still unrelated to the spoken audio.
     final bool proofreadTranslation =
         state.hasLines &&
         !needsFill &&
-        !_hasOfficialEnglish &&
         state.lines.any(
           (PlayerSubtitleLine line) => looksChinese(line.chinese),
         );

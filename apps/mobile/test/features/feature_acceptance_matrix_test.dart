@@ -111,6 +111,27 @@ void main() {
       expect(job.needChinese, isTrue);
     });
 
+    test('中英官方齐全 → 仍入队 ASR 语音校对', () async {
+      final File video = fakeVideo('official-both.mp4');
+      final File en = File('${temp.path}/official/en.srt')
+        ..createSync(recursive: true)
+        ..writeAsStringSync('1\n00:00:00,000 --> 00:00:01,000\nHello\n');
+      final File zh = File('${temp.path}/official/zh.srt')
+        ..createSync(recursive: true)
+        ..writeAsStringSync('1\n00:00:00,000 --> 00:00:01,000\n你好\n');
+      await enqueueSubtitleCompletionForEpisode(
+        episodeId: 'f02-proofread',
+        videoPath: video.path,
+        zhSubtitlePath: zh.path,
+        enSubtitlePath: en.path,
+        queue: queue,
+        appSupportDirectory: () async => temp,
+      );
+      final SubtitleCompletionJob job = (await queue.loadJobs()).single;
+      expect(job.needEnglish, isTrue);
+      expect(job.needChinese, isFalse);
+    });
+
     test('导入成功文案区分缺英文 / 缺中文 / 皆缺', () {
       String hintFor({String? en, String? zh, String? note}) {
         return bilibiliImportSuccessHint(

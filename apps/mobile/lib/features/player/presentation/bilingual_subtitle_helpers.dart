@@ -687,19 +687,40 @@ bool workingEnglishMismatchesAsr({
       continue;
     }
     final PlayerSubtitleLine? asr = _bestOverlappingLine(asrLines, line);
-    if (asr == null || !looksEnglish(asr.english)) {
+    if (asr == null ||
+        !looksEnglish(asr.english) ||
+        looksChinese(asr.english)) {
       continue;
     }
     compared += 1;
+    // Clipped Whisper fragments of a fuller official line are not mismatches.
     if (!_sameEnglishText(line.english, asr.english) &&
-        !_sentencesAgree(line.english, asr.english)) {
+        !_sentencesAgree(line.english, asr.english) &&
+        !_isShorterFragment(asr.english, line.english)) {
       disagree += 1;
     }
   }
+  if (compared == 0) {
+    // English on both sides but no temporal overlap → alien clocks (offset /
+    // 串台). Speech must own the timeline.
+    final bool workingHasEn = working.any(
+      (PlayerSubtitleLine line) =>
+          looksEnglish(line.english) && !looksChinese(line.english),
+    );
+    final bool asrHasEn = asrLines.any(
+      (PlayerSubtitleLine line) =>
+          looksEnglish(line.english) && !looksChinese(line.english),
+    );
+    if (workingHasEn && asrHasEn) {
+      return true;
+    }
+    return (asrLines.length - working.length).abs() >= 5 ||
+        asrLines.length >= working.length * 2;
+  }
   if (compared < 3) {
-    // Few overlaps: rebuild when ≥ half disagree (covers 1/2 and 2/2), or when
+    // Few overlaps: rebuild when ≥ half disagree (covers 1/1, 1/2, 2/2), or when
     // cue counts diverge sharply (sparse OCR vs denser speech track).
-    if (compared >= 2 && disagree * 2 >= compared) {
+    if (disagree * 2 >= compared) {
       return true;
     }
     return (asrLines.length - working.length).abs() >= 5 ||
@@ -724,9 +745,14 @@ List<PlayerSubtitleLine> rebuildBilingualFromAsrLines({
       (() {
         final (String overlapEn, String overlapZh) =
             _bestOverlappingChineseOrEnglish(working, asr);
-        final String english = looksEnglish(asr.english)
-            ? asr.english.trim()
-            : overlapEn;
+        // Never promote Chinese/mixed Whisper pollution into the EN field.
+        final String asrEn = asr.english.trim();
+        final String english =
+            looksEnglish(asrEn) && !looksChinese(asrEn)
+            ? asrEn
+            : (looksEnglish(overlapEn) && !looksChinese(overlapEn)
+                  ? overlapEn.trim()
+                  : '');
         final String chinese = overlapZh.isNotEmpty
             ? overlapZh
             : (looksChinese(asr.chinese) ? asr.chinese : '');
@@ -818,8 +844,9 @@ List<PlayerSubtitleLine> fuseOcrWithAsrLines({
   if (hit == null) {
     return ('', '');
   }
-  final String english = looksEnglish(hit.english)
-      ? repairOcrEnglishSpacing(hit.english)
+  final String hitEn = hit.english.trim();
+  final String english = looksEnglish(hitEn) && !looksChinese(hitEn)
+      ? repairOcrEnglishSpacing(hitEn)
       : '';
   final String chinese = looksChinese(hit.chinese)
       ? hit.chinese

@@ -95,8 +95,12 @@ Future<SubtitleCompletionNeed> detectSubtitleCompletionNeed({
       isUsableSubtitlePath(zhPath) &&
       await _subtitleFileHasLanguage(zhPath, requireEnglish: false);
 
+  // Official EN+ZH still needs speech proofread: B站 CC / ZH→EN can be fluent
+  // and still unrelated to the audio. After Whisper persists an ASR bundle,
+  // the early return above skips a second run.
+  final bool needSpeechProofread = hasZh && hasReliableEn;
   return SubtitleCompletionNeed(
-    needEnglish: !hasReliableEn,
+    needEnglish: !hasReliableEn || needSpeechProofread,
     needChinese: !hasZh,
   );
 }
