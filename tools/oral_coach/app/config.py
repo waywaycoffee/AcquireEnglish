@@ -46,6 +46,10 @@ class Settings:
     @classmethod
     def from_env(cls) -> 'Settings':
         llm_provider = os.getenv('LLM_PROVIDER', 'mock').strip().lower()
+        asr_provider = os.getenv('ASR_PROVIDER', 'mock').strip().lower()
+        deepgram_key = os.getenv('DEEPGRAM_API_KEY', '').strip()
+        if asr_provider == 'mock' and deepgram_key:
+            asr_provider = 'deepgram'
         openai_key = os.getenv('OPENAI_API_KEY', '').strip()
         deepseek_key = os.getenv('DEEPSEEK_API_KEY', '').strip()
         use_deepseek = llm_provider == 'deepseek' or (bool(deepseek_key) and not openai_key)
@@ -64,12 +68,12 @@ class Settings:
             port=int(os.getenv('ORAL_COACH_PORT', '8770')),
             allow_lan=_bool('ORAL_COACH_ALLOW_LAN', True),
             data_dir=Path(os.getenv('ORAL_COACH_DATA_DIR', '~/.local/share/acquire-oral-coach')),
-            asr_provider=os.getenv('ASR_PROVIDER', 'mock').strip().lower(),
+            asr_provider=asr_provider,
             pron_provider=os.getenv('PRON_PROVIDER', 'mock').strip().lower(),
             llm_provider=llm_provider,
             tts_provider=os.getenv('TTS_PROVIDER', 'mock').strip().lower(),
             avatar_provider=os.getenv('AVATAR_PROVIDER', 'livetalking').strip().lower(),
-            deepgram_api_key=os.getenv('DEEPGRAM_API_KEY', '').strip(),
+            deepgram_api_key=deepgram_key,
             whisperx_model=os.getenv('WHISPERX_MODEL', 'base.en').strip(),
             openai_api_key=api_key,
             openai_base_url=base_url,

@@ -30,15 +30,30 @@ class DeepgramAsr:
     async def transcribe(self, audio_path: str, language: str = 'en') -> AsrResult:
         if not self.api_key:
             raise RuntimeError('DEEPGRAM_API_KEY is empty.')
-        data = Path(audio_path).read_bytes()
-        async with httpx.AsyncClient(timeout=60) as client:
+        path = Path(audio_path)
+        data = path.read_bytes()
+        suffix = path.suffix.lower()
+        content_type = {
+            '.wav': 'audio/wav',
+            '.mp3': 'audio/mpeg',
+            '.m4a': 'audio/mp4',
+            '.ogg': 'audio/ogg',
+            '.webm': 'audio/webm',
+            '.flac': 'audio/flac',
+        }.get(suffix, 'application/octet-stream')
+        async with httpx.AsyncClient(timeout=90) as client:
             response = await client.post(
                 'https://api.deepgram.com/v1/listen',
-                params={'model': 'nova-2', 'language': language, 'punctuate': 'true'},
+                params={
+                    'model': 'nova-2',
+                    'language': language or 'en',
+                    'punctuate': 'true',
+                    'smart_format': 'true',
+                },
                 content=data,
                 headers={
                     'Authorization': f'Token {self.api_key}',
-                    'Content-Type': 'audio/wav',
+                    'Content-Type': content_type,
                 },
             )
             response.raise_for_status()
