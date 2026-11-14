@@ -1977,6 +1977,9 @@ class PadLandscapePlayerScreenState
       _handleSeek(targetMs / _videoDuration.inMilliseconds);
       return;
     }
+    if (state.lines.isEmpty) {
+      return;
+    }
     final int targetMs = (state.positionMs + (deltaSeconds * 1000)).clamp(
       state.lines.first.startMs,
       state.lines.last.endMs,
