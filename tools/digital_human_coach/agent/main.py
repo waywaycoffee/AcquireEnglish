@@ -35,10 +35,9 @@ def _missing_livekit() -> bool:
     return False
 
 
-def run() -> None:
-    if _missing_livekit() or '--checklist' in sys.argv:
-        print(
-            """Acquire Digital Human Coach — LiveKit wiring checklist
+def _print_checklist() -> None:
+    print(
+        """Acquire Digital Human Coach — LiveKit wiring checklist
 
 1. LIVEKIT_URL / LIVEKIT_API_KEY / LIVEKIT_API_SECRET
 
@@ -56,19 +55,12 @@ def run() -> None:
 
 See DEPLOY_GPU.md
 """
-        )
-        if _missing_livekit():
-            return
-
-    from livekit.agents import (
-        Agent,
-        AgentSession,
-        AutoSubscribe,
-        JobContext,
-        WorkerOptions,
-        cli,
     )
-    from livekit.agents import TurnHandlingOptions
+
+
+async def entrypoint(ctx) -> None:
+    """Module-level entrypoint (must be picklable for LiveKit process pool)."""
+    from livekit.agents import Agent, AgentSession, AutoSubscribe, TurnHandlingOptions
     from livekit.plugins import silero
 
     from agent.hooks import (
@@ -88,7 +80,10 @@ See DEPLOY_GPU.md
 
     class OralCoachAgent(Agent):
         def __init__(self) -> None:
-            super().__init__(instructions=INSTRUCTIONS, llm=llm, tts=tts, stt=stt)
+            kwargs = {'instructions': INSTRUCTIONS, 'llm': llm, 'tts': tts}
+            if stt is not None:
+                kwargs['stt'] = stt
+            super().__init__(**kwargs)
             self._learning_session_id: str | None = None
             self._room = None
 
@@ -134,29 +129,37 @@ See DEPLOY_GPU.md
                     f'The learner just said: "{text}". {tip} Keep coaching gently.'
                 )
 
-    async def entrypoint(ctx: JobContext) -> None:
-        await ctx.connect(auto_subscribe=AutoSubscribe.AUDIO_ONLY)
-        await ctx.wait_for_participant()
-        agent = OralCoachAgent()
-        agent._room = ctx.room
-        session_kwargs: dict = {
-            'vad': silero.VAD.load(),
-            'llm': llm,
-            'tts': tts,
-            'turn_handling': TurnHandlingOptions(
-                interruption={
-                    'enabled': True,
-                    'mode': interruption_mode,
-                    'min_duration': min_duration,
-                    'false_interruption_timeout': false_timeout,
-                    'resume_false_interruption': True,
-                },
-            ),
-        }
-        if stt is not None:
-            session_kwargs['stt'] = stt
-        session = AgentSession(**session_kwargs)
-        await session.start(room=ctx.room, agent=agent)
+    await ctx.connect(auto_subscribe=AutoSubscribe.AUDIO_ONLY)
+    await ctx.wait_for_participant()
+    agent = OralCoachAgent()
+    agent._room = ctx.room
+    session_kwargs: dict = {
+        'vad': silero.VAD.load(),
+        'llm': llm,
+        'tts': tts,
+        'turn_handling': TurnHandlingOptions(
+            interruption={
+                'enabled': True,
+                'mode': interruption_mode,
+                'min_duration': min_duration,
+                'false_interruption_timeout': false_timeout,
+                'resume_false_interruption': True,
+            },
+        ),
+    }
+    if stt is not None:
+        session_kwargs['stt'] = stt
+    session = AgentSession(**session_kwargs)
+    await session.start(room=ctx.room, agent=agent)
+
+
+def run() -> None:
+    if _missing_livekit() or '--checklist' in sys.argv:
+        _print_checklist()
+        if _missing_livekit():
+            return
+
+    from livekit.agents import WorkerOptions, cli
 
     cli.run_app(
         WorkerOptions(
