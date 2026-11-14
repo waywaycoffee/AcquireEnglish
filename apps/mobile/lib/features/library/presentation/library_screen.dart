@@ -7,11 +7,12 @@ import 'package:go_router/go_router.dart';
 import 'package:hive_ce/hive.dart';
 
 import '../../../router/app_router.dart';
+import '../../import_course/data/bilibili_collection_download.dart';
 import '../../import_course/data/bilibili_cover_refresh.dart';
-import '../../import_course/presentation/bilibili_import_sheet.dart';
-import '../../import_course/presentation/import_course_screen.dart';
+import '../../import_course/data/bilibili_episode_cover_backfill.dart';
+import '../../import_course/data/bilibili_import_service.dart';
+import '../../import_course/presentation/course_import_entry.dart';
 import '../../import_course/presentation/widgets/import_course_flow.dart';
-import '../../import_course/presentation/youtube_import_sheet.dart';
 import '../../navigation/presentation/navigation_destination.dart';
 import '../../player/presentation/asr_subtitle_cache.dart';
 import '../../player/presentation/full_transcript_reader.dart';
@@ -26,7 +27,6 @@ import '../../shared/presentation/pad/app_design_tokens.dart';
 import '../../shared/presentation/pad/pad_compact.dart';
 import '../../shared/presentation/pad/pad_scaffold.dart';
 import '../../shared/presentation/pad/pad_top_bar.dart';
-import '../../shared/presentation/widgets/bilibili_brand_icon.dart';
 import '../../sync/presentation/daily_feed_provider.dart';
 import '../../words/data/offline_word_dictionary.dart';
 import 'library_browse.dart';
@@ -422,6 +422,47 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
                               },
                             ),
                     ),
+                    Consumer(
+                      builder: (BuildContext context, WidgetRef ref, _) {
+                        final BilibiliCollectionDownloadProgress? progress =
+                            ref.watch(
+                              bilibiliCollectionDownloadProgressProvider,
+                            );
+                        if (progress == null ||
+                            progress.courseId != selectedCourse.id ||
+                            progress.done) {
+                          return const SizedBox.shrink();
+                        }
+                        return Padding(
+                          padding: const EdgeInsets.only(top: 12),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: <Widget>[
+                              Text(
+                                progress.message,
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w700,
+                                  color: AppDesignTokens.textSecondary,
+                                ),
+                              ),
+                              const SizedBox(height: 8),
+                              ClipRRect(
+                                borderRadius: BorderRadius.circular(999),
+                                child: LinearProgressIndicator(
+                                  value: progress.progress.clamp(0.05, 1),
+                                  minHeight: 8,
+                                  backgroundColor: AppDesignTokens.softGray,
+                                  valueColor: AlwaysStoppedAnimation<Color>(
+                                    AppDesignTokens.primaryBlue,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        );
+                      },
+                    ),
                     Align(
                       alignment: Alignment.centerRight,
                       child: TextButton.icon(
@@ -567,6 +608,8 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
                                   child: EpisodeListItem(
                                     item: item,
                                     selected: item.id == selectedEpisodeId,
+                                    fallbackCoverImage:
+                                        selectedCourse.coverImage,
                                     onTap: () {
                                       setState(() {
                                         selectedEpisodeId = item.id;
@@ -607,6 +650,7 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
                                 child: EpisodeListItem(
                                   item: item,
                                   selected: item.id == selectedEpisodeId,
+                                  fallbackCoverImage: selectedCourse.coverImage,
                                   onTap: () {
                                     setState(() {
                                       selectedEpisodeId = item.id;
@@ -815,107 +859,8 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
                 ),
                 const SizedBox(height: 10),
                 // Keep import actions on their own full-width row so B站 is
-                // never clipped by the phone's right edge.
-                Row(
-                  children: <Widget>[
-                    Expanded(
-                      child: FilledButton.icon(
-                        onPressed: editMode
-                            ? null
-                            : () {
-                                unawaited(
-                                  showYoutubeImportSheet(context, ref),
-                                );
-                              },
-                        style: FilledButton.styleFrom(
-                          backgroundColor: AppDesignTokens.primaryBlueDark,
-                          foregroundColor: Colors.white,
-                          visualDensity: VisualDensity.standard,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(999),
-                          ),
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 10,
-                            vertical: 14,
-                          ),
-                          elevation: 0,
-                        ),
-                        icon: const Icon(
-                          Icons.ondemand_video_rounded,
-                          size: 18,
-                        ),
-                        label: const Text(
-                          'YouTube',
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(fontWeight: FontWeight.w900),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: FilledButton.icon(
-                        onPressed: editMode
-                            ? null
-                            : () {
-                                unawaited(
-                                  showBilibiliImportSheet(context, ref),
-                                );
-                              },
-                        style: FilledButton.styleFrom(
-                          backgroundColor: const Color(0xFFFB7299),
-                          foregroundColor: Colors.white,
-                          visualDensity: VisualDensity.standard,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(999),
-                          ),
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 10,
-                            vertical: 14,
-                          ),
-                          elevation: 0,
-                        ),
-                        icon: const BilibiliBrandIcon(size: 18),
-                        label: const Text(
-                          'B站',
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(fontWeight: FontWeight.w900),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: FilledButton.icon(
-                        onPressed: editMode
-                            ? null
-                            : () {
-                                openImportCourseExperience(context);
-                              },
-                        style: FilledButton.styleFrom(
-                          backgroundColor: AppDesignTokens.brandGreen,
-                          foregroundColor: Colors.white,
-                          visualDensity: VisualDensity.standard,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(999),
-                          ),
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 10,
-                            vertical: 14,
-                          ),
-                          elevation: 0,
-                        ),
-                        icon: const Icon(Icons.add_rounded, size: 18),
-                        label: const Text(
-                          '导入',
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(fontWeight: FontWeight.w900),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
+                // never clipped by the phone's right edge. Same entry as 首页.
+                CourseImportActionButtons(enabled: !editMode),
                 if (hasActiveQuery) ...<Widget>[
                   const SizedBox(height: 14),
                   Text(
@@ -955,6 +900,11 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
                                 onTap: () => _handleCourseTap(match.course),
                                 onResourceDirectory: () =>
                                     _showResourceDirectory(match.course),
+                                onContextMenu: (Offset position) =>
+                                    _showCourseContextMenu(
+                                      course: match.course,
+                                      globalPosition: position,
+                                    ),
                               ),
                             ),
                           );
@@ -980,6 +930,11 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
                             onResourceDirectory: () => _showResourceDirectory(
                               browsedCourses[i].course,
                             ),
+                            onContextMenu: (Offset position) =>
+                                _showCourseContextMenu(
+                                  course: browsedCourses[i].course,
+                                  globalPosition: position,
+                                ),
                           ),
                         ),
                       ],
@@ -1006,6 +961,11 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
                                 onTap: () => _handleCourseTap(
                                   browsedCourses[i].course,
                                 ),
+                                onContextMenu: (Offset position) =>
+                                    _showCourseContextMenu(
+                                      course: browsedCourses[i].course,
+                                      globalPosition: position,
+                                    ),
                               ),
                             ),
                         ],
@@ -1062,6 +1022,79 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
       selectedEpisodeId = course.episodes.isEmpty ? '' : course.episodes.first.id;
       showDetail = true;
     });
+    _maybeBackfillBilibiliEpisodeCovers(course);
+    _maybeDownloadPendingBilibiliEpisodes(course);
+  }
+
+  void _maybeBackfillBilibiliEpisodeCovers(LibraryCourseData course) {
+    final bool isBili =
+        course.category == 'bilibili' ||
+        course.sourceLabel.toLowerCase().contains('bilibili') ||
+        course.id.startsWith('bilibili-');
+    if (!isBili || course.episodes.isEmpty) {
+      return;
+    }
+    // Always refresh episode posters for bilibili — even a course-level cover
+    // should be stamped onto empty episode rows immediately.
+    final String cookie = ref
+        .read(learningSettingsProvider)
+        .resolvedBilibiliCookieHeader;
+    final ProviderContainer container = ProviderScope.containerOf(context);
+    unawaited(
+      backfillBilibiliEpisodeCovers(
+        catalog: container.read(libraryCatalogProvider.notifier),
+        readCourses: () => container.read(libraryCatalogProvider),
+        courseId: course.id,
+        service: BilibiliImportService.withCookie(cookie),
+      ),
+    );
+  }
+
+  void _maybeDownloadPendingBilibiliEpisodes(LibraryCourseData course) {
+    final bool isBili =
+        course.category == 'bilibili' ||
+        course.sourceLabel.toLowerCase().contains('bilibili') ||
+        course.id.startsWith('bilibili-');
+    if (!isBili || course.episodes.length <= 1) {
+      return;
+    }
+    final bool hasPending = course.episodes.any(
+      (LibraryEpisodeItem e) => e.videoMissing,
+    );
+    if (!hasPending) {
+      return;
+    }
+    if (isBilibiliCollectionDownloadInFlight(course.id)) {
+      return;
+    }
+    final String cookie = ref
+        .read(learningSettingsProvider)
+        .resolvedBilibiliCookieHeader;
+    final ProviderContainer container = ProviderScope.containerOf(context);
+    final BilibiliCollectionDownloadProgressNotifier progressNotifier =
+        container.read(bilibiliCollectionDownloadProgressProvider.notifier);
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('正在后台下载合集剩余分集…')),
+    );
+    unawaited(
+      downloadRemainingBilibiliEpisodes(
+        catalog: container.read(libraryCatalogProvider.notifier),
+        readCourses: () => container.read(libraryCatalogProvider),
+        courseId: course.id,
+        service: BilibiliImportService.withCookie(cookie),
+        progressNotifier: progressNotifier,
+        onProgress: (String message, double? progress) {
+          if (!mounted) {
+            return;
+          }
+          if (progress == 1) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text(message)),
+            );
+          }
+        },
+      ),
+    );
   }
 
   void _handleCourseTap(LibraryCourseData course) {
@@ -1240,7 +1273,59 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
     return file?.path;
   }
 
+  Future<void> _showCourseContextMenu({
+    required LibraryCourseData course,
+    required Offset globalPosition,
+  }) async {
+    final String? action = await showMenu<String>(
+      context: context,
+      position: RelativeRect.fromLTRB(
+        globalPosition.dx,
+        globalPosition.dy,
+        globalPosition.dx,
+        globalPosition.dy,
+      ),
+      items: const <PopupMenuEntry<String>>[
+        PopupMenuItem<String>(
+          value: 'delete',
+          child: Row(
+            children: <Widget>[
+              Icon(Icons.delete_outline_rounded, size: 20),
+              SizedBox(width: 10),
+              Text('删除课程'),
+            ],
+          ),
+        ),
+      ],
+    );
+    if (action != 'delete' || !mounted) {
+      return;
+    }
+    await _confirmDeleteCourses(
+      courseIds: <String>{course.id},
+      title: '删除课程',
+      message: '确定删除「${course.title}」吗？删除后可重新导入。',
+    );
+  }
+
   Future<void> _confirmDeleteSelectedCourses() async {
+    await _confirmDeleteCourses(
+      courseIds: Set<String>.from(selectedCourseIds),
+      title: '删除已选课程',
+      message: '将删除 ${selectedCourseIds.length} 个已选课程。',
+      exitEditMode: true,
+    );
+  }
+
+  Future<void> _confirmDeleteCourses({
+    required Set<String> courseIds,
+    required String title,
+    required String message,
+    bool exitEditMode = false,
+  }) async {
+    if (courseIds.isEmpty) {
+      return;
+    }
     final bool? confirmed = await showDialog<bool>(
       context: context,
       builder: (BuildContext context) {
@@ -1249,8 +1334,8 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(28),
           ),
-          title: const Text('删除已选课程'),
-          content: Text('将删除 ${selectedCourseIds.length} 个已选课程。'),
+          title: Text(title),
+          content: Text(message),
           actions: <Widget>[
             TextButton(
               onPressed: () => Navigator.of(context).pop(false),
@@ -1282,11 +1367,13 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
     if (confirmed != true || !mounted) {
       return;
     }
-    await ref.read(libraryCatalogProvider.notifier).deleteCourses(selectedCourseIds);
+    await ref.read(libraryCatalogProvider.notifier).deleteCourses(courseIds);
     if (!mounted) {
       return;
     }
-    _exitEditMode();
+    if (exitEditMode) {
+      _exitEditMode();
+    }
   }
 
   List<LibraryEpisodeItem> _visibleEpisodes(LibraryCourseData course) {

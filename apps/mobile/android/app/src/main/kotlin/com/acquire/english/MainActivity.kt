@@ -1,6 +1,8 @@
-﻿package com.acquire.english
+package com.acquire.english
 
 import android.app.Activity
+import android.content.pm.ActivityInfo
+import android.content.res.Configuration
 import android.graphics.Bitmap
 import android.media.AudioFormat
 import android.content.Intent
@@ -41,6 +43,7 @@ class MainActivity : FlutterActivity(), MethodChannel.MethodCallHandler {
     private lateinit var importPickerChannel: MethodChannel
     private lateinit var nativeTtsChannel: MethodChannel
     private lateinit var audioToolsChannel: MethodChannel
+    private lateinit var orientationChannel: MethodChannel
     private var pendingResult: MethodChannel.Result? = null
     private var pendingExtensions: Set<String> = emptySet()
     private var pendingTitle: String = ""
@@ -55,6 +58,49 @@ class MainActivity : FlutterActivity(), MethodChannel.MethodCallHandler {
     private var activeTtsUtteranceId: String? = null
     private val pronunciationExtractionRequests =
         ConcurrentHashMap<String, AtomicBoolean>()
+    /// Fullscreen video sets this true; otherwise every resume forces portrait.
+    private var allowLandscapeFullscreen: Boolean = false
+
+    override fun onCreate(savedInstanceState: Bundle?) {
+        // Hard default: portrait. Fullscreen video may temporarily request landscape.
+        allowLandscapeFullscreen = false
+        requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
+        super.onCreate(savedInstanceState)
+    }
+
+    override fun onResume() {
+        super.onResume()
+        applyLockedOrientation()
+    }
+
+    override fun onWindowFocusChanged(hasFocus: Boolean) {
+        super.onWindowFocusChanged(hasFocus)
+        if (hasFocus) {
+            applyLockedOrientation()
+        }
+    }
+
+    override fun onConfigurationChanged(newConfig: Configuration) {
+        super.onConfigurationChanged(newConfig)
+        if (!allowLandscapeFullscreen &&
+            newConfig.orientation == Configuration.ORIENTATION_LANDSCAPE
+        ) {
+            // HyperOS may still flip to landscape briefly; yank it back.
+            requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
+        }
+        applyLockedOrientation()
+    }
+
+    private fun applyLockedOrientation() {
+        val target = if (allowLandscapeFullscreen) {
+            ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
+        } else {
+            ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
+        }
+        if (requestedOrientation != target) {
+            requestedOrientation = target
+        }
+    }
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
@@ -73,6 +119,11 @@ class MainActivity : FlutterActivity(), MethodChannel.MethodCallHandler {
             "com.shadowing.english/audio_tools",
         )
         audioToolsChannel.setMethodCallHandler(this)
+        orientationChannel = MethodChannel(
+            flutterEngine.dartExecutor.binaryMessenger,
+            "com.acquire.english/orientation",
+        )
+        orientationChannel.setMethodCallHandler(this)
     }
 
     override fun onMethodCall(call: MethodCall, result: MethodChannel.Result) {
@@ -87,7 +138,17 @@ class MainActivity : FlutterActivity(), MethodChannel.MethodCallHandler {
             "extractPronunciationAudio" -> handlePronunciationAudioExtraction(call, result)
             "cancelPronunciationAudioExtraction" -> handleCancelPronunciationAudioExtraction(call, result)
             "captureFrameAt" -> handleCaptureFrameAt(call, result)
+            "setOrientation" -> handleSetOrientation(call, result)
             else -> result.notImplemented()
+        }
+    }
+
+    private fun handleSetOrientation(call: MethodCall, result: MethodChannel.Result) {
+        val mode = call.argument<String>("mode")?.trim().orEmpty()
+        mainHandler.post {
+            allowLandscapeFullscreen = mode == "landscape"
+            applyLockedOrientation()
+            result.success(true)
         }
     }
 

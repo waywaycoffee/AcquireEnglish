@@ -55,12 +55,13 @@ Future<void> bootstrap({List<String> args = const <String>[]}) async {
     ProviderScope(
       child: EasyLocalization(
         supportedLocales: const <Locale>[
-          /// Add your supported locales here
+          Locale('zh'),
           Locale('en'),
           Locale('tr'),
         ],
         path: Strings.localizationsPath,
-        fallbackLocale: const Locale('en'),
+        fallbackLocale: const Locale('zh'),
+        startLocale: const Locale('zh'),
         child: const MyApp(),
       ),
     ),

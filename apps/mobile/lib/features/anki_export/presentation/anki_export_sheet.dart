@@ -42,7 +42,7 @@ class AnkiExportSheet extends ConsumerStatefulWidget {
 
 class _AnkiExportSheetState extends ConsumerState<AnkiExportSheet> {
   final TextEditingController _deck = TextEditingController(
-    text: 'AcquireEnglish',
+    text: '爱快英语',
   );
   bool _words = true;
   bool _phrases = true;

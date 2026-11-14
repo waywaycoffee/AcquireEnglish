@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:file_selector/file_selector.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -7,6 +9,7 @@ import '../../../library/presentation/library_catalog_provider.dart';
 import '../../../library/presentation/library_mock_data.dart';
 import '../../../shared/presentation/pad/app_design_tokens.dart';
 import '../../../shared/presentation/pad/pad_compact.dart';
+import '../../../subtitle_completion/subtitle_completion_enqueue.dart';
 import '../../domain/android_import_picker.dart';
 import '../../domain/import_match.dart';
 import '../../domain/online_video_import.dart';
@@ -554,13 +557,20 @@ class _ImportCourseFlowState extends ConsumerState<ImportCourseFlow> {
           .where((ImportMatchRow row) => row.matched)
           .length;
 
+      if (imported) {
+        unawaited(
+          enqueuePendingSubtitleCompletionsForCatalog(
+            courses: ref.read(libraryCatalogProvider),
+          ),
+        );
+      }
       ScaffoldMessenger.of(context)
         ..hideCurrentSnackBar()
         ..showSnackBar(
           SnackBar(
             content: Text(
               imported
-                  ? '智能导入课程成功！已解析 ${parsedRows.length} 个视频文件，其中 $matchedCount 个字幕匹配完整'
+                  ? '导入成功：${parsedRows.length} 个视频，$matchedCount 个字幕已匹配；缺的中/英字幕已开始后台补全'
                   : '该课程已导入！',
             ),
           ),

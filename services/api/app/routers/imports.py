@@ -89,3 +89,33 @@ async def get_import_srt(
     if not body:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Subtitle not found")
     return Response(content=body, media_type="text/plain; charset=utf-8")
+
+
+class SubtitleUpdateIn(BaseModel):
+    lang: str = Field(pattern=r"^(en|zh)$")
+    srt: str = Field(min_length=1, max_length=2_000_000)
+
+
+@router.put("/{import_id}/srt")
+async def put_import_srt(
+    import_id: int,
+    payload: SubtitleUpdateIn,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> dict[str, str]:
+    """Persist translated / AI-completed subtitles so clients can skip re-work."""
+    result = await db.execute(
+        select(UserLinkCourse).where(
+            UserLinkCourse.id == import_id,
+            UserLinkCourse.user_id == user.id,
+        )
+    )
+    row = result.scalar_one_or_none()
+    if row is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Import not found")
+    if payload.lang == "en":
+        row.subtitle_en_srt = payload.srt
+    else:
+        row.subtitle_zh_srt = payload.srt
+    await db.commit()
+    return {"status": "ok", "lang": payload.lang}

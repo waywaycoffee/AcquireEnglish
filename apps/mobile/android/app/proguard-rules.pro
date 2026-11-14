@@ -7,3 +7,7 @@
 -dontwarn com.google.mlkit.vision.text.japanese.JapaneseTextRecognizerOptions
 -dontwarn com.google.mlkit.vision.text.korean.KoreanTextRecognizerOptions$Builder
 -dontwarn com.google.mlkit.vision.text.korean.KoreanTextRecognizerOptions
+
+# Keep ML Kit text recognition (used by OCR subtitle pipeline).
+-keep class com.google.mlkit.vision.text.** { *; }
+-keep class com.google.android.gms.internal.mlkit_vision_text_common.** { *; }

@@ -2,11 +2,17 @@ import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:hive_ce/hive.dart';
 import 'package:workmanager/workmanager.dart';
 
+import '../../subtitle_completion/subtitle_completion_background.dart';
+
 const String kDailyFeedTask = 'acquire_english_daily_feed';
 
 @pragma('vm:entry-point')
 void dailyFeedBackgroundDispatcher() {
   Workmanager().executeTask((String task, Map<String, dynamic>? inputData) async {
+    if (task == kSubtitleCompletionTask) {
+      await handleSubtitleCompletionBackgroundTask();
+      return true;
+    }
     if (task != kDailyFeedTask && task != Workmanager.iOSBackgroundTask) {
       return true;
     }
@@ -47,7 +53,7 @@ Future<void> notifyDailyFeedIfEnabled(Box<String> box) async {
   );
   await plugin.show(
     id: 4101,
-    title: 'AcquireEnglish',
+    title: '爱快英语',
     body: '今日课程已更新，打开 App 查看推荐。',
     notificationDetails: const NotificationDetails(android: androidDetails),
   );

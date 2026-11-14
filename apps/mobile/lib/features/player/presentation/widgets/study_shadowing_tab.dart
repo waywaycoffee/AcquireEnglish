@@ -7,8 +7,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:path_provider/path_provider.dart';
 
+import '../../../settings/presentation/settings_provider.dart';
 import '../../data/pronunciation_audio_extractor.dart';
 import '../../data/pronunciation_providers.dart';
+import '../../data/voice_practice_client.dart';
 import '../../domain/pronunciation_assessment.dart';
 import '../player_mock_state.dart';
 import 'comparison_waveform_painter.dart';
@@ -71,6 +73,9 @@ class _StudyShadowingTabState extends ConsumerState<StudyShadowingTab> {
   List<double> _recordingWaveform = const <double>[];
   Future<void> Function()? _cancelExtraction;
   String? _boundTargetKey;
+  final VoicePracticeClient _voiceClient = VoicePracticeClient();
+  bool _voiceBusy = false;
+  VoiceShadowResult? _voiceResult;
 
   @override
   void initState() {
@@ -118,6 +123,7 @@ class _StudyShadowingTabState extends ConsumerState<StudyShadowingTab> {
       _recording = null;
       _recordingWaveform = const <double>[];
       _recordingPath = null;
+      _voiceResult = null;
       _message = null;
       _referenceError = null;
       _loadingReference = target != null;
@@ -349,6 +355,7 @@ class _StudyShadowingTabState extends ConsumerState<StudyShadowingTab> {
         _recording = audio;
         _recordingWaveform = audio.waveform;
         _recordingPath = path;
+        _voiceResult = null;
         _message = reachedLimit ? '已达到 60 秒上限，录音已停止。' : null;
       });
     } catch (_) {
@@ -441,6 +448,53 @@ class _StudyShadowingTabState extends ConsumerState<StudyShadowingTab> {
     widget.onNextSentence?.call();
   }
 
+  Future<void> _runVoiceFeedback() async {
+    final LearningSettingsState settings = ref.read(learningSettingsProvider);
+    final String server = settings.voicePracticeServerUrl.trim();
+    final String? path = _recordingPath;
+    final String reference = widget.line.english.trim();
+    if (server.isEmpty) {
+      setState(() => _message = '请先在「设置 → Voice 本地口语」填写电脑上的服务地址。');
+      return;
+    }
+    if (path == null || reference.isEmpty || _voiceBusy) {
+      return;
+    }
+    setState(() {
+      _voiceBusy = true;
+      _message = '正在上传到 Voice 做本地转写…';
+      _voiceResult = null;
+    });
+    try {
+      final VoiceShadowResult result = await _voiceClient.shadowSentence(
+        rawBaseUrl: server,
+        referenceText: reference,
+        audioPath: path,
+      );
+      if (!mounted || _resourcesReleased) {
+        return;
+      }
+      setState(() {
+        _voiceBusy = false;
+        _voiceResult = result;
+        _message = result.mock
+            ? 'MOCK 反馈（未跑真实 Whisper）· 重叠 ${result.scorePercentLabel}'
+            : 'Voice 反馈 · 重叠 ${result.scorePercentLabel}';
+      });
+    } catch (error) {
+      if (!mounted || _resourcesReleased) {
+        return;
+      }
+      setState(() {
+        _voiceBusy = false;
+        _message = error
+            .toString()
+            .replaceFirst(RegExp(r'^Bad state:\s*'), '')
+            .replaceFirst(RegExp(r'^Exception:\s*'), '');
+      });
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final StudyShellColors shell = StudyShellColors.of(context);
@@ -462,6 +516,8 @@ class _StudyShadowingTabState extends ConsumerState<StudyShadowingTab> {
     }
 
     final bool canPractice = widget.assessmentTarget != null;
+    final LearningSettingsState settings = ref.watch(learningSettingsProvider);
+    final bool voiceConfigured = settings.usesVoicePractice;
     final Pcm16MonoAudio? own =
         _recordingActive ? _liveRecording : _recording;
     final int referenceMs = _reference?.audio.durationMs ?? 0;
@@ -651,6 +707,23 @@ class _StudyShadowingTabState extends ConsumerState<StudyShadowingTab> {
                     : () => unawaited(_goNextAfterPractice()),
                 child: Text('下一句'),
               ),
+              OutlinedButton.icon(
+                key: const ValueKey<String>('study-shadowing-voice'),
+                onPressed: !voiceConfigured ||
+                        _recordingPath == null ||
+                        _recordingActive ||
+                        _voiceBusy
+                    ? null
+                    : () => unawaited(_runVoiceFeedback()),
+                icon: _voiceBusy
+                    ? const SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Icon(Icons.hearing_rounded, size: 18),
+                label: Text(_voiceBusy ? 'Voice 分析中' : 'Voice 反馈'),
+              ),
               if (widget.onOpenFullDialog != null)
                 TextButton(
                   onPressed: widget.onOpenFullDialog,
@@ -658,9 +731,74 @@ class _StudyShadowingTabState extends ConsumerState<StudyShadowingTab> {
                 ),
             ],
           ),
+          if (_voiceResult != null) ...<Widget>[
+            SizedBox(height: 12),
+            Container(
+              width: double.infinity,
+              padding: EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: shell.cardActive,
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: shell.borderActive),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: <Widget>[
+                  Text(
+                    'Voice 重叠 ${_voiceResult!.scorePercentLabel}'
+                    '${_voiceResult!.mock ? ' · MOCK' : ''}',
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w700,
+                      color: shell.textPrimary,
+                    ),
+                  ),
+                  SizedBox(height: 8),
+                  Text(
+                    '识别：${_voiceResult!.transcript.isEmpty ? '（空）' : _voiceResult!.transcript}',
+                    style: TextStyle(
+                      fontSize: 13,
+                      height: 1.4,
+                      color: shell.textSecondary,
+                    ),
+                  ),
+                  if (_voiceResult!.overlap.missingWords.isNotEmpty) ...<Widget>[
+                    SizedBox(height: 6),
+                    Text(
+                      '漏读：${_voiceResult!.overlap.missingWords.join(', ')}',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Colors.orangeAccent,
+                      ),
+                    ),
+                  ],
+                  if (_voiceResult!.overlap.extraWords.isNotEmpty) ...<Widget>[
+                    SizedBox(height: 4),
+                    Text(
+                      '多读：${_voiceResult!.overlap.extraWords.join(', ')}',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: shell.textMuted,
+                      ),
+                    ),
+                  ],
+                  SizedBox(height: 6),
+                  Text(
+                    _voiceResult!.label,
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: shell.textMuted,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
           SizedBox(height: 8),
           Text(
-            '本地录音与波形对照 · 云端评分默认关闭',
+            voiceConfigured
+                ? '本地波形对照 · Voice sidecar 可做 Whisper 转写反馈'
+                : '本地录音与波形对照 · 设置 Voice 地址后可上传本地转写',
             style: TextStyle(
               color: shell.textMuted,
               fontSize: 11,

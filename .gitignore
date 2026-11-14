@@ -4,8 +4,15 @@
 **/*.pyc
 **/.pytest_cache/
 services/api/acquire_english.db
+services/api/test_*.db
+services/api/.venv/
+docs/digital-human-coach/captures/**
+!docs/digital-human-coach/captures/.gitkeep
+tools/digital_human_coach/.venv/
 services/api/.env
 apps/mobile/.env
+tools/**/.env
+!**/.env.example
 
 # Node
 **/node_modules/

@@ -9,6 +9,7 @@ class LibraryCourseListItem extends StatelessWidget {
     required this.course,
     required this.onTap,
     this.onResourceDirectory,
+    this.onContextMenu,
     this.selected = false,
     this.selectionMode = false,
     super.key,
@@ -17,6 +18,7 @@ class LibraryCourseListItem extends StatelessWidget {
   final LibraryCourseData course;
   final VoidCallback onTap;
   final VoidCallback? onResourceDirectory;
+  final ValueChanged<Offset>? onContextMenu;
   final bool selected;
   final bool selectionMode;
 
@@ -24,7 +26,16 @@ class LibraryCourseListItem extends StatelessWidget {
   Widget build(BuildContext context) {
     final bool isNewCourse = course.id == 'ted-imported';
 
-    return InkWell(
+    return GestureDetector(
+      onSecondaryTapDown: selectionMode || onContextMenu == null
+          ? null
+          : (TapDownDetails details) =>
+                onContextMenu!(details.globalPosition),
+      onLongPressStart: selectionMode || onContextMenu == null
+          ? null
+          : (LongPressStartDetails details) =>
+                onContextMenu!(details.globalPosition),
+      child: InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(32),
       child: Ink(
@@ -286,6 +297,7 @@ class LibraryCourseListItem extends StatelessWidget {
             ],
           ),
         ),
+      ),
       ),
     );
   }

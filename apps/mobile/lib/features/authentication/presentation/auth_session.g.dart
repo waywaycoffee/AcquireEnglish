@@ -41,7 +41,7 @@ final class AuthSessionProvider
   }
 }
 
-String _$authSessionHash() => r'b07981daf7fd922f7609ea26decab99a1c1091e7';
+String _$authSessionHash() => r'4d3054004558172de91fd1b9bff6b940f6143e25';
 
 abstract class _$AuthSession extends $Notifier<AuthSessionState> {
   AuthSessionState build();

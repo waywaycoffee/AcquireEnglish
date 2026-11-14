@@ -4,6 +4,7 @@ import 'dart:convert';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hive_ce/hive.dart';
 
+import '../../sync/data/vocab_sync_service.dart';
 import '../data/offline_word_dictionary.dart';
 import '../domain/sm2_scheduler.dart';
 
@@ -391,7 +392,7 @@ class WordBookNotifier extends Notifier<List<WordEntry>> {
   }
 
   bool? toggleFavorite(String rawWord) {
-    final String word = normalizeWord(rawWord);
+    final String word = normalizeLexeme(rawWord);
     if (word.isEmpty) return null;
     final int index = state.indexWhere((WordEntry item) => item.word == word);
     if (index < 0) return null;
@@ -399,7 +400,11 @@ class WordBookNotifier extends Notifier<List<WordEntry>> {
     next[index] = next[index].copyWith(favorite: !next[index].favorite);
     state = next;
     unawaited(_persist());
-    return state[index].favorite;
+    final WordEntry updated = state[index];
+    if (updated.favorite) {
+      unawaited(ref.read(vocabSyncServiceProvider).pushEntry(updated));
+    }
+    return updated.favorite;
   }
 
   bool addFavoriteWord({
@@ -414,8 +419,8 @@ class WordBookNotifier extends Notifier<List<WordEntry>> {
     required String chinese,
     String? generatedDefinition,
   }) {
-    final String word = normalizeWord(rawWord);
-    if (!_isIndependentEnglishWord(word)) return false;
+    final String word = normalizeLexeme(rawWord);
+    if (!_isFavoriteableLexeme(word)) return false;
     final String? definition = generatedDefinition?.trim();
     final String? validDefinition = definition == null || definition.isEmpty
         ? null
@@ -501,6 +506,10 @@ class WordBookNotifier extends Notifier<List<WordEntry>> {
     }
     unawaited(_persist());
     unawaited(_fillOfflineDefinitions(<String>[word]));
+    final int favIndex = state.indexWhere((WordEntry e) => e.word == word);
+    if (favIndex >= 0 && state[favIndex].favorite) {
+      unawaited(ref.read(vocabSyncServiceProvider).pushEntry(state[favIndex]));
+    }
     return true;
   }
 
@@ -934,5 +943,27 @@ String normalizeWord(String value) => value
     .replaceAll('’', "'")
     .replaceAll(RegExp(r'^[^A-Za-z0-9_]+|[^A-Za-z0-9_]+$'), '');
 
+/// Single word or short English phrase for vocabulary cards.
+String normalizeLexeme(String value) {
+  final String trimmed = value
+      .trim()
+      .toLowerCase()
+      .replaceAll('’', "'")
+      .replaceAll(RegExp(r"[^a-z0-9\s']+"), ' ')
+      .replaceAll(RegExp(r'\s+'), ' ')
+      .trim();
+  if (!trimmed.contains(' ')) {
+    return normalizeWord(trimmed);
+  }
+  return trimmed;
+}
+
 bool _isIndependentEnglishWord(String word) =>
     RegExp(r'^[a-z]{2,}$').hasMatch(word);
+
+bool _isFavoriteableLexeme(String word) {
+  if (_isIndependentEnglishWord(word)) {
+    return true;
+  }
+  return RegExp(r"^[a-z]{2,}(?:\s+[a-z']{2,}){1,5}$").hasMatch(word);
+}

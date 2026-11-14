@@ -1,0 +1,16 @@
+# Desktop / CI sidecar for import-time subtitle fill.
+# Mobile APK keeps on-device Whisper.cpp; this stack is used when Python is available.
+openai-whisper>=20231117
+# auto-subs is vendored under vendor/auto-subs (editable install preferred).
+# Install with: ./bootstrap.sh
+pydantic>=2.0
+typer>=0.12
+rich>=13.0
+charset-normalizer>=3.0
+ffmpeg-python>=0.2.0
+numpy>=1.24
+torch
+tqdm
+more-itertools
+numba
+tiktoken

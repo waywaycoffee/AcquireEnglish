@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -6,6 +8,8 @@ import '../../library/presentation/library_mock_data.dart';
 import '../../player/presentation/widgets/study_shell_tokens.dart';
 import '../../settings/presentation/bilibili_login_sheet.dart';
 import '../../settings/presentation/settings_provider.dart';
+import '../../subtitle_completion/subtitle_completion_enqueue.dart';
+import '../data/bilibili_collection_download.dart';
 import '../data/bilibili_course_builder.dart';
 import '../data/bilibili_import_service.dart';
 import '../domain/bilibili_import.dart';
@@ -95,17 +99,41 @@ class _BilibiliImportFormState extends ConsumerState<_BilibiliImportForm> {
       final bool ok = await ref
           .read(libraryCatalogProvider.notifier)
           .importCourse(course);
+      if (ok) {
+        unawaited(enqueueSubtitleCompletionForCourse(course: course));
+      }
       if (!mounted) {
         return;
       }
       setState(() => _busy = false);
+      final String hint = bilibiliImportSuccessHint(meta);
+      final ProviderContainer container = ProviderScope.containerOf(context);
+      final ScaffoldMessengerState messenger = ScaffoldMessenger.of(context);
+      // Keep downloading the rest of the 合集/分P in the background.
+      if (ok && course.episodes.length > 1) {
+        final LibraryCatalogNotifier catalog =
+            container.read(libraryCatalogProvider.notifier);
+        final BilibiliImportService downloadService = service;
+        final String courseId = course.id;
+        final BilibiliCollectionDownloadProgressNotifier progressNotifier =
+            container.read(
+              bilibiliCollectionDownloadProgressProvider.notifier,
+            );
+        unawaited(
+          downloadRemainingBilibiliEpisodes(
+            catalog: catalog,
+            readCourses: () => container.read(libraryCatalogProvider),
+            courseId: courseId,
+            service: downloadService,
+            progressNotifier: progressNotifier,
+          ),
+        );
+      }
       Navigator.of(context).pop();
-      ScaffoldMessenger.of(context).showSnackBar(
+      messenger.showSnackBar(
         SnackBar(
           content: Text(
-            ok
-                ? '已加入书库。${bilibiliImportSuccessHint(meta)}'
-                : '导入未完成，请重试',
+            ok ? '已加入书库。$hint' : '导入未完成，请重试',
           ),
         ),
       );

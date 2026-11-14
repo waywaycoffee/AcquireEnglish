@@ -179,6 +179,10 @@ class BilibiliImportService {
   final String _cookie;
   final Map<String, List<String>> _dnsCache = <String, List<String>>{};
 
+  /// Coalesce concurrent downloads of the same cache key (import + open / 合集).
+  static final Map<String, Future<File>> _inflightCacheDownloads =
+      <String, Future<File>>{};
+
   /// Cookie header for player / subtitle APIs (login required for CC list).
   String get cookieHeader {
     if (_cookie.isNotEmpty) {
@@ -1082,6 +1086,65 @@ class BilibiliImportService {
     );
   }
 
+  /// Return an on-disk import/cache MP4 for [rawInput] without downloading.
+  ///
+  /// Prefers a cheap BV/av filename probe so open-after-import stays offline
+  /// when the file is already in `bilibili_media/`.
+  Future<String?> findExistingLocalCache(String rawInput) async {
+    final String? cheapKey = _cheapMediaIdKey(rawInput);
+    if (cheapKey != null && cheapKey.isNotEmpty) {
+      final int? page = BilibiliImport.extractPage(rawInput);
+      final List<String> probes = <String>[
+        if (page != null && page > 1)
+          BilibiliImport.mediaIdKey(
+            bvidOrAv: cheapKey,
+            page: page,
+            pageCount: 2,
+          ),
+        cheapKey,
+      ];
+      for (final String key in probes) {
+        final File? cached = await _existingCacheFile(key);
+        if (cached != null) {
+          return cached.path;
+        }
+      }
+    }
+    try {
+      final _BilibiliVideoRef ref = await _resolveVideoRef(rawInput);
+      final File? cached = await _existingCacheFile(ref.idKey);
+      return cached?.path;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  String? _cheapMediaIdKey(String rawInput) {
+    final Map<String, String>? ids = BilibiliImport.extractIds(rawInput);
+    if (ids != null) {
+      final String? bvid = ids['bvid']?.trim();
+      if (bvid != null && bvid.isNotEmpty) {
+        return bvid;
+      }
+      final String? aid = ids['aid']?.trim();
+      if (aid != null && aid.isNotEmpty) {
+        return 'av$aid';
+      }
+    }
+    final RegExpMatch? bv = RegExp(
+      r'(BV[0-9A-Za-z]+)',
+      caseSensitive: false,
+    ).firstMatch(rawInput);
+    if (bv != null) {
+      return bv.group(1);
+    }
+    final RegExpMatch? av = RegExp(
+      r'(?:^|[/\\_-])(av\d+)(?:[/\\_.-]|$)',
+      caseSensitive: false,
+    ).firstMatch(rawInput);
+    return av?.group(1);
+  }
+
   Future<void> _assertRemoteIsPlayable(String mediaUrl) async {
     Object? lastError;
     // Prefer a tiny Range GET. Fall back to HEAD when the node rejects Range.
@@ -1372,11 +1435,7 @@ class BilibiliImportService {
   }
 
   Future<File?> _existingCacheFile(String idKey) async {
-    for (final String key in <String>[
-      idKey,
-      if (BilibiliImport.legacyMediaIdKey(idKey) != null)
-        BilibiliImport.legacyMediaIdKey(idKey)!,
-    ]) {
+    for (final String key in BilibiliImport.mediaIdKeyAliases(idKey)) {
       final File file = await _cacheFileFor(key);
       if (!file.existsSync()) {
         continue;
@@ -1405,6 +1464,51 @@ class BilibiliImportService {
     required String idKey,
     void Function(double? progress)? onProgress,
   }) async {
+    final File? already = await _existingCacheFile(idKey);
+    if (already != null) {
+      onProgress?.call(1);
+      return already;
+    }
+
+    // Share one download across import / player prepare / 合集 background.
+    for (final String alias in BilibiliImport.mediaIdKeyAliases(idKey)) {
+      final Future<File>? inflight = _inflightCacheDownloads[alias];
+      if (inflight != null) {
+        final File shared = await inflight;
+        onProgress?.call(1);
+        return shared;
+      }
+    }
+
+    final Future<File> download = _downloadPlayableToCacheUnlocked(
+      mediaUrl: mediaUrl,
+      idKey: idKey,
+      onProgress: onProgress,
+    );
+    for (final String alias in BilibiliImport.mediaIdKeyAliases(idKey)) {
+      _inflightCacheDownloads[alias] = download;
+    }
+    try {
+      return await download;
+    } finally {
+      for (final String alias in BilibiliImport.mediaIdKeyAliases(idKey)) {
+        if (identical(_inflightCacheDownloads[alias], download)) {
+          _inflightCacheDownloads.remove(alias);
+        }
+      }
+    }
+  }
+
+  Future<File> _downloadPlayableToCacheUnlocked({
+    required String mediaUrl,
+    required String idKey,
+    void Function(double? progress)? onProgress,
+  }) async {
+    final File? already = await _existingCacheFile(idKey);
+    if (already != null) {
+      onProgress?.call(1);
+      return already;
+    }
     final File out = await _cacheFileFor(idKey);
     final File temp = File('${out.path}.part');
     if (temp.existsSync()) {
@@ -1496,6 +1600,45 @@ class BilibiliImportService {
     };
   }
 
+  /// Delete cached official EN/ZH under `Documents/bilibili/<idKey>/`.
+  ///
+  /// Used when B站 confirms there is no CC for this cid — keeping a stale
+  /// `zh.srt` from an earlier串台 download would poison playback forever.
+  Future<void> clearOfficialSubtitleFiles(String? idKey) async {
+    final List<String> keys = BilibiliImport.officialSubtitleFolderKeys(
+      idKey ?? '',
+    );
+    if (keys.isEmpty) {
+      return;
+    }
+    final Directory docs = await getApplicationDocumentsDirectory();
+    final Directory root = Directory('${docs.path}/bilibili');
+    if (!root.existsSync()) {
+      return;
+    }
+    await for (final FileSystemEntity entity in root.list()) {
+      if (entity is! Directory) {
+        continue;
+      }
+      final String name = entity.uri.pathSegments
+          .lastWhere((String segment) => segment.isNotEmpty, orElse: () => '')
+          .toUpperCase();
+      if (!keys.contains(name)) {
+        continue;
+      }
+      for (final String fileName in <String>['en.srt', 'zh.srt']) {
+        final File file = File(
+          '${entity.path}${Platform.pathSeparator}$fileName',
+        );
+        if (file.existsSync()) {
+          try {
+            await file.delete();
+          } catch (_) {}
+        }
+      }
+    }
+  }
+
   Future<Map<String, String?>> _fetchSubtitles({
     required String bvid,
     String? aid,
@@ -1508,6 +1651,8 @@ class BilibiliImportService {
       cid: cid,
     );
     if (list.isEmpty) {
+      // Confirmed empty track list → wipe stale SRTs for this BV/page.
+      await clearOfficialSubtitleFiles(idKey);
       return const <String, String?>{};
     }
 
@@ -1544,12 +1689,22 @@ class BilibiliImportService {
       if (!isZh && !isEn) {
         continue;
       }
+      // Prefer explicit English tags over ambiguous zh/en collisions.
+      final bool treatAsEn = isEn && !isZh;
       final String? path = await _downloadJsonSubtitleToSrt(
         url,
-        File('${dir.path}/${isEn ? 'en' : 'zh'}.srt'),
+        File('${dir.path}/${treatAsEn ? 'en' : 'zh'}.srt'),
       );
-      if (isEn) {
-        enPath ??= path;
+      if (path == null) {
+        continue;
+      }
+      if (treatAsEn) {
+        // Some B站 tracks are labeled en/ai-en but body is Chinese.
+        if (_srtLooksChineseOnly(path)) {
+          zhPath ??= path;
+        } else {
+          enPath ??= path;
+        }
       } else {
         zhPath ??= path;
       }
@@ -1698,20 +1853,46 @@ class BilibiliImportService {
   }
 
   bool _isZhSubtitleLan(String lan, String lanDoc) {
-    final String blob = '$lan $lanDoc';
-    return blob.contains('zh') ||
-        blob.contains('中') ||
-        blob.contains('chs') ||
-        blob.contains('cn') ||
-        lan == 'ai-zh';
+    final String normalizedLan = lan.trim().toLowerCase();
+    if (normalizedLan == 'ai-zh' ||
+        normalizedLan.startsWith('zh') ||
+        normalizedLan == 'chs' ||
+        normalizedLan == 'cht' ||
+        normalizedLan == 'cn') {
+      return true;
+    }
+    final String blob = '$normalizedLan $lanDoc';
+    return blob.contains('中') ||
+        blob.contains('汉') ||
+        RegExp(r'(^|[^a-z])(zh|chs|cht)([^a-z]|$)').hasMatch(blob);
   }
 
   bool _isEnSubtitleLan(String lan, String lanDoc) {
-    final String blob = '$lan $lanDoc';
-    return lan.startsWith('en') ||
-        lan == 'ai-en' ||
-        blob.contains('英') ||
+    final String normalizedLan = lan.trim().toLowerCase();
+    if (normalizedLan == 'ai-en' ||
+        normalizedLan == 'en' ||
+        normalizedLan.startsWith('en-') ||
+        normalizedLan.startsWith('en_')) {
+      return true;
+    }
+    final String blob = '$normalizedLan $lanDoc';
+    return blob.contains('英') ||
         RegExp(r'(^|[^a-z])en([^a-z]|$)').hasMatch(blob);
+  }
+
+  bool _srtLooksChineseOnly(String path) {
+    try {
+      final String raw = File(path).readAsStringSync();
+      final String text = raw
+          .replaceAll(RegExp(r'\d+:\d+:\d+[.,]\d+\s*-->\s*\d+:\d+:\d+[.,]\d+'), ' ')
+          .replaceAll(RegExp(r'^\d+\s*$', multiLine: true), ' ')
+          .replaceAll(RegExp(r'WEBVTT'), ' ');
+      final int latin = RegExp(r'[A-Za-z]').allMatches(text).length;
+      final int chinese = RegExp(r'[\u4e00-\u9fff]').allMatches(text).length;
+      return chinese > 0 && chinese >= latin;
+    } catch (_) {
+      return false;
+    }
   }
 
   Future<String?> _downloadJsonSubtitleToSrt(String url, File outFile) async {
@@ -1847,7 +2028,15 @@ BilibiliSeasonParseResult parseBilibiliUgcSeason(
           (arc['duration'] as num?)?.toInt() ??
           (episode['duration'] as num?)?.toInt() ??
           0;
-      final String? arcCover = arc['pic'] as String?;
+      final String? rawCover =
+          (episode['cover'] as String?)?.trim().isNotEmpty == true
+          ? (episode['cover'] as String).trim()
+          : (arc['pic'] as String?)?.trim().isNotEmpty == true
+          ? (arc['pic'] as String).trim()
+          : (arc['first_frame'] as String?)?.trim();
+      final String? normalizedCover = normalizeCoverUrl == null
+          ? rawCover
+          : normalizeCoverUrl(rawCover);
       episodes.add(
         BilibiliSeasonEpisodeMeta(
           index: episodes.length + 1,
@@ -1856,9 +2045,7 @@ BilibiliSeasonParseResult parseBilibiliUgcSeason(
           aid: aid,
           cid: cid,
           durationSec: durationSec,
-          coverImageUrl: normalizeCoverUrl == null
-              ? arcCover?.trim()
-              : normalizeCoverUrl(arcCover),
+          coverImageUrl: normalizedCover ?? coverUrl,
         ),
       );
     }

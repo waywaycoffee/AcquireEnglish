@@ -13,6 +13,13 @@ class User(Base):
     email: Mapped[str] = mapped_column(String(255), unique=True, index=True)
     hashed_password: Mapped[str] = mapped_column(String(255))
     display_name: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    phone: Mapped[str | None] = mapped_column(String(32), unique=True, index=True, nullable=True)
+    wechat_openid: Mapped[str | None] = mapped_column(
+        String(64), unique=True, index=True, nullable=True
+    )
+    wechat_unionid: Mapped[str | None] = mapped_column(
+        String(64), unique=True, index=True, nullable=True
+    )
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     progresses: Mapped[list["LessonProgress"]] = relationship(back_populates="user")
@@ -74,6 +81,10 @@ class UserPreference(Base):
     tags_json: Mapped[str] = mapped_column(Text, default='["slow","daily"]')
     daily_quota: Mapped[int] = mapped_column(Integer, default=2)
     notify_daily_feed: Mapped[int] = mapped_column(Integer, default=1)
+    # Optional user-provided Bilibili cookie for login-gated CC/AI subtitles.
+    bilibili_cookie: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # Optional per-user DashScope / 百炼 API key for web AI subtitles.
+    asr_api_key: Mapped[str | None] = mapped_column(Text, nullable=True)
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
     )

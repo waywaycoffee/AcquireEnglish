@@ -8,6 +8,7 @@ import '../../library/presentation/library_mock_data.dart';
 import '../../settings/presentation/settings_provider.dart';
 import '../domain/bilibili_import.dart';
 import 'bilibili_import_service.dart';
+import 'bilibili_multipage.dart';
 
 bool _isPlaceholderCover(String cover) {
   final String value = cover.trim();
@@ -20,9 +21,9 @@ bool _isPlaceholderCover(String cover) {
   if (value == 'assets/img/app_icon.png' || value.endsWith('/app_icon.png')) {
     return true;
   }
-  // Prefer pinning a local file for remote covers.
+  // Keep working https covers — do not treat them as missing.
   if (value.startsWith('http://') || value.startsWith('https://')) {
-    return true;
+    return false;
   }
   return !File(value).existsSync();
 }
@@ -119,10 +120,7 @@ Future<void> refreshMissingBilibiliCovers(Ref ref) async {
     }
 
     final bool courseNeedsCover = _isPlaceholderCover(course.coverImage);
-    final bool episodeNeedsCover = course.episodes.any(
-      (LibraryEpisodeItem e) => _isPlaceholderCover(e.coverImage),
-    );
-    if (courseNeedsCover || episodeNeedsCover) {
+    if (courseNeedsCover) {
       try {
         final String? cover = await service.resolveCoverImage(source);
         if (cover != null &&
@@ -151,7 +149,61 @@ Future<void> refreshMissingBilibiliCovers(Ref ref) async {
       }
     }
 
-    if (_courseNeedsLocalVideo(course)) {
+    // Per-episode covers for 合集/分P — avoid stamping one season poster onto
+    // every member when each episode already has (or can resolve) its own.
+    if (course.episodes.length > 1) {
+      for (final LibraryEpisodeItem episode in course.episodes) {
+        if (!_isPlaceholderCover(episode.coverImage)) {
+          continue;
+        }
+        final String? episodeSource = bilibiliSourceForEpisode(
+          course: course,
+          episode: episode,
+          videoAsset: episode.videoAsset,
+        );
+        if (episodeSource == null || episodeSource.isEmpty) {
+          continue;
+        }
+        try {
+          final String? cover = await service.resolveCoverImage(episodeSource);
+          if (cover == null ||
+              cover.isEmpty ||
+              !_isDisplayableCover(cover)) {
+            continue;
+          }
+          await ref
+              .read(libraryCatalogProvider.notifier)
+              .updateEpisodeLocalMedia(
+                courseId: course.id,
+                episodeId: episode.id,
+                coverImage: cover,
+              );
+          developer.log(
+            'episode cover updated ${episode.id} -> $cover',
+            name: 'bilibili.backfill',
+          );
+        } catch (e, st) {
+          developer.log(
+            'episode cover failed ${episode.id}: $e',
+            name: 'bilibili.backfill',
+            error: e,
+            stackTrace: st,
+          );
+        }
+      }
+    } else if (course.episodes.isNotEmpty &&
+        _isPlaceholderCover(course.episodes.first.coverImage) &&
+        !_isPlaceholderCover(course.coverImage)) {
+      // Single episode: mirror course cover onto the episode if needed.
+      await ref.read(libraryCatalogProvider.notifier).updateEpisodeLocalMedia(
+            courseId: course.id,
+            episodeId: course.episodes.first.id,
+            coverImage: course.coverImage,
+          );
+    }
+
+    // Single-episode courses only — never stamp one MP4 onto a whole 合集.
+    if (_courseNeedsLocalVideo(course) && course.episodes.length <= 1) {
       try {
         developer.log(
           'downloading local video for ${course.id}',

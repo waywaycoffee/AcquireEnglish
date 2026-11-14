@@ -1,11 +1,11 @@
 import 'package:common_learn_english/features/home/presentation/pad_home_screen.dart';
 import 'package:common_learn_english/features/player/presentation/full_transcript_reader.dart';
-import 'package:common_learn_english/features/player/presentation/pad_landscape_player_screen.dart';
 import 'package:common_learn_english/features/player/presentation/pad_portrait_player_screen.dart';
 import 'package:common_learn_english/features/player/presentation/player_mock_state.dart';
 import 'package:common_learn_english/features/player/presentation/player_screen.dart';
 import 'package:common_learn_english/features/player/presentation/widgets/player_subtitle_list.dart';
 import 'package:common_learn_english/features/player/presentation/widgets/player_video_panel.dart';
+import 'package:common_learn_english/features/player/presentation/widgets/study_top_bar.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -23,11 +23,19 @@ class _SubtitleListHarness extends StatefulWidget {
 
 class _SubtitleListHarnessState extends State<_SubtitleListHarness> {
   int _activeIndex = 0;
+  int _timelineFollowEpoch = 0;
   bool _isPlaying = false;
 
   void setActiveIndex(int nextIndex) {
     setState(() {
       _activeIndex = nextIndex;
+    });
+  }
+
+  void followTimeline(int nextIndex) {
+    setState(() {
+      _activeIndex = nextIndex;
+      _timelineFollowEpoch += 1;
     });
   }
 
@@ -45,6 +53,7 @@ class _SubtitleListHarnessState extends State<_SubtitleListHarness> {
         child: PlayerSubtitleList(
           lines: PlayerMockState.fallbackLines,
           activeIndex: _activeIndex,
+          timelineFollowEpoch: _timelineFollowEpoch,
           subtitleMode: '双语',
           currentWordIndex: 0,
           fontScale: 1,
@@ -76,10 +85,12 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.textContaining('爱可儿英语'), findsWidgets);
-    expect(find.text('晚上好 Mark 👋'), findsOneWidget);
+    expect(find.textContaining('爱快英语'), findsWidgets);
+    expect(find.textContaining('Elon Musk 👋'), findsOneWidget);
     expect(find.text('导入你的第一套英语视频课程'), findsOneWidget);
-    expect(find.text('去导入课程'), findsOneWidget);
+    expect(find.text('YouTube'), findsOneWidget);
+    expect(find.text('B站'), findsOneWidget);
+    expect(find.text('导入'), findsOneWidget);
     expect(find.text('今日挑战'), findsOneWidget);
   });
 
@@ -102,7 +113,7 @@ void main() {
   });
 
   testWidgets('renders pad player controls', (WidgetTester tester) async {
-    tester.view.physicalSize = const Size(1366, 1024);
+    tester.view.physicalSize = const Size(390, 844);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.reset);
 
@@ -113,13 +124,13 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('课程名称'), findsOneWidget);
-    expect(find.text('第 01 集'), findsOneWidget);
-    expect(find.text('0.8'), findsOneWidget);
+    expect(find.byType(PadPortraitPlayerScreen), findsOneWidget);
+    expect(find.byType(StudyTopBar), findsOneWidget);
+    expect(find.text('0.8x'), findsOneWidget);
   });
 
   testWidgets('switches player speed state', (WidgetTester tester) async {
-    tester.view.physicalSize = const Size(1366, 1024);
+    tester.view.physicalSize = const Size(390, 844);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.reset);
 
@@ -130,18 +141,18 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    await tester.tap(find.text('0.8'));
+    await tester.tap(find.byKey(const ValueKey<String>('study-chip-speed')));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('1.25×').last);
+    await tester.tap(find.text('1.25x').last);
     await tester.pumpAndSettle();
 
-    expect(find.text('1.25'), findsOneWidget);
+    expect(find.text('1.25x'), findsOneWidget);
   });
 
   testWidgets('player progress slider seeks to another line', (
     WidgetTester tester,
   ) async {
-    tester.view.physicalSize = const Size(1366, 1024);
+    tester.view.physicalSize = const Size(390, 844);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.reset);
 
@@ -166,7 +177,7 @@ void main() {
   testWidgets('video progress updates the full transcript reader position', (
     WidgetTester tester,
   ) async {
-    tester.view.physicalSize = const Size(1366, 1024);
+    tester.view.physicalSize = const Size(390, 844);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.reset);
 
@@ -177,8 +188,8 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    final PadLandscapePlayerScreenState playerState = tester.state(
-      find.byType(PadLandscapePlayerScreen),
+    final PadPortraitPlayerScreenState playerState = tester.state(
+      find.byType(PadPortraitPlayerScreen),
     );
     playerState.state.loadLines(PlayerMockState.fallbackLines);
     playerState.debugHandleVideoProgress(const Duration(milliseconds: 169000));
@@ -191,7 +202,7 @@ void main() {
   });
 
   testWidgets('renders portrait player shell', (WidgetTester tester) async {
-    tester.view.physicalSize = const Size(768, 1024);
+    tester.view.physicalSize = const Size(390, 844);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.reset);
 
@@ -204,14 +215,14 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('课程名称'), findsOneWidget);
-    expect(find.text('第 01 集'), findsOneWidget);
+    expect(find.byType(PadPortraitPlayerScreen), findsOneWidget);
+    expect(find.byType(StudyTopBar), findsOneWidget);
   });
 
   testWidgets('player no longer shows daily discovery panel', (
     WidgetTester tester,
   ) async {
-    tester.view.physicalSize = const Size(1366, 1024);
+    tester.view.physicalSize = const Size(390, 844);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.reset);
 
@@ -351,34 +362,56 @@ void main() {
 
     harnessKey.currentState!.setActiveIndex(2);
     await tester.pump();
-
-    final double beforeReleaseCenter =
-        tester.getCenter(targetLine).dy - tester.getCenter(listFinder).dy;
-
     await gesture.up();
     await tester.pumpAndSettle();
 
-    expect(targetLine, findsOneWidget);
-    final double afterReleaseCenter =
-        tester.getCenter(targetLine).dy - tester.getCenter(listFinder).dy;
-    expect(afterReleaseCenter, beforeReleaseCenter);
+    // Dragging the transcript parks follow, so a later cue stays off this screen.
+    expect(find.text('chaotic'), findsOneWidget);
+    expect(targetLine, findsNothing);
 
     await tester.tap(find.text('定位当前'));
     await tester.pumpAndSettle();
 
-    final double afterLocateCenter =
-        tester.getCenter(targetLine).dy - tester.getCenter(listFinder).dy;
-    expect(afterLocateCenter.abs(), lessThan(afterReleaseCenter.abs()));
+    expect(targetLine, findsOneWidget);
 
     harnessKey.currentState!
       ..setPlaying(value: true)
       ..setActiveIndex(1);
     await tester.pumpAndSettle();
 
-    final Finder nextTargetLine = find.text('他们寻找一个远离喧嚣的安静避难所。');
-    final double afterResumeCenter =
-        tester.getCenter(nextTargetLine).dy - tester.getCenter(listFinder).dy;
-    expect(afterResumeCenter.abs(), lessThan(afterReleaseCenter.abs()));
+    expect(find.text('他们寻找一个远离喧嚣的安静避难所。'), findsOneWidget);
+  });
+
+  testWidgets('timeline scrub scrolls the subtitle list to that cue', (
+    WidgetTester tester,
+  ) async {
+    tester.view.physicalSize = const Size(900, 700);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+
+    final GlobalKey<_SubtitleListHarnessState> harnessKey =
+        GlobalKey<_SubtitleListHarnessState>();
+
+    await tester.pumpWidget(
+      MaterialApp(home: _SubtitleListHarness(key: harnessKey)),
+    );
+    await tester.pumpAndSettle();
+
+    final Finder listFinder = find.byType(ListView);
+    final TestGesture gesture = await tester.startGesture(
+      tester.getCenter(listFinder),
+    );
+    await gesture.moveBy(const Offset(0, -120));
+    await tester.pump();
+    await gesture.up();
+    await tester.pumpAndSettle();
+
+    expect(find.text('一个他们最终可以休息的地方。'), findsNothing);
+
+    harnessKey.currentState!.followTimeline(2);
+    await tester.pumpAndSettle();
+
+    expect(find.text('一个他们最终可以休息的地方。'), findsOneWidget);
   });
 
   testWidgets('player video panel does not overflow with many scrubber dots', (
@@ -397,7 +430,7 @@ void main() {
               line: PlayerMockState.fallbackLines.first,
               isPlaying: false,
               subtitleMode: '双语',
-              subtitleModes: const <String>['双语', '单英'],
+              subtitleModes: const <String>['双语', '英文'],
               speed: '1.0×',
               isShadowing: false,
               isLooping: false,

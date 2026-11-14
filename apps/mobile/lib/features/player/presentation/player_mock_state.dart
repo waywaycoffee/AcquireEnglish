@@ -1,5 +1,8 @@
 import 'dart:math';
 
+import 'subtitle_display_mode.dart';
+import 'subtitle_language_sanitize.dart';
+
 class PlayerSubtitleWord {
   const PlayerSubtitleWord({
     required this.text,
@@ -41,7 +44,7 @@ class PlayerMockState {
     _syncCurrentWordIndex(forceLineStart: true);
   }
 
-  static const List<String> subtitleModes = <String>['双语', '单英', '单中', '隐藏'];
+  static const List<String> subtitleModes = SubtitleDisplayMode.learningModes;
 
   static const List<PlayerSubtitleLine> fallbackLines = <PlayerSubtitleLine>[
     PlayerSubtitleLine(
@@ -81,6 +84,7 @@ class PlayerMockState {
   List<PlayerSubtitleLine> lines;
   Map<String, String> generatedWordDefinitions = const <String, String>{};
   int activeLineIndex;
+  int timelineFollowEpoch = 0;
   int currentWordIndex = 0;
   int subtitleDelayMs = 0;
   int positionMs;
@@ -89,7 +93,7 @@ class PlayerMockState {
   bool isLooping = false;
   bool pauseAtSentenceEnd = false;
   bool isShadowing = false;
-  String subtitleMode = '双语';
+  String subtitleMode = SubtitleDisplayMode.defaultMode;
 
   double get playbackRate {
     switch (speed) {
@@ -114,25 +118,12 @@ class PlayerMockState {
   bool get hasLines => lines.isNotEmpty;
 
   List<String> get availableSubtitleModes {
-    final bool hasEnglish = lines.any(
-      (PlayerSubtitleLine line) => line.english.trim().isNotEmpty,
-    );
-    final bool hasChinese = lines.any(
-      (PlayerSubtitleLine line) => line.chinese.trim().isNotEmpty,
-    );
-
-    final List<String> modes = <String>[];
-    if (hasEnglish && hasChinese) {
-      modes.add('双语');
+    // Four learning modes stay selectable even for Chinese-only official CC
+    // while ZH→EN fill is still running. English remains the product primary.
+    if (!hasLines) {
+      return const <String>[SubtitleDisplayMode.hidden];
     }
-    if (hasEnglish) {
-      modes.add('单英');
-    }
-    if (hasChinese) {
-      modes.add('单中');
-    }
-    modes.add('隐藏');
-    return modes;
+    return List<String>.of(SubtitleDisplayMode.learningModes);
   }
 
   bool get canAutoAdvance => hasLines && isPlaying;
@@ -261,7 +252,10 @@ class PlayerMockState {
     String? initialStartTime,
     Map<String, String> wordDefinitions = const <String, String>{},
   }) {
-    final List<PlayerSubtitleLine> validLines = loadedLines
+    // Late import avoids a cycle with player_subtitle_loader.
+    final List<PlayerSubtitleLine> sanitized =
+        sanitizeSubtitleLanguageFields(loadedLines);
+    final List<PlayerSubtitleLine> validLines = sanitized
         .where((PlayerSubtitleLine line) => line.endMs > line.startMs)
         .toList(growable: false);
 
@@ -295,6 +289,58 @@ class PlayerMockState {
     return validLines.isNotEmpty;
   }
 
+  /// Update cue text without resetting the playhead.
+  ///
+  /// OCR / AI partial merges must not call [loadLines] — that seeks to 0 and
+  /// breaks subtitle follow-scroll while the video keeps playing.
+  bool replaceLines(
+    List<PlayerSubtitleLine> loadedLines, {
+    Map<String, String>? wordDefinitions,
+    String preferredSubtitleMode = '',
+  }) {
+    final List<PlayerSubtitleLine> sanitized =
+        sanitizeSubtitleLanguageFields(loadedLines);
+    final List<PlayerSubtitleLine> validLines = sanitized
+        .where((PlayerSubtitleLine line) => line.endMs > line.startMs)
+        .toList(growable: false);
+
+    final int keepPositionMs = positionMs;
+    final bool keepPlaying = isPlaying;
+    lines = validLines;
+    if (wordDefinitions != null) {
+      generatedWordDefinitions = wordDefinitions;
+    }
+
+    if (lines.isEmpty) {
+      activeLineIndex = 0;
+      currentWordIndex = 0;
+      isPlaying = false;
+      subtitleMode = '隐藏';
+      return false;
+    }
+
+    // Rebind against the subtitle clock so nonzero [subtitleDelayMs] does not
+    // jump the highlighted cue when OCR/translate patches land mid-playback.
+    activeLineIndex = _resolveInitialIndexByMilliseconds(
+      keepPositionMs - subtitleDelayMs,
+      lines,
+    );
+    positionMs = keepPositionMs;
+    if (preferredSubtitleMode.trim().isNotEmpty &&
+        availableSubtitleModes.contains(preferredSubtitleMode)) {
+      subtitleMode = preferredSubtitleMode;
+    } else {
+      _normalizeSubtitleMode();
+    }
+    if (keepPlaying) {
+      isPlaying = true;
+      _syncCurrentWordIndex();
+    } else {
+      currentWordIndex = 0;
+    }
+    return true;
+  }
+
   bool seekToStartTime(String startTime) {
     final int? targetMs = _parseTimestampToMs(startTime);
     if (targetMs == null) {
@@ -307,13 +353,15 @@ class PlayerMockState {
     if (!hasLines) {
       return false;
     }
+    // Same clock as playback: video time minus the subtitle delay.
     final int lineIndex = _resolveInitialIndexByMilliseconds(
-      milliseconds,
+      max(0, milliseconds - subtitleDelayMs),
       lines,
     );
     activeLineIndex = lineIndex;
     positionMs = milliseconds;
     currentWordIndex = 0;
+    timelineFollowEpoch += 1;
     return true;
   }
 
@@ -402,18 +450,32 @@ class PlayerMockState {
   }
 
   void setSubtitleMode(String value) {
-    if (!hasLines && subtitleModes.contains(value)) {
-      subtitleMode = value;
+    final String normalized = SubtitleDisplayMode.normalize(value);
+    if (!hasLines) {
+      if (SubtitleDisplayMode.allModes.contains(normalized)) {
+        subtitleMode = normalized;
+      }
       return;
     }
-    subtitleMode = availableSubtitleModes.contains(value)
-        ? value
+    if (normalized == SubtitleDisplayMode.hidden) {
+      subtitleMode = SubtitleDisplayMode.hidden;
+      return;
+    }
+    subtitleMode = availableSubtitleModes.contains(normalized)
+        ? normalized
         : availableSubtitleModes.first;
   }
 
   void _normalizeSubtitleMode() {
+    subtitleMode = SubtitleDisplayMode.normalize(subtitleMode);
+    // Embedded/native「隐藏」is intentional only via setSubtitleMode. When cues
+    // reload, restore a learning mode so English can stay primary.
+    if (subtitleMode == SubtitleDisplayMode.hidden && hasLines) {
+      subtitleMode = SubtitleDisplayMode.defaultMode;
+      return;
+    }
     if (!availableSubtitleModes.contains(subtitleMode)) {
-      subtitleMode = availableSubtitleModes.first;
+      subtitleMode = SubtitleDisplayMode.defaultMode;
     }
   }
 

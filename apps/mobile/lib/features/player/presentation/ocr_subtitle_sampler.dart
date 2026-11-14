@@ -21,8 +21,10 @@ typedef OcrTextRecognizer = Future<List<String>> Function(Uint8List jpegBytes);
 /// Samples video frames while playing and OCR-reads the bottom subtitle band.
 class OcrSubtitleSampler {
   OcrSubtitleSampler({
-    this.interval = const Duration(milliseconds: 800),
-    this.bottomBandRatio = 0.35,
+    // Faster samples keep hardsub English aligned to the video clock.
+    this.interval = const Duration(milliseconds: 350),
+    // English hardsubs sit above Chinese — take a taller lower band.
+    this.bottomBandRatio = 0.48,
     this.captureFrame,
     this.recognizeText,
   });
@@ -41,6 +43,7 @@ class OcrSubtitleSampler {
   Timer? _timer;
   bool _busy = false;
   bool _cancelled = false;
+  int _pausedSamples = 0;
   Player? _player;
   String? _videoPath;
   bool Function()? _isPlaying;
@@ -58,6 +61,7 @@ class OcrSubtitleSampler {
   }) async {
     await stop();
     _cancelled = false;
+    _pausedSamples = 0;
     _player = player;
     _videoPath = videoPath;
     _isPlaying = isPlaying;
@@ -65,9 +69,14 @@ class OcrSubtitleSampler {
     _onCue = onCue;
     if (recognizeText == null) {
       _latinRecognizer ??= TextRecognizer(script: TextRecognitionScript.latin);
-      _chineseRecognizer ??= TextRecognizer(
-        script: TextRecognitionScript.chinese,
-      );
+      // Chinese script pack may be missing on some builds; never crash playback.
+      try {
+        _chineseRecognizer ??= TextRecognizer(
+          script: TextRecognitionScript.chinese,
+        );
+      } catch (_) {
+        _chineseRecognizer = null;
+      }
     }
     _timer = Timer.periodic(interval, (_) {
       unawaited(_tick());
@@ -95,16 +104,25 @@ class OcrSubtitleSampler {
       return;
     }
     final bool Function()? playing = _isPlaying;
-    if (playing == null || !playing()) {
-      return;
+    final bool isPlayingNow = playing?.call() ?? false;
+    // Hardsubs are visible while paused too — sample a few frames so opening
+    // a Chinese-only episode still fills English without waiting for Play.
+    if (!isPlayingNow) {
+      if (_pausedSamples >= 4) {
+        return;
+      }
+      _pausedSamples += 1;
+    } else {
+      _pausedSamples = 0;
     }
     _busy = true;
     try {
-      final int ms = _positionMs?.call() ?? 0;
+      // Snapshot the video clock at capture time — hardsubs live on the frame.
+      final int captureMs = _positionMs?.call() ?? 0;
       final Uint8List? frame = await (captureFrame ?? defaultCaptureFrame)(
         player: _player,
         videoPath: _videoPath,
-        positionMs: ms,
+        positionMs: captureMs,
       );
       if (_cancelled || frame == null || frame.isEmpty) {
         return;
@@ -120,7 +138,9 @@ class OcrSubtitleSampler {
       if (cue.isEmpty) {
         return;
       }
-      _onCue?.call(ms, cue);
+      // Always stamp the cue with the capture clock so slow OCR cannot slide
+      // hardsub English onto a later Chinese line.
+      _onCue?.call(captureMs, cue);
     } catch (_) {
       // OCR is best-effort; keep playback uninterrupted.
     } finally {
@@ -139,29 +159,32 @@ class OcrSubtitleSampler {
       final InputImage input = InputImage.fromFilePath(file.path);
       final List<String> blocks = <String>[];
       final Set<String> seen = <String>{};
+      // Latin first: burned-in English hardsubs are the preferred EN source.
       for (final TextRecognizer? recognizer in <TextRecognizer?>[
-        _chineseRecognizer,
         _latinRecognizer,
+        _chineseRecognizer,
       ]) {
         if (recognizer == null) {
           continue;
         }
         final RecognizedText result = await recognizer.processImage(input);
         for (final TextBlock block in result.blocks) {
-          final String text = block.text.trim();
-          if (text.isEmpty || !seen.add(text)) {
-            continue;
-          }
-          blocks.add(text);
-        }
-        for (final TextBlock block in result.blocks) {
           for (final TextLine line in block.lines) {
-            final String text = line.text.trim();
+            // Prefer element-level words + gap spacing; line.text often glues
+            // hardsub words (`agate`, `andright`).
+            final String text = _lineTextWithElementGaps(line).trim();
             if (text.isEmpty || !seen.add(text)) {
               continue;
             }
             blocks.add(text);
           }
+        }
+        for (final TextBlock block in result.blocks) {
+          final String text = block.text.trim();
+          if (text.isEmpty || !seen.add(text)) {
+            continue;
+          }
+          blocks.add(text);
         }
       }
       return blocks;
@@ -211,13 +234,44 @@ class OcrSubtitleSampler {
     return null;
   }
 
+  /// Join ML Kit word elements using horizontal gaps as space boundaries.
+  static String _lineTextWithElementGaps(TextLine line) {
+    final List<TextElement> elements = line.elements;
+    if (elements.isEmpty) {
+      return line.text;
+    }
+    final StringBuffer buffer = StringBuffer();
+    TextElement? previous;
+    for (final TextElement element in elements) {
+      final String text = element.text.trim();
+      if (text.isEmpty) {
+        continue;
+      }
+      if (previous != null) {
+        final double gap =
+            element.boundingBox.left - previous.boundingBox.right;
+        final double charWidth =
+            previous.boundingBox.width /
+            (previous.text.trim().isEmpty ? 1 : previous.text.trim().length);
+        // Hardsubs are spaced; glued glyphs sit nearly edge-to-edge.
+        if (gap > charWidth * 0.28) {
+          buffer.write(' ');
+        }
+      }
+      buffer.write(text);
+      previous = element;
+    }
+    final String joined = buffer.toString().trim();
+    return joined.isEmpty ? line.text : joined;
+  }
+
   /// Crops the lower [ratio] of a JPEG frame for hard-subtitle OCR.
   static Uint8List cropBottomBand(Uint8List jpegBytes, double ratio) {
     final img.Image? decoded = img.decodeImage(jpegBytes);
     if (decoded == null) {
       return jpegBytes;
     }
-    final double safeRatio = ratio.clamp(0.15, 0.6);
+    final double safeRatio = ratio.clamp(0.15, 0.65);
     final int bandHeight = (decoded.height * safeRatio).round().clamp(
       1,
       decoded.height,

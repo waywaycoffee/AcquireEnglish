@@ -7,6 +7,7 @@ import 'package:media_kit/media_kit.dart';
 import '../../library/presentation/library_mock_data.dart';
 import '../../settings/presentation/settings_provider.dart'
     show playerFontScales;
+import '../../shared/presentation/app_orientation.dart';
 import '../../shared/presentation/pad/app_design_tokens.dart';
 import '../domain/pronunciation_assessment.dart';
 import 'player_mock_state.dart';
@@ -52,6 +53,10 @@ class PlayerFullscreenVideoScreen extends StatefulWidget {
     this.onDictationLine = _ignoreLine,
     this.onAiExplain = _ignoreLine,
     this.onRegenerateAiLine,
+    this.onEditEnglishLine,
+    this.onEditSubtitleLine,
+    this.onEditLineNote,
+    this.lineNotesByStartMs = const <int, String>{},
     this.fontScale = 1,
     this.fontSize = '中',
     this.onSelectFontSize,
@@ -66,6 +71,7 @@ class PlayerFullscreenVideoScreen extends StatefulWidget {
     this.videoLoading = false,
     this.videoDuration = Duration.zero,
     this.videoErrorText,
+    this.paintSubtitlesOnVideo = false,
     super.key,
   });
 
@@ -99,12 +105,17 @@ class PlayerFullscreenVideoScreen extends StatefulWidget {
   final VoidCallback onSubtitleLookupOpen;
   final ValueChanged<String> onCollectWord;
   final void Function(String word, String time)? onCollectWordAtTime;
-  final ValueChanged<String>? onFavoriteWord;
+  final void Function(String word, [String? definitionCn])? onFavoriteWord;
   final ValueChanged<int> onBookmarkLine;
   final ValueChanged<int> onLoopFromLine;
   final ValueChanged<int> onDictationLine;
   final ValueChanged<int> onAiExplain;
   final Future<void> Function(int index)? onRegenerateAiLine;
+  final Future<void> Function(int index, String english)? onEditEnglishLine;
+  final Future<void> Function(int index, String english, String chinese)?
+  onEditSubtitleLine;
+  final Future<void> Function(int index, String note)? onEditLineNote;
+  final Map<int, String> lineNotesByStartMs;
   final double fontScale;
   final String fontSize;
   final ValueChanged<String>? onSelectFontSize;
@@ -119,6 +130,7 @@ class PlayerFullscreenVideoScreen extends StatefulWidget {
   final bool videoLoading;
   final Duration videoDuration;
   final String? videoErrorText;
+  final bool paintSubtitlesOnVideo;
 
   @override
   State<PlayerFullscreenVideoScreen> createState() =>
@@ -144,6 +156,8 @@ class _PlayerFullscreenVideoScreenState
   @override
   void initState() {
     super.initState();
+    // Only fullscreen video is allowed to leave portrait.
+    unawaited(unlockFullscreenLandscapeOrientation());
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
     _refreshTimer = Timer.periodic(widget.playerState.playbackTickDuration, (
       _,
@@ -175,6 +189,8 @@ class _PlayerFullscreenVideoScreenState
   void dispose() {
     _refreshTimer?.cancel();
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
+    // Restore app-wide portrait lock when leaving fullscreen.
+    unawaited(lockPortraitOrientation());
     super.dispose();
   }
 
@@ -221,6 +237,7 @@ class _PlayerFullscreenVideoScreenState
             right: rightInset,
             child: PlayerVideoPanel(
               episodeId: widget.activeEpisodeId,
+              paintSubtitlesOnVideo: widget.paintSubtitlesOnVideo,
               line: line,
               isPlaying: player.isPlaying,
               speed: player.speed,
@@ -414,6 +431,10 @@ class _PlayerFullscreenVideoScreenState
                 pronunciationUnavailableReasonForLine:
                     _lineAssessmentUnavailableReason,
                 onRegenerateAiLine: widget.onRegenerateAiLine,
+                onEditEnglishLine: widget.onEditEnglishLine,
+                onEditSubtitleLine: widget.onEditSubtitleLine,
+                onEditLineNote: widget.onEditLineNote,
+                lineNotesByStartMs: widget.lineNotesByStartMs,
                 onTogglePlaying: () => _refresh(widget.onTogglePlaying),
                 onPronounce: () => _refresh(widget.onSubtitleLookupOpen),
               ),
@@ -465,6 +486,10 @@ class _FullscreenSubtitlePanel extends StatelessWidget {
     required this.onDictationLine,
     required this.onAiExplain,
     this.onRegenerateAiLine,
+    this.onEditEnglishLine,
+    this.onEditSubtitleLine,
+    this.onEditLineNote,
+    this.lineNotesByStartMs = const <int, String>{},
     required this.onAssessLine,
     required this.pronunciationUnavailableReasonForLine,
     required this.onTogglePlaying,
@@ -483,12 +508,17 @@ class _FullscreenSubtitlePanel extends StatelessWidget {
   final ValueChanged<int> onTapLine;
   final ValueChanged<String> onCollectWord;
   final void Function(String word, String time)? onCollectWordAtTime;
-  final ValueChanged<String>? onFavoriteWord;
+  final void Function(String word, [String? definitionCn])? onFavoriteWord;
   final ValueChanged<int> onBookmarkLine;
   final ValueChanged<int> onLoopFromLine;
   final ValueChanged<int> onDictationLine;
   final ValueChanged<int> onAiExplain;
   final Future<void> Function(int index)? onRegenerateAiLine;
+  final Future<void> Function(int index, String english)? onEditEnglishLine;
+  final Future<void> Function(int index, String english, String chinese)?
+  onEditSubtitleLine;
+  final Future<void> Function(int index, String note)? onEditLineNote;
+  final Map<int, String> lineNotesByStartMs;
   final ValueChanged<int> onAssessLine;
   final String? Function(int index) pronunciationUnavailableReasonForLine;
   final VoidCallback onTogglePlaying;
@@ -509,6 +539,7 @@ class _FullscreenSubtitlePanel extends StatelessWidget {
           episodeId: episodeId,
           lines: player.lines,
           activeIndex: player.activeLineIndex,
+          timelineFollowEpoch: player.timelineFollowEpoch,
           subtitleMode: player.subtitleMode,
           subtitleLetterCase: subtitleLetterCase,
           currentWordIndex: player.currentWordIndex,
@@ -530,6 +561,10 @@ class _FullscreenSubtitlePanel extends StatelessWidget {
           pronunciationUnavailableReasonForLine:
               pronunciationUnavailableReasonForLine,
           onRegenerateAiLine: onRegenerateAiLine,
+          onEditEnglishLine: onEditEnglishLine,
+          onEditSubtitleLine: onEditSubtitleLine,
+          onEditLineNote: onEditLineNote,
+          lineNotesByStartMs: lineNotesByStartMs,
           loopingLineIndex: player.isLooping ? player.activeLineIndex : null,
           isPlaying: player.isPlaying,
           onTogglePlaying: onTogglePlaying,

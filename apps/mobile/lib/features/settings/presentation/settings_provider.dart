@@ -5,7 +5,9 @@ import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hive_ce/hive.dart';
 
+import '../../../constants/endpoints.dart';
 import '../../../constants/env_config.dart';
+import '../../../data/repository/network_repository.dart';
 import '../../shared/domain/subtitle_letter_case.dart';
 
 export '../../shared/domain/subtitle_letter_case.dart'
@@ -42,13 +44,22 @@ const Map<String, double> playerFontScales = <String, double>{
 };
 const List<String> subtitleWordHighlightStyleOptions = <String>[
   '绿色填充',
-  '黄色填充',
-  '蓝色填充',
   '下划线',
   '描边',
 ];
 
-const List<String> subtitleModeOptions = <String>['双语', '单英', '单中', '隐藏'];
+/// Older builds persisted these; map them onto the sparse green-text look.
+const Set<String> legacySubtitleWordHighlightStyles = <String>{
+  '黄色填充',
+  '蓝色填充',
+};
+
+const List<String> subtitleModeOptions = <String>[
+  '双语',
+  '英文',
+  '中文',
+  '盲听',
+];
 const List<String> playbackSpeedOptions = <String>[
   '0.5×',
   '0.8×',
@@ -76,6 +87,7 @@ const List<String> localWhisperModelOptions = <String>[
   'small.en',
 ];
 const List<String> oralCoachBackendOptions = <String>[
+  '视频陪练管线',
   'LiveTalking',
   '本地 TTS',
 ];
@@ -181,8 +193,12 @@ class LearningSettingsState {
     required this.ttsEngine,
     required this.ttsVoice,
     required this.ttsRate,
-    this.oralCoachBackend = '本地 TTS',
+    this.cloudApiBaseUrl = '',
+    this.oralCoachBackend = '视频陪练管线',
     this.oralCoachServerUrl = '',
+    this.oralCoachPipelineUrl = 'https://acquireenglish.curlhairai.com/coach',
+    this.voicePracticeServerUrl = '',
+    this.liveKitUrl = '',
     this.bilibiliSessdata = '',
     this.bilibiliUserId = '',
   });
@@ -190,8 +206,9 @@ class LearningSettingsState {
   factory LearningSettingsState.defaults() {
     final TranslationProviderPreset defaultPreset =
         translationProviderPresets['OpenAI']!;
+    // Phone installs often lack dart-define Bailian keys — default on-device.
     final TranslationProviderPreset defaultAsrPreset =
-        asrProviderPresets['阿里云百炼']!;
+        asrProviderPresets['本地 Whisper']!;
     return LearningSettingsState(
       subtitleMode: '双语',
       playbackSpeed: '0.8×',
@@ -213,7 +230,9 @@ class LearningSettingsState {
       asrProvider: defaultAsrPreset.name,
       asrApiKey: '',
       asrBaseUrl: defaultAsrPreset.baseUrl,
-      asrModel: defaultAsrPreset.model,
+      asrModel: defaultAsrPreset.model.isEmpty
+          ? 'base.en'
+          : defaultAsrPreset.model,
       useCustomAsrEndpoint: false,
       generateBilingualAsrSubtitles: true,
       ttsEngine: '',
@@ -249,14 +268,38 @@ class LearningSettingsState {
   final String ttsEngine;
   final String ttsVoice;
   final double ttsRate;
+  /// Empty → use compile-time [Endpoints.baseUrl] (`API_BASE`).
+  final String cloudApiBaseUrl;
   final String oralCoachBackend;
   final String oralCoachServerUrl;
+  /// Hosted or LAN `tools/oral_coach` pipeline.
+  final String oralCoachPipelineUrl;
+  /// Laptop sidecar for [Zemksh/voice](https://github.com/Zemksh/voice), e.g. http://192.168.1.8:8765
+  final String voicePracticeServerUrl;
+  /// Optional LiveKit ws URL for full-duplex; empty = HTTP draft/confirm pipeline.
+  final String liveKitUrl;
   final String bilibiliSessdata;
   /// DedeUserID from QR login (display only).
   final String bilibiliUserId;
 
+  /// Auth / sync API used by the mobile app (server-deployed).
+  String get resolvedCloudApiBaseUrl {
+    final String fromSettings = cloudApiBaseUrl.trim();
+    if (fromSettings.isNotEmpty) {
+      return Endpoints.normalizeBaseUrl(fromSettings);
+    }
+    return Endpoints.normalizeBaseUrl(Endpoints.baseUrl);
+  }
+
   bool get usesLiveTalkingCoach =>
       oralCoachBackend == 'LiveTalking' && oralCoachServerUrl.trim().isNotEmpty;
+
+  bool get usesOralCoachPipeline =>
+      oralCoachBackend == '视频陪练管线' && oralCoachPipelineUrl.trim().isNotEmpty;
+
+  bool get usesVoicePractice => voicePracticeServerUrl.trim().isNotEmpty;
+
+  bool get usesLiveKit => liveKitUrl.trim().isNotEmpty;
 
   bool get isBilibiliLoggedIn => hasBilibiliCookie;
 
@@ -322,8 +365,12 @@ class LearningSettingsState {
     String? ttsEngine,
     String? ttsVoice,
     double? ttsRate,
+    String? cloudApiBaseUrl,
     String? oralCoachBackend,
     String? oralCoachServerUrl,
+    String? oralCoachPipelineUrl,
+    String? voicePracticeServerUrl,
+    String? liveKitUrl,
     String? bilibiliSessdata,
     String? bilibiliUserId,
   }) {
@@ -362,8 +409,13 @@ class LearningSettingsState {
       ttsEngine: ttsEngine ?? this.ttsEngine,
       ttsVoice: ttsVoice ?? this.ttsVoice,
       ttsRate: ttsRate ?? this.ttsRate,
+      cloudApiBaseUrl: cloudApiBaseUrl ?? this.cloudApiBaseUrl,
       oralCoachBackend: oralCoachBackend ?? this.oralCoachBackend,
       oralCoachServerUrl: oralCoachServerUrl ?? this.oralCoachServerUrl,
+      oralCoachPipelineUrl: oralCoachPipelineUrl ?? this.oralCoachPipelineUrl,
+      voicePracticeServerUrl:
+          voicePracticeServerUrl ?? this.voicePracticeServerUrl,
+      liveKitUrl: liveKitUrl ?? this.liveKitUrl,
       bilibiliSessdata: bilibiliSessdata ?? this.bilibiliSessdata,
       bilibiliUserId: bilibiliUserId ?? this.bilibiliUserId,
     );
@@ -441,6 +493,7 @@ class LearningSettingsNotifier extends Notifier<LearningSettingsState> {
   LearningSettingsState build() {
     final LearningSettingsState defaults = LearningSettingsState.defaults();
     if (!Hive.isBoxOpen('prefs')) {
+      _scheduleApplyCloudApiBase(defaults);
       return defaults;
     }
 
@@ -448,14 +501,15 @@ class LearningSettingsNotifier extends Notifier<LearningSettingsState> {
       'prefs',
     ).get(_learningSettingsStorageKey);
     if (raw == null || raw.isEmpty) {
+      _scheduleApplyCloudApiBase(defaults);
       return defaults;
     }
 
     try {
       final Map<String, dynamic> json = jsonDecode(raw) as Map<String, dynamic>;
       final String? asrProvider = _asrProviderOrNull(json['asrProvider']);
-      return defaults.copyWith(
-        subtitleMode: _stringOrNull(json['subtitleMode']),
+      final LearningSettingsState loaded = defaults.copyWith(
+        subtitleMode: _normalizeSubtitleModeOrNull(json['subtitleMode']),
         subtitleLetterCase:
             subtitleLetterCaseOptions.contains(json['subtitleLetterCase'])
             ? json['subtitleLetterCase'] as String
@@ -500,25 +554,78 @@ class LearningSettingsNotifier extends Notifier<LearningSettingsState> {
         ttsEngine: _stringOrNull(json['ttsEngine']),
         ttsVoice: _stringOrNull(json['ttsVoice']),
         ttsRate: _doubleOrNull(json['ttsRate']),
+        cloudApiBaseUrl: _stringOrNull(json['cloudApiBaseUrl']),
         oralCoachBackend: oralCoachBackendOptions.contains(
               json['oralCoachBackend'],
             )
             ? json['oralCoachBackend'] as String
             : null,
         oralCoachServerUrl: _stringOrNull(json['oralCoachServerUrl']),
+        oralCoachPipelineUrl: _stringOrNull(json['oralCoachPipelineUrl']),
+        voicePracticeServerUrl: _stringOrNull(json['voicePracticeServerUrl']),
+        liveKitUrl: _stringOrNull(json['liveKitUrl']),
         bilibiliSessdata: _stringOrNull(json['bilibiliSessdata']),
         bilibiliUserId: _stringOrNull(json['bilibiliUserId']),
       );
+      final LearningSettingsState coerced =
+          _fallbackLocalWhisperIfCloudKeyMissing(loaded);
+      _scheduleApplyCloudApiBase(coerced);
+      if (coerced.asrProvider != loaded.asrProvider) {
+        Future.microtask(() {
+          if (!ref.mounted) {
+            return;
+          }
+          _persist();
+        });
+      }
+      return coerced;
     } catch (_) {
+      _scheduleApplyCloudApiBase(defaults);
       return defaults;
     }
   }
 
+  void _scheduleApplyCloudApiBase(LearningSettingsState settings) {
+    Future.microtask(() {
+      if (!ref.mounted) {
+        return;
+      }
+      ref
+          .read(networkRepositoryProvider.notifier)
+          .setBaseUrl(settings.resolvedCloudApiBaseUrl);
+    });
+  }
+
+  /// Cloud ASR without a key typed in Settings → fall back to on-device Whisper.
+  /// (Env/dart-define Bailian keys alone must not keep the import queue on
+  /// cloud uploads; mobile completion always prefers Whisper.)
+  LearningSettingsState _fallbackLocalWhisperIfCloudKeyMissing(
+    LearningSettingsState settings,
+  ) {
+    if (settings.asrProvider == '本地 Whisper') {
+      return settings;
+    }
+    // Only keep cloud ASR when the user explicitly saved a key in Settings.
+    if (settings.asrApiKey.trim().isNotEmpty) {
+      return settings;
+    }
+    final TranslationProviderPreset local =
+        asrProviderPresets['本地 Whisper']!;
+    return settings.copyWith(
+      asrProvider: local.name,
+      asrApiKey: '',
+      asrBaseUrl: local.baseUrl,
+      asrModel: local.model.isEmpty ? 'base.en' : local.model,
+      useCustomAsrEndpoint: false,
+    );
+  }
+
   void setSubtitleMode(String value) {
-    if (!subtitleModeOptions.contains(value)) {
+    final String normalized = _normalizeSubtitleMode(value);
+    if (!subtitleModeOptions.contains(normalized)) {
       return;
     }
-    state = state.copyWith(subtitleMode: value);
+    state = state.copyWith(subtitleMode: normalized);
     _persist();
   }
 
@@ -727,6 +834,14 @@ class LearningSettingsNotifier extends Notifier<LearningSettingsState> {
     _persist();
   }
 
+  void setCloudApiBaseUrl(String value) {
+    state = state.copyWith(cloudApiBaseUrl: value.trim());
+    _persist();
+    ref
+        .read(networkRepositoryProvider.notifier)
+        .setBaseUrl(state.resolvedCloudApiBaseUrl);
+  }
+
   void setOralCoachBackend(String value) {
     if (!oralCoachBackendOptions.contains(value)) {
       return;
@@ -737,6 +852,21 @@ class LearningSettingsNotifier extends Notifier<LearningSettingsState> {
 
   void setOralCoachServerUrl(String value) {
     state = state.copyWith(oralCoachServerUrl: value.trim());
+    _persist();
+  }
+
+  void setOralCoachPipelineUrl(String value) {
+    state = state.copyWith(oralCoachPipelineUrl: value.trim());
+    _persist();
+  }
+
+  void setVoicePracticeServerUrl(String value) {
+    state = state.copyWith(voicePracticeServerUrl: value.trim());
+    _persist();
+  }
+
+  void setLiveKitUrl(String value) {
+    state = state.copyWith(liveKitUrl: value.trim());
     _persist();
   }
 
@@ -764,6 +894,9 @@ class LearningSettingsNotifier extends Notifier<LearningSettingsState> {
   void resetToDefaults() {
     state = LearningSettingsState.defaults();
     _persist();
+    ref
+        .read(networkRepositoryProvider.notifier)
+        .setBaseUrl(state.resolvedCloudApiBaseUrl);
   }
 
   void _persist() {
@@ -800,13 +933,45 @@ class LearningSettingsNotifier extends Notifier<LearningSettingsState> {
           'ttsEngine': state.ttsEngine,
           'ttsVoice': state.ttsVoice,
           'ttsRate': state.ttsRate,
+          'cloudApiBaseUrl': state.cloudApiBaseUrl,
           'oralCoachBackend': state.oralCoachBackend,
           'oralCoachServerUrl': state.oralCoachServerUrl,
+          'oralCoachPipelineUrl': state.oralCoachPipelineUrl,
+          'voicePracticeServerUrl': state.voicePracticeServerUrl,
+          'liveKitUrl': state.liveKitUrl,
           'bilibiliSessdata': state.bilibiliSessdata,
           'bilibiliUserId': state.bilibiliUserId,
         }),
       ),
     );
+  }
+
+  String _normalizeSubtitleMode(String value) {
+    switch (value.trim()) {
+      case '单英':
+        return '英文';
+      case '单中':
+        return '中文';
+      case '隐藏':
+        // Hidden is no longer a learning preset; restore bilingual.
+        return '双语';
+      case '英文':
+      case '中文':
+      case '双语':
+      case '盲听':
+        return value.trim();
+      default:
+        return '双语';
+    }
+  }
+
+  String? _normalizeSubtitleModeOrNull(Object? value) {
+    final String? raw = _stringOrNull(value);
+    if (raw == null) {
+      return null;
+    }
+    final String normalized = _normalizeSubtitleMode(raw);
+    return subtitleModeOptions.contains(normalized) ? normalized : null;
   }
 
   String? _stringOrNull(Object? value) {
@@ -824,6 +989,12 @@ class LearningSettingsNotifier extends Notifier<LearningSettingsState> {
 
   String? _subtitleWordHighlightStyleOrNull(Object? value) {
     final String? style = _stringOrNull(value);
+    if (style == null) {
+      return null;
+    }
+    if (legacySubtitleWordHighlightStyles.contains(style)) {
+      return '绿色填充';
+    }
     return subtitleWordHighlightStyleOptions.contains(style) ? style : null;
   }
 

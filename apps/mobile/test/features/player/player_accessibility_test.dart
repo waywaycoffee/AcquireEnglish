@@ -173,7 +173,7 @@ void main() {
     await tester.pumpAndSettle();
     expect(binding.orphanNodes, isEmpty);
 
-    for (final String mode in <String>['隐藏', '双语', '单英', '单中', '双语']) {
+    for (final String mode in <String>['隐藏', '双语', '英文', '中文', '双语']) {
       await tester.tap(find.byTooltip('字幕模式'));
       await tester.pumpAndSettle();
       await tester.tap(find.text(mode).last, warnIfMissed: false);

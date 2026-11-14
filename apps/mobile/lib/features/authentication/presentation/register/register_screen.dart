@@ -94,7 +94,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
           padding: const EdgeInsets.fromLTRB(24, 12, 24, 32),
           children: <Widget>[
             Text(
-              '创建爱可儿英语账号',
+              '创建爱快英语账号',
               style: TextStyle(
                 fontSize: 26,
                 fontWeight: FontWeight.w900,
@@ -120,7 +120,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                     controller: _nameController,
                     textInputAction: TextInputAction.next,
                     style: TextStyle(color: AppDesignTokens.textPrimary),
-                    decoration: _decoration('例如 Mark'),
+                    decoration: _decoration('例如 Elon Musk'),
                   ),
                   const SizedBox(height: 14),
                   _label('邮箱'),

@@ -9,16 +9,85 @@ import 'config/theme/theme_logic.dart';
 import 'config/theme/theme_ui_model.dart';
 import 'features/authentication/presentation/auth_session.dart';
 import 'features/settings/presentation/bilibili_login_sheet.dart';
+import 'features/shared/presentation/app_orientation.dart';
 import 'features/shared/presentation/pad/app_design_tokens.dart';
+import 'features/library/presentation/library_catalog_provider.dart';
+import 'features/library/presentation/library_mock_data.dart';
+import 'features/settings/presentation/settings_provider.dart';
+import 'features/subtitle_completion/subtitle_completion_scheduler.dart';
 import 'features/sync/presentation/daily_feed_lifecycle.dart';
 import 'flavors/app_flavor.dart';
 import 'router/app_router.dart';
 
-class MyApp extends ConsumerWidget {
+export 'features/shared/presentation/app_orientation.dart';
+
+class MyApp extends ConsumerStatefulWidget {
   const MyApp({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<MyApp> createState() => _MyAppState();
+}
+
+class _MyAppState extends ConsumerState<MyApp> with WidgetsBindingObserver {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    // Re-assert portrait after first frame — Xiaomi can ignore early boot calls.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      ensureDefaultPortraitOrientation();
+      SubtitleCompletionScheduler.instance.attach(
+        settingsReader: () => ref.read(learningSettingsProvider),
+        catalogReader: () => ref.read(libraryCatalogProvider),
+        onPersisted:
+            ({
+              required String episodeId,
+              required String englishPath,
+              required String chinesePath,
+            }) async {
+              final List<LibraryCourseData> courses = ref.read(
+                libraryCatalogProvider,
+              );
+              for (final LibraryCourseData course in courses) {
+                for (final LibraryEpisodeItem episode in course.episodes) {
+                  if (episode.id != episodeId) {
+                    continue;
+                  }
+                  await ref
+                      .read(libraryCatalogProvider.notifier)
+                      .updateEpisodeLocalMedia(
+                        courseId: course.id,
+                        episodeId: episodeId,
+                        enSubtitlePath: englishPath,
+                        zhSubtitlePath: chinesePath,
+                      );
+                  return;
+                }
+              }
+            },
+      );
+    });
+  }
+
+  @override
+  void dispose() {
+    SubtitleCompletionScheduler.instance.detach();
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      // Keep non-fullscreen routes portrait after returning from background.
+      ensureDefaultPortraitOrientation();
+      // Re-scan + drain unfinished ASR subtitle jobs while the app is open.
+      SubtitleCompletionScheduler.instance.kick(delay: Duration.zero);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
     // Restore JWT into Dio as early as possible.
     ref.watch(authSessionProvider);
     final ThemeUiModel currentTheme = ref.watch(themeLogicProvider);
@@ -139,9 +208,5 @@ ThemeData _buildTheme(Brightness brightness) {
 }
 
 Future<void> setPreferredOrientations() {
-  return SystemChrome.setPreferredOrientations(<DeviceOrientation>[
-    DeviceOrientation.portraitUp,
-    DeviceOrientation.landscapeLeft,
-    DeviceOrientation.landscapeRight,
-  ]);
+  return lockPortraitOrientation();
 }

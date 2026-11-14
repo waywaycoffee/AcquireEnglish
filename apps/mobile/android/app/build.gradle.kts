@@ -1,4 +1,4 @@
-﻿plugins {
+plugins {
     id("com.android.application")
     id("kotlin-android")
     // The Flutter Gradle Plugin must be applied after the Android and Kotlin Gradle plugins.
@@ -38,17 +38,14 @@ android {
             dimension = "env"
             applicationIdSuffix = ".dev"
             versionNameSuffix = "-dev"
-            resValue("string", "app_name", "AcquireEnglish Dev")
         }
         create("staging") {
             dimension = "env"
             applicationIdSuffix = ".staging"
             versionNameSuffix = "-staging"
-            resValue("string", "app_name", "AcquireEnglish Staging")
         }
         create("prod") {
             dimension = "env"
-            resValue("string", "app_name", "AcquireEnglish")
         }
     }
 
@@ -68,6 +65,8 @@ android {
 dependencies {
     coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.5")
     implementation("androidx.documentfile:documentfile:1.0.1")
+    // google_mlkit_text_recognition marks script packs as compileOnly; include Chinese OCR.
+    implementation("com.google.mlkit:text-recognition-chinese:16.0.1")
 }
 
 // AGP 8.11 cannot consume androidx.core 1.19 (needs AGP 9.1+).

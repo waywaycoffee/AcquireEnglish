@@ -1,5 +1,6 @@
 import 'package:common_learn_english/features/import_course/data/bilibili_course_builder.dart';
 import 'package:common_learn_english/features/import_course/data/bilibili_import_service.dart';
+import 'package:common_learn_english/features/import_course/data/bilibili_multipage.dart';
 import 'package:common_learn_english/features/library/presentation/library_mock_data.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -44,6 +45,45 @@ void main() {
     expect(season.episodes.first.bvid, 'BV1AAA111111');
     expect(season.episodes.last.index, 2);
     expect(season.episodes.last.durationSec, 180);
+    expect(season.episodes.first.coverImageUrl, 'https://example.com/1.jpg');
+    // Missing arc.pic falls back to season cover.
+    expect(season.episodes.last.coverImageUrl, 'https://example.com/season.jpg');
+  });
+
+  test('season import matches current episode via local cache BV path', () {
+    final BilibiliImportResult meta = BilibiliImportResult(
+      idKey: 'BV1BBB222222',
+      title: 'Day 2 full title',
+      // Intentionally omit extractable watch BV edge cases — local path wins.
+      watchUrl: 'https://www.bilibili.com/video/BV1BBB222222',
+      durationMinutes: 3,
+      localVideoPath: '/tmp/bilibili_media/BV1BBB222222.mp4',
+      seasonId: '4242',
+      seasonTitle: 'English Daily',
+      seasonEpisodes: const <BilibiliSeasonEpisodeMeta>[
+        BilibiliSeasonEpisodeMeta(
+          index: 1,
+          title: 'Day 1',
+          bvid: 'BV1AAA111111',
+          aid: '101',
+          cid: 201,
+          durationSec: 120,
+        ),
+        BilibiliSeasonEpisodeMeta(
+          index: 2,
+          title: 'Day 2',
+          bvid: 'BV1BBB222222',
+          aid: '102',
+          cid: 202,
+          durationSec: 180,
+        ),
+      ],
+    );
+
+    final LibraryCourseData course = buildLibraryCourseFromBilibiliImport(meta);
+    expect(course.episodes.last.videoAsset, endsWith('BV1BBB222222.mp4'));
+    expect(course.episodes.last.videoMissing, isFalse);
+    expect(course.episodes.first.videoMissing, isTrue);
   });
 
   test('season import builds one episode per BV and keeps current local media', () {
@@ -122,5 +162,102 @@ void main() {
     expect(course.totalEpisodes, 2);
     expect(course.episodes.first.title, 'Opening');
     expect(course.episodes.last.videoMissing, isTrue);
+  });
+
+  test('season source uses episode BV and ignores numberStr as page', () {
+    final LibraryCourseData course = buildLibraryCourseFromBilibiliImport(
+      const BilibiliImportResult(
+        idKey: 'BV1BBB222222',
+        title: 'Day 2',
+        watchUrl: 'https://www.bilibili.com/video/BV1BBB222222',
+        durationMinutes: 3,
+        localVideoPath: '/tmp/day2.mp4',
+        seasonId: '4242',
+        seasonTitle: 'English Daily',
+        seasonEpisodes: <BilibiliSeasonEpisodeMeta>[
+          BilibiliSeasonEpisodeMeta(
+            index: 1,
+            title: 'Day 1',
+            bvid: 'BV1AAA111111',
+            aid: '101',
+            cid: 201,
+            durationSec: 120,
+          ),
+          BilibiliSeasonEpisodeMeta(
+            index: 2,
+            title: 'Day 2',
+            bvid: 'BV1BBB222222',
+            aid: '102',
+            cid: 202,
+            durationSec: 180,
+          ),
+        ],
+      ),
+    );
+    final String? source = bilibiliSourceForEpisode(
+      course: course,
+      episode: course.episodes.first,
+      videoAsset: course.episodes.first.videoAsset,
+    );
+    expect(source, contains('BV1AAA111111'));
+    expect(source, isNot(contains('p=1')));
+    expect(course.episodes.first.sourceUrl, contains('BV1AAA111111'));
+    expect(course.episodes.last.sourceUrl, contains('BV1BBB222222'));
+  });
+
+  test('season local MP4 keeps its own BV via sourceUrl, not course description', () {
+    final LibraryCourseData course = buildLibraryCourseFromBilibiliImport(
+      const BilibiliImportResult(
+        idKey: 'BV1BBB222222',
+        title: 'Day 2',
+        watchUrl: 'https://www.bilibili.com/video/BV1BBB222222',
+        durationMinutes: 3,
+        localVideoPath: '/tmp/bilibili/BV1BBB222222.mp4',
+        seasonId: '4242',
+        seasonTitle: 'English Daily',
+        seasonEpisodes: <BilibiliSeasonEpisodeMeta>[
+          BilibiliSeasonEpisodeMeta(
+            index: 1,
+            title: 'Day 1',
+            bvid: 'BV1AAA111111',
+            aid: '101',
+            cid: 201,
+            durationSec: 120,
+          ),
+          BilibiliSeasonEpisodeMeta(
+            index: 2,
+            title: 'Day 2',
+            bvid: 'BV1BBB222222',
+            aid: '102',
+            cid: 202,
+            durationSec: 180,
+          ),
+        ],
+      ),
+    );
+    final LibraryEpisodeItem day2 = course.episodes.last.copyWith(
+      videoAsset: '/data/user/0/app/files/bilibili/BV1BBB222222.mp4',
+    );
+    final String? source = bilibiliSourceForEpisode(
+      course: course,
+      episode: day2,
+      videoAsset: day2.videoAsset,
+    );
+    expect(source, contains('BV1BBB222222'));
+    expect(source, isNot(contains('BV1AAA111111')));
+    expect(
+      bilibiliSubtitleBelongsToSource(
+        subtitlePath: '/docs/bilibili/BV1AAA111111/zh.srt',
+        source: source,
+      ),
+      isFalse,
+    );
+    expect(
+      bilibiliSubtitleBelongsToSource(
+        subtitlePath: '/docs/bilibili/BV1BBB222222/zh.srt',
+        source: source,
+      ),
+      isTrue,
+    );
   });
 }

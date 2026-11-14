@@ -370,7 +370,7 @@ Widget _popup(
                 ),
             onFavorite: !canFavorite
                 ? null
-                : () => container
+                : (String? definitionCn) => container
                       .read(wordBookProvider.notifier)
                       .addFavoriteWord(
                         rawWord: rawWord,
@@ -381,6 +381,7 @@ Widget _popup(
                         lineKey: '10-12',
                         sentence: 'They found a sanctuary nearby.',
                         chinese: '他们在附近找到了庇护所。',
+                        generatedDefinition: definitionCn,
                       ),
           ),
         ),

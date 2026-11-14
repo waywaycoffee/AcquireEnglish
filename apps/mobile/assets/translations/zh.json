@@ -1,0 +1,16 @@
+{
+  "app_name": "爱快英语",
+
+  "home": "首页",
+  "info": "信息",
+  "intro": "你好 👋🏽",
+  "more": "了解更多",
+  "bottom_nav_first": "首页",
+  "bottom_nav_second": "信息",
+  "toggle_language": "切换语言",
+  "toggle_theme": "切换主题",
+  "theme_mode": "主题模式",
+  "theme_mode_light": "浅色",
+  "theme_mode_dark": "深色",
+  "theme_mode_system": "跟随系统"
+}

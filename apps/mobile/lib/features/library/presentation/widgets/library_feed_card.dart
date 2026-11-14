@@ -10,12 +10,14 @@ class LibraryFeedCard extends StatelessWidget {
     required this.course,
     required this.index,
     required this.onTap,
+    this.onContextMenu,
     super.key,
   });
 
   final LibraryCourseData course;
   final int index;
   final VoidCallback onTap;
+  final ValueChanged<Offset>? onContextMenu;
 
   String get _weekLabel {
     if (course.category.toLowerCase().contains('bilibili') ||
@@ -63,7 +65,16 @@ class LibraryFeedCard extends StatelessWidget {
 
     return Material(
       color: Colors.transparent,
-      child: InkWell(
+      child: GestureDetector(
+        onSecondaryTapDown: onContextMenu == null
+            ? null
+            : (TapDownDetails details) =>
+                  onContextMenu!(details.globalPosition),
+        onLongPressStart: onContextMenu == null
+            ? null
+            : (LongPressStartDetails details) =>
+                  onContextMenu!(details.globalPosition),
+        child: InkWell(
         onTap: onTap,
         borderRadius: BorderRadius.circular(18),
         child: Padding(
@@ -226,6 +237,7 @@ class LibraryFeedCard extends StatelessWidget {
             ],
           ),
         ),
+      ),
       ),
     );
   }

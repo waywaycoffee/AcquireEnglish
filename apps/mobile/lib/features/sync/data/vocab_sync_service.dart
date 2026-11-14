@@ -35,6 +35,22 @@ class VocabSyncService {
     } catch (_) {}
   }
 
+  /// Push every local favorite (used by settings “备份同步”).
+  Future<int> pushAllFavorites() async {
+    final List<WordEntry> favorites = _ref
+        .read(wordBookProvider)
+        .where((WordEntry e) => e.favorite)
+        .toList(growable: false);
+    int ok = 0;
+    for (final WordEntry entry in favorites) {
+      try {
+        await pushEntry(entry);
+        ok += 1;
+      } catch (_) {}
+    }
+    return ok;
+  }
+
   Future<void> pullAndMerge() async {
     try {
       final List<AcquireVocabDto> remote = await _ref

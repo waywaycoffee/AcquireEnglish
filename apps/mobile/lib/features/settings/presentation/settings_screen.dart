@@ -12,6 +12,9 @@ import '../../authentication/presentation/auth_session.dart';
 import '../../navigation/presentation/navigation_destination.dart';
 import '../../player/presentation/local_whisper_asr.dart';
 import '../../shared/data/word_pronunciation_service.dart';
+import '../../sync/data/progress_sync_service.dart';
+import '../../sync/data/vocab_sync_service.dart';
+import '../../sync/presentation/daily_feed_provider.dart';
 import '../../shared/presentation/pad/app_design_tokens.dart';
 import '../../shared/presentation/pad/pad_compact.dart';
 import '../../shared/presentation/pad/pad_scaffold.dart';
@@ -22,6 +25,7 @@ import '../../home/presentation/widgets/theme_widget.dart';
 import 'bilibili_login_sheet.dart';
 import 'learning_preferences_screen.dart';
 import 'settings_provider.dart';
+import 'widgets/api_usage_card.dart';
 import 'widgets/pronunciation_settings_card.dart';
 import 'widgets/settings_group_card.dart';
 
@@ -95,9 +99,23 @@ class SettingsScreen extends ConsumerWidget {
           ),
           SizedBox(height: context.padSectionGap),
           SettingsGroupCard(
-            title: '爱可儿账号',
+            title: '爱快账号',
             icon: Icons.person_rounded,
             children: <Widget>[
+              _InputRow(
+                title: '云端 API 地址',
+                description:
+                    '仅账号 / 进度 / 词库同步部署在服务器。 '
+                    '留空则用编译参数 API_BASE（当前 ${settings.resolvedCloudApiBaseUrl}）。 '
+                    'ASR、翻译、口语陪练等仍在 App 内运行。',
+                value: settings.cloudApiBaseUrl,
+                hintText: settings.resolvedCloudApiBaseUrl,
+                onChanged: (String value) {
+                  ref
+                      .read(learningSettingsProvider.notifier)
+                      .setCloudApiBaseUrl(value);
+                },
+              ),
               if (authSession.isLoggedIn) ...<Widget>[
                 _ActionRow(
                   title: authSession.displayName.isEmpty
@@ -120,7 +138,7 @@ class SettingsScreen extends ConsumerWidget {
                       return;
                     }
                     ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('已退出爱可儿账号')),
+                      const SnackBar(content: Text('已退出爱快账号')),
                     );
                   },
                 ),
@@ -133,13 +151,15 @@ class SettingsScreen extends ConsumerWidget {
                 ),
                 _ActionRow(
                   title: '注册新账号',
-                  description: '使用邮箱创建爱可儿英语账号。',
+                  description: '使用邮箱创建爱快英语账号。',
                   icon: Icons.person_add_alt_1_rounded,
                   onTap: () => context.push(SGRoute.register.route),
                 ),
               ],
             ],
           ),
+          SizedBox(height: context.padSectionGap),
+          const ApiUsageCard(),
           SizedBox(height: context.padSectionGap),
           SettingsGroupCard(
             title: '课程与偏好',
@@ -336,8 +356,8 @@ class SettingsScreen extends ConsumerWidget {
               _SelectRow(
                 title: '陪练引擎',
                 description:
-                    'LiveTalking=开源实时数字人（需自建服务）；本地 TTS=无画面语音陪练。 '
-                    'Duix-Mobile 端侧 SDK 可后续替换。',
+                    '视频陪练管线=当前视频主题实时对话（ASR→发音→LLM→TTS→数字人）；'
+                    'LiveTalking=仅数字人 WebRTC；本地 TTS=无画面。',
                 value: oralCoachBackendOptions.contains(settings.oralCoachBackend)
                     ? settings.oralCoachBackend
                     : '本地 TTS',
@@ -351,12 +371,27 @@ class SettingsScreen extends ConsumerWidget {
                       .setOralCoachBackend(value);
                 },
               ),
-              if (settings.oralCoachBackend == 'LiveTalking')
+              if (settings.oralCoachBackend == '视频陪练管线')
                 _InputRow(
-                  title: 'LiveTalking 服务地址',
+                  title: '陪练管线地址',
                   description:
-                      '例如 http://192.168.1.8:8010 。服务端： '
-                      'python app.py --transport webrtc --model musetalk',
+                      '默认已指向生产托管 https://acquireenglish.curlhairai.com/coach ；'
+                      '也可改成本机 tools/oral_coach（如 http://192.168.1.8:8770）。',
+                  value: settings.oralCoachPipelineUrl,
+                  hintText: 'https://acquireenglish.curlhairai.com/coach',
+                  onChanged: (String value) {
+                    ref
+                        .read(learningSettingsProvider.notifier)
+                        .setOralCoachPipelineUrl(value);
+                  },
+                ),
+              if (settings.oralCoachBackend == '视频陪练管线' ||
+                  settings.oralCoachBackend == 'LiveTalking')
+                _InputRow(
+                  title: 'LiveTalking / 数字人地址',
+                  description:
+                      '虚拟外教画面（WebRTC）。管线 avatar=livetalking 时用于播报回复；'
+                      '也可直连 LiveTalking。示例 http://192.168.1.8:8010',
                   value: settings.oralCoachServerUrl,
                   hintText: 'http://127.0.0.1:8010',
                   onChanged: (String value) {
@@ -365,6 +400,39 @@ class SettingsScreen extends ConsumerWidget {
                         .setOralCoachServerUrl(value);
                   },
                 ),
+              _InputRow(
+                title: 'LiveKit 房间地址（可选）',
+                description:
+                    '填入后口语 Tab 可加入全双工房间（需服务端配置 LIVEKIT_* 并运行 Agent）。'
+                    '例如 wss://xxx.livekit.cloud。留空则只用 HTTP 管线。',
+                value: settings.liveKitUrl,
+                hintText: 'wss://…livekit…',
+                onChanged: (String value) {
+                  ref
+                      .read(learningSettingsProvider.notifier)
+                      .setLiveKitUrl(value);
+                },
+              ),
+            ],
+          ),
+          SizedBox(height: compact ? 20 : 24),
+          SettingsGroupCard(
+            title: 'Voice 本地口语（影子跟读）',
+            icon: Icons.hearing_rounded,
+            children: <Widget>[
+              _InputRow(
+                title: 'Voice 服务地址',
+                description:
+                    '接入开源 Zemksh/voice：电脑运行 tools/voice/run_server.sh，'
+                    '手机跟读录音后可上传做本地 Whisper 转写 + 词重叠反馈。留空则关闭。',
+                value: settings.voicePracticeServerUrl,
+                hintText: 'http://192.168.1.8:8765',
+                onChanged: (String value) {
+                  ref
+                      .read(learningSettingsProvider.notifier)
+                      .setVoicePracticeServerUrl(value);
+                },
+              ),
             ],
           ),
           SizedBox(height: compact ? 20 : 24),
@@ -817,8 +885,43 @@ class SettingsScreen extends ConsumerWidget {
               ),
               _ActionRow(
                 title: '备份同步云端数据',
-                description: '将您本地记录的 142 个词汇与学习周期备份，支持多设备同步。',
-                onTap: () => _showMessage(context, '精听学习进度和短语本备份同步成功！'),
+                description: authSession.isLoggedIn
+                    ? '上传收藏生词并拉取云端进度 / 词库 / 学习偏好。'
+                    : '请先登录爱快账号后再同步。',
+                icon: Icons.cloud_sync_rounded,
+                onTap: () async {
+                  if (!authSession.isLoggedIn) {
+                    _showMessage(context, '请先登录后再同步云端数据');
+                    return;
+                  }
+                  try {
+                    final int pushed = await ref
+                        .read(vocabSyncServiceProvider)
+                        .pushAllFavorites();
+                    await ref.read(vocabSyncServiceProvider).pullAndMerge();
+                    await ref
+                        .read(progressSyncServiceProvider)
+                        .pullIndexed();
+                    await ref
+                        .read(learningPreferencesProvider.notifier)
+                        .pullRemote();
+                    if (!context.mounted) {
+                      return;
+                    }
+                    _showMessage(
+                      context,
+                      '已同步：上传 $pushed 个收藏词，并拉取云端词库与偏好',
+                    );
+                  } catch (error) {
+                    if (!context.mounted) {
+                      return;
+                    }
+                    _showMessage(
+                      context,
+                      '同步失败：${'$error'.replaceFirst('Exception: ', '')}',
+                    );
+                  }
+                },
               ),
               _ActionRow(
                 title: '清除应用缓存与生词记录',

@@ -14,33 +14,86 @@ class AcquireUser {
     required this.id,
     required this.email,
     this.displayName,
+    this.phone,
+    this.wechatBound = false,
   });
 
   factory AcquireUser.fromJson(Map<String, dynamic> json) => AcquireUser(
     id: json['id'] as int,
     email: json['email'] as String,
     displayName: json['display_name'] as String?,
+    phone: json['phone'] as String?,
+    wechatBound: json['wechat_bound'] == true,
   );
 
   final int id;
   final String email;
   final String? displayName;
+  final String? phone;
+  final bool wechatBound;
 }
 
 class AcquireTokenResult {
   const AcquireTokenResult({
     required this.accessToken,
     required this.user,
+    this.isNewUser = false,
   });
 
   factory AcquireTokenResult.fromJson(Map<String, dynamic> json) =>
       AcquireTokenResult(
         accessToken: json['access_token'] as String,
         user: AcquireUser.fromJson(json['user'] as Map<String, dynamic>),
+        isNewUser: json['is_new_user'] == true,
       );
 
   final String accessToken;
   final AcquireUser user;
+  final bool isNewUser;
+}
+
+class AcquireLiveKitToken {
+  const AcquireLiveKitToken({
+    required this.url,
+    required this.token,
+    required this.room,
+    required this.identity,
+    this.expiresIn = 3600,
+  });
+
+  factory AcquireLiveKitToken.fromJson(Map<String, dynamic> json) =>
+      AcquireLiveKitToken(
+        url: '${json['url'] ?? ''}',
+        token: '${json['token'] ?? ''}',
+        room: '${json['room'] ?? ''}',
+        identity: '${json['identity'] ?? ''}',
+        expiresIn: (json['expires_in'] as num?)?.toInt() ?? 3600,
+      );
+
+  final String url;
+  final String token;
+  final String room;
+  final String identity;
+  final int expiresIn;
+}
+
+class AcquireSmsSendResult {
+  const AcquireSmsSendResult({
+    required this.expiresIn,
+    required this.mock,
+    this.debugCode,
+  });
+
+  factory AcquireSmsSendResult.fromJson(Map<String, dynamic> json) =>
+      AcquireSmsSendResult(
+        expiresIn: (json['expires_in'] as num?)?.toInt() ?? 300,
+        mock: json['mock'] == true,
+        debugCode: json['debug_code'] as String?,
+      );
+
+  final int expiresIn;
+  final bool mock;
+  final String? debugCode;
 }
 
 class AcquireLessonDto {
@@ -147,6 +200,10 @@ class AcquirePreferencesDto {
     this.tags = const <String>['slow', 'daily'],
     this.dailyQuota = 2,
     this.notifyDailyFeed = true,
+    this.hasBilibiliCookie = false,
+    this.hasAsrApiKey = false,
+    this.bilibiliCookie,
+    this.asrApiKey,
   });
 
   factory AcquirePreferencesDto.fromJson(Map<String, dynamic> json) =>
@@ -157,18 +214,27 @@ class AcquirePreferencesDto {
             .toList(growable: false),
         dailyQuota: json['daily_quota'] as int? ?? 2,
         notifyDailyFeed: json['notify_daily_feed'] as bool? ?? true,
+        hasBilibiliCookie: json['has_bilibili_cookie'] == true,
+        hasAsrApiKey: json['has_asr_api_key'] == true,
       );
 
   final String level;
   final List<String> tags;
   final int dailyQuota;
   final bool notifyDailyFeed;
+  final bool hasBilibiliCookie;
+  final bool hasAsrApiKey;
+  /// Write-only: sent on PUT when non-null.
+  final String? bilibiliCookie;
+  final String? asrApiKey;
 
   Map<String, dynamic> toJson() => <String, dynamic>{
     'level': level,
     'tags': tags,
     'daily_quota': dailyQuota,
     'notify_daily_feed': notifyDailyFeed,
+    if (bilibiliCookie != null) 'bilibili_cookie': bilibiliCookie,
+    if (asrApiKey != null) 'asr_api_key': asrApiKey,
   };
 
   AcquirePreferencesDto copyWith({
@@ -176,11 +242,19 @@ class AcquirePreferencesDto {
     List<String>? tags,
     int? dailyQuota,
     bool? notifyDailyFeed,
+    bool? hasBilibiliCookie,
+    bool? hasAsrApiKey,
+    String? bilibiliCookie,
+    String? asrApiKey,
   }) => AcquirePreferencesDto(
     level: level ?? this.level,
     tags: tags ?? this.tags,
     dailyQuota: dailyQuota ?? this.dailyQuota,
     notifyDailyFeed: notifyDailyFeed ?? this.notifyDailyFeed,
+    hasBilibiliCookie: hasBilibiliCookie ?? this.hasBilibiliCookie,
+    hasAsrApiKey: hasAsrApiKey ?? this.hasAsrApiKey,
+    bilibiliCookie: bilibiliCookie ?? this.bilibiliCookie,
+    asrApiKey: asrApiKey ?? this.asrApiKey,
   );
 }
 
@@ -255,6 +329,42 @@ class AcquireApiClient {
         'email': email,
         'password': password,
         if (displayName != null) 'display_name': displayName,
+      },
+    );
+    return AcquireTokenResult.fromJson(response.data as Map<String, dynamic>);
+  }
+
+  Future<AcquireSmsSendResult> sendSmsCode({required String phone}) async {
+    final Response<dynamic> response = await _dio.post(
+      Endpoints.smsSend,
+      data: <String, String>{'phone': phone},
+    );
+    return AcquireSmsSendResult.fromJson(
+      response.data as Map<String, dynamic>,
+    );
+  }
+
+  Future<AcquireTokenResult> loginWithSms({
+    required String phone,
+    required String code,
+  }) async {
+    final Response<dynamic> response = await _dio.post(
+      Endpoints.smsLogin,
+      data: <String, String>{'phone': phone, 'code': code},
+    );
+    return AcquireTokenResult.fromJson(response.data as Map<String, dynamic>);
+  }
+
+  Future<AcquireTokenResult> loginWithWechat({
+    required String code,
+    String? nickname,
+  }) async {
+    final Response<dynamic> response = await _dio.post(
+      Endpoints.wechatLogin,
+      data: <String, dynamic>{
+        'code': code,
+        if (nickname != null && nickname.trim().isNotEmpty)
+          'nickname': nickname.trim(),
       },
     );
     return AcquireTokenResult.fromJson(response.data as Map<String, dynamic>);
@@ -360,5 +470,99 @@ class AcquireApiClient {
       },
     );
     return AcquireVocabDto.fromJson(response.data as Map<String, dynamic>);
+  }
+
+  Future<String> startLearningSession({
+    String taskId = 'video_line',
+    String courseTitle = '',
+    String currentEnglish = '',
+  }) async {
+    final Response<dynamic> response = await _dio.post(
+      Endpoints.learningSessions,
+      data: <String, dynamic>{
+        'task_id': taskId,
+        'course_title': courseTitle,
+        'current_english': currentEnglish,
+      },
+    );
+    return (response.data as Map<String, dynamic>)['id'] as String;
+  }
+
+  Future<void> appendLearningTurn({
+    required String sessionId,
+    required String role,
+    required String text,
+    String? machineTranscript,
+    bool confirmed = true,
+    Map<String, dynamic>? scores,
+  }) async {
+    await _dio.post<dynamic>(
+      '${Endpoints.learningSessions}/$sessionId/turns',
+      data: <String, dynamic>{
+        'role': role,
+        'text': text,
+        if (machineTranscript != null) 'machine_transcript': machineTranscript,
+        'confirmed': confirmed,
+        'scores': scores ?? <String, dynamic>{},
+      },
+    );
+  }
+
+  Future<List<Map<String, dynamic>>> finalizeLearningFeedback({
+    required String sessionId,
+    required List<Map<String, dynamic>> items,
+  }) async {
+    final Response<dynamic> response = await _dio.post(
+      '${Endpoints.learningSessions}/$sessionId/feedback',
+      data: <String, dynamic>{'items': items},
+    );
+    final Object? raw = (response.data as Map<String, dynamic>)['items'];
+    if (raw is! List<dynamic>) {
+      return const <Map<String, dynamic>>[];
+    }
+    return raw.cast<Map<String, dynamic>>();
+  }
+
+  Future<List<Map<String, dynamic>>> listWrongItems() async {
+    final Response<dynamic> response = await _dio.get(
+      Endpoints.learningWrongItems,
+    );
+    return (response.data as List<dynamic>).cast<Map<String, dynamic>>();
+  }
+
+  Future<void> saveReviewExpression({
+    required String expression,
+    required String sourceQuote,
+  }) async {
+    await _dio.post<dynamic>(
+      Endpoints.learningReviews,
+      data: <String, String>{
+        'expression': expression,
+        'source_quote': sourceQuote,
+      },
+    );
+  }
+
+  Future<bool> liveKitConfigured() async {
+    try {
+      final Response<dynamic> response = await _dio.get(Endpoints.livekitStatus);
+      final Object? configured =
+          (response.data as Map<String, dynamic>)['configured'];
+      return configured == true || configured == 'true';
+    } catch (_) {
+      return false;
+    }
+  }
+
+  Future<AcquireLiveKitToken> createLiveKitToken({String? room}) async {
+    final Response<dynamic> response = await _dio.post(
+      Endpoints.livekitToken,
+      data: <String, dynamic>{
+        if (room != null && room.trim().isNotEmpty) 'room': room.trim(),
+      },
+    );
+    return AcquireLiveKitToken.fromJson(
+      response.data as Map<String, dynamic>,
+    );
   }
 }

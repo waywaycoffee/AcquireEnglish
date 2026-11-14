@@ -4,6 +4,9 @@ import 'dart:io';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hive_ce/hive.dart';
 
+import '../../import_course/data/bilibili_episode_prepare.dart';
+import '../../import_course/data/bilibili_multipage.dart';
+import '../../import_course/domain/bilibili_import.dart';
 import '../../import_course/domain/import_match.dart';
 import '../../player/presentation/asr_subtitle_cache.dart';
 import 'course_directory_relink.dart';
@@ -72,23 +75,10 @@ class LibraryCatalogNotifier extends Notifier<List<LibraryCourseData>> {
         lastStudiedStr: previous.lastStudiedStr,
         lastStudiedAtMs: previous.lastStudiedAtMs,
         episodes: <LibraryEpisodeItem>[
-          for (int i = 0; i < course.episodes.length; i++)
-            course.episodes[i].copyWith(
-              completed: i < previous.episodes.length
-                  ? previous.episodes[i].completed
-                  : course.episodes[i].completed,
-              progressPercent: i < previous.episodes.length
-                  ? previous.episodes[i].progressPercent
-                  : course.episodes[i].progressPercent,
-              lastWatchedStr: i < previous.episodes.length
-                  ? previous.episodes[i].lastWatchedStr
-                  : course.episodes[i].lastWatchedStr,
-              progressTimeStr: i < previous.episodes.length
-                  ? previous.episodes[i].progressTimeStr
-                  : course.episodes[i].progressTimeStr,
-              totalTimeStr: i < previous.episodes.length
-                  ? previous.episodes[i].totalTimeStr
-                  : course.episodes[i].totalTimeStr,
+          for (final LibraryEpisodeItem episode in course.episodes)
+            _mergeImportedEpisode(
+              next: episode,
+              previous: _findMatchingEpisode(previous.episodes, episode),
             ),
         ],
       );
@@ -203,7 +193,7 @@ class LibraryCatalogNotifier extends Notifier<List<LibraryCourseData>> {
     await _persistImportedCourses();
   }
 
-  /// Update course + episode posters (used after fetching Bilibili covers).
+  /// Update course poster; only fill placeholder episode covers.
   Future<void> updateCourseCover({
     required String courseId,
     required String coverImage,
@@ -221,10 +211,16 @@ class LibraryCatalogNotifier extends Notifier<List<LibraryCourseData>> {
       return course.copyWith(
         coverImage: next,
         episodes: course.episodes
-            .map(
-              (LibraryEpisodeItem episode) =>
-                  episode.copyWith(coverImage: next),
-            )
+            .map((LibraryEpisodeItem episode) {
+              final String existing = episode.coverImage.trim();
+              final bool placeholder =
+                  existing.isEmpty ||
+                  existing.startsWith('assets/') ||
+                  existing == 'assets/img/app_icon.png';
+              return placeholder
+                  ? episode.copyWith(coverImage: next)
+                  : episode;
+            })
             .toList(growable: false),
       );
     }).toList(growable: false);
@@ -233,7 +229,9 @@ class LibraryCatalogNotifier extends Notifier<List<LibraryCourseData>> {
     }
   }
 
-  /// Point every episode at a local media file (after Bilibili download).
+  /// Point a single-episode Bilibili course at a local media file.
+  ///
+  /// Never stamps one MP4 onto every member of a 合集/分P course.
   Future<void> updateCourseVideoAsset({
     required String courseId,
     required String videoAsset,
@@ -247,6 +245,11 @@ class LibraryCatalogNotifier extends Notifier<List<LibraryCourseData>> {
       if (course.id != courseId) {
         return course;
       }
+      if (course.episodes.length > 1) {
+        // Multi-episode courses must update per episode via
+        // [updateEpisodeLocalMedia] / prepare-on-play.
+        return course;
+      }
       changed = true;
       return course.copyWith(
         episodes: course.episodes
@@ -258,6 +261,92 @@ class LibraryCatalogNotifier extends Notifier<List<LibraryCourseData>> {
             )
             .toList(growable: false),
       );
+    }).toList(growable: false);
+    if (changed) {
+      await _persistImportedCourses();
+    }
+  }
+
+  /// Persist one Bilibili episode's local video / subs / cover after download.
+  Future<void> updateEpisodeLocalMedia({
+    required String courseId,
+    required String episodeId,
+    String? videoAsset,
+    String? sourceUrl,
+    String? enSubtitlePath,
+    String? zhSubtitlePath,
+    String? coverImage,
+    bool? videoMissing,
+    bool clearSubtitles = false,
+  }) async {
+    bool changed = false;
+    state = state.map((LibraryCourseData course) {
+      if (course.id != courseId) {
+        return course;
+      }
+      final List<LibraryEpisodeItem> episodes = course.episodes.map((
+        LibraryEpisodeItem episode,
+      ) {
+        if (episode.id != episodeId) {
+          return episode;
+        }
+        changed = true;
+        // Preserve watch URL when downloading overwrites videoAsset with MP4.
+        String? nextSource = (sourceUrl ?? '').trim().isNotEmpty
+            ? sourceUrl!.trim()
+            : episode.sourceUrl;
+        final String? previousAsset = episode.videoAsset?.trim();
+        if ((nextSource == null || nextSource.isEmpty) &&
+            previousAsset != null &&
+            (BilibiliImport.isWatchPageUrl(previousAsset) ||
+                BilibiliImport.looksLikeBilibiliInput(previousAsset))) {
+          nextSource = previousAsset;
+        }
+        final String? nextEn = clearSubtitles
+            ? null
+            : (isUsableSubtitlePath(enSubtitlePath)
+                  ? enSubtitlePath!.trim()
+                  : episode.enSubtitleAsset);
+        final String? nextZh = clearSubtitles
+            ? null
+            : (isUsableSubtitlePath(zhSubtitlePath)
+                  ? zhSubtitlePath!.trim()
+                  : episode.cnSubtitleAsset);
+        final List<LibrarySubtitleTrackItem> tracks = clearSubtitles
+            ? const <LibrarySubtitleTrackItem>[]
+            : <LibrarySubtitleTrackItem>[
+                if (isUsableSubtitlePath(nextEn))
+                  LibrarySubtitleTrackItem(
+                    languageCode: 'en',
+                    languageLabel: 'English',
+                    path: nextEn!,
+                  ),
+                if (isUsableSubtitlePath(nextZh))
+                  LibrarySubtitleTrackItem(
+                    languageCode: 'zh',
+                    languageLabel: '中文',
+                    path: nextZh!,
+                  ),
+              ];
+        return episode.copyWith(
+          videoAsset: (videoAsset ?? '').trim().isNotEmpty
+              ? videoAsset!.trim()
+              : episode.videoAsset,
+          sourceUrl: nextSource,
+          videoMissing: videoMissing,
+          enSubtitleAsset: nextEn,
+          cnSubtitleAsset: nextZh,
+          hasEnglishSubtitles: isUsableSubtitlePath(nextEn),
+          hasChineseSubtitles: isUsableSubtitlePath(nextZh),
+          coverImage: (coverImage ?? '').trim().isNotEmpty
+              ? coverImage!.trim()
+              : episode.coverImage,
+          subtitleTracks: clearSubtitles
+              ? const <LibrarySubtitleTrackItem>[]
+              : (tracks.isNotEmpty ? tracks : episode.subtitleTracks),
+        );
+      }).toList(growable: false);
+      return course.copyWith(episodes: episodes);
     }).toList(growable: false);
     if (changed) {
       await _persistImportedCourses();
@@ -527,6 +616,7 @@ class LibraryCatalogNotifier extends Notifier<List<LibraryCourseData>> {
               'progressTimeStr': item.progressTimeStr,
               'totalTimeStr': item.totalTimeStr,
               'videoAsset': item.videoAsset,
+              'sourceUrl': item.sourceUrl,
               'videoMissing': item.videoMissing,
               'enSubtitleAsset': item.enSubtitleAsset,
               'cnSubtitleAsset': item.cnSubtitleAsset,
@@ -639,6 +729,9 @@ class LibraryCatalogNotifier extends Notifier<List<LibraryCourseData>> {
       progressTimeStr: json['progressTimeStr'] as String?,
       totalTimeStr: json['totalTimeStr'] as String?,
       videoAsset: _sanitizeStoredPath(json['videoAsset'] as String?),
+      sourceUrl: (json['sourceUrl'] as String?)?.trim().isNotEmpty == true
+          ? (json['sourceUrl'] as String).trim()
+          : null,
       enSubtitleAsset: _sanitizeStoredPath(json['enSubtitleAsset'] as String?),
       cnSubtitleAsset: _sanitizeStoredPath(json['cnSubtitleAsset'] as String?),
       subtitleTracks:
@@ -723,6 +816,105 @@ class LibraryCatalogNotifier extends Notifier<List<LibraryCourseData>> {
       return path;
     }
     return ImportMatcher.isImportablePath(path) ? path : null;
+  }
+
+  LibraryEpisodeItem? _findMatchingEpisode(
+    List<LibraryEpisodeItem> previous,
+    LibraryEpisodeItem next,
+  ) {
+    for (final LibraryEpisodeItem item in previous) {
+      if (item.id == next.id) {
+        return item;
+      }
+    }
+    final String? nextKey = _episodeMediaKey(next);
+    if (nextKey == null || nextKey.isEmpty) {
+      return null;
+    }
+    for (final LibraryEpisodeItem item in previous) {
+      final String? key = _episodeMediaKey(item);
+      if (key != null && key == nextKey) {
+        return item;
+      }
+    }
+    return null;
+  }
+
+  String? _episodeMediaKey(LibraryEpisodeItem episode) {
+    for (final String? candidate in <String?>[
+      episode.sourceUrl,
+      episode.videoAsset,
+    ]) {
+      if (candidate == null || candidate.trim().isEmpty) {
+        continue;
+      }
+      final String? fromPath = bilibiliIdKeyFromPath(candidate);
+      if (fromPath != null && fromPath.isNotEmpty) {
+        return fromPath.toUpperCase();
+      }
+      final Map<String, String>? ids = BilibiliImport.extractIds(candidate);
+      final String? bvid = ids?['bvid']?.trim();
+      if (bvid != null && bvid.isNotEmpty) {
+        return bvid.toUpperCase();
+      }
+      final String? aid = ids?['aid']?.trim();
+      if (aid != null && aid.isNotEmpty) {
+        return 'AV$aid';
+      }
+    }
+    return null;
+  }
+
+  /// Keep progress + already-downloaded local MP4/subs when a re-import only
+  /// refreshed the current episode (other 合集分集 would otherwise revert to
+  /// watch URLs and re-download on open).
+  LibraryEpisodeItem _mergeImportedEpisode({
+    required LibraryEpisodeItem next,
+    required LibraryEpisodeItem? previous,
+  }) {
+    if (previous == null) {
+      return next;
+    }
+    final bool nextHasVideo = isUsableLocalVideoPath(next.videoAsset);
+    final bool prevHasVideo = isUsableLocalVideoPath(previous.videoAsset);
+    final bool nextHasEn = isUsableSubtitlePath(next.enSubtitleAsset);
+    final bool prevHasEn = isUsableSubtitlePath(previous.enSubtitleAsset);
+    final bool nextHasZh = isUsableSubtitlePath(next.cnSubtitleAsset);
+    final bool prevHasZh = isUsableSubtitlePath(previous.cnSubtitleAsset);
+    final String? mergedVideo = nextHasVideo
+        ? next.videoAsset
+        : (prevHasVideo ? previous.videoAsset : next.videoAsset);
+    final String? mergedEn = nextHasEn
+        ? next.enSubtitleAsset
+        : (prevHasEn ? previous.enSubtitleAsset : next.enSubtitleAsset);
+    final String? mergedZh = nextHasZh
+        ? next.cnSubtitleAsset
+        : (prevHasZh ? previous.cnSubtitleAsset : next.cnSubtitleAsset);
+    final String? mergedSource =
+        (next.sourceUrl ?? '').trim().isNotEmpty
+        ? next.sourceUrl
+        : previous.sourceUrl;
+    final bool hasLocalVideo = isUsableLocalVideoPath(mergedVideo);
+    return next.copyWith(
+      completed: previous.completed,
+      progressPercent: previous.progressPercent,
+      lastWatchedStr: previous.lastWatchedStr,
+      progressTimeStr: previous.progressTimeStr,
+      totalTimeStr: previous.totalTimeStr,
+      videoAsset: mergedVideo,
+      sourceUrl: mergedSource,
+      videoMissing: hasLocalVideo ? false : next.videoMissing,
+      enSubtitleAsset: mergedEn,
+      cnSubtitleAsset: mergedZh,
+      hasEnglishSubtitles: isUsableSubtitlePath(mergedEn),
+      hasChineseSubtitles: isUsableSubtitlePath(mergedZh),
+      subtitleTracks: next.subtitleTracks.isNotEmpty
+          ? next.subtitleTracks
+          : previous.subtitleTracks,
+      coverImage: next.coverImage.trim().isNotEmpty
+          ? next.coverImage
+          : previous.coverImage,
+    );
   }
 
   String _buildEpisodeId(

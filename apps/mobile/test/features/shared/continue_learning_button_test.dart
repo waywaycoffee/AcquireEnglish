@@ -8,7 +8,7 @@ import 'package:common_learn_english/features/library/presentation/library_scree
 import 'package:common_learn_english/features/navigation/presentation/floating_bottom_nav.dart';
 import 'package:common_learn_english/features/navigation/presentation/navigation_destination.dart';
 import 'package:common_learn_english/features/player/presentation/learning_resume_provider.dart';
-import 'package:common_learn_english/features/player/presentation/pad_landscape_player_screen.dart';
+import 'package:common_learn_english/features/player/presentation/pad_portrait_player_screen.dart';
 import 'package:common_learn_english/features/player/presentation/player_screen.dart';
 import 'package:common_learn_english/features/shared/presentation/pad/pad_scaffold.dart';
 import 'package:common_learn_english/router/app_router.dart';
@@ -72,7 +72,7 @@ void main() {
   testWidgets(
     'home hero follows recent history and resumes the displayed episode',
     (WidgetTester tester) async {
-      tester.view.physicalSize = const Size(1366, 1024);
+      tester.view.physicalSize = const Size(390, 844);
       tester.view.devicePixelRatio = 1;
       addTearDown(tester.view.reset);
       final ProviderContainer container = _container();
@@ -125,8 +125,8 @@ void main() {
       );
       expect(
         tester
-            .state<PadLandscapePlayerScreenState>(
-              find.byType(PadLandscapePlayerScreen),
+            .state<PadPortraitPlayerScreenState>(
+              find.byType(PadPortraitPlayerScreen),
             )
             .state
             .positionMs,
@@ -156,7 +156,7 @@ void main() {
   testWidgets(
     'button resumes the last episode and its saved position, and hides in the player',
     (WidgetTester tester) async {
-      tester.view.physicalSize = const Size(1366, 1024);
+      tester.view.physicalSize = const Size(390, 844);
       tester.view.devicePixelRatio = 1;
       addTearDown(tester.view.reset);
       final ProviderContainer container = _container();
@@ -204,8 +204,8 @@ void main() {
       expect(find.byKey(_buttonKey), findsNothing);
       expect(
         tester
-            .state<PadLandscapePlayerScreenState>(
-              find.byType(PadLandscapePlayerScreen),
+            .state<PadPortraitPlayerScreenState>(
+              find.byType(PadPortraitPlayerScreen),
             )
             .state
             .positionMs,

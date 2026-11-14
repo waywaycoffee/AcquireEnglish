@@ -25,6 +25,7 @@ class LibraryEpisodeItem {
     this.progressTimeStr,
     this.totalTimeStr,
     this.videoAsset,
+    this.sourceUrl,
     this.videoMissing = false,
     this.enSubtitleAsset,
     this.cnSubtitleAsset,
@@ -44,6 +45,9 @@ class LibraryEpisodeItem {
   final String? progressTimeStr;
   final String? totalTimeStr;
   final String? videoAsset;
+  /// Durable B站 watch URL / BV for this episode. Survives local MP4 download
+  /// overwriting [videoAsset], so 合集分集 never reuse another episode's CC.
+  final String? sourceUrl;
   final bool videoMissing;
   final String? enSubtitleAsset;
   final String? cnSubtitleAsset;
@@ -51,9 +55,10 @@ class LibraryEpisodeItem {
 
   LibraryEpisodeItem copyWith({
     String? videoAsset,
-    String? enSubtitleAsset,
-    String? cnSubtitleAsset,
-    List<LibrarySubtitleTrackItem>? subtitleTracks,
+    Object? sourceUrl = _unset,
+    Object? enSubtitleAsset = _unset,
+    Object? cnSubtitleAsset = _unset,
+    Object? subtitleTracks = _unset,
     bool? videoMissing,
     bool? completed,
     int? progressPercent,
@@ -78,13 +83,25 @@ class LibraryEpisodeItem {
       progressTimeStr: progressTimeStr ?? this.progressTimeStr,
       totalTimeStr: totalTimeStr ?? this.totalTimeStr,
       videoAsset: videoAsset ?? this.videoAsset,
+      sourceUrl: identical(sourceUrl, _unset)
+          ? this.sourceUrl
+          : sourceUrl as String?,
       videoMissing: videoMissing ?? this.videoMissing,
-      enSubtitleAsset: enSubtitleAsset ?? this.enSubtitleAsset,
-      cnSubtitleAsset: cnSubtitleAsset ?? this.cnSubtitleAsset,
-      subtitleTracks: subtitleTracks ?? this.subtitleTracks,
+      enSubtitleAsset: identical(enSubtitleAsset, _unset)
+          ? this.enSubtitleAsset
+          : enSubtitleAsset as String?,
+      cnSubtitleAsset: identical(cnSubtitleAsset, _unset)
+          ? this.cnSubtitleAsset
+          : cnSubtitleAsset as String?,
+      subtitleTracks: identical(subtitleTracks, _unset)
+          ? this.subtitleTracks
+          : subtitleTracks as List<LibrarySubtitleTrackItem>? ??
+                const <LibrarySubtitleTrackItem>[],
     );
   }
 }
+
+const Object _unset = Object();
 
 class LibraryCourseData {
   const LibraryCourseData({

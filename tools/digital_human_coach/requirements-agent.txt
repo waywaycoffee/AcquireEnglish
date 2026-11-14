@@ -1,0 +1,7 @@
+# LiveKit Agent worker (install on the 5060 Ti / GPU machine)
+-r requirements.txt
+livekit-agents>=1.0.0
+livekit-plugins-silero>=1.0.0
+livekit-plugins-openai>=1.0.0
+# Optional cloud ASR for the agent path:
+# livekit-plugins-deepgram>=1.0.0

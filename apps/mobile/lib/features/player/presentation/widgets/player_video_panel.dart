@@ -12,6 +12,8 @@ import '../../../shared/presentation/pad/app_design_tokens.dart';
 import '../../../shared/presentation/word_lookup_popup.dart';
 import '../player_mock_state.dart';
 import '../player_native_subtitles.dart';
+import '../subtitle_display_mode.dart';
+import '../subtitle_language_sanitize.dart';
 import 'subtitle_vocabulary_highlight.dart';
 import 'subtitle_word_highlight_style.dart';
 
@@ -84,6 +86,8 @@ class PlayerVideoPanel extends StatefulWidget {
     this.showAiGenerateSubtitles = false,
     this.onGenerateAiSubtitles,
     this.hideOverlayControls = false,
+    // Softsubs belong in the list below — never paint over hardsub video.
+    this.paintSubtitlesOnVideo = false,
     super.key,
   });
 
@@ -132,7 +136,7 @@ class PlayerVideoPanel extends StatefulWidget {
   final String? assessmentUnavailableReason;
   final ValueChanged<String>? onCollectWord;
   final void Function(String word, String time)? onCollectWordAtTime;
-  final ValueChanged<String>? onFavoriteWord;
+  final void Function(String word, [String? definitionCn])? onFavoriteWord;
   final String? episodeId;
   final VoidCallback? onPronounce;
   final VoidCallback? onToggleEpisodePanel;
@@ -156,6 +160,10 @@ class PlayerVideoPanel extends StatefulWidget {
 
   /// When true (study shell with bottom controls), hide the on-video transport dock.
   final bool hideOverlayControls;
+
+  /// When false, skip painting soft subtitle text on the video surface
+  /// (e.g. Bilibili hardsubs already burn captions into the frame).
+  final bool paintSubtitlesOnVideo;
 
   static const List<String> kSpeedOptions = <String>[
     '0.5×',
@@ -339,7 +347,8 @@ class _PlayerVideoPanelState extends State<PlayerVideoPanel> {
                   },
                   onFavorite: widget.onFavoriteWord == null
                       ? null
-                      : () => widget.onFavoriteWord!(word),
+                      : (String? definitionCn) =>
+                            widget.onFavoriteWord!(word, definitionCn),
                 ),
               ),
             ),
@@ -467,6 +476,7 @@ class _PlayerVideoPanelState extends State<PlayerVideoPanel> {
         final int targetSeconds =
             (widget.videoDuration.inSeconds * nextProgress).round();
         _showGestureHint(_formatDuration(Duration(seconds: targetSeconds)));
+        widget.onSeek(nextProgress);
         return;
       case _PlayerGestureMode.volume:
         final double nextVolume =
@@ -506,27 +516,13 @@ class _PlayerVideoPanelState extends State<PlayerVideoPanel> {
   }
 
   String? _overlayText() {
-    final String english = widget.line.english.trim();
-    final String chinese = widget.line.chinese.trim();
-    switch (widget.subtitleMode) {
-      case '双语':
-        if (english.isEmpty && chinese.isEmpty) {
-          return null;
-        }
-        if (english.isEmpty) {
-          return chinese;
-        }
-        if (chinese.isEmpty || chinese == english) {
-          return english;
-        }
-        return '$english\n$chinese';
-      case '单英':
-        return english.isNotEmpty ? english : (chinese.isEmpty ? null : chinese);
-      case '单中':
-        return chinese.isNotEmpty ? chinese : (english.isEmpty ? null : english);
-      default:
-        return null;
+    // Always off unless explicitly opted in. Hardsub videos already burn
+    // captions into the frame; soft overlay would cover them. Learners read
+    // the subtitle list under the player instead.
+    if (!widget.paintSubtitlesOnVideo) {
+      return null;
     }
+    return null;
   }
 
   @override
@@ -535,7 +531,7 @@ class _PlayerVideoPanelState extends State<PlayerVideoPanel> {
     final bool showChinese =
         overlayText != null &&
         overlayText.contains('\n') &&
-        widget.subtitleMode != '单英';
+        !SubtitleDisplayMode.isEnglishOnly(widget.subtitleMode);
     final bool showChrome = !widget.hideOverlayControls;
     final bool showPrimaryButton =
         showChrome && (_showControls || !widget.isPlaying);
@@ -745,7 +741,7 @@ class _PlayerVideoPanelState extends State<PlayerVideoPanel> {
                         ),
                       ),
                     ),
-                  if (overlayText != null)
+                  if (widget.paintSubtitlesOnVideo && overlayText != null)
                     Positioned(
                       left: widget.isFullscreen ? 40 : (tinyControls ? 18 : 24),
                       right: widget.isFullscreen
@@ -755,46 +751,109 @@ class _PlayerVideoPanelState extends State<PlayerVideoPanel> {
                       child: Column(
                         mainAxisSize: MainAxisSize.min,
                         children: <Widget>[
-                          _buildEnglishSubtitle(
-                            widget.subtitleMode == '单中'
-                                ? overlayText
-                                : formatSubtitleLetterCase(
-                                    widget.line.english.trim().isNotEmpty
-                                        ? widget.line.english
-                                        : widget.line.chinese,
-                                    widget.subtitleLetterCase,
-                                  ),
-                            tinyControls: tinyControls,
-                          ),
-                          if (showChinese &&
-                              widget.line.chinese.trim().isNotEmpty &&
-                              widget.line.chinese.trim() !=
-                                  widget.line.english.trim()) ...<Widget>[
-                            SizedBox(height: tinyControls ? 5 : 8),
-                            Text(
-                              widget.line.chinese,
-                              textAlign: TextAlign.center,
-                              maxLines: 2,
-                              overflow: TextOverflow.ellipsis,
-                              style: TextStyle(
-                                fontSize:
-                                    (widget.isFullscreen
-                                        ? (tinyControls ? 13 : 15)
-                                        : (tinyControls ? 12 : 13.5)) *
-                                    widget.fontScale,
-                                fontWeight: FontWeight.w500,
-                                height: 1.35,
-                                color: const Color(0xFFE8E8E8),
-                                shadows: const <Shadow>[
-                                  Shadow(
-                                    color: Color(0xB3000000),
-                                    blurRadius: 8,
-                                    offset: Offset(0, 2),
-                                  ),
+                          Builder(
+                            builder: (BuildContext context) {
+                              final String en = widget.line.english.trim();
+                              final String zh = widget.line.chinese.trim();
+                              final bool enIsChineseOnly =
+                                  subtitleLooksChineseOnly(en);
+                              final String contentMode =
+                                  SubtitleDisplayMode.contentMode(
+                                    widget.subtitleMode,
+                                  );
+                              final bool requireEnglishPrimary =
+                                  SubtitleDisplayMode.requiresEnglishPrimary(
+                                    contentMode,
+                                  );
+                              final bool showEnglishPrimary =
+                                  requireEnglishPrimary &&
+                                  en.isNotEmpty &&
+                                  !enIsChineseOnly;
+                              final String primaryChinese = zh.isNotEmpty
+                                  ? zh
+                                  : (enIsChineseOnly ? en : '');
+                              final bool showChinesePrimary =
+                                  SubtitleDisplayMode.isChineseOnly(
+                                        contentMode,
+                                      ) &&
+                                  primaryChinese.isNotEmpty;
+                              final bool showChineseSecondary =
+                                  showChinese &&
+                                  !SubtitleDisplayMode.isEnglishOnly(
+                                    contentMode,
+                                  ) &&
+                                  primaryChinese.isNotEmpty &&
+                                  (showEnglishPrimary ||
+                                      requireEnglishPrimary) &&
+                                  primaryChinese != en;
+
+                              return Column(
+                                mainAxisSize: MainAxisSize.min,
+                                children: <Widget>[
+                                  if (showEnglishPrimary)
+                                    _buildEnglishSubtitle(
+                                      formatSubtitleLetterCase(
+                                        widget.line.english,
+                                        widget.subtitleLetterCase,
+                                      ),
+                                      tinyControls: tinyControls,
+                                    )
+                                  else if (showChinesePrimary)
+                                    Text(
+                                      primaryChinese,
+                                      textAlign: TextAlign.center,
+                                      maxLines: 2,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: TextStyle(
+                                        fontSize:
+                                            (widget.isFullscreen
+                                                ? (tinyControls ? 22 : 28)
+                                                : (tinyControls ? 20 : 24)) *
+                                            widget.fontScale,
+                                        fontWeight: FontWeight.w700,
+                                        height: 1.25,
+                                        color: Colors.white,
+                                        shadows: const <Shadow>[
+                                          Shadow(
+                                            color: Color(0xCC000000),
+                                            blurRadius: 10,
+                                            offset: Offset(0, 3),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  if (showChineseSecondary) ...<Widget>[
+                                    SizedBox(height: tinyControls ? 5 : 8),
+                                    Text(
+                                      zh,
+                                      textAlign: TextAlign.center,
+                                      maxLines: 2,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: TextStyle(
+                                        fontSize:
+                                            (widget.isFullscreen
+                                                ? (tinyControls ? 13 : 15)
+                                                : (tinyControls
+                                                      ? 12
+                                                      : 13.5)) *
+                                            widget.fontScale,
+                                        fontWeight: FontWeight.w500,
+                                        height: 1.35,
+                                        color: const Color(0xFFE8E8E8),
+                                        shadows: const <Shadow>[
+                                          Shadow(
+                                            color: Color(0xB3000000),
+                                            blurRadius: 8,
+                                            offset: Offset(0, 2),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ],
                                 ],
-                              ),
-                            ),
-                          ],
+                              );
+                            },
+                          ),
                         ],
                       ),
                     ),
@@ -1354,53 +1413,37 @@ class _PlayerVideoPanelState extends State<PlayerVideoPanel> {
                   savedWords: widget.savedVocabularyWords,
                   keyWords: widget.keyVocabularyWords,
                 );
-            final Color vocabFill = SubtitleVocabularyHighlight.fill(
+            // AcquireEnglish karaoke/vocab overlay — green text only, never
+            // yellow chips (legacy「黄色填充」is remapped at style layer).
+            final Color vocabWordColor = SubtitleVocabularyHighlight.textColor(
               vocabMark,
+              fallback: style.color ?? Colors.white,
               onDarkVideo: true,
             );
-            final Color karaokeFill = SubtitleWordHighlightStyle.background(
-              widget.subtitleWordHighlightStyle,
-              highlighted: karaoke,
-            );
-            final Color fill = karaoke ? karaokeFill : vocabFill;
-            final Color borderColor = karaoke
-                ? SubtitleWordHighlightStyle.borderColor(
+            final Color wordColor = karaoke
+                ? SubtitleWordHighlightStyle.textColor(
                     widget.subtitleWordHighlightStyle,
-                    highlighted: karaoke,
+                    highlighted: true,
+                    fallback: AppDesignTokens.brandGreen,
                   )
-                : SubtitleVocabularyHighlight.border(
-                    vocabMark,
-                    onDarkVideo: true,
-                  );
-            final double borderWidth = karaoke
-                ? SubtitleWordHighlightStyle.borderWidth(
-                    widget.subtitleWordHighlightStyle,
-                    highlighted: karaoke,
-                    width: widget.subtitleWordHighlightBorderWidth,
-                  )
-                : (vocabMark == SubtitleVocabMark.none ? 0 : 1.4);
+                : vocabWordColor;
             return Builder(
               builder: (BuildContext tokenContext) {
                 return GestureDetector(
                   key: ValueKey<String>('video-subtitle-word-${entry.key}'),
                   behavior: HitTestBehavior.opaque,
                   onTap: () => _openSubtitleLookup(tokenContext, entry.value),
-                  child: Container(
+                  child: Padding(
                     padding: const EdgeInsets.symmetric(
-                      horizontal: 5,
+                      horizontal: 3,
                       vertical: 1,
-                    ),
-                    decoration: BoxDecoration(
-                      color: fill,
-                      borderRadius: BorderRadius.circular(7),
-                      border: Border.all(
-                        color: borderColor,
-                        width: borderWidth,
-                      ),
                     ),
                     child: Text(
                       entry.value,
                       style: style.copyWith(
+                        // ShadowTalk: green ink for current/favorite words,
+                        // never a yellow/orange fill chip.
+                        color: wordColor,
                         fontWeight: SubtitleVocabularyHighlight.fontWeight(
                           vocabMark,
                           karaoke: karaoke,
@@ -1412,12 +1455,14 @@ class _PlayerVideoPanelState extends State<PlayerVideoPanel> {
                         ),
                         decorationColor:
                             SubtitleWordHighlightStyle.textDecorationColor(
-                              widget.subtitleWordHighlightStyle,
-                              highlighted: karaoke,
-                            ),
-                        decorationThickness:
-                            karaoke &&
-                                widget.subtitleWordHighlightStyle == '下划线'
+                          widget.subtitleWordHighlightStyle,
+                          highlighted: karaoke,
+                        ),
+                        decorationThickness: karaoke &&
+                                SubtitleWordHighlightStyle.effectiveStyle(
+                                      widget.subtitleWordHighlightStyle,
+                                    ) ==
+                                    '下划线'
                             ? 2
                             : null,
                       ),

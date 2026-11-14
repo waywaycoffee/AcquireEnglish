@@ -34,6 +34,8 @@ def _to_out(row: UserPreference) -> PreferencesOut:
         tags=[str(t) for t in tags],
         daily_quota=row.daily_quota or 2,
         notify_daily_feed=bool(row.notify_daily_feed),
+        has_bilibili_cookie=bool((row.bilibili_cookie or "").strip()),
+        has_asr_api_key=bool((row.asr_api_key or "").strip()),
     )
 
 
@@ -69,6 +71,11 @@ async def put_preferences(
     row.tags_json = json.dumps(payload.tags, ensure_ascii=False)
     row.daily_quota = payload.daily_quota
     row.notify_daily_feed = 1 if payload.notify_daily_feed else 0
+    # None = leave unchanged; "" = clear.
+    if payload.bilibili_cookie is not None:
+        row.bilibili_cookie = payload.bilibili_cookie.strip() or None
+    if payload.asr_api_key is not None:
+        row.asr_api_key = payload.asr_api_key.strip() or None
     await db.commit()
     await db.refresh(row)
     return _to_out(row)

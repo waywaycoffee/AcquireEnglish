@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../import_course/data/bilibili_import_service.dart';
 import '../../../import_course/domain/bilibili_import.dart';
+import '../../../import_course/presentation/course_import_entry.dart';
 import '../../../library/presentation/library_catalog_provider.dart';
 import '../../../library/presentation/library_mock_data.dart';
 import '../../../library/presentation/widgets/library_course_poster.dart';
@@ -28,10 +29,13 @@ class PadHomeHero extends StatelessWidget {
   Widget build(BuildContext context) {
     final bool compact = context.isPadCompact;
     final bool narrow = MediaQuery.sizeOf(context).width < 720;
+    final bool hasCourse = course != null;
 
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
-      onTap: onTap,
+      // Empty hero uses the same YouTube / B站 / 导入 entry as 学习页 —
+      // don't swallow those button taps with a whole-card onTap.
+      onTap: hasCourse ? onTap : null,
       child: Container(
         decoration: BoxDecoration(
           color: AppDesignTokens.appWhite,
@@ -107,7 +111,10 @@ String _heroCoverPath(LibraryCourseData? course, LibraryEpisodeItem? episode) {
   return courseCover.isNotEmpty ? courseCover : episodeCover;
 }
 
-String? _bilibiliSource(LibraryCourseData? course, LibraryEpisodeItem? episode) {
+String? _bilibiliSource(
+  LibraryCourseData? course,
+  LibraryEpisodeItem? episode,
+) {
   final String description = course?.description.trim() ?? '';
   if (description.isNotEmpty &&
       (description.contains('bilibili.com') ||
@@ -197,8 +204,9 @@ class _VideoPreviewState extends ConsumerState<_VideoPreview> {
     }
     _fetchKey = key;
     try {
-      final String? cover =
-          await BilibiliImportService().resolveCoverImage(source);
+      final String? cover = await BilibiliImportService().resolveCoverImage(
+        source,
+      );
       if (!mounted || cover == null || cover.isEmpty) {
         return;
       }
@@ -366,7 +374,9 @@ class _HeroDetails extends StatelessWidget {
           ],
           const SizedBox(height: 10),
           Text(
-            hasCourse ? '上次学习：$progressTime' : '导入本地视频和英文字幕，即刻开始精听。',
+            hasCourse
+                ? '上次学习：$progressTime'
+                : '与学习页相同：YouTube、B站或本地视频，导入后即可精听。',
             style: TextStyle(
               color: AppDesignTokens.textSecondary,
               fontSize: 14,
@@ -374,30 +384,33 @@ class _HeroDetails extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 14),
-          SizedBox(
-            height: compact ? 50 : 52,
-            child: FilledButton.icon(
-              onPressed: onTap,
-              icon: const Icon(Icons.play_arrow_rounded, size: 25),
-              label: Text(
-                hasCourse ? '继续播放' : '去导入课程',
-                style: TextStyle(
-                  fontSize: compact ? 17 : 18,
-                  fontWeight: FontWeight.w900,
+          if (hasCourse)
+            SizedBox(
+              height: compact ? 50 : 52,
+              child: FilledButton.icon(
+                onPressed: onTap,
+                icon: const Icon(Icons.play_arrow_rounded, size: 25),
+                label: Text(
+                  '继续播放',
+                  style: TextStyle(
+                    fontSize: compact ? 17 : 18,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+                style: FilledButton.styleFrom(
+                  backgroundColor: AppDesignTokens.brandGreen,
+                  foregroundColor: AppDesignTokens.onAccent,
+                  elevation: 0,
+                  shadowColor: Colors.transparent,
+                  padding: const EdgeInsets.symmetric(horizontal: 24),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(999),
+                  ),
                 ),
               ),
-              style: FilledButton.styleFrom(
-                backgroundColor: AppDesignTokens.brandGreen,
-                foregroundColor: AppDesignTokens.onAccent,
-                elevation: 0,
-                shadowColor: Colors.transparent,
-                padding: const EdgeInsets.symmetric(horizontal: 24),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(999),
-                ),
-              ),
-            ),
-          ),
+            )
+          else
+            const CourseImportActionButtons(compact: true),
           if (hasCourse) ...<Widget>[
             const SizedBox(height: 14),
             Row(

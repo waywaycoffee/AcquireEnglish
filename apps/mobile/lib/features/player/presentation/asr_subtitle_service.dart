@@ -1,10 +1,13 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'dart:typed_data';
 
 import 'package:crypto/crypto.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter/services.dart';
 
+import '../../settings/data/api_usage_ledger.dart';
 import '../../settings/presentation/settings_provider.dart';
 import 'desktop_ffmpeg.dart';
 import 'local_whisper_asr.dart';
@@ -430,6 +433,7 @@ class AsrSubtitleService {
       if (normalized == null) {
         throw StateError('invalid-asr-response');
       }
+      _recordCloudAsrUsage(settings: settings, file: file, responseData: response.data);
       return _offsetNormalized(normalized, offsetMs);
     } on DioException catch (error) {
       throw StateError(_dioErrorMessage(error));
@@ -484,6 +488,7 @@ class AsrSubtitleService {
               data: data,
               options: Options(headers: headers),
             );
+      _recordCloudAsrUsage(settings: settings, file: file);
       return _normalizeTencentSentenceResponse(response.data, offsetMs);
     } on DioException catch (error) {
       throw StateError(_dioErrorMessage(error));
@@ -582,6 +587,7 @@ class AsrSubtitleService {
             path: resultUrl,
             headers: const <String, String>{},
           );
+          _recordCloudAsrUsage(settings: settings, file: file);
           return _offsetNormalized(
             _normalizeAlibabaQwenResult(resultResponse.data),
             offsetMs,
@@ -1087,6 +1093,62 @@ class AsrSubtitleService {
       return (value * 1000).round();
     }
     return null;
+  }
+
+  void _recordCloudAsrUsage({
+    required LearningSettingsState settings,
+    required File file,
+    Object? responseData,
+  }) {
+    int? prompt;
+    int? completion;
+    if (responseData is Map) {
+      final Object? usage = responseData['usage'];
+      if (usage is Map) {
+        prompt = int.tryParse('${usage['prompt_tokens']}');
+        completion = int.tryParse('${usage['completion_tokens']}');
+      }
+    }
+    unawaited(
+      ApiUsageLedger.instance.record(
+        kind: ApiUsageKind.asr,
+        provider: settings.asrProvider,
+        model: settings.asrModel,
+        promptTokens: prompt,
+        completionTokens: completion,
+        audioSeconds: _estimateAudioSeconds(file),
+      ),
+    );
+  }
+
+  double _estimateAudioSeconds(File file) {
+    try {
+      if (!file.existsSync()) {
+        return 0;
+      }
+      final String path = file.path.toLowerCase();
+      if (path.endsWith('.wav')) {
+        final RandomAccessFile raf = file.openSync();
+        try {
+          final Uint8List header = raf.readSync(44);
+          if (header.length >= 44 &&
+              String.fromCharCodes(header.sublist(0, 4)) == 'RIFF') {
+            final ByteData bd = ByteData.sublistView(header);
+            final int byteRate = bd.getUint32(28, Endian.little);
+            final int dataSize = bd.getUint32(40, Endian.little);
+            if (byteRate > 0 && dataSize > 0) {
+              return dataSize / byteRate;
+            }
+          }
+        } finally {
+          raf.closeSync();
+        }
+      }
+      // Compressed audio fallback (~128 kbps).
+      return file.lengthSync() / 16000.0;
+    } catch (_) {
+      return 0;
+    }
   }
 
   bool _usesLocalWhisper(LearningSettingsState settings) {

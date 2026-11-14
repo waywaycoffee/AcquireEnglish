@@ -92,6 +92,7 @@ class _TranscriptReaderProxyWordLookupService extends WordLookupService {
   Future<String?> translateSentence({
     required String sentence,
     required LearningSettingsState settings,
+    String targetLanguage = 'zh',
   }) async {
     try {
       return await WindowController.fromWindowId(

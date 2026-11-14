@@ -8,6 +8,7 @@ class PlayerTranscriptPanel extends StatefulWidget {
   const PlayerTranscriptPanel({
     required this.lines,
     required this.activeIndex,
+    this.timelineFollowEpoch = 0,
     required this.subtitleMode,
     this.subtitleLetterCase = '保留原样',
     required this.currentWordIndex,
@@ -35,6 +36,10 @@ class PlayerTranscriptPanel extends StatefulWidget {
     this.onRegenerateAiSubtitles,
     this.onDeleteAiSubtitles,
     this.onRegenerateAiLine,
+    this.onEditEnglishLine,
+    this.onEditSubtitleLine,
+    this.onEditLineNote,
+    this.lineNotesByStartMs = const <int, String>{},
     this.studyDarkStyle = false,
     this.blindListening = false,
     this.showAiGenerateSubtitles = false,
@@ -50,11 +55,14 @@ class PlayerTranscriptPanel extends StatefulWidget {
     this.onCancelBilingualPipeline,
     this.onDictionaryOpened,
     this.onDictionaryClosed,
+    this.fragmentsBySentenceStartMs = const <int, List<PlayerSubtitleLine>>{},
     super.key,
   });
 
   final List<PlayerSubtitleLine> lines;
+  final Map<int, List<PlayerSubtitleLine>> fragmentsBySentenceStartMs;
   final int activeIndex;
+  final int timelineFollowEpoch;
   final String subtitleMode;
   final String subtitleLetterCase;
   final int currentWordIndex;
@@ -67,7 +75,7 @@ class PlayerTranscriptPanel extends StatefulWidget {
   final ValueChanged<int> onTapLine;
   final ValueChanged<String> onCollectWord;
   final void Function(String word, String time)? onCollectWordAtTime;
-  final ValueChanged<String>? onFavoriteWord;
+  final void Function(String word, [String? definitionCn])? onFavoriteWord;
   final ValueChanged<int> onBookmarkLine;
   final ValueChanged<int> onLoopFromLine;
   final ValueChanged<int> onDictationLine;
@@ -82,6 +90,11 @@ class PlayerTranscriptPanel extends StatefulWidget {
   final VoidCallback? onRegenerateAiSubtitles;
   final VoidCallback? onDeleteAiSubtitles;
   final Future<void> Function(int index)? onRegenerateAiLine;
+  final Future<void> Function(int index, String english)? onEditEnglishLine;
+  final Future<void> Function(int index, String english, String chinese)?
+  onEditSubtitleLine;
+  final Future<void> Function(int index, String note)? onEditLineNote;
+  final Map<int, String> lineNotesByStartMs;
   final bool studyDarkStyle;
   final bool blindListening;
   final bool showAiGenerateSubtitles;
@@ -111,6 +124,7 @@ class _PlayerTranscriptPanelState extends State<PlayerTranscriptPanel> {
       lines: widget.lines,
       episodeId: widget.episodeId,
       activeIndex: widget.activeIndex,
+      timelineFollowEpoch: widget.timelineFollowEpoch,
       subtitleMode: widget.subtitleMode,
       subtitleLetterCase: widget.subtitleLetterCase,
       showCurrentOnly: !widget.studyDarkStyle && _showCurrentOnly,
@@ -139,6 +153,10 @@ class _PlayerTranscriptPanelState extends State<PlayerTranscriptPanel> {
       onRegenerateAiSubtitles: widget.onRegenerateAiSubtitles,
       onDeleteAiSubtitles: widget.onDeleteAiSubtitles,
       onRegenerateAiLine: widget.onRegenerateAiLine,
+      onEditEnglishLine: widget.onEditEnglishLine,
+      onEditSubtitleLine: widget.onEditSubtitleLine,
+      onEditLineNote: widget.onEditLineNote,
+      lineNotesByStartMs: widget.lineNotesByStartMs,
       studyDarkStyle: widget.studyDarkStyle,
       blindListening: widget.blindListening,
       showAiGenerateSubtitles: widget.showAiGenerateSubtitles,
@@ -154,6 +172,7 @@ class _PlayerTranscriptPanelState extends State<PlayerTranscriptPanel> {
       onCancelBilingualPipeline: widget.onCancelBilingualPipeline,
       onDictionaryOpened: widget.onDictionaryOpened,
       onDictionaryClosed: widget.onDictionaryClosed,
+      fragmentsBySentenceStartMs: widget.fragmentsBySentenceStartMs,
     );
 
     if (widget.studyDarkStyle) {

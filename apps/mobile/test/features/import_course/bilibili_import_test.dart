@@ -1,7 +1,38 @@
+import 'package:common_learn_english/features/import_course/data/bilibili_episode_prepare.dart';
 import 'package:common_learn_english/features/import_course/domain/bilibili_import.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
+  group('BilibiliImport.mediaIdKeyAliases', () {
+    test('maps bare BV and P1 multipage key to each other', () {
+      expect(
+        BilibiliImport.mediaIdKeyAliases('BV1xx411c7mD'),
+        containsAll(<String>['BV1xx411c7mD', 'BV1xx411c7mD-p01']),
+      );
+      expect(
+        BilibiliImport.mediaIdKeyAliases('BV1xx411c7mD-p01'),
+        containsAll(<String>['BV1xx411c7mD-p01', 'BV1xx411c7mD']),
+      );
+      expect(
+        BilibiliImport.mediaIdKeyAliases('BV1xx411c7mD-p02'),
+        <String>['BV1xx411c7mD-p02'],
+      );
+    });
+  });
+
+  group('officialBilibiliSubtitleKeys', () {
+    test('matches bare BV to the p01 folder', () {
+      expect(
+        officialBilibiliSubtitleKeys('BV1BSWWZ7EEO'),
+        containsAll(<String>['BV1BSWWZ7EEO', 'BV1BSWWZ7EEO-P01']),
+      );
+      expect(
+        officialBilibiliSubtitleKeys('bv1bswwz7eeo-p01'),
+        containsAll(<String>['BV1BSWWZ7EEO-P01', 'BV1BSWWZ7EEO']),
+      );
+    });
+  });
+
   group('BilibiliImport.extractIds', () {
     test('parses full BV url', () {
       expect(

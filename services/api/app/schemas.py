@@ -18,14 +18,49 @@ class UserOut(BaseModel):
     id: int
     email: EmailStr
     display_name: str | None
+    phone: str | None = None
+    wechat_bound: bool = False
 
     model_config = {"from_attributes": True}
+
+    @classmethod
+    def from_user(cls, user) -> "UserOut":
+        return cls(
+            id=user.id,
+            email=user.email,
+            display_name=user.display_name,
+            phone=getattr(user, "phone", None),
+            wechat_bound=bool(getattr(user, "wechat_openid", None)),
+        )
 
 
 class TokenOut(BaseModel):
     access_token: str
     token_type: str = "bearer"
     user: UserOut
+    is_new_user: bool = False
+
+
+class SmsSendIn(BaseModel):
+    phone: str = Field(min_length=8, max_length=20)
+
+
+class SmsSendOut(BaseModel):
+    ok: bool = True
+    expires_in: int
+    mock: bool = False
+    # Only returned when AUTH_SMS_MOCK=true (dev convenience).
+    debug_code: str | None = None
+
+
+class SmsLoginIn(BaseModel):
+    phone: str = Field(min_length=8, max_length=20)
+    code: str = Field(min_length=4, max_length=8)
+
+
+class WechatLoginIn(BaseModel):
+    code: str = Field(min_length=2, max_length=128)
+    nickname: str | None = Field(default=None, max_length=120)
 
 
 class SubtitlesOut(BaseModel):
@@ -103,6 +138,9 @@ class PreferencesUpdate(BaseModel):
     tags: list[str] = Field(default_factory=lambda: ["slow", "daily"])
     daily_quota: int = Field(default=2, ge=1, le=10)
     notify_daily_feed: bool = True
+    # Empty string clears; omit/null leaves unchanged when using partial-friendly clients.
+    bilibili_cookie: str | None = Field(default=None, max_length=4096)
+    asr_api_key: str | None = Field(default=None, max_length=512)
 
 
 class PreferencesOut(BaseModel):
@@ -110,3 +148,5 @@ class PreferencesOut(BaseModel):
     tags: list[str]
     daily_quota: int
     notify_daily_feed: bool
+    has_bilibili_cookie: bool = False
+    has_asr_api_key: bool = False

@@ -1,9 +1,12 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../library/presentation/library_catalog_provider.dart';
 import '../../library/presentation/library_mock_data.dart';
 import '../../player/presentation/widgets/study_shell_tokens.dart';
+import '../../subtitle_completion/subtitle_completion_enqueue.dart';
 import '../data/youtube_import_service.dart';
 import '../domain/youtube_import.dart';
 
@@ -110,14 +113,19 @@ class _YoutubeImportFormState extends ConsumerState<_YoutubeImportForm> {
       final bool ok = await ref
           .read(libraryCatalogProvider.notifier)
           .importCourse(course);
+      if (ok) {
+        unawaited(enqueueSubtitleCompletionForCourse(course: course));
+      }
       if (!mounted) {
         return;
       }
       setState(() => _busy = false);
       Navigator.of(context).pop();
-      final String subtitleHint = hasEn
-          ? '已拉取英文字幕，可直接跟播。'
-          : '未找到字幕，打开后可用语音识别生成。';
+      final String subtitleHint = !hasEn && !hasZh
+          ? '缺中英字幕，已开始后台补全。'
+          : (!hasEn
+                ? '缺英文字幕，已开始后台补全。'
+                : (!hasZh ? '缺中文字幕，已开始后台补全。' : '中英字幕已就绪。'));
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(ok ? '已加入书库。$subtitleHint' : '该书库中已有此 YouTube 课程'),

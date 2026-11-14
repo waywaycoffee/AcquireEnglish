@@ -2,9 +2,30 @@ import 'dart:io';
 
 import 'package:common_learn_english/features/player/presentation/player_mock_state.dart';
 import 'package:common_learn_english/features/player/presentation/player_subtitle_loader.dart';
+import 'package:common_learn_english/features/player/presentation/subtitle_display_mode.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
+  test('chinese-only cues stay in chinese field, not english', () {
+    const String rawSrt = '''
+1
+00:00:01,000 --> 00:00:03,000
+这里可以做五到六
+
+2
+00:00:03,500 --> 00:00:06,000
+Hello there
+你好
+''';
+
+    final List<PlayerSubtitleLine> lines = parseSubtitleLines(rawSrt);
+    expect(lines, hasLength(2));
+    expect(lines[0].english, isEmpty);
+    expect(lines[0].chinese, '这里可以做五到六');
+    expect(lines[1].english, 'Hello there');
+    expect(lines[1].chinese, '你好');
+  });
+
   test('parses bilingual subtitles from srt/vtt', () {
     const String rawSrt = '''
 1
@@ -84,6 +105,55 @@ Hello there
     expect(lines, hasLength(1));
     expect(lines[0].english, 'Hello there');
     expect(lines[0].chinese, '');
+  });
+
+  test('mislabeled chinese en-track becomes chinese-only seed', () {
+    const String fakeEnglish = '''
+1
+00:00:01,000 --> 00:00:03,000
+这里其实是中文
+''';
+
+    final List<PlayerSubtitleLine> lines = mergeSubtitleLines(
+      englishLines: parseSubtitleLines(fakeEnglish),
+      chineseLines: const <PlayerSubtitleLine>[],
+    );
+
+    expect(lines, hasLength(1));
+    expect(lines[0].english, isEmpty);
+    expect(lines[0].chinese, '这里其实是中文');
+  });
+
+  test('merges chinese cues by time overlap not only index', () {
+    const String english = '''
+1
+00:00:01,000 --> 00:00:03,000
+Hello there
+
+2
+00:00:05,000 --> 00:00:07,000
+Welcome
+''';
+
+    const String chinese = '''
+1
+00:00:04,800 --> 00:00:07,200
+欢迎
+
+2
+00:00:00,900 --> 00:00:03,200
+你好
+''';
+
+    final List<PlayerSubtitleLine> lines = mergeSubtitleLines(
+      englishLines: parseSubtitleLines(english),
+      chineseLines: parseSubtitleLines(chinese),
+    );
+
+    expect(lines[0].english, 'Hello there');
+    expect(lines[0].chinese, '你好');
+    expect(lines[1].english, 'Welcome');
+    expect(lines[1].chinese, '欢迎');
   });
 
   test('parses generated words json subtitles', () {
@@ -168,24 +238,58 @@ Hello from file
     expect(lines[0].english, 'Hello from file');
   });
 
-  test(
-    'player state falls back to english-only mode when chinese is missing',
-    () {
-      final PlayerMockState state = PlayerMockState()
-        ..loadLines(const <PlayerSubtitleLine>[
-          PlayerSubtitleLine(
-            startTime: '00:01',
-            english: 'English only',
-            chinese: '',
-            startMs: 1000,
-            endMs: 2000,
-          ),
-        ])
-        ..setSubtitleMode('单中');
+  test('player state offers four learning subtitle modes', () {
+    final PlayerMockState state = PlayerMockState()
+      ..loadLines(const <PlayerSubtitleLine>[
+        PlayerSubtitleLine(
+          startTime: '00:01',
+          english: 'English only',
+          chinese: '',
+          startMs: 1000,
+          endMs: 2000,
+        ),
+      ]);
 
-      expect(state.subtitleMode, '单英');
-    },
-  );
+    expect(state.subtitleMode, '双语');
+    expect(
+      state.availableSubtitleModes,
+      <String>['双语', '英文', '中文', '盲听'],
+    );
+    state.setSubtitleMode('单中');
+    expect(state.subtitleMode, '中文');
+    state.setSubtitleMode('单英');
+    expect(state.subtitleMode, '英文');
+    state.setSubtitleMode('unknown');
+    expect(state.subtitleMode, '双语');
+  });
+
+  test('english primary is required except when user hides it', () {
+    expect(SubtitleDisplayMode.requiresEnglishPrimary('双语'), isTrue);
+    expect(SubtitleDisplayMode.requiresEnglishPrimary('英文'), isTrue);
+    expect(SubtitleDisplayMode.requiresEnglishPrimary('中文'), isFalse);
+    expect(SubtitleDisplayMode.requiresEnglishPrimary('盲听'), isFalse);
+    expect(SubtitleDisplayMode.defaultMode, '双语');
+  });
+
+  test('chinese-only cues keep all four modes including bilingual', () {
+    final PlayerMockState state = PlayerMockState()
+      ..setSubtitleMode('双语')
+      ..loadLines(const <PlayerSubtitleLine>[
+        PlayerSubtitleLine(
+          startTime: '00:01',
+          english: '',
+          chinese: '只有中文',
+          startMs: 1000,
+          endMs: 2000,
+        ),
+      ]);
+
+    expect(state.subtitleMode, '双语');
+    expect(
+      state.availableSubtitleModes,
+      <String>['双语', '英文', '中文', '盲听'],
+    );
+  });
 
   test('single-line loop restarts before switching to the next subtitle', () {
     final PlayerMockState state = PlayerMockState()
@@ -478,6 +582,10 @@ Hello from file
     expect((state..syncWithTimestamp(2200)).activeLine.english, 'First');
 
     expect((state..syncWithTimestamp(2600)).activeLine.english, 'Second');
+    expect((state..seekToMilliseconds(2200)).activeLine.english, 'First');
+    expect(state.timelineFollowEpoch, 1);
+    expect((state..seekToMilliseconds(2600)).activeLine.english, 'Second');
+    expect(state.timelineFollowEpoch, 2);
     expect(state.videoStartMsForLine(1), 2500);
   });
 }

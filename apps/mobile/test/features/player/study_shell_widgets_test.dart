@@ -59,10 +59,10 @@ void main() {
     expect(selected, StudyModeTab.wordCards);
   });
 
-  testWidgets('StudyBottomControls fires blind loop and word-cards', (
+  testWidgets('StudyBottomControls fires subtitle mode loop and word-cards', (
     WidgetTester tester,
   ) async {
-    int blindTaps = 0;
+    final List<String> selectedModes = <String>[];
     int loopTaps = 0;
     int wordCardTaps = 0;
     int playTaps = 0;
@@ -73,14 +73,13 @@ void main() {
       MaterialApp(
         home: Scaffold(
           body: StudyBottomControls(
-            bilingual: true,
-            blindListening: false,
+            subtitleMode: '双语',
             speed: '1.0×',
             isPlaying: false,
             isLooping: false,
             position: const Duration(seconds: 5),
             duration: const Duration(minutes: 1, seconds: 36),
-            onToggleBlindListening: () => blindTaps += 1,
+            onSelectSubtitleMode: selectedModes.add,
             onCycleSpeed: () {},
             onSpeedSelected: (_) => speedSelects += 1,
             onOpenQualitySheet: () => qualityTaps += 1,
@@ -93,15 +92,18 @@ void main() {
     );
 
     expect(find.text('00:05 / 01:36'), findsOneWidget);
+    expect(find.text('双语'), findsWidgets);
 
-    await tester.tap(find.byKey(const ValueKey<String>('study-chip-blind')));
+    await tester.tap(
+      find.byKey(const ValueKey<String>('study-chip-subtitle-label')),
+    );
     await tester.tap(find.byKey(const ValueKey<String>('study-chip-loop')));
     await tester.tap(find.byKey(const ValueKey<String>('study-chip-word-cards')));
     await tester.tap(find.byKey(const ValueKey<String>('study-chip-play')));
     await tester.tap(find.text('超清'));
     await tester.pump();
 
-    expect(blindTaps, 1);
+    expect(selectedModes, <String>['英文']);
     expect(loopTaps, 1);
     expect(wordCardTaps, 1);
     expect(playTaps, 1);

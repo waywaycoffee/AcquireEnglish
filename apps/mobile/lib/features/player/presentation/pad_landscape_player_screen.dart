@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter/foundation.dart';
@@ -20,6 +21,8 @@ import '../../library/presentation/library_mock_data.dart';
 import '../../navigation/presentation/navigation_destination.dart';
 import '../../phrases/presentation/phrase_book_provider.dart';
 import '../../settings/presentation/settings_provider.dart';
+import '../../subtitle_completion/subtitle_completion_enqueue.dart';
+import '../../subtitle_completion/subtitle_completion_scheduler.dart';
 import '../../shared/data/word_lookup_service.dart';
 import '../../shared/data/word_pronunciation_service.dart';
 import '../../shared/presentation/app_loading_overlay.dart';
@@ -30,6 +33,7 @@ import '../domain/pronunciation_assessment.dart';
 import 'asr_subtitle_cache.dart';
 import 'asr_subtitle_job.dart';
 import 'asr_subtitle_service.dart';
+import 'bilingual_subtitle_helpers.dart';
 import 'bilingual_subtitle_pipeline.dart';
 import 'embedded_subtitle_reference.dart';
 import 'full_transcript_reader.dart';
@@ -44,7 +48,10 @@ import 'player_subtitle_loader.dart';
 import 'player_system_media_controls.dart';
 import 'player_video_init.dart';
 import 'pronunciation_target_selection.dart';
+import 'subtitle_display_mode.dart';
+import 'subtitle_file_persist.dart';
 import 'subtitle_reference_review.dart';
+import 'subtitle_sentence_merge.dart';
 import 'subtitle_word_alignment.dart';
 import 'transcript_reader_session.dart';
 import 'widgets/ai_grammar_analysis_sheet.dart';
@@ -100,6 +107,8 @@ class PadLandscapePlayerScreenState
   bool _videoIsPlaying = false;
   Duration _videoDuration = Duration.zero;
   Duration _videoPosition = Duration.zero;
+  int? _scrubTargetMs;
+  DateTime? _scrubArmedAt;
   String? _videoErrorText;
   String? _videoAsset;
   double _videoAspectRatio = 16 / 9;
@@ -114,14 +123,25 @@ class PadLandscapePlayerScreenState
   String? _aiSubtitlePreviewText;
   String? _aiSubtitleErrorText;
   bool _usingAiSubtitles = false;
+  bool _hasOfficialEnglish = false;
+  final Map<int, String> _manualEnglishByStartMs = <int, String>{};
+  final Map<int, String> _manualChineseByStartMs = <int, String>{};
+  final Map<int, String> _lineNotesByStartMs = <int, String>{};
   BilingualSubtitlePipeline? _bilingualPipeline;
   BilingualPipelinePhase _bilingualPhase = BilingualPipelinePhase.idle;
   String? _bilingualPipelineLabel;
   bool _bilingualShowAiComplete = false;
+  bool _englishFillInFlight = false;
+  AsrSubtitleCancellationToken? _englishFillCancellationToken;
+  Timer? _ocrPersistDebounce;
+  List<PlayerSubtitleLine>? _pendingOcrPersistLines;
   List<SubtitleTrack> _embeddedSubtitleTracks = const <SubtitleTrack>[];
   String? _selectedEmbeddedSubtitleId;
   List<PlayerSubtitleLine> _referenceSubtitleLines =
       const <PlayerSubtitleLine>[];
+  Map<int, List<PlayerSubtitleLine>> _asrFragmentsBySentenceStartMs =
+      const <int, List<PlayerSubtitleLine>>{};
+  bool _usingAsrSentences = false;
 
   @override
   void initState() {
@@ -142,6 +162,7 @@ class PadLandscapePlayerScreenState
       onNext: _handleNextLine,
       onPrevious: _handlePreviousLine,
     );
+    SubtitleCompletionScheduler.instance.setPlayerActive(false);
     _loadEpisodeResources();
   }
 
@@ -154,13 +175,37 @@ class PadLandscapePlayerScreenState
 
   @override
   void dispose() {
+    SubtitleCompletionScheduler.instance.setPlayerActive(false);
     _aiSubtitleCancellationToken?.cancel();
+    _englishFillCancellationToken?.cancel();
+    _ocrPersistDebounce?.cancel();
+    final List<PlayerSubtitleLine>? pending = _pendingOcrPersistLines;
+    if (pending != null) {
+      unawaited(_persistCompletedBilingualSubtitles(pending));
+    }
     unawaited(_bilingualPipeline?.dispose());
     _bilingualPipeline = null;
     PlayerSystemMediaControls.unbind();
     unawaited(_disposeVideo().whenComplete(_releaseGraphicsCache));
     _transcriptReaderSession.dispose();
     super.dispose();
+  }
+
+  void _syncIdleSchedulerWithPlayback(bool isPlaying) {
+    SubtitleCompletionScheduler.instance.setPlayerActive(isPlaying);
+  }
+
+  void _scheduleOcrSubtitlePersist(List<PlayerSubtitleLine> lines) {
+    _pendingOcrPersistLines = lines;
+    _ocrPersistDebounce?.cancel();
+    _ocrPersistDebounce = Timer(const Duration(milliseconds: 700), () {
+      final List<PlayerSubtitleLine>? pending = _pendingOcrPersistLines;
+      _pendingOcrPersistLines = null;
+      if (pending == null || !mounted) {
+        return;
+      }
+      unawaited(_persistCompletedBilingualSubtitles(pending));
+    });
   }
 
   Future<void> _loadEpisodeResources() async {
@@ -178,6 +223,20 @@ class PadLandscapePlayerScreenState
 
     String? enSub = resource.englishSubtitleAsset;
     String? zhSub = resource.chineseSubtitleAsset;
+    final ({String? en, String? zh, bool dropped}) filtered =
+        await _filterForeignSubtitles(
+          resource: resource,
+          enSub: enSub,
+          zhSub: zhSub,
+        );
+    enSub = filtered.en;
+    zhSub = filtered.zh;
+    if (filtered.dropped) {
+      resource = resolvePlayerCourseForEpisode(
+        courses: ref.read(libraryCatalogProvider),
+        episodeId: widget.episodeId,
+      );
+    }
     if (_needsBilibiliPrepare(resource)) {
       if (mounted) {
         setState(() {
@@ -213,7 +272,10 @@ class PadLandscapePlayerScreenState
             );
             messenger.hideCurrentSnackBar();
             messenger.showSnackBar(
-              SnackBar(content: Text(note), duration: const Duration(seconds: 4)),
+              SnackBar(
+                content: Text(note),
+                duration: const Duration(seconds: 4),
+              ),
             );
           });
         }
@@ -225,6 +287,17 @@ class PadLandscapePlayerScreenState
     }
 
     List<PlayerSubtitleLine> resolvedLines = const <PlayerSubtitleLine>[];
+    bool officialEnglish = false;
+    final bool enIsScopedPersist = (enSub ?? '').contains(
+      '${Platform.pathSeparator}episode_subtitles${Platform.pathSeparator}',
+    );
+    final bool zhIsScopedPersist = (zhSub ?? '').contains(
+      '${Platform.pathSeparator}episode_subtitles${Platform.pathSeparator}',
+    );
+    if (enIsScopedPersist || zhIsScopedPersist) {
+      enSub = null;
+      zhSub = null;
+    }
     if (isUsableSubtitlePath(enSub)) {
       try {
         final List<PlayerSubtitleLine> englishLines = await loadSubtitleLines(
@@ -237,6 +310,9 @@ class PadLandscapePlayerScreenState
         resolvedLines = mergeSubtitleLines(
           englishLines: englishLines,
           chineseLines: chineseLines,
+        );
+        officialEnglish = resolvedLines.any(
+          (PlayerSubtitleLine line) => isReliableOcrEnglish(line.english),
         );
       } catch (e) {
         // ignore: avoid_print
@@ -254,6 +330,114 @@ class PadLandscapePlayerScreenState
         resolvedLines = const <PlayerSubtitleLine>[];
       }
     }
+    if (!resolvedLines.any(
+      (PlayerSubtitleLine line) => looksChinese(line.chinese),
+    )) {
+      final String? officialZh = await existingOfficialBilibiliSubtitle(
+        idKey: _episodeSourceKey(resource),
+        fileName: 'zh.srt',
+      );
+      if (officialZh != null) {
+        try {
+          resolvedLines = normalizeChineseOnlySubtitleLines(
+            await loadSubtitleLines(officialZh),
+          );
+        } catch (e) {
+          // ignore: avoid_print
+          print('bilibili official zh load error: $e');
+        }
+      }
+    }
+    if (_linesMissingEnglish(resolvedLines)) {
+      try {
+        final String? sourceKey = _episodeSourceKey(resource);
+        final bool isSeason =
+            resource.course?.id.startsWith('bilibili-season-') ?? false;
+        if (isSeason && (sourceKey == null || sourceKey.isEmpty)) {
+          await deletePersistedBilingualSubtitleFiles(
+            episodeId: widget.episodeId,
+          );
+        } else {
+          final PersistedBilingualSubtitleFiles? files =
+              await locatePersistedBilingualSubtitleFiles(
+                episodeId: widget.episodeId,
+                sourceKey: sourceKey,
+              );
+          if (files != null &&
+              isUsableSubtitlePath(files.englishPath) &&
+              isUsableSubtitlePath(files.chinesePath)) {
+            final List<PlayerSubtitleLine> cachedEnglish =
+                await loadSubtitleLines(files.englishPath);
+            final List<PlayerSubtitleLine> cachedPair =
+                mergePartialEnglishOntoChineseBase(
+                  chineseLines: await loadSubtitleLines(files.chinesePath),
+                  englishLines: cachedEnglish,
+                  allowIndexFallback: false,
+                );
+            final bool officialChinese = resolvedLines.any(
+              (PlayerSubtitleLine line) => looksChinese(line.chinese),
+            );
+            if (officialChinese) {
+              final bool trustTranslation =
+                  await persistedEnglishIsZhTranslation(
+                    episodeId: widget.episodeId,
+                  );
+              resolvedLines = subtitleBaseFromOfficialChinese(
+                officialChinese: resolvedLines,
+                cachedLines: cachedPair,
+                cachedEnglishIsTranslation: trustTranslation,
+              );
+            } else {
+              final List<PlayerSubtitleLine> merged =
+                  mergePartialEnglishOntoChineseBase(
+                    chineseLines: await loadSubtitleLines(files.chinesePath),
+                    englishLines: cachedEnglish,
+                  );
+              final bool hasAnyEnglish = merged.any(
+                (PlayerSubtitleLine line) => looksEnglish(line.english),
+              );
+              if (merged.isNotEmpty && hasAnyEnglish) {
+                resolvedLines = merged;
+              }
+            }
+          }
+        }
+      } catch (_) {}
+    }
+    Map<int, List<PlayerSubtitleLine>> asrFragments =
+        const <int, List<PlayerSubtitleLine>>{};
+    bool usingAsrSentences = false;
+    final MergedSubtitleBundle? asrBundle = await loadAsrSentenceSubtitles(
+      episodeId: widget.episodeId,
+      sourceKey: _episodeSourceKey(resource),
+    );
+    if (asrBundle != null && asrBundle.sentences.isNotEmpty) {
+      resolvedLines = asrBundle.sentenceLines;
+      asrFragments = asrBundle.fragmentsBySentenceStartMs();
+      usingAsrSentences = true;
+      officialEnglish = false;
+    }
+    _manualEnglishByStartMs
+      ..clear()
+      ..addAll(await loadManualEnglishLocks(episodeId: widget.episodeId));
+    _manualChineseByStartMs
+      ..clear()
+      ..addAll(await loadManualChineseLocks(episodeId: widget.episodeId));
+    _lineNotesByStartMs
+      ..clear()
+      ..addAll(await loadEpisodeLineNotes(episodeId: widget.episodeId));
+    if (_manualEnglishByStartMs.isNotEmpty) {
+      resolvedLines = keepManualEnglish(
+        lines: resolvedLines,
+        manualEnglishByStartMs: _manualEnglishByStartMs,
+      );
+    }
+    if (_manualChineseByStartMs.isNotEmpty) {
+      resolvedLines = keepManualChinese(
+        lines: resolvedLines,
+        manualChineseByStartMs: _manualChineseByStartMs,
+      );
+    }
     if (!mounted) {
       return;
     }
@@ -261,16 +445,41 @@ class PadLandscapePlayerScreenState
     setState(() {
       state
         ..loadLines(resolvedLines, initialStartTime: initialStartTime)
+        ..setSubtitleMode(
+          _linesMissingEnglish(resolvedLines)
+              ? SubtitleDisplayMode.bilingual
+              : SubtitleDisplayMode.normalize(
+                  ref.read(learningSettingsProvider).subtitleMode,
+                ),
+        )
         ..isPlaying = widget.autoPlay && (_videoAsset?.isNotEmpty ?? false);
-      _usingAiSubtitles = false;
+      _usingAiSubtitles = usingAsrSentences;
+      _usingAsrSentences = usingAsrSentences;
+      _asrFragmentsBySentenceStartMs = asrFragments;
+      _hasOfficialEnglish = officialEnglish;
       _referenceSubtitleLines = resolvedLines;
       _isBootstrapping = false;
+      if (!usingAsrSentences && _linesMissingEnglish(resolvedLines)) {
+        // OCR-first: burned-in English hardsubs beat machine ZH→EN.
+        _bilingualPhase = BilingualPipelinePhase.ocrRunning;
+        _bilingualPipelineLabel = '正在识别画面英文字幕…';
+        _bilingualShowAiComplete = false;
+      } else {
+        _bilingualPhase = BilingualPipelinePhase.idle;
+        _bilingualPipelineLabel = null;
+        _bilingualShowAiComplete = false;
+      }
     });
     if (resource.episode != null) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (!mounted || ModalRoute.of(context)?.isCurrent == false) return;
         ref.read(lastLearningEpisodeProvider.notifier).record(widget.episodeId);
       });
+    }
+    if (!usingAsrSentences &&
+        _linesMissingEnglish(resolvedLines) &&
+        resolvedLines.any((PlayerSubtitleLine l) => looksChinese(l.chinese))) {
+      unawaited(_eagerFillEnglishFromChinese());
     }
     await _initVideo();
   }
@@ -288,10 +497,17 @@ class PadLandscapePlayerScreenState
       return false;
     }
     final bool hasLocalVideo = isUsableLocalVideoPath(resource.videoAsset);
-    final bool hasSubs =
-        isUsableSubtitlePath(resource.englishSubtitleAsset) ||
-        isUsableSubtitlePath(resource.chineseSubtitleAsset);
-    return !hasLocalVideo || !hasSubs;
+    final bool hasEnglish = isUsableSubtitlePath(resource.englishSubtitleAsset);
+    final bool hasChinese = isUsableSubtitlePath(resource.chineseSubtitleAsset);
+    // Local + real English: open immediately. Local + Chinese-only still
+    // prepare once so official EN can be pulled before falling back to translate.
+    if (hasLocalVideo && hasEnglish) {
+      return false;
+    }
+    if (hasLocalVideo && hasChinese && !hasEnglish) {
+      return true;
+    }
+    return !hasLocalVideo || (!hasEnglish && !hasChinese);
   }
 
   Future<void> _persistBilibiliEpisodeAssets({
@@ -299,6 +515,8 @@ class PadLandscapePlayerScreenState
     String? localVideoPath,
     String? enSubtitlePath,
     String? zhSubtitlePath,
+    String? sourceUrl,
+    bool clearSubtitles = false,
   }) async {
     final LibraryCourseData? course = resource.course;
     final LibraryEpisodeItem? episode = resource.episode;
@@ -308,57 +526,124 @@ class PadLandscapePlayerScreenState
     final bool hasEn = isUsableSubtitlePath(enSubtitlePath);
     final bool hasZh = isUsableSubtitlePath(zhSubtitlePath);
     final bool hasVideo = isUsableLocalVideoPath(localVideoPath);
-    if (!hasEn && !hasZh && !hasVideo) {
+    if (!hasEn &&
+        !hasZh &&
+        !hasVideo &&
+        !clearSubtitles &&
+        (sourceUrl == null || sourceUrl.trim().isEmpty)) {
       return;
     }
-    final LibraryEpisodeItem current = resolvePlayerCourseForEpisode(
+    await ref
+        .read(libraryCatalogProvider.notifier)
+        .updateEpisodeLocalMedia(
+          courseId: course.id,
+          episodeId: episode.id,
+          videoAsset: hasVideo ? localVideoPath : null,
+          sourceUrl: sourceUrl,
+          enSubtitlePath: hasEn ? enSubtitlePath : null,
+          zhSubtitlePath: hasZh ? zhSubtitlePath : null,
+          videoMissing: hasVideo ? false : null,
+          clearSubtitles: clearSubtitles,
+        );
+  }
+
+  Future<void> _rejectSubtitlesThatExceedVideo(Duration mediaDuration) async {
+    if (!mounted || !state.hasLines || mediaDuration.inMilliseconds <= 0) {
+      return;
+    }
+    final int endMs = subtitleLinesEndMs(state.lines);
+    if (!subtitleTimelineExceedsMedia(
+      subtitleEndMs: endMs,
+      mediaDurationMs: mediaDuration.inMilliseconds,
+    )) {
+      return;
+    }
+    await deletePersistedBilingualSubtitleFiles(episodeId: widget.episodeId);
+    final String? sourceKey = _episodeSourceKey();
+    if (sourceKey != null && sourceKey.isNotEmpty) {
+      try {
+        await BilibiliImportService.withCookie(
+          ref.read(learningSettingsProvider).resolvedBilibiliCookieHeader,
+        ).clearOfficialSubtitleFiles(sourceKey);
+      } catch (_) {}
+    }
+    final PlayerCourseLookupResult resource = resolvePlayerCourseForEpisode(
       courses: ref.read(libraryCatalogProvider),
-      episodeId: episode.id,
-    ).episode ??
-        episode;
-    await ref.read(libraryCatalogProvider.notifier).importCourse(
-      course.copyWith(
-        episodes: course.episodes
-            .map(
-              (LibraryEpisodeItem item) => item.id == episode.id
-                  ? item.copyWith(
-                      videoAsset: hasVideo
-                          ? localVideoPath
-                          : item.videoAsset,
-                      videoMissing: hasVideo ? false : item.videoMissing,
-                      enSubtitleAsset: hasEn
-                          ? enSubtitlePath
-                          : item.enSubtitleAsset,
-                      cnSubtitleAsset: hasZh
-                          ? zhSubtitlePath
-                          : item.cnSubtitleAsset,
-                      hasEnglishSubtitles: hasEn || item.hasEnglishSubtitles,
-                      hasChineseSubtitles: hasZh || item.hasChineseSubtitles,
-                      subtitleTracks: <LibrarySubtitleTrackItem>[
-                        if (hasEn ||
-                            isUsableSubtitlePath(current.enSubtitleAsset))
-                          LibrarySubtitleTrackItem(
-                            languageCode: 'en',
-                            languageLabel: 'English',
-                            path: hasEn
-                                ? enSubtitlePath!
-                                : current.enSubtitleAsset!,
-                          ),
-                        if (hasZh ||
-                            isUsableSubtitlePath(current.cnSubtitleAsset))
-                          LibrarySubtitleTrackItem(
-                            languageCode: 'zh',
-                            languageLabel: '中文',
-                            path: hasZh
-                                ? zhSubtitlePath!
-                                : current.cnSubtitleAsset!,
-                          ),
-                      ],
-                    )
-                  : item,
-            )
-            .toList(growable: false),
+      episodeId: widget.episodeId,
+    );
+    await _persistBilibiliEpisodeAssets(
+      resource: resource,
+      sourceUrl: bilibiliSourceForEpisode(
+        course: resource.course,
+        episode: resource.episode,
+        videoAsset: resource.videoAsset ?? _videoAsset,
       ),
+      clearSubtitles: true,
+    );
+    if (!mounted) {
+      return;
+    }
+    setState(() {
+      state.replaceLines(const <PlayerSubtitleLine>[]);
+      _referenceSubtitleLines = const <PlayerSubtitleLine>[];
+      _usingAiSubtitles = false;
+      _usingAsrSentences = false;
+      _asrFragmentsBySentenceStartMs = const <int, List<PlayerSubtitleLine>>{};
+      _bilingualPhase = BilingualPipelinePhase.ocrRunning;
+      _bilingualPipelineLabel = '字幕与视频不匹配，已清除，正在重新识别…';
+      _bilingualShowAiComplete = false;
+    });
+    _showMessage('检测到串台字幕（时长不匹配），已清除并重新识别');
+    unawaited(_restartEnglishFillFromChineseAndOcr());
+  }
+
+  Future<({String? en, String? zh, bool dropped})> _filterForeignSubtitles({
+    required PlayerCourseLookupResult resource,
+    required String? enSub,
+    required String? zhSub,
+  }) async {
+    final String? source = bilibiliSourceForEpisode(
+      course: resource.course,
+      episode: resource.episode,
+      videoAsset: resource.videoAsset ?? _videoAsset,
+    );
+    if (source == null || source.isEmpty) {
+      return (en: enSub, zh: zhSub, dropped: false);
+    }
+    final bool enForeign =
+        isUsableSubtitlePath(enSub) &&
+        !bilibiliSubtitleBelongsToSource(subtitlePath: enSub, source: source);
+    final bool zhForeign =
+        isUsableSubtitlePath(zhSub) &&
+        !bilibiliSubtitleBelongsToSource(subtitlePath: zhSub, source: source);
+    if (!enForeign && !zhForeign) {
+      if ((resource.episode?.sourceUrl ?? '').trim().isEmpty) {
+        await _persistBilibiliEpisodeAssets(
+          resource: resource,
+          sourceUrl: source,
+        );
+      }
+      return (en: enSub, zh: zhSub, dropped: false);
+    }
+    await deletePersistedBilingualSubtitleFiles(episodeId: widget.episodeId);
+    final String? videoPath = resource.videoAsset ?? _videoAsset;
+    if (videoPath != null && videoPath.isNotEmpty) {
+      try {
+        await const AsrSubtitleCache().delete(
+          episodeId: widget.episodeId,
+          videoPath: videoPath,
+        );
+      } catch (_) {}
+    }
+    await _persistBilibiliEpisodeAssets(
+      resource: resource,
+      sourceUrl: source,
+      clearSubtitles: true,
+    );
+    return (
+      en: enForeign ? null : enSub,
+      zh: zhForeign ? null : zhSub,
+      dropped: true,
     );
   }
 
@@ -376,7 +661,9 @@ class PadLandscapePlayerScreenState
           course: course,
         );
         if (expanded != null) {
-          await ref.read(libraryCatalogProvider.notifier).importCourse(expanded);
+          await ref
+              .read(libraryCatalogProvider.notifier)
+              .importCourse(expanded);
           course = expanded;
           resource = resolvePlayerCourseForEpisode(
             courses: ref.read(libraryCatalogProvider),
@@ -385,7 +672,7 @@ class PadLandscapePlayerScreenState
           if (resource.course == null) {
             resource = resolvePlayerCourseForEpisode(
               courses: ref.read(libraryCatalogProvider),
-              episodeId: expanded.episodes.first.id,
+              episodeId: _preferredExpandedEpisodeId(expanded),
             );
           }
         }
@@ -394,22 +681,43 @@ class PadLandscapePlayerScreenState
         print('bilibili.prepare expand pages error: $e');
       }
     }
-    final String? source = bilibiliSourceForEpisode(
+    final bool isSeason =
+        (resource.course ?? course)?.id.startsWith('bilibili-season-') ?? false;
+    final String? source =
+        bilibiliSourceForEpisode(
           course: resource.course ?? course,
           episode: resource.episode,
           videoAsset: resource.videoAsset,
         ) ??
         _bilibiliRecoverSource(resource.videoAsset ?? '') ??
-        _bilibiliRecoverSource(resource.course?.description ?? '');
+        (isSeason
+            ? null
+            : _bilibiliRecoverSource(resource.course?.description ?? ''));
     if (source == null || source.isEmpty) {
       return const BilibiliEpisodePrepareResult(
-        note: '无法识别 B 站视频来源',
+        note: '无法识别本集 B 站来源（合集分集需各自 BV）',
       );
+    }
+    String? currentVideoAsset = resource.videoAsset;
+    if (!isUsableLocalVideoPath(currentVideoAsset)) {
+      try {
+        final String? cached = await service.findExistingLocalCache(source);
+        if (isUsableLocalVideoPath(cached)) {
+          currentVideoAsset = cached;
+          await _persistBilibiliEpisodeAssets(
+            resource: resource,
+            localVideoPath: cached,
+            sourceUrl: source,
+          );
+        }
+      } catch (_) {}
     }
     final BilibiliEpisodePrepareResult prepared = await prepareBilibiliEpisode(
       service: service,
       source: source,
-      currentVideoAsset: resource.videoAsset,
+      currentVideoAsset: currentVideoAsset,
+      existingEnSubtitlePath: resource.englishSubtitleAsset,
+      existingZhSubtitlePath: resource.chineseSubtitleAsset,
       onProgress: (String message) {
         if (!mounted) {
           return;
@@ -426,6 +734,7 @@ class PadLandscapePlayerScreenState
               resource: resource,
               enSubtitlePath: enSubtitlePath,
               zhSubtitlePath: zhSubtitlePath,
+              sourceUrl: source,
             );
           },
     );
@@ -434,6 +743,7 @@ class PadLandscapePlayerScreenState
       localVideoPath: prepared.localVideoPath,
       enSubtitlePath: prepared.enSubtitlePath,
       zhSubtitlePath: prepared.zhSubtitlePath,
+      sourceUrl: source,
     );
     return prepared;
   }
@@ -461,7 +771,7 @@ class PadLandscapePlayerScreenState
       _videoErrorText = isBilibili ? '正在解析 B 站视频…' : null;
     });
 
-    final Player player = Player();
+    final Player player = createStudyVideoPlayer();
     // Own the player before opening media so leaving during initialization
     // also releases its decoder and native video output.
     _videoPlayer = player;
@@ -489,34 +799,28 @@ class PadLandscapePlayerScreenState
                 : null,
           ).timeout(
             Duration(minutes: isBilibili ? 8 : 1),
-            onTimeout: () => throw StateError(
-              isBilibili
-                  ? '缓存 B 站视频超时，请检查网络后重试'
-                  : '视频加载超时',
-            ),
+            onTimeout: () =>
+                throw StateError(isBilibili ? '缓存 B 站视频超时，请检查网络后重试' : '视频加载超时'),
           );
       if (!mounted || !identical(_videoPlayer, player)) return;
       setState(() {
         _videoErrorText = isBilibili ? '正在连接播放器…' : null;
       });
-      await waitForVideoInitialization(
-        () async {
-          await player.open(
-            Media(
-              createPlayerMediaUri(media.uri),
-              httpHeaders: media.headers ?? const <String, String>{},
-            ),
-          );
-        },
-        timeout: Duration(seconds: isBilibili ? 30 : 8),
-      );
+      await waitForVideoInitialization(() async {
+        await player.open(
+          Media(
+            createPlayerMediaUri(media.uri),
+            httpHeaders: media.headers ?? const <String, String>{},
+          ),
+        );
+      }, timeout: Duration(seconds: isBilibili ? 30 : 8));
       if (!mounted || !identical(_videoPlayer, player)) return;
       await waitForPlayerReady(
         player,
         timeout: Duration(seconds: isBilibili ? 30 : 8),
       );
       if (!mounted || !identical(_videoPlayer, player)) return;
-      await player.setSubtitleTrack(SubtitleTrack.no());
+      await suppressPlayerSoftSubtitles(player);
       await player.setRate(state.playbackRate);
       await player.setVolume(_volumeLevel * 100);
       if (!mounted || !identical(_videoPlayer, player)) return;
@@ -547,8 +851,11 @@ class PadLandscapePlayerScreenState
       );
       if (_referenceSubtitleLines.isEmpty && hasEmbeddedEnglish) {
         unawaited(_loadEmbeddedReferenceAndCachedAiSubtitles(embeddedTracks));
-      } else if (!state.hasLines) {
-        await _loadCachedAiSubtitles();
+      } else if ((!state.hasLines || _linesMissingEnglish(state.lines)) &&
+          !state.lines.any(
+            (PlayerSubtitleLine line) => looksChinese(line.chinese),
+          )) {
+        await _loadCachedAiSubtitles(validateReferenceSignature: false);
       }
       if (!mounted) return;
       _applyPlaybackMode();
@@ -566,6 +873,9 @@ class PadLandscapePlayerScreenState
         _videoErrorText = _videoLoadErrorMessage(error, _videoAsset);
       });
       _applyPlaybackMode();
+      if (_linesMissingEnglish(state.lines)) {
+        unawaited(_eagerFillEnglishFromChinese());
+      }
     }
   }
 
@@ -588,7 +898,17 @@ class PadLandscapePlayerScreenState
       return (uri: trimmed, headers: null);
     }
 
-    final String? biliSource = _bilibiliRecoverSource(trimmed);
+    final PlayerCourseLookupResult resource = resolvePlayerCourseForEpisode(
+      courses: ref.read(libraryCatalogProvider),
+      episodeId: widget.episodeId,
+    );
+    final String? biliSource =
+        bilibiliSourceForEpisode(
+          course: resource.course,
+          episode: resource.episode,
+          videoAsset: resource.videoAsset ?? trimmed,
+        ) ??
+        _bilibiliRecoverSource(trimmed);
     if (biliSource == null) {
       if (looksLocal) {
         throw StateError('本地视频文件不存在，且无法从课程信息恢复 B 站链接');
@@ -597,10 +917,20 @@ class PadLandscapePlayerScreenState
     }
 
     try {
-      final BilibiliPlayableMedia media =
-          await BilibiliImportService.withCookie(
-            ref.read(learningSettingsProvider).resolvedBilibiliCookieHeader,
-          ).resolvePlayableForPlayback(biliSource, onProgress: onProgress);
+      final BilibiliImportService service = BilibiliImportService.withCookie(
+        ref.read(learningSettingsProvider).resolvedBilibiliCookieHeader,
+      );
+      final String? cached = await service.findExistingLocalCache(biliSource);
+      if (isUsableLocalVideoPath(cached)) {
+        await _persistLocalBilibiliVideo(cached!);
+        if (mounted) {
+          setState(() => _videoAsset = cached);
+        }
+        onProgress?.call(1, '使用已缓存视频');
+        return (uri: cached, headers: null);
+      }
+      final BilibiliPlayableMedia media = await service
+          .resolvePlayableForPlayback(biliSource, onProgress: onProgress);
       if (media.isLocalFile) {
         await _persistLocalBilibiliVideo(media.uri);
         if (mounted) {
@@ -611,6 +941,15 @@ class PadLandscapePlayerScreenState
     } catch (error) {
       throw StateError('B站视频无法播放：$error');
     }
+  }
+
+  String _preferredExpandedEpisodeId(LibraryCourseData expanded) {
+    for (final LibraryEpisodeItem episode in expanded.episodes) {
+      if (isUsableLocalVideoPath(episode.videoAsset) && !episode.videoMissing) {
+        return episode.id;
+      }
+    }
+    return expanded.episodes.first.id;
   }
 
   String? _bilibiliRecoverSource(String source) {
@@ -624,6 +963,18 @@ class PadLandscapePlayerScreenState
     );
     final LibraryCourseData? course = resource.course;
     if (course == null) {
+      return null;
+    }
+    final bool isSeason = course.id.startsWith('bilibili-season-');
+    final String? fromEpisode = bilibiliSourceForEpisode(
+      course: course,
+      episode: resource.episode,
+      videoAsset: resource.videoAsset ?? source,
+    );
+    if (fromEpisode != null && fromEpisode.isNotEmpty) {
+      return fromEpisode;
+    }
+    if (isSeason) {
       return null;
     }
     final String description = course.description.trim();
@@ -645,39 +996,69 @@ class PadLandscapePlayerScreenState
       episodeId: widget.episodeId,
     );
     final String? courseId = resource.course?.id;
-    if (courseId == null || courseId.isEmpty) {
+    final String? episodeId = resource.episode?.id;
+    if (courseId == null ||
+        courseId.isEmpty ||
+        episodeId == null ||
+        episodeId.isEmpty) {
       return;
     }
     final String? current = resource.episode?.videoAsset?.trim();
     if (current == localPath) {
       return;
     }
-    await ref.read(libraryCatalogProvider.notifier).updateCourseVideoAsset(
+    await ref
+        .read(libraryCatalogProvider.notifier)
+        .updateEpisodeLocalMedia(
           courseId: courseId,
+          episodeId: episodeId,
           videoAsset: localPath,
+          videoMissing: false,
         );
   }
 
   Future<String> _resolveAsrVideoPath(String source) async {
-    if (!source.startsWith('http://') &&
-        !source.startsWith('https://') &&
-        File(source).existsSync() &&
-        File(source).lengthSync() > 64 * 1024) {
+    final String? catalogLocal = _catalogLocalVideoPath();
+    if (catalogLocal != null) {
+      return catalogLocal;
+    }
+    if (isUsableLocalVideoPath(source)) {
       return source;
     }
-    final bool needsBilibiliCache =
-        BilibiliImport.isWatchPageUrl(source) ||
-        BilibiliImport.looksLikeBilibiliInput(source) ||
-        source.startsWith('http://127.0.0.1');
-    if (!needsBilibiliCache) {
-      return source;
+    if (isUsableLocalVideoPath(_videoAsset)) {
+      return _videoAsset!.trim();
     }
-    final String input = source.startsWith('http://127.0.0.1')
-        ? (_videoAsset ?? source)
+
+    final PlayerCourseLookupResult resource = resolvePlayerCourseForEpisode(
+      courses: ref.read(libraryCatalogProvider),
+      episodeId: widget.episodeId,
+    );
+    final String? biliSource =
+        bilibiliSourceForEpisode(
+          course: resource.course,
+          episode: resource.episode,
+          videoAsset: resource.videoAsset ?? _videoAsset ?? source,
+        ) ??
+        _bilibiliRecoverSource(source) ??
+        _bilibiliRecoverSource(_videoAsset ?? '') ??
+        _bilibiliRecoverSource(resource.course?.description ?? '');
+
+    final String input = (biliSource != null && biliSource.trim().isNotEmpty)
+        ? biliSource.trim()
         : source;
-    if (!BilibiliImport.isWatchPageUrl(input) &&
-        !BilibiliImport.looksLikeBilibiliInput(input)) {
-      throw StateError('当前是在线流，请先等待视频缓存完成后再生成字幕');
+    final bool needsBilibiliCache =
+        BilibiliImport.isWatchPageUrl(input) ||
+        BilibiliImport.looksLikeBilibiliInput(input) ||
+        input.startsWith('http://127.0.0.1');
+    if (!needsBilibiliCache) {
+      if (isUsableLocalVideoPath(input)) {
+        return input;
+      }
+      throw StateError('本地视频不可用，无法语音识别');
+    }
+    if (BilibiliImport.isShortLink(input) &&
+        BilibiliImport.extractIds(input) == null) {
+      throw StateError('B 站短链无法解析。请确认分集已下载到本地后再生成，或改用「重新识别」翻译补全。');
     }
     if (mounted) {
       setState(() => _aiSubtitleProgressText = '正在下载视频供语音识别…');
@@ -693,20 +1074,156 @@ class PadLandscapePlayerScreenState
     );
   }
 
+  String? _catalogLocalVideoPath() {
+    final PlayerCourseLookupResult resource = resolvePlayerCourseForEpisode(
+      courses: ref.read(libraryCatalogProvider),
+      episodeId: widget.episodeId,
+    );
+    if (isUsableLocalVideoPath(resource.episode?.videoAsset)) {
+      return resource.episode!.videoAsset!.trim();
+    }
+    if (isUsableLocalVideoPath(resource.videoAsset)) {
+      return resource.videoAsset!.trim();
+    }
+    if (isUsableLocalVideoPath(_videoAsset)) {
+      return _videoAsset!.trim();
+    }
+    return null;
+  }
+
+  Future<void> _eagerFillEnglishFromChinese() async {
+    if (!mounted ||
+        _englishFillInFlight ||
+        !_linesMissingEnglish(state.lines)) {
+      return;
+    }
+    _englishFillInFlight = true;
+    final AsrSubtitleCancellationToken token = AsrSubtitleCancellationToken();
+    _englishFillCancellationToken?.cancel();
+    _englishFillCancellationToken = token;
+    setState(() {
+      state.setSubtitleMode(SubtitleDisplayMode.bilingual);
+      _bilingualPipelineLabel = '正在把中文字幕翻译成英文…';
+      _bilingualPhase = BilingualPipelinePhase.translating;
+      _bilingualShowAiComplete = false;
+    });
+    ref
+        .read(learningSettingsProvider.notifier)
+        .setSubtitleMode(SubtitleDisplayMode.bilingual);
+    try {
+      final List<PlayerSubtitleLine> filled =
+          await BilingualSubtitlePipeline.fillMissingEnglishByTranslation(
+            lines: state.lines,
+            settings: ref.read(learningSettingsProvider),
+            prioritizeAroundMs: state.positionMs,
+            cancellationToken: token,
+            currentLines: () => state.lines,
+            onProgress: (String label) {
+              if (!mounted || token.isCancelled) {
+                return;
+              }
+              setState(() => _bilingualPipelineLabel = label);
+            },
+            onLinesUpdated: (List<PlayerSubtitleLine> partial) {
+              if (!mounted || partial.isEmpty || token.isCancelled) {
+                return;
+              }
+              final List<PlayerSubtitleLine> kept = _withManualEnglish(partial);
+              setState(() {
+                state.replaceLines(
+                  kept,
+                  preferredSubtitleMode: SubtitleDisplayMode.bilingual,
+                );
+                _referenceSubtitleLines = kept;
+                _bilingualPhase = BilingualPipelinePhase.translating;
+              });
+              unawaited(_persistCompletedBilingualSubtitles(kept));
+            },
+          );
+      if (!mounted || filled.isEmpty || token.isCancelled) {
+        return;
+      }
+      final int englishHits = filled
+          .where((PlayerSubtitleLine line) => looksEnglish(line.english))
+          .length;
+      final List<PlayerSubtitleLine> keptFilled = _withManualEnglish(filled);
+      setState(() {
+        state.replaceLines(
+          keptFilled,
+          preferredSubtitleMode: SubtitleDisplayMode.bilingual,
+        );
+        _referenceSubtitleLines = keptFilled;
+        final bool stillMissing = _linesMissingEnglish(filled);
+        _usingAiSubtitles = !stillMissing;
+        _bilingualPhase = stillMissing
+            ? BilingualPipelinePhase.ocrSlow
+            : BilingualPipelinePhase.completed;
+        _bilingualPipelineLabel = stillMissing ? '英文字幕仍不完整，可点「AI 补全」' : null;
+        _bilingualShowAiComplete = stillMissing;
+      });
+      if (englishHits > 0) {
+        unawaited(_persistCompletedBilingualSubtitles(keptFilled));
+        unawaited(_bilingualPipeline?.proofreadEnglishWithAsr());
+      }
+    } catch (error) {
+      // ignore: avoid_print
+      print('eager ZH→EN fill failed: $error');
+      if (!mounted || token.isCancelled) {
+        return;
+      }
+      setState(() {
+        _bilingualPhase = BilingualPipelinePhase.ocrSlow;
+        _bilingualPipelineLabel = '自动翻译未完成，可点「AI 补全」';
+        _bilingualShowAiComplete = true;
+      });
+    } finally {
+      if (identical(_englishFillCancellationToken, token)) {
+        _englishFillCancellationToken = null;
+      }
+      _englishFillInFlight = false;
+    }
+  }
+
   Future<void> _maybeStartBilingualPipeline() async {
-    if (!mounted || _usingAiSubtitles || _generatingAiSubtitles) {
+    if (!mounted || _generatingAiSubtitles) {
       return;
     }
-    final String? videoPath = _videoAsset;
-    if (videoPath == null ||
-        videoPath.isEmpty ||
-        !_videoReady ||
-        !state.hasLines) {
+    final String? rawVideoPath = _videoAsset;
+    if (rawVideoPath == null || rawVideoPath.isEmpty || !_videoReady) {
       return;
     }
-    if (!BilingualSubtitlePipeline.shouldAutoStart(state.lines)) {
+    String videoPath = rawVideoPath;
+    if (!isUsableLocalVideoPath(videoPath)) {
+      try {
+        final String local = await _resolveAsrVideoPath(videoPath);
+        if (isUsableLocalVideoPath(local)) {
+          videoPath = local;
+          if (mounted) {
+            setState(() => _videoAsset = local);
+          }
+        }
+      } catch (_) {}
+    }
+    // Empty timeline still runs OCR: hardsub-only videos have no softsubs.
+    // Chinese courses whose English is only a machine translation still need
+    // a video proofread — that English can be fluent and unrelated.
+    final bool needsFill = BilingualSubtitlePipeline.shouldAutoStart(
+      state.lines,
+    );
+    final bool proofreadTranslation =
+        state.hasLines &&
+        !needsFill &&
+        !_hasOfficialEnglish &&
+        state.lines.any(
+          (PlayerSubtitleLine line) => looksChinese(line.chinese),
+        );
+    if (state.hasLines && !needsFill && !proofreadTranslation) {
       return;
     }
+    if (!state.hasLines && !_isLikelyHardsubCourse()) {
+      return;
+    }
+    _usingAiSubtitles = false;
     await _bilingualPipeline?.dispose();
     final LearningSettingsState settings = ref.read(learningSettingsProvider);
     final BilingualSubtitlePipeline pipeline = BilingualSubtitlePipeline(
@@ -719,9 +1236,18 @@ class PadLandscapePlayerScreenState
         if (!mounted) {
           return;
         }
+        final List<PlayerSubtitleLine> kept = _withManualEnglish(lines);
         setState(() {
-          state.loadLines(lines);
+          state.replaceLines(
+            kept,
+            preferredSubtitleMode: SubtitleDisplayMode.bilingual,
+          );
+          _referenceSubtitleLines = kept;
         });
+        _scheduleOcrSubtitlePersist(kept);
+      },
+      onNeedTranslationFallback: () {
+        unawaited(_eagerFillEnglishFromChinese());
       },
       onPhaseChanged: (BilingualPipelinePhase phase) {
         if (!mounted) {
@@ -731,14 +1257,19 @@ class PadLandscapePlayerScreenState
           _bilingualPhase = phase;
           _bilingualShowAiComplete = phase == BilingualPipelinePhase.ocrSlow;
           if (phase == BilingualPipelinePhase.completed) {
-            _usingAiSubtitles = true;
-            _bilingualPipelineLabel = null;
-            _bilingualShowAiComplete = false;
+            final bool stillMissing = _linesMissingEnglish(state.lines);
+            _usingAiSubtitles = !stillMissing;
+            _bilingualPipelineLabel = stillMissing ? '英文字幕仍不完整' : null;
+            _bilingualShowAiComplete = stillMissing;
           } else if (phase == BilingualPipelinePhase.cancelled) {
             _bilingualPipelineLabel = null;
             _bilingualShowAiComplete = false;
           }
         });
+        if (phase == BilingualPipelinePhase.ocrSlow &&
+            _linesMissingEnglish(state.lines)) {
+          unawaited(_eagerFillEnglishFromChinese());
+        }
       },
       onProgress: (String label) {
         if (!mounted) {
@@ -746,19 +1277,163 @@ class PadLandscapePlayerScreenState
         }
         setState(() => _bilingualPipelineLabel = label);
       },
+      onBilingualReady: (List<PlayerSubtitleLine> lines) async {
+        await _persistCompletedBilingualSubtitles(_withManualEnglish(lines));
+        if (mounted) {
+          _showMessage('双语字幕已保存到本机，下次打开不用重译');
+        }
+      },
     );
     _bilingualPipeline = pipeline;
+    final bool translateFirst =
+        needsFill &&
+        state.lines.any(
+          (PlayerSubtitleLine line) =>
+              looksChinese(line.chinese) ||
+              (looksChinese(line.english) && !looksEnglish(line.english)),
+        );
     setState(() {
-      _bilingualPhase = BilingualPipelinePhase.ocrRunning;
-      _bilingualPipelineLabel = '正在识别画面字幕…';
+      _bilingualPhase = proofreadTranslation
+          ? BilingualPipelinePhase.asrProofreading
+          : (translateFirst
+                ? BilingualPipelinePhase.translating
+                : BilingualPipelinePhase.ocrRunning);
+      _bilingualPipelineLabel = proofreadTranslation
+          ? '正在用语音对齐英文…'
+          : (translateFirst ? '正在把中文字幕翻译成英文…' : '正在识别画面英文字幕…');
       _bilingualShowAiComplete = false;
     });
+    if (_linesMissingEnglish(state.lines)) {
+      unawaited(_eagerFillEnglishFromChinese());
+    }
     await pipeline.startOcr(
       isPlaying: () => state.isPlaying || _videoIsPlaying,
-      positionMs: () =>
-          _videoPosition.inMilliseconds > 0
+      positionMs: () => _videoPosition.inMilliseconds > 0
           ? _videoPosition.inMilliseconds
           : state.positionMs,
+      proofreadExisting: proofreadTranslation,
+    );
+  }
+
+  bool _linesMissingEnglish(List<PlayerSubtitleLine> lines) {
+    if (lines.isEmpty) {
+      return true;
+    }
+    return BilingualSubtitlePipeline.shouldAutoStart(lines);
+  }
+
+  bool _isLikelyHardsubCourse() {
+    final PlayerCourseLookupResult resource = resolvePlayerCourseForEpisode(
+      courses: ref.read(libraryCatalogProvider),
+      episodeId: widget.episodeId,
+    );
+    final LibraryCourseData? course = resource.course;
+    if (course == null) {
+      final String asset = (_videoAsset ?? '').toLowerCase();
+      return asset.contains('bilibili.com') ||
+          asset.contains('b23.tv') ||
+          asset.contains('bili2233.cn');
+    }
+    return course.category == 'bilibili' ||
+        course.sourceLabel.toLowerCase().contains('bilibili') ||
+        course.id.startsWith('bilibili-');
+  }
+
+  String? _episodeSourceKey([PlayerCourseLookupResult? resource]) {
+    final PlayerCourseLookupResult resolved =
+        resource ??
+        resolvePlayerCourseForEpisode(
+          courses: ref.read(libraryCatalogProvider),
+          episodeId: widget.episodeId,
+        );
+    final String? source = bilibiliSourceForEpisode(
+      course: resolved.course,
+      episode: resolved.episode,
+      videoAsset: resolved.videoAsset ?? _videoAsset,
+    );
+    return bilibiliIdKeyFromPath(source) ??
+        bilibiliIdKeyFromPath(resolved.videoAsset ?? _videoAsset) ??
+        BilibiliImport.extractIds(source ?? '')?['bvid'];
+  }
+
+  Future<void> _persistCompletedBilingualSubtitles(
+    List<PlayerSubtitleLine> lines,
+  ) async {
+    final String? videoPath = _videoAsset;
+    if (videoPath == null || videoPath.isEmpty) {
+      return;
+    }
+    final int englishHits = lines
+        .where((PlayerSubtitleLine line) => looksEnglish(line.english))
+        .length;
+    if (englishHits <= 0) {
+      return;
+    }
+    final bool complete = !_linesMissingEnglish(lines);
+    if (complete) {
+      final LearningSettingsState settings = ref.read(learningSettingsProvider);
+      final String content = const JsonEncoder.withIndent('  ').convert(
+        <String, Object?>{
+          'version': 1,
+          'language': 'en',
+          'pipeline': 'bilingual_persist',
+          'lines': lines
+              .map(
+                (PlayerSubtitleLine line) => <String, Object?>{
+                  'startTime': line.startTime,
+                  'english': line.english,
+                  'chinese': line.chinese,
+                  'startMs': line.startMs,
+                  'endMs': line.endMs,
+                  'words': line.words
+                      .map(
+                        (PlayerSubtitleWord w) => <String, Object?>{
+                          'text': w.text,
+                          'startMs': w.startMs,
+                          'endMs': w.endMs,
+                          if (w.confidence != null) 'confidence': w.confidence,
+                        },
+                      )
+                      .toList(growable: false),
+                },
+              )
+              .toList(growable: false),
+        },
+      );
+      await const AsrSubtitleCache().write(
+        episodeId: widget.episodeId,
+        videoPath: videoPath,
+        content: content,
+        settings: settings,
+        referenceSignature:
+            'pipeline=bilingual_persist|${subtitleReferenceSignature(lines)}',
+      );
+    }
+    final PlayerCourseLookupResult resource = resolvePlayerCourseForEpisode(
+      courses: ref.read(libraryCatalogProvider),
+      episodeId: widget.episodeId,
+    );
+    final PersistedBilingualSubtitleFiles? files =
+        await persistBilingualSubtitleFiles(
+          episodeId: widget.episodeId,
+          lines: lines,
+          sourceKey: _episodeSourceKey(resource),
+          translatedFromChinese: lines.any(
+            (PlayerSubtitleLine line) => looksChinese(line.chinese),
+          ),
+        );
+    if (files == null || !complete) {
+      return;
+    }
+    await _persistBilibiliEpisodeAssets(
+      resource: resource,
+      enSubtitlePath: files.englishPath,
+      zhSubtitlePath: files.chinesePath,
+      sourceUrl: bilibiliSourceForEpisode(
+        course: resource.course,
+        episode: resource.episode,
+        videoAsset: resource.videoAsset ?? _videoAsset,
+      ),
     );
   }
 
@@ -777,12 +1452,16 @@ class PadLandscapePlayerScreenState
       if (!mounted) {
         return;
       }
+      await _persistCompletedBilingualSubtitles(state.lines);
+      if (!mounted) {
+        return;
+      }
       setState(() {
         _usingAiSubtitles = true;
         _bilingualPipelineLabel = null;
         _bilingualShowAiComplete = false;
       });
-      _showMessage('双语字幕已补全');
+      _showMessage('双语字幕已补全，已保存到本机（下次打开不用重译）');
     } catch (error) {
       if (!mounted) {
         return;
@@ -882,6 +1561,12 @@ class PadLandscapePlayerScreenState
     if (cached == null || !mounted) return;
     final List<PlayerSubtitleLine> lines = parseSubtitleLines(cached);
     if (lines.isEmpty) return;
+    if (BilingualSubtitlePipeline.shouldAutoStart(lines)) {
+      if (mounted && _videoReady) {
+        unawaited(_maybeStartBilingualPipeline());
+      }
+      return;
+    }
     final int positionMs = state.positionMs;
     setState(() {
       state
@@ -919,14 +1604,11 @@ class PadLandscapePlayerScreenState
       final List<SubtitleTrack> subtitles = embeddedSubtitleTracks(
         tracks.subtitle,
       );
+      _selectedEmbeddedSubtitleId = null;
+      unawaited(suppressPlayerSoftSubtitles(player));
       if (listEquals(_embeddedSubtitleTracks, subtitles)) return;
       setState(() {
         _embeddedSubtitleTracks = subtitles;
-        if (!subtitles.any(
-          (SubtitleTrack track) => track.id == _selectedEmbeddedSubtitleId,
-        )) {
-          _selectedEmbeddedSubtitleId = null;
-        }
       });
     });
     _videoPositionSubscription = player.stream.position.listen(
@@ -938,12 +1620,18 @@ class PadLandscapePlayerScreenState
       if (!mounted) {
         return;
       }
+      final bool durationBecameKnown =
+          _videoDuration.inMilliseconds <= 0 && duration.inMilliseconds > 0;
       setState(() {
         _videoDuration = duration;
       });
+      if (durationBecameKnown) {
+        unawaited(_rejectSubtitlesThatExceedVideo(duration));
+      }
     });
     _videoPlayingSubscription = player.stream.playing.listen((bool playing) {
       _videoIsPlaying = playing;
+      _syncIdleSchedulerWithPlayback(playing);
     });
     _videoCompletedSubscription = player.stream.completed.listen((
       bool completed,
@@ -995,8 +1683,33 @@ class PadLandscapePlayerScreenState
     });
   }
 
+  void _armScrub(int targetMs) {
+    _scrubTargetMs = targetMs;
+    _scrubArmedAt = DateTime.now();
+  }
+
+  /// Player position events lag a scrub and would pull the highlighted cue
+  /// back to the old time. Keep the scrubbed cue until the playhead arrives.
+  bool _ignoreStaleScrubPosition(Duration position) {
+    final int? target = _scrubTargetMs;
+    final DateTime? armedAt = _scrubArmedAt;
+    if (target == null || armedAt == null) {
+      return false;
+    }
+    final bool caughtUp = (position.inMilliseconds - target).abs() <= 200;
+    final bool expired =
+        DateTime.now().difference(armedAt) >
+        const Duration(milliseconds: 1500);
+    if (!caughtUp && !expired) {
+      return true;
+    }
+    _scrubTargetMs = null;
+    _scrubArmedAt = null;
+    return false;
+  }
+
   void _onVideoProgress(Duration position) {
-    if (!mounted) {
+    if (!mounted || _ignoreStaleScrubPosition(position)) {
       return;
     }
 
@@ -1041,6 +1754,106 @@ class PadLandscapePlayerScreenState
 
     if (!state.hasLines) {
       return;
+    }
+  }
+
+  List<PlayerSubtitleLine> _withManualEnglish(List<PlayerSubtitleLine> lines) {
+    return keepManualChinese(
+      lines: keepManualEnglish(
+        lines: lines,
+        manualEnglishByStartMs: _manualEnglishByStartMs,
+      ),
+      manualChineseByStartMs: _manualChineseByStartMs,
+    );
+  }
+
+  Future<void> _editEnglishLine(int index, String english) async {
+    if (!mounted || index < 0 || index >= state.lines.length) {
+      return;
+    }
+    await _editSubtitleLine(index, english, state.lines[index].chinese);
+  }
+
+  Future<void> _editSubtitleLine(
+    int index,
+    String english,
+    String chinese,
+  ) async {
+    final String trimmedEn = english.trim();
+    final String trimmedZh = chinese.trim();
+    if (!mounted ||
+        index < 0 ||
+        index >= state.lines.length ||
+        (trimmedEn.isEmpty && trimmedZh.isEmpty)) {
+      return;
+    }
+    _stopVideo();
+    final PlayerSubtitleLine current = state.lines[index];
+    final String nextEnglish =
+        trimmedEn.isEmpty ? current.english.trim() : trimmedEn;
+    final String nextChinese =
+        trimmedZh.isEmpty ? current.chinese.trim() : trimmedZh;
+    if (nextEnglish.isNotEmpty) {
+      _manualEnglishByStartMs[current.startMs] = nextEnglish;
+      unawaited(
+        saveManualEnglishLocks(
+          episodeId: widget.episodeId,
+          locks: _manualEnglishByStartMs,
+        ),
+      );
+    }
+    if (nextChinese.isNotEmpty) {
+      _manualChineseByStartMs[current.startMs] = nextChinese;
+      unawaited(
+        saveManualChineseLocks(
+          episodeId: widget.episodeId,
+          locks: _manualChineseByStartMs,
+        ),
+      );
+    }
+    final List<PlayerSubtitleLine> next = List<PlayerSubtitleLine>.of(
+      state.lines,
+    );
+    next[index] = PlayerSubtitleLine(
+      startTime: current.startTime,
+      english: nextEnglish.isEmpty ? current.english : nextEnglish,
+      chinese: nextChinese,
+      startMs: current.startMs,
+      endMs: current.endMs,
+      words: current.words,
+    );
+    setState(() {
+      state.replaceLines(
+        next,
+        preferredSubtitleMode: SubtitleDisplayMode.bilingual,
+      );
+      _referenceSubtitleLines = next;
+    });
+    await _persistCompletedBilingualSubtitles(next);
+    if (mounted) {
+      _showMessage('已保存手工字幕，自动校对不会再改它');
+    }
+  }
+
+  Future<void> _editLineNote(int index, String note) async {
+    if (!mounted || index < 0 || index >= state.lines.length) {
+      return;
+    }
+    final PlayerSubtitleLine current = state.lines[index];
+    final String trimmed = note.trim();
+    setState(() {
+      if (trimmed.isEmpty) {
+        _lineNotesByStartMs.remove(current.startMs);
+      } else {
+        _lineNotesByStartMs[current.startMs] = trimmed;
+      }
+    });
+    await saveEpisodeLineNotes(
+      episodeId: widget.episodeId,
+      notes: _lineNotesByStartMs,
+    );
+    if (mounted) {
+      _showMessage(trimmed.isEmpty ? '已清除笔记' : '已保存笔记');
     }
   }
 
@@ -1175,6 +1988,8 @@ class PadLandscapePlayerScreenState
       if (_videoDuration.inMilliseconds > 0) {
         final int targetMs = (_videoDuration.inMilliseconds * safeProgress)
             .round();
+        _videoPosition = Duration(milliseconds: targetMs);
+        _armScrub(targetMs);
         if (state.hasLines) {
           state.seekToMilliseconds(targetMs);
         }
@@ -1192,6 +2007,7 @@ class PadLandscapePlayerScreenState
           maxIndex,
         );
         state.selectLine(targetIndex);
+        state.timelineFollowEpoch += 1;
         _recordCurrentSentenceStudy();
       }
     });
@@ -1398,6 +2214,7 @@ class PadLandscapePlayerScreenState
                           Expanded(
                             child: PlayerVideoPanel(
                               episodeId: widget.episodeId,
+                              paintSubtitlesOnVideo: false,
                               line: activeLine,
                               isPlaying: state.isPlaying,
                               speed: state.speed,
@@ -1514,6 +2331,8 @@ class PadLandscapePlayerScreenState
                                       episodeId: widget.episodeId,
                                       lines: state.lines,
                                       activeIndex: state.activeLineIndex,
+                                      timelineFollowEpoch:
+                                          state.timelineFollowEpoch,
                                       subtitleMode: state.subtitleMode,
                                       currentWordIndex: state.currentWordIndex,
                                       fontScale: settings.fontScale,
@@ -1524,6 +2343,13 @@ class PadLandscapePlayerScreenState
                                           settings.subtitleWordHighlightStyle,
                                       subtitleWordHighlightBorderWidth: settings
                                           .subtitleWordHighlightBorderWidth,
+                                      fragmentsBySentenceStartMs:
+                                          _usingAsrSentences
+                                          ? _asrFragmentsBySentenceStartMs
+                                          : const <
+                                              int,
+                                              List<PlayerSubtitleLine>
+                                            >{},
                                       savedVocabularyWords:
                                           savedVocabularyWords,
                                       keyVocabularyWords: keyVocabularyWords,
@@ -1559,9 +2385,12 @@ class PadLandscapePlayerScreenState
                                       onTogglePlaying: _handleTogglePlaying,
                                       onPronounce: _stopVideo,
                                       onRegenerateAiSubtitles:
-                                          _usingAiSubtitles &&
-                                              !_generatingAiSubtitles
-                                          ? _handleRegenerateAiSubtitles
+                                          !_generatingAiSubtitles
+                                          ? () {
+                                              unawaited(
+                                                _restartEnglishFillFromChineseAndOcr(),
+                                              );
+                                            }
                                           : null,
                                       onDeleteAiSubtitles: _usingAiSubtitles
                                           ? _handleDeleteAiSubtitles
@@ -1569,6 +2398,10 @@ class PadLandscapePlayerScreenState
                                       onRegenerateAiLine: _usingAiSubtitles
                                           ? _handleRegenerateAiLine
                                           : null,
+                                      onEditEnglishLine: _editEnglishLine,
+                                      onEditSubtitleLine: _editSubtitleLine,
+                                      onEditLineNote: _editLineNote,
+                                      lineNotesByStartMs: _lineNotesByStartMs,
                                       bilingualPipelineLabel:
                                           _bilingualPipelineLabel,
                                       showAiCompleteButton:
@@ -1678,26 +2511,32 @@ class PadLandscapePlayerScreenState
   }
 
   void _handleSetSubtitleMode(String mode) {
+    final String normalized = SubtitleDisplayMode.normalize(mode);
     setState(() {
-      state.setSubtitleMode(mode);
+      state.setSubtitleMode(normalized);
       _selectedEmbeddedSubtitleId = null;
     });
-    ref.read(learningSettingsProvider.notifier).setSubtitleMode(mode);
-    unawaited(_videoPlayer?.setSubtitleTrack(SubtitleTrack.no()));
+    if (normalized != SubtitleDisplayMode.hidden) {
+      ref.read(learningSettingsProvider.notifier).setSubtitleMode(normalized);
+    }
+    final Player? player = _videoPlayer;
+    if (player != null) {
+      unawaited(suppressPlayerSoftSubtitles(player));
+    }
     _applyPlaybackMode();
   }
 
   void _handleSelectEmbeddedSubtitle(SubtitleTrack? track) {
     setState(() {
-      _selectedEmbeddedSubtitleId = track?.id;
-      if (track != null) {
-        state.setSubtitleMode('隐藏');
-      }
+      _selectedEmbeddedSubtitleId = null;
     });
-    if (track != null) {
-      ref.read(learningSettingsProvider.notifier).setSubtitleMode('隐藏');
+    final Player? player = _videoPlayer;
+    if (player != null) {
+      unawaited(suppressPlayerSoftSubtitles(player));
     }
-    unawaited(_videoPlayer?.setSubtitleTrack(track ?? SubtitleTrack.no()));
+    if (track != null) {
+      unawaited(_loadEmbeddedSubtitleReference(<SubtitleTrack>[track]));
+    }
   }
 
   void _handleTogglePlaying() {
@@ -1758,9 +2597,9 @@ class PadLandscapePlayerScreenState
         state.togglePauseAtSentenceEnd();
       }
     });
-    ref.read(learningActivityProvider.notifier).recordShadowingToggle(
-      enabled: true,
-    );
+    ref
+        .read(learningActivityProvider.notifier)
+        .recordShadowingToggle(enabled: true);
     _showMessage('已开启跟读：句末暂停，可点麦克风录音对照');
   }
 
@@ -1788,6 +2627,12 @@ class PadLandscapePlayerScreenState
     final String? videoPath = _videoAsset;
     if (videoPath == null || videoPath.isEmpty) {
       _showMessage('当前视频不可用');
+      return;
+    }
+    if (!forceRegenerate &&
+        state.hasLines &&
+        _linesMissingEnglish(state.lines)) {
+      await _restartEnglishFillFromChineseAndOcr();
       return;
     }
     await _bilingualPipeline?.cancel();
@@ -1819,8 +2664,9 @@ class PadLandscapePlayerScreenState
     try {
       final List<PlayerSubtitleLine> referenceLines =
           await _ensureOfficialReferenceSubtitles();
-      final bool hasOfficialEnglish =
-          usableReferenceSubtitles(referenceLines).isNotEmpty;
+      final bool hasOfficialEnglish = usableReferenceSubtitles(
+        referenceLines,
+      ).isNotEmpty;
       if (!hasOfficialEnglish) {
         final String? configError = describeAsrConfigurationError(settings);
         if (configError != null) {
@@ -1946,14 +2792,21 @@ class PadLandscapePlayerScreenState
       courses: ref.read(libraryCatalogProvider),
       episodeId: widget.episodeId,
     );
-    final String? source =
-        resource.course?.description ??
-        resource.episode?.videoAsset ??
-        _videoAsset;
-    if (source == null ||
-        (!BilibiliImport.isWatchPageUrl(source) &&
-            !BilibiliImport.looksLikeBilibiliInput(source) &&
-            !(resource.course?.id.startsWith('bilibili-') ?? false))) {
+    final String? query =
+        bilibiliSourceForEpisode(
+          course: resource.course,
+          episode: resource.episode,
+          videoAsset: resource.videoAsset ?? _videoAsset,
+        ) ??
+        _bilibiliRecoverSource(resource.episode?.videoAsset ?? '') ??
+        _bilibiliRecoverSource(_videoAsset ?? '') ??
+        _bilibiliRecoverSource(resource.course?.description ?? '');
+    if (query == null ||
+        query.isEmpty ||
+        (!BilibiliImport.isWatchPageUrl(query) &&
+            !BilibiliImport.looksLikeBilibiliInput(query)) ||
+        (BilibiliImport.isShortLink(query) &&
+            BilibiliImport.extractIds(query) == null)) {
       return existing;
     }
     if (mounted) {
@@ -1962,65 +2815,35 @@ class PadLandscapePlayerScreenState
         _aiSubtitlePreviewText = '有官方字幕则跳过 Whisper';
       });
     }
-    final String query = resource.course?.id.startsWith('bilibili-') ?? false
-        ? resource.course!.id.substring('bilibili-'.length)
-        : source;
-    final Map<String, String?> tracks = await BilibiliImportService.withCookie(
-      ref.read(learningSettingsProvider).resolvedBilibiliCookieHeader,
-    ).fetchOfficialSubtitleTracks(query);
-    final String? enPath = tracks['en'];
-    final String? zhPath = tracks['zh'];
-    final bool hasEn = enPath != null && enPath.isNotEmpty;
-    final bool hasZh = zhPath != null && zhPath.isNotEmpty;
-    if (!hasEn && !hasZh) {
-      return existing;
-    }
-    final LibraryCourseData? course = resource.course;
-    final LibraryEpisodeItem? episode = resource.episode;
-    if (course != null && episode != null) {
-      unawaited(
-        ref.read(libraryCatalogProvider.notifier).importCourse(
-          course.copyWith(
-            episodes: course.episodes
-                .map(
-                  (LibraryEpisodeItem item) => item.id == episode.id
-                      ? item.copyWith(
-                          enSubtitleAsset: hasEn
-                              ? enPath
-                              : item.enSubtitleAsset,
-                          cnSubtitleAsset: hasZh
-                              ? zhPath
-                              : item.cnSubtitleAsset,
-                          hasEnglishSubtitles:
-                              hasEn || item.hasEnglishSubtitles,
-                          hasChineseSubtitles:
-                              hasZh || item.hasChineseSubtitles,
-                          subtitleTracks: <LibrarySubtitleTrackItem>[
-                            if (hasEn)
-                              LibrarySubtitleTrackItem(
-                                languageCode: 'en',
-                                languageLabel: 'English',
-                                path: enPath,
-                              ),
-                            if (hasZh)
-                              LibrarySubtitleTrackItem(
-                                languageCode: 'zh',
-                                languageLabel: '中文',
-                                path: zhPath,
-                              ),
-                          ],
-                        )
-                      : item,
-                )
-                .toList(growable: false),
-          ),
-        ),
-      );
-    }
-    if (!hasEn) {
-      return existing;
-    }
     try {
+      final Map<String, String?> tracks =
+          await BilibiliImportService.withCookie(
+            ref.read(learningSettingsProvider).resolvedBilibiliCookieHeader,
+          ).fetchOfficialSubtitleTracks(query);
+      final String? enPath = tracks['en'];
+      final String? zhPath = tracks['zh'];
+      final bool hasEn = enPath != null && enPath.isNotEmpty;
+      final bool hasZh = zhPath != null && zhPath.isNotEmpty;
+      if (!hasEn && !hasZh) {
+        return existing;
+      }
+      final LibraryCourseData? course = resource.course;
+      final LibraryEpisodeItem? episode = resource.episode;
+      if (course != null && episode != null) {
+        unawaited(
+          ref
+              .read(libraryCatalogProvider.notifier)
+              .updateEpisodeLocalMedia(
+                courseId: course.id,
+                episodeId: episode.id,
+                enSubtitlePath: hasEn ? enPath : null,
+                zhSubtitlePath: hasZh ? zhPath : null,
+              ),
+        );
+      }
+      if (!hasEn) {
+        return existing;
+      }
       final List<PlayerSubtitleLine> englishLines = await loadSubtitleLines(
         enPath,
       );
@@ -2043,6 +2866,76 @@ class PadLandscapePlayerScreenState
     } catch (_) {
       return existing;
     }
+  }
+
+  Future<void> _restartEnglishFillFromChineseAndOcr() async {
+    if (!mounted) {
+      return;
+    }
+    _englishFillCancellationToken?.cancel();
+    _englishFillInFlight = false;
+    await _bilingualPipeline?.cancel();
+    if (!mounted) {
+      return;
+    }
+    await deletePersistedBilingualSubtitleFiles(episodeId: widget.episodeId);
+    if (state.hasLines) {
+      final List<PlayerSubtitleLine> cleared = state.lines
+          .map((PlayerSubtitleLine line) {
+            if (!looksChinese(line.chinese)) {
+              return line;
+            }
+            return PlayerSubtitleLine(
+              startTime: line.startTime,
+              english: '',
+              chinese: line.chinese,
+              startMs: line.startMs,
+              endMs: line.endMs,
+            );
+          })
+          .toList(growable: false);
+      setState(() {
+        state.replaceLines(
+          cleared,
+          preferredSubtitleMode: SubtitleDisplayMode.bilingual,
+        );
+        _bilingualPhase = BilingualPipelinePhase.asrProofreading;
+        _bilingualPipelineLabel = '正在用语音对齐英文…';
+        _bilingualShowAiComplete = false;
+        _usingAiSubtitles = false;
+        _usingAsrSentences = false;
+        _asrFragmentsBySentenceStartMs =
+            const <int, List<PlayerSubtitleLine>>{};
+        _aiSubtitleErrorText = null;
+      });
+    } else {
+      setState(() {
+        _bilingualPhase = BilingualPipelinePhase.asrProofreading;
+        _bilingualPipelineLabel = '正在用语音对齐英文…';
+        _bilingualShowAiComplete = false;
+        _usingAiSubtitles = false;
+        _usingAsrSentences = false;
+        _asrFragmentsBySentenceStartMs =
+            const <int, List<PlayerSubtitleLine>>{};
+        _aiSubtitleErrorText = null;
+      });
+    }
+    final PlayerCourseLookupResult resource = resolvePlayerCourseForEpisode(
+      courses: ref.read(libraryCatalogProvider),
+      episodeId: widget.episodeId,
+    );
+    unawaited(
+      enqueueSubtitleCompletionForEpisode(
+        episodeId: widget.episodeId,
+        videoPath: _videoAsset ?? resource.videoAsset,
+        zhSubtitlePath: resource.chineseSubtitleAsset,
+        enSubtitlePath: null,
+        sourceUrl: resource.episode?.sourceUrl,
+        force: true,
+      ),
+    );
+    _showMessage('正在用语音重新对齐英文（中文字幕时间轴保留）');
+    unawaited(_maybeStartBilingualPipeline());
   }
 
   Future<void> _handleRegenerateAiSubtitles() async {
@@ -2188,7 +3081,7 @@ class PadLandscapePlayerScreenState
     _showMessage(added ? '成功收藏单词 "$word" 到短语库！' : '该例句已经在您的短语库中！');
   }
 
-  void _handleFavoriteWord(String word) {
+  void _handleFavoriteWord(String word, [String? definitionCn]) {
     if (!state.hasLines) return;
     final PlayerSubtitleLine line = state.activeLine;
     final PlayerCourseLookupResult courseContext =
@@ -2197,10 +3090,12 @@ class PadLandscapePlayerScreenState
           episodeId: widget.episodeId,
         );
     final LibraryEpisodeItem? episode = courseContext.episode;
+    final String lexeme = normalizeLexeme(word);
+    final String? fromCard = definitionCn?.trim();
     final bool added = ref
         .read(wordBookProvider.notifier)
         .addFavoriteWord(
-          rawWord: word,
+          rawWord: lexeme,
           episodeId: widget.episodeId,
           videoFileName: episode?.videoAsset
               ?.replaceAll(r'\', '/')
@@ -2213,9 +3108,16 @@ class PadLandscapePlayerScreenState
           sentence: line.english,
           chinese: line.chinese,
           generatedDefinition:
-              state.generatedWordDefinitions[normalizeWord(word)],
+              (fromCard != null && fromCard.isNotEmpty)
+              ? fromCard
+              : (state.generatedWordDefinitions[normalizeWord(lexeme)] ??
+                    state.generatedWordDefinitions[lexeme]),
         );
-    _showMessage(added ? '已收藏单词 "$word"' : '未能收藏，请选择独立英文单词。');
+    _showMessage(
+      added
+          ? (lexeme.contains(' ') ? '已收藏词组到词卡「$lexeme」' : '已收藏单词到词卡「$lexeme」')
+          : '未能收藏，请选择英文单词或词组。',
+    );
   }
 
   void _recordPlayDuration({required int durationMs}) {
@@ -2415,6 +3317,10 @@ class PadLandscapePlayerScreenState
             onRegenerateAiLine: _usingAiSubtitles
                 ? _handleRegenerateAiLine
                 : null,
+            onEditEnglishLine: _editEnglishLine,
+            onEditSubtitleLine: _editSubtitleLine,
+            onEditLineNote: _editLineNote,
+            lineNotesByStartMs: _lineNotesByStartMs,
             fontScale: ref.read(learningSettingsProvider).fontScale,
             fontSize: ref.read(learningSettingsProvider).fontSize,
             onSelectFontSize: ref
@@ -2431,6 +3337,7 @@ class PadLandscapePlayerScreenState
             videoLoading: _videoLoading,
             videoDuration: _videoDuration,
             videoErrorText: _videoErrorText,
+            paintSubtitlesOnVideo: false,
           ),
         ),
       );
@@ -2476,26 +3383,12 @@ class PadLandscapePlayerScreenState
     if (controller == null) {
       return null;
     }
-    return Consumer(
-      builder: (BuildContext context, WidgetRef ref, _) {
-        final double fontScale = ref.watch(
-          learningSettingsProvider.select(
-            (LearningSettingsState settings) => settings.fontScale,
-          ),
-        );
-        const SubtitleViewConfiguration defaults = SubtitleViewConfiguration();
-        return Video(
-          controller: controller,
-          controls: null,
-          subtitleViewConfiguration: SubtitleViewConfiguration(
-            style: defaults.style.copyWith(
-              fontSize: defaults.style.fontSize! * fontScale,
-            ),
-          ),
-          pauseUponEnteringBackgroundMode: false,
-          filterQuality: FilterQuality.medium,
-        );
-      },
+    return Video(
+      controller: controller,
+      controls: null,
+      subtitleViewConfiguration: kHiddenSubtitleViewConfiguration,
+      pauseUponEnteringBackgroundMode: false,
+      filterQuality: FilterQuality.medium,
     );
   }
 }

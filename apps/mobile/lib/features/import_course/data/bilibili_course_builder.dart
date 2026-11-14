@@ -1,6 +1,7 @@
 import '../../library/presentation/library_mock_data.dart';
 import '../domain/bilibili_import.dart';
 import 'bilibili_import_service.dart';
+import 'bilibili_multipage.dart';
 
 /// Builds a library course from a Bilibili import result.
 ///
@@ -30,6 +31,8 @@ LibraryCourseData _buildSeasonCourse(BilibiliImportResult meta) {
   final String currentAid =
       (meta.aid ?? BilibiliImport.extractIds(meta.watchUrl)?['aid'] ?? '')
           .trim();
+  final String localBvid =
+      (bilibiliIdKeyFromPath(meta.localVideoPath) ?? '').trim().toUpperCase();
   final bool hasEn = meta.enSubtitlePath != null;
   final bool hasZh = meta.cnSubtitlePath != null;
   final String coverImage = meta.bestCoverImage;
@@ -38,9 +41,12 @@ LibraryCourseData _buildSeasonCourse(BilibiliImportResult meta) {
   final List<LibraryEpisodeItem> episodes = <LibraryEpisodeItem>[
     for (final BilibiliSeasonEpisodeMeta episode in meta.seasonEpisodes)
       () {
+        final String episodeBvid = episode.bvid.trim().toUpperCase();
         final bool isCurrent =
-            (episode.bvid.isNotEmpty &&
-                episode.bvid.toUpperCase() == currentBvid) ||
+            (episodeBvid.isNotEmpty && episodeBvid == currentBvid) ||
+            (episodeBvid.isNotEmpty &&
+                localBvid.isNotEmpty &&
+                episodeBvid == localBvid) ||
             (episode.bvid.isEmpty &&
                 episode.aid.isNotEmpty &&
                 episode.aid == currentAid);
@@ -59,6 +65,7 @@ LibraryCourseData _buildSeasonCourse(BilibiliImportResult meta) {
               ? episode.coverImageUrl!
               : coverImage,
           videoAsset: isCurrent ? videoAsset : episode.watchUrl,
+          sourceUrl: episode.watchUrl,
           videoMissing: !isCurrent,
           enSubtitleAsset: isCurrent ? meta.enSubtitlePath : null,
           cnSubtitleAsset: isCurrent ? meta.cnSubtitlePath : null,
@@ -151,6 +158,11 @@ LibraryCourseData _buildPagesCourse(BilibiliImportResult meta) {
                 aid: rootIsBv ? null : rootId,
                 page: page.page,
               ),
+        sourceUrl: BilibiliImport.watchUrl(
+          bvid: rootIsBv ? rootId : null,
+          aid: rootIsBv ? null : rootId,
+          page: page.page,
+        ),
         videoMissing: page.page != meta.page,
         enSubtitleAsset: page.page == meta.page ? meta.enSubtitlePath : null,
         cnSubtitleAsset: page.page == meta.page ? meta.cnSubtitlePath : null,
@@ -220,18 +232,24 @@ String bilibiliImportSuccessHint(BilibiliImportResult meta) {
         ? '第 ${meta.seasonEpisodes[currentIndex].index} 集'
         : '当前集';
     collectionHint =
-        '合集共 ${meta.seasonEpisodes.length} 集，已下载$currentLabel；其余集打开时再下载。';
+        '合集共 ${meta.seasonEpisodes.length} 集，已下载$currentLabel；其余集正在后台下载视频和字幕。';
   } else if (meta.pages.length > 1) {
     collectionHint =
-        '共 ${meta.pages.length} 个分 P，已下载 P${meta.page}；其余分 P 打开时再下载。';
+        '共 ${meta.pages.length} 个分 P，已下载 P${meta.page}；其余分 P 正在后台下载。';
   } else {
     collectionHint = '';
   }
-  final String subtitleHint = (hasEn || hasZh)
-      ? '已拉取${hasEn ? '英' : ''}${hasEn && hasZh ? '/' : ''}${hasZh ? '中' : ''}官方字幕'
-            '${hasEn ? '（跟读优先用官方英文字幕）' : ''}。'
-      : ((meta.subtitleNote ?? '').isNotEmpty
-            ? '${meta.subtitleNote}。打开后可用本地 Whisper 识别。'
-            : '未找到官方字幕，打开后可用本地 Whisper 识别。');
+  final String subtitleHint;
+  if (hasEn && hasZh) {
+    subtitleHint = '已拉取中英官方字幕（跟读优先用官方英文）。';
+  } else if (hasEn && !hasZh) {
+    subtitleHint = '已有英文字幕，缺中文，已开始后台补全。';
+  } else if (!hasEn && hasZh) {
+    subtitleHint = '已有中文字幕，缺英文，已开始后台语音补全。';
+  } else if ((meta.subtitleNote ?? '').isNotEmpty) {
+    subtitleHint = '${meta.subtitleNote}。缺中英字幕，已开始后台补全。';
+  } else {
+    subtitleHint = '未找到官方字幕，缺中英两边，已开始后台补全。';
+  }
   return '$collectionHint$subtitleHint';
 }

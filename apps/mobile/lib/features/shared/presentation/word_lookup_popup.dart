@@ -33,7 +33,8 @@ class WordLookupPopupCard extends ConsumerStatefulWidget {
   final String contextSentence;
   final VoidCallback onClose;
   final VoidCallback? onCollect;
-  final VoidCallback? onFavorite;
+  /// Called with the card's Chinese definition when favoriting to 词卡.
+  final void Function(String? definitionCn)? onFavorite;
   final VoidCallback? onPronounce;
   final String? episodeId;
   final String? contextTime;
@@ -158,7 +159,7 @@ class _WordLookupPopupCardState extends ConsumerState<WordLookupPopupCard> {
 
   @override
   Widget build(BuildContext context) {
-    final String word = normalizeWord(widget.rawWord);
+    final String word = normalizeLexeme(widget.rawWord);
     final bool isFavorite =
         widget.onFavorite != null &&
         ref.watch(
@@ -233,15 +234,23 @@ class _WordLookupPopupCardState extends ConsumerState<WordLookupPopupCard> {
             ),
             if (widget.onFavorite != null)
               IconButton(
-                tooltip: isFavorite ? '取消收藏' : '收藏单词',
+                tooltip: isFavorite ? '取消收藏' : '收藏到词卡',
                 onPressed: () {
                   if (isFavorite) {
                     ref
                         .read(wordBookProvider.notifier)
-                        .toggleFavorite(widget.rawWord);
-                    _showMessage('已取消收藏单词 "${widget.rawWord}"');
+                        .toggleFavorite(word);
+                    _showMessage('已从词卡取消收藏');
                   } else {
-                    widget.onFavorite!();
+                    final String fromEntry =
+                        (_entry?.definitionCn ?? '').trim();
+                    final String fromFallback =
+                        (widget.fallbackDefinitionCn ?? '').trim();
+                    widget.onFavorite!(
+                      fromEntry.isNotEmpty
+                          ? fromEntry
+                          : (fromFallback.isEmpty ? null : fromFallback),
+                    );
                   }
                 },
                 isSelected: isFavorite,

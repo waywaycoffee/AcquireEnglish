@@ -219,6 +219,47 @@ class BilibiliImport {
     return null;
   }
 
+  /// Folder names to try for one BV under `Documents/bilibili/`.
+  /// Page 1 is stored as `BV…-p01` (matched case-insensitively).
+  static List<String> officialSubtitleFolderKeys(String idKey) {
+    final String wanted = idKey.trim().toUpperCase();
+    if (wanted.isEmpty) {
+      return const <String>[];
+    }
+    final bool hasPage = RegExp(r'-P\d+$').hasMatch(wanted);
+    return <String>[
+      wanted,
+      if (!hasPage) '$wanted-P01',
+      if (wanted.endsWith('-P01')) wanted.substring(0, wanted.length - 4),
+    ];
+  }
+
+  /// Cache lookup aliases so import (bare BV) and open (`BV-p01`) hit the same
+  /// file. Never aliases P2+ — those are different videos.
+  static List<String> mediaIdKeyAliases(String idKey) {
+    final String trimmed = idKey.trim();
+    if (trimmed.isEmpty) {
+      return const <String>[];
+    }
+    final List<String> keys = <String>[trimmed];
+    final String? legacy = legacyMediaIdKey(trimmed);
+    if (legacy != null && legacy.isNotEmpty && !keys.contains(legacy)) {
+      keys.add(legacy);
+    }
+    final bool hasPageSuffix = RegExp(
+      r'-p\d{2,}$',
+      caseSensitive: false,
+    ).hasMatch(trimmed);
+    if (!hasPageSuffix) {
+      // Import may have stored multi-P P1 as `BV-p01` while open resolves bare.
+      final String p01 = '$trimmed-p01';
+      if (!keys.contains(p01)) {
+        keys.add(p01);
+      }
+    }
+    return List<String>.unmodifiable(keys);
+  }
+
   /// True for bilibili.com/video/... page URLs (not playable by media_kit directly).
   static bool isWatchPageUrl(String raw) {
     final String input = sanitize(raw).toLowerCase();

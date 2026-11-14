@@ -12,6 +12,10 @@ part 'theme_logic.g.dart';
 class ThemeLogic extends _$ThemeLogic {
   @override
   ThemeUiModel build() {
+    if (!Hive.isBoxOpen('prefs')) {
+      // Widget tests and early boot can build before prefs are opened.
+      return const ThemeUiModel(themeMode: ThemeMode.dark);
+    }
     final Box<String> prefsBox = Hive.box<String>('prefs');
     // Product default is dark canvas; re-assert once for the dark redesign.
     if (prefsBox.get('themeDarkCanvasV4') != '1') {

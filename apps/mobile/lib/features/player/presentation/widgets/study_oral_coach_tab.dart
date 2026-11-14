@@ -1,17 +1,26 @@
 import 'dart:async';
+import 'dart:io';
+import 'dart:math';
+import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_webrtc/flutter_webrtc.dart';
+import 'package:path_provider/path_provider.dart';
 
+import '../../../authentication/presentation/auth_session.dart';
 import '../../../settings/presentation/settings_provider.dart';
 import '../../../shared/data/word_pronunciation_service.dart';
+import '../../../sync/data/acquire_api_client.dart';
+import '../../data/livekit_oral_client.dart';
 import '../../data/livetalking_client.dart';
+import '../../data/oral_coach_pipeline_client.dart';
+import '../../data/pronunciation_providers.dart';
 import '../../domain/pronunciation_assessment.dart';
 import '../player_mock_state.dart';
 import 'study_shell_tokens.dart';
 
-/// Sentence-scoped oral coach: LiveTalking digital human or local TTS fallback.
+/// Video-topic oral coach: pipeline (ASR→发音→LLM→TTS→avatar) or LiveTalking / TTS.
 class StudyOralCoachTab extends ConsumerStatefulWidget {
   const StudyOralCoachTab({
     required this.line,
@@ -21,6 +30,10 @@ class StudyOralCoachTab extends ConsumerStatefulWidget {
     this.onNextSentence,
     this.onOpenAssessment,
     this.unavailableReason,
+    this.courseTitle = '',
+    this.episodeTitle = '',
+    this.previousEnglish = '',
+    this.nextEnglish = '',
     super.key,
   });
 
@@ -31,23 +44,84 @@ class StudyOralCoachTab extends ConsumerStatefulWidget {
   final VoidCallback? onNextSentence;
   final VoidCallback? onOpenAssessment;
   final String? unavailableReason;
+  final String courseTitle;
+  final String episodeTitle;
+  final String previousEnglish;
+  final String nextEnglish;
 
   @override
   ConsumerState<StudyOralCoachTab> createState() => _StudyOralCoachTabState();
 }
 
 class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab> {
-  final LiveTalkingClient _client = LiveTalkingClient();
+  static const int _maxRecordingBytes =
+      Pcm16MonoAudio.expectedSampleRate * 2 * 60;
+
+  final LiveTalkingClient _liveClient = LiveTalkingClient();
+  final OralCoachPipelineClient _pipelineClient = OralCoachPipelineClient();
+  final LiveKitOralClient _liveKitClient = LiveKitOralClient();
   RTCVideoRenderer? _renderer;
+  PronunciationMicrophone? _microphone;
+  final Uint8List _recordingBuffer = Uint8List(_maxRecordingBytes);
+  int _recordingBytesWritten = 0;
+  StreamSubscription<Uint8List>? _recordingSubscription;
+  Timer? _recordingLimitTimer;
+  OralCoachSession? _session;
+  OralCoachTurnResult? _lastTurn;
+  String? _learningSessionId;
+  List<Map<String, dynamic>> _feedbackItems = <Map<String, dynamic>>[];
   bool _connecting = false;
   bool _busy = false;
-  String _status = '未连接数字人';
+  bool _recordingActive = false;
+  String _status = '未开始陪练';
   String? _error;
+  String _difficulty = 'B1';
+
+  @override
+  void initState() {
+    super.initState();
+    _microphone = ref.read(pronunciationMicrophoneFactoryProvider)();
+  }
+
+  @override
+  void didUpdateWidget(covariant StudyOralCoachTab oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.line.english != widget.line.english && _session != null) {
+      unawaited(_syncContext());
+    }
+  }
 
   @override
   void dispose() {
-    unawaited(_client.disconnect());
+    unawaited(_releaseMic());
+    unawaited(_liveClient.disconnect());
+    unawaited(_liveKitClient.disconnect());
     super.dispose();
+  }
+
+  OralCoachVideoContext _videoContext() {
+    return OralCoachVideoContext(
+      courseTitle: widget.courseTitle,
+      episodeTitle: widget.episodeTitle,
+      currentEnglish: widget.line.english,
+      currentChinese: widget.line.chinese,
+      previousEnglish: widget.previousEnglish,
+      nextEnglish: widget.nextEnglish,
+      difficulty: _difficulty,
+    );
+  }
+
+  Future<void> _releaseMic() async {
+    _recordingLimitTimer?.cancel();
+    await _recordingSubscription?.cancel();
+    _recordingSubscription = null;
+    try {
+      await _microphone?.stop();
+    } catch (_) {}
+    try {
+      await _microphone?.dispose();
+    } catch (_) {}
+    _microphone = null;
   }
 
   Future<void> _connectLiveTalking(String serverUrl) async {
@@ -57,16 +131,16 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab> {
     setState(() {
       _connecting = true;
       _error = null;
-      _status = '正在连接 LiveTalking…';
+      _status = '正在连接数字人…';
     });
     try {
-      final RTCVideoRenderer renderer = await _client.connect(serverUrl);
+      final RTCVideoRenderer renderer = await _liveClient.connect(serverUrl);
       if (!mounted) {
         return;
       }
       setState(() {
         _renderer = renderer;
-        _status = '已连接数字人，可开始陪练';
+        _status = '已连接虚拟外教画面';
         _connecting = false;
       });
     } catch (error) {
@@ -76,10 +150,393 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab> {
       setState(() {
         _connecting = false;
         _renderer = null;
-        _error = error.toString().replaceFirst(RegExp(r'^Bad state:\s*'), '');
-        _status = '连接失败，可改用本地 TTS';
+        _error = _pretty(error);
+        _status = '数字人连接失败（仍可文字/管线陪练）';
       });
     }
+  }
+
+  Future<void> _ensurePipelineSession(LearningSettingsState settings) async {
+    if (_session != null) {
+      await _syncContext();
+      return;
+    }
+    final OralCoachSession session = await _pipelineClient.createSession(
+      rawBaseUrl: settings.oralCoachPipelineUrl,
+      context: _videoContext(),
+    );
+    _session = session;
+    _difficulty = session.difficulty;
+  }
+
+  Future<void> _syncContext() async {
+    final OralCoachSession? session = _session;
+    if (session == null) {
+      return;
+    }
+    try {
+      await _pipelineClient.updateContext(
+        session: session,
+        context: _videoContext(),
+      );
+    } catch (_) {}
+  }
+
+  Future<void> _startPipelineConversation(LearningSettingsState settings) async {
+    if (_busy) {
+      return;
+    }
+    setState(() {
+      _busy = true;
+      _error = null;
+      _status = '正在创建视频主题会话…';
+    });
+    try {
+      await _ensurePipelineSession(settings);
+      String modeNote = 'HTTP 管线';
+      if (settings.usesLiveKit) {
+        try {
+          await _liveKitClient.connect(
+            api: ref.read(acquireApiClientProvider),
+            preferredUrl: settings.liveKitUrl,
+          );
+          modeNote = 'LiveKit + HTTP 管线';
+        } catch (error) {
+          modeNote = 'HTTP 管线（LiveKit 未连上：${_pretty(error)}）';
+        }
+      }
+      final String liveUrl = settings.oralCoachServerUrl.trim();
+      if (liveUrl.isNotEmpty && !_liveClient.isConnected) {
+        await _connectLiveTalking(liveUrl);
+      }
+      if (_liveClient.isConnected) {
+        final String open =
+            'Hi! We are practicing with this video. '
+            'Please listen and repeat: ${widget.line.english}';
+        await _liveClient.speak(open);
+      }
+      if (mounted) {
+        setState(() {
+          _status =
+              '会话已就绪 · $modeNote · 难度 $_difficulty · 对着麦克风说当前句';
+          _busy = false;
+        });
+      }
+    } catch (error) {
+      if (mounted) {
+        setState(() {
+          _busy = false;
+          _error = _pretty(error);
+          _status = '创建会话失败';
+        });
+      }
+    }
+  }
+
+  Future<void> _startRecording() async {
+    if (_recordingActive || _busy) {
+      return;
+    }
+    final PronunciationMicrophone? microphone = _microphone;
+    if (microphone == null) {
+      setState(() => _error = '麦克风不可用');
+      return;
+    }
+    setState(() {
+      _error = null;
+      _status = '请说话…';
+    });
+    try {
+      _recordingBuffer.fillRange(0, _recordingBytesWritten, 0);
+      _recordingBytesWritten = 0;
+      final bool allowed = await microphone.requestPermission();
+      if (!mounted) {
+        return;
+      }
+      if (!allowed) {
+        setState(() => _error = '需要麦克风权限');
+        return;
+      }
+      final Stream<Uint8List> stream = await microphone.start();
+      if (!mounted) {
+        await microphone.cancel();
+        return;
+      }
+      setState(() => _recordingActive = true);
+      _recordingSubscription = stream.listen(
+        (Uint8List chunk) {
+          final int remaining = _maxRecordingBytes - _recordingBytesWritten;
+          if (remaining <= 0) {
+            unawaited(_stopRecordingAndSend());
+            return;
+          }
+          final int n = min(remaining, chunk.length);
+          _recordingBuffer.setRange(
+            _recordingBytesWritten,
+            _recordingBytesWritten + n,
+            chunk,
+          );
+          _recordingBytesWritten += n;
+        },
+        onError: (_) {
+          setState(() {
+            _error = '录音中断';
+            _recordingActive = false;
+          });
+        },
+      );
+      _recordingLimitTimer = Timer(
+        const Duration(seconds: 45),
+        () => unawaited(_stopRecordingAndSend()),
+      );
+    } catch (_) {
+      if (mounted) {
+        setState(() {
+          _recordingActive = false;
+          _error = '无法启动录音';
+        });
+      }
+    }
+  }
+
+  Future<void> _stopRecordingAndSend() async {
+    if (!_recordingActive) {
+      return;
+    }
+    _recordingLimitTimer?.cancel();
+    setState(() {
+      _recordingActive = false;
+      _busy = true;
+      _status = '正在跑 ASR → 发音 → LLM…';
+    });
+    try {
+      await _microphone?.stop();
+    } catch (_) {}
+    await _recordingSubscription?.cancel();
+    _recordingSubscription = null;
+
+    final int audioLength = _recordingBytesWritten & ~1;
+    final Pcm16MonoAudio audio = Pcm16MonoAudio(
+      bytes: _recordingBuffer.sublist(0, audioLength),
+      sampleRate: Pcm16MonoAudio.expectedSampleRate,
+    ).trimLeadingSilence();
+    _recordingBytesWritten = 0;
+    if (!audio.hasSpeechEnergy) {
+      if (mounted) {
+        setState(() {
+          _busy = false;
+          _messageSafe('未检测到有效语音，请重试');
+        });
+      }
+      return;
+    }
+
+    final LearningSettingsState settings = ref.read(learningSettingsProvider);
+    String? path;
+    try {
+      final Directory directory = await getTemporaryDirectory();
+      path =
+          '${directory.path}/oral-coach-${DateTime.now().microsecondsSinceEpoch}.wav';
+      await File(path).writeAsBytes(audio.toWav(), flush: true);
+      await _ensurePipelineSession(settings);
+      final OralCoachSession session = _session!;
+      final OralCoachDraftResult draft = await _pipelineClient.createDraft(
+        session: session,
+        audioPath: path,
+        referenceText: widget.line.english,
+      );
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _busy = false;
+        _status = '请核对转写后再发送给外教';
+      });
+      final String? confirmed = await _confirmTranscriptDialog(draft.transcript);
+      if (confirmed == null) {
+        if (mounted) {
+          setState(() => _status = '已取消本回合');
+        }
+        return;
+      }
+      setState(() {
+        _busy = true;
+        _status = '外教思考中…';
+      });
+      final OralCoachTurnResult turn = await _pipelineClient.confirmDraft(
+        session: session,
+        draftId: draft.draftId,
+        confirmedText: confirmed,
+      );
+      _difficulty = turn.difficulty;
+      _lastTurn = turn;
+
+      final String avatarUrl = turn.livetalkingUrl.trim().isNotEmpty
+          ? turn.livetalkingUrl
+          : settings.oralCoachServerUrl.trim();
+      if (turn.avatarAction == 'livetalking_human' && avatarUrl.isNotEmpty) {
+        if (!_liveClient.isConnected) {
+          await _connectLiveTalking(avatarUrl);
+        }
+        if (_liveClient.isConnected && turn.avatarText.trim().isNotEmpty) {
+          await _liveClient.speak(turn.avatarText, type: 'echo');
+        }
+      } else if (turn.coachText.trim().isNotEmpty) {
+        try {
+          await ref.read(wordPronunciationServiceProvider).speak(turn.coachText);
+        } catch (_) {}
+      }
+
+      await _persistLearningTurn(turn);
+
+      if (mounted) {
+        setState(() {
+          _busy = false;
+          _status =
+              '回合完成 · 重叠 ${turn.scoreLabel} · 难度 ${turn.difficulty}';
+        });
+      }
+    } catch (error) {
+      if (mounted) {
+        setState(() {
+          _busy = false;
+          _error = _pretty(error);
+          _status = '本回合失败';
+        });
+      }
+    } finally {
+      if (path != null) {
+        try {
+          final File file = File(path);
+          if (file.existsSync()) {
+            await file.delete();
+          }
+        } catch (_) {}
+      }
+    }
+  }
+
+  Future<String?> _confirmTranscriptDialog(String draft) async {
+    final TextEditingController controller = TextEditingController(text: draft);
+    try {
+      return await showDialog<String>(
+        context: context,
+        barrierDismissible: false,
+        builder: (BuildContext context) {
+          return AlertDialog(
+            title: const Text('核对识别文字'),
+            content: TextField(
+              controller: controller,
+              maxLines: 4,
+              decoration: const InputDecoration(
+                labelText: '确认后才会进入外教回复',
+                border: OutlineInputBorder(),
+              ),
+            ),
+            actions: <Widget>[
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('取消'),
+              ),
+              FilledButton(
+                onPressed: () =>
+                    Navigator.pop(context, controller.text.trim()),
+                child: const Text('确认发送'),
+              ),
+            ],
+          );
+        },
+      );
+    } finally {
+      controller.dispose();
+    }
+  }
+
+  Future<void> _persistLearningTurn(OralCoachTurnResult turn) async {
+    if (!ref.read(authSessionProvider).isLoggedIn) {
+      return;
+    }
+    try {
+      final AcquireApiClient api = ref.read(acquireApiClientProvider);
+      String? sid = _learningSessionId;
+      if (sid == null || sid.isEmpty) {
+        sid = await api.startLearningSession(
+          taskId: 'video_line',
+          courseTitle: widget.courseTitle,
+          currentEnglish: widget.line.english,
+        );
+        _learningSessionId = sid;
+      }
+      await api.appendLearningTurn(
+        sessionId: sid,
+        role: 'user',
+        text: turn.transcript,
+        machineTranscript: turn.transcript,
+        scores: <String, dynamic>{
+          'overall': turn.pronunciationOverall,
+          'notes': turn.pronunciationNotes,
+        },
+      );
+      if (turn.coachText.trim().isNotEmpty) {
+        await api.appendLearningTurn(
+          sessionId: sid,
+          role: 'assistant',
+          text: turn.coachText,
+        );
+      }
+      final List<Map<String, dynamic>> candidates = <Map<String, dynamic>>[
+        for (final String c in turn.corrections)
+          if (c.contains('→') || c.contains('->'))
+            <String, String>{
+              'quote': turn.transcript,
+              'suggestion': c.split(RegExp(r'→|->')).last.trim(),
+              'reason': c,
+            }
+          else if (turn.transcript.trim().isNotEmpty &&
+              widget.line.english.trim().isNotEmpty &&
+              turn.transcript.trim().toLowerCase() !=
+                  widget.line.english.trim().toLowerCase())
+            <String, String>{
+              'quote': turn.transcript,
+              'suggestion': widget.line.english.trim(),
+              'reason': 'Closer to the video line',
+            },
+      ];
+      if (candidates.isEmpty) {
+        return;
+      }
+      final List<Map<String, dynamic>> verified = await api
+          .finalizeLearningFeedback(sessionId: sid, items: candidates);
+      if (mounted) {
+        setState(() => _feedbackItems = verified);
+      }
+    } catch (_) {
+      // Offline / unauthenticated learning persist is best-effort.
+    }
+  }
+
+  Future<void> _saveFeedbackToReview(Map<String, dynamic> item) async {
+    if (!ref.read(authSessionProvider).isLoggedIn) {
+      setState(() => _error = '登录后可保存到复习');
+      return;
+    }
+    try {
+      await ref.read(acquireApiClientProvider).saveReviewExpression(
+        expression: '${item['suggestion'] ?? ''}',
+        sourceQuote: '${item['quote'] ?? ''}',
+      );
+      if (mounted) {
+        setState(() => _status = '已保存到延迟复习');
+      }
+    } catch (error) {
+      if (mounted) {
+        setState(() => _error = _pretty(error));
+      }
+    }
+  }
+
+  void _messageSafe(String text) {
+    _status = text;
   }
 
   Future<void> _demoCurrentLine(LearningSettingsState settings) async {
@@ -91,14 +548,17 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab> {
       _error = null;
     });
     try {
-      if (settings.usesLiveTalkingCoach) {
-        if (!_client.isConnected) {
-          await _connectLiveTalking(settings.oralCoachServerUrl);
+      if (settings.usesLiveTalkingCoach ||
+          (settings.usesOralCoachPipeline &&
+              settings.oralCoachServerUrl.trim().isNotEmpty)) {
+        final String url = settings.oralCoachServerUrl;
+        if (!_liveClient.isConnected && url.trim().isNotEmpty) {
+          await _connectLiveTalking(url);
         }
-        if (_client.isConnected) {
+        if (_liveClient.isConnected) {
           final String script =
               'Listen and repeat after me. ${widget.line.english}';
-          await _client.speak(script);
+          await _liveClient.speak(script);
           if (mounted) {
             setState(() => _status = '数字人正在示范当前句…');
           }
@@ -113,9 +573,7 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab> {
       }
     } catch (error) {
       if (mounted) {
-        setState(() {
-          _error = error.toString().replaceFirst(RegExp(r'^Bad state:\s*'), '');
-        });
+        setState(() => _error = _pretty(error));
       }
     } finally {
       if (mounted) {
@@ -126,6 +584,10 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab> {
 
   Future<void> _coachFeedback(LearningSettingsState settings) async {
     if (!widget.hasLine || _busy) {
+      return;
+    }
+    if (settings.usesOralCoachPipeline) {
+      setState(() => _status = '请用麦克风说一句，管线会自动纠错反馈');
       return;
     }
     setState(() {
@@ -139,11 +601,11 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab> {
           'Give one short tip in simple English (max 2 sentences), then ask them '
           'to say the line again.';
       if (settings.usesLiveTalkingCoach) {
-        if (!_client.isConnected) {
+        if (!_liveClient.isConnected) {
           await _connectLiveTalking(settings.oralCoachServerUrl);
         }
-        if (_client.isConnected) {
-          await _client.speak(prompt, type: 'chat');
+        if (_liveClient.isConnected) {
+          await _liveClient.speak(prompt, type: 'chat');
           if (mounted) {
             setState(() => _status = '数字人正在给出陪练反馈…');
           }
@@ -158,9 +620,7 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab> {
       }
     } catch (error) {
       if (mounted) {
-        setState(() {
-          _error = error.toString().replaceFirst(RegExp(r'^Bad state:\s*'), '');
-        });
+        setState(() => _error = _pretty(error));
       }
     } finally {
       if (mounted) {
@@ -169,11 +629,21 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab> {
     }
   }
 
+  String _pretty(Object error) {
+    return error
+        .toString()
+        .replaceFirst(RegExp(r'^Bad state:\s*'), '')
+        .replaceFirst(RegExp(r'^Exception:\s*'), '');
+  }
+
   @override
   Widget build(BuildContext context) {
     final StudyShellColors colors = StudyShellColors.of(context);
     final LearningSettingsState settings = ref.watch(learningSettingsProvider);
-    final bool live = settings.usesLiveTalkingCoach;
+    final bool pipeline = settings.usesOralCoachPipeline;
+    final bool live =
+        settings.usesLiveTalkingCoach ||
+        (pipeline && settings.oralCoachServerUrl.trim().isNotEmpty);
 
     return ListView(
       padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
@@ -198,11 +668,11 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab> {
                       child: Padding(
                         padding: const EdgeInsets.all(20),
                         child: Text(
-                          live
-                              ? '连接 LiveTalking 后显示数字人画面\n'
-                                    '服务端示例：python app.py --transport webrtc'
-                              : '当前为本地 TTS 陪练（无数字人画面）\n'
-                                    '可在设置切换 LiveTalking / 预留 Duix-Mobile',
+                          pipeline
+                              ? '视频主题陪练管线\nASR→发音→LLM→TTS→数字人\n连接 LiveTalking 后显示外教头像'
+                              : live
+                              ? '连接 LiveTalking 后显示数字人画面'
+                              : '当前为本地 TTS 陪练（无数字人画面）',
                           textAlign: TextAlign.center,
                           style: TextStyle(
                             color: colors.textSecondary,
@@ -215,7 +685,22 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab> {
             ),
           ),
         ),
-        const SizedBox(height: 14),
+        const SizedBox(height: 12),
+        if (widget.courseTitle.trim().isNotEmpty ||
+            widget.episodeTitle.trim().isNotEmpty)
+          Text(
+            [
+              if (widget.courseTitle.trim().isNotEmpty) widget.courseTitle.trim(),
+              if (widget.episodeTitle.trim().isNotEmpty)
+                widget.episodeTitle.trim(),
+            ].join(' · '),
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+              color: colors.textMuted,
+            ),
+          ),
+        const SizedBox(height: 6),
         Text(
           widget.hasLine ? widget.line.english : '暂无当前句',
           style: TextStyle(
@@ -245,6 +730,106 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab> {
             color: colors.textSecondary,
           ),
         ),
+        if (_lastTurn != null) ...<Widget>[
+          const SizedBox(height: 10),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: colors.cardActive,
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: colors.borderActive),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: <Widget>[
+                Text(
+                  '你说：${_lastTurn!.transcript}',
+                  style: TextStyle(
+                    fontSize: 13,
+                    height: 1.4,
+                    color: colors.textSecondary,
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  '外教：${_lastTurn!.coachText}',
+                  style: TextStyle(
+                    fontSize: 14,
+                    height: 1.4,
+                    fontWeight: FontWeight.w700,
+                    color: colors.textPrimary,
+                  ),
+                ),
+                if (_lastTurn!.pronunciationNotes.isNotEmpty) ...<Widget>[
+                  const SizedBox(height: 6),
+                  Text(
+                    _lastTurn!.pronunciationNotes,
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: colors.textMuted,
+                    ),
+                  ),
+                ],
+                if (_lastTurn!.corrections.isNotEmpty) ...<Widget>[
+                  const SizedBox(height: 6),
+                  Text(
+                    '纠正：${_lastTurn!.corrections.join('；')}',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: colors.textSecondary,
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ],
+        if (_feedbackItems.isNotEmpty) ...<Widget>[
+          const SizedBox(height: 10),
+          ..._feedbackItems.map((Map<String, dynamic> item) {
+            return Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: colors.cardActive,
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(color: colors.borderActive),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: <Widget>[
+                    Text(
+                      '原话：${item['quote'] ?? ''}',
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: colors.textSecondary,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      '建议：${item['suggestion'] ?? ''}',
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w700,
+                        color: colors.textPrimary,
+                      ),
+                    ),
+                    Align(
+                      alignment: Alignment.centerRight,
+                      child: TextButton(
+                        onPressed: () => unawaited(_saveFeedbackToReview(item)),
+                        child: const Text('存入复习'),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          }),
+        ],
         if (_error != null) ...<Widget>[
           const SizedBox(height: 6),
           Text(
@@ -268,23 +853,44 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab> {
           spacing: 10,
           runSpacing: 10,
           children: <Widget>[
+            if (pipeline)
+              FilledButton(
+                onPressed: _busy
+                    ? null
+                    : () => unawaited(_startPipelineConversation(settings)),
+                child: Text(_session == null ? '开始视频对话' : '同步当前句'),
+              ),
+            if (pipeline)
+              FilledButton.tonalIcon(
+                onPressed: _busy
+                    ? null
+                    : (_recordingActive
+                          ? () => unawaited(_stopRecordingAndSend())
+                          : () => unawaited(_startRecording())),
+                icon: Icon(
+                  _recordingActive ? Icons.stop_rounded : Icons.mic_rounded,
+                ),
+                label: Text(_recordingActive ? '停止并发送' : '说话回合'),
+              ),
             if (live)
               FilledButton.tonal(
                 onPressed: _connecting
                     ? null
-                    : () => _connectLiveTalking(settings.oralCoachServerUrl),
+                    : () => unawaited(
+                        _connectLiveTalking(settings.oralCoachServerUrl),
+                      ),
                 child: Text(_connecting ? '连接中…' : '连接数字人'),
               ),
             FilledButton(
               onPressed: (!widget.hasLine || _busy)
                   ? null
-                  : () => _demoCurrentLine(settings),
-              child: Text(_busy ? '处理中…' : '示范当前句'),
+                  : () => unawaited(_demoCurrentLine(settings)),
+              child: Text(_busy && !_recordingActive ? '处理中…' : '示范当前句'),
             ),
             OutlinedButton(
               onPressed: (!widget.hasLine || _busy)
                   ? null
-                  : () => _coachFeedback(settings),
+                  : () => unawaited(_coachFeedback(settings)),
               child: const Text('陪练反馈'),
             ),
             if (widget.onReplaySentence != null)
@@ -306,8 +912,11 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab> {
         ),
         const SizedBox(height: 16),
         Text(
-          '流程：示范 → 跟读评测 → 陪练反馈 → 下一句。 '
-          'LiveTalking 需自建 GPU 服务；Duix-Mobile 端侧 SDK 可后续替换同一陪练接口。',
+          pipeline
+              ? '流程：开始视频对话 → 说话回合（WhisperX/Deepgram + 发音打分 + LLM）→ 虚拟外教回复。'
+                    '在 tools/oral_coach/.env 切换 Provider。'
+              : '流程：示范 → 跟读评测 → 陪练反馈 → 下一句。'
+                    '可切换「视频陪练管线」获得实时对话编排。',
           style: TextStyle(
             fontSize: 12,
             height: 1.4,

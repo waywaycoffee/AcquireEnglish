@@ -1,0 +1,6 @@
+.venv/
+__pycache__/
+*.pyc
+vendor/zemksh-voice/.env
+vendor/zemksh-voice/frontend/node_modules/
+vendor/zemksh-voice/frontend/dist/

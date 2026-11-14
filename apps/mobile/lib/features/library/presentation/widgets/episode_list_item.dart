@@ -1,7 +1,27 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 
 import '../../../shared/presentation/pad/app_design_tokens.dart';
 import '../library_mock_data.dart';
+import 'library_course_poster.dart';
+
+bool _isDisplayableCoverPath(String raw) {
+  final String value = raw.trim();
+  if (value.isEmpty || value.startsWith('assets/')) {
+    return false;
+  }
+  if (value.startsWith('http://') ||
+      value.startsWith('https://') ||
+      value.startsWith('//')) {
+    return true;
+  }
+  try {
+    return File(value).existsSync();
+  } catch (_) {
+    return false;
+  }
+}
 
 class EpisodeListItem extends StatelessWidget {
   const EpisodeListItem({
@@ -10,6 +30,7 @@ class EpisodeListItem extends StatelessWidget {
     required this.onTap,
     this.onViewTranscript,
     this.trailing,
+    this.fallbackCoverImage,
     super.key,
   });
 
@@ -18,6 +39,9 @@ class EpisodeListItem extends StatelessWidget {
   final VoidCallback onTap;
   final VoidCallback? onViewTranscript;
   final Widget? trailing;
+
+  /// Course-level cover used when the episode has no poster of its own.
+  final String? fallbackCoverImage;
 
   @override
   Widget build(BuildContext context) {
@@ -34,20 +58,19 @@ class EpisodeListItem extends StatelessWidget {
         final bool narrow =
             constraints.maxWidth / MediaQuery.textScalerOf(context).scale(1) <
             600;
-        final Widget details = Column(
+        final Widget title = Text(
+          item.title,
+          maxLines: narrow ? 3 : 1,
+          overflow: TextOverflow.ellipsis,
+          style: TextStyle(
+            fontSize: narrow ? 17 : 20,
+            fontWeight: FontWeight.w900,
+            color: AppDesignTokens.textPrimary,
+          ),
+        );
+        final Widget meta = Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: <Widget>[
-            Text(
-              item.title,
-              maxLines: narrow ? 2 : 1,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(
-                fontSize: narrow ? 17 : 20,
-                fontWeight: FontWeight.w900,
-                color: AppDesignTokens.textPrimary,
-              ),
-            ),
-            const SizedBox(height: 10),
             Wrap(
               spacing: 8,
               runSpacing: 8,
@@ -65,27 +88,47 @@ class EpisodeListItem extends StatelessWidget {
                   textColor: AppDesignTokens.brandGreenDark,
                 ),
                 if (item.videoMissing)
-                  const _InfoChip(
-                    icon: Icons.warning_amber_rounded,
-                    label: '文件缺失',
-                    backgroundColor: Color(0xFFFFE1E1),
-                    textColor: Color(0xFFBA1A1A),
+                  _InfoChip(
+                    icon: _isPendingBilibiliDownload(item)
+                        ? Icons.cloud_download_rounded
+                        : Icons.warning_amber_rounded,
+                    label: _isPendingBilibiliDownload(item) ? '待下载' : '文件缺失',
+                    backgroundColor: _isPendingBilibiliDownload(item)
+                        ? const Color(0xFFE8F1FF)
+                        : const Color(0xFFFFE1E1),
+                    textColor: _isPendingBilibiliDownload(item)
+                        ? AppDesignTokens.primaryBlueDark
+                        : const Color(0xFFBA1A1A),
                   ),
                 _InfoChip(
                   icon: Icons.closed_caption_rounded,
-                  label: item.hasEnglishSubtitles ? '英文字幕' : '无外部英文字幕',
+                  label: item.hasEnglishSubtitles
+                      ? '英文字幕'
+                      : (_isPendingBilibiliDownload(item)
+                            ? '英文字幕待获取'
+                            : '无外部英文字幕'),
                 ),
                 _InfoChip(
                   icon: item.hasChineseSubtitles
                       ? Icons.translate_rounded
-                      : Icons.warning_rounded,
-                  label: item.hasChineseSubtitles ? '中文字幕' : '无中文字幕',
+                      : (_isPendingBilibiliDownload(item)
+                            ? Icons.cloud_download_rounded
+                            : Icons.warning_rounded),
+                  label: item.hasChineseSubtitles
+                      ? '中文字幕'
+                      : (_isPendingBilibiliDownload(item)
+                            ? '中文字幕待获取'
+                            : '无中文字幕'),
                   backgroundColor: item.hasChineseSubtitles
                       ? AppDesignTokens.pinkLight
-                      : const Color(0xFFFFE1E1),
+                      : (_isPendingBilibiliDownload(item)
+                            ? const Color(0xFFE8F1FF)
+                            : const Color(0xFFFFE1E1)),
                   textColor: item.hasChineseSubtitles
                       ? AppDesignTokens.textPrimary
-                      : const Color(0xFFBA1A1A),
+                      : (_isPendingBilibiliDownload(item)
+                            ? AppDesignTokens.primaryBlueDark
+                            : const Color(0xFFBA1A1A)),
                 ),
                 _InfoChip(
                   icon: Icons.schedule_rounded,
@@ -116,27 +159,11 @@ class EpisodeListItem extends StatelessWidget {
             ),
           ],
         );
-        final Widget number = Container(
-          width: narrow ? 48 : 64,
-          height: narrow ? 48 : 64,
-          decoration: BoxDecoration(
-            color: selected
-                ? AppDesignTokens.brandGreen
-                : AppDesignTokens.skyLight,
-            borderRadius: BorderRadius.circular(20),
-          ),
-          child: Center(
-            child: Text(
-              item.numberStr,
-              style: TextStyle(
-                fontSize: narrow ? 20 : 24,
-                fontWeight: FontWeight.w900,
-                color: selected
-                    ? Colors.white
-                    : AppDesignTokens.primaryBlueDark,
-              ),
-            ),
-          ),
+        final Widget thumb = _EpisodeThumb(
+          item: item,
+          selected: selected,
+          narrow: narrow,
+          fallbackCoverImage: fallbackCoverImage,
         );
         final Widget playIndicator = Icon(
           selected
@@ -181,14 +208,17 @@ class EpisodeListItem extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: <Widget>[
                       Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: <Widget>[
-                          number,
-                          const Spacer(),
+                          thumb,
+                          const SizedBox(width: 12),
+                          Expanded(child: title),
+                          const SizedBox(width: 8),
                           trailing ?? playIndicator,
                         ],
                       ),
                       const SizedBox(height: 12),
-                      details,
+                      meta,
                       if (transcriptButton != null) ...<Widget>[
                         const SizedBox(height: 12),
                         transcriptButton,
@@ -197,9 +227,18 @@ class EpisodeListItem extends StatelessWidget {
                   )
                 : Row(
                     children: <Widget>[
-                      number,
+                      thumb,
                       const SizedBox(width: 16),
-                      Expanded(child: details),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: <Widget>[
+                            title,
+                            const SizedBox(height: 10),
+                            meta,
+                          ],
+                        ),
+                      ),
                       if (transcriptButton != null) ...<Widget>[
                         const SizedBox(width: 12),
                         transcriptButton,
@@ -212,6 +251,19 @@ class EpisodeListItem extends StatelessWidget {
         );
       },
     );
+  }
+
+  bool _isPendingBilibiliDownload(LibraryEpisodeItem item) {
+    final String asset = (item.videoAsset ?? '').trim();
+    if (!item.videoMissing || asset.isEmpty) {
+      return false;
+    }
+    final String lower = asset.toLowerCase();
+    return lower.contains('bilibili.com') ||
+        lower.contains('b23.tv') ||
+        lower.contains('bili2233.cn') ||
+        asset.toUpperCase().contains('BV') ||
+        lower.startsWith('av');
   }
 
   String _progressStatusText(LibraryEpisodeItem item) {
@@ -231,6 +283,88 @@ class EpisodeListItem extends StatelessWidget {
     final int minutes = totalSeconds ~/ 60;
     final int seconds = totalSeconds % 60;
     return '$minutes:${seconds.toString().padLeft(2, '0')}';
+  }
+}
+
+class _EpisodeThumb extends StatelessWidget {
+  const _EpisodeThumb({
+    required this.item,
+    required this.selected,
+    required this.narrow,
+    this.fallbackCoverImage,
+  });
+
+  final LibraryEpisodeItem item;
+  final bool selected;
+  final bool narrow;
+  final String? fallbackCoverImage;
+
+  String get _resolvedCover {
+    final String own = item.coverImage.trim();
+    if (_isDisplayableCoverPath(own)) {
+      return own.startsWith('//') ? 'https:$own' : own;
+    }
+    final String fallback = (fallbackCoverImage ?? '').trim();
+    if (_isDisplayableCoverPath(fallback)) {
+      return fallback.startsWith('//') ? 'https:$fallback' : fallback;
+    }
+    return '';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final double width = narrow ? 96 : 120;
+    final double height = narrow ? 72 : 90;
+    final BorderRadius radius = BorderRadius.circular(16);
+    final String cover = _resolvedCover;
+    return ClipRRect(
+      borderRadius: radius,
+      child: SizedBox(
+        width: width,
+        height: height,
+        child: Stack(
+          fit: StackFit.expand,
+          children: <Widget>[
+            // Reuse course poster renderer — already proven to load B 站 covers.
+            LibraryCoursePoster(
+              title: item.numberStr,
+              path: cover,
+              borderRadius: radius,
+              fit: BoxFit.cover,
+            ),
+            if (selected)
+              DecoratedBox(
+                decoration: BoxDecoration(
+                  border: Border.all(
+                    color: AppDesignTokens.brandGreen,
+                    width: 2,
+                  ),
+                  borderRadius: radius,
+                ),
+              ),
+            Align(
+              alignment: Alignment.bottomLeft,
+              child: Container(
+                margin: const EdgeInsets.all(6),
+                padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                decoration: BoxDecoration(
+                  color: Colors.black.withValues(alpha: 0.65),
+                  borderRadius: BorderRadius.circular(999),
+                ),
+                child: Text(
+                  item.numberStr,
+                  style: const TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w800,
+                    color: Colors.white,
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }
 

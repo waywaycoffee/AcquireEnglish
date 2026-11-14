@@ -3,12 +3,14 @@
 #
 
 list(APPEND FLUTTER_PLUGIN_LIST
+  connectivity_plus
   desktop_multi_window
   file_selector_windows
   flutter_secure_storage_windows
   flutter_tts
   flutter_webrtc
   gal
+  livekit_client
   media_kit_libs_windows_video
   media_kit_video
   record_windows

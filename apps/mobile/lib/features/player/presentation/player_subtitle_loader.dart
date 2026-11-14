@@ -2,8 +2,12 @@ import 'dart:convert';
 
 import 'package:flutter/services.dart';
 
+import 'bilingual_subtitle_helpers.dart';
 import 'player_media_source.dart';
 import 'player_mock_state.dart';
+import 'subtitle_language_sanitize.dart';
+
+export 'subtitle_language_sanitize.dart' show sanitizeSubtitleLanguageFields;
 
 Future<List<PlayerSubtitleLine>> loadSubtitleLinesFromAsset(
   String assetPath,
@@ -18,63 +22,237 @@ Future<List<PlayerSubtitleLine>> loadSubtitleLines(String source) async {
 }
 
 /// Official Chinese-only CC/AI tracks parse into [PlayerSubtitleLine.english]
-/// by default; move cue text into [PlayerSubtitleLine.chinese] and keep a
-/// visible fallback copy in english so 单英/双语 still show something until
-/// Whisper fills a real English track.
+/// by default. Keep the cue in [PlayerSubtitleLine.chinese] only — do **not**
+/// copy Chinese into [english], or 双语 mode looks "all Chinese" and word
+/// highlighting treats CJK as English tokens.
 List<PlayerSubtitleLine> normalizeChineseOnlySubtitleLines(
   List<PlayerSubtitleLine> lines,
 ) {
-  return lines
-      .map((PlayerSubtitleLine line) {
-        final String text = line.chinese.trim().isNotEmpty
-            ? line.chinese.trim()
-            : line.english.trim();
-        if (text.isEmpty) {
-          return line;
+  return sanitizeSubtitleLanguageFields(
+    lines
+        .map((PlayerSubtitleLine line) {
+          final String text = line.chinese.trim().isNotEmpty
+              ? line.chinese.trim()
+              : line.english.trim();
+          if (text.isEmpty) {
+            return line;
+          }
+          return PlayerSubtitleLine(
+            startTime: line.startTime,
+            english: '',
+            chinese: text,
+            startMs: line.startMs,
+            endMs: line.endMs,
+            words: const [],
+          );
+        })
+        .toList(growable: false),
+  );
+}
+
+/// Overlay sparse persisted English cues onto a full Chinese timeline.
+///
+/// Partial `en.srt` omits cues without English; reloading must keep every
+/// Chinese cue so the next fill only translates holes.
+List<PlayerSubtitleLine> mergePartialEnglishOntoChineseBase({
+  required List<PlayerSubtitleLine> chineseLines,
+  required List<PlayerSubtitleLine> englishLines,
+  int minOverlapMs = 120,
+  bool allowIndexFallback = true,
+}) {
+  if (chineseLines.isEmpty) {
+    return sanitizeSubtitleLanguageFields(englishLines);
+  }
+  final List<PlayerSubtitleLine> base =
+      normalizeChineseOnlySubtitleLines(chineseLines);
+  if (englishLines.isEmpty) {
+    return base;
+  }
+  final List<PlayerSubtitleLine> enSanitized =
+      sanitizeSubtitleLanguageFields(englishLines);
+  return sanitizeSubtitleLanguageFields(
+    List<PlayerSubtitleLine>.generate(base.length, (int index) {
+      final PlayerSubtitleLine zh = base[index];
+      String bestEnglish = '';
+      int bestOverlap = 0;
+      for (final PlayerSubtitleLine en in enSanitized) {
+        if (!subtitleLooksEnglish(en.english)) {
+          continue;
         }
-        return PlayerSubtitleLine(
-          startTime: line.startTime,
-          english: text,
-          chinese: text,
-          startMs: line.startMs,
-          endMs: line.endMs,
-          words: line.words,
-        );
-      })
-      .toList(growable: false);
+        final int start = zh.startMs > en.startMs ? zh.startMs : en.startMs;
+        final int end = zh.endMs < en.endMs ? zh.endMs : en.endMs;
+        final int overlap = end - start;
+        if (overlap > bestOverlap) {
+          bestOverlap = overlap;
+          bestEnglish = en.english.trim();
+        }
+      }
+      if (allowIndexFallback &&
+          bestOverlap < minOverlapMs &&
+          index < enSanitized.length) {
+        final PlayerSubtitleLine sameIndex = enSanitized[index];
+        if (subtitleLooksEnglish(sameIndex.english)) {
+          bestEnglish = sameIndex.english.trim();
+          bestOverlap = minOverlapMs;
+        }
+      }
+      if (bestOverlap < minOverlapMs || bestEnglish.isEmpty) {
+        return zh;
+      }
+      return PlayerSubtitleLine(
+        startTime: zh.startTime,
+        english: bestEnglish,
+        chinese: zh.chinese,
+        startMs: zh.startMs,
+        endMs: zh.endMs,
+        words: zh.words,
+      );
+    }),
+  );
+}
+
+/// Official Chinese cues stay the timeline. English is restored only when it
+/// was saved as the translation of that same Chinese cue. A fluent sentence
+/// that merely shares the timestamp (ASR/OCR) is left blank so it can be
+/// translated from the Chinese text.
+List<PlayerSubtitleLine> subtitleBaseFromOfficialChinese({
+  required List<PlayerSubtitleLine> officialChinese,
+  List<PlayerSubtitleLine> cachedLines = const <PlayerSubtitleLine>[],
+  bool cachedEnglishIsTranslation = false,
+}) {
+  final List<PlayerSubtitleLine> base = normalizeChineseOnlySubtitleLines(
+    officialChinese,
+  );
+  if (!cachedEnglishIsTranslation || base.isEmpty || cachedLines.isEmpty) {
+    return base;
+  }
+  return <PlayerSubtitleLine>[
+    for (final PlayerSubtitleLine line in base)
+      _restoreTranslationForCue(line, cachedLines),
+  ];
+}
+
+PlayerSubtitleLine _restoreTranslationForCue(
+  PlayerSubtitleLine cue,
+  List<PlayerSubtitleLine> cachedLines,
+) {
+  final String chinese = cue.chinese.trim();
+  if (chinese.isEmpty) {
+    return cue;
+  }
+  for (final PlayerSubtitleLine cached in cachedLines) {
+    if (cached.startMs != cue.startMs || cached.chinese.trim() != chinese) {
+      continue;
+    }
+    final String english = cached.english.trim();
+    if (!looksEnglish(english) || looksChinese(english)) {
+      continue;
+    }
+    return PlayerSubtitleLine(
+      startTime: cue.startTime,
+      english: english,
+      chinese: chinese,
+      startMs: cue.startMs,
+      endMs: cue.endMs,
+      words: cue.words,
+    );
+  }
+  return cue;
 }
 
 List<PlayerSubtitleLine> mergeSubtitleLines({
   required List<PlayerSubtitleLine> englishLines,
   required List<PlayerSubtitleLine> chineseLines,
 }) {
-  if (englishLines.isEmpty) {
+  final List<PlayerSubtitleLine> enSanitized =
+      sanitizeSubtitleLanguageFields(englishLines);
+  final List<PlayerSubtitleLine> zhSanitized =
+      sanitizeSubtitleLanguageFields(chineseLines);
+
+  final bool hasRealEnglish = enSanitized.any(
+    (PlayerSubtitleLine line) => subtitleLooksEnglish(line.english),
+  );
+
+  // Official "en" tracks are sometimes Chinese AI content mislabeled as EN.
+  if (!hasRealEnglish) {
+    if (zhSanitized.isNotEmpty) {
+      return normalizeChineseOnlySubtitleLines(zhSanitized);
+    }
+    if (enSanitized.isNotEmpty) {
+      return normalizeChineseOnlySubtitleLines(enSanitized);
+    }
     return const <PlayerSubtitleLine>[];
   }
 
-  return List<PlayerSubtitleLine>.generate(englishLines.length, (int index) {
-    final PlayerSubtitleLine englishLine = englishLines[index];
-    final String chinese = index < chineseLines.length
-        ? (chineseLines[index].chinese.isNotEmpty
-              ? chineseLines[index].chinese
-              : chineseLines[index].english)
-        : '';
+  return sanitizeSubtitleLanguageFields(
+    List<PlayerSubtitleLine>.generate(enSanitized.length, (int index) {
+      final PlayerSubtitleLine englishLine = enSanitized[index];
+      final String chinese = _chineseForEnglishCue(
+        englishLine,
+        zhSanitized,
+        index,
+      );
 
-    return PlayerSubtitleLine(
-      startTime: englishLine.startTime,
-      english: englishLine.english,
-      chinese: chinese,
-      startMs: englishLine.startMs,
-      endMs: englishLine.endMs,
-      words: englishLine.words,
-    );
-  });
+      return PlayerSubtitleLine(
+        startTime: englishLine.startTime,
+        english: englishLine.english,
+        chinese: chinese,
+        startMs: englishLine.startMs,
+        endMs: englishLine.endMs,
+        words: englishLine.words,
+      );
+    }),
+  );
+}
+
+String _chineseForEnglishCue(
+  PlayerSubtitleLine englishLine,
+  List<PlayerSubtitleLine> chineseLines,
+  int index,
+) {
+  if (chineseLines.isEmpty) {
+    return englishLine.chinese;
+  }
+
+  int bestIndex = -1;
+  int bestOverlap = 0;
+  for (int i = 0; i < chineseLines.length; i++) {
+    final PlayerSubtitleLine zh = chineseLines[i];
+    final int start = englishLine.startMs > zh.startMs
+        ? englishLine.startMs
+        : zh.startMs;
+    final int end = englishLine.endMs < zh.endMs
+        ? englishLine.endMs
+        : zh.endMs;
+    final int overlap = end - start;
+    if (overlap > bestOverlap) {
+      bestOverlap = overlap;
+      bestIndex = i;
+    }
+  }
+
+  // Prefer time overlap; fall back to same index when tracks are aligned.
+  final PlayerSubtitleLine? matched = bestOverlap > 0
+      ? chineseLines[bestIndex]
+      : (index < chineseLines.length ? chineseLines[index] : null);
+  if (matched == null) {
+    return englishLine.chinese;
+  }
+  if (matched.chinese.trim().isNotEmpty) {
+    return matched.chinese.trim();
+  }
+  if (subtitleLooksChineseOnly(matched.english)) {
+    return matched.english.trim();
+  }
+  return englishLine.chinese;
 }
 
 List<PlayerSubtitleLine> parseSubtitleLines(String rawSubtitle) {
   final String trimmed = rawSubtitle.trimLeft();
   if (trimmed.startsWith('{')) {
-    return _parseGeneratedWordsJson(rawSubtitle);
+    return sanitizeSubtitleLanguageFields(
+      _parseGeneratedWordsJson(rawSubtitle),
+    );
   }
 
   // ponytail: parser supports SRT/VTT lines with basic bilingual cue split, no extra dependency.
@@ -145,7 +323,7 @@ List<PlayerSubtitleLine> parseSubtitleLines(String rawSubtitle) {
     );
   }
 
-  return result;
+  return sanitizeSubtitleLanguageFields(result);
 }
 
 List<PlayerSubtitleLine> _parseGeneratedWordsJson(String rawSubtitle) {
@@ -274,7 +452,11 @@ _DualLanguageLinePair _splitDualLanguageLine(List<String> lines) {
     return const _DualLanguageLinePair(english: '', chinese: '');
   }
   if (lines.length == 1) {
-    return _DualLanguageLinePair(english: lines.first, chinese: '');
+    final String only = lines.first;
+    if (_containsChinese(only) && !_looksLikeEnglishLine(only)) {
+      return _DualLanguageLinePair(english: '', chinese: only);
+    }
+    return _DualLanguageLinePair(english: only, chinese: '');
   }
 
   final String firstLine = lines.first;
@@ -287,6 +469,13 @@ _DualLanguageLinePair _splitDualLanguageLine(List<String> lines) {
       lines.length == 2) {
     return _DualLanguageLinePair(english: firstLine, chinese: secondLine);
   }
+  // ZH-only multi-line cue (or EN mislabeled as first line of CJK).
+  if (_containsChinese(firstLine) && !_looksLikeEnglishLine(firstLine)) {
+    return _DualLanguageLinePair(
+      english: '',
+      chinese: lines.join(' '),
+    );
+  }
 
   return _DualLanguageLinePair(
     english: firstLine,
@@ -296,6 +485,16 @@ _DualLanguageLinePair _splitDualLanguageLine(List<String> lines) {
 
 bool _containsChinese(String value) {
   return RegExp(r'[\u4e00-\u9fff]').hasMatch(value);
+}
+
+bool _looksLikeEnglishLine(String raw) {
+  final String text = raw.trim();
+  if (text.isEmpty) {
+    return false;
+  }
+  final int latin = RegExp(r'[A-Za-z]').allMatches(text).length;
+  final int chinese = RegExp(r'[\u4e00-\u9fff]').allMatches(text).length;
+  return latin > 0 && latin >= chinese;
 }
 
 class _DualLanguageLinePair {

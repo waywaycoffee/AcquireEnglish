@@ -5,7 +5,6 @@ import 'package:go_router/go_router.dart';
 import '../../../router/app_router.dart';
 import '../../growth/presentation/growth_provider.dart';
 import '../../import_course/data/bilibili_cover_refresh.dart';
-import '../../import_course/presentation/import_course_screen.dart';
 import '../../library/presentation/library_catalog_provider.dart';
 import '../../library/presentation/library_mock_data.dart';
 import '../../library/presentation/widgets/library_course_poster.dart';
@@ -16,6 +15,7 @@ import '../../shared/presentation/app_loading_overlay.dart';
 import '../../shared/presentation/pad/app_design_tokens.dart';
 import '../../shared/presentation/pad/pad_scaffold.dart';
 import '../../shared/presentation/pad/pad_top_bar.dart';
+import '../../authentication/presentation/auth_session.dart';
 import '../../sync/presentation/cloud_catalog_sync.dart';
 import '../../sync/presentation/daily_feed_provider.dart';
 import 'learning_dashboard_provider.dart';
@@ -55,7 +55,7 @@ class _PadHomeScreenState extends ConsumerState<PadHomeScreen> {
       bool autoPlay = false,
     }) {
       if (course == null) {
-        openImportCourseExperience(context);
+        // Empty hero now hosts the same YouTube / B站 / 导入 entry as 学习页.
         return;
       }
       if (course.episodes.isEmpty) {
@@ -97,15 +97,16 @@ class _PadHomeScreenState extends ConsumerState<PadHomeScreen> {
       message: '正在打开课程...',
       child: PadScaffold(
         currentDestination: AppNavDestination.home,
-        topBar: const PadTopBar(
-          title: '爱可儿英语 AcquireEnglish',
-          subtitle: '首页',
-        ),
+        topBar: const PadTopBar(title: '爱快英语', subtitle: '首页'),
         body: ListView(
           key: const ValueKey<String>('home-page-scroll'),
           padding: EdgeInsets.all(pagePadding),
           children: <Widget>[
-            _GreetingHeader(stats: stats, growth: growth),
+            _GreetingHeader(
+              stats: stats,
+              growth: growth,
+              displayName: ref.watch(authSessionProvider).displayName,
+            ),
             SizedBox(height: compact ? 24 : 28),
             PadHomeHero(
               onTap: () => openCourse(
@@ -221,14 +222,39 @@ class _TodayFeedSection extends ConsumerWidget {
   }
 }
 
+String _greetingForNow(DateTime now) {
+  final int hour = now.hour;
+  if (hour >= 5 && hour < 11) {
+    return '早上好';
+  }
+  if (hour >= 11 && hour < 14) {
+    return '中午好';
+  }
+  if (hour >= 14 && hour < 18) {
+    return '下午好';
+  }
+  return '晚上好';
+}
+
 class _GreetingHeader extends StatelessWidget {
-  const _GreetingHeader({required this.stats, required this.growth});
+  const _GreetingHeader({
+    required this.stats,
+    required this.growth,
+    required this.displayName,
+  });
 
   final LearningDashboardStats stats;
   final UserGrowth growth;
+  final String displayName;
 
   @override
   Widget build(BuildContext context) {
+    final String rawName = displayName.trim();
+    // Legacy demo default was "Mark"; treat it as unset.
+    final String name = (rawName.isEmpty || rawName == 'Mark')
+        ? 'Elon Musk'
+        : rawName;
+    final String greeting = _greetingForNow(DateTime.now());
     return Row(
       children: <Widget>[
         Expanded(
@@ -236,7 +262,7 @@ class _GreetingHeader extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: <Widget>[
               Text(
-                '晚上好 Mark 👋',
+                '$greeting $name 👋',
                 style: TextStyle(
                   fontSize: 26,
                   fontWeight: FontWeight.w900,
@@ -524,10 +550,7 @@ class _EnglishLevelCard extends StatelessWidget {
                   ],
                 ),
                 shape: BoxShape.circle,
-                border: Border.all(
-                  color: AppDesignTokens.onAccent,
-                  width: 3,
-                ),
+                border: Border.all(color: AppDesignTokens.onAccent, width: 3),
               ),
               child: const Icon(
                 Icons.explore_rounded,

@@ -182,19 +182,11 @@ class _PadSidebarState extends ConsumerState<PadSidebar> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: <Widget>[
                           Text(
-                            '爱可儿英语',
+                            '爱快英语',
                             style: TextStyle(
                               fontSize: compact ? 16 : 18,
                               fontWeight: FontWeight.w900,
                               color: AppDesignTokens.brandGreenDark,
-                            ),
-                          ),
-                          const SizedBox(height: 2),
-                          Text(
-                            'AcquireEnglish',
-                            style: TextStyle(
-                              fontSize: compact ? 11 : 12,
-                              color: AppDesignTokens.textSecondary,
                             ),
                           ),
                         ],

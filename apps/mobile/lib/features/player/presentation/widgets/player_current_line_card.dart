@@ -4,6 +4,8 @@ import '../../../shared/domain/subtitle_letter_case.dart';
 import '../../../shared/presentation/pad/app_design_tokens.dart';
 import '../../../shared/presentation/word_lookup_popup.dart';
 import '../player_mock_state.dart';
+import '../subtitle_display_mode.dart';
+import '../subtitle_language_sanitize.dart';
 import 'subtitle_vocabulary_highlight.dart';
 
 class PlayerCurrentLineCard extends StatefulWidget {
@@ -78,11 +80,28 @@ class _PlayerCurrentLineCardState extends State<PlayerCurrentLineCard> {
 
   @override
   Widget build(BuildContext context) {
-    final bool showEnglish = widget.subtitleMode != '单中';
-    final bool showChinese = widget.subtitleMode != '单英';
+    final String english = widget.line.english.trim();
+    final String chinese = widget.line.chinese.trim();
+    final bool hasRealEnglish =
+        english.isNotEmpty && !subtitleLooksChineseOnly(english);
+    final bool requireEnglishPrimary =
+        SubtitleDisplayMode.requiresEnglishPrimary(widget.subtitleMode);
+    final bool chineseOnlyMode =
+        SubtitleDisplayMode.isChineseOnly(widget.subtitleMode);
+    final bool showEnglish = requireEnglishPrimary && hasRealEnglish;
+    final bool showChineseSecondary =
+        !SubtitleDisplayMode.isEnglishOnly(widget.subtitleMode) &&
+        !SubtitleDisplayMode.isBlind(widget.subtitleMode) &&
+        chinese.isNotEmpty &&
+        showEnglish;
+    final bool showChineseTempPrimary =
+        (requireEnglishPrimary && !hasRealEnglish && chinese.isNotEmpty) ||
+        (chineseOnlyMode && chinese.isNotEmpty);
     final bool highlightEnabled = widget.highlightWords;
+    // English stays the hero size; Chinese is the smaller secondary line.
     final double englishFontSize = 32 * widget.fontScale;
     final double chineseFontSize = 14.5 * widget.fontScale;
+    final double chineseTempFontSize = 26 * widget.fontScale;
 
     return Container(
       padding: const EdgeInsets.fromLTRB(24, 22, 24, 24),
@@ -183,9 +202,13 @@ class _PlayerCurrentLineCardState extends State<PlayerCurrentLineCard> {
                               vocabMark,
                               onDarkVideo: false,
                             );
-                      final double borderWidth = karaoke
-                          ? 1.5
-                          : (vocabMark == SubtitleVocabMark.none ? 0 : 1.2);
+                      final double borderWidth = karaoke ? 1.5 : 0;
+                      final Color wordColor =
+                          SubtitleVocabularyHighlight.textColor(
+                        vocabMark,
+                        fallback: AppDesignTokens.textPrimary,
+                        onDarkVideo: false,
+                      );
 
                       return InkWell(
                         onTap: () {
@@ -217,7 +240,7 @@ class _PlayerCurrentLineCardState extends State<PlayerCurrentLineCard> {
                                 activeLine: true,
                               ),
                               height: 1.22,
-                              color: AppDesignTokens.textPrimary,
+                              color: wordColor,
                             ),
                           ),
                         ),
@@ -225,10 +248,21 @@ class _PlayerCurrentLineCardState extends State<PlayerCurrentLineCard> {
                     })
                     .toList(growable: false),
               ),
-            if (showEnglish && showChinese) const SizedBox(height: 10),
-            if (showChinese)
+            if (showChineseTempPrimary)
               Text(
-                widget.line.chinese,
+                chinese,
+                style: TextStyle(
+                  fontSize: chineseTempFontSize,
+                  fontWeight: FontWeight.w700,
+                  height: 1.35,
+                  color: AppDesignTokens.textPrimary,
+                ),
+              ),
+            if (showEnglish && showChineseSecondary)
+              const SizedBox(height: 10),
+            if (showChineseSecondary)
+              Text(
+                chinese,
                 style: TextStyle(
                   fontSize: chineseFontSize,
                   fontWeight: FontWeight.w500,

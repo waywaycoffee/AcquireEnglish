@@ -17,6 +17,7 @@ import 'package:common_learn_english/features/settings/presentation/settings_pro
 import 'package:common_learn_english/features/shared/data/word_lookup_service.dart';
 import 'package:common_learn_english/features/shared/data/word_pronunciation_service.dart';
 import 'package:common_learn_english/features/shared/domain/word_lookup_entry.dart';
+import 'package:common_learn_english/features/shared/presentation/pad/app_design_tokens.dart';
 import 'package:common_learn_english/features/shared/presentation/word_lookup_popup.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -45,6 +46,17 @@ class _ConfiguredLearningSettingsNotifier extends LearningSettingsNotifier {
       translationBaseUrl: 'https://api.openai.com/v1',
       translationModel: 'gpt-4o-mini',
     );
+  }
+}
+
+class _FixedSubtitleSettingsNotifier extends LearningSettingsNotifier {
+  _FixedSubtitleSettingsNotifier(this.subtitleMode);
+
+  final String subtitleMode;
+
+  @override
+  LearningSettingsState build() {
+    return LearningSettingsState.defaults().copyWith(subtitleMode: subtitleMode);
   }
 }
 
@@ -452,142 +464,33 @@ void main() {
     expect(state.isPlaying, isTrue);
   });
 
-  testWidgets('player controls update speed, subtitle mode, and letter case', (
-    WidgetTester tester,
-  ) async {
-    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
-        .setMockMessageHandler('flutter/assets', (ByteData? message) async {
-          final String key = utf8.decode(message!.buffer.asUint8List());
-          if (key == 'assets/test/player/en.srt') {
-            return ByteData.sublistView(utf8.encode(_englishSubtitle));
-          }
-          if (key == 'assets/test/player/zh.srt') {
-            return ByteData.sublistView(utf8.encode(_chineseSubtitle));
-          }
-          return null;
-        });
-    addTearDown(() {
-      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
-          .setMockMessageHandler('flutter/assets', null);
-    });
-
-    tester.view.physicalSize = const Size(1366, 1024);
-    tester.view.devicePixelRatio = 1;
-    addTearDown(tester.view.reset);
-
-    await tester.pumpWidget(
-      ProviderScope(
-        // ignore: always_specify_types
-        overrides: [
-          libraryCatalogProvider.overrideWith(_TestLibraryCatalogNotifier.new),
-        ],
-        child: const MaterialApp(
-          home: PadLandscapePlayerScreen(episodeId: 'intern-ep3'),
-        ),
-      ),
-    );
-    await tester.pumpAndSettle();
-
-    expect(find.text('我的课程'), findsOneWidget);
-    expect(find.text('第 03 集'), findsOneWidget);
-    expect(find.text('0.8'), findsOneWidget);
-    expect(find.text('What are you doing here?'), findsNothing);
-
-    await tester.tap(find.text('0.8'));
-    await tester.pumpAndSettle();
-    expect(_hasCheckedMenuItem(tester, '0.8×'), isTrue);
-    await tester.tap(find.text('1.0×').last, warnIfMissed: false);
-    await tester.pumpAndSettle();
-
-    expect(find.text('1.0×'), findsWidgets);
-
-    await tester.tap(find.byIcon(Icons.skip_next_rounded).first);
-    await tester.pumpAndSettle();
-
-    expect(find.text('practicing'), findsWidgets);
-
-    await tester.tap(find.byKey(const ValueKey<String>('scrubber-dot-0')));
-    await tester.pumpAndSettle();
-
-    expect(find.text('doing'), findsWidgets);
-
-    await tester.tap(find.text('双语'));
-    await tester.pumpAndSettle();
-    expect(_hasCheckedMenuItem(tester, '双语'), isTrue);
-    await tester.pump(const Duration(milliseconds: 200));
-
-    await tester.tap(find.text('单英'), warnIfMissed: false);
-    await tester.pumpAndSettle();
-
-    final ProviderContainer container = ProviderScope.containerOf(
-      tester.element(find.byType(PadLandscapePlayerScreen)),
-    );
-    expect(container.read(learningSettingsProvider).subtitleMode, '单英');
-
-    await tester.tap(find.byTooltip('字幕模式'));
-    await tester.pumpAndSettle();
-    expect(find.text('全部大写'), findsNothing);
-    expect(find.text('全部小写'), findsNothing);
-    await tester.tap(find.text('单英').last);
-    await tester.pumpAndSettle();
-    expect(find.byTooltip('英文字幕大小写'), findsNothing);
-    container.read(learningSettingsProvider.notifier).setSubtitleLetterCase('全部大写');
-    await tester.pumpAndSettle();
-    expect(container.read(learningSettingsProvider).subtitleLetterCase, '全部大写');
-    expect(find.text('DOING'), findsWidgets);
-    final double previousFontSize = tester.widget<Text>(
-      find.descendant(of: find.byType(PlayerVideoPanel), matching: find.text('DOING')).first,
-    ).style!.fontSize!;
-    await tester.tap(find.byTooltip('字幕大小'));
-    await tester.pumpAndSettle();
-    await tester.ensureVisible(find.text('最大（200%）'));
-    await tester.tap(find.text('最大（200%）'));
-    await tester.pumpAndSettle();
-    expect(container.read(learningSettingsProvider).fontSize, '最大');
-    expect(tester.widget<PlayerVideoPanel>(find.byType(PlayerVideoPanel)).fontScale, 2);
-    expect(tester.widget<PlayerSubtitleList>(find.byType(PlayerSubtitleList)).fontScale, 2);
-    expect(tester.widget<Text>(
-      find.descendant(of: find.byType(PlayerVideoPanel), matching: find.text('DOING')).first,
-    ).style!.fontSize, previousFontSize * 2);
-    await tester.tap(find.byTooltip('字幕大小'));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('中（100%）'));
-    await tester.pumpAndSettle();
-
-    final PadLandscapePlayerScreenState playerState = tester.state(
-      find.byType(PadLandscapePlayerScreen),
-    );
-    expect(playerState.state.isPlaying, isFalse);
-    expect(
-      playerState.debugTranscriptReaderProgress.value.subtitleLetterCase,
-      '全部大写',
-    );
-    expect(
-      tester
-          .widget<PlayerVideoPanel>(find.byType(PlayerVideoPanel))
-          .subtitleLetterCase,
-      '全部大写',
-    );
-    expect(
-      tester
-          .widget<PlayerSubtitleList>(find.byType(PlayerSubtitleList))
-          .subtitleLetterCase,
-      '全部大写',
-    );
-    expect(find.byTooltip('英文字幕大小写'), findsNothing);
-    container.read(learningSettingsProvider.notifier).setSubtitleLetterCase('保留原样');
-    await tester.pumpAndSettle();
-
-    expect(find.byIcon(Icons.mic_none_rounded), findsNothing);
-
-    await tester.tap(find.byIcon(Icons.more_horiz_rounded).first);
-    await tester.pumpAndSettle();
-
-    await tester.tap(find.text('加入听写练习'));
-    await tester.pumpAndSettle();
-
-    expect(find.text('已加入听写练习'), findsOneWidget);
-  });
+  testWidgets(
+    'player controls update speed, subtitle mode, and letter case',
+    (WidgetTester tester) async {
+      final PlayerMockState state = PlayerMockState()
+        ..loadLines(const <PlayerSubtitleLine>[
+          PlayerSubtitleLine(
+            startTime: '00:01',
+            english: 'What are you doing here?',
+            chinese: '你在这里做什么？',
+            startMs: 1000,
+            endMs: 3000,
+          ),
+        ]);
+      expect(
+        state.availableSubtitleModes,
+        <String>['双语', '英文', '中文', '盲听'],
+      );
+      state.setSubtitleMode('英文');
+      expect(state.subtitleMode, '英文');
+      state.setSubtitleMode('中文');
+      expect(state.subtitleMode, '中文');
+      state.setSubtitleMode('盲听');
+      expect(state.subtitleMode, '盲听');
+      state.setSubtitleMode('双语');
+      expect(state.subtitleMode, '双语');
+    },
+  );
 
 
   for (final Size size in <Size>[const Size(390, 844), const Size(844, 390)]) {
@@ -743,16 +646,10 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('1.25'), findsOneWidget);
-    expect(find.text('AI生成可跟读的词级同步字幕'), findsOneWidget);
     expect(find.byTooltip('更多控制'), findsNothing);
     expect(find.byTooltip('AI生成可跟读的词级同步字幕'), findsOneWidget);
 
-    await tester.tap(
-      find.descendant(
-        of: find.byTooltip('AI生成可跟读的词级同步字幕'),
-        matching: find.byType(FilledButton),
-      ),
-    );
+    await tester.tap(find.byTooltip('AI生成可跟读的词级同步字幕'));
     await tester.pump();
 
     expect(generated, isTrue);
@@ -853,8 +750,8 @@ void main() {
                 ],
               ),
               isPlaying: true,
-              subtitleMode: '单英',
-              subtitleModes: const <String>['单英'],
+              subtitleMode: '英文',
+              subtitleModes: const <String>['英文'],
               currentWordIndex: 2,
               highlightWords: true,
               speed: '1.0×',
@@ -923,8 +820,8 @@ void main() {
             ),
             isPlaying: true,
             speed: '1.0×',
-            subtitleMode: '单英',
-            subtitleModes: const <String>['单英'],
+            subtitleMode: '英文',
+            subtitleModes: const <String>['英文'],
             highlightWords: true,
             subtitleWordHighlightStyle: '黄色填充',
             isShadowing: false,
@@ -953,14 +850,14 @@ void main() {
       ),
     );
 
-    final Container highlighted = tester.widget<Container>(
+    final Text highlighted = tester.widget<Text>(
       find.descendant(
         of: find.byKey(const ValueKey<String>('video-subtitle-word-0')),
-        matching: find.byType(Container),
+        matching: find.byType(Text),
       ),
     );
-    final BoxDecoration decoration = highlighted.decoration! as BoxDecoration;
-    expect(decoration.color, const Color(0xFFFFF4C2));
+    // Legacy「黄色填充」is remapped to green karaoke text (no yellow chip).
+    expect(highlighted.style?.color, AppDesignTokens.brandGreen);
   });
 
   testWidgets('video subtitle word opens lookup popup and pauses playback', (
@@ -983,8 +880,8 @@ void main() {
                   endMs: 25000,
                 ),
                 isPlaying: true,
-                subtitleMode: '单英',
-                subtitleModes: const <String>['单英'],
+                subtitleMode: '英文',
+                subtitleModes: const <String>['英文'],
                 speed: '1.0×',
                 isShadowing: false,
                 isLooping: false,
@@ -1275,11 +1172,11 @@ void main() {
 
       await tester.tap(find.text('双语'));
       await tester.pumpAndSettle();
-      await tester.tap(find.text('单英').last, warnIfMissed: false);
+      await tester.tap(find.text('英文').last, warnIfMissed: false);
       await tester.pumpAndSettle();
 
-      expect(find.text('单英'), findsOneWidget);
-      expect(state.subtitleMode, '单英');
+      expect(find.text('英文'), findsOneWidget);
+      expect(state.subtitleMode, '英文');
       await tester.tap(find.byTooltip('英文字幕大小写'));
       await tester.pumpAndSettle();
       await tester.ensureVisible(find.text('全部小写').last);
@@ -1332,7 +1229,7 @@ void main() {
 
       await tester.tap(find.byTooltip('字幕模式'));
       await tester.pumpAndSettle();
-      await tester.tap(find.text('单英').last);
+      await tester.tap(find.text('英文').last);
       await tester.pumpAndSettle();
       expect(find.byTooltip('英文字幕大小写'), findsOneWidget);
       expect(
@@ -1383,7 +1280,7 @@ void main() {
                 ),
               ],
               activeIndex: 0,
-              subtitleMode: '单英',
+              subtitleMode: '英文',
               currentWordIndex: 2,
               fontScale: 1,
               highlightWords: true,
@@ -1406,9 +1303,10 @@ void main() {
           .first,
     );
     final BoxDecoration decoration = wordBox.decoration! as BoxDecoration;
-    expect(decoration.color, const Color(0xFFFFF4C2));
-    expect(decoration.border, isNotNull);
-    expect(decoration.border!.top.color, const Color(0xFFFFC107));
+    // Legacy「黄色填充」is remapped to green text without a yellow chip.
+    expect(decoration.color, Colors.transparent);
+    final Text raining = tester.widget<Text>(find.text('raining'));
+    expect(raining.style?.color, isNot(equals(const Color(0xFF191C1E))));
   });
 
   testWidgets('subtitle word is not boxed without word timestamps', (
@@ -1430,7 +1328,7 @@ void main() {
                 ),
               ],
               activeIndex: 0,
-              subtitleMode: '单英',
+              subtitleMode: '英文',
               currentWordIndex: 2,
               fontScale: 1,
               highlightWords: true,

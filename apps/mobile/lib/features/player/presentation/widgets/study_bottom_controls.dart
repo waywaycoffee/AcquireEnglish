@@ -1,25 +1,23 @@
 import 'package:flutter/material.dart';
 
 import '../../../shared/presentation/android_system_inset.dart';
+import '../subtitle_display_mode.dart';
 import 'player_video_panel.dart';
 import 'study_shell_tokens.dart';
 
 class StudyBottomControls extends StatelessWidget {
   const StudyBottomControls({
-    required this.bilingual,
-    required this.blindListening,
+    required this.subtitleMode,
     required this.speed,
     required this.isPlaying,
     required this.isLooping,
     required this.position,
     required this.duration,
-    required this.onToggleBlindListening,
+    required this.onSelectSubtitleMode,
     required this.onCycleSpeed,
     required this.onTogglePlaying,
     required this.onOpenLoopSheet,
     required this.onOpenWordCards,
-    this.onToggleBilingual,
-    this.onLongPressBlind,
     this.onSeek,
     this.onSpeedSelected,
     this.onOpenSpeedSheet,
@@ -29,20 +27,17 @@ class StudyBottomControls extends StatelessWidget {
     super.key,
   });
 
-  final bool bilingual;
-  final bool blindListening;
+  final String subtitleMode;
   final String speed;
   final bool isPlaying;
   final bool isLooping;
   final Duration position;
   final Duration duration;
-  final VoidCallback onToggleBlindListening;
+  final ValueChanged<String> onSelectSubtitleMode;
   final VoidCallback onCycleSpeed;
   final VoidCallback onTogglePlaying;
   final VoidCallback onOpenLoopSheet;
   final VoidCallback onOpenWordCards;
-  final VoidCallback? onToggleBilingual;
-  final VoidCallback? onLongPressBlind;
   final ValueChanged<double>? onSeek;
   final ValueChanged<String>? onSpeedSelected;
   final VoidCallback? onOpenSpeedSheet;
@@ -73,6 +68,20 @@ class StudyBottomControls extends StatelessWidget {
     return '${minutes.toString().padLeft(2, '0')}:${seconds.toString().padLeft(2, '0')}';
   }
 
+  IconData get _subtitleIcon {
+    switch (SubtitleDisplayMode.normalize(subtitleMode)) {
+      case SubtitleDisplayMode.blind:
+        return Icons.visibility_off_rounded;
+      case SubtitleDisplayMode.english:
+        return Icons.translate_rounded;
+      case SubtitleDisplayMode.chinese:
+        return Icons.language_rounded;
+      case SubtitleDisplayMode.bilingual:
+      default:
+        return Icons.closed_caption_rounded;
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final StudyShellColors colors = StudyShellColors.of(context);
@@ -81,6 +90,7 @@ class StudyBottomControls extends StatelessWidget {
     final double progress = duration.inMilliseconds <= 0
         ? 0
         : (position.inMilliseconds / duration.inMilliseconds).clamp(0.0, 1.0);
+    final String modeLabel = SubtitleDisplayMode.label(subtitleMode);
 
     return Material(
       color: colors.background,
@@ -92,16 +102,54 @@ class StudyBottomControls extends StatelessWidget {
             Row(
               children: <Widget>[
                 Expanded(
-                  child: _IconAction(
-                    key: const ValueKey<String>('study-chip-blind'),
-                    icon: blindListening
-                        ? Icons.visibility_off_rounded
-                        : Icons.visibility_rounded,
-                    label: '盲听',
-                    selected: blindListening,
-                    colors: colors,
-                    onPressed: onToggleBlindListening,
-                    onLongPress: onLongPressBlind ?? onToggleBilingual,
+                  child: PopupMenuButton<String>(
+                    key: const ValueKey<String>('study-chip-subtitle-mode'),
+                    tooltip: '字幕类型',
+                    color: colors.card,
+                    onSelected: onSelectSubtitleMode,
+                    itemBuilder: (BuildContext context) {
+                      return SubtitleDisplayMode.learningModes
+                          .map(
+                            (String mode) => CheckedPopupMenuItem<String>(
+                              value: mode,
+                              checked: mode == modeLabel,
+                              child: Text(
+                                mode,
+                                style: TextStyle(
+                                  fontWeight: mode == modeLabel
+                                      ? FontWeight.w800
+                                      : FontWeight.w600,
+                                  color: mode == modeLabel
+                                      ? colors.accent
+                                      : colors.textPrimary,
+                                ),
+                              ),
+                            ),
+                          )
+                          .toList(growable: false);
+                    },
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 6),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: <Widget>[
+                          Icon(
+                            _subtitleIcon,
+                            size: 22,
+                            color: colors.accent,
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            modeLabel,
+                            style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w700,
+                              color: colors.accent,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
                   ),
                 ),
                 Expanded(
@@ -259,23 +307,28 @@ class StudyBottomControls extends StatelessWidget {
                     ),
                   ),
                 ),
-                if (bilingual)
-                  TextButton(
-                    onPressed: onToggleBilingual,
-                    style: TextButton.styleFrom(
-                      foregroundColor: colors.accent,
-                      padding: const EdgeInsets.symmetric(horizontal: 8),
-                      minimumSize: const Size(0, 32),
-                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                    ),
-                    child: const Text(
-                      '双语',
-                      style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w700,
-                      ),
+                TextButton(
+                  key: const ValueKey<String>('study-chip-subtitle-label'),
+                  onPressed: () {
+                    final List<String> modes = SubtitleDisplayMode.learningModes;
+                    final int index = modes.indexOf(modeLabel);
+                    final String next = modes[(index + 1) % modes.length];
+                    onSelectSubtitleMode(next);
+                  },
+                  style: TextButton.styleFrom(
+                    foregroundColor: colors.accent,
+                    padding: const EdgeInsets.symmetric(horizontal: 8),
+                    minimumSize: const Size(0, 32),
+                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  ),
+                  child: Text(
+                    modeLabel,
+                    style: const TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
                     ),
                   ),
+                ),
                 const Spacer(),
                 IconButton(
                   tooltip: '全屏',
@@ -283,7 +336,6 @@ class StudyBottomControls extends StatelessWidget {
                   icon: Icon(
                     Icons.fullscreen_rounded,
                     color: colors.textSecondary,
-                    size: 22,
                   ),
                 ),
               ],
@@ -317,9 +369,9 @@ class _IconAction extends StatelessWidget {
   Widget build(BuildContext context) {
     final Color color = selected ? colors.accent : colors.textSecondary;
     return InkWell(
-      borderRadius: BorderRadius.circular(12),
       onTap: onPressed,
       onLongPress: onLongPress,
+      borderRadius: BorderRadius.circular(12),
       child: Padding(
         padding: const EdgeInsets.symmetric(vertical: 6),
         child: Column(
@@ -357,33 +409,20 @@ class _PlayButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 6),
-      child: DecoratedBox(
-        decoration: BoxDecoration(
-          shape: BoxShape.circle,
-          boxShadow: <BoxShadow>[
-            BoxShadow(
-              color: colors.playGlow,
-              blurRadius: 18,
-              spreadRadius: 1,
-              offset: const Offset(0, 4),
-            ),
-          ],
-        ),
-        child: Material(
-          color: colors.accent,
-          shape: const CircleBorder(),
-          child: InkWell(
-            customBorder: const CircleBorder(),
-            onTap: onPressed,
-            child: SizedBox(
-              width: 58,
-              height: 58,
-              child: Icon(
-                isPlaying ? Icons.pause_rounded : Icons.play_arrow_rounded,
-                color: colors.accentOn,
-                size: 32,
-              ),
+      padding: const EdgeInsets.symmetric(horizontal: 4),
+      child: Material(
+        color: colors.accent,
+        shape: const CircleBorder(),
+        child: InkWell(
+          customBorder: const CircleBorder(),
+          onTap: onPressed,
+          child: SizedBox(
+            width: 54,
+            height: 54,
+            child: Icon(
+              isPlaying ? Icons.pause_rounded : Icons.play_arrow_rounded,
+              color: colors.accentOn,
+              size: 30,
             ),
           ),
         ),

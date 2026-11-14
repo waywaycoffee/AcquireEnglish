@@ -1,5 +1,6 @@
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
+import '../../../sync/data/acquire_api_client.dart';
 import '../../data/authentication_repository.dart';
 import '../../data/hive/user_repository.dart';
 import '../../domain/login_request.dart';
@@ -94,5 +95,51 @@ class LoginController extends _$LoginController {
         .read(userRepositoryProvider.notifier)
         .cacheUser(LoginCredentials(email: trimmedEmail, password: ''));
     return registerResponse;
+  }
+
+  Future<AcquireSmsSendResult> sendSmsCode({required String phone}) {
+    final String trimmed = phone.trim();
+    if (trimmed.isEmpty) {
+      throw Exception('请输入手机号');
+    }
+    return ref.read(authenticationRepositoryProvider).sendSmsCode(trimmed);
+  }
+
+  Future<LoginResponse> loginWithSms({
+    required String phone,
+    required String code,
+  }) async {
+    final String trimmedPhone = phone.trim();
+    final String trimmedCode = code.trim();
+    if (trimmedPhone.isEmpty || trimmedCode.isEmpty) {
+      throw Exception('请输入手机号和验证码');
+    }
+    final LoginResponse response = await ref
+        .read(authenticationRepositoryProvider)
+        .loginWithSms(phone: trimmedPhone, code: trimmedCode);
+    if (response.token.isEmpty) {
+      throw Exception('登录失败');
+    }
+    await ref
+        .read(userRepositoryProvider.notifier)
+        .cacheUser(LoginCredentials(email: trimmedPhone, password: ''));
+    return response;
+  }
+
+  Future<LoginResponse> loginWithWechat({
+    required String code,
+    String? nickname,
+  }) async {
+    final String trimmed = code.trim();
+    if (trimmed.isEmpty) {
+      throw Exception('缺少微信授权码');
+    }
+    final LoginResponse response = await ref
+        .read(authenticationRepositoryProvider)
+        .loginWithWechat(code: trimmed, nickname: nickname);
+    if (response.token.isEmpty) {
+      throw Exception('微信登录失败');
+    }
+    return response;
   }
 }

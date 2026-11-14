@@ -1,11 +1,14 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/rendering.dart' show SelectedContent;
+import 'package:flutter/rendering.dart'
+    show RenderAbstractViewport, RevealedOffset, SelectedContent;
 import 'package:flutter/services.dart';
 
 import '../../../shared/domain/subtitle_letter_case.dart';
 import '../../../shared/presentation/pad/app_design_tokens.dart';
 import '../../../shared/presentation/word_lookup_popup.dart';
 import '../player_mock_state.dart';
+import '../subtitle_display_mode.dart';
+import '../subtitle_language_sanitize.dart';
 import 'study_shell_tokens.dart';
 import 'subtitle_vocabulary_highlight.dart';
 import 'subtitle_word_highlight_style.dart';
@@ -19,6 +22,7 @@ class PlayerSubtitleList extends StatefulWidget {
   const PlayerSubtitleList({
     required this.lines,
     required this.activeIndex,
+    this.timelineFollowEpoch = 0,
     required this.subtitleMode,
     this.subtitleLetterCase = '保留原样',
     this.showCurrentOnly = false,
@@ -54,6 +58,10 @@ class PlayerSubtitleList extends StatefulWidget {
     this.onRegenerateAiSubtitles,
     this.onDeleteAiSubtitles,
     this.onRegenerateAiLine,
+    this.onEditEnglishLine,
+    this.onEditSubtitleLine,
+    this.onEditLineNote,
+    this.lineNotesByStartMs = const <int, String>{},
     this.bilingualPipelineLabel,
     this.showAiCompleteButton = false,
     this.onAiComplete,
@@ -62,11 +70,19 @@ class PlayerSubtitleList extends StatefulWidget {
     this.blindListening = false,
     this.onDictionaryOpened,
     this.onDictionaryClosed,
+    this.fragmentsBySentenceStartMs = const <int, List<PlayerSubtitleLine>>{},
     super.key,
   });
 
   final List<PlayerSubtitleLine> lines;
+
+  /// Expandable ASR/Chinese fragments keyed by sentence [PlayerSubtitleLine.startMs].
+  final Map<int, List<PlayerSubtitleLine>> fragmentsBySentenceStartMs;
   final int activeIndex;
+
+  /// Bumps when the video timeline is scrubbed, so the list jumps to that cue
+  /// even if the user had scrolled the transcript away.
+  final int timelineFollowEpoch;
   final String subtitleMode;
   final String subtitleLetterCase;
   final bool showCurrentOnly;
@@ -80,7 +96,7 @@ class PlayerSubtitleList extends StatefulWidget {
   final ValueChanged<int> onTapLine;
   final ValueChanged<String> onCollectWord;
   final void Function(String word, String time)? onCollectWordAtTime;
-  final ValueChanged<String>? onFavoriteWord;
+  final void Function(String word, [String? definitionCn])? onFavoriteWord;
   final ValueChanged<int> onBookmarkLine;
   final ValueChanged<int> onLoopFromLine;
   final ValueChanged<int> onDictationLine;
@@ -102,6 +118,11 @@ class PlayerSubtitleList extends StatefulWidget {
   final VoidCallback? onRegenerateAiSubtitles;
   final VoidCallback? onDeleteAiSubtitles;
   final Future<void> Function(int index)? onRegenerateAiLine;
+  final Future<void> Function(int index, String english)? onEditEnglishLine;
+  final Future<void> Function(int index, String english, String chinese)?
+  onEditSubtitleLine;
+  final Future<void> Function(int index, String note)? onEditLineNote;
+  final Map<int, String> lineNotesByStartMs;
   final String? bilingualPipelineLabel;
   final bool showAiCompleteButton;
   final VoidCallback? onAiComplete;
@@ -119,10 +140,14 @@ class _PlayerSubtitleListState extends State<PlayerSubtitleList> {
   final ScrollController _scrollController = ScrollController();
   final Map<int, GlobalKey> _rowKeys = <int, GlobalKey>{};
   final Set<int> _blindRevealed = <int>{};
+  final Set<int> _expandedSentenceStarts = <int>{};
   String? _activeDictionaryTokenId;
   OverlayEntry? _dictionaryOverlayEntry;
   bool _autoFollowCurrentLine = true;
   int? _regeneratingAiLineIndex;
+  int _scrollFollowGeneration = 0;
+  DateTime? _userDragPausedAt;
+  String? _lastSelectedPlainText;
 
   bool get _showCurrentOnly => widget.showCurrentOnly;
 
@@ -140,18 +165,40 @@ class _PlayerSubtitleListState extends State<PlayerSubtitleList> {
     if (oldWidget.blindListening != widget.blindListening) {
       _blindRevealed.clear();
     }
+    // A timeline scrub is an explicit jump. Bring that cue into view even
+    // when the user had parked follow by scrolling the transcript.
+    final bool timelineSeeked =
+        oldWidget.timelineFollowEpoch != widget.timelineFollowEpoch;
+    if (timelineSeeked) {
+      _autoFollowCurrentLine = true;
+      _userDragPausedAt = null;
+    }
     // Resume auto-follow whenever playback starts again.
     if (!oldWidget.isPlaying && widget.isPlaying) {
       _autoFollowCurrentLine = true;
+      _userDragPausedAt = null;
+    }
+    final bool activeLineChanged = oldWidget.activeIndex != widget.activeIndex;
+    // While playing, resume follow after a short drag pause window.
+    if (widget.isPlaying && activeLineChanged) {
+      final DateTime? pausedAt = _userDragPausedAt;
+      final bool dragStillWarm =
+          pausedAt != null &&
+          DateTime.now().difference(pausedAt) < const Duration(seconds: 6);
+      if (!dragStillWarm) {
+        _autoFollowCurrentLine = true;
+        _userDragPausedAt = null;
+      }
     }
     final bool listStateChanged =
-        oldWidget.activeIndex != widget.activeIndex ||
+        activeLineChanged ||
         oldWidget.lines.length != widget.lines.length ||
         oldWidget.subtitleMode != widget.subtitleMode ||
         oldWidget.showCurrentOnly != widget.showCurrentOnly;
     final bool shouldFollowCurrentLine =
         _autoFollowCurrentLine &&
-        (oldWidget.activeIndex != widget.activeIndex ||
+        (activeLineChanged ||
+            timelineSeeked ||
             oldWidget.isPlaying != widget.isPlaying ||
             oldWidget.lines.length != widget.lines.length ||
             oldWidget.showCurrentOnly != widget.showCurrentOnly);
@@ -160,7 +207,6 @@ class _PlayerSubtitleListState extends State<PlayerSubtitleList> {
       return;
     }
 
-    final bool activeLineChanged = oldWidget.activeIndex != widget.activeIndex;
     final bool listStructureChanged =
         oldWidget.lines.length != widget.lines.length ||
         oldWidget.subtitleMode != widget.subtitleMode ||
@@ -170,11 +216,6 @@ class _PlayerSubtitleListState extends State<PlayerSubtitleList> {
       _dismissDictionary();
     }
 
-    if (activeLineChanged && _dictionaryOverlayEntry != null) {
-      _scheduleScrollToActiveLine();
-      return;
-    }
-
     if (shouldFollowCurrentLine || listStructureChanged) {
       _scheduleScrollToActiveLine();
     }
@@ -182,6 +223,7 @@ class _PlayerSubtitleListState extends State<PlayerSubtitleList> {
 
   @override
   void dispose() {
+    _scrollFollowGeneration++;
     _removeDictionaryOverlay(notify: false);
     _scrollController
       ..removeListener(_dismissDictionary)
@@ -193,7 +235,49 @@ class _PlayerSubtitleListState extends State<PlayerSubtitleList> {
     return _rowKeys[index] ??= GlobalKey(debugLabel: 'subtitle-line-$index');
   }
 
-  void _scrollToActiveLine() {
+  double _estimatedOffsetForActiveLine() {
+    final ScrollPosition position = _scrollController.position;
+    final int lastIndex = widget.lines.length - 1;
+    if (lastIndex <= 0) {
+      return 0;
+    }
+    // Prefer index / length ratio over a fixed row height: Wrap-based cues
+    // vary a lot, and a constant 118/132px estimate often lands far from the
+    // active row so its GlobalKey never builds.
+    final double ratio = widget.activeIndex / lastIndex;
+    return (position.maxScrollExtent * ratio).clamp(
+      0.0,
+      position.maxScrollExtent,
+    );
+  }
+
+  double? _offsetToRevealActiveLine() {
+    final BuildContext? activeContext =
+        _rowKeys[widget.activeIndex]?.currentContext;
+    if (activeContext == null || !_scrollController.hasClients) {
+      return null;
+    }
+    final RenderObject? renderObject = activeContext.findRenderObject();
+    if (renderObject == null || !renderObject.attached) {
+      return null;
+    }
+    final RenderAbstractViewport? viewport = RenderAbstractViewport.maybeOf(
+      renderObject,
+    );
+    if (viewport == null) {
+      return null;
+    }
+    final RevealedOffset revealed = viewport.getOffsetToReveal(
+      renderObject,
+      0.35,
+    );
+    return revealed.offset.clamp(
+      0.0,
+      _scrollController.position.maxScrollExtent,
+    );
+  }
+
+  void _scrollToActiveLine({bool animate = true}) {
     if (_showCurrentOnly || !_scrollController.hasClients) {
       return;
     }
@@ -201,47 +285,56 @@ class _PlayerSubtitleListState extends State<PlayerSubtitleList> {
       return;
     }
 
-    final BuildContext? activeContext =
-        _rowKeys[widget.activeIndex]?.currentContext;
-    if (activeContext == null) {
-      final double estimatedExtent = widget.studyDarkStyle ? 118.0 : 132.0;
-      final double targetOffset = (widget.activeIndex * estimatedExtent).clamp(
-        0.0,
-        _scrollController.position.maxScrollExtent,
-      );
-      _scrollController.jumpTo(targetOffset);
+    // Drive our ListView ScrollController directly. SelectionArea +
+    // Scrollable.ensureVisible often scrolls the wrong ancestor (or none).
+    final double? revealed = _offsetToRevealActiveLine();
+    final double targetOffset = revealed ?? _estimatedOffsetForActiveLine();
+    if ((_scrollController.offset - targetOffset).abs() < 2) {
       return;
     }
-
-    Scrollable.ensureVisible(
-      activeContext,
-      duration: const Duration(milliseconds: 220),
-      curve: Curves.easeOut,
-      alignment: 0.35,
-    );
+    // Prefer jump during playback so cue changes cannot queue-skip.
+    if (animate && revealed != null && !widget.isPlaying) {
+      _scrollController.animateTo(
+        targetOffset,
+        duration: const Duration(milliseconds: 180),
+        curve: Curves.easeOut,
+      );
+    } else {
+      _scrollController.jumpTo(targetOffset);
+    }
   }
 
   void _scheduleScrollToActiveLine({int attempt = 0}) {
+    final int generation = attempt == 0
+        ? ++_scrollFollowGeneration
+        : _scrollFollowGeneration;
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted || !_autoFollowCurrentLine) {
+      if (!mounted ||
+          generation != _scrollFollowGeneration ||
+          !_autoFollowCurrentLine) {
         return;
       }
       if (!_scrollController.hasClients) {
-        if (attempt < 10) {
+        if (attempt < 12) {
           _scheduleScrollToActiveLine(attempt: attempt + 1);
         }
         return;
       }
-      _scrollToActiveLine();
-      // Second pass once the jumped-to row has been built.
-      if (attempt < 2 &&
-          _rowKeys[widget.activeIndex]?.currentContext == null) {
+      final bool alreadyBuilt =
+          _rowKeys[widget.activeIndex]?.currentContext != null;
+      _scrollToActiveLine(animate: alreadyBuilt || attempt > 0);
+      final bool built = _rowKeys[widget.activeIndex]?.currentContext != null;
+      if (!built && attempt < 12) {
         _scheduleScrollToActiveLine(attempt: attempt + 1);
-      } else if (attempt < 1) {
+      } else if (built && attempt < 2) {
+        // Refine once layout settles after the jump/ensureVisible.
         WidgetsBinding.instance.addPostFrameCallback((_) {
-          if (mounted && _autoFollowCurrentLine) {
-            _scrollToActiveLine();
+          if (!mounted ||
+              generation != _scrollFollowGeneration ||
+              !_autoFollowCurrentLine) {
+            return;
           }
+          _scrollToActiveLine();
         });
       }
     });
@@ -251,6 +344,8 @@ class _PlayerSubtitleListState extends State<PlayerSubtitleList> {
     if (notification is ScrollStartNotification &&
         notification.dragDetails != null) {
       _autoFollowCurrentLine = false;
+      _userDragPausedAt = DateTime.now();
+      _scrollFollowGeneration++;
     }
     return false;
   }
@@ -262,12 +357,9 @@ class _PlayerSubtitleListState extends State<PlayerSubtitleList> {
     _removeDictionaryOverlay();
   }
 
-  void _removeDictionaryOverlay({
-    bool notify = true,
-    bool emitClosed = true,
-  }) {
-    final bool hadOverlay = _dictionaryOverlayEntry != null ||
-        _activeDictionaryTokenId != null;
+  void _removeDictionaryOverlay({bool notify = true, bool emitClosed = true}) {
+    final bool hadOverlay =
+        _dictionaryOverlayEntry != null || _activeDictionaryTokenId != null;
     _dictionaryOverlayEntry?.remove();
     _dictionaryOverlayEntry = null;
     if (hadOverlay && emitClosed) {
@@ -279,6 +371,95 @@ class _PlayerSubtitleListState extends State<PlayerSubtitleList> {
     }
     setState(() {
       _activeDictionaryTokenId = null;
+    });
+  }
+
+  void _openLookupForSelectedText(String rawSelection) {
+    final String text = rawSelection.trim();
+    if (text.isEmpty) {
+      return;
+    }
+    // Prefer the active cue as sentence context for phrase lookup.
+    final String contextSentence =
+        (widget.activeIndex >= 0 && widget.activeIndex < widget.lines.length)
+        ? widget.lines[widget.activeIndex].english
+        : text;
+    final String contextTime =
+        (widget.activeIndex >= 0 && widget.activeIndex < widget.lines.length)
+        ? widget.lines[widget.activeIndex].startTime
+        : '';
+    final OverlayState overlayState = Overlay.of(context, rootOverlay: true);
+    final RenderBox overlayBox =
+        overlayState.context.findRenderObject()! as RenderBox;
+    final Size overlaySize = overlayBox.size;
+    const double preferredPopupHeight = 520;
+    const double viewportPadding = 16;
+    final double popupWidth = (overlaySize.width - viewportPadding * 2).clamp(
+      0.0,
+      WordLookupPopupCard.preferredWidth,
+    );
+    final double popupHeight = (overlaySize.height - (viewportPadding * 2))
+        .clamp(120.0, preferredPopupHeight);
+    final double left =
+        (overlaySize.width - popupWidth) / 2;
+    final double top =
+        (overlaySize.height - popupHeight) / 2;
+
+    _removeDictionaryOverlay(notify: false, emitClosed: false);
+    widget.onDictionaryOpened?.call();
+    _dictionaryOverlayEntry = OverlayEntry(
+      builder: (BuildContext overlayContext) {
+        return Stack(
+          children: <Widget>[
+            Positioned.fill(
+              child: GestureDetector(
+                behavior: HitTestBehavior.translucent,
+                onTap: _dismissDictionary,
+              ),
+            ),
+            Positioned(
+              left: left.clamp(
+                viewportPadding,
+                overlaySize.width - popupWidth - viewportPadding,
+              ),
+              top: top.clamp(
+                viewportPadding,
+                overlaySize.height - popupHeight - viewportPadding,
+              ),
+              width: popupWidth,
+              child: Material(
+                color: Colors.transparent,
+                child: WordLookupPopupCard(
+                  rawWord: text,
+                  episodeId: widget.episodeId,
+                  contextTime: contextTime,
+                  contextSentence: contextSentence,
+                  maxHeight: popupHeight,
+                  onPronounce: widget.onPronounce,
+                  onClose: _dismissDictionary,
+                  onCollect: () {
+                    final void Function(String, String)? collect =
+                        widget.onCollectWordAtTime;
+                    if (collect != null) {
+                      collect(text, contextTime);
+                    } else {
+                      widget.onCollectWord(text);
+                    }
+                  },
+                  onFavorite: widget.onFavoriteWord == null
+                      ? null
+                      : (String? definitionCn) =>
+                            widget.onFavoriteWord!(text, definitionCn),
+                ),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+    overlayState.insert(_dictionaryOverlayEntry!);
+    setState(() {
+      _activeDictionaryTokenId = 'selection:$text';
     });
   }
 
@@ -404,7 +585,8 @@ class _PlayerSubtitleListState extends State<PlayerSubtitleList> {
                   },
                   onFavorite: widget.onFavoriteWord == null
                       ? null
-                      : () => widget.onFavoriteWord!(rawWord),
+                      : (String? definitionCn) =>
+                            widget.onFavoriteWord!(rawWord, definitionCn),
                 ),
               ),
             ),
@@ -419,13 +601,171 @@ class _PlayerSubtitleListState extends State<PlayerSubtitleList> {
     });
   }
 
+  List<Widget> _buildLineNote({
+    required PlayerSubtitleLine line,
+    required bool dark,
+    required StudyShellColors shell,
+    required double textOpacity,
+    required double chineseFontSize,
+  }) {
+    final String note =
+        (widget.lineNotesByStartMs[line.startMs] ?? '').trim();
+    if (note.isEmpty) {
+      return const <Widget>[];
+    }
+    return <Widget>[
+      const _SelectableLineBreak(),
+      const SizedBox(height: 8),
+      Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          Icon(
+            Icons.sticky_note_2_outlined,
+            size: 16,
+            color: dark
+                ? shell.textMuted.withValues(alpha: textOpacity)
+                : const Color(0xFF8A7A3A).withValues(alpha: textOpacity),
+          ),
+          const SizedBox(width: 6),
+          Expanded(
+            child: Text(
+              note,
+              style: TextStyle(
+                fontSize: (chineseFontSize - 1).clamp(11, 16),
+                height: 1.4,
+                fontWeight: FontWeight.w500,
+                color: dark
+                    ? shell.textSecondary.withValues(alpha: textOpacity)
+                    : const Color(0xFF6B5E2E).withValues(alpha: textOpacity),
+              ),
+            ),
+          ),
+        ],
+      ),
+    ];
+  }
+
+  List<Widget> _buildSentenceFragments({
+    required PlayerSubtitleLine line,
+    required bool dark,
+    required StudyShellColors shell,
+    required double textOpacity,
+    required double chineseFontSize,
+    required Color inactiveZhTextColor,
+  }) {
+    final List<PlayerSubtitleLine>? fragments =
+        widget.fragmentsBySentenceStartMs[line.startMs];
+    if (fragments == null || fragments.isEmpty) {
+      return const <Widget>[];
+    }
+    final bool expanded = _expandedSentenceStarts.contains(line.startMs);
+    return <Widget>[
+      const SizedBox(height: 4),
+      InkWell(
+        onTap: () {
+          setState(() {
+            if (expanded) {
+              _expandedSentenceStarts.remove(line.startMs);
+            } else {
+              _expandedSentenceStarts.add(line.startMs);
+            }
+          });
+        },
+        borderRadius: BorderRadius.circular(10),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 2),
+          child: Row(
+            children: <Widget>[
+              Icon(
+                expanded
+                    ? Icons.expand_less_rounded
+                    : Icons.expand_more_rounded,
+                size: 18,
+                color: dark ? shell.textMuted : const Color(0xFF8A968E),
+              ),
+              const SizedBox(width: 4),
+              Text(
+                expanded ? '收起碎句' : '展开碎句（${fragments.length}）',
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  color: dark ? shell.textMuted : const Color(0xFF8A968E),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+      if (expanded)
+        Padding(
+          padding: const EdgeInsets.only(left: 8, top: 4),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: fragments.map((PlayerSubtitleLine fragment) {
+              final String en = fragment.english.trim();
+              final String zh = fragment.chinese.trim();
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: <Widget>[
+                    Text(
+                      fragment.startTime,
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                        color: dark
+                            ? shell.textMuted.withValues(alpha: textOpacity)
+                            : inactiveZhTextColor.withValues(
+                                alpha: textOpacity,
+                              ),
+                      ),
+                    ),
+                    if (en.isNotEmpty)
+                      Text(
+                        formatSubtitleLetterCase(
+                          en,
+                          widget.subtitleLetterCase,
+                        ),
+                        style: TextStyle(
+                          fontSize: 14 * widget.fontScale,
+                          fontWeight: FontWeight.w600,
+                          height: 1.35,
+                          color: dark
+                              ? shell.textSecondary
+                              : const Color(0xFF3A423C),
+                        ),
+                      ),
+                    if (zh.isNotEmpty) ...<Widget>[
+                      if (en.isNotEmpty) const SizedBox(height: 2),
+                      Text(
+                        zh,
+                        style: TextStyle(
+                          fontSize: chineseFontSize * 0.95,
+                          fontWeight: FontWeight.w500,
+                          height: 1.35,
+                          color: dark
+                              ? shell.textMuted
+                              : inactiveZhTextColor,
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              );
+            }).toList(growable: false),
+          ),
+        ),
+    ];
+  }
+
   @override
   Widget build(BuildContext context) {
-    if (widget.subtitleMode == '隐藏') {
+    if (widget.subtitleMode == SubtitleDisplayMode.hidden) {
       return _SubtitlePlaceholder(
         icon: Icons.closed_caption_disabled_outlined,
         title: '字幕已隐藏',
-        body: '在底栏打开「双语」或切换字幕模式后可恢复列表。',
+        body: '在底栏打开「双语 / 英文 / 中文 / 盲听」后可恢复列表。',
         showAiGenerateSubtitles: widget.showAiGenerateSubtitles,
         generatingAiSubtitles: widget.generatingAiSubtitles,
         progressValue: widget.aiSubtitleProgressValue,
@@ -459,15 +799,42 @@ class _PlayerSubtitleListState extends State<PlayerSubtitleList> {
     final Widget list = SelectionArea(
       key: const ValueKey<String>('subtitle-list-selection-area'),
       onSelectionChanged: (SelectedContent? selection) {
-        if (selection?.plainText.trim().isNotEmpty ?? false) {
-          _autoFollowCurrentLine = false;
-        }
+        // Do not park auto-follow on selection — Chinese taps / SelectionArea
+        // noise previously froze the list. Only user drag parks follow.
+        final String text = selection?.plainText.trim() ?? '';
+        _lastSelectedPlainText = text.isEmpty ? null : text;
       },
+      contextMenuBuilder:
+          (BuildContext context, SelectableRegionState selectableRegionState) {
+            final List<ContextMenuButtonItem> items =
+                <ContextMenuButtonItem>[
+                  ...selectableRegionState.contextMenuButtonItems,
+                  ContextMenuButtonItem(
+                    label: '翻译',
+                    onPressed: () {
+                      ContextMenuController.removeAny();
+                      final String text =
+                          (_lastSelectedPlainText ?? '').trim();
+                      if (text.isEmpty) {
+                        return;
+                      }
+                      _openLookupForSelectedText(text);
+                    },
+                  ),
+                ];
+            return AdaptiveTextSelectionToolbar.buttonItems(
+              anchors: selectableRegionState.contextMenuAnchors,
+              buttonItems: items,
+            );
+          },
       child: NotificationListener<ScrollNotification>(
         onNotification: _handleScrollNotification,
         child: ListView.separated(
           controller: _scrollController,
           padding: const EdgeInsets.all(2),
+          // Keep nearby cues mounted so ensureVisible can find the active row.
+          // ignore: deprecated_member_use
+          cacheExtent: 1200,
           itemCount: itemCount,
           itemBuilder: (BuildContext context, int itemIndex) {
             final int originalIndex = _showCurrentOnly
@@ -486,8 +853,14 @@ class _PlayerSubtitleListState extends State<PlayerSubtitleList> {
                 ?.call(originalIndex);
             final bool dark = widget.studyDarkStyle;
             final StudyShellColors shell = StudyShellColors.of(context);
-            final bool blindHidden = widget.blindListening &&
-                !_blindRevealed.contains(originalIndex);
+            final bool blindMode =
+                widget.blindListening ||
+                SubtitleDisplayMode.isBlind(widget.subtitleMode);
+            final String contentMode = SubtitleDisplayMode.contentMode(
+              widget.subtitleMode,
+            );
+            final bool blindHidden =
+                blindMode && !_blindRevealed.contains(originalIndex);
             final double textOpacity = active ? 1 : (isPast ? 0.84 : 0.60);
             final double chineseOnlyFontSize =
                 (active ? 18.0 : 16.0) * widget.fontScale;
@@ -799,54 +1172,126 @@ class _PlayerSubtitleListState extends State<PlayerSubtitleList> {
                               fontWeight: FontWeight.w700,
                             ),
                           ),
-                        ] else if (widget.subtitleMode == '单中')
-                          Text(
-                            line.chinese,
-                            style: TextStyle(
-                              fontSize: chineseOnlyFontSize,
-                              fontWeight: active
-                                  ? FontWeight.w700
-                                  : FontWeight.w600,
-                              color: active
-                                  ? (dark
-                                        ? shell.textPrimary
-                                        : const Color(0xFF191C1E))
-                                  : inactiveZhTextColor.withValues(
-                                      alpha: textOpacity,
+                        ] else ...<Widget>[
+                          Builder(
+                            builder: (BuildContext context) {
+                              final String en = line.english.trim();
+                              final String zh = line.chinese.trim();
+                              final bool enIsChineseOnly =
+                                  subtitleLooksChineseOnly(en);
+                              final bool chineseOnlyMode =
+                                  SubtitleDisplayMode.isChineseOnly(
+                                    contentMode,
+                                  );
+                              final bool hideChinese =
+                                  SubtitleDisplayMode.isEnglishOnly(
+                                    contentMode,
+                                  );
+                              final bool requireEnglishPrimary =
+                                  SubtitleDisplayMode.requiresEnglishPrimary(
+                                    contentMode,
+                                  );
+                              final String usableEnglish =
+                                  en.isNotEmpty && !enIsChineseOnly ? en : '';
+                              // Default product: English is the hero line;
+                              // Chinese is always the smaller secondary line.
+                              // Only「中文」hides English on purpose.
+                              final bool showEnglishPrimary =
+                                  requireEnglishPrimary &&
+                                  usableEnglish.isNotEmpty;
+                              final String primaryChinese = zh.isNotEmpty
+                                  ? zh
+                                  : (enIsChineseOnly ? en : '');
+                              final bool showChinesePrimary =
+                                  chineseOnlyMode && primaryChinese.isNotEmpty;
+                              // While ZH→EN fill is still running, keep Chinese
+                              // readable as temporary primary — not tiny secondary.
+                              final bool showChineseTempPrimary =
+                                  requireEnglishPrimary &&
+                                  usableEnglish.isEmpty &&
+                                  !chineseOnlyMode &&
+                                  primaryChinese.isNotEmpty;
+                              final bool showChineseSecondary =
+                                  !blindHidden &&
+                                  !hideChinese &&
+                                  !chineseOnlyMode &&
+                                  primaryChinese.isNotEmpty &&
+                                  showEnglishPrimary;
+
+                              return Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: <Widget>[
+                                  if (showEnglishPrimary)
+                                    _buildWordLine(
+                                      formatSubtitleLetterCase(
+                                        line.english,
+                                        widget.subtitleLetterCase,
+                                      ),
+                                      active && line.words.isNotEmpty
+                                          ? widget.currentWordIndex
+                                          : null,
+                                      active,
+                                      line.startTime,
+                                      shellColors: dark ? shell : null,
+                                    )
+                                  else if (showChinesePrimary ||
+                                      showChineseTempPrimary)
+                                    Text(
+                                      primaryChinese,
+                                      style: TextStyle(
+                                        fontSize: chineseOnlyFontSize,
+                                        fontWeight: active
+                                            ? FontWeight.w700
+                                            : FontWeight.w600,
+                                        color: active
+                                            ? (dark
+                                                  ? shell.textPrimary
+                                                  : const Color(0xFF191C1E))
+                                            : inactiveZhTextColor.withValues(
+                                                alpha: textOpacity,
+                                              ),
+                                        height: 1.35,
+                                      ),
                                     ),
-                              height: 1.35,
-                            ),
-                          )
-                        else
-                          _buildWordLine(
-                            formatSubtitleLetterCase(
-                              line.english,
-                              widget.subtitleLetterCase,
-                            ),
-                            active && line.words.isNotEmpty
-                                ? widget.currentWordIndex
-                                : null,
-                            active,
-                            line.startTime,
-                            shellColors: dark ? shell : null,
+                                  if (showChineseSecondary) ...<Widget>[
+                                    if (showEnglishPrimary) ...<Widget>[
+                                      const _SelectableLineBreak(),
+                                      const SizedBox(height: 6),
+                                    ],
+                                    Text(
+                                      primaryChinese,
+                                      style: TextStyle(
+                                        fontSize: chineseFontSize,
+                                        fontWeight: FontWeight.w500,
+                                        color: active
+                                            ? (dark
+                                                  ? shell.textSecondary
+                                                  : const Color(0xFF708077))
+                                            : inactiveZhTextColor.withValues(
+                                                alpha: textOpacity,
+                                              ),
+                                        height: 1.4,
+                                      ),
+                                    ),
+                                  ],
+                                  if (!blindHidden) ..._buildLineNote(
+                                    line: line,
+                                    dark: dark,
+                                    shell: shell,
+                                    textOpacity: textOpacity,
+                                    chineseFontSize: chineseFontSize,
+                                  ),
+                                ],
+                              );
+                            },
                           ),
-                        if (!blindHidden && widget.subtitleMode != '单英') ...<Widget>[
-                          const _SelectableLineBreak(),
-                          const SizedBox(height: 6),
-                          Text(
-                            line.chinese,
-                            style: TextStyle(
-                              fontSize: chineseFontSize,
-                              fontWeight: FontWeight.w500,
-                              color: active
-                                  ? (dark
-                                        ? shell.textSecondary
-                                        : const Color(0xFF708077))
-                                  : inactiveZhTextColor.withValues(
-                                      alpha: textOpacity,
-                                    ),
-                              height: 1.4,
-                            ),
+                          if (!blindHidden) ..._buildSentenceFragments(
+                            line: line,
+                            dark: dark,
+                            shell: shell,
+                            textOpacity: textOpacity,
+                            chineseFontSize: chineseFontSize,
+                            inactiveZhTextColor: inactiveZhTextColor,
                           ),
                         ],
                         const _SelectableLineBreak(),
@@ -902,7 +1347,10 @@ class _PlayerSubtitleListState extends State<PlayerSubtitleList> {
                 ),
               ),
               child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 8,
+                ),
                 child: Row(
                   children: <Widget>[
                     Icon(
@@ -915,7 +1363,8 @@ class _PlayerSubtitleListState extends State<PlayerSubtitleList> {
                     const SizedBox(width: 8),
                     Expanded(
                       child: Text(
-                        widget.bilingualPipelineLabel?.trim().isNotEmpty ?? false
+                        widget.bilingualPipelineLabel?.trim().isNotEmpty ??
+                                false
                             ? widget.bilingualPipelineLabel!.trim()
                             : '单语字幕可补全',
                         maxLines: 2,
@@ -953,7 +1402,9 @@ class _PlayerSubtitleListState extends State<PlayerSubtitleList> {
                     if (widget.onCancelBilingualPipeline != null) ...<Widget>[
                       const SizedBox(width: 4),
                       IconButton(
-                        key: const ValueKey<String>('bilingual-pipeline-cancel'),
+                        key: const ValueKey<String>(
+                          'bilingual-pipeline-cancel',
+                        ),
                         tooltip: '取消',
                         onPressed: widget.onCancelBilingualPipeline,
                         icon: Icon(
@@ -980,10 +1431,7 @@ class _PlayerSubtitleListState extends State<PlayerSubtitleList> {
                   _scheduleScrollToActiveLine();
                 },
                 icon: Icon(Icons.my_location_rounded, color: toolbarColor),
-                label: Text(
-                  '定位当前',
-                  style: TextStyle(color: toolbarColor),
-                ),
+                label: Text('定位当前', style: TextStyle(color: toolbarColor)),
               ),
               if (widget.onRegenerateAiSubtitles != null)
                 TextButton.icon(
@@ -997,14 +1445,8 @@ class _PlayerSubtitleListState extends State<PlayerSubtitleList> {
               if (widget.onDeleteAiSubtitles != null)
                 TextButton.icon(
                   onPressed: widget.onDeleteAiSubtitles,
-                  icon: Icon(
-                    Icons.delete_outline_rounded,
-                    color: toolbarColor,
-                  ),
-                  label: Text(
-                    '切回原始字幕',
-                    style: TextStyle(color: toolbarColor),
-                  ),
+                  icon: Icon(Icons.delete_outline_rounded, color: toolbarColor),
+                  label: Text('切回原始字幕', style: TextStyle(color: toolbarColor)),
                 ),
             ],
           ),
@@ -1012,6 +1454,157 @@ class _PlayerSubtitleListState extends State<PlayerSubtitleList> {
         Expanded(child: list),
       ],
     );
+  }
+
+  Future<String?> _askEnglishEdit(
+    BuildContext context,
+    PlayerSubtitleLine line,
+  ) async {
+    final TextEditingController controller = TextEditingController(
+      text: line.english,
+    );
+    final String? edited = await showDialog<String>(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text('改正英文'),
+          content: TextField(
+            controller: controller,
+            autofocus: true,
+            minLines: 2,
+            maxLines: 5,
+            decoration: InputDecoration(
+              hintText: '按视频里的句子修改',
+              helperText: line.chinese.trim().isEmpty ? null : line.chinese,
+            ),
+          ),
+          actions: <Widget>[
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('取消'),
+            ),
+            FilledButton(
+              onPressed: () =>
+                  Navigator.of(context).pop(controller.text.trim()),
+              child: const Text('保存'),
+            ),
+          ],
+        );
+      },
+    );
+    controller.dispose();
+    return edited;
+  }
+
+  Future<({String english, String chinese})?> _askSubtitleEdit(
+    BuildContext context,
+    PlayerSubtitleLine line,
+  ) async {
+    final TextEditingController englishController = TextEditingController(
+      text: line.english,
+    );
+    final TextEditingController chineseController = TextEditingController(
+      text: line.chinese,
+    );
+    final ({String english, String chinese})? edited =
+        await showDialog<({String english, String chinese})>(
+          context: context,
+          builder: (BuildContext context) {
+            return AlertDialog(
+              title: const Text('手工修改字幕'),
+              content: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: <Widget>[
+                    TextField(
+                      controller: englishController,
+                      autofocus: true,
+                      minLines: 2,
+                      maxLines: 5,
+                      decoration: const InputDecoration(
+                        labelText: '英文',
+                        hintText: '按视频里的句子修改',
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: chineseController,
+                      minLines: 2,
+                      maxLines: 5,
+                      decoration: const InputDecoration(
+                        labelText: '中文',
+                        hintText: '可同步改正译文',
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              actions: <Widget>[
+                TextButton(
+                  onPressed: () => Navigator.of(context).pop(),
+                  child: const Text('取消'),
+                ),
+                FilledButton(
+                  onPressed: () => Navigator.of(context).pop((
+                    english: englishController.text.trim(),
+                    chinese: chineseController.text.trim(),
+                  )),
+                  child: const Text('保存'),
+                ),
+              ],
+            );
+          },
+        );
+    englishController.dispose();
+    chineseController.dispose();
+    return edited;
+  }
+
+  Future<String?> _askLineNote(
+    BuildContext context,
+    PlayerSubtitleLine line,
+  ) async {
+    final String existing =
+        (widget.lineNotesByStartMs[line.startMs] ?? '').trim();
+    final TextEditingController controller = TextEditingController(
+      text: existing,
+    );
+    final String? edited = await showDialog<String>(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: Text(existing.isEmpty ? '手工做笔记' : '编辑笔记'),
+          content: TextField(
+            controller: controller,
+            autofocus: true,
+            minLines: 3,
+            maxLines: 8,
+            decoration: InputDecoration(
+              hintText: '写下这句的学习笔记、考点或联想…',
+              helperText: line.english.trim().isEmpty ? null : line.english,
+            ),
+          ),
+          actions: <Widget>[
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('取消'),
+            ),
+            if (existing.isNotEmpty)
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(''),
+                child: const Text('清除'),
+              ),
+            FilledButton(
+              onPressed: () =>
+                  Navigator.of(context).pop(controller.text.trim()),
+              child: const Text('保存'),
+            ),
+          ],
+        );
+      },
+    );
+    controller.dispose();
+    return edited;
   }
 
   Future<void> _openActions(
@@ -1030,7 +1623,8 @@ class _PlayerSubtitleListState extends State<PlayerSubtitleList> {
               children: <Widget>[
                 ListTile(
                   leading: const Icon(Icons.bookmark_add_outlined),
-                  title: const Text('收藏到短语库'),
+                  title: const Text('收藏句子'),
+                  subtitle: const Text('保存到短语库，便于复习'),
                   onTap: () => Navigator.of(context).pop('bookmark'),
                 ),
                 ListTile(
@@ -1049,6 +1643,27 @@ class _PlayerSubtitleListState extends State<PlayerSubtitleList> {
                   subtitle: const Text('分析句子结构、语法点与表达'),
                   onTap: () => Navigator.of(context).pop('ai-explain'),
                 ),
+                if (widget.onEditSubtitleLine != null ||
+                    widget.onEditEnglishLine != null)
+                  ListTile(
+                    leading: const Icon(Icons.edit_outlined),
+                    title: const Text('手工修改字幕'),
+                    subtitle: const Text('手改英文/中文，之后自动校对不再覆盖'),
+                    onTap: () => Navigator.of(context).pop('edit-subtitle'),
+                  ),
+                if (widget.onEditLineNote != null)
+                  ListTile(
+                    leading: const Icon(Icons.sticky_note_2_outlined),
+                    title: Text(
+                      (widget.lineNotesByStartMs[line.startMs] ?? '')
+                              .trim()
+                              .isEmpty
+                          ? '手工做笔记'
+                          : '编辑笔记',
+                    ),
+                    subtitle: const Text('为本句写下学习笔记'),
+                    onTap: () => Navigator.of(context).pop('edit-note'),
+                  ),
                 if (widget.onRegenerateAiLine != null)
                   ListTile(
                     leading: const Icon(Icons.refresh_rounded),
@@ -1115,6 +1730,55 @@ class _PlayerSubtitleListState extends State<PlayerSubtitleList> {
       case 'ai-explain':
         widget.onAiExplain(index);
         return;
+      case 'edit-en':
+        if (widget.isPlaying) {
+          widget.onTogglePlaying?.call();
+        }
+        final String? edited = await _askEnglishEdit(context, line);
+        if (!context.mounted || edited == null || edited.isEmpty) {
+          return;
+        }
+        await widget.onEditEnglishLine?.call(index, edited);
+        return;
+      case 'edit-subtitle':
+        if (widget.isPlaying) {
+          widget.onTogglePlaying?.call();
+        }
+        if (widget.onEditSubtitleLine != null) {
+          final ({String english, String chinese})? edited =
+              await _askSubtitleEdit(context, line);
+          if (!context.mounted || edited == null) {
+            return;
+          }
+          if (edited.english.isEmpty && edited.chinese.isEmpty) {
+            return;
+          }
+          await widget.onEditSubtitleLine!(
+            index,
+            edited.english.isEmpty ? line.english : edited.english,
+            edited.chinese,
+          );
+          return;
+        }
+        final String? editedEn = await _askEnglishEdit(context, line);
+        if (!context.mounted || editedEn == null || editedEn.isEmpty) {
+          return;
+        }
+        await widget.onEditEnglishLine?.call(index, editedEn);
+        return;
+      case 'edit-note':
+        if (widget.onEditLineNote == null) {
+          return;
+        }
+        if (widget.isPlaying) {
+          widget.onTogglePlaying?.call();
+        }
+        final String? note = await _askLineNote(context, line);
+        if (!context.mounted || note == null) {
+          return;
+        }
+        await widget.onEditLineNote!(index, note);
+        return;
       case 'regenerate-ai-line':
         final Future<void> Function(int index)? regenerate =
             widget.onRegenerateAiLine;
@@ -1170,55 +1834,55 @@ class _PlayerSubtitleListState extends State<PlayerSubtitleList> {
                   keyWords: widget.keyVocabularyWords,
                 );
             final String tokenId = '$text-$index';
-            final Color wordColor = shell?.textPrimary ??
-                AppDesignTokens.textPrimary;
+            final Color baseWordColor =
+                shell?.textPrimary ?? AppDesignTokens.textPrimary;
+            final Color vocabWordColor = SubtitleVocabularyHighlight.textColor(
+              vocabMark,
+              fallback: baseWordColor,
+              onDarkVideo: false,
+            );
+            final Color wordColor = karaoke
+                ? SubtitleWordHighlightStyle.textColor(
+                    widget.subtitleWordHighlightStyle,
+                    highlighted: true,
+                    fallback: vocabWordColor,
+                  )
+                : vocabWordColor;
             final Color vocabFill = SubtitleVocabularyHighlight.fill(
               vocabMark,
               onDarkVideo: false,
             );
-            final Color karaokeFill = shell == null
-                ? SubtitleWordHighlightStyle.background(
-                    widget.subtitleWordHighlightStyle,
-                    highlighted: karaoke,
-                  )
-                : (karaoke
-                      ? shell.highlight.withValues(alpha: 0.22)
-                      : Colors.transparent);
-            final Color highlightFill =
-                karaoke ? karaokeFill : vocabFill;
-            final Color karaokeBorder = shell == null
-                ? SubtitleWordHighlightStyle.borderColor(
-                    widget.subtitleWordHighlightStyle,
-                    highlighted: karaoke,
-                  )
-                : (karaoke ? shell.highlight : Colors.transparent);
+            final Color karaokeFill = SubtitleWordHighlightStyle.background(
+              widget.subtitleWordHighlightStyle,
+              highlighted: karaoke,
+            );
+            final Color highlightFill = karaoke ? karaokeFill : vocabFill;
+            final Color karaokeBorder = SubtitleWordHighlightStyle.borderColor(
+              widget.subtitleWordHighlightStyle,
+              highlighted: karaoke,
+            );
             final Color vocabBorder = SubtitleVocabularyHighlight.border(
               vocabMark,
               onDarkVideo: false,
             );
-            final Color highlightBorder =
-                karaoke ? karaokeBorder : vocabBorder;
-            final TextDecoration? highlightDecoration = shell == null
-                ? SubtitleWordHighlightStyle.textDecoration(
-                    widget.subtitleWordHighlightStyle,
-                    highlighted: karaoke,
-                  )
-                : (karaoke ? TextDecoration.underline : null);
-            final Color? highlightDecorationColor = shell == null
-                ? SubtitleWordHighlightStyle.textDecorationColor(
-                    widget.subtitleWordHighlightStyle,
-                    highlighted: karaoke,
-                  )
-                : (karaoke ? shell.highlight : null);
+            final Color highlightBorder = karaoke ? karaokeBorder : vocabBorder;
+            final TextDecoration? highlightDecoration =
+                SubtitleWordHighlightStyle.textDecoration(
+                  widget.subtitleWordHighlightStyle,
+                  highlighted: karaoke,
+                );
+            final Color? highlightDecorationColor =
+                SubtitleWordHighlightStyle.textDecorationColor(
+                  widget.subtitleWordHighlightStyle,
+                  highlighted: karaoke,
+                );
             final double borderWidth = karaoke
-                ? (shell == null
-                      ? SubtitleWordHighlightStyle.borderWidth(
-                          widget.subtitleWordHighlightStyle,
-                          highlighted: karaoke,
-                          width: widget.subtitleWordHighlightBorderWidth,
-                        )
-                      : 0)
-                : (vocabMark == SubtitleVocabMark.none ? 0 : 1.2);
+                ? SubtitleWordHighlightStyle.borderWidth(
+                    widget.subtitleWordHighlightStyle,
+                    highlighted: karaoke,
+                    width: widget.subtitleWordHighlightBorderWidth,
+                  )
+                : 0;
 
             return Builder(
               builder: (BuildContext wordContext) {
@@ -1261,7 +1925,8 @@ class _PlayerSubtitleListState extends State<PlayerSubtitleList> {
                             color: wordColor,
                             decoration: highlightDecoration,
                             decorationColor: highlightDecorationColor,
-                            decorationThickness: karaoke &&
+                            decorationThickness:
+                                karaoke &&
                                     (shell != null ||
                                         widget.subtitleWordHighlightStyle ==
                                             '下划线')
@@ -1381,11 +2046,7 @@ class _SubtitlePlaceholder extends StatelessWidget {
             Text(
               body,
               textAlign: TextAlign.center,
-              style: TextStyle(
-                fontSize: 14,
-                height: 1.5,
-                color: bodyColor,
-              ),
+              style: TextStyle(fontSize: 14, height: 1.5, color: bodyColor),
             ),
             if (showAiGenerateSubtitles) ...<Widget>[
               const SizedBox(height: 14),

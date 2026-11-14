@@ -1,5 +1,6 @@
 import '../domain/pronunciation_assessment.dart';
 import 'player_mock_state.dart';
+import 'subtitle_display_mode.dart';
 
 class PronunciationTargetSelection {
   const PronunciationTargetSelection.available(this.target)
@@ -32,7 +33,9 @@ PronunciationTargetSelection selectPronunciationTarget({
   }
   final int index;
   if (subtitleIndex == null) {
-    if (state.subtitleMode == '隐藏' || state.subtitleMode == '单中') {
+    if (state.subtitleMode == SubtitleDisplayMode.hidden ||
+        SubtitleDisplayMode.isChineseOnly(state.subtitleMode) ||
+        SubtitleDisplayMode.isBlind(state.subtitleMode)) {
       return const PronunciationTargetSelection.unavailable('当前没有正在显示的英文字幕');
     }
     if (state.visibleLine == null) {
