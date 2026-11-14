@@ -26,6 +26,7 @@ class LocalWhisperAsr {
   WhisperEngine? _engine;
   String? _loadedModelId;
   Future<void>? _ensureInFlight;
+  Future<void> _engineGate = Future<void>.value();
 
   static bool isLocalProvider(LearningSettingsState settings) {
     return settings.asrProvider == providerName;
@@ -141,32 +142,39 @@ class LocalWhisperAsr {
   }) async {
     final String modelId = _normalizeModelId(settings.asrModel);
     await ensureModel(modelId, onProgress: onProgress);
-    final WhisperEngine engine = await _loadEngine(
-      modelId,
-      onProgress: onProgress,
-    );
-    onProgress?.call(null, '本地 Whisper 识别中…');
 
-    final Float32List samples;
-    try {
-      samples = await WhisperAudio.readWav(file);
-    } catch (e) {
-      throw StateError('本地 Whisper 无法读取音频块（需 WAV）：$e');
-    }
-    if (samples.isEmpty) {
-      return <String, Object?>{
-        'version': 1,
-        'language': 'en',
-        'lines': const <Map<String, Object?>>[],
-      };
-    }
+    // Serialize load+transcribe so import-queue Whisper and player proofread
+    // cannot dispose each other's engine mid-run.
+    final Future<Map<String, Object?>> run = _engineGate.then((_) async {
+      final WhisperEngine engine = await _loadEngine(
+        modelId,
+        onProgress: onProgress,
+      );
+      onProgress?.call(null, '本地 Whisper 识别中…');
 
-    final WhisperTask task = engine.transcribe(
-      samples,
-      options: const TranscribeOptions(language: 'en'),
-    );
-    final WhisperResult result = await task.result;
-    return _resultToNormalized(result, offsetMs: offsetMs);
+      final Float32List samples;
+      try {
+        samples = await WhisperAudio.readWav(file);
+      } catch (e) {
+        throw StateError('本地 Whisper 无法读取音频块（需 WAV）：$e');
+      }
+      if (samples.isEmpty) {
+        return <String, Object?>{
+          'version': 1,
+          'language': 'en',
+          'lines': const <Map<String, Object?>>[],
+        };
+      }
+
+      final WhisperTask task = engine.transcribe(
+        samples,
+        options: const TranscribeOptions(language: 'en'),
+      );
+      final WhisperResult result = await task.result;
+      return _resultToNormalized(result, offsetMs: offsetMs);
+    });
+    _engineGate = run.then<void>((_) {}, onError: (_) {});
+    return run;
   }
 
   Future<WhisperEngine> _loadEngine(
@@ -179,9 +187,11 @@ class LocalWhisperAsr {
     onProgress?.call(null, '正在加载 Whisper 模型 $modelId…');
     final String path = await _modelPath(modelId);
     final WhisperEngine next = await WhisperEngine.load(path);
-    _engine?.dispose();
+    final WhisperEngine? previous = _engine;
     _engine = next;
     _loadedModelId = modelId;
+    // Dispose only after swap so a concurrent reader never holds a freed engine.
+    previous?.dispose();
     return next;
   }
 

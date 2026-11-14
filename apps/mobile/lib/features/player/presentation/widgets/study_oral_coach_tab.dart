@@ -349,11 +349,13 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab> {
       return;
     }
     _recordingLimitTimer?.cancel();
-    setState(() {
-      _recordingActive = false;
-      _busy = true;
-      _status = '正在跑 ASR → 发音 → LLM…';
-    });
+    _recordingActive = false;
+    if (mounted) {
+      setState(() {
+        _busy = true;
+        _status = '正在跑 ASR → 发音 → LLM…';
+      });
+    }
     try {
       await _microphone?.stop();
     } catch (_) {}
@@ -419,14 +421,21 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab> {
       final String avatarUrl = turn.livetalkingUrl.trim().isNotEmpty
           ? turn.livetalkingUrl
           : settings.oralCoachServerUrl.trim();
+      bool avatarSpoke = false;
       if (turn.avatarAction == 'livetalking_human' && avatarUrl.isNotEmpty) {
         if (!_liveClient.isConnected) {
           await _connectLiveTalking(avatarUrl);
         }
         if (_liveClient.isConnected && turn.avatarText.trim().isNotEmpty) {
-          await _liveClient.speak(turn.avatarText, type: 'echo');
+          try {
+            await _liveClient.speak(turn.avatarText, type: 'echo');
+            avatarSpoke = true;
+          } catch (_) {
+            avatarSpoke = false;
+          }
         }
-      } else {
+      }
+      if (!avatarSpoke) {
         final String? ttsUrl = turn.ttsUrl?.trim();
         bool playedRemote = false;
         if (ttsUrl != null && ttsUrl.isNotEmpty) {
