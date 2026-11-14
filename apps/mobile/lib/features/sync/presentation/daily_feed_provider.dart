@@ -100,6 +100,7 @@ class DailyFeedNotifier extends Notifier<List<LibraryCourseData>> {
       return list
           .cast<Map<String, dynamic>>()
           .map(AcquireCourseDto.fromJson)
+          .where((AcquireCourseDto c) => !isPlaceholderCloudCourse(c))
           .map(mapAcquireCourseToLibrary)
           .toList(growable: false);
     } catch (_) {
@@ -113,7 +114,9 @@ class DailyFeedNotifier extends Notifier<List<LibraryCourseData>> {
     }
     try {
       final AcquireApiClient api = ref.read(acquireApiClientProvider);
-      final List<AcquireCourseDto> feed = await api.dailyFeed();
+      final List<AcquireCourseDto> feed = (await api.dailyFeed())
+          .where((AcquireCourseDto c) => !isPlaceholderCloudCourse(c))
+          .toList(growable: false);
       final List<LibraryCourseData> mapped = feed
           .map(mapAcquireCourseToLibrary)
           .toList(growable: false);
@@ -158,9 +161,13 @@ class DailyFeedNotifier extends Notifier<List<LibraryCourseData>> {
           DateTime.now().toUtc().toIso8601String(),
         );
       }
+      // Always merge (even empty) so placeholder「云课程」get purged.
       await ref.read(libraryCatalogProvider.notifier).mergeCloudCourses(mapped);
     } catch (_) {
-      // Keep cached feed.
+      // Keep cached feed, but still strip unplayable placeholder packs.
+      await ref
+          .read(libraryCatalogProvider.notifier)
+          .mergeCloudCourses(const <LibraryCourseData>[]);
     }
   }
 
