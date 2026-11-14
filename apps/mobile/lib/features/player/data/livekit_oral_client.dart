@@ -17,9 +17,10 @@ class LiveKitOralClient {
   }) async {
     await disconnect();
     final AcquireLiveKitToken creds = await api.createLiveKitToken(room: roomName);
-    final String url = (preferredUrl != null && preferredUrl.trim().isNotEmpty)
-        ? preferredUrl.trim()
-        : creds.url;
+    // Token is bound to the API-issued host; settings URL is fallback only.
+    final String fromApi = creds.url.trim();
+    final String fromSettings = (preferredUrl ?? '').trim();
+    final String url = fromApi.isNotEmpty ? fromApi : fromSettings;
     if (url.isEmpty || creds.token.isEmpty) {
       throw StateError('LiveKit 未配置或 token 无效。');
     }

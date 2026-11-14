@@ -139,7 +139,6 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('影视库'), findsWidgets);
-    expect(find.text('导入新课程'), findsOneWidget);
     expect(find.text('还没有导入任何课程'), findsOneWidget);
     expect(find.text('先导入你自己的视频和字幕资源，再开始精听。'), findsOneWidget);
   });

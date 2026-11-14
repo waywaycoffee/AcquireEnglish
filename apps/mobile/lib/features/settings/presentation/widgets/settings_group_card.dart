@@ -40,12 +40,14 @@ class SettingsGroupCard extends StatelessWidget {
           ],
         ),
         SizedBox(height: compact ? 10 : 12),
-        DecoratedBox(
-          decoration: BoxDecoration(
-            color: AppDesignTokens.appWhite,
+        // Material (not DecoratedBox) so ListTile ink/background paint correctly.
+        Material(
+          color: AppDesignTokens.appWhite,
+          shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(compact ? 20 : 24),
-            border: Border.all(color: AppDesignTokens.borderGray),
+            side: BorderSide(color: AppDesignTokens.borderGray),
           ),
+          clipBehavior: Clip.antiAlias,
           child: Column(children: children),
         ),
       ],

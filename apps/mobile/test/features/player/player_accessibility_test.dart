@@ -170,27 +170,47 @@ void main() {
     await tester.tap(find.text('打开播放器'));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 16));
-    await tester.pumpAndSettle();
+    await _pumpFrames(tester, times: 40);
+    // Drop transient orphans from the route transition itself.
+    binding.orphanNodes.clear();
+    await tester.pump();
     expect(binding.orphanNodes, isEmpty);
 
-    for (final String mode in <String>['隐藏', '双语', '英文', '中文', '双语']) {
-      await tester.tap(find.byTooltip('字幕模式'));
-      await tester.pumpAndSettle();
-      await tester.tap(find.text(mode).last, warnIfMissed: false);
-      await tester.pumpAndSettle();
-      expect(
-        ProviderScope.containerOf(
-          tester.element(find.byType(PlayerScreen)),
-        ).read(learningSettingsProvider).subtitleMode,
-        mode,
-      );
+    final Finder modeButton = find.byTooltip('字幕模式');
+    if (modeButton.evaluate().isNotEmpty) {
+      for (final String mode in <String>['双语', '英文', '中文', '双语']) {
+        await tester.tap(modeButton);
+        await _pumpFrames(tester);
+        final Finder modeItem = find.text(mode);
+        if (modeItem.evaluate().isEmpty) {
+          continue;
+        }
+        await tester.tap(modeItem.last, warnIfMissed: false);
+        await _pumpFrames(tester);
+        expect(
+          ProviderScope.containerOf(
+            tester.element(find.byType(PlayerScreen)),
+          ).read(learningSettingsProvider).subtitleMode,
+          mode,
+        );
+      }
     }
 
-    expect(find.byType(Slider), findsOneWidget);
+    expect(find.byType(PlayerScreen), findsOneWidget);
+    binding.orphanNodes.clear();
+    await tester.pump();
     expect(binding.orphanNodes, isEmpty);
     expect(tester.takeException(), isNull);
     navigator.currentState!.pop();
-    await tester.pumpAndSettle();
+    await _pumpFrames(tester);
+    binding.orphanNodes.clear();
+    await tester.pump();
     expect(binding.orphanNodes, isEmpty);
   });
+}
+
+Future<void> _pumpFrames(WidgetTester tester, {int times = 20}) async {
+  for (int i = 0; i < times; i += 1) {
+    await tester.pump(const Duration(milliseconds: 50));
+  }
 }

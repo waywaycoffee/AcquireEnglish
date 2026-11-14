@@ -165,14 +165,10 @@ class SettingsScreen extends ConsumerWidget {
             title: '课程与偏好',
             icon: Icons.tune_rounded,
             children: <Widget>[
-              ListTile(
-                contentPadding: EdgeInsets.zero,
-                title: const Text(
-                  '学习偏好 / 每日课程',
-                  style: TextStyle(fontWeight: FontWeight.w800),
-                ),
-                subtitle: const Text('按级别与标签每日后台更新推荐课'),
-                trailing: const Icon(Icons.chevron_right_rounded),
+              _ActionRow(
+                title: '学习偏好 / 每日课程',
+                description: '按级别与标签每日后台更新推荐课',
+                icon: Icons.chevron_right_rounded,
                 onTap: () {
                   Navigator.of(context).push(
                     MaterialPageRoute<void>(

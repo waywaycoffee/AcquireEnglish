@@ -1,6 +1,5 @@
 import 'player_mock_state.dart';
 import 'subtitle_language_sanitize.dart';
-import 'subtitle_word_alignment.dart';
 
 enum MissingSubtitleSide { none, english, chinese, both }
 
@@ -698,7 +697,11 @@ bool workingEnglishMismatchesAsr({
     }
   }
   if (compared < 3) {
-    // Too few comparable cues: trust ASR when cue counts diverge sharply.
+    // Few overlaps: still rebuild when every compared cue disagrees, or when
+    // cue counts diverge sharply (sparse OCR vs denser speech track).
+    if (compared >= 2 && disagree == compared) {
+      return true;
+    }
     return (asrLines.length - working.length).abs() >= 5 ||
         asrLines.length >= working.length * 2;
   }
@@ -718,22 +721,24 @@ List<PlayerSubtitleLine> rebuildBilingualFromAsrLines({
   }
   final List<PlayerSubtitleLine> rebuilt = <PlayerSubtitleLine>[
     for (final PlayerSubtitleLine asr in asrLines)
-      PlayerSubtitleLine(
-        startTime: asr.startTime,
-        english: looksEnglish(asr.english)
+      (() {
+        final (String overlapEn, String overlapZh) =
+            _bestOverlappingChineseOrEnglish(working, asr);
+        final String english = looksEnglish(asr.english)
             ? asr.english.trim()
-            : (_bestOverlappingChineseOrEnglish(working, asr).$1),
-        chinese: (() {
-          final String zh = _bestOverlappingChineseOrEnglish(working, asr).$2;
-          if (zh.isNotEmpty) {
-            return zh;
-          }
-          return looksChinese(asr.chinese) ? asr.chinese : '';
-        })(),
-        startMs: asr.startMs,
-        endMs: asr.endMs,
-        words: asr.words,
-      ),
+            : overlapEn;
+        final String chinese = overlapZh.isNotEmpty
+            ? overlapZh
+            : (looksChinese(asr.chinese) ? asr.chinese : '');
+        return PlayerSubtitleLine(
+          startTime: asr.startTime,
+          english: english,
+          chinese: chinese,
+          startMs: asr.startMs,
+          endMs: asr.endMs,
+          words: asr.words,
+        );
+      })(),
   ];
   return sanitizeSubtitleLanguageFields(rebuilt);
 }
@@ -839,7 +844,16 @@ PlayerSubtitleLine? _bestOverlappingLine(
       best = line;
     }
   }
-  return bestOverlap > 200 ? best : null;
+  if (best == null || bestOverlap <= 0) {
+    return null;
+  }
+  // Short interjections (<200ms) never cleared a fixed 200ms bar even when
+  // fully overlapping — scale the threshold down for brief cues.
+  final int targetDur = target.endMs - target.startMs;
+  final int minOverlap = targetDur > 0 && targetDur < 400
+      ? (targetDur ~/ 2).clamp(1, 200)
+      : 200;
+  return bestOverlap >= minOverlap ? best : null;
 }
 
 MissingSubtitleSide detectMissingSubtitleSide(List<PlayerSubtitleLine> lines) {

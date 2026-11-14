@@ -7,6 +7,7 @@ import 'package:common_learn_english/features/authentication/domain/login_respon
 import 'package:common_learn_english/features/authentication/domain/register_response.dart';
 import 'package:common_learn_english/features/authentication/presentation/login/auth_ui_model.dart';
 import 'package:common_learn_english/features/authentication/presentation/login/login_controller.dart';
+import 'package:common_learn_english/features/sync/data/acquire_api_client.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:riverpod/src/framework.dart';
 
@@ -18,9 +19,36 @@ class FakeAuthRepository implements AuthenticationRepository {
   }
 
   @override
-  Future<RegisterResponse> register(String email, String password) async {
+  Future<RegisterResponse> register(
+    String email,
+    String password, {
+    String? displayName,
+  }) async {
     if (email.isEmpty || password.isEmpty) throw Exception('Empty');
     return const RegisterResponse(id: 1, token: 'fake_token');
+  }
+
+  @override
+  Future<AcquireSmsSendResult> sendSmsCode(String phone) async {
+    return const AcquireSmsSendResult(expiresIn: 300, mock: true, debugCode: '123456');
+  }
+
+  @override
+  Future<LoginResponse> loginWithSms({
+    required String phone,
+    required String code,
+  }) async {
+    if (phone.isEmpty || code.isEmpty) throw Exception('Empty');
+    return const LoginResponse(token: 'fake_sms_token');
+  }
+
+  @override
+  Future<LoginResponse> loginWithWechat({
+    required String code,
+    String? nickname,
+  }) async {
+    if (code.isEmpty) throw Exception('Empty');
+    return const LoginResponse(token: 'fake_wechat_token');
   }
 }
 
@@ -67,8 +95,9 @@ void main() {
   test('initial state is correct', () async {
     await container.read(loginControllerProvider.future);
     final AuthUiModel state = controller.state.requireValue;
-    expect(state.user, isNull);
-    expect(state.rememberMe, isFalse);
+    expect(state.user?.email, isEmpty);
+    expect(state.user?.password, isEmpty);
+    expect(state.rememberMe, isTrue);
     expect(state.showPassword, isFalse);
   });
 

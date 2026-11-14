@@ -5,7 +5,6 @@ import 'package:hive_ce/hive.dart';
 
 import '../library/presentation/library_mock_data.dart';
 import '../player/presentation/asr_subtitle_job.dart';
-import '../player/presentation/asr_subtitle_service.dart';
 import '../settings/presentation/settings_provider.dart';
 import 'subtitle_completion_background.dart';
 import 'subtitle_completion_enqueue.dart';
@@ -13,7 +12,7 @@ import 'subtitle_completion_queue.dart';
 import 'subtitle_completion_worker.dart';
 
 /// Foreground runner: while the app is open, drains the subtitle completion
-/// queue one episode at a time (paused only during active video playback).
+/// queue one episode at a time (keeps draining during playback).
 class SubtitleCompletionScheduler with WidgetsBindingObserver {
   SubtitleCompletionScheduler._();
 

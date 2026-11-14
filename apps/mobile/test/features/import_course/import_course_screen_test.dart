@@ -70,7 +70,7 @@ void main() {
     await tester.pump();
     await tester.pumpAndSettle();
 
-    expect(find.textContaining('智能导入课程成功'), findsOneWidget);
+    expect(find.textContaining('导入成功：'), findsOneWidget);
   });
 
   testWidgets('import screen no longer shows cover generation progress while importing', (

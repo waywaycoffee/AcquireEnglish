@@ -192,10 +192,13 @@ class SubtitleCompletionWorker {
       throw StateError('语音识别未产出可用英文字幕');
     }
 
-    final bool chineseStillMissing = bundle.sentences.every(
-      (SubtitleSentence s) => !looksChinese(s.chinese),
+    // Fill any EN cue still missing ZH — including partial official Chinese
+    // tracks (every() wrongly skipped translation when a few lines already had ZH).
+    final bool anyChineseMissing = bundle.sentences.any(
+      (SubtitleSentence s) =>
+          looksEnglish(s.english) && !looksChinese(s.chinese),
     );
-    if ((job.needChinese || chineseStillMissing) && chineseStillMissing) {
+    if (job.needChinese || anyChineseMissing) {
       onProgress?.call(job.episodeId, '正在翻译中文字幕…');
       bundle = await _fillBundleChinese(
         bundle: bundle,

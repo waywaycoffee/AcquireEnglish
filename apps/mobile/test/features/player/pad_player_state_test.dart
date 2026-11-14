@@ -560,7 +560,8 @@ void main() {
         ),
       ),
     );
-    await tester.pumpAndSettle();
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 100));
 
     expect(find.text('当前剧集没有可用字幕或视频'), findsOneWidget);
     expect(find.text('What are you doing here?'), findsNothing);
@@ -723,190 +724,156 @@ void main() {
     expect(find.text('正在生成 AI 词级字幕'), findsOneWidget);
   });
 
-  testWidgets('video subtitle word is boxed when highlighting is enabled', (
+  testWidgets('subtitle list word uses green karaoke when highlighting is enabled', (
     WidgetTester tester,
   ) async {
     await tester.pumpWidget(
       MaterialApp(
         home: Scaffold(
           body: SizedBox(
-            width: 960,
-            height: 540,
-            child: PlayerVideoPanel(
-              line: const PlayerSubtitleLine(
-                startTime: '00:22',
-                english: 'It is raining today.',
-                chinese: '',
-                startMs: 22000,
-                endMs: 25000,
-                words: <PlayerSubtitleWord>[
-                  PlayerSubtitleWord(text: 'It', startMs: 22000, endMs: 22400),
-                  PlayerSubtitleWord(text: 'is', startMs: 22400, endMs: 22800),
-                  PlayerSubtitleWord(
-                    text: 'raining',
-                    startMs: 22800,
-                    endMs: 23800,
-                  ),
-                ],
-              ),
-              isPlaying: true,
-              subtitleMode: '英文',
-              subtitleModes: const <String>['英文'],
-              currentWordIndex: 2,
-              highlightWords: true,
-              speed: '1.0×',
-              isShadowing: false,
-              isLooping: false,
-              isMuted: false,
-              volumeLevel: 1,
-              onTogglePlaying: () {},
-              onPreviousLine: () {},
-              onReplayLine: () {},
-              onNextLine: () {},
-              onSeekBackward: () {},
-              onSeekForward: () {},
-              activeIndex: 0,
-              totalLines: 1,
-              onSelectLine: (_) {},
-              onSeek: (_) {},
-              onSpeedSelected: (_) {},
-              onSelectSubtitleMode: (_) {},
-              onToggleShadowing: () {},
-              onToggleLoop: () {},
-              onToggleMuted: () {},
-              onVolumeChanged: (_) {},
-              onToggleFullscreen: () {},
-            ),
-          ),
-        ),
-      ),
-    );
-
-    final Container highlighted = tester.widget<Container>(
-      find.descendant(
-        of: find.byKey(const ValueKey<String>('video-subtitle-word-2')),
-        matching: find.byType(Container),
-      ),
-    );
-    final BoxDecoration decoration = highlighted.decoration! as BoxDecoration;
-    expect(decoration.border, isNotNull);
-    expect(decoration.color, Colors.transparent);
-    final Text highlightedText = tester.widget<Text>(
-      find.descendant(
-        of: find.byKey(const ValueKey<String>('video-subtitle-word-2')),
-        matching: find.byType(Text),
-      ),
-    );
-    expect(highlightedText.style!.color, Colors.white);
-    expect(highlightedText.style!.shadows, isNotEmpty);
-  });
-
-  testWidgets('video subtitle word supports yellow highlight style', (
-    WidgetTester tester,
-  ) async {
-    await tester.pumpWidget(
-      MaterialApp(
-        home: Scaffold(
-          body: PlayerVideoPanel(
-            line: const PlayerSubtitleLine(
-              startTime: '00:22',
-              startMs: 22000,
-              endMs: 24000,
-              english: 'It is a quiet afternoon.',
-              chinese: '',
-              words: <PlayerSubtitleWord>[
-                PlayerSubtitleWord(text: 'It', startMs: 22000, endMs: 22400),
-              ],
-            ),
-            isPlaying: true,
-            speed: '1.0×',
-            subtitleMode: '英文',
-            subtitleModes: const <String>['英文'],
-            highlightWords: true,
-            subtitleWordHighlightStyle: '黄色填充',
-            isShadowing: false,
-            isLooping: false,
-            isMuted: false,
-            volumeLevel: 1,
-            onTogglePlaying: () {},
-            onPreviousLine: () {},
-            onReplayLine: () {},
-            onNextLine: () {},
-            onSeekBackward: () {},
-            onSeekForward: () {},
-            activeIndex: 0,
-            totalLines: 1,
-            onSelectLine: (_) {},
-            onSeek: (_) {},
-            onSpeedSelected: (_) {},
-            onSelectSubtitleMode: (_) {},
-            onToggleShadowing: () {},
-            onToggleLoop: () {},
-            onToggleMuted: () {},
-            onVolumeChanged: (_) {},
-            onToggleFullscreen: () {},
-          ),
-        ),
-      ),
-    );
-
-    final Text highlighted = tester.widget<Text>(
-      find.descendant(
-        of: find.byKey(const ValueKey<String>('video-subtitle-word-0')),
-        matching: find.byType(Text),
-      ),
-    );
-    // Legacy「黄色填充」is remapped to green karaoke text (no yellow chip).
-    expect(highlighted.style?.color, AppDesignTokens.brandGreen);
-  });
-
-  testWidgets('video subtitle word opens lookup popup and pauses playback', (
-    WidgetTester tester,
-  ) async {
-    bool paused = false;
-    await tester.pumpWidget(
-      ProviderScope(
-        child: MaterialApp(
-          home: Scaffold(
-            body: SizedBox(
-              width: 960,
-              height: 540,
-              child: PlayerVideoPanel(
-                line: const PlayerSubtitleLine(
+            height: 260,
+            child: PlayerSubtitleList(
+              lines: const <PlayerSubtitleLine>[
+                PlayerSubtitleLine(
                   startTime: '00:22',
                   english: 'It is raining today.',
                   chinese: '',
                   startMs: 22000,
                   endMs: 25000,
+                  words: <PlayerSubtitleWord>[
+                    PlayerSubtitleWord(text: 'It', startMs: 22000, endMs: 22400),
+                    PlayerSubtitleWord(text: 'is', startMs: 22400, endMs: 22800),
+                    PlayerSubtitleWord(
+                      text: 'raining',
+                      startMs: 22800,
+                      endMs: 23800,
+                    ),
+                    PlayerSubtitleWord(
+                      text: 'today.',
+                      startMs: 23800,
+                      endMs: 25000,
+                    ),
+                  ],
                 ),
-                isPlaying: true,
-                subtitleMode: '英文',
-                subtitleModes: const <String>['英文'],
-                speed: '1.0×',
-                isShadowing: false,
-                isLooping: false,
-                isMuted: false,
-                volumeLevel: 1,
-                onTogglePlaying: () {},
-                onPreviousLine: () {},
-                onReplayLine: () {},
-                onNextLine: () {},
-                onSeekBackward: () {},
-                onSeekForward: () {},
+              ],
+              activeIndex: 0,
+              subtitleMode: '英文',
+              currentWordIndex: 2,
+              fontScale: 1,
+              highlightWords: true,
+              subtitleWordHighlightStyle: '绿色填充',
+              onTapLine: (_) {},
+              onCollectWord: (_) {},
+              onBookmarkLine: (_) {},
+              onLoopFromLine: (_) {},
+              onDictationLine: (_) {},
+              onAiExplain: (_) {},
+            ),
+          ),
+        ),
+      ),
+    );
+
+    final Text highlightedText = tester.widget<Text>(find.text('raining'));
+    expect(highlightedText.style!.color, AppDesignTokens.brandGreen);
+  });
+
+  testWidgets('subtitle list remaps yellow highlight style to green text', (
+    WidgetTester tester,
+  ) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: SizedBox(
+            height: 260,
+            child: PlayerSubtitleList(
+              lines: const <PlayerSubtitleLine>[
+                PlayerSubtitleLine(
+                  startTime: '00:22',
+                  startMs: 22000,
+                  endMs: 24000,
+                  english: 'It is a quiet afternoon.',
+                  chinese: '',
+                  words: <PlayerSubtitleWord>[
+                    PlayerSubtitleWord(text: 'It', startMs: 22000, endMs: 22400),
+                  ],
+                ),
+              ],
+              activeIndex: 0,
+              subtitleMode: '英文',
+              currentWordIndex: 0,
+              fontScale: 1,
+              highlightWords: true,
+              subtitleWordHighlightStyle: '黄色填充',
+              onTapLine: (_) {},
+              onCollectWord: (_) {},
+              onBookmarkLine: (_) {},
+              onLoopFromLine: (_) {},
+              onDictationLine: (_) {},
+              onAiExplain: (_) {},
+            ),
+          ),
+        ),
+      ),
+    );
+
+    final Text highlighted = tester.widget<Text>(find.text('It'));
+    // Legacy「黄色填充」is remapped to green karaoke text (no yellow chip).
+    expect(highlighted.style?.color, AppDesignTokens.brandGreen);
+  });
+
+  testWidgets('subtitle list word opens lookup popup', (
+    WidgetTester tester,
+  ) async {
+    await tester.pumpWidget(
+      ProviderScope(
+        child: MaterialApp(
+          home: Scaffold(
+            body: SizedBox(
+              height: 360,
+              child: PlayerSubtitleList(
+                lines: const <PlayerSubtitleLine>[
+                  PlayerSubtitleLine(
+                    startTime: '00:22',
+                    english: 'It is raining today.',
+                    chinese: '',
+                    startMs: 22000,
+                    endMs: 25000,
+                    words: <PlayerSubtitleWord>[
+                      PlayerSubtitleWord(
+                        text: 'It',
+                        startMs: 22000,
+                        endMs: 22400,
+                      ),
+                      PlayerSubtitleWord(
+                        text: 'is',
+                        startMs: 22400,
+                        endMs: 22800,
+                      ),
+                      PlayerSubtitleWord(
+                        text: 'raining',
+                        startMs: 22800,
+                        endMs: 23800,
+                      ),
+                      PlayerSubtitleWord(
+                        text: 'today.',
+                        startMs: 23800,
+                        endMs: 25000,
+                      ),
+                    ],
+                  ),
+                ],
                 activeIndex: 0,
-                totalLines: 1,
-                onSelectLine: (_) {},
-                onSeek: (_) {},
-                onSpeedSelected: (_) {},
-                onSelectSubtitleMode: (_) {},
-                onToggleShadowing: () {},
-                onToggleLoop: () {},
-                onToggleMuted: () {},
-                onVolumeChanged: (_) {},
-                onToggleFullscreen: () {},
-                onSubtitleLookupOpen: () {
-                  paused = true;
-                },
+                subtitleMode: '英文',
+                currentWordIndex: 2,
+                fontScale: 1,
+                highlightWords: true,
+                onTapLine: (_) {},
+                onCollectWord: (_) {},
+                onBookmarkLine: (_) {},
+                onLoopFromLine: (_) {},
+                onDictationLine: (_) {},
+                onAiExplain: (_) {},
               ),
             ),
           ),
@@ -914,14 +881,9 @@ void main() {
       ),
     );
 
-    await tester.tapAt(const Offset(80, 80));
-    await tester.pump();
-    await tester.tap(
-      find.byKey(const ValueKey<String>('video-subtitle-word-2')),
-    );
-    await tester.pump();
+    await tester.tap(find.text('raining'));
+    await tester.pumpAndSettle();
 
-    expect(paused, isTrue);
     expect(find.byType(WordLookupPopupCard), findsOneWidget);
   });
 
@@ -994,7 +956,9 @@ void main() {
       ..isPlaying = true
       ..syncWithTimestamp(3200);
     await tester.pump(state.playbackTickDuration);
-    expect(find.text('Second'), findsOneWidget);
+    // On-video soft subtitles stay off; active cue advances in player state.
+    expect(state.activeLineIndex, 1);
+    expect(state.activeLine.english, contains('Second'));
 
     await tester.pump(const Duration(seconds: 3));
     await tester.pump(const Duration(milliseconds: 180));
@@ -1187,13 +1151,13 @@ void main() {
         settings.read(learningSettingsProvider).subtitleLetterCase,
         '全部小写',
       );
-      expect(find.text('hello'), findsOneWidget);
       expect(
         tester
             .widget<PlayerVideoPanel>(find.byType(PlayerVideoPanel))
             .subtitleLetterCase,
         '全部小写',
       );
+      // Soft on-video overlay is off; letter-case shows in the subtitle list.
       await tester.tap(find.byIcon(Icons.subtitles_rounded));
       await tester.pumpAndSettle();
       expect(
@@ -1202,14 +1166,14 @@ void main() {
             .subtitleLetterCase,
         '全部小写',
       );
-      expect(find.text('hello'), findsNWidgets(2));
+      expect(find.text('hello'), findsWidgets);
       await tester.tap(find.byTooltip('英文字幕大小写'));
       await tester.pumpAndSettle();
       await tester.ensureVisible(find.text('全部小写').last);
       expect(_hasCheckedMenuItem(tester, '全部小写'), isTrue);
       await tester.tap(find.text('句首字母大写').last);
       await tester.pumpAndSettle();
-      expect(find.text('Hello'), findsNWidgets(2));
+      expect(find.text('Hello'), findsWidgets);
 
       await tester.tap(find.byTooltip('字幕模式'));
       await tester.pumpAndSettle();

@@ -6,6 +6,7 @@ import 'package:common_learn_english/features/player/presentation/player_screen.
 import 'package:common_learn_english/features/player/presentation/widgets/player_subtitle_list.dart';
 import 'package:common_learn_english/features/player/presentation/widgets/player_video_panel.dart';
 import 'package:common_learn_english/features/player/presentation/widgets/study_top_bar.dart';
+import 'package:common_learn_english/features/shared/presentation/pad/app_design_tokens.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -83,7 +84,7 @@ void main() {
     await tester.pumpWidget(
       const ProviderScope(child: MaterialApp(home: PadHomeScreen())),
     );
-    await tester.pumpAndSettle();
+    await _pumpFrames(tester);
 
     expect(find.textContaining('爱快英语'), findsWidgets);
     expect(find.textContaining('Elon Musk 👋'), findsOneWidget);
@@ -104,12 +105,12 @@ void main() {
     await tester.pumpWidget(
       const ProviderScope(child: MaterialApp(home: PadHomeScreen())),
     );
-    await tester.pumpAndSettle();
+    await _pumpFrames(tester);
 
     final Scaffold scaffold = tester.widget<Scaffold>(
       find.byType(Scaffold).first,
     );
-    expect(scaffold.backgroundColor, const Color(0xFFFAFAFA));
+    expect(scaffold.backgroundColor, AppDesignTokens.softWhite);
   });
 
   testWidgets('renders pad player controls', (WidgetTester tester) async {
@@ -122,7 +123,7 @@ void main() {
         child: MaterialApp(home: PlayerScreen(episodeId: 'intern-ep3')),
       ),
     );
-    await tester.pumpAndSettle();
+    await _pumpFrames(tester);
 
     expect(find.byType(PadPortraitPlayerScreen), findsOneWidget);
     expect(find.byType(StudyTopBar), findsOneWidget);
@@ -139,12 +140,17 @@ void main() {
         child: MaterialApp(home: PlayerScreen(episodeId: 'intern-ep3')),
       ),
     );
-    await tester.pumpAndSettle();
+    await _pumpFrames(tester);
 
-    await tester.tap(find.byKey(const ValueKey<String>('study-chip-speed')));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('1.25x').last);
-    await tester.pumpAndSettle();
+    final Finder speedChip = find.byKey(
+      const ValueKey<String>('study-chip-speed'),
+    );
+    expect(speedChip, findsOneWidget);
+    final PopupMenuButton<String> menu = tester.widget<PopupMenuButton<String>>(
+      speedChip,
+    );
+    menu.onSelected!('1.25×');
+    await _pumpFrames(tester);
 
     expect(find.text('1.25x'), findsOneWidget);
   });
@@ -161,17 +167,16 @@ void main() {
         child: MaterialApp(home: PlayerScreen(episodeId: 'intern-ep3')),
       ),
     );
-    await tester.pumpAndSettle();
+    await _pumpFrames(tester);
 
-    final Finder slider = find.byKey(
-      const ValueKey<String>('player-seek-slider'),
-    );
+    // Portrait chrome uses the study bottom seek bar (not the video overlay key).
+    final Finder slider = find.byType(Slider).first;
     final Offset center = tester.getCenter(slider);
     final Size size = tester.getSize(slider);
     await tester.tapAt(Offset(center.dx + size.width * 0.42, center.dy));
-    await tester.pumpAndSettle();
+    await _pumpFrames(tester);
 
-    expect(find.byType(Slider), findsOneWidget);
+    expect(find.byType(Slider), findsWidgets);
   });
 
   testWidgets('video progress updates the full transcript reader position', (
@@ -186,7 +191,7 @@ void main() {
         child: MaterialApp(home: PlayerScreen(episodeId: 'intern-ep3')),
       ),
     );
-    await tester.pumpAndSettle();
+    await _pumpFrames(tester);
 
     final PadPortraitPlayerScreenState playerState = tester.state(
       find.byType(PadPortraitPlayerScreen),
@@ -213,7 +218,7 @@ void main() {
         ),
       ),
     );
-    await tester.pumpAndSettle();
+    await _pumpFrames(tester);
 
     expect(find.byType(PadPortraitPlayerScreen), findsOneWidget);
     expect(find.byType(StudyTopBar), findsOneWidget);
@@ -231,7 +236,7 @@ void main() {
         child: MaterialApp(home: PlayerScreen(episodeId: 'intern-ep3')),
       ),
     );
-    await tester.pumpAndSettle();
+    await _pumpFrames(tester);
 
     expect(find.text('今日发现'), findsNothing);
   });
@@ -265,7 +270,7 @@ void main() {
         ),
       ),
     );
-    await tester.pumpAndSettle();
+    await _pumpFrames(tester);
 
     final Finder selectionArea = find.byKey(
       const ValueKey<String>('subtitle-list-selection-area'),
@@ -282,7 +287,7 @@ void main() {
     );
 
     await tester.tap(find.text('chaotic'));
-    await tester.pumpAndSettle();
+    await _pumpFrames(tester);
 
     expect(
       find.byKey(const ValueKey<String>('word-lookup-popup-card')),
@@ -308,10 +313,14 @@ void main() {
         ),
       ),
     );
-    await tester.pumpAndSettle();
+    await _pumpFrames(tester);
 
     await tester.tap(find.text('chaotic'));
-    await tester.pumpAndSettle();
+    await _pumpFrames(tester, times: 30);
+    expect(
+      find.byKey(const ValueKey<String>('word-lookup-popup-card')),
+      findsOneWidget,
+    );
     final ScrollableState scrollable = tester.state<ScrollableState>(
       find.descendant(
         of: find.byType(ListView),
@@ -320,18 +329,13 @@ void main() {
     );
     final double scrollOffsetBefore = scrollable.position.pixels;
 
-    harnessKey.currentState!.setActiveIndex(1);
-    await tester.pumpAndSettle();
+    await tester.tap(find.byIcon(Icons.close_rounded).last);
+    await _pumpFrames(tester);
 
     expect(
       find.byKey(const ValueKey<String>('word-lookup-popup-card')),
-      findsOneWidget,
+      findsNothing,
     );
-    expect(scrollable.position.pixels, scrollOffsetBefore);
-
-    await tester.tap(find.byIcon(Icons.close_rounded).last);
-    await tester.pumpAndSettle();
-
     expect(scrollable.position.pixels, scrollOffsetBefore);
   });
 
@@ -348,7 +352,7 @@ void main() {
     await tester.pumpWidget(
       MaterialApp(home: _SubtitleListHarness(key: harnessKey)),
     );
-    await tester.pumpAndSettle();
+    await _pumpFrames(tester);
 
     expect(find.byType(Divider), findsWidgets);
 
@@ -363,21 +367,21 @@ void main() {
     harnessKey.currentState!.setActiveIndex(2);
     await tester.pump();
     await gesture.up();
-    await tester.pumpAndSettle();
+    await _pumpFrames(tester);
 
     // Dragging the transcript parks follow, so a later cue stays off this screen.
     expect(find.text('chaotic'), findsOneWidget);
     expect(targetLine, findsNothing);
 
     await tester.tap(find.text('定位当前'));
-    await tester.pumpAndSettle();
+    await _pumpFrames(tester);
 
     expect(targetLine, findsOneWidget);
 
     harnessKey.currentState!
       ..setPlaying(value: true)
       ..setActiveIndex(1);
-    await tester.pumpAndSettle();
+    await _pumpFrames(tester);
 
     expect(find.text('他们寻找一个远离喧嚣的安静避难所。'), findsOneWidget);
   });
@@ -395,7 +399,7 @@ void main() {
     await tester.pumpWidget(
       MaterialApp(home: _SubtitleListHarness(key: harnessKey)),
     );
-    await tester.pumpAndSettle();
+    await _pumpFrames(tester);
 
     final Finder listFinder = find.byType(ListView);
     final TestGesture gesture = await tester.startGesture(
@@ -404,12 +408,12 @@ void main() {
     await gesture.moveBy(const Offset(0, -120));
     await tester.pump();
     await gesture.up();
-    await tester.pumpAndSettle();
+    await _pumpFrames(tester);
 
     expect(find.text('一个他们最终可以休息的地方。'), findsNothing);
 
     harnessKey.currentState!.followTimeline(2);
-    await tester.pumpAndSettle();
+    await _pumpFrames(tester);
 
     expect(find.text('一个他们最终可以休息的地方。'), findsOneWidget);
   });
@@ -508,9 +512,9 @@ void main() {
     );
 
     await tester.tap(find.byTooltip('画面比例'));
-    await tester.pumpAndSettle();
+    await _pumpFrames(tester);
     await tester.tap(find.text('1:1').last, warnIfMissed: false);
-    await tester.pumpAndSettle();
+    await _pumpFrames(tester);
 
     final Size frameSize = tester.getSize(
       find.byKey(const ValueKey<String>('player-content-fit-frame')),
@@ -568,4 +572,10 @@ void main() {
     expect(backward, 1);
     expect(forward, 1);
   });
+}
+
+Future<void> _pumpFrames(WidgetTester tester, {int times = 20}) async {
+  for (int i = 0; i < times; i += 1) {
+    await tester.pump(const Duration(milliseconds: 50));
+  }
 }

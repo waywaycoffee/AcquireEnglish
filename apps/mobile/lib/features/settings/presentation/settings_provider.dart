@@ -15,6 +15,15 @@ import '../../sync/data/acquire_api_client.dart';
 export '../../shared/domain/subtitle_letter_case.dart'
     show subtitleLetterCaseOptions;
 
+/// Fixes the historical typo host `caurlhairai` → `curlhairai` (breaks DNS).
+String fixCurlhairaiTypoHost(String raw) {
+  final String value = raw.trim();
+  if (value.isEmpty || !value.contains('caurlhairai')) {
+    return value;
+  }
+  return value.replaceAll('caurlhairai', 'curlhairai');
+}
+
 const List<double> ttsRateOptions = <double>[
   0.5,
   0.75,
@@ -600,19 +609,23 @@ class LearningSettingsNotifier extends Notifier<LearningSettingsState> {
         );
       }
       // Typo host that breaks DNS (caurlhairai → curlhairai).
-      final String pipelineUrl = coerced.oralCoachPipelineUrl.trim();
-      if (pipelineUrl.contains('caurlhairai')) {
-        coerced = coerced.copyWith(
-          oralCoachPipelineUrl: pipelineUrl.replaceAll(
-            'caurlhairai',
-            'curlhairai',
-          ),
-        );
-      }
+      coerced = coerced.copyWith(
+        oralCoachPipelineUrl: fixCurlhairaiTypoHost(
+          coerced.oralCoachPipelineUrl,
+        ),
+        oralCoachServerUrl: fixCurlhairaiTypoHost(coerced.oralCoachServerUrl),
+        voicePracticeServerUrl: fixCurlhairaiTypoHost(
+          coerced.voicePracticeServerUrl,
+        ),
+        cloudApiBaseUrl: fixCurlhairaiTypoHost(coerced.cloudApiBaseUrl),
+      );
       _scheduleApplyCloudApiBase(coerced);
       if (coerced.asrProvider != loaded.asrProvider ||
           coerced.liveKitUrl != loaded.liveKitUrl ||
-          coerced.oralCoachPipelineUrl != loaded.oralCoachPipelineUrl) {
+          coerced.oralCoachPipelineUrl != loaded.oralCoachPipelineUrl ||
+          coerced.oralCoachServerUrl != loaded.oralCoachServerUrl ||
+          coerced.voicePracticeServerUrl != loaded.voicePracticeServerUrl ||
+          coerced.cloudApiBaseUrl != loaded.cloudApiBaseUrl) {
         Future.microtask(() {
           if (!ref.mounted) {
             return;

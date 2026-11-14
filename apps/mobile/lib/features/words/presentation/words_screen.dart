@@ -372,11 +372,11 @@ class _WordCard extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final String translation =
         entry.definitionCn ?? entry.offlineDefinitionCn ?? '暂无释义';
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(14),
-      ),
+    // Material (not DecoratedBox) so InkWell splash paints correctly.
+    return Material(
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(14),
+      clipBehavior: Clip.antiAlias,
       child: InkWell(
         borderRadius: BorderRadius.circular(14),
         onTap: () => _openDetails(context),

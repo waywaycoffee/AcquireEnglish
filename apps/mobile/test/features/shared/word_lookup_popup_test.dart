@@ -23,8 +23,8 @@ void main() {
       await tester.pumpWidget(_popup(container));
       await tester.pumpAndSettle();
 
-      final Finder favorite = find.byTooltip('收藏单词');
-      expect(find.text('收藏单词'), findsNothing);
+      final Finder favorite = find.byTooltip('收藏到词卡');
+      expect(find.text('收藏到词卡'), findsNothing);
       expect(find.text('加入短语库'), findsNothing);
       expect(find.text('播放发音'), findsNothing);
       expect(favorite.hitTestable(), findsOneWidget);
@@ -65,7 +65,7 @@ void main() {
     addTearDown(container.dispose);
     await tester.pumpWidget(_popup(container, rawWord: 'Sanctuary,'));
     await tester.pumpAndSettle();
-    await tester.tap(find.byTooltip('收藏单词'));
+    await tester.tap(find.byTooltip('收藏到词卡'));
     await tester.pumpAndSettle();
 
     expect(find.byTooltip('取消收藏'), findsOneWidget);
@@ -90,19 +90,19 @@ void main() {
 
     await tester.tap(find.byTooltip('取消收藏'));
     await tester.pumpAndSettle();
-    expect(find.byTooltip('收藏单词'), findsOneWidget);
+    expect(find.byTooltip('收藏到词卡'), findsOneWidget);
     expect(find.byIcon(Icons.bookmark_border), findsOneWidget);
     expect(container.read(wordBookProvider).single.favorite, isFalse);
     expect(container.read(wordBookProvider).single.occurrences, hasLength(1));
 
-    await tester.tap(find.byTooltip('收藏单词'));
+    await tester.tap(find.byTooltip('收藏到词卡'));
     await tester.pumpAndSettle();
     expect(find.byTooltip('取消收藏'), findsOneWidget);
     expect(container.read(wordBookProvider).single.favorite, isTrue);
 
     container.read(wordBookProvider.notifier).toggleFavorite('sanctuary');
     await tester.pumpAndSettle();
-    expect(find.byTooltip('收藏单词'), findsOneWidget);
+    expect(find.byTooltip('收藏到词卡'), findsOneWidget);
   });
 
   testWidgets('lookup without a favorite action keeps existing controls', (
@@ -113,7 +113,7 @@ void main() {
     await tester.pumpWidget(_popup(container, canFavorite: false));
     await tester.pumpAndSettle();
 
-    expect(find.byTooltip('收藏单词'), findsNothing);
+    expect(find.byTooltip('收藏到词卡'), findsNothing);
     expect(find.byTooltip('取消收藏'), findsNothing);
     await tester.drag(
       find.byType(SingleChildScrollView),
@@ -246,7 +246,7 @@ void main() {
       tester.getSize(find.byType(WordLookupPopupCard)).width,
       WordLookupPopupCard.preferredWidth,
     );
-    expect(find.byTooltip('收藏单词').hitTestable(), findsOneWidget);
+    expect(find.byTooltip('收藏到词卡').hitTestable(), findsOneWidget);
     expect(find.byTooltip('加入短语库').hitTestable(), findsOneWidget);
     expect(find.byTooltip('播放发音').hitTestable(), findsOneWidget);
     expect(tester.takeException(), isNull);

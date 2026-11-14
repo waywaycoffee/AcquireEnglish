@@ -37,7 +37,7 @@ void main() {
       await tester.tap(find.text('导出所选'));
       await _pumpFrames(tester);
       final Directory exportDirectory = Directory(
-        '${fixture.downloads.path}${Platform.pathSeparator}Shadowing English'
+        '${fixture.downloads.path}${Platform.pathSeparator}AcquireEnglish'
         '${Platform.pathSeparator}AI Subtitles',
       );
       expect(

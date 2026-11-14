@@ -1708,6 +1708,8 @@ void main() {
 
 LearningSettingsState _settings() {
   return LearningSettingsState.defaults().copyWith(
+    // Cloud mock path — avoid LocalWhisperAsr.ensureModel / path_provider.
+    asrProvider: '阿里云百炼',
     asrApiKey: 'demo-key',
     asrBaseUrl: 'https://api.example.com/v1',
     asrModel: 'whisper-1',

@@ -15,7 +15,7 @@ void main() {
   testWidgets(
     'speech speed menu includes two, two-and-a-half, and three times',
     (WidgetTester tester) async {
-      tester.view.physicalSize = const Size(1366, 1024);
+      tester.view.physicalSize = const Size(1366, 8000);
       tester.view.devicePixelRatio = 1;
       addTearDown(tester.view.reset);
       int credentialInitializations = 0;
@@ -63,7 +63,7 @@ void main() {
   testWidgets(
     'voice preview uses current voice and rate, stops on selection and navigation',
     (WidgetTester tester) async {
-      tester.view.physicalSize = const Size(1366, 1024);
+      tester.view.physicalSize = const Size(1366, 8000);
       tester.view.devicePixelRatio = 1;
       addTearDown(tester.view.reset);
       final List<(String, String, double)> requests =
@@ -165,7 +165,7 @@ void main() {
   testWidgets('voice preview reports a failure and can be retried', (
     WidgetTester tester,
   ) async {
-    tester.view.physicalSize = const Size(1366, 1024);
+    tester.view.physicalSize = const Size(1366, 8000);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.reset);
     await tester.pumpWidget(
@@ -206,7 +206,7 @@ void main() {
   testWidgets('subtitle letter case can be changed from playback settings', (
     WidgetTester tester,
   ) async {
-    tester.view.physicalSize = const Size(1366, 1024);
+    tester.view.physicalSize = const Size(1366, 8000);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.reset);
     final ProviderContainer container = ProviderContainer();
@@ -239,7 +239,7 @@ void main() {
   testWidgets('settings screen shows prototype sections', (
     WidgetTester tester,
   ) async {
-    tester.view.physicalSize = const Size(1366, 1024);
+    tester.view.physicalSize = const Size(1366, 8000);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.reset);
 
@@ -272,7 +272,7 @@ void main() {
   testWidgets('settings screen shows AI translation fields for OpenAI', (
     WidgetTester tester,
   ) async {
-    tester.view.physicalSize = const Size(1366, 1024);
+    tester.view.physicalSize = const Size(1366, 8000);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.reset);
 
@@ -295,7 +295,7 @@ void main() {
   testWidgets('settings screen shows DeepSeek as AI provider option', (
     WidgetTester tester,
   ) async {
-    tester.view.physicalSize = const Size(1366, 1024);
+    tester.view.physicalSize = const Size(1366, 8000);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.reset);
 
@@ -314,7 +314,7 @@ void main() {
   testWidgets('settings screen shows direct translation fields for baidu', (
     WidgetTester tester,
   ) async {
-    tester.view.physicalSize = const Size(1366, 1024);
+    tester.view.physicalSize = const Size(1366, 8000);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.reset);
 
@@ -336,7 +336,7 @@ void main() {
   testWidgets('settings screen shows fetched models dropdown for AI provider', (
     WidgetTester tester,
   ) async {
-    tester.view.physicalSize = const Size(1366, 1024);
+    tester.view.physicalSize = const Size(1366, 8000);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.reset);
 
@@ -370,7 +370,7 @@ void main() {
   testWidgets('OpenAI remains in translation but is removed from ASR choices', (
     WidgetTester tester,
   ) async {
-    tester.view.physicalSize = const Size(1366, 1024);
+    tester.view.physicalSize = const Size(1366, 8000);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.reset);
     await tester.pumpWidget(
@@ -410,7 +410,7 @@ void main() {
           .widget<DropdownButton<String>>(asr)
           .items!
           .map((DropdownMenuItem<String> item) => item.value),
-      <String>['阿里云百炼', '腾讯云'],
+      <String>['本地 Whisper', '阿里云百炼', '腾讯云'],
     );
     expect(find.text('获取 ASR 模型'), findsNothing);
     expect(tester.takeException(), isNull);
@@ -419,7 +419,7 @@ void main() {
   testWidgets('settings links to AI subtitle management', (
     WidgetTester tester,
   ) async {
-    tester.view.physicalSize = const Size(1366, 1024);
+    tester.view.physicalSize = const Size(1366, 8000);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.reset);
 

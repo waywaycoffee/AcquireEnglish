@@ -81,8 +81,7 @@ Future<SubtitleCompletionNeed> detectSubtitleCompletionNeed({
     idKey: sourceKey,
     fileName: 'zh.srt',
   );
-  final bool hasZh = isUsableSubtitlePath(zhPath);
-  // Official EN path may exist but be empty / unreadable — treat as missing.
+  // Official paths may exist but be empty / unreadable — treat as missing.
   bool hasReliableEn = reliableEn;
   if (hasReliableEn && enSubtitlePath != null) {
     try {
@@ -92,6 +91,17 @@ Future<SubtitleCompletionNeed> detectSubtitleCompletionNeed({
       }
     } catch (_) {
       hasReliableEn = false;
+    }
+  }
+  bool hasZh = isUsableSubtitlePath(zhPath);
+  if (hasZh && zhPath != null) {
+    try {
+      final File zhFile = File(zhPath.trim());
+      if (!zhFile.existsSync() || zhFile.lengthSync() < 16) {
+        hasZh = false;
+      }
+    } catch (_) {
+      hasZh = false;
     }
   }
 

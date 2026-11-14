@@ -147,4 +147,70 @@ void main() {
     expect(fused.first.english, 'Hello everyone');
     expect(fused.first.chinese, '甲');
   });
+
+  test('workingEnglishMismatchesAsr rebuilds when 2/2 overlaps disagree', () {
+    final List<PlayerSubtitleLine> working = <PlayerSubtitleLine>[
+      const PlayerSubtitleLine(
+        startTime: '00:01',
+        english: 'Wrong paraphrase one',
+        chinese: '错一',
+        startMs: 1000,
+        endMs: 3000,
+      ),
+      const PlayerSubtitleLine(
+        startTime: '00:03',
+        english: 'Wrong paraphrase two',
+        chinese: '错二',
+        startMs: 3000,
+        endMs: 5000,
+      ),
+    ];
+    final List<PlayerSubtitleLine> asr = <PlayerSubtitleLine>[
+      const PlayerSubtitleLine(
+        startTime: '00:01',
+        english: 'Hello everyone',
+        chinese: '',
+        startMs: 1000,
+        endMs: 3000,
+      ),
+      const PlayerSubtitleLine(
+        startTime: '00:03',
+        english: 'Welcome back',
+        chinese: '',
+        startMs: 3000,
+        endMs: 5000,
+      ),
+    ];
+    expect(
+      workingEnglishMismatchesAsr(working: working, asrLines: asr),
+      isTrue,
+    );
+  });
+
+  test('rebuildBilingualFromAsrLines attaches Chinese on short cues', () {
+    final List<PlayerSubtitleLine> working = <PlayerSubtitleLine>[
+      const PlayerSubtitleLine(
+        startTime: '00:01',
+        english: 'Oh',
+        chinese: '哦',
+        startMs: 1000,
+        endMs: 1150,
+      ),
+    ];
+    final List<PlayerSubtitleLine> asr = <PlayerSubtitleLine>[
+      const PlayerSubtitleLine(
+        startTime: '00:01',
+        english: 'Oh.',
+        chinese: '',
+        startMs: 1000,
+        endMs: 1150,
+      ),
+    ];
+    final List<PlayerSubtitleLine> rebuilt = rebuildBilingualFromAsrLines(
+      working: working,
+      asrLines: asr,
+    );
+    expect(rebuilt.single.english, 'Oh.');
+    expect(rebuilt.single.chinese, '哦');
+  });
 }
