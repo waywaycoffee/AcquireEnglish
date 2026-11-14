@@ -1726,7 +1726,11 @@ class BilibiliImportService {
           continue;
         }
         if (treatAsEn) {
-          enPath = path;
+          if (_srtLooksChineseOnly(path)) {
+            zhPath = path;
+          } else {
+            enPath = path;
+          }
         } else {
           zhPath = path;
         }

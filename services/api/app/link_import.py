@@ -51,9 +51,26 @@ def detect_source(url: str) -> str | None:
     raw = url.strip()
     if _YT_ID.search(raw) or re.fullmatch(r"[A-Za-z0-9_-]{11}", raw):
         return "youtube"
-    if _BV.search(raw) or _AV.search(raw) or _BV_ONLY.match(raw) or _AV_ONLY.match(raw):
+    if (
+        "b23.tv" in raw.lower()
+        or _BV.search(raw)
+        or _AV.search(raw)
+        or _BV_ONLY.match(raw)
+        or _AV_ONLY.match(raw)
+    ):
         return "bilibili"
     return None
+
+
+async def _resolve_bilibili_short_url(url: str) -> str:
+    """Follow b23.tv (and similar) redirects to a canonical watch URL."""
+    raw = url.strip()
+    if "b23.tv" not in raw.lower():
+        return raw
+    headers = _bilibili_headers()
+    async with httpx.AsyncClient(headers=headers, timeout=15.0, follow_redirects=True) as client:
+        response = await client.get(raw)
+        return str(response.url)
 
 
 def _fmt_ts(seconds: float) -> str:
@@ -62,6 +79,18 @@ def _fmt_ts(seconds: float) -> str:
     m, rem = divmod(rem, 60_000)
     s, ms = divmod(rem, 1000)
     return f"{h:02d}:{m:02d}:{s:02d},{ms:03d}"
+
+
+_CJK = re.compile(r"[\u4e00-\u9fff]")
+
+
+def _srt_looks_chinese(srt: str) -> bool:
+    """True when most non-empty cue lines contain CJK (mislabeled en tracks)."""
+    lines = [ln.strip() for ln in srt.splitlines() if ln.strip() and "-->" not in ln and not ln.strip().isdigit()]
+    if not lines:
+        return False
+    hits = sum(1 for ln in lines if _CJK.search(ln))
+    return hits * 2 >= len(lines)
 
 
 def _cues_to_srt(cues: list[tuple[float, float, str]]) -> str | None:
@@ -84,7 +113,8 @@ async def import_link(url: str, *, bilibili_cookie: str | None = None) -> LinkIm
     if source == "youtube":
         return await _import_youtube(url)
     if source == "bilibili":
-        return await _import_bilibili(url, cookie=bilibili_cookie)
+        resolved = await _resolve_bilibili_short_url(url)
+        return await _import_bilibili(resolved, cookie=bilibili_cookie)
     raise ValueError("仅支持 YouTube 或 Bilibili 链接")
 
 
@@ -239,9 +269,15 @@ async def _import_bilibili(raw: str, *, cookie: str | None = None) -> LinkImport
                         for c in (body.get("body") or [])
                     ]
                     srt = _cues_to_srt(cues)
-                    if is_en and en_srt is None:
+                    if not srt:
+                        continue
+                    # lan tags lie often (ai-en with Chinese body). Prefer body.
+                    body_zh = _srt_looks_chinese(srt)
+                    if is_en and en_srt is None and not body_zh:
                         en_srt = srt
-                    if is_zh and zh_srt is None:
+                    elif (is_zh or body_zh) and zh_srt is None:
+                        zh_srt = srt
+                    elif is_en and en_srt is None and body_zh and zh_srt is None:
                         zh_srt = srt
             except Exception:
                 pass

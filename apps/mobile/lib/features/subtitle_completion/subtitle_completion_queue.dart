@@ -129,6 +129,9 @@ class SubtitleCompletionQueue {
   }) : _appSupportDirectory =
            appSupportDirectory ?? getApplicationSupportDirectory;
 
+  /// Process-wide queue so import/scheduler/worker share one write lock.
+  static final SubtitleCompletionQueue shared = SubtitleCompletionQueue();
+
   final Future<Directory> Function() _appSupportDirectory;
   final int maxAttempts;
   Future<void> _writeChain = Future<void>.value();

@@ -141,10 +141,11 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab> {
                 player.state.position >= player.state.duration &&
                 player.state.duration > Duration.zero);
         if (ended) {
-          break;
+          return true;
         }
       }
-      return true;
+      // Timed out without completion — let caller fall back to device TTS.
+      return false;
     } catch (_) {
       return false;
     } finally {
@@ -166,6 +167,7 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab> {
     try {
       final RTCVideoRenderer renderer = await _liveClient.connect(serverUrl);
       if (!mounted) {
+        await _liveClient.disconnect();
         return;
       }
       setState(() {
@@ -216,7 +218,10 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab> {
         session: session,
         context: _videoContext(),
       );
-    } catch (_) {}
+    } catch (_) {
+      // Stale host/session — force createSession on the next turn.
+      _session = null;
+    }
   }
 
   Future<void> _startPipelineConversation(LearningSettingsState settings) async {
@@ -316,6 +321,9 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab> {
           _recordingBytesWritten += n;
         },
         onError: (_) {
+          if (!mounted) {
+            return;
+          }
           setState(() {
             _error = '录音中断';
             _recordingActive = false;

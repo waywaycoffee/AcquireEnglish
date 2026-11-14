@@ -26,8 +26,11 @@ class LiveKitOralClient {
     }
     final Room room = Room();
     await room.connect(url, creds.token);
+    // HTTP draft/confirm records via PronunciationMicrophone. Enabling the
+    // LiveKit mic here steals the exclusive audio session on mobile and leaves
+    // turns silent — keep room joined for agent audio only.
     try {
-      await room.localParticipant?.setMicrophoneEnabled(true);
+      await room.localParticipant?.setMicrophoneEnabled(false);
     } catch (_) {}
     _room = room;
     return room;

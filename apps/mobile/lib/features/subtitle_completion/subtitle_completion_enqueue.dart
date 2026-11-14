@@ -186,7 +186,7 @@ Future<void> enqueueSubtitleCompletionForEpisode({
     return;
   }
 
-  final SubtitleCompletionQueue store = queue ?? SubtitleCompletionQueue();
+  final SubtitleCompletionQueue store = queue ?? SubtitleCompletionQueue.shared;
   await store.enqueue(
     episodeId: episodeId,
     videoPath: videoPath!.trim(),
@@ -222,7 +222,7 @@ Future<void> enqueuePendingSubtitleCompletionsForCatalog({
   required List<LibraryCourseData> courses,
   SubtitleCompletionQueue? queue,
 }) async {
-  final SubtitleCompletionQueue store = queue ?? SubtitleCompletionQueue();
+  final SubtitleCompletionQueue store = queue ?? SubtitleCompletionQueue.shared;
   for (final LibraryCourseData course in courses) {
     await enqueueSubtitleCompletionForCourse(course: course, queue: store);
   }

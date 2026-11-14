@@ -978,6 +978,9 @@ class PadPortraitPlayerScreenState
   }
 
   String _preferredExpandedEpisodeId(LibraryCourseData expanded) {
+    if (expanded.episodes.isEmpty) {
+      return widget.episodeId;
+    }
     for (final LibraryEpisodeItem episode in expanded.episodes) {
       if (isUsableLocalVideoPath(episode.videoAsset) && !episode.videoMissing) {
         return episode.id;

@@ -155,3 +155,11 @@ async def test_f06_bilibili_headers_include_cookie():
     assert bare["Referer"] == "https://www.bilibili.com"
     with_cookie = _bilibili_headers("SESSDATA=abc")
     assert with_cookie["Cookie"] == "SESSDATA=abc"
+
+
+def test_f07_b23_short_link_detected_and_chinese_srt_guard():
+    from app.link_import import _srt_looks_chinese, detect_source
+
+    assert detect_source("https://b23.tv/abcdef") == "bilibili"
+    assert _srt_looks_chinese("1\n00:00:00,000 --> 00:00:01,000\n你好世界\n")
+    assert not _srt_looks_chinese("1\n00:00:00,000 --> 00:00:01,000\nHello world\n")

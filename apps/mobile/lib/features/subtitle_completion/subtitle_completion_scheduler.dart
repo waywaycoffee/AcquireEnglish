@@ -19,7 +19,7 @@ class SubtitleCompletionScheduler with WidgetsBindingObserver {
   static final SubtitleCompletionScheduler instance =
       SubtitleCompletionScheduler._();
 
-  final SubtitleCompletionQueue queue = SubtitleCompletionQueue();
+  final SubtitleCompletionQueue queue = SubtitleCompletionQueue.shared;
   SubtitleCompletionWorker? _worker;
   LearningSettingsState Function()? _settingsReader;
   List<LibraryCourseData> Function()? _catalogReader;
