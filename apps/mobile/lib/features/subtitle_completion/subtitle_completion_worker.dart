@@ -171,18 +171,17 @@ class SubtitleCompletionWorker {
 
     // Prefer vendored auto-subs / whisper-subtitle-generator when available
     // (desktop). Mobile falls through to on-device Whisper.cpp.
-    final List<PlayerSubtitleLine>? externalLines =
-        await _tryExternalEnglishLines(
-          job: job,
-          settings: settings,
-          onProgress: onProgress,
-          cancellationToken: cancellationToken,
-        );
+    final _ExternalFillLines? external = await _tryExternalFillLines(
+      job: job,
+      settings: settings,
+      onProgress: onProgress,
+      cancellationToken: cancellationToken,
+    );
     cancellationToken?.throwIfCancelled();
 
     late final List<PlayerSubtitleLine> asrLines;
-    if (externalLines != null && externalLines.isNotEmpty) {
-      asrLines = externalLines;
+    if (external != null && external.english.isNotEmpty) {
+      asrLines = external.english;
     } else {
       final String raw = await asrRunner.run(
         episodeId: job.episodeId,
@@ -200,7 +199,10 @@ class SubtitleCompletionWorker {
       cancellationToken?.throwIfCancelled();
       asrLines = parseSubtitleLines(raw);
     }
-    final List<PlayerSubtitleLine> chineseLines = await _loadChineseLines(job);
+    List<PlayerSubtitleLine> chineseLines = external?.chinese ?? const <PlayerSubtitleLine>[];
+    if (chineseLines.isEmpty) {
+      chineseLines = await _loadChineseLines(job);
+    }
     MergedSubtitleBundle bundle = mergeAsrIntoSentences(
       asrLines: asrLines,
       chineseLines: chineseLines,
@@ -310,7 +312,7 @@ class SubtitleCompletionWorker {
     await _notifyPersisted(job.episodeId, files);
   }
 
-  Future<List<PlayerSubtitleLine>?> _tryExternalEnglishLines({
+  Future<_ExternalFillLines?> _tryExternalFillLines({
     required SubtitleCompletionJob job,
     required LearningSettingsState settings,
     SubtitleCompletionProgress? onProgress,
@@ -346,7 +348,17 @@ class SubtitleCompletionWorker {
         job.episodeId,
         '已用 ${filled?.engine ?? 'auto-subs'} 生成英文字幕',
       );
-      return loadSubtitleLines(enPath);
+      final List<PlayerSubtitleLine> english = await loadSubtitleLines(enPath);
+      List<PlayerSubtitleLine> chinese = const <PlayerSubtitleLine>[];
+      final String? zhPath = filled?.zhPath;
+      if (zhPath != null && File(zhPath).existsSync()) {
+        try {
+          chinese = normalizeChineseOnlySubtitleLines(
+            await loadSubtitleLines(zhPath),
+          );
+        } catch (_) {}
+      }
+      return _ExternalFillLines(english: english, chinese: chinese);
     } on AsrSubtitleGenerationException {
       rethrow;
     } catch (_) {
@@ -496,4 +508,14 @@ class SubtitleCompletionWorker {
       );
     } catch (_) {}
   }
+}
+
+class _ExternalFillLines {
+  const _ExternalFillLines({
+    required this.english,
+    this.chinese = const <PlayerSubtitleLine>[],
+  });
+
+  final List<PlayerSubtitleLine> english;
+  final List<PlayerSubtitleLine> chinese;
 }

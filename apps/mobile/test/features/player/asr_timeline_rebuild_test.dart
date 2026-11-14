@@ -148,6 +148,45 @@ void main() {
     expect(fused.first.chinese, '甲');
   });
 
+  test('workingEnglishMismatchesAsr rebuilds when 1/2 overlaps disagree', () {
+    final List<PlayerSubtitleLine> working = <PlayerSubtitleLine>[
+      const PlayerSubtitleLine(
+        startTime: '00:01',
+        english: 'Hello everyone',
+        chinese: '大家好',
+        startMs: 1000,
+        endMs: 3000,
+      ),
+      const PlayerSubtitleLine(
+        startTime: '00:03',
+        english: 'Wrong paraphrase two',
+        chinese: '错二',
+        startMs: 3000,
+        endMs: 5000,
+      ),
+    ];
+    final List<PlayerSubtitleLine> asr = <PlayerSubtitleLine>[
+      const PlayerSubtitleLine(
+        startTime: '00:01',
+        english: 'Hello everyone',
+        chinese: '',
+        startMs: 1000,
+        endMs: 3000,
+      ),
+      const PlayerSubtitleLine(
+        startTime: '00:03',
+        english: 'Welcome back',
+        chinese: '',
+        startMs: 3000,
+        endMs: 5000,
+      ),
+    ];
+    expect(
+      workingEnglishMismatchesAsr(working: working, asrLines: asr),
+      isTrue,
+    );
+  });
+
   test('workingEnglishMismatchesAsr rebuilds when 2/2 overlaps disagree', () {
     final List<PlayerSubtitleLine> working = <PlayerSubtitleLine>[
       const PlayerSubtitleLine(

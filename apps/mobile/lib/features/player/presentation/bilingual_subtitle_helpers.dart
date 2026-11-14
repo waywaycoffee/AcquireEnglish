@@ -697,9 +697,9 @@ bool workingEnglishMismatchesAsr({
     }
   }
   if (compared < 3) {
-    // Few overlaps: still rebuild when every compared cue disagrees, or when
+    // Few overlaps: rebuild when ≥ half disagree (covers 1/2 and 2/2), or when
     // cue counts diverge sharply (sparse OCR vs denser speech track).
-    if (compared >= 2 && disagree == compared) {
+    if (compared >= 2 && disagree * 2 >= compared) {
       return true;
     }
     return (asrLines.length - working.length).abs() >= 5 ||
