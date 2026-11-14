@@ -1,18 +1,17 @@
-"""LiveKit Agents worker — full-duplex voice + barge-in VAD.
+"""LiveKit Agents worker — DeepSeek LLM + Edge/Deepgram voice (no OpenAI required).
 
-Install extras first:
-  pip install livekit-agents livekit-plugins-silero livekit-plugins-openai
+Install:
+  pip install -r requirements-agent.txt
 
 Run:
   python -m agent.main start
 
-Without LiveKit packages, `python -m agent.main` prints the wiring checklist.
-
-Environment:
+Env:
   LIVEKIT_URL / LIVEKIT_API_KEY / LIVEKIT_API_SECRET
-  ORAL_COACH_URL (default https://acquireenglish.curlhairai.com/coach)
-  LEARNING_API_URL (default …/api/learning)
-  LEARNING_API_BEARER (JWT for persisting turns)
+  DEEPSEEK_API_KEY          # LLM (default)
+  DEEPGRAM_API_KEY          # optional STT+TTS (recommended)
+  TTS_PROVIDER=edge|deepgram|openai|auto
+  ORAL_COACH_URL / LEARNING_API_URL
 """
 
 from __future__ import annotations
@@ -41,25 +40,21 @@ def run() -> None:
         print(
             """Acquire Digital Human Coach — LiveKit wiring checklist
 
-1. Start LiveKit server (or LiveKit Cloud) and set:
-   LIVEKIT_URL / LIVEKIT_API_KEY / LIVEKIT_API_SECRET
+1. LIVEKIT_URL / LIVEKIT_API_KEY / LIVEKIT_API_SECRET
 
-2. pip install livekit-agents livekit-plugins-silero livekit-plugins-openai \\
-     livekit-plugins-deepgram httpx
+2. pip install -r requirements-agent.txt
+   (includes livekit-plugins-openai for DeepSeek via with_deepseek)
 
-3. Interruption (VAD barge-in):
-   TurnHandlingOptions(interruption={"mode": "vad", "min_duration": 0.4,
-     "false_interruption_timeout": 1.5, "resume_false_interruption": True})
+3. LLM (default DeepSeek, no OpenAI):
+   DEEPSEEK_API_KEY=…   LLM_PROVIDER=deepseek
 
-4. After each user turn, agent.hooks.score_pronunciation → room data topic=score.partial
+4. Voice without OpenAI:
+   TTS_PROVIDER=edge          # free, needs ffmpeg + edge-tts
+   # or DEEPGRAM_API_KEY=…    # STT + Aura TTS (recommended)
 
-5. Persist turns via agent.hooks.persist_learning_turn → /api/learning
+5. ORAL_COACH_URL=https://acquireenglish.curlhairai.com/coach
 
-6. Avatar cue: ORAL_COACH_URL avatar provider (MuseTalk / LivePortrait / LiveTalking)
-
-7. App joins with POST /api/livekit/token (JWT) then livekit_client Room.connect
-
-See docs/digital-human-coach/PRD.md
+See DEPLOY_GPU.md
 """
         )
         if _missing_livekit():
@@ -76,30 +71,24 @@ See docs/digital-human-coach/PRD.md
     from livekit.agents import TurnHandlingOptions
     from livekit.plugins import silero
 
-    try:
-        from livekit.plugins import openai as lk_openai
-    except ImportError:
-        lk_openai = None
-
     from agent.hooks import (
         persist_learning_turn,
         score_payload_bytes,
         score_pronunciation,
     )
+    from agent.models import build_llm, build_stt, build_tts
 
     interruption_mode = os.getenv('INTERRUPTION_MODE', 'vad')
     min_duration = float(os.getenv('INTERRUPTION_MIN_DURATION', '0.4'))
     false_timeout = float(os.getenv('FALSE_INTERRUPTION_TIMEOUT', '1.5'))
 
+    llm = build_llm()
+    tts = build_tts()
+    stt = build_stt()
+
     class OralCoachAgent(Agent):
         def __init__(self) -> None:
-            kwargs = {
-                'instructions': INSTRUCTIONS,
-            }
-            if lk_openai is not None:
-                kwargs['llm'] = lk_openai.LLM(model=os.getenv('OPENAI_MODEL', 'gpt-4o-mini'))
-                kwargs['tts'] = lk_openai.TTS(voice=os.getenv('OPENAI_TTS_VOICE', 'alloy'))
-            super().__init__(**kwargs)
+            super().__init__(instructions=INSTRUCTIONS, llm=llm, tts=tts, stt=stt)
             self._learning_session_id: str | None = None
             self._room = None
 
@@ -150,9 +139,11 @@ See docs/digital-human-coach/PRD.md
         await ctx.wait_for_participant()
         agent = OralCoachAgent()
         agent._room = ctx.room
-        session = AgentSession(
-            vad=silero.VAD.load(),
-            turn_handling=TurnHandlingOptions(
+        session_kwargs: dict = {
+            'vad': silero.VAD.load(),
+            'llm': llm,
+            'tts': tts,
+            'turn_handling': TurnHandlingOptions(
                 interruption={
                     'enabled': True,
                     'mode': interruption_mode,
@@ -161,7 +152,10 @@ See docs/digital-human-coach/PRD.md
                     'resume_false_interruption': True,
                 },
             ),
-        )
+        }
+        if stt is not None:
+            session_kwargs['stt'] = stt
+        session = AgentSession(**session_kwargs)
         await session.start(room=ctx.room, agent=agent)
 
     cli.run_app(

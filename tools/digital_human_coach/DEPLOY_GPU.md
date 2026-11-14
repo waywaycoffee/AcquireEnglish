@@ -16,7 +16,7 @@ cd AcquireEnglish/tools/digital_human_coach
 ./scripts/setup_gpu_agent.sh
 ```
 
-要求：Python **3.11 或 3.12**（避开 3.14）、能访问外网。默认路径用云端 OpenAI，**不必先装 CUDA**；以后本地 WhisperX 再开 GPU。
+要求：Python **3.11 或 3.12**（避开 3.14）、能访问外网。默认 LLM 用 **DeepSeek**（不用 OpenAI），**不必先装 CUDA**；以后本地 WhisperX 再开 GPU。
 
 ## 2. 填 `.env`
 
@@ -31,10 +31,18 @@ $EDITOR .env
 |------|------|
 | `LIVEKIT_URL` | LiveKit Cloud → Project → Keys（`wss://…`） |
 | `LIVEKIT_API_KEY` / `LIVEKIT_API_SECRET` | 同上 |
-| `OPENAI_API_KEY` | Agent 对话 LLM + TTS |
+| `DEEPSEEK_API_KEY` | [platform.deepseek.com](https://platform.deepseek.com/api_keys)（默认 LLM，**不用 OpenAI**） |
+
+语音（二选一，都不用 OpenAI）：
+
+| 方案 | 变量 | 说明 |
+|------|------|------|
+| Edge TTS（默认） | `TTS_PROVIDER=auto` + 本机 `ffmpeg` | 免费；听写 STT 仍建议配 Deepgram |
+| Deepgram | `DEEPGRAM_API_KEY` | 注册送额度，STT+TTS 一把钥匙 |
 
 可保持默认：
 
+- `LLM_PROVIDER=deepseek`
 - `ORAL_COACH_URL=https://acquireenglish.curlhairai.com/coach`
 - `LEARNING_API_URL=https://acquireenglish.curlhairai.com/api/learning`
 

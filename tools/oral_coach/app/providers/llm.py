@@ -61,10 +61,16 @@ class MockLlm:
 
 
 class OpenAiLlm:
-    name = 'openai'
+    """OpenAI-compatible chat client (OpenAI or DeepSeek)."""
 
     def __init__(self, settings: Settings):
         self.settings = settings
+        self.name = (
+            'deepseek'
+            if 'deepseek' in (settings.openai_base_url or '').lower()
+            or settings.llm_provider == 'deepseek'
+            else 'openai'
+        )
 
     async def coach_turn(
         self,
@@ -75,7 +81,11 @@ class OpenAiLlm:
         history: list[dict[str, str]],
     ) -> LlmReply:
         if not self.settings.openai_api_key:
-            raise RuntimeError('OPENAI_API_KEY is empty.')
+            raise RuntimeError(
+                'DEEPSEEK_API_KEY / OPENAI_API_KEY is empty.'
+                if self.name == 'deepseek'
+                else 'OPENAI_API_KEY is empty.'
+            )
         user = {
             'video': context.topic_blurb(),
             'current_zh': context.current_chinese,
@@ -95,19 +105,21 @@ class OpenAiLlm:
                 'corrections': ['short notes'],
             },
         }
+        payload: dict = {
+            'model': self.settings.openai_model,
+            'temperature': 0.6,
+            'messages': [
+                {'role': 'system', 'content': SYSTEM + ' Reply as compact JSON.'},
+                {'role': 'user', 'content': json.dumps(user, ensure_ascii=False)},
+            ],
+        }
+        # DeepSeek chat supports json_object; keep it for structured coach replies.
+        payload['response_format'] = {'type': 'json_object'}
         async with httpx.AsyncClient(timeout=60) as client:
             response = await client.post(
                 f'{self.settings.openai_base_url}/chat/completions',
                 headers={'Authorization': f'Bearer {self.settings.openai_api_key}'},
-                json={
-                    'model': self.settings.openai_model,
-                    'temperature': 0.6,
-                    'messages': [
-                        {'role': 'system', 'content': SYSTEM + ' Reply as compact JSON.'},
-                        {'role': 'user', 'content': json.dumps(user, ensure_ascii=False)},
-                    ],
-                    'response_format': {'type': 'json_object'},
-                },
+                json=payload,
             )
             response.raise_for_status()
             content = response.json()['choices'][0]['message']['content']
@@ -159,7 +171,8 @@ class OllamaLlm:
 
 def build_llm(settings: Settings):
     name = settings.llm_provider
-    if name == 'openai':
+    # deepseek uses the same OpenAI-compatible HTTP client
+    if name in {'openai', 'deepseek'}:
         return OpenAiLlm(settings)
     if name == 'ollama':
         return OllamaLlm(settings)

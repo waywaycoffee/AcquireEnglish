@@ -2,6 +2,9 @@
 -r requirements.txt
 livekit-agents>=1.0.0
 livekit-plugins-silero>=1.0.0
+# OpenAI plugin also provides DeepSeek via LLM.with_deepseek()
 livekit-plugins-openai>=1.0.0
-# Optional cloud ASR for the agent path:
-# livekit-plugins-deepgram>=1.0.0
+# Free TTS (no key); needs ffmpeg on PATH to decode mp3
+edge-tts>=6.1.0
+# Optional STT + Aura TTS (recommended if you skip OpenAI voice):
+livekit-plugins-deepgram>=1.0.0

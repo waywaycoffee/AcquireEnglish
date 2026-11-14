@@ -32,7 +32,7 @@ python -m pip install -r requirements-agent.txt
 
 if [[ ! -f .env ]]; then
   cp .env.example .env
-  echo "==> Created .env from .env.example — fill LIVEKIT_* and OPENAI_API_KEY"
+  echo "==> Created .env from .env.example — fill LIVEKIT_* and DEEPSEEK_API_KEY"
 else
   echo "==> .env already exists"
 fi
@@ -46,7 +46,8 @@ Setup done.
 
 1) Edit tools/digital_human_coach/.env
    - LIVEKIT_URL / LIVEKIT_API_KEY / LIVEKIT_API_SECRET
-   - OPENAI_API_KEY (agent LLM+TTS)
+   - DEEPSEEK_API_KEY (LLM; no OpenAI needed)
+   - optional DEEPGRAM_API_KEY (STT+TTS) or rely on free Edge TTS + ffmpeg
    - ORAL_COACH_URL already points at production /coach
 
 2) On the API server also set the SAME LiveKit trio in
