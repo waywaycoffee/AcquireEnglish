@@ -14,6 +14,7 @@ class YoutubeImportResult {
     this.enSubtitlePath,
     this.cnSubtitlePath,
     this.author,
+    this.localVideoPath,
   });
 
   final String videoId;
@@ -23,6 +24,19 @@ class YoutubeImportResult {
   final String? enSubtitlePath;
   final String? cnSubtitlePath;
   final String? author;
+  /// Local MP4 when downloaded for offline play / on-device ASR.
+  final String? localVideoPath;
+
+  YoutubeImportResult copyWith({String? localVideoPath}) => YoutubeImportResult(
+    videoId: videoId,
+    title: title,
+    watchUrl: watchUrl,
+    durationMinutes: durationMinutes,
+    enSubtitlePath: enSubtitlePath,
+    cnSubtitlePath: cnSubtitlePath,
+    author: author,
+    localVideoPath: localVideoPath ?? this.localVideoPath,
+  );
 }
 
 class YoutubeImportService {
@@ -71,6 +85,50 @@ class YoutubeImportService {
         cnSubtitlePath: cnPath,
         author: video.author,
       );
+    } finally {
+      yt.close();
+    }
+  }
+
+  /// Download a progressive muxed stream for local playback / Whisper ASR.
+  Future<String?> downloadLocalVideo(String videoId) async {
+    final YoutubeExplode yt = YoutubeExplode();
+    try {
+      final Directory docs = await getApplicationDocumentsDirectory();
+      final Directory dir = Directory('${docs.path}/youtube/$videoId');
+      if (!dir.existsSync()) {
+        await dir.create(recursive: true);
+      }
+      final File out = File('${dir.path}/video.mp4');
+      if (out.existsSync() && out.lengthSync() > 1024 * 64) {
+        return out.path;
+      }
+      final StreamManifest manifest = await yt.videos.streamsClient
+          .getManifest(videoId);
+      final List<MuxedStreamInfo> muxed = manifest.muxed
+          .where((MuxedStreamInfo s) => s.container == StreamContainer.mp4)
+          .toList(growable: false);
+      if (muxed.isEmpty) {
+        return null;
+      }
+      muxed.sort(
+        (MuxedStreamInfo a, MuxedStreamInfo b) =>
+            a.videoResolution.compareTo(b.videoResolution),
+      );
+      // Prefer mid quality to keep ASR imports fast.
+      final MuxedStreamInfo stream =
+          muxed[muxed.length > 2 ? muxed.length ~/ 2 : muxed.length - 1];
+      final Stream<List<int>> data = yt.videos.streamsClient.get(stream);
+      final IOSink sink = out.openWrite();
+      await data.pipe(sink);
+      await sink.flush();
+      await sink.close();
+      if (!out.existsSync() || out.lengthSync() < 1024) {
+        return null;
+      }
+      return out.path;
+    } catch (_) {
+      return null;
     } finally {
       yt.close();
     }

@@ -15,6 +15,7 @@ import '../features/library/presentation/library_screen.dart';
 import '../features/phrases/presentation/phrases_screen.dart';
 import '../features/player/presentation/player_screen.dart';
 import '../features/settings/presentation/settings_screen.dart';
+import '../features/words/presentation/sm2_daily_session_screen.dart';
 import '../features/words/presentation/words_screen.dart';
 import 'fade_extension.dart';
 
@@ -26,6 +27,7 @@ enum SGRoute {
   growth,
   review,
   reviewSession,
+  sm2Review,
   phrases,
   words,
   phraseReview,
@@ -39,9 +41,17 @@ enum SGRoute {
   editProfile,
   changePassword;
 
-  String get route => this == reviewSession
-      ? '/review/session'
-      : '/${toString().replaceAll('SGRoute.', '')}';
+  String get route {
+    switch (this) {
+      case SGRoute.reviewSession:
+        return '/review/session';
+      case SGRoute.sm2Review:
+        return '/review/sm2';
+      default:
+        return '/${toString().replaceAll('SGRoute.', '')}';
+    }
+  }
+
   String get name => toString().replaceAll('SGRoute.', '');
 }
 
@@ -96,6 +106,12 @@ GoRouter goRouter(Ref ref) => GoRouter(
         session: true,
         practice: state.uri.queryParameters['practice'] == '1',
       ),
+    ).fade(),
+    GoRoute(
+      path: SGRoute.sm2Review.route,
+      name: SGRoute.sm2Review.name,
+      builder: (BuildContext context, GoRouterState state) =>
+          const Sm2DailySessionScreen(),
     ).fade(),
     GoRoute(
       path: SGRoute.phrases.route,

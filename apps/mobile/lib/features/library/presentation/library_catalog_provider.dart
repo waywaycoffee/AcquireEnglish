@@ -104,7 +104,22 @@ class LibraryCatalogNotifier extends Notifier<List<LibraryCourseData>> {
     final List<LibraryCourseData> locals = state
         .where((LibraryCourseData c) => !cloudIds.contains(c.id))
         .toList(growable: false);
-    state = <LibraryCourseData>[...cloudCourses, ...locals];
+    // Plan order: cloud catalog → local imports → YouTube imports.
+    final List<LibraryCourseData> localOnly = locals
+        .where(
+          (LibraryCourseData c) =>
+              c.sourceLabel.trim().toLowerCase() != 'youtube' &&
+              !c.id.startsWith('youtube-'),
+        )
+        .toList(growable: false);
+    final List<LibraryCourseData> youtube = locals
+        .where(
+          (LibraryCourseData c) =>
+              c.sourceLabel.trim().toLowerCase() == 'youtube' ||
+              c.id.startsWith('youtube-'),
+        )
+        .toList(growable: false);
+    state = <LibraryCourseData>[...cloudCourses, ...localOnly, ...youtube];
     await _persistImportedCourses();
   }
 

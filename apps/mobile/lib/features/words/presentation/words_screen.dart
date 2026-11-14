@@ -136,10 +136,10 @@ class _WordsScreenState extends ConsumerState<WordsScreen> {
         actions: <Widget>[
           TextButton.icon(
             onPressed: () {
-              context.push(SGRoute.reviewSession.route);
+              context.push(SGRoute.sm2Review.route);
             },
             icon: const Icon(Icons.style_rounded),
-            label: const Text('今日复习'),
+            label: const Text('今日背词'),
           ),
           const AnkiExportButton(),
         ],

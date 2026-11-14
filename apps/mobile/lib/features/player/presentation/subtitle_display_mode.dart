@@ -79,4 +79,15 @@ class SubtitleDisplayMode {
   }
 
   static String label(String? mode) => normalize(mode);
+
+  /// Cycle bilingual → english → chinese → blind → bilingual (long-press UX).
+  static String nextLearningMode(String? mode) {
+    final List<String> modes = learningModes;
+    final String current = normalize(mode);
+    final int index = modes.indexOf(current);
+    if (index < 0) {
+      return bilingual;
+    }
+    return modes[(index + 1) % modes.length];
+  }
 }

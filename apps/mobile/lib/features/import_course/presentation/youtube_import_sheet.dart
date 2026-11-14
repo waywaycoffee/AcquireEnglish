@@ -61,10 +61,18 @@ class _YoutubeImportFormState extends ConsumerState<_YoutubeImportForm> {
       _error = null;
     });
     try {
-      final YoutubeImportResult meta = await _service.fetch(id);
+      YoutubeImportResult meta = await _service.fetch(id);
       final String courseId = 'youtube-${meta.videoId}';
       final bool hasEn = meta.enSubtitlePath != null;
       final bool hasZh = meta.cnSubtitlePath != null;
+      // Missing captions → download local MP4 so Whisper ASR can fill them.
+      if (!hasEn || !hasZh) {
+        final String? local = await _service.downloadLocalVideo(meta.videoId);
+        if (local != null) {
+          meta = meta.copyWith(localVideoPath: local);
+        }
+      }
+      final String videoAsset = meta.localVideoPath ?? meta.watchUrl;
       final LibraryCourseData course = LibraryCourseData(
         id: courseId,
         title: meta.title,
@@ -92,7 +100,8 @@ class _YoutubeImportFormState extends ConsumerState<_YoutubeImportForm> {
             completed: false,
             progressPercent: 0,
             coverImage: 'assets/img/app_icon.png',
-            videoAsset: meta.watchUrl,
+            videoAsset: videoAsset,
+            sourceUrl: meta.watchUrl,
             enSubtitleAsset: meta.enSubtitlePath,
             cnSubtitleAsset: meta.cnSubtitlePath,
             subtitleTracks: <LibrarySubtitleTrackItem>[
@@ -118,7 +127,7 @@ class _YoutubeImportFormState extends ConsumerState<_YoutubeImportForm> {
       final bool canLocalAsr = course.episodes.any(
         (LibraryEpisodeItem ep) => isUsableLocalVideoPath(ep.videoAsset),
       );
-      if (ok && canLocalAsr) {
+      if (ok && (!hasEn || !hasZh) && canLocalAsr) {
         await enqueueSubtitleCompletionForCourse(course: course);
         SubtitleCompletionScheduler.instance.kick(delay: Duration.zero);
       }
@@ -131,16 +140,15 @@ class _YoutubeImportFormState extends ConsumerState<_YoutubeImportForm> {
       if (hasEn && hasZh) {
         subtitleHint = '中英字幕已就绪。';
       } else if (!canLocalAsr) {
-        // Watch URL alone cannot run on-device Whisper — do not claim backfill.
         subtitleHint = !hasEn && !hasZh
-            ? '缺中英字幕；下载到本地后再补全。'
-            : (!hasEn ? '缺英文字幕；下载到本地后再补全。' : '缺中文字幕；下载到本地后再补全。');
+            ? '缺中英字幕；未能下载本地视频，请稍后重试补全。'
+            : (!hasEn ? '缺英文字幕；未能下载本地视频。' : '缺中文字幕；未能下载本地视频。');
       } else {
         subtitleHint = !hasEn && !hasZh
-            ? '缺中英字幕，已开始后台补全。'
+            ? '缺中英字幕，已下载并开始后台 ASR 补全。'
             : (!hasEn
-                  ? '缺英文字幕，已开始后台补全。'
-                  : '缺中文字幕，已开始后台补全。');
+                  ? '缺英文字幕，已下载并开始后台 ASR 补全。'
+                  : '缺中文字幕，已下载并开始后台 ASR 补全。');
       }
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(

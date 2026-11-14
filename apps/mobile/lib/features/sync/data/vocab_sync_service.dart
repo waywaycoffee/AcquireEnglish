@@ -1,5 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../words/domain/sm2_scheduler.dart';
 import '../../words/presentation/word_book_provider.dart';
 import 'acquire_api_client.dart';
 
@@ -8,8 +9,7 @@ final Provider<VocabSyncService> vocabSyncServiceProvider =
       return VocabSyncService(ref);
     });
 
-/// Cloud vocab is a **favorite mirror** only.
-/// Local FSRS daily review remains the source of truth for scheduling.
+/// Cloud vocab mirrors favorites **and** SM-2 scheduling fields.
 class VocabSyncService {
   VocabSyncService(this._ref);
 
@@ -25,12 +25,13 @@ class VocabSyncService {
         context: entry.occurrences.isEmpty
             ? null
             : entry.occurrences.first.sentence,
-        // Keep API fields populated for older clients, but do not drive local SRS.
-        mastery: 'new',
-        ease: 2.5,
-        intervalDays: 0,
-        repetitions: 0,
-        dueAt: null,
+        mastery: entry.mastery.name,
+        ease: entry.ease,
+        intervalDays: entry.intervalDays,
+        repetitions: entry.repetitions,
+        dueAt: entry.dueAtMs == null
+            ? null
+            : DateTime.fromMillisecondsSinceEpoch(entry.dueAtMs!),
       );
     } catch (_) {}
   }
@@ -61,11 +62,31 @@ class VocabSyncService {
       }
       final WordBookNotifier book = _ref.read(wordBookProvider.notifier);
       for (final AcquireVocabDto row in remote) {
-        await book.mergeRemoteFavorite(
+        await book.mergeRemoteSrs(
           word: row.word,
+          mastery: _parseMastery(row.mastery),
+          ease: row.ease,
+          intervalDays: row.intervalDays,
+          repetitions: row.repetitions,
+          dueAtMs: row.dueAt?.millisecondsSinceEpoch,
           contextSentence: row.context,
         );
       }
     } catch (_) {}
+  }
+
+  WordMastery _parseMastery(String raw) {
+    switch (raw.trim().toLowerCase()) {
+      case 'learning':
+        return WordMastery.learning;
+      case 'known':
+        return WordMastery.known;
+      case 'mastered':
+        return WordMastery.mastered;
+      case 'new':
+      case 'fresh':
+      default:
+        return WordMastery.fresh;
+    }
   }
 }

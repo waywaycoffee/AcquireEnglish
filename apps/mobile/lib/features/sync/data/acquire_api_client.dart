@@ -393,6 +393,7 @@ class AcquireApiClient {
     required String lessonId,
     required double positionSec,
     bool completed = false,
+    DateTime? clientUpdatedAt,
   }) async {
     final Response<dynamic> response = await _dio.put(
       Endpoints.progress,
@@ -401,6 +402,8 @@ class AcquireApiClient {
         'lesson_id': lessonId,
         'position_sec': positionSec,
         'completed': completed,
+        if (clientUpdatedAt != null)
+          'client_updated_at': clientUpdatedAt.toUtc().toIso8601String(),
       },
     );
     return AcquireProgressDto.fromJson(response.data as Map<String, dynamic>);

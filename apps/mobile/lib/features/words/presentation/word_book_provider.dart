@@ -806,10 +806,33 @@ class WordBookNotifier extends Notifier<List<WordEntry>> {
     return updated;
   }
 
-  /// Import a cloud favorite without overwriting local FSRS scheduling fields.
+  /// Import a cloud favorite; keep local SRS when local reps are ahead.
   Future<void> mergeRemoteFavorite({
     required String word,
     String? contextSentence,
+  }) async {
+    await mergeRemoteSrs(
+      word: word,
+      mastery: WordMastery.fresh,
+      ease: 2.5,
+      intervalDays: 0,
+      repetitions: 0,
+      dueAtMs: null,
+      contextSentence: contextSentence,
+      favoriteOnly: true,
+    );
+  }
+
+  /// Merge cloud SM-2 fields. Local wins when it has more repetitions.
+  Future<void> mergeRemoteSrs({
+    required String word,
+    required WordMastery mastery,
+    required double ease,
+    required int intervalDays,
+    required int repetitions,
+    int? dueAtMs,
+    String? contextSentence,
+    bool favoriteOnly = false,
   }) async {
     final String key = word.trim().toLowerCase();
     if (key.isEmpty) {
@@ -820,11 +843,17 @@ class WordBookNotifier extends Notifier<List<WordEntry>> {
     );
     if (index >= 0) {
       final WordEntry existing = state[index];
-      if (existing.favorite) {
-        return;
-      }
       final List<WordEntry> next = List<WordEntry>.from(state);
-      next[index] = existing.copyWith(favorite: true);
+      final bool keepLocalSrs =
+          favoriteOnly || existing.repetitions >= repetitions;
+      next[index] = existing.copyWith(
+        favorite: true,
+        ease: keepLocalSrs ? existing.ease : ease,
+        intervalDays: keepLocalSrs ? existing.intervalDays : intervalDays,
+        repetitions: keepLocalSrs ? existing.repetitions : repetitions,
+        dueAtMs: keepLocalSrs ? existing.dueAtMs : dueAtMs,
+        mastery: keepLocalSrs ? existing.mastery : mastery,
+      );
       state = next;
       await _persist();
       return;
@@ -834,6 +863,11 @@ class WordBookNotifier extends Notifier<List<WordEntry>> {
       WordEntry(
         word: key,
         favorite: true,
+        mastery: favoriteOnly ? WordMastery.fresh : mastery,
+        ease: favoriteOnly ? 2.5 : ease,
+        intervalDays: favoriteOnly ? 0 : intervalDays,
+        repetitions: favoriteOnly ? 0 : repetitions,
+        dueAtMs: favoriteOnly ? null : dueAtMs,
         occurrences: contextSentence == null || contextSentence.isEmpty
             ? const <WordOccurrence>[]
             : <WordOccurrence>[
@@ -860,19 +894,6 @@ class WordBookNotifier extends Notifier<List<WordEntry>> {
       ),
     ];
     await _persist();
-  }
-
-  @Deprecated('Local review uses FSRS; kept for older call sites')
-  Future<void> mergeRemoteSrs({
-    required String word,
-    required WordMastery mastery,
-    required double ease,
-    required int intervalDays,
-    required int repetitions,
-    int? dueAtMs,
-    String? contextSentence,
-  }) {
-    return mergeRemoteFavorite(word: word, contextSentence: contextSentence);
   }
 
   int reviewStreak() {

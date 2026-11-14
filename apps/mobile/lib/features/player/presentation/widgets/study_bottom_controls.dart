@@ -102,52 +102,60 @@ class StudyBottomControls extends StatelessWidget {
             Row(
               children: <Widget>[
                 Expanded(
-                  child: PopupMenuButton<String>(
-                    key: const ValueKey<String>('study-chip-subtitle-mode'),
-                    tooltip: '字幕类型',
-                    color: colors.card,
-                    onSelected: onSelectSubtitleMode,
-                    itemBuilder: (BuildContext context) {
-                      return SubtitleDisplayMode.learningModes
-                          .map(
-                            (String mode) => CheckedPopupMenuItem<String>(
-                              value: mode,
-                              checked: mode == modeLabel,
-                              child: Text(
-                                mode,
-                                style: TextStyle(
-                                  fontWeight: mode == modeLabel
-                                      ? FontWeight.w800
-                                      : FontWeight.w600,
-                                  color: mode == modeLabel
-                                      ? colors.accent
-                                      : colors.textPrimary,
+                  child: GestureDetector(
+                    key: const ValueKey<String>('study-chip-subtitle-longpress'),
+                    onLongPress: () {
+                      onSelectSubtitleMode(
+                        SubtitleDisplayMode.nextLearningMode(subtitleMode),
+                      );
+                    },
+                    child: PopupMenuButton<String>(
+                      key: const ValueKey<String>('study-chip-subtitle-mode'),
+                      tooltip: '字幕类型 · 长按轮换',
+                      color: colors.card,
+                      onSelected: onSelectSubtitleMode,
+                      itemBuilder: (BuildContext context) {
+                        return SubtitleDisplayMode.learningModes
+                            .map(
+                              (String mode) => CheckedPopupMenuItem<String>(
+                                value: mode,
+                                checked: mode == modeLabel,
+                                child: Text(
+                                  mode,
+                                  style: TextStyle(
+                                    fontWeight: mode == modeLabel
+                                        ? FontWeight.w800
+                                        : FontWeight.w600,
+                                    color: mode == modeLabel
+                                        ? colors.accent
+                                        : colors.textPrimary,
+                                  ),
                                 ),
                               ),
-                            ),
-                          )
-                          .toList(growable: false);
-                    },
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 6),
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: <Widget>[
-                          Icon(
-                            _subtitleIcon,
-                            size: 22,
-                            color: colors.accent,
-                          ),
-                          const SizedBox(height: 2),
-                          Text(
-                            modeLabel,
-                            style: TextStyle(
-                              fontSize: 11,
-                              fontWeight: FontWeight.w700,
+                            )
+                            .toList(growable: false);
+                      },
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 6),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: <Widget>[
+                            Icon(
+                              _subtitleIcon,
+                              size: 22,
                               color: colors.accent,
                             ),
-                          ),
-                        ],
+                            const SizedBox(height: 2),
+                            Text(
+                              modeLabel,
+                              style: TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w700,
+                                color: colors.accent,
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
                     ),
                   ),
@@ -310,10 +318,9 @@ class StudyBottomControls extends StatelessWidget {
                 TextButton(
                   key: const ValueKey<String>('study-chip-subtitle-label'),
                   onPressed: () {
-                    final List<String> modes = SubtitleDisplayMode.learningModes;
-                    final int index = modes.indexOf(modeLabel);
-                    final String next = modes[(index + 1) % modes.length];
-                    onSelectSubtitleMode(next);
+                    onSelectSubtitleMode(
+                      SubtitleDisplayMode.nextLearningMode(subtitleMode),
+                    );
                   },
                   style: TextButton.styleFrom(
                     foregroundColor: colors.accent,

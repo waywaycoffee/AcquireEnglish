@@ -93,6 +93,8 @@ class ProgressUpsert(BaseModel):
     lesson_id: str
     position_sec: float = Field(ge=0)
     completed: bool = False
+    # Client write time for last-write-wins merge across devices.
+    client_updated_at: datetime | None = None
 
 
 class ProgressOut(BaseModel):

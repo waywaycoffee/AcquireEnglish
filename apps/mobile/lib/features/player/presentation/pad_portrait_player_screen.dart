@@ -240,24 +240,31 @@ class PadPortraitPlayerScreenState
             : resource.episode?.progressTimeStr);
     _videoAsset = resource.videoAsset;
 
-    // Cloud progress last-write-wins: prefer remote position when newer/farther.
+    // Cloud progress last-write-wins by updated_at (fallback: farther position).
     // Hard-cap so a slow/unreachable API cannot freeze「正在打开课程…」.
     try {
-      final Map<String, AcquireProgressDto> remote = await ref
-          .read(progressSyncServiceProvider)
+      final ProgressSyncService sync = ref.read(progressSyncServiceProvider);
+      final Map<String, AcquireProgressDto> remote = await sync
           .pullIndexed()
           .timeout(const Duration(seconds: 2));
       final AcquireProgressDto? row = remote[widget.episodeId];
-      if (row != null && row.positionSec > 1) {
-        final String cloudTime = StudyBottomControls.formatClock(
-          Duration(milliseconds: (row.positionSec * 1000).round()),
+      final int localMs =
+          PlayerMockState.parseTimestampToMsPublic(initialStartTime) ?? 0;
+      final AcquireProgressDto? winner = await sync.pickWinner(
+        lessonId: widget.episodeId,
+        localPositionSec: localMs / 1000.0,
+        remote: row,
+      );
+      if (winner != null) {
+        initialStartTime = StudyBottomControls.formatClock(
+          Duration(milliseconds: (winner.positionSec * 1000).round()),
         );
-        final int localMs =
-            PlayerMockState.parseTimestampToMsPublic(initialStartTime) ?? 0;
-        final int cloudMs = (row.positionSec * 1000).round();
-        if (cloudMs > localMs + 1500) {
-          initialStartTime = cloudTime;
-        }
+        await sync.rememberLocal(
+          lessonId: widget.episodeId,
+          positionSec: winner.positionSec,
+          updatedAt: winner.updatedAt.toUtc(),
+          completed: winner.completed,
+        );
       }
     } catch (_) {}
 

@@ -5,7 +5,7 @@ import 'package:flutter/material.dart';
 import '../player_mock_state.dart';
 import 'study_shell_tokens.dart';
 
-/// Shadow Talk–style practice: cloze blanks + check + sentence audio nav.
+/// Practice: cloze blanks + multiple choice, with check + sentence audio nav.
 class StudyPracticeTab extends StatefulWidget {
   const StudyPracticeTab({
     required this.lines,
@@ -13,7 +13,7 @@ class StudyPracticeTab extends StatefulWidget {
     required this.onCollectWord,
     this.onReplayLine,
     this.onGoToLine,
-    this.questionCount = 5,
+    this.questionCount = 6,
     super.key,
   });
 
@@ -34,6 +34,7 @@ class _StudyPracticeTabState extends State<StudyPracticeTab> {
   List<TextEditingController> _controllers = <TextEditingController>[];
   bool _checked = false;
   bool? _allCorrect;
+  String? _mcqSelected;
 
   @override
   void initState() {
@@ -51,6 +52,7 @@ class _StudyPracticeTabState extends State<StudyPracticeTab> {
       _index = 0;
       _checked = false;
       _allCorrect = null;
+      _mcqSelected = null;
       _resetControllers();
     }
   }
@@ -70,13 +72,17 @@ class _StudyPracticeTabState extends State<StudyPracticeTab> {
 
   void _resetControllers() {
     _disposeControllers();
+    _mcqSelected = null;
     if (_session.isEmpty) {
       return;
     }
-    _controllers = List<TextEditingController>.generate(
-      _session[_index].answers.length,
-      (_) => TextEditingController(),
-    );
+    final _PracticeItem item = _session[_index];
+    if (item.kind == _PracticeKind.cloze) {
+      _controllers = List<TextEditingController>.generate(
+        item.answers.length,
+        (_) => TextEditingController(),
+      );
+    }
   }
 
   List<_PracticeItem> _buildSession() {
@@ -85,7 +91,7 @@ class _StudyPracticeTabState extends State<StudyPracticeTab> {
     }
     final int center = widget.activeIndex.clamp(0, widget.lines.length - 1);
     final int start = max(0, center - 1);
-    final int end = min(widget.lines.length, center + 5);
+    final int end = min(widget.lines.length, center + 6);
     final List<PlayerSubtitleLine> window = widget.lines.sublist(start, end);
     final Random rng = Random(center + widget.lines.length * 17);
     final List<_PracticeItem> items = <_PracticeItem>[];
@@ -93,9 +99,16 @@ class _StudyPracticeTabState extends State<StudyPracticeTab> {
       final int offset = i % window.length;
       final PlayerSubtitleLine line = window[offset];
       final int lineIndex = start + offset;
-      final _PracticeItem? cloze = _buildCloze(line, lineIndex, rng);
-      if (cloze != null) {
-        items.add(cloze);
+      final _PracticeItem? item = i.isEven
+          ? _buildCloze(line, lineIndex, rng)
+          : _buildMcq(line, lineIndex, rng, window);
+      if (item != null) {
+        items.add(item);
+      } else {
+        final _PracticeItem? fallback = _buildCloze(line, lineIndex, rng);
+        if (fallback != null) {
+          items.add(fallback);
+        }
       }
     }
     return items;
@@ -137,10 +150,63 @@ class _StudyPracticeTabState extends State<StudyPracticeTab> {
       }
     }
     return _PracticeItem(
+      kind: _PracticeKind.cloze,
       lineIndex: lineIndex,
       chinese: line.chinese,
+      prompt: line.english,
       answers: answers,
       tokens: tokens,
+    );
+  }
+
+  _PracticeItem? _buildMcq(
+    PlayerSubtitleLine line,
+    int lineIndex,
+    Random rng,
+    List<PlayerSubtitleLine> pool,
+  ) {
+    final List<String> raw = line.english.split(RegExp(r'\s+'));
+    final List<String> words = raw
+        .map((String w) => w.replaceAll(RegExp(r"[^A-Za-z']"), ''))
+        .where((String w) => w.length > 2)
+        .toList(growable: false);
+    if (words.isEmpty) {
+      return null;
+    }
+    final String answer = words[rng.nextInt(words.length)];
+    final Set<String> distractors = <String>{};
+    for (final PlayerSubtitleLine other in pool) {
+      if (other == line) {
+        continue;
+      }
+      for (final String token in other.english.split(RegExp(r'\s+'))) {
+        final String clean = token.replaceAll(RegExp(r"[^A-Za-z']"), '');
+        if (clean.length > 2 &&
+            clean.toLowerCase() != answer.toLowerCase()) {
+          distractors.add(clean);
+        }
+      }
+    }
+    final List<String> distractorList = distractors.toList()..shuffle(rng);
+    if (distractorList.length < 2) {
+      return null;
+    }
+    final List<String> options = <String>[
+      answer,
+      ...distractorList.take(2),
+    ]..shuffle(rng);
+    final String stem = line.english.replaceFirst(
+      RegExp('\\b${RegExp.escape(answer)}\\b', caseSensitive: false),
+      '____',
+    );
+    return _PracticeItem(
+      kind: _PracticeKind.mcq,
+      lineIndex: lineIndex,
+      chinese: line.chinese,
+      prompt: stem,
+      answers: <String>[answer],
+      options: options,
+      tokens: const <_Token>[],
     );
   }
 
@@ -149,12 +215,20 @@ class _StudyPracticeTabState extends State<StudyPracticeTab> {
   void _check() {
     final _PracticeItem item = _item;
     bool ok = true;
-    for (int i = 0; i < item.answers.length; i++) {
-      final String actual =
-          (i < _controllers.length ? _controllers[i].text : '').trim().toLowerCase();
-      if (actual != item.answers[i].toLowerCase()) {
-        ok = false;
-        break;
+    if (item.kind == _PracticeKind.mcq) {
+      ok =
+          (_mcqSelected ?? '').trim().toLowerCase() ==
+          item.answers.first.toLowerCase();
+    } else {
+      for (int i = 0; i < item.answers.length; i++) {
+        final String actual =
+            (i < _controllers.length ? _controllers[i].text : '')
+                .trim()
+                .toLowerCase();
+        if (actual != item.answers[i].toLowerCase()) {
+          ok = false;
+          break;
+        }
       }
     }
     setState(() {
@@ -172,6 +246,7 @@ class _StudyPracticeTabState extends State<StudyPracticeTab> {
       _index = next;
       _checked = false;
       _allCorrect = null;
+      _mcqSelected = null;
       _resetControllers();
     });
     widget.onGoToLine?.call(_session[next].lineIndex);
@@ -183,7 +258,7 @@ class _StudyPracticeTabState extends State<StudyPracticeTab> {
     if (widget.lines.isEmpty || _session.isEmpty) {
       return Center(
         child: Text(
-          '暂无练习题。加载字幕后可自动出挖空题。',
+          '暂无练习题。加载字幕后可自动出挖空/选择题。',
           textAlign: TextAlign.center,
           style: TextStyle(color: shell.textSecondary),
         ),
@@ -195,54 +270,98 @@ class _StudyPracticeTabState extends State<StudyPracticeTab> {
       padding: const EdgeInsets.fromLTRB(12, 12, 12, 24),
       children: <Widget>[
         Text(
-          '练习 · ${_index + 1}/${_session.length}',
+          '${item.kind == _PracticeKind.mcq ? '选择题' : '挖空'} · ${_index + 1}/${_session.length}',
           style: TextStyle(
             color: shell.textMuted,
             fontWeight: FontWeight.w600,
           ),
         ),
         const SizedBox(height: 16),
-        Wrap(
-          crossAxisAlignment: WrapCrossAlignment.center,
-          spacing: 6,
-          runSpacing: 8,
-          children: <Widget>[
-            for (int i = 0; i < item.tokens.length; i++) ...<Widget>[
-              if (item.tokens[i].blankIndex != null)
-                Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: <Widget>[
-                    _BlankField(
-                      controller: _controllers[item.tokens[i].blankIndex!],
-                      width: max(
-                        48,
-                        item.answers[item.tokens[i].blankIndex!].length * 12.0,
+        if (item.kind == _PracticeKind.mcq) ...<Widget>[
+          Text(
+            item.prompt,
+            style: TextStyle(
+              color: shell.textPrimary,
+              fontSize: 22,
+              fontWeight: FontWeight.w700,
+              height: 1.45,
+            ),
+          ),
+          const SizedBox(height: 14),
+          for (final String option in item.options)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: Material(
+                color: _mcqSelected == option
+                    ? shell.accent.withValues(alpha: 0.25)
+                    : shell.card,
+                borderRadius: BorderRadius.circular(12),
+                child: InkWell(
+                  key: ValueKey<String>('practice-mcq-$option'),
+                  borderRadius: BorderRadius.circular(12),
+                  onTap: _checked
+                      ? null
+                      : () => setState(() => _mcqSelected = option),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 14,
+                      vertical: 14,
+                    ),
+                    child: Text(
+                      option,
+                      style: TextStyle(
+                        color: shell.textPrimary,
+                        fontWeight: FontWeight.w700,
+                        fontSize: 16,
                       ),
                     ),
-                    if (item.tokens[i].trailing.isNotEmpty)
-                      Text(
-                        item.tokens[i].trailing,
-                        style: TextStyle(
-                          color: shell.textPrimary,
-                          fontSize: 22,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                  ],
-                )
-              else
-                Text(
-                  item.tokens[i].text,
-                  style: TextStyle(
-                    color: shell.textPrimary,
-                    fontSize: 22,
-                    fontWeight: FontWeight.w700,
-                    height: 1.45,
                   ),
                 ),
+              ),
+            ),
+        ] else
+          Wrap(
+            crossAxisAlignment: WrapCrossAlignment.center,
+            spacing: 6,
+            runSpacing: 8,
+            children: <Widget>[
+              for (int i = 0; i < item.tokens.length; i++) ...<Widget>[
+                if (item.tokens[i].blankIndex != null)
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: <Widget>[
+                      _BlankField(
+                        controller: _controllers[item.tokens[i].blankIndex!],
+                        width: max(
+                          48,
+                          item.answers[item.tokens[i].blankIndex!].length *
+                              12.0,
+                        ),
+                      ),
+                      if (item.tokens[i].trailing.isNotEmpty)
+                        Text(
+                          item.tokens[i].trailing,
+                          style: TextStyle(
+                            color: shell.textPrimary,
+                            fontSize: 22,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                    ],
+                  )
+                else
+                  Text(
+                    item.tokens[i].text,
+                    style: TextStyle(
+                      color: shell.textPrimary,
+                      fontSize: 22,
+                      fontWeight: FontWeight.w700,
+                      height: 1.45,
+                    ),
+                  ),
+              ],
             ],
-          ],
-        ),
+          ),
         if (item.chinese.trim().isNotEmpty) ...<Widget>[
           const SizedBox(height: 10),
           Text(
@@ -253,7 +372,7 @@ class _StudyPracticeTabState extends State<StudyPracticeTab> {
         if (_checked) ...<Widget>[
           const SizedBox(height: 12),
           Text(
-            _allCorrect == true ? '全部正确！' : '还有空没填对，再听一句试试。',
+            _allCorrect == true ? '全部正确！' : '再听一句试试。',
             style: TextStyle(
               color: _allCorrect == true ? shell.highlight : Colors.orangeAccent,
               fontWeight: FontWeight.w800,
@@ -273,7 +392,9 @@ class _StudyPracticeTabState extends State<StudyPracticeTab> {
         const SizedBox(height: 20),
         FilledButton(
           key: const ValueKey<String>('practice-check'),
-          onPressed: _check,
+          onPressed: item.kind == _PracticeKind.mcq && _mcqSelected == null
+              ? null
+              : _check,
           style: FilledButton.styleFrom(
             backgroundColor: shell.highlight,
             foregroundColor: Colors.white,
@@ -401,16 +522,24 @@ class _Token {
   final String trailing;
 }
 
+enum _PracticeKind { cloze, mcq }
+
 class _PracticeItem {
   const _PracticeItem({
+    required this.kind,
     required this.lineIndex,
     required this.chinese,
+    required this.prompt,
     required this.answers,
     required this.tokens,
+    this.options = const <String>[],
   });
 
+  final _PracticeKind kind;
   final int lineIndex;
   final String chinese;
+  final String prompt;
   final List<String> answers;
   final List<_Token> tokens;
+  final List<String> options;
 }
