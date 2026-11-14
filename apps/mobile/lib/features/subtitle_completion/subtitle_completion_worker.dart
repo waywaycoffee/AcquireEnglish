@@ -106,6 +106,23 @@ class SubtitleCompletionWorker {
         onProgress: onProgress,
         cancellationToken: cancellationToken,
       );
+      // Persist may leave a sparse side (partial EN→ZH). Re-queue before done.
+      final ({bool needEnglish, bool needChinese})? still =
+          await _remainingNeedAfterJob(job);
+      if (still != null && (still.needEnglish || still.needChinese)) {
+        await queue.enqueue(
+          episodeId: job.episodeId,
+          videoPath: job.videoPath,
+          zhPath: job.zhPath,
+          enPath: job.enPath,
+          sourceKey: job.sourceKey,
+          needEnglish: still.needEnglish,
+          needChinese: still.needChinese,
+          force: true,
+        );
+        onProgress?.call(job.episodeId, '字幕仍不完整，已重新排队');
+        return true;
+      }
       await queue.markDone(job.episodeId);
       onProgress?.call(job.episodeId, '字幕已补全');
       return true;
@@ -131,6 +148,30 @@ class SubtitleCompletionWorker {
     }
     final String text = '$error'.toLowerCase();
     return text.contains('取消') || text.contains('cancel');
+  }
+
+  Future<({bool needEnglish, bool needChinese})?> _remainingNeedAfterJob(
+    SubtitleCompletionJob job,
+  ) async {
+    final MergedSubtitleBundle? asrBundle = await loadAsrSentenceSubtitles(
+      episodeId: job.episodeId,
+      sourceKey: job.sourceKey,
+      appSupportDirectory: _appSupportDirectory,
+    );
+    if (asrBundle == null || asrBundle.sentences.isEmpty) {
+      return (needEnglish: job.needEnglish, needChinese: job.needChinese);
+    }
+    final int total = asrBundle.sentences.length;
+    final int enHits = asrBundle.sentences
+        .where((SubtitleSentence s) => looksEnglish(s.english))
+        .length;
+    final int zhHits = asrBundle.sentences
+        .where((SubtitleSentence s) => looksChinese(s.chinese))
+        .length;
+    return (
+      needEnglish: enHits * 2 < total,
+      needChinese: zhHits * 2 < total,
+    );
   }
 
   Future<void> _runJob({
