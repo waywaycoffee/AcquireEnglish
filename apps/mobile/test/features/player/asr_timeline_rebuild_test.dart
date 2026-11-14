@@ -414,6 +414,85 @@ void main() {
     expect(rebuilt.single.chinese, '大家好');
   });
 
+  test('workingEnglishMismatchesAsr ignores clipped ASR fragment of fuller line', () {
+    final List<PlayerSubtitleLine> working = <PlayerSubtitleLine>[
+      const PlayerSubtitleLine(
+        startTime: '06:30',
+        english: 'I am going to cut the tree',
+        chinese: '我要去砍树',
+        startMs: 390000,
+        endMs: 394000,
+      ),
+    ];
+    final List<PlayerSubtitleLine> asr = <PlayerSubtitleLine>[
+      const PlayerSubtitleLine(
+        startTime: '06:30',
+        english: 'I am going',
+        chinese: '',
+        startMs: 390200,
+        endMs: 391000,
+      ),
+    ];
+    expect(
+      workingEnglishMismatchesAsr(working: working, asrLines: asr),
+      isFalse,
+    );
+  });
+
+  test('workingEnglishMismatchesAsr tolerates punctuation-only differences', () {
+    final List<PlayerSubtitleLine> working = <PlayerSubtitleLine>[
+      const PlayerSubtitleLine(
+        startTime: '00:01',
+        english: 'Hello everyone!',
+        chinese: '大家好',
+        startMs: 1000,
+        endMs: 3000,
+      ),
+      const PlayerSubtitleLine(
+        startTime: '00:03',
+        english: 'Welcome back.',
+        chinese: '欢迎回来',
+        startMs: 3000,
+        endMs: 5000,
+      ),
+      const PlayerSubtitleLine(
+        startTime: '00:05',
+        english: "Let's begin",
+        chinese: '我们开始吧',
+        startMs: 5000,
+        endMs: 7000,
+      ),
+    ];
+    final List<PlayerSubtitleLine> asr = <PlayerSubtitleLine>[
+      const PlayerSubtitleLine(
+        startTime: '00:01',
+        english: 'Hello everyone',
+        chinese: '',
+        startMs: 1000,
+        endMs: 3000,
+      ),
+      const PlayerSubtitleLine(
+        startTime: '00:03',
+        english: 'Welcome back',
+        chinese: '',
+        startMs: 3000,
+        endMs: 5000,
+      ),
+      const PlayerSubtitleLine(
+        startTime: '00:05',
+        english: 'Lets begin',
+        chinese: '',
+        startMs: 5000,
+        endMs: 7000,
+      ),
+    ];
+    // Content words agree; do not rebuild for punctuation / contraction noise.
+    expect(
+      workingEnglishMismatchesAsr(working: working, asrLines: asr),
+      isFalse,
+    );
+  });
+
   test('fuseOcrWithAsrLines prefers ASR wording when sentences disagree', () {
     final List<PlayerSubtitleLine> working = <PlayerSubtitleLine>[
       const PlayerSubtitleLine(
