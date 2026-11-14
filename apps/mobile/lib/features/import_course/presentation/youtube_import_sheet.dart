@@ -8,6 +8,7 @@ import '../../library/presentation/library_mock_data.dart';
 import '../../player/presentation/widgets/study_shell_tokens.dart';
 import '../../subtitle_completion/subtitle_completion_enqueue.dart';
 import '../../subtitle_completion/subtitle_completion_scheduler.dart';
+import '../data/bilibili_episode_prepare.dart';
 import '../data/youtube_import_service.dart';
 import '../domain/youtube_import.dart';
 
@@ -114,7 +115,10 @@ class _YoutubeImportFormState extends ConsumerState<_YoutubeImportForm> {
       final bool ok = await ref
           .read(libraryCatalogProvider.notifier)
           .importCourse(course);
-      if (ok) {
+      final bool canLocalAsr = course.episodes.any(
+        (LibraryEpisodeItem ep) => isUsableLocalVideoPath(ep.videoAsset),
+      );
+      if (ok && canLocalAsr) {
         await enqueueSubtitleCompletionForCourse(course: course);
         SubtitleCompletionScheduler.instance.kick(delay: Duration.zero);
       }
@@ -123,11 +127,21 @@ class _YoutubeImportFormState extends ConsumerState<_YoutubeImportForm> {
       }
       setState(() => _busy = false);
       Navigator.of(context).pop();
-      final String subtitleHint = !hasEn && !hasZh
-          ? '缺中英字幕，已开始后台补全。'
-          : (!hasEn
-                ? '缺英文字幕，已开始后台补全。'
-                : (!hasZh ? '缺中文字幕，已开始后台补全。' : '中英字幕已就绪。'));
+      final String subtitleHint;
+      if (hasEn && hasZh) {
+        subtitleHint = '中英字幕已就绪。';
+      } else if (!canLocalAsr) {
+        // Watch URL alone cannot run on-device Whisper — do not claim backfill.
+        subtitleHint = !hasEn && !hasZh
+            ? '缺中英字幕；下载到本地后再补全。'
+            : (!hasEn ? '缺英文字幕；下载到本地后再补全。' : '缺中文字幕；下载到本地后再补全。');
+      } else {
+        subtitleHint = !hasEn && !hasZh
+            ? '缺中英字幕，已开始后台补全。'
+            : (!hasEn
+                  ? '缺英文字幕，已开始后台补全。'
+                  : '缺中文字幕，已开始后台补全。');
+      }
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(ok ? '已加入书库。$subtitleHint' : '该书库中已有此 YouTube 课程'),

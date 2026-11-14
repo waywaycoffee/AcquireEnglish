@@ -9,7 +9,7 @@ class OralCoachPipelineClient {
   final Dio _dio;
 
   static String normalizeBaseUrl(String raw) {
-    String value = raw.trim();
+    String value = raw.trim().replaceAll('caurlhairai', 'curlhairai');
     if (value.isEmpty) {
       throw StateError('请先在设置中填写视频陪练管线地址。');
     }

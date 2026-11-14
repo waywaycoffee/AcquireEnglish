@@ -895,7 +895,9 @@ class LearningSettingsNotifier extends Notifier<LearningSettingsState> {
   }
 
   void setCloudApiBaseUrl(String value) {
-    state = state.copyWith(cloudApiBaseUrl: value.trim());
+    state = state.copyWith(
+      cloudApiBaseUrl: fixCurlhairaiTypoHost(value.trim()),
+    );
     _persist();
     ref
         .read(networkRepositoryProvider.notifier)
@@ -911,22 +913,28 @@ class LearningSettingsNotifier extends Notifier<LearningSettingsState> {
   }
 
   void setOralCoachServerUrl(String value) {
-    state = state.copyWith(oralCoachServerUrl: value.trim());
+    state = state.copyWith(
+      oralCoachServerUrl: fixCurlhairaiTypoHost(value.trim()),
+    );
     _persist();
   }
 
   void setOralCoachPipelineUrl(String value) {
-    state = state.copyWith(oralCoachPipelineUrl: value.trim());
+    state = state.copyWith(
+      oralCoachPipelineUrl: fixCurlhairaiTypoHost(value.trim()),
+    );
     _persist();
   }
 
   void setVoicePracticeServerUrl(String value) {
-    state = state.copyWith(voicePracticeServerUrl: value.trim());
+    state = state.copyWith(
+      voicePracticeServerUrl: fixCurlhairaiTypoHost(value.trim()),
+    );
     _persist();
   }
 
   void setLiveKitUrl(String value) {
-    state = state.copyWith(liveKitUrl: value.trim());
+    state = state.copyWith(liveKitUrl: fixCurlhairaiTypoHost(value.trim()));
     _persist();
   }
 

@@ -6,6 +6,7 @@ import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_webrtc/flutter_webrtc.dart';
+import 'package:media_kit/media_kit.dart';
 import 'package:path_provider/path_provider.dart';
 
 import '../../../authentication/presentation/auth_session.dart';
@@ -122,6 +123,35 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab> {
       await _microphone?.dispose();
     } catch (_) {}
     _microphone = null;
+  }
+
+  /// Play pipeline-hosted TTS (edge/xtts) when avatar echo is unavailable.
+  Future<bool> _playRemoteTts(String url) async {
+    Player? player;
+    try {
+      player = Player();
+      await player.open(Media(url), play: true);
+      // Bound wait so a hung CDN cannot freeze the turn forever.
+      final DateTime deadline = DateTime.now().add(const Duration(seconds: 45));
+      while (DateTime.now().isBefore(deadline)) {
+        await Future<void>.delayed(const Duration(milliseconds: 200));
+        final bool ended =
+            player.state.completed ||
+            (!player.state.playing &&
+                player.state.position >= player.state.duration &&
+                player.state.duration > Duration.zero);
+        if (ended) {
+          break;
+        }
+      }
+      return true;
+    } catch (_) {
+      return false;
+    } finally {
+      try {
+        await player?.dispose();
+      } catch (_) {}
+    }
   }
 
   Future<void> _connectLiveTalking(String serverUrl) async {
@@ -388,10 +418,19 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab> {
         if (_liveClient.isConnected && turn.avatarText.trim().isNotEmpty) {
           await _liveClient.speak(turn.avatarText, type: 'echo');
         }
-      } else if (turn.coachText.trim().isNotEmpty) {
-        try {
-          await ref.read(wordPronunciationServiceProvider).speak(turn.coachText);
-        } catch (_) {}
+      } else {
+        final String? ttsUrl = turn.ttsUrl?.trim();
+        bool playedRemote = false;
+        if (ttsUrl != null && ttsUrl.isNotEmpty) {
+          playedRemote = await _playRemoteTts(ttsUrl);
+        }
+        if (!playedRemote && turn.coachText.trim().isNotEmpty) {
+          try {
+            await ref
+                .read(wordPronunciationServiceProvider)
+                .speak(turn.coachText);
+          } catch (_) {}
+        }
       }
 
       await _persistLearningTurn(turn);

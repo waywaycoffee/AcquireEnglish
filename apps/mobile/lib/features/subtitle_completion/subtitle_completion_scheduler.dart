@@ -88,8 +88,11 @@ class SubtitleCompletionScheduler with WidgetsBindingObserver {
     if (state == AppLifecycleState.resumed) {
       _startHeartbeat();
       unawaited(_bootstrap());
-    } else if (state == AppLifecycleState.paused ||
-        state == AppLifecycleState.detached) {
+    } else if (state == AppLifecycleState.paused) {
+      // Keep Whisper running across brief locks / app switches. Cancelling here
+      // burned maxAttempts and left imports permanently failed overnight.
+      _heartbeat?.cancel();
+    } else if (state == AppLifecycleState.detached) {
       _heartbeat?.cancel();
       _token?.cancel();
     }

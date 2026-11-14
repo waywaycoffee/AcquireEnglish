@@ -104,6 +104,17 @@ void main() {
     expect(jobs.single.status, SubtitleCompletionStatus.pending);
   });
 
+  test('markDeferred keeps attempts and returns to pending', () async {
+    await queue.enqueue(episodeId: 'ep-def', videoPath: '/tmp/a.mp4');
+    await queue.markRunning('ep-def');
+    await queue.markDeferred('ep-def', 'AI 字幕生成已取消。');
+    final SubtitleCompletionJob job = (await queue.loadJobs()).single;
+    expect(job.status, SubtitleCompletionStatus.pending);
+    expect(job.attempts, 0);
+    expect(job.lastError, contains('取消'));
+    expect((await queue.nextRunnable())?.episodeId, 'ep-def');
+  });
+
   test('running enqueue persists OR-merged need flags', () async {
     await queue.enqueue(
       episodeId: 'ep-run',

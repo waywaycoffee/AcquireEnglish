@@ -306,12 +306,16 @@ void main() {
         await tester.tap(
           find.byKey(const ValueKey<String>('pronunciation-dialog-close')),
         );
-        for (int i = 0; i < 24; i++) {
+        // dispose() unawaits release: mic.dispose then async file deletes.
+        // Wait for both — breaking on mic alone left wavs under suite load.
+        for (int i = 0; i < 60; i++) {
           await tester.pump(const Duration(milliseconds: 50));
           await tester.runAsync(
             () => Future<void>.delayed(const Duration(milliseconds: 20)),
           );
-          if (mic.disposes >= 1) {
+          final bool filesGone =
+              temp.listSync(recursive: true).whereType<File>().isEmpty;
+          if (mic.disposes >= 1 && filesGone) {
             break;
           }
         }

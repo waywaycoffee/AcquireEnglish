@@ -302,6 +302,18 @@ class SubtitleCompletionQueue {
     );
   }
 
+  /// Pause a job without consuming an attempt (lifecycle cancel / lock screen).
+  Future<void> markDeferred(String episodeId, String reason) async {
+    await _update(
+      episodeId,
+      (SubtitleCompletionJob job) => job.copyWith(
+        status: SubtitleCompletionStatus.pending,
+        lastError: reason,
+        updatedAtMs: DateTime.now().millisecondsSinceEpoch,
+      ),
+    );
+  }
+
   /// Reset interrupted "running" jobs back to pending (app killed mid-ASR).
   Future<void> recoverInterrupted() async {
     final List<SubtitleCompletionJob> jobs = await loadJobs();
@@ -341,7 +353,9 @@ class SubtitleCompletionQueue {
           error.contains('missing-asr') ||
           error.contains('百炼') ||
           error.contains('whisper');
-      if (onlyConfigErrors && !configError) {
+      final bool cancelError =
+          error.contains('取消') || error.contains('cancel');
+      if (onlyConfigErrors && !configError && !cancelError) {
         continue;
       }
       jobs[i] = job.copyWith(

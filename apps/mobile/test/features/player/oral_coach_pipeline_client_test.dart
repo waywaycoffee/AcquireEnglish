@@ -7,6 +7,12 @@ void main() {
       OralCoachPipelineClient.normalizeBaseUrl('192.168.1.8:8770'),
       'http://192.168.1.8:8770',
     );
+    expect(
+      OralCoachPipelineClient.normalizeBaseUrl(
+        'https://acquireenglish.caurlhairai.com/coach/',
+      ),
+      'https://acquireenglish.curlhairai.com/coach',
+    );
   });
 
   test('turn result parses avatar cue', () {

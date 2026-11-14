@@ -110,10 +110,27 @@ class SubtitleCompletionWorker {
       onProgress?.call(job.episodeId, '字幕已补全');
       return true;
     } catch (error) {
+      if (_isCancellation(error, cancellationToken)) {
+        // Do not burn attempts — phone lock / detach should retry on resume.
+        await queue.markDeferred(job.episodeId, '$error');
+        onProgress?.call(job.episodeId, '字幕补全已暂停，稍后自动继续');
+        return true;
+      }
       await queue.markFailed(job.episodeId, '$error');
       onProgress?.call(job.episodeId, '字幕补全失败：$error');
       return true;
     }
+  }
+
+  bool _isCancellation(
+    Object error,
+    AsrSubtitleCancellationToken? cancellationToken,
+  ) {
+    if (cancellationToken?.isCancelled == true) {
+      return true;
+    }
+    final String text = '$error'.toLowerCase();
+    return text.contains('取消') || text.contains('cancel');
   }
 
   Future<void> _runJob({
