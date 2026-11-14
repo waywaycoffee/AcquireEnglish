@@ -1029,7 +1029,24 @@ class BilibiliImportService {
       }
     }
 
-    // Local-first: do not silently fall back to online streaming.
+    // Last resort for playback only: stream via localhost proxy so media_kit
+    // can play while the user retries a full download later. ASR still needs
+    // ensureLocalCacheForAsr (real file).
+    final String? streamUrl = remoteUrls.isNotEmpty ? remoteUrls.first : null;
+    if (streamUrl != null) {
+      try {
+        onProgress?.call(null, '本地下载失败，改用代理流播放…');
+        final String proxy = await BilibiliMediaProxy.serve(
+          upstreamUrl: streamUrl,
+          headers: _playHeadersWithAuth,
+          dio: _dio,
+        );
+        return BilibiliPlayableMedia(uri: proxy, headers: null);
+      } catch (e) {
+        lastDownloadError ??= e;
+      }
+    }
+
     throw StateError(
       '本地下载失败：${_dioErrorSummary(lastDownloadError)}。'
       '请检查网络后重试；已登录时可获得更稳定的取流。',
