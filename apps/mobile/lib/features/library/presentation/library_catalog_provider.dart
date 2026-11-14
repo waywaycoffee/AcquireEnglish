@@ -9,6 +9,7 @@ import '../../import_course/data/bilibili_multipage.dart';
 import '../../import_course/domain/bilibili_import.dart';
 import '../../import_course/domain/import_match.dart';
 import '../../player/presentation/asr_subtitle_cache.dart';
+import '../data/course_pack_mapper.dart';
 import 'course_directory_relink.dart';
 import 'library_mock_data.dart';
 
@@ -95,13 +96,21 @@ class LibraryCatalogNotifier extends Notifier<List<LibraryCourseData>> {
 
   /// Upsert cloud / feed courses ahead of local imports (plan content order).
   Future<void> mergeCloudCourses(List<LibraryCourseData> cloudCourses) async {
+    // Drop previously synced placeholder「云课程」(slow-english-demo etc.).
+    final List<LibraryCourseData> withoutPlaceholders = state
+        .where((LibraryCourseData c) => !isPlaceholderLibraryCourse(c))
+        .toList(growable: false);
     if (cloudCourses.isEmpty) {
+      if (withoutPlaceholders.length != state.length) {
+        state = withoutPlaceholders;
+        await _persistImportedCourses();
+      }
       return;
     }
     final Set<String> cloudIds = cloudCourses
         .map((LibraryCourseData c) => c.id)
         .toSet();
-    final List<LibraryCourseData> locals = state
+    final List<LibraryCourseData> locals = withoutPlaceholders
         .where((LibraryCourseData c) => !cloudIds.contains(c.id))
         .toList(growable: false);
     // Plan order: cloud catalog → local imports → YouTube imports.

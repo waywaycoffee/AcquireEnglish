@@ -113,6 +113,12 @@ def _synthetic_pool() -> list[CourseOut]:
 
 
 def load_courses() -> list[CourseOut]:
+    """Built-in catalog. Empty unless include_demo_catalog=true (placeholders only)."""
+    from app.config import settings
+
+    if not settings.include_demo_catalog:
+        return []
+
     courses: list[CourseOut] = []
     if _SCHEMA_EXAMPLE.exists():
         raw = json.loads(_SCHEMA_EXAMPLE.read_text(encoding="utf-8"))

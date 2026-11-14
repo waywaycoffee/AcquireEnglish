@@ -1,6 +1,40 @@
 import '../../sync/data/acquire_api_client.dart';
 import '../presentation/library_mock_data.dart';
 
+bool isPlaceholderCloudVideoUrl(String? url) {
+  final String value = (url ?? '').trim().toLowerCase();
+  return value.contains('cdn.example.com');
+}
+
+/// True when every lesson points at the built-in placeholder CDN (unplayable).
+bool isPlaceholderCloudCourse(AcquireCourseDto course) {
+  if (course.lessons.isEmpty) {
+    return course.id == 'slow-english-demo' ||
+        course.id.startsWith('daily-') ||
+        course.id.startsWith('ted-') ||
+        course.id.startsWith('travel-') ||
+        course.id.startsWith('business-') ||
+        course.id.startsWith('slow-') ||
+        course.id.startsWith('science-');
+  }
+  return course.lessons.every(
+    (AcquireLessonDto lesson) => isPlaceholderCloudVideoUrl(lesson.videoUrl),
+  );
+}
+
+bool isPlaceholderLibraryCourse(LibraryCourseData course) {
+  if (course.sourceLabel.trim() != '云课程') {
+    return false;
+  }
+  if (course.episodes.isEmpty) {
+    return true;
+  }
+  return course.episodes.every(
+    (LibraryEpisodeItem e) =>
+        e.videoMissing || isPlaceholderCloudVideoUrl(e.videoAsset),
+  );
+}
+
 LibraryCourseData mapAcquireCourseToLibrary(AcquireCourseDto course) {
   final List<LibraryEpisodeItem> episodes = course.lessons
       .map((AcquireLessonDto lesson) {
@@ -23,7 +57,7 @@ LibraryCourseData mapAcquireCourseToLibrary(AcquireCourseDto course) {
           coverImage: course.coverUrl ?? 'assets/img/app_icon.png',
           totalTimeStr: _formatDuration(lesson.durationSec ?? 90),
           videoAsset: lesson.videoUrl,
-          videoMissing: lesson.videoUrl.contains('cdn.example.com'),
+          videoMissing: isPlaceholderCloudVideoUrl(lesson.videoUrl),
           enSubtitleAsset: hasEn ? lesson.subtitleEn : null,
           cnSubtitleAsset: hasZh ? lesson.subtitleZh : null,
         );

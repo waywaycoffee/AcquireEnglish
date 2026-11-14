@@ -10,8 +10,11 @@ Future<void> syncCloudCatalogAndFeed(Ref ref) async {
   try {
     final AcquireApiClient api = ref.read(acquireApiClientProvider);
     final List<AcquireCourseDto> courses = await api.courses();
-    final List<LibraryCourseData> mapped =
-        courses.map(mapAcquireCourseToLibrary).toList(growable: false);
+    // Never merge unplayable placeholder packs (cdn.example.com demo catalog).
+    final List<LibraryCourseData> mapped = courses
+        .where((AcquireCourseDto c) => !isPlaceholderCloudCourse(c))
+        .map(mapAcquireCourseToLibrary)
+        .toList(growable: false);
     await ref.read(libraryCatalogProvider.notifier).mergeCloudCourses(mapped);
   } catch (_) {}
   try {

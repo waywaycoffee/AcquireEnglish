@@ -19,6 +19,8 @@ class Settings(BaseSettings):
     asr_model: str = "qwen3-asr-flash-filetrans"
     # Cached seekable study audio/video for imported links (Web real <audio>/<video>).
     media_cache_dir: str = "./media"
+    # Placeholder catalog (cdn.example.com). Off in production — users import real media.
+    include_demo_catalog: bool = False
 
     # Phone SMS login (mock accepts fixed code when enabled).
     auth_sms_mock: bool = True
