@@ -14,6 +14,8 @@ File _fakeVideo(Directory root, String name) {
 }
 
 void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
+
   late Directory temp;
   late SubtitleCompletionQueue queue;
 
@@ -73,6 +75,15 @@ void main() {
     final File zh = File('${temp.path}/official/zh.srt')
       ..createSync(recursive: true)
       ..writeAsStringSync('1\n00:00:00,000 --> 00:00:01,000\n你好\n');
+    final SubtitleCompletionNeed need = await detectSubtitleCompletionNeed(
+      episodeId: 'ep-3-detect',
+      zhSubtitlePath: zh.path,
+      enSubtitlePath: en.path,
+      appSupportDirectory: () async => temp,
+    );
+    expect(need.needEnglish, isFalse);
+    expect(need.needChinese, isFalse);
+    expect(need.needProofread, isTrue);
     await enqueueSubtitleCompletionForEpisode(
       episodeId: 'ep-3',
       videoPath: video.path,
@@ -82,6 +93,7 @@ void main() {
       appSupportDirectory: () async => temp,
     );
     final SubtitleCompletionJob job = (await queue.loadJobs()).single;
+    // Proofread maps onto the Whisper English job.
     expect(job.needEnglish, isTrue);
     expect(job.needChinese, isFalse);
   });

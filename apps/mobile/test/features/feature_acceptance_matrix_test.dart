@@ -119,6 +119,14 @@ void main() {
       final File zh = File('${temp.path}/official/zh.srt')
         ..createSync(recursive: true)
         ..writeAsStringSync('1\n00:00:00,000 --> 00:00:01,000\n你好\n');
+      final SubtitleCompletionNeed need = await detectSubtitleCompletionNeed(
+        episodeId: 'f02-proofread-detect',
+        zhSubtitlePath: zh.path,
+        enSubtitlePath: en.path,
+        appSupportDirectory: () async => temp,
+      );
+      expect(need.needProofread, isTrue);
+      expect(need.needEnglish, isFalse);
       await enqueueSubtitleCompletionForEpisode(
         episodeId: 'f02-proofread',
         videoPath: video.path,

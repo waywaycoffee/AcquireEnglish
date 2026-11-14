@@ -27,12 +27,16 @@ class SubtitleCompletionNeed {
   const SubtitleCompletionNeed({
     required this.needEnglish,
     required this.needChinese,
+    this.needProofread = false,
   });
 
   final bool needEnglish;
   final bool needChinese;
 
-  bool get any => needEnglish || needChinese;
+  /// Official EN+ZH exist but speech has not verified them yet (ASR校对).
+  final bool needProofread;
+
+  bool get any => needEnglish || needChinese || needProofread;
 }
 
 /// Decide which sides still need filling for one episode.
@@ -48,7 +52,11 @@ Future<SubtitleCompletionNeed> detectSubtitleCompletionNeed({
   Future<Directory> Function()? appSupportDirectory,
 }) async {
   if (force) {
-    return const SubtitleCompletionNeed(needEnglish: true, needChinese: true);
+    return const SubtitleCompletionNeed(
+      needEnglish: true,
+      needChinese: true,
+      needProofread: true,
+    );
   }
 
   final MergedSubtitleBundle? asrBundle = await loadAsrSentenceSubtitles(
@@ -98,10 +106,13 @@ Future<SubtitleCompletionNeed> detectSubtitleCompletionNeed({
   // Official EN+ZH still needs speech proofread: B站 CC / ZH→EN can be fluent
   // and still unrelated to the audio. After Whisper persists an ASR bundle,
   // the early return above skips a second run.
+  // needEnglish stays false when EN file is reliable — worker still runs via
+  // needProofread → enqueue maps it to needEnglish for Whisper.
   final bool needSpeechProofread = hasZh && hasReliableEn;
   return SubtitleCompletionNeed(
-    needEnglish: !hasReliableEn || needSpeechProofread,
+    needEnglish: !hasReliableEn,
     needChinese: !hasZh,
+    needProofread: needSpeechProofread,
   );
 }
 
@@ -191,13 +202,14 @@ Future<void> enqueueSubtitleCompletionForEpisode({
   }
 
   final SubtitleCompletionQueue store = queue ?? SubtitleCompletionQueue.shared;
+  // Proofread reuses the Whisper English job: speech owns EN, Chinese attaches.
   await store.enqueue(
     episodeId: episodeId,
     videoPath: videoPath!.trim(),
     zhPath: zhPath,
     enPath: enPath,
     sourceKey: sourceKey,
-    needEnglish: need.needEnglish,
+    needEnglish: need.needEnglish || need.needProofread,
     needChinese: need.needChinese,
     force: force,
   );

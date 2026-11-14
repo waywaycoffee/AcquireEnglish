@@ -1254,9 +1254,14 @@ class PadPortraitPlayerScreenState
       setState(() {
         _bilingualPhase = BilingualPipelinePhase.asrProofreading;
         _bilingualShowAiComplete = false;
-        _bilingualPipelineLabel = need.needEnglish && need.needChinese
-            ? '导入后台补全中英字幕中…'
-            : (need.needEnglish ? '导入后台语音补英文中…' : '导入后台补中文中…');
+        // Speech owns English — never advertise ZH→EN on open.
+        _bilingualPipelineLabel = need.needProofread && !need.needEnglish
+            ? '导入后台语音校对英文中…'
+            : (need.needEnglish && need.needChinese
+                  ? '导入后台语音补全中英字幕中…'
+                  : (need.needEnglish
+                        ? '导入后台语音补英文中…'
+                        : '导入后台补中文中…'));
       });
     }
     await enqueueSubtitleCompletionForEpisode(
@@ -1269,7 +1274,9 @@ class PadPortraitPlayerScreenState
     SubtitleCompletionScheduler.instance.kick(delay: Duration.zero);
   }
 
-  Future<void> _maybeStartBilingualPipeline() async {
+  Future<void> _maybeStartBilingualPipeline({
+    bool forRegenerate = false,
+  }) async {
     if (!mounted || _generatingAiSubtitles) {
       return;
     }
@@ -1290,25 +1297,20 @@ class PadPortraitPlayerScreenState
         }
       } catch (_) {}
     }
-    // Empty timeline still runs OCR: hardsub-only videos have no softsubs.
-    // Chinese courses whose English is only a machine translation still need
-    // a video proofread — that English can be fluent and unrelated.
-    final bool needsFill = BilingualSubtitlePipeline.shouldAutoStart(
-      state.lines,
-    );
-    // ASR proofread must verify even "official" EN — B站 CC / ZH→EN can be
-    // fluent and still unrelated to the spoken audio.
-    final bool proofreadTranslation =
-        state.hasLines &&
-        !needsFill &&
-        state.lines.any(
-          (PlayerSubtitleLine line) => looksChinese(line.chinese),
-        );
-    if (state.hasLines && !needsFill && !proofreadTranslation) {
-      return;
-    }
-    if (!state.hasLines && !_isLikelyHardsubCourse()) {
-      return;
+    // Opening the player must NOT ZH→EN or auto-proofread. Import queue owns
+    // missing-side fill + speech proofread; this path is OCR/hardsub or the
+    // explicit「重新识别」entry that calls us.
+    if (!forRegenerate) {
+      final bool needsFill = BilingualSubtitlePipeline.shouldAutoStart(
+        state.lines,
+      );
+      if (needsFill || state.hasLines) {
+        await _ensureImportTimeSubtitleCompletion();
+        return;
+      }
+      if (!_isLikelyHardsubCourse()) {
+        return;
+      }
     }
     // Incomplete AI/OCR caches used to set this true and skip fill forever.
     _usingAiSubtitles = false;
@@ -1378,32 +1380,22 @@ class PadPortraitPlayerScreenState
       },
     );
     _bilingualPipeline = pipeline;
-    final bool translateFirst =
-        needsFill &&
-        state.lines.any(
-          (PlayerSubtitleLine line) =>
-              looksChinese(line.chinese) ||
-              (looksChinese(line.english) && !looksEnglish(line.english)),
-        );
     setState(() {
-      _bilingualPhase = proofreadTranslation
+      _bilingualPhase = forRegenerate
           ? BilingualPipelinePhase.asrProofreading
-          : (translateFirst
-                ? BilingualPipelinePhase.translating
-                : BilingualPipelinePhase.ocrRunning);
-      _bilingualPipelineLabel = proofreadTranslation
+          : BilingualPipelinePhase.ocrRunning;
+      _bilingualPipelineLabel = forRegenerate
           ? '正在用语音对齐英文…'
-          : (translateFirst ? '正在把中文字幕翻译成英文…' : '正在识别画面英文字幕…');
+          : '正在识别画面英文字幕…';
       _bilingualShowAiComplete = false;
     });
-    // Missing softsubs are import-queue work. OCR here is only for hardsub /
-    // manual「重新识别」paths that explicitly started this pipeline.
+    // Hardsub OCR, or「重新识别」speech proofread. Never ZH→EN on open.
     await pipeline.startOcr(
       isPlaying: () => state.isPlaying || _videoIsPlaying,
       positionMs: () => _videoPosition.inMilliseconds > 0
           ? _videoPosition.inMilliseconds
           : state.positionMs,
-      proofreadExisting: proofreadTranslation,
+      proofreadExisting: forRegenerate,
     );
   }
 
@@ -3479,8 +3471,9 @@ class PadPortraitPlayerScreenState
       ),
     );
     _showMessage('正在按语音重新生成字幕（与语音不一致时以 ASR 为准）');
+    SubtitleCompletionScheduler.instance.kick(delay: Duration.zero);
     unawaited(() async {
-      await _maybeStartBilingualPipeline();
+      await _maybeStartBilingualPipeline(forRegenerate: true);
       try {
         await _bilingualPipeline?.proofreadEnglishWithAsr(force: true);
       } catch (_) {}
