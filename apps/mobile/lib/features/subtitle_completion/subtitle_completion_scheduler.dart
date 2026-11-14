@@ -63,17 +63,18 @@ class SubtitleCompletionScheduler with WidgetsBindingObserver {
     _token?.cancel();
   }
 
-  /// Pause ASR only while study playback is actively running.
+  /// Playback no longer cancels import-time subtitle ASR.
+  ///
+  /// Missing EN/ZH must be filled when the video is imported (queue + Whisper),
+  /// not deferred until the player opens. Cancelling here left imports half
+  /// done whenever the user started watching immediately.
   void setPlayerActive(bool active) {
     if (_playerActive == active) {
       return;
     }
     _playerActive = active;
-    if (!active) {
-      kick();
-    } else {
-      _token?.cancel();
-    }
+    // Keep draining either way; kick when leaving the player as a safety net.
+    kick(delay: active ? const Duration(milliseconds: 800) : Duration.zero);
   }
 
   void kick({Duration delay = const Duration(milliseconds: 400)}) {
@@ -99,7 +100,7 @@ class SubtitleCompletionScheduler with WidgetsBindingObserver {
     _heartbeat?.cancel();
     // Keep draining while the app stays open (e.g. user browses elsewhere).
     _heartbeat = Timer.periodic(const Duration(seconds: 20), (_) {
-      if (!_busy && !_playerActive) {
+      if (!_busy) {
         kick(delay: Duration.zero);
       }
     });
@@ -144,7 +145,7 @@ class SubtitleCompletionScheduler with WidgetsBindingObserver {
   }
 
   Future<void> _tick() async {
-    if (_busy || _playerActive || _settingsReader == null) {
+    if (_busy || _settingsReader == null) {
       return;
     }
     final AppLifecycleState? life = WidgetsBinding.instance.lifecycleState;
@@ -170,8 +171,8 @@ class SubtitleCompletionScheduler with WidgetsBindingObserver {
                 settings: _settingsReader!(),
                 cancellationToken: token,
               );
-      if (ran && !token.isCancelled && !_playerActive) {
-        // Chain the next pending job while the app stays open.
+      if (ran && !token.isCancelled) {
+        // Chain the next pending import job while the app stays open.
         kick(delay: const Duration(milliseconds: 200));
       }
     } finally {

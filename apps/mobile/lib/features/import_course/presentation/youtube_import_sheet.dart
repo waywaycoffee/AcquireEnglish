@@ -7,6 +7,7 @@ import '../../library/presentation/library_catalog_provider.dart';
 import '../../library/presentation/library_mock_data.dart';
 import '../../player/presentation/widgets/study_shell_tokens.dart';
 import '../../subtitle_completion/subtitle_completion_enqueue.dart';
+import '../../subtitle_completion/subtitle_completion_scheduler.dart';
 import '../data/youtube_import_service.dart';
 import '../domain/youtube_import.dart';
 
@@ -114,7 +115,8 @@ class _YoutubeImportFormState extends ConsumerState<_YoutubeImportForm> {
           .read(libraryCatalogProvider.notifier)
           .importCourse(course);
       if (ok) {
-        unawaited(enqueueSubtitleCompletionForCourse(course: course));
+        await enqueueSubtitleCompletionForCourse(course: course);
+        SubtitleCompletionScheduler.instance.kick(delay: Duration.zero);
       }
       if (!mounted) {
         return;

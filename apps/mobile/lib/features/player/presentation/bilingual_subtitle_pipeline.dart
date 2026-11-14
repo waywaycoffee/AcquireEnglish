@@ -544,19 +544,29 @@ class BilingualSubtitlePipeline {
           (looksChinese(line.english) && !looksEnglish(line.english)),
     );
     // Timed Chinese cues keep the timeline. Never OCR them. Speech (ASR) is
-    // the English source — do not wait for ZH→EN to finish first, or the list
-    // stays on machine-translation paraphrases for the whole fill.
+    // the English source — do not ZH→EN in parallel, or paraphrases flood the
+    // list and hide audio mismatches for the whole fill.
     if (chineseTimed) {
       try {
         _ocrProofreadOnly = true;
         if (_canRunLocalAsr()) {
           _setPhase(BilingualPipelinePhase.asrProofreading);
           onProgress?.call('正在用语音对齐英文…');
-          // Screen may still fill leftover holes with ZH→EN in parallel.
-          if (_missing != MissingSubtitleSide.none) {
+          try {
+            await proofreadEnglishWithAsr(force: true);
+          } catch (_) {
+            // Fall through to translation for remaining holes.
+          }
+          final MissingSubtitleSide afterAsr = detectMissingSubtitleSide(
+            getLines(),
+          );
+          if (!_cancelled &&
+              (afterAsr == MissingSubtitleSide.english ||
+                  afterAsr == MissingSubtitleSide.both ||
+                  afterAsr == MissingSubtitleSide.chinese)) {
+            onProgress?.call('语音对齐后补全缺失侧…');
             _requestTranslationFallback();
           }
-          await proofreadEnglishWithAsr();
         } else if (_missing != MissingSubtitleSide.none) {
           _setPhase(BilingualPipelinePhase.translating);
           onProgress?.call('正在把中文字幕翻译成英文…');
@@ -821,9 +831,19 @@ class BilingualSubtitlePipeline {
 
       token.throwIfCancelled();
       final List<PlayerSubtitleLine> asrLines = parseSubtitleLines(raw);
-      final List<PlayerSubtitleLine> finalLines = asrLines.isEmpty
-          ? working
-          : fuseOcrWithAsrLines(working: working, asrLines: asrLines);
+      final List<PlayerSubtitleLine> finalLines;
+      if (asrLines.isEmpty) {
+        finalLines = working;
+      } else if (working.isEmpty ||
+          workingEnglishMismatchesAsr(working: working, asrLines: asrLines)) {
+        finalLines = rebuildBilingualFromAsrLines(
+          working: working,
+          asrLines: asrLines,
+        );
+        onProgress?.call('已按语音时间轴更新字幕');
+      } else {
+        finalLines = fuseOcrWithAsrLines(working: working, asrLines: asrLines);
+      }
       if (finalLines.isNotEmpty) {
         setLines(finalLines);
       }
@@ -976,21 +996,29 @@ class BilingualSubtitlePipeline {
 
   /// Align English to the video with Whisper when a local file exists.
   ///
-  /// Chinese-only cues are fine: ASR English is fused onto that timeline.
-  Future<void> proofreadEnglishWithAsr() async {
-    if (_asrProofreadStarted || _cancelled || !_canRunLocalAsr()) {
+  /// When speech disagrees with ZH→EN / Chinese timing, ASR owns the timeline.
+  Future<void> proofreadEnglishWithAsr({bool force = false}) async {
+    if (_cancelled || !_canRunLocalAsr()) {
       return;
+    }
+    if (_asrProofreadStarted && !force) {
+      return;
+    }
+    if (force) {
+      _asrProofreadStarted = false;
+      _asrToken?.cancel();
+      _asrToken = null;
     }
     final List<PlayerSubtitleLine> working = List<PlayerSubtitleLine>.of(
       getLines(),
     );
-    if (working.isEmpty) {
-      return;
-    }
     onProgress?.call('正在用语音对齐英文…');
     try {
-      await _proofreadWithAsr(working, releaseLock: false);
-    } catch (_) {}
+      await _proofreadWithAsr(working, releaseLock: false, force: force);
+    } catch (error) {
+      onProgress?.call('语音校对失败：$error');
+      rethrow;
+    }
   }
 
   bool _canRunLocalAsr() {
@@ -1003,8 +1031,9 @@ class BilingualSubtitlePipeline {
   Future<void> _proofreadWithAsr(
     List<PlayerSubtitleLine> working, {
     bool releaseLock = true,
+    bool force = false,
   }) async {
-    if (_asrProofreadStarted) {
+    if (_asrProofreadStarted && !force) {
       if (releaseLock) {
         _releaseLock();
       }
@@ -1033,26 +1062,41 @@ class BilingualSubtitlePipeline {
       );
       token.throwIfCancelled();
       final List<PlayerSubtitleLine> asrLines = parseSubtitleLines(raw);
-      final List<PlayerSubtitleLine> finalLines = asrLines.isEmpty
-          ? working
-          : fuseOcrWithAsrLines(working: working, asrLines: asrLines);
+      final List<PlayerSubtitleLine> live = List<PlayerSubtitleLine>.of(
+        getLines(),
+      );
+      final List<PlayerSubtitleLine> base = live.isNotEmpty ? live : working;
+      // hear_video: speech owns the clock. Mismatch / empty working → rebuild.
+      final List<PlayerSubtitleLine> finalLines;
+      if (asrLines.isEmpty) {
+        finalLines = base;
+      } else if (base.isEmpty ||
+          workingEnglishMismatchesAsr(working: base, asrLines: asrLines)) {
+        finalLines = rebuildBilingualFromAsrLines(
+          working: base,
+          asrLines: asrLines,
+        );
+        onProgress?.call('已按语音时间轴更新字幕');
+      } else {
+        finalLines = fuseOcrWithAsrLines(working: base, asrLines: asrLines);
+      }
       if (finalLines.isNotEmpty) {
         setLines(finalLines);
       }
-      await _writePartialCache(finalLines.isNotEmpty ? finalLines : working);
+      await _writePartialCache(finalLines.isNotEmpty ? finalLines : base);
       _setPhase(BilingualPipelinePhase.completed);
       onProgress?.call('双语字幕已就绪');
       final Future<void> Function(List<PlayerSubtitleLine> lines)? persist =
           onBilingualReady;
       if (persist != null &&
           detectMissingSubtitleSide(
-                finalLines.isNotEmpty ? finalLines : working,
+                finalLines.isNotEmpty ? finalLines : base,
               ) ==
               MissingSubtitleSide.none) {
         unawaited(
           persist(
             List<PlayerSubtitleLine>.of(
-              finalLines.isNotEmpty ? finalLines : working,
+              finalLines.isNotEmpty ? finalLines : base,
             ),
           ),
         );

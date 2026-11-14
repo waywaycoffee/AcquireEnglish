@@ -243,13 +243,14 @@ String bilibiliImportSuccessHint(BilibiliImportResult meta) {
   if (hasEn && hasZh) {
     subtitleHint = '已拉取中英官方字幕（跟读优先用官方英文）。';
   } else if (hasEn && !hasZh) {
-    subtitleHint = '已有英文字幕，缺中文，已开始后台补全。';
+    subtitleHint = '导入已检查字幕：有英文、缺中文，已开始后台翻译补全。';
   } else if (!hasEn && hasZh) {
-    subtitleHint = '已有中文字幕，缺英文，已开始后台语音补全。';
+    subtitleHint = '导入已检查字幕：有中文、缺英文，已开始后台 ASR 语音补全。';
   } else if ((meta.subtitleNote ?? '').isNotEmpty) {
-    subtitleHint = '${meta.subtitleNote}。缺中英字幕，已开始后台补全。';
+    subtitleHint =
+        '${meta.subtitleNote}。导入已检查：中英皆缺，已开始后台 ASR/翻译同时补全。';
   } else {
-    subtitleHint = '未找到官方字幕，缺中英两边，已开始后台补全。';
+    subtitleHint = '导入已检查：未找到官方字幕，中英皆缺，已开始后台 ASR/翻译同时补全。';
   }
   return '$collectionHint$subtitleHint';
 }

@@ -34,6 +34,9 @@ class SubtitleCompletionNeed {
 }
 
 /// Decide which sides still need filling for one episode.
+///
+/// Import-time rule: inspect English and Chinese together. Missing either side
+/// enqueues ASR (EN) and/or EN→ZH fill so both land before study.
 Future<SubtitleCompletionNeed> detectSubtitleCompletionNeed({
   required String episodeId,
   String? zhSubtitlePath,
@@ -53,15 +56,18 @@ Future<SubtitleCompletionNeed> detectSubtitleCompletionNeed({
         appSupportDirectory ?? getApplicationSupportDirectory,
   );
   if (asrBundle != null && asrBundle.sentences.isNotEmpty) {
-    final bool hasEn = asrBundle.sentences.any(
-      (SubtitleSentence s) => looksEnglish(s.english),
-    );
-    final bool hasZh = asrBundle.sentences.any(
-      (SubtitleSentence s) => looksChinese(s.chinese),
-    );
+    final int total = asrBundle.sentences.length;
+    final int enHits = asrBundle.sentences
+        .where((SubtitleSentence s) => looksEnglish(s.english))
+        .length;
+    final int zhHits = asrBundle.sentences
+        .where((SubtitleSentence s) => looksChinese(s.chinese))
+        .length;
+    // Sparse sides (< half of cues) still count as missing so import backfill
+    // can finish the other language instead of stopping early.
     return SubtitleCompletionNeed(
-      needEnglish: !hasEn,
-      needChinese: !hasZh,
+      needEnglish: enHits * 2 < total,
+      needChinese: zhHits * 2 < total,
     );
   }
 
@@ -76,9 +82,21 @@ Future<SubtitleCompletionNeed> detectSubtitleCompletionNeed({
     fileName: 'zh.srt',
   );
   final bool hasZh = isUsableSubtitlePath(zhPath);
+  // Official EN path may exist but be empty / unreadable — treat as missing.
+  bool hasReliableEn = reliableEn;
+  if (hasReliableEn && enSubtitlePath != null) {
+    try {
+      final File enFile = File(enSubtitlePath.trim());
+      if (!enFile.existsSync() || enFile.lengthSync() < 16) {
+        hasReliableEn = false;
+      }
+    } catch (_) {
+      hasReliableEn = false;
+    }
+  }
 
   return SubtitleCompletionNeed(
-    needEnglish: !reliableEn,
+    needEnglish: !hasReliableEn,
     needChinese: !hasZh,
   );
 }

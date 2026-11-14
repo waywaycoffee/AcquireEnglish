@@ -9,6 +9,7 @@ import '../../player/presentation/widgets/study_shell_tokens.dart';
 import '../../settings/presentation/bilibili_login_sheet.dart';
 import '../../settings/presentation/settings_provider.dart';
 import '../../subtitle_completion/subtitle_completion_enqueue.dart';
+import '../../subtitle_completion/subtitle_completion_scheduler.dart';
 import '../data/bilibili_collection_download.dart';
 import '../data/bilibili_course_builder.dart';
 import '../data/bilibili_import_service.dart';
@@ -100,7 +101,10 @@ class _BilibiliImportFormState extends ConsumerState<_BilibiliImportForm> {
           .read(libraryCatalogProvider.notifier)
           .importCourse(course);
       if (ok) {
-        unawaited(enqueueSubtitleCompletionForCourse(course: course));
+        // Import-time: inspect missing EN/ZH together and start ASR/translate
+        // in the background — do not wait until the player is opened.
+        await enqueueSubtitleCompletionForCourse(course: course);
+        SubtitleCompletionScheduler.instance.kick(delay: Duration.zero);
       }
       if (!mounted) {
         return;

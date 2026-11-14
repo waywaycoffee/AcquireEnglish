@@ -405,7 +405,12 @@ class AcquireApiClient {
   }
 
   Future<AcquirePreferencesDto> getPreferences() async {
-    final Response<dynamic> response = await _dio.get(Endpoints.preferences);
+    final Response<dynamic> response = await _dio.get(
+      Endpoints.preferences,
+      options: Options(
+        extra: const <String, Object>{'dio_cache_interceptor_force_refresh': true},
+      ),
+    );
     return AcquirePreferencesDto.fromJson(
       response.data as Map<String, dynamic>,
     );
@@ -417,6 +422,9 @@ class AcquireApiClient {
     final Response<dynamic> response = await _dio.put(
       Endpoints.preferences,
       data: prefs.toJson(),
+      options: Options(
+        extra: const <String, Object>{'dio_cache_interceptor_force_refresh': true},
+      ),
     );
     return AcquirePreferencesDto.fromJson(
       response.data as Map<String, dynamic>,

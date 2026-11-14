@@ -44,7 +44,7 @@ Future<void> notifySubtitleCompletionPending() async {
   await plugin.show(
     id: 4102,
     title: '爱快英语',
-    body: '有课程字幕待语音补全，打开 App 即可在空闲时自动完成。',
+    body: '有课程在导入后待补中英字幕，打开 App 会在后台用语音补全。',
     notificationDetails: const NotificationDetails(android: androidDetails),
   );
 }

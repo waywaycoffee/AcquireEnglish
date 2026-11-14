@@ -8,7 +8,9 @@ import 'package:hive_ce/hive.dart';
 import '../../../constants/endpoints.dart';
 import '../../../constants/env_config.dart';
 import '../../../data/repository/network_repository.dart';
+import '../../authentication/presentation/auth_session.dart';
 import '../../shared/domain/subtitle_letter_case.dart';
+import '../../sync/data/acquire_api_client.dart';
 
 export '../../shared/domain/subtitle_letter_case.dart'
     show subtitleLetterCaseOptions;
@@ -198,7 +200,8 @@ class LearningSettingsState {
     this.oralCoachServerUrl = '',
     this.oralCoachPipelineUrl = 'https://acquireenglish.curlhairai.com/coach',
     this.voicePracticeServerUrl = '',
-    this.liveKitUrl = '',
+    this.liveKitUrl =
+        'wss://acquireenglish-e5la1koz.livekit.cloud',
     this.bilibiliSessdata = '',
     this.bilibiliUserId = '',
   });
@@ -491,6 +494,27 @@ class TranslationModelService {
 class LearningSettingsNotifier extends Notifier<LearningSettingsState> {
   @override
   LearningSettingsState build() {
+    // Push local Bilibili cookie after cloud login (token may arrive later).
+    ref.listen<AuthSessionState>(authSessionProvider, (
+      AuthSessionState? previous,
+      AuthSessionState next,
+    ) {
+      if (!next.isLoggedIn) {
+        return;
+      }
+      if (previous?.isLoggedIn == true &&
+          previous?.accessToken == next.accessToken) {
+        return;
+      }
+      // Defer until build() has returned and `state` is assigned.
+      Future<void>.microtask(() {
+        if (!ref.mounted) {
+          return;
+        }
+        _scheduleSyncBilibiliCookieToCloud(state);
+      });
+    });
+
     final LearningSettingsState defaults = LearningSettingsState.defaults();
     if (!Hive.isBoxOpen('prefs')) {
       _scheduleApplyCloudApiBase(defaults);
@@ -567,16 +591,38 @@ class LearningSettingsNotifier extends Notifier<LearningSettingsState> {
         bilibiliSessdata: _stringOrNull(json['bilibiliSessdata']),
         bilibiliUserId: _stringOrNull(json['bilibiliUserId']),
       );
-      final LearningSettingsState coerced =
+      LearningSettingsState coerced =
           _fallbackLocalWhisperIfCloudKeyMissing(loaded);
+      // Prod LiveKit was added after some installs saved an empty liveKitUrl.
+      if (coerced.liveKitUrl.trim().isEmpty) {
+        coerced = coerced.copyWith(
+          liveKitUrl: LearningSettingsState.defaults().liveKitUrl,
+        );
+      }
+      // Typo host that breaks DNS (caurlhairai → curlhairai).
+      final String pipelineUrl = coerced.oralCoachPipelineUrl.trim();
+      if (pipelineUrl.contains('caurlhairai')) {
+        coerced = coerced.copyWith(
+          oralCoachPipelineUrl: pipelineUrl.replaceAll(
+            'caurlhairai',
+            'curlhairai',
+          ),
+        );
+      }
       _scheduleApplyCloudApiBase(coerced);
-      if (coerced.asrProvider != loaded.asrProvider) {
+      if (coerced.asrProvider != loaded.asrProvider ||
+          coerced.liveKitUrl != loaded.liveKitUrl ||
+          coerced.oralCoachPipelineUrl != loaded.oralCoachPipelineUrl) {
         Future.microtask(() {
           if (!ref.mounted) {
             return;
           }
+          state = coerced;
           _persist();
         });
+      }
+      if (coerced.hasBilibiliCookie) {
+        _scheduleSyncBilibiliCookieToCloud(coerced);
       }
       return coerced;
     } catch (_) {
@@ -873,6 +919,7 @@ class LearningSettingsNotifier extends Notifier<LearningSettingsState> {
   void setBilibiliSessdata(String value) {
     state = state.copyWith(bilibiliSessdata: value.trim());
     _persist();
+    _scheduleSyncBilibiliCookieToCloud(state);
   }
 
   void setBilibiliLogin({
@@ -884,11 +931,67 @@ class LearningSettingsNotifier extends Notifier<LearningSettingsState> {
       bilibiliUserId: userId.trim(),
     );
     _persist();
+    _scheduleSyncBilibiliCookieToCloud(state);
   }
 
   void clearBilibiliLogin() {
     state = state.copyWith(bilibiliSessdata: '', bilibiliUserId: '');
     _persist();
+    _scheduleSyncBilibiliCookieToCloud(state, clear: true);
+  }
+
+  void _scheduleSyncBilibiliCookieToCloud(
+    LearningSettingsState settings, {
+    bool clear = false,
+  }) {
+    unawaited(
+      syncBilibiliCookieToCloudNow(
+        settingsOverride: settings,
+        clear: clear,
+      ),
+    );
+  }
+
+  /// Returns null on success, otherwise a short error message.
+  Future<String?> syncBilibiliCookieToCloudNow({
+    LearningSettingsState? settingsOverride,
+    bool clear = false,
+  }) async {
+    final LearningSettingsState settings = settingsOverride ?? state;
+    final String cookie = clear
+        ? ''
+        : settings.resolvedBilibiliCookieHeader.trim();
+    if (!clear && cookie.isEmpty) {
+      return '本地没有 B 站 Cookie';
+    }
+    for (int attempt = 0; attempt < 6; attempt++) {
+      if (!ref.mounted) {
+        return '页面已关闭';
+      }
+      final AuthSessionState auth = ref.read(authSessionProvider);
+      if (!auth.isLoggedIn) {
+        await Future<void>.delayed(Duration(milliseconds: 400 * (attempt + 1)));
+        continue;
+      }
+      ref.read(networkRepositoryProvider.notifier).setToken(auth.accessToken);
+      try {
+        final AcquireApiClient api = ref.read(acquireApiClientProvider);
+        final AcquirePreferencesDto current = await api.getPreferences();
+        final AcquirePreferencesDto saved = await api.putPreferences(
+          current.copyWith(bilibiliCookie: cookie),
+        );
+        if (!clear && !saved.hasBilibiliCookie) {
+          return '服务器未确认写入';
+        }
+        return null;
+      } catch (error) {
+        if (attempt >= 5) {
+          return error.toString();
+        }
+        await Future<void>.delayed(Duration(milliseconds: 400 * (attempt + 1)));
+      }
+    }
+    return '未登录云端账号';
   }
 
   void resetToDefaults() {

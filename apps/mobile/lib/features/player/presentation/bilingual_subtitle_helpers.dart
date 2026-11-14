@@ -668,6 +668,76 @@ OcrCueText splitOcrTextBlocks(List<String> blocks) {
   return OcrCueText(english: english.toString(), chinese: chinese.toString());
 }
 
+/// Whether working English disagrees with overlapping ASR cues often enough
+/// that the Chinese/ZH→EN timeline should be discarded.
+bool workingEnglishMismatchesAsr({
+  required List<PlayerSubtitleLine> working,
+  required List<PlayerSubtitleLine> asrLines,
+  double disagreeRatio = 0.4,
+}) {
+  if (asrLines.isEmpty) {
+    return false;
+  }
+  if (working.isEmpty) {
+    return true;
+  }
+  int compared = 0;
+  int disagree = 0;
+  for (final PlayerSubtitleLine line in working) {
+    if (!looksEnglish(line.english) || looksChinese(line.english)) {
+      continue;
+    }
+    final PlayerSubtitleLine? asr = _bestOverlappingLine(asrLines, line);
+    if (asr == null || !looksEnglish(asr.english)) {
+      continue;
+    }
+    compared += 1;
+    if (!_sameEnglishText(line.english, asr.english) &&
+        !_sentencesAgree(line.english, asr.english)) {
+      disagree += 1;
+    }
+  }
+  if (compared < 3) {
+    // Too few comparable cues: trust ASR when cue counts diverge sharply.
+    return (asrLines.length - working.length).abs() >= 5 ||
+        asrLines.length >= working.length * 2;
+  }
+  return disagree / compared >= disagreeRatio;
+}
+
+/// Rebuild bilingual cues from the ASR clock; attach Chinese by time overlap.
+///
+/// Use this when speech and on-screen English disagree — ZH→EN paraphrases and
+/// 串台 Chinese timelines must not keep the wrong timestamps.
+List<PlayerSubtitleLine> rebuildBilingualFromAsrLines({
+  required List<PlayerSubtitleLine> working,
+  required List<PlayerSubtitleLine> asrLines,
+}) {
+  if (asrLines.isEmpty) {
+    return List<PlayerSubtitleLine>.of(working);
+  }
+  final List<PlayerSubtitleLine> rebuilt = <PlayerSubtitleLine>[
+    for (final PlayerSubtitleLine asr in asrLines)
+      PlayerSubtitleLine(
+        startTime: asr.startTime,
+        english: looksEnglish(asr.english)
+            ? asr.english.trim()
+            : (_bestOverlappingChineseOrEnglish(working, asr).$1),
+        chinese: (() {
+          final String zh = _bestOverlappingChineseOrEnglish(working, asr).$2;
+          if (zh.isNotEmpty) {
+            return zh;
+          }
+          return looksChinese(asr.chinese) ? asr.chinese : '';
+        })(),
+        startMs: asr.startMs,
+        endMs: asr.endMs,
+        words: asr.words,
+      ),
+  ];
+  return sanitizeSubtitleLanguageFields(rebuilt);
+}
+
 /// Fuse ASR (cleaner sentences) onto OCR/working cues while keeping Chinese.
 ///
 /// Prefer ASR English when OCR looks glued or ASR offers a fuller phrase.
@@ -682,6 +752,11 @@ List<PlayerSubtitleLine> fuseOcrWithAsrLines({
     return List<PlayerSubtitleLine>.of(asrLines);
   }
 
+  // Speech↔text mismatch or sparse/glued OCR: ASR owns the timeline.
+  if (workingEnglishMismatchesAsr(working: working, asrLines: asrLines)) {
+    return rebuildBilingualFromAsrLines(working: working, asrLines: asrLines);
+  }
+
   final bool workingMostlyGlued =
       working
           .where((PlayerSubtitleLine line) => looksEnglish(line.english))
@@ -693,24 +768,7 @@ List<PlayerSubtitleLine> fuseOcrWithAsrLines({
 
   // Sparse OCR fragments: take ASR as the timeline, attach Chinese by overlap.
   if (workingSparse || workingMostlyGlued) {
-    return <PlayerSubtitleLine>[
-      for (final PlayerSubtitleLine asr in asrLines)
-        PlayerSubtitleLine(
-          startTime: asr.startTime,
-          english: looksEnglish(asr.english)
-              ? asr.english
-              : (_bestOverlappingChineseOrEnglish(working, asr).$1),
-          chinese: (() {
-            final String zh = _bestOverlappingChineseOrEnglish(working, asr).$2;
-            return zh.isNotEmpty
-                ? zh
-                : (looksChinese(asr.chinese) ? asr.chinese : '');
-          })(),
-          startMs: asr.startMs,
-          endMs: asr.endMs,
-          words: asr.words,
-        ),
-    ];
+    return rebuildBilingualFromAsrLines(working: working, asrLines: asrLines);
   }
 
   final List<PlayerSubtitleLine> merged = <PlayerSubtitleLine>[];

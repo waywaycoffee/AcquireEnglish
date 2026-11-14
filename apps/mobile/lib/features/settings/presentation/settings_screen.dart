@@ -472,6 +472,35 @@ class SettingsScreen extends ConsumerWidget {
                         .clearBilibiliLogin();
                   },
                 ),
+              if (settings.isBilibiliLoggedIn)
+                _ActionRow(
+                  title: '同步 B 站 Cookie 到云端',
+                  description: authSession.isLoggedIn
+                      ? '写入当前账号的服务器偏好（字幕 / 拉流用）。'
+                      : '请先登录爱快账号，再同步到 ECS。',
+                  icon: Icons.cloud_upload_rounded,
+                  onTap: () async {
+                    if (!authSession.isLoggedIn) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('请先登录爱快账号')),
+                      );
+                      return;
+                    }
+                    final String? err = await ref
+                        .read(learningSettingsProvider.notifier)
+                        .syncBilibiliCookieToCloudNow();
+                    if (!context.mounted) {
+                      return;
+                    }
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text(
+                          err == null ? '已同步 B 站 Cookie 到云端' : '同步失败：$err',
+                        ),
+                      ),
+                    );
+                  },
+                ),
               _InputRow(
                 title: 'SESSDATA（高级）',
                 description: settings.bilibiliCookieFromEnv

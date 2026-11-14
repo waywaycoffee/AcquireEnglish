@@ -10,6 +10,7 @@ import '../../../library/presentation/library_mock_data.dart';
 import '../../../shared/presentation/pad/app_design_tokens.dart';
 import '../../../shared/presentation/pad/pad_compact.dart';
 import '../../../subtitle_completion/subtitle_completion_enqueue.dart';
+import '../../../subtitle_completion/subtitle_completion_scheduler.dart';
 import '../../domain/android_import_picker.dart';
 import '../../domain/import_match.dart';
 import '../../domain/online_video_import.dart';
@@ -558,11 +559,14 @@ class _ImportCourseFlowState extends ConsumerState<ImportCourseFlow> {
           .length;
 
       if (imported) {
-        unawaited(
-          enqueuePendingSubtitleCompletionsForCatalog(
-            courses: ref.read(libraryCatalogProvider),
-          ),
+        // Import-time bilingual check + ASR/translate — not deferred to player open.
+        await enqueuePendingSubtitleCompletionsForCatalog(
+          courses: ref.read(libraryCatalogProvider),
         );
+        SubtitleCompletionScheduler.instance.kick(delay: Duration.zero);
+      }
+      if (!mounted) {
+        return;
       }
       ScaffoldMessenger.of(context)
         ..hideCurrentSnackBar()
@@ -570,7 +574,7 @@ class _ImportCourseFlowState extends ConsumerState<ImportCourseFlow> {
           SnackBar(
             content: Text(
               imported
-                  ? '导入成功：${parsedRows.length} 个视频，$matchedCount 个字幕已匹配；缺的中/英字幕已开始后台补全'
+                  ? '导入成功：${parsedRows.length} 个视频，$matchedCount 个字幕已匹配；缺的中/英字幕已在导入时开始后台补全'
                   : '该课程已导入！',
             ),
           ),
