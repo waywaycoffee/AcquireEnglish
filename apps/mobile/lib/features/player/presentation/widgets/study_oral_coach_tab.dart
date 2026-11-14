@@ -157,6 +157,13 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab> {
   }
 
   Future<void> _ensurePipelineSession(LearningSettingsState settings) async {
+    final String base = OralCoachPipelineClient.normalizeBaseUrl(
+      settings.oralCoachPipelineUrl,
+    );
+    // Settings may change mid-tab; never keep a session bound to a stale host.
+    if (_session != null && _session!.baseUrl != base) {
+      _session = null;
+    }
     if (_session != null) {
       await _syncContext();
       return;

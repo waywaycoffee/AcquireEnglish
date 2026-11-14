@@ -996,6 +996,9 @@ class LearningSettingsNotifier extends Notifier<LearningSettingsState> {
         if (!clear && !saved.hasBilibiliCookie) {
           return '服务器未确认写入';
         }
+        if (clear && saved.hasBilibiliCookie) {
+          return '服务器未确认清除 Cookie';
+        }
         return null;
       } catch (error) {
         if (attempt >= 5) {

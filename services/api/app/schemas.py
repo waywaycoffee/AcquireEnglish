@@ -139,7 +139,8 @@ class PreferencesUpdate(BaseModel):
     daily_quota: int = Field(default=2, ge=1, le=10)
     notify_daily_feed: bool = True
     # Empty string clears; omit/null leaves unchanged when using partial-friendly clients.
-    bilibili_cookie: str | None = Field(default=None, max_length=4096)
+    # Full QR-login Cookie headers (SESSDATA + buvid + …) often exceed 4KB.
+    bilibili_cookie: str | None = Field(default=None, max_length=16384)
     asr_api_key: str | None = Field(default=None, max_length=512)
 
 

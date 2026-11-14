@@ -673,9 +673,10 @@ class BilingualSubtitlePipeline {
     if (_cancelled) {
       return;
     }
+    final AsrSubtitleCancellationToken token = AsrSubtitleCancellationToken();
     try {
       onProgress?.call('正在把中文字幕翻译成英文…');
-      final AsrSubtitleCancellationToken token = AsrSubtitleCancellationToken();
+      _asrToken?.cancel();
       _asrToken = token;
       List<PlayerSubtitleLine> working = List<PlayerSubtitleLine>.of(
         getLines(),
@@ -750,7 +751,9 @@ class BilingualSubtitlePipeline {
     } catch (_) {
       onProgress?.call('自动翻译失败，继续识别画面字幕…');
     } finally {
-      _asrToken = null;
+      if (identical(_asrToken, token)) {
+        _asrToken = null;
+      }
     }
   }
 
@@ -782,6 +785,7 @@ class BilingualSubtitlePipeline {
     }
 
     final AsrSubtitleCancellationToken token = AsrSubtitleCancellationToken();
+    _asrToken?.cancel();
     _asrToken = token;
 
     try {
@@ -852,7 +856,7 @@ class BilingualSubtitlePipeline {
       onProgress?.call('双语字幕已就绪');
     } on AsrSubtitleGenerationException catch (error) {
       final bool cancelled =
-          _asrToken?.isCancelled == true || error.message.contains('取消');
+          token.isCancelled || error.message.contains('取消');
       if (cancelled) {
         _setPhase(BilingualPipelinePhase.cancelled);
         onProgress?.call('已取消');
@@ -862,7 +866,7 @@ class BilingualSubtitlePipeline {
       onProgress?.call(humanizeAsrSubtitleError(error));
       rethrow;
     } catch (error) {
-      if (_asrToken?.isCancelled == true) {
+      if (token.isCancelled) {
         _setPhase(BilingualPipelinePhase.cancelled);
         onProgress?.call('已取消');
         return;
@@ -871,7 +875,9 @@ class BilingualSubtitlePipeline {
       onProgress?.call(humanizeAsrSubtitleError(error));
       rethrow;
     } finally {
-      _asrToken = null;
+      if (identical(_asrToken, token)) {
+        _asrToken = null;
+      }
       _releaseLock();
     }
   }
@@ -1041,6 +1047,7 @@ class BilingualSubtitlePipeline {
     }
     _asrProofreadStarted = true;
     final AsrSubtitleCancellationToken token = AsrSubtitleCancellationToken();
+    _asrToken?.cancel();
     _asrToken = token;
     _setPhase(BilingualPipelinePhase.asrProofreading);
     onProgress?.call('正在语音校对字幕…');
@@ -1102,7 +1109,9 @@ class BilingualSubtitlePipeline {
         );
       }
     } finally {
-      _asrToken = null;
+      if (identical(_asrToken, token)) {
+        _asrToken = null;
+      }
       if (releaseLock) {
         _releaseLock();
       }

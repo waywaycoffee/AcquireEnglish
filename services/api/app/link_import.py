@@ -27,6 +27,14 @@ _HEADERS = {
 }
 
 
+def _bilibili_headers(cookie: str | None = None) -> dict[str, str]:
+    """Browser-like headers for Bilibili API / CDN. Cookie unlocks login-gated CC."""
+    headers = dict(_HEADERS)
+    if cookie and cookie.strip():
+        headers["Cookie"] = cookie.strip()
+    return headers
+
+
 @dataclass
 class LinkImportPayload:
     source: str
@@ -71,12 +79,12 @@ def _cues_to_srt(cues: list[tuple[float, float, str]]) -> str | None:
     return "\n".join(lines) if lines else None
 
 
-async def import_link(url: str) -> LinkImportPayload:
+async def import_link(url: str, *, bilibili_cookie: str | None = None) -> LinkImportPayload:
     source = detect_source(url)
     if source == "youtube":
         return await _import_youtube(url)
     if source == "bilibili":
-        return await _import_bilibili(url)
+        return await _import_bilibili(url, cookie=bilibili_cookie)
     raise ValueError("仅支持 YouTube 或 Bilibili 链接")
 
 
@@ -167,7 +175,7 @@ def _parse_vtt_ts(value: str) -> float:
     return int(h) * 3600 + int(m) * 60 + float(s)
 
 
-async def _import_bilibili(raw: str) -> LinkImportPayload:
+async def _import_bilibili(raw: str, *, cookie: str | None = None) -> LinkImportPayload:
     text = raw.strip()
     params: dict[str, str] = {}
     bv = _BV.search(text)
@@ -181,7 +189,8 @@ async def _import_bilibili(raw: str) -> LinkImportPayload:
             raise ValueError("无效的 Bilibili 链接")
         params["aid"] = av.group(1)
 
-    async with httpx.AsyncClient(headers=_HEADERS, timeout=25.0, follow_redirects=True) as client:
+    headers = _bilibili_headers(cookie)
+    async with httpx.AsyncClient(headers=headers, timeout=25.0, follow_redirects=True) as client:
         view = await client.get(
             "https://api.bilibili.com/x/web-interface/view",
             params=params,

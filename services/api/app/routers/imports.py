@@ -7,10 +7,11 @@ from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.config import settings
 from app.database import get_db
 from app.deps import get_current_user
 from app.link_import import import_link, to_course_out
-from app.models import User, UserLinkCourse
+from app.models import User, UserLinkCourse, UserPreference
 from app.schemas import CourseOut
 
 router = APIRouter(prefix="/imports", tags=["imports"])
@@ -20,6 +21,19 @@ class LinkImportIn(BaseModel):
     url: str = Field(min_length=3, max_length=1024)
 
 
+async def _bilibili_cookie_for_user(user: User, db: AsyncSession) -> str | None:
+    """Prefer the synced per-user cookie; fall back to server env."""
+    result = await db.execute(
+        select(UserPreference).where(UserPreference.user_id == user.id)
+    )
+    row = result.scalar_one_or_none()
+    user_cookie = (row.bilibili_cookie or "").strip() if row is not None else ""
+    if user_cookie:
+        return user_cookie
+    env_cookie = (settings.bilibili_cookie or "").strip()
+    return env_cookie or None
+
+
 @router.post("/link", response_model=CourseOut)
 async def import_media_link(
     payload: LinkImportIn,
@@ -27,7 +41,10 @@ async def import_media_link(
     db: AsyncSession = Depends(get_db),
 ) -> CourseOut:
     try:
-        meta = await import_link(payload.url)
+        meta = await import_link(
+            payload.url,
+            bilibili_cookie=await _bilibili_cookie_for_user(user, db),
+        )
     except ValueError as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
     except Exception as exc:  # network / upstream

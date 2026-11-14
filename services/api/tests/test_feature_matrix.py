@@ -82,13 +82,14 @@ async def test_f03_livekit_token_endpoint_shape():
         r = await client.post(
             "/api/livekit/token",
             headers=headers,
-            json={"roomName": "feature-matrix", "identity": "matrix-user"},
+            json={"room": "feature-matrix"},
         )
         # Local .env may lack LIVEKIT keys → 503/501 acceptable; 200 must have url+token.
         if r.status_code == 200:
             body = r.json()
             assert body.get("url") or body.get("server_url")
             assert body.get("token")
+            assert body.get("room") == "feature-matrix"
         else:
             assert r.status_code in {400, 501, 503, 500}
 
@@ -99,3 +100,58 @@ async def test_f04_unauthorized_preferences_rejected():
     async with AsyncClient(transport=transport, base_url="http://test") as client:
         r = await client.get("/api/preferences")
         assert r.status_code in {401, 403}
+
+
+@pytest.mark.asyncio
+async def test_f05_bilibili_cookie_put_get_clear_and_leave_unchanged():
+    transport = ASGITransport(app=fastapi_app)
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
+        token = await _sms_token(client, phone="13900004444")
+        headers = {"Authorization": f"Bearer {token}"}
+        put = await client.put(
+            "/api/preferences",
+            headers=headers,
+            json={
+                "level": "B2",
+                "tags": ["ted"],
+                "daily_quota": 2,
+                "bilibili_cookie": "SESSDATA=keep_me; bili_jct=abc",
+            },
+        )
+        assert put.status_code == 200, put.text
+        assert put.json()["has_bilibili_cookie"] is True
+
+        # Omit cookie → leave stored value unchanged.
+        leave = await client.put(
+            "/api/preferences",
+            headers=headers,
+            json={"level": "B2", "tags": ["ted"], "daily_quota": 3},
+        )
+        assert leave.status_code == 200, leave.text
+        assert leave.json()["has_bilibili_cookie"] is True
+        assert leave.json()["daily_quota"] == 3
+
+        # Empty string clears.
+        clear = await client.put(
+            "/api/preferences",
+            headers=headers,
+            json={
+                "level": "B2",
+                "tags": ["ted"],
+                "daily_quota": 3,
+                "bilibili_cookie": "",
+            },
+        )
+        assert clear.status_code == 200, clear.text
+        assert clear.json()["has_bilibili_cookie"] is False
+
+
+@pytest.mark.asyncio
+async def test_f06_bilibili_headers_include_cookie():
+    from app.link_import import _bilibili_headers
+
+    bare = _bilibili_headers(None)
+    assert "Cookie" not in bare
+    assert bare["Referer"] == "https://www.bilibili.com"
+    with_cookie = _bilibili_headers("SESSDATA=abc")
+    assert with_cookie["Cookie"] == "SESSDATA=abc"

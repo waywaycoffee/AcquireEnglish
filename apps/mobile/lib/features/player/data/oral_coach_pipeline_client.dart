@@ -258,7 +258,17 @@ class OralCoachTurnResult {
     final Object? tts = raw['tts_url'];
     String? ttsUrl;
     if (tts is String && tts.trim().isNotEmpty) {
-      ttsUrl = tts.startsWith('http') ? tts : '$baseUrl$tts';
+      final String trimmed = tts.trim();
+      // http(s) absolute, or scheme-relative //cdn… — never glue onto baseUrl.
+      if (trimmed.startsWith('http://') ||
+          trimmed.startsWith('https://') ||
+          trimmed.startsWith('//')) {
+        ttsUrl = trimmed.startsWith('//') ? 'https:$trimmed' : trimmed;
+      } else if (trimmed.startsWith('/')) {
+        ttsUrl = '$baseUrl$trimmed';
+      } else {
+        ttsUrl = '$baseUrl/$trimmed';
+      }
     }
     final List<String> corrections = <String>[];
     final Object? rawCorrections = raw['corrections'];

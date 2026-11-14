@@ -34,4 +34,29 @@ void main() {
     expect(turn.ttsUrl, 'http://127.0.0.1:8770/api/tts/a.wav');
     expect(turn.avatarAction, 'livetalking_human');
   });
+
+  test('tts_url joins subpath base and scheme-relative URLs', () {
+    final OralCoachTurnResult relative = OralCoachTurnResult.fromJson(
+      <String, Object?>{
+        'transcript': 'hi',
+        'coach_text': 'ok',
+        'tts_url': 'api/tts/b.wav',
+      },
+      'https://acquireenglish.curlhairai.com/coach',
+    );
+    expect(
+      relative.ttsUrl,
+      'https://acquireenglish.curlhairai.com/coach/api/tts/b.wav',
+    );
+
+    final OralCoachTurnResult schemeRelative = OralCoachTurnResult.fromJson(
+      <String, Object?>{
+        'transcript': 'hi',
+        'coach_text': 'ok',
+        'tts_url': '//cdn.example.com/x.wav',
+      },
+      'https://acquireenglish.curlhairai.com/coach',
+    );
+    expect(schemeRelative.ttsUrl, 'https://cdn.example.com/x.wav');
+  });
 }

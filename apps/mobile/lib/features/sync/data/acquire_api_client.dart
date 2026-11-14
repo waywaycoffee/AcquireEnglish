@@ -212,7 +212,7 @@ class AcquirePreferencesDto {
         tags: (json['tags'] as List<dynamic>? ?? const <dynamic>[])
             .map((dynamic e) => e.toString())
             .toList(growable: false),
-        dailyQuota: json['daily_quota'] as int? ?? 2,
+        dailyQuota: (json['daily_quota'] as num?)?.toInt() ?? 2,
         notifyDailyFeed: json['notify_daily_feed'] as bool? ?? true,
         hasBilibiliCookie: json['has_bilibili_cookie'] == true,
         hasAsrApiKey: json['has_asr_api_key'] == true,
@@ -233,6 +233,8 @@ class AcquirePreferencesDto {
     'tags': tags,
     'daily_quota': dailyQuota,
     'notify_daily_feed': notifyDailyFeed,
+    'has_bilibili_cookie': hasBilibiliCookie,
+    'has_asr_api_key': hasAsrApiKey,
     if (bilibiliCookie != null) 'bilibili_cookie': bilibiliCookie,
     if (asrApiKey != null) 'asr_api_key': asrApiKey,
   };
