@@ -71,7 +71,7 @@ if token:
     checks.append(("preferences", st == 200 and isinstance(prefs, dict), {
         "has_bilibili_cookie": (prefs or {}).get("has_bilibili_cookie") if isinstance(prefs, dict) else None
     }))
-    st, lk = http("POST", "/api/livekit/token", {"roomName": "matrix-smoke", "identity": "matrix"}, headers=h)
+    st, lk = http("POST", "/api/livekit/token", {"room": "matrix-smoke"}, headers=h)
     checks.append(("livekit_token", st == 200 and isinstance(lk, dict) and bool((lk or {}).get("token")), {
         "url": (lk or {}).get("url") if isinstance(lk, dict) else None
     }))

@@ -131,6 +131,14 @@ class SubtitleCompletionQueue {
 
   final Future<Directory> Function() _appSupportDirectory;
   final int maxAttempts;
+  Future<void> _writeChain = Future<void>.value();
+
+  /// Serialize read-modify-write so concurrent enqueue/mark* cannot drop jobs.
+  Future<T> _withLock<T>(Future<T> Function() action) {
+    final Future<T> next = _writeChain.then((_) => action());
+    _writeChain = next.then<void>((_) {}, onError: (_) {});
+    return next;
+  }
 
   Future<File> _queueFile() async {
     final Directory root = await _appSupportDirectory();
@@ -186,43 +194,61 @@ class SubtitleCompletionQueue {
     bool needEnglish = true,
     bool needChinese = false,
     bool force = false,
-  }) async {
-    final List<SubtitleCompletionJob> jobs = await loadJobs();
-    final int index = jobs.indexWhere(
-      (SubtitleCompletionJob job) => job.episodeId == episodeId,
-    );
-    final int now = DateTime.now().millisecondsSinceEpoch;
-    if (index >= 0) {
-      final SubtitleCompletionJob existing = jobs[index];
-      if (existing.status == SubtitleCompletionStatus.done && !force) {
-        // Done only sticks when detect says both sides are still fine.
-        // Matching prior need flags is NOT enough: the same needEnglish=true
-        // can fire again after a bad en.srt reappears or ASR output is wiped.
-        if (!needEnglish && !needChinese) {
-          return existing;
+  }) {
+    return _withLock(() async {
+      final List<SubtitleCompletionJob> jobs = await loadJobs();
+      final int index = jobs.indexWhere(
+        (SubtitleCompletionJob job) => job.episodeId == episodeId,
+      );
+      final int now = DateTime.now().millisecondsSinceEpoch;
+      if (index >= 0) {
+        final SubtitleCompletionJob existing = jobs[index];
+        if (existing.status == SubtitleCompletionStatus.done && !force) {
+          // Done only sticks when detect says both sides are still fine.
+          // Matching prior need flags is NOT enough: the same needEnglish=true
+          // can fire again after a bad en.srt reappears or ASR output is wiped.
+          if (!needEnglish && !needChinese) {
+            return existing;
+          }
         }
-      }
-      if (existing.status == SubtitleCompletionStatus.running && !force) {
-        // Must persist path/flag refreshes — a bare return left disk stale and
-        // dropped newly discovered missing sides until the next cold start.
+        if (existing.status == SubtitleCompletionStatus.running && !force) {
+          // Must persist path/flag refreshes — a bare return left disk stale and
+          // dropped newly discovered missing sides until the next cold start.
+          final SubtitleCompletionJob next = existing.copyWith(
+            videoPath: videoPath,
+            zhPath: zhPath,
+            enPath: enPath,
+            sourceKey: sourceKey,
+            needEnglish: existing.needEnglish || needEnglish,
+            needChinese: existing.needChinese || needChinese,
+            updatedAtMs: now,
+          );
+          jobs[index] = next;
+          await _saveJobs(jobs);
+          return next;
+        }
+        final bool resetAttempts =
+            force ||
+            existing.status == SubtitleCompletionStatus.failed ||
+            existing.status == SubtitleCompletionStatus.done;
         final SubtitleCompletionJob next = existing.copyWith(
           videoPath: videoPath,
           zhPath: zhPath,
           enPath: enPath,
           sourceKey: sourceKey,
-          needEnglish: existing.needEnglish || needEnglish,
-          needChinese: existing.needChinese || needChinese,
+          needEnglish: needEnglish,
+          needChinese: needChinese,
+          status: SubtitleCompletionStatus.pending,
+          attempts: resetAttempts ? 0 : existing.attempts,
           updatedAtMs: now,
+          clearError: true,
         );
         jobs[index] = next;
         await _saveJobs(jobs);
         return next;
       }
-      final bool resetAttempts =
-          force ||
-          existing.status == SubtitleCompletionStatus.failed ||
-          existing.status == SubtitleCompletionStatus.done;
-      final SubtitleCompletionJob next = existing.copyWith(
+      final SubtitleCompletionJob created = SubtitleCompletionJob(
+        episodeId: episodeId,
         videoPath: videoPath,
         zhPath: zhPath,
         enPath: enPath,
@@ -230,28 +256,12 @@ class SubtitleCompletionQueue {
         needEnglish: needEnglish,
         needChinese: needChinese,
         status: SubtitleCompletionStatus.pending,
-        attempts: resetAttempts ? 0 : existing.attempts,
         updatedAtMs: now,
-        clearError: true,
       );
-      jobs[index] = next;
+      jobs.add(created);
       await _saveJobs(jobs);
-      return next;
-    }
-    final SubtitleCompletionJob created = SubtitleCompletionJob(
-      episodeId: episodeId,
-      videoPath: videoPath,
-      zhPath: zhPath,
-      enPath: enPath,
-      sourceKey: sourceKey,
-      needEnglish: needEnglish,
-      needChinese: needChinese,
-      status: SubtitleCompletionStatus.pending,
-      updatedAtMs: now,
-    );
-    jobs.add(created);
-    await _saveJobs(jobs);
-    return created;
+      return created;
+    });
   }
 
   Future<SubtitleCompletionJob?> nextRunnable() async {
@@ -315,62 +325,66 @@ class SubtitleCompletionQueue {
   }
 
   /// Reset interrupted "running" jobs back to pending (app killed mid-ASR).
-  Future<void> recoverInterrupted() async {
-    final List<SubtitleCompletionJob> jobs = await loadJobs();
-    bool changed = false;
-    final int now = DateTime.now().millisecondsSinceEpoch;
-    for (int i = 0; i < jobs.length; i++) {
-      if (jobs[i].status == SubtitleCompletionStatus.running) {
-        jobs[i] = jobs[i].copyWith(
-          status: SubtitleCompletionStatus.pending,
-          updatedAtMs: now,
-        );
-        changed = true;
+  Future<void> recoverInterrupted() {
+    return _withLock(() async {
+      final List<SubtitleCompletionJob> jobs = await loadJobs();
+      bool changed = false;
+      final int now = DateTime.now().millisecondsSinceEpoch;
+      for (int i = 0; i < jobs.length; i++) {
+        if (jobs[i].status == SubtitleCompletionStatus.running) {
+          jobs[i] = jobs[i].copyWith(
+            status: SubtitleCompletionStatus.pending,
+            updatedAtMs: now,
+          );
+          changed = true;
+        }
       }
-    }
-    if (changed) {
-      await _saveJobs(jobs);
-    }
+      if (changed) {
+        await _saveJobs(jobs);
+      }
+    });
   }
 
   /// Re-open failed jobs so a fixed ASR config (e.g. switch to local Whisper)
   /// can drain the import backlog again.
-  Future<int> requeueFailedJobs({bool onlyConfigErrors = true}) async {
-    final List<SubtitleCompletionJob> jobs = await loadJobs();
-    bool changed = false;
-    final int now = DateTime.now().millisecondsSinceEpoch;
-    int count = 0;
-    for (int i = 0; i < jobs.length; i++) {
-      final SubtitleCompletionJob job = jobs[i];
-      if (job.status != SubtitleCompletionStatus.failed) {
-        continue;
+  Future<int> requeueFailedJobs({bool onlyConfigErrors = true}) {
+    return _withLock(() async {
+      final List<SubtitleCompletionJob> jobs = await loadJobs();
+      bool changed = false;
+      final int now = DateTime.now().millisecondsSinceEpoch;
+      int count = 0;
+      for (int i = 0; i < jobs.length; i++) {
+        final SubtitleCompletionJob job = jobs[i];
+        if (job.status != SubtitleCompletionStatus.failed) {
+          continue;
+        }
+        final String error = (job.lastError ?? '').toLowerCase();
+        final bool configError =
+            error.contains('api key') ||
+            error.contains('密钥') ||
+            error.contains('未配置') ||
+            error.contains('missing-asr') ||
+            error.contains('百炼') ||
+            error.contains('whisper');
+        final bool cancelError =
+            error.contains('取消') || error.contains('cancel');
+        if (onlyConfigErrors && !configError && !cancelError) {
+          continue;
+        }
+        jobs[i] = job.copyWith(
+          status: SubtitleCompletionStatus.pending,
+          attempts: 0,
+          updatedAtMs: now,
+          clearError: true,
+        );
+        changed = true;
+        count += 1;
       }
-      final String error = (job.lastError ?? '').toLowerCase();
-      final bool configError =
-          error.contains('api key') ||
-          error.contains('密钥') ||
-          error.contains('未配置') ||
-          error.contains('missing-asr') ||
-          error.contains('百炼') ||
-          error.contains('whisper');
-      final bool cancelError =
-          error.contains('取消') || error.contains('cancel');
-      if (onlyConfigErrors && !configError && !cancelError) {
-        continue;
+      if (changed) {
+        await _saveJobs(jobs);
       }
-      jobs[i] = job.copyWith(
-        status: SubtitleCompletionStatus.pending,
-        attempts: 0,
-        updatedAtMs: now,
-        clearError: true,
-      );
-      changed = true;
-      count += 1;
-    }
-    if (changed) {
-      await _saveJobs(jobs);
-    }
-    return count;
+      return count;
+    });
   }
 
   Future<bool> hasPendingWork() async {
@@ -380,15 +394,17 @@ class SubtitleCompletionQueue {
   Future<void> _update(
     String episodeId,
     SubtitleCompletionJob Function(SubtitleCompletionJob job) transform,
-  ) async {
-    final List<SubtitleCompletionJob> jobs = await loadJobs();
-    final int index = jobs.indexWhere(
-      (SubtitleCompletionJob job) => job.episodeId == episodeId,
-    );
-    if (index < 0) {
-      return;
-    }
-    jobs[index] = transform(jobs[index]);
-    await _saveJobs(jobs);
+  ) {
+    return _withLock(() async {
+      final List<SubtitleCompletionJob> jobs = await loadJobs();
+      final int index = jobs.indexWhere(
+        (SubtitleCompletionJob job) => job.episodeId == episodeId,
+      );
+      if (index < 0) {
+        return;
+      }
+      jobs[index] = transform(jobs[index]);
+      await _saveJobs(jobs);
+    });
   }
 }

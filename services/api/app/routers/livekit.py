@@ -17,7 +17,12 @@ class LiveKitTokenIn(BaseModel):
         default=None,
         description="Room name; auto-generated when omitted.",
     )
+    # Legacy / alternate clients (older smoke scripts) used roomName.
+    roomName: str | None = Field(default=None, alias="roomName")
     ttl_seconds: int = Field(default=3600, ge=60, le=86400)
+
+    def resolved_room(self) -> str:
+        return ((self.room or self.roomName or "").strip())
 
 
 @router.get("/status")
@@ -37,7 +42,7 @@ async def mint_token(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="LiveKit is not configured. Set LIVEKIT_URL / LIVEKIT_API_KEY / LIVEKIT_API_SECRET.",
         )
-    room = (body.room or "").strip() or f"oral-{user.id}-{uuid.uuid4().hex[:8]}"
+    room = body.resolved_room() or f"oral-{user.id}-{uuid.uuid4().hex[:8]}"
     identity = f"user-{user.id}"
     try:
         return create_room_token(
