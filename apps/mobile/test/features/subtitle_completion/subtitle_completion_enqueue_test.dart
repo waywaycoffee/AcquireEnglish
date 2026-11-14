@@ -105,6 +105,27 @@ void main() {
     expect(job.needChinese, isTrue);
   });
 
+  test('Chinese text saved as en.srt still enqueues needEnglish', () async {
+    final File video = _fakeVideo(temp, 'zh-as-en.mp4');
+    final File en = File('${temp.path}/official/en.srt')
+      ..createSync(recursive: true)
+      ..writeAsStringSync('1\n00:00:00,000 --> 00:00:01,000\n你好世界\n');
+    final File zh = File('${temp.path}/official/zh.srt')
+      ..createSync(recursive: true)
+      ..writeAsStringSync('1\n00:00:00,000 --> 00:00:01,000\n你好世界\n');
+    await enqueueSubtitleCompletionForEpisode(
+      episodeId: 'ep-zh-as-en',
+      videoPath: video.path,
+      zhSubtitlePath: zh.path,
+      enSubtitlePath: en.path,
+      queue: queue,
+      appSupportDirectory: () async => temp,
+    );
+    final SubtitleCompletionJob job = (await queue.loadJobs()).single;
+    expect(job.needEnglish, isTrue);
+    expect(job.needChinese, isFalse);
+  });
+
   test('complete asr-sentences bilingual skips enqueue', () async {
     final File video = _fakeVideo(temp, 'd.mp4');
     await persistAsrSentenceSubtitles(

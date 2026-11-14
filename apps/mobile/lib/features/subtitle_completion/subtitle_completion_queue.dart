@@ -195,25 +195,28 @@ class SubtitleCompletionQueue {
     if (index >= 0) {
       final SubtitleCompletionJob existing = jobs[index];
       if (existing.status == SubtitleCompletionStatus.done && !force) {
-        // Re-open done jobs when a new missing side appears.
+        // Done only sticks when detect says both sides are still fine.
+        // Matching prior need flags is NOT enough: the same needEnglish=true
+        // can fire again after a bad en.srt reappears or ASR output is wiped.
         if (!needEnglish && !needChinese) {
-          return existing;
-        }
-        if (existing.needEnglish == needEnglish &&
-            existing.needChinese == needChinese) {
           return existing;
         }
       }
       if (existing.status == SubtitleCompletionStatus.running && !force) {
-        return existing.copyWith(
+        // Must persist path/flag refreshes — a bare return left disk stale and
+        // dropped newly discovered missing sides until the next cold start.
+        final SubtitleCompletionJob next = existing.copyWith(
           videoPath: videoPath,
           zhPath: zhPath,
           enPath: enPath,
           sourceKey: sourceKey,
-          needEnglish: needEnglish,
-          needChinese: needChinese,
+          needEnglish: existing.needEnglish || needEnglish,
+          needChinese: existing.needChinese || needChinese,
           updatedAtMs: now,
         );
+        jobs[index] = next;
+        await _saveJobs(jobs);
+        return next;
       }
       final bool resetAttempts =
           force ||

@@ -7,6 +7,8 @@ import '../import_course/data/bilibili_multipage.dart';
 import '../import_course/domain/bilibili_import.dart';
 import '../library/presentation/library_mock_data.dart';
 import '../player/presentation/bilingual_subtitle_helpers.dart';
+import '../player/presentation/player_mock_state.dart';
+import '../player/presentation/player_subtitle_loader.dart';
 import '../player/presentation/subtitle_file_persist.dart';
 import '../player/presentation/subtitle_sentence_merge.dart';
 import 'subtitle_completion_background.dart';
@@ -71,7 +73,7 @@ Future<SubtitleCompletionNeed> detectSubtitleCompletionNeed({
     );
   }
 
-  final bool reliableEn =
+  final bool pathLooksOfficialEn =
       isUsableSubtitlePath(enSubtitlePath) &&
       !looksLikeScopedEpisodeSubtitle(enSubtitlePath);
   String? zhPath = isUsableSubtitlePath(zhSubtitlePath)
@@ -81,34 +83,59 @@ Future<SubtitleCompletionNeed> detectSubtitleCompletionNeed({
     idKey: sourceKey,
     fileName: 'zh.srt',
   );
-  // Official paths may exist but be empty / unreadable — treat as missing.
-  bool hasReliableEn = reliableEn;
-  if (hasReliableEn && enSubtitlePath != null) {
-    try {
-      final File enFile = File(enSubtitlePath.trim());
-      if (!enFile.existsSync() || enFile.lengthSync() < 16) {
-        hasReliableEn = false;
-      }
-    } catch (_) {
-      hasReliableEn = false;
-    }
-  }
-  bool hasZh = isUsableSubtitlePath(zhPath);
-  if (hasZh && zhPath != null) {
-    try {
-      final File zhFile = File(zhPath.trim());
-      if (!zhFile.existsSync() || zhFile.lengthSync() < 16) {
-        hasZh = false;
-      }
-    } catch (_) {
-      hasZh = false;
-    }
-  }
+  // Paths may exist but be empty, unreadable, or the wrong language (e.g. a
+  // Chinese CC saved as en.srt). Size + cue language must both pass.
+  final bool hasReliableEn =
+      pathLooksOfficialEn &&
+      await _subtitleFileHasLanguage(
+        enSubtitlePath,
+        requireEnglish: true,
+      );
+  final bool hasZh =
+      isUsableSubtitlePath(zhPath) &&
+      await _subtitleFileHasLanguage(zhPath, requireEnglish: false);
 
   return SubtitleCompletionNeed(
     needEnglish: !hasReliableEn,
     needChinese: !hasZh,
   );
+}
+
+/// True when the SRT exists, is non-trivial, and ≥ half of cues match [lang].
+Future<bool> _subtitleFileHasLanguage(
+  String? path, {
+  required bool requireEnglish,
+}) async {
+  final String? trimmed = isUsableSubtitlePath(path) ? path!.trim() : null;
+  if (trimmed == null) {
+    return false;
+  }
+  try {
+    final File file = File(trimmed);
+    if (!file.existsSync() || file.lengthSync() < 16) {
+      return false;
+    }
+    final List<PlayerSubtitleLine> lines = await loadSubtitleLines(trimmed);
+    if (lines.isEmpty) {
+      return false;
+    }
+    int hits = 0;
+    for (final PlayerSubtitleLine line in lines) {
+      final String primary = requireEnglish
+          ? (line.english.trim().isNotEmpty ? line.english : line.chinese)
+          : (line.chinese.trim().isNotEmpty ? line.chinese : line.english);
+      if (requireEnglish) {
+        if (looksEnglish(primary) && !looksChinese(primary)) {
+          hits += 1;
+        }
+      } else if (looksChinese(primary)) {
+        hits += 1;
+      }
+    }
+    return hits * 2 >= lines.length;
+  } catch (_) {
+    return false;
+  }
 }
 
 /// Enqueue completion when English and/or Chinese is missing.

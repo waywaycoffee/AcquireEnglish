@@ -618,6 +618,7 @@ class LearningSettingsNotifier extends Notifier<LearningSettingsState> {
           coerced.voicePracticeServerUrl,
         ),
         cloudApiBaseUrl: fixCurlhairaiTypoHost(coerced.cloudApiBaseUrl),
+        liveKitUrl: fixCurlhairaiTypoHost(coerced.liveKitUrl),
       );
       _scheduleApplyCloudApiBase(coerced);
       if (coerced.asrProvider != loaded.asrProvider ||

@@ -56,22 +56,31 @@ void main() {
     expect(job.needChinese, isFalse);
   });
 
-  test('done jobs are not re-queued unless forced', () async {
-    await queue.enqueue(episodeId: 'ep-1', videoPath: '/tmp/a.mp4');
-    await queue.markDone('ep-1');
-    final SubtitleCompletionJob again = await queue.enqueue(
+  test('done jobs stay done only when detect reports no missing side', () async {
+    await queue.enqueue(
       episodeId: 'ep-1',
       videoPath: '/tmp/a.mp4',
+      needEnglish: true,
+      needChinese: false,
     );
-    expect(again.status, SubtitleCompletionStatus.done);
+    await queue.markDone('ep-1');
+    final SubtitleCompletionJob stillDone = await queue.enqueue(
+      episodeId: 'ep-1',
+      videoPath: '/tmp/a.mp4',
+      needEnglish: false,
+      needChinese: false,
+    );
+    expect(stillDone.status, SubtitleCompletionStatus.done);
     expect(await queue.nextRunnable(), isNull);
 
-    final SubtitleCompletionJob forced = await queue.enqueue(
+    // Same need flags as the completed job must still reopen when work remains.
+    final SubtitleCompletionJob reopened = await queue.enqueue(
       episodeId: 'ep-1',
       videoPath: '/tmp/a.mp4',
-      force: true,
+      needEnglish: true,
+      needChinese: false,
     );
-    expect(forced.status, SubtitleCompletionStatus.pending);
+    expect(reopened.status, SubtitleCompletionStatus.pending);
     expect((await queue.nextRunnable())?.episodeId, 'ep-1');
   });
 
@@ -93,5 +102,28 @@ void main() {
     await queue.recoverInterrupted();
     final List<SubtitleCompletionJob> jobs = await queue.loadJobs();
     expect(jobs.single.status, SubtitleCompletionStatus.pending);
+  });
+
+  test('running enqueue persists OR-merged need flags', () async {
+    await queue.enqueue(
+      episodeId: 'ep-run',
+      videoPath: '/tmp/a.mp4',
+      needEnglish: true,
+      needChinese: false,
+    );
+    await queue.markRunning('ep-run');
+    await queue.enqueue(
+      episodeId: 'ep-run',
+      videoPath: '/tmp/b.mp4',
+      zhPath: '/tmp/zh.srt',
+      needEnglish: false,
+      needChinese: true,
+    );
+    final SubtitleCompletionJob job = (await queue.loadJobs()).single;
+    expect(job.status, SubtitleCompletionStatus.running);
+    expect(job.videoPath, '/tmp/b.mp4');
+    expect(job.zhPath, '/tmp/zh.srt');
+    expect(job.needEnglish, isTrue);
+    expect(job.needChinese, isTrue);
   });
 }

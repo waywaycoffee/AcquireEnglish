@@ -187,7 +187,8 @@ void main() {
         ),
       );
       await tester.tap(find.text('Open'));
-      await tester.pumpAndSettle();
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 100));
       expect(service.calls, 0);
       expect(store.reads, 0);
       await tester.sendKeyDownEvent(LogicalKeyboardKey.space);
@@ -237,7 +238,17 @@ void main() {
           () => Future<void>.delayed(const Duration(milliseconds: 20)),
         );
       }
-      await tester.pumpAndSettle();
+      // Bounded settle — full-suite load can leave an idle ticker that hangs
+      // pumpAndSettle forever after stop-recording.
+      for (int i = 0; i < 40; i++) {
+        if (find.text('重新录制').evaluate().isNotEmpty) {
+          break;
+        }
+        await tester.pump(const Duration(milliseconds: 50));
+        await tester.runAsync(
+          () => Future<void>.delayed(const Duration(milliseconds: 20)),
+        );
+      }
       expect(mic.stops, 1);
       expect(
         service.calls,
@@ -295,12 +306,14 @@ void main() {
         await tester.tap(
           find.byKey(const ValueKey<String>('pronunciation-dialog-close')),
         );
-        await tester.pumpAndSettle();
-        for (int i = 0; i < 8; i++) {
-          await tester.pump();
+        for (int i = 0; i < 24; i++) {
+          await tester.pump(const Duration(milliseconds: 50));
           await tester.runAsync(
             () => Future<void>.delayed(const Duration(milliseconds: 20)),
           );
+          if (mic.disposes >= 1) {
+            break;
+          }
         }
         expect(mic.disposes, 1);
         expect(temp.listSync(recursive: true).whereType<File>(), isEmpty);
