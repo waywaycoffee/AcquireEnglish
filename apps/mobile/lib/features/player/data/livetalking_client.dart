@@ -4,6 +4,8 @@ import 'dart:convert';
 import 'package:dio/dio.dart';
 import 'package:flutter_webrtc/flutter_webrtc.dart';
 
+import '../../settings/presentation/settings_provider.dart';
+
 /// Minimal LiveTalking WebRTC client (open-source realtime digital human).
 ///
 /// Server: `python app.py --transport webrtc ...` then open `/offer` + `/human`.
@@ -15,18 +17,29 @@ class LiveTalkingClient {
   RTCVideoRenderer? _renderer;
   String? _sessionId;
   String? _baseUrl;
+  bool _hasRemoteVideo = false;
 
   RTCVideoRenderer? get renderer => _renderer;
   String? get sessionId => _sessionId;
+  String? get baseUrl => _baseUrl;
+
+  /// SDP + session accepted by LiveTalking (media may still be negotiating).
   bool get isConnected => _sessionId != null && _pc != null;
+
+  /// True after the first remote video track is attached to the renderer.
+  bool get hasRemoteVideo => _hasRemoteVideo && isConnected;
 
   Future<RTCVideoRenderer> connect(
     String rawBaseUrl, {
     String? avatar,
+    Duration mediaTimeout = const Duration(seconds: 12),
   }) async {
     await disconnect();
     final String baseUrl = _normalizeBaseUrl(rawBaseUrl);
     _baseUrl = baseUrl;
+    _hasRemoteVideo = false;
+
+    await _probeHttp(baseUrl);
 
     final RTCVideoRenderer renderer = RTCVideoRenderer();
     await renderer.initialize();
@@ -49,11 +62,18 @@ class LiveTalkingClient {
       init: RTCRtpTransceiverInit(direction: TransceiverDirection.RecvOnly),
     );
 
+    final Completer<void> firstVideo = Completer<void>();
     pc.onTrack = (RTCTrackEvent event) {
       if (event.streams.isEmpty) {
         return;
       }
       renderer.srcObject = event.streams.first;
+      if (event.track.kind == 'video') {
+        _hasRemoteVideo = true;
+        if (!firstVideo.isCompleted) {
+          firstVideo.complete();
+        }
+      }
     };
 
     final RTCSessionDescription offer = await pc.createOffer();
@@ -65,26 +85,31 @@ class LiveTalkingClient {
       throw StateError('LiveTalking 未能生成本地 SDP。');
     }
 
-    final String? avatarId = avatar?.trim();
+    final String avatarId = (avatar ?? defaultLiveTalkingAvatarId).trim();
     final Map<String, Object?> offerBody = <String, Object?>{
       'type': 'offer',
       'sdp': local.sdp,
     };
-    if (avatarId != null && avatarId.isNotEmpty) {
+    if (avatarId.isNotEmpty) {
       offerBody['avatar'] = avatarId;
     }
 
-    final Response<dynamic> response = await _dio.post<dynamic>(
-      '$baseUrl/offer',
-      data: offerBody,
-      options: Options(
-        contentType: Headers.jsonContentType,
-        responseType: ResponseType.json,
-        sendTimeout: const Duration(seconds: 20),
-        receiveTimeout: const Duration(seconds: 60),
-      ),
-    );
-    final Map<String, dynamic> body = _asMap(response.data);
+    final Map<String, dynamic> body;
+    try {
+      final Response<dynamic> response = await _dio.post<dynamic>(
+        '$baseUrl/offer',
+        data: offerBody,
+        options: Options(
+          contentType: Headers.jsonContentType,
+          responseType: ResponseType.json,
+          sendTimeout: const Duration(seconds: 20),
+          receiveTimeout: const Duration(seconds: 60),
+        ),
+      );
+      body = _asMap(response.data);
+    } on DioException catch (error) {
+      throw StateError(_dioFailureHint(baseUrl, error));
+    }
     if (body['code'] == -1) {
       throw StateError(
         'LiveTalking /offer 拒绝: ${body['msg'] ?? 'unknown'}',
@@ -103,6 +128,14 @@ class LiveTalkingClient {
       RTCSessionDescription(answerSdp, answerType),
     );
     _sessionId = session.toString();
+
+    // Prefer waiting for video so the UI is not a black pane; do not fail
+    // the whole connect if ICE/media is slow (UDP may be restricted).
+    try {
+      await firstVideo.future.timeout(mediaTimeout);
+    } on TimeoutException {
+      // Session is still usable for /human; UI can show “等待画面”.
+    }
     return renderer;
   }
 
@@ -121,31 +154,36 @@ class LiveTalkingClient {
     if (trimmed.isEmpty) {
       return;
     }
-    final Response<dynamic> response = await _dio.post<dynamic>(
-      '$baseUrl/human',
-      data: <String, Object?>{
-        'sessionid': sessionId,
-        'type': type,
-        'text': trimmed,
-        'interrupt': interrupt,
-      },
-      options: Options(
-        contentType: Headers.jsonContentType,
-        sendTimeout: const Duration(seconds: 15),
-        receiveTimeout: const Duration(seconds: 20),
-      ),
-    );
-    final Map<String, dynamic> body = _asMap(response.data);
-    if (body.isNotEmpty && body['code'] == -1) {
-      throw StateError(
-        'LiveTalking /human 失败: ${body['msg'] ?? 'session rejected'}',
+    try {
+      final Response<dynamic> response = await _dio.post<dynamic>(
+        '$baseUrl/human',
+        data: <String, Object?>{
+          'sessionid': sessionId,
+          'type': type,
+          'text': trimmed,
+          'interrupt': interrupt,
+        },
+        options: Options(
+          contentType: Headers.jsonContentType,
+          sendTimeout: const Duration(seconds: 15),
+          receiveTimeout: const Duration(seconds: 20),
+        ),
       );
+      final Map<String, dynamic> body = _asMap(response.data);
+      if (body.isNotEmpty && body['code'] == -1) {
+        throw StateError(
+          'LiveTalking /human 失败: ${body['msg'] ?? 'session rejected'}',
+        );
+      }
+    } on DioException catch (error) {
+      throw StateError(_dioFailureHint(baseUrl, error));
     }
   }
 
   Future<void> disconnect() async {
     _sessionId = null;
     _baseUrl = null;
+    _hasRemoteVideo = false;
     final RTCPeerConnection? pc = _pc;
     _pc = null;
     if (pc != null) {
@@ -157,6 +195,21 @@ class LiveTalkingClient {
     if (renderer != null) {
       renderer.srcObject = null;
       await renderer.dispose();
+    }
+  }
+
+  Future<void> _probeHttp(String baseUrl) async {
+    try {
+      await _dio.get<dynamic>(
+        '$baseUrl/',
+        options: Options(
+          sendTimeout: const Duration(seconds: 6),
+          receiveTimeout: const Duration(seconds: 6),
+          validateStatus: (int? code) => code != null && code < 500,
+        ),
+      );
+    } on DioException catch (error) {
+      throw StateError(_dioFailureHint(baseUrl, error));
     }
   }
 
@@ -193,6 +246,15 @@ class LiveTalkingClient {
       value = value.substring(0, value.length - 1);
     }
     return value;
+  }
+
+  String _dioFailureHint(String baseUrl, DioException error) {
+    final String detail = error.message?.trim().isNotEmpty == true
+        ? error.message!.trim()
+        : error.type.name;
+    return '无法连接数字人 $baseUrl（$detail）。'
+        '请确认：① 手机已登录 Tailscale；② GPU 箱 LiveTalking 已启动（:8010）；'
+        '③ 设置地址可用 $defaultLiveTalkingUrl 或 $defaultLiveTalkingUrlIp。';
   }
 
   Map<String, dynamic> _asMap(Object? data) {

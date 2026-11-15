@@ -1,8 +1,19 @@
 <?xml version="1.0" encoding="utf-8"?>
 <network-security-config>
-    <!-- Localhost proxy for Bilibili CDN (media_kit cannot resolve *.bilivideo.com DNS). -->
+    <!--
+      Cleartext is required for:
+      - localhost Bilibili CDN proxy
+      - GPU-box LiveTalking / Ollama over Tailscale (http://…:8010 / :11434)
+      When this file is present, android:usesCleartextTraffic is ignored unless
+      domains (or base-config) explicitly permit cleartext.
+    -->
     <domain-config cleartextTrafficPermitted="true">
         <domain includeSubdomains="true">localhost</domain>
         <domain includeSubdomains="true">127.0.0.1</domain>
+        <!-- Prod GPU box Tailscale IP -->
+        <domain includeSubdomains="true">100.115.252.55</domain>
+        <!-- Tailscale MagicDNS -->
+        <domain includeSubdomains="true">ts.net</domain>
+        <domain includeSubdomains="true">5060ti.tailc30b42.ts.net</domain>
     </domain-config>
 </network-security-config>

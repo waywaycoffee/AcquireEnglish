@@ -82,6 +82,118 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab> {
   void initState() {
     super.initState();
     _microphone = ref.read(pronunciationMicrophoneFactoryProvider)();
+    _liveKitClient.onScore = _onLiveKitScore;
+    _liveKitClient.onStatus = _onLiveKitStatus;
+    // Auto-wire digital human when the tab opens (pipeline / LiveTalking).
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) {
+        return;
+      }
+      final LearningSettingsState settings = ref.read(learningSettingsProvider);
+      if (settings.wantsDigitalHumanAvatar && !_liveClient.isConnected) {
+        unawaited(_ensureDigitalHumanConnected(settings));
+      }
+    });
+  }
+
+  void _onLiveKitScore(Map<String, dynamic> score) {
+    if (!mounted) {
+      return;
+    }
+    final Object? overall =
+        (score['pronunciation'] is Map
+            ? (score['pronunciation'] as Map)['overall']
+            : null) ??
+        score['overall'] ??
+        score['suggested_score'];
+    setState(() {
+      _status = overall == null
+          ? '收到 LiveKit 评分'
+          : 'LiveKit 评分：${_formatScore(overall)}';
+    });
+  }
+
+  void _onLiveKitStatus(String status) {
+    if (!mounted || _busy || _recordingActive) {
+      return;
+    }
+    setState(() => _status = status);
+  }
+
+  String _formatScore(Object raw) {
+    if (raw is num) {
+      final double value = raw.toDouble();
+      if (value <= 1.0) {
+        return '${(value * 100).round()}%';
+      }
+      return value.toStringAsFixed(value == value.roundToDouble() ? 0 : 1);
+    }
+    return '$raw';
+  }
+
+  /// Resolve LiveTalking URL: override → settings → health → Tailscale default.
+  Future<String> _resolveLiveTalkingUrl(
+    LearningSettingsState settings, {
+    String? preferredUrl,
+  }) async {
+    final String preferred = (preferredUrl ?? '').trim();
+    if (preferred.isNotEmpty && !preferred.contains('127.0.0.1')) {
+      return preferred.replaceAll(RegExp(r'/+$'), '');
+    }
+    final String liveUrl = settings.resolvedOralCoachServerUrl;
+    if (liveUrl.isNotEmpty && !liveUrl.contains('127.0.0.1')) {
+      return liveUrl;
+    }
+    if (settings.usesOralCoachPipeline) {
+      try {
+        final Map<String, dynamic> health = await _pipelineClient.health(
+          settings.oralCoachPipelineUrl,
+        );
+        final String fromHealth = '${health['livetalking_url'] ?? ''}'.trim();
+        if (fromHealth.isNotEmpty && !fromHealth.contains('127.0.0.1')) {
+          return fromHealth.replaceAll(RegExp(r'/+$'), '');
+        }
+      } catch (_) {}
+    }
+    return defaultLiveTalkingUrl;
+  }
+
+  Future<void> _ensureDigitalHumanConnected(
+    LearningSettingsState settings, {
+    bool speakGreeting = false,
+    String? greetingText,
+    String? preferredUrl,
+  }) async {
+    final String liveUrl = await _resolveLiveTalkingUrl(
+      settings,
+      preferredUrl: preferredUrl,
+    );
+    if (liveUrl.isEmpty) {
+      return;
+    }
+    // Reconnect if settings/turn point at a different host than the open session.
+    final String? openBase = _liveClient.baseUrl;
+    final bool hostChanged =
+        openBase != null &&
+        openBase.isNotEmpty &&
+        liveUrl.replaceAll(RegExp(r'/+$'), '') != openBase;
+    if (!_liveClient.isConnected || hostChanged) {
+      await _connectLiveTalking(liveUrl);
+    }
+    if (speakGreeting &&
+        _liveClient.isConnected &&
+        (greetingText ?? '').trim().isNotEmpty) {
+      try {
+        await _liveClient.speak(greetingText!.trim(), type: 'echo');
+      } catch (error) {
+        if (mounted) {
+          setState(() {
+            _error = _pretty(error);
+            _status = '数字人打招呼失败，可点「连接数字人」重试';
+          });
+        }
+      }
+    }
   }
 
   @override
@@ -94,6 +206,8 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab> {
 
   @override
   void dispose() {
+    _liveKitClient.onScore = null;
+    _liveKitClient.onStatus = null;
     unawaited(_releaseMic());
     unawaited(_liveClient.disconnect());
     unawaited(_liveKitClient.disconnect());
@@ -165,14 +279,19 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab> {
       _status = '正在连接数字人…';
     });
     try {
-      final RTCVideoRenderer renderer = await _liveClient.connect(serverUrl);
+      final RTCVideoRenderer renderer = await _liveClient.connect(
+        serverUrl,
+        avatar: defaultLiveTalkingAvatarId,
+      );
       if (!mounted) {
         await _liveClient.disconnect();
         return;
       }
       setState(() {
         _renderer = renderer;
-        _status = '已连接虚拟外教画面';
+        _status = _liveClient.hasRemoteVideo
+            ? '已连接虚拟外教画面'
+            : '已建连，等待画面（检查 Tailscale UDP / LiveTalking）';
         _connecting = false;
       });
     } catch (error) {
@@ -183,7 +302,7 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab> {
         _connecting = false;
         _renderer = null;
         _error = _pretty(error);
-        _status = '数字人连接失败（仍可文字/管线陪练）';
+        _status = '数字人连接失败 — 需 Tailscale + GPU :8010';
       });
     }
   }
@@ -236,39 +355,35 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab> {
     try {
       await _ensurePipelineSession(settings);
       String modeNote = 'HTTP 管线';
-      if (settings.usesLiveKit) {
+      if (settings.usesLiveKit && ref.read(authSessionProvider).isLoggedIn) {
         try {
           await _liveKitClient.connect(
             api: ref.read(acquireApiClientProvider),
             preferredUrl: settings.liveKitUrl,
           );
-          modeNote = 'LiveKit + HTTP 管线';
+          modeNote = 'LiveKit Agent + HTTP 管线';
         } catch (error) {
           modeNote = 'HTTP 管线（LiveKit 未连上：${_pretty(error)}）';
         }
+      } else if (settings.usesLiveKit &&
+          !ref.read(authSessionProvider).isLoggedIn) {
+        modeNote = 'HTTP 管线（登录后可派发 LiveKit Agent）';
       }
-      String liveUrl = settings.oralCoachServerUrl.trim();
-      if (liveUrl.isEmpty) {
-        try {
-          final Map<String, dynamic> health = await _pipelineClient.health(
-            settings.oralCoachPipelineUrl,
-          );
-          liveUrl = '${health['livetalking_url'] ?? ''}'.trim();
-        } catch (_) {}
-      }
-      if (liveUrl.isNotEmpty && !_liveClient.isConnected) {
-        await _connectLiveTalking(liveUrl);
-      }
-      if (_liveClient.isConnected) {
-        final String open =
-            'Hi! We are practicing with this video. '
-            'Please listen and repeat: ${widget.line.english}';
-        await _liveClient.speak(open);
-      }
+      final String open =
+          'Hi! We are practicing with this video. '
+          'Please listen and repeat: ${widget.line.english}';
+      await _ensureDigitalHumanConnected(
+        settings,
+        speakGreeting: true,
+        greetingText: open,
+      );
+      final String avatarNote = _liveClient.isConnected
+          ? '数字人已连接'
+          : '数字人未连接（可点「连接数字人」或检查 Tailscale）';
       if (mounted) {
         setState(() {
           _status =
-              '会话已就绪 · $modeNote · 难度 $_difficulty · 对着麦克风说当前句';
+              '会话已就绪 · $modeNote · $avatarNote · 难度 $_difficulty';
           _busy = false;
         });
       }
@@ -426,23 +541,30 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab> {
       _difficulty = turn.difficulty;
       _lastTurn = turn;
 
-      final String avatarUrl = turn.livetalkingUrl.trim().isNotEmpty
-          ? turn.livetalkingUrl
-          : settings.oralCoachServerUrl.trim();
+      // Prefer digital-human lip-sync for coach replies; TTS is fallback only.
+      final String speakText = turn.avatarText.trim().isNotEmpty
+          ? turn.avatarText.trim()
+          : turn.coachText.trim();
       bool avatarSpoke = false;
-      final bool wantsLiveTalking =
-          turn.avatarAction.startsWith('livetalking') && avatarUrl.isNotEmpty;
-      if (wantsLiveTalking) {
-        if (!_liveClient.isConnected) {
-          await _connectLiveTalking(avatarUrl);
-        }
-        if (_liveClient.isConnected && turn.avatarText.trim().isNotEmpty) {
+      String? avatarFailHint;
+      if (turn.avatarAction == 'livetalking_offline') {
+        avatarFailHint =
+            '管线探测数字人离线（${turn.livetalkingUrl.isNotEmpty ? turn.livetalkingUrl : defaultLiveTalkingUrl}）';
+      } else if (speakText.isNotEmpty) {
+        await _ensureDigitalHumanConnected(
+          settings,
+          preferredUrl: turn.livetalkingUrl,
+        );
+        if (_liveClient.isConnected) {
           try {
-            await _liveClient.speak(turn.avatarText, type: 'echo');
+            await _liveClient.speak(speakText, type: 'echo');
             avatarSpoke = true;
-          } catch (_) {
+          } catch (error) {
+            avatarFailHint = _pretty(error);
             avatarSpoke = false;
           }
+        } else {
+          avatarFailHint = _error ?? '数字人未连接';
         }
       }
       if (!avatarSpoke) {
@@ -465,8 +587,13 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab> {
       if (mounted) {
         setState(() {
           _busy = false;
-          _status =
-              '回合完成 · 重叠 ${turn.scoreLabel} · 难度 ${turn.difficulty}';
+          if (avatarFailHint != null && !avatarSpoke) {
+            _error = avatarFailHint;
+          }
+          _status = avatarSpoke
+              ? '回合完成 · 数字人口型播报 · 重叠 ${turn.scoreLabel}'
+              : '回合完成 · 重叠 ${turn.scoreLabel} · 难度 ${turn.difficulty}'
+                    '${avatarFailHint != null ? '（数字人未播，已用 TTS）' : ''}';
         });
       }
     } catch (error) {
@@ -621,17 +748,14 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab> {
       _error = null;
     });
     try {
-      if (settings.usesLiveTalkingCoach ||
-          (settings.usesOralCoachPipeline &&
-              settings.oralCoachServerUrl.trim().isNotEmpty)) {
-        final String url = settings.oralCoachServerUrl;
-        if (!_liveClient.isConnected && url.trim().isNotEmpty) {
-          await _connectLiveTalking(url);
-        }
+      if (settings.wantsDigitalHumanAvatar) {
+        await _ensureDigitalHumanConnected(
+          settings,
+          speakGreeting: true,
+          greetingText:
+              'Listen and repeat after me. ${widget.line.english}',
+        );
         if (_liveClient.isConnected) {
-          final String script =
-              'Listen and repeat after me. ${widget.line.english}';
-          await _liveClient.speak(script);
           if (mounted) {
             setState(() => _status = '数字人正在示范当前句…');
           }
@@ -673,10 +797,8 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab> {
           '"${widget.line.english}". '
           'Give one short tip in simple English (max 2 sentences), then ask them '
           'to say the line again.';
-      if (settings.usesLiveTalkingCoach) {
-        if (!_liveClient.isConnected) {
-          await _connectLiveTalking(settings.oralCoachServerUrl);
-        }
+      if (settings.wantsDigitalHumanAvatar) {
+        await _ensureDigitalHumanConnected(settings);
         if (_liveClient.isConnected) {
           await _liveClient.speak(prompt, type: 'chat');
           if (mounted) {
@@ -714,9 +836,7 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab> {
     final StudyShellColors colors = StudyShellColors.of(context);
     final LearningSettingsState settings = ref.watch(learningSettingsProvider);
     final bool pipeline = settings.usesOralCoachPipeline;
-    final bool live =
-        settings.usesLiveTalkingCoach ||
-        (pipeline && settings.oralCoachServerUrl.trim().isNotEmpty);
+    final bool live = settings.wantsDigitalHumanAvatar;
 
     return ListView(
       padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
@@ -741,10 +861,14 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab> {
                       child: Padding(
                         padding: const EdgeInsets.all(20),
                         child: Text(
-                          pipeline
-                              ? '视频主题陪练管线\nASR→发音→LLM→TTS→数字人\n连接 LiveTalking 后显示外教头像'
+                          _connecting
+                              ? '正在连接数字人…'
+                              : (_error != null && live)
+                              ? '数字人未就绪\n$_error'
+                              : pipeline
+                              ? '视频主题陪练管线\nASR→发音→LLM→TTS→数字人\n点「连接数字人」显示外教头像'
                               : live
-                              ? '连接 LiveTalking 后显示数字人画面'
+                              ? '点「连接数字人」显示画面\n需 Tailscale · $defaultLiveTalkingUrl'
                               : '当前为本地 TTS 陪练（无数字人画面）',
                           textAlign: TextAlign.center,
                           style: TextStyle(
@@ -950,9 +1074,19 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab> {
                 onPressed: _connecting
                     ? null
                     : () => unawaited(
-                        _connectLiveTalking(settings.oralCoachServerUrl),
+                        _ensureDigitalHumanConnected(
+                          settings,
+                          speakGreeting: true,
+                          greetingText: widget.hasLine
+                              ? 'Hello! Ready to practice: ${widget.line.english}'
+                              : 'Hello! I am your oral coach.',
+                        ),
                       ),
-                child: Text(_connecting ? '连接中…' : '连接数字人'),
+                child: Text(
+                  _connecting
+                      ? '连接中…'
+                      : (_liveClient.isConnected ? '重连数字人' : '连接数字人'),
+                ),
               ),
             FilledButton(
               onPressed: (!widget.hasLine || _busy)
@@ -986,9 +1120,10 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab> {
         const SizedBox(height: 16),
         Text(
           pipeline
-              ? '流程：开始视频对话 → 说话回合（WhisperX/Deepgram + 发音打分 + LLM）→ 虚拟外教回复。'
-                    '在 tools/oral_coach/.env 切换 Provider。'
-              : '流程：示范 → 跟读评测 → 陪练反馈 → 下一句。'
+              ? '流程：开始视频对话（自动连数字人）→ 说话回合 → 外教口型播报。'
+                    '手机需 Tailscale；默认 $defaultLiveTalkingUrl'
+                    '（IP 备选 $defaultLiveTalkingUrlIp）。GPU 箱需已跑 LiveTalking :8010。'
+              : '流程：连接数字人 → 示范 → 跟读评测 → 陪练反馈 → 下一句。'
                     '可切换「视频陪练管线」获得实时对话编排。',
           style: TextStyle(
             fontSize: 12,

@@ -388,10 +388,10 @@ class SettingsScreen extends ConsumerWidget {
                   description:
                       '虚拟外教画面（WebRTC）。管线 avatar=livetalking 时用于播报回复；'
                       '也可直连 LiveTalking。本机 GPU 经 Tailscale：'
-                      'http://100.115.252.55:8010 或 http://5060ti.tailc30b42.ts.net:8010'
+                      '$defaultLiveTalkingUrl 或 $defaultLiveTalkingUrlIp'
                       '（手机需加入同一 Tailscale）。',
                   value: settings.oralCoachServerUrl,
-                  hintText: 'http://100.115.252.55:8010',
+                  hintText: defaultLiveTalkingUrl,
                   onChanged: (String value) {
                     ref
                         .read(learningSettingsProvider.notifier)

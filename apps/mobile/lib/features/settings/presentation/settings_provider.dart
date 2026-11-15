@@ -104,8 +104,14 @@ const List<String> oralCoachBackendOptions = <String>[
   '本地 TTS',
 ];
 
-/// Prod LiveTalking on the GPU box (Tailscale). Phones must join the same tailnet.
-const String defaultLiveTalkingUrl = 'http://100.115.252.55:8010';
+/// Prod LiveTalking on the GPU box (Tailscale MagicDNS; ATS-friendly vs raw IP).
+const String defaultLiveTalkingUrl = 'http://5060ti.tailc30b42.ts.net:8010';
+
+/// Same host as [defaultLiveTalkingUrl], Tailscale CGNAT IP fallback.
+const String defaultLiveTalkingUrlIp = 'http://100.115.252.55:8010';
+
+/// Default wav2lip avatar id on the GPU LiveTalking checkout.
+const String defaultLiveTalkingAvatarId = 'wav2lip_avatar_glass_man';
 
 /// Same GPU box as LiveTalking — Ollama OpenAI-compatible API (no cloud rate limits).
 const String defaultOllamaBaseUrl = 'http://100.115.252.55:11434/v1';
@@ -651,7 +657,11 @@ class LearningSettingsNotifier extends Notifier<LearningSettingsState> {
         );
       }
       // Digital-human LiveTalking URL used to default empty — fill Tailscale host.
-      if (coerced.oralCoachServerUrl.trim().isEmpty) {
+      // Prefer MagicDNS over the raw CGNAT IP (iOS ATS / clearer DNS).
+      final String oralCoachUrl = coerced.oralCoachServerUrl.trim();
+      if (oralCoachUrl.isEmpty ||
+          oralCoachUrl == 'http://100.115.252.55:8010' ||
+          oralCoachUrl == 'http://100.115.252.55:8010/') {
         coerced = coerced.copyWith(
           oralCoachServerUrl: defaultLiveTalkingUrl,
         );

@@ -88,12 +88,15 @@ sudo systemctl daemon-reload
 sudo systemctl enable --now acquireenglish-livekit-agent
 ```
 
-## 5. App
+## 5. App（数字人画面 = LiveTalking，不是 LiveKit 视频）
 
-1. 登录生产账号  
-2. 设置 → LiveKit 房间地址 = 同一个 `wss://…`  
+1. 登录生产账号；手机加入 **同一 Tailscale**  
+2. 设置 → LiveTalking / 数字人地址 = `http://5060ti.tailc30b42.ts.net:8010`（或 IP `100.115.252.55`）  
 3. 口语陪练管线地址保持 `https://acquireenglish.curlhairai.com/coach`  
-4. 开始会话：应显示 `LiveKit + HTTP 管线`
+4. GPU 箱先跑 LiveTalking（`tools/livetalking/run_livetalking.ps1`）  
+5. 陪练 Tab → **连接数字人** → 应出现外教画面；说话回合走口型播报  
+
+详见 `tools/livetalking/APP_CONNECT.md`。LiveKit Agent 负责全双工语音评分，与画面是两条链路。
 
 ## 架构速记
 

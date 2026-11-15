@@ -28,7 +28,7 @@ void main() {
         'corrections': <String>['ending /s/'],
         'tts_url': '/api/tts/a.wav',
         'avatar': <String, Object?>{
-          'action': 'livetalking_human',
+          'action': 'livetalking_connect',
           'text': 'Nice work.',
           'livetalking_url': 'http://127.0.0.1:8010',
         },
@@ -38,7 +38,9 @@ void main() {
     );
     expect(turn.scoreLabel, '80%');
     expect(turn.ttsUrl, 'http://127.0.0.1:8770/api/tts/a.wav');
-    expect(turn.avatarAction, 'livetalking_human');
+    expect(turn.avatarAction, 'livetalking_connect');
+    expect(turn.avatarText, 'Nice work.');
+    expect(turn.livetalkingUrl, 'http://127.0.0.1:8010');
   });
 
   test('tts_url joins subpath base and scheme-relative URLs', () {
