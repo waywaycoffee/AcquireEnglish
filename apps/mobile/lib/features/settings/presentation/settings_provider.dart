@@ -79,6 +79,7 @@ const List<String> playbackSpeedOptions = <String>[
   '1.5×',
 ];
 const List<String> translationProviderOptions = <String>[
+  '本地 Ollama',
   'OpenAI',
   'OpenRouter',
   'SiliconFlow',
@@ -103,6 +104,15 @@ const List<String> oralCoachBackendOptions = <String>[
   '本地 TTS',
 ];
 
+/// Prod LiveTalking on the GPU box (Tailscale). Phones must join the same tailnet.
+const String defaultLiveTalkingUrl = 'http://100.115.252.55:8010';
+
+/// Same GPU box as LiveTalking — Ollama OpenAI-compatible API (no cloud rate limits).
+const String defaultOllamaBaseUrl = 'http://100.115.252.55:11434/v1';
+
+/// Ollama library tag for ~7B-class Qwen3 on 5060 Ti (official tag is 8b, ~5.2GB).
+const String defaultOllamaTranslationModel = 'qwen3:8b';
+
 const String _learningSettingsStorageKey = 'learning_settings_v1';
 
 class TranslationProviderPreset {
@@ -119,6 +129,11 @@ class TranslationProviderPreset {
 
 const Map<String, TranslationProviderPreset> translationProviderPresets =
     <String, TranslationProviderPreset>{
+      '本地 Ollama': TranslationProviderPreset(
+        name: '本地 Ollama',
+        baseUrl: defaultOllamaBaseUrl,
+        model: defaultOllamaTranslationModel,
+      ),
       'OpenAI': TranslationProviderPreset(
         name: 'OpenAI',
         baseUrl: 'https://api.openai.com/v1',
@@ -201,12 +216,13 @@ class LearningSettingsState {
     required this.asrModel,
     required this.useCustomAsrEndpoint,
     required this.generateBilingualAsrSubtitles,
+    this.enableChineseSpeechAsr = false,
     required this.ttsEngine,
     required this.ttsVoice,
     required this.ttsRate,
     this.cloudApiBaseUrl = '',
     this.oralCoachBackend = '视频陪练管线',
-    this.oralCoachServerUrl = '',
+    this.oralCoachServerUrl = defaultLiveTalkingUrl,
     this.oralCoachPipelineUrl = 'https://acquireenglish.curlhairai.com/coach',
     this.voicePracticeServerUrl = '',
     this.liveKitUrl =
@@ -247,6 +263,7 @@ class LearningSettingsState {
           : defaultAsrPreset.model,
       useCustomAsrEndpoint: false,
       generateBilingualAsrSubtitles: true,
+      enableChineseSpeechAsr: false,
       ttsEngine: '',
       ttsVoice: '',
       ttsRate: 0.75,
@@ -277,6 +294,9 @@ class LearningSettingsState {
   final String asrModel;
   final bool useCustomAsrEndpoint;
   final bool generateBilingualAsrSubtitles;
+
+  /// Optional on-device Chinese speech ASR (needs multilingual Whisper `base`).
+  final bool enableChineseSpeechAsr;
   final String ttsEngine;
   final String ttsVoice;
   final double ttsRate;
@@ -304,7 +324,8 @@ class LearningSettingsState {
   }
 
   bool get usesLiveTalkingCoach =>
-      oralCoachBackend == 'LiveTalking' && oralCoachServerUrl.trim().isNotEmpty;
+      oralCoachBackend == 'LiveTalking' &&
+      resolvedOralCoachServerUrl.trim().isNotEmpty;
 
   bool get usesOralCoachPipeline =>
       oralCoachBackend == '视频陪练管线' && oralCoachPipelineUrl.trim().isNotEmpty;
@@ -312,6 +333,20 @@ class LearningSettingsState {
   bool get usesVoicePractice => voicePracticeServerUrl.trim().isNotEmpty;
 
   bool get usesLiveKit => liveKitUrl.trim().isNotEmpty;
+
+  /// LiveTalking / 数字人 base URL (settings → prod Tailscale default).
+  String get resolvedOralCoachServerUrl {
+    final String fromSettings = oralCoachServerUrl.trim();
+    if (fromSettings.isNotEmpty) {
+      return fromSettings.replaceAll(RegExp(r'/+$'), '');
+    }
+    return defaultLiveTalkingUrl;
+  }
+
+  /// Pipeline mode still benefits from a reachable avatar host.
+  bool get wantsDigitalHumanAvatar =>
+      usesLiveTalkingCoach ||
+      (usesOralCoachPipeline && resolvedOralCoachServerUrl.isNotEmpty);
 
   bool get isBilibiliLoggedIn => hasBilibiliCookie;
 
@@ -374,6 +409,7 @@ class LearningSettingsState {
     String? asrModel,
     bool? useCustomAsrEndpoint,
     bool? generateBilingualAsrSubtitles,
+    bool? enableChineseSpeechAsr,
     String? ttsEngine,
     String? ttsVoice,
     double? ttsRate,
@@ -418,6 +454,8 @@ class LearningSettingsState {
       useCustomAsrEndpoint: useCustomAsrEndpoint ?? this.useCustomAsrEndpoint,
       generateBilingualAsrSubtitles:
           generateBilingualAsrSubtitles ?? this.generateBilingualAsrSubtitles,
+      enableChineseSpeechAsr:
+          enableChineseSpeechAsr ?? this.enableChineseSpeechAsr,
       ttsEngine: ttsEngine ?? this.ttsEngine,
       ttsVoice: ttsVoice ?? this.ttsVoice,
       ttsRate: ttsRate ?? this.ttsRate,
@@ -459,12 +497,15 @@ class TranslationModelService {
   Future<List<String>> fetchModels({
     required LearningSettingsState settings,
   }) async {
+    final String apiKey = settings.translationApiKey.trim().isNotEmpty
+        ? settings.translationApiKey.trim()
+        : (settings.translationProvider == '本地 Ollama' ? 'ollama' : '');
     final Response<dynamic> response = httpRequestOverride != null
         ? await httpRequestOverride!(
             options: BaseOptions(
               baseUrl: settings.translationBaseUrl,
               headers: <String, String>{
-                'Authorization': 'Bearer ${settings.translationApiKey}',
+                'Authorization': 'Bearer $apiKey',
                 'Content-Type': 'application/json',
                 'Accept': 'application/json',
               },
@@ -475,7 +516,7 @@ class TranslationModelService {
             BaseOptions(
               baseUrl: settings.translationBaseUrl,
               headers: <String, String>{
-                'Authorization': 'Bearer ${settings.translationApiKey}',
+                'Authorization': 'Bearer $apiKey',
                 'Content-Type': 'application/json',
                 'Accept': 'application/json',
               },
@@ -584,6 +625,7 @@ class LearningSettingsNotifier extends Notifier<LearningSettingsState> {
         generateBilingualAsrSubtitles: _boolOrNull(
           json['generateBilingualAsrSubtitles'],
         ),
+        enableChineseSpeechAsr: _boolOrNull(json['enableChineseSpeechAsr']),
         ttsEngine: _stringOrNull(json['ttsEngine']),
         ttsVoice: _stringOrNull(json['ttsVoice']),
         ttsRate: _doubleOrNull(json['ttsRate']),
@@ -606,6 +648,12 @@ class LearningSettingsNotifier extends Notifier<LearningSettingsState> {
       if (coerced.liveKitUrl.trim().isEmpty) {
         coerced = coerced.copyWith(
           liveKitUrl: LearningSettingsState.defaults().liveKitUrl,
+        );
+      }
+      // Digital-human LiveTalking URL used to default empty — fill Tailscale host.
+      if (coerced.oralCoachServerUrl.trim().isEmpty) {
+        coerced = coerced.copyWith(
+          oralCoachServerUrl: defaultLiveTalkingUrl,
         );
       }
       // Typo host that breaks DNS (caurlhairai → curlhairai).
@@ -726,11 +774,22 @@ class LearningSettingsNotifier extends Notifier<LearningSettingsState> {
       return;
     }
     final TranslationProviderPreset preset = translationProviderPresets[value]!;
+    final bool isOllama = value == '本地 Ollama';
     state = state.copyWith(
       translationProvider: value,
       translationBaseUrl: preset.baseUrl,
       translationModel: preset.model,
-      availableTranslationModels: const <String>[],
+      // Ollama ignores the key; keep a non-empty placeholder for shared checks.
+      translationApiKey: isOllama && state.translationApiKey.trim().isEmpty
+          ? 'ollama'
+          : state.translationApiKey,
+      availableTranslationModels: isOllama
+          ? <String>[
+              defaultOllamaTranslationModel,
+              'qwen2.5:7b',
+              'qwen3:4b',
+            ]
+          : const <String>[],
       isFetchingTranslationModels: false,
     );
     _persist();
@@ -777,7 +836,8 @@ class LearningSettingsNotifier extends Notifier<LearningSettingsState> {
     if (!_isAiProvider(state.translationProvider)) {
       return const <String>[];
     }
-    if (state.translationApiKey.isEmpty) {
+    if (state.translationApiKey.isEmpty &&
+        state.translationProvider != '本地 Ollama') {
       throw StateError('missing-api-key');
     }
 
@@ -822,6 +882,11 @@ class LearningSettingsNotifier extends Notifier<LearningSettingsState> {
 
   void setGenerateBilingualAsrSubtitles({required bool value}) {
     state = state.copyWith(generateBilingualAsrSubtitles: value);
+    _persist();
+  }
+
+  void setEnableChineseSpeechAsr({required bool value}) {
+    state = state.copyWith(enableChineseSpeechAsr: value);
     _persist();
   }
 
@@ -1058,6 +1123,7 @@ class LearningSettingsNotifier extends Notifier<LearningSettingsState> {
           'asrModel': state.asrModel,
           'useCustomAsrEndpoint': state.useCustomAsrEndpoint,
           'generateBilingualAsrSubtitles': state.generateBilingualAsrSubtitles,
+          'enableChineseSpeechAsr': state.enableChineseSpeechAsr,
           'ttsEngine': state.ttsEngine,
           'ttsVoice': state.ttsVoice,
           'ttsRate': state.ttsRate,
@@ -1167,7 +1233,8 @@ class LearningSettingsNotifier extends Notifier<LearningSettingsState> {
   }
 
   bool _isAiProvider(String provider) {
-    return provider == 'OpenAI' ||
+    return provider == '本地 Ollama' ||
+        provider == 'OpenAI' ||
         provider == 'OpenRouter' ||
         provider == 'SiliconFlow' ||
         provider == 'DeepSeek';

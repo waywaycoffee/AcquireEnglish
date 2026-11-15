@@ -524,7 +524,9 @@ class SettingsScreen extends ConsumerWidget {
             children: <Widget>[
               _SelectRow(
                 title: '翻译来源',
-                description: '先选择翻译 API，再填写对应配置。',
+                description: settings.translationProvider == '本地 Ollama'
+                    ? 'GPU 箱 Ollama（与 LiveTalking 同机，Tailscale，不限流）。'
+                    : '先选择翻译 API，再填写对应配置。',
                 value: settings.translationProvider,
                 options: translationProviderOptions,
                 onChanged: (String? value) {
@@ -537,21 +539,32 @@ class SettingsScreen extends ConsumerWidget {
                 },
               ),
               if (isAiProvider) ...<Widget>[
-                _InputRow(
-                  title: 'API Key',
-                  description: '用于调用 AI 翻译接口。',
-                  value: settings.translationApiKey,
-                  hintText: 'YOUR_API_KEY_HERE',
-                  obscureText: true,
-                  onChanged: (String value) {
-                    ref
-                        .read(learningSettingsProvider.notifier)
-                        .setTranslationApiKey(value);
-                  },
-                ),
+                if (settings.translationProvider != '本地 Ollama')
+                  _InputRow(
+                    title: 'API Key',
+                    description: '用于调用 AI 翻译接口。',
+                    value: settings.translationApiKey,
+                    hintText: 'YOUR_API_KEY_HERE',
+                    obscureText: true,
+                    onChanged: (String value) {
+                      ref
+                          .read(learningSettingsProvider.notifier)
+                          .setTranslationApiKey(value);
+                    },
+                  ),
+                if (settings.translationProvider == '本地 Ollama')
+                  const _HintRow(
+                    title: 'GPU 箱部署',
+                    description:
+                        '默认地址与数字人 LiveTalking 同一 Tailscale 主机 '
+                        '（100.115.252.55）。模型用 qwen3:8b（约 7B 档，~5GB，'
+                        '与 LiveTalking 同卡）。部署步骤见仓库 deploy/gpu-box-ollama。',
+                  ),
                 _SwitchRow(
                   title: '自定义接口地址',
-                  description: '关闭时使用内置厂商默认 baseUrl 和 model。',
+                  description: settings.translationProvider == '本地 Ollama'
+                      ? '关闭时使用 GPU 箱默认 Ollama 地址。'
+                      : '关闭时使用内置厂商默认 baseUrl 和 model。',
                   value: settings.useCustomTranslationEndpoint,
                   onChanged: (bool value) {
                     ref
@@ -561,9 +574,13 @@ class SettingsScreen extends ConsumerWidget {
                 ),
                 _InputRow(
                   title: 'Base URL',
-                  description: '默认已内置，可按需覆盖。',
+                  description: settings.translationProvider == '本地 Ollama'
+                      ? 'OpenAI 兼容：http://<tailscale-ip>:11434/v1'
+                      : '默认已内置，可按需覆盖。',
                   value: settings.translationBaseUrl,
-                  hintText: 'https://api.example.com/v1',
+                  hintText: settings.translationProvider == '本地 Ollama'
+                      ? defaultOllamaBaseUrl
+                      : 'https://api.example.com/v1',
                   enabled: settings.useCustomTranslationEndpoint,
                   onChanged: (String value) {
                     ref
@@ -575,7 +592,8 @@ class SettingsScreen extends ConsumerWidget {
                   isLoading: settings.isFetchingTranslationModels,
                   hasModels: settings.availableTranslationModels.isNotEmpty,
                   onTap: () async {
-                    if (settings.translationApiKey.trim().isEmpty) {
+                    if (settings.translationProvider != '本地 Ollama' &&
+                        settings.translationApiKey.trim().isEmpty) {
                       _showMessage(context, '请先填写 API Key。');
                       return;
                     }
@@ -720,6 +738,21 @@ class SettingsScreen extends ConsumerWidget {
                   );
                   return Column(
                     children: <Widget>[
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(16, 4, 16, 12),
+                        child: Text(
+                          '默认本地 Whisper + base.en（安装包已内置）。'
+                          '有可靠官方英文字幕时优先用官方、跳过识别；'
+                          '硬字幕/双语课会忽略 B 站软字幕并走语音识别'
+                          '（仅缺可靠英文时才 ASR，不每集重复识别）。',
+                          style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                            color: Theme.of(
+                              context,
+                            ).colorScheme.onSurfaceVariant,
+                            height: 1.35,
+                          ),
+                        ),
+                      ),
                       _SwitchRow(
                         title: '生成双语字幕',
                         description: '开启后会使用“翻译”设置补齐每句中文。',
@@ -733,7 +766,7 @@ class SettingsScreen extends ConsumerWidget {
                       _SelectRow(
                         title: 'ASR 来源',
                         description: isLocalWhisper
-                            ? '设备端 Whisper.cpp，无需云端 API Key。'
+                            ? '设备端 Whisper.cpp，无需云端 API Key。推荐默认。'
                             : '独立于翻译 API，用于生成视频字幕。',
                         value: settings.asrProvider,
                         options: asrProviderOptions,
@@ -748,9 +781,9 @@ class SettingsScreen extends ConsumerWidget {
                       ),
                       if (isLocalWhisper) ...<Widget>[
                         _SelectRow(
-                          title: 'Whisper 模型',
+                          title: '英语 Whisper 模型',
                           description:
-                              '英语课推荐 base.en；弱设备用 tiny.en；small.en 更准但更大。',
+                              '英语口播用。推荐 base.en（安装包已内置）；弱设备用 tiny.en。',
                           value: whisperModel,
                           options: localWhisperModelOptions,
                           optionLabel: _whisperModelLabel,
@@ -764,6 +797,27 @@ class SettingsScreen extends ConsumerWidget {
                           },
                         ),
                         _LocalWhisperModelStatusRow(modelId: whisperModel),
+                        _SwitchRow(
+                          title: '支持中文语音识别',
+                          description:
+                              '可选。中文口播视频需另下多语言模型（base，约 142MB，国内镜像）。'
+                              '默认关闭，不影响英语课。',
+                          value: settings.enableChineseSpeechAsr,
+                          onChanged: (bool value) {
+                            ref
+                                .read(learningSettingsProvider.notifier)
+                                .setEnableChineseSpeechAsr(value: value);
+                          },
+                        ),
+                        if (settings.enableChineseSpeechAsr)
+                          _LocalWhisperModelStatusRow(
+                            modelId: LocalWhisperAsr.defaultMultilingualModel,
+                            titleWhenReady: '中文语音模型已就绪',
+                            titleWhenIdle: '下载中文语音模型（base）',
+                            titleWhenBusy: '正在下载中文语音模型',
+                            pendingHint:
+                                'base 多语言模型未下载；点此经国内镜像下载后即可识别中文口播。',
+                          ),
                       ] else ...<Widget>[
                         if (isTencentAsr) ...<Widget>[
                           _InputRow(
@@ -1072,7 +1126,8 @@ class SettingsScreen extends ConsumerWidget {
   }
 
   bool _isAiProvider(String provider) {
-    return provider == 'OpenAI' ||
+    return provider == '本地 Ollama' ||
+        provider == 'OpenAI' ||
         provider == 'OpenRouter' ||
         provider == 'SiliconFlow' ||
         provider == 'DeepSeek';
@@ -1120,9 +1175,19 @@ String _whisperModelLabel(String modelId) {
 }
 
 class _LocalWhisperModelStatusRow extends StatefulWidget {
-  const _LocalWhisperModelStatusRow({required this.modelId});
+  const _LocalWhisperModelStatusRow({
+    required this.modelId,
+    this.titleWhenReady,
+    this.titleWhenIdle,
+    this.titleWhenBusy,
+    this.pendingHint,
+  });
 
   final String modelId;
+  final String? titleWhenReady;
+  final String? titleWhenIdle;
+  final String? titleWhenBusy;
+  final String? pendingHint;
 
   @override
   State<_LocalWhisperModelStatusRow> createState() =>
@@ -1135,6 +1200,11 @@ class _LocalWhisperModelStatusRowState
   bool _busy = false;
   String _status = '正在检查模型…';
   double? _progress;
+
+  bool get _isBundledEnglish => widget.modelId == 'base.en';
+  bool get _isChineseMultilingual =>
+      widget.modelId == LocalWhisperAsr.defaultMultilingualModel ||
+      widget.modelId == 'tiny';
 
   @override
   void initState() {
@@ -1163,9 +1233,17 @@ class _LocalWhisperModelStatusRowState
     }
     setState(() {
       _ready = ready;
-      _status = ready
-          ? '$modelId 已就绪，可直接生成字幕'
-          : '$modelId 未下载，首次识别时会自动下载';
+      if (ready) {
+        _status = '$modelId 已就绪，可直接生成字幕';
+      } else if (_isBundledEnglish) {
+        _status = '$modelId 将从安装包内置资源安装，无需联网下载';
+      } else if (widget.pendingHint != null) {
+        _status = widget.pendingHint!;
+      } else if (_isChineseMultilingual) {
+        _status = '$modelId 未下载；开启中文语音识别后请在此下载（国内镜像）';
+      } else {
+        _status = '$modelId 未下载，点此经国内镜像下载';
+      }
     });
   }
 
@@ -1176,7 +1254,11 @@ class _LocalWhisperModelStatusRowState
     setState(() {
       _busy = true;
       _progress = null;
-      _status = '正在下载 ${widget.modelId}…';
+      _status = _isBundledEnglish
+          ? '正在安装内置模型 ${widget.modelId}…'
+          : (_isChineseMultilingual
+                ? '正在从国内镜像下载中文语音模型 ${widget.modelId}…'
+                : '正在从国内镜像准备 ${widget.modelId}…');
     });
     try {
       await LocalWhisperAsr.instance.ensureModel(
@@ -1215,8 +1297,16 @@ class _LocalWhisperModelStatusRowState
   @override
   Widget build(BuildContext context) {
     final String title = _ready
-        ? '模型已下载'
-        : (_busy ? '正在下载模型' : '下载 Whisper 模型');
+        ? (widget.titleWhenReady ?? '模型已就绪')
+        : (_busy
+              ? (widget.titleWhenBusy ??
+                    (_isBundledEnglish ? '正在安装内置模型' : '正在下载模型'))
+              : (widget.titleWhenIdle ??
+                    (_isBundledEnglish
+                        ? '安装内置 Whisper 模型'
+                        : (_isChineseMultilingual
+                              ? '下载中文语音模型'
+                              : '下载 Whisper 模型'))));
     return Column(
       children: <Widget>[
         _ActionRow(
@@ -1652,6 +1742,20 @@ class _TtsRateRow extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+class _HintRow extends StatelessWidget {
+  const _HintRow({required this.title, required this.description});
+
+  final String title;
+  final String description;
+
+  @override
+  Widget build(BuildContext context) {
+    return _SettingsRowFrame(
+      child: _TitleBlock(title: title, description: description),
     );
   }
 }

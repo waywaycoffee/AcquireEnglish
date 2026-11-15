@@ -121,6 +121,24 @@ void main() {
     expect(state.translationModel, 'openrouter/auto');
   });
 
+  test('local Ollama preset fills Tailscale URL and qwen3:8b', () {
+    final ProviderContainer container = ProviderContainer();
+    addTearDown(container.dispose);
+
+    container
+        .read(learningSettingsProvider.notifier)
+        .setTranslationProvider('本地 Ollama');
+
+    final LearningSettingsState state = container.read(
+      learningSettingsProvider,
+    );
+    expect(state.translationProvider, '本地 Ollama');
+    expect(state.translationBaseUrl, defaultOllamaBaseUrl);
+    expect(state.translationModel, defaultOllamaTranslationModel);
+    expect(state.translationApiKey, 'ollama');
+    expect(state.availableTranslationModels, contains('qwen3:8b'));
+  });
+
   test('asr provider presets are independent from translation settings', () {
     final ProviderContainer container = ProviderContainer();
     addTearDown(container.dispose);

@@ -462,14 +462,14 @@ class WordLookupService {
       return SentenceGrammarAnalysis.unavailable(
         sentence: text,
         message:
-            '请先在设置中配置可用的 AI 翻译接口（OpenAI / OpenRouter / SiliconFlow / DeepSeek）。',
+            '请先在设置中配置可用的 AI 翻译接口（本地 Ollama / OpenAI / OpenRouter / SiliconFlow / DeepSeek）。',
       );
     }
     if (_isDirectProvider(settings.translationProvider)) {
       return SentenceGrammarAnalysis.unavailable(
         sentence: text,
         message:
-            '语法解析需要 AI 对话模型。请在设置里把翻译服务切换为 OpenAI、OpenRouter、SiliconFlow 或 DeepSeek。',
+            '语法解析需要 AI 对话模型。请在设置里把翻译服务切换为本地 Ollama、OpenAI、OpenRouter、SiliconFlow 或 DeepSeek。',
       );
     }
 
@@ -987,6 +987,9 @@ class WordLookupService {
   }
 
   bool _canUseRemoteProvider(LearningSettingsState settings) {
+    if (settings.translationProvider == '本地 Ollama') {
+      return settings.translationBaseUrl.trim().isNotEmpty;
+    }
     if (settings.translationApiKey.isEmpty) {
       return false;
     }
