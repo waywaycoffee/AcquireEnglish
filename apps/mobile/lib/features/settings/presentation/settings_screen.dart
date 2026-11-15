@@ -557,7 +557,7 @@ class SettingsScreen extends ConsumerWidget {
                     title: 'GPU 箱部署',
                     description:
                         '默认地址与数字人 LiveTalking 同一 Tailscale 主机 '
-                        '（100.115.252.55）。模型用 qwen3:8b（约 7B 档，~5GB，'
+                        '（100.115.252.55）。模型用 qwen2.5:7b（~4.7GB，'
                         '与 LiveTalking 同卡）。部署步骤见仓库 deploy/gpu-box-ollama。',
                   ),
                 _SwitchRow(

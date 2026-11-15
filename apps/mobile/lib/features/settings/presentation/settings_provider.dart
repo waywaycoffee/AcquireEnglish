@@ -110,8 +110,8 @@ const String defaultLiveTalkingUrl = 'http://100.115.252.55:8010';
 /// Same GPU box as LiveTalking — Ollama OpenAI-compatible API (no cloud rate limits).
 const String defaultOllamaBaseUrl = 'http://100.115.252.55:11434/v1';
 
-/// Ollama library tag for ~7B-class Qwen3 on 5060 Ti (official tag is 8b, ~5.2GB).
-const String defaultOllamaTranslationModel = 'qwen3:8b';
+/// Ollama library tag for ~7B translation on 5060 Ti (stable EN↔ZH, shares VRAM with LiveTalking).
+const String defaultOllamaTranslationModel = 'qwen2.5:7b';
 
 const String _learningSettingsStorageKey = 'learning_settings_v1';
 
@@ -786,7 +786,7 @@ class LearningSettingsNotifier extends Notifier<LearningSettingsState> {
       availableTranslationModels: isOllama
           ? <String>[
               defaultOllamaTranslationModel,
-              'qwen2.5:7b',
+              'qwen3:8b',
               'qwen3:4b',
             ]
           : const <String>[],

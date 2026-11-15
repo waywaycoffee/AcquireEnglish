@@ -6,10 +6,10 @@
 #   cd /opt/acquireenglish/deploy/gpu-box-ollama
 #   ./install.sh
 # Optional:
-#   OLLAMA_MODEL=qwen3:8b OLLAMA_HOST=0.0.0.0:11434 ./install.sh
+#   OLLAMA_MODEL=qwen2.5:7b OLLAMA_HOST=0.0.0.0:11434 ./install.sh
 set -euo pipefail
 
-MODEL="${OLLAMA_MODEL:-qwen3:8b}"
+MODEL="${OLLAMA_MODEL:-qwen2.5:7b}"
 HOST_BIND="${OLLAMA_HOST:-0.0.0.0:11434}"
 KEEP_ALIVE="${OLLAMA_KEEP_ALIVE:-10m}"
 UNIT_DIR="${OLLAMA_SYSTEMD_DIR:-/etc/systemd/system}"

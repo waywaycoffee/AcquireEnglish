@@ -4,13 +4,13 @@
 #
 # Usage:
 #   ./verify.sh
-#   OLLAMA_BASE=http://100.115.252.55:11434 MODEL=qwen3:8b ./verify.sh
+#   OLLAMA_BASE=http://100.115.252.55:11434 MODEL=qwen2.5:7b ./verify.sh
 set -euo pipefail
 
 OLLAMA_BASE="${OLLAMA_BASE:-http://127.0.0.1:11434}"
 # App uses OpenAI-compatible /v1; tags endpoint is native Ollama.
 NATIVE_BASE="${OLLAMA_BASE%/v1}"
-MODEL="${MODEL:-qwen3:8b}"
+MODEL="${MODEL:-qwen2.5:7b}"
 LIVE_URL="${LIVETALKING_URL:-http://127.0.0.1:8010}"
 
 echo "==> Ollama tags @ ${NATIVE_BASE}/api/tags"
