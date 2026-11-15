@@ -615,60 +615,76 @@ class _FullTranscriptReaderScreenState
                 child: Scrollbar(
                   controller: _scrollController,
                   thumbVisibility: true,
-                  child: ListView.builder(
-                    controller: _scrollController,
-                    padding: const EdgeInsets.fromLTRB(32, 28, 32, 80),
-                    itemCount: widget.snapshot.lines.length,
-                    itemBuilder: (BuildContext context, int lineIndex) => Center(
-                      child: ConstrainedBox(
-                        constraints: const BoxConstraints(maxWidth: 1180),
-                        child: Column(
-                          children: <Widget>[
-                            _ReaderLine(
-                              line: widget.snapshot.lines[lineIndex],
-                              subtitleLetterCase:
-                                  _progress.subtitleLetterCase ??
-                                  widget.snapshot.subtitleLetterCase,
-                              meanings: widget.snapshot.meanings,
-                              lineIndex: lineIndex,
-                              activeLineIndex: _progress.lineIndex,
-                              activeWordIndex: _progress.wordIndex,
-                              activeWordKey: _activeWordKey,
-                              showTranslations: _showTranslations,
-                              isLooping:
-                                  _progress.loopingLineIndex == lineIndex,
-                              onToggleLoop: widget.onToggleLineLoop == null
-                                  ? null
-                                  : () => widget.onToggleLineLoop!(lineIndex),
-                              onWordTap:
-                                  (
-                                    BuildContext anchorContext,
-                                    String token,
-                                    int wordIndex,
-                                  ) {
-                                    _toggleWordLookup(
-                                      anchorContext: anchorContext,
-                                      rawWord: token,
-                                      contextSentence: widget
-                                          .snapshot
-                                          .lines[lineIndex]
-                                          .english,
-                                      tokenId: '$lineIndex-$wordIndex',
-                                      fallbackDefinitionCn:
-                                          widget
-                                              .snapshot
-                                              .meanings[normalizeTranscriptReaderWord(
-                                            token,
-                                          )] ??
-                                          '',
-                                    );
-                                  },
+                  child: LayoutBuilder(
+                    builder:
+                        (BuildContext context, BoxConstraints constraints) {
+                      final double lineWidth = constraints.maxWidth.isFinite
+                          ? constraints.maxWidth.clamp(0, 1180).toDouble()
+                          : MediaQuery.sizeOf(context).width.clamp(0, 1180);
+                      return ListView.builder(
+                        controller: _scrollController,
+                        padding: const EdgeInsets.fromLTRB(16, 20, 16, 80),
+                        itemCount: widget.snapshot.lines.length,
+                        itemBuilder: (BuildContext context, int lineIndex) {
+                          return Align(
+                            alignment: Alignment.topCenter,
+                            child: SizedBox(
+                              width: lineWidth,
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.stretch,
+                                children: <Widget>[
+                                  _ReaderLine(
+                                    line: widget.snapshot.lines[lineIndex],
+                                    subtitleLetterCase:
+                                        _progress.subtitleLetterCase ??
+                                        widget.snapshot.subtitleLetterCase,
+                                    meanings: widget.snapshot.meanings,
+                                    lineIndex: lineIndex,
+                                    activeLineIndex: _progress.lineIndex,
+                                    activeWordIndex: _progress.wordIndex,
+                                    activeWordKey: _activeWordKey,
+                                    showTranslations: _showTranslations,
+                                    isLooping:
+                                        _progress.loopingLineIndex ==
+                                        lineIndex,
+                                    onToggleLoop:
+                                        widget.onToggleLineLoop == null
+                                        ? null
+                                        : () => widget.onToggleLineLoop!(
+                                            lineIndex,
+                                          ),
+                                    onWordTap:
+                                        (
+                                          BuildContext anchorContext,
+                                          String token,
+                                          int wordIndex,
+                                        ) {
+                                          _toggleWordLookup(
+                                            anchorContext: anchorContext,
+                                            rawWord: token,
+                                            contextSentence: widget
+                                                .snapshot
+                                                .lines[lineIndex]
+                                                .english,
+                                            tokenId: '$lineIndex-$wordIndex',
+                                            fallbackDefinitionCn:
+                                                widget
+                                                    .snapshot
+                                                    .meanings[normalizeTranscriptReaderWord(
+                                                  token,
+                                                )] ??
+                                                '',
+                                          );
+                                        },
+                                  ),
+                                  const _SelectableLineBreak(),
+                                ],
+                              ),
                             ),
-                            const _SelectableLineBreak(),
-                          ],
-                        ),
-                      ),
-                    ),
+                          );
+                        },
+                      );
+                    },
                   ),
                 ),
               ),
@@ -705,108 +721,135 @@ class _ReaderHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.fromLTRB(24, 16, 18, 14),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        border: Border(bottom: BorderSide(color: AppDesignTokens.borderGray)),
-      ),
-      child: Row(
-        children: <Widget>[
-          Container(
-            width: 42,
-            height: 42,
-            decoration: BoxDecoration(
-              color: const Color(0xFFECFDF5),
-              borderRadius: BorderRadius.circular(13),
-            ),
-            child: const Icon(
-              Icons.menu_book_rounded,
-              color: AppDesignTokens.brandGreenDark,
-              size: 22,
-            ),
-          ),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+    // Always stack title above controls. A single Row squeezes long Bilibili
+    // titles to ~1 glyph wide and wraps them into a full-screen vertical column.
+    final String primaryTitle = courseTitle.trim().isNotEmpty
+        ? courseTitle.trim()
+        : '逐词全文';
+    final String secondaryTitle = episodeTitle.trim().isNotEmpty
+        ? '${episodeTitle.trim()} · 逐词全文'
+        : '逐词全文';
+
+    return Material(
+      color: Colors.white,
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.fromLTRB(16, 12, 12, 12),
+        decoration: BoxDecoration(
+          border: Border(bottom: BorderSide(color: AppDesignTokens.borderGray)),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          mainAxisSize: MainAxisSize.min,
+          children: <Widget>[
+            Row(
               children: <Widget>[
-                Text(
-                  courseTitle,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    color: AppDesignTokens.textPrimary,
-                    fontSize: 17,
-                    fontWeight: FontWeight.w900,
+                Container(
+                  width: 42,
+                  height: 42,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFECFDF5),
+                    borderRadius: BorderRadius.circular(13),
+                  ),
+                  child: const Icon(
+                    Icons.menu_book_rounded,
+                    color: AppDesignTokens.brandGreenDark,
+                    size: 22,
                   ),
                 ),
-                const SizedBox(height: 2),
-                Text(
-                  '$episodeTitle · 逐词全文',
-                  style: TextStyle(
-                    color: AppDesignTokens.textSecondary,
-                    fontSize: 12,
-                    fontWeight: FontWeight.w700,
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: <Widget>[
+                      Text(
+                        primaryTitle,
+                        maxLines: 1,
+                        softWrap: false,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          color: AppDesignTokens.textPrimary,
+                          fontSize: 17,
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        secondaryTitle,
+                        maxLines: 1,
+                        softWrap: false,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          color: AppDesignTokens.textSecondary,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                IconButton.filledTonal(
+                  onPressed: onClose,
+                  tooltip: '关闭逐词全文',
+                  icon: const Icon(Icons.close_rounded),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 8,
+              runSpacing: 4,
+              crossAxisAlignment: WrapCrossAlignment.center,
+              children: <Widget>[
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: <Widget>[
+                    Text(
+                      '翻译',
+                      style: TextStyle(
+                        color: AppDesignTokens.textSecondary,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    const SizedBox(width: 4),
+                    Switch(
+                      key: const ValueKey<String>('reader-translation-toggle'),
+                      value: showTranslations,
+                      onChanged: onTranslationChanged,
+                      materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    ),
+                  ],
+                ),
+                OutlinedButton.icon(
+                  key: const ValueKey<String>('reader-play-full-transcript'),
+                  onPressed: onListenFullTranscript,
+                  icon: Icon(
+                    isListeningFullTranscript
+                        ? Icons.pause_rounded
+                        : Icons.play_arrow_rounded,
+                  ),
+                  label: Text(
+                    isListeningFullTranscript
+                        ? '暂停'
+                        : isFullTranscriptPaused
+                        ? '继续'
+                        : '听全文',
+                  ),
+                ),
+                IconButton.outlined(
+                  key: const ValueKey<String>('reader-locate-current-word'),
+                  onPressed: onLocateCurrentWord,
+                  tooltip: '定位到当前单词',
+                  icon: const Icon(
+                    Icons.my_location_rounded,
+                    color: AppDesignTokens.brandGreenDark,
                   ),
                 ),
               ],
             ),
-          ),
-          Row(
-            mainAxisSize: MainAxisSize.min,
-            children: <Widget>[
-              Text(
-                '翻译',
-                style: TextStyle(
-                  color: AppDesignTokens.textSecondary,
-                  fontSize: 12,
-                  fontWeight: FontWeight.w800,
-                ),
-              ),
-              const SizedBox(width: 4),
-              Switch(
-                key: const ValueKey<String>('reader-translation-toggle'),
-                value: showTranslations,
-                onChanged: onTranslationChanged,
-                materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-              ),
-            ],
-          ),
-          const SizedBox(width: 8),
-          OutlinedButton.icon(
-            key: const ValueKey<String>('reader-play-full-transcript'),
-            onPressed: onListenFullTranscript,
-            icon: Icon(
-              isListeningFullTranscript
-                  ? Icons.pause_rounded
-                  : Icons.play_arrow_rounded,
-            ),
-            label: Text(
-              isListeningFullTranscript
-                  ? '暂停'
-                  : isFullTranscriptPaused
-                  ? '继续'
-                  : '听全文',
-            ),
-          ),
-          const SizedBox(width: 8),
-          IconButton.outlined(
-            key: const ValueKey<String>('reader-locate-current-word'),
-            onPressed: onLocateCurrentWord,
-            tooltip: '定位到当前单词',
-            icon: const Icon(
-              Icons.my_location_rounded,
-              color: AppDesignTokens.brandGreenDark,
-            ),
-          ),
-          const SizedBox(width: 8),
-          IconButton.filledTonal(
-            onPressed: onClose,
-            tooltip: '关闭逐词全文',
-            icon: const Icon(Icons.close_rounded),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -898,30 +941,58 @@ class _ReaderLine extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 8),
-          Wrap(
-            spacing: 7,
-            runSpacing: 12,
-            children: <Widget>[
-              for (int wordIndex = 0; wordIndex < tokens.length; wordIndex++)
-                Builder(
-                  builder: (BuildContext wordContext) => _WordMeaningTile(
-                    key: isActive && wordIndex == activeWordIndex
-                        ? activeWordKey
-                        : ValueKey<String>('reader-word-$lineIndex-$wordIndex'),
-                    token: tokens[wordIndex],
-                    meaning:
-                        meanings[normalizeTranscriptReaderWord(
-                          tokens[wordIndex],
-                        )] ??
-                        '—',
-                    active: isActive && wordIndex == activeWordIndex,
-                    showMeaning: showTranslations,
-                    onTap: () =>
-                        onWordTap(wordContext, tokens[wordIndex], wordIndex),
-                  ),
-                ),
-            ],
+          // Continuous English original — primary reading surface for「查看全文」.
+          Text(
+            key: ValueKey<String>('reader-english-original-$lineIndex'),
+            tokens.isEmpty
+                ? (line.english.trim().isNotEmpty
+                      ? formatSubtitleLetterCase(
+                          line.english,
+                          subtitleLetterCase,
+                        )
+                      : '（本句暂无英文字幕）')
+                : formatSubtitleLetterCase(line.english, subtitleLetterCase),
+            style: TextStyle(
+              color: tokens.isEmpty
+                  ? AppDesignTokens.textSecondary
+                  : AppDesignTokens.textPrimary,
+              fontSize: 20,
+              height: 1.45,
+              fontWeight: FontWeight.w800,
+            ),
           ),
+          if (tokens.isNotEmpty) ...<Widget>[
+            const SizedBox(height: 12),
+            Wrap(
+              spacing: 7,
+              runSpacing: 12,
+              children: <Widget>[
+                for (int wordIndex = 0; wordIndex < tokens.length; wordIndex++)
+                  Builder(
+                    builder: (BuildContext wordContext) => _WordMeaningTile(
+                      key: isActive && wordIndex == activeWordIndex
+                          ? activeWordKey
+                          : ValueKey<String>(
+                              'reader-word-$lineIndex-$wordIndex',
+                            ),
+                      token: tokens[wordIndex],
+                      meaning:
+                          meanings[normalizeTranscriptReaderWord(
+                            tokens[wordIndex],
+                          )] ??
+                          '—',
+                      active: isActive && wordIndex == activeWordIndex,
+                      showMeaning: showTranslations,
+                      onTap: () => onWordTap(
+                        wordContext,
+                        tokens[wordIndex],
+                        wordIndex,
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ],
           if (showTranslations) ...<Widget>[
             const _SelectableLineBreak(),
             const SizedBox(height: 14),

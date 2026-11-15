@@ -326,7 +326,7 @@ void main() {
     );
   });
 
-  testWidgets('shows the full sentence translation below word meanings', (
+  testWidgets('shows English original continuously and Chinese translation', (
     WidgetTester tester,
   ) async {
     final ValueNotifier<TranscriptReaderProgress> progress =
@@ -354,6 +354,12 @@ void main() {
     );
     await tester.pumpAndSettle();
 
+    // Continuous English original (not only word chips).
+    expect(
+      find.byKey(const ValueKey<String>('reader-english-original-0')),
+      findsOneWidget,
+    );
+    expect(find.text('Guess what I bought?'), findsWidgets);
     expect(find.text('猜猜我买了什么？'), findsOneWidget);
     expect(
       find.byKey(const ValueKey<String>('reader-sentence-translation')),
@@ -700,6 +706,60 @@ void main() {
 
     expect(activeWord, findsOneWidget);
     expect(tester.getCenter(activeWord).dy, inInclusiveRange(80, 360));
+  });
+
+  testWidgets('long episode title stays single-line on a phone-sized screen', (
+    WidgetTester tester,
+  ) async {
+    final ValueNotifier<TranscriptReaderProgress> progress =
+        ValueNotifier<TranscriptReaderProgress>(
+          const TranscriptReaderProgress(lineIndex: 0, wordIndex: 0),
+        );
+    addTearDown(progress.dispose);
+    await tester.binding.setSurfaceSize(const Size(390, 844));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+
+    const String longTitle =
+        '【BBC经典】小公主Little Princess 翻译中英双语字幕 ⭐专为幼儿设计的英语启蒙动画';
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: FullTranscriptReaderScreen(
+          snapshot: TranscriptReaderSnapshot(
+            courseTitle: longTitle,
+            episodeTitle: longTitle,
+            lines: lines,
+            meanings: const <String, String>{
+              'guess': '猜',
+              'what': '什么',
+              'bought': '买了',
+            },
+            progress: const TranscriptReaderProgress(
+              lineIndex: 0,
+              wordIndex: 0,
+            ),
+          ),
+          progressListenable: progress,
+          onClose: () {},
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('听全文'), findsOneWidget);
+    expect(find.textContaining('Guess'), findsWidgets);
+
+    final Size headerSize = tester.getSize(find.text('听全文'));
+    expect(headerSize.height, lessThan(80));
+
+    // Title must not balloon into a full-screen vertical glyph column.
+    final Finder titleFinder = find.textContaining('BBC经典');
+    expect(titleFinder, findsWidgets);
+    for (final Element element in titleFinder.evaluate()) {
+      final Size size = tester.getSize(find.byWidget(element.widget));
+      expect(size.height, lessThan(48));
+      expect(size.width, greaterThan(80));
+    }
   });
 }
 

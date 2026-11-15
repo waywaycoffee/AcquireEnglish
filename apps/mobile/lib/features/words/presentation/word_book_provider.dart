@@ -7,6 +7,9 @@ import 'package:hive_ce/hive.dart';
 import '../../sync/data/vocab_sync_service.dart';
 import '../data/offline_word_dictionary.dart';
 import '../domain/sm2_scheduler.dart';
+import '../domain/vocab_card_kind.dart';
+
+export '../domain/vocab_card_kind.dart';
 
 const String _wordBookStorageKey = 'word_book_v1';
 const String _reviewStreakKey = 'word_review_streak_v1';
@@ -155,8 +158,17 @@ class WordEntry {
     required this.word,
     required this.favorite,
     required this.occurrences,
+    this.kind = VocabCardKind.word,
     this.definitionCn,
     this.offlineDefinitionCn,
+    this.phonetic,
+    this.partOfSpeech,
+    this.definitionEn,
+    this.analysisCn,
+    this.mnemonicCn,
+    this.aiExampleEn,
+    this.aiExampleCn,
+    this.enrichmentStatus = VocabEnrichmentStatus.none,
     this.ease = 2.5,
     this.intervalDays = 0,
     this.repetitions = 0,
@@ -164,26 +176,56 @@ class WordEntry {
     this.mastery = WordMastery.fresh,
   });
 
-  factory WordEntry.fromJson(Map<String, Object?> json) => WordEntry(
-    word: json['word']! as String,
-    favorite: json['favorite'] as bool? ?? false,
-    definitionCn: json['definitionCn'] as String?,
-    offlineDefinitionCn: json['offlineDefinitionCn'] as String?,
-    occurrences: (json['occurrences'] as List<Object?>? ?? const <Object?>[])
-        .cast<Map<String, Object?>>()
-        .map(WordOccurrence.fromJson)
-        .toList(growable: false),
-    ease: (json['ease'] as num?)?.toDouble() ?? 2.5,
-    intervalDays: json['intervalDays'] as int? ?? 0,
-    repetitions: json['repetitions'] as int? ?? 0,
-    dueAtMs: (json['dueAtMs'] as num?)?.toInt(),
-    mastery: Sm2Scheduler.masteryFromName(json['mastery'] as String?),
-  );
+  factory WordEntry.fromJson(Map<String, Object?> json) {
+    final String word = json['word']! as String;
+    final String? kindRaw = json['kind'] as String?;
+    final VocabCardKind kind = kindRaw == null || kindRaw.isEmpty
+        ? vocabCardKindForLexeme(word)
+        : VocabCardKind.values.firstWhere(
+            (VocabCardKind k) => k.name == kindRaw,
+            orElse: () => vocabCardKindForLexeme(word),
+          );
+    return WordEntry(
+      word: word,
+      favorite: json['favorite'] as bool? ?? false,
+      kind: kind,
+      definitionCn: json['definitionCn'] as String?,
+      offlineDefinitionCn: json['offlineDefinitionCn'] as String?,
+      phonetic: json['phonetic'] as String?,
+      partOfSpeech: json['partOfSpeech'] as String?,
+      definitionEn: json['definitionEn'] as String?,
+      analysisCn: json['analysisCn'] as String?,
+      mnemonicCn: json['mnemonicCn'] as String?,
+      aiExampleEn: json['aiExampleEn'] as String?,
+      aiExampleCn: json['aiExampleCn'] as String?,
+      enrichmentStatus: vocabEnrichmentStatusFromName(
+        json['enrichmentStatus'] as String?,
+      ),
+      occurrences: (json['occurrences'] as List<Object?>? ?? const <Object?>[])
+          .cast<Map<String, Object?>>()
+          .map(WordOccurrence.fromJson)
+          .toList(growable: false),
+      ease: (json['ease'] as num?)?.toDouble() ?? 2.5,
+      intervalDays: json['intervalDays'] as int? ?? 0,
+      repetitions: json['repetitions'] as int? ?? 0,
+      dueAtMs: (json['dueAtMs'] as num?)?.toInt(),
+      mastery: Sm2Scheduler.masteryFromName(json['mastery'] as String?),
+    );
+  }
 
   final String word;
   final bool favorite;
+  final VocabCardKind kind;
   final String? definitionCn;
   final String? offlineDefinitionCn;
+  final String? phonetic;
+  final String? partOfSpeech;
+  final String? definitionEn;
+  final String? analysisCn;
+  final String? mnemonicCn;
+  final String? aiExampleEn;
+  final String? aiExampleCn;
+  final VocabEnrichmentStatus enrichmentStatus;
   final List<WordOccurrence> occurrences;
   final double ease;
   final int intervalDays;
@@ -196,6 +238,28 @@ class WordEntry {
     0,
     (int total, WordOccurrence item) => total + item.count,
   );
+
+  String get sourceSentence {
+    if (occurrences.isEmpty) {
+      return '';
+    }
+    final WordOccurrence first = occurrences.first;
+    if (first.contexts.isNotEmpty) {
+      return first.contexts.first.sentence.trim();
+    }
+    return first.sentence.trim();
+  }
+
+  String get sourceSentenceCn {
+    if (occurrences.isEmpty) {
+      return '';
+    }
+    final WordOccurrence first = occurrences.first;
+    if (first.contexts.isNotEmpty) {
+      return first.contexts.first.chinese.trim();
+    }
+    return first.chinese.trim();
+  }
 
   bool get isDue {
     if (dueAtMs == null) {
@@ -216,9 +280,18 @@ class WordEntry {
 
   WordEntry copyWith({
     bool? favorite,
+    VocabCardKind? kind,
     List<WordOccurrence>? occurrences,
     String? definitionCn,
     String? offlineDefinitionCn,
+    String? phonetic,
+    String? partOfSpeech,
+    String? definitionEn,
+    String? analysisCn,
+    String? mnemonicCn,
+    String? aiExampleEn,
+    String? aiExampleCn,
+    VocabEnrichmentStatus? enrichmentStatus,
     double? ease,
     int? intervalDays,
     int? repetitions,
@@ -227,9 +300,18 @@ class WordEntry {
   }) => WordEntry(
     word: word,
     favorite: favorite ?? this.favorite,
+    kind: kind ?? this.kind,
     occurrences: occurrences ?? this.occurrences,
     definitionCn: definitionCn ?? this.definitionCn,
     offlineDefinitionCn: offlineDefinitionCn ?? this.offlineDefinitionCn,
+    phonetic: phonetic ?? this.phonetic,
+    partOfSpeech: partOfSpeech ?? this.partOfSpeech,
+    definitionEn: definitionEn ?? this.definitionEn,
+    analysisCn: analysisCn ?? this.analysisCn,
+    mnemonicCn: mnemonicCn ?? this.mnemonicCn,
+    aiExampleEn: aiExampleEn ?? this.aiExampleEn,
+    aiExampleCn: aiExampleCn ?? this.aiExampleCn,
+    enrichmentStatus: enrichmentStatus ?? this.enrichmentStatus,
     ease: ease ?? this.ease,
     intervalDays: intervalDays ?? this.intervalDays,
     repetitions: repetitions ?? this.repetitions,
@@ -240,8 +322,17 @@ class WordEntry {
   Map<String, Object?> toJson() => <String, Object?>{
     'word': word,
     'favorite': favorite,
+    'kind': kind.name,
     'definitionCn': definitionCn,
     'offlineDefinitionCn': offlineDefinitionCn,
+    'phonetic': phonetic,
+    'partOfSpeech': partOfSpeech,
+    'definitionEn': definitionEn,
+    'analysisCn': analysisCn,
+    'mnemonicCn': mnemonicCn,
+    'aiExampleEn': aiExampleEn,
+    'aiExampleCn': aiExampleCn,
+    'enrichmentStatus': enrichmentStatus.name,
     'occurrences': occurrences
         .map((WordOccurrence item) => item.toJson())
         .toList(),
@@ -438,12 +529,15 @@ class WordBookNotifier extends Notifier<List<WordEntry>> {
       chinese: chinese.trim(),
       count: count == 0 ? 1 : count,
     );
+    final VocabCardKind kind = vocabCardKindForLexeme(word);
     if (entryIndex < 0) {
       state = <WordEntry>[
         WordEntry(
           word: word,
           favorite: true,
+          kind: kind,
           definitionCn: validDefinition,
+          enrichmentStatus: VocabEnrichmentStatus.pending,
           occurrences: <WordOccurrence>[
             WordOccurrence(
               episodeId: episodeId,
@@ -475,7 +569,7 @@ class WordBookNotifier extends Notifier<List<WordEntry>> {
               contexts: <WordContext>[...occurrence.contexts, context],
             );
           })
-          .toList(growable: false);
+          .toList(growable: true);
       if (!occurrences.any(
         (WordOccurrence item) => item.episodeId == episodeId,
       )) {
@@ -495,12 +589,15 @@ class WordBookNotifier extends Notifier<List<WordEntry>> {
         );
       }
       final List<WordEntry> next = <WordEntry>[...state];
-      next[entryIndex] = WordEntry(
-        word: entry.word,
+      next[entryIndex] = entry.copyWith(
         favorite: true,
+        kind: entry.kind == VocabCardKind.word ? kind : entry.kind,
         occurrences: occurrences,
         definitionCn: entry.definitionCn ?? validDefinition,
-        offlineDefinitionCn: entry.offlineDefinitionCn,
+        enrichmentStatus:
+            entry.enrichmentStatus == VocabEnrichmentStatus.ready
+            ? VocabEnrichmentStatus.ready
+            : VocabEnrichmentStatus.pending,
       );
       state = next;
     }
@@ -511,6 +608,62 @@ class WordBookNotifier extends Notifier<List<WordEntry>> {
       unawaited(ref.read(vocabSyncServiceProvider).pushEntry(state[favIndex]));
     }
     return true;
+  }
+
+  void markEnrichmentPending(String rawWord) {
+    final String word = normalizeLexeme(rawWord);
+    final int index = state.indexWhere((WordEntry item) => item.word == word);
+    if (index < 0) {
+      return;
+    }
+    final List<WordEntry> next = <WordEntry>[...state];
+    next[index] = next[index].copyWith(
+      enrichmentStatus: VocabEnrichmentStatus.pending,
+    );
+    state = next;
+    unawaited(_persist());
+  }
+
+  void applyEnrichment({
+    required String rawWord,
+    String? phonetic,
+    String? partOfSpeech,
+    String? definitionCn,
+    String? definitionEn,
+    String? analysisCn,
+    String? mnemonicCn,
+    String? aiExampleEn,
+    String? aiExampleCn,
+    required VocabEnrichmentStatus status,
+  }) {
+    final String word = normalizeLexeme(rawWord);
+    final int index = state.indexWhere((WordEntry item) => item.word == word);
+    if (index < 0) {
+      return;
+    }
+    final WordEntry entry = state[index];
+    final List<WordEntry> next = <WordEntry>[...state];
+    next[index] = entry.copyWith(
+      phonetic: _prefer(phonetic, entry.phonetic),
+      partOfSpeech: _prefer(partOfSpeech, entry.partOfSpeech),
+      definitionCn: _prefer(definitionCn, entry.definitionCn),
+      definitionEn: _prefer(definitionEn, entry.definitionEn),
+      analysisCn: _prefer(analysisCn, entry.analysisCn),
+      mnemonicCn: _prefer(mnemonicCn, entry.mnemonicCn),
+      aiExampleEn: _prefer(aiExampleEn, entry.aiExampleEn),
+      aiExampleCn: _prefer(aiExampleCn, entry.aiExampleCn),
+      enrichmentStatus: status,
+    );
+    state = next;
+    unawaited(_persist());
+  }
+
+  static String? _prefer(String? incoming, String? existing) {
+    final String? next = incoming?.trim();
+    if (next != null && next.isNotEmpty) {
+      return next;
+    }
+    return existing;
   }
 
   Future<void> relinkEpisode({
@@ -621,15 +774,39 @@ class WordBookNotifier extends Notifier<List<WordEntry>> {
     }
     final WordEntry entry = state[index];
     final List<WordEntry> next = <WordEntry>[...state];
-    next[index] = WordEntry(
-      word: updatedWord,
-      favorite: entry.favorite,
-      occurrences: entry.occurrences,
+    next[index] = entry.copyWith(
       definitionCn: definitionCn.trim().isEmpty ? null : definitionCn.trim(),
       offlineDefinitionCn: updatedWord == word
           ? entry.offlineDefinitionCn
           : null,
+      kind: updatedWord == word
+          ? entry.kind
+          : vocabCardKindForLexeme(updatedWord),
     );
+    // Renaming requires a fresh WordEntry because `word` is final.
+    if (updatedWord != word) {
+      next[index] = WordEntry(
+        word: updatedWord,
+        favorite: entry.favorite,
+        kind: vocabCardKindForLexeme(updatedWord),
+        occurrences: entry.occurrences,
+        definitionCn: definitionCn.trim().isEmpty ? null : definitionCn.trim(),
+        offlineDefinitionCn: null,
+        phonetic: entry.phonetic,
+        partOfSpeech: entry.partOfSpeech,
+        definitionEn: entry.definitionEn,
+        analysisCn: entry.analysisCn,
+        mnemonicCn: entry.mnemonicCn,
+        aiExampleEn: entry.aiExampleEn,
+        aiExampleCn: entry.aiExampleCn,
+        enrichmentStatus: entry.enrichmentStatus,
+        ease: entry.ease,
+        intervalDays: entry.intervalDays,
+        repetitions: entry.repetitions,
+        dueAtMs: entry.dueAtMs,
+        mastery: entry.mastery,
+      );
+    }
     next.sort((WordEntry a, WordEntry b) => a.word.compareTo(b.word));
     state = next;
     unawaited(_persist());
@@ -986,5 +1163,6 @@ bool _isFavoriteableLexeme(String word) {
   if (_isIndependentEnglishWord(word)) {
     return true;
   }
-  return RegExp(r"^[a-z]{2,}(?:\s+[a-z']{2,}){1,5}$").hasMatch(word);
+  // Up to ~12 tokens so short sentence patterns can live on 词卡.
+  return RegExp(r"^[a-z]{2,}(?:\s+[a-z']{1,}){1,11}$").hasMatch(word);
 }

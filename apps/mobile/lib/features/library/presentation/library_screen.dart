@@ -17,6 +17,7 @@ import '../../navigation/presentation/navigation_destination.dart';
 import '../../player/presentation/asr_subtitle_cache.dart';
 import '../../player/presentation/full_transcript_reader.dart';
 import '../../player/presentation/learning_resume_provider.dart';
+import '../../player/presentation/manual_subtitle_guard.dart';
 import '../../player/presentation/player_course_lookup.dart';
 import '../../player/presentation/player_mock_state.dart';
 import '../../player/presentation/player_subtitle_loader.dart';
@@ -27,7 +28,12 @@ import '../../shared/presentation/pad/app_design_tokens.dart';
 import '../../shared/presentation/pad/pad_compact.dart';
 import '../../shared/presentation/pad/pad_scaffold.dart';
 import '../../shared/presentation/pad/pad_top_bar.dart';
-import '../../sync/presentation/daily_feed_provider.dart';
+import '../../import_course/data/bilibili_episode_prepare.dart';
+import '../../subtitle_completion/reset_episode_subtitles.dart';
+import '../../subtitle_completion/subtitle_completion_enqueue.dart';
+import '../../subtitle_completion/subtitle_completion_queue.dart';
+import '../../subtitle_completion/subtitle_completion_scheduler.dart';
+import '../../subtitle_completion/subtitle_completion_status_provider.dart';
 import '../../words/data/offline_word_dictionary.dart';
 import 'library_browse.dart';
 import 'library_catalog_provider.dart';
@@ -162,18 +168,28 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
     List<PlayerSubtitleLine> lines = const <PlayerSubtitleLine>[];
     Map<String, String> generatedMeanings = const <String, String>{};
     try {
-      if ((resource.englishSubtitleAsset ?? '').isNotEmpty) {
-        final List<PlayerSubtitleLine> englishLines = await loadSubtitleLines(
-          resource.englishSubtitleAsset!,
-        );
-        final List<PlayerSubtitleLine> chineseLines =
-            (resource.chineseSubtitleAsset ?? '').isEmpty
-            ? const <PlayerSubtitleLine>[]
-            : await loadSubtitleLines(resource.chineseSubtitleAsset!);
-        lines = mergeSubtitleLines(
-          englishLines: englishLines,
-          chineseLines: chineseLines,
-        );
+      final String enPath = (resource.englishSubtitleAsset ?? '').trim();
+      final String zhPath = (resource.chineseSubtitleAsset ?? '').trim();
+      final List<PlayerSubtitleLine> englishLines = enPath.isEmpty
+          ? const <PlayerSubtitleLine>[]
+          : await loadSubtitleLines(enPath);
+      final List<PlayerSubtitleLine> chineseLines = zhPath.isEmpty
+          ? const <PlayerSubtitleLine>[]
+          : await loadSubtitleLines(zhPath);
+      if (englishLines.isNotEmpty || chineseLines.isNotEmpty) {
+        // Prefer Chinese timeline + English overlay so EN originals are kept
+        // even when the official "en" track is sparse or mislabeled ZH.
+        if (chineseLines.isNotEmpty) {
+          lines = mergePartialEnglishOntoChineseBase(
+            chineseLines: chineseLines,
+            englishLines: englishLines,
+          );
+        } else {
+          lines = mergeSubtitleLines(
+            englishLines: englishLines,
+            chineseLines: chineseLines,
+          );
+        }
       }
       if (lines.isEmpty && (resource.videoAsset ?? '').isNotEmpty) {
         final String? cached = await const AsrSubtitleCache().read(
@@ -398,6 +414,117 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
                     120,
                   ),
                   children: <Widget>[
+                    // Course-level download / 补字幕 progress stays at the very top.
+                    Consumer(
+                      builder: (BuildContext context, WidgetRef ref, _) {
+                        final BilibiliCollectionDownloadProgress? progress =
+                            ref.watch(
+                              bilibiliCollectionDownloadProgressProvider,
+                            );
+                        final SubtitleCompletionCourseUi? subtitleFill = ref
+                            .watch(subtitleCompletionStatusProvider)
+                            .forCourse(
+                              courseId: selectedCourse.id,
+                              episodeIds: selectedCourse.episodes.map(
+                                (LibraryEpisodeItem e) => e.id,
+                              ),
+                            );
+                        final bool showDownload =
+                            progress != null &&
+                            progress.courseId == selectedCourse.id &&
+                            !progress.done;
+                        final bool showSubtitle =
+                            subtitleFill != null && subtitleFill.showBanner;
+                        if (!showDownload && !showSubtitle) {
+                          return const SizedBox.shrink();
+                        }
+                        return Padding(
+                          padding: const EdgeInsets.only(bottom: 16),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: <Widget>[
+                              if (showDownload) ...<Widget>[
+                                Text(
+                                  progress.message,
+                                  style: TextStyle(
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w700,
+                                    color: AppDesignTokens.textSecondary,
+                                  ),
+                                ),
+                                const SizedBox(height: 8),
+                                ClipRRect(
+                                  borderRadius: BorderRadius.circular(999),
+                                  child: LinearProgressIndicator(
+                                    value: progress.progress.clamp(0.05, 1),
+                                    minHeight: 8,
+                                    backgroundColor: AppDesignTokens.softGray,
+                                    valueColor: AlwaysStoppedAnimation<Color>(
+                                      AppDesignTokens.primaryBlue,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                              if (showDownload && showSubtitle)
+                                const SizedBox(height: 12),
+                              if (showSubtitle) ...<Widget>[
+                                Row(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: <Widget>[
+                                    Expanded(
+                                      child: Text(
+                                        subtitleFill.message,
+                                        style: TextStyle(
+                                          fontSize: 13,
+                                          fontWeight: FontWeight.w700,
+                                          color: subtitleFill.failedCount > 0
+                                              ? const Color(0xFFBA1A1A)
+                                              : AppDesignTokens.textSecondary,
+                                        ),
+                                      ),
+                                    ),
+                                    if (subtitleFill.failedCount > 0)
+                                      TextButton(
+                                        onPressed: () {
+                                          unawaited(
+                                            ref
+                                                .read(
+                                                  subtitleCompletionStatusProvider
+                                                      .notifier,
+                                                )
+                                                .retryCourse(
+                                                  selectedCourse.episodes.map(
+                                                    (LibraryEpisodeItem e) =>
+                                                        e.id,
+                                                  ),
+                                                ),
+                                          );
+                                        },
+                                        child: const Text('重试'),
+                                      ),
+                                  ],
+                                ),
+                                if (subtitleFill.activeCount > 0) ...<Widget>[
+                                  const SizedBox(height: 8),
+                                  ClipRRect(
+                                    borderRadius: BorderRadius.circular(999),
+                                    child: LinearProgressIndicator(
+                                      value: subtitleFill.progress,
+                                      minHeight: 8,
+                                      backgroundColor: AppDesignTokens.softGray,
+                                      valueColor:
+                                          const AlwaysStoppedAnimation<Color>(
+                                        Color(0xFFFB7299),
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ],
+                            ],
+                          ),
+                        );
+                      },
+                    ),
                     CourseOverviewCard(
                       course: selectedCourse,
                       activeEpisode:
@@ -422,46 +549,18 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
                               },
                             ),
                     ),
-                    Consumer(
-                      builder: (BuildContext context, WidgetRef ref, _) {
-                        final BilibiliCollectionDownloadProgress? progress =
-                            ref.watch(
-                              bilibiliCollectionDownloadProgressProvider,
-                            );
-                        if (progress == null ||
-                            progress.courseId != selectedCourse.id ||
-                            progress.done) {
-                          return const SizedBox.shrink();
-                        }
-                        return Padding(
-                          padding: const EdgeInsets.only(top: 12),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: <Widget>[
-                              Text(
-                                progress.message,
-                                style: TextStyle(
-                                  fontSize: 13,
-                                  fontWeight: FontWeight.w700,
-                                  color: AppDesignTokens.textSecondary,
-                                ),
-                              ),
-                              const SizedBox(height: 8),
-                              ClipRRect(
-                                borderRadius: BorderRadius.circular(999),
-                                child: LinearProgressIndicator(
-                                  value: progress.progress.clamp(0.05, 1),
-                                  minHeight: 8,
-                                  backgroundColor: AppDesignTokens.softGray,
-                                  valueColor: AlwaysStoppedAnimation<Color>(
-                                    AppDesignTokens.primaryBlue,
-                                  ),
-                                ),
-                              ),
-                            ],
+                    Padding(
+                      padding: const EdgeInsets.only(top: 8),
+                      child: Align(
+                        alignment: Alignment.centerLeft,
+                        child: TextButton.icon(
+                          onPressed: () => unawaited(
+                            _confirmReimportCourseSubtitles(selectedCourse),
                           ),
-                        );
-                      },
+                          icon: const Icon(Icons.subtitles_outlined, size: 18),
+                          label: const Text('重新导入字幕'),
+                        ),
+                      ),
                     ),
                     Align(
                       alignment: Alignment.centerRight,
@@ -605,11 +704,35 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
                                   padding: EdgeInsets.only(
                                     bottom: compact ? 12 : 16,
                                   ),
-                                  child: EpisodeListItem(
+                                  child: Consumer(
+                                    builder:
+                                        (BuildContext context, WidgetRef ref, _) {
+                                      final SubtitleCompletionEpisodeUi?
+                                      fill = ref
+                                          .watch(
+                                            subtitleCompletionStatusProvider,
+                                          )
+                                          .forEpisode(item.id);
+                                      return EpisodeListItem(
                                     item: item,
                                     selected: item.id == selectedEpisodeId,
                                     fallbackCoverImage:
                                         selectedCourse.coverImage,
+                                    englishFillLabel:
+                                        fill?.englishChipProgressLabel,
+                                    chineseFillLabel:
+                                        fill?.chineseChipProgressLabel,
+                                    englishFillFailed:
+                                        fill != null &&
+                                        fill.isFailed &&
+                                        fill.needEnglish,
+                                    chineseFillFailed:
+                                        fill != null &&
+                                        fill.isFailed &&
+                                        fill.needChinese,
+                                    subtitleFillActive:
+                                        fill != null && fill.isActive,
+                                    subtitleFillProgress: fill?.progressFraction,
                                     onTap: () {
                                       setState(() {
                                         selectedEpisodeId = item.id;
@@ -626,6 +749,42 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
                                           selectedCourse,
                                           item,
                                         ),
+                                    onRerecognizeEnglish: () {
+                                      unawaited(
+                                        _confirmResetEpisodeSubtitles(
+                                          selectedCourse,
+                                          item,
+                                          SubtitleResetSide.english,
+                                        ),
+                                      );
+                                    },
+                                    onRerecognizeChinese: () {
+                                      unawaited(
+                                        _confirmResetEpisodeSubtitles(
+                                          selectedCourse,
+                                          item,
+                                          SubtitleResetSide.chinese,
+                                        ),
+                                      );
+                                    },
+                                    onMissingEnglishTap: () {
+                                      unawaited(
+                                        _requestMissingSubtitleFill(
+                                          course: selectedCourse,
+                                          episode: item,
+                                          chip: SubtitleFillChip.english,
+                                        ),
+                                      );
+                                    },
+                                    onMissingChineseTap: () {
+                                      unawaited(
+                                        _requestMissingSubtitleFill(
+                                          course: selectedCourse,
+                                          episode: item,
+                                          chip: SubtitleFillChip.chinese,
+                                        ),
+                                      );
+                                    },
                                     trailing: ReorderableDragStartListener(
                                       index: index,
                                       child: Icon(
@@ -633,6 +792,8 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
                                         color: AppDesignTokens.textSecondary,
                                       ),
                                     ),
+                                  );
+                                    },
                                   ),
                                 );
                               },
@@ -647,25 +808,89 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
                                 padding: EdgeInsets.only(
                                   bottom: compact ? 12 : 16,
                                 ),
-                                child: EpisodeListItem(
-                                  item: item,
-                                  selected: item.id == selectedEpisodeId,
-                                  fallbackCoverImage: selectedCourse.coverImage,
-                                  onTap: () {
-                                    setState(() {
-                                      selectedEpisodeId = item.id;
-                                    });
-                                    context.pushNamed(
-                                      SGRoute.player.name,
-                                      pathParameters: <String, String>{
-                                        'episodeId': item.id,
+                                child: Consumer(
+                                  builder:
+                                      (BuildContext context, WidgetRef ref, _) {
+                                    final SubtitleCompletionEpisodeUi? fill = ref
+                                        .watch(
+                                          subtitleCompletionStatusProvider,
+                                        )
+                                        .forEpisode(item.id);
+                                    return EpisodeListItem(
+                                      item: item,
+                                      selected: item.id == selectedEpisodeId,
+                                      fallbackCoverImage:
+                                          selectedCourse.coverImage,
+                                      englishFillLabel:
+                                          fill?.englishChipProgressLabel,
+                                      chineseFillLabel:
+                                          fill?.chineseChipProgressLabel,
+                                      englishFillFailed:
+                                          fill != null &&
+                                          fill.isFailed &&
+                                          fill.needEnglish,
+                                      chineseFillFailed:
+                                          fill != null &&
+                                          fill.isFailed &&
+                                          fill.needChinese,
+                                      subtitleFillActive:
+                                          fill != null && fill.isActive,
+                                      subtitleFillProgress:
+                                          fill?.progressFraction,
+                                      onTap: () {
+                                        setState(() {
+                                          selectedEpisodeId = item.id;
+                                        });
+                                        context.pushNamed(
+                                          SGRoute.player.name,
+                                          pathParameters: <String, String>{
+                                            'episodeId': item.id,
+                                          },
+                                        );
+                                      },
+                                      onViewTranscript: () =>
+                                          _openTranscriptReader(
+                                            selectedCourse,
+                                            item,
+                                          ),
+                                      onRerecognizeEnglish: () {
+                                        unawaited(
+                                          _confirmResetEpisodeSubtitles(
+                                            selectedCourse,
+                                            item,
+                                            SubtitleResetSide.english,
+                                          ),
+                                        );
+                                      },
+                                      onRerecognizeChinese: () {
+                                        unawaited(
+                                          _confirmResetEpisodeSubtitles(
+                                            selectedCourse,
+                                            item,
+                                            SubtitleResetSide.chinese,
+                                          ),
+                                        );
+                                      },
+                                      onMissingEnglishTap: () {
+                                        unawaited(
+                                          _requestMissingSubtitleFill(
+                                            course: selectedCourse,
+                                            episode: item,
+                                            chip: SubtitleFillChip.english,
+                                          ),
+                                        );
+                                      },
+                                      onMissingChineseTap: () {
+                                        unawaited(
+                                          _requestMissingSubtitleFill(
+                                            course: selectedCourse,
+                                            episode: item,
+                                            chip: SubtitleFillChip.chinese,
+                                          ),
+                                        );
                                       },
                                     );
                                   },
-                                  onViewTranscript: () => _openTranscriptReader(
-                                    selectedCourse,
-                                    item,
-                                  ),
                                 ),
                               );
                             }),
@@ -875,8 +1100,6 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
                   ),
                 ],
                 const SizedBox(height: 24),
-                const _LibraryTodayFeed(),
-                const SizedBox(height: 16),
                 if (filteredCourses.isEmpty)
                   _EmptyLibraryState(query: query)
                 else if (viewMode == LibraryCourseViewMode.grid ||
@@ -1016,6 +1239,166 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
     }
   }
 
+  Future<void> _confirmReimportCourseSubtitles(LibraryCourseData course) async {
+    final bool ok =
+        await showDialog<bool>(
+          context: context,
+          builder: (BuildContext context) {
+            return AlertDialog(
+              title: const Text('重新导入本课程字幕？'),
+              content: const Text(
+                '将清除本课程语音识别生成的字幕，重新挂上 B 站官方软字幕；'
+                '缺英文/中文的分集再在后台补全。视频文件不会删除。',
+              ),
+              actions: <Widget>[
+                TextButton(
+                  onPressed: () => Navigator.of(context).pop(false),
+                  child: const Text('取消'),
+                ),
+                FilledButton(
+                  onPressed: () => Navigator.of(context).pop(true),
+                  child: const Text('开始重新导入'),
+                ),
+              ],
+            );
+          },
+        ) ??
+        false;
+    if (!ok || !mounted) {
+      return;
+    }
+    try {
+      final int n = await reimportCourseSubtitles(
+        catalog: ref.read(libraryCatalogProvider.notifier),
+        course: course,
+        bilibiliCookieHeader: ref
+            .read(learningSettingsProvider)
+            .resolvedBilibiliCookieHeader,
+      );
+      if (!mounted) {
+        return;
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('已重新导入 $n 集字幕，缺侧正在后台补全')),
+      );
+      unawaited(ref.read(subtitleCompletionStatusProvider.notifier).refresh());
+    } catch (e) {
+      if (!mounted) {
+        return;
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('重新导入字幕失败：$e')),
+      );
+    }
+  }
+
+  Future<void> _confirmResetEpisodeSubtitles(
+    LibraryCourseData course,
+    LibraryEpisodeItem episode,
+    SubtitleResetSide side,
+  ) async {
+    if (!mounted) {
+      return;
+    }
+    final bool hasManual = await episodeHasManualSubtitleEdits(
+      episodeId: episode.id,
+    );
+    if (!mounted) {
+      return;
+    }
+    if (hasManual) {
+      final bool ok = await confirmManualSubtitleDestructiveAction(
+        context,
+        action: ManualSubtitleDestructiveAction.delete,
+      );
+      if (!ok || !mounted) {
+        return;
+      }
+    }
+    final LibraryCatalogNotifier catalog = ref.read(
+      libraryCatalogProvider.notifier,
+    );
+    final String cookie = ref
+        .read(learningSettingsProvider)
+        .resolvedBilibiliCookieHeader;
+    try {
+      final String message;
+      switch (side) {
+        case SubtitleResetSide.chinese:
+          if (!episode.hasEnglishSubtitles) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('没有英文字幕，无法重译中文。请先重新识别英文字幕'),
+              ),
+            );
+            return;
+          }
+          await resetEpisodeChineseSubtitles(
+            catalog: catalog,
+            course: course,
+            episode: episode,
+            bilibiliCookieHeader: cookie,
+          );
+          ref.read(subtitleCompletionStatusProvider.notifier).reportProgress(
+            episode.id,
+            '正在用英文重译中文字幕…',
+            needEnglish: false,
+            needChinese: true,
+            status: SubtitleCompletionStatus.running,
+          );
+          message = '第 ${episode.numberStr} 集：正在用英文重译中文';
+          break;
+        case SubtitleResetSide.english:
+          await resetEpisodeEnglishSubtitles(
+            catalog: catalog,
+            course: course,
+            episode: episode,
+            bilibiliCookieHeader: cookie,
+          );
+          ref.read(subtitleCompletionStatusProvider.notifier).reportProgress(
+            episode.id,
+            '正在用语音重新识别英文字幕…',
+            needEnglish: true,
+            needChinese: false,
+            status: SubtitleCompletionStatus.running,
+          );
+          message = '第 ${episode.numberStr} 集：正在语音 ASR 英文字幕';
+          break;
+        case SubtitleResetSide.both:
+          await resetEpisodeSubtitles(
+            catalog: catalog,
+            course: course,
+            episode: episode,
+            bilibiliCookieHeader: cookie,
+            requeueFill: true,
+          );
+          ref.read(subtitleCompletionStatusProvider.notifier).reportProgress(
+            episode.id,
+            '正在重新识别：先 ASR 英文，再翻译中文…',
+            needEnglish: true,
+            needChinese: true,
+            status: SubtitleCompletionStatus.running,
+          );
+          message = '第 ${episode.numberStr} 集：ASR 英文 → 翻译中文';
+          break;
+      }
+      unawaited(ref.read(subtitleCompletionStatusProvider.notifier).refresh());
+      if (!mounted) {
+        return;
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(message)),
+      );
+    } catch (e) {
+      if (!mounted) {
+        return;
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('重新识别失败：$e')),
+      );
+    }
+  }
+
   void _openCourse(LibraryCourseData course) {
     setState(() {
       selectedCourse = course;
@@ -1073,9 +1456,7 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
     final ProviderContainer container = ProviderScope.containerOf(context);
     final BilibiliCollectionDownloadProgressNotifier progressNotifier =
         container.read(bilibiliCollectionDownloadProgressProvider.notifier);
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('正在后台下载合集剩余分集…')),
-    );
+    // Progress lives on the course banner — avoid SnackBar spam on every open.
     unawaited(
       downloadRemainingBilibiliEpisodes(
         catalog: container.read(libraryCatalogProvider.notifier),
@@ -1083,16 +1464,6 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
         courseId: course.id,
         service: BilibiliImportService.withCookie(cookie),
         progressNotifier: progressNotifier,
-        onProgress: (String message, double? progress) {
-          if (!mounted) {
-            return;
-          }
-          if (progress == 1) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text(message)),
-            );
-          }
-        },
       ),
     );
   }
@@ -1109,6 +1480,54 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
         selectedCourseIds.add(course.id);
       }
     });
+  }
+
+  Future<void> _requestMissingSubtitleFill({
+    required LibraryCourseData course,
+    required LibraryEpisodeItem episode,
+    required SubtitleFillChip chip,
+  }) async {
+    if (episode.videoMissing || !isUsableLocalVideoPath(episode.videoAsset)) {
+      if (!mounted) {
+        return;
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('请先下载本集视频，再补字幕')),
+      );
+      _maybeDownloadPendingBilibiliEpisodes(course);
+      return;
+    }
+    final bool wantEnglish = chip == SubtitleFillChip.english;
+    final bool wantChinese = chip == SubtitleFillChip.chinese;
+    // Optimistic chip + bar update so progress shows on the list immediately.
+    ref.read(subtitleCompletionStatusProvider.notifier).reportProgress(
+      episode.id,
+      wantEnglish ? '排队补英文字幕…' : '排队补中文字幕…',
+      needEnglish: wantEnglish || !episode.hasEnglishSubtitles,
+      needChinese: wantChinese || !episode.hasChineseSubtitles,
+      status: SubtitleCompletionStatus.pending,
+    );
+    // Failed jobs may already be at maxAttempts — force requeue before enqueue.
+    if (wantChinese || wantEnglish) {
+      await SubtitleCompletionQueue.shared.requeueFailedJobs(
+        onlyConfigErrors: false,
+      );
+    }
+    await enqueueSubtitleCompletionForEpisode(
+      episodeId: episode.id,
+      videoPath: episode.videoAsset,
+      zhSubtitlePath: episode.cnSubtitleAsset,
+      enSubtitlePath: episode.enSubtitleAsset,
+      sourceUrl: episode.sourceUrl,
+      title: episode.title,
+      description: course.description,
+      course: course,
+      episode: episode,
+      chip: chip,
+    );
+    await SubtitleCompletionQueue.shared.prioritizeEpisode(episode.id);
+    SubtitleCompletionScheduler.instance.kick(delay: Duration.zero);
+    await ref.read(subtitleCompletionStatusProvider.notifier).refresh();
   }
 
   void _enterEditMode() {
@@ -1858,59 +2277,6 @@ class _LibraryDetailTopStatus extends StatelessWidget {
           ],
         ],
       ),
-    );
-  }
-}
-
-class _LibraryTodayFeed extends ConsumerWidget {
-  const _LibraryTodayFeed();
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final List<LibraryCourseData> feed = ref.watch(dailyFeedProvider);
-    if (feed.isEmpty) {
-      return const SizedBox.shrink();
-    }
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: <Widget>[
-        Text(
-          '今日更新',
-          style: TextStyle(
-            fontSize: 18,
-            fontWeight: FontWeight.w900,
-            color: AppDesignTokens.textPrimary,
-          ),
-        ),
-        const SizedBox(height: 10),
-        ...feed.map(
-          (LibraryCourseData course) => Padding(
-            padding: const EdgeInsets.only(bottom: 8),
-            child: ListTile(
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(16),
-                side: BorderSide(color: AppDesignTokens.borderGray),
-              ),
-              tileColor: Colors.white,
-              title: Text(
-                course.title,
-                style: const TextStyle(fontWeight: FontWeight.w800),
-              ),
-              subtitle: Text(
-                '${course.level} · ${course.totalEpisodes} 课段',
-              ),
-              trailing: const Icon(Icons.chevron_right_rounded),
-              onTap: () => context.goNamed(
-                SGRoute.library.name,
-                queryParameters: <String, String>{
-                  'view': 'detail',
-                  'courseId': course.id,
-                },
-              ),
-            ),
-          ),
-        ),
-      ],
     );
   }
 }

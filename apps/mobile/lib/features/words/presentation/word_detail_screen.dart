@@ -13,6 +13,7 @@ import '../../shared/domain/subtitle_letter_case.dart';
 import '../../shared/domain/word_lookup_entry.dart';
 import '../../shared/presentation/pad/app_design_tokens.dart';
 import '../data/offline_word_dictionary.dart';
+import '../data/vocab_card_enrichment_service.dart';
 import 'word_book_provider.dart';
 import 'word_video_relink.dart';
 
@@ -29,6 +30,7 @@ class _WordDetailDialogState extends ConsumerState<WordDetailDialog> {
   OfflineWordDefinition? _offlineDefinition;
   bool _loadingOfflineDefinition = true;
   bool _translatingWithApi = false;
+  bool _enriching = false;
   String? _speakingText;
   bool _openingVideo = false;
   final Set<String> _translatingContextKeys = <String>{};
@@ -37,6 +39,42 @@ class _WordDetailDialogState extends ConsumerState<WordDetailDialog> {
   void initState() {
     super.initState();
     _loadOfflineDefinition();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      unawaited(_ensureEnrichment());
+    });
+  }
+
+  Future<void> _ensureEnrichment({bool force = false}) async {
+    WordEntry? entry;
+    for (final WordEntry item in ref.read(wordBookProvider)) {
+      if (item.word == widget.word) {
+        entry = item;
+        break;
+      }
+    }
+    if (entry == null || !entry.favorite) {
+      return;
+    }
+    if (!force &&
+        entry.enrichmentStatus == VocabEnrichmentStatus.ready &&
+        (entry.mnemonicCn ?? '').trim().isNotEmpty) {
+      return;
+    }
+    if (_enriching) {
+      return;
+    }
+    setState(() => _enriching = true);
+    await ref
+        .read(vocabCardEnrichmentServiceProvider)
+        .enrichFavorite(
+          rawWord: entry.word,
+          contextSentence: entry.sourceSentence,
+          contextChinese: entry.sourceSentenceCn,
+          force: force,
+        );
+    if (mounted) {
+      setState(() => _enriching = false);
+    }
   }
 
   Future<void> _loadOfflineDefinition() async {
@@ -272,6 +310,14 @@ class _WordDetailDialogState extends ConsumerState<WordDetailDialog> {
                         .toggleFavorite(entry.word),
                   ),
                   const SizedBox(height: 16),
+                  _AiEnrichmentCard(
+                    entry: entry,
+                    enriching: _enriching,
+                    onRegenerate: () => unawaited(
+                      _ensureEnrichment(force: true),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
                   _DefinitionCard(
                     offlineDefinition: offline,
                     offlineTranslation: entry.offlineDefinitionCn,
@@ -281,7 +327,7 @@ class _WordDetailDialogState extends ConsumerState<WordDetailDialog> {
                   ),
                   const SizedBox(height: 22),
                   Text(
-                    '影片语境 · ${entry.occurrenceCount} 次出现',
+                    '单词原句 · ${entry.occurrenceCount} 次出现',
                     style: const TextStyle(
                       fontSize: 18,
                       fontWeight: FontWeight.w900,
@@ -357,19 +403,34 @@ class _WordHeader extends StatelessWidget {
                   fontWeight: FontWeight.w900,
                 ),
               ),
+              Padding(
+                padding: const EdgeInsets.only(top: 4),
+                child: Text(
+                  entry.kind.labelCn,
+                  style: TextStyle(
+                    color: AppDesignTokens.brandGreenDark,
+                    fontWeight: FontWeight.w800,
+                    fontSize: 12,
+                  ),
+                ),
+              ),
               if (loading)
                 const Padding(
                   padding: EdgeInsets.only(top: 6),
                   child: Text('正在加载离线词典…'),
                 )
-              else if (definition != null)
+              else
                 Padding(
                   padding: const EdgeInsets.only(top: 6),
                   child: Text(
                     <String>[
-                      definition!.phonetic,
-                      definition!.partOfSpeech,
-                    ].where((String item) => item.isNotEmpty).join(' · '),
+                      entry.phonetic ?? '',
+                      entry.partOfSpeech ?? '',
+                      if ((entry.phonetic ?? '').isEmpty)
+                        definition?.phonetic ?? '',
+                      if ((entry.partOfSpeech ?? '').isEmpty)
+                        definition?.partOfSpeech ?? '',
+                    ].where((String item) => item.isNotEmpty).toSet().join(' · '),
                     style: TextStyle(
                       color: AppDesignTokens.textSecondary,
                     ),
@@ -397,6 +458,120 @@ class _WordHeader extends StatelessWidget {
       ],
     ),
   );
+}
+
+class _AiEnrichmentCard extends StatelessWidget {
+  const _AiEnrichmentCard({
+    required this.entry,
+    required this.enriching,
+    required this.onRegenerate,
+  });
+
+  final WordEntry entry;
+  final bool enriching;
+  final VoidCallback onRegenerate;
+
+  @override
+  Widget build(BuildContext context) {
+    final String statusLabel = switch (entry.enrichmentStatus) {
+      VocabEnrichmentStatus.pending => 'AI 生成中…',
+      VocabEnrichmentStatus.ready => 'AI 词卡已就绪',
+      VocabEnrichmentStatus.failed => 'AI 生成失败，可重试',
+      VocabEnrichmentStatus.none => '尚未生成 AI 内容',
+    };
+    return Container(
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: const Color(0xFFEFF6FF),
+        borderRadius: BorderRadius.circular(18),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          Row(
+            children: <Widget>[
+              const Expanded(
+                child: Text(
+                  'AI 词卡',
+                  style: TextStyle(fontWeight: FontWeight.w900, fontSize: 16),
+                ),
+              ),
+              Text(
+                enriching ? '生成中…' : statusLabel,
+                style: TextStyle(
+                  color: AppDesignTokens.textSecondary,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ],
+          ),
+          if ((entry.definitionEn ?? '').trim().isNotEmpty) ...<Widget>[
+            const SizedBox(height: 12),
+            const Text('英文释义', style: TextStyle(fontWeight: FontWeight.w800)),
+            const SizedBox(height: 4),
+            Text(entry.definitionEn!),
+          ],
+          if ((entry.analysisCn ?? '').trim().isNotEmpty) ...<Widget>[
+            const SizedBox(height: 12),
+            const Text('AI 解析', style: TextStyle(fontWeight: FontWeight.w800)),
+            const SizedBox(height: 4),
+            Text(entry.analysisCn!),
+          ],
+          if ((entry.mnemonicCn ?? '').trim().isNotEmpty) ...<Widget>[
+            const SizedBox(height: 12),
+            const Text('AI 助记', style: TextStyle(fontWeight: FontWeight.w800)),
+            const SizedBox(height: 4),
+            Text(entry.mnemonicCn!),
+          ],
+          if ((entry.aiExampleEn ?? '').trim().isNotEmpty) ...<Widget>[
+            const SizedBox(height: 12),
+            const Text('AI 例句', style: TextStyle(fontWeight: FontWeight.w800)),
+            const SizedBox(height: 4),
+            Text(
+              entry.aiExampleEn!,
+              style: const TextStyle(fontWeight: FontWeight.w700),
+            ),
+            if ((entry.aiExampleCn ?? '').trim().isNotEmpty) ...<Widget>[
+              const SizedBox(height: 4),
+              Text(
+                entry.aiExampleCn!,
+                style: TextStyle(color: AppDesignTokens.textSecondary),
+              ),
+            ],
+          ],
+          if ((entry.sourceSentence).trim().isNotEmpty) ...<Widget>[
+            const SizedBox(height: 12),
+            const Text('单词原句', style: TextStyle(fontWeight: FontWeight.w800)),
+            const SizedBox(height: 4),
+            Text(
+              entry.sourceSentence,
+              style: const TextStyle(fontWeight: FontWeight.w700),
+            ),
+            if (entry.sourceSentenceCn.isNotEmpty) ...<Widget>[
+              const SizedBox(height: 4),
+              Text(
+                entry.sourceSentenceCn,
+                style: TextStyle(color: AppDesignTokens.textSecondary),
+              ),
+            ],
+          ],
+          const SizedBox(height: 12),
+          OutlinedButton.icon(
+            onPressed: enriching ? null : onRegenerate,
+            icon: enriching
+                ? const SizedBox(
+                    width: 16,
+                    height: 16,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : const Icon(Icons.auto_awesome_rounded),
+            label: Text(enriching ? 'AI 生成中…' : '重新生成 AI 解析 / 助记 / 例句'),
+          ),
+        ],
+      ),
+    );
+  }
 }
 
 class _DefinitionCard extends StatelessWidget {
@@ -427,20 +602,16 @@ class _DefinitionCard extends StatelessWidget {
         const Text('中文释义', style: TextStyle(fontWeight: FontWeight.w900)),
         const SizedBox(height: 8),
         Text(
-          offlineTranslation ??
-              offlineDefinition?.translation ??
-              '离线词典未收录，可查看影片语境或使用 API 补充。',
+          apiDefinition?.trim().isNotEmpty == true
+              ? apiDefinition!
+              : (offlineTranslation ??
+                    offlineDefinition?.translation ??
+                    '离线词典未收录，可使用 AI 词卡或 API 补充。'),
         ),
         const SizedBox(height: 14),
-        if (apiDefinition != null && apiDefinition!.isNotEmpty) ...<Widget>[
-          const Text('API 语境释义', style: TextStyle(fontWeight: FontWeight.w900)),
-          const SizedBox(height: 6),
-          Text(apiDefinition!),
-          const SizedBox(height: 10),
-        ],
         OutlinedButton.icon(
           onPressed: translating ? null : onTranslate,
-          icon: const Icon(Icons.auto_awesome_outlined),
+          icon: const Icon(Icons.translate_rounded),
           label: Text(translating ? '翻译中…' : '使用 API 获取语境释义'),
         ),
       ],

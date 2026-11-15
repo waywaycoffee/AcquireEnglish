@@ -35,6 +35,7 @@ import '../../shared/presentation/app_loading_overlay.dart';
 import '../../sync/data/acquire_api_client.dart';
 import '../../sync/data/progress_sync_service.dart';
 import '../../words/data/offline_word_dictionary.dart';
+import '../../words/data/vocab_card_enrichment_service.dart';
 import '../../words/presentation/word_book_provider.dart';
 import '../data/dictation_queue_provider.dart';
 import '../domain/episode_word_cards.dart';
@@ -4356,7 +4357,7 @@ Future<void> _settleChineseFillIfAlreadyPresent() async {
     final PlayerSubtitleLine line = state.lines[index];
     final LibraryCourseData? course = courseContext.course;
     final LibraryEpisodeItem? episode = courseContext.episode;
-    final bool added = ref
+    final bool addedPhrase = ref
         .read(phraseBookProvider.notifier)
         .addPhraseIfMissing(
           english: line.english,
@@ -4368,10 +4369,22 @@ Future<void> _settleChineseFillIfAlreadyPresent() async {
           episodeId: episode?.id,
           endTime: _formatTimestamp(line.endMs),
         );
-    if (added) {
+    // Also try 句型词卡 when the line is a short English pattern.
+    final bool addedCard = _favoriteLexemeToWordCard(
+      line.english,
+      line: line,
+      courseContext: courseContext,
+    );
+    if (addedPhrase || addedCard) {
       ref.read(learningActivityProvider.notifier).recordPhraseSaved();
     }
-    _showMessage(added ? '成功收藏当前句型到短语库！' : '该例句已经在您的短语库中！');
+    if (addedCard) {
+      _showMessage('已收藏句型到词卡，正在生成 AI 解析…');
+    } else {
+      _showMessage(
+        addedPhrase ? '成功收藏当前句型到短语库！' : '该例句已经在您的短语库中！',
+      );
+    }
   }
 
   void _handleCollectWord(
@@ -4385,6 +4398,18 @@ Future<void> _settleChineseFillIfAlreadyPresent() async {
             (PlayerSubtitleLine item) => item.startTime == contextTime,
             orElse: () => state.activeLine,
           );
+    // Primary: collect the lexeme onto 词卡 with AI enrichment.
+    final bool addedCard = _favoriteLexemeToWordCard(
+      word,
+      line: line,
+      courseContext: courseContext,
+    );
+    if (addedCard) {
+      ref.read(learningActivityProvider.notifier).recordPhraseSaved();
+      _showMessage('已收藏「${normalizeLexeme(word)}」到词卡，正在生成 AI 解析…');
+      return;
+    }
+    // Fallback: keep whole-line phrase book for non-lexeme selections.
     final LibraryCourseData? course = courseContext.course;
     final LibraryEpisodeItem? episode = courseContext.episode;
     final bool added = ref
@@ -4402,7 +4427,7 @@ Future<void> _settleChineseFillIfAlreadyPresent() async {
     if (added) {
       ref.read(learningActivityProvider.notifier).recordPhraseSaved();
     }
-    _showMessage(added ? '成功收藏单词 "$word" 到短语库！' : '该例句已经在您的短语库中！');
+    _showMessage(added ? '成功收藏例句到短语库！' : '该例句已经在您的短语库中！');
   }
 
   void _handleFavoriteWord(String word, [String? definitionCn]) {
@@ -4413,8 +4438,28 @@ Future<void> _settleChineseFillIfAlreadyPresent() async {
           courses: ref.read(libraryCatalogProvider),
           episodeId: widget.episodeId,
         );
-    final LibraryEpisodeItem? episode = courseContext.episode;
     final String lexeme = normalizeLexeme(word);
+    final bool added = _favoriteLexemeToWordCard(
+      lexeme,
+      line: line,
+      courseContext: courseContext,
+      definitionCn: definitionCn,
+    );
+    _showMessage(
+      added
+          ? '已收藏到词卡「$lexeme」，正在生成 AI 解析 / 助记 / 例句…'
+          : '未能收藏，请选择英文单词、词组或短句型。',
+    );
+  }
+
+  bool _favoriteLexemeToWordCard(
+    String raw, {
+    required PlayerSubtitleLine line,
+    required PlayerCourseLookupResult courseContext,
+    String? definitionCn,
+  }) {
+    final LibraryEpisodeItem? episode = courseContext.episode;
+    final String lexeme = normalizeLexeme(raw);
     final String? fromCard = definitionCn?.trim();
     final bool added = ref
         .read(wordBookProvider.notifier)
@@ -4437,11 +4482,18 @@ Future<void> _settleChineseFillIfAlreadyPresent() async {
               : (state.generatedWordDefinitions[normalizeWord(lexeme)] ??
                     state.generatedWordDefinitions[lexeme]),
         );
-    _showMessage(
-      added
-          ? (lexeme.contains(' ') ? '已收藏词组到词卡「$lexeme」' : '已收藏单词到词卡「$lexeme」')
-          : '未能收藏，请选择英文单词或词组。',
-    );
+    if (added) {
+      unawaited(
+        ref
+            .read(vocabCardEnrichmentServiceProvider)
+            .enrichFavorite(
+              rawWord: lexeme,
+              contextSentence: line.english,
+              contextChinese: line.chinese,
+            ),
+      );
+    }
+    return added;
   }
 
   void _recordPlayDuration({required int durationMs}) {

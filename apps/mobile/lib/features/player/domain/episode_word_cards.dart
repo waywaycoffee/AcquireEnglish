@@ -104,12 +104,22 @@ List<EpisodeWordCard> buildEpisodeWordCards({
       EpisodeWordCard(
         id: 'word:${entry.word}',
         text: entry.word,
-        kind: _kindForText(entry.word),
+        kind: switch (entry.kind) {
+          VocabCardKind.word => EpisodeCardKind.word,
+          VocabCardKind.phrase => EpisodeCardKind.phrase,
+          VocabCardKind.pattern => EpisodeCardKind.sentence,
+        },
         favorited: entry.favorite,
         source: 'favorite',
         meaningCn: entry.definitionCn ?? entry.offlineDefinitionCn,
-        exampleEn: ctx?.sentence ?? first.sentence,
-        exampleCn: ctx?.chinese ?? first.chinese,
+        phonetic: entry.phonetic,
+        partOfSpeech: entry.partOfSpeech,
+        exampleEn: (entry.aiExampleEn ?? '').trim().isNotEmpty
+            ? entry.aiExampleEn
+            : (ctx?.sentence ?? first.sentence),
+        exampleCn: (entry.aiExampleCn ?? '').trim().isNotEmpty
+            ? entry.aiExampleCn
+            : (ctx?.chinese ?? first.chinese),
         time: ctx?.time ?? first.time,
         startMs: _parseStartMs(
           ctx?.lineKey ?? (first.lineKeys.isEmpty ? null : first.lineKeys.first),
@@ -117,6 +127,11 @@ List<EpisodeWordCard> buildEpisodeWordCards({
         endMs: _parseEndMs(
           ctx?.lineKey ?? (first.lineKeys.isEmpty ? null : first.lineKeys.first),
         ),
+        tags: <String>[
+          if ((entry.mnemonicCn ?? '').trim().isNotEmpty) '助记',
+          if ((entry.analysisCn ?? '').trim().isNotEmpty) '解析',
+          if (entry.enrichmentStatus == VocabEnrichmentStatus.pending) '生成中',
+        ],
       ),
     );
   }
