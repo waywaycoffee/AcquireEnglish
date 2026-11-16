@@ -24,6 +24,8 @@ class SessionCreate(BaseModel):
     current_chinese: str = ''
     previous_english: str = ''
     next_english: str = ''
+    topic_summary: str = ''
+    article_excerpt: str = ''
     difficulty: str = Field(default='B1', pattern=r'^(A2|B1|B2|C1)$')
 
 
@@ -34,6 +36,8 @@ class ContextUpdate(BaseModel):
     current_chinese: str | None = None
     previous_english: str | None = None
     next_english: str | None = None
+    topic_summary: str | None = None
+    article_excerpt: str | None = None
     difficulty: str | None = Field(default=None, pattern=r'^(A2|B1|B2|C1)$')
 
 
@@ -54,7 +58,9 @@ def health() -> dict[str, Any]:
         'ready': True,
         'providers': pipeline.provider_map(),
         'allow_lan': settings.allow_lan,
-        'livetalking_url': settings.livetalking_url,
+        # Mobile clients must use the public HTTPS URL (no Tailscale on phones).
+        'livetalking_url': settings.livetalking_client_url,
+        'livetalking_internal_url': settings.livetalking_url,
         'stack': {
             'asr': 'WhisperX / Deepgram / mock',
             'pronunciation': 'simple / phoneme / http / wav2vec2',

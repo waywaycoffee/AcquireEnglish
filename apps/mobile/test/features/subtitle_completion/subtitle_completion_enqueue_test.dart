@@ -67,7 +67,7 @@ void main() {
     expect(job.enPath, en.path);
   });
 
-  test('both official sides enqueue ASR speech proofread', () async {
+  test('both official sides skip ASR — keep softsubs as-is', () async {
     final File video = _fakeVideo(temp, 'c.mp4');
     final File en = File('${temp.path}/official/en.srt')
       ..createSync(recursive: true)
@@ -83,7 +83,7 @@ void main() {
     );
     expect(need.needEnglish, isFalse);
     expect(need.needChinese, isFalse);
-    expect(need.needProofread, isTrue);
+    expect(need.needProofread, isFalse);
     await enqueueSubtitleCompletionForEpisode(
       episodeId: 'ep-3',
       videoPath: video.path,
@@ -92,10 +92,8 @@ void main() {
       queue: queue,
       appSupportDirectory: () async => temp,
     );
-    final SubtitleCompletionJob job = (await queue.loadJobs()).single;
-    // Proofread maps onto the Whisper English job.
-    expect(job.needEnglish, isTrue);
-    expect(job.needChinese, isFalse);
+    // Official EN+ZH already present → do not enqueue regenerate jobs.
+    expect(await queue.loadJobs(), isEmpty);
   });
 
   test('empty ZH file still enqueues needChinese', () async {
@@ -142,6 +140,7 @@ void main() {
 
   test('complete asr-sentences bilingual skips enqueue', () async {
     final File video = _fakeVideo(temp, 'd.mp4');
+    final String? fingerprint = videoFileFingerprint(video.path);
     await persistAsrSentenceSubtitles(
       episodeId: 'ep-4',
       bundle: mergeAsrIntoSentences(
@@ -164,6 +163,7 @@ void main() {
           ),
         ],
       ),
+      videoFingerprint: fingerprint,
       appSupportDirectory: () async => temp,
     );
     await enqueueSubtitleCompletionForEpisode(

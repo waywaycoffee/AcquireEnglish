@@ -10,12 +10,51 @@ enum MissingSubtitleSide { none, english, chinese, both }
 bool subtitleTimelineExceedsMedia({
   required int subtitleEndMs,
   required int mediaDurationMs,
-  int slackMs = 60000,
+  // 17-min 串台 CC on a 12:34 lesson must clear (≈4.5min over).
+  int slackMs = 30000,
 }) {
   if (mediaDurationMs <= 0 || subtitleEndMs <= 0) {
     return false;
   }
   return subtitleEndMs > mediaDurationMs + slackMs;
+}
+
+/// True when cues stop far before the video ends (wrong official CC / 串台).
+///
+/// Example: TED poem CC ending at ~3:00 attached to a 12:34 learning video —
+/// path/BV fingerprints still match, so only duration coverage catches it.
+bool subtitleTimelineFarShorterThanMedia({
+  required int subtitleEndMs,
+  required int mediaDurationMs,
+  // 3-min 串台 AI-zh on a ~13-min lesson must always match (3/13 ≈ 0.23).
+  double minCoverage = 0.45,
+  int minTailGapMs = 60000,
+}) {
+  if (mediaDurationMs <= 0 || subtitleEndMs <= 0) {
+    return false;
+  }
+  if (mediaDurationMs < 120000) {
+    // Short clips: avoid false positives from sparse CC.
+    return false;
+  }
+  final bool lowCoverage = subtitleEndMs < mediaDurationMs * minCoverage;
+  final bool largeTail = subtitleEndMs + minTailGapMs < mediaDurationMs;
+  return lowCoverage && largeTail;
+}
+
+/// Too long or far too short vs the open media.
+bool subtitleTimelineMismatchesMedia({
+  required int subtitleEndMs,
+  required int mediaDurationMs,
+}) {
+  return subtitleTimelineExceedsMedia(
+        subtitleEndMs: subtitleEndMs,
+        mediaDurationMs: mediaDurationMs,
+      ) ||
+      subtitleTimelineFarShorterThanMedia(
+        subtitleEndMs: subtitleEndMs,
+        mediaDurationMs: mediaDurationMs,
+      );
 }
 
 int subtitleLinesEndMs(Iterable<PlayerSubtitleLine> lines) {

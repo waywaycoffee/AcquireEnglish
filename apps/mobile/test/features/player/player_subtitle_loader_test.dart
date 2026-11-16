@@ -438,6 +438,10 @@ Hello from file
       expect(state.activeLineIndex, 0);
       expect(state.visibleLine?.english, 'Hello there');
 
+      // Exact cue end (句末暂停) must still show the line for 跟读.
+      expect(state.seekToMilliseconds(3000), isTrue);
+      expect(state.visibleLine?.english, 'Hello there');
+
       expect(state.seekToMilliseconds(4500), isTrue);
       expect(state.positionMs, 4500);
       expect(state.activeLineIndex, 0);

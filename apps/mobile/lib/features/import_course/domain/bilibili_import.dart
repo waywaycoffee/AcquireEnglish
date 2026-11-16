@@ -211,6 +211,62 @@ class BilibiliImport {
     return '$bvidOrAv-p${page.clamp(1, 999).toString().padLeft(2, '0')}';
   }
 
+  /// Extract BV/av (+ optional `-p02`) from a local path or filename.
+  static String? idKeyFromPath(String? path) {
+    final String value = path?.trim() ?? '';
+    if (value.isEmpty) {
+      return null;
+    }
+    final RegExpMatch? bvPage = RegExp(
+      r'(BV[0-9A-Za-z]+-p\d{2,})',
+      caseSensitive: false,
+    ).firstMatch(value);
+    if (bvPage != null) {
+      final String raw = bvPage.group(1)!;
+      final int dash = raw.toLowerCase().lastIndexOf('-p');
+      return '${raw.substring(0, dash).toUpperCase()}'
+          '${raw.substring(dash).toLowerCase()}';
+    }
+    final RegExpMatch? bv = RegExp(
+      r'(BV[0-9A-Za-z]+)',
+      caseSensitive: false,
+    ).firstMatch(value);
+    if (bv != null) {
+      return bv.group(1)!.toUpperCase();
+    }
+    final RegExpMatch? avPage = RegExp(
+      r'(?:^|[/\\_-])(av\d+-p\d{2,})(?:[/\\_.-]|$)',
+      caseSensitive: false,
+    ).firstMatch(value);
+    if (avPage != null) {
+      return avPage.group(1)!.toLowerCase();
+    }
+    final RegExpMatch? av = RegExp(
+      r'(?:^|[/\\_-])(av\d+)(?:[/\\_.-]|$)',
+      caseSensitive: false,
+    ).firstMatch(value);
+    if (av != null) {
+      return av.group(1)!.toLowerCase();
+    }
+    return null;
+  }
+
+  /// True when [idKey] is a multi-P page 2+ fingerprint (`BV…-p02`).
+  static bool idKeyIsSecondaryPage(String? idKey) {
+    final String value = (idKey ?? '').trim();
+    if (value.isEmpty) {
+      return false;
+    }
+    final RegExpMatch? match = RegExp(
+      r'-p(\d{2,})$',
+      caseSensitive: false,
+    ).firstMatch(value);
+    if (match == null) {
+      return false;
+    }
+    return (int.tryParse(match.group(1) ?? '') ?? 1) > 1;
+  }
+
   /// Older builds cached multi-P P1 as bare BV/av without the `-p01` suffix.
   static String? legacyMediaIdKey(String idKey) {
     if (idKey.endsWith('-p01') && idKey.length > 4) {

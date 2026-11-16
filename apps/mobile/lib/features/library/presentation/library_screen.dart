@@ -1524,6 +1524,9 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
       course: course,
       episode: episode,
       chip: chip,
+      bilibiliCookieHeader: ref
+          .read(learningSettingsProvider)
+          .resolvedBilibiliCookieHeader,
     );
     await SubtitleCompletionQueue.shared.prioritizeEpisode(episode.id);
     SubtitleCompletionScheduler.instance.kick(delay: Duration.zero);

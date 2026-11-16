@@ -31,8 +31,11 @@ import '../../subtitle_completion/subtitle_completion_status_hub.dart';
 import '../../subtitle_completion/subtitle_completion_status_provider.dart';
 import '../../shared/data/word_lookup_service.dart';
 import '../../shared/data/word_pronunciation_service.dart';
+import '../../authentication/presentation/auth_session.dart';
 import '../../shared/presentation/app_loading_overlay.dart';
 import '../../shared/presentation/pad/pad_scaffold.dart';
+import '../../sync/data/acquire_api_client.dart';
+import '../../sync/data/personal_import_sync.dart';
 import '../../words/data/offline_word_dictionary.dart';
 import '../../words/data/vocab_card_enrichment_service.dart';
 import '../../words/presentation/word_book_provider.dart';
@@ -1555,6 +1558,9 @@ Future<void> _settleChineseFillIfAlreadyPresent() async {
       sourceUrl: resource.episode?.sourceUrl,
       course: resource.course,
       episode: resource.episode,
+      bilibiliCookieHeader: ref
+          .read(learningSettingsProvider)
+          .resolvedBilibiliCookieHeader,
     );
     SubtitleCompletionScheduler.instance.kick(delay: Duration.zero);
   }
@@ -2058,6 +2064,27 @@ Future<void> _settleChineseFillIfAlreadyPresent() async {
     bool lineChanged = false;
     bool loopRestarted = false;
 
+    // 句末暂停 / 跟读：先卡在当前句，禁止 sync 跳到下一句（可能无英文）。
+    if (wasPlaying &&
+        state.pauseAtSentenceEnd &&
+        state.hasLines &&
+        !state.isLooping &&
+        position.inMilliseconds >=
+            state.videoEndMsForLine(state.activeLineIndex)) {
+      final Duration end = Duration(
+        milliseconds: state.videoEndMsForLine(state.activeLineIndex),
+      );
+      setState(() {
+        _videoPosition = end;
+        state.positionMs = end.inMilliseconds;
+        state.isPlaying = false;
+      });
+      PlayerSystemMediaControls.updatePlaybackState(isPlaying: false);
+      unawaited(_videoPlayer?.pause());
+      unawaited(_videoPlayer?.seek(end));
+      return;
+    }
+
     setState(() {
       _videoPosition = position;
       loopRestarted = state.restartLoopAtTimestamp(position.inMilliseconds);
@@ -2171,9 +2198,35 @@ Future<void> _settleChineseFillIfAlreadyPresent() async {
       _referenceSubtitleLines = next;
     });
     await _persistCompletedBilingualSubtitles(next);
+    unawaited(_syncManualSubtitlesToCloud(next));
     if (mounted) {
-      _showMessage('已保存手工字幕，自动校对不会再改它');
+      _showMessage('已保存手工字幕，并同步云端字幕库');
     }
+  }
+
+  Future<void> _syncManualSubtitlesToCloud(List<PlayerSubtitleLine> lines) async {
+    final AuthSessionState auth = ref.read(authSessionProvider);
+    if (!auth.isLoggedIn) {
+      return;
+    }
+    final ({LibraryCourseData course, LibraryEpisodeItem episode})? hit =
+        findCatalogEpisode(
+          courses: ref.read(libraryCatalogProvider),
+          episodeId: widget.episodeId,
+        );
+    await syncEpisodeSubtitleLinesToCloud(
+      api: ref.read(acquireApiClientProvider),
+      isLoggedIn: true,
+      lines: lines,
+      sourceKey: _episodeSourceKey(),
+      sourceUrl: hit?.episode.sourceUrl,
+      course: hit?.course,
+      episode: hit?.episode,
+      durationSec: (hit?.episode.durationMinutes ?? 0) > 0
+          ? hit!.episode.durationMinutes * 60
+          : null,
+      sourceOrigin: 'mixed',
+    );
   }
 
   Future<void> _editLineNote(int index, String note) async {
@@ -2610,11 +2663,21 @@ Future<void> _settleChineseFillIfAlreadyPresent() async {
                               onVolumeChanged: _handleVolumeChanged,
                               onSubtitleLookupOpen: _stopVideo,
                               onAssessVisibleLine:
-                                  visibleAssessment.target == null
-                                  ? null
-                                  : _handleAssessVisibleLine,
-                              assessmentUnavailableReason:
-                                  visibleAssessment.unavailableReason,
+                                  state.hasLines &&
+                                      RegExp('[A-Za-z]').hasMatch(
+                                        state.lines.isEmpty
+                                            ? ''
+                                            : state
+                                                  .lines[state.activeLineIndex
+                                                      .clamp(
+                                                        0,
+                                                        state.lines.length - 1,
+                                                      )]
+                                                  .english,
+                                      )
+                                  ? _handleAssessVisibleLine
+                                  : null,
+                              assessmentUnavailableReason: null,
                               onCollectWord: (String word) =>
                                   _handleCollectWord(word, courseContext),
                               onCollectWordAtTime: (String word, String time) =>

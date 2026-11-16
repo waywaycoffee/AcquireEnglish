@@ -3,13 +3,10 @@ import 'dart:convert';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hive_ce/hive.dart';
 
-import '../../library/data/course_pack_mapper.dart';
-import '../../library/presentation/library_catalog_provider.dart';
-import '../../library/presentation/library_mock_data.dart';
 import '../data/acquire_api_client.dart';
 
 const String _prefsKey = 'learning_preferences_v1';
-const String _feedKey = 'daily_feed_v1';
+const String _feedKey = 'daily_feed_bili_v1';
 const String _feedSyncedAtKey = 'daily_feed_synced_at_v1';
 
 final NotifierProvider<LearningPreferencesNotifier, AcquirePreferencesDto>
@@ -18,9 +15,9 @@ learningPreferencesProvider =
       LearningPreferencesNotifier.new,
     );
 
-final NotifierProvider<DailyFeedNotifier, List<LibraryCourseData>>
+final NotifierProvider<DailyFeedNotifier, List<AcquireDailyFeedItemDto>>
 dailyFeedProvider =
-    NotifierProvider<DailyFeedNotifier, List<LibraryCourseData>>(
+    NotifierProvider<DailyFeedNotifier, List<AcquireDailyFeedItemDto>>(
       DailyFeedNotifier.new,
     );
 
@@ -85,26 +82,28 @@ class LearningPreferencesNotifier extends Notifier<AcquirePreferencesDto> {
   }
 }
 
-class DailyFeedNotifier extends Notifier<List<LibraryCourseData>> {
+class DailyFeedNotifier extends Notifier<List<AcquireDailyFeedItemDto>> {
   @override
-  List<LibraryCourseData> build() {
+  List<AcquireDailyFeedItemDto> build() {
     if (!Hive.isBoxOpen('prefs')) {
-      return const <LibraryCourseData>[];
+      return const <AcquireDailyFeedItemDto>[];
     }
     final String? raw = Hive.box<String>('prefs').get(_feedKey);
     if (raw == null || raw.isEmpty) {
-      return const <LibraryCourseData>[];
+      return const <AcquireDailyFeedItemDto>[];
     }
     try {
       final List<dynamic> list = jsonDecode(raw) as List<dynamic>;
       return list
           .cast<Map<String, dynamic>>()
-          .map(AcquireCourseDto.fromJson)
-          .where((AcquireCourseDto c) => !isPlaceholderCloudCourse(c))
-          .map(mapAcquireCourseToLibrary)
+          .map(AcquireDailyFeedItemDto.fromJson)
+          .where(
+            (AcquireDailyFeedItemDto item) =>
+                item.bvid.isNotEmpty && item.watchUrl.isNotEmpty,
+          )
           .toList(growable: false);
     } catch (_) {
-      return const <LibraryCourseData>[];
+      return const <AcquireDailyFeedItemDto>[];
     }
   }
 
@@ -114,60 +113,27 @@ class DailyFeedNotifier extends Notifier<List<LibraryCourseData>> {
     }
     try {
       final AcquireApiClient api = ref.read(acquireApiClientProvider);
-      final List<AcquireCourseDto> feed = (await api.dailyFeed())
-          .where((AcquireCourseDto c) => !isPlaceholderCloudCourse(c))
-          .toList(growable: false);
-      final List<LibraryCourseData> mapped = feed
-          .map(mapAcquireCourseToLibrary)
-          .toList(growable: false);
-      state = mapped;
+      final List<AcquireDailyFeedItemDto> feed = await api.dailyFeed();
+      state = feed;
       if (Hive.isBoxOpen('prefs')) {
         final Box<String> box = Hive.box<String>('prefs');
         await box.put(
           _feedKey,
           jsonEncode(
             feed
-                .map(
-                  (AcquireCourseDto c) => <String, dynamic>{
-                    'id': c.id,
-                    'title': c.title,
-                    'titleZh': c.titleZh,
-                    'description': c.description,
-                    'coverUrl': c.coverUrl,
-                    'level': c.level,
-                    'tags': c.tags,
-                    'lessons': c.lessons
-                        .map(
-                          (AcquireLessonDto l) => <String, dynamic>{
-                            'id': l.id,
-                            'title': l.title,
-                            'index': l.index,
-                            'durationSec': l.durationSec,
-                            'videoUrl': l.videoUrl,
-                            'subtitles': <String, dynamic>{
-                              'en': l.subtitleEn,
-                              'zh': l.subtitleZh,
-                            },
-                          },
-                        )
-                        .toList(),
-                  },
-                )
-                .toList(),
+                .map((AcquireDailyFeedItemDto item) => item.toJson())
+                .toList(growable: false),
           ),
         );
         await box.put(
           _feedSyncedAtKey,
           DateTime.now().toUtc().toIso8601String(),
         );
+        // Drop legacy course-pack feed cache so it cannot reappear as「学习课程」.
+        await box.delete('daily_feed_v1');
       }
-      // Always merge (even empty) so placeholder「云课程」get purged.
-      await ref.read(libraryCatalogProvider.notifier).mergeCloudCourses(mapped);
     } catch (_) {
-      // Keep cached feed, but still strip unplayable placeholder packs.
-      await ref
-          .read(libraryCatalogProvider.notifier)
-          .mergeCloudCourses(const <LibraryCourseData>[]);
+      // Keep cached recommendations when offline.
     }
   }
 

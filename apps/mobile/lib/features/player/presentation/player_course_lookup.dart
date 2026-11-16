@@ -1,3 +1,4 @@
+import '../../import_course/data/bilibili_episode_prepare.dart';
 import '../../library/presentation/library_mock_data.dart';
 
 class PlayerCourseLookupResult {
@@ -31,10 +32,12 @@ PlayerCourseLookupResult resolvePlayerCourseForEpisode({
           course: course,
           episode: episode,
           videoAsset: episode.videoAsset,
-          englishSubtitleAsset:
-              episode.enSubtitleAsset ?? _resolveTrackPath(episode, 'en'),
-          chineseSubtitleAsset:
-              episode.cnSubtitleAsset ?? _resolveTrackPath(episode, 'zh'),
+          // Never fall back to missing/stale track paths — that made prepare
+          // skip official fetch and the player wipe both sides as "ASR".
+          englishSubtitleAsset: _usableSubtitlePath(episode.enSubtitleAsset) ??
+              _usableSubtitlePath(_resolveTrackPath(episode, 'en')),
+          chineseSubtitleAsset: _usableSubtitlePath(episode.cnSubtitleAsset) ??
+              _usableSubtitlePath(_resolveTrackPath(episode, 'zh')),
           subtitleTracks: episode.subtitleTracks,
         );
       }
@@ -42,6 +45,9 @@ PlayerCourseLookupResult resolvePlayerCourseForEpisode({
   }
   return const PlayerCourseLookupResult();
 }
+
+String? _usableSubtitlePath(String? path) =>
+    isUsableSubtitlePath(path) ? path!.trim() : null;
 
 String? _resolveTrackPath(LibraryEpisodeItem episode, String languageCode) {
   for (final LibrarySubtitleTrackItem track in episode.subtitleTracks) {

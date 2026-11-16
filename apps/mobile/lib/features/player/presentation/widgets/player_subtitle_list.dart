@@ -56,13 +56,18 @@ class PlayerSubtitleList extends StatefulWidget {
     this.aiSubtitleErrorText,
     this.onGenerateAiSubtitles,
     this.onRegenerateAiSubtitles,
+    this.onResetEpisodeSubtitles,
+    this.onRerecognizeEnglish,
+    this.onRerecognizeChinese,
     this.onDeleteAiSubtitles,
     this.onRegenerateAiLine,
     this.onEditEnglishLine,
     this.onEditSubtitleLine,
+    this.onOpenSubtitleEditor,
     this.onEditLineNote,
     this.lineNotesByStartMs = const <int, String>{},
     this.bilingualPipelineLabel,
+    this.bilingualPipelineProgressValue,
     this.showAiCompleteButton = false,
     this.onAiComplete,
     this.onCancelBilingualPipeline,
@@ -116,14 +121,21 @@ class PlayerSubtitleList extends StatefulWidget {
   final String? aiSubtitleErrorText;
   final VoidCallback? onGenerateAiSubtitles;
   final VoidCallback? onRegenerateAiSubtitles;
+  final VoidCallback? onResetEpisodeSubtitles;
+
+  /// Separate EN ASR / ZH translate actions (preferred over a single dialog).
+  final VoidCallback? onRerecognizeEnglish;
+  final VoidCallback? onRerecognizeChinese;
   final VoidCallback? onDeleteAiSubtitles;
   final Future<void> Function(int index)? onRegenerateAiLine;
   final Future<void> Function(int index, String english)? onEditEnglishLine;
   final Future<void> Function(int index, String english, String chinese)?
   onEditSubtitleLine;
+  final VoidCallback? onOpenSubtitleEditor;
   final Future<void> Function(int index, String note)? onEditLineNote;
   final Map<int, String> lineNotesByStartMs;
   final String? bilingualPipelineLabel;
+  final double? bilingualPipelineProgressValue;
   final bool showAiCompleteButton;
   final VoidCallback? onAiComplete;
   final VoidCallback? onCancelBilingualPipeline;
@@ -148,6 +160,10 @@ class _PlayerSubtitleListState extends State<PlayerSubtitleList> {
   int _scrollFollowGeneration = 0;
   DateTime? _userDragPausedAt;
   String? _lastSelectedPlainText;
+  int? _inlineEditIndex;
+  TextEditingController? _inlineEnglishController;
+  TextEditingController? _inlineChineseController;
+  bool _inlineSaving = false;
 
   bool get _showCurrentOnly => widget.showCurrentOnly;
 
@@ -225,10 +241,174 @@ class _PlayerSubtitleListState extends State<PlayerSubtitleList> {
   void dispose() {
     _scrollFollowGeneration++;
     _removeDictionaryOverlay(notify: false);
+    _disposeInlineEditors();
     _scrollController
       ..removeListener(_dismissDictionary)
       ..dispose();
     super.dispose();
+  }
+
+  void _disposeInlineEditors() {
+    _inlineEnglishController?.dispose();
+    _inlineChineseController?.dispose();
+    _inlineEnglishController = null;
+    _inlineChineseController = null;
+  }
+
+  void _beginInlineEdit(int index, PlayerSubtitleLine line) {
+    if (widget.onEditSubtitleLine == null || _inlineSaving) {
+      return;
+    }
+    if (widget.isPlaying) {
+      widget.onTogglePlaying?.call();
+    }
+    _disposeInlineEditors();
+    setState(() {
+      _inlineEditIndex = index;
+      _inlineEnglishController = TextEditingController(text: line.english);
+      _inlineChineseController = TextEditingController(text: line.chinese);
+      _autoFollowCurrentLine = false;
+    });
+  }
+
+  void _cancelInlineEdit() {
+    if (_inlineEditIndex == null) {
+      return;
+    }
+    setState(() {
+      _inlineEditIndex = null;
+      _disposeInlineEditors();
+    });
+  }
+
+  Future<void> _commitInlineEdit() async {
+    final int? index = _inlineEditIndex;
+    final Future<void> Function(int index, String english, String chinese)?
+    save = widget.onEditSubtitleLine;
+    if (index == null || save == null || _inlineSaving) {
+      return;
+    }
+    final String english = (_inlineEnglishController?.text ?? '').trim();
+    final String chinese = (_inlineChineseController?.text ?? '').trim();
+    if (english.isEmpty && chinese.isEmpty) {
+      return;
+    }
+    setState(() => _inlineSaving = true);
+    try {
+      await save(index, english, chinese);
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _inlineEditIndex = null;
+        _inlineSaving = false;
+        _disposeInlineEditors();
+      });
+    } catch (_) {
+      if (mounted) {
+        setState(() => _inlineSaving = false);
+      }
+    }
+  }
+
+  Widget _buildInlineEditor({
+    required bool dark,
+    required StudyShellColors shell,
+  }) {
+    final Color fill = dark ? shell.card : Colors.white;
+    final Color border = dark ? shell.border : const Color(0xFFE1E7E1);
+    final Color label = dark ? shell.textSecondary : AppDesignTokens.textSecondary;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: <Widget>[
+        TextField(
+          controller: _inlineEnglishController,
+          autofocus: true,
+          minLines: 1,
+          maxLines: 4,
+          style: TextStyle(
+            fontSize: 18,
+            fontWeight: FontWeight.w700,
+            color: dark ? shell.textPrimary : AppDesignTokens.textPrimary,
+            height: 1.35,
+          ),
+          decoration: InputDecoration(
+            labelText: '英文',
+            labelStyle: TextStyle(color: label, fontWeight: FontWeight.w700),
+            filled: true,
+            fillColor: fill,
+            isDense: true,
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(14),
+              borderSide: BorderSide(color: border),
+            ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(14),
+              borderSide: BorderSide(color: border),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(14),
+              borderSide: BorderSide(
+                color: dark ? shell.borderActive : AppDesignTokens.brandGreen,
+                width: 1.5,
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(height: 8),
+        TextField(
+          controller: _inlineChineseController,
+          minLines: 1,
+          maxLines: 4,
+          style: TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.w600,
+            color: dark ? shell.textSecondary : const Color(0xFF708077),
+            height: 1.4,
+          ),
+          decoration: InputDecoration(
+            labelText: '中文',
+            labelStyle: TextStyle(color: label, fontWeight: FontWeight.w700),
+            filled: true,
+            fillColor: fill,
+            isDense: true,
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(14),
+              borderSide: BorderSide(color: border),
+            ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(14),
+              borderSide: BorderSide(color: border),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(14),
+              borderSide: BorderSide(
+                color: dark ? shell.borderActive : AppDesignTokens.primaryBlue,
+                width: 1.5,
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(height: 10),
+        Row(
+          children: <Widget>[
+            TextButton(onPressed: _cancelInlineEdit, child: const Text('取消')),
+            const Spacer(),
+            FilledButton.icon(
+              onPressed: _inlineSaving ? null : _commitInlineEdit,
+              icon: _inlineSaving
+                  ? const SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Icon(Icons.check_rounded, size: 18),
+              label: const Text('保存'),
+            ),
+          ],
+        ),
+      ],
+    );
   }
 
   GlobalKey _rowKeyFor(int index) {
@@ -761,16 +941,47 @@ class _PlayerSubtitleListState extends State<PlayerSubtitleList> {
 
   @override
   Widget build(BuildContext context) {
+    final String? pipelineLabel = widget.bilingualPipelineLabel?.trim();
+    final bool pipelineBusy = pipelineLabel != null && pipelineLabel.isNotEmpty;
+    final bool emptyGenerating =
+        widget.generatingAiSubtitles || pipelineBusy;
+    final String? emptyProgressText = () {
+      final String? ai = widget.aiSubtitleProgressText?.trim();
+      if (ai != null &&
+          ai.isNotEmpty &&
+          !ai.contains('拉取 B 站官方') &&
+          !ai.contains('检查官方字幕')) {
+        return ai;
+      }
+      if (pipelineLabel != null && pipelineLabel.isNotEmpty) {
+        return pipelineLabel;
+      }
+      return widget.aiSubtitleProgressText;
+    }();
+    final double? emptyProgressValue =
+        widget.aiSubtitleProgressValue ??
+        widget.bilingualPipelineProgressValue;
+    final String? emptyPreviewText = () {
+      final String? preview = widget.aiSubtitlePreviewText?.trim();
+      if (preview != null && preview.isNotEmpty) {
+        return preview;
+      }
+      if (pipelineBusy) {
+        return '语音识别进行中，完成后会出现可跟读字幕列表';
+      }
+      return widget.aiSubtitlePreviewText;
+    }();
+
     if (widget.subtitleMode == SubtitleDisplayMode.hidden) {
       return _SubtitlePlaceholder(
         icon: Icons.closed_caption_disabled_outlined,
         title: '字幕已隐藏',
         body: '在底栏打开「双语 / 英文 / 中文 / 盲听」后可恢复列表。',
         showAiGenerateSubtitles: widget.showAiGenerateSubtitles,
-        generatingAiSubtitles: widget.generatingAiSubtitles,
-        progressValue: widget.aiSubtitleProgressValue,
-        progressText: widget.aiSubtitleProgressText,
-        previewText: widget.aiSubtitlePreviewText,
+        generatingAiSubtitles: emptyGenerating,
+        progressValue: emptyProgressValue,
+        progressText: emptyProgressText,
+        previewText: emptyPreviewText,
         errorText: widget.aiSubtitleErrorText,
         onGenerateAiSubtitles: widget.onGenerateAiSubtitles,
         studyDarkStyle: widget.studyDarkStyle,
@@ -784,10 +995,10 @@ class _PlayerSubtitleListState extends State<PlayerSubtitleList> {
         title: '当前视频没有字幕',
         body: '点击下方按钮，用语音识别自动生成可跟读的词级同步字幕。',
         showAiGenerateSubtitles: widget.showAiGenerateSubtitles,
-        generatingAiSubtitles: widget.generatingAiSubtitles,
-        progressValue: widget.aiSubtitleProgressValue,
-        progressText: widget.aiSubtitleProgressText,
-        previewText: widget.aiSubtitlePreviewText,
+        generatingAiSubtitles: emptyGenerating,
+        progressValue: emptyProgressValue,
+        progressText: emptyProgressText,
+        previewText: emptyPreviewText,
         errorText: widget.aiSubtitleErrorText,
         onGenerateAiSubtitles: widget.onGenerateAiSubtitles,
         studyDarkStyle: widget.studyDarkStyle,
@@ -874,15 +1085,20 @@ class _PlayerSubtitleListState extends State<PlayerSubtitleList> {
                 ? shell.textSecondary
                 : const Color(0xFFB7C2BA);
 
+            final bool editingThis = _inlineEditIndex == originalIndex;
             return InkWell(
               key: _rowKeyFor(originalIndex),
-              onTap: () {
-                if (blindHidden) {
-                  setState(() => _blindRevealed.add(originalIndex));
-                }
-                widget.onTapLine(originalIndex);
-              },
-              onLongPress: () => _openActions(context, line, originalIndex),
+              onTap: editingThis
+                  ? null
+                  : () {
+                      if (blindHidden) {
+                        setState(() => _blindRevealed.add(originalIndex));
+                      }
+                      widget.onTapLine(originalIndex);
+                    },
+              onLongPress: editingThis
+                  ? null
+                  : () => _openActions(context, line, originalIndex),
               borderRadius: BorderRadius.circular(20),
               child: Ink(
                 padding: EdgeInsets.all(dark ? 14 : 12),
@@ -992,6 +1208,23 @@ class _PlayerSubtitleListState extends State<PlayerSubtitleList> {
                                       )
                                     : const SizedBox.shrink(),
                               ),
+                              if (widget.onEditSubtitleLine != null)
+                                IconButton(
+                                  tooltip: '改这句字幕',
+                                  onPressed: () =>
+                                      _beginInlineEdit(originalIndex, line),
+                                  visualDensity: VisualDensity.compact,
+                                  padding: EdgeInsets.zero,
+                                  constraints: const BoxConstraints(
+                                    minWidth: 36,
+                                    minHeight: 36,
+                                  ),
+                                  icon: Icon(
+                                    Icons.edit_rounded,
+                                    color: shell.textSecondary,
+                                    size: 20,
+                                  ),
+                                ),
                               IconButton(
                                 onPressed: () =>
                                     widget.onBookmarkLine(originalIndex),
@@ -1125,6 +1358,30 @@ class _PlayerSubtitleListState extends State<PlayerSubtitleList> {
                                 child: const Icon(Icons.star_rounded),
                               ),
                               const SizedBox(width: 6),
+                              if (widget.onEditSubtitleLine != null) ...<Widget>[
+                                Tooltip(
+                                  message: '改这句字幕',
+                                  child: FilledButton.tonal(
+                                    onPressed: () =>
+                                        _beginInlineEdit(originalIndex, line),
+                                    style: FilledButton.styleFrom(
+                                      backgroundColor: const Color(0xFFE8F1FF),
+                                      foregroundColor:
+                                          AppDesignTokens.primaryBlueDark,
+                                      minimumSize: const Size(44, 44),
+                                      fixedSize: const Size(44, 44),
+                                      padding: EdgeInsets.zero,
+                                      tapTargetSize:
+                                          MaterialTapTargetSize.shrinkWrap,
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(16),
+                                      ),
+                                    ),
+                                    child: const Icon(Icons.edit_rounded),
+                                  ),
+                                ),
+                                const SizedBox(width: 6),
+                              ],
                               FilledButton.tonal(
                                 onPressed: () =>
                                     _openActions(context, line, originalIndex),
@@ -1172,6 +1429,8 @@ class _PlayerSubtitleListState extends State<PlayerSubtitleList> {
                               fontWeight: FontWeight.w700,
                             ),
                           ),
+                        ] else if (_inlineEditIndex == originalIndex) ...<Widget>[
+                          _buildInlineEditor(dark: dark, shell: shell),
                         ] else ...<Widget>[
                           Builder(
                             builder: (BuildContext context) {
@@ -1227,12 +1486,11 @@ class _PlayerSubtitleListState extends State<PlayerSubtitleList> {
                                         line.english,
                                         widget.subtitleLetterCase,
                                       ),
-                                      active && line.words.isNotEmpty
-                                          ? widget.currentWordIndex
-                                          : null,
+                                      active ? widget.currentWordIndex : null,
                                       active,
                                       line.startTime,
                                       shellColors: dark ? shell : null,
+                                      timedWords: line.words,
                                     )
                                   else if (showChinesePrimary ||
                                       showChineseTempPrimary)
@@ -1351,67 +1609,100 @@ class _PlayerSubtitleListState extends State<PlayerSubtitleList> {
                   horizontal: 10,
                   vertical: 8,
                 ),
-                child: Row(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: <Widget>[
-                    Icon(
-                      Icons.subtitles_outlined,
-                      size: 18,
-                      color: widget.studyDarkStyle
-                          ? shell.textSecondary
-                          : AppDesignTokens.textSecondary,
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        widget.bilingualPipelineLabel?.trim().isNotEmpty ??
-                                false
-                            ? widget.bilingualPipelineLabel!.trim()
-                            : '单语字幕可补全',
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w700,
+                    Row(
+                      children: <Widget>[
+                        Icon(
+                          Icons.subtitles_outlined,
+                          size: 18,
                           color: widget.studyDarkStyle
-                              ? shell.textPrimary
-                              : AppDesignTokens.textPrimary,
+                              ? shell.textSecondary
+                              : AppDesignTokens.textSecondary,
                         ),
-                      ),
-                    ),
-                    if (widget.showAiCompleteButton &&
-                        widget.onAiComplete != null) ...<Widget>[
-                      const SizedBox(width: 6),
-                      FilledButton(
-                        key: const ValueKey<String>('bilingual-ai-complete'),
-                        onPressed: widget.onAiComplete,
-                        style: FilledButton.styleFrom(
-                          backgroundColor: shell.accent,
-                          foregroundColor: Colors.white,
-                          minimumSize: const Size(0, 34),
-                          padding: const EdgeInsets.symmetric(horizontal: 12),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            widget.bilingualPipelineLabel?.trim().isNotEmpty ??
+                                    false
+                                ? widget.bilingualPipelineLabel!.trim()
+                                : '单语字幕可补全',
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w700,
+                              color: widget.studyDarkStyle
+                                  ? shell.textPrimary
+                                  : AppDesignTokens.textPrimary,
+                            ),
                           ),
                         ),
-                        child: const Text(
-                          'AI 补全',
-                          style: TextStyle(fontWeight: FontWeight.w700),
-                        ),
-                      ),
-                    ],
-                    if (widget.onCancelBilingualPipeline != null) ...<Widget>[
-                      const SizedBox(width: 4),
-                      IconButton(
-                        key: const ValueKey<String>(
-                          'bilingual-pipeline-cancel',
-                        ),
-                        tooltip: '取消',
-                        onPressed: widget.onCancelBilingualPipeline,
-                        icon: Icon(
-                          Icons.close_rounded,
-                          color: widget.studyDarkStyle
-                              ? shell.textMuted
-                              : AppDesignTokens.textSecondary,
+                        if (widget.showAiCompleteButton &&
+                            widget.onAiComplete != null) ...<Widget>[
+                          const SizedBox(width: 6),
+                          FilledButton(
+                            key: const ValueKey<String>(
+                              'bilingual-ai-complete',
+                            ),
+                            onPressed: widget.onAiComplete,
+                            style: FilledButton.styleFrom(
+                              backgroundColor: shell.accent,
+                              foregroundColor: Colors.white,
+                              minimumSize: const Size(0, 34),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 12,
+                              ),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                            ),
+                            child: const Text(
+                              'AI 补全',
+                              style: TextStyle(fontWeight: FontWeight.w700),
+                            ),
+                          ),
+                        ],
+                        if (widget.onCancelBilingualPipeline != null) ...<
+                          Widget
+                        >[
+                          const SizedBox(width: 4),
+                          IconButton(
+                            key: const ValueKey<String>(
+                              'bilingual-pipeline-cancel',
+                            ),
+                            tooltip: '取消',
+                            onPressed: widget.onCancelBilingualPipeline,
+                            icon: Icon(
+                              Icons.close_rounded,
+                              color: widget.studyDarkStyle
+                                  ? shell.textMuted
+                                  : AppDesignTokens.textSecondary,
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                    if ((widget.bilingualPipelineLabel?.trim().isNotEmpty ??
+                            false) ||
+                        widget.bilingualPipelineProgressValue != null) ...<
+                      Widget
+                    >[
+                      const SizedBox(height: 8),
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(999),
+                        child: LinearProgressIndicator(
+                          key: const ValueKey<String>(
+                            'bilingual-pipeline-progress',
+                          ),
+                          // null value = indeterminate while waiting for %.
+                          value: widget.bilingualPipelineProgressValue,
+                          minHeight: 4,
+                          backgroundColor: widget.studyDarkStyle
+                              ? shell.progressTrack
+                              : const Color(0xFFE1E7E1),
+                          color: shell.accent,
                         ),
                       ),
                     ],
@@ -1422,8 +1713,10 @@ class _PlayerSubtitleListState extends State<PlayerSubtitleList> {
           ),
         Align(
           alignment: Alignment.centerRight,
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
+          child: Wrap(
+            alignment: WrapAlignment.end,
+            spacing: 0,
+            runSpacing: 0,
             children: <Widget>[
               TextButton.icon(
                 onPressed: () {
@@ -1433,20 +1726,36 @@ class _PlayerSubtitleListState extends State<PlayerSubtitleList> {
                 icon: Icon(Icons.my_location_rounded, color: toolbarColor),
                 label: Text('定位当前', style: TextStyle(color: toolbarColor)),
               ),
-              if (widget.onRegenerateAiSubtitles != null)
+              if (widget.onRerecognizeEnglish != null)
+                TextButton.icon(
+                  onPressed: widget.onRerecognizeEnglish,
+                  icon: Icon(
+                    Icons.record_voice_over_rounded,
+                    color: toolbarColor,
+                  ),
+                  label: Text('重新识别英文', style: TextStyle(color: toolbarColor)),
+                ),
+              if (widget.onRerecognizeChinese != null)
+                TextButton.icon(
+                  onPressed: widget.onRerecognizeChinese,
+                  icon: Icon(Icons.translate_rounded, color: toolbarColor),
+                  label: Text('重新识别中文', style: TextStyle(color: toolbarColor)),
+                ),
+              if (widget.onRerecognizeEnglish == null &&
+                  widget.onRerecognizeChinese == null &&
+                  widget.onRegenerateAiSubtitles != null)
                 TextButton.icon(
                   onPressed: widget.onRegenerateAiSubtitles,
                   icon: Icon(Icons.refresh_rounded, color: toolbarColor),
-                  label: Text(
-                    widget.studyDarkStyle ? '重新识别' : '重新生成',
-                    style: TextStyle(color: toolbarColor),
-                  ),
+                  label: Text('重新识别', style: TextStyle(color: toolbarColor)),
                 ),
-              if (widget.onDeleteAiSubtitles != null)
+              if (widget.onRerecognizeEnglish == null &&
+                  widget.onRerecognizeChinese == null &&
+                  widget.onResetEpisodeSubtitles != null)
                 TextButton.icon(
-                  onPressed: widget.onDeleteAiSubtitles,
-                  icon: Icon(Icons.delete_outline_rounded, color: toolbarColor),
-                  label: Text('切回原始字幕', style: TextStyle(color: toolbarColor)),
+                  onPressed: widget.onResetEpisodeSubtitles,
+                  icon: Icon(Icons.restart_alt_rounded, color: toolbarColor),
+                  label: Text('重新识别', style: TextStyle(color: toolbarColor)),
                 ),
             ],
           ),
@@ -1647,8 +1956,8 @@ class _PlayerSubtitleListState extends State<PlayerSubtitleList> {
                     widget.onEditEnglishLine != null)
                   ListTile(
                     leading: const Icon(Icons.edit_outlined),
-                    title: const Text('手工修改字幕'),
-                    subtitle: const Text('手改英文/中文，之后自动校对不再覆盖'),
+                    title: const Text('改这句字幕'),
+                    subtitle: const Text('在句子里直接改英文/中文，边看边改'),
                     onTap: () => Navigator.of(context).pop('edit-subtitle'),
                   ),
                 if (widget.onEditLineNote != null)
@@ -1741,24 +2050,12 @@ class _PlayerSubtitleListState extends State<PlayerSubtitleList> {
         await widget.onEditEnglishLine?.call(index, edited);
         return;
       case 'edit-subtitle':
+        if (widget.onEditSubtitleLine != null) {
+          _beginInlineEdit(index, line);
+          return;
+        }
         if (widget.isPlaying) {
           widget.onTogglePlaying?.call();
-        }
-        if (widget.onEditSubtitleLine != null) {
-          final ({String english, String chinese})? edited =
-              await _askSubtitleEdit(context, line);
-          if (!context.mounted || edited == null) {
-            return;
-          }
-          if (edited.english.isEmpty && edited.chinese.isEmpty) {
-            return;
-          }
-          await widget.onEditSubtitleLine!(
-            index,
-            edited.english.isEmpty ? line.english : edited.english,
-            edited.chinese,
-          );
-          return;
         }
         final String? editedEn = await _askEnglishEdit(context, line);
         if (!context.mounted || editedEn == null || editedEn.isEmpty) {
@@ -1805,12 +2102,22 @@ class _PlayerSubtitleListState extends State<PlayerSubtitleList> {
     bool active,
     String contextTime, {
     StudyShellColors? shellColors,
+    List<PlayerSubtitleWord> timedWords = const <PlayerSubtitleWord>[],
   }) {
-    final List<_WordToken> tokens = text
-        .split(' ')
+    // Prefer timed ASR words when they match space-split chips 1:1 — after
+    // sentence merge this keeps karaoke index on a visible token.
+    final List<String> spaceTokens = text
+        .split(RegExp(r'\s+'))
         .where((String rawWord) => rawWord.isNotEmpty)
-        .map((String rawWord) => _WordToken(value: rawWord))
         .toList(growable: false);
+    final List<_WordToken> tokens =
+        timedWords.isNotEmpty && timedWords.length == spaceTokens.length
+        ? timedWords
+              .map((PlayerSubtitleWord word) => _WordToken(value: word.text))
+              .toList(growable: false)
+        : spaceTokens
+              .map((String rawWord) => _WordToken(value: rawWord))
+              .toList(growable: false);
     final StudyShellColors? shell = shellColors;
 
     return Wrap(

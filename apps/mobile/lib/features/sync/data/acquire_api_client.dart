@@ -77,6 +77,121 @@ class AcquireLiveKitToken {
   final int expiresIn;
 }
 
+class PersonalImportAsset {
+  const PersonalImportAsset({
+    required this.id,
+    required this.source,
+    required this.externalId,
+    required this.title,
+    required this.watchUrl,
+    required this.durationSec,
+    required this.hasEn,
+    required this.hasZh,
+    required this.courseId,
+    this.author,
+    this.subtitleEnUrl,
+    this.subtitleZhUrl,
+  });
+
+  factory PersonalImportAsset.fromJson(Map<String, dynamic> json) =>
+      PersonalImportAsset(
+        id: (json['id'] as num?)?.toInt() ?? 0,
+        source: '${json['source'] ?? ''}',
+        externalId: '${json['external_id'] ?? ''}',
+        title: '${json['title'] ?? ''}',
+        author: json['author'] as String?,
+        watchUrl: '${json['watch_url'] ?? ''}',
+        durationSec: (json['duration_sec'] as num?)?.toInt() ?? 60,
+        hasEn: json['has_en'] == true,
+        hasZh: json['has_zh'] == true,
+        courseId: '${json['course_id'] ?? 'link-${json['id']}'}',
+        subtitleEnUrl: json['subtitle_en_url'] as String?,
+        subtitleZhUrl: json['subtitle_zh_url'] as String?,
+      );
+
+  final int id;
+  final String source;
+  final String externalId;
+  final String title;
+  final String? author;
+  final String watchUrl;
+  final int durationSec;
+  final bool hasEn;
+  final bool hasZh;
+  final String courseId;
+  final String? subtitleEnUrl;
+  final String? subtitleZhUrl;
+}
+
+class SharedBilibiliSubtitlePack {
+  const SharedBilibiliSubtitlePack({
+    required this.bvid,
+    required this.page,
+    required this.subtitleEnSrt,
+    this.cid,
+    this.durationSec,
+    this.subtitleZhSrt,
+    this.qualityScore = 0,
+    this.cueCount = 0,
+    this.enHits = 0,
+    this.zhHits = 0,
+    this.sourceOrigin = 'asr',
+  });
+
+  factory SharedBilibiliSubtitlePack.fromJson(Map<String, dynamic> json) =>
+      SharedBilibiliSubtitlePack(
+        bvid: '${json['bvid'] ?? ''}',
+        page: (json['page'] as num?)?.toInt() ?? 1,
+        cid: (json['cid'] as num?)?.toInt(),
+        durationSec: (json['duration_sec'] as num?)?.toInt(),
+        subtitleEnSrt: '${json['subtitle_en_srt'] ?? ''}',
+        subtitleZhSrt: json['subtitle_zh_srt'] as String?,
+        qualityScore: (json['quality_score'] as num?)?.toDouble() ?? 0,
+        cueCount: (json['cue_count'] as num?)?.toInt() ?? 0,
+        enHits: (json['en_hits'] as num?)?.toInt() ?? 0,
+        zhHits: (json['zh_hits'] as num?)?.toInt() ?? 0,
+        sourceOrigin: '${json['source_origin'] ?? 'asr'}',
+      );
+
+  final String bvid;
+  final int page;
+  final int? cid;
+  final int? durationSec;
+  final String subtitleEnSrt;
+  final String? subtitleZhSrt;
+  final double qualityScore;
+  final int cueCount;
+  final int enHits;
+  final int zhHits;
+  final String sourceOrigin;
+}
+
+class SharedBilibiliSubtitleUpsertResult {
+  const SharedBilibiliSubtitleUpsertResult({
+    required this.stored,
+    this.replaced = false,
+    this.qualityScore = 0,
+    this.cueCount = 0,
+    this.reason = '',
+  });
+
+  factory SharedBilibiliSubtitleUpsertResult.fromJson(
+    Map<String, dynamic> json,
+  ) => SharedBilibiliSubtitleUpsertResult(
+    stored: json['stored'] == true,
+    replaced: json['replaced'] == true,
+    qualityScore: (json['quality_score'] as num?)?.toDouble() ?? 0,
+    cueCount: (json['cue_count'] as num?)?.toInt() ?? 0,
+    reason: '${json['reason'] ?? ''}',
+  );
+
+  final bool stored;
+  final bool replaced;
+  final double qualityScore;
+  final int cueCount;
+  final String reason;
+}
+
 class AcquireSmsSendResult {
   const AcquireSmsSendResult({
     required this.expiresIn,
@@ -167,6 +282,62 @@ class AcquireCourseDto {
   final String level;
   final List<String> tags;
   final List<AcquireLessonDto> lessons;
+}
+
+/// Interest-based Bilibili recommendation (not a library course pack).
+class AcquireDailyFeedItemDto {
+  const AcquireDailyFeedItemDto({
+    required this.id,
+    required this.bvid,
+    required this.title,
+    required this.watchUrl,
+    this.author = '',
+    this.coverUrl,
+    this.durationSec,
+    this.description,
+    this.tags = const <String>[],
+    this.source = 'bilibili',
+  });
+
+  factory AcquireDailyFeedItemDto.fromJson(Map<String, dynamic> json) =>
+      AcquireDailyFeedItemDto(
+        id: json['id'] as String? ?? '',
+        bvid: json['bvid'] as String? ?? '',
+        title: json['title'] as String? ?? '',
+        author: json['author'] as String? ?? '',
+        coverUrl: json['coverUrl'] as String?,
+        durationSec: (json['durationSec'] as num?)?.toDouble(),
+        watchUrl: json['watchUrl'] as String? ?? '',
+        description: json['description'] as String?,
+        tags: (json['tags'] as List<dynamic>? ?? const <dynamic>[])
+            .map((dynamic e) => e.toString())
+            .toList(growable: false),
+        source: json['source'] as String? ?? 'bilibili',
+      );
+
+  final String id;
+  final String bvid;
+  final String title;
+  final String author;
+  final String? coverUrl;
+  final double? durationSec;
+  final String watchUrl;
+  final String? description;
+  final List<String> tags;
+  final String source;
+
+  Map<String, dynamic> toJson() => <String, dynamic>{
+        'id': id,
+        'bvid': bvid,
+        'title': title,
+        'author': author,
+        'coverUrl': coverUrl,
+        'durationSec': durationSec,
+        'watchUrl': watchUrl,
+        'description': description,
+        'tags': tags,
+        'source': source,
+      };
 }
 
 class AcquireProgressDto {
@@ -436,7 +607,7 @@ class AcquireApiClient {
     );
   }
 
-  Future<List<AcquireCourseDto>> dailyFeed({String? date}) async {
+  Future<List<AcquireDailyFeedItemDto>> dailyFeed({String? date}) async {
     final Response<dynamic> response = await _dio.get(
       Endpoints.dailyFeed,
       queryParameters: <String, dynamic>{
@@ -445,7 +616,11 @@ class AcquireApiClient {
     );
     return (response.data as List<dynamic>)
         .cast<Map<String, dynamic>>()
-        .map(AcquireCourseDto.fromJson)
+        .map(AcquireDailyFeedItemDto.fromJson)
+        .where(
+          (AcquireDailyFeedItemDto item) =>
+              item.bvid.isNotEmpty && item.watchUrl.isNotEmpty,
+        )
         .toList(growable: false);
   }
 
@@ -575,6 +750,155 @@ class AcquireApiClient {
       },
     );
     return AcquireLiveKitToken.fromJson(
+      response.data as Map<String, dynamic>,
+    );
+  }
+
+  /// Returns null on 404 / network miss (shared cache optional).
+  Future<SharedBilibiliSubtitlePack?> getSharedBilibiliSubtitle({
+    required String bvid,
+    int page = 1,
+    int? cid,
+  }) async {
+    try {
+      final Response<dynamic> response = await _dio.get(
+        Endpoints.sharedSubtitlesBilibili,
+        queryParameters: <String, dynamic>{
+          'bvid': bvid,
+          'page': page,
+          if (cid != null) 'cid': cid,
+        },
+        options: Options(
+          validateStatus: (int? status) =>
+              status != null &&
+              ((status >= 200 && status < 300) || status == 404),
+          extra: const <String, Object>{
+            'dio_cache_interceptor_force_refresh': true,
+          },
+        ),
+      );
+      if (response.statusCode == 404 || response.data == null) {
+        return null;
+      }
+      return SharedBilibiliSubtitlePack.fromJson(
+        response.data as Map<String, dynamic>,
+      );
+    } on DioException catch (error) {
+      if (error.response?.statusCode == 404) {
+        return null;
+      }
+      rethrow;
+    }
+  }
+
+  Future<List<PersonalImportAsset>> listPersonalImports() async {
+    final Response<dynamic> response = await _dio.get(
+      Endpoints.imports,
+      options: Options(
+        extra: const <String, Object>{
+          'dio_cache_interceptor_force_refresh': true,
+        },
+      ),
+    );
+    return (response.data as List<dynamic>)
+        .cast<Map<String, dynamic>>()
+        .map(PersonalImportAsset.fromJson)
+        .toList(growable: false);
+  }
+
+  Future<PersonalImportAsset> upsertPersonalImport({
+    required String source,
+    required String externalId,
+    required String title,
+    required String watchUrl,
+    String? author,
+    int durationSec = 60,
+    String? subtitleEnSrt,
+    String? subtitleZhSrt,
+  }) async {
+    final Response<dynamic> response = await _dio.put(
+      Endpoints.importsAsset,
+      data: <String, dynamic>{
+        'source': source,
+        'external_id': externalId,
+        'title': title,
+        'watch_url': watchUrl,
+        if (author != null && author.trim().isNotEmpty) 'author': author.trim(),
+        'duration_sec': durationSec,
+        if (subtitleEnSrt != null) 'subtitle_en_srt': subtitleEnSrt,
+        if (subtitleZhSrt != null) 'subtitle_zh_srt': subtitleZhSrt,
+      },
+      options: Options(
+        extra: const <String, Object>{
+          'dio_cache_interceptor_force_refresh': true,
+        },
+      ),
+    );
+    return PersonalImportAsset.fromJson(
+      response.data as Map<String, dynamic>,
+    );
+  }
+
+  Future<String?> fetchPersonalImportSrt({
+    required int importId,
+    required String lang,
+  }) async {
+    try {
+      final Response<dynamic> response = await _dio.get(
+        '${Endpoints.imports}/$importId/srt/$lang',
+        options: Options(
+          responseType: ResponseType.plain,
+          validateStatus: (int? status) =>
+              status != null &&
+              ((status >= 200 && status < 300) || status == 404),
+          extra: const <String, Object>{
+            'dio_cache_interceptor_force_refresh': true,
+          },
+        ),
+      );
+      if (response.statusCode == 404) {
+        return null;
+      }
+      final Object? data = response.data;
+      if (data is String && data.trim().isNotEmpty) {
+        return data;
+      }
+      return data?.toString();
+    } on DioException catch (error) {
+      if (error.response?.statusCode == 404) {
+        return null;
+      }
+      rethrow;
+    }
+  }
+
+  Future<SharedBilibiliSubtitleUpsertResult> putSharedBilibiliSubtitle({
+    required String bvid,
+    int page = 1,
+    int? cid,
+    int? durationSec,
+    required String subtitleEnSrt,
+    String? subtitleZhSrt,
+    String sourceOrigin = 'asr',
+  }) async {
+    final Response<dynamic> response = await _dio.put(
+      Endpoints.sharedSubtitlesBilibili,
+      data: <String, dynamic>{
+        'bvid': bvid,
+        'page': page,
+        if (cid != null) 'cid': cid,
+        if (durationSec != null) 'duration_sec': durationSec,
+        'subtitle_en_srt': subtitleEnSrt,
+        if (subtitleZhSrt != null) 'subtitle_zh_srt': subtitleZhSrt,
+        'source_origin': sourceOrigin,
+      },
+      options: Options(
+        extra: const <String, Object>{
+          'dio_cache_interceptor_force_refresh': true,
+        },
+      ),
+    );
+    return SharedBilibiliSubtitleUpsertResult.fromJson(
       response.data as Map<String, dynamic>,
     );
   }

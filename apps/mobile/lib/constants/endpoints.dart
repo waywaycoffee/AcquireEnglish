@@ -39,6 +39,10 @@ class Endpoints {
   static const String learningReviewsDue = 'api/learning/reviews/due';
   static const String livekitToken = 'api/livekit/token';
   static const String livekitStatus = 'api/livekit/status';
+  static const String sharedSubtitlesBilibili =
+      'api/shared-subtitles/bilibili';
+  static const String imports = 'api/imports';
+  static const String importsAsset = 'api/imports/asset';
 
   /// Kept for Dio header compatibility; AcquireEnglish API ignores it.
   static const String apiKey = '';

@@ -4,6 +4,7 @@ import 'dart:math';
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_webrtc/flutter_webrtc.dart';
 import 'package:media_kit/media_kit.dart';
@@ -18,210 +19,211 @@ import '../../data/livetalking_client.dart';
 import '../../data/oral_coach_pipeline_client.dart';
 import '../../data/pronunciation_providers.dart';
 import '../../domain/pronunciation_assessment.dart';
-import '../player_mock_state.dart';
-import 'study_shell_tokens.dart';
+import 'coach_avatar_stage.dart';
 
-/// Video-topic oral coach: pipeline (ASR→发音→LLM→TTS→avatar) or LiveTalking / TTS.
+class _ChatBubble {
+  const _ChatBubble({
+    required this.role,
+    required this.text,
+    this.hint = false,
+    this.zh = '',
+  });
+
+  final String role; // user | coach
+  final String text;
+  final bool hint;
+  final String zh;
+}
+
+/// Midoo-style digital-human coach: free talk on the whole video/article theme.
+///
+/// Not sentence shadowing — that lives in the 跟读 tab.
 class StudyOralCoachTab extends ConsumerStatefulWidget {
   const StudyOralCoachTab({
-    required this.line,
-    required this.hasLine,
-    this.assessmentTarget,
-    this.onReplaySentence,
-    this.onNextSentence,
-    this.onOpenAssessment,
-    this.unavailableReason,
+    required this.topicSummary,
+    required this.articleExcerpt,
     this.courseTitle = '',
     this.episodeTitle = '',
-    this.previousEnglish = '',
-    this.nextEnglish = '',
+    this.hasTranscript = false,
     super.key,
   });
 
-  final PlayerSubtitleLine line;
-  final bool hasLine;
-  final PronunciationAssessmentTarget? assessmentTarget;
-  final VoidCallback? onReplaySentence;
-  final VoidCallback? onNextSentence;
-  final VoidCallback? onOpenAssessment;
-  final String? unavailableReason;
+  /// Short theme (course / episode / first-line hint).
+  final String topicSummary;
+
+  /// Condensed English from the full transcript / article.
+  final String articleExcerpt;
   final String courseTitle;
   final String episodeTitle;
-  final String previousEnglish;
-  final String nextEnglish;
+  final bool hasTranscript;
 
   @override
   ConsumerState<StudyOralCoachTab> createState() => _StudyOralCoachTabState();
 }
 
-class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab> {
+class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
+    with SingleTickerProviderStateMixin {
   static const int _maxRecordingBytes =
       Pcm16MonoAudio.expectedSampleRate * 2 * 60;
+  static const Duration _sessionBudget = Duration(minutes: 3);
 
   final LiveTalkingClient _liveClient = LiveTalkingClient();
   final OralCoachPipelineClient _pipelineClient = OralCoachPipelineClient();
   final LiveKitOralClient _liveKitClient = LiveKitOralClient();
+  final List<_ChatBubble> _bubbles = <_ChatBubble>[];
+  final Set<int> _showZhIndexes = <int>{};
+  final ScrollController _chatScroll = ScrollController();
   RTCVideoRenderer? _renderer;
   PronunciationMicrophone? _microphone;
   final Uint8List _recordingBuffer = Uint8List(_maxRecordingBytes);
   int _recordingBytesWritten = 0;
   StreamSubscription<Uint8List>? _recordingSubscription;
   Timer? _recordingLimitTimer;
+  Timer? _sessionTicker;
+  Timer? _reconnectTimer;
+  DateTime? _sessionStartedAt;
+  Duration _sessionLeft = _sessionBudget;
   OralCoachSession? _session;
-  OralCoachTurnResult? _lastTurn;
   String? _learningSessionId;
-  List<Map<String, dynamic>> _feedbackItems = <Map<String, dynamic>>[];
   bool _connecting = false;
   bool _busy = false;
   bool _recordingActive = false;
-  String _status = '未开始陪练';
+  bool _started = false;
+  bool _bootstrapped = false;
+  String _status = '你可以开始说';
   String? _error;
   String _difficulty = 'B1';
+  List<Map<String, dynamic>> _iceServers = defaultLiveTalkingIceServers;
+  late final AnimationController _orbPulse;
+  bool _coachSpeaking = false;
+  int _busyLineFailures = 0;
 
   @override
   void initState() {
     super.initState();
+    _orbPulse = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1400),
+    )..repeat(reverse: true);
     _microphone = ref.read(pronunciationMicrophoneFactoryProvider)();
-    _liveKitClient.onScore = _onLiveKitScore;
-    _liveKitClient.onStatus = _onLiveKitStatus;
-    // Auto-wire digital human when the tab opens (pipeline / LiveTalking).
+    _liveKitClient.onScore = (_) {};
+    _liveKitClient.onStatus = (String status) {
+      if (!mounted || _busy || _recordingActive) {
+        return;
+      }
+      setState(() => _status = status);
+    };
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) {
         return;
       }
-      final LearningSettingsState settings = ref.read(learningSettingsProvider);
-      if (settings.wantsDigitalHumanAvatar && !_liveClient.isConnected) {
-        unawaited(_ensureDigitalHumanConnected(settings));
-      }
+      unawaited(_bootstrapSession());
     });
-  }
-
-  void _onLiveKitScore(Map<String, dynamic> score) {
-    if (!mounted) {
-      return;
-    }
-    final Object? overall =
-        (score['pronunciation'] is Map
-            ? (score['pronunciation'] as Map)['overall']
-            : null) ??
-        score['overall'] ??
-        score['suggested_score'];
-    setState(() {
-      _status = overall == null
-          ? '收到 LiveKit 评分'
-          : 'LiveKit 评分：${_formatScore(overall)}';
-    });
-  }
-
-  void _onLiveKitStatus(String status) {
-    if (!mounted || _busy || _recordingActive) {
-      return;
-    }
-    setState(() => _status = status);
-  }
-
-  String _formatScore(Object raw) {
-    if (raw is num) {
-      final double value = raw.toDouble();
-      if (value <= 1.0) {
-        return '${(value * 100).round()}%';
-      }
-      return value.toStringAsFixed(value == value.roundToDouble() ? 0 : 1);
-    }
-    return '$raw';
-  }
-
-  /// Resolve LiveTalking URL: override → settings → health → Tailscale default.
-  Future<String> _resolveLiveTalkingUrl(
-    LearningSettingsState settings, {
-    String? preferredUrl,
-  }) async {
-    final String preferred = (preferredUrl ?? '').trim();
-    if (preferred.isNotEmpty && !preferred.contains('127.0.0.1')) {
-      return preferred.replaceAll(RegExp(r'/+$'), '');
-    }
-    final String liveUrl = settings.resolvedOralCoachServerUrl;
-    if (liveUrl.isNotEmpty && !liveUrl.contains('127.0.0.1')) {
-      return liveUrl;
-    }
-    if (settings.usesOralCoachPipeline) {
-      try {
-        final Map<String, dynamic> health = await _pipelineClient.health(
-          settings.oralCoachPipelineUrl,
-        );
-        final String fromHealth = '${health['livetalking_url'] ?? ''}'.trim();
-        if (fromHealth.isNotEmpty && !fromHealth.contains('127.0.0.1')) {
-          return fromHealth.replaceAll(RegExp(r'/+$'), '');
-        }
-      } catch (_) {}
-    }
-    return defaultLiveTalkingUrl;
-  }
-
-  Future<void> _ensureDigitalHumanConnected(
-    LearningSettingsState settings, {
-    bool speakGreeting = false,
-    String? greetingText,
-    String? preferredUrl,
-  }) async {
-    final String liveUrl = await _resolveLiveTalkingUrl(
-      settings,
-      preferredUrl: preferredUrl,
-    );
-    if (liveUrl.isEmpty) {
-      return;
-    }
-    // Reconnect if settings/turn point at a different host than the open session.
-    final String? openBase = _liveClient.baseUrl;
-    final bool hostChanged =
-        openBase != null &&
-        openBase.isNotEmpty &&
-        liveUrl.replaceAll(RegExp(r'/+$'), '') != openBase;
-    if (!_liveClient.isConnected || hostChanged) {
-      await _connectLiveTalking(liveUrl);
-    }
-    if (speakGreeting &&
-        _liveClient.isConnected &&
-        (greetingText ?? '').trim().isNotEmpty) {
-      try {
-        await _liveClient.speak(greetingText!.trim(), type: 'echo');
-      } catch (error) {
-        if (mounted) {
-          setState(() {
-            _error = _pretty(error);
-            _status = '数字人打招呼失败，可点「连接数字人」重试';
-          });
-        }
-      }
-    }
-  }
-
-  @override
-  void didUpdateWidget(covariant StudyOralCoachTab oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    if (oldWidget.line.english != widget.line.english && _session != null) {
-      unawaited(_syncContext());
-    }
   }
 
   @override
   void dispose() {
+    _orbPulse.dispose();
+    _sessionTicker?.cancel();
+    _reconnectTimer?.cancel();
+    _chatScroll.dispose();
     _liveKitClient.onScore = null;
     _liveKitClient.onStatus = null;
     unawaited(_releaseMic());
-    unawaited(_liveClient.disconnect());
-    unawaited(_liveKitClient.disconnect());
+    // Awaited hangup frees GPU session slots; fire-and-forget left zombies.
+    unawaited(_teardownLiveSessions());
     super.dispose();
+  }
+
+  Future<void> _teardownLiveSessions() async {
+    try {
+      await _liveClient.disconnect();
+    } catch (_) {}
+    try {
+      await _liveKitClient.disconnect();
+    } catch (_) {}
+  }
+
+  /// Auto open greeting — no "连接/开始" buttons.
+  ///
+  /// Default pipeline uses a local avatar + TTS (no LiveTalking WebRTC).
+  Future<void> _bootstrapSession() async {
+    if (_bootstrapped || !mounted) {
+      return;
+    }
+    _bootstrapped = true;
+    final LearningSettingsState settings = ref.read(learningSettingsProvider);
+    // Realtime lip-sync only when user explicitly chose LiveTalking backend.
+    if (settings.usesRealtimeLipSync) {
+      await _ensureDigitalHumanConnected(settings);
+      _scheduleReconnectIfNeeded();
+    }
+    if (!mounted) {
+      return;
+    }
+    if (!_started) {
+      await _startTopicConversation();
+    }
+  }
+
+  void _scheduleReconnectIfNeeded() {
+    _reconnectTimer?.cancel();
+    final LearningSettingsState settings = ref.read(learningSettingsProvider);
+    if (!settings.usesRealtimeLipSync) {
+      return;
+    }
+    if (_busyLineFailures >= 3) {
+      return;
+    }
+    if (_liveClient.isConnected || _connecting) {
+      return;
+    }
+    _reconnectTimer = Timer.periodic(const Duration(seconds: 20), (_) {
+      if (!mounted || _connecting || _liveClient.isConnected) {
+        if (_liveClient.isConnected) {
+          _reconnectTimer?.cancel();
+        }
+        return;
+      }
+      if (_busyLineFailures >= 3 || _sessionLeft == Duration.zero) {
+        _reconnectTimer?.cancel();
+        return;
+      }
+      // Drop stale half-open peers before opening a new /offer slot.
+      unawaited(() async {
+        if (_liveClient.isConnected && !_liveClient.isSessionAlive) {
+          await _liveClient.disconnect();
+        }
+        await _ensureDigitalHumanConnected(
+          ref.read(learningSettingsProvider),
+          speakGreeting: false,
+        );
+      }());
+    });
+  }
+
+  String get _topicLabel {
+    final String summary = widget.topicSummary.trim();
+    if (summary.isNotEmpty) {
+      return summary;
+    }
+    final String episode = widget.episodeTitle.trim();
+    if (episode.isNotEmpty) {
+      return episode;
+    }
+    final String course = widget.courseTitle.trim();
+    if (course.isNotEmpty) {
+      return course;
+    }
+    return '本集视频主题';
   }
 
   OralCoachVideoContext _videoContext() {
     return OralCoachVideoContext(
       courseTitle: widget.courseTitle,
       episodeTitle: widget.episodeTitle,
-      currentEnglish: widget.line.english,
-      currentChinese: widget.line.chinese,
-      previousEnglish: widget.previousEnglish,
-      nextEnglish: widget.nextEnglish,
+      topicSummary: _topicLabel,
+      articleExcerpt: widget.articleExcerpt,
       difficulty: _difficulty,
     );
   }
@@ -239,34 +241,78 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab> {
     _microphone = null;
   }
 
-  /// Play pipeline-hosted TTS (edge/xtts) when avatar echo is unavailable.
-  Future<bool> _playRemoteTts(String url) async {
-    Player? player;
-    try {
-      player = Player();
-      await player.open(Media(url), play: true);
-      // Bound wait so a hung CDN cannot freeze the turn forever.
-      final DateTime deadline = DateTime.now().add(const Duration(seconds: 45));
-      while (DateTime.now().isBefore(deadline)) {
-        await Future<void>.delayed(const Duration(milliseconds: 200));
-        final bool ended =
-            player.state.completed ||
-            (!player.state.playing &&
-                player.state.position >= player.state.duration &&
-                player.state.duration > Duration.zero);
-        if (ended) {
-          return true;
-        }
+  String _pretty(Object error) {
+    return error
+        .toString()
+        .replaceFirst(RegExp(r'^Bad state:\s*'), '')
+        .replaceFirst(RegExp(r'^Exception:\s*'), '');
+  }
+
+  Future<String> _resolveLiveTalkingUrl(
+    LearningSettingsState settings, {
+    String? preferredUrl,
+  }) async {
+    bool usable(String raw) {
+      final String v = raw.trim();
+      if (v.isEmpty || v.contains('127.0.0.1')) {
+        return false;
       }
-      // Timed out without completion — let caller fall back to device TTS.
-      return false;
-    } catch (_) {
-      return false;
-    } finally {
+      // Phones must not use Tailscale-only endpoints.
+      if (v.contains('100.115.252.55') || v.contains('ts.net')) {
+        return false;
+      }
+      return true;
+    }
+
+    final List<String> preferred = <String>[];
+    final String override = (preferredUrl ?? '').trim();
+    if (usable(override)) {
+      preferred.add(override.replaceAll(RegExp(r'/+$'), ''));
+    }
+    final String fromSettings = settings.resolvedOralCoachServerUrl;
+    if (usable(fromSettings)) {
+      preferred.add(fromSettings);
+    }
+    if (settings.usesOralCoachPipeline) {
       try {
-        await player?.dispose();
+        final Map<String, dynamic> health = await _pipelineClient.health(
+          settings.oralCoachPipelineUrl,
+        );
+        final String fromHealth = '${health['livetalking_url'] ?? ''}'.trim();
+        if (usable(fromHealth)) {
+          preferred.add(fromHealth.replaceAll(RegExp(r'/+$'), ''));
+        }
+        final List<Map<String, dynamic>> ice = _parseIceServers(
+          health['webrtc_ice_servers'],
+        );
+        if (ice.isNotEmpty) {
+          _iceServers = ice;
+        }
       } catch (_) {}
     }
+    return LiveTalkingClient.pickReachableBaseUrl(
+      preferred: preferred.isEmpty ? defaultLiveTalkingUrlPublic : preferred.first,
+      candidates: liveTalkingUrlCandidates,
+    );
+  }
+
+  List<Map<String, dynamic>> _parseIceServers(Object? raw) {
+    if (raw is! List) {
+      return const <Map<String, dynamic>>[];
+    }
+    final List<Map<String, dynamic>> out = <Map<String, dynamic>>[];
+    for (final Object? item in raw) {
+      if (item is! Map) {
+        continue;
+      }
+      final Map<String, dynamic> row = Map<String, dynamic>.from(item);
+      final Object? urls = row['urls'];
+      if (urls == null) {
+        continue;
+      }
+      out.add(row);
+    }
+    return out;
   }
 
   Future<void> _connectLiveTalking(String serverUrl) async {
@@ -282,6 +328,7 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab> {
       final RTCVideoRenderer renderer = await _liveClient.connect(
         serverUrl,
         avatar: defaultLiveTalkingAvatarId,
+        iceServers: _iceServers,
       );
       if (!mounted) {
         await _liveClient.disconnect();
@@ -289,21 +336,76 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab> {
       }
       setState(() {
         _renderer = renderer;
+        _error = null;
+        _busyLineFailures = 0;
         _status = _liveClient.hasRemoteVideo
-            ? '已连接虚拟外教画面'
-            : '已建连，等待画面（检查 Tailscale UDP / LiveTalking）';
+            ? '你可以开始说'
+            : '画面加载中 · 可以先开口';
         _connecting = false;
       });
+      _reconnectTimer?.cancel();
     } catch (error) {
       if (!mounted) {
         return;
       }
+      final String msg = _pretty(error);
+      final bool busy = msg.contains('忙线') || msg.contains('会话');
+      if (busy) {
+        _busyLineFailures += 1;
+      }
       setState(() {
         _connecting = false;
         _renderer = null;
-        _error = _pretty(error);
-        _status = '数字人连接失败 — 需 Tailscale + GPU :8010';
+        _error = busy
+            ? (_busyLineFailures >= 3
+                  ? '外教线路繁忙，已改用头像对话'
+                  : '外教忙线，正在清理后重试…')
+            : msg;
+        _status = _busyLineFailures >= 3 ? '头像对话中' : '仍可语音对话 · 自动重连中';
       });
+      if (_busyLineFailures < 3) {
+        _scheduleReconnectIfNeeded();
+      }
+    }
+  }
+
+  Future<void> _ensureDigitalHumanConnected(
+    LearningSettingsState settings, {
+    bool speakGreeting = false,
+    String? greetingText,
+    String? preferredUrl,
+  }) async {
+    if (!settings.usesRealtimeLipSync) {
+      return;
+    }
+    final String liveUrl = await _resolveLiveTalkingUrl(
+      settings,
+      preferredUrl: preferredUrl,
+    );
+    if (liveUrl.isEmpty) {
+      return;
+    }
+    final String? openBase = _liveClient.baseUrl;
+    final bool hostChanged =
+        openBase != null &&
+        openBase.isNotEmpty &&
+        liveUrl.replaceAll(RegExp(r'/+$'), '') != openBase;
+    if (_liveClient.isConnected && !_liveClient.isSessionAlive) {
+      await _liveClient.disconnect();
+    }
+    if (!_liveClient.isConnected || hostChanged) {
+      await _connectLiveTalking(liveUrl);
+    }
+    if (speakGreeting &&
+        _liveClient.isConnected &&
+        (greetingText ?? '').trim().isNotEmpty) {
+      try {
+        await _liveClient.speak(greetingText!.trim(), type: 'echo');
+      } catch (error) {
+        if (mounted) {
+          setState(() => _error = _pretty(error));
+        }
+      }
     }
   }
 
@@ -311,13 +413,21 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab> {
     final String base = OralCoachPipelineClient.normalizeBaseUrl(
       settings.oralCoachPipelineUrl,
     );
-    // Settings may change mid-tab; never keep a session bound to a stale host.
     if (_session != null && _session!.baseUrl != base) {
       _session = null;
     }
     if (_session != null) {
-      await _syncContext();
-      return;
+      try {
+        await _pipelineClient.updateContext(
+          session: _session!,
+          context: _videoContext(),
+        );
+      } catch (_) {
+        _session = null;
+      }
+      if (_session != null) {
+        return;
+      }
     }
     final OralCoachSession session = await _pipelineClient.createSession(
       rawBaseUrl: settings.oralCoachPipelineUrl,
@@ -327,80 +437,158 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab> {
     _difficulty = session.difficulty;
   }
 
-  Future<void> _syncContext() async {
-    final OralCoachSession? session = _session;
-    if (session == null) {
-      return;
-    }
+  Future<bool> _playRemoteTts(String url) async {
+    Player? player;
     try {
-      await _pipelineClient.updateContext(
-        session: session,
-        context: _videoContext(),
-      );
+      player = Player();
+      await player.open(Media(url), play: true);
+      final DateTime deadline = DateTime.now().add(const Duration(seconds: 45));
+      while (DateTime.now().isBefore(deadline)) {
+        await Future<void>.delayed(const Duration(milliseconds: 200));
+        final bool ended =
+            player.state.completed ||
+            (!player.state.playing &&
+                player.state.position >= player.state.duration &&
+                player.state.duration > Duration.zero);
+        if (ended) {
+          return true;
+        }
+      }
+      return false;
     } catch (_) {
-      // Stale host/session — force createSession on the next turn.
-      _session = null;
+      return false;
+    } finally {
+      try {
+        await player?.dispose();
+      } catch (_) {}
     }
   }
 
-  Future<void> _startPipelineConversation(LearningSettingsState settings) async {
+  Future<void> _speakCoach(String text, LearningSettingsState settings) async {
+    final String speak = text.trim();
+    if (speak.isEmpty) {
+      return;
+    }
+    if (mounted) {
+      setState(() => _coachSpeaking = true);
+    }
+    try {
+      // Realtime lip-sync only for explicit LiveTalking backend.
+      if (settings.usesRealtimeLipSync) {
+        await _ensureDigitalHumanConnected(settings);
+        if (_liveClient.isConnected) {
+          try {
+            await _liveClient.speak(speak, type: 'echo');
+            return;
+          } catch (_) {}
+        }
+      }
+      try {
+        await ref.read(wordPronunciationServiceProvider).speak(speak);
+      } catch (_) {}
+    } finally {
+      if (mounted) {
+        setState(() => _coachSpeaking = false);
+      }
+    }
+  }
+
+  Future<void> _startTopicConversation() async {
     if (_busy) {
       return;
     }
+    final LearningSettingsState settings = ref.read(learningSettingsProvider);
     setState(() {
       _busy = true;
       _error = null;
-      _status = '正在创建视频主题会话…';
+      _status = '正在开启主题对话…';
     });
+    final String open =
+        'Hi! Let\'s talk about “$_topicLabel”. '
+        'What did you find most interesting, and why?';
     try {
-      await _ensurePipelineSession(settings);
-      String modeNote = 'HTTP 管线';
-      if (settings.usesLiveKit && ref.read(authSessionProvider).isLoggedIn) {
+      if (settings.usesOralCoachPipeline) {
         try {
-          await _liveKitClient.connect(
-            api: ref.read(acquireApiClientProvider),
-            preferredUrl: settings.liveKitUrl,
-          );
-          modeNote = 'LiveKit Agent + HTTP 管线';
+          await _ensurePipelineSession(settings);
+          if (settings.usesLiveKit &&
+              ref.read(authSessionProvider).isLoggedIn) {
+            try {
+              await _liveKitClient.connect(
+                api: ref.read(acquireApiClientProvider),
+                preferredUrl: settings.liveKitUrl,
+              );
+            } catch (_) {}
+          }
         } catch (error) {
-          modeNote = 'HTTP 管线（LiveKit 未连上：${_pretty(error)}）';
+          if (mounted) {
+            setState(() => _error = '管线暂不可用：${_pretty(error)}');
+          }
         }
-      } else if (settings.usesLiveKit &&
-          !ref.read(authSessionProvider).isLoggedIn) {
-        modeNote = 'HTTP 管线（登录后可派发 LiveKit Agent）';
       }
-      final String open =
-          'Hi! We are practicing with this video. '
-          'Please listen and repeat: ${widget.line.english}';
-      await _ensureDigitalHumanConnected(
-        settings,
-        speakGreeting: true,
-        greetingText: open,
-      );
-      final String avatarNote = _liveClient.isConnected
-          ? '数字人已连接'
-          : '数字人未连接（可点「连接数字人」或检查 Tailscale）';
+      if (settings.usesRealtimeLipSync) {
+        await _ensureDigitalHumanConnected(
+          settings,
+          speakGreeting: true,
+          greetingText: open,
+        );
+      }
+      if (!_liveClient.isConnected) {
+        await _speakCoach(open, settings);
+      }
       if (mounted) {
         setState(() {
-          _status =
-              '会话已就绪 · $modeNote · $avatarNote · 难度 $_difficulty';
+          _started = true;
           _busy = false;
+          _bubbles
+            ..clear()
+            ..add(_ChatBubble(role: 'coach', text: open));
+          _status = '你可以开始说';
+          _showZhIndexes.clear();
         });
+        _armSessionClock();
+        _scrollChatToEnd();
       }
     } catch (error) {
       if (mounted) {
         setState(() {
           _busy = false;
           _error = _pretty(error);
-          _status = '创建会话失败';
+          _status = '开启失败';
         });
       }
     }
   }
 
+  void _armSessionClock() {
+    _sessionStartedAt = DateTime.now();
+    _sessionLeft = _sessionBudget;
+    _sessionTicker?.cancel();
+    _sessionTicker = Timer.periodic(const Duration(seconds: 1), (_) {
+      if (!mounted || _sessionStartedAt == null) {
+        return;
+      }
+      final Duration elapsed = DateTime.now().difference(_sessionStartedAt!);
+      final Duration left = _sessionBudget - elapsed;
+      final Duration next = left.isNegative ? Duration.zero : left;
+      setState(() {
+        _sessionLeft = next;
+      });
+      if (next == Duration.zero) {
+        _sessionTicker?.cancel();
+        unawaited(_hangUp());
+      }
+    });
+  }
+
   Future<void> _startRecording() async {
     if (_recordingActive || _busy) {
       return;
+    }
+    if (!_started) {
+      await _startTopicConversation();
+      if (!_started) {
+        return;
+      }
     }
     final PronunciationMicrophone? microphone = _microphone;
     if (microphone == null) {
@@ -409,7 +597,7 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab> {
     }
     setState(() {
       _error = null;
-      _status = '请说话…';
+      _status = '正在听你说…';
     });
     try {
       _recordingBuffer.fillRange(0, _recordingBytesWritten, 0);
@@ -476,7 +664,7 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab> {
     if (mounted) {
       setState(() {
         _busy = true;
-        _status = '正在跑 ASR → 发音 → LLM…';
+        _status = '正在理解你的话…';
       });
     }
     try {
@@ -495,7 +683,7 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab> {
       if (mounted) {
         setState(() {
           _busy = false;
-          _messageSafe('未检测到有效语音，请重试');
+          _status = '没听清，请再说一次';
         });
       }
       return;
@@ -506,96 +694,22 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab> {
     try {
       final Directory directory = await getTemporaryDirectory();
       path =
-          '${directory.path}/oral-coach-${DateTime.now().microsecondsSinceEpoch}.wav';
+          '${directory.path}/oral-topic-${DateTime.now().microsecondsSinceEpoch}.wav';
       await File(path).writeAsBytes(audio.toWav(), flush: true);
-      await _ensurePipelineSession(settings);
-      final OralCoachSession session = _session!;
-      final OralCoachDraftResult draft = await _pipelineClient.createDraft(
-        session: session,
-        audioPath: path,
-        referenceText: widget.line.english,
-      );
-      if (!mounted) {
-        return;
-      }
-      setState(() {
-        _busy = false;
-        _status = '请核对转写后再发送给外教';
-      });
-      final String? confirmed = await _confirmTranscriptDialog(draft.transcript);
-      if (confirmed == null) {
-        if (mounted) {
-          setState(() => _status = '已取消本回合');
-        }
-        return;
-      }
-      setState(() {
-        _busy = true;
-        _status = '外教思考中…';
-      });
-      final OralCoachTurnResult turn = await _pipelineClient.confirmDraft(
-        session: session,
-        draftId: draft.draftId,
-        confirmedText: confirmed,
-      );
-      _difficulty = turn.difficulty;
-      _lastTurn = turn;
 
-      // Prefer digital-human lip-sync for coach replies; TTS is fallback only.
-      final String speakText = turn.avatarText.trim().isNotEmpty
-          ? turn.avatarText.trim()
-          : turn.coachText.trim();
-      bool avatarSpoke = false;
-      String? avatarFailHint;
-      if (turn.avatarAction == 'livetalking_offline') {
-        avatarFailHint =
-            '管线探测数字人离线（${turn.livetalkingUrl.isNotEmpty ? turn.livetalkingUrl : defaultLiveTalkingUrl}）';
-      } else if (speakText.isNotEmpty) {
-        await _ensureDigitalHumanConnected(
-          settings,
-          preferredUrl: turn.livetalkingUrl,
-        );
-        if (_liveClient.isConnected) {
-          try {
-            await _liveClient.speak(speakText, type: 'echo');
-            avatarSpoke = true;
-          } catch (error) {
-            avatarFailHint = _pretty(error);
-            avatarSpoke = false;
+      if (settings.usesOralCoachPipeline) {
+        try {
+          await _runPipelineFreeTalk(settings: settings, audioPath: path);
+          return;
+        } catch (error) {
+          if (mounted) {
+            setState(() {
+              _error = '管线暂不可用：${_pretty(error)} · 已用本地回复';
+            });
           }
-        } else {
-          avatarFailHint = _error ?? '数字人未连接';
         }
       }
-      if (!avatarSpoke) {
-        final String? ttsUrl = turn.ttsUrl?.trim();
-        bool playedRemote = false;
-        if (ttsUrl != null && ttsUrl.isNotEmpty) {
-          playedRemote = await _playRemoteTts(ttsUrl);
-        }
-        if (!playedRemote && turn.coachText.trim().isNotEmpty) {
-          try {
-            await ref
-                .read(wordPronunciationServiceProvider)
-                .speak(turn.coachText);
-          } catch (_) {}
-        }
-      }
-
-      await _persistLearningTurn(turn);
-
-      if (mounted) {
-        setState(() {
-          _busy = false;
-          if (avatarFailHint != null && !avatarSpoke) {
-            _error = avatarFailHint;
-          }
-          _status = avatarSpoke
-              ? '回合完成 · 数字人口型播报 · 重叠 ${turn.scoreLabel}'
-              : '回合完成 · 重叠 ${turn.scoreLabel} · 难度 ${turn.difficulty}'
-                    '${avatarFailHint != null ? '（数字人未播，已用 TTS）' : ''}';
-        });
-      }
+      await _runLocalFreeTalk(settings: settings);
     } catch (error) {
       if (mounted) {
         setState(() {
@@ -616,6 +730,122 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab> {
     }
   }
 
+  Future<void> _runLocalFreeTalk({
+    required LearningSettingsState settings,
+  }) async {
+    final String reply =
+        'Thanks for sharing. About “$_topicLabel” — '
+        'what would you tell a friend who hadn\'t watched it yet?';
+    if (mounted) {
+      setState(() {
+        _bubbles.add(
+          const _ChatBubble(role: 'user', text: '（语音已录）', hint: true),
+        );
+        _bubbles.add(_ChatBubble(role: 'coach', text: reply));
+        _busy = false;
+        _status = '你可以开始说';
+      });
+      _scrollChatToEnd();
+    }
+    await _speakCoach(reply, settings);
+  }
+
+  Future<void> _runPipelineFreeTalk({
+    required LearningSettingsState settings,
+    required String audioPath,
+  }) async {
+    await _ensurePipelineSession(settings);
+    final OralCoachSession session = _session!;
+    // Free talk: no subtitle-line reference — coach discusses the theme.
+    final OralCoachDraftResult draft = await _pipelineClient.createDraft(
+      session: session,
+      audioPath: audioPath,
+    );
+    if (!mounted) {
+      return;
+    }
+    setState(() {
+      _busy = false;
+      _status = '请核对你说的话';
+    });
+    final String? confirmed = await _confirmTranscriptDialog(draft.transcript);
+    if (confirmed == null) {
+      if (mounted) {
+        setState(() => _status = '已取消本回合');
+      }
+      return;
+    }
+    setState(() {
+      _busy = true;
+      _status = '外教思考中…';
+      _bubbles.add(_ChatBubble(role: 'user', text: confirmed, hint: true));
+    });
+    final OralCoachTurnResult turn = await _pipelineClient.confirmDraft(
+      session: session,
+      draftId: draft.draftId,
+      confirmedText: confirmed,
+    );
+    _difficulty = turn.difficulty;
+    final String speakText = turn.avatarText.trim().isNotEmpty
+        ? turn.avatarText.trim()
+        : turn.coachText.trim();
+
+    bool avatarSpoke = false;
+    if (speakText.isNotEmpty && settings.usesRealtimeLipSync) {
+      await _ensureDigitalHumanConnected(
+        settings,
+        preferredUrl: turn.livetalkingUrl,
+      );
+      if (_liveClient.isConnected) {
+        if (mounted) {
+          setState(() => _coachSpeaking = true);
+        }
+        try {
+          await _liveClient.speak(speakText, type: 'echo');
+          avatarSpoke = true;
+        } catch (_) {
+          avatarSpoke = false;
+        } finally {
+          if (mounted) {
+            setState(() => _coachSpeaking = false);
+          }
+        }
+      }
+    }
+    if (!avatarSpoke) {
+      final String? ttsUrl = turn.ttsUrl?.trim();
+      bool playedRemote = false;
+      if (ttsUrl != null && ttsUrl.isNotEmpty) {
+        if (mounted) {
+          setState(() => _coachSpeaking = true);
+        }
+        try {
+          playedRemote = await _playRemoteTts(ttsUrl);
+        } finally {
+          if (mounted) {
+            setState(() => _coachSpeaking = false);
+          }
+        }
+      }
+      if (!playedRemote && speakText.isNotEmpty) {
+        await _speakCoach(speakText, settings);
+      }
+    }
+
+    await _persistLearningTurn(turn);
+
+    if (mounted) {
+      setState(() {
+        _busy = false;
+        if (speakText.isNotEmpty) {
+          _bubbles.add(_ChatBubble(role: 'coach', text: speakText));
+        }
+        _status = '你可以开始说';
+      });
+      _scrollChatToEnd();
+    }
+  }
+
   Future<String?> _confirmTranscriptDialog(String draft) async {
     final TextEditingController controller = TextEditingController(text: draft);
     try {
@@ -624,12 +854,12 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab> {
         barrierDismissible: false,
         builder: (BuildContext context) {
           return AlertDialog(
-            title: const Text('核对识别文字'),
+            title: const Text('核对你说的话'),
             content: TextField(
               controller: controller,
               maxLines: 4,
               decoration: const InputDecoration(
-                labelText: '确认后才会进入外教回复',
+                labelText: '确认后发给数字人外教',
                 border: OutlineInputBorder(),
               ),
             ),
@@ -641,7 +871,7 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab> {
               FilledButton(
                 onPressed: () =>
                     Navigator.pop(context, controller.text.trim()),
-                child: const Text('确认发送'),
+                child: const Text('发送'),
               ),
             ],
           );
@@ -661,9 +891,9 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab> {
       String? sid = _learningSessionId;
       if (sid == null || sid.isEmpty) {
         sid = await api.startLearningSession(
-          taskId: 'video_line',
+          taskId: 'video_topic',
           courseTitle: widget.courseTitle,
-          currentEnglish: widget.line.english,
+          currentEnglish: _topicLabel,
         );
         _learningSessionId = sid;
       }
@@ -684,454 +914,697 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab> {
           text: turn.coachText,
         );
       }
-      final List<Map<String, dynamic>> candidates = <Map<String, dynamic>>[
-        for (final String c in turn.corrections)
-          if (c.contains('→') || c.contains('->'))
-            <String, String>{
-              'quote': turn.transcript,
-              'suggestion': c.split(RegExp(r'→|->')).last.trim(),
-              'reason': c,
-            }
-          else if (turn.transcript.trim().isNotEmpty &&
-              widget.line.english.trim().isNotEmpty &&
-              turn.transcript.trim().toLowerCase() !=
-                  widget.line.english.trim().toLowerCase())
-            <String, String>{
-              'quote': turn.transcript,
-              'suggestion': widget.line.english.trim(),
-              'reason': 'Closer to the video line',
-            },
-      ];
-      if (candidates.isEmpty) {
+    } catch (_) {}
+  }
+
+  Future<void> _onHoldStart() async {
+    if (_busy || _recordingActive) {
+      return;
+    }
+    if (!_started) {
+      await _startTopicConversation();
+      if (!mounted || _busy) {
         return;
       }
-      final List<Map<String, dynamic>> verified = await api
-          .finalizeLearningFeedback(sessionId: sid, items: candidates);
-      if (mounted) {
-        setState(() => _feedbackItems = verified);
-      }
-    } catch (_) {
-      // Offline / unauthenticated learning persist is best-effort.
     }
+    await _startRecording();
   }
 
-  Future<void> _saveFeedbackToReview(Map<String, dynamic> item) async {
-    if (!ref.read(authSessionProvider).isLoggedIn) {
-      setState(() => _error = '登录后可保存到复习');
+  Future<void> _onHoldEnd() async {
+    if (!_recordingActive) {
       return;
     }
-    try {
-      await ref.read(acquireApiClientProvider).saveReviewExpression(
-        expression: '${item['suggestion'] ?? ''}',
-        sourceQuote: '${item['quote'] ?? ''}',
+    await _stopRecordingAndSend();
+  }
+
+  Future<void> _hangUp() async {
+    if (_recordingActive) {
+      await _stopRecordingAndSend();
+    }
+    _sessionTicker?.cancel();
+    _sessionTicker = null;
+    _reconnectTimer?.cancel();
+    _reconnectTimer = null;
+    _sessionStartedAt = null;
+    _coachSpeaking = false;
+    await _teardownLiveSessions();
+    if (!mounted) {
+      return;
+    }
+    setState(() {
+      _renderer = null;
+      _started = false;
+      _bootstrapped = false;
+      _session = null;
+      _sessionLeft = _sessionBudget;
+      _busyLineFailures = 0;
+      _bubbles.clear();
+      _showZhIndexes.clear();
+      _error = null;
+      _status = '已结束 · 点麦克风重新开始';
+    });
+  }
+
+  void _scrollChatToEnd() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!_chatScroll.hasClients) {
+        return;
+      }
+      _chatScroll.animateTo(
+        _chatScroll.position.maxScrollExtent,
+        duration: const Duration(milliseconds: 220),
+        curve: Curves.easeOut,
       );
-      if (mounted) {
-        setState(() => _status = '已保存到延迟复习');
-      }
-    } catch (error) {
-      if (mounted) {
-        setState(() => _error = _pretty(error));
-      }
+    });
+  }
+
+  Future<void> _replayBubble(String text) async {
+    final LearningSettingsState settings = ref.read(learningSettingsProvider);
+    await _speakCoach(text, settings);
+  }
+
+  Future<void> _copyBubble(String text) async {
+    await Clipboard.setData(ClipboardData(text: text));
+    if (!mounted) {
+      return;
     }
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('已复制'),
+        duration: Duration(milliseconds: 900),
+      ),
+    );
   }
 
-  void _messageSafe(String text) {
-    _status = text;
-  }
-
-  Future<void> _demoCurrentLine(LearningSettingsState settings) async {
-    if (!widget.hasLine || widget.line.english.trim().isEmpty || _busy) {
+  void _toggleZh(int index, String zh) {
+    if (zh.trim().isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('暂无中文翻译'),
+          duration: Duration(milliseconds: 900),
+        ),
+      );
       return;
     }
     setState(() {
-      _busy = true;
-      _error = null;
+      if (_showZhIndexes.contains(index)) {
+        _showZhIndexes.remove(index);
+      } else {
+        _showZhIndexes.add(index);
+      }
     });
-    try {
-      if (settings.wantsDigitalHumanAvatar) {
-        await _ensureDigitalHumanConnected(
-          settings,
-          speakGreeting: true,
-          greetingText:
-              'Listen and repeat after me. ${widget.line.english}',
+  }
+
+  void _showSceneSheet() {
+    showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: const Color(0xFF1B1530),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (BuildContext context) {
+        return Padding(
+          padding: const EdgeInsets.fromLTRB(20, 16, 20, 28),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: <Widget>[
+              const Text(
+                '当前场景',
+                style: TextStyle(
+                  color: Colors.white70,
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                _topicLabel,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 17,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                widget.hasTranscript
+                    ? '围绕本集视频 / 文章主题自由对话'
+                    : '暂无字幕摘要 · 仍可按标题自由聊',
+                style: const TextStyle(color: Colors.white54, fontSize: 13),
+              ),
+            ],
+          ),
         );
-        if (_liveClient.isConnected) {
-          if (mounted) {
-            setState(() => _status = '数字人正在示范当前句…');
-          }
-          return;
-        }
-      }
-      await ref
-          .read(wordPronunciationServiceProvider)
-          .speak(widget.line.english);
-      if (mounted) {
-        setState(() => _status = '本地 TTS 已示范当前句');
-      }
-    } catch (error) {
-      if (mounted) {
-        setState(() => _error = _pretty(error));
-      }
-    } finally {
-      if (mounted) {
-        setState(() => _busy = false);
-      }
-    }
+      },
+    );
   }
 
-  Future<void> _coachFeedback(LearningSettingsState settings) async {
-    if (!widget.hasLine || _busy) {
-      return;
-    }
-    if (settings.usesOralCoachPipeline) {
-      setState(() => _status = '请用麦克风说一句，管线会自动纠错反馈');
-      return;
-    }
-    setState(() {
-      _busy = true;
-      _error = null;
-    });
-    try {
-      final String prompt =
-          'You are an English oral coach. The learner is practicing this line: '
-          '"${widget.line.english}". '
-          'Give one short tip in simple English (max 2 sentences), then ask them '
-          'to say the line again.';
-      if (settings.wantsDigitalHumanAvatar) {
-        await _ensureDigitalHumanConnected(settings);
-        if (_liveClient.isConnected) {
-          await _liveClient.speak(prompt, type: 'chat');
-          if (mounted) {
-            setState(() => _status = '数字人正在给出陪练反馈…');
-          }
-          return;
-        }
-      }
-      const String tip =
-          'Focus on clear word endings. Listen again, then say the sentence.';
-      await ref.read(wordPronunciationServiceProvider).speak(tip);
-      if (mounted) {
-        setState(() => _status = tip);
-      }
-    } catch (error) {
-      if (mounted) {
-        setState(() => _error = _pretty(error));
-      }
-    } finally {
-      if (mounted) {
-        setState(() => _busy = false);
-      }
-    }
-  }
-
-  String _pretty(Object error) {
-    return error
-        .toString()
-        .replaceFirst(RegExp(r'^Bad state:\s*'), '')
-        .replaceFirst(RegExp(r'^Exception:\s*'), '');
+  String get _sessionClockLabel {
+    final int total = _sessionLeft.inSeconds.clamp(0, 99 * 60);
+    final int m = total ~/ 60;
+    final int s = total % 60;
+    return '${m.toString().padLeft(2, '0')}:${s.toString().padLeft(2, '0')}';
   }
 
   @override
   Widget build(BuildContext context) {
-    final StudyShellColors colors = StudyShellColors.of(context);
     final LearningSettingsState settings = ref.watch(learningSettingsProvider);
-    final bool pipeline = settings.usesOralCoachPipeline;
-    final bool live = settings.wantsDigitalHumanAvatar;
+    final bool lipSync = settings.usesRealtimeLipSync;
+    final String orbHint = _recordingActive
+        ? '正在听你说…'
+        : (_busy
+              ? '外教思考中…'
+              : (_status.trim().isNotEmpty
+                    ? _status
+                    : (_started ? '你可以开始说' : '点麦克风开始对话')));
+    final String stageLabel = _connecting
+        ? '正在连接真人唇形…'
+        : (_coachSpeaking
+              ? '外教在说…'
+              : (_recordingActive
+                    ? '外教在听…'
+                    : (lipSync && _liveClient.isConnected
+                          ? '真人唇形已连接'
+                          : '头像对话 · 节省算力')));
 
-    return ListView(
-      padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
-      children: <Widget>[
-        AspectRatio(
-          aspectRatio: 16 / 10,
-          child: DecoratedBox(
-            decoration: BoxDecoration(
-              color: const Color(0xFF101820),
-              borderRadius: BorderRadius.circular(18),
-              border: Border.all(color: colors.border),
-            ),
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(18),
-              child: _renderer != null
-                  ? RTCVideoView(
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(22),
+      child: DecoratedBox(
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: <Color>[
+              Color(0xFF14102A),
+              Color(0xFF2A1B4A),
+              Color(0xFF1A1240),
+              Color(0xFF0E0A22),
+            ],
+          ),
+        ),
+        child: Column(
+          children: <Widget>[
+            // Upper stage: WebRTC only when LiveTalking backend; else avatar.
+            Expanded(
+              flex: 11,
+              child: Stack(
+                fit: StackFit.expand,
+                children: <Widget>[
+                  if (lipSync && _renderer != null)
+                    RTCVideoView(
                       _renderer!,
                       objectFit:
                           RTCVideoViewObjectFit.RTCVideoViewObjectFitCover,
                     )
-                  : Center(
-                      child: Padding(
-                        padding: const EdgeInsets.all(20),
-                        child: Text(
-                          _connecting
-                              ? '正在连接数字人…'
-                              : (_error != null && live)
-                              ? '数字人未就绪\n$_error'
-                              : pipeline
-                              ? '视频主题陪练管线\nASR→发音→LLM→TTS→数字人\n点「连接数字人」显示外教头像'
-                              : live
-                              ? '点「连接数字人」显示画面\n需 Tailscale · $defaultLiveTalkingUrl'
-                              : '当前为本地 TTS 陪练（无数字人画面）',
-                          textAlign: TextAlign.center,
-                          style: TextStyle(
-                            color: colors.textSecondary,
-                            height: 1.45,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
+                  else
+                    CoachAvatarStage(
+                      pulse: _orbPulse,
+                      speaking: _coachSpeaking,
+                      listening: _recordingActive,
+                      label: stageLabel,
+                    ),
+                  const DecoratedBox(
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                        colors: <Color>[
+                          Color(0x33000000),
+                          Color(0x00000000),
+                          Color(0xCC14102A),
+                        ],
+                        stops: <double>[0, 0.45, 1],
                       ),
                     ),
+                  ),
+                  Positioned(
+                    left: 12,
+                    right: 12,
+                    top: 10,
+                    child: Row(
+                      children: <Widget>[
+                        _GlassChip(
+                          onTap: _showSceneSheet,
+                          child: Text(
+                            _started ? _sessionClockLabel : '准备中',
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 12,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ),
+                        const Spacer(),
+                        if (lipSync &&
+                            (_connecting || !_liveClient.isConnected))
+                          Padding(
+                            padding: const EdgeInsets.only(right: 8),
+                            child: Text(
+                              _connecting ? '连线中' : '重连中',
+                              style: TextStyle(
+                                color: Colors.white.withValues(alpha: 0.7),
+                                fontSize: 11,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ),
+                        _RoundIconButton(
+                          icon: Icons.close_rounded,
+                          onTap: () => unawaited(_hangUp()),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Positioned(
+                    left: 0,
+                    right: 0,
+                    bottom: 8,
+                    child: Text(
+                      '内容由 AI 生成 · $_topicLabel',
+                      textAlign: TextAlign.center,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        color: Colors.white.withValues(alpha: 0.55),
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
             ),
+            if (_error != null)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 4, 16, 0),
+                child: Text(
+                  _error!,
+                  textAlign: TextAlign.center,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: Color(0xFFFFB4A8),
+                    fontSize: 11,
+                    height: 1.3,
+                  ),
+                ),
+              ),
+            // Hi Echo conversation + orb + dock.
+            Expanded(
+              flex: 10,
+              child: Column(
+                children: <Widget>[
+                  Expanded(
+                    child: _bubbles.isEmpty
+                        ? Center(
+                            child: Padding(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 28,
+                              ),
+                              child: Text(
+                                'Hi~ 我们聊聊「$_topicLabel」',
+                                textAlign: TextAlign.center,
+                                style: TextStyle(
+                                  color: Colors.white.withValues(alpha: 0.78),
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.w600,
+                                  height: 1.4,
+                                ),
+                              ),
+                            ),
+                          )
+                        : ListView.builder(
+                            controller: _chatScroll,
+                            padding: const EdgeInsets.fromLTRB(14, 8, 14, 4),
+                            itemCount: _bubbles.length,
+                            itemBuilder: (BuildContext context, int index) {
+                              final _ChatBubble bubble = _bubbles[index];
+                              return _ConversationBubble(
+                                bubble: bubble,
+                                showZh: _showZhIndexes.contains(index),
+                                onToggleZh: () =>
+                                    _toggleZh(index, bubble.zh),
+                                onCopy: () =>
+                                    unawaited(_copyBubble(bubble.text)),
+                                onSpeak: () =>
+                                    unawaited(_replayBubble(bubble.text)),
+                              );
+                            },
+                          ),
+                  ),
+                  GestureDetector(
+                    key: const ValueKey<String>('study-oral-coach-mic'),
+                    onLongPressStart: _busy
+                        ? null
+                        : (_) => unawaited(_onHoldStart()),
+                    onLongPressEnd: _busy
+                        ? null
+                        : (_) => unawaited(_onHoldEnd()),
+                    onLongPressCancel: _busy
+                        ? null
+                        : () => unawaited(_onHoldEnd()),
+                    onTap: _busy
+                        ? null
+                        : () => unawaited(
+                            _recordingActive
+                                ? _stopRecordingAndSend()
+                                : _onHoldStart(),
+                          ),
+                    child: AnimatedBuilder(
+                      animation: _orbPulse,
+                      builder: (BuildContext context, Widget? child) {
+                        final double t = _recordingActive
+                            ? 0.55 + _orbPulse.value * 0.45
+                            : 0.35 + _orbPulse.value * 0.25;
+                        return Container(
+                          width: 84,
+                          height: 84,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            gradient: RadialGradient(
+                              colors: <Color>[
+                                Color.lerp(
+                                      const Color(0xFF9B7CFF),
+                                      const Color(0xFFE8DEFF),
+                                      t,
+                                    ) ??
+                                    const Color(0xFFB9A6FF),
+                                const Color(0xFF5B3FD4),
+                                const Color(0xFF2A1B6A),
+                              ],
+                              stops: const <double>[0, 0.55, 1],
+                            ),
+                            boxShadow: <BoxShadow>[
+                              BoxShadow(
+                                color: const Color(
+                                  0xFF8B6CFF,
+                                ).withValues(alpha: 0.25 + t * 0.35),
+                                blurRadius: 28 + t * 18,
+                                spreadRadius: 2,
+                              ),
+                            ],
+                          ),
+                          child: Icon(
+                            _recordingActive
+                                ? Icons.graphic_eq_rounded
+                                : Icons.mic_none_rounded,
+                            color: Colors.white.withValues(alpha: 0.92),
+                            size: 32,
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    orbHint,
+                    style: TextStyle(
+                      color: Colors.white.withValues(alpha: 0.78),
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(28, 10, 28, 12),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: <Widget>[
+                        _DockRoundButton(
+                          icon: Icons.lightbulb_outline_rounded,
+                          onTap: () {
+                            final String hint =
+                                'You could say: "What I liked about $_topicLabel is..."';
+                            setState(() {
+                              _bubbles.add(
+                                _ChatBubble(
+                                  role: 'coach',
+                                  text: hint,
+                                  hint: true,
+                                ),
+                              );
+                              _status = '试试上面的提示';
+                            });
+                            _scrollChatToEnd();
+                          },
+                        ),
+                        _DockRoundButton(
+                          icon: Icons.grid_view_rounded,
+                          onTap: _showSceneSheet,
+                        ),
+                        _DockRoundButton(
+                          icon: _recordingActive
+                              ? Icons.stop_rounded
+                              : Icons.mic_rounded,
+                          active: _recordingActive,
+                          onTap: _busy
+                              ? null
+                              : () => unawaited(
+                                  _recordingActive
+                                      ? _stopRecordingAndSend()
+                                      : _onHoldStart(),
+                                ),
+                        ),
+                        _DockRoundButton(
+                          icon: Icons.call_end_rounded,
+                          danger: true,
+                          onTap: () => unawaited(_hangUp()),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _GlassChip extends StatelessWidget {
+  const _GlassChip({required this.child, this.onTap});
+
+  final Widget child;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.white.withValues(alpha: 0.12),
+      borderRadius: BorderRadius.circular(999),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(999),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          child: child,
+        ),
+      ),
+    );
+  }
+}
+
+class _RoundIconButton extends StatelessWidget {
+  const _RoundIconButton({required this.icon, this.onTap});
+
+  final IconData icon;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.white.withValues(alpha: 0.12),
+      shape: const CircleBorder(),
+      child: InkWell(
+        customBorder: const CircleBorder(),
+        onTap: onTap,
+        child: SizedBox(
+          width: 36,
+          height: 36,
+          child: Icon(icon, size: 18, color: Colors.white),
+        ),
+      ),
+    );
+  }
+}
+
+class _DockRoundButton extends StatelessWidget {
+  const _DockRoundButton({
+    required this.icon,
+    this.onTap,
+    this.active = false,
+    this.danger = false,
+  });
+
+  final IconData icon;
+  final VoidCallback? onTap;
+  final bool active;
+  final bool danger;
+
+  @override
+  Widget build(BuildContext context) {
+    final Color fill = danger
+        ? const Color(0x66B42318)
+        : active
+        ? const Color(0xFF7C5CFF)
+        : Colors.white.withValues(alpha: 0.12);
+    return Material(
+      color: fill,
+      shape: const CircleBorder(),
+      child: InkWell(
+        customBorder: const CircleBorder(),
+        onTap: onTap,
+        child: SizedBox(
+          width: 48,
+          height: 48,
+          child: Icon(
+            icon,
+            color: danger ? const Color(0xFFFF8A80) : Colors.white,
+            size: 22,
           ),
         ),
-        const SizedBox(height: 12),
-        if (widget.courseTitle.trim().isNotEmpty ||
-            widget.episodeTitle.trim().isNotEmpty)
-          Text(
-            [
-              if (widget.courseTitle.trim().isNotEmpty) widget.courseTitle.trim(),
-              if (widget.episodeTitle.trim().isNotEmpty)
-                widget.episodeTitle.trim(),
-            ].join(' · '),
-            style: TextStyle(
-              fontSize: 12,
-              fontWeight: FontWeight.w600,
-              color: colors.textMuted,
+      ),
+    );
+  }
+}
+
+class _ConversationBubble extends StatelessWidget {
+  const _ConversationBubble({
+    required this.bubble,
+    required this.showZh,
+    required this.onToggleZh,
+    required this.onCopy,
+    required this.onSpeak,
+  });
+
+  final _ChatBubble bubble;
+  final bool showZh;
+  final VoidCallback onToggleZh;
+  final VoidCallback onCopy;
+  final VoidCallback onSpeak;
+
+  @override
+  Widget build(BuildContext context) {
+    final bool mine = bubble.role == 'user';
+    final String body = showZh && bubble.zh.trim().isNotEmpty
+        ? bubble.zh
+        : bubble.text;
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisAlignment: mine
+            ? MainAxisAlignment.end
+            : MainAxisAlignment.start,
+        children: <Widget>[
+          if (!mine) ...<Widget>[
+            const CircleAvatar(
+              radius: 16,
+              backgroundColor: Color(0xFF5B3FD4),
+              child: Icon(
+                Icons.face_retouching_natural_rounded,
+                size: 18,
+                color: Colors.white,
+              ),
             ),
-          ),
-        const SizedBox(height: 6),
-        Text(
-          widget.hasLine ? widget.line.english : '暂无当前句',
-          style: TextStyle(
-            fontSize: 18,
-            fontWeight: FontWeight.w800,
-            height: 1.35,
-            color: colors.textPrimary,
-          ),
-        ),
-        if (widget.line.chinese.trim().isNotEmpty) ...<Widget>[
-          const SizedBox(height: 6),
-          Text(
-            widget.line.chinese,
-            style: TextStyle(
-              fontSize: 14,
-              height: 1.4,
-              color: colors.textSecondary,
-            ),
-          ),
-        ],
-        const SizedBox(height: 10),
-        Text(
-          _status,
-          style: TextStyle(
-            fontSize: 13,
-            fontWeight: FontWeight.w600,
-            color: colors.textSecondary,
-          ),
-        ),
-        if (_lastTurn != null) ...<Widget>[
-          const SizedBox(height: 10),
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: colors.cardActive,
-              borderRadius: BorderRadius.circular(14),
-              border: Border.all(color: colors.borderActive),
-            ),
+            const SizedBox(width: 8),
+          ],
+          Flexible(
             child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+              crossAxisAlignment: mine
+                  ? CrossAxisAlignment.end
+                  : CrossAxisAlignment.start,
               children: <Widget>[
-                Text(
-                  '你说：${_lastTurn!.transcript}',
-                  style: TextStyle(
-                    fontSize: 13,
-                    height: 1.4,
-                    color: colors.textSecondary,
-                  ),
-                ),
-                const SizedBox(height: 6),
-                Text(
-                  '外教：${_lastTurn!.coachText}',
-                  style: TextStyle(
-                    fontSize: 14,
-                    height: 1.4,
-                    fontWeight: FontWeight.w700,
-                    color: colors.textPrimary,
-                  ),
-                ),
-                if (_lastTurn!.pronunciationNotes.isNotEmpty) ...<Widget>[
-                  const SizedBox(height: 6),
-                  Text(
-                    _lastTurn!.pronunciationNotes,
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: colors.textMuted,
+                if (bubble.hint)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 4),
+                    child: Text(
+                      '对话提示',
+                      style: TextStyle(
+                        color: Colors.white.withValues(alpha: 0.45),
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                      ),
                     ),
                   ),
-                ],
-                if (_lastTurn!.corrections.isNotEmpty) ...<Widget>[
-                  const SizedBox(height: 6),
-                  Text(
-                    '纠正：${_lastTurn!.corrections.join('；')}',
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: colors.textSecondary,
+                Container(
+                  padding: const EdgeInsets.fromLTRB(14, 12, 14, 10),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: mine ? 0.14 : 0.10),
+                    borderRadius: BorderRadius.circular(18),
+                    border: Border.all(
+                      color: Colors.white.withValues(alpha: 0.10),
                     ),
                   ),
-                ],
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: <Widget>[
+                      Text(
+                        body,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 14,
+                          height: 1.4,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: <Widget>[
+                          _BubbleAction(
+                            icon: Icons.translate_rounded,
+                            onTap: onToggleZh,
+                          ),
+                          _BubbleAction(
+                            icon: Icons.star_border_rounded,
+                            onTap: () {},
+                          ),
+                          if (!mine)
+                            _BubbleAction(
+                              icon: Icons.copy_rounded,
+                              onTap: onCopy,
+                            ),
+                          _BubbleAction(
+                            icon: Icons.volume_up_rounded,
+                            onTap: onSpeak,
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
               ],
             ),
           ),
         ],
-        if (_feedbackItems.isNotEmpty) ...<Widget>[
-          const SizedBox(height: 10),
-          ..._feedbackItems.map((Map<String, dynamic> item) {
-            return Padding(
-              padding: const EdgeInsets.only(bottom: 8),
-              child: Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: colors.cardActive,
-                  borderRadius: BorderRadius.circular(14),
-                  border: Border.all(color: colors.borderActive),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: <Widget>[
-                    Text(
-                      '原话：${item['quote'] ?? ''}',
-                      style: TextStyle(
-                        fontSize: 13,
-                        color: colors.textSecondary,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      '建议：${item['suggestion'] ?? ''}',
-                      style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w700,
-                        color: colors.textPrimary,
-                      ),
-                    ),
-                    Align(
-                      alignment: Alignment.centerRight,
-                      child: TextButton(
-                        onPressed: () => unawaited(_saveFeedbackToReview(item)),
-                        child: const Text('存入复习'),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            );
-          }),
-        ],
-        if (_error != null) ...<Widget>[
-          const SizedBox(height: 6),
-          Text(
-            _error!,
-            style: const TextStyle(
-              fontSize: 13,
-              color: Color(0xFFB42318),
-              height: 1.35,
-            ),
-          ),
-        ],
-        if (widget.unavailableReason != null) ...<Widget>[
-          const SizedBox(height: 6),
-          Text(
-            widget.unavailableReason!,
-            style: TextStyle(fontSize: 13, color: colors.textSecondary),
-          ),
-        ],
-        const SizedBox(height: 16),
-        Wrap(
-          spacing: 10,
-          runSpacing: 10,
-          children: <Widget>[
-            if (pipeline)
-              FilledButton(
-                onPressed: _busy
-                    ? null
-                    : () => unawaited(_startPipelineConversation(settings)),
-                child: Text(_session == null ? '开始视频对话' : '同步当前句'),
-              ),
-            if (pipeline)
-              FilledButton.tonalIcon(
-                onPressed: _busy
-                    ? null
-                    : (_recordingActive
-                          ? () => unawaited(_stopRecordingAndSend())
-                          : () => unawaited(_startRecording())),
-                icon: Icon(
-                  _recordingActive ? Icons.stop_rounded : Icons.mic_rounded,
-                ),
-                label: Text(_recordingActive ? '停止并发送' : '说话回合'),
-              ),
-            if (live)
-              FilledButton.tonal(
-                onPressed: _connecting
-                    ? null
-                    : () => unawaited(
-                        _ensureDigitalHumanConnected(
-                          settings,
-                          speakGreeting: true,
-                          greetingText: widget.hasLine
-                              ? 'Hello! Ready to practice: ${widget.line.english}'
-                              : 'Hello! I am your oral coach.',
-                        ),
-                      ),
-                child: Text(
-                  _connecting
-                      ? '连接中…'
-                      : (_liveClient.isConnected ? '重连数字人' : '连接数字人'),
-                ),
-              ),
-            FilledButton(
-              onPressed: (!widget.hasLine || _busy)
-                  ? null
-                  : () => unawaited(_demoCurrentLine(settings)),
-              child: Text(_busy && !_recordingActive ? '处理中…' : '示范当前句'),
-            ),
-            OutlinedButton(
-              onPressed: (!widget.hasLine || _busy)
-                  ? null
-                  : () => unawaited(_coachFeedback(settings)),
-              child: const Text('陪练反馈'),
-            ),
-            if (widget.onReplaySentence != null)
-              OutlinedButton(
-                onPressed: widget.onReplaySentence,
-                child: const Text('重播视频句'),
-              ),
-            if (widget.onOpenAssessment != null)
-              OutlinedButton(
-                onPressed: widget.onOpenAssessment,
-                child: const Text('跟读评测'),
-              ),
-            if (widget.onNextSentence != null)
-              OutlinedButton(
-                onPressed: widget.onNextSentence,
-                child: const Text('下一句'),
-              ),
-          ],
+      ),
+    );
+  }
+}
+
+class _BubbleAction extends StatelessWidget {
+  const _BubbleAction({required this.icon, required this.onTap});
+
+  final IconData icon;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(999),
+      child: Padding(
+        padding: const EdgeInsets.all(4),
+        child: Icon(
+          icon,
+          size: 16,
+          color: Colors.white.withValues(alpha: 0.55),
         ),
-        const SizedBox(height: 16),
-        Text(
-          pipeline
-              ? '流程：开始视频对话（自动连数字人）→ 说话回合 → 外教口型播报。'
-                    '手机需 Tailscale；默认 $defaultLiveTalkingUrl'
-                    '（IP 备选 $defaultLiveTalkingUrlIp）。GPU 箱需已跑 LiveTalking :8010。'
-              : '流程：连接数字人 → 示范 → 跟读评测 → 陪练反馈 → 下一句。'
-                    '可切换「视频陪练管线」获得实时对话编排。',
-          style: TextStyle(
-            fontSize: 12,
-            height: 1.4,
-            color: colors.textSecondary,
-          ),
-        ),
-      ],
+      ),
     );
   }
 }

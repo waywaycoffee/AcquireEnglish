@@ -3,19 +3,22 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../router/app_router.dart';
+import '../../authentication/presentation/auth_session.dart';
 import '../../growth/presentation/growth_provider.dart';
 import '../../import_course/data/bilibili_cover_refresh.dart';
+import '../../import_course/presentation/bilibili_import_sheet.dart';
 import '../../library/presentation/library_catalog_provider.dart';
 import '../../library/presentation/library_mock_data.dart';
 import '../../library/presentation/widgets/library_course_poster.dart';
 import '../../navigation/presentation/navigation_destination.dart';
 import '../../phrases/presentation/phrase_book_provider.dart';
 import '../../player/presentation/learning_resume_provider.dart';
+import '../../settings/presentation/learning_preferences_screen.dart';
 import '../../shared/presentation/app_loading_overlay.dart';
 import '../../shared/presentation/pad/app_design_tokens.dart';
 import '../../shared/presentation/pad/pad_scaffold.dart';
 import '../../shared/presentation/pad/pad_top_bar.dart';
-import '../../authentication/presentation/auth_session.dart';
+import '../../sync/data/acquire_api_client.dart';
 import '../../sync/presentation/cloud_catalog_sync.dart';
 import '../../sync/presentation/daily_feed_provider.dart';
 import 'learning_dashboard_provider.dart';
@@ -118,9 +121,9 @@ class _PadHomeScreenState extends ConsumerState<PadHomeScreen> {
               episode: resumeTarget?.episode,
             ),
             SizedBox(height: compact ? 26 : 30),
-            _SectionTitle(title: '今日更新', compact: compact),
+            _SectionTitle(title: '每日推荐', compact: compact),
             SizedBox(height: compact ? 12 : 14),
-            const _TodayFeedSection(),
+            const _DailyRecommendSection(),
             SizedBox(height: compact ? 26 : 30),
             _SectionTitle(title: '今日挑战', compact: compact),
             SizedBox(height: compact ? 12 : 14),
@@ -162,12 +165,27 @@ class _PadHomeScreenState extends ConsumerState<PadHomeScreen> {
   }
 }
 
-class _TodayFeedSection extends ConsumerWidget {
-  const _TodayFeedSection();
+class _DailyRecommendSection extends ConsumerWidget {
+  const _DailyRecommendSection();
+
+  static String _formatDuration(double? sec) {
+    if (sec == null || sec <= 0) {
+      return '';
+    }
+    final int total = sec.round();
+    final int m = total ~/ 60;
+    final int s = total % 60;
+    if (m >= 60) {
+      final int h = m ~/ 60;
+      final int mm = m % 60;
+      return '$h:${mm.toString().padLeft(2, '0')}:${s.toString().padLeft(2, '0')}';
+    }
+    return '$m:${s.toString().padLeft(2, '0')}';
+  }
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final List<LibraryCourseData> feed = ref.watch(dailyFeedProvider);
+    final List<AcquireDailyFeedItemDto> feed = ref.watch(dailyFeedProvider);
     if (feed.isEmpty) {
       return Container(
         width: double.infinity,
@@ -177,45 +195,98 @@ class _TodayFeedSection extends ConsumerWidget {
           borderRadius: BorderRadius.circular(18),
           border: Border.all(color: AppDesignTokens.borderGray),
         ),
-        child: Text(
-          '登录后按学习偏好每日推送新课。可在设置中配置偏好。',
-          style: TextStyle(
-            color: AppDesignTokens.textSecondary,
-            fontWeight: FontWeight.w600,
-          ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: <Widget>[
+            Text(
+              '设置兴趣后，这里会自动推荐相关 B站英语视频。推荐不会进入你的学习课程。',
+              style: TextStyle(
+                color: AppDesignTokens.textSecondary,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            const SizedBox(height: 12),
+            TextButton(
+              onPressed: () {
+                Navigator.of(context).push(
+                  MaterialPageRoute<void>(
+                    builder: (_) => const LearningPreferencesScreen(),
+                  ),
+                );
+              },
+              child: const Text('去设置兴趣'),
+            ),
+          ],
         ),
       );
     }
     return Column(
       children: feed
           .map(
-            (LibraryCourseData course) => Padding(
-              padding: const EdgeInsets.only(bottom: 10),
-              child: ListTile(
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(16),
-                  side: BorderSide(color: AppDesignTokens.borderGray),
+            (AcquireDailyFeedItemDto item) {
+              final String duration = _formatDuration(item.durationSec);
+              final String tags = item.tags.isEmpty
+                  ? 'B站'
+                  : item.tags.join(' · ');
+              final String subtitle = <String>[
+                if (item.author.isNotEmpty) item.author,
+                if (duration.isNotEmpty) duration,
+                tags,
+              ].join(' · ');
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 10),
+                child: ListTile(
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16),
+                    side: BorderSide(color: AppDesignTokens.borderGray),
+                  ),
+                  tileColor: AppDesignTokens.appWhite,
+                  leading: item.coverUrl == null || item.coverUrl!.isEmpty
+                      ? const CircleAvatar(
+                          backgroundColor: Color(0xFFFB7299),
+                          child: Icon(
+                            Icons.play_arrow_rounded,
+                            color: Colors.white,
+                          ),
+                        )
+                      : ClipRRect(
+                          borderRadius: BorderRadius.circular(10),
+                          child: Image.network(
+                            item.coverUrl!,
+                            width: 56,
+                            height: 56,
+                            fit: BoxFit.cover,
+                            errorBuilder: (_, __, ___) => const SizedBox(
+                              width: 56,
+                              height: 56,
+                              child: ColoredBox(
+                                color: Color(0xFFFFE4EC),
+                                child: Icon(
+                                  Icons.play_arrow_rounded,
+                                  color: Color(0xFFFB7299),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                  title: Text(
+                    item.title,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(fontWeight: FontWeight.w800),
+                  ),
+                  subtitle: Text(subtitle),
+                  trailing: const Icon(Icons.download_rounded),
+                  onTap: () {
+                    showBilibiliImportSheet(
+                      context,
+                      ref,
+                      initialUrl: item.watchUrl,
+                    );
+                  },
                 ),
-                tileColor: AppDesignTokens.appWhite,
-                title: Text(
-                  course.title,
-                  style: const TextStyle(fontWeight: FontWeight.w800),
-                ),
-                subtitle: Text(
-                  '${course.level} · ${course.category} · ${course.totalEpisodes} 课段',
-                ),
-                trailing: const Icon(Icons.chevron_right_rounded),
-                onTap: () {
-                  context.goNamed(
-                    SGRoute.library.name,
-                    queryParameters: <String, String>{
-                      'view': 'detail',
-                      'courseId': course.id,
-                    },
-                  );
-                },
-              ),
-            ),
+              );
+            },
           )
           .toList(growable: false),
     );

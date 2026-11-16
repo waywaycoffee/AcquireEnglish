@@ -5,7 +5,18 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import settings
 from app.database import Base, engine
-from app.routers import auth, courses, feed, imports, learning, livekit, preferences, progress, vocab
+from app.routers import (
+    auth,
+    courses,
+    feed,
+    imports,
+    learning,
+    livekit,
+    preferences,
+    progress,
+    shared_subtitles,
+    vocab,
+)
 
 
 @asynccontextmanager
@@ -39,6 +50,7 @@ app.include_router(feed.router, prefix="/api")
 app.include_router(imports.router, prefix="/api")
 app.include_router(learning.router, prefix="/api")
 app.include_router(livekit.router, prefix="/api")
+app.include_router(shared_subtitles.router, prefix="/api")
 
 
 @app.get("/api/health")

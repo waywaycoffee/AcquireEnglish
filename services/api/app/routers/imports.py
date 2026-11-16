@@ -1,4 +1,4 @@
-"""Paste-link imports (YouTube / Bilibili)."""
+"""Paste-link imports (YouTube / Bilibili) — personal learning assets."""
 
 from __future__ import annotations
 
@@ -21,6 +21,34 @@ class LinkImportIn(BaseModel):
     url: str = Field(min_length=3, max_length=1024)
 
 
+class PersonalAssetIn(BaseModel):
+    """Upsert a personal import asset (subs stored in DB; video re-fetched by URL)."""
+
+    source: str = Field(pattern=r"^(bilibili|youtube)$")
+    external_id: str = Field(min_length=2, max_length=64)
+    title: str = Field(min_length=1, max_length=512)
+    watch_url: str = Field(min_length=8, max_length=1024)
+    author: str | None = Field(default=None, max_length=255)
+    duration_sec: int = Field(default=60, ge=1, le=86400)
+    subtitle_en_srt: str | None = Field(default=None, max_length=2_000_000)
+    subtitle_zh_srt: str | None = Field(default=None, max_length=2_000_000)
+
+
+class PersonalAssetOut(BaseModel):
+    id: int
+    source: str
+    external_id: str
+    title: str
+    author: str | None = None
+    watch_url: str
+    duration_sec: int
+    has_en: bool
+    has_zh: bool
+    course_id: str
+    subtitle_en_url: str | None = None
+    subtitle_zh_url: str | None = None
+
+
 async def _bilibili_cookie_for_user(user: User, db: AsyncSession) -> str | None:
     """Prefer the synced per-user cookie; fall back to server env BILIBILI_COOKIE."""
     result = await db.execute(
@@ -32,6 +60,88 @@ async def _bilibili_cookie_for_user(user: User, db: AsyncSession) -> str | None:
         return user_cookie
     env_cookie = (settings.bilibili_cookie or "").strip()
     return env_cookie or None
+
+
+def _asset_out(row: UserLinkCourse) -> PersonalAssetOut:
+    has_en = bool((row.subtitle_en_srt or "").strip())
+    has_zh = bool((row.subtitle_zh_srt or "").strip())
+    return PersonalAssetOut(
+        id=row.id,
+        source=row.source,
+        external_id=row.external_id,
+        title=row.title,
+        author=row.author,
+        watch_url=row.watch_url,
+        duration_sec=int(row.duration_sec or 60),
+        has_en=has_en,
+        has_zh=has_zh,
+        course_id=f"link-{row.id}",
+        subtitle_en_url=f"/api/imports/{row.id}/srt/en" if has_en else None,
+        subtitle_zh_url=f"/api/imports/{row.id}/srt/zh" if has_zh else None,
+    )
+
+
+@router.get("", response_model=list[PersonalAssetOut])
+async def list_personal_assets(
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> list[PersonalAssetOut]:
+    """List this user's personal import assets (for cross-device restore)."""
+    result = await db.execute(
+        select(UserLinkCourse)
+        .where(UserLinkCourse.user_id == user.id)
+        .order_by(UserLinkCourse.id.desc())
+    )
+    return [_asset_out(row) for row in result.scalars().all()]
+
+
+@router.put("/asset", response_model=PersonalAssetOut)
+async def upsert_personal_asset(
+    payload: PersonalAssetIn,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> PersonalAssetOut:
+    """Store / refresh personal EN·ZH softsubs keyed by source + external_id."""
+    source = payload.source.strip().lower()
+    external_id = payload.external_id.strip()
+    if source == "bilibili":
+        external_id = external_id.upper() if external_id.upper().startswith("BV") else external_id
+
+    result = await db.execute(
+        select(UserLinkCourse).where(
+            UserLinkCourse.user_id == user.id,
+            UserLinkCourse.source == source,
+            UserLinkCourse.external_id == external_id,
+        )
+    )
+    row = result.scalar_one_or_none()
+    en = (payload.subtitle_en_srt or "").strip() or None
+    zh = (payload.subtitle_zh_srt or "").strip() or None
+    if row is None:
+        row = UserLinkCourse(
+            user_id=user.id,
+            source=source,
+            external_id=external_id,
+            title=payload.title.strip(),
+            author=(payload.author or "").strip() or None,
+            watch_url=payload.watch_url.strip(),
+            duration_sec=payload.duration_sec,
+            subtitle_en_srt=en,
+            subtitle_zh_srt=zh,
+        )
+        db.add(row)
+    else:
+        row.title = payload.title.strip() or row.title
+        row.author = (payload.author or "").strip() or row.author
+        row.watch_url = payload.watch_url.strip() or row.watch_url
+        row.duration_sec = payload.duration_sec or row.duration_sec
+        if en:
+            row.subtitle_en_srt = en
+        if zh:
+            row.subtitle_zh_srt = zh
+    await db.commit()
+    await db.refresh(row)
+    return _asset_out(row)
 
 
 @router.post("/link", response_model=CourseOut)

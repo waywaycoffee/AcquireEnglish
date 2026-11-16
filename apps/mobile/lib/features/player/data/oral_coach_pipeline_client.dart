@@ -182,6 +182,8 @@ class OralCoachVideoContext {
     this.currentChinese = '',
     this.previousEnglish = '',
     this.nextEnglish = '',
+    this.topicSummary = '',
+    this.articleExcerpt = '',
     this.difficulty = 'B1',
   });
 
@@ -191,6 +193,12 @@ class OralCoachVideoContext {
   final String currentChinese;
   final String previousEnglish;
   final String nextEnglish;
+
+  /// Short theme label for the whole video / article.
+  final String topicSummary;
+
+  /// Condensed English excerpt from the full transcript (not one drill line).
+  final String articleExcerpt;
   final String difficulty;
 
   Map<String, Object?> toJson() => <String, Object?>{
@@ -200,6 +208,8 @@ class OralCoachVideoContext {
     'current_chinese': currentChinese,
     'previous_english': previousEnglish,
     'next_english': nextEnglish,
+    'topic_summary': topicSummary,
+    'article_excerpt': articleExcerpt,
     'difficulty': difficulty,
   };
 }

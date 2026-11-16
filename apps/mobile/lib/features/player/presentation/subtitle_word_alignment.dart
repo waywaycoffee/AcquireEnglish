@@ -113,6 +113,100 @@ List<_Token> _tokens(String text) =>
         .map((Match match) => _Token(match.group(0)!))
         .toList(growable: false);
 
+/// Display tokens for karaoke chips — must match [PlayerSubtitleList] split.
+List<String> karaokeDisplayTokens(String english) {
+  return english
+      .trim()
+      .split(RegExp(r'\s+'))
+      .where((String token) => token.isNotEmpty)
+      .toList(growable: false);
+}
+
+/// Evenly spaced word clocks for space-split [english] (UI karaoke tokens).
+List<PlayerSubtitleWord> synthesizeSubtitleWordTimings({
+  required String english,
+  required int startMs,
+  required int endMs,
+}) {
+  final List<String> display = karaokeDisplayTokens(english);
+  if (display.isEmpty) {
+    return const <PlayerSubtitleWord>[];
+  }
+  final int safeEnd = endMs <= startMs ? startMs + display.length : endMs;
+  return _interpolate(
+    display.map((String text) => _Token(text)).toList(growable: false),
+    startMs,
+    safeEnd,
+  );
+}
+
+/// Force [words] onto the same space-split tokens the UI highlights.
+///
+/// Sentence merge concatenates Whisper crumb words; their count often drifts
+/// from `english.split(' ')`, so [currentWordIndex] never paints green.
+List<PlayerSubtitleWord> fitWordTimingsToDisplayEnglish({
+  required String english,
+  required List<PlayerSubtitleWord> timedWords,
+  required int startMs,
+  required int endMs,
+}) {
+  final List<String> display = karaokeDisplayTokens(english);
+  if (display.isEmpty) {
+    return const <PlayerSubtitleWord>[];
+  }
+  final int safeEnd = endMs <= startMs ? startMs + display.length : endMs;
+  if (timedWords.isEmpty) {
+    return synthesizeSubtitleWordTimings(
+      english: english,
+      startMs: startMs,
+      endMs: safeEnd,
+    );
+  }
+  if (timedWords.length == display.length) {
+    return List<PlayerSubtitleWord>.generate(
+      display.length,
+      (int i) => PlayerSubtitleWord(
+        text: display[i],
+        startMs: timedWords[i].startMs.clamp(startMs, safeEnd - 1),
+        endMs: timedWords[i].endMs.clamp(startMs + 1, safeEnd),
+        confidence: timedWords[i].confidence,
+      ),
+      growable: false,
+    );
+  }
+
+  // Prefer LCS against punctuation-stripped ASR words, then fill holes.
+  final List<_Token> target =
+      display.map((String text) => _Token(text)).toList(growable: false);
+  final List<_Match> matches = _longestCommonSubsequence(target, timedWords);
+  final Map<int, PlayerSubtitleWord> direct = <int, PlayerSubtitleWord>{
+    for (final _Match match in matches)
+      match.targetIndex: PlayerSubtitleWord(
+        text: display[match.targetIndex],
+        startMs: match.word.startMs.clamp(startMs, safeEnd - 1),
+        endMs: match.word.endMs.clamp(startMs + 1, safeEnd),
+        confidence: match.word.confidence,
+      ),
+  };
+  return _fillMissingWords(
+    target: target,
+    direct: direct,
+    startMs: startMs,
+    endMs: safeEnd,
+  );
+}
+
+/// True when timed words cannot drive space-split karaoke chips 1:1.
+bool subtitleWordsMismatchDisplay(PlayerSubtitleLine line) {
+  final int displayCount = karaokeDisplayTokens(line.english).length;
+  if (displayCount == 0) {
+    return false;
+  }
+  if (line.words.isEmpty) {
+    return true;
+  }
+  return line.words.length != displayCount;
+}
 class _Match {
   const _Match(this.targetIndex, this.word);
 

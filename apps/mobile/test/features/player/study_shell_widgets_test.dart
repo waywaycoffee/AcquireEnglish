@@ -37,7 +37,7 @@ void main() {
 
     expect(find.text('字幕'), findsOneWidget);
     expect(find.text('跟读'), findsOneWidget);
-    expect(find.text('陪练'), findsOneWidget);
+    expect(find.text('数字人'), findsOneWidget);
     expect(find.text('听写'), findsOneWidget);
     expect(find.text('练习'), findsOneWidget);
     expect(find.text('词卡'), findsOneWidget);
@@ -65,6 +65,7 @@ void main() {
     final List<String> selectedModes = <String>[];
     int loopTaps = 0;
     int wordCardTaps = 0;
+    int shadowingTaps = 0;
     int playTaps = 0;
     int speedSelects = 0;
     int qualityTaps = 0;
@@ -85,6 +86,7 @@ void main() {
             onOpenQualitySheet: () => qualityTaps += 1,
             onTogglePlaying: () => playTaps += 1,
             onOpenLoopSheet: () => loopTaps += 1,
+            onOpenShadowing: () => shadowingTaps += 1,
             onOpenWordCards: () => wordCardTaps += 1,
           ),
         ),
@@ -93,11 +95,13 @@ void main() {
 
     expect(find.text('00:05 / 01:36'), findsOneWidget);
     expect(find.text('双语'), findsWidgets);
+    expect(find.text('跟读'), findsOneWidget);
 
     await tester.tap(
       find.byKey(const ValueKey<String>('study-chip-subtitle-label')),
     );
     await tester.tap(find.byKey(const ValueKey<String>('study-chip-loop')));
+    await tester.tap(find.byKey(const ValueKey<String>('study-chip-shadowing')));
     await tester.tap(find.byKey(const ValueKey<String>('study-chip-word-cards')));
     await tester.tap(find.byKey(const ValueKey<String>('study-chip-play')));
     await tester.tap(find.text('超清'));
@@ -105,6 +109,7 @@ void main() {
 
     expect(selectedModes, <String>['英文']);
     expect(loopTaps, 1);
+    expect(shadowingTaps, 1);
     expect(wordCardTaps, 1);
     expect(playTaps, 1);
     expect(qualityTaps, 1);
@@ -134,7 +139,7 @@ void main() {
     expect(backTaps, 1);
   });
 
-  testWidgets('StudyShadowingTab shows line and unavailable reason', (
+  testWidgets('StudyShadowingTab shows mic even without assessment target', (
     WidgetTester tester,
   ) async {
     const PlayerSubtitleLine line = PlayerSubtitleLine(
@@ -152,7 +157,7 @@ void main() {
             body: StudyShadowingTab(
               line: line,
               hasLine: true,
-              unavailableReason: '当前句暂不可录音跟读。',
+              unavailableReason: '视频时长暂不可用',
             ),
           ),
         ),
@@ -160,7 +165,15 @@ void main() {
     );
 
     expect(find.text('Hello world'), findsOneWidget);
-    expect(find.textContaining('当前句暂不可录音跟读'), findsOneWidget);
+    expect(find.textContaining('仍可录音评分'), findsOneWidget);
+    expect(find.text('点击麦克风开始跟读'), findsOneWidget);
+    expect(find.text('影子跟读'), findsOneWidget);
+    expect(find.text('看句读'), findsOneWidget);
+    expect(find.text('藏句读'), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey<String>('study-shadowing-assess')),
+      findsOneWidget,
+    );
   });
 
   testWidgets('StudyDictationTab can add to queue and mark difficult', (

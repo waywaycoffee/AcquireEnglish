@@ -34,10 +34,14 @@ class PlayerTranscriptPanel extends StatefulWidget {
     this.onAssessLine,
     this.pronunciationUnavailableReasonForLine,
     this.onRegenerateAiSubtitles,
+    this.onResetEpisodeSubtitles,
+    this.onRerecognizeEnglish,
+    this.onRerecognizeChinese,
     this.onDeleteAiSubtitles,
     this.onRegenerateAiLine,
     this.onEditEnglishLine,
     this.onEditSubtitleLine,
+    this.onOpenSubtitleEditor,
     this.onEditLineNote,
     this.lineNotesByStartMs = const <int, String>{},
     this.studyDarkStyle = false,
@@ -50,6 +54,7 @@ class PlayerTranscriptPanel extends StatefulWidget {
     this.aiSubtitleErrorText,
     this.onGenerateAiSubtitles,
     this.bilingualPipelineLabel,
+    this.bilingualPipelineProgressValue,
     this.showAiCompleteButton = false,
     this.onAiComplete,
     this.onCancelBilingualPipeline,
@@ -88,11 +93,15 @@ class PlayerTranscriptPanel extends StatefulWidget {
   final ValueChanged<int>? onAssessLine;
   final String? Function(int index)? pronunciationUnavailableReasonForLine;
   final VoidCallback? onRegenerateAiSubtitles;
+  final VoidCallback? onResetEpisodeSubtitles;
+  final VoidCallback? onRerecognizeEnglish;
+  final VoidCallback? onRerecognizeChinese;
   final VoidCallback? onDeleteAiSubtitles;
   final Future<void> Function(int index)? onRegenerateAiLine;
   final Future<void> Function(int index, String english)? onEditEnglishLine;
   final Future<void> Function(int index, String english, String chinese)?
   onEditSubtitleLine;
+  final VoidCallback? onOpenSubtitleEditor;
   final Future<void> Function(int index, String note)? onEditLineNote;
   final Map<int, String> lineNotesByStartMs;
   final bool studyDarkStyle;
@@ -105,6 +114,7 @@ class PlayerTranscriptPanel extends StatefulWidget {
   final String? aiSubtitleErrorText;
   final VoidCallback? onGenerateAiSubtitles;
   final String? bilingualPipelineLabel;
+  final double? bilingualPipelineProgressValue;
   final bool showAiCompleteButton;
   final VoidCallback? onAiComplete;
   final VoidCallback? onCancelBilingualPipeline;
@@ -151,10 +161,14 @@ class _PlayerTranscriptPanelState extends State<PlayerTranscriptPanel> {
       pronunciationUnavailableReasonForLine:
           widget.pronunciationUnavailableReasonForLine,
       onRegenerateAiSubtitles: widget.onRegenerateAiSubtitles,
+      onResetEpisodeSubtitles: widget.onResetEpisodeSubtitles,
+      onRerecognizeEnglish: widget.onRerecognizeEnglish,
+      onRerecognizeChinese: widget.onRerecognizeChinese,
       onDeleteAiSubtitles: widget.onDeleteAiSubtitles,
       onRegenerateAiLine: widget.onRegenerateAiLine,
       onEditEnglishLine: widget.onEditEnglishLine,
       onEditSubtitleLine: widget.onEditSubtitleLine,
+      onOpenSubtitleEditor: widget.onOpenSubtitleEditor,
       onEditLineNote: widget.onEditLineNote,
       lineNotesByStartMs: widget.lineNotesByStartMs,
       studyDarkStyle: widget.studyDarkStyle,
@@ -167,6 +181,7 @@ class _PlayerTranscriptPanelState extends State<PlayerTranscriptPanel> {
       aiSubtitleErrorText: widget.aiSubtitleErrorText,
       onGenerateAiSubtitles: widget.onGenerateAiSubtitles,
       bilingualPipelineLabel: widget.bilingualPipelineLabel,
+      bilingualPipelineProgressValue: widget.bilingualPipelineProgressValue,
       showAiCompleteButton: widget.showAiCompleteButton,
       onAiComplete: widget.onAiComplete,
       onCancelBilingualPipeline: widget.onCancelBilingualPipeline,

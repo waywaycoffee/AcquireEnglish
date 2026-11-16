@@ -3,6 +3,7 @@ import 'dart:io';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hive_ce/hive.dart';
+import 'package:path_provider/path_provider.dart';
 
 import '../../import_course/data/bilibili_episode_prepare.dart';
 import '../../import_course/data/bilibili_multipage.dart';
@@ -326,32 +327,63 @@ class LibraryCatalogNotifier extends Notifier<List<LibraryCourseData>> {
                 BilibiliImport.looksLikeBilibiliInput(previousAsset))) {
           nextSource = previousAsset;
         }
-        final String? nextEn = clearSubtitles
-            ? null
-            : (isUsableSubtitlePath(enSubtitlePath)
-                  ? enSubtitlePath!.trim()
-                  : episode.enSubtitleAsset);
-        final String? nextZh = clearSubtitles
-            ? null
-            : (isUsableSubtitlePath(zhSubtitlePath)
-                  ? zhSubtitlePath!.trim()
-                  : episode.cnSubtitleAsset);
-        final List<LibrarySubtitleTrackItem> tracks = clearSubtitles
-            ? const <LibrarySubtitleTrackItem>[]
-            : <LibrarySubtitleTrackItem>[
-                if (isUsableSubtitlePath(nextEn))
-                  LibrarySubtitleTrackItem(
-                    languageCode: 'en',
-                    languageLabel: 'English',
-                    path: nextEn!,
-                  ),
-                if (isUsableSubtitlePath(nextZh))
-                  LibrarySubtitleTrackItem(
-                    languageCode: 'zh',
-                    languageLabel: '中文',
-                    path: nextZh!,
-                  ),
-              ];
+        // clearSubtitles must not drop usable ASR or official softsubs.
+        bool isProtectedSubtitlePath(String? path) {
+          final String value = (path ?? '').trim();
+          if (value.isEmpty || !isUsableSubtitlePath(value)) {
+            return false;
+          }
+          final bool asr =
+              value.contains(
+                '${Platform.pathSeparator}episode_subtitles${Platform.pathSeparator}',
+              ) ||
+              value.contains('/episode_subtitles/') ||
+              value.contains(r'\episode_subtitles\');
+          final bool official =
+              value.contains('${Platform.pathSeparator}bilibili${Platform.pathSeparator}') ||
+              value.contains('/bilibili/') ||
+              value.contains(r'\bilibili\');
+          return asr || official;
+        }
+
+        final String? nextEn;
+        final String? nextZh;
+        if (clearSubtitles) {
+          final String? keptEn = isProtectedSubtitlePath(episode.enSubtitleAsset)
+              ? episode.enSubtitleAsset
+              : (isProtectedSubtitlePath(enSubtitlePath)
+                    ? enSubtitlePath!.trim()
+                    : null);
+          final String? keptZh = isProtectedSubtitlePath(episode.cnSubtitleAsset)
+              ? episode.cnSubtitleAsset
+              : (isProtectedSubtitlePath(zhSubtitlePath)
+                    ? zhSubtitlePath!.trim()
+                    : null);
+          nextEn = keptEn;
+          nextZh = keptZh;
+        } else {
+          nextEn = isUsableSubtitlePath(enSubtitlePath)
+              ? enSubtitlePath!.trim()
+              : episode.enSubtitleAsset;
+          nextZh = isUsableSubtitlePath(zhSubtitlePath)
+              ? zhSubtitlePath!.trim()
+              : episode.cnSubtitleAsset;
+        }
+        final List<LibrarySubtitleTrackItem> tracks =
+            <LibrarySubtitleTrackItem>[
+              if (isUsableSubtitlePath(nextEn))
+                LibrarySubtitleTrackItem(
+                  languageCode: 'en',
+                  languageLabel: 'English',
+                  path: nextEn!,
+                ),
+              if (isUsableSubtitlePath(nextZh))
+                LibrarySubtitleTrackItem(
+                  languageCode: 'zh',
+                  languageLabel: '中文',
+                  path: nextZh!,
+                ),
+            ];
         return episode.copyWith(
           videoAsset: (videoAsset ?? '').trim().isNotEmpty
               ? videoAsset!.trim()
@@ -365,9 +397,11 @@ class LibraryCatalogNotifier extends Notifier<List<LibraryCourseData>> {
           coverImage: (coverImage ?? '').trim().isNotEmpty
               ? coverImage!.trim()
               : episode.coverImage,
-          subtitleTracks: clearSubtitles
-              ? const <LibrarySubtitleTrackItem>[]
-              : (tracks.isNotEmpty ? tracks : episode.subtitleTracks),
+          subtitleTracks: tracks.isNotEmpty
+              ? tracks
+              : (clearSubtitles
+                    ? const <LibrarySubtitleTrackItem>[]
+                    : episode.subtitleTracks),
         );
       }).toList(growable: false);
       return course.copyWith(episodes: episodes);
@@ -375,6 +409,196 @@ class LibraryCatalogNotifier extends Notifier<List<LibraryCourseData>> {
     if (changed) {
       await _persistImportedCourses();
     }
+  }
+
+  /// Re-attach ASR `episode_subtitles/{id}/en.srt|zh.srt` onto the library row.
+  Future<void> relinkEpisodeSubtitleFiles({
+    required String episodeId,
+    bool clearChineseIfMissing = false,
+    bool clearEnglishIfMissing = false,
+  }) async {
+    final String id = episodeId.trim();
+    if (id.isEmpty) {
+      return;
+    }
+    LibraryCourseData? course;
+    for (final LibraryCourseData c in state) {
+      if (c.episodes.any((LibraryEpisodeItem e) => e.id == id)) {
+        course = c;
+        break;
+      }
+    }
+    if (course == null) {
+      return;
+    }
+    final Directory root = await getApplicationSupportDirectory();
+    final ({String? en, String? zh}) paths = _episodeSubtitleDiskPaths(
+      root: root,
+      episodeId: id,
+    );
+    final bool hasEn = isUsableSubtitlePath(paths.en);
+    final bool hasZh = isUsableSubtitlePath(paths.zh);
+    await updateEpisodeLocalMedia(
+      courseId: course.id,
+      episodeId: id,
+      enSubtitlePath: hasEn
+          ? paths.en
+          : (clearEnglishIfMissing ? '' : null),
+      zhSubtitlePath: hasZh
+          ? paths.zh
+          : (clearChineseIfMissing ? '' : null),
+      clearSubtitles: false,
+    );
+    // Empty-string paths above won't clear via isUsableSubtitlePath — force.
+    if ((clearChineseIfMissing && !hasZh) ||
+        (clearEnglishIfMissing && !hasEn)) {
+      state = state.map((LibraryCourseData c) {
+        if (c.id != course!.id) {
+          return c;
+        }
+        return c.copyWith(
+          episodes: c.episodes.map((LibraryEpisodeItem e) {
+            if (e.id != id) {
+              return e;
+            }
+            final String? nextEn = clearEnglishIfMissing && !hasEn
+                ? null
+                : (hasEn ? paths.en : e.enSubtitleAsset);
+            final String? nextZh = clearChineseIfMissing && !hasZh
+                ? null
+                : (hasZh ? paths.zh : e.cnSubtitleAsset);
+            return e.copyWith(
+              enSubtitleAsset: nextEn,
+              cnSubtitleAsset: nextZh,
+              hasEnglishSubtitles: isUsableSubtitlePath(nextEn),
+              hasChineseSubtitles: isUsableSubtitlePath(nextZh),
+            );
+          }).toList(growable: false),
+        );
+      }).toList(growable: false);
+      await _persistImportedCourses();
+    }
+  }
+
+  /// Scan every episode and re-attach on-disk ASR + official softsubs.
+  ///
+  /// Prefer `episode_subtitles/{id}/en.srt|zh.srt` when present; otherwise
+  /// rediscover B站 official files under `bilibili/<BV>/`. Call on bootstrap
+  /// so library chips stay linked even after a bad clear.
+  Future<int> relinkAllEpisodeSubtitleFiles() async {
+    final Directory root = await getApplicationSupportDirectory();
+    bool changed = false;
+    final List<LibraryCourseData> nextCourses = <LibraryCourseData>[];
+    for (final LibraryCourseData course in state) {
+      final List<LibraryEpisodeItem> episodes = <LibraryEpisodeItem>[];
+      for (final LibraryEpisodeItem episode in course.episodes) {
+        final ({String? en, String? zh}) disk = _episodeSubtitleDiskPaths(
+          root: root,
+          episodeId: episode.id,
+        );
+        final bool hasAsrEn = isUsableSubtitlePath(disk.en);
+        final bool hasAsrZh = isUsableSubtitlePath(disk.zh);
+        final String? sourceKey = bilibiliEpisodeCacheKey(
+          course: course,
+          episode: episode,
+          sourceUrl: episode.sourceUrl,
+          videoAsset: episode.videoAsset,
+        );
+        // Official B站 softsubs win over ASR episode_subtitles when both exist.
+        final String? officialEn = await existingOfficialBilibiliSubtitle(
+          idKey: sourceKey,
+          fileName: 'en.srt',
+        );
+        final String? officialZh = await existingOfficialBilibiliSubtitle(
+          idKey: sourceKey,
+          fileName: 'zh.srt',
+        );
+        String? nextEn = officialEn;
+        String? nextZh = officialZh;
+        if (nextEn == null && isUsableSubtitlePath(episode.enSubtitleAsset)) {
+          nextEn = episode.enSubtitleAsset;
+        }
+        if (nextZh == null && isUsableSubtitlePath(episode.cnSubtitleAsset)) {
+          nextZh = episode.cnSubtitleAsset;
+        }
+        nextEn ??= hasAsrEn ? disk.en : null;
+        nextZh ??= hasAsrZh ? disk.zh : null;
+        final bool enFlag = isUsableSubtitlePath(nextEn);
+        final bool zhFlag = isUsableSubtitlePath(nextZh);
+        final bool tracksStale = episode.subtitleTracks.any(
+          (LibrarySubtitleTrackItem t) => !isUsableSubtitlePath(t.path),
+        );
+        if (nextEn == episode.enSubtitleAsset &&
+            nextZh == episode.cnSubtitleAsset &&
+            enFlag == episode.hasEnglishSubtitles &&
+            zhFlag == episode.hasChineseSubtitles &&
+            !tracksStale) {
+          episodes.add(episode);
+          continue;
+        }
+        changed = true;
+        episodes.add(
+          episode.copyWith(
+            enSubtitleAsset: nextEn,
+            cnSubtitleAsset: nextZh,
+            hasEnglishSubtitles: enFlag,
+            hasChineseSubtitles: zhFlag,
+            subtitleTracks: <LibrarySubtitleTrackItem>[
+              if (enFlag)
+                LibrarySubtitleTrackItem(
+                  languageCode: 'en',
+                  languageLabel: 'English',
+                  path: nextEn!,
+                ),
+              if (zhFlag)
+                LibrarySubtitleTrackItem(
+                  languageCode: 'zh',
+                  languageLabel: '中文',
+                  path: nextZh!,
+                ),
+            ],
+          ),
+        );
+      }
+      nextCourses.add(course.copyWith(episodes: episodes));
+    }
+    if (!changed) {
+      return 0;
+    }
+    state = nextCourses;
+    await _persistImportedCourses();
+    return nextCourses.fold<int>(
+      0,
+      (int sum, LibraryCourseData c) =>
+          sum +
+          c.episodes
+              .where(
+                (LibraryEpisodeItem e) =>
+                    isUsableSubtitlePath(e.enSubtitleAsset) ||
+                    isUsableSubtitlePath(e.cnSubtitleAsset),
+              )
+              .length,
+    );
+  }
+
+  ({String? en, String? zh}) _episodeSubtitleDiskPaths({
+    required Directory root,
+    required String episodeId,
+  }) {
+    final String safeId = episodeId
+        .trim()
+        .replaceAll(RegExp(r'[\\/:*?"<>|]+'), '_');
+    if (safeId.isEmpty) {
+      return (en: null, zh: null);
+    }
+    final Directory dir = Directory(
+      '${root.path}${Platform.pathSeparator}episode_subtitles'
+      '${Platform.pathSeparator}$safeId',
+    );
+    return (
+      en: '${dir.path}${Platform.pathSeparator}en.srt',
+      zh: '${dir.path}${Platform.pathSeparator}zh.srt',
+    );
   }
 
   Future<void> updateEpisodeProgress({
@@ -908,16 +1132,30 @@ class LibraryCatalogNotifier extends Notifier<List<LibraryCourseData>> {
     final String? mergedVideo = nextHasVideo
         ? next.videoAsset
         : (prevHasVideo ? previous.videoAsset : next.videoAsset);
-    final String? mergedEn = nextHasEn
-        ? next.enSubtitleAsset
-        : (prevHasEn ? previous.enSubtitleAsset : next.enSubtitleAsset);
-    final String? mergedZh = nextHasZh
-        ? next.cnSubtitleAsset
-        : (prevHasZh ? previous.cnSubtitleAsset : next.cnSubtitleAsset);
     final String? mergedSource =
         (next.sourceUrl ?? '').trim().isNotEmpty
         ? next.sourceUrl
         : previous.sourceUrl;
+    // Never keep previous CC when the durable source BV/page changed — that
+    // reintroduced 合集/分P 串台 after re-import/expand.
+    final String? nextSourceKey = bilibiliEpisodeCacheKey(
+      sourceUrl: mergedSource,
+      episode: next,
+    );
+    final String? prevEnKey = bilibiliIdKeyFromPath(previous.enSubtitleAsset);
+    final String? prevZhKey = bilibiliIdKeyFromPath(previous.cnSubtitleAsset);
+    final bool prevEnAligned = bilibiliMediaKeysAligned(prevEnKey, nextSourceKey);
+    final bool prevZhAligned = bilibiliMediaKeysAligned(prevZhKey, nextSourceKey);
+    final String? mergedEn = nextHasEn
+        ? next.enSubtitleAsset
+        : (prevHasEn && prevEnAligned
+              ? previous.enSubtitleAsset
+              : next.enSubtitleAsset);
+    final String? mergedZh = nextHasZh
+        ? next.cnSubtitleAsset
+        : (prevHasZh && prevZhAligned
+              ? previous.cnSubtitleAsset
+              : next.cnSubtitleAsset);
     final bool hasLocalVideo = isUsableLocalVideoPath(mergedVideo);
     return next.copyWith(
       completed: previous.completed,

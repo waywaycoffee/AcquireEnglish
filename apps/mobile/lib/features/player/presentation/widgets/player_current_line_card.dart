@@ -53,6 +53,7 @@ class _PlayerCurrentLineCardState extends State<PlayerCurrentLineCard> {
     super.initState();
     _tokens = _buildTokens(
       formatSubtitleLetterCase(widget.line.english, widget.subtitleLetterCase),
+      words: widget.line.words,
     );
   }
 
@@ -60,22 +61,32 @@ class _PlayerCurrentLineCardState extends State<PlayerCurrentLineCard> {
   void didUpdateWidget(covariant PlayerCurrentLineCard oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.line.english != widget.line.english ||
-        oldWidget.subtitleLetterCase != widget.subtitleLetterCase) {
+        oldWidget.subtitleLetterCase != widget.subtitleLetterCase ||
+        oldWidget.line.words.length != widget.line.words.length) {
       selectedWord = null;
       _tokens = _buildTokens(
         formatSubtitleLetterCase(
           widget.line.english,
           widget.subtitleLetterCase,
         ),
+        words: widget.line.words,
       );
     }
   }
 
-  List<String> _buildTokens(String lineText) {
-    return lineText
-        .split(' ')
+  List<String> _buildTokens(String lineText, {List<PlayerSubtitleWord>? words}) {
+    final List<String> spaceTokens = lineText
+        .split(RegExp(r'\s+'))
         .where((String word) => word.isNotEmpty)
         .toList(growable: false);
+    if (words != null &&
+        words.isNotEmpty &&
+        words.length == spaceTokens.length) {
+      return words.map((PlayerSubtitleWord word) => word.text).toList(
+            growable: false,
+          );
+    }
+    return spaceTokens;
   }
 
   @override
@@ -181,7 +192,6 @@ class _PlayerCurrentLineCardState extends State<PlayerCurrentLineCard> {
                       final bool selectedToken = selectedWord == token;
                       final bool karaoke =
                           highlightEnabled &&
-                          widget.line.words.isNotEmpty &&
                           index == widget.currentWordIndex;
                       final SubtitleVocabMark vocabMark =
                           SubtitleVocabularyHighlight.resolve(

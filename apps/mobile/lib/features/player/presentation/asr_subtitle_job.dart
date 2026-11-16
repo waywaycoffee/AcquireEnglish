@@ -9,6 +9,7 @@ import '../../settings/presentation/settings_provider.dart';
 import '../../shared/data/word_lookup_service.dart';
 import 'asr_subtitle_cache.dart';
 import 'asr_subtitle_service.dart';
+import 'bilingual_subtitle_helpers.dart';
 import 'local_whisper_asr.dart';
 import 'player_mock_state.dart';
 import 'player_subtitle_loader.dart';
@@ -197,7 +198,7 @@ class _SubtitleQualityReport {
 }
 
 class AsrSubtitleJobRunner {
-  const AsrSubtitleJobRunner({
+  AsrSubtitleJobRunner({
     this.supportDirectory,
     this.cache = const AsrSubtitleCache(),
     this.service = const AsrSubtitleService(),
@@ -213,11 +214,19 @@ class AsrSubtitleJobRunner {
   final AsrSentenceTranslator? translateSentence;
   final AsrBatchTranslator? translateSentences;
 
+  /// Per-run Whisper language hint (`en` / `zh`) for local transcription.
+  String _activeAsrLanguage = 'en';
+
   static const int _translationBatchLines = 40;
   static const int _translationBatchCharacters = 6000;
 
-  static const int _repairableOverlapMs = 500;
+  /// Allow stronger cross-chunk overlap repair (SmartSub-style timeline tidy).
+  static const int _repairableOverlapMs = 800;
   static final Set<String> _activeJobs = <String>{};
+
+  /// Serialize all full-video ASR runs. Different [jobPipeline] keys used to
+  /// allow import-queue + player proofread to race the same Whisper engine.
+  static Future<void> _globalRunGate = Future<void>.value();
 
   Future<AsrRegeneratedLineResult> regenerateLine({
     required String episodeId,
@@ -375,7 +384,67 @@ class AsrSubtitleJobRunner {
     AsrProgressCallback? onProgress,
     AsrSubtitleCancellationToken? cancellationToken,
     String? jobPipeline,
+    /// Whisper language hint: `en` (default) or `zh`.
+    String language = 'en',
   }) async {
+    final String jobKey = _jobKey(
+      episodeId: episodeId,
+      videoPath: videoPath,
+      settings: settings,
+      pipeline: jobPipeline,
+    );
+    // Reject same-video duplicates before waiting on the global gate; otherwise
+    // a second caller blocks forever while the first job holds the gate.
+    if (_activeJobs.contains(jobKey)) {
+      throw const AsrSubtitleGenerationException(
+        '这个视频的 AI 字幕正在生成，请等待当前任务完成。',
+      );
+    }
+    final Completer<void> gateSlot = Completer<void>();
+    final Future<void> previousGate = _globalRunGate;
+    _globalRunGate = gateSlot.future;
+    await previousGate;
+    try {
+      if (_activeJobs.contains(jobKey)) {
+        throw const AsrSubtitleGenerationException(
+          '这个视频的 AI 字幕正在生成，请等待当前任务完成。',
+        );
+      }
+      return await _runSerialized(
+        episodeId: episodeId,
+        videoPath: videoPath,
+        settings: settings,
+        referenceSubtitleLines: referenceSubtitleLines,
+        referenceSignatureOverride: referenceSignatureOverride,
+        forceRegenerate: forceRegenerate,
+        onProgress: onProgress,
+        cancellationToken: cancellationToken,
+        jobPipeline: jobPipeline,
+        language: language,
+      );
+    } finally {
+      if (!gateSlot.isCompleted) {
+        gateSlot.complete();
+      }
+    }
+  }
+
+  Future<String> _runSerialized({
+    required String episodeId,
+    required String videoPath,
+    required LearningSettingsState settings,
+    List<PlayerSubtitleLine> referenceSubtitleLines =
+        const <PlayerSubtitleLine>[],
+    String? referenceSignatureOverride,
+    bool forceRegenerate = false,
+    AsrProgressCallback? onProgress,
+    AsrSubtitleCancellationToken? cancellationToken,
+    String? jobPipeline,
+    String language = 'en',
+  }) async {
+    _activeAsrLanguage = language.trim().toLowerCase().startsWith('zh')
+        ? 'zh'
+        : 'en';
     final List<PlayerSubtitleLine> usableReferenceLines =
         usableReferenceSubtitles(referenceSubtitleLines);
     // biliSub-style: official/imported English first; Whisper/cloud only if absent.
@@ -431,12 +500,30 @@ class AsrSubtitleJobRunner {
           cancellationToken: cancellationToken,
         );
       }
+      onProgress?.call(
+        const AsrSubtitleProgress(
+          completedChunks: 0,
+          totalChunks: 0,
+          phase: AsrSubtitlePhase.preparing,
+          previewText: '语音识别：正在切分音频…',
+        ),
+      );
       try {
         chunks = await service.prepareAudioChunks(video);
       } catch (_) {
         cancellationToken?.throwIfCancelled();
         rethrow;
       }
+      onProgress?.call(
+        AsrSubtitleProgress(
+          completedChunks: 0,
+          totalChunks: chunks.isEmpty ? 1 : chunks.length,
+          currentMs: 0,
+          totalMs: chunks.isEmpty ? null : _estimatedTotalMs(chunks),
+          phase: AsrSubtitlePhase.recognizing,
+          previewText: '语音识别：开始识别…',
+        ),
+      );
       cancellationToken?.throwIfCancelled();
       return await _runPrepared(
         episodeId: episodeId,
@@ -530,13 +617,21 @@ class AsrSubtitleJobRunner {
         const AsrSubtitleProgress(
           completedChunks: 1,
           totalChunks: 1,
-          phase: AsrSubtitlePhase.finalizing,
-          previewText: '正在整理官方字幕并保存。',
+          phase: AsrSubtitlePhase.repairing,
+          previewText: '正在修复官方字幕时间轴…',
         ),
       );
       final String completedRaw = _repairFinalWordTimelines(
         translatedRaw,
         report: report,
+      );
+      onProgress?.call(
+        const AsrSubtitleProgress(
+          completedChunks: 1,
+          totalChunks: 1,
+          phase: AsrSubtitlePhase.finalizing,
+          previewText: '正在校验并保存官方字幕…',
+        ),
       );
       _validateFinalResult(completedRaw, allowLineOverlap: true);
       await cache.write(
@@ -627,7 +722,11 @@ class AsrSubtitleJobRunner {
 
     if (LocalWhisperAsr.isLocalProvider(settings)) {
       await LocalWhisperAsr.instance.ensureModel(
-        settings.asrModel,
+        LocalWhisperAsr.modelForLanguage(
+          settings.asrModel,
+          _activeAsrLanguage,
+          enableChineseSpeechAsr: settings.enableChineseSpeechAsr,
+        ),
         onProgress: (double? _, String message) {
           onProgress?.call(
             AsrSubtitleProgress(
@@ -635,6 +734,7 @@ class AsrSubtitleJobRunner {
               totalChunks: chunks.length,
               currentMs: 0,
               totalMs: totalMs,
+              phase: AsrSubtitlePhase.downloadingModel,
               previewText: message,
             ),
           );
@@ -659,6 +759,8 @@ class AsrSubtitleJobRunner {
           report: report,
           allowReferenceFallback: referenceSubtitleLines.isNotEmpty,
           cancellationToken: cancellationToken,
+          onProgress: onProgress,
+          totalChunks: chunks.length,
         );
         final Object? decoded = jsonDecode(await chunkFile.readAsString());
         final List<Map<String, Object?>> chunkLines =
@@ -735,11 +837,19 @@ class AsrSubtitleJobRunner {
         AsrSubtitleProgress(
           completedChunks: chunks.length,
           totalChunks: chunks.length,
-          phase: AsrSubtitlePhase.finalizing,
-          previewText: '正在整理时间轴并保存结果。',
+          phase: AsrSubtitlePhase.repairing,
+          previewText: '正在修复分片边界与词级时间轴…',
         ),
       );
       completedRaw = _repairFinalWordTimelines(translatedRaw, report: report);
+      onProgress?.call(
+        AsrSubtitleProgress(
+          completedChunks: chunks.length,
+          totalChunks: chunks.length,
+          phase: AsrSubtitlePhase.finalizing,
+          previewText: '正在校验并保存结果…',
+        ),
+      );
     } catch (error) {
       await report.write(jobDir, 'FAILED');
       await _writeJob(
@@ -761,6 +871,10 @@ class AsrSubtitleJobRunner {
       _validateFinalResult(
         completedRaw,
         allowLineOverlap: referenceSubtitleLines.isNotEmpty,
+      );
+      _validateMediaCoverage(
+        completedRaw,
+        mediaDurationMs: _estimatedTotalMs(chunks),
       );
     } catch (error) {
       await report.write(jobDir, 'FAILED');
@@ -1075,7 +1189,11 @@ class AsrSubtitleJobRunner {
     if (cloudTranscribeChunk != null) {
       return cloudTranscribeChunk!(chunk: chunk, settings: settings);
     }
-    return service.generateCloudChunk(chunk: chunk, settings: settings);
+    return service.generateCloudChunk(
+      chunk: chunk,
+      settings: settings,
+      language: _activeAsrLanguage,
+    );
   }
 
   List<PlayerSubtitleWord> _wordsForCurrentLine(
@@ -1188,6 +1306,8 @@ class AsrSubtitleJobRunner {
     required _SubtitleQualityReport report,
     required bool allowReferenceFallback,
     AsrSubtitleCancellationToken? cancellationToken,
+    AsrProgressCallback? onProgress,
+    int totalChunks = 1,
   }) async {
     for (int attempt = 0; attempt < 2; attempt += 1) {
       try {
@@ -1226,6 +1346,24 @@ class AsrSubtitleJobRunner {
         if (chunkFile.existsSync()) {
           await chunkFile.delete();
         }
+        final bool busyEngine = _errorMessage(error).toLowerCase().contains(
+              'already has an active transcription',
+            ) ||
+            _errorMessage(error).toLowerCase().contains(
+              'reserved by an active transcription',
+            );
+        if (busyEngine && attempt < 1) {
+          onProgress?.call(
+            AsrSubtitleProgress(
+              completedChunks: sourceChunk,
+              totalChunks: totalChunks < 1 ? sourceChunk + 1 : totalChunks,
+              phase: AsrSubtitlePhase.recognizing,
+              previewText: '引擎占用，排队重试…',
+            ),
+          );
+          await Future<void>.delayed(const Duration(milliseconds: 120));
+          continue;
+        }
         if (attempt == 1) {
           if (allowReferenceFallback) {
             report
@@ -1251,6 +1389,34 @@ class AsrSubtitleJobRunner {
         }
       }
     }
+  }
+
+  /// Reject ASR that only covers a short head of a long video (串台/半截).
+  void _validateMediaCoverage(String raw, {required int mediaDurationMs}) {
+    if (mediaDurationMs < 120000) {
+      return;
+    }
+    final List<PlayerSubtitleLine> lines = parseSubtitleLines(raw);
+    if (lines.isEmpty) {
+      return;
+    }
+    final int subtitleEndMs = subtitleLinesEndMs(lines);
+    if (subtitleTimelineMismatchesMedia(
+      subtitleEndMs: subtitleEndMs,
+      mediaDurationMs: mediaDurationMs,
+    )) {
+      throw StateError(
+        '语音识别结果时长与视频不符（字幕至 ${_formatClock(subtitleEndMs)}，'
+        '视频约 ${_formatClock(mediaDurationMs)}），未保存脏字幕。',
+      );
+    }
+  }
+
+  String _formatClock(int ms) {
+    final int seconds = (ms / 1000).floor();
+    final int minutes = seconds ~/ 60;
+    final int rest = seconds % 60;
+    return '$minutes:${rest.toString().padLeft(2, '0')}';
   }
 
   void _validateFinalResult(String raw, {bool allowLineOverlap = false}) {

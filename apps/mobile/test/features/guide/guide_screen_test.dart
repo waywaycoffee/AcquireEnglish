@@ -18,6 +18,9 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('每天 20 分钟，用一部剧练会真实英语'), findsOneWidget);
+    expect(find.text('怎么导入视频开始学'), findsOneWidget);
+    expect(find.text('导入 B 站视频'), findsOneWidget);
+    expect(find.text('导入 YouTube 视频'), findsOneWidget);
     expect(find.text('一集视频，只练这三件事'), findsOneWidget);
     expect(find.text('第 2 遍：听清表达'), findsOneWidget);
     expect(find.text('一句台词，具体应该怎么学？'), findsOneWidget);
@@ -50,6 +53,9 @@ void main() {
       ),
     );
 
+    expect(find.text('怎么导入视频开始学'), findsOneWidget);
+    expect(find.text('导入 B 站视频'), findsOneWidget);
+    expect(find.text('导入 YouTube 视频'), findsOneWidget);
     expect(find.text('第 1 遍：看懂剧情'), findsOneWidget);
     expect(find.text('第 2 遍：听清表达'), findsOneWidget);
     expect(find.text('第 3 遍：开口模仿'), findsOneWidget);

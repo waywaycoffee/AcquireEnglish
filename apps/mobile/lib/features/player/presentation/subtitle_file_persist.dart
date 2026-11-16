@@ -3,6 +3,7 @@ import 'dart:io';
 
 import 'package:path_provider/path_provider.dart';
 
+import '../../import_course/data/bilibili_multipage.dart';
 import 'bilingual_subtitle_helpers.dart';
 import 'player_mock_state.dart';
 import 'subtitle_sentence_merge.dart';
@@ -22,9 +23,115 @@ class PersistedBilingualSubtitleFiles {
   final String chinesePath;
 }
 
+/// Bind persisted cues to a concrete local MP4 so a later correct download
+/// cannot keep ASR that was generated against the wrong page's file.
+///
+/// Use path + size only — never mtime. Android/media scanners touch mtime and
+/// used to invalidate fingerprints, deleting the whole episode_subtitles dir
+/// so completed EN/ZH looked "unrelated" to the video.
+String? videoFileFingerprint(String? videoPath) {
+  final String path = (videoPath ?? '').trim();
+  if (path.isEmpty) {
+    return null;
+  }
+  final File file = File(path);
+  if (!file.existsSync()) {
+    return null;
+  }
+  try {
+    final FileStat stat = file.statSync();
+    return '${file.absolute.path}|${stat.size}';
+  } catch (_) {
+    return null;
+  }
+}
+
+Future<bool> _fingerprintMatches({
+  required Directory dir,
+  String? sourceKey,
+  String? videoFingerprint,
+}) async {
+  final String expected = (sourceKey ?? '').trim();
+  if (expected.isNotEmpty) {
+    final File meta = File('${dir.path}${Platform.pathSeparator}source.key');
+    final String saved = meta.existsSync()
+        ? meta.readAsStringSync().trim()
+        : '';
+    // Missing fingerprint → contaminated. Bare BV vs BV-p01 must still align.
+    if (saved.isEmpty || !bilibiliMediaKeysAligned(saved, expected)) {
+      return false;
+    }
+    if (saved.toUpperCase() != expected.toUpperCase()) {
+      try {
+        await meta.writeAsString(expected, flush: true);
+      } catch (_) {}
+    }
+  }
+  final String expectedVideo = (videoFingerprint ?? '').trim();
+  if (expectedVideo.isNotEmpty) {
+    final File meta = File(
+      '${dir.path}${Platform.pathSeparator}video.fingerprint',
+    );
+    final String saved = meta.existsSync()
+        ? meta.readAsStringSync().trim()
+        : '';
+    if (saved.isEmpty) {
+      // Legacy cache: source.key already matched. Bind video now; do not wipe.
+      await meta.writeAsString(expectedVideo, flush: true);
+      return true;
+    }
+    if (saved == expectedVideo) {
+      return true;
+    }
+    // Same file size under a new path (re-download / move) — keep ASR, rebind.
+    final String savedSize = saved.contains('|')
+        ? saved.split('|').last
+        : '';
+    final String expectedSize = expectedVideo.contains('|')
+        ? expectedVideo.split('|').last
+        : '';
+    if (savedSize.isNotEmpty && savedSize == expectedSize) {
+      await meta.writeAsString(expectedVideo, flush: true);
+      return true;
+    }
+    // Also accept legacy fingerprints that appended mtime as a 3rd field.
+    final List<String> savedParts = saved.split('|');
+    final List<String> expectedParts = expectedVideo.split('|');
+    if (savedParts.length >= 2 &&
+        expectedParts.length >= 2 &&
+        savedParts[0] == expectedParts[0] &&
+        savedParts[1] == expectedParts[1]) {
+      await meta.writeAsString(expectedVideo, flush: true);
+      return true;
+    }
+    return false;
+  }
+  return true;
+}
+
+Future<void> _writeSourceAndVideoMeta({
+  required Directory dir,
+  String? sourceKey,
+  String? videoFingerprint,
+}) async {
+  final String key = (sourceKey ?? '').trim();
+  if (key.isNotEmpty) {
+    await File(
+      '${dir.path}${Platform.pathSeparator}source.key',
+    ).writeAsString(key, flush: true);
+  }
+  final String video = (videoFingerprint ?? '').trim();
+  if (video.isNotEmpty) {
+    await File(
+      '${dir.path}${Platform.pathSeparator}video.fingerprint',
+    ).writeAsString(video, flush: true);
+  }
+}
+
 Future<PersistedBilingualSubtitleFiles?> locatePersistedBilingualSubtitleFiles({
   required String episodeId,
   String? sourceKey,
+  String? videoFingerprint,
   Future<Directory> Function() appSupportDirectory =
       getApplicationSupportDirectory,
 }) async {
@@ -38,19 +145,14 @@ Future<PersistedBilingualSubtitleFiles?> locatePersistedBilingualSubtitleFiles({
   if (!enFile.existsSync() || !zhFile.existsSync()) {
     return null;
   }
-  final String expected = (sourceKey ?? '').trim();
-  if (expected.isNotEmpty) {
-    final File meta = File('${dir.path}${Platform.pathSeparator}source.key');
-    final String saved = meta.existsSync()
-        ? meta.readAsStringSync().trim()
-        : '';
-    // Missing or mismatched fingerprint → treat as contaminated (合集串台).
-    if (saved.isEmpty || saved.toUpperCase() != expected.toUpperCase()) {
-      try {
-        await dir.delete(recursive: true);
-      } catch (_) {}
-      return null;
-    }
+  if (!await _fingerprintMatches(
+    dir: dir,
+    sourceKey: sourceKey,
+    videoFingerprint: videoFingerprint,
+  )) {
+    // Do not delete — a transient path/fingerprint mismatch used to wipe
+    // completed ASR so library/player looked unlinked from the video.
+    return null;
   }
   return PersistedBilingualSubtitleFiles(
     englishPath: enFile.path,
@@ -84,6 +186,7 @@ Future<PersistedBilingualSubtitleFiles?> persistBilingualSubtitleFiles({
   required String episodeId,
   required List<PlayerSubtitleLine> lines,
   String? sourceKey,
+  String? videoFingerprint,
   Future<Directory> Function() appSupportDirectory =
       getApplicationSupportDirectory,
   bool requireComplete = false,
@@ -137,12 +240,11 @@ Future<PersistedBilingualSubtitleFiles?> persistBilingualSubtitleFiles({
     linesToSrt(lines: lines, english: false),
     flush: true,
   );
-  final String key = (sourceKey ?? '').trim();
-  if (key.isNotEmpty) {
-    await File(
-      '${dir.path}${Platform.pathSeparator}source.key',
-    ).writeAsString(key, flush: true);
-  }
+  await _writeSourceAndVideoMeta(
+    dir: dir,
+    sourceKey: sourceKey,
+    videoFingerprint: videoFingerprint,
+  );
   final File origin = File('${dir.path}${Platform.pathSeparator}en.origin');
   if (translatedFromChinese) {
     await origin.writeAsString(zhTranslationOrigin, flush: true);
@@ -263,6 +365,7 @@ Future<PersistedBilingualSubtitleFiles?> persistAsrSentenceSubtitles({
   required String episodeId,
   required MergedSubtitleBundle bundle,
   String? sourceKey,
+  String? videoFingerprint,
   String origin = asrSentencesOrigin,
   Future<Directory> Function() appSupportDirectory =
       getApplicationSupportDirectory,
@@ -307,12 +410,11 @@ Future<PersistedBilingualSubtitleFiles?> persistAsrSentenceSubtitles({
     flush: true,
   );
 
-  final String key = (sourceKey ?? '').trim();
-  if (key.isNotEmpty) {
-    await File(
-      '${dir.path}${Platform.pathSeparator}source.key',
-    ).writeAsString(key, flush: true);
-  }
+  await _writeSourceAndVideoMeta(
+    dir: dir,
+    sourceKey: sourceKey,
+    videoFingerprint: videoFingerprint,
+  );
   await File(
     '${dir.path}${Platform.pathSeparator}en.origin',
   ).writeAsString(origin, flush: true);
@@ -326,6 +428,7 @@ Future<PersistedBilingualSubtitleFiles?> persistAsrSentenceSubtitles({
 Future<MergedSubtitleBundle?> loadAsrSentenceSubtitles({
   required String episodeId,
   String? sourceKey,
+  String? videoFingerprint,
   Future<Directory> Function() appSupportDirectory =
       getApplicationSupportDirectory,
 }) async {
@@ -339,18 +442,13 @@ Future<MergedSubtitleBundle?> loadAsrSentenceSubtitles({
     episodeId,
     appSupportDirectory: appSupportDirectory,
   );
-  final String expected = (sourceKey ?? '').trim();
-  if (expected.isNotEmpty) {
-    final File meta = File('${dir.path}${Platform.pathSeparator}source.key');
-    final String saved = meta.existsSync()
-        ? meta.readAsStringSync().trim()
-        : '';
-    if (saved.isEmpty || saved.toUpperCase() != expected.toUpperCase()) {
-      try {
-        await dir.delete(recursive: true);
-      } catch (_) {}
-      return null;
-    }
+  if (!await _fingerprintMatches(
+    dir: dir,
+    sourceKey: sourceKey,
+    videoFingerprint: videoFingerprint,
+  )) {
+    // Keep files on disk; caller can still recover via episodeId + rebind.
+    return null;
   }
   final File sentencesFile = File(
     '${dir.path}${Platform.pathSeparator}sentences.json',

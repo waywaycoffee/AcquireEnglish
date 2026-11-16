@@ -9,9 +9,11 @@ from .base import LlmReply, PronunciationResult, VideoContext
 
 
 SYSTEM = (
-    'You are a warm virtual English tutor with a visible avatar. '
-    'Keep replies under 3 short sentences. Correct gently. '
-    'Adapt difficulty to the learner. Always stay on the video topic.'
+    'You are a warm virtual English tutor with a visible avatar (Midoo-style). '
+    'Have a free spoken conversation about the WHOLE video or article theme — '
+    'not sentence-by-sentence shadowing or "repeat after me". '
+    'Ask follow-up questions, react to the learner\'s ideas, and gently correct. '
+    'Keep each reply under 3 short sentences. Adapt difficulty. Stay on topic.'
 )
 
 
@@ -35,21 +37,27 @@ class MockLlm:
         pronunciation: PronunciationResult,
         history: list[dict[str, str]],
     ) -> LlmReply:
-        score_pct = int(round(pronunciation.overall * 100))
-        target = context.current_english.strip() or 'the line from the video'
-        tip = pronunciation.notes or 'Focus on clear word endings.'
-        text = (
-            f'Nice try — about {score_pct}% word match on “{target}”. '
-            f'{tip} '
-            f'Can you say it once more, a little slower?'
+        topic = (
+            context.topic_summary.strip()
+            or context.episode_title.strip()
+            or context.course_title.strip()
+            or 'this video'
         )
+        learner = (learner_text or '').strip() or '(silence)'
+        tip = pronunciation.notes or ''
+        text = (
+            f'Interesting point about {topic}. '
+            f'You said: “{learner[:120]}”. '
+        )
+        if tip and 'Missing:' in tip:
+            text += f'{tip} '
+        text += 'What part of the video stood out to you most, and why?'
         corrections = []
-        if 'Missing:' in (pronunciation.notes or ''):
-            corrections.append(pronunciation.notes)
+        if tip and 'Missing:' in tip:
+            corrections.append(tip)
         difficulty = context.difficulty
         if pronunciation.overall >= 0.85 and difficulty in {'A2', 'B1'}:
             difficulty = 'B2' if difficulty == 'B1' else 'B1'
-            text += ' Great — next time we can try a tougher follow-up question.'
         elif pronunciation.overall < 0.45:
             difficulty = 'A2'
         return LlmReply(
@@ -87,10 +95,10 @@ class OpenAiLlm:
                 else 'OPENAI_API_KEY is empty.'
             )
         user = {
+            'mode': 'free_topic_conversation',
             'video': context.topic_blurb(),
-            'current_zh': context.current_chinese,
-            'prev': context.previous_english,
-            'next': context.next_english,
+            'topic_summary': context.topic_summary,
+            'article_excerpt': context.article_excerpt[:1200],
             'learner': learner_text,
             'pronunciation': {
                 'overall': pronunciation.overall,
@@ -99,6 +107,10 @@ class OpenAiLlm:
             },
             'difficulty': context.difficulty,
             'history': history[-6:],
+            'instructions': (
+                'Discuss the video/article theme freely. '
+                'Do not ask the learner to repeat a single subtitle line.'
+            ),
             'format': {
                 'text': 'spoken tutor reply',
                 'difficulty': 'A2|B1|B2|C1',
@@ -125,7 +137,8 @@ class OpenAiLlm:
             content = response.json()['choices'][0]['message']['content']
         data = json.loads(content)
         return LlmReply(
-            text=str(data.get('text') or '').strip() or 'Let’s try that line again.',
+            text=str(data.get('text') or '').strip()
+            or 'What did you find most interesting in this video?',
             provider=self.name,
             difficulty=str(data.get('difficulty') or context.difficulty),
             corrections=[str(x) for x in (data.get('corrections') or [])][:4],
@@ -149,10 +162,12 @@ class OllamaLlm:
         prompt = (
             f'{SYSTEM}\n\n'
             f'Context: {context.topic_blurb()}\n'
-            f'Chinese gloss: {context.current_chinese}\n'
+            f'Topic summary: {context.topic_summary}\n'
             f'Learner said: {learner_text}\n'
             f'Pronunciation notes: {pronunciation.notes} (score={pronunciation.overall:.2f})\n'
             f'Recent history:\n{_history_block(history)}\n\n'
+            'Free conversation about the video theme. '
+            'Do not ask them to repeat a subtitle line. '
             'Reply in plain English only, max 3 sentences.'
         )
         async with httpx.AsyncClient(timeout=90) as client:

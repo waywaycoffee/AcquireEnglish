@@ -4,14 +4,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hive_ce/hive.dart';
 
-import '../../library/presentation/library_mock_data.dart';
 import '../data/acquire_api_client.dart';
 import '../data/vocab_sync_service.dart';
 import 'cloud_catalog_sync.dart';
 import 'daily_feed_provider.dart';
 
-/// Cold-start + resume refresh for daily course feed ( >20h / force ).
-/// Mobile background WorkManager can be layered later; lifecycle covers plan验收.
+/// Cold-start + resume refresh for daily Bilibili recommendations (>20h / force).
 class DailyFeedLifecycleHost extends ConsumerStatefulWidget {
   const DailyFeedLifecycleHost({required this.child, super.key});
 
@@ -50,7 +48,7 @@ class _DailyFeedLifecycleHostState extends ConsumerState<DailyFeedLifecycleHost>
     final int before = ref.read(dailyFeedProvider).length;
     final Set<String> beforeIds = ref
         .read(dailyFeedProvider)
-        .map((LibraryCourseData c) => c.id)
+        .map((AcquireDailyFeedItemDto item) => item.id)
         .toSet();
     ref.invalidate(cloudCatalogSyncProvider);
     await ref.read(cloudCatalogSyncProvider.future);
@@ -62,9 +60,9 @@ class _DailyFeedLifecycleHostState extends ConsumerState<DailyFeedLifecycleHost>
     if (!prefs.notifyDailyFeed) {
       return;
     }
-    final List<LibraryCourseData> feed = ref.read(dailyFeedProvider);
+    final List<AcquireDailyFeedItemDto> feed = ref.read(dailyFeedProvider);
     final int newCount = feed
-        .where((LibraryCourseData c) => !beforeIds.contains(c.id))
+        .where((AcquireDailyFeedItemDto item) => !beforeIds.contains(item.id))
         .length;
     if (newCount <= 0 && feed.length <= before) {
       return;
@@ -83,7 +81,7 @@ class _DailyFeedLifecycleHostState extends ConsumerState<DailyFeedLifecycleHost>
       return;
     }
     ScaffoldMessenger.maybeOf(context)?.showSnackBar(
-      SnackBar(content: Text('今日有 $n 门新课推荐')),
+      SnackBar(content: Text('每日推荐更新了 $n 条 B站视频')),
     );
   }
 

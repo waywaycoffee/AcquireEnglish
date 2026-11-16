@@ -29,8 +29,18 @@ class EpisodeListItem extends StatelessWidget {
     required this.selected,
     required this.onTap,
     this.onViewTranscript,
+    this.onRerecognizeEnglish,
+    this.onRerecognizeChinese,
+    this.onMissingEnglishTap,
+    this.onMissingChineseTap,
     this.trailing,
     this.fallbackCoverImage,
+    this.englishFillLabel,
+    this.chineseFillLabel,
+    this.englishFillFailed = false,
+    this.chineseFillFailed = false,
+    this.subtitleFillProgress,
+    this.subtitleFillActive = false,
     super.key,
   });
 
@@ -38,10 +48,24 @@ class EpisodeListItem extends StatelessWidget {
   final bool selected;
   final VoidCallback onTap;
   final VoidCallback? onViewTranscript;
+  final VoidCallback? onRerecognizeEnglish;
+  final VoidCallback? onRerecognizeChinese;
+  final VoidCallback? onMissingEnglishTap;
+  final VoidCallback? onMissingChineseTap;
   final Widget? trailing;
 
   /// Course-level cover used when the episode has no poster of its own.
   final String? fallbackCoverImage;
+
+  /// Live fill progress shown on the English / Chinese subtitle chips.
+  final String? englishFillLabel;
+  final String? chineseFillLabel;
+  final bool englishFillFailed;
+  final bool chineseFillFailed;
+
+  /// 0–1 fill progress drawn under the chips while补字幕 is running.
+  final double? subtitleFillProgress;
+  final bool subtitleFillActive;
 
   @override
   Widget build(BuildContext context) {
@@ -101,34 +125,80 @@ class EpisodeListItem extends StatelessWidget {
                         : const Color(0xFFBA1A1A),
                   ),
                 _InfoChip(
-                  icon: Icons.closed_caption_rounded,
+                  icon: englishFillFailed
+                      ? Icons.error_outline_rounded
+                      : ((englishFillLabel ?? '').trim().isNotEmpty
+                            ? Icons.record_voice_over_rounded
+                            : Icons.closed_caption_rounded),
                   label: item.hasEnglishSubtitles
                       ? '英文字幕'
                       : (_isPendingBilibiliDownload(item)
                             ? '英文字幕待获取'
-                            : '无外部英文字幕'),
+                            : ((englishFillLabel ?? '').trim().isNotEmpty
+                                  ? englishFillLabel!.trim()
+                                  : (onMissingEnglishTap != null
+                                        ? '补英文字幕'
+                                        : '无英文字幕'))),
+                  backgroundColor: englishFillFailed
+                      ? const Color(0xFFFFE1E1)
+                      : (!item.hasEnglishSubtitles &&
+                                ((englishFillLabel ?? '').trim().isNotEmpty ||
+                                    onMissingEnglishTap != null)
+                            ? const Color(0xFFE8F1FF)
+                            : null),
+                  textColor: englishFillFailed
+                      ? const Color(0xFFBA1A1A)
+                      : (!item.hasEnglishSubtitles &&
+                                ((englishFillLabel ?? '').trim().isNotEmpty ||
+                                    onMissingEnglishTap != null)
+                            ? AppDesignTokens.primaryBlueDark
+                            : null),
+                  onTap: item.hasEnglishSubtitles ||
+                          _isPendingBilibiliDownload(item)
+                      ? null
+                      : onMissingEnglishTap,
                 ),
                 _InfoChip(
-                  icon: item.hasChineseSubtitles
-                      ? Icons.translate_rounded
-                      : (_isPendingBilibiliDownload(item)
-                            ? Icons.cloud_download_rounded
-                            : Icons.warning_rounded),
+                  icon: chineseFillFailed
+                      ? Icons.error_outline_rounded
+                      : (item.hasChineseSubtitles
+                            ? Icons.translate_rounded
+                            : ((chineseFillLabel ?? '').trim().isNotEmpty
+                                  ? Icons.translate_rounded
+                                  : (_isPendingBilibiliDownload(item)
+                                        ? Icons.cloud_download_rounded
+                                        : Icons.warning_rounded))),
                   label: item.hasChineseSubtitles
                       ? '中文字幕'
                       : (_isPendingBilibiliDownload(item)
                             ? '中文字幕待获取'
-                            : '无中文字幕'),
+                            : ((chineseFillLabel ?? '').trim().isNotEmpty
+                                  ? chineseFillLabel!.trim()
+                                  : (onMissingChineseTap != null
+                                        ? '补中文字幕'
+                                        : '无中文字幕'))),
                   backgroundColor: item.hasChineseSubtitles
                       ? AppDesignTokens.pinkLight
-                      : (_isPendingBilibiliDownload(item)
-                            ? const Color(0xFFE8F1FF)
-                            : const Color(0xFFFFE1E1)),
+                      : (chineseFillFailed
+                            ? const Color(0xFFFFE1E1)
+                            : (_isPendingBilibiliDownload(item)
+                                  ? const Color(0xFFE8F1FF)
+                                  : ((chineseFillLabel ?? '').trim().isNotEmpty
+                                        ? const Color(0xFFE8F1FF)
+                                        : const Color(0xFFFFE1E1)))),
                   textColor: item.hasChineseSubtitles
                       ? AppDesignTokens.textPrimary
-                      : (_isPendingBilibiliDownload(item)
-                            ? AppDesignTokens.primaryBlueDark
-                            : const Color(0xFFBA1A1A)),
+                      : (chineseFillFailed
+                            ? const Color(0xFFBA1A1A)
+                            : (_isPendingBilibiliDownload(item)
+                                  ? AppDesignTokens.primaryBlueDark
+                                  : ((chineseFillLabel ?? '').trim().isNotEmpty
+                                        ? AppDesignTokens.primaryBlueDark
+                                        : const Color(0xFFBA1A1A)))),
+                  onTap: item.hasChineseSubtitles ||
+                          _isPendingBilibiliDownload(item)
+                      ? null
+                      : onMissingChineseTap,
                 ),
                 _InfoChip(
                   icon: Icons.schedule_rounded,
@@ -143,6 +213,20 @@ class EpisodeListItem extends StatelessWidget {
                   ),
               ],
             ),
+            if (subtitleFillActive) ...<Widget>[
+              const SizedBox(height: 10),
+              ClipRRect(
+                borderRadius: BorderRadius.circular(999),
+                child: LinearProgressIndicator(
+                  value: (subtitleFillProgress ?? 0.08).clamp(0.05, 1.0),
+                  minHeight: 8,
+                  backgroundColor: const Color(0xFFDCE8FF),
+                  valueColor: const AlwaysStoppedAnimation<Color>(
+                    AppDesignTokens.primaryBlue,
+                  ),
+                ),
+              ),
+            ],
             const SizedBox(height: 12),
             ClipRRect(
               borderRadius: BorderRadius.circular(999),
@@ -185,6 +269,44 @@ class EpisodeListItem extends StatelessWidget {
                 icon: const Icon(Icons.menu_book_rounded, size: 18),
                 label: const Text('查看全文'),
               );
+        final Widget? rerecognizeEnglishButton = onRerecognizeEnglish == null
+            ? null
+            : OutlinedButton.icon(
+                key: ValueKey<String>(
+                  'episode-rerecognize-english-${item.id}',
+                ),
+                onPressed: onRerecognizeEnglish,
+                style: OutlinedButton.styleFrom(minimumSize: const Size(0, 48)),
+                icon: const Icon(Icons.mic_none_rounded, size: 18),
+                label: const Text('重新识别英文'),
+              );
+        final Widget? rerecognizeChineseButton = onRerecognizeChinese == null
+            ? null
+            : OutlinedButton.icon(
+                key: ValueKey<String>(
+                  'episode-rerecognize-chinese-${item.id}',
+                ),
+                onPressed: onRerecognizeChinese,
+                style: OutlinedButton.styleFrom(minimumSize: const Size(0, 48)),
+                icon: const Icon(Icons.translate_rounded, size: 18),
+                label: const Text('重新识别中文'),
+              );
+        final Widget? actionRow =
+            transcriptButton == null &&
+                rerecognizeEnglishButton == null &&
+                rerecognizeChineseButton == null
+            ? null
+            : Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: <Widget>[
+                  if (transcriptButton != null) transcriptButton,
+                  if (rerecognizeEnglishButton != null)
+                    rerecognizeEnglishButton,
+                  if (rerecognizeChineseButton != null)
+                    rerecognizeChineseButton,
+                ],
+              );
         return InkWell(
           onTap: onTap,
           borderRadius: BorderRadius.circular(26),
@@ -219,9 +341,9 @@ class EpisodeListItem extends StatelessWidget {
                       ),
                       const SizedBox(height: 12),
                       meta,
-                      if (transcriptButton != null) ...<Widget>[
+                      if (actionRow != null) ...<Widget>[
                         const SizedBox(height: 12),
-                        transcriptButton,
+                        actionRow,
                       ],
                     ],
                   )
@@ -236,13 +358,13 @@ class EpisodeListItem extends StatelessWidget {
                             title,
                             const SizedBox(height: 10),
                             meta,
+                            if (actionRow != null) ...<Widget>[
+                              const SizedBox(height: 10),
+                              actionRow,
+                            ],
                           ],
                         ),
                       ),
-                      if (transcriptButton != null) ...<Widget>[
-                        const SizedBox(width: 12),
-                        transcriptButton,
-                      ],
                       const SizedBox(width: 16),
                       trailing ?? playIndicator,
                     ],
@@ -374,18 +496,20 @@ class _InfoChip extends StatelessWidget {
     required this.label,
     this.backgroundColor,
     this.textColor,
+    this.onTap,
   });
 
   final IconData icon;
   final String label;
   final Color? backgroundColor;
   final Color? textColor;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
     final Color bg = backgroundColor ?? AppDesignTokens.softWhite;
     final Color fg = textColor ?? AppDesignTokens.textPrimary;
-    return Container(
+    final Widget child = Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
       decoration: BoxDecoration(
         color: bg,
@@ -408,6 +532,16 @@ class _InfoChip extends StatelessWidget {
           ),
         ],
       ),
+    );
+    if (onTap == null) {
+      return child;
+    }
+    // GestureDetector (not nested InkWell) so the parent episode InkWell
+    // does not also open the player when tapping a fill chip.
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: onTap,
+      child: child,
     );
   }
 }

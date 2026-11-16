@@ -2,6 +2,7 @@ import 'dart:math';
 
 import 'subtitle_display_mode.dart';
 import 'subtitle_language_sanitize.dart';
+import 'subtitle_word_alignment.dart';
 
 class PlayerSubtitleWord {
   const PlayerSubtitleWord({
@@ -137,7 +138,9 @@ class PlayerMockState {
     final PlayerSubtitleLine line = activeLine;
     final int displayEndMs = _displayEndMsFor(activeLineIndex);
     final int subtitleMs = _subtitlePositionMs;
-    return subtitleMs >= line.startMs && subtitleMs < displayEndMs
+    // Inclusive end so 句末暂停 (seeked to endMs) still shows the cue —
+    // otherwise 跟读 sees an empty line and blocks the mic.
+    return subtitleMs >= line.startMs && subtitleMs <= displayEndMs
         ? line
         : null;
   }
@@ -534,31 +537,37 @@ class PlayerMockState {
     final PlayerSubtitleLine line = lines[activeLineIndex];
     final int subtitleMs = _subtitlePositionMs;
     if (line.words.isNotEmpty) {
+      final int displayCount = karaokeDisplayTokens(line.english).length;
+      final int wordCount = line.words.length;
+      // Before the first timed word: still highlight word 0 so paused/start
+      // of a cue is never "no green". (-1 hid karaoke entirely.)
       if (subtitleMs < line.words.first.startMs) {
-        currentWordIndex = -1;
+        currentWordIndex = 0;
         return;
       }
-      for (int index = 0; index < line.words.length; index++) {
+      for (int index = 0; index < wordCount; index++) {
         final PlayerSubtitleWord word = line.words[index];
         if (subtitleMs >= word.startMs && subtitleMs < word.endMs) {
-          currentWordIndex = index;
+          // Clamp into display token range when crumb words drifted after merge.
+          currentWordIndex = displayCount > 0
+              ? min(index, displayCount - 1)
+              : index;
           return;
         }
       }
-      for (int index = line.words.length - 1; index >= 0; index--) {
+      for (int index = wordCount - 1; index >= 0; index--) {
         if (subtitleMs >= line.words[index].endMs) {
-          currentWordIndex = index;
+          currentWordIndex = displayCount > 0
+              ? min(index, displayCount - 1)
+              : index;
           return;
         }
       }
+      currentWordIndex = 0;
       return;
     }
 
-    final List<String> words = line.english
-        .trim()
-        .split(' ')
-        .where((String word) => word.isNotEmpty)
-        .toList(growable: false);
+    final List<String> words = karaokeDisplayTokens(line.english);
     if (words.isEmpty) {
       currentWordIndex = 0;
       return;

@@ -11,6 +11,7 @@ import 'package:path_provider/path_provider.dart';
 import '../../../constants/env_config.dart';
 import '../domain/bilibili_import.dart';
 import 'bilibili_media_proxy.dart';
+import 'subtitle_source_policy.dart';
 
 class BilibiliPageMeta {
   const BilibiliPageMeta({
@@ -221,19 +222,19 @@ class BilibiliImportService {
 
   static Dio _createDio() {
     return Dio(
-      BaseOptions(
-        connectTimeout: const Duration(seconds: 20),
+            BaseOptions(
+              connectTimeout: const Duration(seconds: 20),
         receiveTimeout: const Duration(seconds: 45),
-        headers: <String, dynamic>{
+              headers: <String, dynamic>{
           'User-Agent': playHttpHeaders['User-Agent'],
           'Referer': playHttpHeaders['Referer'],
           'Origin': 'https://www.bilibili.com',
           // Keep */* so the same client can hit JSON APIs and MP4 CDNs.
           // Accept: application/json alone makes some bilivideo nodes return 400.
           'Accept': '*/*',
-        },
-      ),
-    );
+              },
+            ),
+          );
   }
 
   void _installDnsBypassAdapter() {
@@ -673,16 +674,21 @@ class BilibiliImportService {
           aid: aid?.toString(),
           cid: cid,
           idKey: idKey,
+          mediaDurationSec: durationSec,
+          pagePart: selected.part,
         );
         enPath = tracks['en'];
         cnPath = tracks['zh'];
+        final String? trackNote = tracks['note'];
         if (enPath == null && cnPath == null) {
           final bool multi = pageMetas.length > 1;
-          subtitleNote = multi
-              ? 'P$page 暂无中/英官方字幕（合集共 ${pageMetas.length} P，部分分 P 才有英文字幕）'
-              : (hasLoginCookie
-                    ? '该视频暂无可用中/英官方字幕'
-                    : '官方字幕需要登录 Cookie：在设置里登录 B 站或粘贴 SESSDATA');
+          subtitleNote = (trackNote != null && trackNote.isNotEmpty)
+              ? trackNote
+              : (multi
+                    ? 'P$page 暂无中/英官方字幕（合集共 ${pageMetas.length} P，部分分 P 才有英文字幕）'
+                    : (hasLoginCookie
+                          ? '该视频暂无可用中/英官方字幕'
+                          : '官方字幕需要登录 Cookie：在设置里登录 B 站或粘贴 SESSDATA'));
         } else if (enPath == null && cnPath != null && pageMetas.length > 1) {
           subtitleNote =
               'P$page 已保存中文字幕；该分 P 无英文字幕（可切换到带 English(US) 的分 P）';
@@ -1108,27 +1114,52 @@ class BilibiliImportService {
   /// Prefers a cheap BV/av filename probe so open-after-import stays offline
   /// when the file is already in `bilibili_media/`.
   Future<String?> findExistingLocalCache(String rawInput) async {
-    final String? cheapKey = _cheapMediaIdKey(rawInput);
-    if (cheapKey != null && cheapKey.isNotEmpty) {
-      final int? page = BilibiliImport.extractPage(rawInput);
-      final List<String> probes = <String>[
-        if (page != null && page > 1)
-          BilibiliImport.mediaIdKey(
-            bvidOrAv: cheapKey,
-            page: page,
-            pageCount: 2,
-          ),
-        cheapKey,
-      ];
-      for (final String key in probes) {
-        final File? cached = await _existingCacheFile(key);
-        if (cached != null) {
-          return cached.path;
+    final String? pathKey = BilibiliImport.idKeyFromPath(rawInput);
+    final String? cheapRoot = _cheapMediaIdKey(rawInput);
+    final int? page = BilibiliImport.extractPage(rawInput) ??
+        () {
+          final RegExpMatch? m = RegExp(
+            r'-p(\d{2,})$',
+            caseSensitive: false,
+          ).firstMatch(pathKey ?? '');
+          return m == null ? null : int.tryParse(m.group(1) ?? '');
+        }();
+    final bool secondaryPage = (page ?? 1) > 1 ||
+        BilibiliImport.idKeyIsSecondaryPage(pathKey);
+    final List<String> probes = <String>[];
+    if (pathKey != null && pathKey.isNotEmpty) {
+      probes.add(pathKey);
+    }
+    if (secondaryPage) {
+      final String root = (cheapRoot ?? pathKey?.split('-p').first ?? '').trim();
+      if (root.isNotEmpty && page != null && page > 1) {
+        final String scoped = BilibiliImport.mediaIdKey(
+          bvidOrAv: root,
+          page: page,
+          pageCount: 2,
+        );
+        if (!probes.contains(scoped)) {
+          probes.add(scoped);
         }
+      }
+      // Never fall back to bare BV for P2+ — that returns page-1's MP4.
+    } else if (cheapRoot != null && cheapRoot.isNotEmpty) {
+      if (!probes.contains(cheapRoot)) {
+        probes.add(cheapRoot);
+      }
+    }
+    for (final String key in probes) {
+      final File? cached = await _existingCacheFile(key);
+      if (cached != null) {
+        return cached.path;
       }
     }
     try {
       final _BilibiliVideoRef ref = await _resolveVideoRef(rawInput);
+      // Page 2+ must not accept a bare-BV alias of page 1.
+      if (secondaryPage && !BilibiliImport.idKeyIsSecondaryPage(ref.idKey)) {
+        return null;
+      }
       final File? cached = await _existingCacheFile(ref.idKey);
       return cached?.path;
     } catch (_) {
@@ -1137,6 +1168,18 @@ class BilibiliImportService {
   }
 
   String? _cheapMediaIdKey(String rawInput) {
+    final String? fromPath = BilibiliImport.idKeyFromPath(rawInput);
+    if (fromPath != null && fromPath.isNotEmpty) {
+      // Strip page suffix for root probes; callers add -pXX themselves.
+      final int dash = fromPath.toLowerCase().lastIndexOf('-p');
+      if (dash > 0 && BilibiliImport.idKeyIsSecondaryPage(fromPath)) {
+        return fromPath.substring(0, dash);
+      }
+      if (fromPath.toLowerCase().endsWith('-p01') && fromPath.length > 4) {
+        return fromPath.substring(0, fromPath.length - 4);
+      }
+      return fromPath;
+    }
     final Map<String, String>? ids = BilibiliImport.extractIds(rawInput);
     if (ids != null) {
       final String? bvid = ids['bvid']?.trim();
@@ -1148,18 +1191,7 @@ class BilibiliImportService {
         return 'av$aid';
       }
     }
-    final RegExpMatch? bv = RegExp(
-      r'(BV[0-9A-Za-z]+)',
-      caseSensitive: false,
-    ).firstMatch(rawInput);
-    if (bv != null) {
-      return bv.group(1);
-    }
-    final RegExpMatch? av = RegExp(
-      r'(?:^|[/\\_-])(av\d+)(?:[/\\_.-]|$)',
-      caseSensitive: false,
-    ).firstMatch(rawInput);
-    return av?.group(1);
+    return null;
   }
 
   Future<void> _assertRemoteIsPlayable(String mediaUrl) async {
@@ -1531,24 +1563,58 @@ class BilibiliImportService {
     if (temp.existsSync()) {
       await temp.delete();
     }
+    final CancelToken cancelToken = CancelToken();
+    // CDN often returns Content-Length then stalls at 0B; abort and try next URL.
+    const Duration stallLimit = Duration(seconds: 35);
+    Timer? stallTimer;
+    int lastReceived = -1;
+    int lastReportedPercent = -1;
+    void armStallWatchdog() {
+      stallTimer?.cancel();
+      stallTimer = Timer(stallLimit, () {
+        if (!cancelToken.isCancelled) {
+          cancelToken.cancel('下载停滞超时（超过 ${stallLimit.inSeconds}s 无数据）');
+        }
+      });
+    }
+
     try {
+      armStallWatchdog();
       await _dio.download(
         mediaUrl,
         temp.path,
+        cancelToken: cancelToken,
         options: Options(
           headers: _playHeadersWithAuth,
           // Anthology P1 alone can be 100MB+; keep the socket alive on slow nets.
+          // Stall watchdog above still cuts hung 0% transfers quickly.
           receiveTimeout: const Duration(minutes: 45),
           sendTimeout: const Duration(minutes: 2),
+          connectTimeout: const Duration(seconds: 20),
         ),
         onReceiveProgress: (int received, int total) {
+          if (received > lastReceived) {
+            lastReceived = received;
+            armStallWatchdog();
+          }
           if (total <= 0) {
-            onProgress?.call(null);
+            // Avoid spamming identical "下载中" when size unknown.
+            if (received == 0 || received % (256 * 1024) < 16 * 1024) {
+              onProgress?.call(null);
+            }
             return;
           }
-          onProgress?.call((received / total).clamp(0.0, 1.0));
+          final double fraction = (received / total).clamp(0.0, 1.0);
+          final int percent = (fraction * 100).floor();
+          // Only emit when the integer percent changes — stops "0%" UI thrash.
+          if (percent == lastReportedPercent && percent < 100) {
+            return;
+          }
+          lastReportedPercent = percent;
+          onProgress?.call(fraction);
         },
       );
+      stallTimer?.cancel();
       if (!temp.existsSync() || temp.lengthSync() < 64 * 1024) {
         throw StateError('缓存文件过小或不存在');
       }
@@ -1571,10 +1637,20 @@ class BilibiliImportService {
       onProgress?.call(1);
       return out;
     } catch (e) {
+      stallTimer?.cancel();
       if (temp.existsSync()) {
-        await temp.delete();
+        try {
+          await temp.delete();
+        } catch (_) {}
+      }
+      final String text = '$e';
+      final bool cancelled = e is DioException && CancelToken.isCancel(e);
+      if (cancelled || text.contains('停滞超时')) {
+        throw StateError('B 站视频下载停滞超时，将尝试其他线路');
       }
       throw StateError('B 站视频缓存失败：$e');
+    } finally {
+      stallTimer?.cancel();
     }
   }
 
@@ -1661,6 +1737,8 @@ class BilibiliImportService {
     String? aid,
     required int cid,
     required String idKey,
+    int mediaDurationSec = 0,
+    String pagePart = '',
   }) async {
     final List<Map<String, dynamic>> list = await _listSubtitleTracks(
       bvid: bvid,
@@ -1672,6 +1750,11 @@ class BilibiliImportService {
       await clearOfficialSubtitleFiles(idKey);
       return const <String, String?>{};
     }
+
+    final bool hardsubPage = SubtitleSourcePolicy.isHardsubHint(
+      pagePart: pagePart,
+      sourceUrl: pagePart,
+    );
 
     final Directory docs = await getApplicationDocumentsDirectory();
     final Directory dir = Directory('${docs.path}/bilibili/$idKey');
@@ -1708,6 +1791,21 @@ class BilibiliImportService {
       }
       // Prefer explicit English tags over ambiguous zh/en collisions.
       final bool treatAsEn = isEn && !isZh;
+      // Never persist AI Chinese / hardsub JSON ZH — Softsubs are the 串台 vector.
+      if (!treatAsEn &&
+          SubtitleSourcePolicy.shouldSkipOfficialChineseTrack(
+            lan: lan,
+            lanDoc: lanDoc,
+            isAiTrack: _isAiSubtitleTrack(raw),
+            hardsubPage: hardsubPage,
+          )) {
+        // ignore: avoid_print
+        print(
+          'bilibili.subs skip zh lan=$lan hardsub=$hardsubPage '
+          'ai=${_isAiSubtitleTrack(raw)} idKey=$idKey',
+        );
+        continue;
+      }
       final String? path = await _downloadJsonSubtitleToSrt(
         url,
         File('${dir.path}/${treatAsEn ? 'en' : 'zh'}.srt'),
@@ -1718,40 +1816,38 @@ class BilibiliImportService {
       if (treatAsEn) {
         // Some B站 tracks are labeled en/ai-en but body is Chinese.
         if (_srtLooksChineseOnly(path)) {
-          zhPath ??= path;
-        } else {
-          enPath ??= path;
+          // Labeled EN but Chinese body — still unusable as EN; skip.
+          continue;
         }
+        enPath ??= path;
       } else {
         zhPath ??= path;
       }
     }
-    // If language tags are unusual, still keep the first downloadable track.
     if (enPath == null && zhPath == null) {
-      for (final Map<String, dynamic> raw in list) {
-        final String? url = _subtitleTrackUrl(raw);
-        if (url == null) {
+      return const <String, String?>{
+        'note': '该视频暂无中/英官方软字幕，将按语音识别补全',
+      };
+    }
+    // Duration mismatch: keep softsubs. User regenerates manually if wrong.
+    if (mediaDurationSec >= 120) {
+      for (final String? path in <String?>[enPath, zhPath]) {
+        if (path == null || path.isEmpty) {
           continue;
         }
-        final String lan = (raw['lan'] as String? ?? 'und').toLowerCase();
-        final bool treatAsEn = lan.contains('en');
-        final String? path = await _downloadJsonSubtitleToSrt(
-          url,
-          File('${dir.path}/${treatAsEn ? 'en' : 'zh'}.srt'),
-        );
-        if (path == null) {
-          continue;
+        final int endMs = _srtEndMs(path);
+        final int mediaMs = mediaDurationSec * 1000;
+        final bool tooShort =
+            endMs > 0 &&
+            endMs < mediaMs * 0.45 &&
+            endMs + 60000 < mediaMs;
+        if (tooShort) {
+          // ignore: avoid_print
+          print(
+            'bilibili.subs keep short CC idKey=$idKey endMs=$endMs '
+            'mediaSec=$mediaDurationSec (no auto-drop)',
+          );
         }
-        if (treatAsEn) {
-          if (_srtLooksChineseOnly(path)) {
-            zhPath = path;
-          } else {
-            enPath = path;
-          }
-        } else {
-          zhPath = path;
-        }
-        break;
       }
     }
     return <String, String?>{'en': enPath, 'zh': zhPath};
@@ -1899,6 +1995,28 @@ class BilibiliImportService {
     final String blob = '$normalizedLan $lanDoc';
     return blob.contains('英') ||
         RegExp(r'(^|[^a-z])en([^a-z]|$)').hasMatch(blob);
+  }
+
+  int _srtEndMs(String path) {
+    try {
+      final String raw = File(path).readAsStringSync();
+      int endMs = 0;
+      for (final RegExpMatch match in RegExp(
+        r'(\d+):(\d+):(\d+)[.,](\d+)\s*-->\s*(\d+):(\d+):(\d+)[.,](\d+)',
+      ).allMatches(raw)) {
+        final int to =
+            (int.tryParse(match.group(5) ?? '') ?? 0) * 3600000 +
+            (int.tryParse(match.group(6) ?? '') ?? 0) * 60000 +
+            (int.tryParse(match.group(7) ?? '') ?? 0) * 1000 +
+            (int.tryParse(match.group(8) ?? '') ?? 0);
+        if (to > endMs) {
+          endMs = to;
+        }
+      }
+      return endMs;
+    } catch (_) {
+      return 0;
+    }
   }
 
   bool _srtLooksChineseOnly(String path) {

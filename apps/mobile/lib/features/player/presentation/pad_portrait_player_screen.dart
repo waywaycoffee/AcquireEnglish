@@ -32,7 +32,9 @@ import '../../subtitle_completion/subtitle_completion_status_provider.dart';
 import '../../shared/data/word_lookup_service.dart';
 import '../../shared/data/word_pronunciation_service.dart';
 import '../../shared/presentation/app_loading_overlay.dart';
+import '../../authentication/presentation/auth_session.dart';
 import '../../sync/data/acquire_api_client.dart';
+import '../../sync/data/personal_import_sync.dart';
 import '../../sync/data/progress_sync_service.dart';
 import '../../words/data/offline_word_dictionary.dart';
 import '../../words/data/vocab_card_enrichment_service.dart';
@@ -1709,6 +1711,9 @@ Future<void> _settleChineseFillIfAlreadyPresent() async {
       sourceUrl: resource.episode?.sourceUrl,
       course: resource.course,
       episode: resource.episode,
+      bilibiliCookieHeader: ref
+          .read(learningSettingsProvider)
+          .resolvedBilibiliCookieHeader,
     );
     SubtitleCompletionScheduler.instance.kick(delay: Duration.zero);
   }
@@ -2207,6 +2212,27 @@ Future<void> _settleChineseFillIfAlreadyPresent() async {
     bool lineChanged = false;
     bool loopRestarted = false;
 
+    // 句末暂停 / 跟读：先卡在当前句，禁止 sync 跳到下一句（可能无英文）。
+    if (wasPlaying &&
+        state.pauseAtSentenceEnd &&
+        state.hasLines &&
+        !state.isLooping &&
+        position.inMilliseconds >=
+            state.videoEndMsForLine(state.activeLineIndex)) {
+      final Duration end = Duration(
+        milliseconds: state.videoEndMsForLine(state.activeLineIndex),
+      );
+      setState(() {
+        _videoPosition = end;
+        state.positionMs = end.inMilliseconds;
+        state.isPlaying = false;
+      });
+      PlayerSystemMediaControls.updatePlaybackState(isPlaying: false);
+      unawaited(_videoPlayer?.pause());
+      unawaited(_videoPlayer?.seek(end));
+      return;
+    }
+
     setState(() {
       _videoPosition = position;
       loopRestarted = state.restartLoopAtTimestamp(position.inMilliseconds);
@@ -2239,20 +2265,6 @@ Future<void> _settleChineseFillIfAlreadyPresent() async {
         return;
       }
       unawaited(_videoPlayer?.seek(_videoPosition));
-      return;
-    }
-
-    if (wasPlaying && state.shouldPauseAtSentenceEnd(position.inMilliseconds)) {
-      final Duration end = Duration(
-        milliseconds: state.videoEndMsForLine(state.activeLineIndex),
-      );
-      setState(() {
-        _videoPosition = end;
-        state.positionMs = end.inMilliseconds;
-        state.isPlaying = false;
-      });
-      unawaited(_videoPlayer?.pause());
-      unawaited(_videoPlayer?.seek(end));
       return;
     }
 
@@ -2332,9 +2344,35 @@ Future<void> _settleChineseFillIfAlreadyPresent() async {
       sourceKey: _episodeSourceKey(),
       videoPath: _videoAsset,
     );
+    unawaited(_syncManualSubtitlesToCloud(next));
     if (mounted) {
-      _showMessage('已保存手工字幕，自动校对不会再改它');
+      _showMessage('已保存手工字幕，并同步云端字幕库');
     }
+  }
+
+  Future<void> _syncManualSubtitlesToCloud(List<PlayerSubtitleLine> lines) async {
+    final AuthSessionState auth = ref.read(authSessionProvider);
+    if (!auth.isLoggedIn) {
+      return;
+    }
+    final ({LibraryCourseData course, LibraryEpisodeItem episode})? hit =
+        findCatalogEpisode(
+          courses: ref.read(libraryCatalogProvider),
+          episodeId: widget.episodeId,
+        );
+    await syncEpisodeSubtitleLinesToCloud(
+      api: ref.read(acquireApiClientProvider),
+      isLoggedIn: true,
+      lines: lines,
+      sourceKey: _episodeSourceKey(),
+      sourceUrl: hit?.episode.sourceUrl,
+      course: hit?.course,
+      episode: hit?.episode,
+      durationSec: (hit?.episode.durationMinutes ?? 0) > 0
+          ? hit!.episode.durationMinutes * 60
+          : null,
+      sourceOrigin: 'mixed',
+    );
   }
 
   Future<void> _editLineNote(int index, String note) async {
@@ -2771,15 +2809,14 @@ Future<void> _settleChineseFillIfAlreadyPresent() async {
                         onToggleMuted: _handleToggleMuted,
                         onVolumeChanged: _handleVolumeChanged,
                         onSubtitleLookupOpen: _stopVideo,
-                          onAssessVisibleLine: visibleAssessment.target == null
-                              ? null
-                              : () {
-                                  // Stay in-tab: record → auto-score → next.
-                                  // Full Tencent dialog remains on「腾讯云精评」.
-                                  _enterShadowingMode();
-                                },
-                        assessmentUnavailableReason:
-                            visibleAssessment.unavailableReason,
+                          // Always enter 跟读 when the episode has cues —
+                          // never gate on subtitle display mode / duration.
+                          onAssessVisibleLine: state.hasLines
+                              ? () => _enterShadowingMode()
+                              : null,
+                        assessmentUnavailableReason: state.hasLines
+                            ? null
+                            : '当前没有可跟读的字幕',
                         onCollectWord: (String word) =>
                             _handleCollectWord(word, courseContext),
                         onCollectWordAtTime: (String word, String time) =>
@@ -2871,6 +2908,8 @@ Future<void> _settleChineseFillIfAlreadyPresent() async {
               onToggleFullscreen: () => _handleOpenFullscreen(
                 course?.episodes ?? const <LibraryEpisodeItem>[],
               ),
+                onOpenShadowing: () => _enterShadowingMode(),
+                shadowingSelected: _studyTab == StudyModeTab.shadowing,
                 onOpenWordCards: () {
                   setState(() => _studyTab = StudyModeTab.wordCards);
                     },
@@ -3032,20 +3071,28 @@ Future<void> _settleChineseFillIfAlreadyPresent() async {
           ),
         );
       case StudyModeTab.shadowing:
+        // Use active-line target (not on-screen subtitle mode), so 中文/隐藏字幕
+        // modes still unlock in-tab mic recording.
+        final PronunciationTargetSelection shadowAssessment =
+            state.hasLines
+            ? _selectPronunciationForLine(state.activeLineIndex)
+            : visibleAssessment;
         return StudyShadowingTab(
-          line: activeLine,
+          // Pin the practice cue — never use visibleLine (null at sentence end).
+          line: state.hasLines ? state.activeLine : activeLine,
           hasLine: state.hasLines,
-          assessmentTarget: visibleAssessment.target,
+          assessmentTarget: shadowAssessment.target,
           pauseAtSentenceEnd: state.pauseAtSentenceEnd,
           onTogglePauseAtSentenceEnd: () {
             setState(() => state.togglePauseAtSentenceEnd());
           },
+          onPreviousSentence: state.hasLines ? _handlePreviousLine : null,
           onNextSentence: state.hasLines ? _handleNextLine : null,
           onReplaySentence: state.hasLines ? _handleReplayLine : null,
-          unavailableReason: visibleAssessment.unavailableReason,
-          onOpenFullDialog: visibleAssessment.target == null
+          unavailableReason: shadowAssessment.unavailableReason,
+          onOpenFullDialog: shadowAssessment.target == null
               ? null
-              : _handleAssessVisibleLine,
+              : () => _handleAssessLine(state.activeLineIndex),
           onRecordingStarted: () {
             if (state.isPlaying) {
               setState(() => state.isPlaying = false);
@@ -3061,28 +3108,40 @@ Future<void> _settleChineseFillIfAlreadyPresent() async {
           },
         );
       case StudyModeTab.coach:
-        final int activeIndex = state.activeLineIndex;
-        final String previousEnglish = activeIndex > 0 && state.hasLines
-            ? state.lines[activeIndex - 1].english
-            : '';
-        final String nextEnglish =
-            state.hasLines && activeIndex + 1 < state.lines.length
-            ? state.lines[activeIndex + 1].english
-            : '';
+        // Digital human = free talk on whole episode theme (Midoo-style),
+        // not line-by-line shadowing (that is the 跟读 tab).
+        final String courseTitle = courseContext.course?.title ?? '';
+        final String episodeTitle = courseContext.episode?.title ?? '';
+        final String topicSummary = <String>[
+          if (courseTitle.trim().isNotEmpty) courseTitle.trim(),
+          if (episodeTitle.trim().isNotEmpty) episodeTitle.trim(),
+        ].join(' · ');
+        final StringBuffer excerptBuf = StringBuffer();
+        if (state.hasLines) {
+          for (final PlayerSubtitleLine line in state.lines) {
+            final String en = line.english.trim();
+            if (en.isEmpty || !RegExp('[A-Za-z]').hasMatch(en)) {
+              continue;
+            }
+            if (excerptBuf.length + en.length + 1 > 1200) {
+              break;
+            }
+            if (excerptBuf.isNotEmpty) {
+              excerptBuf.write(' ');
+            }
+            excerptBuf.write(en);
+          }
+        }
         return StudyOralCoachTab(
-          line: activeLine,
-          hasLine: state.hasLines,
-          assessmentTarget: visibleAssessment.target,
-          unavailableReason: visibleAssessment.unavailableReason,
-          courseTitle: courseContext.course?.title ?? '',
-          episodeTitle: courseContext.episode?.title ?? '',
-          previousEnglish: previousEnglish,
-          nextEnglish: nextEnglish,
-          onReplaySentence: state.hasLines ? _handleReplayLine : null,
-          onNextSentence: state.hasLines ? _handleNextLine : null,
-          onOpenAssessment: visibleAssessment.target == null
-              ? null
-              : _handleAssessVisibleLine,
+          topicSummary: topicSummary.isNotEmpty
+              ? topicSummary
+              : (activeLine.english.trim().isNotEmpty
+                    ? activeLine.english.trim()
+                    : '本集视频'),
+          articleExcerpt: excerptBuf.toString(),
+          courseTitle: courseTitle,
+          episodeTitle: episodeTitle,
+          hasTranscript: excerptBuf.isNotEmpty,
         );
       case StudyModeTab.dictation:
         final List<DictationQueueItem> queue = ref.watch(

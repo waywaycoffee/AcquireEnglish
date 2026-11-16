@@ -19,7 +19,7 @@ extension StudyModeTabLabel on StudyModeTab {
       case StudyModeTab.shadowing:
         return '跟读';
       case StudyModeTab.coach:
-        return '陪练';
+        return '数字人';
       case StudyModeTab.dictation:
         return '听写';
       case StudyModeTab.practice:

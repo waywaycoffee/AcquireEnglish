@@ -16,14 +16,15 @@ class LearningPreferencesScreen extends ConsumerStatefulWidget {
 class _LearningPreferencesScreenState
     extends ConsumerState<LearningPreferencesScreen> {
   static const List<String> _levels = <String>['A1', 'A2', 'B1', 'B2', 'C1'];
-  static const List<String> _allTags = <String>[
-    'slow',
-    'daily',
-    'news',
-    'ted',
-    'travel',
-    'business',
-  ];
+  static const List<({String id, String label})> _allTags =
+      <({String id, String label})>[
+        (id: 'slow', label: '慢速英语'),
+        (id: 'daily', label: '日常对话'),
+        (id: 'news', label: '英语新闻'),
+        (id: 'ted', label: 'TED 演讲'),
+        (id: 'travel', label: '旅行英语'),
+        (id: 'business', label: '商务英语'),
+      ];
 
   late AcquirePreferencesDto _draft;
 
@@ -68,26 +69,34 @@ class _LearningPreferencesScreenState
           ),
           const SizedBox(height: 20),
           const Text(
-            '主题标签',
+            '兴趣主题（用于每日 B站推荐）',
             style: TextStyle(
               color: StudyShellTokens.textSecondary,
               fontWeight: FontWeight.w700,
             ),
           ),
+          const SizedBox(height: 6),
+          const Text(
+            '只影响首页「每日推荐」，不会自动加入你的学习课程。',
+            style: TextStyle(
+              color: StudyShellTokens.textSecondary,
+              fontSize: 13,
+            ),
+          ),
           const SizedBox(height: 8),
           Wrap(
             spacing: 8,
-            children: _allTags.map((String tag) {
-              final bool selected = _draft.tags.contains(tag);
+            children: _allTags.map((({String id, String label}) tag) {
+              final bool selected = _draft.tags.contains(tag.id);
               return FilterChip(
-                label: Text(tag),
+                label: Text(tag.label),
                 selected: selected,
                 onSelected: (bool value) {
                   final List<String> next = List<String>.from(_draft.tags);
                   if (value) {
-                    next.add(tag);
+                    next.add(tag.id);
                   } else {
-                    next.remove(tag);
+                    next.remove(tag.id);
                   }
                   setState(() => _draft = _draft.copyWith(tags: next));
                 },
@@ -96,7 +105,7 @@ class _LearningPreferencesScreenState
           ),
           const SizedBox(height: 20),
           Text(
-            '每日推荐 ${_draft.dailyQuota} 课',
+            '每日推荐 ${_draft.dailyQuota} 条',
             style: const TextStyle(
               color: StudyShellTokens.textSecondary,
               fontWeight: FontWeight.w700,
@@ -117,7 +126,7 @@ class _LearningPreferencesScreenState
           SwitchListTile(
             contentPadding: EdgeInsets.zero,
             title: const Text(
-              '每日课程推送',
+              '推荐更新提醒',
               style: TextStyle(color: StudyShellTokens.textPrimary),
             ),
             value: _draft.notifyDailyFeed,
@@ -134,14 +143,14 @@ class _LearningPreferencesScreenState
               if (context.mounted) {
                 ScaffoldMessenger.of(
                   context,
-                ).showSnackBar(const SnackBar(content: Text('偏好已保存，今日课程已刷新')));
+                ).showSnackBar(const SnackBar(content: Text('偏好已保存，每日推荐已刷新')));
                 Navigator.of(context).pop();
               }
             },
             style: FilledButton.styleFrom(
               backgroundColor: StudyShellTokens.accent,
             ),
-            child: const Text('保存并刷新今日课程'),
+            child: const Text('保存并刷新每日推荐'),
           ),
         ],
       ),

@@ -12,13 +12,26 @@ class VideoContext:
     current_chinese: str = ''
     previous_english: str = ''
     next_english: str = ''
+    # Whole-video / article theme for free conversation (not line drill).
+    topic_summary: str = ''
+    article_excerpt: str = ''
     difficulty: str = 'B1'  # A2 / B1 / B2 / C1
 
     def topic_blurb(self) -> str:
         bits = [b for b in (self.course_title, self.episode_title) if b.strip()]
-        head = ' / '.join(bits) if bits else 'this video clip'
-        line = self.current_english.strip() or '(no subtitle line yet)'
-        return f'Video: {head}. Current line: "{line}".'
+        head = ' / '.join(bits) if bits else 'this video'
+        summary = (self.topic_summary or '').strip()
+        excerpt = (self.article_excerpt or '').strip()
+        if summary and excerpt:
+            return f'Video: {head}. Topic: {summary}. Excerpt: {excerpt[:800]}'
+        if summary:
+            return f'Video: {head}. Topic: {summary}'
+        if excerpt:
+            return f'Video: {head}. Excerpt: {excerpt[:800]}'
+        line = self.current_english.strip()
+        if line:
+            return f'Video: {head}. Related line: "{line}".'
+        return f'Video: {head}.'
 
 
 @dataclass

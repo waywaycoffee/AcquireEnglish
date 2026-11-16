@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:developer' as developer;
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -10,6 +11,11 @@ import 'bilibili_import_service.dart';
 import 'bilibili_multipage.dart';
 
 final Set<String> _inFlightCourseIds = <String>{};
+
+/// Episodes that failed recently — skip for a while so one stuck CDN URL
+/// cannot restart forever and spam「正在下载视频 0%」.
+final Map<String, DateTime> _episodeDownloadCooldownUntil = <String, DateTime>{};
+const Duration _episodeFailCooldown = Duration(minutes: 12);
 
 class BilibiliCollectionDownloadProgress {
   const BilibiliCollectionDownloadProgress({
@@ -87,6 +93,10 @@ Future<void> downloadRemainingBilibiliEpisodes({
       return;
     }
 
+    final DateTime now = DateTime.now();
+    _episodeDownloadCooldownUntil.removeWhere(
+      (_, DateTime until) => !until.isAfter(now),
+    );
     final List<LibraryEpisodeItem> pending = target.episodes
         .where(
           (LibraryEpisodeItem e) =>
@@ -99,6 +109,34 @@ Future<void> downloadRemainingBilibiliEpisodes({
 
     int success = 0;
     int failed = 0;
+    int skippedCooldown = 0;
+    String? lastUiMessage;
+    DateTime lastUiAt = DateTime.fromMillisecondsSinceEpoch(0);
+    void publish({
+      required String message,
+      required double progress,
+      bool force = false,
+    }) {
+      final DateTime tick = DateTime.now();
+      if (!force &&
+          message == lastUiMessage &&
+          tick.difference(lastUiAt) < const Duration(milliseconds: 700)) {
+        return;
+      }
+      lastUiMessage = message;
+      lastUiAt = tick;
+      onProgress?.call(message, progress);
+      progressNotifier?.update(
+        BilibiliCollectionDownloadProgress(
+          courseId: courseId,
+          message: message,
+          progress: progress.clamp(0.0, 1.0),
+          successCount: success,
+          failedCount: failed,
+        ),
+      );
+    }
+
     for (int i = 0; i < pending.length; i++) {
       LibraryCourseData? live;
       for (final LibraryCourseData course in readCourses()) {
@@ -119,6 +157,18 @@ Future<void> downloadRemainingBilibiliEpisodes({
         continue;
       }
 
+      final DateTime? coolUntil = _episodeDownloadCooldownUntil[current.id];
+      if (coolUntil != null && coolUntil.isAfter(DateTime.now())) {
+        skippedCooldown += 1;
+        publish(
+          message:
+              '第 ${current.numberStr} 集下载失败冷却中，先跳过（稍后自动重试）',
+          progress: (i + 1) / pending.length,
+          force: true,
+        );
+        continue;
+      }
+
       final String? source = bilibiliSourceForEpisode(
         course: live,
         episode: current,
@@ -128,18 +178,12 @@ Future<void> downloadRemainingBilibiliEpisodes({
         failed += 1;
         continue;
       }
-      final double progress = (i + 1) / pending.length;
-      final String message =
-          '正在下载第 ${current.numberStr} 集（${i + 1}/${pending.length}）…';
-      onProgress?.call(message, progress);
-      progressNotifier?.update(
-        BilibiliCollectionDownloadProgress(
-          courseId: courseId,
-          message: message,
-          progress: progress,
-          successCount: success,
-          failedCount: failed,
-        ),
+      final double episodeBase = i / pending.length;
+      final double episodeSpan = 1 / pending.length;
+      publish(
+        message: '正在下载第 ${current.numberStr} 集（${i + 1}/${pending.length}）…',
+        progress: episodeBase + episodeSpan * 0.05,
+        force: true,
       );
       try {
         final BilibiliEpisodePrepareResult prepared =
@@ -150,22 +194,39 @@ Future<void> downloadRemainingBilibiliEpisodes({
               existingEnSubtitlePath: current.enSubtitleAsset,
               existingZhSubtitlePath: current.cnSubtitleAsset,
               onProgress: (String detail) {
-                final String detailMessage =
-                    '第 ${current.numberStr} 集：$detail';
-                onProgress?.call(detailMessage, progress);
-                progressNotifier?.update(
-                  BilibiliCollectionDownloadProgress(
-                    courseId: courseId,
-                    message: detailMessage,
-                    progress: progress,
-                    successCount: success,
-                    failedCount: failed,
-                  ),
+                // Prefer byte % from "正在下载视频 N%" when present.
+                final RegExpMatch? pct = RegExp(
+                  r'正在下载视频\s+(\d+)%',
+                ).firstMatch(detail);
+                double local = 0.15;
+                if (pct != null) {
+                  local = ((int.tryParse(pct.group(1)!) ?? 0) / 100.0).clamp(
+                    0.0,
+                    0.95,
+                  );
+                } else if (detail.contains('完成') || detail.contains('本地')) {
+                  local = 0.98;
+                }
+                publish(
+                  message: '第 ${current.numberStr} 集：$detail',
+                  progress: episodeBase + episodeSpan * local,
                 );
               },
+            ).timeout(
+              const Duration(minutes: 8),
+              onTimeout: () => throw TimeoutException(
+                '第 ${current.numberStr} 集下载超时',
+              ),
             );
         if (!isUsableLocalVideoPath(prepared.localVideoPath)) {
           failed += 1;
+          _episodeDownloadCooldownUntil[current.id] =
+              DateTime.now().add(_episodeFailCooldown);
+          publish(
+            message: '第 ${current.numberStr} 集下载失败，已跳过',
+            progress: (i + 1) / pending.length,
+            force: true,
+          );
           continue;
         }
         String cover = current.coverImage.trim();
@@ -187,14 +248,25 @@ Future<void> downloadRemainingBilibiliEpisodes({
           coverImage: cover.isEmpty ? null : cover,
           videoMissing: false,
         );
+        _episodeDownloadCooldownUntil.remove(current.id);
         await enqueueSubtitleCompletionForEpisode(
           episodeId: current.id,
           videoPath: prepared.localVideoPath,
           zhSubtitlePath: prepared.zhSubtitlePath,
           enSubtitlePath: prepared.enSubtitlePath,
           sourceUrl: source,
+          title: current.title,
+          course: catalog.state
+              .where((LibraryCourseData c) => c.id == courseId)
+              .firstOrNull,
+          episode: current,
         );
         success += 1;
+        publish(
+          message: '第 ${current.numberStr} 集下载完成（${i + 1}/${pending.length}）',
+          progress: (i + 1) / pending.length,
+          force: true,
+        );
         developer.log(
           'collection download ok ${current.id} '
           'video=${prepared.localVideoPath}',
@@ -202,6 +274,13 @@ Future<void> downloadRemainingBilibiliEpisodes({
         );
       } catch (e, st) {
         failed += 1;
+        _episodeDownloadCooldownUntil[current.id] =
+            DateTime.now().add(_episodeFailCooldown);
+        publish(
+          message: '第 ${current.numberStr} 集下载失败，已跳过：$e',
+          progress: (i + 1) / pending.length,
+          force: true,
+        );
         developer.log(
           'collection download failed ${current.id}: $e',
           name: 'bilibili.collection',
@@ -210,9 +289,10 @@ Future<void> downloadRemainingBilibiliEpisodes({
         );
       }
     }
-    final String doneMessage = failed == 0
+    final String doneMessage = failed == 0 && skippedCooldown == 0
         ? '合集下载完成（$success 集）'
-        : '合集下载完成（成功 $success，失败 $failed）';
+        : '合集下载完成（成功 $success，失败 $failed'
+            '${skippedCooldown > 0 ? '，冷却跳过 $skippedCooldown' : ''}）';
     onProgress?.call(doneMessage, 1);
     progressNotifier?.update(
       BilibiliCollectionDownloadProgress(

@@ -56,6 +56,9 @@ String humanizeAsrSubtitleError(Object error) {
       .replaceFirst(RegExp(r'^Exception:\s*'), '')
       .replaceFirst('AsrSubtitleGenerationException: ', '');
   final String lower = text.toLowerCase();
+  if (text.contains('AI 字幕生成已取消') || lower.contains('cancelled')) {
+    return '语音识别已取消，可随时重新生成。';
+  }
   if (lower.contains('missing-asr') ||
       lower.contains('missing-api-key') ||
       lower.contains('no api key') ||
@@ -67,12 +70,43 @@ String humanizeAsrSubtitleError(Object error) {
     return '未配置或无效的 API Key。请到「更多 → 设置 → AI生成字幕」填写百炼/腾讯云密钥，'
         '或改用「本地 Whisper」。开启双语时还需填写「翻译」API Key。';
   }
+  if (lower.contains('already has an active transcription') ||
+      lower.contains('reserved by an active transcription') ||
+      text.contains('引擎正忙')) {
+    return '语音识别引擎正忙，请稍后再点「重新识别」。';
+  }
+  if (text.contains('时长与视频不符') ||
+      text.contains('覆盖率') ||
+      (lower.contains('coverage') && lower.contains('media'))) {
+    return '语音识别结果时长与视频不符，未保存脏字幕。请重新识别。';
+  }
+  if (lower.contains('未开启中文语音识别') ||
+      lower.contains('中文语音模型尚未下载')) {
+    return text;
+  }
+  if (lower.contains('huggingface') ||
+      lower.contains('hf-mirror') ||
+      lower.contains('国内镜像') ||
+      ((lower.contains('socket') ||
+              lower.contains('timed out') ||
+              lower.contains('connection')) &&
+          (lower.contains('whisper') ||
+              lower.contains('模型') ||
+              lower.contains('ggml') ||
+              lower.contains('download') ||
+              lower.contains('下载')))) {
+    return 'Whisper 模型下载失败：国内镜像不可用。请检查网络后重试，或使用已内置 base.en 的安装包。';
+  }
   if (lower.contains('whisper') &&
       (lower.contains('下载') ||
           lower.contains('download') ||
           lower.contains('未安装') ||
           lower.contains('model'))) {
     return text;
+  }
+  if (text.contains('没有识别到有效字幕') ||
+      text.contains('段处理失败')) {
+    return '$text 可重新生成，不会被脏软字幕挡住入口。';
   }
   return text;
 }
@@ -117,7 +151,15 @@ class AsrAudioChunk {
   final int offsetMs;
 }
 
-enum AsrSubtitlePhase { recognizing, translating, finalizing, completed }
+enum AsrSubtitlePhase {
+  preparing,
+  downloadingModel,
+  recognizing,
+  repairing,
+  translating,
+  finalizing,
+  completed,
+}
 
 class AsrSubtitleProgress {
   const AsrSubtitleProgress({
@@ -141,10 +183,17 @@ class AsrSubtitleProgress {
   final int totalTranslations;
 
   double get value {
+    if (phase == AsrSubtitlePhase.preparing ||
+        phase == AsrSubtitlePhase.downloadingModel) {
+      return 0;
+    }
     if (phase == AsrSubtitlePhase.translating) {
       return totalTranslations == 0
           ? 0
           : (completedTranslations / totalTranslations).clamp(0.0, 1.0);
+    }
+    if (phase == AsrSubtitlePhase.repairing) {
+      return 0.92;
     }
     if (phase == AsrSubtitlePhase.finalizing ||
         phase == AsrSubtitlePhase.completed) {
@@ -153,17 +202,37 @@ class AsrSubtitleProgress {
     final int? current = currentMs;
     final int? total = totalMs;
     if (current != null && total != null && total > 0) {
-      return (current / total).clamp(0.0, 1.0);
+      return (current / total).clamp(0.0, 0.9);
     }
-    return totalChunks == 0 ? 0 : completedChunks / totalChunks;
+    return totalChunks == 0 ? 0 : (completedChunks / totalChunks).clamp(0.0, 0.9);
   }
 
   String get label {
+    final String? preview = previewText?.trim();
     switch (phase) {
+      case AsrSubtitlePhase.preparing:
+        return (preview != null && preview.isNotEmpty)
+            ? preview
+            : '语音识别：正在准备音频…';
+      case AsrSubtitlePhase.downloadingModel:
+        return (preview != null && preview.isNotEmpty)
+            ? preview
+            : '语音识别：正在准备 Whisper 模型…';
+      case AsrSubtitlePhase.repairing:
+        return (preview != null && preview.isNotEmpty)
+            ? preview
+            : '语音识别：正在修复时间轴…';
       case AsrSubtitlePhase.translating:
-        return '正在翻译中文字幕 $completedTranslations/$totalTranslations 句';
+        final int pct = totalTranslations <= 0
+            ? 0
+            : ((completedTranslations / totalTranslations) * 100)
+                .round()
+                .clamp(0, 100);
+        return '正在翻译中文字幕 $completedTranslations/$totalTranslations 句（$pct%）';
       case AsrSubtitlePhase.finalizing:
-        return '正在校验并保存字幕...';
+        return (preview != null && preview.isNotEmpty)
+            ? preview
+            : '正在校验并保存字幕…';
       case AsrSubtitlePhase.completed:
         return '字幕生成完成';
       case AsrSubtitlePhase.recognizing:
@@ -171,12 +240,28 @@ class AsrSubtitleProgress {
     }
     final int? current = currentMs;
     final int? total = totalMs;
-    if (current != null && total != null && total > 0) {
-      return '已识别到 ${_formatPosition(current)} / ${_formatPosition(total)}';
+    if (totalChunks <= 0) {
+      if (preview != null && preview.isNotEmpty) {
+        return preview;
+      }
+      return '语音识别：正在准备音频…';
     }
-    return totalChunks == 0
-        ? '正在准备音频...'
-        : '正在生成词级同步字幕 $completedChunks/$totalChunks';
+    final int pct = ((completedChunks / totalChunks) * 100)
+        .round()
+        .clamp(0, 100);
+    if (preview != null &&
+        preview.isNotEmpty &&
+        (preview.contains('引擎占用') || preview.contains('排队重试'))) {
+      return '语音识别 $completedChunks/$totalChunks 段（$pct%）· $preview';
+    }
+    if (current != null && total != null && total > 0) {
+      return '语音识别 $completedChunks/$totalChunks 段（$pct%）· '
+          '${_formatPosition(current)} / ${_formatPosition(total)}';
+    }
+    if (preview != null && preview.isNotEmpty) {
+      return '语音识别 $completedChunks/$totalChunks 段（$pct%）· $preview';
+    }
+    return '语音识别 $completedChunks/$totalChunks 段（$pct%）';
   }
 
   String _formatPosition(int ms) {
@@ -230,6 +315,14 @@ class AsrSubtitleService {
       );
     }
 
+    onProgress?.call(
+      const AsrSubtitleProgress(
+        completedChunks: 0,
+        totalChunks: 0,
+        phase: AsrSubtitlePhase.preparing,
+        previewText: '语音识别：正在准备音频…',
+      ),
+    );
     final List<AsrAudioChunk> chunks = await prepareAudioChunks(file);
     final int totalMs = _estimatedTotalMs(chunks);
     onProgress?.call(
@@ -238,6 +331,7 @@ class AsrSubtitleService {
         totalChunks: chunks.length,
         currentMs: 0,
         totalMs: totalMs,
+        phase: AsrSubtitlePhase.recognizing,
       ),
     );
 
@@ -251,6 +345,7 @@ class AsrSubtitleService {
               totalChunks: chunks.length,
               currentMs: 0,
               totalMs: totalMs,
+              phase: AsrSubtitlePhase.downloadingModel,
               previewText: message,
             ),
           );
@@ -301,6 +396,7 @@ class AsrSubtitleService {
     required AsrAudioChunk chunk,
     required LearningSettingsState settings,
     BaseOptions? options,
+    String language = 'en',
   }) async {
     final BaseOptions resolvedOptions =
         options ??
@@ -316,6 +412,7 @@ class AsrSubtitleService {
             file: chunk.file,
             settings: settings,
             offsetMs: chunk.offsetMs,
+            language: language,
           )
         : _usesAlibabaCloudAsr(settings)
         ? await _generateAlibabaQwenChunk(

@@ -13,7 +13,45 @@ void main() {
     );
     expect(
       subtitleTimelineExceedsMedia(
+        subtitleEndMs: 17 * 60 * 1000,
+        mediaDurationMs: 12 * 60 * 1000 + 34 * 1000,
+      ),
+      isTrue,
+    );
+    expect(
+      subtitleTimelineExceedsMedia(
         subtitleEndMs: 12 * 60 * 1000,
+        mediaDurationMs: 12 * 60 * 1000 + 34 * 1000,
+      ),
+      isFalse,
+    );
+  });
+
+  test('subtitleTimelineFarShorterThanMedia catches 3-min CC on 12-min video', () {
+    expect(
+      subtitleTimelineFarShorterThanMedia(
+        subtitleEndMs: 3 * 60 * 1000 + 12 * 1000,
+        mediaDurationMs: 12 * 60 * 1000 + 34 * 1000,
+      ),
+      isTrue,
+    );
+    expect(
+      subtitleTimelineMismatchesMedia(
+        subtitleEndMs: 3 * 60 * 1000 + 12 * 1000,
+        mediaDurationMs: 12 * 60 * 1000 + 34 * 1000,
+      ),
+      isTrue,
+    );
+    expect(
+      subtitleTimelineFarShorterThanMedia(
+        subtitleEndMs: 3 * 60 * 1000,
+        mediaDurationMs: 13 * 60 * 1000,
+      ),
+      isTrue,
+    );
+    expect(
+      subtitleTimelineFarShorterThanMedia(
+        subtitleEndMs: 11 * 60 * 1000,
         mediaDurationMs: 12 * 60 * 1000 + 34 * 1000,
       ),
       isFalse,

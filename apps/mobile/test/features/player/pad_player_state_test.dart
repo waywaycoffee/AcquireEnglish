@@ -682,7 +682,7 @@ void main() {
     await tester.tap(find.text('生成'));
     await tester.pump(const Duration(milliseconds: 300));
     expect(find.text('正在生成 AI 词级字幕'), findsOneWidget);
-    expect(find.text('正在准备音频...'), findsOneWidget);
+    expect(find.text('语音识别：正在准备音频…'), findsOneWidget);
     expect(find.byType(LinearProgressIndicator), findsOneWidget);
 
     progress.value = const AsrSubtitleProgress(
@@ -691,8 +691,7 @@ void main() {
       previewText: 'Recognized preview.',
     );
     await tester.pump();
-    expect(find.text('正在生成词级同步字幕 1/2'), findsOneWidget);
-    expect(find.text('Recognized preview.'), findsOneWidget);
+    expect(find.text('语音识别 1/2 段（50%）· Recognized preview.'), findsOneWidget);
 
     progress.value = const AsrSubtitleProgress(
       completedChunks: 2,
@@ -702,8 +701,8 @@ void main() {
       totalTranslations: 3,
     );
     await tester.pump();
-    expect(find.text('正在翻译中文字幕 1/3 句'), findsOneWidget);
-    expect(find.text('正在生成词级同步字幕 1/2'), findsNothing);
+    expect(find.text('正在翻译中文字幕 1/3 句（33%）'), findsOneWidget);
+    expect(find.textContaining('语音识别 1/2'), findsNothing);
     expect(
       tester
           .widget<LinearProgressIndicator>(find.byType(LinearProgressIndicator))
@@ -717,7 +716,7 @@ void main() {
       phase: AsrSubtitlePhase.finalizing,
     );
     await tester.pump();
-    expect(find.text('正在校验并保存字幕...'), findsOneWidget);
+    expect(find.text('正在校验并保存字幕…'), findsOneWidget);
 
     await tester.tapAt(const Offset(4, 4));
     await tester.pump();

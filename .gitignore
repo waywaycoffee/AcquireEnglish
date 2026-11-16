@@ -4,8 +4,10 @@
 **/*.pyc
 **/.pytest_cache/
 services/api/acquire_english.db
+services/api/sms_codes.db
 services/api/test_*.db
 services/api/.venv/
+.tmp/
 docs/digital-human-coach/captures/**
 !docs/digital-human-coach/captures/.gitkeep
 tools/digital_human_coach/.venv/

@@ -93,3 +93,7 @@ yarn.lock
 
 # FVM Version Cache
 .fvm/
+
+# Large Whisper weights (fetch via tools/download_whisper_models.sh)
+assets/whisper/*.bin
+assets/whisper/*.part

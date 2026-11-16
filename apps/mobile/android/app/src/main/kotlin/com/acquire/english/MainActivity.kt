@@ -44,6 +44,9 @@ class MainActivity : FlutterActivity(), MethodChannel.MethodCallHandler {
     private lateinit var nativeTtsChannel: MethodChannel
     private lateinit var audioToolsChannel: MethodChannel
     private lateinit var orientationChannel: MethodChannel
+    private lateinit var whisperAssetsChannel: MethodChannel
+    private lateinit var subtitleOverlayChannel: MethodChannel
+    private val subtitleFloatingBall by lazy { SubtitleFloatingBall(applicationContext) }
     private var pendingResult: MethodChannel.Result? = null
     private var pendingExtensions: Set<String> = emptySet()
     private var pendingTitle: String = ""
@@ -124,6 +127,16 @@ class MainActivity : FlutterActivity(), MethodChannel.MethodCallHandler {
             "com.acquire.english/orientation",
         )
         orientationChannel.setMethodCallHandler(this)
+        whisperAssetsChannel = MethodChannel(
+            flutterEngine.dartExecutor.binaryMessenger,
+            "com.acquire.english/whisper_assets",
+        )
+        whisperAssetsChannel.setMethodCallHandler(this)
+        subtitleOverlayChannel = MethodChannel(
+            flutterEngine.dartExecutor.binaryMessenger,
+            "com.acquire.english/subtitle_overlay",
+        )
+        subtitleOverlayChannel.setMethodCallHandler(this)
     }
 
     override fun onMethodCall(call: MethodCall, result: MethodChannel.Result) {
@@ -139,8 +152,110 @@ class MainActivity : FlutterActivity(), MethodChannel.MethodCallHandler {
             "cancelPronunciationAudioExtraction" -> handleCancelPronunciationAudioExtraction(call, result)
             "captureFrameAt" -> handleCaptureFrameAt(call, result)
             "setOrientation" -> handleSetOrientation(call, result)
+            "copyBundledWhisperModel" -> handleCopyBundledWhisperModel(call, result)
+            "canDrawOverlays" -> result.success(subtitleFloatingBall.canDrawOverlays())
+            "openOverlaySettings" -> {
+                subtitleFloatingBall.openOverlaySettings()
+                result.success(true)
+            }
+            "showSubtitleBall" -> {
+                val progress = call.argument<Double>("progress") ?: 0.08
+                val label = call.argument<String>("label") ?: "补字幕"
+                mainHandler.post {
+                    subtitleFloatingBall.show(progress, label)
+                    result.success(subtitleFloatingBall.isShowing)
+                }
+            }
+            "updateSubtitleBall" -> {
+                val progress = call.argument<Double>("progress") ?: 0.08
+                val label = call.argument<String>("label") ?: "补字幕"
+                mainHandler.post {
+                    subtitleFloatingBall.update(progress, label)
+                    result.success(subtitleFloatingBall.isShowing)
+                }
+            }
+            "hideSubtitleBall" -> {
+                mainHandler.post {
+                    subtitleFloatingBall.hide()
+                    result.success(true)
+                }
+            }
             else -> result.notImplemented()
         }
+    }
+
+    /// Stream-copy the Flutter-packaged Whisper weights without loading 141MB into Dart heap.
+    private fun handleCopyBundledWhisperModel(call: MethodCall, result: MethodChannel.Result) {
+        val destPath = call.argument<String>("destPath")?.trim().orEmpty()
+        val assetPath = call.argument<String>("assetPath")?.trim().orEmpty().ifEmpty {
+            "flutter_assets/assets/whisper/ggml-base.en.bin"
+        }
+        if (destPath.isEmpty()) {
+            result.error("bad_args", "destPath is required.", null)
+            return
+        }
+        Thread {
+            try {
+                val dest = File(destPath)
+                dest.parentFile?.let { parent ->
+                    ensureDirectoryExists(parent, "whisper model parent")
+                }
+                val partial = File("$destPath.part")
+                if (partial.exists() && !partial.delete()) {
+                    error("unable to clear partial whisper model")
+                }
+                val candidates = listOf(
+                    assetPath,
+                    "flutter_assets/$assetPath",
+                    assetPath.removePrefix("flutter_assets/"),
+                ).distinct()
+                var opened: InputStream? = null
+                var usedPath: String? = null
+                for (candidate in candidates) {
+                    try {
+                        opened = assets.open(candidate)
+                        usedPath = candidate
+                        break
+                    } catch (_: Exception) {
+                        opened = null
+                    }
+                }
+                val input = opened ?: error(
+                    "bundled whisper asset not found (tried ${candidates.joinToString()})",
+                )
+                input.use { stream ->
+                    FileOutputStream(partial).use { output ->
+                        copyStream(stream, output)
+                    }
+                }
+                if (dest.exists() && !dest.delete()) {
+                    error("unable to replace existing whisper model")
+                }
+                if (!partial.renameTo(dest)) {
+                    partial.copyTo(dest, overwrite = true)
+                    partial.delete()
+                }
+                require(dest.exists() && dest.length() > 1_000_000L) {
+                    "whisper model copy incomplete from $usedPath"
+                }
+                postResult(
+                    result,
+                    mapOf(
+                        "path" to dest.absolutePath,
+                        "bytes" to dest.length(),
+                        "assetPath" to (usedPath ?: assetPath),
+                    ),
+                )
+            } catch (exception: Exception) {
+                Handler(Looper.getMainLooper()).post {
+                    result.error(
+                        "whisper_asset_copy_failed",
+                        exception.message,
+                        null,
+                    )
+                }
+            }
+        }.start()
     }
 
     private fun handleSetOrientation(call: MethodCall, result: MethodChannel.Result) {

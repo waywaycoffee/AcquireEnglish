@@ -58,4 +58,7 @@ if ($tsIp) {
 } else {
   Write-Host "LAN/Tailscale: http://<this-pc-ip>:$port/index.html  (TCP $port + UDP for WebRTC)"
 }
-& $VenvPython app.py --transport webrtc --model wav2lip --avatar_id $avatarId --listenport $port
+# Keep headroom: phones + dashboard probes leave zombie WebRTC sessions until restart.
+$maxSession = if ($env:LIVETALKING_MAX_SESSION) { $env:LIVETALKING_MAX_SESSION } else { "10" }
+Write-Host "max_session=$maxSession"
+& $VenvPython app.py --transport webrtc --model wav2lip --avatar_id $avatarId --listenport $port --max_session $maxSession

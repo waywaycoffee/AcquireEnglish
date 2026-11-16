@@ -19,12 +19,16 @@ class HowToLearnContent extends StatelessWidget {
     required this.onStart,
     required this.onPlayMethod,
     required this.onOpenResource,
+    this.onImportBilibili,
+    this.onImportYoutube,
     super.key,
   });
 
   final VoidCallback onStart;
   final VoidCallback onPlayMethod;
   final ValueChanged<GuideLearningResource> onOpenResource;
+  final VoidCallback? onImportBilibili;
+  final VoidCallback? onImportYoutube;
 
   @override
   Widget build(BuildContext context) => Column(
@@ -32,6 +36,11 @@ class HowToLearnContent extends StatelessWidget {
     children: <Widget>[
       _LearningHero(onStart: onStart, onPlayMethod: onPlayMethod),
       const SizedBox(height: 40),
+      _ImportGuideSection(
+        onImportBilibili: onImportBilibili,
+        onImportYoutube: onImportYoutube,
+      ),
+      const SizedBox(height: 48),
       _MethodVideoCard(onPlay: onPlayMethod),
       const SizedBox(height: 48),
       const _SectionTitle(
@@ -171,6 +180,224 @@ class _HeroProgressPreview extends StatelessWidget {
         ),
       ],
     ),
+  );
+}
+
+class _ImportGuideSection extends StatelessWidget {
+  const _ImportGuideSection({
+    this.onImportBilibili,
+    this.onImportYoutube,
+  });
+
+  final VoidCallback? onImportBilibili;
+  final VoidCallback? onImportYoutube;
+
+  @override
+  Widget build(BuildContext context) => Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: <Widget>[
+      const _SectionTitle(
+        title: '怎么导入视频开始学',
+        subtitle: '支持 B 站链接、YouTube 链接，也可以导入本地影视文件。',
+      ),
+      const SizedBox(height: 20),
+      _ImportPlatformCard(
+        key: const Key('guide-import-bilibili'),
+        accent: const Color(0xFFFB7299),
+        icon: Icons.smart_display_rounded,
+        title: '导入 B 站视频',
+        steps: const <String>[
+          '打开 B 站 App 或网页，点分享 → 复制链接（支持 b23.tv 短链、BV 号、合集）。',
+          '在爱快英语首页或影视库点「导入」→ 选择「Bilibili」。',
+          '首次建议先「扫码登录哔哩哔哩」，才能拉取官方字幕；未登录也可下载视频。',
+          '粘贴分享文案或链接，点「下载并加入书库」。',
+          '下载完成后会出现在影视库；缺中/英字幕时会自动在后台补全。',
+        ],
+        tip: '合集/多 P 会按分集入库。硬字幕课可在播放器里用语音重新识别英文。',
+        actionLabel: '去导入 B 站',
+        onAction: onImportBilibili,
+      ),
+      const SizedBox(height: 16),
+      _ImportPlatformCard(
+        key: const Key('guide-import-youtube'),
+        accent: AppDesignTokens.primaryBlue,
+        icon: Icons.ondemand_video_rounded,
+        title: '导入 YouTube 视频',
+        steps: const <String>[
+          '在 YouTube 打开想学的视频，复制分享链接（youtube.com 或 youtu.be）。',
+          '在爱快英语首页或影视库点「导入」→ 选择「YouTube」。',
+          '粘贴链接，点「加入书库」。',
+          '有官方字幕时会一并拉取；没有字幕时，进入学习页可用语音识别生成。',
+        ],
+        tip: '需能访问 YouTube。导入后同样会出现在影视库，可直接开始三遍学习法。',
+        actionLabel: '去导入 YouTube',
+        onAction: onImportYoutube,
+      ),
+      const SizedBox(height: 16),
+      Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(20),
+        decoration: _cardDecoration(color: AppDesignTokens.softWhite),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: <Widget>[
+            const Text(
+              '也可以导入本地影视',
+              style: TextStyle(fontSize: 17, fontWeight: FontWeight.w900),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              '在「导入」里选择「导入本地影视」，分别选视频文件夹和字幕文件夹；'
+              '同名会自动匹配中英字幕。没有字幕也可先导入，之后在播放器里生成 AI / 语音字幕。',
+              style: TextStyle(
+                color: AppDesignTokens.textSecondary,
+                height: 1.5,
+              ),
+            ),
+          ],
+        ),
+      ),
+    ],
+  );
+}
+
+class _ImportPlatformCard extends StatelessWidget {
+  const _ImportPlatformCard({
+    required this.accent,
+    required this.icon,
+    required this.title,
+    required this.steps,
+    required this.tip,
+    required this.actionLabel,
+    this.onAction,
+    super.key,
+  });
+
+  final Color accent;
+  final IconData icon;
+  final String title;
+  final List<String> steps;
+  final String tip;
+  final String actionLabel;
+  final VoidCallback? onAction;
+
+  @override
+  Widget build(BuildContext context) => Container(
+    width: double.infinity,
+    padding: const EdgeInsets.all(22),
+    decoration: _cardDecoration(color: AppDesignTokens.appWhite, border: accent),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: <Widget>[
+        Row(
+          children: <Widget>[
+            CircleAvatar(
+              backgroundColor: accent.withValues(alpha: 0.14),
+              foregroundColor: accent,
+              child: Icon(icon),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                title,
+                style: const TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 16),
+        for (int i = 0; i < steps.length; i++) ...<Widget>[
+          _ImportStepRow(index: i + 1, text: steps[i], accent: accent),
+          if (i < steps.length - 1) const SizedBox(height: 10),
+        ],
+        const SizedBox(height: 14),
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: accent.withValues(alpha: 0.08),
+            borderRadius: BorderRadius.circular(14),
+          ),
+          child: Text(
+            tip,
+            style: TextStyle(
+              color: AppDesignTokens.textSecondary,
+              height: 1.45,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ),
+        if (onAction != null) ...<Widget>[
+          const SizedBox(height: 16),
+          FilledButton.icon(
+            onPressed: onAction,
+            icon: const Icon(Icons.download_rounded),
+            label: Text(actionLabel),
+            style: FilledButton.styleFrom(
+              backgroundColor: accent,
+              foregroundColor: Colors.white,
+              minimumSize: const Size(0, 48),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(24),
+              ),
+              textStyle: const TextStyle(
+                fontSize: 15,
+                fontWeight: FontWeight.w900,
+              ),
+            ),
+          ),
+        ],
+      ],
+    ),
+  );
+}
+
+class _ImportStepRow extends StatelessWidget {
+  const _ImportStepRow({
+    required this.index,
+    required this.text,
+    required this.accent,
+  });
+
+  final int index;
+  final String text;
+  final Color accent;
+
+  @override
+  Widget build(BuildContext context) => Row(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: <Widget>[
+      Container(
+        width: 26,
+        height: 26,
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          color: accent,
+          borderRadius: BorderRadius.circular(9),
+        ),
+        child: Text(
+          '$index',
+          style: const TextStyle(
+            color: Colors.white,
+            fontWeight: FontWeight.w900,
+            fontSize: 13,
+          ),
+        ),
+      ),
+      const SizedBox(width: 10),
+      Expanded(
+        child: Text(
+          text,
+          style: const TextStyle(
+            height: 1.45,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+      ),
+    ],
   );
 }
 

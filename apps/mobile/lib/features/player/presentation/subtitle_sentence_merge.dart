@@ -1,8 +1,13 @@
 import 'bilingual_subtitle_helpers.dart';
 import 'player_mock_state.dart';
+import 'subtitle_word_alignment.dart';
 
 /// Max gap between adjacent ASR cues that may still form one sentence.
-const int kSubtitleSentenceMergeGapMs = 700;
+/// Slightly generous so Whisper crumbs like "There is" + "a lot of water"
+/// become one study sentence instead of two chips.
+/// Slightly wider than before so Whisper crumbs coalesce into study sentences
+/// (SmartSub-style sentence tidy without full VAD).
+const int kSubtitleSentenceMergeGapMs = 1600;
 
 /// One learning-facing sentence built from ASR, with Chinese attached by time.
 class SubtitleSentence {
@@ -13,6 +18,7 @@ class SubtitleSentence {
     required this.chinese,
     required this.fragmentStartMs,
     required this.fragmentEndMs,
+    this.words = const <PlayerSubtitleWord>[],
   });
 
   final int startMs;
@@ -21,6 +27,9 @@ class SubtitleSentence {
   final String chinese;
   final List<int> fragmentStartMs;
   final List<int> fragmentEndMs;
+
+  /// Word-level timings from Whisper/cloud ASR (required for green karaoke).
+  final List<PlayerSubtitleWord> words;
 
   String get startTime => _clock(startMs);
 
@@ -31,6 +40,7 @@ class SubtitleSentence {
       chinese: chinese,
       startMs: startMs,
       endMs: endMs,
+      words: words,
     );
   }
 
@@ -42,6 +52,17 @@ class SubtitleSentence {
       'chinese': chinese,
       'fragmentStartMs': fragmentStartMs,
       'fragmentEndMs': fragmentEndMs,
+      if (words.isNotEmpty)
+        'words': words
+            .map(
+              (PlayerSubtitleWord word) => <String, Object?>{
+                'text': word.text,
+                'startMs': word.startMs,
+                'endMs': word.endMs,
+                if (word.confidence != null) 'confidence': word.confidence,
+              },
+            )
+            .toList(growable: false),
     };
   }
 
@@ -65,6 +86,7 @@ class SubtitleSentence {
       chinese: '${raw['chinese'] ?? ''}'.trim(),
       fragmentStartMs: _asIntList(raw['fragmentStartMs']),
       fragmentEndMs: _asIntList(raw['fragmentEndMs']),
+      words: _asWords(raw['words']),
     );
   }
 }
@@ -76,12 +98,14 @@ class SubtitleFragment {
     required this.endMs,
     required this.english,
     required this.chinese,
+    this.words = const <PlayerSubtitleWord>[],
   });
 
   final int startMs;
   final int endMs;
   final String english;
   final String chinese;
+  final List<PlayerSubtitleWord> words;
 
   String get startTime => _clock(startMs);
 
@@ -92,6 +116,7 @@ class SubtitleFragment {
       chinese: chinese,
       startMs: startMs,
       endMs: endMs,
+      words: words,
     );
   }
 
@@ -101,6 +126,17 @@ class SubtitleFragment {
       'endMs': endMs,
       'english': english,
       'chinese': chinese,
+      if (words.isNotEmpty)
+        'words': words
+            .map(
+              (PlayerSubtitleWord word) => <String, Object?>{
+                'text': word.text,
+                'startMs': word.startMs,
+                'endMs': word.endMs,
+                if (word.confidence != null) 'confidence': word.confidence,
+              },
+            )
+            .toList(growable: false),
     };
   }
 
@@ -118,6 +154,7 @@ class SubtitleFragment {
       endMs: endMs,
       english: '${raw['english'] ?? ''}'.trim(),
       chinese: '${raw['chinese'] ?? ''}'.trim(),
+      words: _asWords(raw['words']),
     );
   }
 }
@@ -234,14 +271,19 @@ MergedSubtitleBundle mergeAsrIntoSentences({
     final List<PlayerSubtitleLine> current = groups.last;
     final PlayerSubtitleLine last = current.last;
     final int gap = line.startMs - last.endMs;
-    if (gap <= maxGapMs && !_englishEndsSentence(last.english)) {
+    if (_shouldMergeEnglishCues(
+      previous: last.english,
+      next: line.english,
+      gapMs: gap,
+      maxGapMs: maxGapMs,
+    )) {
       current.add(line);
     } else {
       groups.add(<PlayerSubtitleLine>[line]);
     }
   }
 
-  final List<SubtitleSentence> sentences = <SubtitleSentence>[];
+  final List<SubtitleSentence> rawSentences = <SubtitleSentence>[];
   for (final List<PlayerSubtitleLine> group in groups) {
     final int startMs = group.first.startMs;
     final int endMs = group.last.endMs;
@@ -258,7 +300,7 @@ MergedSubtitleBundle mergeAsrIntoSentences({
         .map((PlayerSubtitleLine cue) => cue.chinese.trim())
         .where((String text) => text.isNotEmpty)
         .join(' ');
-    sentences.add(
+    rawSentences.add(
       SubtitleSentence(
         startMs: startMs,
         endMs: endMs,
@@ -270,9 +312,23 @@ MergedSubtitleBundle mergeAsrIntoSentences({
         fragmentEndMs: overlapped
             .map((PlayerSubtitleLine cue) => cue.endMs)
             .toList(growable: false),
+        words: group
+            .expand((PlayerSubtitleLine line) => line.words)
+            .toList(growable: false),
       ),
     );
   }
+  final List<SubtitleSentence> coalesced = _coalesceIncompleteSentences(
+    rawSentences,
+    maxGapMs: maxGapMs,
+  );
+  // Re-align Whisper word timings onto the merged English. Concatenating raw
+  // crumb words often leaves a length mismatch vs space-split display tokens,
+  // so karaoke index never paints green on the active sentence.
+  final List<SubtitleSentence> sentences = _reattachWordTimings(
+    sentences: coalesced,
+    asrLines: asr,
+  );
 
   final List<SubtitleFragment> fragments = <SubtitleFragment>[];
   if (chinese.isNotEmpty) {
@@ -295,12 +351,52 @@ MergedSubtitleBundle mergeAsrIntoSentences({
           endMs: line.endMs,
           english: line.english.trim(),
           chinese: '',
+          words: line.words,
         ),
       );
     }
   }
 
   return MergedSubtitleBundle(sentences: sentences, fragments: fragments);
+}
+
+/// Map ASR word clocks onto each merged sentence's space-split English 1:1.
+List<SubtitleSentence> _reattachWordTimings({
+  required List<SubtitleSentence> sentences,
+  required List<PlayerSubtitleLine> asrLines,
+}) {
+  if (sentences.isEmpty) {
+    return sentences;
+  }
+  final List<PlayerSubtitleWord> pool = <PlayerSubtitleWord>[
+    ...asrLines.expand((PlayerSubtitleLine line) => line.words),
+    ...sentences.expand((SubtitleSentence sentence) => sentence.words),
+  ];
+  return sentences
+      .map((SubtitleSentence sentence) {
+        final List<PlayerSubtitleWord> nearby = pool
+            .where(
+              (PlayerSubtitleWord word) =>
+                  word.endMs > sentence.startMs - 800 &&
+                  word.startMs < sentence.endMs + 800,
+            )
+            .toList(growable: false);
+        return SubtitleSentence(
+          startMs: sentence.startMs,
+          endMs: sentence.endMs,
+          english: sentence.english,
+          chinese: sentence.chinese,
+          fragmentStartMs: sentence.fragmentStartMs,
+          fragmentEndMs: sentence.fragmentEndMs,
+          words: fitWordTimingsToDisplayEnglish(
+            english: sentence.english,
+            timedWords: nearby.isNotEmpty ? nearby : sentence.words,
+            startMs: sentence.startMs,
+            endMs: sentence.endMs,
+          ),
+        );
+      })
+      .toList(growable: false);
 }
 
 PlayerSubtitleLine _normalizeChineseCue(PlayerSubtitleLine line) {
@@ -317,12 +413,107 @@ PlayerSubtitleLine _normalizeChineseCue(PlayerSubtitleLine line) {
   );
 }
 
+final RegExp _abbreviationEnd = RegExp(
+  r'\b(Mr|Mrs|Ms|Dr|Prof|Sr|Jr|vs|etc|U\.S|U\.K|e\.g|i\.e)\.$',
+  caseSensitive: false,
+);
+
 bool _englishEndsSentence(String raw) {
   final String text = raw.trim();
   if (text.isEmpty) {
     return false;
   }
-  return RegExp(r'[.?!…]$').hasMatch(text);
+  if (_abbreviationEnd.hasMatch(text)) {
+    return false;
+  }
+  // Allow closing quote after end punctuation.
+  return RegExp(r'[.?!…]["”]?$').hasMatch(text);
+}
+
+bool _englishLooksContinuation(String raw) {
+  final String text = raw.trim();
+  if (text.isEmpty) {
+    return false;
+  }
+  final String first = text[0];
+  return RegExp(r'[a-z]').hasMatch(first);
+}
+
+bool _englishLooksIncomplete(String raw) {
+  final String text = raw.trim();
+  if (text.isEmpty) {
+    return true;
+  }
+  if (_englishEndsSentence(text)) {
+    return false;
+  }
+  if (RegExp(r'[,:;—–-]$').hasMatch(text)) {
+    return true;
+  }
+  return RegExp(
+    r'\b(and|or|but|that|which|who|whom|whose|to|of|for|with|in|on|at|a|an|the|as|if|when|while|because|so)$',
+    caseSensitive: false,
+  ).hasMatch(text);
+}
+
+bool _shouldMergeEnglishCues({
+  required String previous,
+  required String next,
+  required int gapMs,
+  required int maxGapMs,
+}) {
+  if (gapMs > maxGapMs) {
+    return false;
+  }
+  if (!_englishEndsSentence(previous)) {
+    return true;
+  }
+  // False period (abbr) already handled. Rare: Whisper ends mid-thought with
+  // "." then continues lowercase — keep merging for a complete sentence.
+  return _englishLooksContinuation(next);
+}
+
+List<SubtitleSentence> _coalesceIncompleteSentences(
+  List<SubtitleSentence> input, {
+  required int maxGapMs,
+}) {
+  if (input.length < 2) {
+    return input;
+  }
+  final List<SubtitleSentence> out = <SubtitleSentence>[];
+  for (final SubtitleSentence sentence in input) {
+    if (out.isEmpty) {
+      out.add(sentence);
+      continue;
+    }
+    final SubtitleSentence prev = out.last;
+    final int gap = sentence.startMs - prev.endMs;
+    final bool merge =
+        gap <= maxGapMs &&
+        (_englishLooksIncomplete(prev.english) ||
+            (_englishLooksContinuation(sentence.english) &&
+                !_englishEndsSentence(prev.english)));
+    if (!merge) {
+      out.add(sentence);
+      continue;
+    }
+    out[out.length - 1] = SubtitleSentence(
+      startMs: prev.startMs,
+      endMs: sentence.endMs,
+      english: _joinEnglish(<String>[prev.english, sentence.english]),
+      chinese: <String>[prev.chinese, sentence.chinese]
+          .map((String s) => s.trim())
+          .where((String s) => s.isNotEmpty)
+          .join(' '),
+      fragmentStartMs: <int>[
+        ...prev.fragmentStartMs,
+        ...sentence.fragmentStartMs,
+      ],
+      fragmentEndMs: <int>[...prev.fragmentEndMs, ...sentence.fragmentEndMs],
+      words: <PlayerSubtitleWord>[...prev.words, ...sentence.words],
+    );
+  }
+  return out;
 }
 
 String _joinEnglish(Iterable<String> parts) {
@@ -397,6 +588,36 @@ List<int> _asIntList(Object? value) {
     if (n != null) {
       out.add(n);
     }
+  }
+  return out;
+}
+
+List<PlayerSubtitleWord> _asWords(Object? value) {
+  if (value is! List) {
+    return const <PlayerSubtitleWord>[];
+  }
+  final List<PlayerSubtitleWord> out = <PlayerSubtitleWord>[];
+  for (final Object? item in value) {
+    if (item is! Map) {
+      continue;
+    }
+    final String text = '${item['text'] ?? ''}'.trim();
+    final int? startMs = _asInt(item['startMs']);
+    final int? endMs = _asInt(item['endMs']);
+    if (text.isEmpty || startMs == null || endMs == null || endMs <= startMs) {
+      continue;
+    }
+    final double? confidence = item['confidence'] is num
+        ? (item['confidence'] as num).toDouble()
+        : null;
+    out.add(
+      PlayerSubtitleWord(
+        text: text,
+        startMs: startMs,
+        endMs: endMs,
+        confidence: confidence,
+      ),
+    );
   }
   return out;
 }

@@ -541,7 +541,7 @@ void main() {
               required LearningSettingsState settings,
             }) async {
               expect(progress.last.phase, AsrSubtitlePhase.translating);
-              expect(progress.last.label, '正在翻译中文字幕 0/1 句');
+              expect(progress.last.label, '正在翻译中文字幕 0/1 句（0%）');
               return '你好。';
             },
       );
@@ -562,6 +562,15 @@ void main() {
             )
             .map((AsrSubtitleProgress value) => value.completedTranslations),
         <int>[0, 1],
+      );
+      expect(
+        progress
+            .where(
+              (AsrSubtitleProgress value) =>
+                  value.phase == AsrSubtitlePhase.repairing,
+            )
+            .isNotEmpty,
+        isTrue,
       );
       expect(progress[progress.length - 2].phase, AsrSubtitlePhase.finalizing);
       expect(progress.last.phase, AsrSubtitlePhase.completed);
@@ -1576,7 +1585,7 @@ void main() {
       (AsrSubtitleProgress value) =>
           value.phase == AsrSubtitlePhase.recognizing,
     );
-    expect(recognized.label, '已识别到 1:31 / 2:00');
+    expect(recognized.label, '语音识别 2/2 段（100%）· 1:31 / 2:00');
     expect(recognized.value, closeTo(91000 / 120000, 0.001));
     expect(recognized.previewText, 'chunk');
     expect(progress.last.label, '字幕生成完成');

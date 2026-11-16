@@ -18,6 +18,8 @@ class StudyBottomControls extends StatelessWidget {
     required this.onTogglePlaying,
     required this.onOpenLoopSheet,
     required this.onOpenWordCards,
+    this.onOpenShadowing,
+    this.shadowingSelected = false,
     this.onSeek,
     this.onSpeedSelected,
     this.onOpenSpeedSheet,
@@ -38,6 +40,10 @@ class StudyBottomControls extends StatelessWidget {
   final VoidCallback onTogglePlaying;
   final VoidCallback onOpenLoopSheet;
   final VoidCallback onOpenWordCards;
+
+  /// Persistent 跟读 entry — always visible in the bottom bar when set.
+  final VoidCallback? onOpenShadowing;
+  final bool shadowingSelected;
   final ValueChanged<double>? onSeek;
   final ValueChanged<String>? onSpeedSelected;
   final VoidCallback? onOpenSpeedSheet;
@@ -234,6 +240,16 @@ class StudyBottomControls extends StatelessWidget {
                     selected: isLooping,
                     colors: colors,
                     onPressed: onOpenLoopSheet,
+                  ),
+                ),
+                Expanded(
+                  child: _IconAction(
+                    key: const ValueKey<String>('study-chip-shadowing'),
+                    icon: Icons.mic_rounded,
+                    label: '跟读',
+                    selected: shadowingSelected,
+                    colors: colors,
+                    onPressed: onOpenShadowing ?? () {},
                   ),
                 ),
                 Expanded(

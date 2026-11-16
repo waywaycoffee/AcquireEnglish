@@ -1,18 +1,25 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:flutter/widgets.dart';
 import 'package:hive_ce/hive.dart';
+import 'package:path_provider/path_provider.dart';
 
+import '../library/presentation/library_catalog_provider.dart';
 import '../library/presentation/library_mock_data.dart';
 import '../player/presentation/asr_subtitle_job.dart';
 import '../settings/presentation/settings_provider.dart';
+import 'reset_episode_subtitles.dart';
 import 'subtitle_completion_background.dart';
 import 'subtitle_completion_enqueue.dart';
 import 'subtitle_completion_queue.dart';
+import 'subtitle_completion_runtime.dart';
 import 'subtitle_completion_worker.dart';
 
-/// Foreground runner: while the app is open, drains the subtitle completion
-/// queue one episode at a time (keeps draining during playback).
+/// Drains the subtitle completion queue one episode at a time.
+///
+/// Android: [SubtitleCompletionRuntime] keeps a foreground service + overlay
+/// ball alive so work continues across background / lock screen.
 class SubtitleCompletionScheduler with WidgetsBindingObserver {
   SubtitleCompletionScheduler._();
 
@@ -23,7 +30,10 @@ class SubtitleCompletionScheduler with WidgetsBindingObserver {
   SubtitleCompletionWorker? _worker;
   LearningSettingsState Function()? _settingsReader;
   List<LibraryCourseData> Function()? _catalogReader;
+  LibraryCatalogNotifier Function()? _catalogNotifier;
   SubtitleCompletionPersistedHook? _onPersisted;
+  SubtitleCompletionProgress? _onProgress;
+  void Function()? _onQueueChanged;
   bool _attached = false;
   bool _busy = false;
   bool _playerActive = false;
@@ -35,12 +45,18 @@ class SubtitleCompletionScheduler with WidgetsBindingObserver {
   void attach({
     required LearningSettingsState Function() settingsReader,
     List<LibraryCourseData> Function()? catalogReader,
+    LibraryCatalogNotifier Function()? catalogNotifier,
     SubtitleCompletionPersistedHook? onPersisted,
+    SubtitleCompletionProgress? onProgress,
+    void Function()? onQueueChanged,
     SubtitleCompletionWorker? worker,
   }) {
     _settingsReader = settingsReader;
     _catalogReader = catalogReader;
+    _catalogNotifier = catalogNotifier;
     _onPersisted = onPersisted;
+    _onProgress = onProgress;
+    _onQueueChanged = onQueueChanged;
     _worker =
         worker ??
         SubtitleCompletionWorker(queue: queue, onPersisted: onPersisted);
@@ -88,13 +104,17 @@ class SubtitleCompletionScheduler with WidgetsBindingObserver {
     if (state == AppLifecycleState.resumed) {
       _startHeartbeat();
       unawaited(_bootstrap());
-    } else if (state == AppLifecycleState.paused) {
-      // Keep Whisper running across brief locks / app switches. Cancelling here
-      // burned maxAttempts and left imports permanently failed overnight.
-      _heartbeat?.cancel();
+    } else if (state == AppLifecycleState.inactive) {
+      // Android 12+: start FGS *before* paused, while start is still allowed.
+      unawaited(_promoteToBackgroundRuntime());
+    } else if (state == AppLifecycleState.paused ||
+        state == AppLifecycleState.hidden) {
+      // Do not cancel in-flight Whisper. Keep draining via FGS kicks.
+      unawaited(_promoteToBackgroundRuntime());
     } else if (state == AppLifecycleState.detached) {
       _heartbeat?.cancel();
       _token?.cancel();
+      unawaited(SubtitleCompletionRuntime.instance.stop());
     }
   }
 
@@ -108,16 +128,70 @@ class SubtitleCompletionScheduler with WidgetsBindingObserver {
     });
   }
 
+  Future<void> _promoteToBackgroundRuntime() async {
+    try {
+      if (!await queue.hasPendingWork()) {
+        return;
+      }
+      await SubtitleCompletionRuntime.instance.ensureRunning();
+      // Heartbeat alone is paused by OS; FGS repeat + this kick keep draining.
+      _startHeartbeat();
+      kick(delay: Duration.zero);
+    } catch (_) {}
+  }
+
   Future<void> _bootstrap() async {
     await queue.recoverInterrupted();
-    // Import jobs often failed while Bailian key was missing; reopen them so
-    // the worker can drain with local Whisper (or a fixed cloud key).
+    // Reopen failed jobs (including EN→ZH translation timeouts) so episode 2+
+    // Chinese fill can drain again after a fix / network recovery.
     try {
-      await queue.requeueFailedJobs(onlyConfigErrors: true);
+      await queue.requeueFailedJobs(onlyConfigErrors: false);
     } catch (_) {}
     await _consumeBackgroundNudge();
+    await _maybeReimportSubtitlesFromFlag();
+    // Re-attach on-disk ASR before enqueue scan so "already generated"
+    // subtitles show as linked and are not treated as missing.
+    try {
+      await _catalogNotifier?.call().relinkAllEpisodeSubtitleFiles();
+    } catch (_) {}
     await _scanCatalogIfNeeded();
     kick(delay: Duration.zero);
+  }
+
+  /// One-shot: `files/reimport_subtitles.flag` → reimport every course.
+  Future<void> _maybeReimportSubtitlesFromFlag() async {
+    final LibraryCatalogNotifier Function()? notifierReader = _catalogNotifier;
+    final List<LibraryCourseData> Function()? catalogReader = _catalogReader;
+    final LearningSettingsState Function()? settingsReader = _settingsReader;
+    if (notifierReader == null || catalogReader == null) {
+      return;
+    }
+    try {
+      final Directory root = await getApplicationSupportDirectory();
+      final File flag = File(
+        '${root.path}${Platform.pathSeparator}$kReimportSubtitlesFlagName',
+      );
+      if (!flag.existsSync()) {
+        return;
+      }
+      try {
+        await flag.delete();
+      } catch (_) {}
+      final LibraryCatalogNotifier catalog = notifierReader();
+      final String? cookie = settingsReader
+          ?.call()
+          .resolvedBilibiliCookieHeader;
+      for (final LibraryCourseData course in catalogReader()) {
+        if (course.episodes.isEmpty) {
+          continue;
+        }
+        await reimportCourseSubtitles(
+          catalog: catalog,
+          course: course,
+          bilibiliCookieHeader: cookie,
+        );
+      }
+    } catch (_) {}
   }
 
   Future<void> _consumeBackgroundNudge() async {
@@ -139,7 +213,13 @@ class SubtitleCompletionScheduler with WidgetsBindingObserver {
     }
     _scanning = true;
     try {
-      await enqueuePendingSubtitleCompletionsForCatalog(courses: reader());
+      final String? cookie = _settingsReader
+          ?.call()
+          .resolvedBilibiliCookieHeader;
+      await enqueuePendingSubtitleCompletionsForCatalog(
+        courses: reader(),
+        bilibiliCookieHeader: cookie,
+      );
     } catch (_) {
     } finally {
       _scanning = false;
@@ -150,13 +230,23 @@ class SubtitleCompletionScheduler with WidgetsBindingObserver {
     if (_busy || _settingsReader == null) {
       return;
     }
-    final AppLifecycleState? life = WidgetsBinding.instance.lifecycleState;
-    if (life != null &&
-        life != AppLifecycleState.resumed &&
-        life != AppLifecycleState.inactive) {
+    if (!await queue.hasPendingWork()) {
+      await SubtitleCompletionRuntime.instance.stop();
       return;
     }
-    if (!await queue.hasPendingWork()) {
+    // Start FGS + floating ball before work so background/lock cannot freeze us.
+    final bool runtimeOk =
+        await SubtitleCompletionRuntime.instance.ensureRunning();
+    final AppLifecycleState? life = WidgetsBinding.instance.lifecycleState;
+    final bool foregroundish =
+        life == null ||
+        life == AppLifecycleState.resumed ||
+        life == AppLifecycleState.inactive;
+    // Background drain requires a live FGS. If start failed (often: started
+    // too late after pause), skip this tick — resume will retry.
+    if (!foregroundish &&
+        !runtimeOk &&
+        !SubtitleCompletionRuntime.instance.isActive) {
       return;
     }
     _busy = true;
@@ -172,10 +262,18 @@ class SubtitleCompletionScheduler with WidgetsBindingObserver {
               .processNext(
                 settings: _settingsReader!(),
                 cancellationToken: token,
+                onProgress: (String episodeId, String label) {
+                  _onProgress?.call(episodeId, label);
+                  _onQueueChanged?.call();
+                  unawaited(_publishRuntimeProgress(label));
+                },
               );
+      _onQueueChanged?.call();
       if (ran && !token.isCancelled) {
-        // Chain the next pending import job while the app stays open.
+        // Chain the next pending import job (works in background via FGS).
         kick(delay: const Duration(milliseconds: 200));
+      } else if (!await queue.hasPendingWork()) {
+        await SubtitleCompletionRuntime.instance.stop();
       }
     } finally {
       if (identical(_token, token)) {
@@ -183,5 +281,43 @@ class SubtitleCompletionScheduler with WidgetsBindingObserver {
       }
       _busy = false;
     }
+  }
+
+  Future<void> _publishRuntimeProgress(String label) async {
+    try {
+      await SubtitleCompletionRuntime.instance.updateProgress(
+        label: label,
+        progress: _progressFromLabel(label),
+      );
+    } catch (_) {}
+  }
+
+  double _progressFromLabel(String label) {
+    final String live = label.trim();
+    final RegExpMatch? pct =
+        RegExp(r'（(\d{1,3})%）').firstMatch(live) ??
+        RegExp(r'(\d{1,3})%').firstMatch(live);
+    if (pct != null) {
+      final int value = int.tryParse(pct.group(1) ?? '') ?? 0;
+      return (value / 100).clamp(0.0, 1.0);
+    }
+    final RegExpMatch? frac = RegExp(r'(\d+)\s*/\s*(\d+)').firstMatch(live);
+    if (frac != null) {
+      final int done = int.tryParse(frac.group(1) ?? '') ?? 0;
+      final int total = int.tryParse(frac.group(2) ?? '') ?? 0;
+      if (total > 0) {
+        return (done / total).clamp(0.0, 1.0);
+      }
+    }
+    if (live.contains('完成') || live.contains('已就绪') || live.contains('已补全')) {
+      return 0.96;
+    }
+    if (live.contains('翻译') || live.contains('中文')) {
+      return 0.72;
+    }
+    if (live.contains('英文') || live.contains('语音') || live.contains('Whisper')) {
+      return 0.42;
+    }
+    return 0.18;
   }
 }

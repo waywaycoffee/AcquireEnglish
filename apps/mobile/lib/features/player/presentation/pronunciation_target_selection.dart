@@ -25,9 +25,8 @@ PronunciationTargetSelection selectPronunciationTarget({
   if (videoSource == null || videoSource.trim().isEmpty || !videoReady) {
     return const PronunciationTargetSelection.unavailable('视频暂不可用');
   }
-  if (videoSource.startsWith('http://') || videoSource.startsWith('https://')) {
-    return const PronunciationTargetSelection.unavailable('远程视频暂不支持原声提取');
-  }
+  // Remote streams can still be recorded/scored against subtitle text; local
+  // reference-waveform extraction may fail and is handled as a soft warning.
   if (videoDuration <= Duration.zero) {
     return const PronunciationTargetSelection.unavailable('视频时长暂不可用');
   }

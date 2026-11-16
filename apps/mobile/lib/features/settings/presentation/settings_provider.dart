@@ -104,20 +104,46 @@ const List<String> oralCoachBackendOptions = <String>[
   '本地 TTS',
 ];
 
-/// Prod LiveTalking on the GPU box (Tailscale MagicDNS; ATS-friendly vs raw IP).
-const String defaultLiveTalkingUrl = 'http://5060ti.tailc30b42.ts.net:8010';
+/// Public HTTPS reverse proxy on ECS → GPU LiveTalking (phones must use this).
+const String defaultLiveTalkingUrlPublic =
+    'https://acquireenglish.curlhairai.com/livetalking';
 
-/// Same host as [defaultLiveTalkingUrl], Tailscale CGNAT IP fallback.
+/// Same-WiFi GPU box (optional LAN shortcut; not required).
+const String defaultLiveTalkingUrlLan = 'http://192.168.31.121:8010';
+
+/// @Deprecated Tailscale-only — do not use on phones.
+const String defaultLiveTalkingUrl = defaultLiveTalkingUrlPublic;
+
+/// @Deprecated Tailscale CGNAT — do not use on phones.
 const String defaultLiveTalkingUrlIp = 'http://100.115.252.55:8010';
+
+/// Probe order for digital-human connect (public HTTPS first).
+const List<String> liveTalkingUrlCandidates = <String>[
+  defaultLiveTalkingUrlPublic,
+  defaultLiveTalkingUrlLan,
+];
 
 /// Default wav2lip avatar id on the GPU LiveTalking checkout.
 const String defaultLiveTalkingAvatarId = 'wav2lip_avatar_glass_man';
 
+/// Public STUN + TURNS so phones can receive GPU WebRTC media without Tailscale.
+/// Mirrors `GET /coach/api/health` → `webrtc_ice_servers`.
+const List<Map<String, dynamic>> defaultLiveTalkingIceServers =
+    <Map<String, dynamic>>[
+      <String, dynamic>{'urls': 'stun:stun.l.google.com:19302'},
+      <String, dynamic>{
+        'urls': 'turns:turn.curlhairai.com:443?transport=tcp',
+        'username': 'acquire',
+        'credential': 'sElj0IvyOQCe7vb6VIDCW8ax3KcKv3VT',
+      },
+    ];
+
 /// Same GPU box as LiveTalking — Ollama OpenAI-compatible API (no cloud rate limits).
 const String defaultOllamaBaseUrl = 'http://100.115.252.55:11434/v1';
 
-/// Ollama library tag for ~7B translation on 5060 Ti (stable EN↔ZH, shares VRAM with LiveTalking).
-const String defaultOllamaTranslationModel = 'qwen2.5:7b';
+/// Ollama tag currently installed on 5060 Ti (EN↔ZH). Prefer 3b while sharing
+/// VRAM with LiveTalking; pull `qwen2.5:7b` later if quality needs a bump.
+const String defaultOllamaTranslationModel = 'qwen2.5:3b';
 
 const String _learningSettingsStorageKey = 'learning_settings_v1';
 
@@ -228,7 +254,7 @@ class LearningSettingsState {
     required this.ttsRate,
     this.cloudApiBaseUrl = '',
     this.oralCoachBackend = '视频陪练管线',
-    this.oralCoachServerUrl = defaultLiveTalkingUrl,
+    this.oralCoachServerUrl = defaultLiveTalkingUrlPublic,
     this.oralCoachPipelineUrl = 'https://acquireenglish.curlhairai.com/coach',
     this.voicePracticeServerUrl = '',
     this.liveKitUrl =
@@ -238,8 +264,9 @@ class LearningSettingsState {
   });
 
   factory LearningSettingsState.defaults() {
+    // EN↔ZH defaults to GPU-box Ollama (qwen2.5) — not DeepSeek / OpenAI cloud.
     final TranslationProviderPreset defaultPreset =
-        translationProviderPresets['OpenAI']!;
+        translationProviderPresets['本地 Ollama']!;
     // Phone installs often lack dart-define Bailian keys — default on-device.
     final TranslationProviderPreset defaultAsrPreset =
         asrProviderPresets['本地 Whisper']!;
@@ -254,7 +281,7 @@ class LearningSettingsState {
       subtitleWordHighlightBorderWidth: 2.5,
       reminder: false,
       translationProvider: defaultPreset.name,
-      translationApiKey: '',
+      translationApiKey: 'ollama',
       translationApiSecret: '',
       translationBaseUrl: defaultPreset.baseUrl,
       translationModel: defaultPreset.model,
@@ -340,19 +367,31 @@ class LearningSettingsState {
 
   bool get usesLiveKit => liveKitUrl.trim().isNotEmpty;
 
-  /// LiveTalking / 数字人 base URL (settings → prod Tailscale default).
+  /// LiveTalking / 数字人 base URL (settings → public HTTPS).
   String get resolvedOralCoachServerUrl {
     final String fromSettings = oralCoachServerUrl.trim();
     if (fromSettings.isNotEmpty) {
-      return fromSettings.replaceAll(RegExp(r'/+$'), '');
+      final String normalized = fromSettings.replaceAll(RegExp(r'/+$'), '');
+      // Migrate away from Tailscale-only endpoints on phones.
+      if (normalized.contains('100.115.252.55') ||
+          normalized.contains('ts.net')) {
+        return defaultLiveTalkingUrlPublic;
+      }
+      return normalized;
     }
-    return defaultLiveTalkingUrl;
+    return defaultLiveTalkingUrlPublic;
   }
 
-  /// Pipeline mode still benefits from a reachable avatar host.
+  /// Show a coach stage (local avatar / fixed motions). Does **not** imply
+  /// LiveTalking WebRTC lip-sync — that is [usesRealtimeLipSync] only.
   bool get wantsDigitalHumanAvatar =>
       usesLiveTalkingCoach ||
-      (usesOralCoachPipeline && resolvedOralCoachServerUrl.isNotEmpty);
+      usesOralCoachPipeline ||
+      oralCoachBackend == '本地 TTS';
+
+  /// Real-time wav2lip WebRTC on the GPU box. Expensive; default pipeline
+  /// conversation uses a local avatar + TTS instead.
+  bool get usesRealtimeLipSync => usesLiveTalkingCoach;
 
   bool get isBilibiliLoggedIn => hasBilibiliCookie;
 
@@ -650,20 +689,21 @@ class LearningSettingsNotifier extends Notifier<LearningSettingsState> {
       );
       LearningSettingsState coerced =
           _fallbackLocalWhisperIfCloudKeyMissing(loaded);
+      coerced = _preferGpuOllamaTranslation(coerced);
       // Prod LiveKit was added after some installs saved an empty liveKitUrl.
       if (coerced.liveKitUrl.trim().isEmpty) {
         coerced = coerced.copyWith(
           liveKitUrl: LearningSettingsState.defaults().liveKitUrl,
         );
       }
-      // Digital-human LiveTalking URL used to default empty — fill Tailscale host.
-      // Prefer MagicDNS over the raw CGNAT IP (iOS ATS / clearer DNS).
+      // Digital-human URL: always public HTTPS for phones (no Tailscale).
       final String oralCoachUrl = coerced.oralCoachServerUrl.trim();
       if (oralCoachUrl.isEmpty ||
-          oralCoachUrl == 'http://100.115.252.55:8010' ||
-          oralCoachUrl == 'http://100.115.252.55:8010/') {
+          oralCoachUrl.contains('100.115.252.55') ||
+          oralCoachUrl.contains('ts.net') ||
+          oralCoachUrl.contains('192.168.31.121')) {
         coerced = coerced.copyWith(
-          oralCoachServerUrl: defaultLiveTalkingUrl,
+          oralCoachServerUrl: defaultLiveTalkingUrlPublic,
         );
       }
       // Typo host that breaks DNS (caurlhairai → curlhairai).
@@ -680,6 +720,9 @@ class LearningSettingsNotifier extends Notifier<LearningSettingsState> {
       );
       _scheduleApplyCloudApiBase(coerced);
       if (coerced.asrProvider != loaded.asrProvider ||
+          coerced.translationProvider != loaded.translationProvider ||
+          coerced.translationBaseUrl != loaded.translationBaseUrl ||
+          coerced.translationModel != loaded.translationModel ||
           coerced.liveKitUrl != loaded.liveKitUrl ||
           coerced.oralCoachPipelineUrl != loaded.oralCoachPipelineUrl ||
           coerced.oralCoachServerUrl != loaded.oralCoachServerUrl ||
@@ -735,6 +778,40 @@ class LearningSettingsNotifier extends Notifier<LearningSettingsState> {
       asrBaseUrl: local.baseUrl,
       asrModel: local.model.isEmpty ? 'base.en' : local.model,
       useCustomAsrEndpoint: false,
+    );
+  }
+
+  /// Point EN↔ZH at 5060 Ti Ollama when the user never configured a paid API.
+  ///
+  /// Keeps DeepSeek / OpenAI / etc. if they already saved a real key.
+  LearningSettingsState _preferGpuOllamaTranslation(
+    LearningSettingsState settings,
+  ) {
+    final TranslationProviderPreset ollama =
+        translationProviderPresets['本地 Ollama']!;
+    final String provider = settings.translationProvider.trim();
+    final String key = settings.translationApiKey.trim();
+    final bool unpaidCloud =
+        (provider == 'OpenAI' ||
+            provider == 'DeepSeek' ||
+            provider == 'OpenRouter' ||
+            provider == 'SiliconFlow') &&
+        (key.isEmpty || key == 'ollama');
+    final bool alreadyOllama = provider == '本地 Ollama';
+    if (!unpaidCloud && !alreadyOllama) {
+      return settings;
+    }
+    final String model = settings.translationModel.trim();
+    final bool staleSevenB = model == 'qwen2.5:7b' || model.isEmpty;
+    return settings.copyWith(
+      translationProvider: ollama.name,
+      translationBaseUrl: settings.useCustomTranslationEndpoint
+          ? settings.translationBaseUrl
+          : ollama.baseUrl,
+      translationModel: alreadyOllama && !staleSevenB
+          ? settings.translationModel
+          : ollama.model,
+      translationApiKey: key.isEmpty ? 'ollama' : settings.translationApiKey,
     );
   }
 
@@ -796,6 +873,7 @@ class LearningSettingsNotifier extends Notifier<LearningSettingsState> {
       availableTranslationModels: isOllama
           ? <String>[
               defaultOllamaTranslationModel,
+              'qwen2.5:7b',
               'qwen3:8b',
               'qwen3:4b',
             ]

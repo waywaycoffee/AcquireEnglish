@@ -25,7 +25,8 @@ typedef BilingualPhaseListener = void Function(BilingualPipelinePhase phase);
 typedef BilingualProgressListener = void Function(String label);
 typedef BilingualTranslationFallback = void Function();
 
-/// Orchestrates on-device OCR while playing, then optional AI translate + ASR.
+/// Orchestrates speech (ASR) fill/proofread, then optional AI translate.
+/// Frame OCR is intentionally disabled — hardsub OCR was too often wrong.
 class BilingualSubtitlePipeline {
   BilingualSubtitlePipeline({
     required this.episodeId,
@@ -36,6 +37,7 @@ class BilingualSubtitlePipeline {
     this.player,
     this.onPhaseChanged,
     this.onProgress,
+    this.onProofreadProgress,
     this.onNeedTranslationFallback,
     this.slowTimeout = const Duration(seconds: 4),
     // Start ZH→EN quickly so Chinese softsubs are not stuck English-empty
@@ -44,11 +46,11 @@ class BilingualSubtitlePipeline {
     this.minFilledCues = 2,
     this.sampler,
     this.wordLookup = const WordLookupService(),
-    this.asrRunner = const AsrSubtitleJobRunner(),
+    AsrSubtitleJobRunner? asrRunner,
     this.cache = const AsrSubtitleCache(),
     this.supportDirectory,
     this.onBilingualReady,
-  });
+  }) : asrRunner = asrRunner ?? AsrSubtitleJobRunner();
 
   final String episodeId;
   final String videoPath;
@@ -58,6 +60,9 @@ class BilingualSubtitlePipeline {
   final Player? player;
   final BilingualPhaseListener? onPhaseChanged;
   final BilingualProgressListener? onProgress;
+
+  /// 0..1 while speech proofreading is running.
+  final void Function(double value)? onProofreadProgress;
 
   /// Fired when burned-in OCR needs ZH→EN to fill remaining English holes.
   final BilingualTranslationFallback? onNeedTranslationFallback;
@@ -100,9 +105,9 @@ class BilingualSubtitlePipeline {
   String get statusLabel {
     switch (_phase) {
       case BilingualPipelinePhase.ocrRunning:
-        return '正在识别画面字幕…';
+        return '正在用语音补全字幕…';
       case BilingualPipelinePhase.ocrSlow:
-        return '画面字幕收益不足';
+        return '语音补全较慢，可点「重新识别」';
       case BilingualPipelinePhase.translating:
         return '正在翻译补全…';
       case BilingualPipelinePhase.asrProofreading:
@@ -538,127 +543,43 @@ class BilingualSubtitlePipeline {
     }
     _lockKey = lockKey;
     _filledCount = 0;
-    final bool chineseTimed = seed.any(
-      (PlayerSubtitleLine line) =>
-          looksChinese(line.chinese) ||
-          (looksChinese(line.english) && !looksEnglish(line.english)),
-    );
-    // Timed Chinese cues keep the timeline. Never OCR them. Speech (ASR) is
-    // the English source — do not ZH→EN in parallel, or paraphrases flood the
-    // list and hide audio mismatches for the whole fill.
-    if (chineseTimed) {
-      try {
-        _ocrProofreadOnly = true;
-        if (_canRunLocalAsr()) {
-          _setPhase(BilingualPipelinePhase.asrProofreading);
-          onProgress?.call('正在用语音对齐英文…');
-          try {
-            await proofreadEnglishWithAsr(force: true);
-          } catch (_) {
-            // Fall through to translation for remaining holes.
-          }
-          final MissingSubtitleSide afterAsr = detectMissingSubtitleSide(
-            getLines(),
-          );
-          if (!_cancelled &&
-              (afterAsr == MissingSubtitleSide.english ||
-                  afterAsr == MissingSubtitleSide.both ||
-                  afterAsr == MissingSubtitleSide.chinese)) {
-            onProgress?.call('语音对齐后补全缺失侧…');
-            _requestTranslationFallback();
-          }
-        } else if (_missing != MissingSubtitleSide.none) {
-          _setPhase(BilingualPipelinePhase.translating);
-          onProgress?.call('正在把中文字幕翻译成英文…');
-          _requestTranslationFallback();
-        } else {
-          _setPhase(BilingualPipelinePhase.completed);
-          onProgress?.call('双语字幕已就绪');
+    // Never OCR hardsubs from the video frame — glued/wrong text is common.
+    // Speech (ASR) owns English; translation only fills leftover holes.
+    _ocrProofreadOnly = true;
+    try {
+      if (_canRunLocalAsr()) {
+        _setPhase(BilingualPipelinePhase.asrProofreading);
+        onProgress?.call('正在用语音对齐英文…');
+        try {
+          await proofreadEnglishWithAsr(force: true);
+        } catch (_) {
+          // Fall through to translation for remaining holes.
         }
-      } finally {
-        _releaseLock();
-      }
-      return;
-    }
-    _ocrProofreadOnly =
-        proofreadExisting ||
-        seed.any(
-          (PlayerSubtitleLine line) =>
-              looksChinese(line.chinese) ||
-              (looksChinese(line.english) && !looksEnglish(line.english)),
+        final MissingSubtitleSide afterAsr = detectMissingSubtitleSide(
+          getLines(),
         );
-    final bool hearVideoOnly =
-        proofreadExisting && _missing == MissingSubtitleSide.none;
-    if (hearVideoOnly) {
-      _setPhase(BilingualPipelinePhase.asrProofreading);
-      onProgress?.call('正在用语音对齐英文…');
-    } else if (_ocrProofreadOnly) {
-      _setPhase(BilingualPipelinePhase.translating);
-      onProgress?.call('正在把中文字幕翻译成英文…');
-    } else {
-      _setPhase(BilingualPipelinePhase.ocrRunning);
-      onProgress?.call(statusLabel);
-    }
-
-    _slowTimer?.cancel();
-    _slowTimer = Timer(slowTimeout, () {
-      if (_cancelled) {
-        return;
-      }
-      if ((_phase == BilingualPipelinePhase.ocrRunning ||
-              _phase == BilingualPipelinePhase.translating) &&
-          _filledCount < minFilledCues) {
-        _setPhase(BilingualPipelinePhase.ocrSlow);
-        if (_missing == MissingSubtitleSide.chinese) {
-          onProgress?.call('画面字幕较慢，可点「AI 补全」');
-        } else {
-          // Hardsub OCR yielded little English — ask the screen to translate
-          // remaining holes (single writer). OCR keeps running to upgrade.
-          onProgress?.call('画面英文字幕不足，开始翻译补全…');
+        if (!_cancelled &&
+            (afterAsr == MissingSubtitleSide.english ||
+                afterAsr == MissingSubtitleSide.both ||
+                afterAsr == MissingSubtitleSide.chinese)) {
+          onProgress?.call('语音对齐后补全缺失侧…');
           _requestTranslationFallback();
         }
+      } else if (_missing != MissingSubtitleSide.none) {
+        _setPhase(BilingualPipelinePhase.translating);
+        onProgress?.call(
+          _missing == MissingSubtitleSide.english
+              ? '正在把中文字幕翻译成英文…'
+              : '正在翻译补全…',
+        );
+        _requestTranslationFallback();
+      } else {
+        _setPhase(BilingualPipelinePhase.completed);
+        onProgress?.call('双语字幕已就绪');
       }
-    });
-
-    // OCR-first: burned-in Latin English is more accurate than ZH→EN. Only
-    // after [translationFallbackDelay] (or ocrSlow) do we ask for translation.
-    // An existing translation is proofread against the video, not replaced
-    // by another machine translation.
-    _translationFallbackTimer?.cancel();
-    if (hearVideoOnly) {
-      onProgress?.call('正在用语音对齐英文…');
-      unawaited(proofreadEnglishWithAsr());
+    } finally {
+      _releaseLock();
     }
-    _translationFallbackTimer = hearVideoOnly
-        ? null
-        : Timer(translationFallbackDelay, () {
-            if (_cancelled) {
-              return;
-            }
-            final MissingSubtitleSide still = detectMissingSubtitleSide(
-              getLines(),
-            );
-            if (still == MissingSubtitleSide.english ||
-                still == MissingSubtitleSide.both) {
-              onProgress?.call('画面识别进行中，翻译补其余英文…');
-              _requestTranslationFallback();
-            }
-          });
-
-    final OcrSubtitleSampler active =
-        sampler ?? (_ownedSampler ??= OcrSubtitleSampler());
-    onProgress?.call(
-      hearVideoOnly
-          ? '正在用语音对齐英文…'
-          : (_ocrProofreadOnly ? '翻译完成后会用语音校对…' : '正在识别画面英文字幕…'),
-    );
-    await active.start(
-      player: player,
-      videoPath: videoPath,
-      isPlaying: isPlaying,
-      positionMs: positionMs,
-      onCue: _handleOcrCue,
-    );
   }
 
   void _requestTranslationFallback() {
@@ -815,7 +736,8 @@ class BilingualSubtitlePipeline {
       }
 
       _setPhase(BilingualPipelinePhase.asrProofreading);
-      onProgress?.call('正在语音校对字幕…');
+      onProgress?.call('语音校对：正在准备…');
+      onProofreadProgress?.call(0);
 
       // Empty reference: a non-empty list is treated as official English and
       // Whisper never runs, so a wrong translation was copied back as-is.
@@ -830,6 +752,7 @@ class BilingualSubtitlePipeline {
         jobPipeline: 'hear_video',
         onProgress: (AsrSubtitleProgress progress) {
           onProgress?.call(progress.label);
+          onProofreadProgress?.call(progress.value);
         },
       );
 
@@ -948,8 +871,7 @@ class BilingualSubtitlePipeline {
       unawaited(_finishOcrSuccess());
     } else if (_filledCount >= minFilledCues &&
         _phase == BilingualPipelinePhase.ocrSlow) {
-      // Enough yield; keep OCR running silently without nagging AI button.
-      onProgress?.call('正在识别画面英文字幕…');
+      onProgress?.call('正在用语音补全字幕…');
     }
   }
 
@@ -1022,7 +944,7 @@ class BilingualSubtitlePipeline {
     try {
       await _proofreadWithAsr(working, releaseLock: false, force: force);
     } catch (error) {
-      onProgress?.call('语音校对失败：$error');
+      onProgress?.call('语音校对失败：${humanizeAsrSubtitleError(error)}');
       rethrow;
     }
   }
@@ -1050,7 +972,8 @@ class BilingualSubtitlePipeline {
     _asrToken?.cancel();
     _asrToken = token;
     _setPhase(BilingualPipelinePhase.asrProofreading);
-    onProgress?.call('正在语音校对字幕…');
+    onProgress?.call('语音校对：正在准备…');
+    onProofreadProgress?.call(0);
     try {
       // Empty reference: a non-empty list is treated as official English and
       // Whisper never runs, so a wrong translation was copied back as-is.
@@ -1065,6 +988,7 @@ class BilingualSubtitlePipeline {
         jobPipeline: 'hear_video',
         onProgress: (AsrSubtitleProgress progress) {
           onProgress?.call(progress.label);
+          onProofreadProgress?.call(progress.value);
         },
       );
       token.throwIfCancelled();

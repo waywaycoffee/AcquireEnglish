@@ -48,13 +48,13 @@ Future<void> notifyDailyFeedIfEnabled(Box<String> box) async {
   );
   const AndroidNotificationDetails androidDetails = AndroidNotificationDetails(
     'daily_feed',
-    '每日课程',
-    channelDescription: '按学习偏好推送今日课程',
+    '每日推荐',
+    channelDescription: '按兴趣推送 B站英语视频推荐',
   );
   await plugin.show(
     id: 4101,
     title: '爱快英语',
-    body: '今日课程已更新，打开 App 查看推荐。',
+    body: '每日推荐已更新，打开 App 查看 B站视频。',
     notificationDetails: const NotificationDetails(android: androidDetails),
   );
 }

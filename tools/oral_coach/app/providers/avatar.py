@@ -20,18 +20,19 @@ class NoneAvatar:
 class LiveTalkingAvatar:
     name = "livetalking"
 
-    def __init__(self, url: str):
-        self.url = url.rstrip("/")
+    def __init__(self, probe_url: str, client_url: str | None = None):
+        self.probe_url = probe_url.rstrip("/")
+        self.client_url = (client_url or probe_url).rstrip("/")
 
     async def cue(self, text: str) -> AvatarCue:
         # Do NOT POST /human without a WebRTC sessionid — LiveTalking returns
         # code:-1 ("session not found"). The App owns the /offer session and
         # should call /human after connect. We only probe readiness here.
         reachable = False
-        if self.url:
+        if self.probe_url:
             try:
                 async with httpx.AsyncClient(timeout=4.0) as client:
-                    health = await client.get(f"{self.url}/")
+                    health = await client.get(f"{self.probe_url}/")
                     reachable = health.status_code < 500
             except Exception as exc:  # noqa: BLE001 — soft-fail for offline avatar
                 logger.debug("livetalking probe skipped: %s", exc)
@@ -40,7 +41,8 @@ class LiveTalkingAvatar:
             # App connects via WebRTC then speaks coach text with sessionid.
             action="livetalking_connect" if reachable else "livetalking_offline",
             text=text,
-            livetalking_url=self.url,
+            # Always hand the phone a public HTTPS URL (not Tailscale).
+            livetalking_url=self.client_url,
         )
 
 
@@ -69,7 +71,10 @@ class LivePortraitAvatar:
 def build_avatar(settings: Settings):
     name = settings.avatar_provider
     if name == "livetalking":
-        return LiveTalkingAvatar(settings.livetalking_url)
+        return LiveTalkingAvatar(
+            settings.livetalking_url,
+            client_url=settings.livetalking_client_url,
+        )
     if name == "musetalk":
         return MuseTalkAvatar()
     if name == "liveportrait":

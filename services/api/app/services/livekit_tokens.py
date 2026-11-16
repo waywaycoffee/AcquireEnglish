@@ -26,6 +26,7 @@ def create_room_token(
     ttl_seconds: int = 3600,
     can_publish: bool = True,
     can_subscribe: bool = True,
+    agent_name: str | None = "acquire-oral-coach",
 ) -> dict[str, Any]:
     if not livekit_configured():
         raise RuntimeError("LiveKit is not configured on this server.")
@@ -43,6 +44,10 @@ def create_room_token(
             "canPublishData": True,
         },
     }
+    # Explicit AgentDispatch so named workers (acquire-oral-coach) join the room.
+    agent = (agent_name or "").strip()
+    if agent:
+        payload["roomConfig"] = {"agents": [{"agentName": agent}]}
     if name:
         payload["name"] = name
     token = jwt.encode(
@@ -56,4 +61,5 @@ def create_room_token(
         "room": room_name,
         "identity": identity,
         "expires_in": max(60, ttl_seconds),
+        "agent": agent or None,
     }

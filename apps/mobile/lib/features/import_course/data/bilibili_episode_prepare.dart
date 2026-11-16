@@ -5,6 +5,64 @@ import 'package:path_provider/path_provider.dart';
 import '../domain/bilibili_import.dart';
 import 'bilibili_import_service.dart';
 import 'bilibili_multipage.dart';
+import 'subtitle_source_policy.dart';
+
+/// One-shot resync marker after the wrong-official-CC duration fix (v5).
+///
+/// Returns true when this episode still needs a cold purge of local CC/ASR
+/// that may have been produced against the wrong page's media.
+Future<bool> consumeBilibiliSubtitleResyncNeeded({
+  required String episodeId,
+  String? sourceKey,
+  Future<Directory> Function() appSupportDirectory =
+      getApplicationSupportDirectory,
+}) async {
+  final String id = episodeId.trim();
+  if (id.isEmpty) {
+    return false;
+  }
+  final Directory root = await appSupportDirectory();
+  final String safeId = id.replaceAll(RegExp(r'[\\/:*?"<>|]+'), '_');
+  final String safeKey = (sourceKey ?? 'none')
+      .trim()
+      .replaceAll(RegExp(r'[\\/:*?"<>|]+'), '_');
+  final File marker = File(
+    '${root.path}${Platform.pathSeparator}bilibili_resync_v8'
+    '${Platform.pathSeparator}$safeId'
+    '${Platform.pathSeparator}$safeKey.done',
+  );
+  if (marker.existsSync()) {
+    return false;
+  }
+  return true;
+}
+
+Future<void> markBilibiliSubtitleResyncDone({
+  required String episodeId,
+  String? sourceKey,
+  Future<Directory> Function() appSupportDirectory =
+      getApplicationSupportDirectory,
+}) async {
+  final String id = episodeId.trim();
+  if (id.isEmpty) {
+    return;
+  }
+  final Directory root = await appSupportDirectory();
+  final String safeId = id.replaceAll(RegExp(r'[\\/:*?"<>|]+'), '_');
+  final String safeKey = (sourceKey ?? 'none')
+      .trim()
+      .replaceAll(RegExp(r'[\\/:*?"<>|]+'), '_');
+  final File marker = File(
+    '${root.path}${Platform.pathSeparator}bilibili_resync_v8'
+    '${Platform.pathSeparator}$safeId'
+    '${Platform.pathSeparator}$safeKey.done',
+  );
+  await marker.parent.create(recursive: true);
+  await marker.writeAsString(
+    DateTime.now().toUtc().toIso8601String(),
+    flush: true,
+  );
+}
 
 class BilibiliEpisodePrepareResult {
   const BilibiliEpisodePrepareResult({
@@ -128,17 +186,46 @@ Future<BilibiliEpisodePrepareResult> prepareBilibiliEpisode({
     zhPath = null;
   }
   String? note;
+  final int sourcePage = BilibiliImport.extractPage(source) ?? 1;
+  final String? expectedKey = bilibiliEpisodeCacheKey(sourceUrl: source);
+  final bool pathLooksForeign =
+      (enPath != null &&
+          !bilibiliMediaKeysAligned(
+            bilibiliIdKeyFromPath(enPath),
+            expectedKey,
+          )) ||
+      (zhPath != null &&
+          !bilibiliMediaKeysAligned(
+            bilibiliIdKeyFromPath(zhPath),
+            expectedKey,
+          ));
+  // P2+ / mismatched folder keys may still hold unrelated cues under a
+  // plausible path — wipe and re-pull. Duration mismatches are caught later
+  // in the player once media length is known.
+  final bool forceOfficialRefresh =
+      sourcePage > 1 ||
+      bilibiliIdKeyIsSecondaryPage(expectedKey) ||
+      pathLooksForeign;
+  if (forceOfficialRefresh) {
+    // Ignore misaligned paths for this prepare, but do not delete softsub
+    // files on disk — user can regenerate if the re-pull is still wrong.
+    enPath = null;
+    zhPath = null;
+  }
   final bool hasLocalEnglish = enPath != null && enPath.isNotEmpty;
   final bool hasLocalChinese = zhPath != null && zhPath.isNotEmpty;
 
-  // Only skip the network when English is already on disk. ZH-only is not enough.
-  if (hasLocalEnglish) {
-    onProgress?.call(
-      hasLocalChinese ? '使用本地双语字幕' : '使用本地英文字幕',
-    );
+  // Skip network only when both EN+ZH softsubs are already local. EN-only
+  // must still fetch so we pick up official ZH instead of EN→ZH compute.
+  if (hasLocalEnglish && hasLocalChinese && !forceOfficialRefresh) {
+    onProgress?.call('使用本地双语字幕');
   } else {
     onProgress?.call(
-      hasLocalChinese ? '本地仅有中文字幕，正在补拉英文字幕…' : '正在拉取 B 站官方字幕…',
+      hasLocalEnglish && !hasLocalChinese
+          ? '本地已有英文字幕，正在补拉官方中文…'
+          : hasLocalChinese
+          ? '本地仅有中文字幕，正在补拉英文字幕…'
+          : '正在拉取 B 站官方字幕…',
     );
     try {
       final Map<String, String?> tracks = await service
@@ -146,27 +233,22 @@ Future<BilibiliEpisodePrepareResult> prepareBilibiliEpisode({
       final String? fetchedEn = tracks['en'];
       final String? fetchedZh = tracks['zh'];
       note = tracks['note'];
-      final bool fetchedAny =
-          (fetchedEn != null && fetchedEn.isNotEmpty) ||
-          (fetchedZh != null && fetchedZh.isNotEmpty);
       if (fetchedEn != null && fetchedEn.isNotEmpty) {
         enPath = fetchedEn;
       }
-      if (fetchedZh != null && fetchedZh.isNotEmpty) {
-        // Fresh official/AI track always wins over a possibly串台 local ZH.
+      final SubtitleSourceDecision sourcePolicy =
+          SubtitleSourcePolicy.decideEpisode(
+            sourceUrl: source,
+            pagePart: source,
+          );
+      if (fetchedZh != null &&
+          fetchedZh.isNotEmpty &&
+          !sourcePolicy.ignoreOfficialChinese) {
+        // Fresh official track wins over a possibly串台 local ZH.
         zhPath = fetchedZh;
-      } else if (!fetchedAny && hasLocalChinese) {
-        // B站确认本集无 CC，但本地仍有同 BV 的 zh.srt → 视为脏缓存丢掉。
-        final String? idKey =
-            bilibiliIdKeyFromPath(source) ??
-            bilibiliIdKeyFromPath(zhPath) ??
-            bilibiliIdKeyFromPath(enPath);
-        await service.clearOfficialSubtitleFiles(idKey);
-        zhPath = null;
-        if (fetchedEn == null || fetchedEn.isEmpty) {
-          enPath = null;
-        }
       }
+      // Never auto-delete local softsubs. Empty fetch keeps existing files;
+      // user can regenerate manually if they are wrong.
       if ((enPath == null || enPath.isEmpty) &&
           (zhPath == null || zhPath.isEmpty) &&
           (note == null || note.isEmpty)) {
@@ -228,10 +310,15 @@ Future<BilibiliEpisodePrepareResult> prepareBilibiliEpisode({
         note: note,
       );
     }
-    // Stale catalog path (moved/cleared) but BV still matches a cache file.
-    final String? fromStalePath = bilibiliIdKeyFromPath(currentVideoAsset);
-    if (fromStalePath != null && fromStalePath.isNotEmpty) {
-      final String? byName = await service.findExistingLocalCache(fromStalePath);
+    // Stale catalog path (moved/cleared) — probe with the page-aware source,
+    // never a bare BV stripped from a multipage filename.
+    final String? staleProbe =
+        bilibiliEpisodeCacheKey(sourceUrl: source) ??
+        bilibiliIdKeyFromPath(currentVideoAsset);
+    if (staleProbe != null && staleProbe.isNotEmpty) {
+      final String? byName = await service.findExistingLocalCache(
+        source.contains('bilibili.com') ? source : staleProbe,
+      );
       if (isUsableLocalVideoPath(byName)) {
         onProgress?.call('使用已缓存视频');
         return BilibiliEpisodePrepareResult(

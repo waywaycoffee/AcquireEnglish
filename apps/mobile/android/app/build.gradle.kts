@@ -60,6 +60,11 @@ android {
             )
         }
     }
+
+    // Keep Whisper .bin uncompressed so first-run install can stream-copy from the APK.
+    androidResources {
+        noCompress += "bin"
+    }
 }
 
 dependencies {

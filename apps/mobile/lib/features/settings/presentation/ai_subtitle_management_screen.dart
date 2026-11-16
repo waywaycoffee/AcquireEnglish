@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../player/presentation/asr_subtitle_cache.dart';
 import '../../player/presentation/asr_subtitle_job.dart';
+import '../../player/presentation/manual_subtitle_guard.dart';
 import '../../player/presentation/player_mock_state.dart';
 import '../../player/presentation/player_subtitle_loader.dart';
 import '../../shared/presentation/continue_learning_button.dart';
@@ -230,14 +231,28 @@ class _AiSubtitleManagementScreenState
               _selectedPaths.contains(entry.cacheFile.path),
         )
         .toList(growable: false);
-    final bool confirmed = await _confirm(
-      title: '删除所选 ${selected.length} 份字幕？',
-      content: '所选字幕和对应生成断点都会被删除，此操作无法恢复。',
-      action: '删除所选',
-      danger: true,
-    );
+    bool hasManual = false;
+    for (final AiSubtitleCacheEntry entry in selected) {
+      if (await episodeHasManualSubtitleEdits(episodeId: entry.episodeId)) {
+        hasManual = true;
+        break;
+      }
+    }
+    if (!mounted) return;
+    final bool confirmed = hasManual
+        ? await confirmManualSubtitleDestructiveAction(
+            context,
+            action: ManualSubtitleDestructiveAction.delete,
+          )
+        : await _confirm(
+            title: '删除所选 ${selected.length} 份字幕？',
+            content: '所选字幕和对应生成断点都会被删除，此操作无法恢复。',
+            action: '删除所选',
+            danger: true,
+          );
     if (!confirmed) return;
     for (final AiSubtitleCacheEntry entry in selected) {
+      await clearManualSubtitleLocks(episodeId: entry.episodeId);
       await _cache.deleteEntry(entry);
     }
     if (mounted) _reload();
@@ -257,15 +272,28 @@ class _AiSubtitleManagementScreenState
       _message('原视频文件已移动或删除，无法重新生成。');
       return;
     }
-    final bool confirmed = await _confirm(
-      title: '重新生成 AI 字幕？',
-      content: '这会再次调用当前设置中的 AI 服务，可能产生费用。生成失败时会保留现有字幕。',
-      action: '重新生成',
+    final bool hasManual = await episodeHasManualSubtitleEdits(
+      episodeId: entry.episodeId,
     );
+    if (!mounted) return;
+    final bool confirmed = hasManual
+        ? await confirmManualSubtitleDestructiveAction(
+            context,
+            action: ManualSubtitleDestructiveAction.overwrite,
+          )
+        : await _confirm(
+            title: '重新生成 AI 字幕？',
+            content: '这会再次调用当前设置中的 AI 服务，可能产生费用。生成失败时会保留现有字幕。',
+            action: '重新生成',
+          );
     if (!confirmed || !mounted) return;
+    if (hasManual) {
+      await clearManualSubtitleLocks(episodeId: entry.episodeId);
+    }
+    if (!mounted) return;
     setState(() => _regeneratingPath = entry.cacheFile.path);
     try {
-      const AsrSubtitleJobRunner runner = AsrSubtitleJobRunner();
+      final AsrSubtitleJobRunner runner = AsrSubtitleJobRunner();
       final LearningSettingsState settings = ref.read(learningSettingsProvider);
       List<PlayerSubtitleLine> referenceSubtitleLines =
           const <PlayerSubtitleLine>[];
@@ -314,13 +342,25 @@ class _AiSubtitleManagementScreenState
   }
 
   Future<void> _delete(AiSubtitleCacheEntry entry) async {
-    final bool confirmed = await _confirm(
-      title: '删除这份 AI 字幕？',
-      content: '删除后无法恢复，但可以从视频播放页重新生成。',
-      action: '删除',
-      danger: true,
+    final bool hasManual = await episodeHasManualSubtitleEdits(
+      episodeId: entry.episodeId,
     );
+    if (!mounted) return;
+    final bool confirmed = hasManual
+        ? await confirmManualSubtitleDestructiveAction(
+            context,
+            action: ManualSubtitleDestructiveAction.delete,
+          )
+        : await _confirm(
+            title: '删除这份 AI 字幕？',
+            content: '删除后无法恢复，但可以从视频播放页重新生成。',
+            action: '删除',
+            danger: true,
+          );
     if (!confirmed) return;
+    if (hasManual) {
+      await clearManualSubtitleLocks(episodeId: entry.episodeId);
+    }
     await _cache.deleteEntry(entry);
     if (mounted) _reload();
   }

@@ -2,13 +2,15 @@ import 'dart:async';
 import 'dart:io';
 import 'dart:typed_data';
 
+import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
 import 'package:whisper_cpp_flutter_plus/whisper_cpp_flutter_plus.dart';
 
 import '../../settings/presentation/settings_provider.dart';
 
 typedef LocalWhisperProgress = void Function(double? fraction, String message);
 
-/// On-device Whisper.cpp ASR for English courses (tiny.en / base.en / small.en).
+/// On-device Whisper.cpp ASR (English `.en` models + multilingual `tiny`/`base`).
 class LocalWhisperAsr {
   LocalWhisperAsr._();
 
@@ -19,8 +21,18 @@ class LocalWhisperAsr {
     'tiny.en',
     'base.en',
     'small.en',
+    'tiny',
+    'base',
   ];
   static const String defaultModel = 'base.en';
+  static const String defaultMultilingualModel = 'base';
+
+  /// Bundled default English model — avoids first-run Hugging Face download.
+  static const String _bundledBaseEnglishAsset =
+      'assets/whisper/ggml-base.en.bin';
+  static const MethodChannel _whisperAssetsChannel = MethodChannel(
+    'com.acquire.english/whisper_assets',
+  );
 
   final WhisperModelManager _models = WhisperModelManager();
   WhisperEngine? _engine;
@@ -38,15 +50,85 @@ class LocalWhisperAsr {
         return WhisperModelCatalog.tinyEnglish;
       case 'base.en':
         return WhisperModelCatalog.baseEnglish;
+      case 'tiny':
+        return WhisperModelCatalog.tiny;
+      case 'base':
+        return WhisperModelCatalog.base;
       default:
         return null;
     }
   }
 
+  /// English-only models cannot transcribe Chinese.
+  ///
+  /// Chinese speech ASR is opt-in ([LearningSettingsState.enableChineseSpeechAsr])
+  /// and uses the multilingual [defaultMultilingualModel] downloaded in Settings.
+  static String modelForLanguage(
+    String modelId,
+    String language, {
+    bool enableChineseSpeechAsr = false,
+  }) {
+    final String lang = language.trim().toLowerCase();
+    final String id = modelId.trim().isEmpty ? defaultModel : modelId.trim();
+    if (lang.startsWith('zh') || lang == 'chinese' || lang == 'cn') {
+      if (!enableChineseSpeechAsr) {
+        throw StateError(
+          '未开启中文语音识别。请到「设置 → AI生成字幕」开启，并下载多语言 Whisper 模型。',
+        );
+      }
+      if (id.endsWith('.en') || id == 'small.en') {
+        return defaultMultilingualModel;
+      }
+    }
+    return id;
+  }
+
+  static bool isMultilingualModel(String modelId) {
+    final String id = modelId.trim();
+    return id == 'tiny' || id == 'base' || (!id.contains('.en') && id.isNotEmpty);
+  }
+
   static Uri smallEnglishUri() {
     return Uri.parse(
-      'https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-small.en.bin',
+      'https://hf-mirror.com/ggerganov/whisper.cpp/resolve/main/ggml-small.en.bin',
     );
+  }
+
+  /// Domestic mirrors only for normal installs — huggingface.co is often unreachable
+  /// from CN networks and must not be the first (or only) attempt.
+  static List<Uri> _downloadUrisFor(WhisperModelDescriptor catalog) {
+    final String path = catalog.uri.path;
+    final String query = catalog.uri.hasQuery ? '?${catalog.uri.query}' : '';
+    final String fileName = catalog.fileName;
+    return <Uri>[
+      // Primary CN mirror (hf-mirror.com).
+      Uri.parse('https://hf-mirror.com$path$query'),
+      // Same mirror, branch tip (works when revision pin 404s on the mirror).
+      Uri.parse(
+        'https://hf-mirror.com/ggerganov/whisper.cpp/resolve/main/$fileName',
+      ),
+      // Last resort only — many CN networks time out here.
+      catalog.uri,
+    ];
+  }
+
+  static List<Uri> _smallEnglishDownloadUris() {
+    return <Uri>[
+      Uri.parse(
+        'https://hf-mirror.com/ggerganov/whisper.cpp/resolve/main/ggml-small.en.bin',
+      ),
+      Uri.parse(
+        'https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-small.en.bin',
+      ),
+    ];
+  }
+
+  static bool _isDomesticMirrorHost(String host) {
+    final String h = host.toLowerCase();
+    return h.contains('hf-mirror') ||
+        h.contains('modelscope') ||
+        h.contains('aliyuncs') ||
+        h.endsWith('.cn');
   }
 
   Future<bool> isModelReady(String modelId) async {
@@ -75,30 +157,26 @@ class LocalWhisperAsr {
       onProgress?.call(null, '正在检查 Whisper 模型 $id…');
       final WhisperModelDescriptor? catalog = catalogDescriptorFor(id);
       if (catalog != null) {
-        final File? cached = await _models.findCatalogModel(catalog);
+        File? cached = await _findCatalogModelOrClearCorrupt(catalog);
         if (cached != null) {
           onProgress?.call(1, '模型已就绪');
           return;
         }
-        onProgress?.call(
-          0,
-          '正在下载 $id（约 ${_sizeLabel(catalog.approximateBytes)}）…',
-        );
-        await for (final ModelDownloadProgress progress
-            in _models.downloadCatalogModel(catalog)) {
-          final double? fraction = progress.fraction;
+        if (id == 'base.en') {
+          final bool seeded = await _seedBundledBaseEnglish(
+            catalog: catalog,
+            onProgress: onProgress,
+          );
+          if (seeded) {
+            return;
+          }
+          // Prefer mirrors only when the APK somehow lacks the bundled weights.
           onProgress?.call(
-            fraction,
-            fraction == null
-                ? '正在下载 $id…'
-                : '正在下载 $id ${(fraction * 100).clamp(0, 100).round()}%',
+            null,
+            '内置模型安装失败，尝试镜像下载 base.en…',
           );
         }
-        final File? verified = await _models.findCatalogModel(catalog);
-        if (verified == null) {
-          throw StateError('Whisper 模型 $id 下载失败，请检查网络后重试。');
-        }
-        onProgress?.call(1, '模型下载完成');
+        await _downloadCatalogWithMirrors(catalog, onProgress: onProgress);
         return;
       }
 
@@ -110,18 +188,40 @@ class LocalWhisperAsr {
         onProgress?.call(1, '模型已就绪');
         return;
       }
-      onProgress?.call(0, '正在下载 small.en（约 466MB）…');
-      await for (final ModelDownloadProgress progress in _models.download(
-        smallEnglishUri(),
-        'ggml-small.en.bin',
-      )) {
-        final double? fraction = progress.fraction;
-        onProgress?.call(
-          fraction,
-          fraction == null
-              ? '正在下载 small.en…'
-              : '正在下载 small.en ${(fraction * 100).clamp(0, 100).round()}%',
-        );
+      onProgress?.call(0, '正在从国内镜像下载 small.en（约 466MB）…');
+      Object? lastError;
+      for (final Uri uri in _smallEnglishDownloadUris()) {
+        try {
+          final bool domestic = _isDomesticMirrorHost(uri.host);
+          onProgress?.call(
+            0,
+            domestic
+                ? '正在从国内镜像（${uri.host}）下载 small.en…'
+                : '国内镜像不可用，回退 ${uri.host}…',
+          );
+          await for (final ModelDownloadProgress progress in _models.download(
+            uri,
+            'ggml-small.en.bin',
+          )) {
+            final double? fraction = progress.fraction;
+            onProgress?.call(
+              fraction,
+              fraction == null
+                  ? (domestic
+                        ? '正在从国内镜像下载 small.en…'
+                        : '正在下载 small.en…')
+                  : '${domestic ? '国内镜像' : uri.host} small.en '
+                        '${(fraction * 100).clamp(0, 100).round()}%',
+            );
+          }
+          lastError = null;
+          break;
+        } catch (error) {
+          lastError = error;
+        }
+      }
+      if (lastError != null) {
+        throw StateError(_modelDownloadFailureMessage('small.en', lastError));
       }
       final File? small = await _models.find('ggml-small.en.bin');
       if (small == null) {
@@ -134,47 +234,304 @@ class LocalWhisperAsr {
     }
   }
 
+  Future<File?> _findCatalogModelOrClearCorrupt(
+    WhisperModelDescriptor catalog,
+  ) async {
+    try {
+      return await _models.findCatalogModel(catalog);
+    } on FormatException catch (error) {
+      debugPrint('whisper: clearing corrupt ${catalog.fileName}: $error');
+      try {
+        await _models.delete(catalog.fileName);
+      } catch (_) {}
+      try {
+        final File partial = File(
+          '${(await _models.directory).path}/${catalog.fileName}.part',
+        );
+        if (await partial.exists()) {
+          await partial.delete();
+        }
+      } catch (_) {}
+      return null;
+    }
+  }
+
+  Future<bool> _seedBundledBaseEnglish({
+    required WhisperModelDescriptor catalog,
+    LocalWhisperProgress? onProgress,
+  }) async {
+    final Directory dir = await _models.directory;
+    final File target = File('${dir.path}/${catalog.fileName}');
+    onProgress?.call(0.05, '正在安装内置 Whisper 模型 base.en…');
+
+    // 1) Native stream-copy from APK (avoids loading 141MB into Dart heap).
+    if (Platform.isAndroid) {
+      try {
+        final Object? raw = await _whisperAssetsChannel.invokeMethod<Object?>(
+          'copyBundledWhisperModel',
+          <String, Object?>{
+            'destPath': target.path,
+            'assetPath': 'flutter_assets/$_bundledBaseEnglishAsset',
+          },
+        );
+        debugPrint('whisper: native seed result=$raw');
+        final File? verified = await _findCatalogModelOrClearCorrupt(catalog);
+        if (verified != null) {
+          onProgress?.call(1, '内置模型已就绪');
+          return true;
+        }
+      } catch (error) {
+        debugPrint('whisper: native seed failed: $error');
+        onProgress?.call(0.1, '原生安装失败，改用资源解压…');
+      }
+    }
+
+    // 2) Dart AssetBundle fallback (may OOM on weak devices).
+    try {
+      onProgress?.call(0.15, '正在解压内置模型 base.en…');
+      final ByteData data = await rootBundle.load(_bundledBaseEnglishAsset);
+      final File partial = File('${target.path}.part');
+      final IOSink sink = partial.openWrite();
+      try {
+        final Uint8List bytes = data.buffer.asUint8List(
+          data.offsetInBytes,
+          data.lengthInBytes,
+        );
+        const int chunk = 1024 * 1024;
+        for (int offset = 0; offset < bytes.length; offset += chunk) {
+          final int end = (offset + chunk < bytes.length)
+              ? offset + chunk
+              : bytes.length;
+          sink.add(bytes.sublist(offset, end));
+          if (bytes.length > 0) {
+            onProgress?.call(
+              0.15 + 0.75 * (end / bytes.length),
+              '正在解压内置模型 base.en '
+              '${((end / bytes.length) * 100).clamp(0, 100).round()}%',
+            );
+          }
+        }
+      } finally {
+        await sink.close();
+      }
+      if (await target.exists()) {
+        await target.delete();
+      }
+      await partial.rename(target.path);
+      final File? verified = await _findCatalogModelOrClearCorrupt(catalog);
+      if (verified != null) {
+        onProgress?.call(1, '内置模型已就绪');
+        return true;
+      }
+      debugPrint('whisper: dart seed wrote file but SHA check failed');
+      return false;
+    } catch (error) {
+      debugPrint('whisper: dart seed failed: $error');
+      return false;
+    }
+  }
+
+  Future<void> _downloadCatalogWithMirrors(
+    WhisperModelDescriptor catalog, {
+    LocalWhisperProgress? onProgress,
+  }) async {
+    final String id = catalog.id;
+    onProgress?.call(
+      0,
+      '正在从国内镜像下载 $id（约 ${_sizeLabel(catalog.approximateBytes)}）…',
+    );
+    Object? lastError;
+    for (final Uri uri in _downloadUrisFor(catalog)) {
+      final bool domestic = _isDomesticMirrorHost(uri.host);
+      try {
+        onProgress?.call(
+          0,
+          domestic
+              ? '正在从国内镜像（${uri.host}）下载 $id…'
+              : '国内镜像不可用，回退 ${uri.host}…',
+        );
+        await for (final ModelDownloadProgress progress
+            in _models.download(
+          uri,
+          catalog.fileName,
+          sha256Hex: catalog.sha256,
+        )) {
+          final double? fraction = progress.fraction;
+          onProgress?.call(
+            fraction,
+            fraction == null
+                ? (domestic ? '正在从国内镜像下载 $id…' : '正在下载 $id…')
+                : '${domestic ? '国内镜像' : uri.host} $id '
+                      '${(fraction * 100).clamp(0, 100).round()}%',
+          );
+        }
+        final File? verified = await _findCatalogModelOrClearCorrupt(catalog);
+        if (verified == null) {
+          throw StateError('Whisper 模型 $id 校验失败，请重试。');
+        }
+        onProgress?.call(1, '模型下载完成');
+        return;
+      } catch (error) {
+        debugPrint('whisper: download via ${uri.host} failed: $error');
+        lastError = error;
+      }
+    }
+    throw StateError(_modelDownloadFailureMessage(id, lastError));
+  }
+
+  String _modelDownloadFailureMessage(String id, Object? error) {
+    final String detail = error == null ? '' : error.toString();
+    final String lower = detail.toLowerCase();
+    if (lower.contains('socket') ||
+        lower.contains('timed out') ||
+        lower.contains('failed host lookup') ||
+        lower.contains('network') ||
+        lower.contains('connection') ||
+        lower.contains('huggingface')) {
+      return 'Whisper 模型 $id 下载失败：国内镜像与备用源均不可用。'
+          '请检查网络后重试；base.en 也可使用已内置该模型的安装包。';
+    }
+    return 'Whisper 模型 $id 下载失败，请检查网络后重试。';
+  }
+
   Future<Map<String, Object?>> transcribeChunk({
     required File file,
     required LearningSettingsState settings,
     required int offsetMs,
+    String language = 'en',
     LocalWhisperProgress? onProgress,
   }) async {
-    final String modelId = _normalizeModelId(settings.asrModel);
+    final String lang =
+        language.trim().isEmpty ? 'en' : language.trim().toLowerCase();
+    final String requested = modelForLanguage(
+      settings.asrModel,
+      lang,
+      enableChineseSpeechAsr: settings.enableChineseSpeechAsr,
+    );
+    final String modelId = _normalizeModelId(requested);
+    if (lang.startsWith('zh') && !await isModelReady(modelId)) {
+      throw StateError(
+        '中文语音模型尚未下载。请到「设置 → AI生成字幕」下载多语言 Whisper 模型（$modelId）。',
+      );
+    }
     await ensureModel(modelId, onProgress: onProgress);
 
-    // Serialize load+transcribe so import-queue Whisper and player proofread
-    // cannot dispose each other's engine mid-run.
-    final Future<Map<String, Object?>> run = _engineGate.then((_) async {
-      final WhisperEngine engine = await _loadEngine(
-        modelId,
-        onProgress: onProgress,
-      );
-      onProgress?.call(null, '本地 Whisper 识别中…');
-
-      final Float32List samples;
-      try {
-        samples = await WhisperAudio.readWav(file);
-      } catch (e) {
-        throw StateError('本地 Whisper 无法读取音频块（需 WAV）：$e');
+    // Claim the mutex slot before awaiting the previous job — the old
+    // `_engineGate.then(...); _engineGate = run` pattern raced when two
+    // callers both chained off the same previous future.
+    final Completer<void> mySlot = Completer<void>();
+    final Future<void> previous = _engineGate;
+    _engineGate = mySlot.future;
+    await previous;
+    try {
+      Object? lastError;
+      for (int attempt = 0; attempt < 3; attempt += 1) {
+        try {
+          return await _transcribeChunkLocked(
+            file: file,
+            modelId: modelId,
+            offsetMs: offsetMs,
+            language: lang,
+            onProgress: onProgress,
+          );
+        } catch (error) {
+          lastError = error;
+          if (!_isBusyEngineError(error) || attempt >= 2) {
+            rethrow;
+          }
+          debugPrint(
+            'whisper: busy engine on attempt ${attempt + 1}, '
+            'abandoning and retrying: $error',
+          );
+          await _abandonEngine();
+          await Future<void>.delayed(
+            Duration(milliseconds: 80 * (attempt + 1)),
+          );
+        }
       }
-      if (samples.isEmpty) {
-        return <String, Object?>{
-          'version': 1,
-          'language': 'en',
-          'lines': const <Map<String, Object?>>[],
-        };
+      throw lastError ?? StateError('Whisper 识别失败');
+    } finally {
+      if (!mySlot.isCompleted) {
+        mySlot.complete();
       }
+    }
+  }
 
-      final WhisperTask task = engine.transcribe(
-        samples,
-        options: const TranscribeOptions(language: 'en'),
-      );
+  Future<Map<String, Object?>> _transcribeChunkLocked({
+    required File file,
+    required String modelId,
+    required int offsetMs,
+    required String language,
+    LocalWhisperProgress? onProgress,
+  }) async {
+    final WhisperEngine engine = await _loadEngine(
+      modelId,
+      onProgress: onProgress,
+    );
+    onProgress?.call(
+      null,
+      language.startsWith('zh') ? '本地 Whisper 识别中文中…' : '本地 Whisper 识别英文中…',
+    );
+
+    final Float32List samples;
+    try {
+      samples = await WhisperAudio.readWav(file);
+    } catch (e) {
+      throw StateError('本地 Whisper 无法读取音频块（需 WAV）：$e');
+    }
+    if (samples.isEmpty) {
+      return <String, Object?>{
+        'version': 1,
+        'language': language.startsWith('zh') ? 'zh' : 'en',
+        'lines': const <Map<String, Object?>>[],
+      };
+    }
+
+    final WhisperTask task = engine.transcribe(
+      samples,
+      options: TranscribeOptions(
+        language: language.startsWith('zh') ? 'zh' : 'en',
+      ),
+    );
+    try {
       final WhisperResult result = await task.result;
-      return _resultToNormalized(result, offsetMs: offsetMs);
-    });
-    _engineGate = run.then<void>((_) {}, onError: (_) {});
-    return run;
+      // whisper_cpp decrements _activeJobs in a .then() microtask after the
+      // Future completes — yield so the next chunk does not see a stale lock.
+      await Future<void>.delayed(const Duration(milliseconds: 30));
+      return _resultToNormalized(
+        result,
+        offsetMs: offsetMs,
+        language: language.startsWith('zh') ? 'zh' : 'en',
+      );
+    } catch (error) {
+      try {
+        task.cancel();
+      } catch (_) {}
+      await Future<void>.delayed(const Duration(milliseconds: 30));
+      rethrow;
+    }
+  }
+
+  bool _isBusyEngineError(Object error) {
+    final String text = error.toString().toLowerCase();
+    return text.contains('already has an active transcription') ||
+        text.contains('reserved by an active transcription') ||
+        text.contains('cannot dispose an engine while transcription');
+  }
+
+  /// Drop a stuck engine without waiting for dispose (which throws while busy).
+  Future<void> _abandonEngine() async {
+    final WhisperEngine? previous = _engine;
+    _engine = null;
+    _loadedModelId = null;
+    if (previous == null) {
+      return;
+    }
+    try {
+      previous.dispose();
+    } catch (_) {
+      // Leave the busy native context orphaned; a fresh load replaces it.
+    }
   }
 
   Future<WhisperEngine> _loadEngine(
@@ -190,8 +547,12 @@ class LocalWhisperAsr {
     final WhisperEngine? previous = _engine;
     _engine = next;
     _loadedModelId = modelId;
-    // Dispose only after swap so a concurrent reader never holds a freed engine.
-    previous?.dispose();
+    // Dispose only after swap; ignore busy dispose — orphan the stuck context.
+    if (previous != null) {
+      try {
+        previous.dispose();
+      } catch (_) {}
+    }
     return next;
   }
 
@@ -214,11 +575,13 @@ class LocalWhisperAsr {
   Map<String, Object?> _resultToNormalized(
     WhisperResult result, {
     required int offsetMs,
+    String language = 'en',
   }) {
+    final bool chinese = language.startsWith('zh');
     final List<Map<String, Object?>> lines = <Map<String, Object?>>[];
     for (final WhisperSegment segment in result.segments) {
-      final String english = segment.text.trim();
-      if (english.isEmpty) {
+      final String text = segment.text.trim();
+      if (text.isEmpty) {
         continue;
       }
       final int startMs = segment.start.inMilliseconds + offsetMs;
@@ -228,11 +591,11 @@ class LocalWhisperAsr {
       }
       final List<Map<String, Object?>> words = <Map<String, Object?>>[];
       for (final WhisperToken token in segment.tokens) {
-        final String text = token.text.trim();
-        if (text.isEmpty ||
-            text.startsWith('[') ||
-            text.startsWith('<') ||
-            text.startsWith('(_')) {
+        final String tokenText = token.text.trim();
+        if (tokenText.isEmpty ||
+            tokenText.startsWith('[') ||
+            tokenText.startsWith('<') ||
+            tokenText.startsWith('(_')) {
           continue;
         }
         final int wordStart = token.start.inMilliseconds + offsetMs;
@@ -241,7 +604,7 @@ class LocalWhisperAsr {
           continue;
         }
         words.add(<String, Object?>{
-          'text': text,
+          'text': tokenText,
           'startMs': wordStart,
           'endMs': wordEnd,
           'confidence': token.probability,
@@ -250,14 +613,16 @@ class LocalWhisperAsr {
       lines.add(<String, Object?>{
         'startMs': startMs,
         'endMs': endMs,
-        'english': english,
-        'chinese': '',
+        'english': chinese ? '' : text,
+        'chinese': chinese ? text : '',
         'words': words,
       });
     }
     return <String, Object?>{
       'version': 1,
-      'language': result.language.isEmpty ? 'en' : result.language,
+      'language': result.language.isEmpty
+          ? (chinese ? 'zh' : 'en')
+          : result.language,
       'lines': lines,
     };
   }
@@ -278,6 +643,16 @@ class LocalWhisperAsr {
     }
     if (value.contains('base.en')) {
       return 'base.en';
+    }
+    if (value == 'tiny' ||
+        value.endsWith('/tiny') ||
+        value.contains('ggml-tiny.bin')) {
+      return 'tiny';
+    }
+    if (value == 'base' ||
+        value.endsWith('/base') ||
+        value.contains('ggml-base.bin')) {
+      return 'base';
     }
     return defaultModel;
   }

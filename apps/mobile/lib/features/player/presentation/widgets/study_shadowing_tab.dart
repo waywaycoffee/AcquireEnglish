@@ -17,6 +17,53 @@ import '../player_mock_state.dart';
 import 'comparison_waveform_painter.dart';
 import 'study_shell_tokens.dart';
 
+/// How the practice sentence is shown while shadowing.
+enum ShadowPromptMode {
+  /// Speak along with playback (sentence visible, echo / 句末暂停).
+  shadow,
+
+  /// Look at the sentence, then read it.
+  look,
+
+  /// Hide the English sentence; recall from memory (peek allowed).
+  hide,
+}
+
+extension ShadowPromptModeLabel on ShadowPromptMode {
+  String get label {
+    switch (this) {
+      case ShadowPromptMode.shadow:
+        return '影子跟读';
+      case ShadowPromptMode.look:
+        return '看句读';
+      case ShadowPromptMode.hide:
+        return '藏句读';
+    }
+  }
+
+  String get hint {
+    switch (this) {
+      case ShadowPromptMode.shadow:
+        return '跟着原声同步说 · 句末会暂停';
+      case ShadowPromptMode.look:
+        return '看着句子朗读 · 停录后自动评分';
+      case ShadowPromptMode.hide:
+        return '英文已藏 · 凭记忆说完再对照';
+    }
+  }
+
+  String get micIdleHint {
+    switch (this) {
+      case ShadowPromptMode.shadow:
+        return '点击麦克风开始影子跟读';
+      case ShadowPromptMode.look:
+        return '点击麦克风开始跟读';
+      case ShadowPromptMode.hide:
+        return '点击麦克风开始藏句读';
+    }
+  }
+}
+
 /// Shadowing study tab with in-tab mic recording, waveform compare, and next-line flow.
 class StudyShadowingTab extends ConsumerStatefulWidget {
   const StudyShadowingTab({
@@ -25,6 +72,7 @@ class StudyShadowingTab extends ConsumerStatefulWidget {
     this.assessmentTarget,
     this.pauseAtSentenceEnd = false,
     this.onTogglePauseAtSentenceEnd,
+    this.onPreviousSentence,
     this.onNextSentence,
     this.onReplaySentence,
     this.unavailableReason,
@@ -39,6 +87,7 @@ class StudyShadowingTab extends ConsumerStatefulWidget {
   final PronunciationAssessmentTarget? assessmentTarget;
   final bool pauseAtSentenceEnd;
   final VoidCallback? onTogglePauseAtSentenceEnd;
+  final VoidCallback? onPreviousSentence;
   final VoidCallback? onNextSentence;
   final VoidCallback? onReplaySentence;
   final String? unavailableReason;
@@ -86,6 +135,8 @@ class _StudyShadowingTabState extends ConsumerState<StudyShadowingTab> {
   final LocalShadowScorer _localScorer = const LocalShadowScorer();
   bool _voiceBusy = false;
   VoiceShadowResult? _voiceResult;
+  ShadowPromptMode _promptMode = ShadowPromptMode.look;
+  bool _peekHiddenSentence = false;
 
   @override
   void initState() {
@@ -103,6 +154,10 @@ class _StudyShadowingTabState extends ConsumerState<StudyShadowingTab> {
   @override
   void didUpdateWidget(covariant StudyShadowingTab oldWidget) {
     super.didUpdateWidget(oldWidget);
+    if (oldWidget.line.english != widget.line.english ||
+        oldWidget.line.startMs != widget.line.startMs) {
+      _peekHiddenSentence = false;
+    }
     final String? nextKey = _targetKey(widget.assessmentTarget);
     if (nextKey != _boundTargetKey) {
       unawaited(_bindTarget(force: true));
@@ -220,11 +275,29 @@ class _StudyShadowingTabState extends ConsumerState<StudyShadowingTab> {
     );
   }
 
+  bool get _hasEnglishLine =>
+      widget.hasLine &&
+      widget.line.english.trim().isNotEmpty &&
+      RegExp('[A-Za-z]').hasMatch(widget.line.english);
+
+  void _setPromptMode(ShadowPromptMode mode) {
+    setState(() {
+      _promptMode = mode;
+      _peekHiddenSentence = false;
+    });
+    // 影子跟读：默认打开句末暂停，方便 Echo。
+    if (mode == ShadowPromptMode.shadow &&
+        !widget.pauseAtSentenceEnd &&
+        widget.onTogglePauseAtSentenceEnd != null) {
+      widget.onTogglePauseAtSentenceEnd!();
+    }
+  }
+
   Future<void> _startRecording() async {
     if (_resourcesReleased ||
         _recordingActive ||
         _finishingRecording ||
-        widget.assessmentTarget == null) {
+        !_hasEnglishLine) {
       return;
     }
     final PronunciationMicrophone? microphone = _microphone;
@@ -558,13 +631,148 @@ class _StudyShadowingTabState extends ConsumerState<StudyShadowingTab> {
     await _scoreAfterRecording(path: path, audio: audio);
   }
 
+  String get _micStatusText {
+    if (!_hasEnglishLine) {
+      return '当前句没有英文，无法录音';
+    }
+    if (_recordingActive) {
+      return '录音中 · 再点一次停止并评分';
+    }
+    if (_finishingRecording || _voiceBusy) {
+      return '处理中…';
+    }
+    return _promptMode.micIdleHint;
+  }
+
+  Widget _modeChip(StudyShellColors shell, ShadowPromptMode mode) {
+    final bool selected = _promptMode == mode;
+    return Expanded(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 3),
+        child: Material(
+          color: selected ? shell.accent : shell.chipIdle,
+          borderRadius: BorderRadius.circular(20),
+          child: InkWell(
+            key: ValueKey<String>('study-shadowing-mode-${mode.name}'),
+            borderRadius: BorderRadius.circular(20),
+            onTap: () => _setPromptMode(mode),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 9),
+              child: Text(
+                mode.label,
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w700,
+                  color: selected ? Colors.white : shell.textSecondary,
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _sideNavButton({
+    required IconData icon,
+    required String semanticLabel,
+    required VoidCallback? onPressed,
+    required StudyShellColors shell,
+  }) {
+    return IconButton(
+      onPressed: onPressed,
+      tooltip: semanticLabel,
+      iconSize: 28,
+      color: onPressed == null ? shell.textMuted : shell.textPrimary,
+      icon: Icon(icon),
+    );
+  }
+
+  Widget _originalSoundButton(StudyShellColors shell) {
+    final bool canPlayRef = _reference != null && !_recordingActive;
+    final bool canReplayVideo =
+        widget.onReplaySentence != null && !_recordingActive;
+    return InkWell(
+      key: const ValueKey<String>('study-shadowing-original'),
+      onTap: !canPlayRef && !canReplayVideo
+          ? null
+          : () {
+              if (canPlayRef) {
+                unawaited(_playLocalFile(_reference!.path));
+              } else {
+                widget.onReplaySentence?.call();
+              }
+            },
+      borderRadius: BorderRadius.circular(12),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: <Widget>[
+            Icon(
+              Icons.volume_up_rounded,
+              size: 28,
+              color: (canPlayRef || canReplayVideo)
+                  ? shell.textPrimary
+                  : shell.textMuted,
+            ),
+            const SizedBox(height: 4),
+            Text(
+              '原声',
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+                color: (canPlayRef || canReplayVideo)
+                    ? shell.textSecondary
+                    : shell.textMuted,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _micButton(StudyShellColors shell, bool canRecord) {
+    return Semantics(
+      button: true,
+      label: _recordingActive ? '停止录音' : '开始跟读录音',
+      child: Material(
+        color: !canRecord
+            ? shell.accent.withValues(alpha: 0.35)
+            : (_recordingActive ? const Color(0xFFB42318) : shell.accent),
+        shape: const CircleBorder(),
+        elevation: 3,
+        child: InkWell(
+          key: const ValueKey<String>('study-shadowing-assess'),
+          customBorder: const CircleBorder(),
+          onTap: !canRecord || _finishingRecording
+              ? null
+              : () => unawaited(
+                  _recordingActive ? _stopRecording() : _startRecording(),
+                ),
+          child: SizedBox(
+            width: 76,
+            height: 76,
+            child: Icon(
+              _recordingActive ? Icons.stop_rounded : Icons.mic_rounded,
+              size: 36,
+              color: Colors.white,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final StudyShellColors shell = StudyShellColors.of(context);
     if (!widget.hasLine) {
       return Center(
         child: Padding(
-          padding: EdgeInsets.all(24),
+          padding: const EdgeInsets.all(24),
           child: Text(
             '当前没有可跟读的字幕句子。可先用语音识别生成字幕。',
             textAlign: TextAlign.center,
@@ -578,7 +786,8 @@ class _StudyShadowingTabState extends ConsumerState<StudyShadowingTab> {
       );
     }
 
-    final bool canPractice = widget.assessmentTarget != null;
+    final bool canRecord = _hasEnglishLine;
+    final bool hasReferenceTrack = widget.assessmentTarget != null;
     final LearningSettingsState settings = ref.watch(learningSettingsProvider);
     final bool voiceConfigured = settings.usesVoicePractice;
     final Pcm16MonoAudio? own =
@@ -590,296 +799,367 @@ class _StudyShadowingTabState extends ConsumerState<StudyShadowingTab> {
         ? (own?.waveform ?? <double>[])
         : _recordingWaveform;
 
-    return ListView(
-      padding: EdgeInsets.fromLTRB(4, 4, 4, 16),
+    final bool hideEnglish =
+        _promptMode == ShadowPromptMode.hide && !_peekHiddenSentence;
+    final bool revealAfterAttempt =
+        _voiceResult != null || _recording != null;
+    final bool showEnglish = !hideEnglish || revealAfterAttempt;
+    final bool showChinese = widget.line.chinese.trim().isNotEmpty &&
+        (_promptMode != ShadowPromptMode.hide ||
+            _peekHiddenSentence ||
+            revealAfterAttempt);
+
+    // Reference layout: sentence card → 原声 + ◀ mic ▶ → secondary feedback.
+    return Column(
       children: <Widget>[
-        Container(
-          width: double.infinity,
-          padding: EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: shell.cardActive,
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: shell.borderActive),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+        Padding(
+          padding: const EdgeInsets.fromLTRB(8, 4, 8, 0),
+          child: Row(
             children: <Widget>[
-              Text(
-                widget.line.startTime,
-                style: TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w600,
-                  color: shell.textMuted,
+              for (final ShadowPromptMode mode in ShadowPromptMode.values)
+                _modeChip(shell, mode),
+            ],
+          ),
+        ),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(12, 8, 12, 0),
+          child: Text(
+            _promptMode.hint,
+            textAlign: TextAlign.center,
+            style: TextStyle(fontSize: 12, color: shell.textMuted),
+          ),
+        ),
+        Expanded(
+          child: ListView(
+            padding: const EdgeInsets.fromLTRB(12, 12, 12, 8),
+            children: <Widget>[
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.fromLTRB(18, 20, 18, 20),
+                decoration: BoxDecoration(
+                  color: shell.surfaceRaised,
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: <Widget>[
+                    if (_promptMode == ShadowPromptMode.hide)
+                      Align(
+                        alignment: Alignment.centerRight,
+                        child: TextButton(
+                          key: const ValueKey<String>('study-shadowing-peek'),
+                          style: TextButton.styleFrom(
+                            visualDensity: VisualDensity.compact,
+                            padding: EdgeInsets.zero,
+                          ),
+                          onPressed: () {
+                            setState(
+                              () => _peekHiddenSentence = !_peekHiddenSentence,
+                            );
+                          },
+                          child: Text(
+                            _peekHiddenSentence ? '重新隐藏' : '偷看一句',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: shell.accent,
+                            ),
+                          ),
+                        ),
+                      ),
+                    if (showEnglish)
+                      Text(
+                        widget.line.english,
+                        style: TextStyle(
+                          fontSize: 20,
+                          height: 1.45,
+                          fontWeight: FontWeight.w700,
+                          color: shell.textPrimary,
+                        ),
+                      )
+                    else
+                      Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        child: Text(
+                          '······',
+                          style: TextStyle(
+                            fontSize: 28,
+                            letterSpacing: 4,
+                            fontWeight: FontWeight.w700,
+                            color: shell.textMuted,
+                          ),
+                        ),
+                      ),
+                    if (showChinese) ...<Widget>[
+                      const SizedBox(height: 12),
+                      Text(
+                        widget.line.chinese,
+                        style: TextStyle(
+                          fontSize: 14,
+                          height: 1.4,
+                          fontWeight: FontWeight.w500,
+                          color: shell.textSecondary,
+                        ),
+                      ),
+                    ],
+                  ],
                 ),
               ),
-              SizedBox(height: 8),
-              Text(
-                widget.line.english,
-                style: TextStyle(
-                  fontSize: 18,
-                  height: 1.45,
-                  fontWeight: FontWeight.w700,
-                  color: shell.textPrimary,
-                ),
-              ),
-              if (widget.line.chinese.trim().isNotEmpty) ...<Widget>[
-                SizedBox(height: 8),
+              if (!canRecord) ...<Widget>[
+                const SizedBox(height: 12),
                 Text(
-                  widget.line.chinese,
+                  widget.unavailableReason?.trim().isNotEmpty == true
+                      ? widget.unavailableReason!
+                      : '当前没有可跟读的英文字幕。',
                   style: TextStyle(
-                    fontSize: 14,
+                    fontSize: 13,
                     height: 1.4,
-                    fontWeight: FontWeight.w500,
                     color: shell.textSecondary,
                   ),
                 ),
               ],
-            ],
-          ),
-        ),
-        SizedBox(height: 12),
-        SwitchListTile(
-          contentPadding: EdgeInsets.zero,
-          title: Text(
-            '句末暂停',
-            style: TextStyle(
-              color: shell.textPrimary,
-              fontWeight: FontWeight.w700,
-            ),
-          ),
-          subtitle: Text(
-            '播完当前句自动暂停，便于跟读（Echo）',
-            style: TextStyle(color: shell.textSecondary),
-          ),
-          value: widget.pauseAtSentenceEnd,
-          activeThumbColor: shell.accent,
-          onChanged: widget.onTogglePauseAtSentenceEnd == null
-              ? null
-              : (_) => widget.onTogglePauseAtSentenceEnd!(),
-        ),
-        SizedBox(height: 8),
-        if (!canPractice) ...<Widget>[
-          Text(
-            widget.unavailableReason?.trim().isNotEmpty == true
-                ? widget.unavailableReason!
-                : '当前句暂不可录音跟读。',
-            style: TextStyle(
-              fontSize: 13,
-              height: 1.4,
-              color: shell.textSecondary,
-            ),
-          ),
-          SizedBox(height: 12),
-          FilledButton.icon(
-            key: const ValueKey<String>('study-shadowing-assess'),
-            onPressed: null,
-            style: FilledButton.styleFrom(
-              backgroundColor: shell.accent,
-              foregroundColor: Colors.white,
-              disabledBackgroundColor: shell.accent.withValues(alpha: 0.35),
-              disabledForegroundColor: Colors.white70,
-            ),
-            icon: const Icon(Icons.mic_rounded),
-            label: const Text('开始跟读'),
-          ),
-        ] else ...<Widget>[
-          if (_loadingReference) LinearProgressIndicator(minHeight: 2),
-          SizedBox(height: 8),
-          SizedBox(
-            key: ValueKey<String>('study-shadowing-waveforms'),
-            height: 140,
-            child: CustomPaint(
-              painter: ComparisonWaveformPainter(
-                reference: _referenceWaveform,
-                own: ownWaveform,
-                referenceMs: referenceMs,
-                ownMs: ownMs,
-                timelineMs: timelineMs,
-                positionMs: _playingPath == null ? null : _previewPositionMs,
-                playingOwn:
-                    _playingPath != null && _playingPath == _recordingPath,
-              ),
-              child: ownMs == 0
-                  ? Align(
-                      alignment: Alignment.bottomCenter,
-                      child: Padding(
-                        padding: EdgeInsets.only(bottom: 8),
-                        child: Text(
-                          '点按麦克风开始录音，波形会叠在原声上',
-                          textAlign: TextAlign.center,
-                          style: TextStyle(
-                            color: shell.textMuted,
-                            fontSize: 12,
-                          ),
+              if (_loadingReference) ...<Widget>[
+                const SizedBox(height: 8),
+                const LinearProgressIndicator(minHeight: 2),
+              ],
+              if (!hasReferenceTrack &&
+                  (widget.unavailableReason?.trim().isNotEmpty ??
+                      false)) ...<Widget>[
+                const SizedBox(height: 8),
+                Text(
+                  '${widget.unavailableReason!} · 仍可录音评分',
+                  style: const TextStyle(
+                    color: Colors.orangeAccent,
+                    fontSize: 12,
+                  ),
+                ),
+              ],
+              if (_message != null) ...<Widget>[
+                const SizedBox(height: 10),
+                Text(
+                  _message!,
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    color: shell.textSecondary,
+                    fontSize: 13,
+                  ),
+                ),
+              ],
+              if (_recording != null || _recordingActive) ...<Widget>[
+                const SizedBox(height: 12),
+                SizedBox(
+                  key: const ValueKey<String>('study-shadowing-waveforms'),
+                  height: 96,
+                  child: CustomPaint(
+                    painter: ComparisonWaveformPainter(
+                      reference: _referenceWaveform,
+                      own: ownWaveform,
+                      referenceMs: referenceMs,
+                      ownMs: ownMs,
+                      timelineMs: timelineMs,
+                      positionMs:
+                          _playingPath == null ? null : _previewPositionMs,
+                      playingOwn: _playingPath != null &&
+                          _playingPath == _recordingPath,
+                    ),
+                  ),
+                ),
+              ],
+              if (_voiceResult != null) ...<Widget>[
+                const SizedBox(height: 12),
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(14),
+                  decoration: BoxDecoration(
+                    color: shell.cardActive,
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(color: shell.border),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: <Widget>[
+                      Text(
+                        '重叠 ${_voiceResult!.scorePercentLabel}'
+                        '${_voiceResult!.mock ? ' · 粗评' : ''}',
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w700,
+                          color: shell.textPrimary,
                         ),
                       ),
-                    )
-                  : null,
-            ),
-          ),
-          if (_referenceError != null) ...<Widget>[
-            SizedBox(height: 8),
-            Text(
-              _referenceError!,
-              style: TextStyle(
-                color: Colors.orangeAccent,
-                fontSize: 12,
-              ),
-            ),
-          ],
-          if (_message != null) ...<Widget>[
-            SizedBox(height: 8),
-            Text(
-              _message!,
-              style: TextStyle(
-                color: shell.textSecondary,
-                fontSize: 12,
-              ),
-            ),
-          ],
-          SizedBox(height: 12),
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: <Widget>[
-              FilledButton.icon(
-                key: ValueKey<String>('study-shadowing-assess'),
-                onPressed: _recordingActive
-                    ? () => unawaited(_stopRecording())
-                    : (_finishingRecording
+                      const SizedBox(height: 8),
+                      Text(
+                        '识别：${_voiceResult!.transcript.isEmpty ? '（空）' : _voiceResult!.transcript}',
+                        style: TextStyle(
+                          fontSize: 13,
+                          height: 1.4,
+                          color: shell.textSecondary,
+                        ),
+                      ),
+                      if (_voiceResult!.overlap.missingWords.isNotEmpty) ...<
+                          Widget>[
+                        const SizedBox(height: 6),
+                        Text(
+                          '漏读：${_voiceResult!.overlap.missingWords.join(', ')}',
+                          style: const TextStyle(
+                            fontSize: 12,
+                            color: Colors.orangeAccent,
+                          ),
+                        ),
+                      ],
+                      if (_voiceResult!
+                          .overlap.extraWords.isNotEmpty) ...<Widget>[
+                        const SizedBox(height: 4),
+                        Text(
+                          '多读：${_voiceResult!.overlap.extraWords.join(', ')}',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: shell.textMuted,
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  alignment: WrapAlignment.center,
+                  children: <Widget>[
+                    OutlinedButton.icon(
+                      onPressed: _recordingPath == null
                           ? null
-                          : () => unawaited(_startRecording())),
-                style: FilledButton.styleFrom(
-                  backgroundColor: shell.accent,
-                  foregroundColor: Colors.white,
+                          : () => unawaited(_playLocalFile(_recordingPath)),
+                      icon: Icon(
+                        Icons.graphic_eq_rounded,
+                        size: 18,
+                        color: _ownColor,
+                      ),
+                      label: const Text('我的录音'),
+                    ),
+                    OutlinedButton.icon(
+                      key: const ValueKey<String>('study-shadowing-voice'),
+                      onPressed: _recordingPath == null ||
+                              _recordingActive ||
+                              _voiceBusy
+                          ? null
+                          : () => unawaited(_runVoiceFeedback()),
+                      icon: _voiceBusy
+                          ? const SizedBox(
+                              width: 16,
+                              height: 16,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : const Icon(Icons.hearing_rounded, size: 18),
+                      label: Text(_voiceBusy ? '评分中' : '重新评分'),
+                    ),
+                    if (widget.onOpenFullDialog != null)
+                      TextButton(
+                        onPressed: widget.onOpenFullDialog,
+                        child: const Text('腾讯云精评'),
+                      ),
+                  ],
                 ),
-                icon: Icon(
-                  _recordingActive ? Icons.stop_rounded : Icons.mic_rounded,
+              ],
+              if (_referenceError != null) ...<Widget>[
+                const SizedBox(height: 8),
+                Text(
+                  _referenceError!,
+                  style: const TextStyle(
+                    color: Colors.orangeAccent,
+                    fontSize: 12,
+                  ),
                 ),
-                label: Text(_recordingActive ? '停止录音' : '开始跟读'),
-              ),
-              OutlinedButton.icon(
-                onPressed: _reference == null
-                    ? null
-                    : () => unawaited(_playLocalFile(_reference!.path)),
-                icon: Icon(Icons.volume_up_rounded, size: 18),
-                label: Text('原声'),
-              ),
-              OutlinedButton.icon(
-                onPressed: _recordingPath == null
-                    ? null
-                    : () => unawaited(_playLocalFile(_recordingPath)),
-                icon: Icon(Icons.graphic_eq_rounded, size: 18, color: _ownColor),
-                label: Text('我的录音'),
-              ),
-              OutlinedButton(
-                onPressed: widget.onReplaySentence,
-                child: Text('重播本句'),
-              ),
-              FilledButton.tonal(
-                key: ValueKey<String>('study-shadowing-next'),
-                onPressed: widget.onNextSentence == null
-                    ? null
-                    : () => unawaited(_goNextAfterPractice()),
-                child: Text('下一句'),
-              ),
-              OutlinedButton.icon(
-                key: const ValueKey<String>('study-shadowing-voice'),
-                onPressed: _recordingPath == null ||
-                        _recordingActive ||
-                        _voiceBusy
-                    ? null
-                    : () => unawaited(_runVoiceFeedback()),
-                icon: _voiceBusy
-                    ? const SizedBox(
-                        width: 16,
-                        height: 16,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                    : const Icon(Icons.hearing_rounded, size: 18),
-                label: Text(_voiceBusy ? '评分中' : '重新评分'),
-              ),
-              if (widget.onOpenFullDialog != null)
-                TextButton(
-                  onPressed: widget.onOpenFullDialog,
-                  child: Text('腾讯云精评'),
+              ],
+              if (_promptMode == ShadowPromptMode.shadow) ...<Widget>[
+                const SizedBox(height: 4),
+                SwitchListTile(
+                  contentPadding: EdgeInsets.zero,
+                  dense: true,
+                  title: Text(
+                    '句末暂停',
+                    style: TextStyle(
+                      color: shell.textPrimary,
+                      fontWeight: FontWeight.w700,
+                      fontSize: 13,
+                    ),
+                  ),
+                  subtitle: Text(
+                    '播完本句暂停，方便影子跟读',
+                    style: TextStyle(
+                      color: shell.textSecondary,
+                      fontSize: 11,
+                    ),
+                  ),
+                  value: widget.pauseAtSentenceEnd,
+                  activeThumbColor: shell.accent,
+                  onChanged: widget.onTogglePauseAtSentenceEnd == null
+                      ? null
+                      : (_) => widget.onTogglePauseAtSentenceEnd!(),
                 ),
+              ],
+              const SizedBox(height: 4),
+              Text(
+                '停录后自动评分'
+                '${voiceConfigured ? ' · Voice 可用' : ''}',
+                textAlign: TextAlign.center,
+                style: TextStyle(color: shell.textMuted, fontSize: 11),
+              ),
             ],
           ),
-          if (_voiceResult != null) ...<Widget>[
-            SizedBox(height: 12),
-            Container(
-              width: double.infinity,
-              padding: EdgeInsets.all(14),
-              decoration: BoxDecoration(
-                color: shell.cardActive,
-                borderRadius: BorderRadius.circular(14),
-                border: Border.all(color: shell.borderActive),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: <Widget>[
-                  Text(
-                    '重叠 ${_voiceResult!.scorePercentLabel}'
-                    '${_voiceResult!.mock ? ' · 粗评' : ''}',
-                    style: TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w700,
-                      color: shell.textPrimary,
+        ),
+        SafeArea(
+          top: false,
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(8, 4, 8, 10),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: <Widget>[
+                Row(
+                  children: <Widget>[
+                    SizedBox(
+                      width: 72,
+                      child: _originalSoundButton(shell),
                     ),
-                  ),
-                  SizedBox(height: 8),
-                  Text(
-                    '识别：${_voiceResult!.transcript.isEmpty ? '（空）' : _voiceResult!.transcript}',
-                    style: TextStyle(
-                      fontSize: 13,
-                      height: 1.4,
-                      color: shell.textSecondary,
-                    ),
-                  ),
-                  if (_voiceResult!.overlap.missingWords.isNotEmpty) ...<Widget>[
-                    SizedBox(height: 6),
-                    Text(
-                      '漏读：${_voiceResult!.overlap.missingWords.join(', ')}',
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: Colors.orangeAccent,
+                    Expanded(
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: <Widget>[
+                          _sideNavButton(
+                            icon: Icons.chevron_left_rounded,
+                            semanticLabel: '上一句',
+                            onPressed: widget.onPreviousSentence,
+                            shell: shell,
+                          ),
+                          _micButton(shell, canRecord),
+                          _sideNavButton(
+                            icon: Icons.chevron_right_rounded,
+                            semanticLabel: '下一句',
+                            onPressed: widget.onNextSentence == null
+                                ? null
+                                : () => unawaited(_goNextAfterPractice()),
+                            shell: shell,
+                          ),
+                        ],
                       ),
                     ),
+                    const SizedBox(width: 72),
                   ],
-                  if (_voiceResult!.overlap.extraWords.isNotEmpty) ...<Widget>[
-                    SizedBox(height: 4),
-                    Text(
-                      '多读：${_voiceResult!.overlap.extraWords.join(', ')}',
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: shell.textMuted,
-                      ),
-                    ),
-                  ],
-                  SizedBox(height: 6),
-                  Text(
-                    _voiceResult!.label,
-                    style: TextStyle(
-                      fontSize: 11,
-                      color: shell.textMuted,
-                    ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  _micStatusText,
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                    color: shell.textPrimary,
                   ),
-                ],
-              ),
-            ),
-          ],
-          SizedBox(height: 8),
-          Text(
-            '停录后自动本地 Whisper 评分'
-            '${voiceConfigured ? '；也可走 Voice 服务' : ''}'
-            ' · 腾讯云密钥可做精评',
-            style: TextStyle(
-              color: shell.textMuted,
-              fontSize: 11,
+                ),
+              ],
             ),
           ),
-        ],
+        ),
       ],
     );
   }

@@ -1,6 +1,6 @@
 # 视频主题口语陪练管线（Oral Coach）
 
-以**当前视频 / 当前句**为话题，组装流畅实时对话 + 虚拟外教头像。优先可插拔，默认 mock 可无 GPU 跑通 UI。
+以**整集视频 / 全文主题**为话题做自由对话 + 虚拟外教头像（Midoo 式），不是逐句跟读。优先可插拔，默认 mock 可无 GPU 跑通 UI。
 
 > **完整产品栈（LiveKit 全双工 + ChatterPal 学习闭环 + 竞品 PRD）**  
 > 见 [`../digital_human_coach/`](../digital_human_coach/) 与 [`../../docs/digital-human-coach/`](../../docs/digital-human-coach/)。  

@@ -21,6 +21,8 @@ class StudyDictationTab extends StatefulWidget {
     this.onClearQueue,
     this.usingQueue = false,
     this.suggestedSpeed = '0.8×',
+    this.hardsubMosaicEnabled = false,
+    this.onToggleHardsubMosaic,
     super.key,
   });
 
@@ -38,6 +40,8 @@ class StudyDictationTab extends StatefulWidget {
   final VoidCallback? onClearQueue;
   final bool usingQueue;
   final String suggestedSpeed;
+  final bool hardsubMosaicEnabled;
+  final ValueChanged<bool>? onToggleHardsubMosaic;
 
   @override
   State<StudyDictationTab> createState() => _StudyDictationTabState();
@@ -105,6 +109,27 @@ class _StudyDictationTabState extends State<StudyDictationTab> {
     return ListView(
       padding: const EdgeInsets.fromLTRB(8, 8, 8, 24),
       children: <Widget>[
+        if (widget.onToggleHardsubMosaic != null) ...<Widget>[
+          SwitchListTile(
+            key: const ValueKey<String>('dictation-hardsub-mosaic'),
+            contentPadding: EdgeInsets.zero,
+            title: Text(
+              '遮挡硬字幕',
+              style: TextStyle(
+                color: shell.textPrimary,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            subtitle: Text(
+              '拉出马赛克框盖住视频里的字幕',
+              style: TextStyle(color: shell.textSecondary, fontSize: 12),
+            ),
+            value: widget.hardsubMosaicEnabled,
+            activeThumbColor: shell.accent,
+            onChanged: widget.onToggleHardsubMosaic,
+          ),
+          const SizedBox(height: 8),
+        ],
         if (widget.queue.isNotEmpty) ...<Widget>[
           SizedBox(
             height: 36,

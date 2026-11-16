@@ -51,7 +51,8 @@ PRON_PROVIDER=simple
 LLM_PROVIDER=mock
 TTS_PROVIDER=mock
 AVATAR_PROVIDER=livetalking
-LIVETALKING_URL=http://127.0.0.1:8010
+# GPU LiveTalking via Tailscale (phones/ECS on the same tailnet).
+LIVETALKING_URL=http://100.115.252.55:8010
 ENV
 fi
 

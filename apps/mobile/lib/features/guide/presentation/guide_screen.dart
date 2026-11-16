@@ -1,14 +1,17 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../utils/url_utils.dart';
+import '../../import_course/presentation/bilibili_import_sheet.dart';
+import '../../import_course/presentation/youtube_import_sheet.dart';
 import '../../navigation/presentation/navigation_destination.dart';
 import '../../shared/presentation/pad/pad_compact.dart';
 import '../../shared/presentation/pad/pad_scaffold.dart';
 import '../../shared/presentation/pad/pad_top_bar.dart';
 import 'widgets/how_to_learn_content.dart';
 
-class GuideScreen extends StatelessWidget {
+class GuideScreen extends ConsumerWidget {
   const GuideScreen({super.key});
 
   static final Uri _methodVideo = Uri.parse(
@@ -50,14 +53,26 @@ class GuideScreen extends StatelessWidget {
                   child: ListView(
                     padding: const EdgeInsets.fromLTRB(24, 24, 24, 40),
                     children: <Widget>[
-                      HowToLearnContent(
-                        onStart: () {
-                          Navigator.of(dialogContext).pop();
-                          context.go(AppNavDestination.library.route);
+                      Consumer(
+                        builder: (BuildContext context, WidgetRef ref, _) {
+                          return HowToLearnContent(
+                            onStart: () {
+                              Navigator.of(dialogContext).pop();
+                              context.go(AppNavDestination.library.route);
+                            },
+                            onPlayMethod: () => _openUrl(context, _methodVideo),
+                            onOpenResource: (GuideLearningResource resource) =>
+                                _showResourceSheet(context, resource),
+                            onImportBilibili: () {
+                              Navigator.of(dialogContext).pop();
+                              showBilibiliImportSheet(context, ref);
+                            },
+                            onImportYoutube: () {
+                              Navigator.of(dialogContext).pop();
+                              showYoutubeImportSheet(context, ref);
+                            },
+                          );
                         },
-                        onPlayMethod: () => _openUrl(context, _methodVideo),
-                        onOpenResource: (GuideLearningResource resource) =>
-                            _showResourceSheet(context, resource),
                       ),
                     ],
                   ),
@@ -69,7 +84,7 @@ class GuideScreen extends StatelessWidget {
       );
 
   @override
-  Widget build(BuildContext context) => PadScaffold(
+  Widget build(BuildContext context, WidgetRef ref) => PadScaffold(
     currentDestination: AppNavDestination.guide,
     topBar: const PadTopBar(
       title: '怎么学',
@@ -92,6 +107,8 @@ class GuideScreen extends StatelessWidget {
               onPlayMethod: () => _openUrl(context, _methodVideo),
               onOpenResource: (GuideLearningResource resource) =>
                   _showResourceSheet(context, resource),
+              onImportBilibili: () => showBilibiliImportSheet(context, ref),
+              onImportYoutube: () => showYoutubeImportSheet(context, ref),
             ),
           ),
         ),

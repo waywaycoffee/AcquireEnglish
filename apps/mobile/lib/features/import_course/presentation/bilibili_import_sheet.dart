@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../authentication/presentation/auth_session.dart';
 import '../../library/presentation/library_catalog_provider.dart';
 import '../../library/presentation/library_mock_data.dart';
 import '../../player/presentation/widgets/study_shell_tokens.dart';
@@ -10,12 +11,18 @@ import '../../settings/presentation/bilibili_login_sheet.dart';
 import '../../settings/presentation/settings_provider.dart';
 import '../../subtitle_completion/subtitle_completion_enqueue.dart';
 import '../../subtitle_completion/subtitle_completion_scheduler.dart';
+import '../../sync/data/acquire_api_client.dart';
+import '../../sync/data/personal_import_sync.dart';
 import '../data/bilibili_collection_download.dart';
 import '../data/bilibili_course_builder.dart';
 import '../data/bilibili_import_service.dart';
 import '../domain/bilibili_import.dart';
 
-Future<void> showBilibiliImportSheet(BuildContext context, WidgetRef ref) {
+Future<void> showBilibiliImportSheet(
+  BuildContext context,
+  WidgetRef ref, {
+  String? initialUrl,
+}) {
   return showModalBottomSheet<void>(
     context: context,
     isScrollControlled: true,
@@ -28,25 +35,33 @@ Future<void> showBilibiliImportSheet(BuildContext context, WidgetRef ref) {
           top: 16,
           bottom: MediaQuery.viewInsetsOf(context).bottom + 16,
         ),
-        child: const _BilibiliImportForm(),
+        child: _BilibiliImportForm(initialUrl: initialUrl),
       );
     },
   );
 }
 
 class _BilibiliImportForm extends ConsumerStatefulWidget {
-  const _BilibiliImportForm();
+  const _BilibiliImportForm({this.initialUrl});
+
+  final String? initialUrl;
 
   @override
   ConsumerState<_BilibiliImportForm> createState() => _BilibiliImportFormState();
 }
 
 class _BilibiliImportFormState extends ConsumerState<_BilibiliImportForm> {
-  final TextEditingController _controller = TextEditingController();
+  late final TextEditingController _controller;
   String? _error;
   bool _busy = false;
   double? _progress;
   String _status = '';
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = TextEditingController(text: widget.initialUrl ?? '');
+  }
 
   @override
   void dispose() {
@@ -103,8 +118,34 @@ class _BilibiliImportFormState extends ConsumerState<_BilibiliImportForm> {
       if (ok) {
         // Import-time: inspect missing EN/ZH together and start ASR/translate
         // in the background — do not wait until the player is opened.
-        await enqueueSubtitleCompletionForCourse(course: course);
+        await enqueueSubtitleCompletionForCourse(
+          course: course,
+          bilibiliCookieHeader: ref
+              .read(learningSettingsProvider)
+              .resolvedBilibiliCookieHeader,
+        );
         SubtitleCompletionScheduler.instance.kick(delay: Duration.zero);
+        // Auto-save to personal cloud; shared if official pack passes audit.
+        final AuthSessionState auth = ref.read(authSessionProvider);
+        if (auth.isLoggedIn) {
+          final LibraryEpisodeItem? ep = course.episodes.isEmpty
+              ? null
+              : course.episodes.first;
+          unawaited(
+            syncEpisodeSubtitlesToCloud(
+              api: ref.read(acquireApiClientProvider),
+              isLoggedIn: true,
+              sourceKey: meta.idKey,
+              sourceUrl: meta.watchUrl,
+              englishPath: meta.enSubtitlePath ?? '',
+              chinesePath: meta.cnSubtitlePath ?? '',
+              course: course,
+              episode: ep,
+              durationSec: meta.durationMinutes * 60,
+              sourceOrigin: 'official',
+            ),
+          );
+        }
       }
       if (!mounted) {
         return;
@@ -137,7 +178,9 @@ class _BilibiliImportFormState extends ConsumerState<_BilibiliImportForm> {
       messenger.showSnackBar(
         SnackBar(
           content: Text(
-            ok ? '已加入书库。$hint' : '导入未完成，请重试',
+            ok
+                ? '已加入书库。$hint 缺失字幕会在课程页后台自动补全。'
+                : '导入未完成，请重试',
           ),
         ),
       );

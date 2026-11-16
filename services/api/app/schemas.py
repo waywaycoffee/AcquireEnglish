@@ -153,3 +153,18 @@ class PreferencesOut(BaseModel):
     notify_daily_feed: bool
     has_bilibili_cookie: bool = False
     has_asr_api_key: bool = False
+
+
+class DailyFeedItemOut(BaseModel):
+    """Interest-based Bilibili recommendation — not a library course pack."""
+
+    id: str
+    bvid: str
+    title: str
+    author: str = ""
+    coverUrl: str | None = None
+    durationSec: float | None = None
+    watchUrl: str
+    description: str | None = None
+    tags: list[str] = []
+    source: str = "bilibili"

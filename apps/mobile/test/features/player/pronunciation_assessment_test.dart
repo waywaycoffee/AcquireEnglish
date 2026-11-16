@@ -126,6 +126,17 @@ void main() {
       );
       expect(noMedia.target, isNull);
       expect(noMedia.unavailableReason, contains('视频'));
+
+      // Remote streams remain recordable/scoreable (reference extract may fail).
+      final PronunciationTargetSelection remote = selectPronunciationTarget(
+        state: state,
+        videoSource: 'https://example.com/Practice.mp4',
+        videoReady: true,
+        videoDuration: const Duration(milliseconds: 5393),
+        subtitleIndex: 1,
+      );
+      expect(remote.target, isNotNull);
+      expect(remote.target?.text, 'Listen.');
     },
   );
 

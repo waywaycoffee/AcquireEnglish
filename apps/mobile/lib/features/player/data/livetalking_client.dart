@@ -10,9 +10,105 @@ import '../../settings/presentation/settings_provider.dart';
 ///
 /// Server: `python app.py --transport webrtc ...` then open `/offer` + `/human`.
 class LiveTalkingClient {
-  LiveTalkingClient({Dio? dio}) : _dio = dio ?? Dio();
+  LiveTalkingClient({Dio? dio})
+    : _dio =
+          dio ??
+          Dio(
+            BaseOptions(
+              connectTimeout: const Duration(seconds: 8),
+              sendTimeout: const Duration(seconds: 20),
+              receiveTimeout: const Duration(seconds: 60),
+            ),
+          );
 
   final Dio _dio;
+
+  /// Fast HTTP reachability check.
+  ///
+  /// Probes `/index.html` (not `/`) so nginx never returns a 302 that older
+  /// proxies absolutized as `https://host:8443/...` (phones cannot open :8443).
+  static Future<bool> isReachable(
+    String rawBaseUrl, {
+    Duration timeout = const Duration(seconds: 3),
+    Dio? dio,
+  }) async {
+    final Dio client =
+        dio ??
+        Dio(
+          BaseOptions(
+            connectTimeout: timeout,
+            sendTimeout: timeout,
+            receiveTimeout: timeout,
+            followRedirects: false,
+            maxRedirects: 0,
+          ),
+        );
+    try {
+      String value = rawBaseUrl.trim();
+      if (value.isEmpty) {
+        return false;
+      }
+      if (!value.startsWith('http://') && !value.startsWith('https://')) {
+        value = 'http://$value';
+      }
+      while (value.endsWith('/')) {
+        value = value.substring(0, value.length - 1);
+      }
+      // Reject Tailscale-only endpoints on phones.
+      if (value.contains('100.115.') || value.contains('ts.net')) {
+        return false;
+      }
+      final Response<dynamic> response = await client.get<dynamic>(
+        '$value/index.html',
+        options: Options(
+          validateStatus: (int? code) =>
+              code != null && code >= 200 && code < 400,
+          followRedirects: false,
+        ),
+      );
+      final String? location = response.headers.value('location');
+      if (location != null && location.contains(':8443')) {
+        return false;
+      }
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  /// Prefer the first reachable candidate (LAN → preferred → MagicDNS → TS IP).
+  static Future<String> pickReachableBaseUrl({
+    String? preferred,
+    List<String> candidates = liveTalkingUrlCandidates,
+    Dio? dio,
+  }) async {
+    final List<String> ordered = <String>[];
+    void add(String raw) {
+      final String normalized = raw.trim().replaceAll(RegExp(r'/+$'), '');
+      if (normalized.isNotEmpty && !ordered.contains(normalized)) {
+        ordered.add(normalized);
+      }
+    }
+
+    // Public HTTPS first — phones must not depend on Tailscale.
+    add(defaultLiveTalkingUrlPublic);
+    final String pref = (preferred ?? '').trim();
+    if (pref.isNotEmpty &&
+        !pref.contains('100.115.252.55') &&
+        !pref.contains('ts.net')) {
+      add(pref);
+    }
+    for (final String url in candidates) {
+      add(url);
+    }
+    for (final String url in ordered) {
+      if (await isReachable(url, dio: dio)) {
+        return url;
+      }
+    }
+    // Fall back to public HTTPS so the caller still gets a concrete error.
+    return defaultLiveTalkingUrlPublic;
+  }
   RTCPeerConnection? _pc;
   RTCVideoRenderer? _renderer;
   String? _sessionId;
@@ -32,6 +128,7 @@ class LiveTalkingClient {
   Future<RTCVideoRenderer> connect(
     String rawBaseUrl, {
     String? avatar,
+    List<Map<String, dynamic>>? iceServers,
     Duration mediaTimeout = const Duration(seconds: 12),
   }) async {
     await disconnect();
@@ -45,11 +142,13 @@ class LiveTalkingClient {
     await renderer.initialize();
     _renderer = renderer;
 
+    final List<Map<String, dynamic>> ice =
+        (iceServers != null && iceServers.isNotEmpty)
+        ? iceServers
+        : defaultLiveTalkingIceServers;
     final RTCPeerConnection pc = await createPeerConnection(<String, dynamic>{
       'sdpSemantics': 'unified-plan',
-      'iceServers': <Map<String, dynamic>>[
-        <String, dynamic>{'urls': 'stun:stun.l.google.com:19302'},
-      ],
+      'iceServers': ice,
     });
     _pc = pc;
 
@@ -111,9 +210,16 @@ class LiveTalkingClient {
       throw StateError(_dioFailureHint(baseUrl, error));
     }
     if (body['code'] == -1) {
-      throw StateError(
-        'LiveTalking /offer 拒绝: ${body['msg'] ?? 'unknown'}',
-      );
+      final String msg = '${body['msg'] ?? 'unknown'}';
+      if (msg.toLowerCase().contains('maximum session') ||
+          msg.toLowerCase().contains('max session') ||
+          msg.contains('会话')) {
+        throw StateError(
+          '外教线路忙线（会话已满）。正在自动重试，也可在 GPU 上运行 '
+          'tools/livetalking/restart_livetalking.ps1 清理占用。',
+        );
+      }
+      throw StateError('LiveTalking /offer 拒绝: $msg');
     }
     final String? answerSdp = body['sdp'] as String?;
     final String? answerType = body['type'] as String?;
@@ -180,34 +286,107 @@ class LiveTalkingClient {
     }
   }
 
+  /// Flush the talk queue without tearing down the WebRTC session.
+  Future<void> interruptTalk() async {
+    final String? baseUrl = _baseUrl;
+    final String? sessionId = _sessionId;
+    if (baseUrl == null || sessionId == null) {
+      return;
+    }
+    try {
+      await _dio.post<dynamic>(
+        '$baseUrl/interrupt_talk',
+        data: <String, Object?>{'sessionid': sessionId},
+        options: Options(
+          contentType: Headers.jsonContentType,
+          sendTimeout: const Duration(seconds: 4),
+          receiveTimeout: const Duration(seconds: 4),
+        ),
+      );
+    } catch (_) {}
+  }
+
+  /// True when the peer is still open and the session id is set.
+  bool get isSessionAlive {
+    final RTCPeerConnection? pc = _pc;
+    if (_sessionId == null || pc == null) {
+      return false;
+    }
+    final RTCPeerConnectionState? state = pc.connectionState;
+    if (state == RTCPeerConnectionState.RTCPeerConnectionStateFailed ||
+        state == RTCPeerConnectionState.RTCPeerConnectionStateClosed ||
+        state == RTCPeerConnectionState.RTCPeerConnectionStateDisconnected) {
+      return false;
+    }
+    return true;
+  }
+
+  /// Best-effort hangup: interrupt speech, close PC so the GPU frees the slot.
   Future<void> disconnect() async {
+    final String? baseUrl = _baseUrl;
+    final String? sessionId = _sessionId;
+    try {
+      await interruptTalk();
+    } catch (_) {}
     _sessionId = null;
     _baseUrl = null;
     _hasRemoteVideo = false;
     final RTCPeerConnection? pc = _pc;
     _pc = null;
     if (pc != null) {
-      await pc.close();
-      await pc.dispose();
+      try {
+        // Nudge ICE to closed so LiveTalking's session_manager can release.
+        pc.onConnectionState = null;
+        await pc.close();
+      } catch (_) {}
+      try {
+        await pc.dispose();
+      } catch (_) {}
     }
     final RTCVideoRenderer? renderer = _renderer;
     _renderer = null;
     if (renderer != null) {
-      renderer.srcObject = null;
-      await renderer.dispose();
+      try {
+        renderer.srcObject = null;
+        await renderer.dispose();
+      } catch (_) {}
+    }
+    // Drop references so GC / server timeouts can reclaim zombies faster.
+    if (baseUrl != null && sessionId != null) {
+      try {
+        await _dio.post<dynamic>(
+          '$baseUrl/interrupt_talk',
+          data: <String, Object?>{'sessionid': sessionId},
+          options: Options(
+            contentType: Headers.jsonContentType,
+            sendTimeout: const Duration(seconds: 2),
+            receiveTimeout: const Duration(seconds: 2),
+          ),
+        );
+      } catch (_) {}
     }
   }
 
   Future<void> _probeHttp(String baseUrl) async {
     try {
-      await _dio.get<dynamic>(
-        '$baseUrl/',
+      final Response<dynamic> response = await _dio.get<dynamic>(
+        '$baseUrl/index.html',
         options: Options(
           sendTimeout: const Duration(seconds: 6),
           receiveTimeout: const Duration(seconds: 6),
-          validateStatus: (int? code) => code != null && code < 500,
+          followRedirects: false,
+          maxRedirects: 0,
+          validateStatus: (int? code) =>
+              code != null && code >= 200 && code < 400,
         ),
       );
+      final String? location = response.headers.value('location');
+      if (location != null && location.contains(':8443')) {
+        throw StateError(
+          '数字人地址被错误重定向到 :8443（$location）。'
+          '请使用公网 $defaultLiveTalkingUrlPublic。',
+        );
+      }
     } on DioException catch (error) {
       throw StateError(_dioFailureHint(baseUrl, error));
     }
@@ -253,8 +432,9 @@ class LiveTalkingClient {
         ? error.message!.trim()
         : error.type.name;
     return '无法连接数字人 $baseUrl（$detail）。'
-        '请确认：① 手机已登录 Tailscale；② GPU 箱 LiveTalking 已启动（:8010）；'
-        '③ 设置地址可用 $defaultLiveTalkingUrl 或 $defaultLiveTalkingUrlIp。';
+        '请使用公网地址 $defaultLiveTalkingUrlPublic '
+        '（ECS 反代 → GPU LiveTalking；手机无需 Tailscale）。'
+        '并确认 GPU 箱 LiveTalking :8010 在线。';
   }
 
   Map<String, dynamic> _asMap(Object? data) {

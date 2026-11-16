@@ -1,7 +1,10 @@
+import 'dart:io';
+
 import '../../library/presentation/library_mock_data.dart';
 import '../domain/bilibili_import.dart';
 import 'bilibili_course_builder.dart';
 import 'bilibili_import_service.dart';
+import 'subtitle_source_policy.dart';
 
 /// If a Bilibili course was imported as a single episode but belongs to a
 /// 合集 or multi-page BV, expand to one episode per member/page.
@@ -56,9 +59,18 @@ Future<LibraryCourseData?> expandBilibiliCourseIfNeeded({
     seeded,
   );
 
+  // Only the imported page keeps local video/CC. Stamping them onto every
+  // non-missing row reintroduced classic multi-P 串台 after expand.
+  final int currentPage =
+      BilibiliImport.extractPage(course.description) ??
+      BilibiliImport.extractPage(current.sourceUrl ?? '') ??
+      BilibiliImport.extractPage(current.videoAsset ?? '') ??
+      int.tryParse(current.numberStr) ??
+      meta.page;
   final List<LibraryEpisodeItem> episodes = <LibraryEpisodeItem>[
     for (final LibraryEpisodeItem episode in expanded.episodes)
-      if (!episode.videoMissing)
+      if ((int.tryParse(episode.numberStr) ?? -1) == currentPage &&
+          !episode.videoMissing)
         LibraryEpisodeItem(
           id: episode.id,
           numberStr: episode.numberStr,
@@ -75,7 +87,8 @@ Future<LibraryCourseData?> expandBilibiliCourseIfNeeded({
           progressTimeStr: current.progressTimeStr,
           totalTimeStr: current.totalTimeStr,
           videoAsset: localPath ?? episode.videoAsset,
-          videoMissing: current.videoMissing,
+          sourceUrl: episode.sourceUrl ?? current.sourceUrl,
+          videoMissing: false,
           enSubtitleAsset: current.enSubtitleAsset ?? episode.enSubtitleAsset,
           cnSubtitleAsset: current.cnSubtitleAsset ?? episode.cnSubtitleAsset,
           subtitleTracks: current.subtitleTracks.isNotEmpty
@@ -109,51 +122,199 @@ Future<LibraryCourseData?> expandBilibiliCourseIfNeeded({
   );
 }
 
-/// Extract BV/av id from a local cache path like `.../bilibili/BV1xxx.mp4`
-/// or `.../bilibili/BV1xxx/zh.srt`.
-String? bilibiliIdKeyFromPath(String? path) {
-  final String value = path?.trim() ?? '';
-  if (value.isEmpty) {
+/// Page-aware cache / fingerprint key for one episode.
+///
+/// Multi-P anthologies must use `BVxxx-p02` (not bare `BVxxx`), or every page
+/// reuses page-1 official CC and ASR fingerprints — classic 串台.
+String? bilibiliEpisodeCacheKey({
+  LibraryCourseData? course,
+  LibraryEpisodeItem? episode,
+  String? videoAsset,
+  String? sourceUrl,
+}) {
+  final String? source =
+      (sourceUrl ?? '').trim().isNotEmpty
+      ? sourceUrl!.trim()
+      : bilibiliSourceForEpisode(
+          course: course,
+          episode: episode,
+          videoAsset: videoAsset,
+        );
+  if ((source ?? '').trim().isEmpty && (videoAsset ?? '').trim().isEmpty) {
     return null;
   }
-  final RegExpMatch? bv = RegExp(
-    r'(BV[0-9A-Za-z]+)',
-    caseSensitive: false,
-  ).firstMatch(value);
-  if (bv != null) {
-    return bv.group(1)!.toUpperCase();
+
+  final String raw = (source ?? videoAsset)!.trim();
+  final Map<String, String>? ids = BilibiliImport.extractIds(raw);
+  String root =
+      (ids?['bvid'] ??
+              (ids?['aid'] != null ? 'av${ids!['aid']}' : null) ??
+              bilibiliIdKeyFromPath(raw) ??
+              '')
+          .trim();
+  if (root.isEmpty) {
+    root = (bilibiliIdKeyFromPath(videoAsset) ?? '').trim();
   }
-  final RegExpMatch? av = RegExp(
-    r'(?:^|[/\\_-])(av\d+)(?:[/\\_.-]|$)',
-    caseSensitive: false,
-  ).firstMatch(value);
-  if (av != null) {
-    return av.group(1)!.toLowerCase();
+  if (root.isEmpty) {
+    return null;
   }
-  return null;
+  if (root.toUpperCase().startsWith('BV')) {
+    root = root.toUpperCase();
+  } else if (root.toLowerCase().startsWith('av')) {
+    root = root.toLowerCase();
+  }
+
+  // UGC 合集: each member is its own BV — never invent ?p= from numberStr.
+  final bool isSeason = course?.id.startsWith('bilibili-season-') ?? false;
+  if (isSeason) {
+    return root;
+  }
+
+  final int page =
+      BilibiliImport.extractPage(raw) ??
+      BilibiliImport.extractPage(episode?.sourceUrl ?? '') ??
+      int.tryParse(episode?.numberStr ?? '') ??
+      1;
+  if (page <= 1) {
+    return root;
+  }
+  return BilibiliImport.mediaIdKey(
+    bvidOrAv: root,
+    page: page,
+    pageCount: page, // >1 forces `-pXX` even when pageCount is unknown
+  );
+}
+
+/// Extract BV/av id from a local cache path like `.../bilibili/BV1xxx.mp4`
+/// or `.../bilibili/BV1xxx-p02/zh.srt`.
+String? bilibiliIdKeyFromPath(String? path) => BilibiliImport.idKeyFromPath(path);
+
+/// True when [idKey] is a multi-P page 2+ fingerprint (`BV…-p02`).
+bool bilibiliIdKeyIsSecondaryPage(String? idKey) =>
+    BilibiliImport.idKeyIsSecondaryPage(idKey);
+
+/// Episodes that advertise burned-in bilingual hardsubs — ignore B站 JSON CC
+/// (especially AI-zh) and prefer speech ASR.
+bool bilibiliEpisodePrefersSpeechOverOfficialCc({
+  LibraryEpisodeItem? episode,
+  LibraryCourseData? course,
+  String? sourceUrl,
+  String? pagePart,
+}) {
+  return SubtitleSourcePolicy.isHardsubHint(
+    episode: episode,
+    course: course,
+    sourceUrl: sourceUrl,
+    pagePart: pagePart,
+  );
+}
+
+/// Hardsub English lessons: B站 JSON/AI Chinese is frequently unrelated speech
+/// (phone reviews, fitness, TED). Never treat ZH-only softsubs as the timeline.
+bool bilibiliHardsubShouldIgnoreOfficialChinese({
+  LibraryEpisodeItem? episode,
+  String? sourceUrl,
+  String? pagePart,
+  required bool hasReliableEnglish,
+}) {
+  final SubtitleSourceDecision decision = SubtitleSourcePolicy.decideEpisode(
+    episode: episode,
+    sourceUrl: sourceUrl,
+    pagePart: pagePart,
+  );
+  if (!decision.ignoreOfficialChinese) {
+    return false;
+  }
+  // Keep human EN softsubs when present; only discard Chinese-led softsubs.
+  return !hasReliableEnglish;
+}
+
+/// Whether two BV/av cache keys refer to the same playable page.
+///
+/// Bare `BV` aligns with `BV-p01` only. `BV-p02` never aligns with bare/`-p01`.
+bool bilibiliMediaKeysAligned(String? a, String? b) {
+  final String left = (a ?? '').trim();
+  final String right = (b ?? '').trim();
+  if (left.isEmpty || right.isEmpty) {
+    return true;
+  }
+  final String aa = left.toUpperCase();
+  final String bb = right.toUpperCase();
+  if (aa == bb) {
+    return true;
+  }
+  final String aRoot = aa.split('-P').first;
+  final String bRoot = bb.split('-P').first;
+  if (aRoot != bRoot) {
+    return false;
+  }
+  final bool aSecondary = BilibiliImport.idKeyIsSecondaryPage(left);
+  final bool bSecondary = BilibiliImport.idKeyIsSecondaryPage(right);
+  if (!aSecondary && !bSecondary) {
+    return true;
+  }
+  if (!aSecondary && bb.endsWith('-P01')) {
+    return true;
+  }
+  if (!bSecondary && aa.endsWith('-P01')) {
+    return true;
+  }
+  return false;
 }
 
 /// True when a subtitle file under `bilibili/<idKey>/` matches [source].
 ///
 /// Returns true when either side has no extractable id (cannot validate).
+/// Multi-P page 2+ must not accept bare-BV or `-p01` folders from page 1.
 bool bilibiliSubtitleBelongsToSource({
   required String? subtitlePath,
   required String? source,
 }) {
-  final String? subKey = bilibiliIdKeyFromPath(subtitlePath);
+  final String path = (subtitlePath ?? '').trim();
+  if (path.isEmpty) {
+    return true;
+  }
+  final String? subKey = bilibiliIdKeyFromPath(path);
   if (subKey == null || subKey.isEmpty) {
     return true;
   }
-  String? sourceKey = bilibiliIdKeyFromPath(source);
-  if (sourceKey == null || sourceKey.isEmpty) {
-    final Map<String, String>? ids = BilibiliImport.extractIds(source ?? '');
-    sourceKey = (ids?['bvid'] ?? (ids?['aid'] != null ? 'av${ids!['aid']}' : null))
-        ?.trim();
+  final String? expected = bilibiliEpisodeCacheKey(sourceUrl: source);
+  if (expected == null || expected.isEmpty) {
+    String? sourceKey = bilibiliIdKeyFromPath(source);
+    if (sourceKey == null || sourceKey.isEmpty) {
+      final Map<String, String>? ids = BilibiliImport.extractIds(source ?? '');
+      sourceKey =
+          (ids?['bvid'] ??
+                  (ids?['aid'] != null ? 'av${ids!['aid']}' : null))
+              ?.trim();
+    }
+    if (sourceKey == null || sourceKey.isEmpty) {
+      return true;
+    }
+    return subKey.toUpperCase() == sourceKey.toUpperCase();
   }
-  if (sourceKey == null || sourceKey.isEmpty) {
+
+  final String pathUpper = path.toUpperCase();
+  final String expectedUpper = expected.toUpperCase();
+  final String subKeyUpper = subKey.toUpperCase();
+  // Path itself embeds the page-scoped key (folder or `BV…-p02.srt`).
+  if (subKeyUpper == expectedUpper) {
     return true;
   }
-  return subKey.toUpperCase() == sourceKey.toUpperCase();
+  // Prefer folder-segment match: `.../bilibili/BV…-p02/en.srt`.
+  if (pathUpper.contains(
+        '${Platform.pathSeparator}$expectedUpper${Platform.pathSeparator}',
+      ) ||
+      pathUpper.contains('/$expectedUpper/') ||
+      pathUpper.contains('\\$expectedUpper\\')) {
+    return true;
+  }
+  // Page 1 may live under bare BV or BV-p01.
+  if (!RegExp(r'-P\d{2,}$').hasMatch(expectedUpper)) {
+    return subKeyUpper.split('-P').first == expectedUpper.split('-P').first;
+  }
+  // Page 2+: reject bare BV / other pages even when the BV letters match.
+  return false;
 }
 
 /// Build a page-aware Bilibili watch URL for an episode.

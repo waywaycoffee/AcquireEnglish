@@ -92,6 +92,37 @@ class UserPreference(Base):
     user: Mapped[User] = relationship(back_populates="preference")
 
 
+class SharedBilibiliSubtitle(Base):
+    """Community cache of filled EN/ZH softsubs keyed by Bilibili episode."""
+
+    __tablename__ = "shared_bilibili_subtitles"
+    __table_args__ = (
+        UniqueConstraint("bvid", "page", name="uq_shared_bili_bvid_page"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    bvid: Mapped[str] = mapped_column(String(32), index=True)
+    page: Mapped[int] = mapped_column(Integer, default=1)
+    cid: Mapped[int | None] = mapped_column(Integer, nullable=True, index=True)
+    duration_sec: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    subtitle_en_srt: Mapped[str] = mapped_column(Text)
+    subtitle_zh_srt: Mapped[str | None] = mapped_column(Text, nullable=True)
+    quality_score: Mapped[float] = mapped_column(Float, default=0.0)
+    cue_count: Mapped[int] = mapped_column(Integer, default=0)
+    en_hits: Mapped[int] = mapped_column(Integer, default=0)
+    zh_hits: Mapped[int] = mapped_column(Integer, default=0)
+    uploader_user_id: Mapped[int | None] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True
+    )
+    source_origin: Mapped[str] = mapped_column(String(32), default="asr")
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
+
+
 class UserLinkCourse(Base):
     """YouTube / Bilibili paste-link imports owned by a user."""
 

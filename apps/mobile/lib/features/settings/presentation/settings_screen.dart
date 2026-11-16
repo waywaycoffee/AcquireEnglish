@@ -23,8 +23,10 @@ import 'ai_subtitle_management_screen.dart';
 import 'app_update_provider.dart';
 import '../../home/presentation/widgets/theme_widget.dart';
 import 'bilibili_login_sheet.dart';
+import 'cloud_subtitle_library_screen.dart';
 import 'learning_preferences_screen.dart';
 import 'settings_provider.dart';
+import '../../sync/presentation/cloud_catalog_sync.dart';
 import 'widgets/api_usage_card.dart';
 import 'widgets/pronunciation_settings_card.dart';
 import 'widgets/settings_group_card.dart';
@@ -352,8 +354,9 @@ class SettingsScreen extends ConsumerWidget {
               _SelectRow(
                 title: '陪练引擎',
                 description:
-                    '视频陪练管线=当前视频主题实时对话（ASR→发音→LLM→TTS→数字人）；'
-                    'LiveTalking=仅数字人 WebRTC；本地 TTS=无画面。',
+                    '视频陪练管线=主题对话 + 本地头像/固定动作（省 GPU，默认）；'
+                    'LiveTalking=真人唇形 WebRTC（占会话槽）；'
+                    '本地 TTS=仅语音无舞台。',
                 value: oralCoachBackendOptions.contains(settings.oralCoachBackend)
                     ? settings.oralCoachBackend
                     : '本地 TTS',
@@ -386,12 +389,11 @@ class SettingsScreen extends ConsumerWidget {
                 _InputRow(
                   title: 'LiveTalking / 数字人地址',
                   description:
-                      '虚拟外教画面（WebRTC）。管线 avatar=livetalking 时用于播报回复；'
-                      '也可直连 LiveTalking。本机 GPU 经 Tailscale：'
-                      '$defaultLiveTalkingUrl 或 $defaultLiveTalkingUrlIp'
-                      '（手机需加入同一 Tailscale）。',
+                      '虚拟外教画面（WebRTC）。手机走公网 HTTPS：'
+                      '$defaultLiveTalkingUrlPublic（无需 Tailscale）。'
+                      '留空则自动使用该地址。',
                   value: settings.oralCoachServerUrl,
-                  hintText: defaultLiveTalkingUrl,
+                  hintText: defaultLiveTalkingUrlPublic,
                   onChanged: (String value) {
                     ref
                         .read(learningSettingsProvider.notifier)
@@ -556,9 +558,10 @@ class SettingsScreen extends ConsumerWidget {
                   const _HintRow(
                     title: 'GPU 箱部署',
                     description:
-                        '默认地址与数字人 LiveTalking 同一 Tailscale 主机 '
-                        '（100.115.252.55）。模型用 qwen2.5:7b（~4.7GB，'
-                        '与 LiveTalking 同卡）。部署步骤见仓库 deploy/gpu-box-ollama。',
+                        '默认连 5060 Ti Ollama（100.115.252.55:11434）。'
+                        '当前预设模型 qwen2.5:3b（与 LiveTalking 同卡）；'
+                        '需要更高质量可在 GPU 箱拉取 qwen2.5:7b。'
+                        '部署步骤见仓库 deploy/gpu-box-ollama。',
                   ),
                 _SwitchRow(
                   title: '自定义接口地址',
@@ -965,9 +968,21 @@ class SettingsScreen extends ConsumerWidget {
                 ),
               ),
               _ActionRow(
+                title: '云端字幕库',
+                description: authSession.isLoggedIn
+                    ? '查看私人字幕资产，一键恢复到本机；共享字幕自动命中。'
+                    : '登录后可查看私人字幕库并恢复到本机。',
+                icon: Icons.cloud_queue_rounded,
+                onTap: () => Navigator.of(context).push(
+                  MaterialPageRoute<void>(
+                    builder: (_) => const CloudSubtitleLibraryScreen(),
+                  ),
+                ),
+              ),
+              _ActionRow(
                 title: '备份同步云端数据',
                 description: authSession.isLoggedIn
-                    ? '上传收藏生词并拉取云端进度 / 词库 / 学习偏好。'
+                    ? '上传收藏生词并拉取云端进度 / 词库 / 学习偏好 / 私人字幕。'
                     : '请先登录爱快账号后再同步。',
                 icon: Icons.cloud_sync_rounded,
                 onTap: () async {
@@ -986,12 +1001,13 @@ class SettingsScreen extends ConsumerWidget {
                     await ref
                         .read(learningPreferencesProvider.notifier)
                         .pullRemote();
+                    await syncCloudCatalogAndFeed(ref);
                     if (!context.mounted) {
                       return;
                     }
                     _showMessage(
                       context,
-                      '已同步：上传 $pushed 个收藏词，并拉取云端词库与偏好',
+                      '已同步：上传 $pushed 个收藏词，并拉取云端词库、偏好与私人字幕',
                     );
                   } catch (error) {
                     if (!context.mounted) {

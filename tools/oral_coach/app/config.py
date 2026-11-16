@@ -35,7 +35,17 @@ class Settings:
     openai_model: str = 'gpt-4o-mini'
     ollama_url: str = 'http://127.0.0.1:11434'
     ollama_model: str = 'llama3.2'
-    livetalking_url: str = 'http://127.0.0.1:8010'
+    # Internal (ECS → GPU over Tailscale) — used for server-side probes.
+    livetalking_url: str = 'http://100.115.252.55:8010'
+    # Public HTTPS for mobile clients (nginx reverse proxy). Never require Tailscale on phones.
+    livetalking_public_url: str = 'https://acquireenglish.curlhairai.com/livetalking'
+
+    @property
+    def livetalking_client_url(self) -> str:
+        public = (self.livetalking_public_url or '').strip().rstrip('/')
+        if public:
+            return public
+        return (self.livetalking_url or '').rstrip('/')
 
     def __post_init__(self) -> None:
         self.data_dir = self.data_dir.expanduser().resolve()
@@ -80,5 +90,12 @@ class Settings:
             openai_model=model,
             ollama_url=os.getenv('OLLAMA_URL', 'http://127.0.0.1:11434').rstrip('/'),
             ollama_model=os.getenv('OLLAMA_MODEL', 'llama3.2').strip(),
-            livetalking_url=os.getenv('LIVETALKING_URL', 'http://127.0.0.1:8010').rstrip('/'),
+            livetalking_url=os.getenv(
+                'LIVETALKING_URL',
+                'http://100.115.252.55:8010',
+            ).rstrip('/'),
+            livetalking_public_url=os.getenv(
+                'LIVETALKING_PUBLIC_URL',
+                'https://acquireenglish.curlhairai.com/livetalking',
+            ).rstrip('/'),
         )

@@ -3,11 +3,19 @@ import 'package:common_learn_english/features/settings/presentation/settings_pro
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
-  test('defaults point at Tailscale MagicDNS and glass_man avatar', () {
-    expect(defaultLiveTalkingUrl, contains('5060ti.tailc30b42.ts.net'));
-    expect(defaultLiveTalkingUrl, startsWith('http://'));
-    expect(defaultLiveTalkingUrlIp, contains('100.115.252.55'));
+  test('defaults prefer public HTTPS (no Tailscale on phones)', () {
+    expect(defaultLiveTalkingUrlPublic, startsWith('https://'));
+    expect(defaultLiveTalkingUrlPublic, contains('curlhairai.com/livetalking'));
+    expect(defaultLiveTalkingUrl, defaultLiveTalkingUrlPublic);
+    expect(liveTalkingUrlCandidates.first, defaultLiveTalkingUrlPublic);
     expect(defaultLiveTalkingAvatarId, 'wav2lip_avatar_glass_man');
+    expect(defaultLiveTalkingIceServers, isNotEmpty);
+    expect(
+      defaultLiveTalkingIceServers.any(
+        (Map<String, dynamic> s) => '${s['urls']}'.contains('turn.curlhairai'),
+      ),
+      isTrue,
+    );
   });
 
   test('fresh client is disconnected without media', () {

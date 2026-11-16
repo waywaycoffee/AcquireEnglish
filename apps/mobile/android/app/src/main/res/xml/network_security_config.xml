@@ -3,13 +3,15 @@
     <!--
       Cleartext is required for:
       - localhost Bilibili CDN proxy
-      - GPU-box LiveTalking / Ollama over Tailscale (http://…:8010 / :11434)
-      When this file is present, android:usesCleartextTraffic is ignored unless
-      domains (or base-config) explicitly permit cleartext.
+      - GPU-box LiveTalking / Ollama over LAN or Tailscale (http://…:8010 / :11434)
+      base-config permits LAN IPs (CIDR cannot be listed as <domain>).
     -->
+    <base-config cleartextTrafficPermitted="true" />
     <domain-config cleartextTrafficPermitted="true">
         <domain includeSubdomains="true">localhost</domain>
         <domain includeSubdomains="true">127.0.0.1</domain>
+        <!-- Same-WiFi GPU box (no Tailscale needed on phone) -->
+        <domain includeSubdomains="true">192.168.31.121</domain>
         <!-- Prod GPU box Tailscale IP -->
         <domain includeSubdomains="true">100.115.252.55</domain>
         <!-- Tailscale MagicDNS -->

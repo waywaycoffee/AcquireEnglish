@@ -50,6 +50,50 @@ void main() {
       expect(bundle.fragments.first.chinese, '是');
     });
 
+    test('merges incomplete crumbs across a short pause into one sentence', () {
+      const List<PlayerSubtitleLine> asr = <PlayerSubtitleLine>[
+        PlayerSubtitleLine(
+          startTime: '00:01',
+          english: 'I want to',
+          chinese: '',
+          startMs: 1000,
+          endMs: 1600,
+        ),
+        PlayerSubtitleLine(
+          startTime: '00:02',
+          english: 'go home now',
+          chinese: '',
+          startMs: 1800,
+          endMs: 2600,
+        ),
+      ];
+      final MergedSubtitleBundle bundle = mergeAsrIntoSentences(asrLines: asr);
+      expect(bundle.sentences, hasLength(1));
+      expect(bundle.sentences.single.english, 'I want to go home now');
+    });
+
+    test('does not merge abbreviations as sentence ends', () {
+      const List<PlayerSubtitleLine> asr = <PlayerSubtitleLine>[
+        PlayerSubtitleLine(
+          startTime: '00:01',
+          english: 'Mr.',
+          chinese: '',
+          startMs: 1000,
+          endMs: 1300,
+        ),
+        PlayerSubtitleLine(
+          startTime: '00:01',
+          english: 'Smith is here',
+          chinese: '',
+          startMs: 1400,
+          endMs: 2200,
+        ),
+      ];
+      final MergedSubtitleBundle bundle = mergeAsrIntoSentences(asrLines: asr);
+      expect(bundle.sentences, hasLength(1));
+      expect(bundle.sentences.single.english, 'Mr. Smith is here');
+    });
+
     test('does not merge across a large pause or sentence end', () {
       const List<PlayerSubtitleLine> asr = <PlayerSubtitleLine>[
         PlayerSubtitleLine(

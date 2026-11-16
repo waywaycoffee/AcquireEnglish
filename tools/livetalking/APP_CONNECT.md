@@ -1,42 +1,70 @@
-# App 连接 GPU 数字人（LiveTalking）
+# App 连接 GPU 数字人（LiveTalking）— 公网
 
-目标：手机陪练 Tab 看到外教画面，并用 `/human` 口型播报。
+目标：手机**不装 Tailscale**，走公网 HTTPS 连接数字人。
+
+## 架构
+
+```
+手机 App
+  │  HTTPS
+  ▼
+https://acquireenglish.curlhairai.com/livetalking/
+  │  nginx reverse proxy (ECS)
+  ▼
+http://100.115.252.55:8010   ← GPU 箱 LiveTalking（仅 ECS↔GPU 用 Tailscale）
+```
+
+- 口语管线：`https://acquireenglish.curlhairai.com/coach`（公网）
+- 数字人画面：同上域名 `/livetalking`（公网）
+- Tailscale 只给 **ECS 访问家里 GPU**，不要求用户手机加入
 
 ## GPU 箱
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File tools/livetalking/run_livetalking.ps1
-# 或计划任务 watchdog
 ```
 
-浏览器本机打开 `http://127.0.0.1:8010/index.html` 应能看到画面。
+本机打开 `http://127.0.0.1:8010/` 应 302/200。
 
-Tailscale 地址：
+## ECS（已部署）
 
-- MagicDNS：`http://5060ti.tailc30b42.ts.net:8010`
-- IP：`http://100.115.252.55:8010`
+- Nginx snippet：`/etc/nginx/snippets/acquireenglish-livetalking.conf`
+- oral_coach `.env`：
+  - `LIVETALKING_URL=http://100.115.252.55:8010`（服务端探测）
+  - `LIVETALKING_PUBLIC_URL=https://acquireenglish.curlhairai.com/livetalking`（下发给 App）
+
+探测：
+
+```bash
+# / 必须直接 200（不要 302 到 :8443）
+curl -sI https://acquireenglish.curlhairai.com/livetalking/
+curl -sI https://acquireenglish.curlhairai.com/livetalking/index.html
+curl -s https://acquireenglish.curlhairai.com/coach/api/health
+# livetalking_url 应为 https://acquireenglish.curlhairai.com/livetalking
+# webrtc_ice_servers 应含 turns:turn.curlhairai.com:443
+```
 
 ## 手机
 
-1. 安装并登录 **同一 Tailscale**。
-2. 设置 → 口语陪练：引擎选「视频陪练管线」或「LiveTalking」。
-3. LiveTalking 地址保持 App 默认（MagicDNS）；连不上再试 IP。
-4. 打开视频 → 陪练 Tab → **连接数字人** → 应出画面；点说话回合后外教口型播报。
+1. 设置 → LiveTalking 地址留空或填  
+   `https://acquireenglish.curlhairai.com/livetalking`
+2. **不要**填 `100.115.*` / `*.ts.net`（那是 Tailscale，手机连不上）
+3. 数字人 Tab → 连接数字人
 
 ## 常见失败
 
 | 现象 | 原因 | 处理 |
 |------|------|------|
-| 连接失败 / cleartext | Android/iOS 拦明文 HTTP | 已放行 `ts.net` + Tailscale IP；重装含此配置的 APK |
-| 黑屏但“已建连” | WebRTC UDP 被拦 | 检查 Tailscale；同网浏览器先过 E2E |
-| 回合只用 TTS | `/human` 失败或未连上 | 看 Tab 红色错误；先点「连接数字人」 |
-| session not found | 服务端替 App 调 `/human` | 不要；由 App WebRTC session 调 |
+| 连接超时到 100.115.* | App 仍用 Tailscale 地址 | 升到含公网默认的 APK；清设置里的旧地址 |
+| 已建连但黑屏 | WebRTC UDP/ICE 被 NAT 拦 | 确认 GPU LiveTalking 在线；后续可加 Coturn/MediaMtx |
+| `/offer` → Maximum session limit (5/5) | 僵尸 WebRTC 会话占满 | 在 GPU 箱运行 `cleanup_livetalking_sessions.ps1` 或 `restart_livetalking.ps1`；watchdog 每 90s 巡检；启动参数默认 `--max_session 10` |
+| 只有 TTS / 头像无唇形 | 默认陪练管线不占 WebRTC | 正常：对话用本地头像+TTS；需要真人唇形时在设置里选 **LiveTalking** |
 
 ## 验收
 
 ```bash
-# 任意同 tailnet 机器
-python tools/livetalking/test_webrtc_e2e.py --url http://100.115.252.55:8010
+curl -fsS -o /dev/null -w '%{http_code}\n' https://acquireenglish.curlhairai.com/livetalking/
+# → 200（勿出现 Location: …:8443）
 ```
 
-App：连接数字人有画面 → 说话回合状态含「数字人口型播报」。
+App：连接数字人有画面（或至少 `/offer` 成功）→ 说话回合有外教回复。

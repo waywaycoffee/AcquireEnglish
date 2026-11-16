@@ -14,6 +14,7 @@ import '../player_mock_state.dart';
 import '../player_native_subtitles.dart';
 import '../subtitle_display_mode.dart';
 import '../subtitle_language_sanitize.dart';
+import 'hardsub_mosaic_cover.dart';
 import 'subtitle_vocabulary_highlight.dart';
 import 'subtitle_word_highlight_style.dart';
 
@@ -88,6 +89,10 @@ class PlayerVideoPanel extends StatefulWidget {
     this.hideOverlayControls = false,
     // Softsubs belong in the list below — never paint over hardsub video.
     this.paintSubtitlesOnVideo = false,
+    this.hardsubMosaicEnabled = false,
+    this.hardsubMosaicBand = const HardsubMosaicBand(),
+    this.onHardsubMosaicBandChanged,
+    this.onHardsubMosaicDismiss,
     super.key,
   });
 
@@ -165,6 +170,12 @@ class PlayerVideoPanel extends StatefulWidget {
   /// (e.g. Bilibili hardsubs already burn captions into the frame).
   final bool paintSubtitlesOnVideo;
 
+  /// Dictation helper: mosaic strip covering burned-in hardsubs.
+  final bool hardsubMosaicEnabled;
+  final HardsubMosaicBand hardsubMosaicBand;
+  final ValueChanged<HardsubMosaicBand>? onHardsubMosaicBandChanged;
+  final VoidCallback? onHardsubMosaicDismiss;
+
   static const List<String> kSpeedOptions = <String>[
     '0.5×',
     '0.8×',
@@ -195,6 +206,7 @@ class _PlayerVideoPanelState extends State<PlayerVideoPanel> {
   double? _gestureStartBrightness;
   double _brightnessLevel = 0.5;
   bool _canChangeSystemBrightness = true;
+  bool _ignoreGestureForMosaic = false;
   OverlayEntry? _subtitleLookupOverlayEntry;
   late final FocusNode _keyboardFocusNode;
   _PlayerContentFit _contentFit = _PlayerContentFit.wide;
@@ -242,6 +254,9 @@ class _PlayerVideoPanelState extends State<PlayerVideoPanel> {
   }
 
   void _handleSurfaceTap() {
+    if (_ignoreGestureForMosaic) {
+      return;
+    }
     _setControlsVisible(!_showControls);
     if (_showControls) {
       _scheduleAutoHide();
@@ -411,7 +426,18 @@ class _PlayerVideoPanelState extends State<PlayerVideoPanel> {
     );
   }
 
-  void _handlePointerDown(PointerDownEvent event) {
+  bool _isInHardsubMosaicBand(Offset local, Size size) {
+    if (!widget.hardsubMosaicEnabled || size.height <= 0) {
+      return false;
+    }
+    final HardsubMosaicBand band = widget.hardsubMosaicBand.clamped();
+    final double bottom = size.height * band.bottomFraction;
+    final double bandHeight = size.height * band.heightFraction;
+    final double top = size.height - bottom - bandHeight;
+    return local.dy >= top && local.dy <= size.height - bottom;
+  }
+
+  void _handlePointerDown(PointerDownEvent event, Size size) {
     _keyboardFocusNode.requestFocus();
     _gestureMode = null;
     _gestureStartLocalPosition = event.localPosition;
@@ -419,6 +445,7 @@ class _PlayerVideoPanelState extends State<PlayerVideoPanel> {
     _gesturePreviewProgress = null;
     _gestureStartVolume = widget.volumeLevel;
     _gestureStartBrightness = _brightnessLevel;
+    _ignoreGestureForMosaic = _isInHardsubMosaicBand(event.localPosition, size);
   }
 
   KeyEventResult _handleKeyboardShortcut(FocusNode _, KeyEvent event) {
@@ -442,6 +469,10 @@ class _PlayerVideoPanelState extends State<PlayerVideoPanel> {
   void _handlePointerMove(PointerMoveEvent event, Size size) {
     final Offset? start = _gestureStartLocalPosition;
     if (start == null || size.height <= 0 || size.width <= 0) {
+      return;
+    }
+    if (_ignoreGestureForMosaic || _isInHardsubMosaicBand(start, size)) {
+      _ignoreGestureForMosaic = true;
       return;
     }
 
@@ -500,7 +531,8 @@ class _PlayerVideoPanelState extends State<PlayerVideoPanel> {
   }
 
   void _handleGestureEnd() {
-    if (_gestureMode == _PlayerGestureMode.seek &&
+    if (!_ignoreGestureForMosaic &&
+        _gestureMode == _PlayerGestureMode.seek &&
         _gesturePreviewProgress != null) {
       widget.onSeek(_gesturePreviewProgress!);
     }
@@ -511,6 +543,7 @@ class _PlayerVideoPanelState extends State<PlayerVideoPanel> {
       _gesturePreviewProgress = null;
       _gestureStartVolume = null;
       _gestureStartBrightness = null;
+      _ignoreGestureForMosaic = false;
     });
     _scheduleAutoHide();
   }
@@ -628,7 +661,8 @@ class _PlayerVideoPanelState extends State<PlayerVideoPanel> {
           onKeyEvent: _handleKeyboardShortcut,
           child: Listener(
             behavior: HitTestBehavior.opaque,
-            onPointerDown: _handlePointerDown,
+            onPointerDown: (PointerDownEvent event) =>
+                _handlePointerDown(event, gestureSize),
             onPointerMove: (PointerMoveEvent event) =>
                 _handlePointerMove(event, gestureSize),
             onPointerUp: (_) => _handleGestureEnd(),
@@ -640,6 +674,15 @@ class _PlayerVideoPanelState extends State<PlayerVideoPanel> {
                 fit: StackFit.expand,
                 children: <Widget>[
                   _buildVideoBackdrop(),
+                  if (widget.hardsubMosaicEnabled)
+                    Positioned.fill(
+                      child: HardsubMosaicCover(
+                        enabled: true,
+                        band: widget.hardsubMosaicBand,
+                        onBandChanged: widget.onHardsubMosaicBandChanged,
+                        onDismiss: widget.onHardsubMosaicDismiss,
+                      ),
+                    ),
                   if (showChrome)
                     const Positioned.fill(
                       child: DecoratedBox(
@@ -870,38 +913,6 @@ class _PlayerVideoPanelState extends State<PlayerVideoPanel> {
                             tiny: tinyControls,
                             onPressed: () =>
                                 _handleControlTap(widget.onTogglePlaying),
-                          ),
-                        ),
-                      ),
-                    ),
-                  if (showChrome &&
-                      (widget.onAssessVisibleLine != null ||
-                          widget.assessmentUnavailableReason != null))
-                    Positioned(
-                      right: dockInset,
-                      bottom: _showControls ? subtitleBottom : 18,
-                      child: Tooltip(
-                        message:
-                            widget.assessmentUnavailableReason ?? '跟读录音 · 原声对照',
-                        child: IconButton.filledTonal(
-                          key: ValueKey<String>(
-                            widget.isFullscreen
-                                ? 'fullscreen-visible-pronunciation-assessment'
-                                : 'player-visible-pronunciation-assessment',
-                          ),
-                          onPressed:
-                              widget.assessmentUnavailableReason != null ||
-                                  widget.onAssessVisibleLine == null
-                              ? null
-                              : () => _handleControlTap(
-                                  widget.onAssessVisibleLine!,
-                                ),
-                          icon: const Icon(Icons.mic_rounded),
-                          style: IconButton.styleFrom(
-                            backgroundColor: const Color(0xFF0F7A43),
-                            foregroundColor: Colors.white,
-                            minimumSize: const Size(44, 44),
-                            shape: const CircleBorder(),
                           ),
                         ),
                       ),
@@ -1358,6 +1369,39 @@ class _PlayerVideoPanelState extends State<PlayerVideoPanel> {
                         ),
                       ),
                     ),
+                  // Mic last in Stack so the control dock cannot steal taps.
+                  // Keep visible even while chrome auto-hides during playback.
+                  if (showChrome && widget.onAssessVisibleLine != null)
+                    Positioned(
+                      right: dockInset,
+                      bottom: _showControls ? subtitleBottom : 18,
+                      child: Material(
+                        color: const Color(0xFF0F7A43),
+                        shape: const CircleBorder(),
+                        elevation: 6,
+                        shadowColor: Colors.black54,
+                        child: InkWell(
+                          key: ValueKey<String>(
+                            widget.isFullscreen
+                                ? 'fullscreen-visible-pronunciation-assessment'
+                                : 'player-visible-pronunciation-assessment',
+                          ),
+                          customBorder: const CircleBorder(),
+                          onTap: () => _handleControlTap(
+                            widget.onAssessVisibleLine!,
+                          ),
+                          child: const SizedBox(
+                            width: 52,
+                            height: 52,
+                            child: Icon(
+                              Icons.mic_rounded,
+                              color: Colors.white,
+                              size: 28,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
                 ],
               ),
             ),
@@ -1405,7 +1449,6 @@ class _PlayerVideoPanelState extends State<PlayerVideoPanel> {
           .map((MapEntry<int, String> entry) {
             final bool karaoke =
                 widget.highlightWords &&
-                widget.line.words.isNotEmpty &&
                 entry.key == widget.currentWordIndex;
             final SubtitleVocabMark vocabMark =
                 SubtitleVocabularyHighlight.resolve(

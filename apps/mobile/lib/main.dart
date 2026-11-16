@@ -13,6 +13,8 @@ import 'constants/strings.dart';
 import 'features/import_course/domain/video_cover_extractor.dart';
 import 'features/player/presentation/player_backend.dart';
 import 'features/player/presentation/transcript_reader_window.dart';
+import 'features/subtitle_completion/subtitle_completion_runtime.dart';
+import 'features/subtitle_completion/subtitle_overlay_entry.dart';
 import 'features/sync/presentation/daily_feed_background.dart';
 import 'flavors/app_flavor.dart';
 import 'hive/hive.dart';
@@ -23,6 +25,12 @@ import 'my_app.dart';
 Future<void> main(List<String> args) async {
   FlavorConfig.setFlavor(AppFlavor.prod);
   await bootstrap(args: args);
+}
+
+/// System overlay floating ball (flutter_overlay_window hard-codes this name).
+@pragma('vm:entry-point')
+void overlayMain() {
+  runSubtitleOverlayApp();
 }
 
 Future<void> bootstrap({List<String> args = const <String>[]}) async {
@@ -41,6 +49,12 @@ Future<void> bootstrap({List<String> args = const <String>[]}) async {
   await SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
   if (!kIsWeb && defaultTargetPlatform == TargetPlatform.android) {
     await FlutterDisplayMode.setHighRefreshRate();
+    // Port must exist before any FGS callbacks from subtitle completion.
+    await SubtitleCompletionRuntime.instance.init();
+    // Ask notification / overlay early — FGS + 悬浮球 need them on Android 13+.
+    try {
+      await SubtitleCompletionRuntime.instance.requestPermissions();
+    } catch (_) {}
   }
 
   if (kReleaseMode) {

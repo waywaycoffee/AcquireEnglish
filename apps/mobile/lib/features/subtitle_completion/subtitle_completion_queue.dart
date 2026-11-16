@@ -14,6 +14,9 @@ class SubtitleCompletionJob {
     this.sourceKey,
     this.needEnglish = true,
     this.needChinese = false,
+    /// Spoken-language side that Whisper must produce before translation.
+    /// `en` | `zh`
+    this.asrPrimary = 'en',
     this.status = SubtitleCompletionStatus.pending,
     this.attempts = 0,
     this.lastError,
@@ -27,6 +30,7 @@ class SubtitleCompletionJob {
   final String? sourceKey;
   final bool needEnglish;
   final bool needChinese;
+  final String asrPrimary;
   final SubtitleCompletionStatus status;
   final int attempts;
   final String? lastError;
@@ -39,6 +43,7 @@ class SubtitleCompletionJob {
     String? sourceKey,
     bool? needEnglish,
     bool? needChinese,
+    String? asrPrimary,
     SubtitleCompletionStatus? status,
     int? attempts,
     String? lastError,
@@ -53,6 +58,7 @@ class SubtitleCompletionJob {
       sourceKey: sourceKey ?? this.sourceKey,
       needEnglish: needEnglish ?? this.needEnglish,
       needChinese: needChinese ?? this.needChinese,
+      asrPrimary: asrPrimary ?? this.asrPrimary,
       status: status ?? this.status,
       attempts: attempts ?? this.attempts,
       lastError: clearError ? null : (lastError ?? this.lastError),
@@ -69,6 +75,7 @@ class SubtitleCompletionJob {
       'sourceKey': sourceKey,
       'needEnglish': needEnglish,
       'needChinese': needChinese,
+      'asrPrimary': asrPrimary,
       'status': status.name,
       'attempts': attempts,
       'lastError': lastError,
@@ -98,6 +105,10 @@ class SubtitleCompletionJob {
     final bool needChinese = raw.containsKey('needChinese')
         ? raw['needChinese'] == true || '${raw['needChinese']}' == 'true'
         : false;
+    final String asrPrimaryRaw =
+        '${raw['asrPrimary'] ?? 'en'}'.trim().toLowerCase();
+    final String asrPrimary =
+        asrPrimaryRaw.startsWith('zh') ? 'zh' : 'en';
     return SubtitleCompletionJob(
       episodeId: episodeId,
       videoPath: videoPath,
@@ -106,6 +117,7 @@ class SubtitleCompletionJob {
       sourceKey: _nullableString(raw['sourceKey']),
       needEnglish: needEnglish,
       needChinese: needChinese,
+      asrPrimary: asrPrimary,
       status: status,
       attempts: int.tryParse('${raw['attempts']}') ?? 0,
       lastError: _nullableString(raw['lastError']),
@@ -130,7 +142,10 @@ class SubtitleCompletionQueue {
            appSupportDirectory ?? getApplicationSupportDirectory;
 
   /// Process-wide queue so import/scheduler/worker share one write lock.
-  static final SubtitleCompletionQueue shared = SubtitleCompletionQueue();
+  /// Chinese EN→ZH often needs many soft retries under free-API rate limits.
+  static final SubtitleCompletionQueue shared = SubtitleCompletionQueue(
+    maxAttempts: 12,
+  );
 
   final Future<Directory> Function() _appSupportDirectory;
   final int maxAttempts;
@@ -196,6 +211,7 @@ class SubtitleCompletionQueue {
     String? sourceKey,
     bool needEnglish = true,
     bool needChinese = false,
+    String asrPrimary = 'en',
     bool force = false,
   }) {
     return _withLock(() async {
@@ -204,6 +220,9 @@ class SubtitleCompletionQueue {
         (SubtitleCompletionJob job) => job.episodeId == episodeId,
       );
       final int now = DateTime.now().millisecondsSinceEpoch;
+      final String primary = asrPrimary.trim().toLowerCase().startsWith('zh')
+          ? 'zh'
+          : 'en';
       if (index >= 0) {
         final SubtitleCompletionJob existing = jobs[index];
         if (existing.status == SubtitleCompletionStatus.done && !force) {
@@ -224,16 +243,17 @@ class SubtitleCompletionQueue {
             sourceKey: sourceKey,
             needEnglish: existing.needEnglish || needEnglish,
             needChinese: existing.needChinese || needChinese,
+            asrPrimary: primary,
             updatedAtMs: now,
           );
           jobs[index] = next;
           await _saveJobs(jobs);
           return next;
         }
+        // Only reset attempts on explicit force or a fresh re-queue of a done
+        // job. Failed→pending must keep attempts or "仍不完整" loops forever.
         final bool resetAttempts =
-            force ||
-            existing.status == SubtitleCompletionStatus.failed ||
-            existing.status == SubtitleCompletionStatus.done;
+            force || existing.status == SubtitleCompletionStatus.done;
         final SubtitleCompletionJob next = existing.copyWith(
           videoPath: videoPath,
           zhPath: zhPath,
@@ -241,6 +261,7 @@ class SubtitleCompletionQueue {
           sourceKey: sourceKey,
           needEnglish: needEnglish,
           needChinese: needChinese,
+          asrPrimary: primary,
           status: SubtitleCompletionStatus.pending,
           attempts: resetAttempts ? 0 : existing.attempts,
           updatedAtMs: now,
@@ -258,6 +279,7 @@ class SubtitleCompletionQueue {
         sourceKey: sourceKey,
         needEnglish: needEnglish,
         needChinese: needChinese,
+        asrPrimary: primary,
         status: SubtitleCompletionStatus.pending,
         updatedAtMs: now,
       );
@@ -269,8 +291,22 @@ class SubtitleCompletionQueue {
 
   Future<SubtitleCompletionJob?> nextRunnable() async {
     final List<SubtitleCompletionJob> jobs = await loadJobs();
+    final int now = DateTime.now().millisecondsSinceEpoch;
+    SubtitleCompletionJob? cooling;
     for (final SubtitleCompletionJob job in jobs) {
       if (job.status == SubtitleCompletionStatus.pending) {
+        // Soft defer after free-API rate limits — skip for ~45s so other
+        // episodes can drain instead of hot-looping one stuck Chinese fill.
+        final String err = (job.lastError ?? '').toLowerCase();
+        final bool rateLimited =
+            err.contains('稍后继续') ||
+            err.contains('限流') ||
+            err.contains('已保留已译');
+        final int updated = job.updatedAtMs ?? 0;
+        if (rateLimited && now - updated < 45000) {
+          cooling ??= job;
+          continue;
+        }
         return job;
       }
       if (job.status == SubtitleCompletionStatus.failed &&
@@ -278,7 +314,7 @@ class SubtitleCompletionQueue {
         return job;
       }
     }
-    return null;
+    return cooling; // only rate-limited work left — caller may wait/heartbeat
   }
 
   Future<void> markRunning(String episodeId) async {
@@ -313,6 +349,80 @@ class SubtitleCompletionQueue {
         updatedAtMs: DateTime.now().millisecondsSinceEpoch,
       ),
     );
+  }
+
+  /// Drop a side that is already satisfied (e.g. official ZH softsub present).
+  Future<void> clearSatisfiedNeeds(
+    String episodeId, {
+    bool clearEnglish = false,
+    bool clearChinese = false,
+  }) {
+    if (!clearEnglish && !clearChinese) {
+      return Future<void>.value();
+    }
+    return _withLock(() async {
+      final List<SubtitleCompletionJob> jobs = await loadJobs();
+      final int index = jobs.indexWhere(
+        (SubtitleCompletionJob job) => job.episodeId == episodeId,
+      );
+      if (index < 0) {
+        return;
+      }
+      final SubtitleCompletionJob job = jobs[index];
+      final bool needEnglish = clearEnglish ? false : job.needEnglish;
+      final bool needChinese = clearChinese ? false : job.needChinese;
+      if (!needEnglish && !needChinese) {
+        jobs[index] = job.copyWith(
+          needEnglish: false,
+          needChinese: false,
+          status: SubtitleCompletionStatus.done,
+          updatedAtMs: DateTime.now().millisecondsSinceEpoch,
+          clearError: true,
+        );
+      } else {
+        jobs[index] = job.copyWith(
+          needEnglish: needEnglish,
+          needChinese: needChinese,
+          updatedAtMs: DateTime.now().millisecondsSinceEpoch,
+          clearError: true,
+        );
+      }
+      await _saveJobs(jobs);
+    });
+  }
+
+  /// After a partial success: keep attempt budget, narrow remaining sides.
+  Future<void> markIncompleteRetry({
+    required String episodeId,
+    required bool needEnglish,
+    required bool needChinese,
+    required String error,
+    String? asrPrimary,
+  }) {
+    return _withLock(() async {
+      final List<SubtitleCompletionJob> jobs = await loadJobs();
+      final int index = jobs.indexWhere(
+        (SubtitleCompletionJob job) => job.episodeId == episodeId,
+      );
+      if (index < 0) {
+        return;
+      }
+      final SubtitleCompletionJob job = jobs[index];
+      final int attempts = job.attempts + 1;
+      final bool giveUp = attempts >= maxAttempts;
+      jobs[index] = job.copyWith(
+        needEnglish: needEnglish,
+        needChinese: needChinese,
+        asrPrimary: asrPrimary ?? job.asrPrimary,
+        status: giveUp
+            ? SubtitleCompletionStatus.failed
+            : SubtitleCompletionStatus.pending,
+        attempts: attempts,
+        lastError: error,
+        updatedAtMs: DateTime.now().millisecondsSinceEpoch,
+      );
+      await _saveJobs(jobs);
+    });
   }
 
   /// Pause a job without consuming an attempt (lifecycle cancel / lock screen).
@@ -392,6 +502,44 @@ class SubtitleCompletionQueue {
 
   Future<bool> hasPendingWork() async {
     return (await nextRunnable()) != null;
+  }
+
+  /// Move [episodeId] to the front of the pending queue.
+  Future<void> prioritizeEpisode(String episodeId) {
+    final String id = episodeId.trim();
+    if (id.isEmpty) {
+      return Future<void>.value();
+    }
+    return _withLock(() async {
+      final List<SubtitleCompletionJob> jobs = await loadJobs();
+      final int index = jobs.indexWhere(
+        (SubtitleCompletionJob job) => job.episodeId == id,
+      );
+      if (index <= 0) {
+        return;
+      }
+      final SubtitleCompletionJob job = jobs.removeAt(index);
+      jobs.insert(0, job);
+      await _saveJobs(jobs);
+    });
+  }
+
+  /// Drop all jobs for [episodeId] (used when user resets subtitles).
+  Future<void> removeEpisode(String episodeId) {
+    final String id = episodeId.trim();
+    if (id.isEmpty) {
+      return Future<void>.value();
+    }
+    return _withLock(() async {
+      final List<SubtitleCompletionJob> jobs = await loadJobs();
+      final List<SubtitleCompletionJob> next = jobs
+          .where((SubtitleCompletionJob job) => job.episodeId != id)
+          .toList(growable: false);
+      if (next.length == jobs.length) {
+        return;
+      }
+      await _saveJobs(next);
+    });
   }
 
   Future<void> _update(

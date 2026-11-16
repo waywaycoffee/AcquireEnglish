@@ -6,7 +6,7 @@
 
 ```text
 手机 App (Tailscale)
-  ├─ 翻译 / 字幕补全 ──▶ Ollama :11434/v1   (qwen2.5:7b)
+  ├─ 翻译 / 字幕补全 ──▶ Ollama :11434/v1   (qwen2.5:3b，可选 7b)
   └─ 数字人陪练 ──────▶ LiveTalking :8010
          └── 同机、同卡，按需交错占用 VRAM
 ```
@@ -23,8 +23,8 @@
 
 ## 模型选择
 
-默认 **`qwen2.5:7b`**（~4.7GB）：英中短句翻译稳、无 thinking 额外延迟，适合与 LiveTalking 同卡。  
-备选：`qwen3:8b`（略新一代）、VRAM 紧用 `qwen3:4b`。不要上 14B/32B。
+当前 GPU 箱已装 **`qwen2.5:3b`**（App 默认）：显存更省，可与 LiveTalking 同卡。  
+质量不够时再拉 **`qwen2.5:7b`**（~4.7GB）。备选：`qwen3:8b` / `qwen3:4b`。不要上 14B/32B。
 
 ## 在 5060 Ti 上执行（不要在本机跑）
 

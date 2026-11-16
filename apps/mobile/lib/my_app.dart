@@ -1,6 +1,9 @@
+import 'dart:async';
+
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_foreground_task/flutter_foreground_task.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -8,13 +11,20 @@ import 'package:google_fonts/google_fonts.dart';
 import 'config/theme/theme_logic.dart';
 import 'config/theme/theme_ui_model.dart';
 import 'features/authentication/presentation/auth_session.dart';
-import 'features/settings/presentation/bilibili_login_sheet.dart';
-import 'features/shared/presentation/app_orientation.dart';
-import 'features/shared/presentation/pad/app_design_tokens.dart';
+import 'features/import_course/data/bilibili_multipage.dart';
 import 'features/library/presentation/library_catalog_provider.dart';
 import 'features/library/presentation/library_mock_data.dart';
+import 'features/settings/presentation/bilibili_login_sheet.dart';
 import 'features/settings/presentation/settings_provider.dart';
+import 'features/shared/presentation/app_orientation.dart';
+import 'features/shared/presentation/pad/app_design_tokens.dart';
+import 'features/subtitle_completion/shared_bilibili_subtitle_sync.dart';
+import 'features/subtitle_completion/subtitle_completion_runtime.dart';
 import 'features/subtitle_completion/subtitle_completion_scheduler.dart';
+import 'features/subtitle_completion/subtitle_completion_status_provider.dart';
+import 'features/subtitle_completion/overlay_permission_host.dart';
+import 'features/sync/data/acquire_api_client.dart';
+import 'features/sync/data/personal_import_sync.dart';
 import 'features/sync/presentation/daily_feed_lifecycle.dart';
 import 'flavors/app_flavor.dart';
 import 'router/app_router.dart';
@@ -36,15 +46,37 @@ class _MyAppState extends ConsumerState<MyApp> with WidgetsBindingObserver {
     // Re-assert portrait after first frame — Xiaomi can ignore early boot calls.
     WidgetsBinding.instance.addPostFrameCallback((_) {
       ensureDefaultPortraitOrientation();
+      // Touch status provider so library course UI can show fill progress.
+      ref.read(subtitleCompletionStatusProvider);
+      configureSharedBilibiliSubtitleApi(
+        ref.read(acquireApiClientProvider),
+      );
+      unawaited(SubtitleCompletionRuntime.instance.init());
       SubtitleCompletionScheduler.instance.attach(
         settingsReader: () => ref.read(learningSettingsProvider),
         catalogReader: () => ref.read(libraryCatalogProvider),
+        catalogNotifier: () => ref.read(libraryCatalogProvider.notifier),
+        onProgress: (String episodeId, String label) {
+          ref
+              .read(subtitleCompletionStatusProvider.notifier)
+              .reportProgress(episodeId, label);
+        },
+        onQueueChanged: () {
+          unawaited(
+            ref.read(subtitleCompletionStatusProvider.notifier).refresh(),
+          );
+        },
         onPersisted:
             ({
               required String episodeId,
               required String englishPath,
               required String chinesePath,
             }) async {
+              await ref
+                  .read(libraryCatalogProvider.notifier)
+                  .relinkEpisodeSubtitleFiles(episodeId: episodeId);
+              // Also write the exact paths the worker just persisted (covers
+              // the race where files land a tick before existsSync).
               final List<LibraryCourseData> courses = ref.read(
                 libraryCatalogProvider,
               );
@@ -61,6 +93,35 @@ class _MyAppState extends ConsumerState<MyApp> with WidgetsBindingObserver {
                         enSubtitlePath: englishPath,
                         zhSubtitlePath: chinesePath,
                       );
+                  unawaited(
+                    ref
+                        .read(subtitleCompletionStatusProvider.notifier)
+                        .refresh(),
+                  );
+                  final AuthSessionState auth = ref.read(authSessionProvider);
+                  final String? sourceKey = bilibiliEpisodeCacheKey(
+                    course: course,
+                    episode: episode,
+                    sourceUrl: episode.sourceUrl,
+                    videoAsset: episode.videoAsset,
+                  );
+                  final AcquireApiClient api =
+                      ref.read(acquireApiClientProvider);
+                  // Audit → shared (if quality OK) + always upsert personal.
+                  unawaited(
+                    syncEpisodeSubtitlesToCloud(
+                      api: api,
+                      isLoggedIn: auth.isLoggedIn,
+                      sourceKey: sourceKey,
+                      sourceUrl: episode.sourceUrl,
+                      englishPath: englishPath,
+                      chinesePath: chinesePath,
+                      course: course,
+                      episode: episode,
+                      durationSec: episode.durationMinutes * 60,
+                      sourceOrigin: 'asr',
+                    ),
+                  );
                   return;
                 }
               }
@@ -72,6 +133,7 @@ class _MyAppState extends ConsumerState<MyApp> with WidgetsBindingObserver {
   @override
   void dispose() {
     SubtitleCompletionScheduler.instance.detach();
+    unawaited(SubtitleCompletionRuntime.instance.dispose());
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
   }
@@ -98,48 +160,52 @@ class _MyAppState extends ConsumerState<MyApp> with WidgetsBindingObserver {
             WidgetsBinding.instance.platformDispatcher.platformBrightness ==
                 Brightness.dark);
     AppDesignTokens.brightness = isDark ? Brightness.dark : Brightness.light;
-    return AnnotatedRegion<SystemUiOverlayStyle>(
-      value: SystemUiOverlayStyle(
-        statusBarColor: Colors.transparent,
-        statusBarIconBrightness: isDark ? Brightness.light : Brightness.dark,
-        statusBarBrightness: isDark ? Brightness.dark : Brightness.light,
-        systemNavigationBarColor: isDark
-            ? const Color(0xFF12141A)
-            : const Color(0xFFF3F4F7),
-        systemNavigationBarIconBrightness: isDark
-            ? Brightness.light
-            : Brightness.dark,
-        systemStatusBarContrastEnforced: false,
-        systemNavigationBarContrastEnforced: false,
-      ),
-      child: MaterialApp.router(
-        routerConfig: router,
+    return WithForegroundTask(
+      child: AnnotatedRegion<SystemUiOverlayStyle>(
+        value: SystemUiOverlayStyle(
+          statusBarColor: Colors.transparent,
+          statusBarIconBrightness: isDark ? Brightness.light : Brightness.dark,
+          statusBarBrightness: isDark ? Brightness.dark : Brightness.light,
+          systemNavigationBarColor: isDark
+              ? const Color(0xFF12141A)
+              : const Color(0xFFF3F4F7),
+          systemNavigationBarIconBrightness: isDark
+              ? Brightness.light
+              : Brightness.dark,
+          systemStatusBarContrastEnforced: false,
+          systemNavigationBarContrastEnforced: false,
+        ),
+        child: MaterialApp.router(
+          routerConfig: router,
 
-        /// Localization is not available for the title.
-        title: FlavorConfig.appName,
-        theme: _buildTheme(Brightness.light),
-        darkTheme: _buildTheme(Brightness.dark),
+          /// Localization is not available for the title.
+          title: FlavorConfig.appName,
+          theme: _buildTheme(Brightness.light),
+          darkTheme: _buildTheme(Brightness.dark),
 
-        themeMode: currentTheme.themeMode,
-        debugShowCheckedModeBanner: false,
-        localizationsDelegates: context.localizationDelegates,
-        supportedLocales: context.supportedLocales,
-        locale: context.locale,
-        builder: (BuildContext context, Widget? child) {
-          final MediaQueryData mediaQuery = MediaQuery.of(context);
-          return DailyFeedLifecycleHost(
-            child: MediaQuery(
-              data: mediaQuery.copyWith(
-                textScaler: TextScaler.linear(
-                  _textScaleForWidth(mediaQuery.size.width),
+          themeMode: currentTheme.themeMode,
+          debugShowCheckedModeBanner: false,
+          localizationsDelegates: context.localizationDelegates,
+          supportedLocales: context.supportedLocales,
+          locale: context.locale,
+          builder: (BuildContext context, Widget? child) {
+            final MediaQueryData mediaQuery = MediaQuery.of(context);
+            return DailyFeedLifecycleHost(
+              child: MediaQuery(
+                data: mediaQuery.copyWith(
+                  textScaler: TextScaler.linear(
+                    _textScaleForWidth(mediaQuery.size.width),
+                  ),
+                ),
+                child: BilibiliLoginGate(
+                  child: OverlayPermissionHost(
+                    child: child ?? const SizedBox.shrink(),
+                  ),
                 ),
               ),
-              child: BilibiliLoginGate(
-                child: child ?? const SizedBox.shrink(),
-              ),
-            ),
-          );
-        },
+            );
+          },
+        ),
       ),
     );
   }

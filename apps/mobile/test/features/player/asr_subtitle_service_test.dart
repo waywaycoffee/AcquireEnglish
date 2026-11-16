@@ -645,7 +645,12 @@ void main() {
     ]);
     expect(lines.last.words.single.startMs, 301000);
     expect(
-      progress.map((AsrSubtitleProgress item) => item.completedChunks),
+      progress
+          .where(
+            (AsrSubtitleProgress item) =>
+                item.phase == AsrSubtitlePhase.recognizing,
+          )
+          .map((AsrSubtitleProgress item) => item.completedChunks),
       <int>[0, 1, 2],
     );
   });
