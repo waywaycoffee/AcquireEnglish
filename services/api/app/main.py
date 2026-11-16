@@ -15,6 +15,7 @@ from app.routers import (
     livekit,
     preferences,
     progress,
+    rewards,
     shared_subtitles,
     vocab,
 )
@@ -57,6 +58,7 @@ app.include_router(learning.router, prefix="/api")
 app.include_router(livekit.router, prefix="/api")
 app.include_router(assets.router, prefix="/api")
 app.include_router(shared_subtitles.router, prefix="/api")
+app.include_router(rewards.router, prefix="/api")
 
 
 @app.get("/api/health")

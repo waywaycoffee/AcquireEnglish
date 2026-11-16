@@ -12,6 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncConnection
 async def ensure_schema_columns(conn: AsyncConnection) -> None:
     await _ensure_user_auth_columns(conn)
     await _ensure_preference_columns(conn)
+    await _ensure_user_points_columns(conn)
 
 
 async def ensure_user_auth_columns(conn: AsyncConnection) -> None:
@@ -91,4 +92,14 @@ async def _ensure_preference_columns(conn: AsyncConnection) -> None:
     if "asr_api_key" not in existing:
         await conn.execute(
             text("ALTER TABLE user_preferences ADD COLUMN asr_api_key TEXT")
+        )
+
+
+async def _ensure_user_points_columns(conn: AsyncConnection) -> None:
+    existing = await _existing_columns(conn, "users")
+    if existing is None:
+        return
+    if "points_balance" not in existing:
+        await conn.execute(
+            text("ALTER TABLE users ADD COLUMN points_balance INTEGER DEFAULT 0")
         )

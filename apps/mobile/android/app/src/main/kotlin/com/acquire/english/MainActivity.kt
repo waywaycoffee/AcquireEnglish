@@ -1,11 +1,12 @@
 package com.acquire.english
 
 import android.app.Activity
+import android.content.ComponentName
+import android.content.Intent
 import android.content.pm.ActivityInfo
 import android.content.res.Configuration
 import android.graphics.Bitmap
 import android.media.AudioFormat
-import android.content.Intent
 import android.media.MediaCodec
 import android.media.MediaExtractor
 import android.media.MediaFormat
@@ -20,6 +21,7 @@ import android.provider.DocumentsContract
 import android.provider.Settings
 import android.speech.tts.TextToSpeech
 import android.speech.tts.UtteranceProgressListener
+import androidx.core.content.FileProvider
 import androidx.documentfile.provider.DocumentFile
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
@@ -159,6 +161,8 @@ class MainActivity : FlutterActivity(), MethodChannel.MethodCallHandler {
             "splitAudio" -> handleSplitAudio(call, result)
             "extractPronunciationAudio" -> handlePronunciationAudioExtraction(call, result)
             "cancelPronunciationAudioExtraction" -> handleCancelPronunciationAudioExtraction(call, result)
+            "exportDubbedVideo" -> handleExportDubbedVideo(call, result)
+            "shareVideoToMoments" -> handleShareVideoToMoments(call, result)
             "captureFrameAt" -> handleCaptureFrameAt(call, result)
             "setOrientation" -> handleSetOrientation(call, result)
             "copyBundledWhisperModel" -> handleCopyBundledWhisperModel(call, result)
@@ -715,6 +719,101 @@ class MainActivity : FlutterActivity(), MethodChannel.MethodCallHandler {
         val cancelled = requestId?.let(pronunciationExtractionRequests::get)
         cancelled?.set(true)
         postResult(result, cancelled != null)
+    }
+
+    private fun handleShareVideoToMoments(call: MethodCall, result: MethodChannel.Result) {
+        val path = call.argument<String>("path")?.trim().orEmpty()
+        val title = call.argument<String>("title")?.trim().orEmpty().ifEmpty { "我的配音练习" }
+        if (path.isEmpty()) {
+            result.error("bad_args", "path is required", null)
+            return
+        }
+        val file = File(path)
+        if (!file.exists()) {
+            result.error("missing_file", "share file not found", null)
+            return
+        }
+        try {
+            val uri = FileProvider.getUriForFile(
+                this,
+                "${applicationContext.packageName}.fileprovider",
+                file,
+            )
+            val intent = Intent(Intent.ACTION_SEND).apply {
+                type = "video/*"
+                putExtra(Intent.EXTRA_STREAM, uri)
+                putExtra(Intent.EXTRA_TEXT, title)
+                putExtra("Kdescription", title)
+                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                component = ComponentName(
+                    "com.tencent.mm",
+                    "com.tencent.mm.ui.tools.ShareToTimeLineUI",
+                )
+            }
+            // Grant WeChat read access explicitly.
+            grantUriPermission(
+                "com.tencent.mm",
+                uri,
+                Intent.FLAG_GRANT_READ_URI_PERMISSION,
+            )
+            startActivity(intent)
+            result.success(true)
+        } catch (exception: Exception) {
+            try {
+                val uri = FileProvider.getUriForFile(
+                    this,
+                    "${applicationContext.packageName}.fileprovider",
+                    file,
+                )
+                val fallback = Intent(Intent.ACTION_SEND).apply {
+                    type = "video/*"
+                    putExtra(Intent.EXTRA_STREAM, uri)
+                    putExtra(Intent.EXTRA_TEXT, title)
+                    addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                    setPackage("com.tencent.mm")
+                }
+                startActivity(Intent.createChooser(fallback, title))
+                result.success(true)
+            } catch (inner: Exception) {
+                postError(result, inner)
+            }
+        }
+    }
+
+    private fun handleExportDubbedVideo(call: MethodCall, result: MethodChannel.Result) {
+        val sourcePath = call.argument<String>("sourcePath")
+        val outputPath = call.argument<String>("outputPath")
+        val startMs = call.argument<Int>("startMs")
+        val endMs = call.argument<Int>("endMs")
+        val accompanimentPath = call.argument<String>("accompanimentPath")
+        val rawTakes = call.argument<List<Map<String, Any?>>>("takes")
+        if (sourcePath.isNullOrBlank() || outputPath.isNullOrBlank() ||
+            startMs == null || endMs == null || endMs <= startMs || rawTakes == null
+        ) {
+            result.error("bad_args", "Invalid dubbed export args.", null)
+            return
+        }
+        Thread {
+            try {
+                val takes = rawTakes.mapNotNull { row ->
+                    val s = (row["startMs"] as? Number)?.toInt() ?: return@mapNotNull null
+                    val e = (row["endMs"] as? Number)?.toInt() ?: return@mapNotNull null
+                    val wav = row["wavPath"] as? String ?: return@mapNotNull null
+                    DubVideoExporter.Take(startMs = s, endMs = e, wavPath = wav)
+                }
+                val path = DubVideoExporter.export(
+                    sourcePath = sourcePath,
+                    outputPath = outputPath,
+                    startMs = startMs,
+                    endMs = endMs,
+                    takes = takes,
+                    accompanimentPath = accompanimentPath,
+                )
+                postResult(result, path)
+            } catch (exception: Exception) {
+                postError(result, exception)
+            }
+        }.start()
     }
 
     private fun extractPronunciationAudio(

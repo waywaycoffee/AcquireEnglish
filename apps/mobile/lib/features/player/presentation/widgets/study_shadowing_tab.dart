@@ -8,6 +8,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:path_provider/path_provider.dart';
 
 import '../../../settings/presentation/settings_provider.dart';
+import '../../data/dub_session_store.dart';
 import '../../data/local_shadow_scorer.dart';
 import '../../data/pronunciation_audio_extractor.dart';
 import '../../data/pronunciation_providers.dart';
@@ -79,6 +80,10 @@ class StudyShadowingTab extends ConsumerStatefulWidget {
     this.onOpenFullDialog,
     this.onRecordingStarted,
     this.onPracticeCompleted,
+    this.episodeId,
+    this.videoSource,
+    this.onDubPlaybackRequested,
+    this.onExportShareRequested,
     super.key,
   });
 
@@ -93,11 +98,31 @@ class StudyShadowingTab extends ConsumerStatefulWidget {
   final String? unavailableReason;
   final VoidCallback? onOpenFullDialog;
 
-  /// Pause video / Echo when the learner starts recording.
-  final VoidCallback? onRecordingStarted;
+  /// Called when recording starts. [pauseVideo] is false for shadow mode
+  /// (play reference while recording) and true for look/hide modes.
+  final void Function({required bool pauseVideo})? onRecordingStarted;
 
   /// Fired after a successful record + score cycle (for dashboard counts).
   final VoidCallback? onPracticeCompleted;
+
+  /// Episode id for persisting dub takes / export.
+  final String? episodeId;
+
+  /// Local video path used for dub mix / export.
+  final String? videoSource;
+
+  /// Parent plays video with ducking over dubbed windows (趣配音回放).
+  final Future<void> Function({
+    required int startMs,
+    required int endMs,
+    required String userWavPath,
+    bool continuous,
+  })? onDubPlaybackRequested;
+
+  /// Parent exports MP4 and shares (WeChat Moments when available).
+  final Future<void> Function({
+    required bool fullEpisode,
+  })? onExportShareRequested;
 
   @override
   ConsumerState<StudyShadowingTab> createState() => _StudyShadowingTabState();
@@ -137,6 +162,10 @@ class _StudyShadowingTabState extends ConsumerState<StudyShadowingTab> {
   VoiceShadowResult? _voiceResult;
   ShadowPromptMode _promptMode = ShadowPromptMode.look;
   bool _peekHiddenSentence = false;
+  /// Hide mode: only reveal after a new attempt in this hide session.
+  bool _hideRevealThisRound = false;
+  bool _dubTakeSaved = false;
+  static const Duration _scoreTimeout = Duration(seconds: 25);
 
   @override
   void initState() {
@@ -157,6 +186,8 @@ class _StudyShadowingTabState extends ConsumerState<StudyShadowingTab> {
     if (oldWidget.line.english != widget.line.english ||
         oldWidget.line.startMs != widget.line.startMs) {
       _peekHiddenSentence = false;
+      _hideRevealThisRound = false;
+      _dubTakeSaved = false;
     }
     final String? nextKey = _targetKey(widget.assessmentTarget);
     if (nextKey != _boundTargetKey) {
@@ -194,8 +225,20 @@ class _StudyShadowingTabState extends ConsumerState<StudyShadowingTab> {
       _loadingReference = target != null;
       _previewPositionMs = 0;
       _playingPath = null;
+      _hideRevealThisRound = false;
+      _dubTakeSaved = false;
     });
-    if (target == null) return;
+    if (target == null) {
+      if (mounted) {
+        setState(() {
+          _loadingReference = false;
+          _referenceError = widget.unavailableReason?.trim().isNotEmpty == true
+              ? widget.unavailableReason!
+              : '当前句不可提取原声，仍可录音评分。';
+        });
+      }
+      return;
+    }
     await _loadReferenceAudio(target);
   }
 
@@ -206,6 +249,8 @@ class _StudyShadowingTabState extends ConsumerState<StudyShadowingTab> {
         setState(() {
           _loadingReference = false;
           _referenceError = validationError;
+          _referenceWaveform = const <double>[];
+          _reference = null;
         });
       }
       return;
@@ -232,6 +277,9 @@ class _StudyShadowingTabState extends ConsumerState<StudyShadowingTab> {
         if (aligned.bytes.isEmpty) {
           throw const PronunciationAudioExtractionException('这段原声未检测到有效声音。');
         }
+        if (aligned.waveform.isEmpty) {
+          throw const PronunciationAudioExtractionException('原声波形为空，请重试。');
+        }
         if (!identical(aligned, segment.audio)) {
           await File(segment.path).writeAsBytes(aligned.toWav(), flush: true);
         }
@@ -257,12 +305,16 @@ class _StudyShadowingTabState extends ConsumerState<StudyShadowingTab> {
       setState(() {
         _loadingReference = false;
         _referenceError = error.message;
+        _referenceWaveform = const <double>[];
+        _reference = null;
       });
     } catch (_) {
       if (!mounted || _resourcesReleased) return;
       setState(() {
         _loadingReference = false;
         _referenceError = '原声暂不可用。';
+        _referenceWaveform = const <double>[];
+        _reference = null;
       });
     }
   }
@@ -284,6 +336,10 @@ class _StudyShadowingTabState extends ConsumerState<StudyShadowingTab> {
     setState(() {
       _promptMode = mode;
       _peekHiddenSentence = false;
+      if (mode == ShadowPromptMode.hide) {
+        // Do not carry over look/shadow results into hide reveal.
+        _hideRevealThisRound = false;
+      }
     });
     // 影子跟读：默认打开句末暂停，方便 Echo。
     if (mode == ShadowPromptMode.shadow &&
@@ -304,10 +360,11 @@ class _StudyShadowingTabState extends ConsumerState<StudyShadowingTab> {
     final PronunciationPreviewPlayer? preview = _previewPlayer;
     if (microphone == null || preview == null) return;
     setState(() {
-      _message = null;
+      _message = '录音准备中…';
       _finishingRecording = true;
       _playingPath = null;
       _previewPositionMs = 0;
+      _dubTakeSaved = false;
     });
     try {
       await preview.stop();
@@ -315,7 +372,12 @@ class _StudyShadowingTabState extends ConsumerState<StudyShadowingTab> {
       _recordingBuffer.fillRange(0, _recordingBytesWritten, 0);
       _recordingBytesWritten = 0;
       final bool allowed = await microphone.requestPermission();
-      if (!mounted || _resourcesReleased) return;
+      if (!mounted || _resourcesReleased) {
+        if (mounted) {
+          setState(() => _finishingRecording = false);
+        }
+        return;
+      }
       if (!allowed) {
         setState(() {
           _message = '需要麦克风权限才能录制跟读。';
@@ -326,14 +388,36 @@ class _StudyShadowingTabState extends ConsumerState<StudyShadowingTab> {
       final Stream<Uint8List> stream = await microphone.start();
       if (!mounted || _resourcesReleased) {
         await microphone.cancel();
+        if (mounted) {
+          setState(() => _finishingRecording = false);
+        }
         return;
       }
       _recording = null;
+      _voiceResult = null;
       setState(() {
         _recordingActive = true;
         _finishingRecording = false;
+        _message = null;
       });
-      widget.onRecordingStarted?.call();
+      final bool shadowMode = _promptMode == ShadowPromptMode.shadow;
+      widget.onRecordingStarted?.call(pauseVideo: !shadowMode);
+      if (shadowMode) {
+        // Play reference (or sentence replay) in parallel with the mic.
+        if (_reference != null) {
+          try {
+            setState(() {
+              _playingPath = _reference!.path;
+              _previewPositionMs = 0;
+            });
+            unawaited(preview.playLocalFile(_reference!.path));
+          } catch (_) {
+            widget.onReplaySentence?.call();
+          }
+        } else {
+          widget.onReplaySentence?.call();
+        }
+      }
       _recordingSubscription = stream.listen(
         (Uint8List chunk) {
           if (_recordingActive && !_resourcesReleased) {
@@ -385,9 +469,15 @@ class _StudyShadowingTabState extends ConsumerState<StudyShadowingTab> {
   }) async {
     if (!_recordingActive || _finishingRecording) return;
     bool shouldDiscard = discard;
-    setState(() => _finishingRecording = true);
+    setState(() {
+      _finishingRecording = true;
+      _message = '正在保存录音…';
+    });
     _recordingLimitTimer?.cancel();
     _recordingRefreshTimer?.cancel();
+    try {
+      await _previewPlayer?.stop();
+    } catch (_) {}
     try {
       await _microphone?.stop();
     } catch (_) {
@@ -558,68 +648,110 @@ class _StudyShadowingTabState extends ConsumerState<StudyShadowingTab> {
     setState(() {
       _voiceBusy = true;
       _voiceResult = null;
-      _message = '正在本地识别并评分…';
+      _message = '正在评分…';
+      if (_promptMode == ShadowPromptMode.hide) {
+        _hideRevealThisRound = true;
+      }
     });
 
     VoiceShadowResult? result;
     String? lastError;
 
     try {
-      result = await _localScorer.score(
-        settings: settings,
-        referenceText: reference,
-        audioPath: path,
-        onProgress: (double? _, String message) {
-          if (mounted && !_resourcesReleased) {
-            setState(() => _message = message);
-          }
-        },
-      );
-    } catch (error) {
-      lastError = _prettyError(error);
-    }
-
-    if (result == null && settings.usesVoicePractice) {
       try {
-        if (mounted) {
-          setState(() => _message = '本地识别不可用，改用 Voice 服务…');
-        }
-        result = await _voiceClient.shadowSentence(
-          rawBaseUrl: settings.voicePracticeServerUrl,
-          referenceText: reference,
-          audioPath: path,
-        );
-        lastError = null;
+        result = await _localScorer
+            .score(
+              settings: settings,
+              referenceText: reference,
+              audioPath: path,
+              onProgress: (double? _, String message) {
+                if (mounted && !_resourcesReleased) {
+                  setState(() => _message = message);
+                }
+              },
+            )
+            .timeout(_scoreTimeout);
       } catch (error) {
-        lastError = _prettyError(error);
+        lastError = error is TimeoutException
+            ? '本地评分超时'
+            : _prettyError(error);
       }
-    }
 
-    if (result == null) {
-      result = _localScorer.durationHeuristic(
+      if (result == null && settings.usesVoicePractice) {
+        try {
+          if (mounted) {
+            setState(() => _message = '本地识别不可用，改用 Voice 服务…');
+          }
+          result = await _voiceClient
+              .shadowSentence(
+                rawBaseUrl: settings.voicePracticeServerUrl,
+                referenceText: reference,
+                audioPath: path,
+              )
+              .timeout(_scoreTimeout);
+          lastError = null;
+        } catch (error) {
+          lastError = error is TimeoutException
+              ? 'Voice 评分超时'
+              : _prettyError(error);
+        }
+      }
+
+      result ??= _localScorer.durationHeuristic(
         referenceText: reference,
         referenceMs: _reference?.audio.durationMs ?? 0,
         recordingMs: audio.durationMs,
       );
-    }
 
-    if (!mounted || _resourcesReleased) {
+      if (!mounted || _resourcesReleased) {
+        return;
+      }
+      setState(() {
+        _voiceResult = result;
+        if (result!.mock && result.transcript.isEmpty) {
+          _message = lastError == null
+              ? '已录音 · ${result.label} · ${result.scorePercentLabel}'
+              : '已录音 · 评分受限（$lastError）· ${result.scorePercentLabel}';
+        } else {
+          _message = result.mock
+              ? 'MOCK 反馈 · 重叠 ${result.scorePercentLabel}'
+              : '跟读反馈 · 重叠 ${result.scorePercentLabel} · 可点「配音回放」';
+        }
+      });
+      unawaited(_persistDubTake(path));
+      widget.onPracticeCompleted?.call();
+    } finally {
+      if (mounted && !_resourcesReleased) {
+        setState(() => _voiceBusy = false);
+      } else {
+        _voiceBusy = false;
+      }
+    }
+  }
+
+  Future<void> _persistDubTake(String wavPath) async {
+    final String? episodeId = widget.episodeId?.trim();
+    if (episodeId == null || episodeId.isEmpty) {
       return;
     }
-    setState(() {
-      _voiceBusy = false;
-      _voiceResult = result;
-      if (result!.mock && result.transcript.isEmpty) {
-        _message = lastError == null
-            ? '已录音 · ${result.label} · ${result.scorePercentLabel}'
-            : '已录音 · 评分受限（$lastError）· ${result.scorePercentLabel}';
-      } else {
-        _message = result.mock
-            ? 'MOCK 反馈 · 重叠 ${result.scorePercentLabel}'
-            : '跟读反馈 · 重叠 ${result.scorePercentLabel} · 可点「下一句」';
+    try {
+      await DubSessionStore.instance.saveTake(
+        DubTake(
+          episodeId: episodeId,
+          lineId: '${widget.line.startMs}-${widget.line.endMs}',
+          startMs: widget.line.startMs,
+          endMs: widget.line.endMs,
+          english: widget.line.english,
+          userWavPath: wavPath,
+          createdAt: DateTime.now(),
+        ),
+      );
+      if (mounted && !_resourcesReleased) {
+        setState(() => _dubTakeSaved = true);
       }
-    });
-    widget.onPracticeCompleted?.call();
+    } catch (_) {
+      // Persistence failure should not block scoring UX.
+    }
   }
 
   Future<void> _runVoiceFeedback() async {
@@ -636,10 +768,15 @@ class _StudyShadowingTabState extends ConsumerState<StudyShadowingTab> {
       return '当前句没有英文，无法录音';
     }
     if (_recordingActive) {
-      return '录音中 · 再点一次停止并评分';
+      return _promptMode == ShadowPromptMode.shadow
+          ? '录音中 · 请跟着原声说 · 再点停止'
+          : '录音中 · 再点一次停止并评分';
     }
-    if (_finishingRecording || _voiceBusy) {
-      return '处理中…';
+    if (_finishingRecording && !_voiceBusy) {
+      return '录音准备中…';
+    }
+    if (_voiceBusy) {
+      return '正在评分…';
     }
     return _promptMode.micIdleHint;
   }
@@ -801,8 +938,9 @@ class _StudyShadowingTabState extends ConsumerState<StudyShadowingTab> {
 
     final bool hideEnglish =
         _promptMode == ShadowPromptMode.hide && !_peekHiddenSentence;
-    final bool revealAfterAttempt =
-        _voiceResult != null || _recording != null;
+    final bool revealAfterAttempt = _promptMode == ShadowPromptMode.hide
+        ? _hideRevealThisRound
+        : (_voiceResult != null || _recording != null);
     final bool showEnglish = !hideEnglish || revealAfterAttempt;
     final bool showChinese = widget.line.chinese.trim().isNotEmpty &&
         (_promptMode != ShadowPromptMode.hide ||
@@ -944,7 +1082,9 @@ class _StudyShadowingTabState extends ConsumerState<StudyShadowingTab> {
                   ),
                 ),
               ],
-              if (_recording != null || _recordingActive) ...<Widget>[
+              if (_recording != null ||
+                  _recordingActive ||
+                  _referenceWaveform.isNotEmpty) ...<Widget>[
                 const SizedBox(height: 12),
                 SizedBox(
                   key: const ValueKey<String>('study-shadowing-waveforms'),
@@ -1027,6 +1167,40 @@ class _StudyShadowingTabState extends ConsumerState<StudyShadowingTab> {
                   alignment: WrapAlignment.center,
                   children: <Widget>[
                     OutlinedButton.icon(
+                      key: const ValueKey<String>('study-shadowing-dub-play'),
+                      onPressed: _recordingPath == null ||
+                              widget.onDubPlaybackRequested == null
+                          ? null
+                          : () => unawaited(
+                                widget.onDubPlaybackRequested!(
+                                  startMs: widget.line.startMs,
+                                  endMs: widget.line.endMs,
+                                  userWavPath: _recordingPath!,
+                                ),
+                              ),
+                      icon: const Icon(Icons.movie_filter_rounded, size: 18),
+                      label: const Text('配音回放'),
+                    ),
+                    if (widget.onDubPlaybackRequested != null &&
+                        widget.episodeId != null)
+                      OutlinedButton.icon(
+                        key: const ValueKey<String>(
+                          'study-shadowing-dub-play-all',
+                        ),
+                        onPressed: _recordingPath == null
+                            ? null
+                            : () => unawaited(
+                                  widget.onDubPlaybackRequested!(
+                                    startMs: widget.line.startMs,
+                                    endMs: widget.line.endMs,
+                                    userWavPath: _recordingPath!,
+                                    continuous: true,
+                                  ),
+                                ),
+                        icon: const Icon(Icons.playlist_play_rounded, size: 18),
+                        label: const Text('连续回放'),
+                      ),
+                    OutlinedButton.icon(
                       onPressed: _recordingPath == null
                           ? null
                           : () => unawaited(_playLocalFile(_recordingPath)),
@@ -1053,12 +1227,41 @@ class _StudyShadowingTabState extends ConsumerState<StudyShadowingTab> {
                           : const Icon(Icons.hearing_rounded, size: 18),
                       label: Text(_voiceBusy ? '评分中' : '重新评分'),
                     ),
+                    if (widget.onExportShareRequested != null)
+                      OutlinedButton.icon(
+                        key: const ValueKey<String>('study-shadowing-share'),
+                        onPressed: !_dubTakeSaved && _recordingPath == null
+                            ? null
+                            : () => unawaited(
+                                  widget.onExportShareRequested!(
+                                    fullEpisode: false,
+                                  ),
+                                ),
+                        icon: const Icon(Icons.share_rounded, size: 18),
+                        label: const Text('分享本句'),
+                      ),
+                    if (widget.onExportShareRequested != null)
+                      TextButton(
+                        key: const ValueKey<String>(
+                          'study-shadowing-share-full',
+                        ),
+                        onPressed: () => unawaited(
+                          widget.onExportShareRequested!(fullEpisode: true),
+                        ),
+                        child: const Text('分享整段配音'),
+                      ),
                     if (widget.onOpenFullDialog != null)
                       TextButton(
                         onPressed: widget.onOpenFullDialog,
                         child: const Text('腾讯云精评'),
                       ),
                   ],
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  '配音回放会压低对白窗原声并叠你的录音；伴奏轨可用时尽量保留背景声。',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(fontSize: 11, color: shell.textMuted),
                 ),
               ],
               if (_referenceError != null) ...<Widget>[

@@ -16,6 +16,7 @@ class AcquireUser {
     this.displayName,
     this.phone,
     this.wechatBound = false,
+    this.pointsBalance = 0,
   });
 
   factory AcquireUser.fromJson(Map<String, dynamic> json) => AcquireUser(
@@ -24,6 +25,7 @@ class AcquireUser {
     displayName: json['display_name'] as String?,
     phone: json['phone'] as String?,
     wechatBound: json['wechat_bound'] == true,
+    pointsBalance: (json['points_balance'] as num?)?.toInt() ?? 0,
   );
 
   final int id;
@@ -31,6 +33,29 @@ class AcquireUser {
   final String? displayName;
   final String? phone;
   final bool wechatBound;
+  final int pointsBalance;
+}
+
+class AcquireShareRewardResult {
+  const AcquireShareRewardResult({
+    required this.awarded,
+    required this.delta,
+    required this.balance,
+    required this.reason,
+  });
+
+  factory AcquireShareRewardResult.fromJson(Map<String, dynamic> json) =>
+      AcquireShareRewardResult(
+        awarded: json['awarded'] == true,
+        delta: (json['delta'] as num?)?.toInt() ?? 0,
+        balance: (json['balance'] as num?)?.toInt() ?? 0,
+        reason: '${json['reason'] ?? ''}',
+      );
+
+  final bool awarded;
+  final int delta;
+  final int balance;
+  final String reason;
 }
 
 class AcquireTokenResult {
@@ -899,6 +924,40 @@ class AcquireApiClient {
       ),
     );
     return SharedBilibiliSubtitleUpsertResult.fromJson(
+      response.data as Map<String, dynamic>,
+    );
+  }
+
+  Future<int> fetchPointsBalance() async {
+    final Response<dynamic> response = await _dio.get(Endpoints.rewardsPoints);
+    final Object? data = response.data;
+    if (data is Map<String, dynamic>) {
+      return (data['balance'] as num?)?.toInt() ?? 0;
+    }
+    return 0;
+  }
+
+  Future<AcquireShareRewardResult> claimShareReward({
+    required String episodeId,
+    required String clientShareId,
+    String assetKind = 'dub_video',
+    String channel = 'wechat_moments',
+  }) async {
+    final Response<dynamic> response = await _dio.post(
+      Endpoints.rewardsShare,
+      data: <String, dynamic>{
+        'episode_id': episodeId,
+        'asset_kind': assetKind,
+        'channel': channel,
+        'client_share_id': clientShareId,
+      },
+      options: Options(
+        extra: const <String, Object>{
+          'dio_cache_interceptor_force_refresh': true,
+        },
+      ),
+    );
+    return AcquireShareRewardResult.fromJson(
       response.data as Map<String, dynamic>,
     );
   }

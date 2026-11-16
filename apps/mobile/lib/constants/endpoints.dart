@@ -43,6 +43,8 @@ class Endpoints {
       'api/shared-subtitles/bilibili';
   static const String imports = 'api/imports';
   static const String importsAsset = 'api/imports/asset';
+  static const String rewardsShare = 'api/rewards/share';
+  static const String rewardsPoints = 'api/rewards/points';
 
   /// Kept for Dio header compatibility; AcquireEnglish API ignores it.
   static const String apiKey = '';

@@ -176,6 +176,41 @@ void main() {
     );
   });
 
+  testWidgets('Hide mode masks English until peek', (WidgetTester tester) async {
+    const PlayerSubtitleLine line = PlayerSubtitleLine(
+      startTime: '01:02',
+      english: 'Hello world',
+      chinese: '你好世界',
+      startMs: 62000,
+      endMs: 65000,
+    );
+
+    await tester.pumpWidget(
+      const ProviderScope(
+        child: MaterialApp(
+          home: Scaffold(
+            body: StudyShadowingTab(
+              line: line,
+              hasLine: true,
+            ),
+          ),
+        ),
+      ),
+    );
+
+    await tester.tap(find.byKey(const ValueKey<String>('study-shadowing-mode-hide')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('······'), findsOneWidget);
+    expect(find.text('Hello world'), findsNothing);
+    expect(find.text('你好世界'), findsNothing);
+
+    await tester.tap(find.byKey(const ValueKey<String>('study-shadowing-peek')));
+    await tester.pumpAndSettle();
+    expect(find.text('Hello world'), findsOneWidget);
+    expect(find.text('你好世界'), findsOneWidget);
+  });
+
   testWidgets('StudyDictationTab can add to queue and mark difficult', (
     WidgetTester tester,
   ) async {

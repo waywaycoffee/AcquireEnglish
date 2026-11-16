@@ -20,6 +20,7 @@ class User(Base):
     wechat_unionid: Mapped[str | None] = mapped_column(
         String(64), unique=True, index=True, nullable=True
     )
+    points_balance: Mapped[int] = mapped_column(Integer, default=0)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     progresses: Mapped[list["LessonProgress"]] = relationship(back_populates="user")
@@ -33,6 +34,24 @@ class User(Base):
     wallet: Mapped["WalletAccount | None"] = relationship(
         back_populates="user", uselist=False
     )
+    points_ledger: Mapped[list["UserPointsLedger"]] = relationship(back_populates="user")
+
+
+class UserPointsLedger(Base):
+    __tablename__ = "user_points_ledger"
+    __table_args__ = (
+        UniqueConstraint("user_id", "client_share_id", name="uq_user_client_share"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    delta: Mapped[int] = mapped_column(Integer)
+    reason: Mapped[str] = mapped_column(String(64), index=True)
+    ref: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    client_share_id: Mapped[str] = mapped_column(String(128), index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+    user: Mapped[User] = relationship(back_populates="points_ledger")
 
 
 class LessonProgress(Base):
@@ -149,35 +168,6 @@ class UserLinkCourse(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     user: Mapped[User] = relationship(back_populates="link_courses")
-
-
-class SharedBilibiliSubtitle(Base):
-    """Community-shared Bilibili subtitle pack (quality-gated cache)."""
-
-    __tablename__ = "shared_bilibili_subtitles"
-    __table_args__ = (
-        UniqueConstraint("bvid", "page", name="uq_shared_bili_bvid_page"),
-    )
-
-    id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    bvid: Mapped[str] = mapped_column(String(32), index=True)
-    page: Mapped[int] = mapped_column(Integer, default=1)
-    cid: Mapped[int | None] = mapped_column(Integer, nullable=True, index=True)
-    duration_sec: Mapped[int | None] = mapped_column(Integer, nullable=True)
-    subtitle_en_srt: Mapped[str] = mapped_column(Text)
-    subtitle_zh_srt: Mapped[str | None] = mapped_column(Text, nullable=True)
-    quality_score: Mapped[float] = mapped_column(Float, default=0.0)
-    cue_count: Mapped[int] = mapped_column(Integer, default=0)
-    en_hits: Mapped[int] = mapped_column(Integer, default=0)
-    zh_hits: Mapped[int] = mapped_column(Integer, default=0)
-    uploader_user_id: Mapped[int | None] = mapped_column(
-        ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True
-    )
-    source_origin: Mapped[str] = mapped_column(String(32), default="asr")
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
-    updated_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
-    )
 
 
 class ProductSku(Base):

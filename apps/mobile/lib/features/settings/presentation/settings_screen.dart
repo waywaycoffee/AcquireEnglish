@@ -12,6 +12,7 @@ import '../../authentication/presentation/auth_session.dart';
 import '../../navigation/presentation/navigation_destination.dart';
 import '../../player/presentation/local_whisper_asr.dart';
 import '../../shared/data/word_pronunciation_service.dart';
+import '../../sync/data/acquire_api_client.dart';
 import '../../sync/data/progress_sync_service.dart';
 import '../../sync/data/vocab_sync_service.dart';
 import '../../sync/presentation/daily_feed_provider.dart';
@@ -128,6 +129,31 @@ class SettingsScreen extends ConsumerWidget {
                       : '${authSession.email}\n已登录，可同步学习进度与词库。',
                   icon: Icons.verified_user_rounded,
                   onTap: () {},
+                ),
+                _ActionRow(
+                  title: '使用积分',
+                  description: '分享配音到微信朋友圈可获得积分（每日上限）。',
+                  icon: Icons.stars_rounded,
+                  onTap: () async {
+                    try {
+                      final int balance = await ref
+                          .read(acquireApiClientProvider)
+                          .fetchPointsBalance();
+                      if (!context.mounted) {
+                        return;
+                      }
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text('当前积分：$balance')),
+                      );
+                    } catch (_) {
+                      if (!context.mounted) {
+                        return;
+                      }
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('无法获取积分，请检查网络后重试')),
+                      );
+                    }
+                  },
                 ),
                 _ActionRow(
                   title: '退出登录',

@@ -32,6 +32,7 @@ import '../../subtitle_completion/subtitle_completion_status_provider.dart';
 import '../../shared/data/word_lookup_service.dart';
 import '../../shared/data/word_pronunciation_service.dart';
 import '../../shared/presentation/app_loading_overlay.dart';
+import '../../authentication/data/wechat_share_helper.dart';
 import '../../authentication/presentation/auth_session.dart';
 import '../../sync/data/acquire_api_client.dart';
 import '../../sync/data/personal_import_sync.dart';
@@ -40,6 +41,10 @@ import '../../words/data/offline_word_dictionary.dart';
 import '../../words/data/vocab_card_enrichment_service.dart';
 import '../../words/presentation/word_book_provider.dart';
 import '../data/dictation_queue_provider.dart';
+import '../data/dub_accompaniment_service.dart';
+import '../data/dub_export_service.dart';
+import '../data/dub_session_store.dart';
+import '../data/pronunciation_providers.dart';
 import '../domain/episode_word_cards.dart';
 import '../domain/pronunciation_assessment.dart';
 import 'asr_subtitle_cache.dart';
@@ -124,6 +129,13 @@ class PadPortraitPlayerScreenState
   StreamSubscription<Tracks>? _videoTracksSubscription;
   bool _isMuted = false;
   double _volumeLevel = 1;
+  bool _dubPlaybackActive = false;
+  StreamSubscription<Duration>? _dubPositionSubscription;
+  PronunciationPreviewPlayer? _dubOverlayPlayer;
+  Timer? _dubWindowTimer;
+  final DubAccompanimentService _dubAccompanimentService =
+      DubAccompanimentService();
+  final DubExportService _dubExportService = const DubExportService();
   bool _videoReady = false;
   bool _videoLoading = false;
   bool _isBootstrapping = true;
@@ -284,6 +296,9 @@ class PadPortraitPlayerScreenState
     _aiSubtitleCancellationToken?.cancel();
     _englishFillCancellationToken?.cancel();
     _ocrPersistDebounce?.cancel();
+    _dubWindowTimer?.cancel();
+    unawaited(_dubPositionSubscription?.cancel());
+    unawaited(_dubOverlayPlayer?.dispose());
     final List<PlayerSubtitleLine>? pending = _pendingOcrPersistLines;
     if (pending != null) {
       unawaited(_persistCompletedBilingualSubtitles(pending));
@@ -3097,12 +3112,33 @@ Future<void> _settleChineseFillIfAlreadyPresent() async {
           onOpenFullDialog: shadowAssessment.target == null
               ? null
               : () => _handleAssessLine(state.activeLineIndex),
-          onRecordingStarted: () {
+          episodeId: widget.episodeId,
+          videoSource: _localPlayableVideoPath(),
+          onRecordingStarted: ({required bool pauseVideo}) {
+            if (!pauseVideo) {
+              return;
+            }
             if (state.isPlaying) {
               setState(() => state.isPlaying = false);
               PlayerSystemMediaControls.updatePlaybackState(isPlaying: false);
               unawaited(_videoPlayer?.pause());
             }
+          },
+          onDubPlaybackRequested: ({
+            required int startMs,
+            required int endMs,
+            required String userWavPath,
+            bool continuous = false,
+          }) {
+            return _handleDubPlayback(
+              startMs: startMs,
+              endMs: endMs,
+              userWavPath: userWavPath,
+              continuous: continuous,
+            );
+          },
+          onExportShareRequested: ({required bool fullEpisode}) {
+            return _handleDubExportShare(fullEpisode: fullEpisode);
           },
           onPracticeCompleted: () {
             ref
@@ -4826,6 +4862,222 @@ Future<void> _settleChineseFillIfAlreadyPresent() async {
       pathParameters: <String, String>{'episodeId': nextEpisodeId},
       queryParameters: const <String, String>{'fullscreen': '1'},
     );
+  }
+
+  String? _localPlayableVideoPath() {
+    return _catalogLocalVideoPath();
+  }
+
+  Future<void> _stopDubPlayback() async {
+    _dubPlaybackActive = false;
+    _dubWindowTimer?.cancel();
+    _dubWindowTimer = null;
+    await _dubPositionSubscription?.cancel();
+    _dubPositionSubscription = null;
+    try {
+      await _dubOverlayPlayer?.stop();
+    } catch (_) {}
+    try {
+      await _videoPlayer?.setVolume(_volumeLevel * 100);
+    } catch (_) {}
+  }
+
+  Future<void> _handleDubPlayback({
+    required int startMs,
+    required int endMs,
+    required String userWavPath,
+    bool continuous = false,
+  }) async {
+    final Player? player = _videoPlayer;
+    if (player == null || !_videoReady) {
+      _showMessage('视频尚未就绪，无法配音回放。');
+      return;
+    }
+    await _stopDubPlayback();
+    _dubOverlayPlayer ??=
+        ref.read(pronunciationPreviewPlayerFactoryProvider)();
+
+    final List<DubTake> takes;
+    if (continuous) {
+      takes = await DubSessionStore.instance.loadTakes(widget.episodeId);
+    } else {
+      takes = <DubTake>[
+        DubTake(
+          episodeId: widget.episodeId,
+          lineId: '$startMs-$endMs',
+          startMs: startMs,
+          endMs: endMs,
+          english: '',
+          userWavPath: userWavPath,
+          createdAt: DateTime.now(),
+        ),
+      ];
+    }
+    if (takes.isEmpty) {
+      _showMessage('还没有可回放的配音。');
+      return;
+    }
+
+    final int playStart = continuous
+        ? takes.first.startMs
+        : startMs;
+    final int playEnd = continuous ? takes.last.endMs : endMs;
+    final Set<String> fired = <String>{};
+    _dubPlaybackActive = true;
+    _showMessage(
+      continuous
+          ? '配音连续回放：对白窗压低原声并叠你的录音'
+          : '配音回放：对白窗压低原声（伴奏轨可用时更保留背景声）',
+    );
+
+    // Prefetch accompaniment in background for later export quality.
+    final String? videoPath = _localPlayableVideoPath();
+    if (videoPath != null) {
+      unawaited(
+        _dubAccompanimentService.ensureAccompaniment(
+          episodeId: widget.episodeId,
+          videoSource: videoPath,
+        ),
+      );
+    }
+
+    setState(() {
+      state.isPlaying = true;
+      state.seekToMilliseconds(playStart);
+    });
+    PlayerSystemMediaControls.updatePlaybackState(isPlaying: true);
+    await player.seek(Duration(milliseconds: playStart));
+    await player.setVolume(_volumeLevel * 100);
+    await player.play();
+
+    _dubPositionSubscription = player.stream.position.listen((Duration pos) {
+      if (!_dubPlaybackActive || !mounted) {
+        return;
+      }
+      final int ms = pos.inMilliseconds;
+      if (ms >= playEnd + 200) {
+        unawaited(() async {
+          await player.pause();
+          await _stopDubPlayback();
+          if (mounted) {
+            setState(() => state.isPlaying = false);
+            PlayerSystemMediaControls.updatePlaybackState(isPlaying: false);
+          }
+        }());
+        return;
+      }
+      DubTake? active;
+      for (final DubTake take in takes) {
+        if (ms >= take.startMs && ms < take.endMs) {
+          active = take;
+          break;
+        }
+      }
+      if (active != null) {
+        unawaited(player.setVolume((_volumeLevel * 100) * 0.05));
+        final String key = active.lineId;
+        if (!fired.contains(key) && active.fileExists) {
+          fired.add(key);
+          unawaited(_dubOverlayPlayer!.playLocalFile(active.userWavPath));
+        }
+      } else {
+        unawaited(player.setVolume(_volumeLevel * 100));
+      }
+    });
+  }
+
+  Future<void> _handleDubExportShare({required bool fullEpisode}) async {
+    final String? videoPath = _localPlayableVideoPath();
+    if (videoPath == null) {
+      _showMessage('需要本地视频才能导出配音。');
+      return;
+    }
+    final List<DubTake> takes =
+        await DubSessionStore.instance.loadTakes(widget.episodeId);
+    if (takes.isEmpty) {
+      _showMessage('还没有配音录音可分享。');
+      return;
+    }
+
+    _showMessage('正在准备配音视频…');
+    String? accompaniment;
+    try {
+      accompaniment = await _dubAccompanimentService.ensureAccompaniment(
+        episodeId: widget.episodeId,
+        videoSource: videoPath,
+      );
+    } catch (_) {}
+
+    final int? rangeStart = fullEpisode ? null : state.activeLine.startMs;
+    final int? rangeEnd = fullEpisode ? null : state.activeLine.endMs;
+    try {
+      final DubExportResult exported = await _dubExportService.export(
+        episodeId: widget.episodeId,
+        videoSource: videoPath,
+        takes: takes,
+        rangeStartMs: rangeStart,
+        rangeEndMs: rangeEnd,
+        accompanimentPath: accompaniment,
+      );
+      final WechatShareOutcome share = await WechatShareHelper.shareVideoFile(
+        filePath: exported.outputPath,
+        title: fullEpisode ? '整段配音练习' : '本句配音练习',
+      );
+      if (!mounted) {
+        return;
+      }
+      if (!share.success) {
+        _showMessage(share.errorMessage ?? '分享失败');
+        return;
+      }
+      if (!share.countsForMomentsPoints) {
+        _showMessage(
+          share.errorMessage ??
+              '已分享（系统分享不计朋友圈积分）'
+              '${exported.duckedDialogue ? ' · 对白窗已压低原声' : ''}',
+        );
+        return;
+      }
+      final AuthSessionState auth = ref.read(authSessionProvider);
+      if (!auth.isLoggedIn) {
+        _showMessage('朋友圈分享成功。登录后可领取积分。');
+        return;
+      }
+      try {
+        final String clientShareId =
+            'dub-${widget.episodeId}-${fullEpisode ? 'full' : '${rangeStart}_$rangeEnd'}-${DateTime.now().millisecondsSinceEpoch ~/ 60000}';
+        final AcquireShareRewardResult reward =
+            await ref.read(acquireApiClientProvider).claimShareReward(
+                  episodeId: widget.episodeId,
+                  clientShareId: clientShareId,
+                );
+        if (!mounted) {
+          return;
+        }
+        if (reward.awarded) {
+          _showMessage('分享成功 · +${reward.delta} 积分（余额 ${reward.balance}）');
+        } else if (reward.reason == 'daily_cap') {
+          _showMessage('分享成功 · 今日积分已达上限（余额 ${reward.balance}）');
+        } else if (reward.reason == 'already_awarded') {
+          _showMessage('分享成功 · 该分享已领过积分（余额 ${reward.balance}）');
+        } else {
+          _showMessage('分享成功 · 积分 ${reward.balance}');
+        }
+      } catch (_) {
+        if (mounted) {
+          _showMessage('分享成功，但积分领取失败，请稍后在设置页查看。');
+        }
+      }
+    } catch (error) {
+      if (mounted) {
+        _showMessage(
+          error
+              .toString()
+              .replaceFirst(RegExp(r'^Bad state:\s*'), '')
+              .replaceFirst(RegExp(r'^Exception:\s*'), ''),
+        );
+      }
+    }
   }
 
   void _showMessage(String message) {
