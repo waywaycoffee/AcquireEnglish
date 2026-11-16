@@ -554,7 +554,7 @@ class SettingsScreen extends ConsumerWidget {
               _SelectRow(
                 title: '翻译来源',
                 description: settings.translationProvider == '本地 Ollama'
-                    ? 'GPU 箱 Ollama（与 LiveTalking 同机，Tailscale，不限流）。'
+                    ? 'GPU 箱本地模型，经公网 HTTPS 反代（手机不用 Tailscale，免费不限流）。'
                     : '先选择翻译 API，再填写对应配置。',
                 value: settings.translationProvider,
                 options: translationProviderOptions,
@@ -583,17 +583,16 @@ class SettingsScreen extends ConsumerWidget {
                   ),
                 if (settings.translationProvider == '本地 Ollama')
                   const _HintRow(
-                    title: 'GPU 箱部署',
+                    title: '公网本地模型',
                     description:
-                        '默认连 5060 Ti Ollama（100.115.252.55:11434）。'
-                        '当前预设模型 qwen2.5:3b（与 LiveTalking 同卡）；'
-                        '需要更高质量可在 GPU 箱拉取 qwen2.5:7b。'
-                        '部署步骤见仓库 deploy/gpu-box-ollama。',
+                        '默认：https://acquireenglish.curlhairai.com/ollama/v1'
+                        '（ECS→GPU 本地 qwen2.5:3b，手机免 Tailscale）。'
+                        '部署见 deploy/gpu-box-ollama 与 nginx ollama 片段。',
                   ),
                 _SwitchRow(
                   title: '自定义接口地址',
                   description: settings.translationProvider == '本地 Ollama'
-                      ? '关闭时使用 GPU 箱默认 Ollama 地址。'
+                      ? '关闭时使用公网默认 Ollama 地址。'
                       : '关闭时使用内置厂商默认 baseUrl 和 model。',
                   value: settings.useCustomTranslationEndpoint,
                   onChanged: (bool value) {
@@ -605,7 +604,7 @@ class SettingsScreen extends ConsumerWidget {
                 _InputRow(
                   title: 'Base URL',
                   description: settings.translationProvider == '本地 Ollama'
-                      ? 'OpenAI 兼容：http://<tailscale-ip>:11434/v1'
+                      ? 'OpenAI 兼容：https://acquireenglish.curlhairai.com/ollama/v1'
                       : '默认已内置，可按需覆盖。',
                   value: settings.translationBaseUrl,
                   hintText: settings.translationProvider == '本地 Ollama'

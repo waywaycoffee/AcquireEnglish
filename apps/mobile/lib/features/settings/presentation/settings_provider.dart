@@ -146,8 +146,20 @@ const List<Map<String, dynamic>> defaultLiveTalkingIceServers =
       },
     ];
 
-/// Same GPU box as LiveTalking — Ollama OpenAI-compatible API (no cloud rate limits).
-const String defaultOllamaBaseUrl = 'http://100.115.252.55:11434/v1';
+/// Public Ollama OpenAI-compatible API (ECS nginx → GPU Tailscale :11434).
+/// Phone needs no Tailscale — same pattern as LiveTalking.
+const String defaultOllamaBaseUrl =
+    'https://acquireenglish.curlhairai.com/ollama/v1';
+
+/// Legacy Tailscale / LAN Ollama bases — migrate saved settings to public HTTPS.
+const Set<String> legacyTailscaleOllamaBaseUrls = <String>{
+  'http://100.115.252.55:11434/v1',
+  'http://100.115.252.55:11434/v1/',
+  'http://5060ti.tailc30b42.ts.net:11434/v1',
+  'http://5060ti.tailc30b42.ts.net:11434/v1/',
+  'http://192.168.31.121:11434/v1',
+  'http://192.168.31.121:11434/v1/',
+};
 
 /// Ollama tag currently installed on 5060 Ti (EN↔ZH). Prefer 3b while sharing
 /// VRAM with LiveTalking; pull `qwen2.5:7b` later if quality needs a bump.
@@ -715,6 +727,16 @@ class LearningSettingsNotifier extends Notifier<LearningSettingsState> {
           oralCoachServerUrl: defaultLiveTalkingUrlPublic,
         );
       }
+      // Translation Ollama: migrate Tailscale / LAN → public HTTPS.
+      final String ollamaBase = coerced.translationBaseUrl.trim();
+      if (coerced.translationProvider == '本地 Ollama' &&
+          (ollamaBase.isEmpty ||
+              legacyTailscaleOllamaBaseUrls.contains(ollamaBase) ||
+              ollamaBase.contains('100.115.252.55:11434') ||
+              (ollamaBase.contains('ts.net') &&
+                  ollamaBase.contains(':11434')))) {
+        coerced = coerced.copyWith(translationBaseUrl: defaultOllamaBaseUrl);
+      }
       // Typo host that breaks DNS (caurlhairai → curlhairai).
       coerced = coerced.copyWith(
         oralCoachPipelineUrl: fixCurlhairaiTypoHost(
@@ -726,6 +748,7 @@ class LearningSettingsNotifier extends Notifier<LearningSettingsState> {
         ),
         cloudApiBaseUrl: fixCurlhairaiTypoHost(coerced.cloudApiBaseUrl),
         liveKitUrl: fixCurlhairaiTypoHost(coerced.liveKitUrl),
+        translationBaseUrl: fixCurlhairaiTypoHost(coerced.translationBaseUrl),
       );
       _scheduleApplyCloudApiBase(coerced);
       if (coerced.asrProvider != loaded.asrProvider ||

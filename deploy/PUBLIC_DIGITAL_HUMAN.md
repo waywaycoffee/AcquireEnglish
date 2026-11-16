@@ -3,11 +3,11 @@
 App **不需要**装 Tailscale。只需 **ECS + GPU** 同一 Tailscale 账号：
 
 ```text
-手机 App ──公网 HTTPS──► ECS nginx /livetalking/
+手机 App ──公网 HTTPS──► ECS nginx
                               │
-                              ├──Tailscale──► GPU LiveTalking :8010  (信令 /offer /human)
-                              │
-                              └── coturn :3478  (WebRTC 媒体中继)
+                              ├── /livetalking/ ──Tailscale──► GPU LiveTalking :8010
+                              ├── /ollama/v1/  ──Tailscale──► GPU Qwen :11434（翻译，免费）
+                              └── TURN :443 SNI ──► coturn（数字人媒体）
 ```
 
 对照 CurlHair：
