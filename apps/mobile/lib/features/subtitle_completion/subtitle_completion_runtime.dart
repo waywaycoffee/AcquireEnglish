@@ -27,13 +27,14 @@ class SubtitleCompletionRuntime {
   bool _serviceRunning = false;
   bool _overlayVisible = false;
   bool _needsOverlayPermission = false;
+
   /// In-app FAB covers progress while resumed; native ball only when backgrounded.
   bool _appInForeground = true;
   bool _notifPermissionAsked = false;
   bool _batteryAsked = false;
   String _lastTitle = '爱快英语 · 补字幕';
   String _lastBody = '正在补全字幕…';
-  double _lastProgress = 0.08;
+  double _lastProgress = 0;
   final StreamController<SubtitleRuntimeSnapshot> _snapshots =
       StreamController<SubtitleRuntimeSnapshot>.broadcast();
 
@@ -43,12 +44,12 @@ class SubtitleCompletionRuntime {
   Stream<SubtitleRuntimeSnapshot> get snapshots => _snapshots.stream;
 
   SubtitleRuntimeSnapshot get currentSnapshot => SubtitleRuntimeSnapshot(
-        active: _serviceRunning || _lastProgress > 0 && _lastProgress < 1,
-        label: _lastBody,
-        progress: _lastProgress,
-        overlayVisible: _overlayVisible,
-        needsOverlayPermission: _needsOverlayPermission,
-      );
+    active: _serviceRunning || _lastProgress > 0 && _lastProgress < 1,
+    label: _lastBody,
+    progress: _lastProgress,
+    overlayVisible: _overlayVisible,
+    needsOverlayPermission: _needsOverlayPermission,
+  );
 
   /// Called by [OverlayPermissionHost] after the user grants overlay.
   void clearOverlayPermissionNeeded() {
@@ -151,8 +152,9 @@ class SubtitleCompletionRuntime {
     double? hintProgress,
   }) async {
     try {
-      final List<SubtitleCompletionJob> jobs =
-          await SubtitleCompletionQueue.shared.loadJobs();
+      final List<SubtitleCompletionJob> jobs = await SubtitleCompletionQueue
+          .shared
+          .loadJobs();
       final int done = jobs
           .where(
             (SubtitleCompletionJob j) =>
@@ -189,10 +191,7 @@ class SubtitleCompletionRuntime {
   }
 
   /// Start / refresh when the queue has work. Call while app is still resumed.
-  Future<bool> ensureRunning({
-    String? label,
-    double? progress,
-  }) async {
+  Future<bool> ensureRunning({String? label, double? progress}) async {
     if (kIsWeb || !Platform.isAndroid) {
       return false;
     }
@@ -203,10 +202,8 @@ class SubtitleCompletionRuntime {
       return false;
     }
     await _ensurePermissions();
-    final ({String label, double progress}) display = await _resolvedFillDisplay(
-      hintLabel: label,
-      hintProgress: progress,
-    );
+    final ({String label, double progress}) display =
+        await _resolvedFillDisplay(hintLabel: label, hintProgress: progress);
     final String body = display.label;
     final double frac = display.progress;
     _lastBody = body;
@@ -226,17 +223,17 @@ class SubtitleCompletionRuntime {
     } else {
       final ServiceRequestResult started =
           await FlutterForegroundTask.startService(
-        serviceId: 4201,
-        serviceTypes: const <ForegroundServiceTypes>[
-          ForegroundServiceTypes.dataSync,
-        ],
-        notificationTitle: _lastTitle,
-        notificationText: body,
-        notificationButtons: const <NotificationButton>[
-          NotificationButton(id: 'open', text: '打开'),
-        ],
-        callback: subtitleForegroundCallback,
-      );
+            serviceId: 4201,
+            serviceTypes: const <ForegroundServiceTypes>[
+              ForegroundServiceTypes.dataSync,
+            ],
+            notificationTitle: _lastTitle,
+            notificationText: body,
+            notificationButtons: const <NotificationButton>[
+              NotificationButton(id: 'open', text: '打开'),
+            ],
+            callback: subtitleForegroundCallback,
+          );
       if (started is ServiceRequestFailure) {
         debugPrint('subtitle fg start failed: ${started.error}');
         _serviceRunning = false;
@@ -248,21 +245,17 @@ class SubtitleCompletionRuntime {
         if (await FlutterForegroundTask.isAppOnForeground) {
           final ServiceRequestResult retry =
               await FlutterForegroundTask.startService(
-            serviceId: 4201,
-            serviceTypes: const <ForegroundServiceTypes>[
-              ForegroundServiceTypes.dataSync,
-            ],
-            notificationTitle: _lastTitle,
-            notificationText: body,
-            callback: subtitleForegroundCallback,
-          );
+                serviceId: 4201,
+                serviceTypes: const <ForegroundServiceTypes>[
+                  ForegroundServiceTypes.dataSync,
+                ],
+                notificationTitle: _lastTitle,
+                notificationText: body,
+                callback: subtitleForegroundCallback,
+              );
           if (retry is ServiceRequestFailure) {
             debugPrint('subtitle fg retry failed: ${retry.error}');
-            await _showOrUpdateOverlay(
-              busy: true,
-              label: body,
-              progress: frac,
-            );
+            await _showOrUpdateOverlay(busy: true, label: body, progress: frac);
             _emit();
             return false;
           }
@@ -283,10 +276,8 @@ class SubtitleCompletionRuntime {
     required String label,
     required double progress,
   }) async {
-    final ({String label, double progress}) display = await _resolvedFillDisplay(
-      hintLabel: label,
-      hintProgress: progress,
-    );
+    final ({String label, double progress}) display =
+        await _resolvedFillDisplay(hintLabel: label, hintProgress: progress);
     if (!_serviceRunning) {
       await ensureRunning(label: display.label, progress: display.progress);
       return;

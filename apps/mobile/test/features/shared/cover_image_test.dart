@@ -14,7 +14,19 @@ void main() {
     final Directory temporary = Directory.systemTemp.createTempSync(
       'cover-size-',
     );
-    addTearDown(() => temporary.deleteSync(recursive: true));
+    addTearDown(
+      () => tester.runAsync(() async {
+        for (int attempt = 0; ; attempt++) {
+          try {
+            await temporary.delete(recursive: true);
+            break;
+          } on FileSystemException {
+            if (attempt >= 20) rethrow;
+            await Future<void>.delayed(const Duration(milliseconds: 100));
+          }
+        }
+      }),
+    );
     final File source = File('${temporary.path}/large.png');
     await tester.runAsync(() => _writeImage(source, 4000, 3000));
 
@@ -45,6 +57,9 @@ void main() {
     await tester.pumpWidget(const SizedBox.shrink());
     PaintingBinding.instance.imageCache.clear();
     PaintingBinding.instance.imageCache.clearLiveImages();
+    await tester.runAsync(() async {
+      await Future<void>.delayed(const Duration(milliseconds: 100));
+    });
   });
 
   testWidgets('small covers are not enlarged in the decoded cache', (
@@ -53,7 +68,19 @@ void main() {
     final Directory temporary = Directory.systemTemp.createTempSync(
       'cover-small-',
     );
-    addTearDown(() => temporary.deleteSync(recursive: true));
+    addTearDown(
+      () => tester.runAsync(() async {
+        for (int attempt = 0; ; attempt++) {
+          try {
+            await temporary.delete(recursive: true);
+            break;
+          } on FileSystemException {
+            if (attempt >= 20) rethrow;
+            await Future<void>.delayed(const Duration(milliseconds: 100));
+          }
+        }
+      }),
+    );
     final File source = File('${temporary.path}/small.png');
     await tester.runAsync(() => _writeImage(source, 40, 30));
     await tester.pumpWidget(
@@ -75,6 +102,9 @@ void main() {
     await tester.pumpWidget(const SizedBox.shrink());
     PaintingBinding.instance.imageCache.clear();
     PaintingBinding.instance.imageCache.clearLiveImages();
+    await tester.runAsync(() async {
+      await Future<void>.delayed(const Duration(milliseconds: 100));
+    });
   });
 }
 
@@ -93,17 +123,17 @@ Future<ui.Size> _decodedSize(ImageProvider<Object> provider) async {
   await provider.evict();
   final Completer<ui.Size> result = Completer<ui.Size>();
   final ImageStream stream = provider.resolve(ImageConfiguration.empty);
-  final ImageStreamListener listener = ImageStreamListener(
-    (ImageInfo info, bool synchronousCall) {
-      if (!result.isCompleted) {
-        result.complete(
-          ui.Size(info.image.width.toDouble(), info.image.height.toDouble()),
-        );
-      }
-      info.dispose();
-    },
-    onError: result.completeError,
-  );
+  final ImageStreamListener listener = ImageStreamListener((
+    ImageInfo info,
+    bool synchronousCall,
+  ) {
+    if (!result.isCompleted) {
+      result.complete(
+        ui.Size(info.image.width.toDouble(), info.image.height.toDouble()),
+      );
+    }
+    info.dispose();
+  }, onError: result.completeError);
   stream.addListener(listener);
   try {
     return await result.future.timeout(const Duration(seconds: 10));

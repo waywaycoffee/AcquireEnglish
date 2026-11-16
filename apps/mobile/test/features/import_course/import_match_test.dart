@@ -21,7 +21,10 @@ void main() {
       );
       expect(rows, hasLength(1));
       expect(rows.single.videoFile, 'lesson1.mkv');
-      expect(rows.single.englishSubtitlePath, '${root.path}/lesson1.srt');
+      expect(
+        rows.single.englishSubtitlePath,
+        '${root.path}${Platform.pathSeparator}lesson1.srt',
+      );
     },
   );
 

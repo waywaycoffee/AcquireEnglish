@@ -1,10 +1,17 @@
+import 'dart:io';
 import 'package:common_learn_english/features/library/presentation/library_mock_data.dart';
 import 'package:common_learn_english/features/player/presentation/player_course_lookup.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
   test('resolves subtitle paths from subtitle tracks', () {
-    const List<LibraryCourseData> courses = <LibraryCourseData>[
+    final Directory root = Directory.systemTemp.createTempSync('track-lookup-');
+    addTearDown(() => root.deleteSync(recursive: true));
+    final String en = '${root.path}/episode.en.srt';
+    final String zh = '${root.path}/episode.zh.srt';
+    File(en).writeAsStringSync('1\n00:00:00,000 --> 00:00:01,000\nHello\n');
+    File(zh).writeAsStringSync('1\n00:00:00,000 --> 00:00:01,000\n你好\n');
+    final List<LibraryCourseData> courses = <LibraryCourseData>[
       LibraryCourseData(
         id: 'course-1',
         title: 'Imported course',
@@ -34,12 +41,12 @@ void main() {
               LibrarySubtitleTrackItem(
                 languageCode: 'en',
                 languageLabel: '英文字幕',
-                path: '/tmp/episode.en.srt',
+                path: en,
               ),
               LibrarySubtitleTrackItem(
                 languageCode: 'zh-Hans',
                 languageLabel: '中文字幕',
-                path: '/tmp/episode.zh.srt',
+                path: zh,
               ),
             ],
           ),
@@ -52,7 +59,7 @@ void main() {
       episodeId: 'course-1-ep01',
     );
 
-    expect(result.englishSubtitleAsset, '/tmp/episode.en.srt');
-    expect(result.chineseSubtitleAsset, '/tmp/episode.zh.srt');
+    expect(result.englishSubtitleAsset, en);
+    expect(result.chineseSubtitleAsset, zh);
   });
 }

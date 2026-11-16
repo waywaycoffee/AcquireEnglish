@@ -166,14 +166,8 @@ class _EpisodeSubtitleEditorScreenState
       final Map<int, String> zhLocks = await loadManualChineseLocks(
         episodeId: widget.episodeId,
       );
-      lines = keepManualEnglish(
-        lines: lines,
-        manualEnglishByStartMs: enLocks,
-      );
-      lines = keepManualChinese(
-        lines: lines,
-        manualChineseByStartMs: zhLocks,
-      );
+      lines = keepManualEnglish(lines: lines, manualEnglishByStartMs: enLocks);
+      lines = keepManualChinese(lines: lines, manualChineseByStartMs: zhLocks);
       if (!mounted) {
         return;
       }
@@ -214,9 +208,9 @@ class _EpisodeSubtitleEditorScreenState
   }
 
   List<PlayerSubtitleLine> _collectLines() {
-    return _rows.map((_EpisodeSubtitleEditorRow row) => row.toLine()).toList(
-      growable: false,
-    );
+    return _rows
+        .map((_EpisodeSubtitleEditorRow row) => row.toLine())
+        .toList(growable: false);
   }
 
   Future<void> _remergeSentences() async {
@@ -361,6 +355,7 @@ class _EpisodeSubtitleEditorScreenState
                               const SizedBox(height: 8),
                               TextField(
                                 controller: row.english,
+                                scrollPadding: const EdgeInsets.all(80),
                                 minLines: 1,
                                 maxLines: 4,
                                 decoration: const InputDecoration(
@@ -372,6 +367,7 @@ class _EpisodeSubtitleEditorScreenState
                               const SizedBox(height: 8),
                               TextField(
                                 controller: row.chinese,
+                                scrollPadding: const EdgeInsets.all(80),
                                 minLines: 1,
                                 maxLines: 4,
                                 decoration: const InputDecoration(

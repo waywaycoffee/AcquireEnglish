@@ -416,7 +416,8 @@ class AsrSubtitleCache {
 
   String _fileName(String path) {
     return path
-        .replaceAll(String.fromCharCode(92), Platform.pathSeparator)
+        .replaceAll(String.fromCharCode(92), '/')
+        .replaceAll('/', Platform.pathSeparator)
         .split(Platform.pathSeparator)
         .last;
   }

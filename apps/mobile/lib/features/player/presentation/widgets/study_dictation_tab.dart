@@ -158,6 +158,7 @@ class _StudyDictationTabState extends State<StudyDictationTab> {
         ],
         TextField(
           controller: _controller,
+          scrollPadding: const EdgeInsets.all(80),
           style: TextStyle(
             color: shell.textPrimary,
             fontSize: 18,

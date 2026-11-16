@@ -33,6 +33,7 @@ class WordLookupPopupCard extends ConsumerStatefulWidget {
   final String contextSentence;
   final VoidCallback onClose;
   final VoidCallback? onCollect;
+
   /// Called with the card's Chinese definition when favoriting to 词卡.
   final void Function(String? definitionCn)? onFavorite;
   final VoidCallback? onPronounce;
@@ -198,10 +199,7 @@ class _WordLookupPopupCardState extends ConsumerState<WordLookupPopupCard> {
         padding: const EdgeInsets.only(top: 8),
         child: Text(
           _errorMessage!,
-          style: TextStyle(
-            height: 1.45,
-            color: AppDesignTokens.textSecondary,
-          ),
+          style: TextStyle(height: 1.45, color: AppDesignTokens.textSecondary),
         ),
       );
     } else if (_entry != null) {
@@ -237,13 +235,11 @@ class _WordLookupPopupCardState extends ConsumerState<WordLookupPopupCard> {
                 tooltip: isFavorite ? '取消收藏' : '收藏到词卡',
                 onPressed: () {
                   if (isFavorite) {
-                    ref
-                        .read(wordBookProvider.notifier)
-                        .toggleFavorite(word);
+                    ref.read(wordBookProvider.notifier).toggleFavorite(word);
                     _showMessage('已从词卡取消收藏');
                   } else {
-                    final String fromEntry =
-                        (_entry?.definitionCn ?? '').trim();
+                    final String fromEntry = (_entry?.definitionCn ?? '')
+                        .trim();
                     final String fromFallback =
                         (widget.fallbackDefinitionCn ?? '').trim();
                     widget.onFavorite!(
@@ -337,7 +333,7 @@ class _WordLookupPopupCardState extends ConsumerState<WordLookupPopupCard> {
       ),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: AppDesignTokens.appWhite,
         borderRadius: BorderRadius.circular(20),
         border: Border.all(color: const Color(0xFFE1E7E1)),
         boxShadow: const <BoxShadow>[
@@ -464,7 +460,7 @@ class _WordLookupPopupBody extends StatelessWidget {
           width: double.infinity,
           padding: const EdgeInsets.all(14),
           decoration: BoxDecoration(
-            color: const Color(0xFFF8FAFC),
+            color: AppDesignTokens.softWhite,
             borderRadius: BorderRadius.circular(14),
           ),
           child: Column(
@@ -578,10 +574,7 @@ class _WordLookupPopupBody extends StatelessWidget {
         const SizedBox(height: 8),
         Text(
           '翻译来源：${entry.sourceLabel}',
-          style: TextStyle(
-            fontSize: 12,
-            color: AppDesignTokens.textSecondary,
-          ),
+          style: TextStyle(fontSize: 12, color: AppDesignTokens.textSecondary),
         ),
       ],
     );
@@ -635,7 +628,9 @@ class _MeaningCard extends StatelessWidget {
       width: double.infinity,
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: backgroundColor,
+        color: AppDesignTokens.isDark
+            ? AppDesignTokens.softWhite
+            : backgroundColor,
         borderRadius: BorderRadius.circular(16),
       ),
       child: Column(
@@ -708,7 +703,9 @@ class _InfoChip extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       decoration: BoxDecoration(
-        color: backgroundColor,
+        color: AppDesignTokens.isDark
+            ? AppDesignTokens.softWhite
+            : backgroundColor,
         borderRadius: BorderRadius.circular(999),
       ),
       child: Text(

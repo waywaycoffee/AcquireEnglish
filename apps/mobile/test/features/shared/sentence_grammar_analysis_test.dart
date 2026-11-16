@@ -48,16 +48,10 @@ void main() {
                               'translationCn': '我一直在等你。',
                               'structureCn': '主语 + 现在完成进行时 + 介词短语',
                               'grammarPoints': <Map<String, String>>[
-                                <String, String>{
-                                  'title': '现在完成进行时',
-                                  'explanation': '强调动作从过去持续到现在。',
-                                },
+                                <String, String>{'title': '现在完成进行时', 'explanation': '强调动作从过去持续到现在。'},
                               ],
                               'keyPhrases': <Map<String, String>>[
-                                <String, String>{
-                                  'phrase': 'wait for',
-                                  'explanation': '等待某人/某事。',
-                                },
+                                <String, String>{'phrase': 'wait for', 'explanation': '等待某人/某事。'},
                               ],
                               'paraphraseEn': 'I have been expecting you.',
                               'learningTipCn': '注意 have been + doing 的搭配。',
@@ -102,7 +96,10 @@ void main() {
       final SentenceGrammarAnalysis analysis = await const WordLookupService()
           .analyzeSentenceGrammar(
             sentence: 'Hello there.',
-            settings: LearningSettingsState.defaults(),
+            settings: LearningSettingsState.defaults().copyWith(
+              translationProvider: 'OpenAI',
+              translationApiKey: '',
+            ),
           );
       expect(analysis.isAvailable, isFalse);
       expect(analysis.errorMessage, contains('设置'));
@@ -155,9 +152,7 @@ void main() {
         // ignore: always_specify_types
         overrides: [
           wordLookupServiceProvider.overrideWithValue(service),
-          learningSettingsProvider.overrideWith(
-            _GrammarSettingsNotifier.new,
-          ),
+          learningSettingsProvider.overrideWith(_GrammarSettingsNotifier.new),
         ],
         child: const MaterialApp(
           home: Scaffold(

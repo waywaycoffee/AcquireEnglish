@@ -1,3 +1,4 @@
+import 'package:common_learn_english/features/shared/presentation/pad/app_design_tokens.dart';
 import 'dart:async';
 
 import 'package:common_learn_english/features/phrases/presentation/phrase_book_provider.dart';
@@ -15,6 +16,33 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
+  testWidgets('popup background follows dark and light text colors', (
+    tester,
+  ) async {
+    final previous = AppDesignTokens.brightness;
+    addTearDown(() => AppDesignTokens.brightness = previous);
+    final container = _container();
+    addTearDown(container.dispose);
+    for (final brightness in [Brightness.dark, Brightness.light]) {
+      AppDesignTokens.brightness = brightness;
+      await tester.pumpWidget(_popup(container));
+      await tester.pumpAndSettle();
+      final card = tester.widget<Container>(
+        find.byKey(const ValueKey<String>('word-lookup-popup-card')),
+      );
+      final background = (card.decoration! as BoxDecoration).color!;
+      final text = tester
+          .widget<Text>(find.text('Sanctuary').first)
+          .style!
+          .color!;
+      expect(
+        (background.computeLuminance() - text.computeLuminance()).abs(),
+        greaterThan(0.5),
+      );
+      expect(tester.takeException(), isNull);
+    }
+  });
+
   testWidgets(
     'all primary actions stay visible while long definitions scroll',
     (WidgetTester tester) async {

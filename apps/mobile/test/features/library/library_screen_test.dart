@@ -15,6 +15,7 @@ class _TestLibraryCatalogNotifier extends LibraryCatalogNotifier {
   @override
   List<LibraryCourseData> build() => const <LibraryCourseData>[_testCourse];
 }
+
 const LibraryCourseData _testCourse = LibraryCourseData(
   id: 'custom-course',
   title: '我的课程',
@@ -57,10 +58,9 @@ void main() {
         GoRoute(
           path: '/episodes/:episodeId',
           name: SGRoute.player.name,
-          builder: (BuildContext context, GoRouterState state) =>
-              Scaffold(
-                body: Text('player:${state.pathParameters['episodeId']!}'),
-              ),
+          builder: (BuildContext context, GoRouterState state) => Scaffold(
+            body: Text('player:${state.pathParameters['episodeId']!}'),
+          ),
         ),
       ],
     );
@@ -99,7 +99,9 @@ void main() {
           child: MaterialApp.router(
             routerConfig: router,
             builder: (BuildContext context, Widget? child) => MediaQuery(
-              data: MediaQuery.of(context).copyWith(textScaler: const TextScaler.linear(1.3)),
+              data: MediaQuery.of(
+                context,
+              ).copyWith(textScaler: const TextScaler.linear(1.3)),
               child: child!,
             ),
           ),
@@ -124,24 +126,25 @@ void main() {
     });
   }
 
-  testWidgets('library list shows empty state when no built-in courses remain', (
-    WidgetTester tester,
-  ) async {
-    tester.view.physicalSize = const Size(1366, 1024);
-    tester.view.devicePixelRatio = 1;
-    addTearDown(tester.view.reset);
+  testWidgets(
+    'library list shows empty state when no built-in courses remain',
+    (WidgetTester tester) async {
+      tester.view.physicalSize = const Size(1366, 1024);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
 
-    final GoRouter router = buildRouter();
+      final GoRouter router = buildRouter();
 
-    await tester.pumpWidget(
-      ProviderScope(child: MaterialApp.router(routerConfig: router)),
-    );
-    await tester.pumpAndSettle();
+      await tester.pumpWidget(
+        ProviderScope(child: MaterialApp.router(routerConfig: router)),
+      );
+      await tester.pumpAndSettle();
 
-    expect(find.text('影视库'), findsWidgets);
-    expect(find.text('还没有导入任何课程'), findsOneWidget);
-    expect(find.text('先导入你自己的视频和字幕资源，再开始精听。'), findsOneWidget);
-  });
+      expect(find.text('影视库'), findsWidgets);
+      expect(find.text('还没有导入任何课程'), findsOneWidget);
+      expect(find.text('先导入你自己的视频和字幕资源，再开始精听。'), findsOneWidget);
+    },
+  );
 
   testWidgets('library detail cover play entry opens player', (
     WidgetTester tester,
@@ -233,29 +236,32 @@ void main() {
     expect(find.textContaining('来源：本地资源'), findsOneWidget);
   });
 
-  testWidgets('library list renders placeholder poster text when no cover image', (
-    WidgetTester tester,
-  ) async {
-    tester.view.physicalSize = const Size(1366, 1024);
-    tester.view.devicePixelRatio = 1;
-    addTearDown(tester.view.reset);
+  testWidgets(
+    'library list renders placeholder poster text when no cover image',
+    (WidgetTester tester) async {
+      tester.view.physicalSize = const Size(1366, 1024);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
 
-    final GoRouter router = buildRouter();
+      final GoRouter router = buildRouter();
 
-    await tester.pumpWidget(
-      ProviderScope(
-        // ignore: always_specify_types
-        overrides: [
-          libraryCatalogProvider.overrideWith(_TestLibraryCatalogNotifier.new),
-        ],
-        child: MaterialApp.router(routerConfig: router),
-      ),
-    );
-    await tester.pumpAndSettle();
+      await tester.pumpWidget(
+        ProviderScope(
+          // ignore: always_specify_types
+          overrides: [
+            libraryCatalogProvider.overrideWith(
+              _TestLibraryCatalogNotifier.new,
+            ),
+          ],
+          child: MaterialApp.router(routerConfig: router),
+        ),
+      );
+      await tester.pumpAndSettle();
 
-    expect(find.byType(LibraryCoursePosterTitle), findsOneWidget);
-    expect(find.text('我的课程'), findsNWidgets(2));
-  });
+      expect(find.byType(LibraryCoursePosterTitle), findsOneWidget);
+      expect(find.text('我的课程'), findsNWidgets(2));
+    },
+  );
 
   testWidgets('library edit mode supports batch delete', (
     WidgetTester tester,
@@ -336,16 +342,26 @@ void main() {
     );
     final File cover = File('${tempDir.path}/cover.jpg')
       ..writeAsBytesSync(<int>[1, 2, 3]);
-    addTearDown(() => tempDir.deleteSync(recursive: true));
+    addTearDown(
+      () => tester.runAsync(() async {
+        for (int attempt = 0; ; attempt++) {
+          try {
+            await tempDir.delete(recursive: true);
+            break;
+          } on FileSystemException {
+            if (attempt >= 20) rethrow;
+            await Future<void>.delayed(const Duration(milliseconds: 100));
+          }
+        }
+      }),
+    );
 
     tester.view.physicalSize = const Size(1366, 1024);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.reset);
 
     final GoRouter router = buildRouterWithScreen(
-      LibraryScreen(
-        pickCoverImage: () => Future<String?>.value(cover.path),
-      ),
+      LibraryScreen(pickCoverImage: () => Future<String?>.value(cover.path)),
     );
 
     await tester.pumpWidget(

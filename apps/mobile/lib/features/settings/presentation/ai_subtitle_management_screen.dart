@@ -1,4 +1,4 @@
-﻿import 'dart:convert';
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
@@ -233,7 +233,10 @@ class _AiSubtitleManagementScreenState
         .toList(growable: false);
     bool hasManual = false;
     for (final AiSubtitleCacheEntry entry in selected) {
-      if (await episodeHasManualSubtitleEdits(episodeId: entry.episodeId)) {
+      if (await episodeHasManualSubtitleEdits(
+        episodeId: entry.episodeId,
+        appSupportDirectory: _cache.appSupportDirectory,
+      )) {
         hasManual = true;
         break;
       }
@@ -252,7 +255,10 @@ class _AiSubtitleManagementScreenState
           );
     if (!confirmed) return;
     for (final AiSubtitleCacheEntry entry in selected) {
-      await clearManualSubtitleLocks(episodeId: entry.episodeId);
+      await clearManualSubtitleLocks(
+        episodeId: entry.episodeId,
+        appSupportDirectory: _cache.appSupportDirectory,
+      );
       await _cache.deleteEntry(entry);
     }
     if (mounted) _reload();
@@ -288,7 +294,10 @@ class _AiSubtitleManagementScreenState
           );
     if (!confirmed || !mounted) return;
     if (hasManual) {
-      await clearManualSubtitleLocks(episodeId: entry.episodeId);
+      await clearManualSubtitleLocks(
+        episodeId: entry.episodeId,
+        appSupportDirectory: _cache.appSupportDirectory,
+      );
     }
     if (!mounted) return;
     setState(() => _regeneratingPath = entry.cacheFile.path);
@@ -359,7 +368,10 @@ class _AiSubtitleManagementScreenState
           );
     if (!confirmed) return;
     if (hasManual) {
-      await clearManualSubtitleLocks(episodeId: entry.episodeId);
+      await clearManualSubtitleLocks(
+        episodeId: entry.episodeId,
+        appSupportDirectory: _cache.appSupportDirectory,
+      );
     }
     await _cache.deleteEntry(entry);
     if (mounted) _reload();
@@ -935,6 +947,7 @@ class _AiSubtitleEditorScreenState extends State<AiSubtitleEditorScreen> {
           builder: (BuildContext context) => StatefulBuilder(
             builder: (BuildContext context, StateSetter setDialogState) {
               return AlertDialog(
+                scrollable: true,
                 title: Text('编辑第 ${lineIndex + 1} 句'),
                 content: SizedBox(
                   width: 620,

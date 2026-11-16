@@ -56,7 +56,9 @@ class _FixedSubtitleSettingsNotifier extends LearningSettingsNotifier {
 
   @override
   LearningSettingsState build() {
-    return LearningSettingsState.defaults().copyWith(subtitleMode: subtitleMode);
+    return LearningSettingsState.defaults().copyWith(
+      subtitleMode: subtitleMode,
+    );
   }
 }
 
@@ -204,6 +206,11 @@ void main() {
       findsOneWidget,
     );
 
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(
+      find.byKey(const ValueKey<String>('subtitle-line-loop-0')),
+    );
+    await tester.pumpAndSettle();
     await tester.tap(
       find.byKey(const ValueKey<String>('subtitle-line-loop-0')),
     );
@@ -314,6 +321,7 @@ void main() {
       ),
     );
 
+    await tester.pumpAndSettle();
     await tester.tap(find.byIcon(Icons.more_horiz_rounded));
     await tester.pumpAndSettle();
     expect(find.text('AI 重新生成当前句'), findsOneWidget);
@@ -464,80 +472,86 @@ void main() {
     expect(state.isPlaying, isTrue);
   });
 
-  testWidgets(
-    'player controls update speed, subtitle mode, and letter case',
-    (WidgetTester tester) async {
-      final PlayerMockState state = PlayerMockState()
-        ..loadLines(const <PlayerSubtitleLine>[
-          PlayerSubtitleLine(
-            startTime: '00:01',
-            english: 'What are you doing here?',
-            chinese: '你在这里做什么？',
-            startMs: 1000,
-            endMs: 3000,
-          ),
-        ]);
-      expect(
-        state.availableSubtitleModes,
-        <String>['双语', '英文', '中文', '盲听'],
-      );
-      state.setSubtitleMode('英文');
-      expect(state.subtitleMode, '英文');
-      state.setSubtitleMode('中文');
-      expect(state.subtitleMode, '中文');
-      state.setSubtitleMode('盲听');
-      expect(state.subtitleMode, '盲听');
-      state.setSubtitleMode('双语');
-      expect(state.subtitleMode, '双语');
-    },
-  );
-
+  testWidgets('player controls update speed, subtitle mode, and letter case', (
+    WidgetTester tester,
+  ) async {
+    final PlayerMockState state = PlayerMockState()
+      ..loadLines(const <PlayerSubtitleLine>[
+        PlayerSubtitleLine(
+          startTime: '00:01',
+          english: 'What are you doing here?',
+          chinese: '你在这里做什么？',
+          startMs: 1000,
+          endMs: 3000,
+        ),
+      ]);
+    expect(state.availableSubtitleModes, <String>['双语', '英文', '中文', '盲听']);
+    state.setSubtitleMode('英文');
+    expect(state.subtitleMode, '英文');
+    state.setSubtitleMode('中文');
+    expect(state.subtitleMode, '中文');
+    state.setSubtitleMode('盲听');
+    expect(state.subtitleMode, '盲听');
+    state.setSubtitleMode('双语');
+    expect(state.subtitleMode, '双语');
+  });
 
   for (final Size size in <Size>[const Size(390, 844), const Size(844, 390)]) {
-    testWidgets('subtitle size can change in a small fullscreen player at $size', (WidgetTester tester) async {
-      tester.view.physicalSize = size;
-      tester.view.devicePixelRatio = 1;
-      addTearDown(tester.view.reset);
-      final PlayerMockState state = PlayerMockState()..loadLines(const <PlayerSubtitleLine>[_dictionaryLine]);
-      await tester.pumpWidget(MaterialApp(
-        home: PlayerFullscreenVideoScreen(
-          playerState: state,
-          highlightWords: true,
-          isMuted: false,
-          volumeLevel: 1,
-          onTogglePlaying: state.togglePlaying,
-          onPreviousLine: state.previousLine,
-          onReplayLine: () => state.selectLine(0),
-          onNextLine: state.nextLine,
-          onSeekBackward: () {},
-          onSeekForward: () {},
-          onSelectLine: state.selectLine,
-          onSeek: (_) {},
-          onSpeedSelected: state.selectSpeed,
-          onSelectSubtitleMode: state.setSubtitleMode,
-          onSelectFontSize: (_) {},
-          onToggleShadowing: state.toggleShadowing,
-          onToggleLoop: state.toggleLoop,
-          onToggleMuted: () {},
-          onVolumeChanged: (_) {},
-          onSubtitleLookupOpen: () {},
-          onCollectWord: (_) {},
-          episodes: const <LibraryEpisodeItem>[],
-          activeEpisodeId: 'episode-1',
-          onExit: () {},
-        ),
-      ));
-      await tester.pumpAndSettle();
-      await tester.tap(find.byTooltip('字幕大小'));
-      await tester.pumpAndSettle();
-      await tester.ensureVisible(find.text('最大（200%）'));
-      await tester.pumpAndSettle();
-      await tester.tap(find.text('最大（200%）'));
-      await tester.pumpAndSettle();
-      expect(tester.widget<PlayerVideoPanel>(find.byType(PlayerVideoPanel)).fontScale, 2);
-      expect(find.byTooltip('英文字幕大小写'), findsNothing);
-      expect(tester.takeException(), isNull);
-    });
+    testWidgets(
+      'subtitle size can change in a small fullscreen player at $size',
+      (WidgetTester tester) async {
+        tester.view.physicalSize = size;
+        tester.view.devicePixelRatio = 1;
+        addTearDown(tester.view.reset);
+        final PlayerMockState state = PlayerMockState()
+          ..loadLines(const <PlayerSubtitleLine>[_dictionaryLine]);
+        await tester.pumpWidget(
+          MaterialApp(
+            home: PlayerFullscreenVideoScreen(
+              playerState: state,
+              highlightWords: true,
+              isMuted: false,
+              volumeLevel: 1,
+              onTogglePlaying: state.togglePlaying,
+              onPreviousLine: state.previousLine,
+              onReplayLine: () => state.selectLine(0),
+              onNextLine: state.nextLine,
+              onSeekBackward: () {},
+              onSeekForward: () {},
+              onSelectLine: state.selectLine,
+              onSeek: (_) {},
+              onSpeedSelected: state.selectSpeed,
+              onSelectSubtitleMode: state.setSubtitleMode,
+              onSelectFontSize: (_) {},
+              onToggleShadowing: state.toggleShadowing,
+              onToggleLoop: state.toggleLoop,
+              onToggleMuted: () {},
+              onVolumeChanged: (_) {},
+              onSubtitleLookupOpen: () {},
+              onCollectWord: (_) {},
+              episodes: const <LibraryEpisodeItem>[],
+              activeEpisodeId: 'episode-1',
+              onExit: () {},
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+        await tester.tap(find.byTooltip('字幕大小'));
+        await tester.pumpAndSettle();
+        await tester.ensureVisible(find.text('最大（200%）'));
+        await tester.pumpAndSettle();
+        await tester.tap(find.text('最大（200%）'));
+        await tester.pumpAndSettle();
+        expect(
+          tester
+              .widget<PlayerVideoPanel>(find.byType(PlayerVideoPanel))
+              .fontScale,
+          2,
+        );
+        expect(find.byTooltip('英文字幕大小写'), findsNothing);
+        expect(tester.takeException(), isNull);
+      },
+    );
   }
 
   testWidgets('player shows real empty state when subtitles are missing', (
@@ -723,59 +737,68 @@ void main() {
     expect(find.text('正在生成 AI 词级字幕'), findsOneWidget);
   });
 
-  testWidgets('subtitle list word uses green karaoke when highlighting is enabled', (
-    WidgetTester tester,
-  ) async {
-    await tester.pumpWidget(
-      MaterialApp(
-        home: Scaffold(
-          body: SizedBox(
-            height: 260,
-            child: PlayerSubtitleList(
-              lines: const <PlayerSubtitleLine>[
-                PlayerSubtitleLine(
-                  startTime: '00:22',
-                  english: 'It is raining today.',
-                  chinese: '',
-                  startMs: 22000,
-                  endMs: 25000,
-                  words: <PlayerSubtitleWord>[
-                    PlayerSubtitleWord(text: 'It', startMs: 22000, endMs: 22400),
-                    PlayerSubtitleWord(text: 'is', startMs: 22400, endMs: 22800),
-                    PlayerSubtitleWord(
-                      text: 'raining',
-                      startMs: 22800,
-                      endMs: 23800,
-                    ),
-                    PlayerSubtitleWord(
-                      text: 'today.',
-                      startMs: 23800,
-                      endMs: 25000,
-                    ),
-                  ],
-                ),
-              ],
-              activeIndex: 0,
-              subtitleMode: '英文',
-              currentWordIndex: 2,
-              fontScale: 1,
-              highlightWords: true,
-              subtitleWordHighlightStyle: '绿色填充',
-              onTapLine: (_) {},
-              onCollectWord: (_) {},
-              onBookmarkLine: (_) {},
-              onLoopFromLine: (_) {},
-              onDictationLine: (_) {},
-              onAiExplain: (_) {},
+  testWidgets(
+    'subtitle list word uses green karaoke when highlighting is enabled',
+    (WidgetTester tester) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: SizedBox(
+              height: 260,
+              child: PlayerSubtitleList(
+                lines: const <PlayerSubtitleLine>[
+                  PlayerSubtitleLine(
+                    startTime: '00:22',
+                    english: 'It is raining today.',
+                    chinese: '',
+                    startMs: 22000,
+                    endMs: 25000,
+                    words: <PlayerSubtitleWord>[
+                      PlayerSubtitleWord(
+                        text: 'It',
+                        startMs: 22000,
+                        endMs: 22400,
+                      ),
+                      PlayerSubtitleWord(
+                        text: 'is',
+                        startMs: 22400,
+                        endMs: 22800,
+                      ),
+                      PlayerSubtitleWord(
+                        text: 'raining',
+                        startMs: 22800,
+                        endMs: 23800,
+                      ),
+                      PlayerSubtitleWord(
+                        text: 'today.',
+                        startMs: 23800,
+                        endMs: 25000,
+                      ),
+                    ],
+                  ),
+                ],
+                activeIndex: 0,
+                subtitleMode: '英文',
+                currentWordIndex: 2,
+                fontScale: 1,
+                highlightWords: true,
+                subtitleWordHighlightStyle: '绿色填充',
+                onTapLine: (_) {},
+                onCollectWord: (_) {},
+                onBookmarkLine: (_) {},
+                onLoopFromLine: (_) {},
+                onDictationLine: (_) {},
+                onAiExplain: (_) {},
+              ),
             ),
           ),
         ),
-      ),
-    );
+      );
 
-    final Text highlightedText = tester.widget<Text>(find.text('raining'));
-    expect(highlightedText.style!.color, AppDesignTokens.brandGreen);
-  });
+      final Text highlightedText = tester.widget<Text>(find.text('raining'));
+      expect(highlightedText.style!.color, AppDesignTokens.brandGreen);
+    },
+  );
 
   testWidgets('subtitle list remaps yellow highlight style to green text', (
     WidgetTester tester,
@@ -794,7 +817,11 @@ void main() {
                   english: 'It is a quiet afternoon.',
                   chinese: '',
                   words: <PlayerSubtitleWord>[
-                    PlayerSubtitleWord(text: 'It', startMs: 22000, endMs: 22400),
+                    PlayerSubtitleWord(
+                      text: 'It',
+                      startMs: 22000,
+                      endMs: 22400,
+                    ),
                   ],
                 ),
               ],
@@ -880,6 +907,7 @@ void main() {
       ),
     );
 
+    await tester.pumpAndSettle();
     await tester.tap(find.text('raining'));
     await tester.pumpAndSettle();
 
@@ -1116,7 +1144,9 @@ void main() {
               SubtitleTrack('1', 'Embedded', 'eng'),
             ],
             onSelectEmbeddedSubtitle: (_) => state.setSubtitleMode('隐藏'),
-            onSelectFontSize: settings.read(learningSettingsProvider.notifier).setFontSize,
+            onSelectFontSize: settings
+                .read(learningSettingsProvider.notifier)
+                .setFontSize,
             onSelectSubtitleLetterCase: settings
                 .read(learningSettingsProvider.notifier)
                 .setSubtitleLetterCase,
@@ -1186,9 +1216,18 @@ void main() {
       await tester.tap(find.text('超大（170%）'));
       await tester.pumpAndSettle();
       expect(settings.read(learningSettingsProvider).fontSize, '超大');
-      expect(tester.widget<PlayerVideoPanel>(find.byType(PlayerVideoPanel)).fontScale, 1.7);
-      expect(tester.widget<PlayerSubtitleList>(find.byType(PlayerSubtitleList)).fontScale, 1.7);
-
+      expect(
+        tester
+            .widget<PlayerVideoPanel>(find.byType(PlayerVideoPanel))
+            .fontScale,
+        1.7,
+      );
+      expect(
+        tester
+            .widget<PlayerSubtitleList>(find.byType(PlayerSubtitleList))
+            .fontScale,
+        1.7,
+      );
 
       await tester.tap(find.byTooltip('字幕模式'));
       await tester.pumpAndSettle();

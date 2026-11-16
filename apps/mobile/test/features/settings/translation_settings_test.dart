@@ -25,11 +25,12 @@ void main() {
     hiveDir.deleteSync(recursive: true);
   });
 
-
   test('expanded subtitle sizes persist and keep legacy scales', () async {
     final ProviderContainer container = ProviderContainer();
     addTearDown(container.dispose);
-    final LearningSettingsNotifier settings = container.read(learningSettingsProvider.notifier)..setFontSize('大');
+    final LearningSettingsNotifier settings = container.read(
+      learningSettingsProvider.notifier,
+    )..setFontSize('大');
     expect(container.read(learningSettingsProvider).fontScale, 1.18);
     settings
       ..setFontSize('最大')
@@ -93,16 +94,16 @@ void main() {
     },
   );
 
-  test('defaults to OpenAI translation source', () {
+  test('defaults to local Ollama translation source', () {
     final ProviderContainer container = ProviderContainer();
     addTearDown(container.dispose);
 
     final LearningSettingsState state = container.read(
       learningSettingsProvider,
     );
-    expect(state.translationProvider, 'OpenAI');
-    expect(state.translationApiKey, isEmpty);
-    expect(state.translationBaseUrl, 'https://api.openai.com/v1');
+    expect(state.translationProvider, '本地 Ollama');
+    expect(state.translationApiKey, 'ollama');
+    expect(state.translationBaseUrl, defaultOllamaBaseUrl);
   });
 
   test('translation provider presets fill default base url and model', () {
@@ -135,9 +136,9 @@ void main() {
     expect(state.translationProvider, '本地 Ollama');
     expect(state.translationBaseUrl, defaultOllamaBaseUrl);
     expect(state.translationModel, defaultOllamaTranslationModel);
-    expect(state.translationModel, 'qwen2.5:7b');
+    expect(state.translationModel, 'qwen2.5:3b');
     expect(state.translationApiKey, 'ollama');
-    expect(state.availableTranslationModels, contains('qwen2.5:7b'));
+    expect(state.availableTranslationModels, contains('qwen2.5:3b'));
   });
 
   test('asr provider presets are independent from translation settings', () {
@@ -359,11 +360,7 @@ void main() {
       final LearningSettingsState state = container.read(
         learningSettingsProvider,
       );
-      expect(asrProviderOptions, <String>[
-        '本地 Whisper',
-        '阿里云百炼',
-        '腾讯云',
-      ]);
+      expect(asrProviderOptions, <String>['本地 Whisper', '阿里云百炼', '腾讯云']);
       expect(asrProviderPresets.containsKey('OpenAI'), isFalse);
       expect(asrProviderPresets['本地 Whisper']?.model, 'base.en');
       expect(state.asrProvider, '本地 Whisper');
@@ -402,7 +399,10 @@ void main() {
           .read(learningSettingsProvider.notifier)
           .setAsrProvider('MiMo Token Plan');
 
-      expect(container.read(learningSettingsProvider).asrProvider, '本地 Whisper');
+      expect(
+        container.read(learningSettingsProvider).asrProvider,
+        '本地 Whisper',
+      );
 
       await Hive.box<String>('prefs').put(
         'learning_settings_v1',

@@ -243,8 +243,9 @@ class SubtitleCompletionStatusState {
 
   /// Global fill progress for FAB / system overlay.
   SubtitleFillProgressSummary? get activeFillProgress {
-    final List<SubtitleCompletionEpisodeUi> jobs =
-        byEpisodeId.values.toList(growable: false);
+    final List<SubtitleCompletionEpisodeUi> jobs = byEpisodeId.values.toList(
+      growable: false,
+    );
     if (jobs.isEmpty) {
       return null;
     }
@@ -278,8 +279,10 @@ class SubtitleCompletionStatusState {
       }
     }
     final SubtitleCompletionEpisodeUi focused = focus!;
-    final double currentFrac =
-        (focused.progressFraction ?? 0.08).clamp(0.0, 0.99);
+    final double currentFrac = (focused.progressFraction ?? 0.08).clamp(
+      0.0,
+      0.99,
+    );
     final int currentPercent = (currentFrac * 100).round().clamp(0, 99);
     final String live = (focused.label ?? activeLabel ?? '').trim();
     return SubtitleFillProgressSummary(
@@ -314,10 +317,17 @@ class SubtitleCompletionStatusState {
     if (jobs.isEmpty) {
       return null;
     }
-    final int active = jobs.where((SubtitleCompletionEpisodeUi e) => e.isActive).length;
-    final int failed = jobs.where((SubtitleCompletionEpisodeUi e) => e.isFailed).length;
+    final int active = jobs
+        .where((SubtitleCompletionEpisodeUi e) => e.isActive)
+        .length;
+    final int failed = jobs
+        .where((SubtitleCompletionEpisodeUi e) => e.isFailed)
+        .length;
     final int done = jobs
-        .where((SubtitleCompletionEpisodeUi e) => e.status == SubtitleCompletionStatus.done)
+        .where(
+          (SubtitleCompletionEpisodeUi e) =>
+              e.status == SubtitleCompletionStatus.done,
+        )
         .length;
     if (active == 0 && failed == 0) {
       return null;
@@ -352,7 +362,8 @@ class SubtitleCompletionStatusState {
         ? liveFocus
         : (focus?.displayLabel ?? '');
     final String message;
-    if (running != null || (focus != null && focus.status == SubtitleCompletionStatus.running)) {
+    if (running != null ||
+        (focus != null && focus.status == SubtitleCompletionStatus.running)) {
       message = active > 1
           ? '补字幕中（排队 $active 集，已完成 $done 集）：$focusLabel'
           : '补字幕中：$focusLabel';
@@ -361,9 +372,7 @@ class SubtitleCompletionStatusState {
           ? '排队补字幕（$active 集待处理，已完成 $done 集）：$focusLabel'
           : '排队补字幕：$focusLabel';
     } else if (failedJob != null) {
-      message = failed > 1
-          ? '$failed 集字幕补全失败，可点重试'
-          : failedJob.displayLabel;
+      message = failed > 1 ? '$failed 集字幕补全失败，可点重试' : failedJob.displayLabel;
     } else {
       message = '字幕补全进行中…';
     }
@@ -386,7 +395,8 @@ class SubtitleCompletionStatusState {
       failedCount: failed,
       doneCount: done,
       totalTracked: jobs.length,
-      activeEpisodeId: focus?.episodeId ?? running?.episodeId ?? pending?.episodeId,
+      activeEpisodeId:
+          focus?.episodeId ?? running?.episodeId ?? pending?.episodeId,
     );
   }
 
@@ -398,7 +408,9 @@ class SubtitleCompletionStatusState {
   }) {
     return SubtitleCompletionStatusState(
       byEpisodeId: byEpisodeId ?? this.byEpisodeId,
-      activeEpisodeId: clearActive ? null : (activeEpisodeId ?? this.activeEpisodeId),
+      activeEpisodeId: clearActive
+          ? null
+          : (activeEpisodeId ?? this.activeEpisodeId),
       activeLabel: clearActive ? null : (activeLabel ?? this.activeLabel),
     );
   }
@@ -419,15 +431,23 @@ class SubtitleCompletionStatusNotifier
     // Initial load + light poll so import/enqueue from other code paths shows up.
     Future<void>.microtask(refresh);
     _poll?.cancel();
-    _poll = Timer.periodic(const Duration(seconds: 2), (_) {
-      unawaited(refresh());
-    });
+    void startPolling() {
+      _poll?.cancel();
+      _poll = Timer.periodic(const Duration(seconds: 2), (_) {
+        unawaited(refresh());
+      });
+    }
+
+    ref.onCancel(() => _poll?.cancel());
+    ref.onResume(startPolling);
+    startPolling();
     return const SubtitleCompletionStatusState();
   }
 
   Future<void> refresh() async {
-    final List<SubtitleCompletionJob> jobs =
-        await SubtitleCompletionQueue.shared.loadJobs();
+    final List<SubtitleCompletionJob> jobs = await SubtitleCompletionQueue
+        .shared
+        .loadJobs();
     final Map<String, SubtitleCompletionEpisodeUi> next =
         <String, SubtitleCompletionEpisodeUi>{};
     for (final SubtitleCompletionJob job in jobs) {
@@ -489,7 +509,8 @@ class SubtitleCompletionStatusNotifier
     final SubtitleCompletionEpisodeUi? existing = next[episodeId];
     next[episodeId] = SubtitleCompletionEpisodeUi(
       episodeId: episodeId,
-      status: status ??
+      status:
+          status ??
           (existing?.status == SubtitleCompletionStatus.done
               ? SubtitleCompletionStatus.running
               : (existing?.status ?? SubtitleCompletionStatus.running)),
@@ -564,4 +585,4 @@ subtitleCompletionStatusProvider =
     NotifierProvider<
       SubtitleCompletionStatusNotifier,
       SubtitleCompletionStatusState
-    >(SubtitleCompletionStatusNotifier.new);
+    >(SubtitleCompletionStatusNotifier.new, isAutoDispose: true);

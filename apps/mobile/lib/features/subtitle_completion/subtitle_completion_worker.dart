@@ -43,6 +43,7 @@ class SubtitleCompletionWorker {
     SubtitleCompletionQueue? queue,
     this.onPersisted,
     this.translateChinese,
+    this.fallbackTranslateChinese,
     this.externalFill = const ExternalSubtitleFill(),
     Future<Directory> Function()? appSupportDirectory,
   }) : asrRunner = asrRunner ?? AsrSubtitleJobRunner(),
@@ -54,6 +55,7 @@ class SubtitleCompletionWorker {
   final SubtitleCompletionQueue queue;
   final SubtitleCompletionPersistedHook? onPersisted;
   final SubtitleChineseTranslator? translateChinese;
+  final SubtitleChineseTranslator? fallbackTranslateChinese;
   final ExternalSubtitleFill externalFill;
   final Future<Directory> Function() _appSupportDirectory;
 
@@ -61,9 +63,9 @@ class SubtitleCompletionWorker {
     // Mobile import fill always uses on-device Whisper: no Bailian key prompts
     // and no multi‑hundred‑MB cloud uploads that stall the queue for hours.
     if (Platform.isAndroid || Platform.isIOS) {
-      final TranslationProviderPreset local =
-          asrProviderPresets['本地 Whisper']!;
-      final String model = settings.asrProvider == local.name &&
+      final TranslationProviderPreset local = asrProviderPresets['本地 Whisper']!;
+      final String model =
+          settings.asrProvider == local.name &&
               settings.asrModel.trim().isNotEmpty
           ? settings.asrModel.trim()
           : (local.model.isEmpty ? 'base.en' : local.model);
@@ -78,8 +80,7 @@ class SubtitleCompletionWorker {
     if (describeAsrConfigurationError(settings) == null) {
       return settings;
     }
-    final TranslationProviderPreset local =
-        asrProviderPresets['本地 Whisper']!;
+    final TranslationProviderPreset local = asrProviderPresets['本地 Whisper']!;
     return settings.copyWith(
       asrProvider: local.name,
       asrApiKey: '',
@@ -104,13 +105,9 @@ class SubtitleCompletionWorker {
     final bool asrZh = job.asrPrimary.trim().toLowerCase().startsWith('zh');
     final String label;
     if (asrZh && job.needChinese) {
-      label = job.needEnglish
-          ? '正在语音生成中文字幕，随后翻译英文…'
-          : '正在用语音生成中文字幕…';
+      label = job.needEnglish ? '正在语音生成中文字幕，随后翻译英文…' : '正在用语音生成中文字幕…';
     } else if (job.needEnglish) {
-      label = job.needChinese
-          ? '正在语音生成英文字幕，随后翻译中文…'
-          : '正在用语音生成英文字幕…';
+      label = job.needChinese ? '正在语音生成英文字幕，随后翻译中文…' : '正在用语音生成英文字幕…';
     } else {
       label = '正在翻译中文字幕…';
     }
@@ -138,10 +135,7 @@ class SubtitleCompletionWorker {
             !still.needEnglish &&
             await _asrHasAnyChinese(job);
         if (chineseOnlyPartial) {
-          await queue.markDeferred(
-            job.episodeId,
-            '中文翻译未完成，稍后继续（已保留已译句子）',
-          );
+          await queue.markDeferred(job.episodeId, '中文翻译未完成，稍后继续（已保留已译句子）');
           onProgress?.call(job.episodeId, '中文翻译限流，稍后自动继续…');
           return true;
         }
@@ -247,11 +241,13 @@ class SubtitleCompletionWorker {
       needEnglish = false;
     }
     if (needChinese) {
-      final List<PlayerSubtitleLine> enTimeline = asrBundle?.sentenceLines
+      final List<PlayerSubtitleLine> enTimeline =
+          asrBundle?.sentenceLines
               .where((PlayerSubtitleLine line) => looksEnglish(line.english))
               .toList(growable: false) ??
           const <PlayerSubtitleLine>[];
-      final String? zhPath = job.zhPath ??
+      final String? zhPath =
+          job.zhPath ??
           await existingOfficialBilibiliSubtitle(
             idKey: job.sourceKey,
             fileName: 'zh.srt',
@@ -344,7 +340,7 @@ class SubtitleCompletionWorker {
     final bool hasOfficialEn = await _officialEnglishCoversEpisode(officialEn);
     final bool hasOfficialZh = await _officialChineseCoversEpisode(officialZh);
     bool needEnglish = linked.needEnglish && !hasOfficialEn;
-    bool needChinese = linked.needChinese && !hasOfficialZh;
+    bool needChinese = linked.needChinese && (!hasOfficialZh || needEnglish);
     if (!needEnglish && !needChinese) {
       onProgress?.call(job.episodeId, '官方软字幕已就绪');
       final String en = (officialEn ?? '').trim();
@@ -379,7 +375,8 @@ class SubtitleCompletionWorker {
         videoFingerprint: videoFileFingerprint(job.videoPath),
         appSupportDirectory: _appSupportDirectory,
       );
-      final int enHits = existing?.sentences
+      final int enHits =
+          existing?.sentences
               .where((SubtitleSentence s) => looksEnglish(s.english))
               .length ??
           0;
@@ -399,10 +396,7 @@ class SubtitleCompletionWorker {
     // Then EN→ZH when Chinese is also needed and official ZH is absent.
     if (needEnglish) {
       await _runAsrEnglishThenMaybeChinese(
-        job: linked.copyWith(
-          needEnglish: true,
-          needChinese: needChinese,
-        ),
+        job: linked.copyWith(needEnglish: true, needChinese: needChinese),
         settings: settings,
         onProgress: onProgress,
         cancellationToken: cancellationToken,
@@ -501,7 +495,7 @@ class SubtitleCompletionWorker {
       (SubtitleSentence s) =>
           looksEnglish(s.english) && !looksChinese(s.chinese),
     );
-    if (chineseCoverageOk) {
+    if (chineseCoverageOk && !anyChineseMissing) {
       onProgress?.call(job.episodeId, '中文字幕已就绪');
     } else if (job.needChinese || anyChineseMissing) {
       // Prefer official ZH only when it actually covers this English timeline.
@@ -513,11 +507,10 @@ class SubtitleCompletionWorker {
               idKey: job.sourceKey,
               fileName: 'zh.srt',
             );
-      if (await _officialChineseCoversEpisode(officialZh) ||
-          await _officialChineseCoversEnglishTimeline(
-            officialZh,
-            englishLines: bundle.sentenceLines,
-          )) {
+      if (await _officialChineseCoversEnglishTimeline(
+        officialZh,
+        englishLines: bundle.sentenceLines,
+      )) {
         onProgress?.call(job.episodeId, '中文字幕已就绪（官方软字幕）');
         translatedChineseCount = 0;
       } else {
@@ -566,9 +559,7 @@ class SubtitleCompletionWorker {
     }
     if (LocalWhisperAsr.isLocalProvider(settings) &&
         !settings.enableChineseSpeechAsr) {
-      throw StateError(
-        '未开启中文语音识别。请到「设置 → AI生成字幕」开启，并下载多语言 Whisper 模型。',
-      );
+      throw StateError('未开启中文语音识别。请到「设置 → AI生成字幕」开启，并下载多语言 Whisper 模型。');
     }
 
     onProgress?.call(job.episodeId, '正在用语音生成中文字幕…');
@@ -914,8 +905,9 @@ class SubtitleCompletionWorker {
           if (zh.endMs > zhEndMs) {
             zhEndMs = zh.endMs;
           }
-          final int overlapStart =
-              en.startMs > zh.startMs ? en.startMs : zh.startMs;
+          final int overlapStart = en.startMs > zh.startMs
+              ? en.startMs
+              : zh.startMs;
           final int overlapEnd = en.endMs < zh.endMs ? en.endMs : zh.endMs;
           return overlapEnd > overlapStart;
         });
@@ -1263,13 +1255,18 @@ class SubtitleCompletionWorker {
     // 2) Free / Edge / MyMemory only for remaining holes (GPU unreachable).
     try {
       await merge(
-        await const WordLookupService()
-            .translateSentencesFreeParallel(
-              sentences: batch,
-              toEnglish: false,
-              concurrency: 3,
-            )
-            .timeout(const Duration(seconds: 90)),
+        fallbackTranslateChinese != null
+            ? await fallbackTranslateChinese!(
+                sentences: batch,
+                settings: settings,
+              )
+            : await const WordLookupService()
+                  .translateSentencesFreeParallel(
+                    sentences: batch,
+                    toEnglish: false,
+                    concurrency: 3,
+                  )
+                  .timeout(const Duration(seconds: 90)),
       );
     } catch (_) {}
 
@@ -1302,8 +1299,8 @@ class SubtitleCompletionWorker {
     }
     cancellationToken?.throwIfCancelled();
 
-    final List<String> translated =
-        await const WordLookupService().translateSentences(
+    final List<String> translated = await const WordLookupService()
+        .translateSentences(
           sentences: pendingSentences,
           settings: settings,
           targetLanguage: 'en',
@@ -1324,7 +1321,9 @@ class SubtitleCompletionWorker {
       next[index] = PlayerSubtitleLine(
         startTime: line.startTime,
         english: en,
-        chinese: looksChinese(line.chinese) ? line.chinese : pendingSentences[i],
+        chinese: looksChinese(line.chinese)
+            ? line.chinese
+            : pendingSentences[i],
         startMs: line.startMs,
         endMs: line.endMs,
         words: line.words,

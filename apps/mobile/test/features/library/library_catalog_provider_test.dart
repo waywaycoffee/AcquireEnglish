@@ -701,7 +701,19 @@ void main() {
     );
     final File cover = File('${tempDir.path}/cover.jpg')
       ..writeAsBytesSync(<int>[0]);
-    addTearDown(() => tempDir.deleteSync(recursive: true));
+    addTearDown(
+      () => tester.runAsync(() async {
+        for (int attempt = 0; ; attempt++) {
+          try {
+            await tempDir.delete(recursive: true);
+            break;
+          } on FileSystemException {
+            if (attempt >= 20) rethrow;
+            await Future<void>.delayed(const Duration(milliseconds: 100));
+          }
+        }
+      }),
+    );
 
     await tester.pumpWidget(
       MaterialApp(

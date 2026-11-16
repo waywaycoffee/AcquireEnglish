@@ -224,7 +224,9 @@ void main() {
     });
     final Directory oldRoot = Directory('${temp.path}/old')..createSync();
     final Directory newRoot = Directory('${temp.path}/new')..createSync();
-    File('${newRoot.path}/ep01.mp4').writeAsStringSync('video');
+    File(
+      '${newRoot.path}${Platform.pathSeparator}ep01.mp4',
+    ).writeAsStringSync('video');
     final LibraryCourseData original = courseWith(<LibraryEpisodeItem>[
       episode('one', '${oldRoot.path}/ep01.mp4'),
       episode('two', '${oldRoot.path}/ep02.mp4'),
@@ -251,7 +253,10 @@ void main() {
     final LibraryCourseData loaded = container
         .read(libraryCatalogProvider)
         .single;
-    expect(loaded.episodes.first.videoAsset, '${newRoot.path}/ep01.mp4');
+    expect(
+      loaded.episodes.first.videoAsset,
+      '${newRoot.path}${Platform.pathSeparator}ep01.mp4',
+    );
     expect(loaded.episodes.last.videoMissing, isTrue);
     expect(loaded.videoDirectories, contains(newRoot.path));
     File('${newRoot.path}/ep02.mp4').writeAsStringSync('restored');

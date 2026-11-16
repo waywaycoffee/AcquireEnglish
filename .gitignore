@@ -67,6 +67,7 @@ deploy/gpu-box-ollama/models/
 deploy/gpu-box-ollama/wheels/
 deploy/gpu-box-ollama/*.log
 deploy/gpu-box-ollama/*.err
+deploy/gpu-box-ollama/usage.sqlite3*
 deploy/gpu-box-ollama/OllamaSetup.exe
 deploy/gpu-box-ollama/ollama-windows-amd64.zip
 deploy/gpu-box-ollama/aria2c.exe

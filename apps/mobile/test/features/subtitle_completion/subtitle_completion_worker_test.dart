@@ -103,10 +103,13 @@ Hello there
       settings: LearningSettingsState.defaults(),
     );
     expect(ran, isTrue);
-    expect(await persistedEnglishIsAsrSentences(
-      episodeId: 'ep-zh',
-      appSupportDirectory: () async => temp,
-    ), isTrue);
+    expect(
+      await persistedEnglishIsAsrSentences(
+        episodeId: 'ep-zh',
+        appSupportDirectory: () async => temp,
+      ),
+      isTrue,
+    );
     expect(
       await readPersistedEnglishOrigin(
         episodeId: 'ep-zh',
@@ -117,7 +120,10 @@ Hello there
     final String zhSrt = await File(attachedZh!).readAsString();
     expect(zhSrt, contains('译:Hello there'));
     expect(attachedEn, isNotNull);
-    expect((await queue.loadJobs()).single.status, SubtitleCompletionStatus.done);
+    expect(
+      (await queue.loadJobs()).single.status,
+      SubtitleCompletionStatus.done,
+    );
   });
 
   test('ASR job fills remaining Chinese when ZH track is partial', () async {
@@ -184,64 +190,74 @@ How are you?
     );
   });
 
-  test('mid-batch translator failure falls back and still completes ZH', () async {
-    final File video = _fakeVideo(temp, 'batch-fail.mp4');
-    final StringBuffer enBuf = StringBuffer();
-    for (int i = 0; i < 45; i++) {
-      final int start = i;
-      final int end = i + 1;
-      enBuf.writeln('${i + 1}');
-      enBuf.writeln(
-        '00:00:${start.toString().padLeft(2, '0')},000 --> '
-        '00:00:${end.toString().padLeft(2, '0')},000',
+  test(
+    'mid-batch translator failure falls back and still completes ZH',
+    () async {
+      final File video = _fakeVideo(temp, 'batch-fail.mp4');
+      final StringBuffer enBuf = StringBuffer();
+      for (int i = 0; i < 45; i++) {
+        final int start = i;
+        final int end = i + 1;
+        enBuf.writeln('${i + 1}');
+        enBuf.writeln(
+          '00:00:${start.toString().padLeft(2, '0')},000 --> '
+          '00:00:${end.toString().padLeft(2, '0')},000',
+        );
+        enBuf.writeln('Hello sentence number $i for chinese fill.');
+        enBuf.writeln();
+      }
+      final File en = File('${temp.path}/batch-en.srt')
+        ..writeAsStringSync(enBuf.toString());
+      await queue.enqueue(
+        episodeId: 'ep-batch-fail',
+        videoPath: video.path,
+        enPath: en.path,
+        needEnglish: false,
+        needChinese: true,
       );
-      enBuf.writeln('Hello sentence number $i for chinese fill.');
-      enBuf.writeln();
-    }
-    final File en = File('${temp.path}/batch-en.srt')
-      ..writeAsStringSync(enBuf.toString());
-    await queue.enqueue(
-      episodeId: 'ep-batch-fail',
-      videoPath: video.path,
-      enPath: en.path,
-      needEnglish: false,
-      needChinese: true,
-    );
 
-    int calls = 0;
-    final SubtitleCompletionWorker worker = SubtitleCompletionWorker(
-      queue: queue,
-      appSupportDirectory: () async => temp,
-      translateChinese:
-          ({
-            required List<String> sentences,
-            required LearningSettingsState settings,
-          }) async {
-            calls += 1;
-            if (calls == 1) {
-              return sentences.map((String s) => '首批:$s').toList();
-            }
-            // Second batch used to abort the whole job before persist.
-            throw TimeoutException('simulated batch timeout');
-          },
-    );
+      int calls = 0;
+      final SubtitleCompletionWorker worker = SubtitleCompletionWorker(
+        queue: queue,
+        appSupportDirectory: () async => temp,
+        fallbackTranslateChinese:
+            ({
+              required List<String> sentences,
+              required LearningSettingsState settings,
+            }) async => sentences.map((s) => '回退:$s').toList(),
+        translateChinese:
+            ({
+              required List<String> sentences,
+              required LearningSettingsState settings,
+            }) async {
+              calls += 1;
+              if (calls == 1) {
+                return sentences.map((String s) => '首批:$s').toList();
+              }
+              // Second batch used to abort the whole job before persist.
+              throw TimeoutException('simulated batch timeout');
+            },
+      );
 
-    final bool ran = await worker.processNext(
-      settings: LearningSettingsState.defaults(),
-    );
-    expect(ran, isTrue);
-    expect(calls, greaterThanOrEqualTo(2));
-    // First batch must survive; free fallback may fill later batches empty in
-    // unit tests without network — job may be incomplete-retry or done.
-    final MergedSubtitleBundle? bundle = await loadAsrSentenceSubtitles(
-      episodeId: 'ep-batch-fail',
-      videoFingerprint: videoFileFingerprint(video.path),
-      appSupportDirectory: () async => temp,
-    );
-    expect(bundle, isNotNull);
-    expect(
-      bundle!.sentences.any((SubtitleSentence s) => s.chinese.contains('首批:')),
-      isTrue,
-    );
-  });
+      final bool ran = await worker.processNext(
+        settings: LearningSettingsState.defaults(),
+      );
+      expect(ran, isTrue);
+      expect(calls, greaterThanOrEqualTo(2));
+      // First batch must survive; free fallback may fill later batches empty in
+      // unit tests without network — job may be incomplete-retry or done.
+      final MergedSubtitleBundle? bundle = await loadAsrSentenceSubtitles(
+        episodeId: 'ep-batch-fail',
+        videoFingerprint: videoFileFingerprint(video.path),
+        appSupportDirectory: () async => temp,
+      );
+      expect(bundle, isNotNull);
+      expect(
+        bundle!.sentences.any(
+          (SubtitleSentence s) => s.chinese.contains('首批:'),
+        ),
+        isTrue,
+      );
+    },
+  );
 }

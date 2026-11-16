@@ -606,7 +606,11 @@ void main() {
       final String raw = await runner.run(
         episodeId: 'episode-1',
         videoPath: video.path,
-        settings: _settings().copyWith(generateBilingualAsrSubtitles: true),
+        settings: _settings().copyWith(
+          generateBilingualAsrSubtitles: true,
+          translationProvider: 'OpenAI',
+          translationApiKey: '',
+        ),
       );
 
       expect(parseSubtitleLines(raw).single.english, 'Hello there');

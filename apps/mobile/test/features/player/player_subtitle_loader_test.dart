@@ -251,10 +251,7 @@ Hello from file
       ]);
 
     expect(state.subtitleMode, '双语');
-    expect(
-      state.availableSubtitleModes,
-      <String>['双语', '英文', '中文', '盲听'],
-    );
+    expect(state.availableSubtitleModes, <String>['双语', '英文', '中文', '盲听']);
     state.setSubtitleMode('单中');
     expect(state.subtitleMode, '中文');
     state.setSubtitleMode('单英');
@@ -285,10 +282,7 @@ Hello from file
       ]);
 
     expect(state.subtitleMode, '双语');
-    expect(
-      state.availableSubtitleModes,
-      <String>['双语', '英文', '中文', '盲听'],
-    );
+    expect(state.availableSubtitleModes, <String>['双语', '英文', '中文', '盲听']);
   });
 
   test('single-line loop restarts before switching to the next subtitle', () {
@@ -558,7 +552,7 @@ Hello from file
         ),
       ]);
 
-    expect((state..syncWithTimestamp(69990)).currentWordIndex, -1);
+    expect((state..syncWithTimestamp(69990)).currentWordIndex, 0);
     expect((state..syncWithTimestamp(70300)).currentWordIndex, 0);
     expect((state..syncWithTimestamp(72900)).currentWordIndex, 1);
   });

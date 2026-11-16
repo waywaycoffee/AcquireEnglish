@@ -1,3 +1,4 @@
+import 'package:common_learn_english/features/subtitle_completion/subtitle_completion_status_provider.dart';
 import 'dart:io';
 
 import 'package:common_learn_english/features/player/presentation/asr_subtitle_cache.dart';
@@ -19,6 +20,11 @@ void main() {
 
       await tester.pumpWidget(
         ProviderScope(
+          overrides: [
+            subtitleCompletionStatusProvider.overrideWith(
+              _IdleSubtitleStatus.new,
+            ),
+          ],
           child: MaterialApp(
             home: AiSubtitleManagementScreen(cache: fixture.cache),
           ),
@@ -60,6 +66,11 @@ void main() {
 
     await tester.pumpWidget(
       ProviderScope(
+        overrides: [
+          subtitleCompletionStatusProvider.overrideWith(
+            _IdleSubtitleStatus.new,
+          ),
+        ],
         child: MaterialApp(
           home: AiSubtitleManagementScreen(cache: fixture.cache),
         ),
@@ -70,9 +81,18 @@ void main() {
     await _pumpFrames(tester);
     await tester.tap(find.text('全选 2 项'));
     await _pumpFrames(tester);
-    await tester.tap(find.text('删除所选'));
+    await tester.runAsync(() async {
+      await tester.tap(find.text('删除所选'));
+      await Future<void>.delayed(const Duration(milliseconds: 100));
+    });
     await _pumpFrames(tester);
-    await tester.tap(find.text('删除所选').last);
+    await tester.runAsync(() async {
+      await tester.tap(find.text('删除所选').last);
+      await Future<void>.delayed(const Duration(milliseconds: 100));
+    });
+    await tester.runAsync(
+      () => Future<void>.delayed(const Duration(milliseconds: 200)),
+    );
     await _pumpFrames(tester);
 
     expect(await tester.runAsync(fixture.cache.listEntries), isEmpty);
@@ -93,6 +113,11 @@ void main() {
 
     await tester.pumpWidget(
       ProviderScope(
+        overrides: [
+          subtitleCompletionStatusProvider.overrideWith(
+            _IdleSubtitleStatus.new,
+          ),
+        ],
         child: MaterialApp(
           home: AiSubtitleEditorScreen(entry: entry, cache: fixture.cache),
         ),
@@ -166,7 +191,7 @@ Future<_CacheFixture> _createFixture({int count = 2}) async {
     final File video = File('${videoDirectory.path}/lesson.mp4')
       ..writeAsStringSync('video-$index');
     await cache.write(
-      episodeId: 'episode-$index',
+      episodeId: '${root.path.split(Platform.pathSeparator).last}-$index',
       videoPath: video.path,
       settings: settings,
       content: '''
@@ -184,6 +209,15 @@ Future<_CacheFixture> _createFixture({int count = 2}) async {
 
 Future<void> _pumpFrames(WidgetTester tester) async {
   for (int index = 0; index < 6; index += 1) {
+    await tester.runAsync(
+      () => Future<void>.delayed(const Duration(milliseconds: 30)),
+    );
     await tester.pump(const Duration(milliseconds: 100));
   }
+}
+
+class _IdleSubtitleStatus extends SubtitleCompletionStatusNotifier {
+  @override
+  SubtitleCompletionStatusState build() =>
+      const SubtitleCompletionStatusState();
 }

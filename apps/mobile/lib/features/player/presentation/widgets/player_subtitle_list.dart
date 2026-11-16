@@ -151,6 +151,9 @@ class PlayerSubtitleList extends StatefulWidget {
 class _PlayerSubtitleListState extends State<PlayerSubtitleList> {
   final ScrollController _scrollController = ScrollController();
   final Map<int, GlobalKey> _rowKeys = <int, GlobalKey>{};
+  final GlobalKey _activeWordKey = GlobalKey(
+    debugLabel: 'active-subtitle-word',
+  );
   final Set<int> _blindRevealed = <int>{};
   final Set<int> _expandedSentenceStarts = <int>{};
   String? _activeDictionaryTokenId;
@@ -195,6 +198,11 @@ class _PlayerSubtitleListState extends State<PlayerSubtitleList> {
       _userDragPausedAt = null;
     }
     final bool activeLineChanged = oldWidget.activeIndex != widget.activeIndex;
+    if (widget.isPlaying &&
+        oldWidget.currentWordIndex != widget.currentWordIndex) {
+      _autoFollowCurrentLine = true;
+      _userDragPausedAt = null;
+    }
     // While playing, resume follow after a short drag pause window.
     if (widget.isPlaying && activeLineChanged) {
       final DateTime? pausedAt = _userDragPausedAt;
@@ -208,12 +216,14 @@ class _PlayerSubtitleListState extends State<PlayerSubtitleList> {
     }
     final bool listStateChanged =
         activeLineChanged ||
+        oldWidget.currentWordIndex != widget.currentWordIndex ||
         oldWidget.lines.length != widget.lines.length ||
         oldWidget.subtitleMode != widget.subtitleMode ||
         oldWidget.showCurrentOnly != widget.showCurrentOnly;
     final bool shouldFollowCurrentLine =
         _autoFollowCurrentLine &&
         (activeLineChanged ||
+            oldWidget.currentWordIndex != widget.currentWordIndex ||
             timelineSeeked ||
             oldWidget.isPlaying != widget.isPlaying ||
             oldWidget.lines.length != widget.lines.length ||
@@ -317,7 +327,9 @@ class _PlayerSubtitleListState extends State<PlayerSubtitleList> {
   }) {
     final Color fill = dark ? shell.card : Colors.white;
     final Color border = dark ? shell.border : const Color(0xFFE1E7E1);
-    final Color label = dark ? shell.textSecondary : AppDesignTokens.textSecondary;
+    final Color label = dark
+        ? shell.textSecondary
+        : AppDesignTokens.textSecondary;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: <Widget>[
@@ -433,6 +445,7 @@ class _PlayerSubtitleListState extends State<PlayerSubtitleList> {
 
   double? _offsetToRevealActiveLine() {
     final BuildContext? activeContext =
+        _activeWordKey.currentContext ??
         _rowKeys[widget.activeIndex]?.currentContext;
     if (activeContext == null || !_scrollController.hasClients) {
       return null;
@@ -449,7 +462,7 @@ class _PlayerSubtitleListState extends State<PlayerSubtitleList> {
     }
     final RevealedOffset revealed = viewport.getOffsetToReveal(
       renderObject,
-      0.35,
+      0.5,
     );
     return revealed.offset.clamp(
       0.0,
@@ -580,10 +593,8 @@ class _PlayerSubtitleListState extends State<PlayerSubtitleList> {
     );
     final double popupHeight = (overlaySize.height - (viewportPadding * 2))
         .clamp(120.0, preferredPopupHeight);
-    final double left =
-        (overlaySize.width - popupWidth) / 2;
-    final double top =
-        (overlaySize.height - popupHeight) / 2;
+    final double left = (overlaySize.width - popupWidth) / 2;
+    final double top = (overlaySize.height - popupHeight) / 2;
 
     _removeDictionaryOverlay(notify: false, emitClosed: false);
     widget.onDictionaryOpened?.call();
@@ -788,8 +799,7 @@ class _PlayerSubtitleListState extends State<PlayerSubtitleList> {
     required double textOpacity,
     required double chineseFontSize,
   }) {
-    final String note =
-        (widget.lineNotesByStartMs[line.startMs] ?? '').trim();
+    final String note = (widget.lineNotesByStartMs[line.startMs] ?? '').trim();
     if (note.isEmpty) {
       return const <Widget>[];
     }
@@ -881,59 +891,61 @@ class _PlayerSubtitleListState extends State<PlayerSubtitleList> {
           padding: const EdgeInsets.only(left: 8, top: 4),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
-            children: fragments.map((PlayerSubtitleLine fragment) {
-              final String en = fragment.english.trim();
-              final String zh = fragment.chinese.trim();
-              return Padding(
-                padding: const EdgeInsets.only(bottom: 8),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: <Widget>[
-                    Text(
-                      fragment.startTime,
-                      style: TextStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.w600,
-                        color: dark
-                            ? shell.textMuted.withValues(alpha: textOpacity)
-                            : inactiveZhTextColor.withValues(
-                                alpha: textOpacity,
-                              ),
-                      ),
+            children: fragments
+                .map((PlayerSubtitleLine fragment) {
+                  final String en = fragment.english.trim();
+                  final String zh = fragment.chinese.trim();
+                  return Padding(
+                    padding: const EdgeInsets.only(bottom: 8),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: <Widget>[
+                        Text(
+                          fragment.startTime,
+                          style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w600,
+                            color: dark
+                                ? shell.textMuted.withValues(alpha: textOpacity)
+                                : inactiveZhTextColor.withValues(
+                                    alpha: textOpacity,
+                                  ),
+                          ),
+                        ),
+                        if (en.isNotEmpty)
+                          Text(
+                            formatSubtitleLetterCase(
+                              en,
+                              widget.subtitleLetterCase,
+                            ),
+                            style: TextStyle(
+                              fontSize: 14 * widget.fontScale,
+                              fontWeight: FontWeight.w600,
+                              height: 1.35,
+                              color: dark
+                                  ? shell.textSecondary
+                                  : const Color(0xFF3A423C),
+                            ),
+                          ),
+                        if (zh.isNotEmpty) ...<Widget>[
+                          if (en.isNotEmpty) const SizedBox(height: 2),
+                          Text(
+                            zh,
+                            style: TextStyle(
+                              fontSize: chineseFontSize * 0.95,
+                              fontWeight: FontWeight.w500,
+                              height: 1.35,
+                              color: dark
+                                  ? shell.textMuted
+                                  : inactiveZhTextColor,
+                            ),
+                          ),
+                        ],
+                      ],
                     ),
-                    if (en.isNotEmpty)
-                      Text(
-                        formatSubtitleLetterCase(
-                          en,
-                          widget.subtitleLetterCase,
-                        ),
-                        style: TextStyle(
-                          fontSize: 14 * widget.fontScale,
-                          fontWeight: FontWeight.w600,
-                          height: 1.35,
-                          color: dark
-                              ? shell.textSecondary
-                              : const Color(0xFF3A423C),
-                        ),
-                      ),
-                    if (zh.isNotEmpty) ...<Widget>[
-                      if (en.isNotEmpty) const SizedBox(height: 2),
-                      Text(
-                        zh,
-                        style: TextStyle(
-                          fontSize: chineseFontSize * 0.95,
-                          fontWeight: FontWeight.w500,
-                          height: 1.35,
-                          color: dark
-                              ? shell.textMuted
-                              : inactiveZhTextColor,
-                        ),
-                      ),
-                    ],
-                  ],
-                ),
-              );
-            }).toList(growable: false),
+                  );
+                })
+                .toList(growable: false),
           ),
         ),
     ];
@@ -943,8 +955,7 @@ class _PlayerSubtitleListState extends State<PlayerSubtitleList> {
   Widget build(BuildContext context) {
     final String? pipelineLabel = widget.bilingualPipelineLabel?.trim();
     final bool pipelineBusy = pipelineLabel != null && pipelineLabel.isNotEmpty;
-    final bool emptyGenerating =
-        widget.generatingAiSubtitles || pipelineBusy;
+    final bool emptyGenerating = widget.generatingAiSubtitles || pipelineBusy;
     final String? emptyProgressText = () {
       final String? ai = widget.aiSubtitleProgressText?.trim();
       if (ai != null &&
@@ -959,8 +970,7 @@ class _PlayerSubtitleListState extends State<PlayerSubtitleList> {
       return widget.aiSubtitleProgressText;
     }();
     final double? emptyProgressValue =
-        widget.aiSubtitleProgressValue ??
-        widget.bilingualPipelineProgressValue;
+        widget.aiSubtitleProgressValue ?? widget.bilingualPipelineProgressValue;
     final String? emptyPreviewText = () {
       final String? preview = widget.aiSubtitlePreviewText?.trim();
       if (preview != null && preview.isNotEmpty) {
@@ -1017,22 +1027,20 @@ class _PlayerSubtitleListState extends State<PlayerSubtitleList> {
       },
       contextMenuBuilder:
           (BuildContext context, SelectableRegionState selectableRegionState) {
-            final List<ContextMenuButtonItem> items =
-                <ContextMenuButtonItem>[
-                  ...selectableRegionState.contextMenuButtonItems,
-                  ContextMenuButtonItem(
-                    label: '翻译',
-                    onPressed: () {
-                      ContextMenuController.removeAny();
-                      final String text =
-                          (_lastSelectedPlainText ?? '').trim();
-                      if (text.isEmpty) {
-                        return;
-                      }
-                      _openLookupForSelectedText(text);
-                    },
-                  ),
-                ];
+            final List<ContextMenuButtonItem> items = <ContextMenuButtonItem>[
+              ...selectableRegionState.contextMenuButtonItems,
+              ContextMenuButtonItem(
+                label: '翻译',
+                onPressed: () {
+                  ContextMenuController.removeAny();
+                  final String text = (_lastSelectedPlainText ?? '').trim();
+                  if (text.isEmpty) {
+                    return;
+                  }
+                  _openLookupForSelectedText(text);
+                },
+              ),
+            ];
             return AdaptiveTextSelectionToolbar.buttonItems(
               anchors: selectableRegionState.contextMenuAnchors,
               buttonItems: items,
@@ -1040,179 +1048,200 @@ class _PlayerSubtitleListState extends State<PlayerSubtitleList> {
           },
       child: NotificationListener<ScrollNotification>(
         onNotification: _handleScrollNotification,
-        child: ListView.separated(
-          controller: _scrollController,
-          padding: const EdgeInsets.all(2),
-          // Keep nearby cues mounted so ensureVisible can find the active row.
-          // ignore: deprecated_member_use
-          cacheExtent: 1200,
-          itemCount: itemCount,
-          itemBuilder: (BuildContext context, int itemIndex) {
-            final int originalIndex = _showCurrentOnly
-                ? widget.activeIndex
-                : itemIndex;
-            if (originalIndex < 0 || originalIndex >= totalLineCount) {
-              return const SizedBox.shrink();
-            }
+        child: LayoutBuilder(
+          builder: (BuildContext context, BoxConstraints constraints) => ListView.separated(
+            controller: _scrollController,
+            padding: EdgeInsets.symmetric(
+              horizontal: 2,
+              vertical: _showCurrentOnly ? 2 : constraints.maxHeight / 2,
+            ),
+            // Keep nearby cues mounted so ensureVisible can find the active row.
+            // ignore: deprecated_member_use
+            cacheExtent: 1200,
+            itemCount: itemCount,
+            itemBuilder: (BuildContext context, int itemIndex) {
+              final int originalIndex = _showCurrentOnly
+                  ? widget.activeIndex
+                  : itemIndex;
+              if (originalIndex < 0 || originalIndex >= totalLineCount) {
+                return const SizedBox.shrink();
+              }
 
-            final PlayerSubtitleLine line = widget.lines[originalIndex];
-            final bool active = originalIndex == widget.activeIndex;
-            final bool isLooping = originalIndex == widget.loopingLineIndex;
-            final bool isPast = originalIndex < widget.activeIndex;
-            final String? pronunciationUnavailableReason = widget
-                .pronunciationUnavailableReasonForLine
-                ?.call(originalIndex);
-            final bool dark = widget.studyDarkStyle;
-            final StudyShellColors shell = StudyShellColors.of(context);
-            final bool blindMode =
-                widget.blindListening ||
-                SubtitleDisplayMode.isBlind(widget.subtitleMode);
-            final String contentMode = SubtitleDisplayMode.contentMode(
-              widget.subtitleMode,
-            );
-            final bool blindHidden =
-                blindMode && !_blindRevealed.contains(originalIndex);
-            final double textOpacity = active ? 1 : (isPast ? 0.84 : 0.60);
-            final double chineseOnlyFontSize =
-                (active ? 18.0 : 16.0) * widget.fontScale;
-            final double chineseFontSize =
-                (active ? _activeChineseFontSize : _inactiveChineseFontSize) *
-                widget.fontScale;
-            final Color inactiveStartTimeColor = dark
-                ? shell.textMuted
-                : const Color(0xFFADB7B0);
-            final Color inactiveZhTextColor = dark
-                ? shell.textSecondary
-                : const Color(0xFFB7C2BA);
+              final PlayerSubtitleLine line = widget.lines[originalIndex];
+              final bool active = originalIndex == widget.activeIndex;
+              final bool isLooping = originalIndex == widget.loopingLineIndex;
+              final bool isPast = originalIndex < widget.activeIndex;
+              final String? pronunciationUnavailableReason = widget
+                  .pronunciationUnavailableReasonForLine
+                  ?.call(originalIndex);
+              final bool dark = widget.studyDarkStyle;
+              final StudyShellColors shell = StudyShellColors.of(context);
+              final bool blindMode =
+                  widget.blindListening ||
+                  SubtitleDisplayMode.isBlind(widget.subtitleMode);
+              final String contentMode = SubtitleDisplayMode.contentMode(
+                widget.subtitleMode,
+              );
+              final bool blindHidden =
+                  blindMode && !_blindRevealed.contains(originalIndex);
+              final double textOpacity = active ? 1 : (isPast ? 0.84 : 0.60);
+              final double chineseOnlyFontSize =
+                  (active ? 18.0 : 16.0) * widget.fontScale;
+              final double chineseFontSize =
+                  (active ? _activeChineseFontSize : _inactiveChineseFontSize) *
+                  widget.fontScale;
+              final Color inactiveStartTimeColor = dark
+                  ? shell.textMuted
+                  : const Color(0xFFADB7B0);
+              final Color inactiveZhTextColor = dark
+                  ? shell.textSecondary
+                  : const Color(0xFFB7C2BA);
 
-            final bool editingThis = _inlineEditIndex == originalIndex;
-            return InkWell(
-              key: _rowKeyFor(originalIndex),
-              onTap: editingThis
-                  ? null
-                  : () {
-                      if (blindHidden) {
-                        setState(() => _blindRevealed.add(originalIndex));
-                      }
-                      widget.onTapLine(originalIndex);
-                    },
-              onLongPress: editingThis
-                  ? null
-                  : () => _openActions(context, line, originalIndex),
-              borderRadius: BorderRadius.circular(20),
-              child: Ink(
-                padding: EdgeInsets.all(dark ? 14 : 12),
-                decoration: BoxDecoration(
-                  color: dark
-                      ? (active ? shell.cardActive : shell.card)
-                      : (active ? const Color(0xFFEFFFF5) : Colors.white),
-                  borderRadius: BorderRadius.circular(dark ? 18 : 24),
-                  border: Border.all(
+              final bool editingThis = _inlineEditIndex == originalIndex;
+              return InkWell(
+                key: _rowKeyFor(originalIndex),
+                onTap: editingThis
+                    ? null
+                    : () {
+                        if (blindHidden) {
+                          setState(() => _blindRevealed.add(originalIndex));
+                        }
+                        widget.onTapLine(originalIndex);
+                      },
+                onLongPress: editingThis
+                    ? null
+                    : () => _openActions(context, line, originalIndex),
+                borderRadius: BorderRadius.circular(20),
+                child: Ink(
+                  padding: EdgeInsets.all(dark ? 14 : 12),
+                  decoration: BoxDecoration(
                     color: dark
-                        ? (active ? shell.borderActive : shell.border)
-                        : (active
-                              ? AppDesignTokens.brandGreen
-                              : const Color(0xFFE1E7E1)),
-                    width: active ? (dark ? 2 : 2.5) : 1,
+                        ? (active ? shell.cardActive : shell.card)
+                        : (active ? const Color(0xFFEFFFF5) : Colors.white),
+                    borderRadius: BorderRadius.circular(dark ? 18 : 24),
+                    border: Border.all(
+                      color: dark
+                          ? (active ? shell.borderActive : shell.border)
+                          : (active
+                                ? AppDesignTokens.brandGreen
+                                : const Color(0xFFE1E7E1)),
+                      width: active ? (dark ? 2 : 2.5) : 1,
+                    ),
+                    boxShadow: dark
+                        ? (active
+                              ? <BoxShadow>[
+                                  BoxShadow(
+                                    color: shell.glowAccent,
+                                    blurRadius: 16,
+                                    offset: const Offset(0, 4),
+                                  ),
+                                ]
+                              : const <BoxShadow>[])
+                        : const <BoxShadow>[
+                            BoxShadow(
+                              color: Color(0x0F000000),
+                              blurRadius: 10,
+                              offset: Offset(0, 5),
+                            ),
+                          ],
                   ),
-                  boxShadow: dark
-                      ? (active
-                            ? <BoxShadow>[
-                                BoxShadow(
-                                  color: shell.glowAccent,
-                                  blurRadius: 16,
-                                  offset: const Offset(0, 4),
-                                ),
-                              ]
-                            : const <BoxShadow>[])
-                      : const <BoxShadow>[
-                          BoxShadow(
-                            color: Color(0x0F000000),
-                            blurRadius: 10,
-                            offset: Offset(0, 5),
-                          ),
-                        ],
-                ),
-                child: Stack(
-                  children: <Widget>[
-                    if (active && !dark)
-                      Positioned(
-                        right: 0,
-                        top: 0,
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 10,
-                            vertical: 6,
-                          ),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFFFFF7D6),
-                            borderRadius: BorderRadius.circular(14),
-                          ),
-                          child: Text(
-                            '正在学习',
-                            style: TextStyle(
-                              color: AppDesignTokens.textPrimary,
-                              fontSize: 11,
-                              fontWeight: FontWeight.w800,
+                  child: Stack(
+                    children: <Widget>[
+                      if (active && !dark)
+                        Positioned(
+                          right: 0,
+                          top: 0,
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 10,
+                              vertical: 6,
+                            ),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFFFF7D6),
+                              borderRadius: BorderRadius.circular(14),
+                            ),
+                            child: Text(
+                              '正在学习',
+                              style: TextStyle(
+                                color: AppDesignTokens.textPrimary,
+                                fontSize: 11,
+                                fontWeight: FontWeight.w800,
+                              ),
                             ),
                           ),
                         ),
-                      ),
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: <Widget>[
-                        if (dark) ...<Widget>[
-                          Row(
-                            children: <Widget>[
-                              Icon(
-                                Icons.lock_open_rounded,
-                                size: 16,
-                                color: active
-                                    ? shell.textSecondary
-                                    : shell.textMuted.withValues(
-                                        alpha: textOpacity,
-                                      ),
-                              ),
-                              const SizedBox(width: 6),
-                              Text(
-                                line.startTime,
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.w600,
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: <Widget>[
+                          if (dark) ...<Widget>[
+                            Row(
+                              children: <Widget>[
+                                Icon(
+                                  Icons.lock_open_rounded,
+                                  size: 16,
                                   color: active
                                       ? shell.textSecondary
-                                      : inactiveStartTimeColor.withValues(
+                                      : shell.textMuted.withValues(
                                           alpha: textOpacity,
                                         ),
                                 ),
-                              ),
-                              Expanded(
-                                child: active && widget.onTogglePlaying != null
-                                    ? Center(
-                                        child: IconButton(
-                                          onPressed: widget.onTogglePlaying,
-                                          visualDensity: VisualDensity.compact,
-                                          padding: EdgeInsets.zero,
-                                          constraints: const BoxConstraints(
-                                            minWidth: 36,
-                                            minHeight: 36,
+                                const SizedBox(width: 6),
+                                Text(
+                                  line.startTime,
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w600,
+                                    color: active
+                                        ? shell.textSecondary
+                                        : inactiveStartTimeColor.withValues(
+                                            alpha: textOpacity,
                                           ),
-                                          icon: Icon(
-                                            widget.isPlaying
-                                                ? Icons.pause_rounded
-                                                : Icons.play_arrow_rounded,
-                                            color: shell.textPrimary,
-                                            size: 26,
+                                  ),
+                                ),
+                                Expanded(
+                                  child:
+                                      active && widget.onTogglePlaying != null
+                                      ? Center(
+                                          child: IconButton(
+                                            onPressed: widget.onTogglePlaying,
+                                            visualDensity:
+                                                VisualDensity.compact,
+                                            padding: EdgeInsets.zero,
+                                            constraints: const BoxConstraints(
+                                              minWidth: 36,
+                                              minHeight: 36,
+                                            ),
+                                            icon: Icon(
+                                              widget.isPlaying
+                                                  ? Icons.pause_rounded
+                                                  : Icons.play_arrow_rounded,
+                                              color: shell.textPrimary,
+                                              size: 26,
+                                            ),
                                           ),
-                                        ),
-                                      )
-                                    : const SizedBox.shrink(),
-                              ),
-                              if (widget.onEditSubtitleLine != null)
+                                        )
+                                      : const SizedBox.shrink(),
+                                ),
+                                if (widget.onEditSubtitleLine != null)
+                                  IconButton(
+                                    tooltip: '改这句字幕',
+                                    onPressed: () =>
+                                        _beginInlineEdit(originalIndex, line),
+                                    visualDensity: VisualDensity.compact,
+                                    padding: EdgeInsets.zero,
+                                    constraints: const BoxConstraints(
+                                      minWidth: 36,
+                                      minHeight: 36,
+                                    ),
+                                    icon: Icon(
+                                      Icons.edit_rounded,
+                                      color: shell.textSecondary,
+                                      size: 20,
+                                    ),
+                                  ),
                                 IconButton(
-                                  tooltip: '改这句字幕',
                                   onPressed: () =>
-                                      _beginInlineEdit(originalIndex, line),
+                                      widget.onBookmarkLine(originalIndex),
                                   visualDensity: VisualDensity.compact,
                                   padding: EdgeInsets.zero,
                                   constraints: const BoxConstraints(
@@ -1220,89 +1249,27 @@ class _PlayerSubtitleListState extends State<PlayerSubtitleList> {
                                     minHeight: 36,
                                   ),
                                   icon: Icon(
-                                    Icons.edit_rounded,
+                                    Icons.favorite_border_rounded,
                                     color: shell.textSecondary,
                                     size: 20,
                                   ),
                                 ),
-                              IconButton(
-                                onPressed: () =>
-                                    widget.onBookmarkLine(originalIndex),
-                                visualDensity: VisualDensity.compact,
-                                padding: EdgeInsets.zero,
-                                constraints: const BoxConstraints(
-                                  minWidth: 36,
-                                  minHeight: 36,
-                                ),
-                                icon: Icon(
-                                  Icons.favorite_border_rounded,
-                                  color: shell.textSecondary,
-                                  size: 20,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ] else
-                          Row(
-                            children: <Widget>[
-                              FilledButton.tonal(
-                                onPressed: active
-                                    ? widget.onTogglePlaying
-                                    : () => widget.onTapLine(originalIndex),
-                                style: FilledButton.styleFrom(
-                                  backgroundColor: active
-                                      ? const Color(0xFFDFF8C8)
-                                      : AppDesignTokens.softWhite,
-                                  foregroundColor: active
-                                      ? AppDesignTokens.brandGreenDark
-                                      : AppDesignTokens.primaryBlueDark,
-                                  minimumSize: const Size(44, 44),
-                                  fixedSize: const Size(44, 44),
-                                  padding: EdgeInsets.zero,
-                                  tapTargetSize:
-                                      MaterialTapTargetSize.shrinkWrap,
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(16),
-                                  ),
-                                ),
-                                child: Icon(
-                                  active && widget.isPlaying
-                                      ? Icons.pause_rounded
-                                      : Icons.play_arrow_rounded,
-                                ),
-                              ),
-                              const SizedBox(width: 6),
-                              Expanded(
-                                child: Text(
-                                  line.startTime,
-                                  style: TextStyle(
-                                    fontSize: 11,
-                                    fontWeight: FontWeight.w700,
-                                    color: active
-                                        ? const Color(0xFF7E8A82)
-                                        : inactiveStartTimeColor.withValues(
-                                            alpha: textOpacity,
-                                          ),
-                                  ),
-                                ),
-                              ),
-                              if (widget.onAssessLine != null) ...<Widget>[
-                                IconButton.filledTonal(
-                                  key: ValueKey<String>(
-                                    'subtitle-line-assess-$originalIndex',
-                                  ),
-                                  tooltip:
-                                      pronunciationUnavailableReason ?? '跟读录音',
-                                  onPressed:
-                                      pronunciationUnavailableReason == null
-                                      ? () =>
-                                            widget.onAssessLine!(originalIndex)
-                                      : null,
-                                  icon: const Icon(Icons.mic_rounded, size: 20),
-                                  style: IconButton.styleFrom(
-                                    foregroundColor:
-                                        AppDesignTokens.primaryBlueDark,
-                                    backgroundColor: AppDesignTokens.softWhite,
+                              ],
+                            ),
+                          ] else
+                            Row(
+                              children: <Widget>[
+                                FilledButton.tonal(
+                                  onPressed: active
+                                      ? widget.onTogglePlaying
+                                      : () => widget.onTapLine(originalIndex),
+                                  style: FilledButton.styleFrom(
+                                    backgroundColor: active
+                                        ? const Color(0xFFDFF8C8)
+                                        : AppDesignTokens.softWhite,
+                                    foregroundColor: active
+                                        ? AppDesignTokens.brandGreenDark
+                                        : AppDesignTokens.primaryBlueDark,
                                     minimumSize: const Size(44, 44),
                                     fixedSize: const Size(44, 44),
                                     padding: EdgeInsets.zero,
@@ -1312,62 +1279,50 @@ class _PlayerSubtitleListState extends State<PlayerSubtitleList> {
                                       borderRadius: BorderRadius.circular(16),
                                     ),
                                   ),
+                                  child: Icon(
+                                    active && widget.isPlaying
+                                        ? Icons.pause_rounded
+                                        : Icons.play_arrow_rounded,
+                                  ),
                                 ),
                                 const SizedBox(width: 6),
-                              ],
-                              FilledButton.tonal(
-                                key: ValueKey<String>(
-                                  'subtitle-line-loop-$originalIndex',
-                                ),
-                                onPressed: () =>
-                                    widget.onLoopFromLine(originalIndex),
-                                style: FilledButton.styleFrom(
-                                  backgroundColor: isLooping
-                                      ? const Color(0xFFDFF8C8)
-                                      : AppDesignTokens.softWhite,
-                                  foregroundColor: isLooping
-                                      ? AppDesignTokens.brandGreenDark
-                                      : AppDesignTokens.textSecondary,
-                                  minimumSize: const Size(44, 44),
-                                  fixedSize: const Size(44, 44),
-                                  padding: EdgeInsets.zero,
-                                  tapTargetSize:
-                                      MaterialTapTargetSize.shrinkWrap,
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(16),
+                                Expanded(
+                                  child: Text(
+                                    line.startTime,
+                                    style: TextStyle(
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w700,
+                                      color: active
+                                          ? const Color(0xFF7E8A82)
+                                          : inactiveStartTimeColor.withValues(
+                                              alpha: textOpacity,
+                                            ),
+                                    ),
                                   ),
                                 ),
-                                child: const Icon(Icons.repeat_one_rounded),
-                              ),
-                              const SizedBox(width: 6),
-                              FilledButton.tonal(
-                                onPressed: () =>
-                                    widget.onBookmarkLine(originalIndex),
-                                style: FilledButton.styleFrom(
-                                  backgroundColor: const Color(0xFFFFF7D6),
-                                  foregroundColor: const Color(0xFFB58600),
-                                  minimumSize: const Size(44, 44),
-                                  fixedSize: const Size(44, 44),
-                                  padding: EdgeInsets.zero,
-                                  tapTargetSize:
-                                      MaterialTapTargetSize.shrinkWrap,
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(16),
-                                  ),
-                                ),
-                                child: const Icon(Icons.star_rounded),
-                              ),
-                              const SizedBox(width: 6),
-                              if (widget.onEditSubtitleLine != null) ...<Widget>[
-                                Tooltip(
-                                  message: '改这句字幕',
-                                  child: FilledButton.tonal(
-                                    onPressed: () =>
-                                        _beginInlineEdit(originalIndex, line),
-                                    style: FilledButton.styleFrom(
-                                      backgroundColor: const Color(0xFFE8F1FF),
+                                if (widget.onAssessLine != null) ...<Widget>[
+                                  IconButton.filledTonal(
+                                    key: ValueKey<String>(
+                                      'subtitle-line-assess-$originalIndex',
+                                    ),
+                                    tooltip:
+                                        pronunciationUnavailableReason ??
+                                        '跟读录音',
+                                    onPressed:
+                                        pronunciationUnavailableReason == null
+                                        ? () => widget.onAssessLine!(
+                                            originalIndex,
+                                          )
+                                        : null,
+                                    icon: const Icon(
+                                      Icons.mic_rounded,
+                                      size: 20,
+                                    ),
+                                    style: IconButton.styleFrom(
                                       foregroundColor:
                                           AppDesignTokens.primaryBlueDark,
+                                      backgroundColor:
+                                          AppDesignTokens.softWhite,
                                       minimumSize: const Size(44, 44),
                                       fixedSize: const Size(44, 44),
                                       padding: EdgeInsets.zero,
@@ -1377,204 +1332,282 @@ class _PlayerSubtitleListState extends State<PlayerSubtitleList> {
                                         borderRadius: BorderRadius.circular(16),
                                       ),
                                     ),
-                                    child: const Icon(Icons.edit_rounded),
                                   ),
+                                  const SizedBox(width: 6),
+                                ],
+                                FilledButton.tonal(
+                                  key: ValueKey<String>(
+                                    'subtitle-line-loop-$originalIndex',
+                                  ),
+                                  onPressed: () =>
+                                      widget.onLoopFromLine(originalIndex),
+                                  style: FilledButton.styleFrom(
+                                    backgroundColor: isLooping
+                                        ? const Color(0xFFDFF8C8)
+                                        : AppDesignTokens.softWhite,
+                                    foregroundColor: isLooping
+                                        ? AppDesignTokens.brandGreenDark
+                                        : AppDesignTokens.textSecondary,
+                                    minimumSize: const Size(44, 44),
+                                    fixedSize: const Size(44, 44),
+                                    padding: EdgeInsets.zero,
+                                    tapTargetSize:
+                                        MaterialTapTargetSize.shrinkWrap,
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(16),
+                                    ),
+                                  ),
+                                  child: const Icon(Icons.repeat_one_rounded),
                                 ),
                                 const SizedBox(width: 6),
-                              ],
-                              FilledButton.tonal(
-                                onPressed: () =>
-                                    _openActions(context, line, originalIndex),
-                                style: FilledButton.styleFrom(
-                                  backgroundColor: AppDesignTokens.softWhite,
-                                  foregroundColor:
-                                      AppDesignTokens.textSecondary,
-                                  minimumSize: const Size(44, 44),
-                                  fixedSize: const Size(44, 44),
-                                  padding: EdgeInsets.zero,
-                                  tapTargetSize:
-                                      MaterialTapTargetSize.shrinkWrap,
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(16),
+                                FilledButton.tonal(
+                                  onPressed: () =>
+                                      widget.onBookmarkLine(originalIndex),
+                                  style: FilledButton.styleFrom(
+                                    backgroundColor: const Color(0xFFFFF7D6),
+                                    foregroundColor: const Color(0xFFB58600),
+                                    minimumSize: const Size(44, 44),
+                                    fixedSize: const Size(44, 44),
+                                    padding: EdgeInsets.zero,
+                                    tapTargetSize:
+                                        MaterialTapTargetSize.shrinkWrap,
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(16),
+                                    ),
                                   ),
+                                  child: const Icon(Icons.star_rounded),
                                 ),
-                                child: const Icon(Icons.more_horiz_rounded),
-                              ),
-                            ],
-                          ),
-                        SizedBox(height: dark ? 4 : 8),
-                        if (blindHidden) ...<Widget>[
-                          Container(
-                            height: 14,
-                            margin: const EdgeInsets.only(bottom: 8),
-                            decoration: BoxDecoration(
-                              color: shell.chipIdle,
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                          ),
-                          Container(
-                            height: 12,
-                            width: 180,
-                            decoration: BoxDecoration(
-                              color: shell.chipIdle.withValues(alpha: 0.7),
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                          ),
-                          const SizedBox(height: 10),
-                          Text(
-                            '点击显示',
-                            style: TextStyle(
-                              color: shell.textMuted,
-                              fontSize: 12,
-                              fontWeight: FontWeight.w700,
-                            ),
-                          ),
-                        ] else if (_inlineEditIndex == originalIndex) ...<Widget>[
-                          _buildInlineEditor(dark: dark, shell: shell),
-                        ] else ...<Widget>[
-                          Builder(
-                            builder: (BuildContext context) {
-                              final String en = line.english.trim();
-                              final String zh = line.chinese.trim();
-                              final bool enIsChineseOnly =
-                                  subtitleLooksChineseOnly(en);
-                              final bool chineseOnlyMode =
-                                  SubtitleDisplayMode.isChineseOnly(
-                                    contentMode,
-                                  );
-                              final bool hideChinese =
-                                  SubtitleDisplayMode.isEnglishOnly(
-                                    contentMode,
-                                  );
-                              final bool requireEnglishPrimary =
-                                  SubtitleDisplayMode.requiresEnglishPrimary(
-                                    contentMode,
-                                  );
-                              final String usableEnglish =
-                                  en.isNotEmpty && !enIsChineseOnly ? en : '';
-                              // Default product: English is the hero line;
-                              // Chinese is always the smaller secondary line.
-                              // Only「中文」hides English on purpose.
-                              final bool showEnglishPrimary =
-                                  requireEnglishPrimary &&
-                                  usableEnglish.isNotEmpty;
-                              final String primaryChinese = zh.isNotEmpty
-                                  ? zh
-                                  : (enIsChineseOnly ? en : '');
-                              final bool showChinesePrimary =
-                                  chineseOnlyMode && primaryChinese.isNotEmpty;
-                              // While ZH→EN fill is still running, keep Chinese
-                              // readable as temporary primary — not tiny secondary.
-                              final bool showChineseTempPrimary =
-                                  requireEnglishPrimary &&
-                                  usableEnglish.isEmpty &&
-                                  !chineseOnlyMode &&
-                                  primaryChinese.isNotEmpty;
-                              final bool showChineseSecondary =
-                                  !blindHidden &&
-                                  !hideChinese &&
-                                  !chineseOnlyMode &&
-                                  primaryChinese.isNotEmpty &&
-                                  showEnglishPrimary;
-
-                              return Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: <Widget>[
-                                  if (showEnglishPrimary)
-                                    _buildWordLine(
-                                      formatSubtitleLetterCase(
-                                        line.english,
-                                        widget.subtitleLetterCase,
+                                const SizedBox(width: 6),
+                                if (widget.onEditSubtitleLine !=
+                                    null) ...<Widget>[
+                                  Tooltip(
+                                    message: '改这句字幕',
+                                    child: FilledButton.tonal(
+                                      onPressed: () =>
+                                          _beginInlineEdit(originalIndex, line),
+                                      style: FilledButton.styleFrom(
+                                        backgroundColor: const Color(
+                                          0xFFE8F1FF,
+                                        ),
+                                        foregroundColor:
+                                            AppDesignTokens.primaryBlueDark,
+                                        minimumSize: const Size(44, 44),
+                                        fixedSize: const Size(44, 44),
+                                        padding: EdgeInsets.zero,
+                                        tapTargetSize:
+                                            MaterialTapTargetSize.shrinkWrap,
+                                        shape: RoundedRectangleBorder(
+                                          borderRadius: BorderRadius.circular(
+                                            16,
+                                          ),
+                                        ),
                                       ),
-                                      active ? widget.currentWordIndex : null,
-                                      active,
-                                      line.startTime,
-                                      shellColors: dark ? shell : null,
-                                      timedWords: line.words,
-                                    )
-                                  else if (showChinesePrimary ||
-                                      showChineseTempPrimary)
-                                    Text(
-                                      primaryChinese,
-                                      style: TextStyle(
-                                        fontSize: chineseOnlyFontSize,
-                                        fontWeight: active
-                                            ? FontWeight.w700
-                                            : FontWeight.w600,
-                                        color: active
-                                            ? (dark
-                                                  ? shell.textPrimary
-                                                  : const Color(0xFF191C1E))
-                                            : inactiveZhTextColor.withValues(
-                                                alpha: textOpacity,
-                                              ),
-                                        height: 1.35,
-                                      ),
+                                      child: const Icon(Icons.edit_rounded),
                                     ),
-                                  if (showChineseSecondary) ...<Widget>[
-                                    if (showEnglishPrimary) ...<Widget>[
-                                      const _SelectableLineBreak(),
-                                      const SizedBox(height: 6),
-                                    ],
-                                    Text(
-                                      primaryChinese,
-                                      style: TextStyle(
-                                        fontSize: chineseFontSize,
-                                        fontWeight: FontWeight.w500,
-                                        color: active
-                                            ? (dark
-                                                  ? shell.textSecondary
-                                                  : const Color(0xFF708077))
-                                            : inactiveZhTextColor.withValues(
-                                                alpha: textOpacity,
-                                              ),
-                                        height: 1.4,
-                                      ),
-                                    ),
-                                  ],
-                                  if (!blindHidden) ..._buildLineNote(
-                                    line: line,
-                                    dark: dark,
-                                    shell: shell,
-                                    textOpacity: textOpacity,
-                                    chineseFontSize: chineseFontSize,
                                   ),
+                                  const SizedBox(width: 6),
                                 ],
-                              );
-                            },
-                          ),
-                          if (!blindHidden) ..._buildSentenceFragments(
-                            line: line,
-                            dark: dark,
-                            shell: shell,
-                            textOpacity: textOpacity,
-                            chineseFontSize: chineseFontSize,
-                            inactiveZhTextColor: inactiveZhTextColor,
-                          ),
+                                FilledButton.tonal(
+                                  onPressed: () => _openActions(
+                                    context,
+                                    line,
+                                    originalIndex,
+                                  ),
+                                  style: FilledButton.styleFrom(
+                                    backgroundColor: AppDesignTokens.softWhite,
+                                    foregroundColor:
+                                        AppDesignTokens.textSecondary,
+                                    minimumSize: const Size(44, 44),
+                                    fixedSize: const Size(44, 44),
+                                    padding: EdgeInsets.zero,
+                                    tapTargetSize:
+                                        MaterialTapTargetSize.shrinkWrap,
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(16),
+                                    ),
+                                  ),
+                                  child: const Icon(Icons.more_horiz_rounded),
+                                ),
+                              ],
+                            ),
+                          SizedBox(height: dark ? 4 : 8),
+                          if (blindHidden) ...<Widget>[
+                            Container(
+                              height: 14,
+                              margin: const EdgeInsets.only(bottom: 8),
+                              decoration: BoxDecoration(
+                                color: shell.chipIdle,
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                            ),
+                            Container(
+                              height: 12,
+                              width: 180,
+                              decoration: BoxDecoration(
+                                color: shell.chipIdle.withValues(alpha: 0.7),
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                            ),
+                            const SizedBox(height: 10),
+                            Text(
+                              '点击显示',
+                              style: TextStyle(
+                                color: shell.textMuted,
+                                fontSize: 12,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                          ] else if (_inlineEditIndex ==
+                              originalIndex) ...<Widget>[
+                            _buildInlineEditor(dark: dark, shell: shell),
+                          ] else ...<Widget>[
+                            Builder(
+                              builder: (BuildContext context) {
+                                final String en = line.english.trim();
+                                final String zh = line.chinese.trim();
+                                final bool enIsChineseOnly =
+                                    subtitleLooksChineseOnly(en);
+                                final bool chineseOnlyMode =
+                                    SubtitleDisplayMode.isChineseOnly(
+                                      contentMode,
+                                    );
+                                final bool hideChinese =
+                                    SubtitleDisplayMode.isEnglishOnly(
+                                      contentMode,
+                                    );
+                                final bool requireEnglishPrimary =
+                                    SubtitleDisplayMode.requiresEnglishPrimary(
+                                      contentMode,
+                                    );
+                                final String usableEnglish =
+                                    en.isNotEmpty && !enIsChineseOnly ? en : '';
+                                // Default product: English is the hero line;
+                                // Chinese is always the smaller secondary line.
+                                // Only「中文」hides English on purpose.
+                                final bool showEnglishPrimary =
+                                    requireEnglishPrimary &&
+                                    usableEnglish.isNotEmpty;
+                                final String primaryChinese = zh.isNotEmpty
+                                    ? zh
+                                    : (enIsChineseOnly ? en : '');
+                                final bool showChinesePrimary =
+                                    chineseOnlyMode &&
+                                    primaryChinese.isNotEmpty;
+                                // While ZH→EN fill is still running, keep Chinese
+                                // readable as temporary primary — not tiny secondary.
+                                final bool showChineseTempPrimary =
+                                    requireEnglishPrimary &&
+                                    usableEnglish.isEmpty &&
+                                    !chineseOnlyMode &&
+                                    primaryChinese.isNotEmpty;
+                                final bool showChineseSecondary =
+                                    !blindHidden &&
+                                    !hideChinese &&
+                                    !chineseOnlyMode &&
+                                    primaryChinese.isNotEmpty &&
+                                    showEnglishPrimary;
+
+                                return Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: <Widget>[
+                                    if (showEnglishPrimary)
+                                      _buildWordLine(
+                                        formatSubtitleLetterCase(
+                                          line.english,
+                                          widget.subtitleLetterCase,
+                                        ),
+                                        active ? widget.currentWordIndex : null,
+                                        active,
+                                        line.startTime,
+                                        shellColors: dark ? shell : null,
+                                        timedWords: line.words,
+                                      )
+                                    else if (showChinesePrimary ||
+                                        showChineseTempPrimary)
+                                      Text(
+                                        primaryChinese,
+                                        style: TextStyle(
+                                          fontSize: chineseOnlyFontSize,
+                                          fontWeight: active
+                                              ? FontWeight.w700
+                                              : FontWeight.w600,
+                                          color: active
+                                              ? (dark
+                                                    ? shell.textPrimary
+                                                    : const Color(0xFF191C1E))
+                                              : inactiveZhTextColor.withValues(
+                                                  alpha: textOpacity,
+                                                ),
+                                          height: 1.35,
+                                        ),
+                                      ),
+                                    if (showChineseSecondary) ...<Widget>[
+                                      if (showEnglishPrimary) ...<Widget>[
+                                        const _SelectableLineBreak(),
+                                        const SizedBox(height: 6),
+                                      ],
+                                      Text(
+                                        primaryChinese,
+                                        style: TextStyle(
+                                          fontSize: chineseFontSize,
+                                          fontWeight: FontWeight.w500,
+                                          color: active
+                                              ? (dark
+                                                    ? shell.textSecondary
+                                                    : const Color(0xFF708077))
+                                              : inactiveZhTextColor.withValues(
+                                                  alpha: textOpacity,
+                                                ),
+                                          height: 1.4,
+                                        ),
+                                      ),
+                                    ],
+                                    if (!blindHidden)
+                                      ..._buildLineNote(
+                                        line: line,
+                                        dark: dark,
+                                        shell: shell,
+                                        textOpacity: textOpacity,
+                                        chineseFontSize: chineseFontSize,
+                                      ),
+                                  ],
+                                );
+                              },
+                            ),
+                            if (!blindHidden)
+                              ..._buildSentenceFragments(
+                                line: line,
+                                dark: dark,
+                                shell: shell,
+                                textOpacity: textOpacity,
+                                chineseFontSize: chineseFontSize,
+                                inactiveZhTextColor: inactiveZhTextColor,
+                              ),
+                          ],
+                          const _SelectableLineBreak(),
                         ],
-                        const _SelectableLineBreak(),
-                      ],
-                    ),
-                  ],
+                      ),
+                    ],
+                  ),
                 ),
+              );
+            },
+            separatorBuilder: (_, __) => Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 14),
+              child: Column(
+                children: <Widget>[
+                  const SizedBox(height: 4),
+                  Divider(
+                    key: const ValueKey<String>('subtitle-list-divider'),
+                    height: 1,
+                    thickness: 1,
+                    color: widget.studyDarkStyle
+                        ? Colors.transparent
+                        : const Color(0xFFE6EBE7),
+                  ),
+                  const SizedBox(height: 4),
+                ],
               ),
-            );
-          },
-          separatorBuilder: (_, __) => Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 14),
-            child: Column(
-              children: <Widget>[
-                const SizedBox(height: 4),
-                Divider(
-                  key: const ValueKey<String>('subtitle-list-divider'),
-                  height: 1,
-                  thickness: 1,
-                  color: widget.studyDarkStyle
-                      ? Colors.transparent
-                      : const Color(0xFFE6EBE7),
-                ),
-                const SizedBox(height: 4),
-              ],
             ),
           ),
         ),
@@ -1664,9 +1697,8 @@ class _PlayerSubtitleListState extends State<PlayerSubtitleList> {
                             ),
                           ),
                         ],
-                        if (widget.onCancelBilingualPipeline != null) ...<
-                          Widget
-                        >[
+                        if (widget.onCancelBilingualPipeline !=
+                            null) ...<Widget>[
                           const SizedBox(width: 4),
                           IconButton(
                             key: const ValueKey<String>(
@@ -1686,9 +1718,8 @@ class _PlayerSubtitleListState extends State<PlayerSubtitleList> {
                     ),
                     if ((widget.bilingualPipelineLabel?.trim().isNotEmpty ??
                             false) ||
-                        widget.bilingualPipelineProgressValue != null) ...<
-                      Widget
-                    >[
+                        widget.bilingualPipelineProgressValue !=
+                            null) ...<Widget>[
                       const SizedBox(height: 8),
                       ClipRRect(
                         borderRadius: BorderRadius.circular(999),
@@ -1776,6 +1807,7 @@ class _PlayerSubtitleListState extends State<PlayerSubtitleList> {
       context: context,
       builder: (BuildContext context) {
         return AlertDialog(
+          scrollable: true,
           title: const Text('改正英文'),
           content: TextField(
             controller: controller,
@@ -1820,6 +1852,7 @@ class _PlayerSubtitleListState extends State<PlayerSubtitleList> {
           context: context,
           builder: (BuildContext context) {
             return AlertDialog(
+              scrollable: true,
               title: const Text('手工修改字幕'),
               content: SingleChildScrollView(
                 child: Column(
@@ -1873,8 +1906,8 @@ class _PlayerSubtitleListState extends State<PlayerSubtitleList> {
     BuildContext context,
     PlayerSubtitleLine line,
   ) async {
-    final String existing =
-        (widget.lineNotesByStartMs[line.startMs] ?? '').trim();
+    final String existing = (widget.lineNotesByStartMs[line.startMs] ?? '')
+        .trim();
     final TextEditingController controller = TextEditingController(
       text: existing,
     );
@@ -1882,6 +1915,7 @@ class _PlayerSubtitleListState extends State<PlayerSubtitleList> {
       context: context,
       builder: (BuildContext context) {
         return AlertDialog(
+          scrollable: true,
           title: Text(existing.isEmpty ? '手工做笔记' : '编辑笔记'),
           content: TextField(
             controller: controller,
@@ -2110,14 +2144,9 @@ class _PlayerSubtitleListState extends State<PlayerSubtitleList> {
         .split(RegExp(r'\s+'))
         .where((String rawWord) => rawWord.isNotEmpty)
         .toList(growable: false);
-    final List<_WordToken> tokens =
-        timedWords.isNotEmpty && timedWords.length == spaceTokens.length
-        ? timedWords
-              .map((PlayerSubtitleWord word) => _WordToken(value: word.text))
-              .toList(growable: false)
-        : spaceTokens
-              .map((String rawWord) => _WordToken(value: rawWord))
-              .toList(growable: false);
+    final List<_WordToken> tokens = spaceTokens
+        .map((String word) => _WordToken(value: word))
+        .toList(growable: false);
     final StudyShellColors? shell = shellColors;
 
     return Wrap(
@@ -2203,6 +2232,7 @@ class _PlayerSubtitleListState extends State<PlayerSubtitleList> {
                   ),
                   borderRadius: BorderRadius.circular(8),
                   child: Container(
+                    key: karaoke ? _activeWordKey : null,
                     padding: const EdgeInsets.symmetric(
                       horizontal: 3,
                       vertical: 2,

@@ -75,3 +75,16 @@ chmod +x install.sh verify.sh
 
 - 只通过 Tailscale 访问，不要把 `11434` 暴露到公网。
 - Ollama 不校验 Key；App 用占位符 `ollama` 即可。
+
+
+## Windows 托盘监控（2026-11-16）
+
+运行 `powershell -NoProfile -STA -WindowStyle Hidden -ExecutionPolicy Bypass -File .\tray_monitor.ps1 -Install`，安装当前用户登录自启动并显示托盘图标。双击打开监控，关闭窗口收起，菜单退出仅关闭监控，不停止推理。取消自启动：使用 `-Uninstall`。
+
+更新后台后重启推理进程，`usage_monitor.py` 随 FastAPI 启动；统计接口仅监听 `127.0.0.1:11435/stats`，不走公网代理。托盘每 5 秒刷新。SQLite 文件 `usage.sqlite3` 被 Git 忽略；按北京时间统计今日请求、失败、最近 5 分钟活跃客户端、每客户端请求和输入/输出 Token。未返回 usage 的请求单列，不伪造精确值；安装前历史用量无法追溯。
+
+新版 App 通过匿名设备 ID 或账号邮箱哈希区分客户端，不发送明文邮箱及登录令牌。账号标识由客户端自报，不是服务端验证的身份。旧版客户端没有标识时按连接地址聚合，经过反向代理的多个用户可能合并；不能据此声称是真实在线人数。
+
+本次已在本机加载统计模块、启动托盘并配置登录自启动。真实推理冒烟：HTTP 200，输入 33 / 输出 2 / 总计 35 Token，与统计接口一致。不需要为了统计重新加载其他陪练服务。
+
+查词故障复现：公网接口返回 HTTP 200，但 Qwen 偶尔生成 `tag: "noun"` 这种未给字段名加双引号的 JSON。旧客户端 jsonDecode 抛错后统一显示“翻译服务不可用”。新版客户端支持此键名格式及 Markdown JSON 围栏，增加生成预算与请求超时，并通过模拟实际响应的回归测试。服务器同时兑现 json_object 请求，规范化该格式以兼容当前手机版本；更新后的 App 还增加了客户端兼容。

@@ -54,8 +54,8 @@ void main() {
       control.onChanged!(3);
       await tester.pumpAndSettle();
       expect(container.read(learningSettingsProvider).ttsRate, 3);
-      expect(find.byType(PronunciationSettingsCard), findsNothing);
-      expect(credentialInitializations, 0);
+      expect(find.byType(PronunciationSettingsCard), findsOneWidget);
+      expect(credentialInitializations, 1);
       expect(tester.takeException(), isNull);
     },
   );
@@ -261,7 +261,7 @@ void main() {
 
     expect(find.text('翻译'), findsOneWidget);
     expect(find.text('翻译来源'), findsOneWidget);
-    expect(find.text('API Key'), findsOneWidget);
+    expect(find.text('API Key'), findsNothing);
     expect(find.text('获取模型'), findsWidgets);
     expect(find.text('Model'), findsOneWidget);
     expect(find.text('API Secret'), findsNothing);

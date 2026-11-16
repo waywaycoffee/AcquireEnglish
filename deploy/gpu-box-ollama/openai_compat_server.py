@@ -33,6 +33,9 @@ CACHE_DIR = Path(
 )
 
 app = FastAPI(title="AcquireEnglish local Qwen OpenAI shim")
+from usage_monitor import install_monitor, normalize_json_response
+
+usage_store = install_monitor(app)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -85,8 +88,9 @@ class ChatCompletionRequest(BaseModel):
     model: str = MODEL_ID
     messages: list[ChatMessage]
     temperature: float = 0.2
-    max_tokens: int = Field(default=256, ge=1, le=2048)
+    max_tokens: int = Field(default=768, ge=1, le=2048)
     stream: bool = False
+    response_format: dict[str, Any] | None = None
 
 
 @app.get("/health")
@@ -156,6 +160,13 @@ def chat_completions(body: ChatCompletionRequest) -> dict[str, Any]:
             )
         gen = out[0][inputs["input_ids"].shape[-1] :]
         text = tokenizer.decode(gen, skip_special_tokens=True).strip()
+        if (body.response_format or {}).get('type') == 'json_object':
+            try:
+                text = normalize_json_response(text)
+            except (ValueError, TypeError) as exc:
+                raise HTTPException(status_code=502, detail='Model returned invalid JSON; retry the request') from exc
+    except HTTPException:
+        raise
     except Exception as exc:  # noqa: BLE001
         raise HTTPException(status_code=500, detail=str(exc)) from exc
 
@@ -168,7 +179,7 @@ def chat_completions(body: ChatCompletionRequest) -> dict[str, Any]:
             {
                 "index": 0,
                 "message": {"role": "assistant", "content": text},
-                "finish_reason": "stop",
+                "finish_reason": "length" if int(gen.shape[-1]) >= body.max_tokens else "stop",
             }
         ],
         "usage": {

@@ -29,8 +29,7 @@ void main() {
     });
 
     test('拼写错误的管线域名会被纠正为 curlhairai', () {
-      const String broken =
-          'https://acquireenglish.caurlhairai.com/coach';
+      const String broken = 'https://acquireenglish.caurlhairai.com/coach';
       expect(
         fixCurlhairaiTypoHost(broken),
         'https://acquireenglish.curlhairai.com/coach',
@@ -111,7 +110,7 @@ void main() {
       expect(job.needChinese, isTrue);
     });
 
-    test('中英官方齐全 → 仍入队 ASR 语音校对', () async {
+    test('中英官方齐全 → 不自动覆盖官方字幕', () async {
       final File video = fakeVideo('official-both.mp4');
       final File en = File('${temp.path}/official/en.srt')
         ..createSync(recursive: true)
@@ -125,7 +124,7 @@ void main() {
         enSubtitlePath: en.path,
         appSupportDirectory: () async => temp,
       );
-      expect(need.needProofread, isTrue);
+      expect(need.needProofread, isFalse);
       expect(need.needEnglish, isFalse);
       await enqueueSubtitleCompletionForEpisode(
         episodeId: 'f02-proofread',
@@ -135,9 +134,7 @@ void main() {
         queue: queue,
         appSupportDirectory: () async => temp,
       );
-      final SubtitleCompletionJob job = (await queue.loadJobs()).single;
-      expect(job.needEnglish, isTrue);
-      expect(job.needChinese, isFalse);
+      expect(await queue.loadJobs(), isEmpty);
     });
 
     test('导入成功文案区分缺英文 / 缺中文 / 皆缺', () {

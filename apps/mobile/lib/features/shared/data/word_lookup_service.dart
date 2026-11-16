@@ -1,9 +1,12 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:math';
 
 import 'package:crypto/crypto.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:hive_ce/hive.dart';
+import '../../authentication/presentation/auth_session.dart';
 
 import '../../settings/data/api_usage_ledger.dart';
 import '../../settings/presentation/settings_provider.dart';
@@ -27,14 +30,39 @@ typedef WordLookupHttpRequest =
     });
 
 final Provider<WordLookupService> wordLookupServiceProvider =
-    Provider<WordLookupService>((Ref ref) => const WordLookupService());
+    Provider<WordLookupService>((Ref ref) {
+      final session = ref.watch(authSessionProvider);
+      final prefs = Hive.isBoxOpen('prefs') ? Hive.box<String>('prefs') : null;
+      String client = prefs?.get('usageClientId') ?? '';
+      if (client.isEmpty) {
+        client = List<int>.generate(
+          16,
+          (_) => Random.secure().nextInt(256),
+        ).map((v) => v.toRadixString(16).padLeft(2, '0')).join();
+        if (prefs != null) unawaited(prefs.put('usageClientId', client));
+      }
+      return WordLookupService(
+        clientId: session.isLoggedIn && session.email.isNotEmpty
+            ? sha256
+                  .convert(utf8.encode(session.email.toLowerCase()))
+                  .toString()
+            : client,
+        clientKind: session.isLoggedIn && session.email.isNotEmpty
+            ? 'account'
+            : 'anonymous',
+      );
+    });
 
 class WordLookupService {
   const WordLookupService({
     this.remoteLookupOverride,
     this.httpRequestOverride,
+    this.clientId = '',
+    this.clientKind = 'anonymous',
   });
 
+  final String clientId;
+  final String clientKind;
   final WordLookupRemoteLookup? remoteLookupOverride;
   final WordLookupHttpRequest? httpRequestOverride;
 
@@ -656,10 +684,7 @@ class WordLookupService {
         model: settings.translationModel,
         responseData: data,
         messages: <Map<String, String>>[
-          <String, String>{
-            'role': 'user',
-            'content': sentences.join('\n'),
-          },
+          <String, String>{'role': 'user', 'content': sentences.join('\n')},
         ],
         completionText: content,
         note: 'batch=${sentences.length}',
@@ -706,21 +731,24 @@ class WordLookupService {
       );
     }
 
-    final Dio dio = Dio(
-      BaseOptions(
-        baseUrl: settings.translationBaseUrl,
-        headers: <String, String>{
-          'Authorization': 'Bearer ${settings.translationApiKey}',
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-        },
-      ),
+    final BaseOptions options = BaseOptions(
+      connectTimeout: const Duration(seconds: 15),
+      receiveTimeout: const Duration(seconds: 90),
+      baseUrl: settings.translationBaseUrl,
+      headers: <String, String>{
+        'Authorization': 'Bearer ${settings.translationApiKey}',
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+      },
     );
-    final Response<dynamic> response = await dio.post<dynamic>(
-      '/chat/completions',
+    final Response<dynamic> response = await _sendRequest(
+      options: options,
+      method: 'POST',
+      path: '/chat/completions',
       data: <String, dynamic>{
         'model': settings.translationModel,
         'temperature': 0.2,
+        'max_tokens': 768,
         'response_format': const <String, String>{'type': 'json_object'},
         'messages': <Map<String, String>>[
           <String, String>{
@@ -763,19 +791,42 @@ class WordLookupService {
         completionText: content,
       ),
     );
-    final Map<String, dynamic> decoded =
-        jsonDecode(content) as Map<String, dynamic>;
+    final Map<String, dynamic> decoded = _parseLookupJson(content);
+    if ((decoded['definitionCn'] as String? ?? '').trim().isEmpty) {
+      throw const FormatException('Missing word definition');
+    }
 
     return WordLookupEntry(
       word: (decoded['word'] as String? ?? rawWord).trim(),
       phonetic: (decoded['phonetic'] as String? ?? '').trim(),
-      type: (decoded['type'] as String? ?? '英文单词').trim(),
+      type: (decoded['type'] as String? ?? decoded['tag'] as String? ?? '英文单词')
+          .trim(),
       definitionEn: (decoded['definitionEn'] as String? ?? '').trim(),
       usageEn: (decoded['usageEn'] as String? ?? '').trim(),
       exampleSentenceEn: (decoded['exampleSentenceEn'] as String? ?? '').trim(),
       definitionCn: (decoded['definitionCn'] as String? ?? '').trim(),
       sourceLabel: 'API',
     );
+  }
+
+  Map<String, dynamic> _parseLookupJson(String content) {
+    String json = content.trim();
+    if (json.startsWith('```')) {
+      json = json
+          .replaceFirst(RegExp(r'^```(?:json)?\s*'), '')
+          .replaceFirst(RegExp(r'\s*```$'), '');
+    }
+    try {
+      return jsonDecode(json) as Map<String, dynamic>;
+    } on FormatException {
+      // Small local models sometimes emit JavaScript-style unquoted keys.
+      // Only repair key positions; never rewrite quoted definition values.
+      json = json.replaceAllMapped(
+        RegExp(r'(^|\n)(\s*)([A-Za-z_][A-Za-z0-9_]*)(\s*:)'),
+        (Match match) => '${match[1]}${match[2]}"${match[3]}"${match[4]}',
+      );
+      return jsonDecode(json) as Map<String, dynamic>;
+    }
   }
 
   Future<WordLookupEntry> _lookupDirectProvider({
@@ -1018,6 +1069,10 @@ class WordLookupService {
     Map<String, dynamic>? queryParameters,
     Object? data,
   }) async {
+    if (clientId.isNotEmpty) {
+      options.headers['X-Acquire-Client-ID'] = clientId;
+      options.headers['X-Acquire-Client-Kind'] = clientKind;
+    }
     if (httpRequestOverride != null) {
       return httpRequestOverride!(
         options: options,

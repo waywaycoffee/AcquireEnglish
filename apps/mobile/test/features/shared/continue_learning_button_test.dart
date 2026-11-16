@@ -1,3 +1,4 @@
+import 'package:common_learn_english/features/subtitle_completion/subtitle_completion_status_provider.dart';
 import 'dart:io';
 
 import 'package:common_learn_english/features/home/presentation/pad_home_screen.dart';
@@ -248,7 +249,7 @@ void main() {
         ),
       );
       await tester.pumpAndSettle();
-      expect(find.byKey(_buttonKey), findsNothing);
+      expect(find.byKey(_buttonKey), findsOneWidget);
       expect(find.text('继续播放第 02 集'), findsOneWidget);
       await tester.tap(find.byTooltip('返回影视库'));
       await tester.pumpAndSettle();
@@ -291,6 +292,7 @@ void main() {
 
 ProviderContainer _container() => ProviderContainer(
   overrides: <Override>[
+    subtitleCompletionStatusProvider.overrideWith(_IdleSubtitleStatus.new),
     libraryCatalogProvider.overrideWith(_TestCatalog.new),
     progressSyncServiceProvider.overrideWithValue(_InstantProgressSync()),
   ],
@@ -358,7 +360,6 @@ Future<void> _pumpFrames(WidgetTester tester, {int times = 12}) async {
   }
 }
 
-
 Future<void> _pumpUntil(WidgetTester tester, Finder finder) async {
   for (int i = 0; i < 40; i += 1) {
     await tester.pump(const Duration(milliseconds: 50));
@@ -368,4 +369,10 @@ Future<void> _pumpUntil(WidgetTester tester, Finder finder) async {
     }
   }
   expect(finder, findsWidgets);
+}
+
+class _IdleSubtitleStatus extends SubtitleCompletionStatusNotifier {
+  @override
+  SubtitleCompletionStatusState build() =>
+      const SubtitleCompletionStatusState();
 }

@@ -7,6 +7,47 @@ import 'package:dio/dio.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
+  for (final content in [
+    '{"word":"Minecraft","type":"noun","definitionCn":"我的世界"}',
+    '```json\n{"word":"Minecraft","definitionCn":"我的世界"}\n```',
+    '{\n  "word": "minecraft",\n  tag: "noun",\n  "definitionCn": "我的世界"\n}',
+  ]) {
+    test(
+      'local lookup parses valid, fenced and unquoted model JSON: $content',
+      () async {
+        final service = WordLookupService(
+          httpRequestOverride:
+              ({
+                required BaseOptions options,
+                required String method,
+                required String path,
+                Map<String, dynamic>? queryParameters,
+                Object? data,
+              }) async {
+                expect(path, '/chat/completions');
+                expect((data as Map<String, dynamic>)['max_tokens'], 768);
+                return Response<dynamic>(
+                  requestOptions: RequestOptions(path: path),
+                  data: {
+                    'choices': [
+                      {
+                        'message': {'content': content},
+                      },
+                    ],
+                  },
+                );
+              },
+        );
+        final entry = await service.lookupWord(
+          rawWord: 'Minecraft',
+          settings: LearningSettingsState.defaults(),
+        );
+        expect(entry.definitionCn, '我的世界');
+        expect(entry.sourceLabel, 'API');
+      },
+    );
+  }
+
   group('batch subtitle translation', () {
     final LearningSettingsState settings = LearningSettingsState.defaults()
         .copyWith(translationApiKey: 'test-key');
@@ -248,7 +289,10 @@ void main() {
     final WordLookupEntry entry = await service.lookupWord(
       rawWord: 'sanctuary',
       contextSentence: 'They found a sanctuary nearby.',
-      settings: LearningSettingsState.defaults(),
+      settings: LearningSettingsState.defaults().copyWith(
+        translationProvider: 'OpenAI',
+        translationApiKey: '',
+      ),
     );
 
     expect(remoteCallCount, 0);
