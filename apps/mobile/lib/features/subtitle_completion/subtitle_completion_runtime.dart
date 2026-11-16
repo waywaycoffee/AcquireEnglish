@@ -9,6 +9,7 @@ import 'package:wakelock_plus/wakelock_plus.dart';
 import 'native_subtitle_ball.dart';
 import 'subtitle_completion_queue.dart';
 import 'subtitle_completion_scheduler.dart';
+import 'subtitle_fill_label.dart';
 
 /// Keeps subtitle completion alive in background / lock screen, and shows a
 /// system overlay floating ball with live progress (Android).
@@ -26,6 +27,8 @@ class SubtitleCompletionRuntime {
   bool _serviceRunning = false;
   bool _overlayVisible = false;
   bool _needsOverlayPermission = false;
+  /// In-app FAB covers progress while resumed; native ball only when backgrounded.
+  bool _appInForeground = true;
   bool _notifPermissionAsked = false;
   bool _batteryAsked = false;
   String _lastTitle = '爱快英语 · 补字幕';
@@ -53,6 +56,32 @@ class SubtitleCompletionRuntime {
       return;
     }
     _needsOverlayPermission = false;
+    _emit();
+  }
+
+  /// Foreground → hide system ball (FAB shows). Background → show system ball.
+  Future<void> setAppForeground(bool foreground) async {
+    _appInForeground = foreground;
+    if (kIsWeb || !Platform.isAndroid) {
+      return;
+    }
+    if (foreground) {
+      // Always hide — Activity recreate can leave orphan WindowManager views
+      // even when Dart thinks the ball is already gone.
+      await NativeSubtitleBall.hide();
+      _overlayVisible = false;
+      _emit();
+      return;
+    }
+    final bool pending = await SubtitleCompletionQueue.shared.hasPendingWork();
+    if (!pending && !_serviceRunning) {
+      return;
+    }
+    await _showOrUpdateOverlay(
+      busy: true,
+      label: _lastBody,
+      progress: _lastProgress <= 0 ? 0.08 : _lastProgress,
+    );
     _emit();
   }
 
@@ -116,6 +145,49 @@ class SubtitleCompletionRuntime {
     await _ensurePermissions();
   }
 
+  /// Resolves queue counts into `已完成N（P%）/T` — never shows raw worker prose.
+  Future<({String label, double progress})> _resolvedFillDisplay({
+    String? hintLabel,
+    double? hintProgress,
+  }) async {
+    try {
+      final List<SubtitleCompletionJob> jobs =
+          await SubtitleCompletionQueue.shared.loadJobs();
+      final int done = jobs
+          .where(
+            (SubtitleCompletionJob j) =>
+                j.status == SubtitleCompletionStatus.done,
+          )
+          .length;
+      final int total = jobs.isEmpty ? 1 : jobs.length;
+      final double currentFrac = hintProgress != null && hintProgress > 0
+          ? hintProgress.clamp(0.0, 0.99)
+          : progressFractionFromSubtitleLabel(hintLabel ?? _lastBody);
+      final int currentPercent = (currentFrac * 100).round().clamp(0, 99);
+      final String compact = formatSubtitleFillCompactLabel(
+        doneCount: done,
+        totalCount: total,
+        currentPercent: currentPercent,
+      );
+      return (
+        label: compact,
+        progress: subtitleFillOverallProgress(
+          doneCount: done,
+          totalCount: total,
+          currentFraction: currentFrac,
+        ),
+      );
+    } catch (_) {
+      final double frac = (hintProgress ?? _lastProgress).clamp(0.05, 0.99);
+      final String fallback = formatSubtitleFillCompactLabel(
+        doneCount: 0,
+        totalCount: 1,
+        currentPercent: (frac * 100).round(),
+      );
+      return (label: fallback, progress: frac);
+    }
+  }
+
   /// Start / refresh when the queue has work. Call while app is still resumed.
   Future<bool> ensureRunning({
     String? label,
@@ -131,12 +203,15 @@ class SubtitleCompletionRuntime {
       return false;
     }
     await _ensurePermissions();
-    final String rawLabel = (label ?? _lastBody).trim();
-    final String body = rawLabel.isEmpty ? '正在补全字幕…' : rawLabel;
-    final double frac = (progress ?? _lastProgress).clamp(0.0, 1.0);
+    final ({String label, double progress}) display = await _resolvedFillDisplay(
+      hintLabel: label,
+      hintProgress: progress,
+    );
+    final String body = display.label;
+    final double frac = display.progress;
     _lastBody = body;
     _lastProgress = frac;
-    _lastTitle = '爱快英语 · 补字幕 ${(frac * 100).round()}%';
+    _lastTitle = '爱快英语 · $body';
 
     try {
       await WakelockPlus.enable();
@@ -208,15 +283,19 @@ class SubtitleCompletionRuntime {
     required String label,
     required double progress,
   }) async {
+    final ({String label, double progress}) display = await _resolvedFillDisplay(
+      hintLabel: label,
+      hintProgress: progress,
+    );
     if (!_serviceRunning) {
-      await ensureRunning(label: label, progress: progress);
+      await ensureRunning(label: display.label, progress: display.progress);
       return;
     }
-    final String body = label.trim().isEmpty ? _lastBody : label.trim();
-    final double frac = progress.clamp(0.0, 1.0);
+    final String body = display.label;
+    final double frac = display.progress;
     _lastBody = body;
     _lastProgress = frac;
-    _lastTitle = '爱快英语 · 补字幕 ${(frac * 100).round()}%';
+    _lastTitle = '爱快英语 · $body';
     if (await FlutterForegroundTask.isRunningService) {
       await FlutterForegroundTask.updateService(
         notificationTitle: _lastTitle,
@@ -294,6 +373,12 @@ class SubtitleCompletionRuntime {
     required double progress,
   }) async {
     try {
+      // Avoid double balls: in-app FAB already shows progress while resumed.
+      if (_appInForeground) {
+        await NativeSubtitleBall.hide();
+        _overlayVisible = false;
+        return;
+      }
       final bool granted = await NativeSubtitleBall.canDrawOverlays();
       if (!granted) {
         _needsOverlayPermission = true;

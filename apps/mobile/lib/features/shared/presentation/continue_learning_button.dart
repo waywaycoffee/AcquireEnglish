@@ -6,7 +6,6 @@ import 'package:go_router/go_router.dart';
 
 import '../../../router/app_router.dart';
 import '../../player/presentation/learning_resume_provider.dart';
-import '../../subtitle_completion/subtitle_completion_queue.dart';
 import '../../subtitle_completion/subtitle_completion_runtime.dart';
 import '../../subtitle_completion/subtitle_completion_status_provider.dart';
 import 'pad/app_design_tokens.dart';
@@ -51,16 +50,34 @@ class _ContinueLearningButtonState
     final SubtitleCompletionStatusState fill = ref.watch(
       subtitleCompletionStatusProvider,
     );
-    final _SubtitleFabState? subtitle = _subtitleFabState(fill, _runtime);
-    if (subtitle != null) {
+    final SubtitleFillProgressSummary? summary = fill.activeFillProgress;
+    final bool runtimeBusy =
+        _runtime.active ||
+        _runtime.needsOverlayPermission ||
+        _runtime.overlayVisible;
+    if (summary != null || runtimeBusy) {
+      final String compact = summary?.compactLabel ??
+          (_runtime.label.startsWith('已完成')
+              ? _runtime.label
+              : formatSubtitleFillCompactLabel(
+                  doneCount: 0,
+                  totalCount: 1,
+                  currentPercent: (_runtime.progress * 100).round(),
+                ));
+      final String tooltip =
+          (summary?.detailLabel ?? _runtime.label).trim().isEmpty
+          ? '正在补字幕 $compact'
+          : (summary?.detailLabel ?? _runtime.label);
+      final double progress =
+          (summary?.overallProgress ?? _runtime.progress).clamp(0.05, 0.99);
       return FloatingActionButton.extended(
         key: const ValueKey<String>('subtitle-fill-fab'),
         heroTag: 'global-subtitle-fill',
-        tooltip: subtitle.tooltip,
+        tooltip: tooltip,
         onPressed: () {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text(subtitle.tooltip),
+              content: Text(tooltip),
               duration: const Duration(seconds: 2),
             ),
           );
@@ -76,7 +93,7 @@ class _ContinueLearningButtonState
             alignment: Alignment.center,
             children: <Widget>[
               CircularProgressIndicator(
-                value: subtitle.progress.clamp(0.05, 1.0),
+                value: progress,
                 strokeWidth: 2.4,
                 backgroundColor: Colors.white24,
                 valueColor: const AlwaysStoppedAnimation<Color>(Colors.white),
@@ -86,7 +103,7 @@ class _ContinueLearningButtonState
           ),
         ),
         label: Text(
-          subtitle.label,
+          compact,
           style: const TextStyle(fontWeight: FontWeight.w800),
         ),
       );
@@ -134,55 +151,4 @@ class _ContinueLearningButtonState
       ),
     );
   }
-}
-
-class _SubtitleFabState {
-  const _SubtitleFabState({
-    required this.label,
-    required this.tooltip,
-    required this.progress,
-  });
-
-  final String label;
-  final String tooltip;
-  final double progress;
-}
-
-_SubtitleFabState? _subtitleFabState(
-  SubtitleCompletionStatusState fill,
-  SubtitleRuntimeSnapshot runtime,
-) {
-  final List<SubtitleCompletionEpisodeUi> active = fill.byEpisodeId.values
-      .where((SubtitleCompletionEpisodeUi e) => e.isActive)
-      .toList(growable: false);
-  final bool runtimeBusy =
-      runtime.active || runtime.needsOverlayPermission || runtime.overlayVisible;
-  if (active.isEmpty && !runtimeBusy) {
-    return null;
-  }
-  SubtitleCompletionEpisodeUi? focus;
-  for (final SubtitleCompletionEpisodeUi row in active) {
-    if (row.status == SubtitleCompletionStatus.running) {
-      focus = row;
-      break;
-    }
-  }
-  focus ??= active.isEmpty ? null : active.first;
-
-  // Prefer course-banner style progress when we can parse live labels.
-  double progress = focus?.progressFraction ??
-      (runtimeBusy ? runtime.progress : null) ??
-      0.12;
-  progress = progress.clamp(0.05, 0.99);
-  final int pct = (progress * 100).round();
-  final String live = (focus?.label ?? fill.activeLabel ?? runtime.label).trim();
-  final String tooltip = live.isNotEmpty
-      ? live
-      : (active.length > 1 ? '正在补字幕（${active.length} 集）' : '正在补字幕');
-  // Keep a unique compile-time marker so release APK string checks can verify.
-  return _SubtitleFabState(
-    label: '补字幕 $pct%',
-    tooltip: tooltip,
-    progress: progress,
-  );
 }

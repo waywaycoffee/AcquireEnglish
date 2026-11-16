@@ -22,10 +22,11 @@ import android.widget.Toast
 import kotlin.math.roundToInt
 
 /**
- * Native SYSTEM_ALERT_WINDOW floating pill for subtitle-completion progress.
- * Matches the in-app「继续播放 / 补字幕」stadium FAB so it stays visible off-app.
+ * Process-wide singleton SYSTEM_ALERT_WINDOW pill.
+ * Must be a singleton: Activity recreate otherwise leaves orphan WindowManager
+ * views → multiple floating balls on screen.
  */
-class SubtitleFloatingBall(private val context: Context) {
+class SubtitleFloatingBall private constructor(private val context: Context) {
     private val windowManager =
         context.applicationContext.getSystemService(Context.WINDOW_SERVICE) as WindowManager
     private var root: LinearLayout? = null
@@ -45,7 +46,6 @@ class SubtitleFloatingBall(private val context: Context) {
         if (Settings.canDrawOverlays(context)) {
             return true
         }
-        // Xiaomi sometimes reports Settings=false while AppOps is already allow.
         return try {
             val appOps = context.getSystemService(Context.APP_OPS_SERVICE) as AppOpsManager
             val mode = appOps.checkOpNoThrow(
@@ -71,6 +71,12 @@ class SubtitleFloatingBall(private val context: Context) {
     }
 
     fun show(progress: Double, label: String) {
+        // Never mount a system overlay while MainActivity is resumed —
+        // the in-app FAB already shows progress (avoids 2–3 balls).
+        if (MainActivity.isActivityResumed) {
+            hide()
+            return
+        }
         if (!canDrawOverlays()) {
             Toast.makeText(
                 context,
@@ -82,11 +88,13 @@ class SubtitleFloatingBall(private val context: Context) {
         }
         val frac = progress.toFloat().coerceIn(0f, 1f)
         lastProgress = frac
-        val existing = root
-        if (existing != null) {
+        if (root != null) {
             update(frac.toDouble(), label)
             return
         }
+        // Drop any leaked view before attaching a new one.
+        hide()
+
         val density = context.resources.displayMetrics.density
         val params = WindowManager.LayoutParams(
             WindowManager.LayoutParams.WRAP_CONTENT,
@@ -110,6 +118,7 @@ class SubtitleFloatingBall(private val context: Context) {
         val container = LinearLayout(context).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
+            tag = VIEW_TAG
             setPadding(
                 (16 * density).roundToInt(),
                 (12 * density).roundToInt(),
@@ -135,13 +144,12 @@ class SubtitleFloatingBall(private val context: Context) {
 
         val percent = TextView(context).apply {
             setTextColor(Color.WHITE)
-            setTextSize(TypedValue.COMPLEX_UNIT_SP, 15f)
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 14f)
             paint.isFakeBoldText = true
-            text = "补字幕 ${(frac * 100).roundToInt()}%"
+            text = displayLabel(label, frac)
             setPadding((10 * density).roundToInt(), 0, 0, 0)
         }
 
-        // Keep a short live caption under contentDescription for a11y / future use.
         val caption = TextView(context).apply {
             visibility = View.GONE
             text = label
@@ -177,33 +185,51 @@ class SubtitleFloatingBall(private val context: Context) {
     }
 
     fun update(progress: Double, label: String) {
+        if (MainActivity.isActivityResumed) {
+            hide()
+            return
+        }
         val frac = progress.toFloat().coerceIn(0f, 1f)
         lastProgress = frac
         val view = root ?: run {
             show(progress, label)
             return
         }
-        percentView?.text = if (frac >= 0.99f) {
-            "补字幕完成"
-        } else {
-            "补字幕 ${(frac * 100).roundToInt()}%"
-        }
+        percentView?.text = displayLabel(label, frac)
         ring?.isIndeterminate = frac < 0.99f
         captionView?.text = label
         view.contentDescription = label
     }
 
     fun hide() {
-        val view = root ?: return
-        try {
-            windowManager.removeView(view)
-        } catch (_: Exception) {
-        }
+        val view = root
         root = null
         percentView = null
         captionView = null
         ring = null
         layoutParams = null
+        if (view != null) {
+            try {
+                windowManager.removeView(view)
+            } catch (_: Exception) {
+                try {
+                    windowManager.removeViewImmediate(view)
+                } catch (_: Exception) {
+                }
+            }
+        }
+    }
+
+    private fun displayLabel(label: String, frac: Float): String {
+        val trimmed = label.trim()
+        if (trimmed.isNotEmpty()) {
+            return trimmed
+        }
+        return if (frac >= 0.99f) {
+            "补字幕完成"
+        } else {
+            "补字幕 ${(frac * 100).roundToInt()}%"
+        }
     }
 
     private fun attachDrag(view: View, params: WindowManager.LayoutParams) {
@@ -228,7 +254,6 @@ class SubtitleFloatingBall(private val context: Context) {
                     if (kotlin.math.abs(dx) > 4 || kotlin.math.abs(dy) > 4) {
                         moved = true
                     }
-                    // BOTTOM|END: x grows leftward from the right edge; y up from bottom.
                     params.x = (startX - dx).coerceAtLeast(0)
                     params.y = (startY - dy).coerceAtLeast(0)
                     try {
@@ -244,6 +269,25 @@ class SubtitleFloatingBall(private val context: Context) {
                     true
                 }
                 else -> false
+            }
+        }
+    }
+
+    companion object {
+        private const val VIEW_TAG = "acquire_subtitle_floating_ball"
+
+        @Volatile
+        private var instance: SubtitleFloatingBall? = null
+
+        fun get(context: Context): SubtitleFloatingBall {
+            val existing = instance
+            if (existing != null) {
+                return existing
+            }
+            return synchronized(this) {
+                instance ?: SubtitleFloatingBall(context.applicationContext).also {
+                    instance = it
+                }
             }
         }
     }

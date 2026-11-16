@@ -212,10 +212,14 @@ class PadLandscapePlayerScreenState
               return;
             }
           }
-          final String label = fill.displayLabel;
+          final SubtitleFillProgressSummary? summary = next.activeFillProgress;
+          final String label = fill.isFailed
+              ? fill.displayLabel
+              : (summary?.compactLabel ?? fill.displayLabel);
           final double? progress = fill.isFailed
               ? null
-              : (_progressFromProofreadLabel(label) ??
+              : (summary?.overallProgress ??
+                    _progressFromProofreadLabel(fill.displayLabel) ??
                     fill.progressFraction ??
                     0.08);
           if (_bilingualPipelineLabel != label ||

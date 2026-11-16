@@ -6,9 +6,8 @@ import 'native_subtitle_ball.dart';
 import 'subtitle_completion_queue.dart';
 import 'subtitle_completion_runtime.dart';
 
-/// When subtitle jobs are pending:
-/// 1) auto-open overlay settings if permission missing
-/// 2) force-show the native system ball once granted
+/// Handles overlay permission + shows the **system** ball only in background.
+/// While the app is resumed, the in-app FAB owns progress UI (no double ball).
 class OverlayPermissionHost extends StatefulWidget {
   const OverlayPermissionHost({required this.child, super.key});
 
@@ -23,46 +22,72 @@ class _OverlayPermissionHostState extends State<OverlayPermissionHost>
   StreamSubscription<SubtitleRuntimeSnapshot>? _sub;
   bool _dialogOpen = false;
   DateTime? _lastPromptAt;
-  Timer? _kick;
+  bool _foreground = true;
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    unawaited(SubtitleCompletionRuntime.instance.setAppForeground(true));
     _sub = SubtitleCompletionRuntime.instance.snapshots.listen((
       SubtitleRuntimeSnapshot snap,
     ) {
-      if (snap.needsOverlayPermission || snap.active) {
-        unawaited(_syncOverlay());
+      if (snap.needsOverlayPermission && _foreground) {
+        unawaited(_maybePrompt());
       }
     });
-    _kick = Timer.periodic(const Duration(seconds: 4), (_) {
-      unawaited(_syncOverlay());
-    });
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      unawaited(_syncOverlay());
+      unawaited(_onResumed());
     });
   }
 
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
-    _kick?.cancel();
     unawaited(_sub?.cancel() ?? Future<void>.value());
     super.dispose();
   }
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.resumed) {
-      unawaited(_syncOverlay(forcePrompt: true));
+    switch (state) {
+      case AppLifecycleState.resumed:
+        _foreground = true;
+        unawaited(_onResumed());
+      case AppLifecycleState.inactive:
+        // Don't hide yet — rotation / permission sheets briefly go inactive.
+        break;
+      case AppLifecycleState.hidden:
+      case AppLifecycleState.paused:
+      case AppLifecycleState.detached:
+        _foreground = false;
+        unawaited(_onBackgrounded());
     }
   }
 
-  Future<void> _syncOverlay({bool forcePrompt = false}) async {
-    if (!mounted) {
+  Future<void> _onResumed() async {
+    await SubtitleCompletionRuntime.instance.setAppForeground(true);
+    // Hide repeatedly — OEM WindowManager can keep a stale second pill briefly.
+    await NativeSubtitleBall.hide();
+    await Future<void>.delayed(const Duration(milliseconds: 120));
+    await NativeSubtitleBall.hide();
+    final bool pending = await SubtitleCompletionQueue.shared.hasPendingWork();
+    if (!pending) {
       return;
     }
+    final bool granted = await NativeSubtitleBall.canDrawOverlays();
+    if (!granted) {
+      await _maybePrompt(force: true);
+      return;
+    }
+    SubtitleCompletionRuntime.instance.clearOverlayPermissionNeeded();
+    // Keep FGS alive; do not show the system ball while foreground.
+    await SubtitleCompletionRuntime.instance.ensureRunning();
+    await NativeSubtitleBall.hide();
+  }
+
+  Future<void> _onBackgrounded() async {
+    await SubtitleCompletionRuntime.instance.setAppForeground(false);
     final bool pending = await SubtitleCompletionQueue.shared.hasPendingWork();
     final SubtitleRuntimeSnapshot snap =
         SubtitleCompletionRuntime.instance.currentSnapshot;
@@ -71,31 +96,25 @@ class _OverlayPermissionHostState extends State<OverlayPermissionHost>
     }
     final bool granted = await NativeSubtitleBall.canDrawOverlays();
     if (!granted) {
-      await _maybePrompt(force: forcePrompt);
       return;
     }
-    SubtitleCompletionRuntime.instance.clearOverlayPermissionNeeded();
-    // Keep FGS + native ball in sync while jobs drain.
+    // ensureRunning always rewrites label to 已完成N（P%）/T.
     await SubtitleCompletionRuntime.instance.ensureRunning(
-      label: snap.label.isEmpty ? '正在补全字幕…' : snap.label,
       progress: snap.progress <= 0 ? 0.08 : snap.progress,
     );
-    final bool showing = await NativeSubtitleBall.show(
-      progress: (snap.progress <= 0 ? 0.08 : snap.progress).clamp(0.05, 0.99),
-      label: snap.label.isEmpty ? '补字幕中' : snap.label,
-    );
-    if (!showing) {
-      // Retry once after a tick (WindowManager sometimes needs Activity resume).
-      await Future<void>.delayed(const Duration(milliseconds: 300));
-      await NativeSubtitleBall.show(
-        progress: (snap.progress <= 0 ? 0.08 : snap.progress).clamp(0.05, 0.99),
-        label: snap.label.isEmpty ? '补字幕中' : snap.label,
-      );
-    }
   }
 
   Future<void> _maybePrompt({bool force = false}) async {
-    if (!mounted || _dialogOpen) {
+    if (!mounted || _dialogOpen || !_foreground) {
+      return;
+    }
+    final bool pending = await SubtitleCompletionQueue.shared.hasPendingWork();
+    if (!pending) {
+      return;
+    }
+    final bool granted = await NativeSubtitleBall.canDrawOverlays();
+    if (granted) {
+      SubtitleCompletionRuntime.instance.clearOverlayPermissionNeeded();
       return;
     }
     final DateTime now = DateTime.now();
@@ -118,9 +137,8 @@ class _OverlayPermissionHostState extends State<OverlayPermissionHost>
           return AlertDialog(
             title: const Text('需要悬浮窗权限'),
             content: const Text(
-              '补字幕在后台/锁屏时需要「显示在其他应用上层」。'
-              '系统设置页已打开，请找到本应用并允许。'
-              '开启后返回 App，右下角按钮会显示「补字幕」进度，并出现系统悬浮球。',
+              '补字幕切到后台/锁屏时需要「显示在其他应用上层」。'
+              '请允许本应用；App 内用右下角按钮看进度，离开 App 后才显示系统悬浮窗。',
             ),
             actions: <Widget>[
               TextButton(

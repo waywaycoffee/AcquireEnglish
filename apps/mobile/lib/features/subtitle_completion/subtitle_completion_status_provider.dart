@@ -4,8 +4,12 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'subtitle_completion_enqueue.dart';
 import 'subtitle_completion_queue.dart';
+import 'subtitle_completion_runtime.dart';
 import 'subtitle_completion_scheduler.dart';
 import 'subtitle_completion_status_hub.dart';
+import 'subtitle_fill_label.dart';
+
+export 'subtitle_fill_label.dart';
 
 /// Live snapshot of one episode's import-time subtitle fill job.
 class SubtitleCompletionEpisodeUi {
@@ -163,6 +167,25 @@ class SubtitleCompletionEpisodeUi {
   }
 }
 
+/// Compact progress: `已完成(当前任务%)/总任务数` e.g. `3(7%)/16`.
+class SubtitleFillProgressSummary {
+  const SubtitleFillProgressSummary({
+    required this.doneCount,
+    required this.totalCount,
+    required this.currentPercent,
+    required this.overallProgress,
+    required this.compactLabel,
+    required this.detailLabel,
+  });
+
+  final int doneCount;
+  final int totalCount;
+  final int currentPercent;
+  final double overallProgress;
+  final String compactLabel;
+  final String detailLabel;
+}
+
 /// Course-level rollup for the library detail banner.
 class SubtitleCompletionCourseUi {
   const SubtitleCompletionCourseUi({
@@ -186,6 +209,22 @@ class SubtitleCompletionCourseUi {
   final String? activeEpisodeId;
 
   bool get showBanner => activeCount > 0 || failedCount > 0;
+
+  String get compactProgressLabel {
+    final int pct = ((progress.clamp(0.0, 1.0)) * 100).round().clamp(0, 99);
+    // Prefer parsing live message current-task % when present.
+    final RegExpMatch? livePct =
+        RegExp(r'（(\d{1,3})%）').firstMatch(message) ??
+        RegExp(r'(\d{1,3})%').firstMatch(message);
+    final int current = livePct == null
+        ? pct
+        : (int.tryParse(livePct.group(1) ?? '') ?? pct).clamp(0, 99);
+    return formatSubtitleFillCompactLabel(
+      doneCount: doneCount,
+      totalCount: totalTracked,
+      currentPercent: current,
+    );
+  }
 }
 
 class SubtitleCompletionStatusState {
@@ -201,6 +240,65 @@ class SubtitleCompletionStatusState {
 
   SubtitleCompletionEpisodeUi? forEpisode(String episodeId) =>
       byEpisodeId[episodeId];
+
+  /// Global fill progress for FAB / system overlay.
+  SubtitleFillProgressSummary? get activeFillProgress {
+    final List<SubtitleCompletionEpisodeUi> jobs =
+        byEpisodeId.values.toList(growable: false);
+    if (jobs.isEmpty) {
+      return null;
+    }
+    final List<SubtitleCompletionEpisodeUi> active = jobs
+        .where((SubtitleCompletionEpisodeUi e) => e.isActive)
+        .toList(growable: false);
+    if (active.isEmpty) {
+      return null;
+    }
+    final int done = jobs
+        .where(
+          (SubtitleCompletionEpisodeUi e) =>
+              e.status == SubtitleCompletionStatus.done,
+        )
+        .length;
+    final int total = jobs.length;
+    SubtitleCompletionEpisodeUi? focus;
+    for (final SubtitleCompletionEpisodeUi row in active) {
+      if (row.status == SubtitleCompletionStatus.running) {
+        focus = row;
+        break;
+      }
+    }
+    focus ??= active.first;
+    if (activeEpisodeId != null) {
+      for (final SubtitleCompletionEpisodeUi row in active) {
+        if (row.episodeId == activeEpisodeId) {
+          focus = row;
+          break;
+        }
+      }
+    }
+    final SubtitleCompletionEpisodeUi focused = focus!;
+    final double currentFrac =
+        (focused.progressFraction ?? 0.08).clamp(0.0, 0.99);
+    final int currentPercent = (currentFrac * 100).round().clamp(0, 99);
+    final String live = (focused.label ?? activeLabel ?? '').trim();
+    return SubtitleFillProgressSummary(
+      doneCount: done,
+      totalCount: total,
+      currentPercent: currentPercent,
+      overallProgress: subtitleFillOverallProgress(
+        doneCount: done,
+        totalCount: total,
+        currentFraction: currentFrac,
+      ),
+      compactLabel: formatSubtitleFillCompactLabel(
+        doneCount: done,
+        totalCount: total,
+        currentPercent: currentPercent,
+      ),
+      detailLabel: live.isNotEmpty ? live : focused.displayLabel,
+    );
+  }
 
   SubtitleCompletionCourseUi? forCourse({
     required String courseId,
@@ -407,6 +505,15 @@ class SubtitleCompletionStatusNotifier
       activeEpisodeId: clearActive ? null : episodeId,
       activeLabel: clearActive ? null : trimmed,
     );
+    final SubtitleFillProgressSummary? summary = state.activeFillProgress;
+    if (summary != null) {
+      unawaited(
+        SubtitleCompletionRuntime.instance.updateProgress(
+          label: summary.compactLabel,
+          progress: summary.overallProgress,
+        ),
+      );
+    }
     if (clearActive) {
       unawaited(refresh());
     }

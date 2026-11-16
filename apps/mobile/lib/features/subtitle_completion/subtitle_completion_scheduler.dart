@@ -15,6 +15,7 @@ import 'subtitle_completion_enqueue.dart';
 import 'subtitle_completion_queue.dart';
 import 'subtitle_completion_runtime.dart';
 import 'subtitle_completion_worker.dart';
+import 'subtitle_fill_label.dart';
 
 /// Drains the subtitle completion queue one episode at a time.
 ///
@@ -285,39 +286,33 @@ class SubtitleCompletionScheduler with WidgetsBindingObserver {
 
   Future<void> _publishRuntimeProgress(String label) async {
     try {
+      final List<SubtitleCompletionJob> jobs = await queue.loadJobs();
+      final int done = jobs
+          .where(
+            (SubtitleCompletionJob j) =>
+                j.status == SubtitleCompletionStatus.done,
+          )
+          .length;
+      final int total = jobs.isEmpty ? 1 : jobs.length;
+      final double currentFrac = _progressFromLabel(label);
+      final int currentPercent = (currentFrac * 100).round().clamp(0, 99);
+      final String compact = formatSubtitleFillCompactLabel(
+        doneCount: done,
+        totalCount: total,
+        currentPercent: currentPercent,
+      );
       await SubtitleCompletionRuntime.instance.updateProgress(
-        label: label,
-        progress: _progressFromLabel(label),
+        label: compact,
+        progress: subtitleFillOverallProgress(
+          doneCount: done,
+          totalCount: total,
+          currentFraction: currentFrac,
+        ),
       );
     } catch (_) {}
   }
 
   double _progressFromLabel(String label) {
-    final String live = label.trim();
-    final RegExpMatch? pct =
-        RegExp(r'（(\d{1,3})%）').firstMatch(live) ??
-        RegExp(r'(\d{1,3})%').firstMatch(live);
-    if (pct != null) {
-      final int value = int.tryParse(pct.group(1) ?? '') ?? 0;
-      return (value / 100).clamp(0.0, 1.0);
-    }
-    final RegExpMatch? frac = RegExp(r'(\d+)\s*/\s*(\d+)').firstMatch(live);
-    if (frac != null) {
-      final int done = int.tryParse(frac.group(1) ?? '') ?? 0;
-      final int total = int.tryParse(frac.group(2) ?? '') ?? 0;
-      if (total > 0) {
-        return (done / total).clamp(0.0, 1.0);
-      }
-    }
-    if (live.contains('完成') || live.contains('已就绪') || live.contains('已补全')) {
-      return 0.96;
-    }
-    if (live.contains('翻译') || live.contains('中文')) {
-      return 0.72;
-    }
-    if (live.contains('英文') || live.contains('语音') || live.contains('Whisper')) {
-      return 0.42;
-    }
-    return 0.18;
+    return progressFractionFromSubtitleLabel(label);
   }
 }

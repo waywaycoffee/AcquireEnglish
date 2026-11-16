@@ -22,6 +22,7 @@ import 'subtitle_completion_queue.dart';
 import 'subtitle_completion_runtime.dart';
 import 'subtitle_completion_scheduler.dart';
 import 'subtitle_completion_status_hub.dart';
+import 'subtitle_fill_label.dart';
 
 bool looksLikeScopedEpisodeSubtitle(String? path) {
   final String value = (path ?? '').trim();
@@ -422,12 +423,29 @@ Future<void> enqueueSubtitleCompletionForEpisode({
   await scheduleSubtitleCompletionNudge();
   SubtitleCompletionStatusHub.instance.notifyChanged();
   // Start FGS + overlay while still foreground — Android 12+ blocks later starts.
-  unawaited(
-    SubtitleCompletionRuntime.instance.ensureRunning(
-      label: plan.needEnglish ? '排队补英文字幕…' : '排队补中文字幕…',
-      progress: 0.05,
-    ),
-  );
+  unawaited(() async {
+    final List<SubtitleCompletionJob> jobs = await store.loadJobs();
+    final int done = jobs
+        .where(
+          (SubtitleCompletionJob j) =>
+              j.status == SubtitleCompletionStatus.done,
+        )
+        .length;
+    final int total = jobs.isEmpty ? 1 : jobs.length;
+    final String compact = formatSubtitleFillCompactLabel(
+      doneCount: done,
+      totalCount: total,
+      currentPercent: 5,
+    );
+    await SubtitleCompletionRuntime.instance.ensureRunning(
+      label: compact,
+      progress: subtitleFillOverallProgress(
+        doneCount: done,
+        totalCount: total,
+        currentFraction: 0.05,
+      ),
+    );
+  }());
   SubtitleCompletionScheduler.instance.kick(delay: Duration.zero);
 }
 

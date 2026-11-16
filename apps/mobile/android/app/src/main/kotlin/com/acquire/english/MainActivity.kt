@@ -46,7 +46,8 @@ class MainActivity : FlutterActivity(), MethodChannel.MethodCallHandler {
     private lateinit var orientationChannel: MethodChannel
     private lateinit var whisperAssetsChannel: MethodChannel
     private lateinit var subtitleOverlayChannel: MethodChannel
-    private val subtitleFloatingBall by lazy { SubtitleFloatingBall(applicationContext) }
+    private val subtitleFloatingBall: SubtitleFloatingBall
+        get() = SubtitleFloatingBall.get(this)
     private var pendingResult: MethodChannel.Result? = null
     private var pendingExtensions: Set<String> = emptySet()
     private var pendingTitle: String = ""
@@ -73,7 +74,15 @@ class MainActivity : FlutterActivity(), MethodChannel.MethodCallHandler {
 
     override fun onResume() {
         super.onResume()
+        isActivityResumed = true
         applyLockedOrientation()
+        // Foreground: never keep SYSTEM_ALERT_WINDOW pills (in-app FAB owns UI).
+        mainHandler.post { subtitleFloatingBall.hide() }
+    }
+
+    override fun onPause() {
+        isActivityResumed = false
+        super.onPause()
     }
 
     override fun onWindowFocusChanged(hasFocus: Boolean) {
@@ -1237,6 +1246,10 @@ class MainActivity : FlutterActivity(), MethodChannel.MethodCallHandler {
     }
 
     companion object {
+        @JvmField
+        @Volatile
+        var isActivityResumed: Boolean = false
+
         private const val REQUEST_PICK_DIRECTORY = 28061
         private const val WAV_HEADER_BYTES = 44
         private const val WAV_SAMPLE_RATE = 16000
