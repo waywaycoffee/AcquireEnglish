@@ -315,6 +315,28 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
     return out;
   }
 
+  Future<List<Map<String, dynamic>>?> _fetchIceServers() async {
+    try {
+      final LearningSettingsState settings = ref.read(learningSettingsProvider);
+      final Map<String, dynamic> health = await _pipelineClient.health(
+        settings.oralCoachPipelineUrl,
+      );
+      final Object? raw = health['webrtc_ice_servers'];
+      if (raw is! List) {
+        return null;
+      }
+      final List<Map<String, dynamic>> out = <Map<String, dynamic>>[];
+      for (final Object? item in raw) {
+        if (item is Map) {
+          out.add(Map<String, dynamic>.from(item));
+        }
+      }
+      return out.isEmpty ? null : out;
+    } catch (_) {
+      return null;
+    }
+  }
+
   Future<void> _connectLiveTalking(String serverUrl) async {
     if (_connecting) {
       return;
@@ -325,6 +347,10 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
       _status = '正在连接数字人…';
     });
     try {
+      final List<Map<String, dynamic>>? ice = await _fetchIceServers();
+      if (ice != null && ice.isNotEmpty) {
+        _iceServers = ice;
+      }
       final RTCVideoRenderer renderer = await _liveClient.connect(
         serverUrl,
         avatar: defaultLiveTalkingAvatarId,

@@ -6,6 +6,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.config import settings
 from app.database import Base, engine
 from app.routers import (
+    assets,
     auth,
     courses,
     feed,
@@ -21,11 +22,15 @@ from app.routers import (
 
 @asynccontextmanager
 async def lifespan(_: FastAPI):
+    from app.database import SessionLocal
     from app.db_migrate import ensure_schema_columns
+    from app.services.user_assets import ensure_default_skus
 
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
         await ensure_schema_columns(conn)
+    async with SessionLocal() as session:
+        await ensure_default_skus(session)
     yield
 
 
@@ -50,6 +55,7 @@ app.include_router(feed.router, prefix="/api")
 app.include_router(imports.router, prefix="/api")
 app.include_router(learning.router, prefix="/api")
 app.include_router(livekit.router, prefix="/api")
+app.include_router(assets.router, prefix="/api")
 app.include_router(shared_subtitles.router, prefix="/api")
 
 
@@ -71,4 +77,5 @@ async def health() -> dict[str, str]:
             if livekit_configured()
             else "unset"
         ),
+        "user_assets": "/api/assets",
     }

@@ -390,7 +390,8 @@ class SettingsScreen extends ConsumerWidget {
                   title: 'LiveTalking / 数字人地址',
                   description:
                       '虚拟外教画面（WebRTC）。手机走公网 HTTPS：'
-                      '$defaultLiveTalkingUrlPublic（无需 Tailscale）。'
+                      '$defaultLiveTalkingUrlPublic（无需 Tailscale；'
+                      '信令走 HTTPS，媒体走 ECS TURN）。'
                       '留空则自动使用该地址。',
                   value: settings.oralCoachServerUrl,
                   hintText: defaultLiveTalkingUrlPublic,

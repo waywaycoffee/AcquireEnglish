@@ -111,11 +111,19 @@ const String defaultLiveTalkingUrlPublic =
 /// Same-WiFi GPU box (optional LAN shortcut; not required).
 const String defaultLiveTalkingUrlLan = 'http://192.168.31.121:8010';
 
-/// @Deprecated Tailscale-only — do not use on phones.
+/// @Deprecated Tailscale-only — do not use on phones. Alias of public URL.
 const String defaultLiveTalkingUrl = defaultLiveTalkingUrlPublic;
 
 /// @Deprecated Tailscale CGNAT — do not use on phones.
 const String defaultLiveTalkingUrlIp = 'http://100.115.252.55:8010';
+
+/// Legacy Tailscale-only URLs — migrate saved settings to the public base.
+const Set<String> legacyTailscaleLiveTalkingUrls = <String>{
+  'http://100.115.252.55:8010',
+  'http://100.115.252.55:8010/',
+  'http://5060ti.tailc30b42.ts.net:8010',
+  'http://5060ti.tailc30b42.ts.net:8010/',
+};
 
 /// Probe order for digital-human connect (public HTTPS first).
 const List<String> liveTalkingUrlCandidates = <String>[
@@ -696,9 +704,10 @@ class LearningSettingsNotifier extends Notifier<LearningSettingsState> {
           liveKitUrl: LearningSettingsState.defaults().liveKitUrl,
         );
       }
-      // Digital-human URL: always public HTTPS for phones (no Tailscale).
+      // Digital-human URL: empty → public HTTPS; migrate Tailscale / LAN saves.
       final String oralCoachUrl = coerced.oralCoachServerUrl.trim();
       if (oralCoachUrl.isEmpty ||
+          legacyTailscaleLiveTalkingUrls.contains(oralCoachUrl) ||
           oralCoachUrl.contains('100.115.252.55') ||
           oralCoachUrl.contains('ts.net') ||
           oralCoachUrl.contains('192.168.31.121')) {

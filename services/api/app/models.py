@@ -28,6 +28,11 @@ class User(Base):
         back_populates="user", uselist=False
     )
     link_courses: Mapped[list["UserLinkCourse"]] = relationship(back_populates="user")
+    entitlements: Mapped[list["UserEntitlement"]] = relationship(back_populates="user")
+    orders: Mapped[list["Order"]] = relationship(back_populates="user")
+    wallet: Mapped["WalletAccount | None"] = relationship(
+        back_populates="user", uselist=False
+    )
 
 
 class LessonProgress(Base):
@@ -144,3 +149,157 @@ class UserLinkCourse(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     user: Mapped[User] = relationship(back_populates="link_courses")
+
+
+class SharedBilibiliSubtitle(Base):
+    """Community-shared Bilibili subtitle pack (quality-gated cache)."""
+
+    __tablename__ = "shared_bilibili_subtitles"
+    __table_args__ = (
+        UniqueConstraint("bvid", "page", name="uq_shared_bili_bvid_page"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    bvid: Mapped[str] = mapped_column(String(32), index=True)
+    page: Mapped[int] = mapped_column(Integer, default=1)
+    cid: Mapped[int | None] = mapped_column(Integer, nullable=True, index=True)
+    duration_sec: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    subtitle_en_srt: Mapped[str] = mapped_column(Text)
+    subtitle_zh_srt: Mapped[str | None] = mapped_column(Text, nullable=True)
+    quality_score: Mapped[float] = mapped_column(Float, default=0.0)
+    cue_count: Mapped[int] = mapped_column(Integer, default=0)
+    en_hits: Mapped[int] = mapped_column(Integer, default=0)
+    zh_hits: Mapped[int] = mapped_column(Integer, default=0)
+    uploader_user_id: Mapped[int | None] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True
+    )
+    source_origin: Mapped[str] = mapped_column(String(32), default="asr")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
+
+
+class ProductSku(Base):
+    """Sellable / grantable catalog SKU for user assets."""
+
+    __tablename__ = "product_skus"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    sku_code: Mapped[str] = mapped_column(String(64), unique=True, index=True)
+    # course_pack | membership | coach_minutes | digital_human_minutes | vocab_pack | credits
+    kind: Mapped[str] = mapped_column(String(32), index=True)
+    title: Mapped[str] = mapped_column(String(255))
+    # Optional catalog ref (course_id / pack_id / plan code).
+    ref_id: Mapped[str | None] = mapped_column(String(120), nullable=True, index=True)
+    price_cents: Mapped[int] = mapped_column(Integer, default=0)
+    currency: Mapped[str] = mapped_column(String(8), default="CNY")
+    # Consumable grant amount (minutes / credits); null = unlimited license.
+    grant_quantity: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    # Days of validity after grant; null = no expiry.
+    duration_days: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    meta_json: Mapped[str] = mapped_column(Text, default="{}")
+    active: Mapped[int] = mapped_column(Integer, default=1)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class Order(Base):
+    __tablename__ = "orders"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    # pending | paid | refunded | failed | cancelled
+    status: Mapped[str] = mapped_column(String(24), default="pending", index=True)
+    # wechat | apple | google | manual | mock
+    provider: Mapped[str] = mapped_column(String(24), default="manual")
+    provider_ref: Mapped[str | None] = mapped_column(String(128), nullable=True, index=True)
+    amount_cents: Mapped[int] = mapped_column(Integer, default=0)
+    currency: Mapped[str] = mapped_column(String(8), default="CNY")
+    meta_json: Mapped[str] = mapped_column(Text, default="{}")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    paid_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+    user: Mapped[User] = relationship(back_populates="orders")
+    items: Mapped[list["OrderItem"]] = relationship(
+        back_populates="order", cascade="all, delete-orphan"
+    )
+
+
+class OrderItem(Base):
+    __tablename__ = "order_items"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    order_id: Mapped[int] = mapped_column(ForeignKey("orders.id", ondelete="CASCADE"), index=True)
+    sku_id: Mapped[int] = mapped_column(ForeignKey("product_skus.id", ondelete="RESTRICT"), index=True)
+    quantity: Mapped[int] = mapped_column(Integer, default=1)
+    unit_price_cents: Mapped[int] = mapped_column(Integer, default=0)
+
+    order: Mapped[Order] = relationship(back_populates="items")
+    sku: Mapped[ProductSku] = relationship()
+
+
+class UserEntitlement(Base):
+    """Core user asset / license / quota row."""
+
+    __tablename__ = "user_entitlements"
+    __table_args__ = (
+        UniqueConstraint(
+            "user_id",
+            "asset_kind",
+            "asset_ref",
+            name="uq_user_asset_kind_ref",
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    # course_access | course_pack | link_import | vocab_pack |
+    # membership | coach_quota | digital_human_quota | credits
+    asset_kind: Mapped[str] = mapped_column(String(32), index=True)
+    asset_ref: Mapped[str] = mapped_column(String(160), index=True)
+    # purchase | grant | import | promo | system
+    source: Mapped[str] = mapped_column(String(24), default="system")
+    order_id: Mapped[int | None] = mapped_column(
+        ForeignKey("orders.id", ondelete="SET NULL"), nullable=True, index=True
+    )
+    # active | expired | revoked
+    status: Mapped[str] = mapped_column(String(24), default="active", index=True)
+    # Remaining units for consumables; null = unlimited.
+    quantity: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    starts_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    ends_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    meta_json: Mapped[str] = mapped_column(Text, default="{}")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
+
+    user: Mapped[User] = relationship(back_populates="entitlements")
+
+
+class WalletAccount(Base):
+    __tablename__ = "wallet_accounts"
+
+    user_id: Mapped[int] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), primary_key=True
+    )
+    balance_credits: Mapped[int] = mapped_column(Integer, default=0)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
+
+    user: Mapped[User] = relationship(back_populates="wallet")
+
+
+class WalletLedger(Base):
+    __tablename__ = "wallet_ledger"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    delta: Mapped[int] = mapped_column(Integer)
+    reason: Mapped[str] = mapped_column(String(64), default="adjust")
+    order_id: Mapped[int | None] = mapped_column(
+        ForeignKey("orders.id", ondelete="SET NULL"), nullable=True, index=True
+    )
+    meta_json: Mapped[str] = mapped_column(Text, default="{}")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())

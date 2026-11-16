@@ -39,19 +39,41 @@ class Settings:
     livetalking_url: str = 'http://100.115.252.55:8010'
     # Public HTTPS for mobile clients (nginx reverse proxy). Never require Tailscale on phones.
     livetalking_public_url: str = 'https://acquireenglish.curlhairai.com/livetalking'
-
-    @property
-    def livetalking_client_url(self) -> str:
-        public = (self.livetalking_public_url or '').strip().rstrip('/')
-        if public:
-            return public
-        return (self.livetalking_url or '').rstrip('/')
+    turn_urls: str = ''
+    turn_username: str = ''
+    turn_password: str = ''
 
     def __post_init__(self) -> None:
         self.data_dir = self.data_dir.expanduser().resolve()
         self.data_dir.mkdir(parents=True, exist_ok=True)
         (self.data_dir / 'audio').mkdir(exist_ok=True)
         (self.data_dir / 'tts').mkdir(exist_ok=True)
+
+    @property
+    def livetalking_client_url(self) -> str:
+        """URL the phone App should open (public preferred)."""
+        public = (self.livetalking_public_url or '').strip().rstrip('/')
+        if public:
+            return public
+        return (self.livetalking_url or '').rstrip('/')
+
+    def webrtc_ice_servers(self) -> list[dict]:
+        """ICE servers for flutter_webrtc / browser clients."""
+        servers: list[dict] = [
+            {'urls': ['stun:stun.l.google.com:19302']},
+        ]
+        urls = [u.strip() for u in (self.turn_urls or '').split(',') if u.strip()]
+        user = (self.turn_username or '').strip()
+        password = (self.turn_password or '').strip()
+        if urls and user and password:
+            servers.append(
+                {
+                    'urls': urls,
+                    'username': user,
+                    'credential': password,
+                }
+            )
+        return servers
 
     @classmethod
     def from_env(cls) -> 'Settings':
@@ -98,4 +120,11 @@ class Settings:
                 'LIVETALKING_PUBLIC_URL',
                 'https://acquireenglish.curlhairai.com/livetalking',
             ).rstrip('/'),
+            turn_urls=os.getenv(
+                'TURN_URLS',
+                # CurlHair-style: only 80/443 public — TURN over TLS on 443 (SNI).
+                'turns:turn.curlhairai.com:443?transport=tcp',
+            ).strip(),
+            turn_username=os.getenv('TURN_USERNAME', '').strip(),
+            turn_password=os.getenv('TURN_PASSWORD', '').strip(),
         )

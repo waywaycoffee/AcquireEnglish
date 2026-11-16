@@ -46,6 +46,15 @@ if ($ffCandidates) {
 }
 
 $port = if ($env:LIVETALKING_PORT) { $env:LIVETALKING_PORT } else { "8010" }
+
+# Public phone path: ECS nginx (signaling) + coturn (media). Load secrets if present.
+$turnEnv = Join-Path $PSScriptRoot "livetalking_turn.env.ps1"
+if (Test-Path $turnEnv) { . $turnEnv }
+if (-not $env:LIVETALKING_TURN_URLS) {
+  # CurlHair-style: TURN TLS on public 443 (nginx SNI → coturn)
+  $env:LIVETALKING_TURN_URLS = "turns:turn.curlhairai.com:443?transport=tcp"
+}
+
 $tsIp = ""
 $tsExe = Join-Path ${env:ProgramFiles} "Tailscale\tailscale.exe"
 if (Test-Path $tsExe) {
@@ -53,8 +62,12 @@ if (Test-Path $tsExe) {
 }
 Write-Host "LiveTalking → 0.0.0.0:$port  model=wav2lip  avatar=$avatarId  transport=webrtc"
 Write-Host "Local:     http://127.0.0.1:$port/index.html"
+Write-Host "Public:    https://acquireenglish.curlhairai.com/livetalking/  (phone: no Tailscale)"
+if ($env:LIVETALKING_TURN_USERNAME) {
+  Write-Host "TURN:      $($env:LIVETALKING_TURN_URLS)  user=$($env:LIVETALKING_TURN_USERNAME)"
+}
 if ($tsIp) {
-  Write-Host "Tailscale: http://${tsIp}:$port/index.html  (MagicDNS: http://5060ti.tailc30b42.ts.net:$port)"
+  Write-Host "Tailscale: http://${tsIp}:$port/index.html  (ECS→GPU probe only)"
 } else {
   Write-Host "LAN/Tailscale: http://<this-pc-ip>:$port/index.html  (TCP $port + UDP for WebRTC)"
 }

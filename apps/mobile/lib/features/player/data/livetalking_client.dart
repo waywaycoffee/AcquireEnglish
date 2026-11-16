@@ -142,6 +142,8 @@ class LiveTalkingClient {
     await renderer.initialize();
     _renderer = renderer;
 
+    // Prefer ICE from oral-coach /api/health (CurlHair-style: phone only uses
+    // public config). Fallback: built-in STUN + TURNS.
     final List<Map<String, dynamic>> ice =
         (iceServers != null && iceServers.isNotEmpty)
         ? iceServers

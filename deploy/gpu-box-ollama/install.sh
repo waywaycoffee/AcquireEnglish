@@ -9,7 +9,7 @@
 #   OLLAMA_MODEL=qwen2.5:7b OLLAMA_HOST=0.0.0.0:11434 ./install.sh
 set -euo pipefail
 
-MODEL="${OLLAMA_MODEL:-qwen2.5:7b}"
+MODEL="${OLLAMA_MODEL:-qwen2.5:3b}"
 HOST_BIND="${OLLAMA_HOST:-0.0.0.0:11434}"
 KEEP_ALIVE="${OLLAMA_KEEP_ALIVE:-10m}"
 UNIT_DIR="${OLLAMA_SYSTEMD_DIR:-/etc/systemd/system}"

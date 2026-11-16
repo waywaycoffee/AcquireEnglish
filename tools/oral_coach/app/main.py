@@ -58,9 +58,10 @@ def health() -> dict[str, Any]:
         'ready': True,
         'providers': pipeline.provider_map(),
         'allow_lan': settings.allow_lan,
-        # Mobile clients must use the public HTTPS URL (no Tailscale on phones).
+        # Phone-facing public URL (nginx). Internal Tailscale stays in probe only.
         'livetalking_url': settings.livetalking_client_url,
         'livetalking_internal_url': settings.livetalking_url,
+        'webrtc_ice_servers': settings.webrtc_ice_servers(),
         'stack': {
             'asr': 'WhisperX / Deepgram / mock',
             'pronunciation': 'simple / phoneme / http / wav2vec2',

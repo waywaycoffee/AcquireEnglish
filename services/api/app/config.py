@@ -2,7 +2,11 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
-    model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8")
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        env_file_encoding="utf-8",
+        extra="ignore",
+    )
 
     app_name: str = "AcquireEnglish API"
     secret_key: str = "dev-change-me-acquire-english"
@@ -28,6 +32,12 @@ class Settings(BaseSettings):
     auth_sms_mock_code: str = "123456"
     # Optional webhook: POST JSON {phone, code}; used when auth_sms_mock=false.
     auth_sms_webhook_url: str = ""
+    # Aliyun SMS (optional; ignored when auth_sms_mock=true).
+    aliyun_sms_access_key_id: str = ""
+    aliyun_sms_access_key_secret: str = ""
+    aliyun_sms_sign_name: str = ""
+    aliyun_sms_template_code: str = ""
+    aliyun_sms_region: str = "cn-hangzhou"
 
     # WeChat mobile app login (code → openid). Mock uses the code as openid.
     auth_wechat_mock: bool = True

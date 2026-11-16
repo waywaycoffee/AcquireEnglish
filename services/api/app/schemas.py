@@ -168,3 +168,88 @@ class DailyFeedItemOut(BaseModel):
     description: str | None = None
     tags: list[str] = []
     source: str = "bilibili"
+
+
+# --- User assets (entitlements / orders / wallet) ---
+
+
+class ProductSkuOut(BaseModel):
+    id: int
+    sku_code: str
+    kind: str
+    title: str
+    ref_id: str | None = None
+    price_cents: int
+    currency: str = "CNY"
+    grant_quantity: int | None = None
+    duration_days: int | None = None
+    active: bool = True
+
+    model_config = {"from_attributes": True}
+
+
+class EntitlementOut(BaseModel):
+    id: int
+    asset_kind: str
+    asset_ref: str
+    source: str
+    status: str
+    quantity: int | None = None
+    starts_at: datetime | None = None
+    ends_at: datetime | None = None
+    order_id: int | None = None
+    created_at: datetime
+    updated_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
+class EntitlementGrantIn(BaseModel):
+    asset_kind: str = Field(min_length=2, max_length=32)
+    asset_ref: str = Field(min_length=1, max_length=160)
+    source: str = Field(default="grant", max_length=24)
+    quantity: int | None = Field(default=None, ge=0)
+    duration_days: int | None = Field(default=None, ge=1, le=3650)
+    meta: dict | None = None
+
+
+class OrderItemIn(BaseModel):
+    sku_code: str = Field(min_length=1, max_length=64)
+    quantity: int = Field(default=1, ge=1, le=99)
+
+
+class OrderCreateIn(BaseModel):
+    items: list[OrderItemIn] = Field(min_length=1)
+    provider: str = Field(default="mock", max_length=24)
+
+
+class OrderItemOut(BaseModel):
+    sku_id: int
+    sku_code: str
+    quantity: int
+    unit_price_cents: int
+
+
+class OrderOut(BaseModel):
+    id: int
+    status: str
+    provider: str
+    provider_ref: str | None = None
+    amount_cents: int
+    currency: str
+    items: list[OrderItemOut]
+    created_at: datetime
+    paid_at: datetime | None = None
+
+
+class WalletOut(BaseModel):
+    balance_credits: int
+    updated_at: datetime | None = None
+
+
+class UserAssetsOut(BaseModel):
+    entitlements: list[EntitlementOut]
+    wallet: WalletOut
+    link_course_count: int
+    vocab_count: int
+    active_membership: str | None = None
