@@ -11,6 +11,7 @@ import httpx
 
 from app.config import settings
 from app.security import hash_password
+from app.services.aliyun_sms import aliyun_sms_configured, send_aliyun_sms
 
 
 _PHONE_RE = re.compile(r"^\+?[0-9]{8,15}$")
@@ -40,11 +41,24 @@ def random_password_hash() -> str:
     return hash_password(secrets.token_urlsafe(32))
 
 
-def sms_mock_enabled() -> bool:
-    """Mock unless explicitly disabled AND a webhook is configured."""
+def sms_provider() -> str:
+    """mock | aliyun | webhook | unset"""
     if settings.auth_sms_mock:
-        return True
-    return not bool(settings.auth_sms_webhook_url.strip())
+        return "mock"
+    if aliyun_sms_configured():
+        return "aliyun"
+    if settings.auth_sms_webhook_url.strip():
+        return "webhook"
+    return "unset"
+
+
+def sms_mock_enabled() -> bool:
+    """True only when explicitly mocked. Real mode requires Aliyun or webhook."""
+    return sms_provider() == "mock"
+
+
+def sms_delivery_ready() -> bool:
+    return sms_provider() in {"mock", "aliyun", "webhook"}
 
 
 def _codes_db() -> Path:
@@ -106,11 +120,19 @@ def verify_sms_code(phone: str, code: str) -> bool:
 
 
 async def deliver_sms(phone: str, code: str) -> None:
-    if sms_mock_enabled():
+    provider = sms_provider()
+    if provider == "mock":
         return
-    webhook = settings.auth_sms_webhook_url.strip()
-    if not webhook:
-        raise RuntimeError("未配置短信网关（AUTH_SMS_WEBHOOK_URL）")
-    async with httpx.AsyncClient(timeout=15) as client:
-        response = await client.post(webhook, json={"phone": phone, "code": code})
-        response.raise_for_status()
+    if provider == "aliyun":
+        await send_aliyun_sms(phone=phone, code=code)
+        return
+    if provider == "webhook":
+        webhook = settings.auth_sms_webhook_url.strip()
+        async with httpx.AsyncClient(timeout=15) as client:
+            response = await client.post(webhook, json={"phone": phone, "code": code})
+            response.raise_for_status()
+        return
+    raise RuntimeError(
+        "未配置短信通道：请设置阿里云短信参数或 AUTH_SMS_WEBHOOK_URL，"
+        "或临时保持 AUTH_SMS_MOCK=true"
+    )

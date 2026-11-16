@@ -151,6 +151,42 @@ async def credit_wallet(
     return wallet
 
 
+async def grant_new_user_trial(db: AsyncSession, user_id: int) -> dict[str, object]:
+    """Seed a lightweight trial pack so new accounts are not empty in /api/assets."""
+    membership = await grant_entitlement(
+        db,
+        user_id,
+        asset_kind="membership",
+        asset_ref="pro",
+        source="promo",
+        quantity=None,
+        duration_days=7,
+        meta={"campaign": "new_user_trial"},
+    )
+    coach = await grant_entitlement(
+        db,
+        user_id,
+        asset_kind="coach_quota",
+        asset_ref="coach",
+        source="promo",
+        quantity=10,
+        duration_days=30,
+        meta={"campaign": "new_user_trial"},
+    )
+    wallet = await credit_wallet(
+        db,
+        user_id,
+        50,
+        reason="promo",
+        meta={"campaign": "new_user_trial"},
+    )
+    return {
+        "membership_id": membership.id,
+        "coach_id": coach.id,
+        "wallet_balance": int(wallet.balance_credits or 0),
+    }
+
+
 async def grant_entitlement(
     db: AsyncSession,
     user_id: int,

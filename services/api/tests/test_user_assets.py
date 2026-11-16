@@ -47,11 +47,13 @@ async def test_assets_summary_and_grant():
         token = await _sms_token(client)
         headers = {"Authorization": f"Bearer {token}"}
 
-        empty = await client.get("/api/assets", headers=headers)
-        assert empty.status_code == 200, empty.text
-        body = empty.json()
-        assert body["entitlements"] == []
-        assert body["wallet"]["balance_credits"] == 0
+        seeded = await client.get("/api/assets", headers=headers)
+        assert seeded.status_code == 200, seeded.text
+        body = seeded.json()
+        # New-user trial: 7d Pro + coach quota + 50 credits.
+        assert body["wallet"]["balance_credits"] >= 50
+        assert body["active_membership"] == "pro"
+        assert any(e["asset_kind"] == "coach_quota" for e in body["entitlements"])
         assert body["link_course_count"] == 0
 
         skus = await client.get("/api/assets/skus", headers=headers)
@@ -113,7 +115,8 @@ async def test_order_mark_paid_grants_minutes_and_credits():
         assets = await client.get("/api/assets", headers=headers)
         assert assets.status_code == 200
         body = assets.json()
-        assert body["wallet"]["balance_credits"] == 200
+        # 50 trial credits + 200 from paid credits.100 x2
+        assert body["wallet"]["balance_credits"] == 250
         dh = [
             e
             for e in body["entitlements"]

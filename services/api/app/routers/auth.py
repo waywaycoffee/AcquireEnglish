@@ -26,6 +26,7 @@ from app.services.phone_auth import (
     sms_mock_enabled,
     verify_sms_code,
 )
+from app.services.user_assets import grant_new_user_trial
 from app.services.wechat_auth import (
     exchange_wechat_code,
     random_password_hash as wechat_password_hash,
@@ -43,6 +44,15 @@ def _token_for(user: User, *, is_new_user: bool = False) -> TokenOut:
     )
 
 
+async def _seed_trial_if_new(db: AsyncSession, user: User, *, is_new: bool) -> None:
+    if not is_new:
+        return
+    try:
+        await grant_new_user_trial(db, user.id)
+    except Exception:  # noqa: BLE001 — registration must not fail on promo grant
+        pass
+
+
 @router.post("/register", response_model=TokenOut)
 async def register(payload: UserCreate, db: AsyncSession = Depends(get_db)) -> TokenOut:
     existing = await db.execute(select(User).where(User.email == payload.email.lower()))
@@ -57,6 +67,7 @@ async def register(payload: UserCreate, db: AsyncSession = Depends(get_db)) -> T
     db.add(user)
     await db.commit()
     await db.refresh(user)
+    await _seed_trial_if_new(db, user, is_new=True)
     return _token_for(user, is_new_user=True)
 
 
@@ -119,6 +130,7 @@ async def sms_login(payload: SmsLoginIn, db: AsyncSession = Depends(get_db)) -> 
         db.add(user)
         await db.commit()
         await db.refresh(user)
+        await _seed_trial_if_new(db, user, is_new=True)
     return _token_for(user, is_new_user=is_new)
 
 
@@ -154,6 +166,7 @@ async def wechat_login(payload: WechatLoginIn, db: AsyncSession = Depends(get_db
         db.add(user)
         await db.commit()
         await db.refresh(user)
+        await _seed_trial_if_new(db, user, is_new=True)
     else:
         dirty = False
         if identity.unionid and not user.wechat_unionid:

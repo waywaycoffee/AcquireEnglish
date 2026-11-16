@@ -63,16 +63,19 @@ app.include_router(rewards.router, prefix="/api")
 
 @app.get("/api/health")
 async def health() -> dict[str, str]:
-    from app.services.phone_auth import sms_mock_enabled
+    from app.services.phone_auth import sms_mock_enabled, sms_provider
     from app.services.livekit_tokens import livekit_configured
 
-    wechat_mock = settings.auth_wechat_mock or not (
+    wechat_ready = bool(
         settings.wechat_app_id.strip() and settings.wechat_app_secret.strip()
     )
+    wechat_mock = settings.auth_wechat_mock or not wechat_ready
     return {
         "status": "ok",
         "auth_sms_mock": str(sms_mock_enabled()).lower(),
+        "auth_sms_provider": sms_provider(),
         "auth_wechat_mock": str(wechat_mock).lower(),
+        "auth_wechat_configured": str(wechat_ready).lower(),
         "oral_coach": "https://acquireenglish.curlhairai.com/coach",
         "livekit": (
             (settings.livekit_url or "").strip()

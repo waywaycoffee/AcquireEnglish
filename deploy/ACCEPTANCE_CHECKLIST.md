@@ -40,18 +40,19 @@ third_party/LiveTalking/.venv/Scripts/python.exe tools/livetalking/test_webrtc_e
 
 | Path | Current production behavior | Accept as |
 |------|-----------------------------|-----------|
-| SMS login (`/api/auth/sms/*`) | `AUTH_SMS_MOCK=true`, code **123456** | **Accepted mock** unless real SMS secrets/webhook appear |
-| WeChat login (`/api/auth/wechat/login`) | `AUTH_WECHAT_MOCK=true` (or AppID/Secret empty) — any `code` maps to stable mock openid | **Accepted mock** unless WeChat App secrets are configured |
+| SMS login (`/api/auth/sms/*`) | Dev mock code **123456**; prod target `auth_sms_provider=aliyun` | See [`AUTH_PRODUCTION.md`](AUTH_PRODUCTION.md) |
+| WeChat login (`/api/auth/wechat/login`) | Dev mock openid; prod needs AppID/Secret + App dart-define | See AUTH_PRODUCTION.md |
 | Email register/login | Real JWT against **Postgres** | Real |
+| New-user trial assets | Auto: 7d Pro + 10 coach min + 50 credits | Real after first register/login |
 
-Confirm mock flags via health:
+Confirm flags via health:
 
 ```bash
 curl -fsS https://acquireenglish.curlhairai.com/api/health
-# expect: "auth_sms_mock":"true","auth_wechat_mock":"true"
+# prod target: auth_sms_mock=false, auth_sms_provider=aliyun, auth_wechat_mock=false
 ```
 
-Do **not** fail acceptance because SMS/WeChat are mocked. Mark those rows **mock-mode pass** when login returns a token.
+CI/staging may still use mocks. Do **not** fail acceptance solely for mock SMS/WeChat on non-prod builds.
 
 ---
 

@@ -41,6 +41,18 @@ async def test_sms_login_auto_registers():
         assert data["is_new_user"] is True
         assert data["user"]["phone"] in {"+8613900001111", "13900001111"}
 
+        assets = await client.get(
+            "/api/assets",
+            headers={"Authorization": f"Bearer {data['access_token']}"},
+        )
+        assert assets.status_code == 200, assets.text
+        body = assets.json()
+        assert body["wallet"]["balance_credits"] >= 50
+        assert body["active_membership"] is not None
+        assert any(
+            row.get("asset_kind") == "coach_quota" for row in body.get("entitlements", [])
+        )
+
         send2 = await client.post("/api/auth/sms/send", json={"phone": "13900001111"})
         code2 = send2.json().get("debug_code") or "123456"
         again = await client.post(
@@ -65,6 +77,13 @@ async def test_wechat_login_auto_registers():
         assert data["user"]["wechat_bound"] is True
         assert data["user"]["display_name"] == "测试微信"
 
+        assets = await client.get(
+            "/api/assets",
+            headers={"Authorization": f"Bearer {data['access_token']}"},
+        )
+        assert assets.status_code == 200
+        assert assets.json()["wallet"]["balance_credits"] >= 50
+
         second = await client.post(
             "/api/auth/wechat/login",
             json={"code": "dev_wx_user_1"},
@@ -72,3 +91,11 @@ async def test_wechat_login_auto_registers():
         assert second.status_code == 200
         assert second.json()["is_new_user"] is False
         assert second.json()["user"]["id"] == data["user"]["id"]
+
+
+def test_aliyun_phone_normalization_and_provider_labels():
+    from app.services.aliyun_sms import _phone_for_aliyun
+    from app.services.phone_auth import sms_provider
+
+    assert _phone_for_aliyun("+8613900011111") == "13900011111"
+    assert sms_provider() == "mock"
