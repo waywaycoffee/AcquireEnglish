@@ -85,4 +85,31 @@ class NativeSubtitleBall {
       await _channel.invokeMethod<void>('hideSubtitleBall');
     } catch (_) {}
   }
+
+  /// Whether the user tapped × (persisted until [setDismissed] false).
+  static Future<bool> isDismissed() async {
+    if (!_supported) {
+      return false;
+    }
+    try {
+      return await _channel.invokeMethod<bool>('isSubtitleBallDismissed') ??
+          false;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  /// Persist hide/show. When [dismissed] is true the native ball stays off
+  /// even while subtitle fill continues in the foreground service.
+  static Future<void> setDismissed(bool dismissed) async {
+    if (!_supported) {
+      return;
+    }
+    try {
+      await _channel.invokeMethod<void>(
+        'setSubtitleBallDismissed',
+        <String, Object?>{'dismissed': dismissed},
+      );
+    } catch (_) {}
+  }
 }

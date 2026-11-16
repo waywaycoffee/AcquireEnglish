@@ -25,19 +25,54 @@ import kotlin.math.roundToInt
  * Process-wide singleton SYSTEM_ALERT_WINDOW pill.
  * Must be a singleton: Activity recreate otherwise leaves orphan WindowManager
  * views → multiple floating balls on screen.
+ *
+ * User can tap × to hide. Dismissal is persisted so the ball stays hidden while
+ * the user does other things; re-enable via [setUserDismissed]/false) from App.
  */
 class SubtitleFloatingBall private constructor(private val context: Context) {
     private val windowManager =
         context.applicationContext.getSystemService(Context.WINDOW_SERVICE) as WindowManager
+    private val prefs =
+        context.applicationContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
     private var root: LinearLayout? = null
     private var percentView: TextView? = null
     private var captionView: TextView? = null
+    private var closeView: TextView? = null
     private var ring: ProgressBar? = null
     private var layoutParams: WindowManager.LayoutParams? = null
     private var lastProgress = 0.08f
 
+    @Volatile
+    private var userDismissed: Boolean = prefs.getBoolean(KEY_DISMISSED, false)
+
     val isShowing: Boolean
         get() = root != null
+
+    val isUserDismissed: Boolean
+        get() = userDismissed
+
+    fun setUserDismissed(dismissed: Boolean) {
+        userDismissed = dismissed
+        prefs.edit().putBoolean(KEY_DISMISSED, dismissed).apply()
+        if (dismissed) {
+            hide()
+        }
+    }
+
+    /** Clear a previous × dismissal so the next background session can show. */
+    fun resetDismissal() {
+        setUserDismissed(false)
+    }
+
+    /** The × button: hide the pill; FGS keeps filling subtitles. */
+    private fun dismissByUser() {
+        setUserDismissed(true)
+        Toast.makeText(
+            context,
+            "已隐藏悬浮球，补字幕仍在后台进行",
+            Toast.LENGTH_SHORT,
+        ).show()
+    }
 
     fun canDrawOverlays(): Boolean {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M) {
@@ -71,6 +106,9 @@ class SubtitleFloatingBall private constructor(private val context: Context) {
     }
 
     fun show(progress: Double, label: String) {
+        if (userDismissed) {
+            return
+        }
         // Never mount a system overlay while MainActivity is resumed —
         // the in-app FAB already shows progress (avoids 2–3 balls).
         if (MainActivity.isActivityResumed) {
@@ -92,7 +130,6 @@ class SubtitleFloatingBall private constructor(private val context: Context) {
             update(frac.toDouble(), label)
             return
         }
-        // Drop any leaked view before attaching a new one.
         hide()
 
         val density = context.resources.displayMetrics.density
@@ -122,7 +159,7 @@ class SubtitleFloatingBall private constructor(private val context: Context) {
             setPadding(
                 (16 * density).roundToInt(),
                 (12 * density).roundToInt(),
-                (18 * density).roundToInt(),
+                (10 * density).roundToInt(),
                 (12 * density).roundToInt(),
             )
             background = GradientDrawable().apply {
@@ -155,10 +192,47 @@ class SubtitleFloatingBall private constructor(private val context: Context) {
             text = label
         }
 
+        val divider = View(context).apply {
+            layoutParams = LinearLayout.LayoutParams(
+                (1 * density).roundToInt(),
+                (16 * density).roundToInt(),
+            ).apply {
+                gravity = Gravity.CENTER_VERTICAL
+                setMargins((10 * density).roundToInt(), 0, 0, 0)
+            }
+            setBackgroundColor(Color.parseColor("#66FFFFFF"))
+        }
+
+        val close = TextView(context).apply {
+            text = "×"
+            setTextColor(Color.WHITE)
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 22f)
+            gravity = Gravity.CENTER
+            isClickable = true
+            isFocusable = true
+            contentDescription = "关闭悬浮球"
+            // Large tap target so × is easy to hit while dragging the pill.
+            setPadding(
+                (14 * density).roundToInt(),
+                (10 * density).roundToInt(),
+                (12 * density).roundToInt(),
+                (10 * density).roundToInt(),
+            )
+            // Consume touch here so the container drag listener never steals ×.
+            setOnTouchListener { _, event ->
+                if (event.action == MotionEvent.ACTION_UP) {
+                    dismissByUser()
+                }
+                true
+            }
+        }
+
         container.addView(progressBar)
         container.addView(percent)
         container.addView(caption)
-        attachDrag(container, params)
+        container.addView(divider)
+        container.addView(close)
+        attachDrag(container, params, close)
         container.setOnClickListener {
             val launch = context.packageManager.getLaunchIntentForPackage(context.packageName)
             if (launch != null) {
@@ -172,6 +246,7 @@ class SubtitleFloatingBall private constructor(private val context: Context) {
             root = container
             percentView = percent
             captionView = caption
+            closeView = close
             ring = progressBar
             layoutParams = params
         } catch (error: Exception) {
@@ -185,6 +260,9 @@ class SubtitleFloatingBall private constructor(private val context: Context) {
     }
 
     fun update(progress: Double, label: String) {
+        if (userDismissed) {
+            return
+        }
         if (MainActivity.isActivityResumed) {
             hide()
             return
@@ -206,6 +284,7 @@ class SubtitleFloatingBall private constructor(private val context: Context) {
         root = null
         percentView = null
         captionView = null
+        closeView = null
         ring = null
         layoutParams = null
         if (view != null) {
@@ -232,13 +311,21 @@ class SubtitleFloatingBall private constructor(private val context: Context) {
         }
     }
 
-    private fun attachDrag(view: View, params: WindowManager.LayoutParams) {
+    private fun attachDrag(
+        view: View,
+        params: WindowManager.LayoutParams,
+        close: View,
+    ) {
         var downX = 0f
         var downY = 0f
         var startX = 0
         var startY = 0
         var moved = false
         view.setOnTouchListener { v, event ->
+            // Never start a drag from the close control.
+            if (event.action == MotionEvent.ACTION_DOWN && isInView(close, event.rawX, event.rawY)) {
+                return@setOnTouchListener false
+            }
             when (event.action) {
                 MotionEvent.ACTION_DOWN -> {
                     downX = event.rawX
@@ -273,8 +360,20 @@ class SubtitleFloatingBall private constructor(private val context: Context) {
         }
     }
 
+    private fun isInView(target: View, rawX: Float, rawY: Float): Boolean {
+        val loc = IntArray(2)
+        target.getLocationOnScreen(loc)
+        val left = loc[0]
+        val top = loc[1]
+        val right = left + target.width
+        val bottom = top + target.height
+        return rawX >= left && rawX <= right && rawY >= top && rawY <= bottom
+    }
+
     companion object {
         private const val VIEW_TAG = "acquire_subtitle_floating_ball"
+        private const val PREFS = "acquire_subtitle_overlay"
+        private const val KEY_DISMISSED = "user_dismissed"
 
         @Volatile
         private var instance: SubtitleFloatingBall? = null

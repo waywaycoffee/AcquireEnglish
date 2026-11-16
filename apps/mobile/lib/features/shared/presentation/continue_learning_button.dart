@@ -6,6 +6,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../../router/app_router.dart';
 import '../../player/presentation/learning_resume_provider.dart';
+import '../../subtitle_completion/native_subtitle_ball.dart';
 import '../../subtitle_completion/subtitle_completion_runtime.dart';
 import '../../subtitle_completion/subtitle_completion_status_provider.dart';
 import 'pad/app_design_tokens.dart';
@@ -22,6 +23,7 @@ class ContinueLearningButton extends ConsumerStatefulWidget {
 class _ContinueLearningButtonState
     extends ConsumerState<ContinueLearningButton> {
   bool _isOpening = false;
+  bool _overlayDismissed = false;
   SubtitleRuntimeSnapshot _runtime =
       SubtitleCompletionRuntime.instance.currentSnapshot;
   StreamSubscription<SubtitleRuntimeSnapshot>? _runtimeSub;
@@ -29,6 +31,7 @@ class _ContinueLearningButtonState
   @override
   void initState() {
     super.initState();
+    unawaited(_refreshOverlayDismissed());
     _runtimeSub = SubtitleCompletionRuntime.instance.snapshots.listen((
       SubtitleRuntimeSnapshot snap,
     ) {
@@ -36,7 +39,34 @@ class _ContinueLearningButtonState
         return;
       }
       setState(() => _runtime = snap);
+      unawaited(_refreshOverlayDismissed());
     });
+  }
+
+  Future<void> _refreshOverlayDismissed() async {
+    final bool dismissed = await NativeSubtitleBall.isDismissed();
+    if (mounted && dismissed != _overlayDismissed) {
+      setState(() => _overlayDismissed = dismissed);
+    }
+  }
+
+  Future<void> _toggleOverlayBall() async {
+    final bool next = !_overlayDismissed;
+    await NativeSubtitleBall.setDismissed(next);
+    if (!mounted) {
+      return;
+    }
+    setState(() => _overlayDismissed = next);
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          next
+              ? '已隐藏后台悬浮球（补字幕仍继续）'
+              : '已恢复后台悬浮球（离开 App 后显示）',
+        ),
+        duration: const Duration(seconds: 2),
+      ),
+    );
   }
 
   @override
@@ -70,41 +100,55 @@ class _ContinueLearningButtonState
           : (summary?.detailLabel ?? _runtime.label);
       final double progress =
           (summary?.overallProgress ?? _runtime.progress).clamp(0.05, 0.99);
-      return FloatingActionButton.extended(
-        key: const ValueKey<String>('subtitle-fill-fab'),
-        heroTag: 'global-subtitle-fill',
-        tooltip: tooltip,
-        onPressed: () {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(tooltip),
-              duration: const Duration(seconds: 2),
-            ),
-          );
-        },
-        backgroundColor: const Color(0xFF3B7CFF),
-        foregroundColor: Colors.white,
-        elevation: 3,
-        shape: const StadiumBorder(),
-        icon: SizedBox(
-          width: 22,
-          height: 22,
-          child: Stack(
-            alignment: Alignment.center,
-            children: <Widget>[
-              CircularProgressIndicator(
-                value: progress,
-                strokeWidth: 2.4,
-                backgroundColor: Colors.white24,
-                valueColor: const AlwaysStoppedAnimation<Color>(Colors.white),
+      return GestureDetector(
+        onLongPress: () => unawaited(_toggleOverlayBall()),
+        child: FloatingActionButton.extended(
+          key: const ValueKey<String>('subtitle-fill-fab'),
+          heroTag: 'global-subtitle-fill',
+          tooltip: _overlayDismissed
+              ? '$tooltip · 长按可恢复悬浮球'
+              : '$tooltip · 长按可隐藏悬浮球',
+          onPressed: () {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(
+                  _overlayDismissed
+                      ? '$tooltip（后台悬浮球已隐藏，长按可恢复）'
+                      : '$tooltip（长按可隐藏后台悬浮球）',
+                ),
+                duration: const Duration(seconds: 2),
               ),
-              const Icon(Icons.subtitles_rounded, size: 12),
-            ],
+            );
+          },
+          backgroundColor: const Color(0xFF3B7CFF),
+          foregroundColor: Colors.white,
+          elevation: 3,
+          shape: const StadiumBorder(),
+          icon: SizedBox(
+            width: 22,
+            height: 22,
+            child: Stack(
+              alignment: Alignment.center,
+              children: <Widget>[
+                CircularProgressIndicator(
+                  value: progress,
+                  strokeWidth: 2.4,
+                  backgroundColor: Colors.white24,
+                  valueColor: const AlwaysStoppedAnimation<Color>(Colors.white),
+                ),
+                Icon(
+                  _overlayDismissed
+                      ? Icons.visibility_off_rounded
+                      : Icons.subtitles_rounded,
+                  size: 12,
+                ),
+              ],
+            ),
           ),
-        ),
-        label: Text(
-          compact,
-          style: const TextStyle(fontWeight: FontWeight.w800),
+          label: Text(
+            compact,
+            style: const TextStyle(fontWeight: FontWeight.w800),
+          ),
         ),
       );
     }

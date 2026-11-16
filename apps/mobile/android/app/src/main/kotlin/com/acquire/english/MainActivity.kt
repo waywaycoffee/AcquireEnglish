@@ -78,8 +78,12 @@ class MainActivity : FlutterActivity(), MethodChannel.MethodCallHandler {
         super.onResume()
         isActivityResumed = true
         applyLockedOrientation()
-        // Foreground: never keep SYSTEM_ALERT_WINDOW pills (in-app FAB owns UI).
-        mainHandler.post { subtitleFloatingBall.hide() }
+        // Foreground: hide SYSTEM_ALERT_WINDOW pills (in-app FAB owns UI).
+        // Do NOT clear user dismissal here — × should stay hidden until the
+        // user explicitly re-enables the ball from the App.
+        mainHandler.post {
+            subtitleFloatingBall.hide()
+        }
     }
 
     override fun onPause() {
@@ -191,6 +195,16 @@ class MainActivity : FlutterActivity(), MethodChannel.MethodCallHandler {
                 mainHandler.post {
                     subtitleFloatingBall.hide()
                     result.success(true)
+                }
+            }
+            "isSubtitleBallDismissed" -> {
+                result.success(subtitleFloatingBall.isUserDismissed)
+            }
+            "setSubtitleBallDismissed" -> {
+                val dismissed = call.argument<Boolean>("dismissed") ?: true
+                mainHandler.post {
+                    subtitleFloatingBall.setUserDismissed(dismissed)
+                    result.success(subtitleFloatingBall.isUserDismissed)
                 }
             }
             else -> result.notImplemented()
