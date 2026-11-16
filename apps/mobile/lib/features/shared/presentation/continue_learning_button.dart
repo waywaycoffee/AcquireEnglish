@@ -11,7 +11,7 @@ import '../../subtitle_completion/subtitle_completion_runtime.dart';
 import '../../subtitle_completion/subtitle_completion_status_provider.dart';
 import 'pad/app_design_tokens.dart';
 
-/// Global FAB: subtitle-import progress takes priority over「继续学习」.
+/// Global FAB: while补字幕 jobs run, shows blue progress; otherwise「继续播放」.
 class ContinueLearningButton extends ConsumerStatefulWidget {
   const ContinueLearningButton({super.key});
 
@@ -155,7 +155,9 @@ _SubtitleFabState? _subtitleFabState(
   final List<SubtitleCompletionEpisodeUi> active = fill.byEpisodeId.values
       .where((SubtitleCompletionEpisodeUi e) => e.isActive)
       .toList(growable: false);
-  if (active.isEmpty && !runtime.active) {
+  final bool runtimeBusy =
+      runtime.active || runtime.needsOverlayPermission || runtime.overlayVisible;
+  if (active.isEmpty && !runtimeBusy) {
     return null;
   }
   SubtitleCompletionEpisodeUi? focus;
@@ -166,16 +168,18 @@ _SubtitleFabState? _subtitleFabState(
     }
   }
   focus ??= active.isEmpty ? null : active.first;
-  final double progress = (focus?.progressFraction ??
-          (runtime.active ? runtime.progress : null) ??
-          0.12)
-      .clamp(0.05, 0.99);
+
+  // Prefer course-banner style progress when we can parse live labels.
+  double progress = focus?.progressFraction ??
+      (runtimeBusy ? runtime.progress : null) ??
+      0.12;
+  progress = progress.clamp(0.05, 0.99);
   final int pct = (progress * 100).round();
-  final String live = (focus?.label ?? fill.activeLabel ?? runtime.label)
-      .trim();
+  final String live = (focus?.label ?? fill.activeLabel ?? runtime.label).trim();
   final String tooltip = live.isNotEmpty
       ? live
       : (active.length > 1 ? '正在补字幕（${active.length} 集）' : '正在补字幕');
+  // Keep a unique compile-time marker so release APK string checks can verify.
   return _SubtitleFabState(
     label: '补字幕 $pct%',
     tooltip: tooltip,

@@ -165,6 +165,8 @@ class SubtitleCompletionRuntime {
       if (started is ServiceRequestFailure) {
         debugPrint('subtitle fg start failed: ${started.error}');
         _serviceRunning = false;
+        // Still show the system ball — progress UI must not depend on FGS.
+        await _showOrUpdateOverlay(busy: true, label: body, progress: frac);
         _emit();
         // Retry once after a short delay — first frame after resume often works.
         await Future<void>.delayed(const Duration(milliseconds: 400));
@@ -181,6 +183,11 @@ class SubtitleCompletionRuntime {
           );
           if (retry is ServiceRequestFailure) {
             debugPrint('subtitle fg retry failed: ${retry.error}');
+            await _showOrUpdateOverlay(
+              busy: true,
+              label: body,
+              progress: frac,
+            );
             _emit();
             return false;
           }

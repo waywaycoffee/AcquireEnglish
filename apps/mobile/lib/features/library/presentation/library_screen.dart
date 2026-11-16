@@ -300,7 +300,8 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
     final bool canContinueLearning =
         ref.watch(continueLearningTargetProvider) != null;
     return PadScaffold(
-      showContinueLearning: !showDetail,
+      // Always show: morphs to「补字幕」while fill jobs run (detail + list).
+      showContinueLearning: true,
       currentDestination: AppNavDestination.library,
       topBar: PadTopBar(
         title: showImport
@@ -898,38 +899,6 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
                       ),
                     ),
                   ],
-                ),
-                Positioned(
-                  right: pagePadding,
-                  bottom: compact ? 24 : 28,
-                  child: FilledButton.icon(
-                    onPressed: activeEpisode == null
-                        ? null
-                        : () => context.pushNamed(
-                            SGRoute.player.name,
-                            pathParameters: <String, String>{
-                              'episodeId': activeEpisode.id,
-                            },
-                          ),
-                    style: FilledButton.styleFrom(
-                      backgroundColor: AppDesignTokens.brandGreen,
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 26,
-                        vertical: 18,
-                      ),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(999),
-                      ),
-                      elevation: 0,
-                    ),
-                    icon: const Icon(Icons.play_circle_fill_rounded, size: 26),
-                    label: Text(
-                      activeEpisode == null
-                          ? '暂无可播放剧集'
-                          : '继续播放第 ${activeEpisode.numberStr} 集',
-                      style: const TextStyle(fontWeight: FontWeight.w900),
-                    ),
-                  ),
                 ),
               ],
             )

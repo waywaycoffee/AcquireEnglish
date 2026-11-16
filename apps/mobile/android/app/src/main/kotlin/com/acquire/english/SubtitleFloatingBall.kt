@@ -1,5 +1,6 @@
 package com.acquire.english
 
+import android.app.AppOpsManager
 import android.content.Context
 import android.content.Intent
 import android.graphics.Color
@@ -7,26 +8,27 @@ import android.graphics.PixelFormat
 import android.graphics.drawable.GradientDrawable
 import android.net.Uri
 import android.os.Build
+import android.os.Process
 import android.provider.Settings
 import android.util.TypedValue
 import android.view.Gravity
 import android.view.MotionEvent
 import android.view.View
 import android.view.WindowManager
-import android.widget.FrameLayout
+import android.widget.LinearLayout
 import android.widget.ProgressBar
 import android.widget.TextView
 import android.widget.Toast
 import kotlin.math.roundToInt
 
 /**
- * Native SYSTEM_ALERT_WINDOW floating ball for subtitle-completion progress.
- * Avoids flutter_overlay_window's second Flutter engine (broken with flavor `-t`).
+ * Native SYSTEM_ALERT_WINDOW floating pill for subtitle-completion progress.
+ * Matches the in-app「继续播放 / 补字幕」stadium FAB so it stays visible off-app.
  */
 class SubtitleFloatingBall(private val context: Context) {
     private val windowManager =
         context.applicationContext.getSystemService(Context.WINDOW_SERVICE) as WindowManager
-    private var root: FrameLayout? = null
+    private var root: LinearLayout? = null
     private var percentView: TextView? = null
     private var captionView: TextView? = null
     private var ring: ProgressBar? = null
@@ -37,10 +39,23 @@ class SubtitleFloatingBall(private val context: Context) {
         get() = root != null
 
     fun canDrawOverlays(): Boolean {
-        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-            Settings.canDrawOverlays(context)
-        } else {
-            true
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M) {
+            return true
+        }
+        if (Settings.canDrawOverlays(context)) {
+            return true
+        }
+        // Xiaomi sometimes reports Settings=false while AppOps is already allow.
+        return try {
+            val appOps = context.getSystemService(Context.APP_OPS_SERVICE) as AppOpsManager
+            val mode = appOps.checkOpNoThrow(
+                "android:system_alert_window",
+                Process.myUid(),
+                context.packageName,
+            )
+            mode == AppOpsManager.MODE_ALLOWED
+        } catch (_: Exception) {
+            false
         }
     }
 
@@ -59,7 +74,7 @@ class SubtitleFloatingBall(private val context: Context) {
         if (!canDrawOverlays()) {
             Toast.makeText(
                 context,
-                "请开启「悬浮窗」权限以显示补字幕进度球",
+                "请开启「悬浮窗」权限以显示补字幕进度",
                 Toast.LENGTH_LONG,
             ).show()
             openOverlaySettings()
@@ -73,10 +88,9 @@ class SubtitleFloatingBall(private val context: Context) {
             return
         }
         val density = context.resources.displayMetrics.density
-        val size = (84 * density).roundToInt()
         val params = WindowManager.LayoutParams(
-            size,
-            size,
+            WindowManager.LayoutParams.WRAP_CONTENT,
+            WindowManager.LayoutParams.WRAP_CONTENT,
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                 WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
             } else {
@@ -88,63 +102,49 @@ class SubtitleFloatingBall(private val context: Context) {
                 WindowManager.LayoutParams.FLAG_HARDWARE_ACCELERATED,
             PixelFormat.TRANSLUCENT,
         ).apply {
-            gravity = Gravity.TOP or Gravity.END
-            x = (12 * density).roundToInt()
-            y = (180 * density).roundToInt()
+            gravity = Gravity.BOTTOM or Gravity.END
+            x = (16 * density).roundToInt()
+            y = (120 * density).roundToInt()
         }
 
-        val container = FrameLayout(context).apply {
-            background = GradientDrawable().apply {
-                shape = GradientDrawable.OVAL
-                colors = intArrayOf(Color.parseColor("#3B7CFF"), Color.parseColor("#1B4FD8"))
-                orientation = GradientDrawable.Orientation.TL_BR
-                setStroke((2 * density).roundToInt(), Color.WHITE)
-            }
-            elevation = 12 * density
-        }
-
-        val progressBar = ProgressBar(
-            context,
-            null,
-            android.R.attr.progressBarStyleHorizontal,
-        ).apply {
-            isIndeterminate = false
-            setMax(1000)
-            setProgress((frac * 1000).roundToInt().coerceIn(50, 1000))
-            layoutParams = FrameLayout.LayoutParams(
-                (58 * density).roundToInt(),
-                (58 * density).roundToInt(),
-                Gravity.CENTER,
+        val container = LinearLayout(context).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            setPadding(
+                (16 * density).roundToInt(),
+                (12 * density).roundToInt(),
+                (18 * density).roundToInt(),
+                (12 * density).roundToInt(),
             )
-            // Text is the primary signal; bar is a light cue.
-            alpha = 0.35f
+            background = GradientDrawable().apply {
+                shape = GradientDrawable.RECTANGLE
+                cornerRadius = 999 * density
+                colors = intArrayOf(Color.parseColor("#3B7CFF"), Color.parseColor("#1B4FD8"))
+                orientation = GradientDrawable.Orientation.LEFT_RIGHT
+            }
+            elevation = 10 * density
+        }
+
+        val progressBar = ProgressBar(context).apply {
+            isIndeterminate = true
+            layoutParams = LinearLayout.LayoutParams(
+                (22 * density).roundToInt(),
+                (22 * density).roundToInt(),
+            )
         }
 
         val percent = TextView(context).apply {
             setTextColor(Color.WHITE)
-            setTextSize(TypedValue.COMPLEX_UNIT_SP, 14f)
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 15f)
             paint.isFakeBoldText = true
-            gravity = Gravity.CENTER
-            text = "${(frac * 100).roundToInt()}%"
-            layoutParams = FrameLayout.LayoutParams(
-                FrameLayout.LayoutParams.WRAP_CONTENT,
-                FrameLayout.LayoutParams.WRAP_CONTENT,
-                Gravity.CENTER,
-            ).apply { bottomMargin = (8 * density).roundToInt() }
+            text = "补字幕 ${(frac * 100).roundToInt()}%"
+            setPadding((10 * density).roundToInt(), 0, 0, 0)
         }
 
+        // Keep a short live caption under contentDescription for a11y / future use.
         val caption = TextView(context).apply {
-            setTextColor(Color.WHITE)
-            setTextSize(TypedValue.COMPLEX_UNIT_SP, 9f)
-            paint.isFakeBoldText = true
-            gravity = Gravity.CENTER
-            text = "字幕"
-            alpha = 0.92f
-            layoutParams = FrameLayout.LayoutParams(
-                FrameLayout.LayoutParams.WRAP_CONTENT,
-                FrameLayout.LayoutParams.WRAP_CONTENT,
-                Gravity.CENTER,
-            ).apply { topMargin = (14 * density).roundToInt() }
+            visibility = View.GONE
+            text = label
         }
 
         container.addView(progressBar)
@@ -170,7 +170,7 @@ class SubtitleFloatingBall(private val context: Context) {
             root = null
             Toast.makeText(
                 context,
-                "悬浮球显示失败：${error.message ?: "请检查悬浮窗权限"}",
+                "悬浮窗显示失败：${error.message ?: "请检查悬浮窗权限"}",
                 Toast.LENGTH_LONG,
             ).show()
         }
@@ -183,9 +183,13 @@ class SubtitleFloatingBall(private val context: Context) {
             show(progress, label)
             return
         }
-        percentView?.text = "${(frac * 100).roundToInt()}%"
-        ring?.setProgress((frac * 1000).roundToInt().coerceIn(50, 1000))
-        captionView?.text = if (frac >= 0.99f) "完成" else "字幕"
+        percentView?.text = if (frac >= 0.99f) {
+            "补字幕完成"
+        } else {
+            "补字幕 ${(frac * 100).roundToInt()}%"
+        }
+        ring?.isIndeterminate = frac < 0.99f
+        captionView?.text = label
         view.contentDescription = label
     }
 
@@ -224,9 +228,9 @@ class SubtitleFloatingBall(private val context: Context) {
                     if (kotlin.math.abs(dx) > 4 || kotlin.math.abs(dy) > 4) {
                         moved = true
                     }
-                    // TOP|END: x grows leftward from the right edge.
+                    // BOTTOM|END: x grows leftward from the right edge; y up from bottom.
                     params.x = (startX - dx).coerceAtLeast(0)
-                    params.y = (startY + dy).coerceAtLeast(0)
+                    params.y = (startY - dy).coerceAtLeast(0)
                     try {
                         windowManager.updateViewLayout(v, params)
                     } catch (_: Exception) {
