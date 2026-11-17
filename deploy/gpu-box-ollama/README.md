@@ -88,3 +88,14 @@ chmod +x install.sh verify.sh
 本次已在本机加载统计模块、启动托盘并配置登录自启动。真实推理冒烟：HTTP 200，输入 33 / 输出 2 / 总计 35 Token，与统计接口一致。不需要为了统计重新加载其他陪练服务。
 
 查词故障复现：公网接口返回 HTTP 200，但 Qwen 偶尔生成 `tag: "noun"` 这种未给字段名加双引号的 JSON。旧客户端 jsonDecode 抛错后统一显示“翻译服务不可用”。新版客户端支持此键名格式及 Markdown JSON 围栏，增加生成预算与请求超时，并通过模拟实际响应的回归测试。服务器同时兑现 json_object 请求，规范化该格式以兼容当前手机版本；更新后的 App 还增加了客户端兼容。
+
+
+### 独立 Windows 应用（2026-11-17）
+
+旧 PowerShell 宿主的托盘不易发现，现增加无终端窗口的独立 WinForms 应用。
+
+- 编译：`powershell -NoProfile -File .\build_monitor.ps1`，生成本地 `AcquireEnglishMonitor.exe`。
+- 安装入口：`powershell -NoProfile -File .\install_monitor.ps1`，创建桌面 `AcquireEnglish Monitor` 快捷方式、配置当前用户登录自启动并打开面板。
+- 手动启动默认显示面板；登录启动用 `--background` 收起到托盘；关闭面板继续常驻。
+- 再次双击快捷方式通过命名事件唤起已有窗口，不创建重复实例；托盘菜单可退出监控而保留推理服务。
+- 本机已编译、打开窗口并通过桌面 UI 验证中文标签和真实统计数据显示。可执行文件为本地生成产物，不提交 Git。
