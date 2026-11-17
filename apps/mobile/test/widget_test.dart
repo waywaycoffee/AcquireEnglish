@@ -87,7 +87,7 @@ void main() {
     await _pumpFrames(tester);
 
     expect(find.textContaining('爱快英语'), findsWidgets);
-    expect(find.textContaining('Elon Musk 👋'), findsOneWidget);
+    expect(find.textContaining('weiwei 👋'), findsOneWidget);
     expect(find.text('导入你的第一套英语视频课程'), findsOneWidget);
     expect(find.text('YouTube'), findsOneWidget);
     expect(find.text('B站'), findsOneWidget);

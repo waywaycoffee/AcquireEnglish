@@ -276,11 +276,57 @@ bool _localHasUsableVideoForWatchUrl(
   return false;
 }
 
+Future<int>? _restorePersonalImportsInFlight;
+
+Future<void> _persistCloudSubtitlePack({
+  required String idKey,
+  required String? enSrt,
+  required String? zhSrt,
+}) async {
+  if ((enSrt ?? '').trim().length >= 20) {
+    await writeSharedBilibiliSubtitleFiles(
+      idKey: idKey,
+      enSrt: enSrt!,
+      zhSrt: zhSrt,
+    );
+    return;
+  }
+  if ((zhSrt ?? '').trim().length < 20) {
+    return;
+  }
+  final Directory docs = await getApplicationDocumentsDirectory();
+  final Directory dir = Directory(
+    '${docs.path}${Platform.pathSeparator}bilibili'
+    '${Platform.pathSeparator}$idKey',
+  );
+  if (!dir.existsSync()) {
+    await dir.create(recursive: true);
+  }
+  await File(
+    '${dir.path}${Platform.pathSeparator}zh.srt',
+  ).writeAsString(zhSrt!, flush: true);
+}
+
 /// After login on a new phone: re-download B站 videos from watch URLs and
 /// apply personal EN/ZH softsubs from the API database.
 ///
 /// [ref] may be a [Ref] or [WidgetRef] (both expose `.read`).
 Future<int> restorePersonalImportAssets(dynamic ref) async {
+  if (_restorePersonalImportsInFlight != null) {
+    return _restorePersonalImportsInFlight!;
+  }
+  final Future<int> run = _restorePersonalImportAssetsImpl(ref);
+  _restorePersonalImportsInFlight = run;
+  try {
+    return await run;
+  } finally {
+    if (identical(_restorePersonalImportsInFlight, run)) {
+      _restorePersonalImportsInFlight = null;
+    }
+  }
+}
+
+Future<int> _restorePersonalImportAssetsImpl(dynamic ref) async {
   final AuthSessionState auth =
       ref.read(authSessionProvider) as AuthSessionState;
   if (!auth.isLoggedIn) {
@@ -350,57 +396,40 @@ Future<int> restorePersonalImportAssets(dynamic ref) async {
         if (!needEn && !needZh) {
           continue;
         }
-        if ((enSrt ?? '').trim().length >= 20) {
-          await writeSharedBilibiliSubtitleFiles(
-            idKey: idKey,
-            enSrt: enSrt!,
-            zhSrt: zhSrt,
-          );
-        } else if ((zhSrt ?? '').trim().length >= 20) {
-          final Directory docs = await getApplicationDocumentsDirectory();
-          final Directory dir = Directory(
-            '${docs.path}${Platform.pathSeparator}bilibili'
-            '${Platform.pathSeparator}$idKey',
-          );
-          if (!dir.existsSync()) {
-            await dir.create(recursive: true);
-          }
-          await File(
-            '${dir.path}${Platform.pathSeparator}zh.srt',
-          ).writeAsString(zhSrt!, flush: true);
-        }
-        restored += 1;
-        continue;
-      }
-
-      final BilibiliImportResult meta = await service.fetchAndDownloadLocal(
-        asset.watchUrl,
-      );
-      if ((meta.localVideoPath ?? '').trim().isEmpty) {
-        continue;
-      }
-
-      final String idKey =
-          meta.idKey.trim().isNotEmpty ? meta.idKey.trim() : asset.externalId;
-      if (enSrt != null && enSrt.trim().length >= 20) {
-        await writeSharedBilibiliSubtitleFiles(
+        await _persistCloudSubtitlePack(
           idKey: idKey,
           enSrt: enSrt,
           zhSrt: zhSrt,
         );
-      } else if (zhSrt != null && zhSrt.trim().length >= 20) {
-        // EN missing — still persist ZH under official folder.
-        final Directory docs = await getApplicationDocumentsDirectory();
-        final Directory dir = Directory(
-          '${docs.path}${Platform.pathSeparator}bilibili'
-          '${Platform.pathSeparator}$idKey',
-        );
-        if (!dir.existsSync()) {
-          await dir.create(recursive: true);
+        restored += 1;
+        continue;
+      }
+
+      // New device / missing local video: download from watch URL when possible.
+      BilibiliImportResult? meta;
+      try {
+        meta = await service.fetchAndDownloadLocal(asset.watchUrl);
+      } catch (_) {
+        meta = null;
+      }
+      final String idKey = () {
+        final String fromMeta = (meta?.idKey ?? '').trim();
+        if (fromMeta.isNotEmpty) {
+          return fromMeta;
         }
-        await File(
-          '${dir.path}${Platform.pathSeparator}zh.srt',
-        ).writeAsString(zhSrt, flush: true);
+        return bilibiliEpisodeCacheKey(sourceUrl: asset.watchUrl) ??
+            asset.externalId;
+      }();
+      if (idKey.trim().isEmpty) {
+        continue;
+      }
+
+      if (hasCloudSubs) {
+        await _persistCloudSubtitlePack(
+          idKey: idKey,
+          enSrt: enSrt,
+          zhSrt: zhSrt,
+        );
       }
 
       final String? enPath = await existingOfficialBilibiliSubtitle(
@@ -412,19 +441,46 @@ Future<int> restorePersonalImportAssets(dynamic ref) async {
         fileName: 'zh.srt',
       );
 
+      // Even when CDN download fails (no cookie / network), still import a
+      // catalog row with watch URL + restored softsubs so the episode exists.
+      final BilibiliImportResult resolved =
+          (meta ??
+                  BilibiliImportResult(
+                    idKey: idKey,
+                    title: asset.title.trim().isEmpty
+                        ? asset.externalId
+                        : asset.title.trim(),
+                    watchUrl: asset.watchUrl,
+                    durationMinutes: (asset.durationSec / 60).ceil().clamp(
+                      1,
+                      24 * 60,
+                    ),
+                    author: asset.author,
+                  ))
+              .copyWith(
+                enSubtitlePath: enPath ?? meta?.enSubtitlePath,
+                cnSubtitlePath: zhPath ?? meta?.cnSubtitlePath,
+              );
+
+      final bool hasLocalVideo =
+          isUsableLocalVideoPath(resolved.localVideoPath);
+      if (!hasLocalVideo && !hasCloudSubs) {
+        // Nothing useful to restore for this asset yet.
+        continue;
+      }
+
       final LibraryCourseData course = buildLibraryCourseFromBilibiliImport(
-        meta.copyWith(
-          enSubtitlePath: enPath ?? meta.enSubtitlePath,
-          cnSubtitlePath: zhPath ?? meta.cnSubtitlePath,
-        ),
+        resolved,
       );
       final bool ok = await catalog.importCourse(course);
       if (ok) {
         restored += 1;
-        await enqueueSubtitleCompletionForCourse(
-          course: course,
-          bilibiliCookieHeader: settings.resolvedBilibiliCookieHeader,
-        );
+        if (hasLocalVideo) {
+          await enqueueSubtitleCompletionForCourse(
+            course: course,
+            bilibiliCookieHeader: settings.resolvedBilibiliCookieHeader,
+          );
+        }
       }
     } catch (_) {
       // Continue remaining assets.

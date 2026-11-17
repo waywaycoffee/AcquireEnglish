@@ -11,7 +11,9 @@ import 'package:google_fonts/google_fonts.dart';
 import 'config/theme/theme_logic.dart';
 import 'config/theme/theme_ui_model.dart';
 import 'features/authentication/presentation/auth_session.dart';
+import 'features/authentication/presentation/ensure_default_account.dart';
 import 'features/import_course/data/bilibili_multipage.dart';
+import 'features/sync/presentation/cloud_catalog_sync.dart';
 import 'features/library/presentation/library_catalog_provider.dart';
 import 'features/library/presentation/library_mock_data.dart';
 import 'features/settings/presentation/bilibili_login_sheet.dart';
@@ -46,6 +48,13 @@ class _MyAppState extends ConsumerState<MyApp> with WidgetsBindingObserver {
     // Re-assert portrait after first frame — Xiaomi can ignore early boot calls.
     WidgetsBinding.instance.addPostFrameCallback((_) {
       ensureDefaultPortraitOrientation();
+      // Default to weiwei so personal watch-url + subtitle assets sync.
+      unawaited(() async {
+        final bool signedIn = await ensureDefaultAccountSignIn(ref);
+        if (!signedIn && ref.read(authSessionProvider).isLoggedIn) {
+          unawaited(syncCloudCatalogAndFeed(ref));
+        }
+      }());
       // Touch status provider so library course UI can show fill progress.
       ref.read(subtitleCompletionStatusProvider);
       configureSharedBilibiliSubtitleApi(

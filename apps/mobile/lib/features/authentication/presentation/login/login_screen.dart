@@ -8,6 +8,8 @@ import '../../../../constants/assets.dart';
 import '../../../../router/app_router.dart';
 import '../../../shared/presentation/pad/app_design_tokens.dart';
 import '../../../sync/data/acquire_api_client.dart';
+import '../../../sync/presentation/cloud_catalog_sync.dart';
+import '../../data/default_account.dart';
 import '../../data/wechat_auth_helper.dart';
 import '../../domain/login_response.dart';
 import 'auth_ui_model.dart';
@@ -38,8 +40,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
   @override
   void initState() {
     super.initState();
-    _emailController = TextEditingController();
-    _passwordController = TextEditingController();
+    _emailController = TextEditingController(text: DefaultAccount.email);
+    _passwordController = TextEditingController(text: DefaultAccount.password);
     _phoneController = TextEditingController();
     _smsCodeController = TextEditingController();
     _tabController = TabController(length: 2, vsync: this);
@@ -71,6 +73,14 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
     }
     if (isNew) {
       _toast('已自动注册并登录');
+    } else {
+      _toast('正在同步云端视频与字幕…');
+    }
+    // New device / re-login: restore personal watch URLs + subtitle assets first.
+    ref.invalidate(cloudCatalogSyncProvider);
+    unawaited(syncCloudCatalogAndFeed(ref));
+    if (!mounted) {
+      return;
     }
     context.go(SGRoute.home.route);
   }

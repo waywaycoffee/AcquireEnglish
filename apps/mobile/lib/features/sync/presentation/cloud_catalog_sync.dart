@@ -1,5 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../authentication/presentation/auth_session.dart';
 import '../../library/data/course_pack_mapper.dart';
 import '../../library/presentation/library_catalog_provider.dart';
 import '../../library/presentation/library_mock_data.dart';
@@ -25,7 +26,7 @@ Future<void> syncCloudCatalogAndFeed(dynamic ref) async {
         .mergeCloudCourses(mapped);
   } catch (_) {}
   try {
-    // Cross-device: B站原链接重下视频，字幕从个人资产库拉取。
+    // Cross-device / re-login: B站原链接重下视频，字幕从个人资产库拉取。
     await restorePersonalImportAssets(ref);
   } catch (_) {}
   try {
@@ -38,7 +39,15 @@ Future<void> syncCloudCatalogAndFeed(dynamic ref) async {
   } catch (_) {}
 }
 
+/// Cold start + every login (token change) → restore personal video/subtitle assets.
 final FutureProvider<void> cloudCatalogSyncProvider =
     FutureProvider<void>((Ref ref) async {
+      // Rebuild when the user signs in / switches account on a new device.
+      final String token = ref.watch(
+        authSessionProvider.select((AuthSessionState s) => s.accessToken),
+      );
+      if (token.isEmpty) {
+        return;
+      }
       await syncCloudCatalogAndFeed(ref);
     });

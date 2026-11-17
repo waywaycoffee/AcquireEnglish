@@ -321,9 +321,12 @@ class _GreetingHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final String rawName = displayName.trim();
-    // Legacy demo default was "Mark"; treat it as unset.
-    final String name = (rawName.isEmpty || rawName == 'Mark')
-        ? 'Elon Musk'
+    // Legacy demo placeholders — prefer the product default account name.
+    final String name =
+        (rawName.isEmpty ||
+            rawName == 'Mark' ||
+            rawName == 'Elon Musk')
+        ? 'weiwei'
         : rawName;
     final String greeting = _greetingForNow(DateTime.now());
     return Row(
