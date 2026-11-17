@@ -16,14 +16,15 @@ class Paths extends fixture.ReviewPaths {
   Future<String?> getApplicationDocumentsPath() async => directory;
 }
 void main() {
-  testWidgets('episode dialog saves recording and automatically scores on stop', (WidgetTester tester) async {
+  for (final bool timeout in <bool>[false, true]) {
+  testWidgets('episode dialog persists recording; scoring timeout=$timeout', (WidgetTester tester) async {
     final Directory dir = Directory.systemTemp.createTempSync('shadow-dialog-');
     final PathProviderPlatform previous = PathProviderPlatform.instance;
     PathProviderPlatform.instance = Paths(dir.path);
     addTearDown(() { PathProviderPlatform.instance = previous; dir.deleteSync(recursive: true); });
     final fixture.ReviewMicrophone mic = fixture.ReviewMicrophone();
     final fixture.ReviewService service = fixture.ReviewService();
-    service.pending.complete(const PronunciationAssessmentResult(suggestedScore: 86));
+    if (!timeout) service.pending.complete(const PronunciationAssessmentResult(suggestedScore: 86));
     await tester.pumpWidget(ProviderScope(overrides: [
       pronunciationAudioExtractorProvider.overrideWithValue(fixture.ReviewExtractor(dir)),
       pronunciationMicrophoneFactoryProvider.overrideWithValue(() => mic),
@@ -40,12 +41,16 @@ void main() {
     mic.stream.add(fixture.speech().bytes);
     await tester.pump();
     await tester.sendKeyEvent(LogicalKeyboardKey.space);
-    for (int i = 0; i < 40; i++) { await tester.pump(const Duration(milliseconds: 50)); await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 10))); }
+    for (int i = 0; i < 200; i++) { await tester.pump(const Duration(milliseconds: 50)); await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 10))); }
     expect(service.calls, 1);
+    if (timeout) { await tester.pump(const Duration(seconds: 21)); await tester.pump(); }
     final List<DubTake> takes = await tester.runAsync(() => DubSessionStore.instance.loadTakes('test-episode')) ?? [];
-    expect(takes.single.scorePercent, 86);
+    expect(takes.single.scorePercent, timeout ? isNull : 86);
     expect(takes.single.fileExists, isTrue);
-    expect(find.text('已评分'), findsOneWidget);
+    expect(find.byKey(const ValueKey<String>('shadowing-own-recording-replay')), findsOneWidget);
+    if (timeout) { expect(find.textContaining('评分超时'), findsOneWidget); }
+    else { expect(find.text('已评分'), findsOneWidget); }
     await tester.pumpWidget(const SizedBox());
   });
+  }
 }

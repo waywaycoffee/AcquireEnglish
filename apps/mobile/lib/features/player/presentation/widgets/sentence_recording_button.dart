@@ -57,11 +57,9 @@ class _RecordingState extends ConsumerState<SentenceRecordingButton> {
                 .toList();
             return Wrap(
               children: <Widget>[
-                TextButton.icon(
-                  icon: const Icon(Icons.play_circle_outline, size: 18),
-                  label: Text(
-                    '我的录音 · ${recording.scorePercent == null ? "暂未评分" : "${recording.professionalScore ? "发音评分" : "内容匹配"} ${recording.scorePercent}分"}',
-                  ),
+                IconButton(
+                  icon: const Icon(Icons.graphic_eq, size: 18),
+                  tooltip: '播放我的录音',
                   onPressed: () async {
                     widget.pauseVideo();
                     _player ??= ref.read(

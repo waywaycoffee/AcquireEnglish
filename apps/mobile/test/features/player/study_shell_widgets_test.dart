@@ -139,6 +139,25 @@ void main() {
     expect(backTaps, 1);
   });
 
+  testWidgets('shadow controls overlay video bottom and remain tappable', (WidgetTester tester) async {
+    final LayerLink link = LayerLink();
+    await tester.pumpWidget(ProviderScope(child: MaterialApp(home: Scaffold(body: Column(children: <Widget>[
+      CompositedTransformTarget(link: link, child: const SizedBox(key: ValueKey<String>('video-target'), width: 320, height: 180)),
+      Expanded(child: StudyShadowingTab(toolbarLink: link, hasLine: true,
+        line: const PlayerSubtitleLine(startTime: '00:00', english: 'Hello', chinese: '你好', startMs: 0, endMs: 1000))),
+    ])))));
+    await tester.pump();
+    final Rect video = tester.getRect(find.byKey(const ValueKey<String>('video-target')));
+    final Rect row = tester.getRect(find.byKey(const ValueKey<String>('study-shadowing-control-row')));
+    expect(row.bottom, lessThanOrEqualTo(video.bottom));
+    expect(row.top, greaterThanOrEqualTo(video.top));
+    expect(row.width, lessThanOrEqualTo(video.width));
+    await tester.tap(find.byTooltip('跟读模式：看句读'));
+    await tester.pumpAndSettle();
+    expect(find.text('藏句读'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('StudyShadowingTab shows mic even without assessment target', (
     WidgetTester tester,
   ) async {
@@ -166,10 +185,10 @@ void main() {
 
     expect(find.text('Hello world'), findsOneWidget);
     expect(find.textContaining('仍可录音评分'), findsOneWidget);
-    expect(find.text('点击麦克风开始跟读'), findsOneWidget);
-    expect(find.text('影子跟读'), findsOneWidget);
-    expect(find.text('看句读'), findsOneWidget);
-    expect(find.text('藏句读'), findsOneWidget);
+    expect(find.byTooltip('播放我的录音'), findsOneWidget);
+    final Size controls = tester.getSize(find.byKey(const ValueKey<String>('study-shadowing-control-row')));
+    expect(controls.height, 48);
+    expect(tester.getSize(find.byKey(const ValueKey<String>('study-shadowing-assess'))), const Size(44, 44));
     expect(
       find.byKey(const ValueKey<String>('study-shadowing-assess')),
       findsOneWidget,
@@ -198,7 +217,9 @@ void main() {
       ),
     );
 
-    await tester.tap(find.byKey(const ValueKey<String>('study-shadowing-mode-hide')));
+    await tester.tap(find.byTooltip('跟读模式：看句读'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('藏句读'));
     await tester.pumpAndSettle();
 
     expect(find.text('······'), findsOneWidget);

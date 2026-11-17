@@ -69,6 +69,7 @@ extension ShadowPromptModeLabel on ShadowPromptMode {
 /// Shadowing study tab with in-tab mic recording, waveform compare, and next-line flow.
 class StudyShadowingTab extends ConsumerStatefulWidget {
   const StudyShadowingTab({
+    this.toolbarLink,
     required this.line,
     required this.hasLine,
     this.assessmentTarget,
@@ -88,6 +89,7 @@ class StudyShadowingTab extends ConsumerStatefulWidget {
     super.key,
   });
 
+  final LayerLink? toolbarLink;
   final PlayerSubtitleLine line;
   final bool hasLine;
   final PronunciationAssessmentTarget? assessmentTarget;
@@ -169,7 +171,7 @@ class _StudyShadowingTabState extends ConsumerState<StudyShadowingTab> {
   bool _hideRevealThisRound = false;
   bool _dubTakeSaved = false;
   DateTime? _takeCreatedAt;
-  static const Duration _scoreTimeout = Duration(seconds: 25);
+  static const Duration _scoreTimeout = Duration(seconds: 8);
 
   @override
   void initState() {
@@ -676,7 +678,7 @@ class _StudyShadowingTabState extends ConsumerState<StudyShadowingTab> {
     try {
       PronunciationCredentials credentials = const PronunciationCredentials();
       try {
-        credentials = await ref.read(pronunciationCredentialsProvider.future);
+        credentials = await ref.read(pronunciationCredentialsProvider.future).timeout(const Duration(seconds: 5));
       } catch (error) {
         lastError = _prettyError(error);
       }
@@ -685,7 +687,7 @@ class _StudyShadowingTabState extends ConsumerState<StudyShadowingTab> {
         try {
           final PronunciationAssessmentResult assessment = await ref
               .read(tencentPronunciationServiceProvider)
-              .evaluate(credentials: credentials, target: target, audio: audio);
+              .evaluate(credentials: credentials, target: target, audio: audio).timeout(const Duration(seconds: 20));
           if (!mounted || _resourcesReleased || scoringKey != _boundTargetKey)
             return;
           setState(() {
@@ -815,54 +817,6 @@ class _StudyShadowingTabState extends ConsumerState<StudyShadowingTab> {
     await _scoreAfterRecording(path: path, audio: audio);
   }
 
-  String get _micStatusText {
-    if (!_hasEnglishLine) {
-      return '当前句没有英文，无法录音';
-    }
-    if (_recordingActive) {
-      return _promptMode == ShadowPromptMode.shadow
-          ? '录音中 · 请跟着原声说 · 再点停止'
-          : '录音中 · 再点一次停止并评分';
-    }
-    if (_finishingRecording && !_voiceBusy) {
-      return '录音准备中…';
-    }
-    if (_voiceBusy) {
-      return '正在评分…';
-    }
-    return _promptMode.micIdleHint;
-  }
-
-  Widget _modeChip(StudyShellColors shell, ShadowPromptMode mode) {
-    final bool selected = _promptMode == mode;
-    return Expanded(
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 3),
-        child: Material(
-          color: selected ? shell.accent : shell.chipIdle,
-          borderRadius: BorderRadius.circular(20),
-          child: InkWell(
-            key: ValueKey<String>('study-shadowing-mode-${mode.name}'),
-            borderRadius: BorderRadius.circular(20),
-            onTap: () => _setPromptMode(mode),
-            child: Padding(
-              padding: const EdgeInsets.symmetric(vertical: 9),
-              child: Text(
-                mode.label,
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w700,
-                  color: selected ? Colors.white : shell.textSecondary,
-                ),
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
   Widget _sideNavButton({
     required IconData icon,
     required String semanticLabel,
@@ -873,53 +827,8 @@ class _StudyShadowingTabState extends ConsumerState<StudyShadowingTab> {
       onPressed: onPressed,
       tooltip: semanticLabel,
       iconSize: 28,
-      color: onPressed == null ? shell.textMuted : shell.textPrimary,
+      color: onPressed == null ? shell.textMuted : widget.toolbarLink != null ? Colors.white : shell.textPrimary,
       icon: Icon(icon),
-    );
-  }
-
-  Widget _originalSoundButton(StudyShellColors shell) {
-    final bool canPlayRef = _reference != null && !_recordingActive;
-    final bool canReplayVideo =
-        widget.onReplaySentence != null && !_recordingActive;
-    return InkWell(
-      key: const ValueKey<String>('study-shadowing-original'),
-      onTap: !canPlayRef && !canReplayVideo
-          ? null
-          : () {
-              if (canPlayRef) {
-                unawaited(_playLocalFile(_reference!.path));
-              } else {
-                widget.onReplaySentence?.call();
-              }
-            },
-      borderRadius: BorderRadius.circular(12),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: <Widget>[
-            Icon(
-              Icons.volume_up_rounded,
-              size: 28,
-              color: (canPlayRef || canReplayVideo)
-                  ? shell.textPrimary
-                  : shell.textMuted,
-            ),
-            const SizedBox(height: 4),
-            Text(
-              '原声',
-              style: TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w600,
-                color: (canPlayRef || canReplayVideo)
-                    ? shell.textSecondary
-                    : shell.textMuted,
-              ),
-            ),
-          ],
-        ),
-      ),
     );
   }
 
@@ -928,11 +837,13 @@ class _StudyShadowingTabState extends ConsumerState<StudyShadowingTab> {
       button: true,
       label: _recordingActive ? '停止录音' : '开始跟读录音',
       child: Material(
-        color: !canRecord
+        color: widget.toolbarLink != null
+            ? (_recordingActive ? Colors.red.withValues(alpha: 0.7) : Colors.transparent)
+            : !canRecord
             ? shell.accent.withValues(alpha: 0.35)
             : (_recordingActive ? const Color(0xFFB42318) : shell.accent),
         shape: const CircleBorder(),
-        elevation: 3,
+        elevation: widget.toolbarLink == null ? 3 : 0,
         child: InkWell(
           key: const ValueKey<String>('study-shadowing-assess'),
           customBorder: const CircleBorder(),
@@ -942,11 +853,11 @@ class _StudyShadowingTabState extends ConsumerState<StudyShadowingTab> {
                   _recordingActive ? _stopRecording() : _startRecording(),
                 ),
           child: SizedBox(
-            width: 76,
-            height: 76,
+            width: 44,
+            height: 44,
             child: Icon(
               _recordingActive ? Icons.stop_rounded : Icons.mic_rounded,
-              size: 36,
+              size: 24,
               color: Colors.white,
             ),
           ),
@@ -1002,23 +913,6 @@ class _StudyShadowingTabState extends ConsumerState<StudyShadowingTab> {
     // Reference layout: sentence card → 原声 + ◀ mic ▶ → secondary feedback.
     return Column(
       children: <Widget>[
-        Padding(
-          padding: const EdgeInsets.fromLTRB(8, 4, 8, 0),
-          child: Row(
-            children: <Widget>[
-              for (final ShadowPromptMode mode in ShadowPromptMode.values)
-                _modeChip(shell, mode),
-            ],
-          ),
-        ),
-        Padding(
-          padding: const EdgeInsets.fromLTRB(12, 8, 12, 0),
-          child: Text(
-            _promptMode.hint,
-            textAlign: TextAlign.center,
-            style: TextStyle(fontSize: 12, color: shell.textMuted),
-          ),
-        ),
         Expanded(
           child: ListView(
             padding: const EdgeInsets.fromLTRB(12, 12, 12, 8),
@@ -1383,56 +1277,98 @@ class _StudyShadowingTabState extends ConsumerState<StudyShadowingTab> {
             ],
           ),
         ),
-        SafeArea(
+        _ShadowToolbarPortal(
+          link: widget.toolbarLink,
+          child: SafeArea(
+          bottom: widget.toolbarLink == null,
           top: false,
           child: Padding(
-            padding: const EdgeInsets.fromLTRB(8, 4, 8, 10),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: <Widget>[
-                Row(
-                  children: <Widget>[
-                    SizedBox(width: 72, child: _originalSoundButton(shell)),
-                    Expanded(
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: <Widget>[
-                          _sideNavButton(
-                            icon: Icons.chevron_left_rounded,
-                            semanticLabel: '上一句',
-                            onPressed: widget.onPreviousSentence,
-                            shell: shell,
-                          ),
-                          _micButton(shell, canRecord),
-                          _sideNavButton(
-                            icon: Icons.chevron_right_rounded,
-                            semanticLabel: '下一句',
-                            onPressed: widget.onNextSentence == null
-                                ? null
-                                : () => unawaited(_goNextAfterPractice()),
-                            shell: shell,
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(width: 72),
-                  ],
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  _micStatusText,
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w600,
-                    color: shell.textPrimary,
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+            child: SizedBox(
+              key: const ValueKey<String>('study-shadowing-control-row'),
+              height: 48,
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: <Widget>[
+                  PopupMenuButton<ShadowPromptMode>(
+                    tooltip: '跟读模式：${_promptMode.label}',
+                    icon: Icon(Icons.tune, color: widget.toolbarLink != null ? Colors.white : shell.textSecondary, size: 22),
+                    onSelected: _setPromptMode,
+                    itemBuilder: (BuildContext context) => <PopupMenuEntry<ShadowPromptMode>>[
+                      for (final ShadowPromptMode mode in ShadowPromptMode.values)
+                        PopupMenuItem<ShadowPromptMode>(value: mode, child: Text(mode.label)),
+                    ],
                   ),
-                ),
-              ],
+                  IconButton(
+                    key: const ValueKey<String>('study-shadowing-original'),
+                    tooltip: '播放原声', icon: const Icon(Icons.volume_up_rounded),
+                    onPressed: _recordingActive ? null : () {
+                      if (_reference != null) { unawaited(_playLocalFile(_reference!.path)); }
+                      else { widget.onReplaySentence?.call(); }
+                    },
+                  ),
+                  _sideNavButton(icon: Icons.chevron_left_rounded,
+                    semanticLabel: '上一句', onPressed: widget.onPreviousSentence, shell: shell),
+                  _micButton(shell, canRecord),
+                  IconButton(
+                    key: const ValueKey<String>('study-shadowing-own-replay'),
+                    tooltip: '播放我的录音',
+                    icon: const Icon(Icons.graphic_eq_rounded),
+                    color: _ownColor,
+                    onPressed: _recordingPath == null || _recordingActive ? null
+                      : () => unawaited(_playLocalFile(_recordingPath)),
+                  ),
+                  _sideNavButton(icon: Icons.chevron_right_rounded,
+                    semanticLabel: '下一句', onPressed: widget.onNextSentence == null ? null
+                      : () => unawaited(_goNextAfterPractice()), shell: shell),
+                ],
+              ),
             ),
           ),
-        ),
+        )),
       ],
+    );
+  }
+}
+
+/// Keeps recording state in the study tab while painting controls over video.
+class _ShadowToolbarPortal extends StatefulWidget {
+  const _ShadowToolbarPortal({required this.link, required this.child});
+  final LayerLink? link;
+  final Widget child;
+  @override
+  State<_ShadowToolbarPortal> createState() => _ShadowToolbarPortalState();
+}
+class _ShadowToolbarPortalState extends State<_ShadowToolbarPortal> {
+  final OverlayPortalController _controller = OverlayPortalController();
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted && widget.link != null) _controller.show();
+    });
+  }
+  @override
+  Widget build(BuildContext context) {
+    final LayerLink? link = widget.link;
+    if (link == null) return widget.child;
+    return OverlayPortal(
+      controller: _controller,
+      overlayChildBuilder: (BuildContext context) => Positioned(
+        left: 0, top: 0,
+        child: CompositedTransformFollower(
+          link: link, showWhenUnlinked: false,
+          targetAnchor: Alignment.bottomCenter,
+          followerAnchor: Alignment.bottomCenter,
+          child: SizedBox(
+            width: link.leaderSize?.width ?? MediaQuery.sizeOf(context).width,
+            child: Material(color: Colors.transparent,
+              child: IconTheme(data: const IconThemeData(color: Colors.white,
+                shadows: <Shadow>[Shadow(blurRadius: 4)]), child: widget.child)),
+          ),
+        ),
+      ),
+      child: const SizedBox.shrink(),
     );
   }
 }

@@ -430,7 +430,7 @@ class _PronunciationAssessmentDialogState
     try {
       final PronunciationCredentials credentials;
       try {
-        credentials = await ref.read(pronunciationCredentialsProvider.future);
+        credentials = await ref.read(pronunciationCredentialsProvider.future).timeout(const Duration(seconds: 5));
       } catch (_) {
         throw const PronunciationAssessmentException(
           '读取评测密钥失败，请到「设置 - 跟读评测」检查配置。',
@@ -451,7 +451,7 @@ class _PronunciationAssessmentDialogState
             target: widget.target,
             audio: audio,
             onCancelAvailable: _registerAssessmentCancel,
-          );
+          ).timeout(const Duration(seconds: 20));
       _cancelAssessment = null;
       if (!mounted || _resourcesReleased || attempt != _assessmentAttempt) {
         return;
@@ -461,6 +461,16 @@ class _PronunciationAssessmentDialogState
         _assessing = false;
       });
       await _saveTake();
+    } on TimeoutException {
+      final Future<void> Function()? cancel = _cancelAssessment;
+      _cancelAssessment = null;
+      if (cancel != null) unawaited(cancel().catchError((Object _) {}));
+      if (mounted && !_resourcesReleased && attempt == _assessmentAttempt) {
+        setState(() {
+          _assessing = false;
+          _message = '评分超时，录音已保留，可回放或重试评分。';
+        });
+      }
     } on PronunciationAssessmentException catch (error) {
       _cancelAssessment = null;
       if (!mounted || _resourcesReleased || attempt != _assessmentAttempt) {
@@ -924,6 +934,13 @@ class _PronunciationAssessmentDialogState
     spacing: 16,
     runSpacing: 12,
     children: <Widget>[
+      if (_recordingPath != null && !_recordingActive)
+        FilledButton.tonalIcon(
+          key: const ValueKey<String>('shadowing-own-recording-replay'),
+          onPressed: () => unawaited(_playLocalFile(_recordingPath)),
+          icon: const Icon(Icons.graphic_eq),
+          label: const Text('回放我的录音'),
+        ),
       if (_recordingActive)
         FilledButton.icon(
           key: const ValueKey<String>('pronunciation-record-stop'),

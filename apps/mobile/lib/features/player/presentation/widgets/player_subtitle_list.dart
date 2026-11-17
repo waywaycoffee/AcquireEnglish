@@ -1174,13 +1174,6 @@ class _PlayerSubtitleListState extends State<PlayerSubtitleList> {
                       Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: <Widget>[
-                          if (widget.episodeId != null)
-                            SentenceRecordingButton(
-                              episodeId: widget.episodeId!, line: line,
-                              pauseVideo: () {
-                                if (widget.isPlaying) widget.onTogglePlaying?.call();
-                              },
-                            ),
                           if (dark) ...<Widget>[
                             Row(
                               children: <Widget>[
@@ -1592,6 +1585,13 @@ class _PlayerSubtitleListState extends State<PlayerSubtitleList> {
                                 inactiveZhTextColor: inactiveZhTextColor,
                               ),
                           ],
+                          if (widget.episodeId != null)
+                            Align(alignment: Alignment.bottomRight, child: SentenceRecordingButton(
+                              episodeId: widget.episodeId!, line: line,
+                              pauseVideo: () {
+                                if (widget.isPlaying) widget.onTogglePlaying?.call();
+                              },
+                            )),
                           const _SelectableLineBreak(),
                         ],
                       ),

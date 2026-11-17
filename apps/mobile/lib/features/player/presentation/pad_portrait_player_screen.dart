@@ -129,6 +129,7 @@ class PadPortraitPlayerScreenState
   StreamSubscription<Tracks>? _videoTracksSubscription;
   bool _isMuted = false;
   double _volumeLevel = 1;
+  final LayerLink _shadowToolbarLink = LayerLink();
   bool _dubPlaybackActive = false;
   Player? _dubMixPlayer;
   StreamSubscription<Duration>? _dubPositionSubscription;
@@ -2769,7 +2770,9 @@ Future<void> _settleChineseFillIfAlreadyPresent() async {
                       padding: EdgeInsets.symmetric(
                         horizontal: playerHorizontalPadding,
                       ),
-                      child: PlayerVideoPanel(
+                      child: CompositedTransformTarget(
+                        link: _shadowToolbarLink,
+                        child: PlayerVideoPanel(
                         episodeId: widget.episodeId,
                         showSceneHeader: false,
                           hideOverlayControls: true,
@@ -2863,7 +2866,7 @@ Future<void> _settleChineseFillIfAlreadyPresent() async {
                             ? null
                             : _handleGenerateAiSubtitles,
                         ),
-                      ),
+                      )),
                       if (_videoErrorText != null &&
                           !_videoLoading &&
                           !(_videoErrorText!.startsWith('正在')))
@@ -3101,6 +3104,7 @@ Future<void> _settleChineseFillIfAlreadyPresent() async {
             ? _selectPronunciationForLine(state.activeLineIndex)
             : visibleAssessment;
         return StudyShadowingTab(
+          toolbarLink: _shadowToolbarLink,
           // Pin the practice cue — never use visibleLine (null at sentence end).
           line: state.hasLines ? state.activeLine : activeLine,
           hasLine: state.hasLines,
