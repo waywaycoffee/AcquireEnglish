@@ -1363,7 +1363,11 @@ class _ShadowToolbarPortalState extends State<_ShadowToolbarPortal> {
           followerAnchor: Alignment.bottomCenter,
           child: SizedBox(
             width: link.leaderSize?.width ?? MediaQuery.sizeOf(context).width,
-            child: Material(color: Colors.transparent,
+            child: Material(
+              key: const ValueKey<String>('study-shadowing-overlay-background'),
+              color: const Color(0xFFE5E7EB).withValues(alpha: 0.65),
+              borderRadius: BorderRadius.circular(18),
+              clipBehavior: Clip.antiAlias,
               child: IconButtonTheme(
                 data: IconButtonThemeData(style: IconButton.styleFrom(
                   backgroundColor: Colors.black.withValues(alpha: 0.5),

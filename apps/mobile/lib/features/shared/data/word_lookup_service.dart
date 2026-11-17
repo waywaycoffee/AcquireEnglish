@@ -12,6 +12,7 @@ import '../../settings/data/api_usage_ledger.dart';
 import '../../settings/presentation/settings_provider.dart';
 import '../domain/sentence_grammar_analysis.dart';
 import '../domain/word_lookup_entry.dart';
+import '../../words/data/offline_word_dictionary.dart';
 
 typedef WordLookupRemoteLookup =
     Future<WordLookupEntry> Function({
@@ -54,6 +55,19 @@ final Provider<WordLookupService> wordLookupServiceProvider =
     });
 
 class WordLookupService {
+  static final OfflineWordDictionary _dictionary = OfflineWordDictionary();
+
+  Future<WordLookupEntry?> _offlineEntry(String word, String? sentence, String status) async {
+    try {
+      final OfflineWordDefinition? entry = await _dictionary.lookup(word);
+      if (entry == null) return null;
+      return WordLookupEntry(word: word, phonetic: entry.phonetic,
+        type: entry.partOfSpeech, definitionCn: entry.translation,
+        definitionEn: "", usageEn: status,
+        exampleSentenceEn: "", contextMeaningCn: null,
+        sourceLabel: "离线词典");
+    } catch (_) { return null; }
+  }
   const WordLookupService({
     this.remoteLookupOverride,
     this.httpRequestOverride,
@@ -108,6 +122,9 @@ class WordLookupService {
 
     final String normalizedWord = _normalizeWord(phrase);
     if (!_canUseRemoteProvider(settings)) {
+      final WordLookupEntry? offline = await _offlineEntry(normalizedWord, contextSentence,
+        'AI 解析未配置，请在设置中配置翻译模型。');
+      if (offline != null) return offline;
       return _buildUnavailableEntry(
         rawWord: normalizedWord,
         messageCn: '请先在设置中配置可用的翻译 API。',
@@ -125,8 +142,11 @@ class WordLookupService {
               rawWord: normalizedWord,
               contextSentence: contextSentence,
               settings: settings,
-            );
+            ).timeout(const Duration(seconds: 12));
     } catch (_) {
+      final WordLookupEntry? offline = await _offlineEntry(normalizedWord, contextSentence,
+        'AI 解析暂不可用，当前显示离线释义。请检查模型地址、网络和 API 配置。');
+      if (offline != null) return offline;
       return _buildUnavailableEntry(
         rawWord: normalizedWord,
         messageCn: '翻译服务当前不可用，请检查 API 配置后重试。',
