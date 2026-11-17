@@ -10,6 +10,7 @@ import '../player_mock_state.dart';
 import '../subtitle_display_mode.dart';
 import '../subtitle_language_sanitize.dart';
 import 'study_shell_tokens.dart';
+import 'sentence_recording_button.dart';
 import 'subtitle_vocabulary_highlight.dart';
 import 'subtitle_word_highlight_style.dart';
 
@@ -1173,6 +1174,13 @@ class _PlayerSubtitleListState extends State<PlayerSubtitleList> {
                       Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: <Widget>[
+                          if (widget.episodeId != null)
+                            SentenceRecordingButton(
+                              episodeId: widget.episodeId!, line: line,
+                              pauseVideo: () {
+                                if (widget.isPlaying) widget.onTogglePlaying?.call();
+                              },
+                            ),
                           if (dark) ...<Widget>[
                             Row(
                               children: <Widget>[

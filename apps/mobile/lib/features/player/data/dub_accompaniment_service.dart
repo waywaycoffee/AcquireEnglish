@@ -3,13 +3,12 @@ import 'dart:io';
 import 'package:dio/dio.dart';
 import 'package:path_provider/path_provider.dart';
 
-import '../presentation/desktop_ffmpeg.dart';
 import 'dub_session_store.dart';
 
 /// Resolves an accompaniment (no-vocals) track for 趣配音-style mixing.
 ///
 /// Quality path: POST audio to a stem-separation service (GPU box).
-/// Fallback: local ffmpeg center-channel attenuation, else null (UI ducks).
+/// Returns null when genuine stem separation is unavailable.
 class DubAccompanimentService {
   DubAccompanimentService({Dio? dio}) : _dio = dio ?? Dio();
 
@@ -26,8 +25,9 @@ class DubAccompanimentService {
     required String videoSource,
     String? stemBaseUrl,
   }) async {
-    final String? cached =
-        await DubSessionStore.instance.accompanimentPath(episodeId);
+    final String? cached = await DubSessionStore.instance.accompanimentPath(
+      episodeId,
+    );
     if (cached != null) {
       return cached;
     }
@@ -55,16 +55,6 @@ class DubAccompanimentService {
       } catch (_) {}
     }
 
-    try {
-      final String? local = await _localCenterAttenuate(video.path);
-      if (local != null) {
-        await DubSessionStore.instance.saveAccompanimentPath(
-          episodeId: episodeId,
-          sourcePath: local,
-        );
-        return DubSessionStore.instance.accompanimentPath(episodeId);
-      }
-    } catch (_) {}
     return null;
   }
 
@@ -101,36 +91,5 @@ class DubAccompanimentService {
       sourcePath: path,
     );
     return DubSessionStore.instance.accompanimentPath(episodeId);
-  }
-
-  /// Weak local fallback: attenuate mid (approx vocals) with ffmpeg pan.
-  Future<String?> _localCenterAttenuate(String videoPath) async {
-    final String? ffmpeg = await findDesktopFfmpeg();
-    if (ffmpeg == null) {
-      return null;
-    }
-    final Directory temp = await getTemporaryDirectory();
-    final String out =
-        '${temp.path}/accomp-center-${DateTime.now().microsecondsSinceEpoch}.wav';
-    final ProcessResult result = await Process.run(ffmpeg, <String>[
-      '-hide_banner',
-      '-loglevel',
-      'error',
-      '-y',
-      '-i',
-      videoPath,
-      '-vn',
-      '-af',
-      'pan=stereo|c0=0.5*c0+-0.5*c1|c1=-0.5*c0+0.5*c1,aformat=sample_fmts=s16:sample_rates=16000:channel_layouts=mono',
-      '-ac',
-      '1',
-      '-ar',
-      '16000',
-      out,
-    ]);
-    if (result.exitCode != 0 || !File(out).existsSync()) {
-      return null;
-    }
-    return out;
   }
 }

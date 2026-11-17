@@ -130,6 +130,7 @@ class PadPortraitPlayerScreenState
   bool _isMuted = false;
   double _volumeLevel = 1;
   bool _dubPlaybackActive = false;
+  Player? _dubMixPlayer;
   StreamSubscription<Duration>? _dubPositionSubscription;
   PronunciationPreviewPlayer? _dubOverlayPlayer;
   Timer? _dubWindowTimer;
@@ -299,6 +300,7 @@ class PadPortraitPlayerScreenState
     _dubWindowTimer?.cancel();
     unawaited(_dubPositionSubscription?.cancel());
     unawaited(_dubOverlayPlayer?.dispose());
+    unawaited(_dubMixPlayer?.dispose());
     final List<PlayerSubtitleLine>? pending = _pendingOcrPersistLines;
     if (pending != null) {
       unawaited(_persistCompletedBilingualSubtitles(pending));
@@ -2140,6 +2142,8 @@ Future<void> _settleChineseFillIfAlreadyPresent() async {
     });
     _videoPlayingSubscription = player.stream.playing.listen((bool playing) {
       _videoIsPlaying = playing;
+      final Player? mix = _dubMixPlayer;
+      if (mix != null) unawaited(playing ? mix.play() : mix.pause());
       _syncIdleSchedulerWithPlayback(playing);
     });
     _videoCompletedSubscription = player.stream.completed.listen((
@@ -4870,6 +4874,8 @@ Future<void> _settleChineseFillIfAlreadyPresent() async {
 
   Future<void> _stopDubPlayback() async {
     _dubPlaybackActive = false;
+    await _dubMixPlayer?.dispose();
+    _dubMixPlayer = null;
     _dubWindowTimer?.cancel();
     _dubWindowTimer = null;
     await _dubPositionSubscription?.cancel();
@@ -4894,8 +4900,7 @@ Future<void> _settleChineseFillIfAlreadyPresent() async {
       return;
     }
     await _stopDubPlayback();
-    _dubOverlayPlayer ??=
-        ref.read(pronunciationPreviewPlayerFactoryProvider)();
+    _dubOverlayPlayer ??= ref.read(pronunciationPreviewPlayerFactoryProvider)();
 
     final List<DubTake> takes;
     if (continuous) {
@@ -4918,72 +4923,67 @@ Future<void> _settleChineseFillIfAlreadyPresent() async {
       return;
     }
 
-    final int playStart = continuous
-        ? takes.first.startMs
-        : startMs;
+    final int playStart = continuous ? takes.first.startMs : startMs;
     final int playEnd = continuous ? takes.last.endMs : endMs;
-    final Set<String> fired = <String>{};
-    _dubPlaybackActive = true;
-    _showMessage(
-      continuous
-          ? '配音连续回放：对白窗压低原声并叠你的录音'
-          : '配音回放：对白窗压低原声（伴奏轨可用时更保留背景声）',
-    );
-
-    // Prefetch accompaniment in background for later export quality.
     final String? videoPath = _localPlayableVideoPath();
-    if (videoPath != null) {
-      unawaited(
-        _dubAccompanimentService.ensureAccompaniment(
-          episodeId: widget.episodeId,
-          videoSource: videoPath,
-        ),
-      );
+    if (videoPath == null) {
+      _showMessage('请先下载视频，再生成环境音配音。');
+      return;
     }
-
-    setState(() {
-      state.isPlaying = true;
-      state.seekToMilliseconds(playStart);
-    });
-    PlayerSystemMediaControls.updatePlaybackState(isPlaying: true);
-    await player.seek(Duration(milliseconds: playStart));
-    await player.setVolume(_volumeLevel * 100);
-    await player.play();
-
-    _dubPositionSubscription = player.stream.position.listen((Duration pos) {
-      if (!_dubPlaybackActive || !mounted) {
+    _showMessage('正在分离环境音并合成配音…');
+    try {
+      final String? accompaniment = await _dubAccompanimentService
+          .ensureAccompaniment(
+            episodeId: widget.episodeId,
+            videoSource: videoPath,
+          );
+      if (accompaniment == null) {
+        _showMessage('环境音分离不可用，请配置人声分离服务后重试。');
         return;
       }
-      final int ms = pos.inMilliseconds;
-      if (ms >= playEnd + 200) {
-        unawaited(() async {
-          await player.pause();
-          await _stopDubPlayback();
-          if (mounted) {
-            setState(() => state.isPlaying = false);
-            PlayerSystemMediaControls.updatePlaybackState(isPlaying: false);
-          }
-        }());
-        return;
-      }
-      DubTake? active;
-      for (final DubTake take in takes) {
-        if (ms >= take.startMs && ms < take.endMs) {
-          active = take;
-          break;
+      final DubExportResult mix = await _dubExportService.export(
+        episodeId: widget.episodeId,
+        videoSource: videoPath,
+        takes: takes,
+        rangeStartMs: playStart,
+        rangeEndMs: playEnd,
+        accompanimentPath: accompaniment,
+      );
+      if (!mounted) return;
+      final Player audio = Player();
+      _dubMixPlayer = audio;
+      await audio.open(Media(Uri.file(mix.outputPath).toString()), play: false);
+      await audio.setRate(state.playbackRate);
+      await audio.setVolume(_volumeLevel * 100);
+      await player.pause();
+      await player.seek(Duration(milliseconds: playStart));
+      _dubPlaybackActive = true;
+      await player.setVolume(0);
+      _dubPositionSubscription = player.stream.position.listen((
+        Duration position,
+      ) {
+        if (!_dubPlaybackActive) return;
+        final int ms = position.inMilliseconds;
+        if (ms < playStart || ms >= playEnd) {
+          unawaited(_stopDubPlayback());
+          return;
         }
-      }
-      if (active != null) {
-        unawaited(player.setVolume((_volumeLevel * 100) * 0.05));
-        final String key = active.lineId;
-        if (!fired.contains(key) && active.fileExists) {
-          fired.add(key);
-          unawaited(_dubOverlayPlayer!.playLocalFile(active.userWavPath));
+        final Duration expected = Duration(milliseconds: ms - playStart);
+        if ((audio.state.position - expected).inMilliseconds.abs() > 180) {
+          unawaited(audio.seek(expected));
         }
-      } else {
-        unawaited(player.setVolume(_volumeLevel * 100));
-      }
-    });
+        if (audio.state.rate != state.playbackRate) {
+          unawaited(audio.setRate(state.playbackRate));
+        }
+      });
+      await audio.play();
+      await player.play();
+      if (mounted) setState(() => state.isPlaying = true);
+      _showMessage('正在播放环境音＋我的配音');
+    } catch (error) {
+      await _stopDubPlayback();
+      _showMessage('配音合成失败，请检查分离服务或设备混音支持。');
+    }
   }
 
   Future<void> _handleDubExportShare({required bool fullEpisode}) async {

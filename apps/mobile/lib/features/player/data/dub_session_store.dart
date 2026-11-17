@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:io';
+import 'package:flutter/foundation.dart';
 
 import 'package:path_provider/path_provider.dart';
 
@@ -13,19 +14,26 @@ class DubTake {
     required this.english,
     required this.userWavPath,
     required this.createdAt,
+    this.scorePercent,
+    this.professionalScore = false,
   });
 
   factory DubTake.fromJson(Map<String, dynamic> json) => DubTake(
-        episodeId: '${json['episodeId'] ?? ''}',
-        lineId: '${json['lineId'] ?? ''}',
-        startMs: (json['startMs'] as num?)?.toInt() ?? 0,
-        endMs: (json['endMs'] as num?)?.toInt() ?? 0,
-        english: '${json['english'] ?? ''}',
-        userWavPath: '${json['userWavPath'] ?? ''}',
-        createdAt: DateTime.tryParse('${json['createdAt'] ?? ''}') ??
-            DateTime.fromMillisecondsSinceEpoch(0),
-      );
+    scorePercent: (json['scorePercent'] as num?)?.toInt(),
+    professionalScore: json['professionalScore'] == true,
+    episodeId: '${json['episodeId'] ?? ''}',
+    lineId: '${json['lineId'] ?? ''}',
+    startMs: (json['startMs'] as num?)?.toInt() ?? 0,
+    endMs: (json['endMs'] as num?)?.toInt() ?? 0,
+    english: '${json['english'] ?? ''}',
+    userWavPath: '${json['userWavPath'] ?? ''}',
+    createdAt:
+        DateTime.tryParse('${json['createdAt'] ?? ''}') ??
+        DateTime.fromMillisecondsSinceEpoch(0),
+  );
 
+  final bool professionalScore;
+  final int? scorePercent;
   final String episodeId;
   final String lineId;
   final int startMs;
@@ -35,14 +43,16 @@ class DubTake {
   final DateTime createdAt;
 
   Map<String, dynamic> toJson() => <String, dynamic>{
-        'episodeId': episodeId,
-        'lineId': lineId,
-        'startMs': startMs,
-        'endMs': endMs,
-        'english': english,
-        'userWavPath': userWavPath,
-        'createdAt': createdAt.toIso8601String(),
-      };
+    'scorePercent': scorePercent,
+    'professionalScore': professionalScore,
+    'episodeId': episodeId,
+    'lineId': lineId,
+    'startMs': startMs,
+    'endMs': endMs,
+    'english': english,
+    'userWavPath': userWavPath,
+    'createdAt': createdAt.toIso8601String(),
+  };
 
   bool get fileExists =>
       userWavPath.isNotEmpty && File(userWavPath).existsSync();
@@ -52,10 +62,16 @@ class DubTake {
 class DubSessionStore {
   DubSessionStore._();
 
+  DubSessionStore.forDirectory(Directory directory) : _directory = directory;
+  Directory? _directory;
+
+  final ValueNotifier<int> revision = ValueNotifier<int>(0);
+
   static final DubSessionStore instance = DubSessionStore._();
 
   Future<Directory> _episodeDir(String episodeId) async {
-    final Directory root = await getApplicationDocumentsDirectory();
+    final Directory root =
+        _directory ?? await getApplicationDocumentsDirectory();
     final Directory dir = Directory('${root.path}/dub_sessions/$episodeId');
     if (!dir.existsSync()) {
       await dir.create(recursive: true);
@@ -68,7 +84,10 @@ class DubSessionStore {
     return File('${dir.path}/takes.json');
   }
 
-  Future<List<DubTake>> loadTakes(String episodeId) async {
+  Future<List<DubTake>> loadTakes(
+    String episodeId, {
+    bool history = false,
+  }) async {
     final File file = await _indexFile(episodeId);
     if (!file.existsSync()) {
       return const <DubTake>[];
@@ -92,7 +111,13 @@ class DubSessionStore {
           parsed.add(take);
         }
       }
-      return parsed;
+      if (history) return parsed;
+      final Map<String, DubTake> selected = <String, DubTake>{};
+      for (final DubTake take in parsed) {
+        selected[take.lineId] = take;
+      }
+      return selected.values.toList()
+        ..sort((DubTake a, DubTake b) => a.startMs.compareTo(b.startMs));
     } catch (_) {
       return const <DubTake>[];
     }
@@ -102,7 +127,7 @@ class DubSessionStore {
     final Directory dir = await _episodeDir(take.episodeId);
     // Copy wav into durable session folder so temp cleanup won't delete it.
     final String durablePath =
-        '${dir.path}/take-${take.lineId.replaceAll(RegExp(r'[^0-9A-Za-z_-]'), '_')}.wav';
+        '${dir.path}/take-${take.lineId.replaceAll(RegExp('[^0-9A-Za-z_-]'), '_')}-${take.createdAt.microsecondsSinceEpoch}.wav';
     final File source = File(take.userWavPath);
     if (!source.existsSync()) {
       throw StateError('录音文件不存在，无法保存配音。');
@@ -118,23 +143,31 @@ class DubSessionStore {
       english: take.english,
       userWavPath: durablePath,
       createdAt: take.createdAt,
+      scorePercent: take.scorePercent,
+      professionalScore: take.professionalScore,
     );
-    final List<DubTake> existing = await loadTakes(take.episodeId);
+    final List<DubTake> existing = await loadTakes(
+      take.episodeId,
+      history: true,
+    );
     final List<DubTake> next = <DubTake>[
       for (final DubTake row in existing)
-        if (row.lineId != durable.lineId) row,
+        if (row.userWavPath != durable.userWavPath) row,
       durable,
-    ]..sort((DubTake a, DubTake b) => a.startMs.compareTo(b.startMs));
+    ];
     final File index = await _indexFile(take.episodeId);
-    await index.writeAsString(
+    final File pending = File('${index.path}.pending');
+    await pending.writeAsString(
       jsonEncode(next.map((DubTake t) => t.toJson()).toList(growable: false)),
       flush: true,
     );
+    await pending.rename(index.path);
+    revision.value++;
   }
 
   Future<String?> accompanimentPath(String episodeId) async {
     final Directory dir = await _episodeDir(episodeId);
-    final File file = File('${dir.path}/no_vocals.wav');
+    final File file = File('${dir.path}/separated_background_v2.wav');
     return file.existsSync() ? file.path : null;
   }
 
@@ -143,7 +176,7 @@ class DubSessionStore {
     required String sourcePath,
   }) async {
     final Directory dir = await _episodeDir(episodeId);
-    final String dest = '${dir.path}/no_vocals.wav';
+    final String dest = '${dir.path}/separated_background_v2.wav';
     final File source = File(sourcePath);
     if (!source.existsSync()) {
       throw StateError('伴奏轨不存在。');

@@ -198,7 +198,7 @@ class DubExportService {
       args.addAll(<String>['-i', take.userWavPath]);
       final int delayMs = (take.startMs - startMs).clamp(0, 1 << 30);
       filter.write(
-        '[$inputIndex:a]aformat=sample_rates=44100:channel_layouts=stereo,adelay=$delayMs|$delayMs[t$inputIndex];',
+        '[$inputIndex:a]atrim=duration=${(take.endMs - take.startMs) / 1000},asetpts=PTS-STARTPTS,aformat=sample_rates=44100:channel_layouts=stereo,adelay=$delayMs|$delayMs[t$inputIndex];',
       );
       mixLabels.add('[t$inputIndex]');
       inputIndex += 1;

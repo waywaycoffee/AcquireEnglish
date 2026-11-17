@@ -8,6 +8,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:path_provider/path_provider.dart';
 
 import '../../../settings/presentation/settings_provider.dart';
+import '../../../settings/data/pronunciation_credentials.dart';
 import '../../data/dub_session_store.dart';
 import '../../data/local_shadow_scorer.dart';
 import '../../data/pronunciation_audio_extractor.dart';
@@ -117,12 +118,12 @@ class StudyShadowingTab extends ConsumerStatefulWidget {
     required int endMs,
     required String userWavPath,
     bool continuous,
-  })? onDubPlaybackRequested;
+  })?
+  onDubPlaybackRequested;
 
   /// Parent exports MP4 and shares (WeChat Moments when available).
-  final Future<void> Function({
-    required bool fullEpisode,
-  })? onExportShareRequested;
+  final Future<void> Function({required bool fullEpisode})?
+  onExportShareRequested;
 
   @override
   ConsumerState<StudyShadowingTab> createState() => _StudyShadowingTabState();
@@ -160,11 +161,14 @@ class _StudyShadowingTabState extends ConsumerState<StudyShadowingTab> {
   final LocalShadowScorer _localScorer = const LocalShadowScorer();
   bool _voiceBusy = false;
   VoiceShadowResult? _voiceResult;
+  PronunciationAssessmentResult? _assessment;
   ShadowPromptMode _promptMode = ShadowPromptMode.look;
   bool _peekHiddenSentence = false;
+
   /// Hide mode: only reveal after a new attempt in this hide session.
   bool _hideRevealThisRound = false;
   bool _dubTakeSaved = false;
+  DateTime? _takeCreatedAt;
   static const Duration _scoreTimeout = Duration(seconds: 25);
 
   @override
@@ -220,6 +224,7 @@ class _StudyShadowingTabState extends ConsumerState<StudyShadowingTab> {
       _recordingWaveform = const <double>[];
       _recordingPath = null;
       _voiceResult = null;
+      _assessment = null;
       _message = null;
       _referenceError = null;
       _loadingReference = target != null;
@@ -268,7 +273,9 @@ class _StudyShadowingTabState extends ConsumerState<StudyShadowingTab> {
             },
           );
       _cancelExtraction = null;
-      if (!mounted || _resourcesReleased || _targetKey(target) != _boundTargetKey) {
+      if (!mounted ||
+          _resourcesReleased ||
+          _targetKey(target) != _boundTargetKey) {
         await _deleteTemporaryPath(segment.path);
         return;
       }
@@ -322,7 +329,11 @@ class _StudyShadowingTabState extends ConsumerState<StudyShadowingTab> {
   Pcm16MonoAudio? get _liveRecording {
     if (!_recordingActive || _recordingBytesWritten < 2) return null;
     return Pcm16MonoAudio(
-      bytes: Uint8List.sublistView(_recordingBuffer, 0, _recordingBytesWritten & ~1),
+      bytes: Uint8List.sublistView(
+        _recordingBuffer,
+        0,
+        _recordingBytesWritten & ~1,
+      ),
       sampleRate: Pcm16MonoAudio.expectedSampleRate,
     );
   }
@@ -395,6 +406,7 @@ class _StudyShadowingTabState extends ConsumerState<StudyShadowingTab> {
       }
       _recording = null;
       _voiceResult = null;
+      _assessment = null;
       setState(() {
         _recordingActive = true;
         _finishingRecording = false;
@@ -530,10 +542,11 @@ class _StudyShadowingTabState extends ConsumerState<StudyShadowingTab> {
         _recordingWaveform = audio.waveform;
         _recordingPath = path;
         _voiceResult = null;
-        _message = reachedLimit
-            ? '已达到 60 秒上限，正在评分…'
-            : '录音完成，正在评分…';
+        _assessment = null;
+        _message = reachedLimit ? '已达到 60 秒上限，正在评分…' : '录音完成，正在评分…';
       });
+      _takeCreatedAt = DateTime.now();
+      await _persistDubTake(path);
       await _scoreAfterRecording(path: path, audio: audio);
     } catch (_) {
       if (path != null) await _deleteTemporaryPath(path);
@@ -641,6 +654,8 @@ class _StudyShadowingTabState extends ConsumerState<StudyShadowingTab> {
       return;
     }
     final LearningSettingsState settings = ref.read(learningSettingsProvider);
+    final String? scoringKey = _boundTargetKey;
+    final PronunciationAssessmentTarget? target = widget.assessmentTarget;
     final String reference = widget.line.english.trim();
     if (reference.isEmpty) {
       return;
@@ -648,6 +663,7 @@ class _StudyShadowingTabState extends ConsumerState<StudyShadowingTab> {
     setState(() {
       _voiceBusy = true;
       _voiceResult = null;
+      _assessment = null;
       _message = '正在评分…';
       if (_promptMode == ShadowPromptMode.hide) {
         _hideRevealThisRound = true;
@@ -658,6 +674,31 @@ class _StudyShadowingTabState extends ConsumerState<StudyShadowingTab> {
     String? lastError;
 
     try {
+      PronunciationCredentials credentials = const PronunciationCredentials();
+      try {
+        credentials = await ref.read(pronunciationCredentialsProvider.future);
+      } catch (error) {
+        lastError = _prettyError(error);
+      }
+
+      if (credentials.isComplete && target != null) {
+        try {
+          final PronunciationAssessmentResult assessment = await ref
+              .read(tencentPronunciationServiceProvider)
+              .evaluate(credentials: credentials, target: target, audio: audio);
+          if (!mounted || _resourcesReleased || scoringKey != _boundTargetKey)
+            return;
+          setState(() {
+            _assessment = assessment;
+            _message = '发音评测完成';
+          });
+          await _persistDubTake(path);
+          widget.onPracticeCompleted?.call();
+          return;
+        } catch (error) {
+          lastError = _prettyError(error);
+        }
+      }
       try {
         result = await _localScorer
             .score(
@@ -665,16 +706,16 @@ class _StudyShadowingTabState extends ConsumerState<StudyShadowingTab> {
               referenceText: reference,
               audioPath: path,
               onProgress: (double? _, String message) {
-                if (mounted && !_resourcesReleased) {
+                if (mounted &&
+                    !_resourcesReleased &&
+                    scoringKey == _boundTargetKey) {
                   setState(() => _message = message);
                 }
               },
             )
             .timeout(_scoreTimeout);
       } catch (error) {
-        lastError = error is TimeoutException
-            ? '本地评分超时'
-            : _prettyError(error);
+        lastError = error is TimeoutException ? '本地评分超时' : _prettyError(error);
       }
 
       if (result == null && settings.usesVoicePractice) {
@@ -697,15 +738,20 @@ class _StudyShadowingTabState extends ConsumerState<StudyShadowingTab> {
         }
       }
 
-      result ??= _localScorer.durationHeuristic(
-        referenceText: reference,
-        referenceMs: _reference?.audio.durationMs ?? 0,
-        recordingMs: audio.durationMs,
-      );
+      if (result == null) {
+        if (mounted && !_resourcesReleased) {
+          setState(
+            () => _message = '录音已保存 · 暂未评分（${lastError ?? "识别不可用"}），可重试',
+          );
+        }
+        widget.onPracticeCompleted?.call();
+        return;
+      }
 
       if (!mounted || _resourcesReleased) {
         return;
       }
+      if (scoringKey != _boundTargetKey) return;
       setState(() {
         _voiceResult = result;
         if (result!.mock && result.transcript.isEmpty) {
@@ -743,7 +789,13 @@ class _StudyShadowingTabState extends ConsumerState<StudyShadowingTab> {
           endMs: widget.line.endMs,
           english: widget.line.english,
           userWavPath: wavPath,
-          createdAt: DateTime.now(),
+          createdAt: _takeCreatedAt ??= DateTime.now(),
+          professionalScore: _assessment != null,
+          scorePercent: _assessment != null
+              ? (_assessment!.suggestedScore ?? _assessment!.accuracy)?.round()
+              : _voiceResult == null || _voiceResult!.mock
+              ? null
+              : (_voiceResult!.overlap.score * 100).round(),
         ),
       );
       if (mounted && !_resourcesReleased) {
@@ -927,8 +979,7 @@ class _StudyShadowingTabState extends ConsumerState<StudyShadowingTab> {
     final bool hasReferenceTrack = widget.assessmentTarget != null;
     final LearningSettingsState settings = ref.watch(learningSettingsProvider);
     final bool voiceConfigured = settings.usesVoicePractice;
-    final Pcm16MonoAudio? own =
-        _recordingActive ? _liveRecording : _recording;
+    final Pcm16MonoAudio? own = _recordingActive ? _liveRecording : _recording;
     final int referenceMs = _reference?.audio.durationMs ?? 0;
     final int ownMs = own?.durationMs ?? 0;
     final int timelineMs = max(1000, max(referenceMs, ownMs));
@@ -942,7 +993,8 @@ class _StudyShadowingTabState extends ConsumerState<StudyShadowingTab> {
         ? _hideRevealThisRound
         : (_voiceResult != null || _recording != null);
     final bool showEnglish = !hideEnglish || revealAfterAttempt;
-    final bool showChinese = widget.line.chinese.trim().isNotEmpty &&
+    final bool showChinese =
+        widget.line.chinese.trim().isNotEmpty &&
         (_promptMode != ShadowPromptMode.hide ||
             _peekHiddenSentence ||
             revealAfterAttempt);
@@ -997,10 +1049,7 @@ class _StudyShadowingTabState extends ConsumerState<StudyShadowingTab> {
                           },
                           child: Text(
                             _peekHiddenSentence ? '重新隐藏' : '偷看一句',
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: shell.accent,
-                            ),
+                            style: TextStyle(fontSize: 12, color: shell.accent),
                           ),
                         ),
                       ),
@@ -1076,10 +1125,7 @@ class _StudyShadowingTabState extends ConsumerState<StudyShadowingTab> {
                 Text(
                   _message!,
                   textAlign: TextAlign.center,
-                  style: TextStyle(
-                    color: shell.textSecondary,
-                    fontSize: 13,
-                  ),
+                  style: TextStyle(color: shell.textSecondary, fontSize: 13),
                 ),
               ],
               if (_recording != null ||
@@ -1096,12 +1142,35 @@ class _StudyShadowingTabState extends ConsumerState<StudyShadowingTab> {
                       referenceMs: referenceMs,
                       ownMs: ownMs,
                       timelineMs: timelineMs,
-                      positionMs:
-                          _playingPath == null ? null : _previewPositionMs,
-                      playingOwn: _playingPath != null &&
+                      positionMs: _playingPath == null
+                          ? null
+                          : _previewPositionMs,
+                      playingOwn:
+                          _playingPath != null &&
                           _playingPath == _recordingPath,
                     ),
                   ),
+                ),
+              ],
+              if (_assessment != null) ...<Widget>[
+                Text('发音评分：${_assessment!.suggestedScore?.round() ?? "—"}分'),
+                Text(
+                  '准确度 ${_assessment!.accuracy?.round() ?? "—"} · 流利度 ${_assessment!.fluency?.round() ?? "—"} · 完整度 ${_assessment!.completion?.round() ?? "—"}',
+                ),
+                Wrap(
+                  spacing: 8,
+                  children: <Widget>[
+                    for (final PronunciationWordResult word
+                        in _assessment!.words)
+                      Text(
+                        '${word.referenceWord}: ${word.accuracy?.round() ?? "—"}',
+                        style: TextStyle(
+                          color: (word.accuracy ?? 0) < 60
+                              ? Colors.orange
+                              : Colors.green,
+                        ),
+                      ),
+                  ],
                 ),
               ],
               if (_voiceResult != null) ...<Widget>[
@@ -1135,8 +1204,10 @@ class _StudyShadowingTabState extends ConsumerState<StudyShadowingTab> {
                           color: shell.textSecondary,
                         ),
                       ),
-                      if (_voiceResult!.overlap.missingWords.isNotEmpty) ...<
-                          Widget>[
+                      if (_voiceResult!
+                          .overlap
+                          .missingWords
+                          .isNotEmpty) ...<Widget>[
                         const SizedBox(height: 6),
                         Text(
                           '漏读：${_voiceResult!.overlap.missingWords.join(', ')}',
@@ -1147,7 +1218,9 @@ class _StudyShadowingTabState extends ConsumerState<StudyShadowingTab> {
                         ),
                       ],
                       if (_voiceResult!
-                          .overlap.extraWords.isNotEmpty) ...<Widget>[
+                          .overlap
+                          .extraWords
+                          .isNotEmpty) ...<Widget>[
                         const SizedBox(height: 4),
                         Text(
                           '多读：${_voiceResult!.overlap.extraWords.join(', ')}',
@@ -1168,16 +1241,17 @@ class _StudyShadowingTabState extends ConsumerState<StudyShadowingTab> {
                   children: <Widget>[
                     OutlinedButton.icon(
                       key: const ValueKey<String>('study-shadowing-dub-play'),
-                      onPressed: _recordingPath == null ||
+                      onPressed:
+                          _recordingPath == null ||
                               widget.onDubPlaybackRequested == null
                           ? null
                           : () => unawaited(
-                                widget.onDubPlaybackRequested!(
-                                  startMs: widget.line.startMs,
-                                  endMs: widget.line.endMs,
-                                  userWavPath: _recordingPath!,
-                                ),
+                              widget.onDubPlaybackRequested!(
+                                startMs: widget.line.startMs,
+                                endMs: widget.line.endMs,
+                                userWavPath: _recordingPath!,
                               ),
+                            ),
                       icon: const Icon(Icons.movie_filter_rounded, size: 18),
                       label: const Text('配音回放'),
                     ),
@@ -1190,13 +1264,13 @@ class _StudyShadowingTabState extends ConsumerState<StudyShadowingTab> {
                         onPressed: _recordingPath == null
                             ? null
                             : () => unawaited(
-                                  widget.onDubPlaybackRequested!(
-                                    startMs: widget.line.startMs,
-                                    endMs: widget.line.endMs,
-                                    userWavPath: _recordingPath!,
-                                    continuous: true,
-                                  ),
+                                widget.onDubPlaybackRequested!(
+                                  startMs: widget.line.startMs,
+                                  endMs: widget.line.endMs,
+                                  userWavPath: _recordingPath!,
+                                  continuous: true,
                                 ),
+                              ),
                         icon: const Icon(Icons.playlist_play_rounded, size: 18),
                         label: const Text('连续回放'),
                       ),
@@ -1213,7 +1287,8 @@ class _StudyShadowingTabState extends ConsumerState<StudyShadowingTab> {
                     ),
                     OutlinedButton.icon(
                       key: const ValueKey<String>('study-shadowing-voice'),
-                      onPressed: _recordingPath == null ||
+                      onPressed:
+                          _recordingPath == null ||
                               _recordingActive ||
                               _voiceBusy
                           ? null
@@ -1233,10 +1308,10 @@ class _StudyShadowingTabState extends ConsumerState<StudyShadowingTab> {
                         onPressed: !_dubTakeSaved && _recordingPath == null
                             ? null
                             : () => unawaited(
-                                  widget.onExportShareRequested!(
-                                    fullEpisode: false,
-                                  ),
+                                widget.onExportShareRequested!(
+                                  fullEpisode: false,
                                 ),
+                              ),
                         icon: const Icon(Icons.share_rounded, size: 18),
                         label: const Text('分享本句'),
                       ),
@@ -1289,10 +1364,7 @@ class _StudyShadowingTabState extends ConsumerState<StudyShadowingTab> {
                   ),
                   subtitle: Text(
                     '播完本句暂停，方便影子跟读',
-                    style: TextStyle(
-                      color: shell.textSecondary,
-                      fontSize: 11,
-                    ),
+                    style: TextStyle(color: shell.textSecondary, fontSize: 11),
                   ),
                   value: widget.pauseAtSentenceEnd,
                   activeThumbColor: shell.accent,
@@ -1320,10 +1392,7 @@ class _StudyShadowingTabState extends ConsumerState<StudyShadowingTab> {
               children: <Widget>[
                 Row(
                   children: <Widget>[
-                    SizedBox(
-                      width: 72,
-                      child: _originalSoundButton(shell),
-                    ),
+                    SizedBox(width: 72, child: _originalSoundButton(shell)),
                     Expanded(
                       child: Row(
                         mainAxisAlignment: MainAxisAlignment.center,

@@ -97,7 +97,7 @@ async def separate(
     try:
         src.write_bytes(await file.read())
         if not _separate_with_demucs(src, out):
-            _separate_with_ffmpeg(src, out)
+            raise HTTPException(status_code=503, detail="Demucs unavailable or separation failed")
         if not out.exists() or out.stat().st_size <= 0:
             raise HTTPException(status_code=500, detail="separation produced empty output")
         # Caller downloads the wav; temp dir cleanup is left to OS tmp scrubbers.
