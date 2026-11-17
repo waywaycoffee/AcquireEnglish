@@ -9,6 +9,7 @@ import '../../../constants/endpoints.dart';
 import '../../../constants/env_config.dart';
 import '../../../data/repository/network_repository.dart';
 import '../../authentication/presentation/auth_session.dart';
+import '../../player/data/digital_human_catalog.dart';
 import '../../shared/domain/subtitle_letter_case.dart';
 import '../../sync/data/acquire_api_client.dart';
 
@@ -281,6 +282,8 @@ class LearningSettingsState {
         'wss://acquireenglish-e5la1koz.livekit.cloud',
     this.bilibiliSessdata = '',
     this.bilibiliUserId = '',
+    this.digitalHumanId = defaultDigitalHumanId,
+    this.cartoonDigitalHuman = true,
   });
 
   factory LearningSettingsState.defaults() {
@@ -366,6 +369,9 @@ class LearningSettingsState {
   final String bilibiliSessdata;
   /// DedeUserID from QR login (display only).
   final String bilibiliUserId;
+  /// Selected digital-human persona id (see [digitalHumanCatalog]).
+  final String digitalHumanId;
+  final bool cartoonDigitalHuman;
 
   /// Auth / sync API used by the mobile app (server-deployed).
   String get resolvedCloudApiBaseUrl {
@@ -486,6 +492,8 @@ class LearningSettingsState {
     String? liveKitUrl,
     String? bilibiliSessdata,
     String? bilibiliUserId,
+    String? digitalHumanId,
+    bool? cartoonDigitalHuman,
   }) {
     return LearningSettingsState(
       subtitleMode: subtitleMode ?? this.subtitleMode,
@@ -533,10 +541,15 @@ class LearningSettingsState {
       liveKitUrl: liveKitUrl ?? this.liveKitUrl,
       bilibiliSessdata: bilibiliSessdata ?? this.bilibiliSessdata,
       bilibiliUserId: bilibiliUserId ?? this.bilibiliUserId,
+      digitalHumanId: digitalHumanId ?? this.digitalHumanId,
+      cartoonDigitalHuman: cartoonDigitalHuman ?? this.cartoonDigitalHuman,
     );
   }
 
   double get fontScale => playerFontScales[fontSize] ?? 1;
+
+  DigitalHumanPersona get selectedDigitalHuman =>
+      digitalHumanById(digitalHumanId);
 }
 
 final NotifierProvider<LearningSettingsNotifier, LearningSettingsState>
@@ -706,6 +719,14 @@ class LearningSettingsNotifier extends Notifier<LearningSettingsState> {
         liveKitUrl: _stringOrNull(json['liveKitUrl']),
         bilibiliSessdata: _stringOrNull(json['bilibiliSessdata']),
         bilibiliUserId: _stringOrNull(json['bilibiliUserId']),
+        cartoonDigitalHuman: json['cartoonDigitalHuman'] is bool ? json['cartoonDigitalHuman'] as bool : true,
+        digitalHumanId: () {
+          final String? raw = _stringOrNull(json['digitalHumanId']);
+          if (raw == null || raw.isEmpty) {
+            return defaultDigitalHumanId;
+          }
+          return digitalHumanById(raw).id;
+        }(),
       );
       LearningSettingsState coerced =
           _fallbackLocalWhisperIfCloudKeyMissing(loaded);
@@ -1123,6 +1144,16 @@ class LearningSettingsNotifier extends Notifier<LearningSettingsState> {
     _persist();
   }
 
+  void setCartoonDigitalHuman(bool value) {
+    state = state.copyWith(cartoonDigitalHuman: value);
+    _persist();
+  }
+
+  void setDigitalHumanId(String value) {
+    state = state.copyWith(digitalHumanId: digitalHumanById(value).id);
+    _persist();
+  }
+
   void setBilibiliSessdata(String value) {
     state = state.copyWith(bilibiliSessdata: value.trim());
     _persist();
@@ -1255,6 +1286,8 @@ class LearningSettingsNotifier extends Notifier<LearningSettingsState> {
           'liveKitUrl': state.liveKitUrl,
           'bilibiliSessdata': state.bilibiliSessdata,
           'bilibiliUserId': state.bilibiliUserId,
+          'digitalHumanId': state.digitalHumanId,
+          'cartoonDigitalHuman': state.cartoonDigitalHuman,
         }),
       ),
     );

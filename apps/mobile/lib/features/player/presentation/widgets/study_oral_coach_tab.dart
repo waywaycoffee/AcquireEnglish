@@ -4,6 +4,8 @@ import 'dart:math';
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
+import 'package:flutter_tts/flutter_tts.dart';
+import '../../domain/coach_animation_timeline.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_webrtc/flutter_webrtc.dart';
@@ -12,14 +14,47 @@ import 'package:path_provider/path_provider.dart';
 
 import '../../../authentication/presentation/auth_session.dart';
 import '../../../settings/presentation/settings_provider.dart';
-import '../../../shared/data/word_pronunciation_service.dart';
 import '../../../sync/data/acquire_api_client.dart';
+import '../../data/digital_human_catalog.dart';
 import '../../data/livekit_oral_client.dart';
 import '../../data/livetalking_client.dart';
 import '../../data/oral_coach_pipeline_client.dart';
 import '../../data/pronunciation_providers.dart';
 import '../../domain/pronunciation_assessment.dart';
 import 'coach_avatar_stage.dart';
+
+final RegExp _hanChars = RegExp(r'[\u4e00-\u9fff]');
+
+String preferEnglishCoachReply(
+  String raw, {
+  required bool allowChinese,
+  required String topic,
+}) {
+  final String text = raw.trim();
+  if (allowChinese) {
+    return text;
+  }
+  if (text.isEmpty) {
+    return 'What stood out to you most in this video?';
+  }
+  if (!_hanChars.hasMatch(text)) {
+    return text;
+  }
+  final List<String> englishBits = text
+      .split(RegExp(r'[。！？\n]+'))
+      .map((String part) => part.trim())
+      .where(
+        (String part) =>
+            part.length >= 8 && !_hanChars.hasMatch(part),
+      )
+      .toList(growable: false);
+  if (englishBits.isNotEmpty) {
+    return englishBits.join(' ');
+  }
+  final String safeTopic = topic.trim().isEmpty ? 'this video' : topic.trim();
+  return 'Thanks for sharing about “$safeTopic”. '
+      'What else stood out to you, and why?';
+}
 
 class _ChatBubble {
   const _ChatBubble({
@@ -96,7 +131,12 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
   List<Map<String, dynamic>> _iceServers = defaultLiveTalkingIceServers;
   late final AnimationController _orbPulse;
   bool _coachSpeaking = false;
+  final FlutterTts _cartoonTts = FlutterTts();
+  CoachViseme _mouth = CoachViseme.closed;
+  Timer? _mouthReset;
   int _busyLineFailures = 0;
+  /// Default English. Flip only when the learner asks for Chinese.
+  bool _preferChineseReply = false;
 
   @override
   void initState() {
@@ -123,6 +163,8 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
 
   @override
   void dispose() {
+    _mouthReset?.cancel();
+    unawaited(_cartoonTts.stop());
     _orbPulse.dispose();
     _sessionTicker?.cancel();
     _reconnectTimer?.cancel();
@@ -218,13 +260,19 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
     return '本集视频主题';
   }
 
-  OralCoachVideoContext _videoContext() {
+  OralCoachVideoContext _videoContext({LearningSettingsState? settings}) {
+    final LearningSettingsState resolved =
+        settings ?? ref.read(learningSettingsProvider);
+    final DigitalHumanPersona persona = resolved.selectedDigitalHuman;
     return OralCoachVideoContext(
       courseTitle: widget.courseTitle,
       episodeTitle: widget.episodeTitle,
       topicSummary: _topicLabel,
       articleExcerpt: widget.articleExcerpt,
       difficulty: _difficulty,
+      digitalHumanId: persona.id,
+      ttsVoice: persona.edgeVoice(chinese: _preferChineseReply),
+      replyLanguage: _preferChineseReply ? 'zh' : 'en',
     );
   }
 
@@ -351,9 +399,11 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
       if (ice != null && ice.isNotEmpty) {
         _iceServers = ice;
       }
+      final DigitalHumanPersona persona =
+          ref.read(learningSettingsProvider).selectedDigitalHuman;
       final RTCVideoRenderer renderer = await _liveClient.connect(
         serverUrl,
-        avatar: defaultLiveTalkingAvatarId,
+        avatar: persona.liveTalkingAvatarId,
         iceServers: _iceServers,
       );
       if (!mounted) {
@@ -446,7 +496,7 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
       try {
         await _pipelineClient.updateContext(
           session: _session!,
-          context: _videoContext(),
+          context: _videoContext(settings: settings),
         );
       } catch (_) {
         _session = null;
@@ -457,13 +507,13 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
     }
     final OralCoachSession session = await _pipelineClient.createSession(
       rawBaseUrl: settings.oralCoachPipelineUrl,
-      context: _videoContext(),
+      context: _videoContext(settings: settings),
     );
     _session = session;
     _difficulty = session.difficulty;
   }
 
-  Future<bool> _playRemoteTts(String url) async {
+  Future<bool> _playRemoteTts(String url, {String text = ''}) async {
     Player? player;
     try {
       player = Player();
@@ -471,6 +521,13 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
       final DateTime deadline = DateTime.now().add(const Duration(seconds: 45));
       while (DateTime.now().isBefore(deadline)) {
         await Future<void>.delayed(const Duration(milliseconds: 200));
+        if (mounted && player.state.playing && player.state.duration.inMilliseconds > 0 && text.isNotEmpty) {
+          final List<String> words = text.split(RegExp(r'\s+'));
+          final int index = (player.state.position.inMilliseconds / player.state.duration.inMilliseconds * words.length).floor().clamp(0, words.length - 1);
+          final String word = words[index].toLowerCase();
+          setState(() => _mouth = RegExp('[ou]').hasMatch(word) ? CoachViseme.rounded
+            : RegExp('[ei]').hasMatch(word) ? CoachViseme.wide : CoachViseme.open);
+        }
         final bool ended =
             player.state.completed ||
             (!player.state.playing &&
@@ -495,6 +552,7 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
     if (speak.isEmpty) {
       return;
     }
+    final DigitalHumanPersona persona = settings.selectedDigitalHuman;
     if (mounted) {
       setState(() => _coachSpeaking = true);
     }
@@ -509,14 +567,125 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
           } catch (_) {}
         }
       }
+      // Prefer persona Edge voice (different timbre per digital human).
+      if (settings.usesOralCoachPipeline) {
+        try {
+          final String? ttsUrl = await _pipelineClient.synthesizeSpeech(
+            rawBaseUrl: settings.oralCoachPipelineUrl,
+            text: speak,
+            digitalHumanId: persona.id,
+            ttsVoice: persona.edgeVoice(chinese: _preferChineseReply),
+            language: _preferChineseReply ? 'zh' : 'en',
+          );
+          if (ttsUrl != null && ttsUrl.isNotEmpty) {
+            final bool played = await _playRemoteTts(ttsUrl, text: speak);
+            if (played) {
+              return;
+            }
+          }
+        } catch (_) {}
+      }
       try {
-        await ref.read(wordPronunciationServiceProvider).speak(speak);
+        _cartoonTts.setProgressHandler((
+          String text,
+          int start,
+          int end,
+          String word,
+        ) {
+          if (!mounted) {
+            return;
+          }
+          final String sound = word.toLowerCase();
+          setState(() {
+            _mouth = RegExp('[ou]').hasMatch(sound)
+                ? CoachViseme.rounded
+                : RegExp('[ei]').hasMatch(sound)
+                ? CoachViseme.wide
+                : RegExp('[fv]').hasMatch(sound)
+                ? CoachViseme.teeth
+                : CoachViseme.open;
+          });
+        });
+        await _configureLocalPersonaVoice(persona);
+        await _cartoonTts.awaitSpeakCompletion(true);
+        await _cartoonTts.speak(speak).timeout(const Duration(seconds: 90));
       } catch (_) {}
     } finally {
       if (mounted) {
-        setState(() => _coachSpeaking = false);
+        setState(() {
+          _coachSpeaking = false;
+          _mouth = CoachViseme.closed;
+        });
       }
     }
+  }
+
+  /// Device TTS fallback: pick a gendered local voice + persona pitch/rate.
+  Future<void> _configureLocalPersonaVoice(DigitalHumanPersona persona) async {
+    final String locale = persona.locale(chinese: _preferChineseReply);
+    await _cartoonTts.setLanguage(locale);
+    await _cartoonTts.setPitch(persona.localPitch);
+    await _cartoonTts.setSpeechRate(persona.localSpeechRate);
+    try {
+      final dynamic raw = await _cartoonTts.getVoices;
+      if (raw is! List) {
+        return;
+      }
+      final String localeKey = locale.toLowerCase().replaceAll('_', '-');
+      final String localePrefix = localeKey.split('-').first;
+      final bool wantFemale = persona.isFemaleVoice;
+      Map<String, String>? best;
+      int bestScore = -1;
+      for (final dynamic item in raw) {
+        if (item is! Map) {
+          continue;
+        }
+        final String name = '${item['name'] ?? ''}'.toLowerCase();
+        final String voiceLocale =
+            '${item['locale'] ?? ''}'.toLowerCase().replaceAll('_', '-');
+        if (voiceLocale.isEmpty && name.isEmpty) {
+          continue;
+        }
+        int score = 0;
+        if (voiceLocale == localeKey || name.contains(localeKey)) {
+          score += 4;
+        } else if (voiceLocale.startsWith(localePrefix) ||
+            name.startsWith(localePrefix)) {
+          score += 2;
+        } else {
+          continue;
+        }
+        final bool looksFemale = RegExp(
+          r'female|woman|girl|aria|jenny|xiaoxiao|xiaoyi|sfg|language',
+        ).hasMatch(name);
+        final bool looksMale = RegExp(
+          r'male|man|boy|guy|prabhat|yunxi|yunjian|tpd|x-m',
+        ).hasMatch(name);
+        if (wantFemale && looksFemale) {
+          score += 3;
+        } else if (!wantFemale && looksMale) {
+          score += 3;
+        } else if (wantFemale && looksMale) {
+          score -= 2;
+        } else if (!wantFemale && looksFemale) {
+          score -= 2;
+        }
+        // Prefer neural / enhanced when available.
+        if (name.contains('neural') || name.contains('enhanced')) {
+          score += 1;
+        }
+        if (score > bestScore) {
+          bestScore = score;
+          best = <String, String>{
+            'name': '${item['name'] ?? ''}',
+            'locale': '${item['locale'] ?? locale}',
+          };
+        }
+      }
+      if (best != null && best['name']!.isNotEmpty) {
+        await _cartoonTts.setVoice(best);
+      }
+    } catch (_) {}
   }
 
   Future<void> _startTopicConversation() async {
@@ -529,9 +698,12 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
       _error = null;
       _status = '正在开启主题对话…';
     });
+    final DigitalHumanPersona persona = settings.selectedDigitalHuman;
     final String open =
-        'Hi! Let\'s talk about “$_topicLabel”. '
-        'What did you find most interesting, and why?';
+        'Hi, I\'m ${persona.displayName}! Let\'s talk about “$_topicLabel” in English. '
+        'What did you find most interesting, and why? '
+        '(Say “用中文” anytime if you want Chinese.)';
+    _preferChineseReply = false;
     try {
       if (settings.usesOralCoachPipeline) {
         try {
@@ -765,7 +937,7 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
     if (mounted) {
       setState(() {
         _bubbles.add(
-          const _ChatBubble(role: 'user', text: '（语音已录）', hint: true),
+          const _ChatBubble(role: 'user', text: '(voice note)', hint: true),
         );
         _bubbles.add(_ChatBubble(role: 'coach', text: reply));
         _busy = false;
@@ -774,6 +946,16 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
       _scrollChatToEnd();
     }
     await _speakCoach(reply, settings);
+  }
+
+  void _updateReplyLanguageFromLearner(String transcript) {
+    if (learnerRequestsChineseReply(transcript)) {
+      _preferChineseReply = true;
+      return;
+    }
+    if (learnerRequestsEnglishReply(transcript)) {
+      _preferChineseReply = false;
+    }
   }
 
   Future<void> _runPipelineFreeTalk({
@@ -801,20 +983,30 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
       }
       return;
     }
+    _updateReplyLanguageFromLearner(confirmed);
     setState(() {
       _busy = true;
       _status = '外教思考中…';
       _bubbles.add(_ChatBubble(role: 'user', text: confirmed, hint: true));
     });
+    final DigitalHumanPersona persona = settings.selectedDigitalHuman;
     final OralCoachTurnResult turn = await _pipelineClient.confirmDraft(
       session: session,
       draftId: draft.draftId,
       confirmedText: confirmed,
+      digitalHumanId: persona.id,
+      ttsVoice: persona.edgeVoice(chinese: _preferChineseReply),
+      replyLanguage: _preferChineseReply ? 'zh' : 'en',
     );
     _difficulty = turn.difficulty;
-    final String speakText = turn.avatarText.trim().isNotEmpty
+    final String rawSpeak = turn.avatarText.trim().isNotEmpty
         ? turn.avatarText.trim()
         : turn.coachText.trim();
+    final String speakText = preferEnglishCoachReply(
+      rawSpeak,
+      allowChinese: _preferChineseReply,
+      topic: _topicLabel,
+    );
 
     bool avatarSpoke = false;
     if (speakText.isNotEmpty && settings.usesRealtimeLipSync) {
@@ -833,7 +1025,7 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
           avatarSpoke = false;
         } finally {
           if (mounted) {
-            setState(() => _coachSpeaking = false);
+            setState(() { _coachSpeaking = false; _mouth = CoachViseme.closed; });
           }
         }
       }
@@ -841,15 +1033,19 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
     if (!avatarSpoke) {
       final String? ttsUrl = turn.ttsUrl?.trim();
       bool playedRemote = false;
+      // Always prefer persona Edge TTS from the coach pipeline when available.
       if (ttsUrl != null && ttsUrl.isNotEmpty) {
         if (mounted) {
           setState(() => _coachSpeaking = true);
         }
         try {
-          playedRemote = await _playRemoteTts(ttsUrl);
+          playedRemote = await _playRemoteTts(ttsUrl, text: speakText);
         } finally {
           if (mounted) {
-            setState(() => _coachSpeaking = false);
+            setState(() {
+              _coachSpeaking = false;
+              _mouth = CoachViseme.closed;
+            });
           }
         }
       }
@@ -1144,11 +1340,25 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
                           RTCVideoViewObjectFit.RTCVideoViewObjectFitCover,
                     )
                   else
-                    CoachAvatarStage(
-                      pulse: _orbPulse,
-                      speaking: _coachSpeaking,
-                      listening: _recordingActive,
-                      label: stageLabel,
+                    Builder(
+                      builder: (BuildContext context) {
+                        final DigitalHumanPersona persona = ref
+                            .watch(learningSettingsProvider)
+                            .selectedDigitalHuman;
+                        return CoachAvatarStage(
+                          onPersonaSelected: (String id) => ref.read(learningSettingsProvider.notifier).setDigitalHumanId(id),
+                          onCartoonChanged: (bool value) => ref.read(learningSettingsProvider.notifier).setCartoonDigitalHuman(value),
+                          spriteAsset: ref.watch(learningSettingsProvider).cartoonDigitalHuman ? 'assets/img/digital_human/${persona.id}-cartoon.png' : null,
+                          mouth: _mouth,
+                          thinking: _busy,
+                          pulse: _orbPulse,
+                          speaking: _coachSpeaking,
+                          listening: _recordingActive,
+                          label: stageLabel,
+                          imageAsset: persona.assetPath,
+                          displayName: persona.displayName,
+                        );
+                      },
                     ),
                   const DecoratedBox(
                     decoration: BoxDecoration(
@@ -1249,7 +1459,7 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
                                 horizontal: 28,
                               ),
                               child: Text(
-                                'Hi~ 我们聊聊「$_topicLabel」',
+                                'Hi~ Let\'s talk about “$_topicLabel” in English.',
                                 textAlign: TextAlign.center,
                                 style: TextStyle(
                                   color: Colors.white.withValues(alpha: 0.78),
@@ -1266,9 +1476,13 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
                             itemCount: _bubbles.length,
                             itemBuilder: (BuildContext context, int index) {
                               final _ChatBubble bubble = _bubbles[index];
+                              final DigitalHumanPersona persona = ref
+                                  .watch(learningSettingsProvider)
+                                  .selectedDigitalHuman;
                               return _ConversationBubble(
                                 bubble: bubble,
                                 showZh: _showZhIndexes.contains(index),
+                                coachAvatarAsset: persona.assetPath,
                                 onToggleZh: () =>
                                     _toggleZh(index, bubble.zh),
                                 onCopy: () =>
@@ -1503,6 +1717,7 @@ class _ConversationBubble extends StatelessWidget {
     required this.onToggleZh,
     required this.onCopy,
     required this.onSpeak,
+    this.coachAvatarAsset,
   });
 
   final _ChatBubble bubble;
@@ -1510,6 +1725,7 @@ class _ConversationBubble extends StatelessWidget {
   final VoidCallback onToggleZh;
   final VoidCallback onCopy;
   final VoidCallback onSpeak;
+  final String? coachAvatarAsset;
 
   @override
   Widget build(BuildContext context) {
@@ -1517,6 +1733,7 @@ class _ConversationBubble extends StatelessWidget {
     final String body = showZh && bubble.zh.trim().isNotEmpty
         ? bubble.zh
         : bubble.text;
+    final String avatar = (coachAvatarAsset ?? '').trim();
 
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
@@ -1527,14 +1744,20 @@ class _ConversationBubble extends StatelessWidget {
             : MainAxisAlignment.start,
         children: <Widget>[
           if (!mine) ...<Widget>[
-            const CircleAvatar(
+            CircleAvatar(
               radius: 16,
-              backgroundColor: Color(0xFF5B3FD4),
-              child: Icon(
-                Icons.face_retouching_natural_rounded,
-                size: 18,
-                color: Colors.white,
-              ),
+              backgroundColor: const Color(0xFF5B3FD4),
+              backgroundImage: avatar.isEmpty ? null : AssetImage(avatar),
+              onBackgroundImageError: avatar.isEmpty
+                  ? null
+                  : (_, __) {},
+              child: avatar.isEmpty
+                  ? const Icon(
+                      Icons.face_retouching_natural_rounded,
+                      size: 18,
+                      color: Colors.white,
+                    )
+                  : null,
             ),
             const SizedBox(width: 8),
           ],

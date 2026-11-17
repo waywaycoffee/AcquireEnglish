@@ -1,8 +1,11 @@
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import '../../domain/coach_animation_timeline.dart';
+import 'cartoon_coach_sprite.dart';
+import '../../data/digital_human_catalog.dart';
 
-/// Local coach stage: circular avatar + fixed idle / speaking motions.
+/// Local coach stage: circular photo avatar + fixed idle / speaking motions.
 ///
 /// Replaces always-on LiveTalking WebRTC during conversation to save GPU.
 class CoachAvatarStage extends StatelessWidget {
@@ -11,6 +14,13 @@ class CoachAvatarStage extends StatelessWidget {
     required this.speaking,
     required this.listening,
     required this.label,
+    this.imageAsset,
+    this.spriteAsset,
+    this.onCartoonChanged,
+    this.onPersonaSelected,
+    this.mouth = CoachViseme.closed,
+    this.thinking = false,
+    this.displayName,
     super.key,
   });
 
@@ -18,6 +28,13 @@ class CoachAvatarStage extends StatelessWidget {
   final bool speaking;
   final bool listening;
   final String label;
+  final ValueChanged<bool>? onCartoonChanged;
+  final ValueChanged<String>? onPersonaSelected;
+  final String? spriteAsset;
+  final CoachViseme mouth;
+  final bool thinking;
+  final String? imageAsset;
+  final String? displayName;
 
   @override
   Widget build(BuildContext context) {
@@ -31,9 +48,9 @@ class CoachAvatarStage extends StatelessWidget {
             ? math.sin(t * math.pi * 2) * 3
             : math.sin(t * math.pi) * 2;
         final double scale = speaking
-            ? 1.0 + t * 0.04
+            ? 1.0 + math.sin(t * math.pi * 2) * 0.008
             : listening
-            ? 1.0 + t * 0.02
+            ? 1.0 + math.sin(t * math.pi * 2) * 0.005
             : 1.0;
         return Stack(
           fit: StackFit.expand,
@@ -60,6 +77,25 @@ class CoachAvatarStage extends StatelessWidget {
                 ),
               ),
             ),
+            if (onPersonaSelected != null)
+              Positioned(top: 12, left: 8, child: PopupMenuButton<String>(
+                tooltip: '选择外教形象',
+                onSelected: onPersonaSelected,
+                itemBuilder: (BuildContext context) => <PopupMenuEntry<String>>[
+                  for (final DigitalHumanPersona persona in digitalHumanCatalog)
+                    PopupMenuItem<String>(value: persona.id, child: Text(persona.displayName)),
+                ],
+                child: Padding(padding: const EdgeInsets.all(12), child: Text(displayName ?? '选择外教', style: const TextStyle(color: Colors.white))),
+              )),
+            if (onCartoonChanged != null)
+              Positioned(top: 12, right: 12, child: SegmentedButton<bool>(
+                segments: const <ButtonSegment<bool>>[
+                  ButtonSegment<bool>(value: true, label: Text('卡通版')),
+                  ButtonSegment<bool>(value: false, label: Text('真人版')),
+                ],
+                selected: <bool>{spriteAsset != null},
+                onSelectionChanged: (Set<bool> values) => onCartoonChanged!(values.first),
+              )),
             Positioned(
               left: 24,
               right: 24,
@@ -77,7 +113,18 @@ class CoachAvatarStage extends StatelessWidget {
           ],
         );
       },
-      child: _AvatarDisc(speaking: speaking, listening: listening, pulse: pulse),
+      child: spriteAsset != null ? SizedBox(width: 260, height: 260,
+        child: AnimatedBuilder(animation: pulse, builder: (BuildContext context, Widget? child) => CartoonCoachSprite(
+          asset: spriteAsset!, mouth: mouth, phase: pulse.value,
+          motion: speaking ? CoachMotion.speaking : listening ? CoachMotion.listening : thinking ? CoachMotion.thinking : CoachMotion.idle,
+        )),
+      ) : _AvatarDisc(
+        speaking: speaking,
+        listening: listening,
+        pulse: pulse,
+        imageAsset: imageAsset,
+        displayName: displayName,
+      ),
     );
   }
 }
@@ -87,11 +134,15 @@ class _AvatarDisc extends StatelessWidget {
     required this.speaking,
     required this.listening,
     required this.pulse,
+    this.imageAsset,
+    this.displayName,
   });
 
   final bool speaking;
   final bool listening;
   final Animation<double> pulse;
+  final String? imageAsset;
+  final String? displayName;
 
   @override
   Widget build(BuildContext context) {
@@ -100,21 +151,17 @@ class _AvatarDisc extends StatelessWidget {
         : listening
         ? const Color(0xFF6EE7B7)
         : const Color(0xFF9B8EC4);
+    final String asset = (imageAsset ?? '').trim();
     return AnimatedBuilder(
       animation: pulse,
       builder: (BuildContext context, Widget? child) {
         final double glow = 18 + pulse.value * (speaking ? 22 : 10);
         return Container(
-          width: 168,
-          height: 168,
+          width: 196,
+          height: 196,
           decoration: BoxDecoration(
             shape: BoxShape.circle,
-            gradient: const LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: <Color>[Color(0xFF5B4B8A), Color(0xFF2F2550)],
-            ),
-            border: Border.all(color: ring.withValues(alpha: 0.9), width: 3),
+            border: Border.all(color: ring.withValues(alpha: 0.95), width: 3.5),
             boxShadow: <BoxShadow>[
               BoxShadow(
                 color: ring.withValues(alpha: 0.35),
@@ -126,19 +173,63 @@ class _AvatarDisc extends StatelessWidget {
           child: child,
         );
       },
-      child: Stack(
-        alignment: Alignment.center,
-        children: <Widget>[
-          Icon(
-            Icons.face_retouching_natural_rounded,
-            size: 78,
-            color: Colors.white.withValues(alpha: 0.92),
-          ),
-          Positioned(
-            bottom: 28,
-            child: _MouthBar(speaking: speaking, pulse: pulse),
-          ),
-        ],
+      child: ClipOval(
+        child: Stack(
+          fit: StackFit.expand,
+          children: <Widget>[
+            if (asset.isNotEmpty)
+              Image.asset(
+                asset,
+                fit: BoxFit.cover,
+                errorBuilder: (_, __, ___) => _FallbackFace(
+                  displayName: displayName,
+                ),
+              )
+            else
+              _FallbackFace(displayName: displayName),
+            Positioned(
+              left: 54,
+              right: 54,
+              bottom: 36,
+              child: _MouthBar(speaking: speaking, pulse: pulse),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _FallbackFace extends StatelessWidget {
+  const _FallbackFace({this.displayName});
+
+  final String? displayName;
+
+  @override
+  Widget build(BuildContext context) {
+    return ColoredBox(
+      color: const Color(0xFF3A2F5C),
+      child: Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: <Widget>[
+            Icon(
+              Icons.face_retouching_natural_rounded,
+              size: 72,
+              color: Colors.white.withValues(alpha: 0.92),
+            ),
+            if ((displayName ?? '').trim().isNotEmpty) ...<Widget>[
+              const SizedBox(height: 6),
+              Text(
+                displayName!.trim(),
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+            ],
+          ],
+        ),
       ),
     );
   }

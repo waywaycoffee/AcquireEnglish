@@ -149,6 +149,7 @@ flutter:
     - assets/dictionary/
     - assets/translations/
     - assets/img/
+    - assets/img/digital_human/
 
   fonts:
     - family: Nunito

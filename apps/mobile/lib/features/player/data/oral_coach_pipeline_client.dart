@@ -118,6 +118,9 @@ class OralCoachPipelineClient {
     required OralCoachSession session,
     required String draftId,
     String? confirmedText,
+    String? digitalHumanId,
+    String? ttsVoice,
+    String? replyLanguage,
   }) async {
     final Response<dynamic> response = await _dio.post<dynamic>(
       '${session.baseUrl}/api/sessions/${session.id}/confirm',
@@ -125,6 +128,11 @@ class OralCoachPipelineClient {
         'draft_id': draftId,
         if ((confirmedText ?? '').trim().isNotEmpty)
           'confirmed_text': confirmedText!.trim(),
+        if ((digitalHumanId ?? '').trim().isNotEmpty)
+          'digital_human_id': digitalHumanId!.trim(),
+        if ((ttsVoice ?? '').trim().isNotEmpty) 'tts_voice': ttsVoice!.trim(),
+        if ((replyLanguage ?? '').trim().isNotEmpty)
+          'reply_language': replyLanguage!.trim(),
       },
       options: Options(
         contentType: Headers.jsonContentType,
@@ -133,6 +141,52 @@ class OralCoachPipelineClient {
       ),
     );
     return OralCoachTurnResult.fromJson(_asMap(response.data), session.baseUrl);
+  }
+
+  /// One-shot persona TTS (greeting / local fallback). Returns absolute URL.
+  Future<String?> synthesizeSpeech({
+    required String rawBaseUrl,
+    required String text,
+    required String digitalHumanId,
+    String? ttsVoice,
+    String language = 'en',
+  }) async {
+    final String spoken = text.trim();
+    if (spoken.isEmpty) {
+      return null;
+    }
+    final String base = normalizeBaseUrl(rawBaseUrl);
+    final Response<dynamic> response = await _dio.post<dynamic>(
+      '$base/api/tts/speak',
+      data: <String, dynamic>{
+        'text': spoken,
+        'digital_human_id': digitalHumanId.trim().isEmpty
+            ? 'mia'
+            : digitalHumanId.trim(),
+        if ((ttsVoice ?? '').trim().isNotEmpty) 'tts_voice': ttsVoice!.trim(),
+        'language': language.trim().isEmpty ? 'en' : language.trim(),
+      },
+      options: Options(
+        contentType: Headers.jsonContentType,
+        sendTimeout: const Duration(seconds: 30),
+        receiveTimeout: const Duration(seconds: 45),
+      ),
+    );
+    final Map<String, dynamic> body = _asMap(response.data);
+    final String relative = '${body['tts_url'] ?? ''}'.trim();
+    if (relative.isEmpty) {
+      return null;
+    }
+    if (relative.startsWith('http://') || relative.startsWith('https://')) {
+      return relative;
+    }
+    if (relative.startsWith('//')) {
+      return 'https:$relative';
+    }
+    if (relative.startsWith('/')) {
+      return '$base$relative';
+    }
+    return '$base/$relative';
   }
 
   Future<OralCoachTurnResult> turn({
@@ -185,6 +239,9 @@ class OralCoachVideoContext {
     this.topicSummary = '',
     this.articleExcerpt = '',
     this.difficulty = 'B1',
+    this.digitalHumanId = 'mia',
+    this.ttsVoice = '',
+    this.replyLanguage = 'en',
   });
 
   final String courseTitle;
@@ -200,6 +257,9 @@ class OralCoachVideoContext {
   /// Condensed English excerpt from the full transcript (not one drill line).
   final String articleExcerpt;
   final String difficulty;
+  final String digitalHumanId;
+  final String ttsVoice;
+  final String replyLanguage;
 
   Map<String, Object?> toJson() => <String, Object?>{
     'course_title': courseTitle,
@@ -211,6 +271,9 @@ class OralCoachVideoContext {
     'topic_summary': topicSummary,
     'article_excerpt': articleExcerpt,
     'difficulty': difficulty,
+    'digital_human_id': digitalHumanId,
+    if (ttsVoice.trim().isNotEmpty) 'tts_voice': ttsVoice.trim(),
+    'reply_language': replyLanguage,
   };
 }
 
