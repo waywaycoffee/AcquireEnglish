@@ -11,6 +11,7 @@ import 'package:path_provider/path_provider.dart';
 import '../../../../constants/feature_flags.dart';
 import '../../../settings/data/pronunciation_credentials.dart';
 import '../../data/pronunciation_audio_extractor.dart';
+import '../../data/dub_session_store.dart';
 import '../../data/pronunciation_providers.dart';
 import '../../data/tencent_pronunciation_service.dart';
 import '../../domain/pronunciation_assessment.dart';
@@ -18,18 +19,21 @@ import '../../domain/pronunciation_assessment.dart';
 Future<void> showPronunciationAssessmentDialog(
   BuildContext context, {
   required PronunciationAssessmentTarget target,
+  String? episodeId,
 }) {
   return showDialog<void>(
     context: context,
     useSafeArea: false,
     barrierColor: Colors.transparent,
     builder: (BuildContext context) =>
-        PronunciationAssessmentDialog(target: target),
+        PronunciationAssessmentDialog(target: target, episodeId: episodeId),
   );
 }
 
 class PronunciationAssessmentDialog extends ConsumerStatefulWidget {
-  const PronunciationAssessmentDialog({required this.target, super.key});
+  const PronunciationAssessmentDialog({required this.target, this.episodeId, super.key});
+
+  final String? episodeId;
 
   final PronunciationAssessmentTarget target;
 
@@ -56,6 +60,7 @@ class _PronunciationAssessmentDialogState
   Pcm16MonoAudio? _recording;
   PronunciationAssessmentResult? _result;
   String? _recordingPath;
+  DateTime? _takeCreatedAt;
   String? _message;
   String? _referenceError;
   bool _loadingReference = true;
@@ -344,6 +349,11 @@ class _PronunciationAssessmentDialogState
         _result = null;
         _message = reachedLimit ? '已达到 60 秒上限，录音已停止。' : null;
       });
+      _takeCreatedAt = DateTime.now();
+      if (widget.episodeId != null) {
+        await _saveTake();
+        if (mounted && !_resourcesReleased) await _score();
+      }
     } catch (_) {
       if (path != null) await _deleteTemporaryPath(path);
       if (!mounted || _resourcesReleased) return;
@@ -352,6 +362,26 @@ class _PronunciationAssessmentDialogState
         _finishingRecording = false;
         _message = '保存临时录音失败，请重试。';
       });
+    }
+  }
+
+  Future<void> _saveTake() async {
+    final String? episode = widget.episodeId;
+    final String? path = _recordingPath;
+    if (episode == null || path == null) return;
+    try {
+      await DubSessionStore.instance.saveTake(DubTake(
+        episodeId: episode,
+        lineId: '${widget.target.startMs}-${widget.target.endMs}',
+        startMs: widget.target.startMs, endMs: widget.target.endMs,
+        english: widget.target.text, userWavPath: path,
+        createdAt: _takeCreatedAt ??= DateTime.now(),
+        scorePercent: (_result?.suggestedScore ?? _result?.accuracy)?.round(),
+        professionalScore: _result != null,
+      ));
+      if (mounted && !_resourcesReleased) setState(() => _message = '录音已保存，可在字幕句子中回听');
+    } catch (_) {
+      if (mounted && !_resourcesReleased) setState(() => _message = '录音保存失败，可先在此回听并重试');
     }
   }
 
@@ -430,6 +460,7 @@ class _PronunciationAssessmentDialogState
         _result = result;
         _assessing = false;
       });
+      await _saveTake();
     } on PronunciationAssessmentException catch (error) {
       _cancelAssessment = null;
       if (!mounted || _resourcesReleased || attempt != _assessmentAttempt) {

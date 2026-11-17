@@ -2483,7 +2483,7 @@ Future<void> _settleChineseFillIfAlreadyPresent() async {
         await ref.read(wordPronunciationServiceProvider).stop();
       } catch (_) {}
       if (!mounted) return;
-      await showPronunciationAssessmentDialog(context, target: target);
+      await showPronunciationAssessmentDialog(context, target: target, episodeId: widget.episodeId);
     } catch (_) {
       if (mounted) _showMessage('无法暂停当前视频，暂时不能开始录音。');
     } finally {
