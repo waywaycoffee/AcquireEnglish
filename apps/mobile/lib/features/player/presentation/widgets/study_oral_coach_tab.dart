@@ -177,6 +177,7 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
   static const Duration _sessionBudget = Duration(minutes: 3);
 
   final LiveTalkingClient _liveClient = LiveTalkingClient();
+  String? _connectedPersonaId;
   final OralCoachPipelineClient _pipelineClient = OralCoachPipelineClient();
   final LiveKitOralClient _liveKitClient = LiveKitOralClient();
   final List<_ChatBubble> _bubbles = <_ChatBubble>[];
@@ -491,6 +492,19 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
     }
   }
 
+  Future<void> _changeCoachPresentation({String? personaId, bool? cartoon}) async {
+    if (_connecting) return;
+    await _cartoonTts.stop();
+    await _liveClient.disconnect();
+    if (!mounted) return;
+    setState(() { _renderer = null; _connectedPersonaId = null; _coachSpeaking = false; _mouth = CoachViseme.closed; });
+    final LearningSettingsNotifier settings = ref.read(learningSettingsProvider.notifier);
+    if (personaId != null) settings.setDigitalHumanId(personaId);
+    if (cartoon != null) settings.setCartoonDigitalHuman(cartoon);
+    final LearningSettingsState next = ref.read(learningSettingsProvider);
+    if (next.usesRealtimeLipSync) await _ensureDigitalHumanConnected(next);
+  }
+
   Future<void> _connectLiveTalking(String serverUrl) async {
     if (_connecting) {
       return;
@@ -518,7 +532,8 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
       }
       setState(() {
         _renderer = renderer;
-        _error = null;
+        _connectedPersonaId = persona.id;
+        _error = '当前为 LiveTalking 服务示例形象；${persona.displayName} 的专属真人视频尚未部署。';
         _busyLineFailures = 0;
         _status = _liveClient.hasRemoteVideo
             ? '你可以开始说'
@@ -575,7 +590,7 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
     if (_liveClient.isConnected && !_liveClient.isSessionAlive) {
       await _liveClient.disconnect();
     }
-    if (!_liveClient.isConnected || hostChanged) {
+    if (!_liveClient.isConnected || hostChanged || _connectedPersonaId != settings.digitalHumanId) {
       await _connectLiveTalking(liveUrl);
     }
     if (speakGreeting &&
@@ -1473,8 +1488,8 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
                             .watch(learningSettingsProvider)
                             .selectedDigitalHuman;
                         return CoachAvatarStage(
-                          onPersonaSelected: (String id) => ref.read(learningSettingsProvider.notifier).setDigitalHumanId(id),
-                          onCartoonChanged: (bool value) => ref.read(learningSettingsProvider.notifier).setCartoonDigitalHuman(value),
+                          onPersonaSelected: (String id) => unawaited(_changeCoachPresentation(personaId: id)),
+                          onCartoonChanged: (bool value) => unawaited(_changeCoachPresentation(cartoon: value)),
                           spriteAsset: ref.watch(learningSettingsProvider).cartoonDigitalHuman ? 'assets/img/digital_human/${persona.id}-cartoon.png' : null,
                           mouth: _mouth,
                           thinking: _busy,
@@ -1487,6 +1502,11 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
                         );
                       },
                     ),
+                  if (lipSync && _liveClient.hasRemoteVideo)
+                    Positioned(right: 8, top: 52, child: FilledButton.tonal(
+                      onPressed: () => unawaited(_changeCoachPresentation(cartoon: true)),
+                      child: const Text('切换卡通版'),
+                    )),
                   const DecoratedBox(
                     decoration: BoxDecoration(
                       gradient: LinearGradient(

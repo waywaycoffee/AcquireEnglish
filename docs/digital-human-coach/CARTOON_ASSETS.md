@@ -14,3 +14,11 @@
 > Use case: style-transfer. Create a production 2D cartoon English tutor sprite atlas based on this reference portrait, preserving hairstyle, skin tone and outfit. Exact square 3 by 3 equal-cell grid, NO borders, NO labels, transparent background. Each cell has the SAME front-facing waist-up cartoon character at EXACTLY same scale and location. Cells in row-major order: relaxed eyes open mouth closed; open AH; wide EE; rounded OO; FV; eyes closed blink; listening head nod; thinking; encouraging smile and thumbs up. No photography, no speech bubbles, no text. Character is {mia|leo|emma|arun}.
 
 素材路径：apps/mobile/assets/img/digital_human/{角色}-cartoon.png。
+
+## 真人素材与 LiveTalking 当前状态
+
+四张原始真人 JPG 位于同目录。目前未生成四位外教的真人动作组图或动作视频，也未在 GPU LiveTalking 服务部署对应专属 avatar。当前 catalog 的两个 avatar id 来自服务器示例，不应宣称对应 Mia/Leo/Emma/Arun。
+
+应用现在：卡通不连接实时视频；真人可复用视频陪练管线连接 LiveTalking；切换形象会断开并重建会话；示例形象明确显示提示；实时画面保留切回卡通的入口。
+
+真人上线验收前必须：为每位角色取得或生成有授权的正面自然动作视频；按当前 LiveTalking 后端模型预处理四套 avatar；将 catalog 的 liveTalkingAvatarId 改为部署后的真实 ID；逐一验证 offer、视频首帧、语音口型、切换与挂断释放会话。不能只替换照片或配置虚构 ID 就声称真人完成。

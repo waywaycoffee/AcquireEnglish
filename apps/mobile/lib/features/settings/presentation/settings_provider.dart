@@ -417,7 +417,8 @@ class LearningSettingsState {
 
   /// Real-time wav2lip WebRTC on the GPU box. Expensive; default pipeline
   /// conversation uses a local avatar + TTS instead.
-  bool get usesRealtimeLipSync => usesLiveTalkingCoach;
+  bool get usesRealtimeLipSync => !cartoonDigitalHuman &&
+      (usesLiveTalkingCoach || usesOralCoachPipeline);
 
   bool get isBilibiliLoggedIn => hasBilibiliCookie;
 
