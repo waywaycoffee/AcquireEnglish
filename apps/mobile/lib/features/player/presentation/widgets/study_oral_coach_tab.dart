@@ -212,6 +212,9 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
   int _busyLineFailures = 0;
   /// Default English. Flip only when the learner asks for Chinese.
   bool _preferChineseReply = false;
+  /// Pre-generated oral Q&A topics from the episode transcript.
+  List<String> _talkTopics = const <String>[];
+  int _topicCursor = 0;
 
   @override
   void initState() {
@@ -320,35 +323,91 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
   }
 
   String _openingCoachPrompt(String coachName) {
-    final String excerpt = widget.articleExcerpt.trim();
-    final List<String> words = RegExp(r"[A-Za-z][A-Za-z'-]{3,}")
-        .allMatches(excerpt.isNotEmpty ? excerpt : _topicLabel)
-        .map((Match m) => m.group(0)!)
-        .where(
-          (String w) => !const <String>{
-            'this',
-            'that',
-            'with',
-            'from',
-            'have',
-            'been',
-            'were',
-            'what',
-            'when',
-            'about',
-            'would',
-            'could',
-          }.contains(w.toLowerCase()),
-        )
-        .toList(growable: false);
-    final String vocab = words.isEmpty
-        ? 'idea'
-        : words[words.length > 3 ? 3 : words.length - 1];
-    return 'Hi, I\'m $coachName! We\'ll practice English around “$_topicLabel”. '
-        'I\'ll ask about the video, help you recall key words and grammar, '
-        'and correct mistakes as we go. '
-        'First: what happened in the video, and can you use the word “$vocab”? '
+    final String firstTopic = _talkTopics.isNotEmpty
+        ? _talkTopics.first
+        : 'What happened in the video?';
+    return 'Hi, I\'m $coachName! I already read the subtitles for “$_topicLabel” '
+        'and prepared ${_talkTopics.isEmpty ? 'some' : '${_talkTopics.length}'} '
+        'oral practice questions. '
+        'I\'ll correct grammar as we go. First: $firstTopic '
         '(Say “用中文” anytime if you want Chinese.)';
+  }
+
+  List<String> _localHeuristicTalkTopics() {
+    final String excerpt = widget.articleExcerpt.trim();
+    final String topic = _topicLabel;
+    if (excerpt.isEmpty) {
+      return <String>[
+        'What is the main idea of “$topic”?',
+        'Can you retell one moment from the video in a full sentence?',
+        'Which word from the video do you want to practice?',
+        'What happened first, and what happened next?',
+      ];
+    }
+    final List<String> sentences = excerpt
+        .split(RegExp(r'(?<=[.!?])\s+|\n+'))
+        .map((String s) => s.trim())
+        .where((String s) => RegExp('[A-Za-z]').hasMatch(s) && s.length >= 12)
+        .toList(growable: false);
+    final List<String> topics = <String>[];
+    for (int i = 0; i < sentences.length && topics.length < 6; i += 1) {
+      final String clip = sentences[i].length <= 100
+          ? sentences[i]
+          : '${sentences[i].substring(0, 97)}…';
+      if (i % 3 == 0) {
+        topics.add('In the video, what happens here: $clip?');
+      } else if (i % 3 == 1) {
+        topics.add('Can you retell this part in your own words: $clip?');
+      } else {
+        topics.add('Why is this moment important: $clip?');
+      }
+    }
+    topics.addAll(<String>[
+      'What is the main idea of “$topic”?',
+      'Which key vocabulary from the video can you use in a sentence?',
+      'Try past tense: what happened first in the video?',
+    ]);
+    final Set<String> seen = <String>{};
+    return topics
+        .map((String t) => t.trim())
+        .where((String t) => t.isNotEmpty && seen.add(t.toLowerCase()))
+        .take(8)
+        .toList(growable: false);
+  }
+
+  Future<void> _prepareTalkTopics(LearningSettingsState settings) async {
+    List<String> topics = const <String>[];
+    if (settings.usesOralCoachPipeline && _session != null) {
+      try {
+        topics = await _pipelineClient.generateTalkTopics(
+          session: _session!,
+          articleExcerpt: widget.articleExcerpt,
+          topicSummary: _topicLabel,
+          count: 8,
+          force: true,
+        );
+      } catch (_) {
+        topics = const <String>[];
+      }
+    }
+    if (topics.isEmpty) {
+      topics = _localHeuristicTalkTopics();
+    }
+    if (!mounted) {
+      return;
+    }
+    setState(() {
+      _talkTopics = topics;
+      _topicCursor = 0;
+    });
+    if (_session != null) {
+      try {
+        await _pipelineClient.updateContext(
+          session: _session!,
+          context: _videoContext(settings: settings),
+        );
+      } catch (_) {}
+    }
   }
 
   String get _topicLabel {
@@ -376,6 +435,7 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
       episodeTitle: widget.episodeTitle,
       topicSummary: _topicLabel,
       articleExcerpt: widget.articleExcerpt,
+      talkTopics: _talkTopics,
       difficulty: _difficulty,
       digitalHumanId: persona.id,
       ttsVoice: persona.edgeVoice(chinese: _preferChineseReply),
@@ -809,6 +869,31 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
     } catch (_) {}
   }
 
+  Future<void> _askPreparedTopic(int index) async {
+    if (_busy || index < 0 || index >= _talkTopics.length) {
+      return;
+    }
+    final LearningSettingsState settings = ref.read(learningSettingsProvider);
+    final String question = _talkTopics[index];
+    setState(() {
+      _topicCursor = index;
+      _busy = true;
+      _bubbles.add(_ChatBubble(role: 'coach', text: question));
+      _status = '请围绕这个话题回答';
+    });
+    _scrollChatToEnd();
+    try {
+      await _speakCoach(question, settings);
+    } finally {
+      if (mounted) {
+        setState(() {
+          _busy = false;
+          _status = '你可以开始说';
+        });
+      }
+    }
+  }
+
   Future<void> _startTopicConversation() async {
     if (_busy) {
       return;
@@ -820,12 +905,15 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
       _status = '正在开启主题对话…';
     });
     final DigitalHumanPersona persona = settings.selectedDigitalHuman;
-    final String open = _openingCoachPrompt(persona.displayName);
     _preferChineseReply = false;
     try {
       if (settings.usesOralCoachPipeline) {
         try {
+          if (mounted) {
+            setState(() => _status = '正在读取字幕并生成口语话题…');
+          }
           await _ensurePipelineSession(settings);
+          await _prepareTalkTopics(settings);
           if (settings.usesLiveKit &&
               ref.read(authSessionProvider).isLoggedIn) {
             try {
@@ -839,8 +927,14 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
           if (mounted) {
             setState(() => _error = '管线暂不可用：${_pretty(error)}');
           }
+          if (_talkTopics.isEmpty) {
+            await _prepareTalkTopics(settings);
+          }
         }
+      } else if (_talkTopics.isEmpty) {
+        await _prepareTalkTopics(settings);
       }
+      final String open = _openingCoachPrompt(persona.displayName);
       if (settings.usesRealtimeLipSync) {
         await _ensureDigitalHumanConnected(
           settings,
@@ -1606,7 +1700,9 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
                                 horizontal: 28,
                               ),
                               child: Text(
-                                'Hi~ I\'ll ask about “$_topicLabel”, help you recall key words & grammar, and correct mistakes.',
+                                _talkTopics.isEmpty
+                                    ? 'Hi~ 我会先读字幕，再围绕“$_topicLabel”生成口语问答。'
+                                    : '已准备 ${_talkTopics.length} 个口语话题，点下方话题或直接说话。',
                                 textAlign: TextAlign.center,
                                 style: TextStyle(
                                   color: Colors.white.withValues(alpha: 0.78),
@@ -1640,6 +1736,43 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
                             },
                           ),
                   ),
+                  if (_talkTopics.isNotEmpty)
+                    SizedBox(
+                      height: 40,
+                      child: ListView.separated(
+                        scrollDirection: Axis.horizontal,
+                        padding: const EdgeInsets.fromLTRB(14, 0, 14, 8),
+                        itemCount: _talkTopics.length,
+                        separatorBuilder: (_, __) => const SizedBox(width: 8),
+                        itemBuilder: (BuildContext context, int index) {
+                          final String topic = _talkTopics[index];
+                          final bool active = index == _topicCursor;
+                          return ActionChip(
+                            label: Text(
+                              topic,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w700,
+                                color: active
+                                    ? Colors.white
+                                    : Colors.white.withValues(alpha: 0.88),
+                              ),
+                            ),
+                            backgroundColor: active
+                                ? const Color(0xFF5B3FD4)
+                                : Colors.white.withValues(alpha: 0.12),
+                            side: BorderSide(
+                              color: Colors.white.withValues(alpha: 0.18),
+                            ),
+                            onPressed: _busy
+                                ? null
+                                : () => unawaited(_askPreparedTopic(index)),
+                          );
+                        },
+                      ),
+                    ),
                   GestureDetector(
                     key: const ValueKey<String>('study-oral-coach-mic'),
                     onLongPressStart: _busy

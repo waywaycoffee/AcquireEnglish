@@ -92,6 +92,64 @@ import 'widgets/study_shell_tokens.dart';
 import 'widgets/study_top_bar.dart';
 import 'widgets/study_word_cards_tab.dart';
 
+/// Build a whole-episode English excerpt for oral-coach topic generation.
+///
+/// Samples start / middle / end so questions are not limited to the opening.
+String _oralCoachSubtitleExcerpt(
+  List<PlayerSubtitleLine> lines, {
+  int maxChars = 3500,
+}) {
+  final List<String> english = <String>[];
+  for (final PlayerSubtitleLine line in lines) {
+    final String en = line.english.trim();
+    if (en.isEmpty || !RegExp('[A-Za-z]').hasMatch(en)) {
+      continue;
+    }
+    english.add(en);
+  }
+  if (english.isEmpty) {
+    return '';
+  }
+  if (english.length <= 24) {
+    final StringBuffer all = StringBuffer();
+    for (final String en in english) {
+      if (all.isNotEmpty) {
+        all.write(' ');
+      }
+      if (all.length + en.length + 1 > maxChars) {
+        break;
+      }
+      all.write(en);
+    }
+    return all.toString();
+  }
+  final int takeEach = 10;
+  final int midStart = ((english.length - takeEach) / 2).floor().clamp(
+    0,
+    english.length - 1,
+  );
+  final List<String> sampled = <String>[
+    ...english.take(takeEach),
+    ...english.skip(midStart).take(takeEach),
+    ...english.skip(english.length - takeEach),
+  ];
+  final Set<String> seen = <String>{};
+  final StringBuffer buf = StringBuffer();
+  for (final String en in sampled) {
+    if (!seen.add(en)) {
+      continue;
+    }
+    if (buf.isNotEmpty) {
+      buf.write(' ');
+    }
+    if (buf.length + en.length + 1 > maxChars) {
+      break;
+    }
+    buf.write(en);
+  }
+  return buf.toString();
+}
+
 class PadPortraitPlayerScreen extends ConsumerStatefulWidget {
   const PadPortraitPlayerScreen({
     required this.episodeId,
@@ -3164,32 +3222,19 @@ Future<void> _settleChineseFillIfAlreadyPresent() async {
           if (courseTitle.trim().isNotEmpty) courseTitle.trim(),
           if (episodeTitle.trim().isNotEmpty) episodeTitle.trim(),
         ].join(' · ');
-        final StringBuffer excerptBuf = StringBuffer();
-        if (state.hasLines) {
-          for (final PlayerSubtitleLine line in state.lines) {
-            final String en = line.english.trim();
-            if (en.isEmpty || !RegExp('[A-Za-z]').hasMatch(en)) {
-              continue;
-            }
-            if (excerptBuf.length + en.length + 1 > 2000) {
-              break;
-            }
-            if (excerptBuf.isNotEmpty) {
-              excerptBuf.write(' ');
-            }
-            excerptBuf.write(en);
-          }
-        }
+        // Sample start / middle / end so the coach can pre-generate topics
+        // across the whole episode, not only the opening lines.
+        final String excerpt = _oralCoachSubtitleExcerpt(state.lines);
         return StudyOralCoachTab(
           topicSummary: topicSummary.isNotEmpty
               ? topicSummary
               : (activeLine.english.trim().isNotEmpty
                     ? activeLine.english.trim()
                     : '本集视频'),
-          articleExcerpt: excerptBuf.toString(),
+          articleExcerpt: excerpt,
           courseTitle: courseTitle,
           episodeTitle: episodeTitle,
-          hasTranscript: excerptBuf.isNotEmpty,
+          hasTranscript: excerpt.isNotEmpty,
         );
       case StudyModeTab.dictation:
         final List<DictationQueueItem> queue = ref.watch(

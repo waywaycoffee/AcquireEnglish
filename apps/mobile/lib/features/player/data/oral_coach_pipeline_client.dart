@@ -71,6 +71,41 @@ class OralCoachPipelineClient {
     );
   }
 
+  /// Pre-read transcript on the coach server and generate oral Q&A topics.
+  Future<List<String>> generateTalkTopics({
+    required OralCoachSession session,
+    String? articleExcerpt,
+    String? topicSummary,
+    int count = 8,
+    bool force = true,
+  }) async {
+    final Response<dynamic> response = await _dio.post<dynamic>(
+      '${session.baseUrl}/api/sessions/${session.id}/topics',
+      data: <String, dynamic>{
+        'count': count.clamp(4, 12),
+        'force': force,
+        if ((articleExcerpt ?? '').trim().isNotEmpty)
+          'article_excerpt': articleExcerpt!.trim(),
+        if ((topicSummary ?? '').trim().isNotEmpty)
+          'topic_summary': topicSummary!.trim(),
+      },
+      options: Options(
+        contentType: Headers.jsonContentType,
+        sendTimeout: const Duration(seconds: 45),
+        receiveTimeout: const Duration(seconds: 60),
+      ),
+    );
+    final Map<String, dynamic> body = _asMap(response.data);
+    final Object? raw = body['topics'];
+    if (raw is! List) {
+      return const <String>[];
+    }
+    return raw
+        .map((Object? item) => '$item'.trim())
+        .where((String item) => item.isNotEmpty)
+        .toList(growable: false);
+  }
+
   Future<OralCoachDraftResult> createDraft({
     required OralCoachSession session,
     required String audioPath,
@@ -238,6 +273,7 @@ class OralCoachVideoContext {
     this.nextEnglish = '',
     this.topicSummary = '',
     this.articleExcerpt = '',
+    this.talkTopics = const <String>[],
     this.difficulty = 'B1',
     this.digitalHumanId = 'mia',
     this.ttsVoice = '',
@@ -256,6 +292,9 @@ class OralCoachVideoContext {
 
   /// Condensed English excerpt from the full transcript (not one drill line).
   final String articleExcerpt;
+
+  /// Pre-generated oral Q&A prompts grounded in the transcript.
+  final List<String> talkTopics;
   final String difficulty;
   final String digitalHumanId;
   final String ttsVoice;
@@ -270,6 +309,7 @@ class OralCoachVideoContext {
     'next_english': nextEnglish,
     'topic_summary': topicSummary,
     'article_excerpt': articleExcerpt,
+    if (talkTopics.isNotEmpty) 'talk_topics': talkTopics,
     'difficulty': difficulty,
     'digital_human_id': digitalHumanId,
     if (ttsVoice.trim().isNotEmpty) 'tts_voice': ttsVoice.trim(),

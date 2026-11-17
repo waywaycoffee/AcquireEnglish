@@ -69,6 +69,114 @@ def _is_stuck(learner_text: str) -> bool:
     return False
 
 
+def _normalize_topics(raw: list[str] | None, *, limit: int = 10) -> list[str]:
+    out: list[str] = []
+    seen: set[str] = set()
+    for item in raw or []:
+        text = re.sub(r'\s+', ' ', str(item or '').strip())
+        text = re.sub(r'^[\d]+[.)、:\-\s]+', '', text).strip()
+        if len(text) < 8:
+            continue
+        key = text.lower()
+        if key in seen:
+            continue
+        seen.add(key)
+        if not text.endswith('?'):
+            text = text.rstrip('.!') + '?'
+        out.append(text)
+        if len(out) >= limit:
+            break
+    return out
+
+
+def heuristic_talk_topics(context: VideoContext, *, count: int = 8) -> list[str]:
+    """Build oral Q&A prompts from subtitle sentences without an LLM."""
+    topic = (
+        context.topic_summary.strip()
+        or context.episode_title.strip()
+        or context.course_title.strip()
+        or 'this video'
+    )
+    excerpt = (context.article_excerpt or '').strip()
+    sentences = [
+        re.sub(r'\s+', ' ', s).strip(' .-')
+        for s in re.split(r'(?<=[.!?])\s+|\n+', excerpt)
+        if s and re.search(r'[A-Za-z]', s)
+    ]
+    # Prefer mid-length content sentences.
+    scored = sorted(
+        sentences,
+        key=lambda s: abs(len(s.split()) - 12),
+    )
+    picks = [s for s in scored if 5 <= len(s.split()) <= 28][: max(count, 6)]
+    if not picks and sentences:
+        picks = sentences[: max(count, 4)]
+    topics: list[str] = []
+    templates = (
+        'In the video, what happens when: {clip}?',
+        'Can you retell this part in your own words: {clip}?',
+        'Why is this moment important: {clip}?',
+        'What would you say to a friend about: {clip}?',
+        'Which key word from this line can you use: {clip}?',
+        'How would you explain this scene using past tense: {clip}?',
+    )
+    for i, clip in enumerate(picks):
+        short = clip if len(clip) <= 110 else clip[:107].rstrip() + '…'
+        topics.append(templates[i % len(templates)].format(clip=short))
+    vocab, grammar = _pick_focus_bits(excerpt, topic)
+    topics.extend(
+        [
+            f'What is the main idea of “{topic[:80]}”?',
+            f'Can you use the word “{vocab}” to describe one scene?',
+            f'Try a full sentence with {grammar}. What happened first?',
+            f'Who or what changed during “{topic[:80]}”, and why?',
+        ]
+    )
+    return _normalize_topics(topics, limit=count)
+
+
+async def generate_talk_topics(
+    llm: object,
+    context: VideoContext,
+    *,
+    count: int = 8,
+) -> list[str]:
+    """Pre-read transcript excerpt and generate oral Q&A topics."""
+    fallback = heuristic_talk_topics(context, count=count)
+    generate = getattr(llm, 'generate_talk_topics', None)
+    if not callable(generate):
+        return fallback
+    try:
+        topics = await generate(context=context, count=count)
+    except Exception:
+        return fallback
+    normalized = _normalize_topics(list(topics or []), limit=count)
+    if len(normalized) < 4:
+        # Fill with heuristics so the coach always has a bank of prompts.
+        merged = _normalize_topics(normalized + fallback, limit=count)
+        return merged or fallback
+    return normalized
+
+
+def _unused_talk_topics(
+    context: VideoContext,
+    history: list[dict[str, str]],
+) -> list[str]:
+    topics = [t.strip() for t in (context.talk_topics or []) if str(t).strip()]
+    if not topics:
+        return []
+    spoken = ' '.join(
+        str(item.get('content') or '') for item in history[-12:]
+    ).lower()
+    unused = []
+    for topic in topics:
+        key = topic.lower().rstrip('?')[:48]
+        if key and key in spoken:
+            continue
+        unused.append(topic)
+    return unused or topics
+
+
 def _pick_focus_bits(excerpt: str, topic: str) -> tuple[str, str]:
     """Heuristic vocab + grammar focus from transcript excerpt."""
     text = (excerpt or '').strip() or (topic or '').strip()
@@ -140,6 +248,14 @@ def _guided_fallback(context: VideoContext, learner_text: str) -> LlmReply:
 class MockLlm:
     name = 'mock'
 
+    async def generate_talk_topics(
+        self,
+        *,
+        context: VideoContext,
+        count: int = 8,
+    ) -> list[str]:
+        return heuristic_talk_topics(context, count=count)
+
     async def coach_turn(
         self,
         *,
@@ -153,6 +269,24 @@ class MockLlm:
         corrections = list(reply.corrections)
         if tip and 'Missing:' in tip:
             corrections.append(tip)
+        unused = _unused_talk_topics(context, history)
+        if unused and _is_stuck(learner_text):
+            reply = LlmReply(
+                text=(
+                    f"No worries — let's use this prompt: {unused[0]} "
+                    'Try one full sentence.'
+                ),
+                provider=self.name,
+                difficulty=context.difficulty,
+                corrections=corrections,
+            )
+        elif unused and not _is_stuck(learner_text):
+            reply = LlmReply(
+                text=f'{reply.text.rstrip()} Next: {unused[0]}',
+                provider=self.name,
+                difficulty=context.difficulty,
+                corrections=corrections,
+            )
         difficulty = context.difficulty
         if pronunciation.overall >= 0.85 and difficulty in {'A2', 'B1'}:
             difficulty = 'B2' if difficulty == 'B1' else 'B1'
@@ -162,7 +296,7 @@ class MockLlm:
             text=reply.text,
             provider=self.name,
             difficulty=difficulty,
-            corrections=corrections[:4],
+            corrections=list(reply.corrections)[:4] or corrections[:4],
         )
 
 
@@ -177,6 +311,63 @@ class OpenAiLlm:
             or settings.llm_provider == 'deepseek'
             else 'openai'
         )
+
+    async def generate_talk_topics(
+        self,
+        *,
+        context: VideoContext,
+        count: int = 8,
+    ) -> list[str]:
+        if not self.settings.openai_api_key:
+            return heuristic_talk_topics(context, count=count)
+        user = {
+            'mode': 'pregenerate_oral_qa_topics',
+            'video': context.topic_blurb(),
+            'topic_summary': context.topic_summary,
+            'article_excerpt': context.article_excerpt[:3500],
+            'difficulty': context.difficulty,
+            'count': count,
+            'instructions': (
+                'Read the subtitle/transcript excerpt carefully. '
+                f'Create {count} spoken English oral-practice questions for a learner. '
+                'Cover: plot/recall, opinions, key vocabulary in context, '
+                'and useful grammar points from the video. '
+                'Questions must be answerable from the excerpt, short enough to speak, '
+                'and varied (not near-duplicates). '
+                'Do not ask the learner to repeat a subtitle line verbatim.'
+            ),
+            'format': {
+                'topics': ['question 1', 'question 2'],
+            },
+        }
+        payload: dict = {
+            'model': self.settings.openai_model,
+            'temperature': 0.5,
+            'messages': [
+                {
+                    'role': 'system',
+                    'content': (
+                        'You prepare oral English practice prompts from a video transcript. '
+                        'Reply as compact JSON with a "topics" array of English questions only.'
+                    ),
+                },
+                {'role': 'user', 'content': json.dumps(user, ensure_ascii=False)},
+            ],
+            'response_format': {'type': 'json_object'},
+        }
+        async with httpx.AsyncClient(timeout=60) as client:
+            response = await client.post(
+                f'{self.settings.openai_base_url}/chat/completions',
+                headers={'Authorization': f'Bearer {self.settings.openai_api_key}'},
+                json=payload,
+            )
+            response.raise_for_status()
+            content = response.json()['choices'][0]['message']['content']
+        data = json.loads(content)
+        raw = data.get('topics') or data.get('questions') or []
+        if isinstance(raw, str):
+            raw = [raw]
+        return _normalize_topics([str(x) for x in raw], limit=count)
 
     async def coach_turn(
         self,
@@ -196,11 +387,14 @@ class OpenAiLlm:
         vocab, grammar = _pick_focus_bits(
             context.article_excerpt, context.topic_summary
         )
+        unused = _unused_talk_topics(context, history)
         user = {
             'mode': 'video_guided_oral_practice',
             'video': context.topic_blurb(),
             'topic_summary': context.topic_summary,
-            'article_excerpt': context.article_excerpt[:2000],
+            'article_excerpt': context.article_excerpt[:3500],
+            'prepared_talk_topics': context.talk_topics[:10],
+            'next_unused_topics': unused[:4],
             'learner': learner_text,
             'learner_seems_stuck': stuck,
             'suggested_focus': {
@@ -216,10 +410,13 @@ class OpenAiLlm:
             'history': history[-6:],
             'instructions': (
                 'Ground every turn in the video/article excerpt. '
+                'Prefer asking or adapting one item from next_unused_topics '
+                'so the conversation covers many prepared oral prompts. '
                 'Ask about what happened, who, why, or how the learner would retell it. '
                 'If learner_seems_stuck is true, do NOT only say "try again": '
                 'guide recall with a concrete scene hint, teach/use the suggested '
-                'vocabulary word and grammar point, then ask a scaffolded question. '
+                'vocabulary word and grammar point, then ask a scaffolded question '
+                '(preferably from next_unused_topics). '
                 'If the learner made grammar mistakes, correct them immediately in '
                 '"text" and list brief notes in "corrections". '
                 'Do not ask the learner to repeat a single subtitle line verbatim. '
@@ -272,6 +469,34 @@ class OllamaLlm:
     def __init__(self, settings: Settings):
         self.settings = settings
 
+    async def generate_talk_topics(
+        self,
+        *,
+        context: VideoContext,
+        count: int = 8,
+    ) -> list[str]:
+        prompt = (
+            'Create spoken English oral-practice questions from this video transcript.\n'
+            f'Topic: {context.topic_summary}\n'
+            f'Excerpt: {context.article_excerpt[:3500]}\n'
+            f'Return {count} short questions, one per line, English only.'
+        )
+        async with httpx.AsyncClient(timeout=90) as client:
+            response = await client.post(
+                f'{self.settings.ollama_url}/api/generate',
+                json={
+                    'model': self.settings.ollama_model,
+                    'prompt': prompt,
+                    'stream': False,
+                },
+            )
+            response.raise_for_status()
+            text = (response.json().get('response') or '').strip()
+        lines = [ln.strip(' -•\t') for ln in text.splitlines() if ln.strip()]
+        return _normalize_topics(lines, limit=count) or heuristic_talk_topics(
+            context, count=count
+        )
+
     async def coach_turn(
         self,
         *,
@@ -284,18 +509,22 @@ class OllamaLlm:
         vocab, grammar = _pick_focus_bits(
             context.article_excerpt, context.topic_summary
         )
+        unused = _unused_talk_topics(context, history)
         prompt = (
             f'{SYSTEM}\n\n'
             f'Context: {context.topic_blurb()}\n'
             f'Topic summary: {context.topic_summary}\n'
-            f'Excerpt: {context.article_excerpt[:2000]}\n'
+            f'Excerpt: {context.article_excerpt[:3500]}\n'
+            f'Prepared topics: {context.talk_topics[:10]}\n'
+            f'Next unused topics: {unused[:4]}\n'
             f'Learner said: {learner_text}\n'
             f'Learner seems stuck: {stuck}\n'
             f'Suggested vocabulary: {vocab}\n'
             f'Suggested grammar: {grammar}\n'
             f'Pronunciation notes: {pronunciation.notes} (score={pronunciation.overall:.2f})\n'
             f'Recent history:\n{_history_block(history)}\n\n'
-            'Ask about the video. If stuck, guide recall with vocab + grammar. '
+            'Ask about the video using prepared topics when possible. '
+            'If stuck, guide recall with vocab + grammar. '
             'Correct grammar mistakes immediately. '
             'Reply in plain English only, max 4 sentences. '
             'Never mix Chinese characters into the reply unless the learner '

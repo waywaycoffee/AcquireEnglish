@@ -26,7 +26,11 @@ class SessionCreate(BaseModel):
     next_english: str = ''
     topic_summary: str = ''
     article_excerpt: str = ''
+    talk_topics: list[str] = Field(default_factory=list)
     difficulty: str = Field(default='B1', pattern=r'^(A2|B1|B2|C1)$')
+    digital_human_id: str = 'mia'
+    tts_voice: str = ''
+    reply_language: str = 'en'
 
 
 class ContextUpdate(BaseModel):
@@ -38,7 +42,18 @@ class ContextUpdate(BaseModel):
     next_english: str | None = None
     topic_summary: str | None = None
     article_excerpt: str | None = None
+    talk_topics: list[str] | None = None
     difficulty: str | None = Field(default=None, pattern=r'^(A2|B1|B2|C1)$')
+    digital_human_id: str | None = None
+    tts_voice: str | None = None
+    reply_language: str | None = None
+
+
+class TopicsBody(BaseModel):
+    count: int = Field(default=8, ge=4, le=12)
+    force: bool = False
+    article_excerpt: str | None = None
+    topic_summary: str | None = None
 
 
 @app.middleware('http')
@@ -88,11 +103,23 @@ def providers() -> dict[str, Any]:
 
 @app.post('/api/sessions', status_code=201)
 def create_session(body: SessionCreate) -> dict[str, Any]:
-    context = VideoContext(**body.model_dump())
-    session = pipeline.create_session(context)
+    payload = body.model_dump()
+    digital_human_id = str(payload.pop('digital_human_id', 'mia') or 'mia')
+    tts_voice = str(payload.pop('tts_voice', '') or '')
+    reply_language = str(payload.pop('reply_language', 'en') or 'en')
+    context = VideoContext(**payload)
+    session = pipeline.create_session(
+        context,
+        digital_human_id=digital_human_id,
+        tts_voice=tts_voice,
+        reply_language=reply_language,
+    )
     return {
         'id': session.id,
         'difficulty': session.difficulty,
+        'digital_human_id': session.digital_human_id,
+        'tts_voice': session.tts_voice,
+        'reply_language': session.reply_language,
         'context': body.model_dump(),
         'providers': pipeline.provider_map(),
     }
@@ -105,13 +132,26 @@ def patch_context(sid: str, body: ContextUpdate) -> dict[str, Any]:
         raise HTTPException(404, 'Session not found.')
     data = body.model_dump(exclude_unset=True)
     for key, value in data.items():
-        if value is not None:
-            setattr(session.context, key, value)
-            if key == 'difficulty':
-                session.difficulty = value
+        if value is None:
+            continue
+        if key == 'digital_human_id':
+            session.digital_human_id = str(value).strip().lower() or session.digital_human_id
+            continue
+        if key == 'tts_voice':
+            session.tts_voice = str(value).strip()
+            continue
+        if key == 'reply_language':
+            session.reply_language = str(value).strip().lower() or session.reply_language
+            continue
+        setattr(session.context, key, value)
+        if key == 'difficulty':
+            session.difficulty = value
     return {
         'id': session.id,
         'difficulty': session.difficulty,
+        'digital_human_id': session.digital_human_id,
+        'tts_voice': session.tts_voice,
+        'reply_language': session.reply_language,
         'context': {
             'course_title': session.context.course_title,
             'episode_title': session.context.episode_title,
@@ -119,8 +159,38 @@ def patch_context(sid: str, body: ContextUpdate) -> dict[str, Any]:
             'current_chinese': session.context.current_chinese,
             'previous_english': session.context.previous_english,
             'next_english': session.context.next_english,
+            'topic_summary': session.context.topic_summary,
+            'article_excerpt': session.context.article_excerpt,
+            'talk_topics': session.context.talk_topics,
             'difficulty': session.context.difficulty,
         },
+    }
+
+
+@app.post('/api/sessions/{sid}/topics')
+async def generate_session_topics(sid: str, body: TopicsBody | None = None) -> dict[str, Any]:
+    """Pre-read session transcript and generate oral Q&A topics."""
+    session = pipeline.get(sid)
+    if not session:
+        raise HTTPException(404, 'Session not found.')
+    payload = body or TopicsBody()
+    if (payload.article_excerpt or '').strip():
+        session.context.article_excerpt = payload.article_excerpt.strip()
+    if (payload.topic_summary or '').strip():
+        session.context.topic_summary = payload.topic_summary.strip()
+    try:
+        topics = await pipeline.ensure_talk_topics(
+            session,
+            count=payload.count,
+            force=payload.force or not session.context.talk_topics,
+        )
+    except Exception as exc:  # noqa: BLE001
+        raise HTTPException(422, str(exc)) from None
+    return {
+        'session_id': session.id,
+        'topics': topics,
+        'count': len(topics),
+        'topic_summary': session.context.topic_summary,
     }
 
 
@@ -173,6 +243,37 @@ async def create_draft(
 class ConfirmBody(BaseModel):
     draft_id: str
     confirmed_text: str | None = None
+    tts_voice: str | None = None
+    digital_human_id: str | None = None
+    reply_language: str | None = None
+
+
+class SpeakBody(BaseModel):
+    text: str = Field(min_length=1, max_length=4000)
+    digital_human_id: str = 'mia'
+    tts_voice: str = ''
+    language: str = 'en'
+
+
+@app.post('/api/tts/speak')
+async def speak_tts(body: SpeakBody) -> dict[str, Any]:
+    """One-shot coach TTS with persona voice (greeting / local fallback)."""
+    try:
+        relative = await pipeline.synthesize_speech(
+            body.text,
+            digital_human_id=body.digital_human_id,
+            tts_voice=body.tts_voice or None,
+            language=body.language,
+        )
+    except Exception as exc:  # noqa: BLE001
+        raise HTTPException(422, str(exc)) from None
+    if not relative:
+        raise HTTPException(422, 'Empty speech text.')
+    return {
+        'tts_url': relative,
+        'digital_human_id': (body.digital_human_id or 'mia').strip().lower(),
+        'language': (body.language or 'en').strip().lower(),
+    }
 
 
 @app.post('/api/sessions/{sid}/confirm')
@@ -185,6 +286,9 @@ async def confirm_draft(sid: str, body: ConfirmBody) -> dict[str, Any]:
             session,
             body.draft_id,
             confirmed_text=body.confirmed_text,
+            tts_voice=body.tts_voice,
+            digital_human_id=body.digital_human_id,
+            reply_language=body.reply_language,
         )
     except KeyError:
         raise HTTPException(404, 'Draft not found or already used.') from None
@@ -248,7 +352,9 @@ def get_tts(name: str):
     path = settings.data_dir / 'tts' / safe
     if not path.is_file():
         raise HTTPException(404, 'TTS audio not found.')
-    return FileResponse(path, media_type='audio/wav')
+    suffix = path.suffix.lower()
+    media = 'audio/mpeg' if suffix in {'.mp3', '.mpeg'} else 'audio/wav'
+    return FileResponse(path, media_type=media)
 
 
 @app.get('/api/sessions/{sid}')

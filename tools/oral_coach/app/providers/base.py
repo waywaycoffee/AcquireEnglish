@@ -15,6 +15,8 @@ class VideoContext:
     # Whole-video / article theme for free conversation (not line drill).
     topic_summary: str = ''
     article_excerpt: str = ''
+    # Pre-generated oral Q&A prompts grounded in the transcript.
+    talk_topics: list[str] = field(default_factory=list)
     difficulty: str = 'B1'  # A2 / B1 / B2 / C1
 
     def topic_blurb(self) -> str:
@@ -22,16 +24,23 @@ class VideoContext:
         head = ' / '.join(bits) if bits else 'this video'
         summary = (self.topic_summary or '').strip()
         excerpt = (self.article_excerpt or '').strip()
+        topics = [t.strip() for t in (self.talk_topics or []) if str(t).strip()]
+        topic_line = ''
+        if topics:
+            topic_line = ' Prepared oral topics: ' + ' | '.join(topics[:8]) + '.'
         if summary and excerpt:
-            return f'Video: {head}. Topic: {summary}. Excerpt: {excerpt[:2000]}'
+            return (
+                f'Video: {head}. Topic: {summary}. Excerpt: {excerpt[:3500]}.'
+                f'{topic_line}'
+            )
         if summary:
-            return f'Video: {head}. Topic: {summary}'
+            return f'Video: {head}. Topic: {summary}.{topic_line}'
         if excerpt:
-            return f'Video: {head}. Excerpt: {excerpt[:2000]}'
+            return f'Video: {head}. Excerpt: {excerpt[:3500]}.{topic_line}'
         line = self.current_english.strip()
         if line:
-            return f'Video: {head}. Related line: "{line}".'
-        return f'Video: {head}.'
+            return f'Video: {head}. Related line: "{line}".{topic_line}'
+        return f'Video: {head}.{topic_line}'
 
 
 @dataclass

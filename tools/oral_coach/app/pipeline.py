@@ -23,6 +23,9 @@ class CoachSession:
     history: list[dict[str, str]] = field(default_factory=list)
     difficulty: str = 'B1'
     drafts: dict[str, dict] = field(default_factory=dict)
+    digital_human_id: str = 'mia'
+    tts_voice: str = ''
+    reply_language: str = 'en'
 
 
 @dataclass
@@ -67,18 +70,74 @@ class OralCoachPipeline:
             'avatar': getattr(self.avatar, 'name', self.settings.avatar_provider),
         }
 
-    def create_session(self, context: VideoContext) -> CoachSession:
+    def create_session(
+        self,
+        context: VideoContext,
+        *,
+        digital_human_id: str = 'mia',
+        tts_voice: str = '',
+        reply_language: str = 'en',
+    ) -> CoachSession:
         sid = uuid.uuid4().hex
         session = CoachSession(
             id=sid,
             context=context,
             difficulty=context.difficulty or 'B1',
+            digital_human_id=(digital_human_id or 'mia').strip().lower() or 'mia',
+            tts_voice=(tts_voice or '').strip(),
+            reply_language=(reply_language or 'en').strip().lower() or 'en',
         )
         self.sessions[sid] = session
         return session
 
+    async def synthesize_speech(
+        self,
+        text: str,
+        *,
+        digital_human_id: str | None = None,
+        tts_voice: str | None = None,
+        language: str | None = None,
+    ) -> str | None:
+        """Synthesize coach speech and return a relative /api/tts/... URL."""
+        spoken = (text or '').strip()
+        if not spoken:
+            return None
+        tts_name = f'speak-{uuid.uuid4().hex[:10]}.mp3'
+        tts_path = str(self.settings.data_dir / 'tts' / tts_name)
+        result = await self.tts.synthesize(
+            spoken,
+            tts_path,
+            voice=tts_voice,
+            digital_human_id=digital_human_id,
+            language=language,
+        )
+        if not result.audio_path:
+            return None
+        return f'/api/tts/{tts_name}'
+
     def get(self, sid: str) -> CoachSession | None:
         return self.sessions.get(sid)
+
+    async def ensure_talk_topics(
+        self,
+        session: CoachSession,
+        *,
+        count: int = 8,
+        force: bool = False,
+    ) -> list[str]:
+        """Pre-read transcript and fill session.context.talk_topics."""
+        existing = [
+            str(t).strip()
+            for t in (session.context.talk_topics or [])
+            if str(t).strip()
+        ]
+        if existing and not force:
+            return existing[:count]
+        from .providers.llm import generate_talk_topics
+
+        topics = await generate_talk_topics(self.llm, session.context, count=count)
+        session.context.talk_topics = topics
+        return topics
 
     async def create_draft(
         self,
@@ -123,6 +182,9 @@ class OralCoachPipeline:
         draft_id: str,
         *,
         confirmed_text: str | None = None,
+        tts_voice: str | None = None,
+        digital_human_id: str | None = None,
+        reply_language: str | None = None,
     ) -> TurnResult:
         draft = session.drafts.pop(draft_id, None)
         if draft is None:
@@ -155,6 +217,11 @@ class OralCoachPipeline:
             phonemes=list(pron_dict.get('phonemes') or []),
         )
         session.context.difficulty = session.difficulty
+        if not session.context.talk_topics:
+            try:
+                await self.ensure_talk_topics(session, count=8)
+            except Exception:
+                pass
         reply = await self.llm.coach_turn(
             context=session.context,
             learner_text=transcript,
@@ -166,9 +233,22 @@ class OralCoachPipeline:
         session.history.append({'role': 'user', 'content': transcript})
         session.history.append({'role': 'assistant', 'content': reply.text})
 
-        tts_name = f'{session.id}-{uuid.uuid4().hex[:8]}.wav'
+        if (digital_human_id or '').strip():
+            session.digital_human_id = digital_human_id.strip().lower()
+        if (tts_voice or '').strip():
+            session.tts_voice = tts_voice.strip()
+        if (reply_language or '').strip():
+            session.reply_language = reply_language.strip().lower()
+
+        tts_name = f'{session.id}-{uuid.uuid4().hex[:8]}.mp3'
         tts_path = str(self.settings.data_dir / 'tts' / tts_name)
-        tts = await self.tts.synthesize(reply.text, tts_path)
+        tts = await self.tts.synthesize(
+            reply.text,
+            tts_path,
+            voice=session.tts_voice or tts_voice,
+            digital_human_id=session.digital_human_id or digital_human_id,
+            language=session.reply_language or reply_language or 'en',
+        )
         avatar = await self.avatar.cue(reply.text)
 
         return TurnResult(
