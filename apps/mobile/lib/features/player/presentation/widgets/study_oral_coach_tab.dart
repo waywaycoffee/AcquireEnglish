@@ -53,7 +53,81 @@ String preferEnglishCoachReply(
   }
   final String safeTopic = topic.trim().isEmpty ? 'this video' : topic.trim();
   return 'Thanks for sharing about “$safeTopic”. '
-      'What else stood out to you, and why?';
+      'What happened next in the video, and can you retell it in one sentence?';
+}
+
+bool _learnerSeemsStuck(String raw) {
+  final String text = raw.trim().toLowerCase();
+  if (text.length < 3) {
+    return true;
+  }
+  const List<String> cues = <String>[
+    "i don't know",
+    'i dont know',
+    'no idea',
+    'nothing',
+    'idk',
+    'pass',
+    'skip',
+    '不知道',
+    '不清楚',
+    '没想好',
+    '没什么',
+    '不会',
+  ];
+  for (final String cue in cues) {
+    if (text == cue || text.startsWith('$cue.') || text.startsWith('$cue!')) {
+      return true;
+    }
+  }
+  final List<String> words = RegExp(
+    r"[A-Za-z']+",
+  ).allMatches(text).map((Match m) => m.group(0)!).toList(growable: false);
+  return words.length <= 2 && !_hanChars.hasMatch(text);
+}
+
+String _guidedCoachFallback({
+  required String topic,
+  required String excerpt,
+  required String learner,
+}) {
+  final String safeTopic = topic.trim().isEmpty ? 'this video' : topic.trim();
+  final String source = excerpt.trim().isNotEmpty ? excerpt : safeTopic;
+  final List<String> words = RegExp(r"[A-Za-z][A-Za-z'-]{3,}")
+      .allMatches(source)
+      .map((Match m) => m.group(0)!)
+      .where(
+        (String w) => !const <String>{
+          'this',
+          'that',
+          'with',
+          'from',
+          'have',
+          'been',
+          'were',
+          'what',
+          'when',
+          'where',
+          'which',
+          'there',
+          'their',
+          'about',
+          'would',
+          'could',
+          'should',
+        }.contains(w.toLowerCase()),
+      )
+      .toList(growable: false);
+  final String vocab = words.isEmpty
+      ? 'detail'
+      : words[words.length > 4 ? 4 : words.length - 1];
+  if (_learnerSeemsStuck(learner)) {
+    return 'No worries — let\'s recall “$safeTopic”. '
+        'Try the word “$vocab”, and retell one moment in a full sentence. '
+        'What happened around that idea in the video?';
+  }
+  return 'Nice try. If anything sounded off, reshape it into a clear sentence. '
+      'Can you use “$vocab” to explain one part of “$safeTopic”?';
 }
 
 class _ChatBubble {
@@ -242,6 +316,38 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
         );
       }());
     });
+  }
+
+  String _openingCoachPrompt(String coachName) {
+    final String excerpt = widget.articleExcerpt.trim();
+    final List<String> words = RegExp(r"[A-Za-z][A-Za-z'-]{3,}")
+        .allMatches(excerpt.isNotEmpty ? excerpt : _topicLabel)
+        .map((Match m) => m.group(0)!)
+        .where(
+          (String w) => !const <String>{
+            'this',
+            'that',
+            'with',
+            'from',
+            'have',
+            'been',
+            'were',
+            'what',
+            'when',
+            'about',
+            'would',
+            'could',
+          }.contains(w.toLowerCase()),
+        )
+        .toList(growable: false);
+    final String vocab = words.isEmpty
+        ? 'idea'
+        : words[words.length > 3 ? 3 : words.length - 1];
+    return 'Hi, I\'m $coachName! We\'ll practice English around “$_topicLabel”. '
+        'I\'ll ask about the video, help you recall key words and grammar, '
+        'and correct mistakes as we go. '
+        'First: what happened in the video, and can you use the word “$vocab”? '
+        '(Say “用中文” anytime if you want Chinese.)';
   }
 
   String get _topicLabel {
@@ -699,10 +805,7 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
       _status = '正在开启主题对话…';
     });
     final DigitalHumanPersona persona = settings.selectedDigitalHuman;
-    final String open =
-        'Hi, I\'m ${persona.displayName}! Let\'s talk about “$_topicLabel” in English. '
-        'What did you find most interesting, and why? '
-        '(Say “用中文” anytime if you want Chinese.)';
+    final String open = _openingCoachPrompt(persona.displayName);
     _preferChineseReply = false;
     try {
       if (settings.usesOralCoachPipeline) {
@@ -931,9 +1034,11 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
   Future<void> _runLocalFreeTalk({
     required LearningSettingsState settings,
   }) async {
-    final String reply =
-        'Thanks for sharing. About “$_topicLabel” — '
-        'what would you tell a friend who hadn\'t watched it yet?';
+    final String reply = _guidedCoachFallback(
+      topic: _topicLabel,
+      excerpt: widget.articleExcerpt,
+      learner: '(voice note)',
+    );
     if (mounted) {
       setState(() {
         _bubbles.add(
@@ -1002,11 +1107,24 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
     final String rawSpeak = turn.avatarText.trim().isNotEmpty
         ? turn.avatarText.trim()
         : turn.coachText.trim();
-    final String speakText = preferEnglishCoachReply(
+    String speakText = preferEnglishCoachReply(
       rawSpeak,
       allowChinese: _preferChineseReply,
       topic: _topicLabel,
     );
+    if (speakText.trim().isEmpty ||
+        (_learnerSeemsStuck(confirmed) && speakText.length < 24)) {
+      speakText = _guidedCoachFallback(
+        topic: _topicLabel,
+        excerpt: widget.articleExcerpt,
+        learner: confirmed,
+      );
+    }
+    final List<String> corrections = turn.corrections
+        .map((String item) => item.trim())
+        .where((String item) => item.isNotEmpty)
+        .take(3)
+        .toList(growable: false);
 
     bool avatarSpoke = false;
     if (speakText.isNotEmpty && settings.usesRealtimeLipSync) {
@@ -1061,6 +1179,15 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
         _busy = false;
         if (speakText.isNotEmpty) {
           _bubbles.add(_ChatBubble(role: 'coach', text: speakText));
+        }
+        if (corrections.isNotEmpty) {
+          _bubbles.add(
+            _ChatBubble(
+              role: 'coach',
+              text: '纠错：${corrections.join(' · ')}',
+              hint: true,
+            ),
+          );
         }
         _status = '你可以开始说';
       });
@@ -1459,7 +1586,7 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
                                 horizontal: 28,
                               ),
                               child: Text(
-                                'Hi~ Let\'s talk about “$_topicLabel” in English.',
+                                'Hi~ I\'ll ask about “$_topicLabel”, help you recall key words & grammar, and correct mistakes.',
                                 textAlign: TextAlign.center,
                                 style: TextStyle(
                                   color: Colors.white.withValues(alpha: 0.78),
@@ -1574,7 +1701,7 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
                           icon: Icons.lightbulb_outline_rounded,
                           onTap: () {
                             final String hint =
-                                'You could say: "What I liked about $_topicLabel is..."';
+                                'Stuck? Retell one moment: "In the video, …" or ask me for a key word.';
                             setState(() {
                               _bubbles.add(
                                 _ChatBubble(

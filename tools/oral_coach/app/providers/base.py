@@ -23,11 +23,11 @@ class VideoContext:
         summary = (self.topic_summary or '').strip()
         excerpt = (self.article_excerpt or '').strip()
         if summary and excerpt:
-            return f'Video: {head}. Topic: {summary}. Excerpt: {excerpt[:800]}'
+            return f'Video: {head}. Topic: {summary}. Excerpt: {excerpt[:2000]}'
         if summary:
             return f'Video: {head}. Topic: {summary}'
         if excerpt:
-            return f'Video: {head}. Excerpt: {excerpt[:800]}'
+            return f'Video: {head}. Excerpt: {excerpt[:2000]}'
         line = self.current_english.strip()
         if line:
             return f'Video: {head}. Related line: "{line}".'

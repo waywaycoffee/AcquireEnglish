@@ -3171,7 +3171,7 @@ Future<void> _settleChineseFillIfAlreadyPresent() async {
             if (en.isEmpty || !RegExp('[A-Za-z]').hasMatch(en)) {
               continue;
             }
-            if (excerptBuf.length + en.length + 1 > 1200) {
+            if (excerptBuf.length + en.length + 1 > 2000) {
               break;
             }
             if (excerptBuf.isNotEmpty) {
