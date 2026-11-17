@@ -38,6 +38,7 @@ Thumbs.db
 *.log
 apps/mobile.zip
 apps/_tmp_mobile/
+.workbuddy/
 
 services/api/body.json
 
