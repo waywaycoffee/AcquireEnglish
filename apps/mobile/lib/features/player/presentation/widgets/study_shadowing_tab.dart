@@ -827,7 +827,7 @@ class _StudyShadowingTabState extends ConsumerState<StudyShadowingTab> {
       onPressed: onPressed,
       tooltip: semanticLabel,
       iconSize: 28,
-      color: onPressed == null ? shell.textMuted : widget.toolbarLink != null ? Colors.white : shell.textPrimary,
+      color: widget.toolbarLink != null ? (onPressed == null ? Colors.white38 : Colors.white) : onPressed == null ? shell.textMuted : shell.textPrimary,
       icon: Icon(icon),
     );
   }
@@ -838,7 +838,7 @@ class _StudyShadowingTabState extends ConsumerState<StudyShadowingTab> {
       label: _recordingActive ? '停止录音' : '开始跟读录音',
       child: Material(
         color: widget.toolbarLink != null
-            ? (_recordingActive ? Colors.red.withValues(alpha: 0.7) : Colors.transparent)
+            ? (_recordingActive ? Colors.red.withValues(alpha: 0.8) : Colors.black.withValues(alpha: 0.5))
             : !canRecord
             ? shell.accent.withValues(alpha: 0.35)
             : (_recordingActive ? const Color(0xFFB42318) : shell.accent),
@@ -1292,6 +1292,7 @@ class _StudyShadowingTabState extends ConsumerState<StudyShadowingTab> {
                 children: <Widget>[
                   PopupMenuButton<ShadowPromptMode>(
                     tooltip: '跟读模式：${_promptMode.label}',
+                    style: widget.toolbarLink == null ? null : IconButton.styleFrom(backgroundColor: Colors.black.withValues(alpha: 0.5)),
                     icon: Icon(Icons.tune, color: widget.toolbarLink != null ? Colors.white : shell.textSecondary, size: 22),
                     onSelected: _setPromptMode,
                     itemBuilder: (BuildContext context) => <PopupMenuEntry<ShadowPromptMode>>[
@@ -1363,8 +1364,16 @@ class _ShadowToolbarPortalState extends State<_ShadowToolbarPortal> {
           child: SizedBox(
             width: link.leaderSize?.width ?? MediaQuery.sizeOf(context).width,
             child: Material(color: Colors.transparent,
-              child: IconTheme(data: const IconThemeData(color: Colors.white,
-                shadows: <Shadow>[Shadow(blurRadius: 4)]), child: widget.child)),
+              child: IconButtonTheme(
+                data: IconButtonThemeData(style: IconButton.styleFrom(
+                  backgroundColor: Colors.black.withValues(alpha: 0.5),
+                  disabledBackgroundColor: Colors.black.withValues(alpha: 0.3),
+                  foregroundColor: Colors.white,
+                  disabledForegroundColor: Colors.white38,
+                  shape: const CircleBorder(),
+                )),
+                child: IconTheme(data: const IconThemeData(color: Colors.white,
+                  shadows: <Shadow>[Shadow(color: Colors.black54, blurRadius: 3)]), child: widget.child))),
           ),
         ),
       ),
