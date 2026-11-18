@@ -208,7 +208,7 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
   bool _coachSpeaking = false;
   final FlutterTts _cartoonTts = FlutterTts();
   CoachViseme _mouth = CoachViseme.closed;
-  Timer? _mouthReset;
+  Timer? _wordMouthTicker;
   int _busyLineFailures = 0;
   /// Default English. Flip only when the learner asks for Chinese.
   bool _preferChineseReply = false;
@@ -241,7 +241,7 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
 
   @override
   void dispose() {
-    _mouthReset?.cancel();
+    _wordMouthTicker?.cancel();
     unawaited(_cartoonTts.stop());
     _orbPulse.dispose();
     _sessionTicker?.cancel();
@@ -552,19 +552,6 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
     }
   }
 
-  Future<void> _changeCoachPresentation({String? personaId, bool? cartoon}) async {
-    if (_connecting) return;
-    await _cartoonTts.stop();
-    await _liveClient.disconnect();
-    if (!mounted) return;
-    setState(() { _renderer = null; _connectedPersonaId = null; _coachSpeaking = false; _mouth = CoachViseme.closed; });
-    final LearningSettingsNotifier settings = ref.read(learningSettingsProvider.notifier);
-    if (personaId != null) settings.setDigitalHumanId(personaId);
-    if (cartoon != null) settings.setCartoonDigitalHuman(cartoon);
-    final LearningSettingsState next = ref.read(learningSettingsProvider);
-    if (next.usesRealtimeLipSync) await _ensureDigitalHumanConnected(next);
-  }
-
   Future<void> _connectLiveTalking(String serverUrl) async {
     if (_connecting) {
       return;
@@ -700,15 +687,22 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
       player = Player();
       await player.open(Media(url), play: true);
       final DateTime deadline = DateTime.now().add(const Duration(seconds: 45));
+      Duration cueDuration = Duration.zero;
+      CoachAnimationTimeline? timeline;
       while (mounted && DateTime.now().isBefore(deadline)) {
-        await Future<void>.delayed(const Duration(milliseconds: 200));
-        if (mounted && player.state.playing && player.state.duration.inMilliseconds > 0 && text.isNotEmpty) {
-          final List<String> words = text.split(RegExp(r'\s+'));
-          final int index = (player.state.position.inMilliseconds / player.state.duration.inMilliseconds * words.length).floor().clamp(0, words.length - 1);
-          final String word = words[index].toLowerCase();
-          setState(() => _mouth = RegExp('[ou]').hasMatch(word) ? CoachViseme.rounded
-            : RegExp('[ei]').hasMatch(word) ? CoachViseme.wide : CoachViseme.open);
+        await Future<void>.delayed(const Duration(milliseconds: 40));
+        if (!mounted) return false;
+        final PlayerState playback = player.state;
+        if (playback.duration > Duration.zero &&
+            playback.duration != cueDuration &&
+            text.isNotEmpty) {
+          cueDuration = playback.duration;
+          timeline = CoachAnimationTimeline.estimate(text, cueDuration);
         }
+        _setMouth(
+          timeline?.mouthAt(playback.position, playing: playback.playing) ??
+              CoachViseme.closed,
+        );
         final bool ended =
             player.state.completed ||
             (!player.state.playing &&
@@ -726,6 +720,27 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
         await player?.dispose();
       } catch (_) {}
     }
+  }
+
+  void _setMouth(CoachViseme shape) {
+    if (mounted && _mouth != shape) {
+      setState(() => _mouth = shape);
+    }
+  }
+
+  void _animateLocalWord(String word) {
+    _wordMouthTicker?.cancel();
+    if (!mounted || word.trim().isEmpty) return;
+    final Duration estimate = Duration(milliseconds: (word.length * 55).clamp(140, 600));
+    final CoachAnimationTimeline timeline =
+        CoachAnimationTimeline.estimate(word, estimate);
+    final Stopwatch clock = Stopwatch()..start();
+    _setMouth(timeline.mouthAt(Duration.zero, playing: true));
+    _wordMouthTicker = Timer.periodic(const Duration(milliseconds: 32), (Timer timer) {
+      final Duration position = clock.elapsed;
+      _setMouth(timeline.mouthAt(position, playing: true));
+      if (position >= estimate) timer.cancel();
+    });
   }
 
   Future<void> _speakCoach(String text, LearningSettingsState settings) async {
@@ -773,25 +788,14 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
           int end,
           String word,
         ) {
-          if (!mounted) {
-            return;
-          }
-          final String sound = word.toLowerCase();
-          setState(() {
-            _mouth = RegExp('[ou]').hasMatch(sound)
-                ? CoachViseme.rounded
-                : RegExp('[ei]').hasMatch(sound)
-                ? CoachViseme.wide
-                : RegExp('[fv]').hasMatch(sound)
-                ? CoachViseme.teeth
-                : CoachViseme.open;
-          });
+          _animateLocalWord(word);
         });
         await _configureLocalPersonaVoice(persona);
         await _cartoonTts.awaitSpeakCompletion(true);
         await _cartoonTts.speak(speak).timeout(const Duration(seconds: 90));
       } catch (_) {}
     } finally {
+      _wordMouthTicker?.cancel();
       if (mounted) {
         setState(() {
           _coachSpeaking = false;
@@ -1593,8 +1597,6 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
                             .watch(learningSettingsProvider)
                             .selectedDigitalHuman;
                         return CoachAvatarStage(
-                          onPersonaSelected: (String id) => unawaited(_changeCoachPresentation(personaId: id)),
-                          onCartoonChanged: (bool value) => unawaited(_changeCoachPresentation(cartoon: value)),
                           spriteAsset: ref.watch(learningSettingsProvider).cartoonDigitalHuman ? 'assets/img/digital_human/${persona.id}-cartoon.png' : null,
                           mouth: _mouth,
                           thinking: _busy,
@@ -1607,11 +1609,6 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
                         );
                       },
                     ),
-                  if (lipSync && _liveClient.hasRemoteVideo)
-                    Positioned(right: 8, top: 52, child: FilledButton.tonal(
-                      onPressed: () => unawaited(_changeCoachPresentation(cartoon: true)),
-                      child: const Text('切换卡通版'),
-                    )),
                   const DecoratedBox(
                     decoration: BoxDecoration(
                       gradient: LinearGradient(

@@ -1,0 +1,207 @@
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+
+import '../../../player/data/digital_human_catalog.dart';
+import '../../../settings/presentation/settings_provider.dart';
+import '../../../shared/presentation/pad/app_design_tokens.dart';
+
+/// Home-page row: pick a near-real digital-human coach persona.
+class DigitalHumanPicker extends ConsumerStatefulWidget {
+  const DigitalHumanPicker({super.key});
+
+  @override
+  ConsumerState<DigitalHumanPicker> createState() => _DigitalHumanPickerState();
+}
+
+class _DigitalHumanPickerState extends ConsumerState<DigitalHumanPicker> {
+  final ScrollController _personas = ScrollController();
+
+  @override
+  void dispose() {
+    _personas.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final String selectedId = ref
+        .watch(learningSettingsProvider)
+        .digitalHumanId;
+    final DigitalHumanPersona selected = digitalHumanById(selectedId);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: <Widget>[
+        Text(
+          '选择数字人形象',
+          style: TextStyle(
+            fontSize: 20,
+            fontWeight: FontWeight.w900,
+            color: AppDesignTokens.textPrimary,
+          ),
+        ),
+        const SizedBox(height: 6),
+        Text(
+          '当前：${selected.displayName} · ${selected.tagline} · ${selected.voiceLabel}',
+          style: TextStyle(
+            fontSize: 13,
+            fontWeight: FontWeight.w600,
+            color: AppDesignTokens.textSecondary,
+          ),
+        ),
+        const SizedBox(height: 12),
+        SegmentedButton<bool>(
+          segments: const <ButtonSegment<bool>>[
+            ButtonSegment<bool>(
+              value: true,
+              label: Text('卡通版'),
+              icon: Icon(Icons.face),
+            ),
+            ButtonSegment<bool>(
+              value: false,
+              label: Text('真人版'),
+              icon: Icon(Icons.portrait),
+            ),
+          ],
+          selected: <bool>{
+            ref.watch(learningSettingsProvider).cartoonDigitalHuman,
+          },
+          onSelectionChanged: (Set<bool> values) => ref
+              .read(learningSettingsProvider.notifier)
+              .setCartoonDigitalHuman(values.first),
+        ),
+        const SizedBox(height: 12),
+        RawScrollbar(
+          controller: _personas,
+          thumbVisibility: true,
+          trackVisibility: true,
+          interactive: true,
+          scrollbarOrientation: ScrollbarOrientation.bottom,
+          thickness: 8,
+          radius: const Radius.circular(8),
+          thumbColor: AppDesignTokens.brandGreenDark,
+          trackColor: AppDesignTokens.borderGray,
+          child: SizedBox(
+            height: 184,
+            child: ListView.separated(
+              controller: _personas,
+              primary: false,
+              padding: const EdgeInsets.only(bottom: 16),
+              scrollDirection: Axis.horizontal,
+              itemCount: digitalHumanCatalog.length,
+              separatorBuilder: (_, __) => const SizedBox(width: 12),
+              itemBuilder: (BuildContext context, int index) {
+                final DigitalHumanPersona persona = digitalHumanCatalog[index];
+                final bool active = persona.id == selected.id;
+                return _PersonaCard(
+                  persona: persona,
+                  selected: active,
+                  onTap: () {
+                    ref
+                        .read(learningSettingsProvider.notifier)
+                        .setDigitalHumanId(persona.id);
+                  },
+                );
+              },
+            ),
+          ),
+        ),
+        Align(
+          alignment: Alignment.centerRight,
+          child: TextButton(
+            onPressed: () {
+              if (_personas.hasClients) {
+                _personas.animateTo(
+                  _personas.position.maxScrollExtent,
+                  duration: const Duration(milliseconds: 280),
+                  curve: Curves.easeOut,
+                );
+              }
+            },
+            child: const Text('更多数字人 ›'),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _PersonaCard extends StatelessWidget {
+  const _PersonaCard({
+    required this.persona,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final DigitalHumanPersona persona;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(20),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 220),
+        width: 112,
+        padding: const EdgeInsets.all(8),
+        decoration: BoxDecoration(
+          color: AppDesignTokens.appWhite.withValues(alpha: 0.96),
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+            color: selected
+                ? AppDesignTokens.brandGreenDark
+                : AppDesignTokens.borderGray,
+            width: selected ? 2.5 : 1,
+          ),
+          boxShadow: selected ? AppDesignTokens.toyCardShadow : null,
+        ),
+        child: Column(
+          children: <Widget>[
+            Expanded(
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(14),
+                child: Image.asset(
+                  persona.assetPath,
+                  fit: BoxFit.cover,
+                  width: double.infinity,
+                  errorBuilder: (_, __, ___) => ColoredBox(
+                    color: AppDesignTokens.skyLight,
+                    child: Icon(
+                      Icons.face_retouching_natural_rounded,
+                      color: AppDesignTokens.brandGreenDark,
+                      size: 36,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              persona.displayName,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                fontWeight: FontWeight.w900,
+                color: selected
+                    ? AppDesignTokens.brandGreenDark
+                    : AppDesignTokens.textPrimary,
+              ),
+            ),
+            Text(
+              persona.voiceLabel,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w600,
+                color: AppDesignTokens.textSecondary,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}

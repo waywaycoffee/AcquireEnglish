@@ -22,6 +22,7 @@ import '../../sync/data/acquire_api_client.dart';
 import '../../sync/presentation/cloud_catalog_sync.dart';
 import '../../sync/presentation/daily_feed_provider.dart';
 import 'learning_dashboard_provider.dart';
+import 'widgets/digital_human_picker.dart';
 import 'widgets/pad_home_hero.dart';
 
 class PadHomeScreen extends ConsumerStatefulWidget {
@@ -120,6 +121,8 @@ class _PadHomeScreenState extends ConsumerState<PadHomeScreen> {
               course: resumeTarget?.course,
               episode: resumeTarget?.episode,
             ),
+            SizedBox(height: compact ? 26 : 30),
+            const DigitalHumanPicker(),
             SizedBox(height: compact ? 26 : 30),
             _SectionTitle(title: '每日推荐', compact: compact),
             SizedBox(height: compact ? 12 : 14),

@@ -13,6 +13,25 @@ void main() {
     expect(timeline.mouthAt(const Duration(milliseconds: 150), playing: true), CoachViseme.open);
     expect(timeline.mouthAt(const Duration(seconds: 1), playing: true), CoachViseme.closed);
   });
+  test('estimated mouth cues vary within a word and close for punctuation', () {
+    final CoachAnimationTimeline timeline =
+        CoachAnimationTimeline.estimate('Move!', const Duration(seconds: 1));
+    expect(
+      timeline.cues.map((CoachMouthCue cue) => cue.shape),
+      <CoachViseme>[
+        CoachViseme.closed,
+        CoachViseme.rounded,
+        CoachViseme.teeth,
+        CoachViseme.wide,
+        CoachViseme.closed,
+      ],
+    );
+    expect(timeline.cues.last.endMs, 1000);
+    expect(
+      CoachAnimationTimeline.estimate('', Duration.zero).cues,
+      isEmpty,
+    );
+  });
   test('rejects overlapping cues', () {
     expect(() => CoachAnimationTimeline(const <CoachMouthCue>[
       CoachMouthCue(startMs: 0, endMs: 100, shape: CoachViseme.open),

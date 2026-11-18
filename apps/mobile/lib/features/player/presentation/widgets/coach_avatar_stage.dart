@@ -3,7 +3,6 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import '../../domain/coach_animation_timeline.dart';
 import 'cartoon_coach_sprite.dart';
-import '../../data/digital_human_catalog.dart';
 
 /// Local coach stage: circular photo avatar + fixed idle / speaking motions.
 ///
@@ -16,8 +15,6 @@ class CoachAvatarStage extends StatelessWidget {
     required this.label,
     this.imageAsset,
     this.spriteAsset,
-    this.onCartoonChanged,
-    this.onPersonaSelected,
     this.mouth = CoachViseme.closed,
     this.thinking = false,
     this.displayName,
@@ -28,8 +25,6 @@ class CoachAvatarStage extends StatelessWidget {
   final bool speaking;
   final bool listening;
   final String label;
-  final ValueChanged<bool>? onCartoonChanged;
-  final ValueChanged<String>? onPersonaSelected;
   final String? spriteAsset;
   final CoachViseme mouth;
   final bool thinking;
@@ -77,25 +72,6 @@ class CoachAvatarStage extends StatelessWidget {
                 ),
               ),
             ),
-            if (onPersonaSelected != null)
-              Positioned(top: 12, left: 8, child: PopupMenuButton<String>(
-                tooltip: '选择外教形象',
-                onSelected: onPersonaSelected,
-                itemBuilder: (BuildContext context) => <PopupMenuEntry<String>>[
-                  for (final DigitalHumanPersona persona in digitalHumanCatalog)
-                    PopupMenuItem<String>(value: persona.id, child: Text(persona.displayName)),
-                ],
-                child: Padding(padding: const EdgeInsets.all(12), child: Text(displayName ?? '选择外教', style: const TextStyle(color: Colors.white))),
-              )),
-            if (onCartoonChanged != null)
-              Positioned(top: 12, right: 12, child: SegmentedButton<bool>(
-                segments: const <ButtonSegment<bool>>[
-                  ButtonSegment<bool>(value: true, label: Text('卡通版')),
-                  ButtonSegment<bool>(value: false, label: Text('真人版')),
-                ],
-                selected: <bool>{spriteAsset != null},
-                onSelectionChanged: (Set<bool> values) => onCartoonChanged!(values.first),
-              )),
             Positioned(
               left: 24,
               right: 24,
