@@ -700,7 +700,7 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
       player = Player();
       await player.open(Media(url), play: true);
       final DateTime deadline = DateTime.now().add(const Duration(seconds: 45));
-      while (DateTime.now().isBefore(deadline)) {
+      while (mounted && DateTime.now().isBefore(deadline)) {
         await Future<void>.delayed(const Duration(milliseconds: 200));
         if (mounted && player.state.playing && player.state.duration.inMilliseconds > 0 && text.isNotEmpty) {
           final List<String> words = text.split(RegExp(r'\s+'));
@@ -730,7 +730,7 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
 
   Future<void> _speakCoach(String text, LearningSettingsState settings) async {
     final String speak = text.trim();
-    if (speak.isEmpty) {
+    if (!mounted || speak.isEmpty) {
       return;
     }
     final DigitalHumanPersona persona = settings.selectedDigitalHuman;
@@ -934,7 +934,15 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
       } else if (_talkTopics.isEmpty) {
         await _prepareTalkTopics(settings);
       }
+      if (!mounted) return;
       final String open = _openingCoachPrompt(persona.displayName);
+      setState(() {
+        _bubbles
+          ..clear()
+          ..add(_ChatBubble(role: 'coach', text: open));
+        _showZhIndexes.clear();
+      });
+      _scrollChatToEnd();
       if (settings.usesRealtimeLipSync) {
         await _ensureDigitalHumanConnected(
           settings,
@@ -949,9 +957,6 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
         setState(() {
           _started = true;
           _busy = false;
-          _bubbles
-            ..clear()
-            ..add(_ChatBubble(role: 'coach', text: open));
           _status = '你可以开始说';
           _showZhIndexes.clear();
         });
@@ -1151,7 +1156,7 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
     if (mounted) {
       setState(() {
         _bubbles.add(
-          const _ChatBubble(role: 'user', text: '(voice note)', hint: true),
+          const _ChatBubble(role: 'user', text: '语音消息（暂无转写）'),
         );
         _bubbles.add(_ChatBubble(role: 'coach', text: reply));
         _busy = false;
@@ -1191,7 +1196,7 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
       _status = '请核对你说的话';
     });
     final String? confirmed = await _confirmTranscriptDialog(draft.transcript);
-    if (confirmed == null) {
+    if (!mounted || confirmed == null) {
       if (mounted) {
         setState(() => _status = '已取消本回合');
       }
@@ -1201,8 +1206,9 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
     setState(() {
       _busy = true;
       _status = '外教思考中…';
-      _bubbles.add(_ChatBubble(role: 'user', text: confirmed, hint: true));
+      _bubbles.add(_ChatBubble(role: 'user', text: confirmed));
     });
+    _scrollChatToEnd();
     final DigitalHumanPersona persona = settings.selectedDigitalHuman;
     final OralCoachTurnResult turn = await _pipelineClient.confirmDraft(
       session: session,
@@ -1234,6 +1240,23 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
         .where((String item) => item.isNotEmpty)
         .take(3)
         .toList(growable: false);
+
+    if (!mounted) return;
+    setState(() {
+      if (speakText.isNotEmpty) {
+        _bubbles.add(_ChatBubble(role: 'coach', text: speakText));
+      }
+      if (corrections.isNotEmpty) {
+        _bubbles.add(
+          _ChatBubble(
+            role: 'coach',
+            text: '纠错：${corrections.join(' · ')}',
+            hint: true,
+          ),
+        );
+      }
+    });
+    _scrollChatToEnd();
 
     bool avatarSpoke = false;
     if (speakText.isNotEmpty && settings.usesRealtimeLipSync) {
@@ -1286,18 +1309,6 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
     if (mounted) {
       setState(() {
         _busy = false;
-        if (speakText.isNotEmpty) {
-          _bubbles.add(_ChatBubble(role: 'coach', text: speakText));
-        }
-        if (corrections.isNotEmpty) {
-          _bubbles.add(
-            _ChatBubble(
-              role: 'coach',
-              text: '纠错：${corrections.join(' · ')}',
-              hint: true,
-            ),
-          );
-        }
         _status = '你可以开始说';
       });
       _scrollChatToEnd();
@@ -1565,7 +1576,7 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
           children: <Widget>[
             // Upper stage: WebRTC only when LiveTalking backend; else avatar.
             Expanded(
-              flex: 11,
+              flex: 3,
               child: Stack(
                 fit: StackFit.expand,
                 children: <Widget>[
@@ -1616,44 +1627,6 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
                     ),
                   ),
                   Positioned(
-                    left: 12,
-                    right: 12,
-                    top: 10,
-                    child: Row(
-                      children: <Widget>[
-                        _GlassChip(
-                          onTap: _showSceneSheet,
-                          child: Text(
-                            _started ? _sessionClockLabel : '准备中',
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 12,
-                              fontWeight: FontWeight.w700,
-                            ),
-                          ),
-                        ),
-                        const Spacer(),
-                        if (lipSync &&
-                            (_connecting || !_liveClient.isConnected))
-                          Padding(
-                            padding: const EdgeInsets.only(right: 8),
-                            child: Text(
-                              _connecting ? '连线中' : '重连中',
-                              style: TextStyle(
-                                color: Colors.white.withValues(alpha: 0.7),
-                                fontSize: 11,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                          ),
-                        _RoundIconButton(
-                          icon: Icons.close_rounded,
-                          onTap: () => unawaited(_hangUp()),
-                        ),
-                      ],
-                    ),
-                  ),
-                  Positioned(
                     left: 0,
                     right: 0,
                     bottom: 8,
@@ -1667,6 +1640,23 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
                         fontSize: 11,
                         fontWeight: FontWeight.w600,
                       ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
+              child: Row(
+                children: <Widget>[
+                  const Expanded(
+                    child: Text('对话记录', style: TextStyle(color: Colors.white)),
+                  ),
+                  _GlassChip(
+                    onTap: _showSceneSheet,
+                    child: Text(
+                      _started ? _sessionClockLabel : '准备中',
+                      style: const TextStyle(color: Colors.white, fontSize: 12),
                     ),
                   ),
                 ],
@@ -1687,103 +1677,192 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
                   ),
                 ),
               ),
-            // Hi Echo conversation + orb + dock.
             Expanded(
-              flex: 10,
-              child: Column(
-                children: <Widget>[
-                  Expanded(
-                    child: _bubbles.isEmpty
-                        ? Center(
-                            child: Padding(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 28,
-                              ),
-                              child: Text(
-                                _talkTopics.isEmpty
-                                    ? 'Hi~ 我会先读字幕，再围绕“$_topicLabel”生成口语问答。'
-                                    : '已准备 ${_talkTopics.length} 个口语话题，点下方话题或直接说话。',
-                                textAlign: TextAlign.center,
-                                style: TextStyle(
-                                  color: Colors.white.withValues(alpha: 0.78),
-                                  fontSize: 15,
-                                  fontWeight: FontWeight.w600,
-                                  height: 1.4,
-                                ),
-                              ),
-                            ),
-                          )
-                        : ListView.builder(
-                            controller: _chatScroll,
-                            padding: const EdgeInsets.fromLTRB(14, 8, 14, 4),
-                            itemCount: _bubbles.length,
-                            itemBuilder: (BuildContext context, int index) {
-                              final _ChatBubble bubble = _bubbles[index];
-                              final DigitalHumanPersona persona = ref
-                                  .watch(learningSettingsProvider)
-                                  .selectedDigitalHuman;
-                              return _ConversationBubble(
-                                bubble: bubble,
-                                showZh: _showZhIndexes.contains(index),
-                                coachAvatarAsset: persona.assetPath,
-                                onToggleZh: () =>
-                                    _toggleZh(index, bubble.zh),
-                                onCopy: () =>
-                                    unawaited(_copyBubble(bubble.text)),
-                                onSpeak: () =>
-                                    unawaited(_replayBubble(bubble.text)),
-                              );
-                            },
+              flex: 4,
+              child: _bubbles.isEmpty
+                  ? Center(
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 28,
+                        ),
+                        child: Text(
+                          _talkTopics.isEmpty
+                              ? 'Hi~ 我会先读字幕，再围绕“$_topicLabel”生成口语问答。'
+                              : '已准备 ${_talkTopics.length} 个口语话题，点下方话题或直接说话。',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            color: Colors.white.withValues(alpha: 0.78),
+                            fontSize: 15,
+                            fontWeight: FontWeight.w600,
+                            height: 1.4,
                           ),
-                  ),
-                  if (_talkTopics.isNotEmpty)
-                    SizedBox(
-                      height: 40,
-                      child: ListView.separated(
-                        scrollDirection: Axis.horizontal,
-                        padding: const EdgeInsets.fromLTRB(14, 0, 14, 8),
-                        itemCount: _talkTopics.length,
-                        separatorBuilder: (_, __) => const SizedBox(width: 8),
-                        itemBuilder: (BuildContext context, int index) {
-                          final String topic = _talkTopics[index];
-                          final bool active = index == _topicCursor;
-                          return ActionChip(
-                            label: Text(
-                              topic,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: TextStyle(
-                                fontSize: 12,
-                                fontWeight: FontWeight.w700,
-                                color: active
-                                    ? Colors.white
-                                    : Colors.white.withValues(alpha: 0.88),
-                              ),
-                            ),
-                            backgroundColor: active
-                                ? const Color(0xFF5B3FD4)
-                                : Colors.white.withValues(alpha: 0.12),
-                            side: BorderSide(
-                              color: Colors.white.withValues(alpha: 0.18),
-                            ),
-                            onPressed: _busy
-                                ? null
-                                : () => unawaited(_askPreparedTopic(index)),
-                          );
-                        },
+                        ),
                       ),
+                    )
+                  : ListView.builder(
+                      controller: _chatScroll,
+                      padding: const EdgeInsets.fromLTRB(14, 8, 14, 4),
+                      itemCount: _bubbles.length,
+                      itemBuilder: (BuildContext context, int index) {
+                        final _ChatBubble bubble = _bubbles[index];
+                        final DigitalHumanPersona persona = ref
+                            .watch(learningSettingsProvider)
+                            .selectedDigitalHuman;
+                        return _ConversationBubble(
+                          bubble: bubble,
+                          showZh: _showZhIndexes.contains(index),
+                          coachAvatarAsset: persona.assetPath,
+                          onToggleZh: () =>
+                              _toggleZh(index, bubble.zh),
+                          onCopy: () =>
+                              unawaited(_copyBubble(bubble.text)),
+                          onSpeak: () =>
+                              unawaited(_replayBubble(bubble.text)),
+                        );
+                      },
                     ),
-                  GestureDetector(
-                    key: const ValueKey<String>('study-oral-coach-mic'),
-                    onLongPressStart: _busy
-                        ? null
-                        : (_) => unawaited(_onHoldStart()),
-                    onLongPressEnd: _busy
-                        ? null
-                        : (_) => unawaited(_onHoldEnd()),
-                    onLongPressCancel: _busy
-                        ? null
-                        : () => unawaited(_onHoldEnd()),
+            ),
+            if (_talkTopics.isNotEmpty)
+              SizedBox(
+                height: 40,
+                child: ListView.separated(
+                  scrollDirection: Axis.horizontal,
+                  padding: const EdgeInsets.fromLTRB(14, 0, 14, 8),
+                  itemCount: _talkTopics.length,
+                  separatorBuilder: (_, __) => const SizedBox(width: 8),
+                  itemBuilder: (BuildContext context, int index) {
+                    final String topic = _talkTopics[index];
+                    final bool active = index == _topicCursor;
+                    return ActionChip(
+                      label: Text(
+                        topic,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w700,
+                          color: active
+                              ? Colors.white
+                              : Colors.white.withValues(alpha: 0.88),
+                        ),
+                      ),
+                      backgroundColor: active
+                          ? const Color(0xFF5B3FD4)
+                          : Colors.white.withValues(alpha: 0.12),
+                      side: BorderSide(
+                        color: Colors.white.withValues(alpha: 0.18),
+                      ),
+                      onPressed: _busy
+                          ? null
+                          : () => unawaited(_askPreparedTopic(index)),
+                    );
+                  },
+                ),
+              ),
+            GestureDetector(
+              key: const ValueKey<String>('study-oral-coach-mic'),
+              onLongPressStart: _busy
+                  ? null
+                  : (_) => unawaited(_onHoldStart()),
+              onLongPressEnd: _busy
+                  ? null
+                  : (_) => unawaited(_onHoldEnd()),
+              onLongPressCancel: _busy
+                  ? null
+                  : () => unawaited(_onHoldEnd()),
+              onTap: _busy
+                  ? null
+                  : () => unawaited(
+                      _recordingActive
+                          ? _stopRecordingAndSend()
+                          : _onHoldStart(),
+                    ),
+              child: AnimatedBuilder(
+                animation: _orbPulse,
+                builder: (BuildContext context, Widget? child) {
+                  final double t = _recordingActive
+                      ? 0.55 + _orbPulse.value * 0.45
+                      : 0.35 + _orbPulse.value * 0.25;
+                  return Container(
+                    width: 60,
+                    height: 60,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      gradient: RadialGradient(
+                        colors: <Color>[
+                          Color.lerp(
+                                const Color(0xFF9B7CFF),
+                                const Color(0xFFE8DEFF),
+                                t,
+                              ) ??
+                              const Color(0xFFB9A6FF),
+                          const Color(0xFF5B3FD4),
+                          const Color(0xFF2A1B6A),
+                        ],
+                        stops: const <double>[0, 0.55, 1],
+                      ),
+                      boxShadow: <BoxShadow>[
+                        BoxShadow(
+                          color: const Color(
+                            0xFF8B6CFF,
+                          ).withValues(alpha: 0.25 + t * 0.35),
+                          blurRadius: 28 + t * 18,
+                          spreadRadius: 2,
+                        ),
+                      ],
+                    ),
+                    child: Icon(
+                      _recordingActive
+                          ? Icons.graphic_eq_rounded
+                          : Icons.mic_none_rounded,
+                      color: Colors.white.withValues(alpha: 0.92),
+                      size: 32,
+                    ),
+                  );
+                },
+              ),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              orbHint,
+              style: TextStyle(
+                color: Colors.white.withValues(alpha: 0.78),
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(28, 10, 28, 12),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: <Widget>[
+                  _DockRoundButton(
+                    icon: Icons.lightbulb_outline_rounded,
+                    onTap: () {
+                      final String hint =
+                          'Stuck? Retell one moment: "In the video, …" or ask me for a key word.';
+                      setState(() {
+                        _bubbles.add(
+                          _ChatBubble(
+                            role: 'coach',
+                            text: hint,
+                            hint: true,
+                          ),
+                        );
+                        _status = '试试上面的提示';
+                      });
+                      _scrollChatToEnd();
+                    },
+                  ),
+                  _DockRoundButton(
+                    icon: Icons.grid_view_rounded,
+                    onTap: _showSceneSheet,
+                  ),
+                  _DockRoundButton(
+                    icon: _recordingActive
+                        ? Icons.stop_rounded
+                        : Icons.mic_rounded,
+                    active: _recordingActive,
                     onTap: _busy
                         ? null
                         : () => unawaited(
@@ -1791,107 +1870,11 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
                                 ? _stopRecordingAndSend()
                                 : _onHoldStart(),
                           ),
-                    child: AnimatedBuilder(
-                      animation: _orbPulse,
-                      builder: (BuildContext context, Widget? child) {
-                        final double t = _recordingActive
-                            ? 0.55 + _orbPulse.value * 0.45
-                            : 0.35 + _orbPulse.value * 0.25;
-                        return Container(
-                          width: 84,
-                          height: 84,
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            gradient: RadialGradient(
-                              colors: <Color>[
-                                Color.lerp(
-                                      const Color(0xFF9B7CFF),
-                                      const Color(0xFFE8DEFF),
-                                      t,
-                                    ) ??
-                                    const Color(0xFFB9A6FF),
-                                const Color(0xFF5B3FD4),
-                                const Color(0xFF2A1B6A),
-                              ],
-                              stops: const <double>[0, 0.55, 1],
-                            ),
-                            boxShadow: <BoxShadow>[
-                              BoxShadow(
-                                color: const Color(
-                                  0xFF8B6CFF,
-                                ).withValues(alpha: 0.25 + t * 0.35),
-                                blurRadius: 28 + t * 18,
-                                spreadRadius: 2,
-                              ),
-                            ],
-                          ),
-                          child: Icon(
-                            _recordingActive
-                                ? Icons.graphic_eq_rounded
-                                : Icons.mic_none_rounded,
-                            color: Colors.white.withValues(alpha: 0.92),
-                            size: 32,
-                          ),
-                        );
-                      },
-                    ),
                   ),
-                  const SizedBox(height: 6),
-                  Text(
-                    orbHint,
-                    style: TextStyle(
-                      color: Colors.white.withValues(alpha: 0.78),
-                      fontSize: 13,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(28, 10, 28, 12),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: <Widget>[
-                        _DockRoundButton(
-                          icon: Icons.lightbulb_outline_rounded,
-                          onTap: () {
-                            final String hint =
-                                'Stuck? Retell one moment: "In the video, …" or ask me for a key word.';
-                            setState(() {
-                              _bubbles.add(
-                                _ChatBubble(
-                                  role: 'coach',
-                                  text: hint,
-                                  hint: true,
-                                ),
-                              );
-                              _status = '试试上面的提示';
-                            });
-                            _scrollChatToEnd();
-                          },
-                        ),
-                        _DockRoundButton(
-                          icon: Icons.grid_view_rounded,
-                          onTap: _showSceneSheet,
-                        ),
-                        _DockRoundButton(
-                          icon: _recordingActive
-                              ? Icons.stop_rounded
-                              : Icons.mic_rounded,
-                          active: _recordingActive,
-                          onTap: _busy
-                              ? null
-                              : () => unawaited(
-                                  _recordingActive
-                                      ? _stopRecordingAndSend()
-                                      : _onHoldStart(),
-                                ),
-                        ),
-                        _DockRoundButton(
-                          icon: Icons.call_end_rounded,
-                          danger: true,
-                          onTap: () => unawaited(_hangUp()),
-                        ),
-                      ],
-                    ),
+                  _DockRoundButton(
+                    icon: Icons.call_end_rounded,
+                    danger: true,
+                    onTap: () => unawaited(_hangUp()),
                   ),
                 ],
               ),
@@ -1920,30 +1903,6 @@ class _GlassChip extends StatelessWidget {
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
           child: child,
-        ),
-      ),
-    );
-  }
-}
-
-class _RoundIconButton extends StatelessWidget {
-  const _RoundIconButton({required this.icon, this.onTap});
-
-  final IconData icon;
-  final VoidCallback? onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return Material(
-      color: Colors.white.withValues(alpha: 0.12),
-      shape: const CircleBorder(),
-      child: InkWell(
-        customBorder: const CircleBorder(),
-        onTap: onTap,
-        child: SizedBox(
-          width: 36,
-          height: 36,
-          child: Icon(icon, size: 18, color: Colors.white),
         ),
       ),
     );
@@ -2051,7 +2010,7 @@ class _ConversationBubble extends StatelessWidget {
                   Padding(
                     padding: const EdgeInsets.only(bottom: 4),
                     child: Text(
-                      '对话提示',
+                      '外教反馈',
                       style: TextStyle(
                         color: Colors.white.withValues(alpha: 0.45),
                         fontSize: 11,
@@ -2062,8 +2021,15 @@ class _ConversationBubble extends StatelessWidget {
                 Container(
                   padding: const EdgeInsets.fromLTRB(14, 12, 14, 10),
                   decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: mine ? 0.14 : 0.10),
-                    borderRadius: BorderRadius.circular(18),
+                    color: mine
+                        ? const Color(0xFF5140A0)
+                        : const Color(0xFF302842),
+                    borderRadius: BorderRadius.only(
+                      topLeft: Radius.circular(mine ? 14 : 4),
+                      topRight: Radius.circular(mine ? 4 : 14),
+                      bottomLeft: const Radius.circular(14),
+                      bottomRight: const Radius.circular(14),
+                    ),
                     border: Border.all(
                       color: Colors.white.withValues(alpha: 0.10),
                     ),
@@ -2087,10 +2053,6 @@ class _ConversationBubble extends StatelessWidget {
                           _BubbleAction(
                             icon: Icons.translate_rounded,
                             onTap: onToggleZh,
-                          ),
-                          _BubbleAction(
-                            icon: Icons.star_border_rounded,
-                            onTap: () {},
                           ),
                           if (!mine)
                             _BubbleAction(

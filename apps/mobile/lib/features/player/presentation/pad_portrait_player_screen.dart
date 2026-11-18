@@ -243,6 +243,7 @@ class PadPortraitPlayerScreenState
   int _dictationQueueIndex = 0;
   bool _hardsubMosaicEnabled = false;
   HardsubMosaicBand _hardsubMosaicBand = const HardsubMosaicBand();
+  bool _oralCoachOpen = false;
   bool _pausedForLookup = false;
   bool _episodeFavorited = false;
   bool _blindListening = false;
@@ -2945,6 +2946,10 @@ Future<void> _settleChineseFillIfAlreadyPresent() async {
                     StudyModeTabs(
                       value: _studyTab,
                       onChanged: (StudyModeTab tab) {
+                        if (tab == StudyModeTab.coach) {
+                          unawaited(_openOralCoach(courseContext, activeLine));
+                          return;
+                        }
                         if (tab == StudyModeTab.shadowing) {
                           _enterShadowingMode(showToast: false);
                           return;
@@ -2992,17 +2997,58 @@ Future<void> _settleChineseFillIfAlreadyPresent() async {
               onToggleFullscreen: () => _handleOpenFullscreen(
                 course?.episodes ?? const <LibraryEpisodeItem>[],
               ),
-                onOpenShadowing: () => _enterShadowingMode(),
-                shadowingSelected: _studyTab == StudyModeTab.shadowing,
-                onOpenWordCards: () {
-                  setState(() => _studyTab = StudyModeTab.wordCards);
-                    },
+              onOpenOralCoach: () =>
+                  unawaited(_openOralCoach(courseContext, activeLine)),
             ),
           ],
           ),
         ),
       ),
     );
+  }
+
+  Future<void> _openOralCoach(
+    PlayerCourseLookupResult courseContext,
+    PlayerSubtitleLine activeLine,
+  ) async {
+    if (_oralCoachOpen) return;
+    _oralCoachOpen = true;
+    try {
+      setState(() => state.isPlaying = false);
+      PlayerSystemMediaControls.updatePlaybackState(isPlaying: false);
+      await _videoPlayer?.pause();
+      if (!mounted) return;
+      final String courseTitle = courseContext.course?.title ?? '';
+      final String episodeTitle = courseContext.episode?.title ?? '';
+      final String topicSummary = <String>[
+        if (courseTitle.trim().isNotEmpty) courseTitle.trim(),
+        if (episodeTitle.trim().isNotEmpty) episodeTitle.trim(),
+      ].join(' · ');
+      final String excerpt = _oralCoachSubtitleExcerpt(state.lines);
+      final Widget coach = StudyOralCoachTab(
+        topicSummary: topicSummary.isNotEmpty
+            ? topicSummary
+            : (activeLine.english.trim().isNotEmpty
+                  ? activeLine.english.trim()
+                  : '本集视频'),
+        articleExcerpt: excerpt,
+        courseTitle: courseTitle,
+        episodeTitle: episodeTitle,
+        hasTranscript: excerpt.isNotEmpty,
+      );
+      await Navigator.of(context).push<void>(
+        MaterialPageRoute<void>(
+          fullscreenDialog: true,
+          builder: (BuildContext context) => Scaffold(
+            backgroundColor: const Color(0xFF14102A),
+            appBar: AppBar(title: const Text('英语口语')),
+            body: SafeArea(top: false, child: coach),
+          ),
+        ),
+      );
+    } finally {
+      _oralCoachOpen = false;
+    }
   }
 
   Widget _buildStudyTabBody({
@@ -3214,28 +3260,7 @@ Future<void> _settleChineseFillIfAlreadyPresent() async {
           },
         );
       case StudyModeTab.coach:
-        // Digital human = free talk on whole episode theme (Midoo-style),
-        // not line-by-line shadowing (that is the 跟读 tab).
-        final String courseTitle = courseContext.course?.title ?? '';
-        final String episodeTitle = courseContext.episode?.title ?? '';
-        final String topicSummary = <String>[
-          if (courseTitle.trim().isNotEmpty) courseTitle.trim(),
-          if (episodeTitle.trim().isNotEmpty) episodeTitle.trim(),
-        ].join(' · ');
-        // Sample start / middle / end so the coach can pre-generate topics
-        // across the whole episode, not only the opening lines.
-        final String excerpt = _oralCoachSubtitleExcerpt(state.lines);
-        return StudyOralCoachTab(
-          topicSummary: topicSummary.isNotEmpty
-              ? topicSummary
-              : (activeLine.english.trim().isNotEmpty
-                    ? activeLine.english.trim()
-                    : '本集视频'),
-          articleExcerpt: excerpt,
-          courseTitle: courseTitle,
-          episodeTitle: episodeTitle,
-          hasTranscript: excerpt.isNotEmpty,
-        );
+        return const SizedBox.shrink();
       case StudyModeTab.dictation:
         final List<DictationQueueItem> queue = ref.watch(
           dictationQueueProvider,
@@ -3463,7 +3488,7 @@ Future<void> _settleChineseFillIfAlreadyPresent() async {
   }
 
   void _handleSystemPlay() {
-    if (!state.isPlaying) {
+    if (!_oralCoachOpen && !state.isPlaying) {
       _handleTogglePlaying();
     }
   }

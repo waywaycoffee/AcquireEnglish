@@ -17,9 +17,7 @@ class StudyBottomControls extends StatelessWidget {
     required this.onCycleSpeed,
     required this.onTogglePlaying,
     required this.onOpenLoopSheet,
-    required this.onOpenWordCards,
-    this.onOpenShadowing,
-    this.shadowingSelected = false,
+    required this.onOpenOralCoach,
     this.onSeek,
     this.onSpeedSelected,
     this.onOpenSpeedSheet,
@@ -39,11 +37,7 @@ class StudyBottomControls extends StatelessWidget {
   final VoidCallback onCycleSpeed;
   final VoidCallback onTogglePlaying;
   final VoidCallback onOpenLoopSheet;
-  final VoidCallback onOpenWordCards;
-
-  /// Persistent 跟读 entry — always visible in the bottom bar when set.
-  final VoidCallback? onOpenShadowing;
-  final bool shadowingSelected;
+  final VoidCallback onOpenOralCoach;
   final ValueChanged<double>? onSeek;
   final ValueChanged<String>? onSpeedSelected;
   final VoidCallback? onOpenSpeedSheet;
@@ -244,22 +238,12 @@ class StudyBottomControls extends StatelessWidget {
                 ),
                 Expanded(
                   child: _IconAction(
-                    key: const ValueKey<String>('study-chip-shadowing'),
-                    icon: Icons.mic_rounded,
-                    label: '跟读',
-                    selected: shadowingSelected,
-                    colors: colors,
-                    onPressed: onOpenShadowing ?? () {},
-                  ),
-                ),
-                Expanded(
-                  child: _IconAction(
-                    key: const ValueKey<String>('study-chip-word-cards'),
-                    icon: Icons.style_rounded,
-                    label: '词卡',
+                    key: const ValueKey<String>('study-chip-oral-coach'),
+                    icon: Icons.record_voice_over_rounded,
+                    label: '英语口语',
                     selected: false,
                     colors: colors,
-                    onPressed: onOpenWordCards,
+                    onPressed: onOpenOralCoach,
                   ),
                 ),
               ],

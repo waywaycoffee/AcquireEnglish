@@ -59,13 +59,12 @@ void main() {
     expect(selected, StudyModeTab.wordCards);
   });
 
-  testWidgets('StudyBottomControls fires subtitle mode loop and word-cards', (
+  testWidgets('StudyBottomControls fires subtitle mode loop and oral coach', (
     WidgetTester tester,
   ) async {
     final List<String> selectedModes = <String>[];
     int loopTaps = 0;
-    int wordCardTaps = 0;
-    int shadowingTaps = 0;
+    int oralCoachTaps = 0;
     int playTaps = 0;
     int speedSelects = 0;
     int qualityTaps = 0;
@@ -86,8 +85,7 @@ void main() {
             onOpenQualitySheet: () => qualityTaps += 1,
             onTogglePlaying: () => playTaps += 1,
             onOpenLoopSheet: () => loopTaps += 1,
-            onOpenShadowing: () => shadowingTaps += 1,
-            onOpenWordCards: () => wordCardTaps += 1,
+            onOpenOralCoach: () => oralCoachTaps += 1,
           ),
         ),
       ),
@@ -95,22 +93,22 @@ void main() {
 
     expect(find.text('00:05 / 01:36'), findsOneWidget);
     expect(find.text('双语'), findsWidgets);
-    expect(find.text('跟读'), findsOneWidget);
+    expect(find.text('英语口语'), findsOneWidget);
+    expect(find.text('跟读'), findsNothing);
+    expect(find.text('词卡'), findsNothing);
 
     await tester.tap(
       find.byKey(const ValueKey<String>('study-chip-subtitle-label')),
     );
     await tester.tap(find.byKey(const ValueKey<String>('study-chip-loop')));
-    await tester.tap(find.byKey(const ValueKey<String>('study-chip-shadowing')));
-    await tester.tap(find.byKey(const ValueKey<String>('study-chip-word-cards')));
+    await tester.tap(find.byKey(const ValueKey<String>('study-chip-oral-coach')));
     await tester.tap(find.byKey(const ValueKey<String>('study-chip-play')));
     await tester.tap(find.text('超清'));
     await tester.pump();
 
     expect(selectedModes, <String>['英文']);
     expect(loopTaps, 1);
-    expect(shadowingTaps, 1);
-    expect(wordCardTaps, 1);
+    expect(oralCoachTaps, 1);
     expect(playTaps, 1);
     expect(qualityTaps, 1);
     expect(speedSelects, 0);
