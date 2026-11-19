@@ -8,6 +8,8 @@ import 'auth_session.dart';
 /// If the device has no session (or still shows a legacy demo name), sign in as
 /// the product default account [DefaultAccount] and pull personal cloud assets.
 Future<bool> ensureDefaultAccountSignIn(WidgetRef ref) async {
+  if (DefaultAccount.password.isEmpty || DefaultAccount.email.isEmpty) return false;
+
   final AuthSessionState auth = ref.read(authSessionProvider);
   final String name = auth.displayName.trim();
   final String email = auth.email.trim().toLowerCase();

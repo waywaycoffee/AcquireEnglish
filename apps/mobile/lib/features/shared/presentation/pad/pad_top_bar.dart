@@ -122,7 +122,16 @@ class PadTopBar extends ConsumerWidget {
               ),
             ),
           ),
-          ...actions,
+          if (actions.isNotEmpty)
+            ConstrainedBox(
+              constraints: BoxConstraints(
+                maxWidth: width * (compact ? 0.52 : 0.60),
+              ),
+              child: SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: Row(mainAxisSize: MainAxisSize.min, children: actions),
+              ),
+            ),
           if (actions.isNotEmpty) const SizedBox(width: 8),
           if (trailing != null)
             trailing!

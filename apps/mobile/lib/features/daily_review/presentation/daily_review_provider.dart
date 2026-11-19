@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:fsrs/fsrs.dart' as fsrs;
 import 'package:hive_ce/hive.dart';
 
+import '../../authentication/presentation/account_storage.dart';
 import '../../phrases/presentation/phrase_book_provider.dart';
 import '../../words/presentation/word_book_provider.dart';
 import '../../words/presentation/vocabulary_placement_provider.dart';
@@ -13,14 +14,18 @@ import '../domain/daily_review.dart';
 final Provider<DateTime Function()> reviewClockProvider =
     Provider<DateTime Function()>((Ref ref) => DateTime.now);
 final Provider<ReviewRepository> reviewRepositoryProvider =
-    Provider<ReviewRepository>((Ref ref) => ReviewRepository());
+    Provider<ReviewRepository>(
+      (Ref ref) => ReviewRepository(account: ref.watch(studyAccountProvider)),
+    );
 
 class ReviewRepository {
+  ReviewRepository({this.account = ''});
+  final String account;
   static const String storageKey = 'daily_review_fsrs_v1';
   String? _memory;
   DailyReviewState load() {
     final String? raw = Hive.isBoxOpen('prefs')
-        ? Hive.box<String>('prefs').get(storageKey)
+        ? readStudyStorage(storageKey, account)
         : _memory;
     if (raw == null) return const DailyReviewState();
     return DailyReviewState.fromJson(
@@ -31,7 +36,9 @@ class ReviewRepository {
   Future<void> save(DailyReviewState value) async {
     final String encoded = jsonEncode(value.toJson());
     if (Hive.isBoxOpen('prefs')) {
-      await Hive.box<String>('prefs').put(storageKey, encoded);
+      await Hive.box<String>(
+        'prefs',
+      ).put(studyStorageKey(storageKey, account), encoded);
     } else {
       _memory = encoded;
     }
@@ -145,12 +152,17 @@ dailyReviewProvider = NotifierProvider<DailyReviewNotifier, DailyReviewState>(
 
 class DailyReviewNotifier extends Notifier<DailyReviewState> {
   Future<void> _pending = Future<void>.value();
+  int _generation = 0;
   bool _disposed = false;
 
   @override
   DailyReviewState build() {
-    ref.onDispose(() => _disposed = true);
-    final ReviewRepository repository = ref.read(reviewRepositoryProvider);
+    _disposed = false;
+    final int generation = ++_generation;
+    ref.onDispose(() {
+      if (generation == _generation) _disposed = true;
+    });
+    final ReviewRepository repository = ref.watch(reviewRepositoryProvider);
     final List<ReviewSource> sources = ref.read(reviewSourcesProvider);
     final DailyReviewState initial;
     try {
@@ -185,10 +197,12 @@ class DailyReviewNotifier extends Notifier<DailyReviewState> {
   Future<void> _transaction(
     DailyReviewState Function(DailyReviewState) update,
   ) {
+    final int generation = _generation;
+    final ReviewRepository repository = ref.read(reviewRepositoryProvider);
     final Future<void> operation = _pending.catchError((Object error) {}).then((
       _,
     ) async {
-      if (_disposed) return;
+      if (_disposed || generation != _generation) return;
       if (state.storageError != null) throw StateError(state.storageError!);
       final DailyReviewState next = update(
         state.synchronize(
@@ -196,8 +210,8 @@ class DailyReviewNotifier extends Notifier<DailyReviewState> {
           ref.read(reviewClockProvider)(),
         ),
       );
-      await ref.read(reviewRepositoryProvider).save(next);
-      if (!_disposed) state = next;
+      await repository.save(next);
+      if (!_disposed && generation == _generation) state = next;
     });
     _pending = operation;
     return operation;
@@ -232,6 +246,7 @@ class DailyReviewNotifier extends Notifier<DailyReviewState> {
     fsrs.Rating rating, {
     required int expectedReviews,
   }) async {
+    final int generation = _generation;
     final VocabularyPlacement placement = ref.read(
       vocabularyPlacementProvider.notifier,
     );
@@ -252,6 +267,7 @@ class DailyReviewNotifier extends Notifier<DailyReviewState> {
         expectedReviews: expectedReviews,
       );
     });
+    if (_disposed || generation != _generation) return;
     if (!_disposed &&
         gradedSource?.kind == ReviewKind.word &&
         (rating == fsrs.Rating.good || rating == fsrs.Rating.easy)) {

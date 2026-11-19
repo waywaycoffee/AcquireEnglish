@@ -1,5 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../authentication/presentation/auth_session.dart';
 import '../../phrases/presentation/phrase_book_provider.dart';
 import 'acquire_api_client.dart';
 
@@ -34,29 +35,36 @@ class PhraseSyncService {
     nextReviewAt: DateTime.tryParse(entry.nextReviewAt ?? ''),
   );
 
-  Future<void> pushEntry(PhraseEntry entry) async {
+  Future<bool> pushEntry(PhraseEntry entry) async {
     try {
       await _ref.read(acquireApiClientProvider).upsertPhrase(_toDto(entry));
-    } catch (_) {}
+      return true;
+    } catch (_) {
+      return false;
+    }
   }
 
-  Future<int> pushAll() async {
+  Future<({int uploaded, int failed})> pushAll() async {
     final List<PhraseEntry> rows = _ref.read(phraseBookProvider);
+    final String token = _ref.read(authSessionProvider).accessToken;
     int ok = 0;
     for (final PhraseEntry entry in rows) {
-      try {
-        await pushEntry(entry);
-        ok += 1;
-      } catch (_) {}
+      if (token.isEmpty || _ref.read(authSessionProvider).accessToken != token)
+        break;
+      if (await pushEntry(entry)) ok++;
     }
-    return ok;
+    return (uploaded: ok, failed: rows.length - ok);
   }
 
   Future<void> pullAndMerge() async {
+    final String token = _ref.read(authSessionProvider).accessToken;
+    if (token.isEmpty) return;
     try {
-      final List<AcquirePhraseDto> remote =
-          await _ref.read(acquireApiClientProvider).listPhrases();
-      if (remote.isEmpty) {
+      final List<AcquirePhraseDto> remote = await _ref
+          .read(acquireApiClientProvider)
+          .listPhrases();
+      if (remote.isEmpty ||
+          _ref.read(authSessionProvider).accessToken != token) {
         return;
       }
       await _ref.read(phraseBookProvider.notifier).mergeRemotePhrases(remote);

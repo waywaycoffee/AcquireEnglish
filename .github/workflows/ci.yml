@@ -25,7 +25,7 @@ jobs:
           cache: pip
           cache-dependency-path: services/api/requirements.txt
       - run: pip install -r requirements.txt
-      - run: python -m pytest tests/test_feature_matrix.py tests/test_phone_wechat_auth.py tests/test_user_assets.py tests/test_rewards.py tests/test_shared_subtitles.py tests/test_personal_import_assets.py tests/test_bilibili_search.py -q
+      - run: python -m pytest -q --ignore=tests/test_prod_e2e_suite.py
   web:
     runs-on: ubuntu-latest
     defaults:

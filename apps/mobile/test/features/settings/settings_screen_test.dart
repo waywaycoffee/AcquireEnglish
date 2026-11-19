@@ -248,7 +248,9 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('设置'), findsWidgets);
+    expect(find.text('我的'), findsWidgets);
+    expect(find.text('爱快账号'), findsOneWidget);
+    expect(find.text('登录账号'), findsOneWidget);
     expect(find.text('播放'), findsOneWidget);
     expect(find.text('学习').last, findsOneWidget);
     expect(find.text('默认字幕模式'), findsOneWidget);

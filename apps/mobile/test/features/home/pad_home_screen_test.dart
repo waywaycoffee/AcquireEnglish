@@ -214,7 +214,7 @@ void main() {
     // Same three entry points as 学习页 — not a redirect to the library tab.
     expect(find.text('YouTube'), findsOneWidget);
     expect(find.text('B站'), findsOneWidget);
-    expect(find.text('导入'), findsOneWidget);
+    expect(find.text('本地'), findsOneWidget);
     expect(find.text('去导入课程'), findsNothing);
     expect(
       router.routeInformationProvider.value.uri.path,

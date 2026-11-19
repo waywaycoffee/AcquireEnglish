@@ -17,13 +17,13 @@ import '../data/bilibili_course_builder.dart';
 import '../data/bilibili_import_service.dart';
 import '../domain/bilibili_import.dart';
 
-Future<void> showBilibiliImportSheet(
+Future<String?> showBilibiliImportSheet(
   BuildContext context,
   WidgetRef ref, {
   String? initialUrl,
   bool startImmediately = false,
 }) {
-  return showModalBottomSheet<void>(
+  return showModalBottomSheet<String>(
     context: context,
     isScrollControlled: true,
     backgroundColor: StudyShellTokens.surface,
@@ -118,6 +118,9 @@ class _BilibiliImportFormState extends ConsumerState<_BilibiliImportForm> {
         throw StateError('视频未能下载到本地');
       }
       final LibraryCourseData course = buildLibraryCourseFromBilibiliImport(meta);
+      final LibraryEpisodeItem? importedEpisode = course.episodes
+          .where((LibraryEpisodeItem episode) => !episode.videoMissing)
+          .firstOrNull;
       final bool ok = await ref
           .read(libraryCatalogProvider.notifier)
           .importCourse(course);
@@ -134,9 +137,7 @@ class _BilibiliImportFormState extends ConsumerState<_BilibiliImportForm> {
         // Auto-save to personal cloud; shared if official pack passes audit.
         final AuthSessionState auth = ref.read(authSessionProvider);
         if (auth.isLoggedIn) {
-          final LibraryEpisodeItem? ep = course.episodes
-              .where((LibraryEpisodeItem item) => !item.videoMissing)
-              .firstOrNull;
+          final LibraryEpisodeItem? ep = importedEpisode;
           unawaited(
             syncEpisodeSubtitlesToCloud(
               api: ref.read(acquireApiClientProvider),
@@ -162,7 +163,7 @@ class _BilibiliImportFormState extends ConsumerState<_BilibiliImportForm> {
       final String success = course.episodes.length > 1
           ? '已导入一集试看。想继续时，可在课程详情点「下载剩余各集」。'
           : '已加入书库。$hint 缺失字幕会在课程页后台自动补全。';
-      Navigator.of(context).pop();
+      Navigator.of(context).pop(ok ? importedEpisode?.id : null);
       messenger.showSnackBar(
         SnackBar(
           content: Text(

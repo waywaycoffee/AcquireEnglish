@@ -1871,7 +1871,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(pausedForPronunciation, isTrue);
-    expect(spokenWord, 'Sanctuary');
+    expect(spokenWord?.toLowerCase(), 'sanctuary');
   });
 
   testWidgets('word popup shows snackbar when pronunciation fails', (

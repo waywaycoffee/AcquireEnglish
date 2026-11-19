@@ -162,9 +162,10 @@ class _MoreNavItem extends StatelessWidget {
     await showModalBottomSheet<void>(
       context: context,
       showDragHandle: true,
+      isScrollControlled: true,
       builder: (BuildContext sheetContext) => SafeArea(
         top: false,
-        child: Padding(
+        child: SingleChildScrollView(
           padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
           child: Column(
             mainAxisSize: MainAxisSize.min,

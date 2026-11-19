@@ -5,7 +5,6 @@ import 'package:go_router/go_router.dart';
 import '../../../../constants/assets.dart';
 import '../../../../router/app_router.dart';
 import '../../../shared/presentation/pad/app_design_tokens.dart';
-import '../../data/default_account.dart';
 import '../../data/wechat_auth_helper.dart';
 import '../../domain/login_response.dart';
 import 'auth_ui_model.dart';
@@ -29,8 +28,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   @override
   void initState() {
     super.initState();
-    _emailController = TextEditingController(text: DefaultAccount.email);
-    _passwordController = TextEditingController(text: DefaultAccount.password);
+    _emailController = TextEditingController();
+    _passwordController = TextEditingController();
   }
 
   @override

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-import random
+import secrets
 import re
 import smtplib
 import sqlite3
@@ -24,7 +24,7 @@ def normalize_email(raw: str) -> str:
 
 def email_provider() -> str:
     """mock | smtp | webhook | unset"""
-    if settings.auth_email_mock:
+    if not settings.production_mode and settings.auth_email_mock:
         return "mock"
     if (
         settings.smtp_host.strip()
@@ -75,7 +75,7 @@ def issue_email_code(email: str) -> str:
     code = (
         settings.auth_email_mock_code
         if email_mock_enabled()
-        else f"{random.randint(0, 999999):06d}"
+        else f"{secrets.randbelow(1000000):06d}"
     )
     expires = time.time() + max(60, settings.auth_email_code_ttl_seconds)
     with _connect() as conn:

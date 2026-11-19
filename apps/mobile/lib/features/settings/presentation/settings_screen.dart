@@ -1067,10 +1067,10 @@ class SettingsScreen extends ConsumerWidget {
                     return;
                   }
                   try {
-                    final int pushed = await ref
+                    final (:uploaded, :failed) = await ref
                         .read(vocabSyncServiceProvider)
                         .pushAllFavorites();
-                    final int phrasesPushed = await ref
+                    final (uploaded: phrasesUploaded, failed: phrasesFailed) = await ref
                         .read(phraseSyncServiceProvider)
                         .pushAll();
                     await ref.read(vocabSyncServiceProvider).pullAndMerge();
@@ -1087,8 +1087,8 @@ class SettingsScreen extends ConsumerWidget {
                     }
                     _showMessage(
                       context,
-                      '已同步：上传 $pushed 个收藏词、$phrasesPushed 条短语，'
-                      '并拉取云端词库、短语、偏好与私人字幕',
+                      '已上传 $uploaded 个收藏词、$phrasesUploaded 条短语。'
+                      '上传失败：${failed + phrasesFailed} 条。',
                     );
                   } catch (error) {
                     if (!context.mounted) {

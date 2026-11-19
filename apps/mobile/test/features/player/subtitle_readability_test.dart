@@ -98,7 +98,13 @@ void main() {
           ),
         ),
       );
-      await Future<void>.delayed(const Duration(milliseconds: 100));
+      final deadline = DateTime.now().add(const Duration(seconds: 5));
+      while (find.byType(TextField).evaluate().isEmpty &&
+          DateTime.now().isBefore(deadline)) {
+        await Future<void>.delayed(const Duration(milliseconds: 10));
+        await tester.pump();
+      }
+      expect(find.byType(TextField), findsWidgets);
     });
     await tester.pumpAndSettle();
     final input = find.byType(TextField).first;

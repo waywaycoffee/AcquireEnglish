@@ -26,33 +26,6 @@ rsync -az \
   "$ROOT/app/" "$HOST:$PATH_REMOTE/app/"
 rsync -az "$ROOT/requirements.txt" "$HOST:$PATH_REMOTE/requirements.txt"
 
-echo "==> Ensure AUTH_* in remote .env"
-ssh "$HOST" "python3 - <<'PY'
-from pathlib import Path
-p = Path('$PATH_REMOTE') / '.env'
-text = p.read_text(encoding='utf-8') if p.exists() else ''
-extras = {
-    'AUTH_SMS_MOCK': 'true',
-    'AUTH_SMS_MOCK_CODE': '123456',
-    'AUTH_SMS_CODE_TTL_SECONDS': '300',
-    'AUTH_EMAIL_MOCK': 'true',
-    'AUTH_EMAIL_MOCK_CODE': '123456',
-    'AUTH_EMAIL_CODE_TTL_SECONDS': '300',
-    'AUTH_WECHAT_MOCK': 'true',
-    'LIVEKIT_URL': '',
-    'LIVEKIT_API_KEY': '',
-    'LIVEKIT_API_SECRET': '',
-}
-lines = text.splitlines()
-keys = {ln.split('=',1)[0] for ln in lines if '=' in ln and not ln.strip().startswith('#')}
-out = list(lines)
-for k,v in extras.items():
-    if k not in keys:
-        out.append(f'{k}={v}')
-p.write_text('\\n'.join(out).rstrip() + '\\n', encoding='utf-8')
-print('env ok', p)
-PY"
-
 echo "==> restart systemd (skip pip unless FORCE_PIP=1; remote venv is py3.14 and pip may hang)"
 if [[ "${FORCE_PIP:-0}" == "1" ]]; then
   ssh "$HOST" "cd '$PATH_REMOTE' && .venv/bin/pip install -q -r requirements.txt greenlet"

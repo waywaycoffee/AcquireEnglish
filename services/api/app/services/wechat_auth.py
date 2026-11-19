@@ -30,11 +30,13 @@ async def exchange_wechat_code(code: str) -> WeChatIdentity:
     if not trimmed:
         raise ValueError("缺少微信授权 code")
 
-    wechat_ready = bool(settings.wechat_app_id.strip() and settings.wechat_app_secret.strip())
-    if settings.auth_wechat_mock or not wechat_ready:
+    if settings.wechat_mock_enabled:
         # Dev / CI / until AppID+Secret configured: treat code as stable openid.
         openid = trimmed if trimmed.startswith("mock_") else f"mock_{trimmed}"
         return WeChatIdentity(openid=openid[:64], unionid=None, nickname="微信用户")
+
+    if not settings.wechat_configured:
+        raise ValueError("微信登录暂未配置")
 
     async with httpx.AsyncClient(timeout=20) as client:
         response = await client.get(

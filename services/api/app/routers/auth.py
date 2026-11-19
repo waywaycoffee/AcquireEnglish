@@ -22,6 +22,7 @@ from app.security import create_access_token, hash_password, verify_password
 from app.services.email_auth import (
     deliver_email_code,
     email_mock_enabled,
+    email_delivery_ready,
     issue_email_code,
     normalize_email,
     verify_email_code,
@@ -64,6 +65,8 @@ async def _seed_trial_if_new(db: AsyncSession, user: User, *, is_new: bool) -> N
 
 @router.post("/email/send", response_model=EmailSendOut)
 async def email_send(payload: EmailSendIn, db: AsyncSession = Depends(get_db)) -> EmailSendOut:
+    if not email_delivery_ready():
+        raise HTTPException(status_code=503, detail="邮箱注册暂未开放")
     try:
         email = normalize_email(str(payload.email))
     except ValueError as exc:
@@ -90,6 +93,8 @@ async def email_send(payload: EmailSendIn, db: AsyncSession = Depends(get_db)) -
 
 @router.post("/register", response_model=TokenOut)
 async def register(payload: UserCreate, db: AsyncSession = Depends(get_db)) -> TokenOut:
+    if settings.production_mode and not email_delivery_ready():
+        raise HTTPException(status_code=503, detail="邮箱注册暂未开放")
     try:
         email = normalize_email(str(payload.email))
     except ValueError as exc:
@@ -180,6 +185,8 @@ async def sms_login(payload: SmsLoginIn, db: AsyncSession = Depends(get_db)) -> 
 
 @router.post("/wechat/login", response_model=TokenOut)
 async def wechat_login(payload: WechatLoginIn, db: AsyncSession = Depends(get_db)) -> TokenOut:
+    if not settings.wechat_mock_enabled and not settings.wechat_configured:
+        raise HTTPException(status_code=503, detail="微信登录暂未开放")
     try:
         identity = await exchange_wechat_code(payload.code)
     except ValueError as exc:

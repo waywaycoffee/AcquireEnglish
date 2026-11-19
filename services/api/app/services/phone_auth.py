@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import random
 import re
 import secrets
 import sqlite3
@@ -43,7 +42,7 @@ def random_password_hash() -> str:
 
 def sms_provider() -> str:
     """mock | aliyun | webhook | unset"""
-    if settings.auth_sms_mock:
+    if not settings.production_mode and settings.auth_sms_mock:
         return "mock"
     if aliyun_sms_configured():
         return "aliyun"
@@ -90,7 +89,7 @@ def issue_sms_code(phone: str) -> str:
     code = (
         settings.auth_sms_mock_code
         if sms_mock_enabled()
-        else f"{random.randint(0, 999999):06d}"
+        else f"{secrets.randbelow(1000000):06d}"
     )
     expires = time.time() + max(60, settings.auth_sms_code_ttl_seconds)
     with _connect() as conn:

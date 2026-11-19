@@ -198,6 +198,7 @@ class _WordsScreenState extends ConsumerState<WordsScreen> {
                     ),
                   ],
                 ),
+                if (MediaQuery.sizeOf(context).width >= 600)
                 _TodayPlanCard(
                   planNew: planNew,
                   planReview: planReview,

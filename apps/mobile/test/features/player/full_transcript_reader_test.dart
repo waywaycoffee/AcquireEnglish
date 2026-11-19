@@ -337,6 +337,11 @@ void main() {
 
     await tester.pumpWidget(
       ProviderScope(
+        overrides: [
+          wordLookupServiceProvider.overrideWith(
+            (Ref ref) => const WordLookupService(),
+          ),
+        ],
         child: MaterialApp(
           home: FullTranscriptReaderScreen(
             snapshot: const TranscriptReaderSnapshot(
@@ -534,6 +539,11 @@ void main() {
 
     await tester.pumpWidget(
       ProviderScope(
+        overrides: [
+          wordLookupServiceProvider.overrideWith(
+            (Ref ref) => const WordLookupService(),
+          ),
+        ],
         child: MaterialApp(
           home: FullTranscriptReaderScreen(
             snapshot: const TranscriptReaderSnapshot(
@@ -558,7 +568,7 @@ void main() {
       const ValueKey<String>('word-lookup-popup-card'),
     );
     expect(popup, findsOneWidget);
-    expect(find.text('翻译来源：字幕词义'), findsOneWidget);
+    expect(find.text('猜测'), findsWidgets);
     expect(
       find.byKey(const ValueKey<String>('reader-word-box-what-true')),
       findsOneWidget,
@@ -647,7 +657,7 @@ void main() {
       findsOneWidget,
     );
     expect(find.text('Can you guess who called me?'), findsOneWidget);
-    expect(find.text('翻译来源：API'), findsOneWidget);
+    expect(find.text('来源：API'), findsOneWidget);
   });
 
   testWidgets('locate button scrolls back to the current word', (

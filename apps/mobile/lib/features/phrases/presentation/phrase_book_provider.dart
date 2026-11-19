@@ -4,6 +4,7 @@ import 'dart:convert';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hive_ce/hive.dart';
 
+import '../../authentication/presentation/account_storage.dart';
 import '../../sync/data/acquire_api_client.dart';
 import '../../sync/data/phrase_sync_service.dart';
 
@@ -163,10 +164,13 @@ class PhraseEntry {
 }
 
 class PhraseBookNotifier extends Notifier<List<PhraseEntry>> {
+  String _studyAccount = '';
+
   @override
   List<PhraseEntry> build() {
+    _studyAccount = ref.watch(studyAccountProvider);
     if (!Hive.isBoxOpen('prefs')) return const <PhraseEntry>[];
-    final String? stored = Hive.box<String>('prefs').get(_phraseBookStorageKey);
+    final String? stored = readStudyStorage(_phraseBookStorageKey, _studyAccount);
     if (stored == null || stored.isEmpty) return const <PhraseEntry>[];
     try {
       return (jsonDecode(stored) as List<Object?>)
@@ -423,7 +427,7 @@ class PhraseBookNotifier extends Notifier<List<PhraseEntry>> {
   Future<void> _persist() async {
     if (!Hive.isBoxOpen('prefs')) return;
     await Hive.box<String>('prefs').put(
-      _phraseBookStorageKey,
+      studyStorageKey(_phraseBookStorageKey, _studyAccount),
       jsonEncode(state.map((PhraseEntry item) => item.toJson()).toList()),
     );
   }

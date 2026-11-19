@@ -58,11 +58,17 @@ class _DiscoverScreenState extends ConsumerState<DiscoverScreen>
   }
 
   Future<void> _open(AcquireDailyFeedItemDto item) async {
-    await showBilibiliImportSheet(
+    final String? episodeId = await showBilibiliImportSheet(
       context,
       ref,
       initialUrl: item.watchUrl,
       startImmediately: true,
+    );
+    if (!mounted || episodeId == null) return;
+    await context.pushNamed<void>(
+      SGRoute.player.name,
+      pathParameters: <String, String>{'episodeId': episodeId},
+      queryParameters: const <String, String>{'autoplay': '1'},
     );
     if (mounted) await _refresh(force: true);
   }

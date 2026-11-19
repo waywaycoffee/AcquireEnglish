@@ -5,7 +5,7 @@
 class DefaultAccount {
   const DefaultAccount._();
 
-  static const String email = '24873279@qq.com';
-  static const String password = 'weiwei123';
+  static const String email = String.fromEnvironment('DEMO_ACCOUNT_EMAIL');
+  static const String password = String.fromEnvironment('DEMO_ACCOUNT_PASSWORD');
   static const String displayName = 'weiwei';
 }

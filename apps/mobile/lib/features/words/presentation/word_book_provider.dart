@@ -4,6 +4,7 @@ import 'dart:convert';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hive_ce/hive.dart';
 
+import '../../authentication/presentation/account_storage.dart';
 import '../../sync/data/vocab_sync_service.dart';
 import '../data/offline_word_dictionary.dart';
 import '../domain/sm2_scheduler.dart';
@@ -348,10 +349,13 @@ class WordEntry {
 
 class WordBookNotifier extends Notifier<List<WordEntry>> {
   final Set<String> _pendingOfflineDefinitions = <String>{};
+  String _studyAccount = '';
+
   @override
   List<WordEntry> build() {
+    _studyAccount = ref.watch(studyAccountProvider);
     if (!Hive.isBoxOpen('prefs')) return const <WordEntry>[];
-    final String? stored = Hive.box<String>('prefs').get(_wordBookStorageKey);
+    final String? stored = readStudyStorage(_wordBookStorageKey, _studyAccount);
     if (stored == null || stored.isEmpty) return const <WordEntry>[];
     try {
       return (jsonDecode(stored) as List<Object?>)
@@ -374,6 +378,7 @@ class WordBookNotifier extends Notifier<List<WordEntry>> {
     required String chinese,
     Map<String, String> generatedDefinitions = const <String, String>{},
   }) async {
+    final String account = _studyAccount;
     final Map<String, int> rawWordCounts = <String, int>{};
     for (final String word in tokenizeWords(english)) {
       rawWordCounts[word] = (rawWordCounts[word] ?? 0) + 1;
@@ -385,6 +390,7 @@ class WordBookNotifier extends Notifier<List<WordEntry>> {
     final List<OfflineWordDefinition?> definitions = await Future.wait(
       rawWordCounts.keys.map(dictionary.lookup),
     );
+    if (_studyAccount != account) return;
     final Map<String, int> wordCounts = <String, int>{
       for (int index = 0; index < rawWordCounts.length; index++)
         if (definitions[index] != null)
@@ -732,7 +738,7 @@ class WordBookNotifier extends Notifier<List<WordEntry>> {
     // Write the complete replacement once; leave current state intact on failure.
     if (Hive.isBoxOpen('prefs')) {
       await Hive.box<String>('prefs').put(
-        _wordBookStorageKey,
+        studyStorageKey(_wordBookStorageKey, _studyAccount),
         jsonEncode(updated.map((WordEntry e) => e.toJson()).toList()),
       );
     }
@@ -843,6 +849,7 @@ class WordBookNotifier extends Notifier<List<WordEntry>> {
   }
 
   Future<void> _removeInvalidWords() async {
+    final String account = _studyAccount;
     final List<WordEntry> candidates = state
         .where((WordEntry entry) => _isIndependentEnglishWord(entry.word))
         .toList(growable: false);
@@ -853,6 +860,7 @@ class WordBookNotifier extends Notifier<List<WordEntry>> {
       final List<OfflineWordDefinition?> definitions = await Future.wait(
         candidates.map((WordEntry entry) => dictionary.lookup(entry.word)),
       );
+      if (_studyAccount != account) return;
       final Set<String> validWords = <String>{
         for (int index = 0; index < candidates.length; index++)
           if (definitions[index] != null) candidates[index].word,
@@ -874,6 +882,7 @@ class WordBookNotifier extends Notifier<List<WordEntry>> {
   }
 
   Future<void> _fillOfflineDefinitions(Iterable<String> words) async {
+    final String account = _studyAccount;
     final List<String> pending = words
         .where(
           (String word) =>
@@ -892,6 +901,7 @@ class WordBookNotifier extends Notifier<List<WordEntry>> {
       final List<OfflineWordDefinition?> definitions = await Future.wait(
         pending.map(dictionary.lookup),
       );
+      if (_studyAccount != account) return;
       final Map<String, String> translations = <String, String>{
         for (int index = 0; index < pending.length; index++)
           if (definitions[index]?.translation.isNotEmpty ?? false)
@@ -1158,7 +1168,7 @@ class WordBookNotifier extends Notifier<List<WordEntry>> {
   Future<void> _persist() async {
     if (!Hive.isBoxOpen('prefs')) return;
     await Hive.box<String>('prefs').put(
-      _wordBookStorageKey,
+      studyStorageKey(_wordBookStorageKey, _studyAccount),
       jsonEncode(state.map((WordEntry item) => item.toJson()).toList()),
     );
   }

@@ -91,8 +91,8 @@ void main() {
     expect(find.text('导入你的第一套英语视频课程'), findsOneWidget);
     expect(find.text('YouTube'), findsOneWidget);
     expect(find.text('B站'), findsOneWidget);
-    expect(find.text('导入'), findsOneWidget);
-    expect(find.text('今日挑战'), findsOneWidget);
+    expect(find.text('本地'), findsOneWidget);
+    expect(find.byKey(const Key('home-vocabulary-estimate')), findsOneWidget);
   });
 
   testWidgets('shows pad home scaffold background color', (

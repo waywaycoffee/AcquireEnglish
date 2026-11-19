@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../router/app_router.dart';
+import '../../authentication/presentation/account_hub_sheet.dart';
 import '../../authentication/presentation/auth_session.dart';
 import '../../growth/presentation/growth_provider.dart';
 import '../../import_course/data/bilibili_cover_refresh.dart';
@@ -43,6 +44,7 @@ class _PadHomeScreenState extends ConsumerState<PadHomeScreen> {
     ref.watch(bilibiliCoverRefreshProvider);
     final LearningDashboardStats stats = ref.watch(learningDashboardProvider);
     final UserGrowth growth = ref.watch(userGrowthProvider);
+    final AuthSessionState auth = ref.watch(authSessionProvider);
     final int? vocabulary = ref.watch(predictedVocabularyProvider);
     final List<LibraryCourseData> courses = ref.watch(
       recentLearningCoursesProvider,
@@ -115,6 +117,15 @@ class _PadHomeScreenState extends ConsumerState<PadHomeScreen> {
                 textStyle: const TextStyle(fontSize: 12),
               ),
               child: Text(vocabulary == null ? '测词汇量' : '词汇量 ≈ $vocabulary'),
+            ),
+            _AccountChipButton(
+              loggedIn: auth.isLoggedIn,
+              label: auth.isLoggedIn
+                  ? (auth.displayName.trim().isEmpty
+                        ? '账号'
+                        : auth.displayName.trim())
+                  : '登录',
+              onPressed: () => showAccountHubSheet(context, ref),
             ),
           ],
         ),
@@ -324,6 +335,49 @@ String _greetingForNow(DateTime now) {
     return '下午好';
   }
   return '晚上好';
+}
+
+class _AccountChipButton extends StatelessWidget {
+  const _AccountChipButton({
+    required this.loggedIn,
+    required this.label,
+    required this.onPressed,
+  });
+
+  final bool loggedIn;
+  final String label;
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    return Tooltip(
+      message: loggedIn ? '账号与同步' : '登录爱快账号',
+      child: TextButton.icon(
+        key: const Key('home-account-chip'),
+        onPressed: onPressed,
+        icon: Icon(
+          loggedIn ? Icons.person_rounded : Icons.login_rounded,
+          size: 18,
+        ),
+        label: Text(
+          label,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: const TextStyle(fontWeight: FontWeight.w800),
+        ),
+        style: TextButton.styleFrom(
+          foregroundColor: AppDesignTokens.brandGreenDark,
+          backgroundColor: AppDesignTokens.appWhite.withValues(alpha: 0.92),
+          minimumSize: const Size(44, 44),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          side: BorderSide(color: AppDesignTokens.borderGray),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(999),
+          ),
+        ),
+      ),
+    );
+  }
 }
 
 class _GreetingHeader extends StatelessWidget {

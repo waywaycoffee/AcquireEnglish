@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -54,6 +56,8 @@ class _WordLookupPopupCardState extends ConsumerState<WordLookupPopupCard> {
   WordLookupEntry? _entry;
   String? _errorMessage;
   bool _isLoading = true;
+  int _lookupGeneration = 0;
+  Timer? _lookupTimeout;
   bool _isPronouncing = false;
 
   @override
@@ -72,7 +76,24 @@ class _WordLookupPopupCardState extends ConsumerState<WordLookupPopupCard> {
     }
   }
 
+  @override
+  void dispose() {
+    _lookupTimeout?.cancel();
+    super.dispose();
+  }
+
   Future<void> _loadEntry() async {
+    final int generation = ++_lookupGeneration;
+    _lookupTimeout?.cancel();
+    _lookupTimeout = Timer(const Duration(seconds: 15), () {
+      if (!mounted || generation != _lookupGeneration) return;
+      _lookupGeneration++;
+      setState(() {
+        _entry = null;
+        _isLoading = false;
+        _errorMessage = '查词超时，请稍后重试。';
+      });
+    });
     setState(() {
       _isLoading = true;
       _errorMessage = null;
@@ -103,17 +124,19 @@ class _WordLookupPopupCardState extends ConsumerState<WordLookupPopupCard> {
               contextMeaningCn: fallbackDefinition,
             )
           : entry;
-      if (!mounted) {
+      if (!mounted || generation != _lookupGeneration) {
         return;
       }
+      _lookupTimeout?.cancel();
       setState(() {
         _entry = resolvedEntry;
         _isLoading = false;
       });
     } catch (_) {
-      if (!mounted) {
+      if (!mounted || generation != _lookupGeneration) {
         return;
       }
+      _lookupTimeout?.cancel();
       setState(() {
         _entry = null;
         _isLoading = false;
@@ -128,7 +151,7 @@ class _WordLookupPopupCardState extends ConsumerState<WordLookupPopupCard> {
     bool preferSource = false,
   }) async {
     final WordLookupEntry? entry = _entry;
-    if (entry == null || _isPronouncing) {
+    if (_isPronouncing) {
       return;
     }
 
@@ -144,8 +167,8 @@ class _WordLookupPopupCardState extends ConsumerState<WordLookupPopupCard> {
             text,
             language: language,
             recordedUrl:
-                language == 'en-US' && text.trim().toLowerCase() == entry.word
-                ? entry.audioUrl
+                language == 'en-US' && text.trim().toLowerCase() == entry?.word
+                ? entry?.audioUrl
                 : null,
           );
     } on WordPronunciationException catch (error) {
@@ -237,14 +260,6 @@ class _WordLookupPopupCardState extends ConsumerState<WordLookupPopupCard> {
                 ),
               ),
             ),
-            if (_entry?.audioUrl != null)
-              IconButton(
-                tooltip: '播放词库发音',
-                onPressed: _isPronouncing
-                    ? null
-                    : () => _handlePronounce(_entry!.word),
-                icon: const Icon(Icons.volume_up_outlined),
-              ),
             if (widget.onFavorite != null)
               IconButton(
                 tooltip: isFavorite ? '取消收藏' : '收藏到单词本',
@@ -305,9 +320,9 @@ class _WordLookupPopupCardState extends ConsumerState<WordLookupPopupCard> {
               ),
             IconButton(
               tooltip: _isPronouncing ? '播放中...' : '播放发音',
-              onPressed: _isLoading || _entry == null || _isPronouncing
+              onPressed: _isPronouncing
                   ? null
-                  : () => _handlePronounce(_entry!.word),
+                  : () => _handlePronounce(_entry?.word ?? widget.rawWord),
               visualDensity: VisualDensity.compact,
               iconSize: 20,
               disabledColor: _isPronouncing

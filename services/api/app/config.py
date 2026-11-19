@@ -8,6 +8,7 @@ class Settings(BaseSettings):
         extra="ignore",
     )
 
+    production_mode: bool = False
     app_name: str = "AcquireEnglish API"
     secret_key: str = "dev-change-me-acquire-english"
     access_token_expire_minutes: int = 60 * 24 * 7
@@ -68,6 +69,23 @@ class Settings(BaseSettings):
     openlist_admin_password: str = ""
     # Public base for OpenList links if different from openlist_base_url (nginx reverse proxy).
     openlist_public_base: str = ""
+
+    def validate_auth_configuration(self) -> None:
+        if self.production_mode and (
+            not self.secret_key.strip()
+            or self.secret_key == type(self).model_fields["secret_key"].default
+        ):
+            raise RuntimeError("Production requires a non-default SECRET_KEY.")
+
+    @property
+    def wechat_configured(self) -> bool:
+        return bool(self.wechat_app_id.strip() and self.wechat_app_secret.strip())
+
+    @property
+    def wechat_mock_enabled(self) -> bool:
+        return not self.production_mode and (
+            self.auth_wechat_mock or not self.wechat_configured
+        )
 
     @property
     def cors_origin_list(self) -> list[str]:

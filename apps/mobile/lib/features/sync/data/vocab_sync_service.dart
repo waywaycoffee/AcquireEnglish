@@ -1,5 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../authentication/presentation/auth_session.dart';
 import '../../words/domain/sm2_scheduler.dart';
 import '../../words/presentation/word_book_provider.dart';
 import 'acquire_api_client.dart';
@@ -15,53 +16,62 @@ class VocabSyncService {
 
   final Ref _ref;
 
-  Future<void> pushEntry(WordEntry entry) async {
+  Future<bool> pushEntry(WordEntry entry) async {
     if (!entry.favorite) {
-      return;
+      return false;
     }
     try {
-      await _ref.read(acquireApiClientProvider).upsertVocab(
-        word: entry.word,
-        context: entry.occurrences.isEmpty
-            ? null
-            : entry.occurrences.first.sentence,
-        mastery: entry.mastery.name,
-        ease: entry.ease,
-        intervalDays: entry.intervalDays,
-        repetitions: entry.repetitions,
-        dueAt: entry.dueAtMs == null
-            ? null
-            : DateTime.fromMillisecondsSinceEpoch(entry.dueAtMs!),
-      );
-    } catch (_) {}
+      await _ref
+          .read(acquireApiClientProvider)
+          .upsertVocab(
+            word: entry.word,
+            context: entry.occurrences.isEmpty
+                ? null
+                : entry.occurrences.first.sentence,
+            mastery: entry.mastery.name,
+            ease: entry.ease,
+            intervalDays: entry.intervalDays,
+            repetitions: entry.repetitions,
+            dueAt: entry.dueAtMs == null
+                ? null
+                : DateTime.fromMillisecondsSinceEpoch(entry.dueAtMs!),
+          );
+      return true;
+    } catch (_) {
+      return false;
+    }
   }
 
   /// Push every local favorite (used by settings “备份同步”).
-  Future<int> pushAllFavorites() async {
+  Future<({int uploaded, int failed})> pushAllFavorites() async {
     final List<WordEntry> favorites = _ref
         .read(wordBookProvider)
         .where((WordEntry e) => e.favorite)
         .toList(growable: false);
+    final String token = _ref.read(authSessionProvider).accessToken;
     int ok = 0;
     for (final WordEntry entry in favorites) {
-      try {
-        await pushEntry(entry);
-        ok += 1;
-      } catch (_) {}
+      if (token.isEmpty || _ref.read(authSessionProvider).accessToken != token)
+        break;
+      if (await pushEntry(entry)) ok++;
     }
-    return ok;
+    return (uploaded: ok, failed: favorites.length - ok);
   }
 
   Future<void> pullAndMerge() async {
+    final String token = _ref.read(authSessionProvider).accessToken;
+    if (token.isEmpty) return;
     try {
       final List<AcquireVocabDto> remote = await _ref
           .read(acquireApiClientProvider)
           .listVocab();
-      if (remote.isEmpty) {
+      if (remote.isEmpty ||
+          _ref.read(authSessionProvider).accessToken != token) {
         return;
       }
       final WordBookNotifier book = _ref.read(wordBookProvider.notifier);
       for (final AcquireVocabDto row in remote) {
+        if (_ref.read(authSessionProvider).accessToken != token) break;
         await book.mergeRemoteSrs(
           word: row.word,
           mastery: _parseMastery(row.mastery),
