@@ -62,13 +62,17 @@ void main() {
     );
   });
 
-  test('vocab marks use green text without chip fill', () {
+  test('favorites use yellow and recommendations use blue', () {
     expect(
       SubtitleVocabularyHighlight.fill(
         SubtitleVocabMark.saved,
         onDarkVideo: false,
       ),
-      Colors.transparent,
+      const Color(0xFFFFEDAB),
+    );
+    expect(
+      SubtitleVocabularyHighlight.fill(SubtitleVocabMark.key, onDarkVideo: false),
+      const Color(0xFFDDEBFF),
     );
     expect(
       SubtitleVocabularyHighlight.textColor(

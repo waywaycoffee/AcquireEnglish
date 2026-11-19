@@ -4,7 +4,7 @@ import zlib
 from contextlib import closing
 from pathlib import Path
 
-from fastapi import APIRouter, HTTPException, Path as PathParameter
+from fastapi import APIRouter, HTTPException, Path as PathParameter, Query
 from fastapi.responses import Response
 
 router = APIRouter(prefix='/public-lexicon', tags=['public-lexicon'])
@@ -21,6 +21,39 @@ def _connect():
         raise HTTPException(503, 'Public lexicon unavailable') from None
     db.row_factory = sqlite3.Row
     return db
+
+
+# Band widths estimate recognized word forms through rank 20,000.
+PLACEMENT_BANDS = ((1, 500), (501, 1500), (1501, 3500), (3501, 6500),
+                   (6501, 10000), (10001, 15000), (15001, 20000))
+
+
+@router.get('/placement')
+def placement():
+    with closing(_connect()) as db:
+        return [
+            {'size': hi - lo + 1, 'items': [dict(row) for row in db.execute(
+                """SELECT word, rank, definition_cn FROM entries
+                   WHERE rank BETWEEN ? AND ? AND length(word) >= 2
+                     AND word NOT GLOB '*[^a-z]*'
+                     AND display_word = word AND trim(definition_cn) <> ''
+                   ORDER BY random() LIMIT 4""", (lo, hi)
+            )]}
+            for lo, hi in PLACEMENT_BANDS
+        ]
+
+
+@router.get('/recommendations')
+def recommendations(start: int = Query(ge=1, le=60383),
+                    limit: int = Query(default=100, ge=1, le=150)):
+    with closing(_connect()) as db:
+        return [dict(row) for row in db.execute(
+            """SELECT word, rank, definition_cn FROM entries
+               WHERE rank >= ? AND length(word) >= 2
+                 AND word NOT GLOB '*[^a-z]*'
+                 AND display_word = word AND trim(definition_cn) <> ''
+               ORDER BY rank LIMIT ?""", (start, limit)
+        )]
 
 
 @router.get('/{word}')

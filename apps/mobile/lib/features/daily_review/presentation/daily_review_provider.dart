@@ -7,6 +7,7 @@ import 'package:hive_ce/hive.dart';
 
 import '../../phrases/presentation/phrase_book_provider.dart';
 import '../../words/presentation/word_book_provider.dart';
+import '../../words/presentation/vocabulary_placement_provider.dart';
 import '../domain/daily_review.dart';
 
 final Provider<DateTime Function()> reviewClockProvider =
@@ -100,6 +101,19 @@ reviewSourcesProvider = Provider<List<ReviewSource>>((Ref ref) {
   // Mix the two sources when first enrolling a legacy library; future additions
   // append to the persistent order and never jump ahead of waiting items.
   return List<ReviewSource>.unmodifiable(<ReviewSource>[
+    for (final PlacementRow row
+        in (ref.watch(vocabularyPlacementProvider)['words'] as List<dynamic>? ??
+                const <dynamic>[])
+            .cast<PlacementRow>())
+      ReviewSource(
+        key: 'recommended:${row['word']}',
+        kind: ReviewKind.word,
+        question: row['word'] as String,
+        answer: row['definition_cn'] as String,
+        english: '',
+        chinese: '',
+        sourceLabel: '公共词库 · 词频第 ${row['rank']} 位',
+      ),
     for (
       int i = 0;
       i < wordSources.length || i < phraseSources.length;

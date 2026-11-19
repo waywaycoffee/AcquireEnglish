@@ -203,9 +203,11 @@ class _PlayerCurrentLineCardState extends State<PlayerCurrentLineCard> {
                         vocabMark,
                         onDarkVideo: false,
                       );
-                      final Color fill = selectedToken || karaoke
+                      final Color fill = vocabMark != SubtitleVocabMark.none
+                          ? vocabFill
+                          : selectedToken || karaoke
                           ? const Color(0xFFDFF8C8)
-                          : vocabFill;
+                          : Colors.transparent;
                       final Color borderColor = karaoke
                           ? AppDesignTokens.brandGreen
                           : SubtitleVocabularyHighlight.border(

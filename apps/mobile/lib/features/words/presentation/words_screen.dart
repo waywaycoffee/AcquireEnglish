@@ -1,3 +1,4 @@
+import 'vocabulary_placement_provider.dart';
 import '../../daily_review/presentation/daily_review_provider.dart';
 import 'dart:async';
 
@@ -177,6 +178,25 @@ class _WordsScreenState extends ConsumerState<WordsScreen> {
                       .length,
                 ),
                 const SizedBox(height: 12),
+                Wrap(
+                  spacing: 8,
+                  children: <Widget>[
+                    ActionChip(
+                      label: const Text('背推荐单词'),
+                      onPressed: () => context.push(
+                        ref.read(recommendedWordsProvider).isEmpty
+                            ? SGRoute.vocabularyPlacement.route
+                            : '${SGRoute.reviewSession.route}?deck=recommended',
+                      ),
+                    ),
+                    ActionChip(
+                      label: const Text('背收藏单词'),
+                      onPressed: () => context.push(
+                        '${SGRoute.reviewSession.route}?practice=1&kind=word',
+                      ),
+                    ),
+                  ],
+                ),
                 _TodayPlanCard(
                   planNew: planNew,
                   planReview: planReview,

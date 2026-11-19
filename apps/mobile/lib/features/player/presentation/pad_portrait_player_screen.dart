@@ -1,3 +1,4 @@
+import '../../words/presentation/vocabulary_placement_provider.dart';
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
@@ -2811,9 +2812,7 @@ Future<void> _settleChineseFillIfAlreadyPresent() async {
           ref.watch(wordBookProvider),
         );
     final Set<String> keyVocabularyWords =
-        SubtitleVocabularyHighlight.keyWordsFromGlossary(
-          state.generatedWordDefinitions,
-        );
+        ref.watch(recommendedWordsProvider);
     final bool canGenerateAiSubtitles =
         (_videoAsset?.isNotEmpty ?? false) && !_usingAiSubtitles;
     if (widget.autoOpenFullscreen &&
@@ -4879,9 +4878,7 @@ Future<void> _settleChineseFillIfAlreadyPresent() async {
           ref.read(wordBookProvider),
         );
     final Set<String> keyVocabularyWords =
-        SubtitleVocabularyHighlight.keyWordsFromGlossary(
-          state.generatedWordDefinitions,
-        );
+        ref.read(recommendedWordsProvider);
     final PlayerCourseLookupResult courseContext =
         resolvePlayerCourseForEpisode(
           courses: ref.read(libraryCatalogProvider),

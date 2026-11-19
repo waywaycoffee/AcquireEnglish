@@ -1456,14 +1456,12 @@ class _PlayerVideoPanelState extends State<PlayerVideoPanel> {
                   savedWords: widget.savedVocabularyWords,
                   keyWords: widget.keyVocabularyWords,
                 );
-            // AcquireEnglish karaoke/vocab overlay — green text only, never
-            // yellow chips (legacy「黄色填充」is remapped at style layer).
             final Color vocabWordColor = SubtitleVocabularyHighlight.textColor(
               vocabMark,
               fallback: style.color ?? Colors.white,
               onDarkVideo: true,
             );
-            final Color wordColor = karaoke
+            final Color wordColor = karaoke && vocabMark == SubtitleVocabMark.none
                 ? SubtitleWordHighlightStyle.textColor(
                     widget.subtitleWordHighlightStyle,
                     highlighted: true,
@@ -1484,8 +1482,6 @@ class _PlayerVideoPanelState extends State<PlayerVideoPanel> {
                     child: Text(
                       entry.value,
                       style: style.copyWith(
-                        // ShadowTalk: green ink for current/favorite words,
-                        // never a yellow/orange fill chip.
                         color: wordColor,
                         fontWeight: SubtitleVocabularyHighlight.fontWeight(
                           vocabMark,

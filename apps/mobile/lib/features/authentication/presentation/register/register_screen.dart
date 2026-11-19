@@ -136,7 +136,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
         ).showSnackBar(const SnackBar(content: Text('注册成功')));
         ref.invalidate(cloudCatalogSyncProvider);
         unawaited(syncCloudCatalogAndFeed(ref));
-        context.go(SGRoute.home.route);
+        context.go(SGRoute.vocabularyPlacement.route);
       }
     } catch (error) {
       if (!mounted) {

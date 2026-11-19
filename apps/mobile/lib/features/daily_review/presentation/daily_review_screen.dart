@@ -14,6 +14,7 @@ import '../../shared/domain/subtitle_letter_case.dart';
 import '../../shared/presentation/pad/app_design_tokens.dart';
 import '../../shared/presentation/pad/pad_scaffold.dart';
 import '../../shared/presentation/pad/pad_top_bar.dart';
+import '../../words/presentation/vocabulary_placement_provider.dart';
 import '../domain/daily_review.dart';
 import 'daily_review_provider.dart';
 
@@ -23,8 +24,10 @@ class DailyReviewScreen extends ConsumerStatefulWidget {
     this.session = false,
     this.practice = false,
     this.practiceKind,
+    this.recommended = false,
   });
   final bool session;
+  final bool recommended;
   final bool practice;
   final ReviewKind? practiceKind;
   @override
@@ -71,7 +74,13 @@ class _DailyReviewScreenState extends ConsumerState<DailyReviewScreen>
   @override
   Widget build(BuildContext context) {
     final DailyReviewState state = ref.watch(dailyReviewProvider);
-    final List<ReviewSource> sources = ref.watch(reviewSourcesProvider);
+    final List<ReviewSource> sources = ref
+        .watch(reviewSourcesProvider)
+        .where(
+          (ReviewSource source) =>
+              source.key.startsWith('recommended:') == widget.recommended,
+        )
+        .toList();
     final DateTime now = ref.read(reviewClockProvider)();
     final ReviewPlan plan = state.plan(sources, now);
     return PadScaffold(
@@ -79,7 +88,11 @@ class _DailyReviewScreenState extends ConsumerState<DailyReviewScreen>
       showContinueLearning: false,
       showNavigation: !widget.session,
       topBar: PadTopBar(
-        title: widget.session ? (widget.practice ? '自由复习' : '正在复习') : '每日复习',
+        title: widget.recommended
+            ? '推荐背词'
+            : widget.session
+            ? (widget.practice ? '自由复习' : '正在复习')
+            : '每日复习',
         description: widget.session
             ? (widget.practice ? '随时再练，不改变复习计划。' : null)
             : '复习单词、短语和收藏句子。',
@@ -744,6 +757,27 @@ class _DailyReviewScreenState extends ConsumerState<DailyReviewScreen>
               label: const Text('调整每天新学数量'),
             ),
           ],
+          const SizedBox(height: 16),
+          Wrap(
+            spacing: 8,
+            children: <Widget>[
+              ActionChip(
+                label: Text(
+                  '推荐背词 ${ref.watch(recommendedWordsProvider).length}',
+                ),
+                onPressed: () => context.push(
+                  ref.read(recommendedWordsProvider).isEmpty
+                      ? SGRoute.vocabularyPlacement.route
+                      : '${SGRoute.reviewSession.route}?deck=recommended',
+                ),
+              ),
+              ActionChip(
+                label: const Text('词汇量测试'),
+                onPressed: () =>
+                    context.push(SGRoute.vocabularyPlacement.route),
+              ),
+            ],
+          ),
           if (!empty) ...<Widget>[
             const SizedBox(height: 20),
             Wrap(

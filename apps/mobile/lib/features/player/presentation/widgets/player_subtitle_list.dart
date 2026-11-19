@@ -2229,7 +2229,7 @@ class _PlayerSubtitleListState extends State<PlayerSubtitleList> {
               fallback: baseWordColor,
               onDarkVideo: false,
             );
-            final Color wordColor = karaoke
+            final Color wordColor = karaoke && vocabMark == SubtitleVocabMark.none
                 ? SubtitleWordHighlightStyle.textColor(
                     widget.subtitleWordHighlightStyle,
                     highlighted: true,
@@ -2244,7 +2244,8 @@ class _PlayerSubtitleListState extends State<PlayerSubtitleList> {
               widget.subtitleWordHighlightStyle,
               highlighted: karaoke,
             );
-            final Color highlightFill = karaoke ? karaokeFill : vocabFill;
+            final Color highlightFill =
+                vocabMark != SubtitleVocabMark.none ? vocabFill : karaokeFill;
             final Color karaokeBorder = SubtitleWordHighlightStyle.borderColor(
               widget.subtitleWordHighlightStyle,
               highlighted: karaoke,

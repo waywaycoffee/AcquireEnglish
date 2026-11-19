@@ -1,12 +1,11 @@
 import 'package:flutter/material.dart';
 
-import '../../../shared/presentation/pad/app_design_tokens.dart';
 import '../../../words/presentation/word_book_provider.dart';
 
 /// Vocabulary mark layered under karaoke current-word highlight.
 enum SubtitleVocabMark { none, key, saved }
 
-/// ShadowTalk-style: most words plain; sparse green text for favorites only.
+/// Favorites take precedence over personalized recommendations.
 class SubtitleVocabularyHighlight {
   const SubtitleVocabularyHighlight._();
 
@@ -44,12 +43,20 @@ class SubtitleVocabularyHighlight {
     return SubtitleVocabMark.none;
   }
 
-  /// No chip fill — ShadowTalk uses green text, not yellow blocks.
+  /// Vocabulary colors stay visible behind the subtitle text.
   static Color fill(
     SubtitleVocabMark mark, {
     required bool onDarkVideo,
   }) {
-    return Colors.transparent;
+    return switch (mark) {
+      SubtitleVocabMark.saved => onDarkVideo
+          ? const Color(0xFF624A10)
+          : const Color(0xFFFFEDAB),
+      SubtitleVocabMark.key => onDarkVideo
+          ? const Color(0xFF193D6E)
+          : const Color(0xFFDDEBFF),
+      SubtitleVocabMark.none => Colors.transparent,
+    };
   }
 
   static Color border(
@@ -59,7 +66,7 @@ class SubtitleVocabularyHighlight {
     return Colors.transparent;
   }
 
-  /// Green ink for vocabulary marks (stronger for saved).
+  /// Use a contrasting ink color on both subtitle surfaces.
   static Color textColor(
     SubtitleVocabMark mark, {
     required Color fallback,
@@ -68,12 +75,12 @@ class SubtitleVocabularyHighlight {
     switch (mark) {
       case SubtitleVocabMark.saved:
         return onDarkVideo
-            ? const Color(0xFF9AE66E)
-            : AppDesignTokens.brandGreenDark;
+            ? const Color(0xFFFFDB72)
+            : const Color(0xFF765300);
       case SubtitleVocabMark.key:
         return onDarkVideo
-            ? const Color(0xFF86EFAC)
-            : AppDesignTokens.brandGreen;
+            ? const Color(0xFFACD1FF)
+            : const Color(0xFF174B9B);
       case SubtitleVocabMark.none:
         return fallback;
     }

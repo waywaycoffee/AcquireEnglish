@@ -20,6 +20,7 @@ import '../features/player/presentation/player_screen.dart';
 import '../features/settings/presentation/settings_screen.dart';
 import '../features/words/presentation/sm2_daily_session_screen.dart';
 import '../features/words/presentation/words_screen.dart';
+import '../features/words/presentation/vocabulary_placement_screen.dart';
 import 'fade_extension.dart';
 
 part 'app_router.g.dart';
@@ -31,6 +32,7 @@ enum SGRoute {
   review,
   reviewSession,
   sm2Review,
+  vocabularyPlacement,
   phrases,
   words,
   phraseReview,
@@ -121,11 +123,17 @@ GoRouter goRouter(Ref ref) => GoRouter(
           const DailyReviewScreen(),
     ).fade(),
     GoRoute(
+      path: SGRoute.vocabularyPlacement.route,
+      builder: (BuildContext context, GoRouterState state) =>
+          const VocabularyPlacementScreen(),
+    ).fade(),
+    GoRoute(
       path: SGRoute.reviewSession.route,
       name: SGRoute.reviewSession.name,
       builder: (BuildContext context, GoRouterState state) => DailyReviewScreen(
         session: true,
         practice: state.uri.queryParameters['practice'] == '1',
+        recommended: state.uri.queryParameters['deck'] == 'recommended',
         practiceKind: ReviewKind.values
             .where(
               (ReviewKind kind) =>
