@@ -1,9 +1,7 @@
 from __future__ import annotations
 
-import shutil
 import uuid
 from dataclasses import asdict, dataclass, field
-from pathlib import Path
 
 from .config import Settings
 from .providers import (
@@ -280,8 +278,3 @@ class OralCoachPipeline:
         )
         text = confirmed_text if confirmed_text is not None else draft.transcript
         return await self.confirm_draft(session, draft.draft_id, confirmed_text=text)
-
-    def store_upload(self, upload_name: str, source_path: Path) -> Path:
-        dest = self.settings.data_dir / 'audio' / f'{uuid.uuid4().hex}{Path(upload_name).suffix or ".wav"}'
-        shutil.copyfile(source_path, dest)
-        return dest
