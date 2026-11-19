@@ -130,6 +130,48 @@ class LearningActivityNotifier extends Notifier<LearningActivityState> {
     });
   }
 
+  /// Fill recent days so growth / home streak UI is non-empty (demo seed).
+  Future<void> seedDemoStreak({int days = 5}) async {
+    final DateTime now = DateTime.now();
+    final Map<String, LearningDailyRecord> records =
+        <String, LearningDailyRecord>{...state.records};
+    for (int i = 0; i < days; i++) {
+      final DateTime day = now.subtract(Duration(days: i));
+      final String dayKey = _dayKey(day);
+      records[dayKey] = LearningDailyRecord(
+        dayKey: dayKey,
+        studyMilliseconds: const Duration(minutes: 22).inMilliseconds,
+        learnedSentenceKeys: <String>{'demo_sentence_$i'},
+        shadowingCount: 2,
+        savedPhraseCount: 2,
+        checkedIn: true,
+      );
+    }
+    state = LearningActivityState(records: records);
+    if (Hive.isBoxOpen('prefs')) {
+      await Hive.box<String>(
+        'prefs',
+      ).put(_learningActivityStorageKey, state.toJson());
+    }
+  }
+
+  Future<void> clearDemoStreakDays() async {
+    final Map<String, LearningDailyRecord> records =
+        <String, LearningDailyRecord>{...state.records};
+    records.removeWhere((String key, LearningDailyRecord record) {
+      if (record.learnedSentenceKeys.isEmpty) return false;
+      return record.learnedSentenceKeys.every(
+        (String s) => s.startsWith('demo_'),
+      );
+    });
+    state = LearningActivityState(records: records);
+    if (Hive.isBoxOpen('prefs')) {
+      await Hive.box<String>(
+        'prefs',
+      ).put(_learningActivityStorageKey, state.toJson());
+    }
+  }
+
   void _updateDay(
     DateTime occurredAt,
     LearningDailyRecord Function(LearningDailyRecord record) update,

@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:workmanager/workmanager.dart';
 
+import '../../idle_jobs/idle_job_scheduler.dart';
 import 'daily_feed_callback.dart';
 
 Future<void> registerDailyFeedBackground() async {
@@ -21,6 +22,7 @@ Future<void> registerDailyFeedBackground() async {
       existingWorkPolicy: ExistingPeriodicWorkPolicy.keep,
       constraints: Constraints(networkType: NetworkType.connected),
     );
+    await scheduleIdleJobs();
   } catch (_) {
     // Plugin may be unavailable on some desktops / emulators.
   }

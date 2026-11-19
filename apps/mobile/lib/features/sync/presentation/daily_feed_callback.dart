@@ -2,6 +2,7 @@ import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:hive_ce/hive.dart';
 import 'package:workmanager/workmanager.dart';
 
+import '../../idle_jobs/idle_job_scheduler.dart';
 import '../../subtitle_completion/subtitle_completion_background.dart';
 
 const String kDailyFeedTask = 'acquire_english_daily_feed';
@@ -11,6 +12,10 @@ void dailyFeedBackgroundDispatcher() {
   Workmanager().executeTask((String task, Map<String, dynamic>? inputData) async {
     if (task == kSubtitleCompletionTask) {
       await handleSubtitleCompletionBackgroundTask();
+      return true;
+    }
+    if (task == kIdleJobsTask || task == '${kIdleJobsTask}_periodic') {
+      await handleIdleJobsBackgroundTask();
       return true;
     }
     if (task != kDailyFeedTask && task != Workmanager.iOSBackgroundTask) {

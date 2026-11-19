@@ -21,6 +21,8 @@ Future<void> handleSubtitleCompletionBackgroundTask() async {
       kSubtitleCompletionNudgeKey,
       DateTime.now().toUtc().toIso8601String(),
     );
+    // Ask the next app resume / foreground to start FGS drain immediately.
+    await box.put('subtitle_completion_auto_run_v1', '1');
     final bool pending = await SubtitleCompletionQueue().hasPendingWork();
     if (pending) {
       await notifySubtitleCompletionPending();
@@ -39,12 +41,12 @@ Future<void> notifySubtitleCompletionPending() async {
   const AndroidNotificationDetails androidDetails = AndroidNotificationDetails(
     'subtitle_completion',
     '字幕补全',
-    channelDescription: '导入后空闲补全英文字幕的提醒',
+    channelDescription: '充电空闲时自动补全中英字幕',
   );
   await plugin.show(
     id: 4102,
     title: '爱快英语',
-    body: '有课程在导入后待补中英字幕，打开 App 会在后台用语音补全。',
+    body: '有课程待补中英字幕。充电空闲时会自动继续；打开 App 可立即开始。',
     notificationDetails: const NotificationDetails(android: androidDetails),
   );
 }
@@ -64,6 +66,7 @@ Future<void> scheduleSubtitleCompletionNudge() async {
       constraints: Constraints(
         networkType: NetworkType.notRequired,
         requiresBatteryNotLow: true,
+        requiresCharging: true,
       ),
       backoffPolicy: BackoffPolicy.exponential,
       initialDelay: const Duration(minutes: 2),

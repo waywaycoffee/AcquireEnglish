@@ -6,27 +6,31 @@ import 'package:flutter/services.dart';
 import 'package:flutter_foreground_task/flutter_foreground_task.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:hive_ce/hive.dart';
 
 import 'config/theme/theme_logic.dart';
 import 'config/theme/theme_ui_model.dart';
 import 'features/authentication/presentation/auth_session.dart';
 import 'features/authentication/presentation/ensure_default_account.dart';
+import 'features/idle_jobs/idle_job_drain.dart';
+import 'features/idle_jobs/idle_job_queue.dart';
+import 'features/idle_jobs/idle_job_scheduler.dart';
 import 'features/import_course/data/bilibili_multipage.dart';
-import 'features/sync/presentation/cloud_catalog_sync.dart';
 import 'features/library/presentation/library_catalog_provider.dart';
 import 'features/library/presentation/library_mock_data.dart';
 import 'features/settings/presentation/bilibili_login_sheet.dart';
 import 'features/settings/presentation/settings_provider.dart';
 import 'features/shared/presentation/app_orientation.dart';
 import 'features/shared/presentation/pad/app_design_tokens.dart';
+import 'features/subtitle_completion/overlay_permission_host.dart';
 import 'features/subtitle_completion/shared_bilibili_subtitle_sync.dart';
 import 'features/subtitle_completion/subtitle_completion_runtime.dart';
 import 'features/subtitle_completion/subtitle_completion_scheduler.dart';
 import 'features/subtitle_completion/subtitle_completion_status_hub.dart';
 import 'features/subtitle_completion/subtitle_completion_status_provider.dart';
-import 'features/subtitle_completion/overlay_permission_host.dart';
 import 'features/sync/data/acquire_api_client.dart';
 import 'features/sync/data/personal_import_sync.dart';
+import 'features/sync/presentation/cloud_catalog_sync.dart';
 import 'features/sync/presentation/daily_feed_lifecycle.dart';
 import 'flavors/app_flavor.dart';
 import 'router/app_router.dart';
@@ -184,6 +188,25 @@ class _MyAppState extends ConsumerState<MyApp> with WidgetsBindingObserver {
       ensureDefaultPortraitOrientation();
       // Re-scan + drain unfinished ASR subtitle jobs while the app is open.
       SubtitleCompletionScheduler.instance.kick(delay: Duration.zero);
+      unawaited(_drainIdleOnResume());
+    }
+  }
+
+  Future<void> _drainIdleOnResume() async {
+    if (!idleJobsEnabled()) return;
+    bool wake = false;
+    try {
+      wake = await consumeIdleWakeFlag();
+      if (Hive.isBoxOpen('prefs')) {
+        final Box<String> box = Hive.box<String>('prefs');
+        if (box.get('subtitle_completion_auto_run_v1') == '1') {
+          wake = true;
+          await box.put('subtitle_completion_auto_run_v1', '0');
+        }
+      }
+    } catch (_) {}
+    if (wake || IdleJobQueue.shared.pending.isNotEmpty) {
+      await drainIdleJobs(ref);
     }
   }
 

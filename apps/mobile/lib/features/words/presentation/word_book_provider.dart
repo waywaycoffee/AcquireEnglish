@@ -5,6 +5,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hive_ce/hive.dart';
 
 import '../../authentication/presentation/account_storage.dart';
+import '../../idle_jobs/idle_job_queue.dart';
+import '../../idle_jobs/idle_job_scheduler.dart';
 import '../../sync/data/vocab_sync_service.dart';
 import '../data/offline_word_dictionary.dart';
 import '../domain/sm2_scheduler.dart';
@@ -629,6 +631,15 @@ class WordBookNotifier extends Notifier<List<WordEntry>> {
     final int favIndex = state.indexWhere((WordEntry e) => e.word == word);
     if (favIndex >= 0 && state[favIndex].favorite) {
       unawaited(ref.read(vocabSyncServiceProvider).pushEntry(state[favIndex]));
+      if (idleJobsEnabled()) {
+        unawaited(
+          IdleJobQueue.shared.enqueue(
+            kind: IdleJobKind.vocabEnrich,
+            key: word,
+          ),
+        );
+        unawaited(scheduleIdleJobs());
+      }
     }
     return true;
   }
@@ -1181,6 +1192,35 @@ class WordBookNotifier extends Notifier<List<WordEntry>> {
       _reviewStreakKey,
       jsonEncode(<String, Object?>{'day': today, 'count': count}),
     );
+  }
+
+  /// Replace-or-insert entries (used by demo seed). Does not push cloud sync.
+  Future<void> upsertEntries(List<WordEntry> entries) async {
+    if (entries.isEmpty) return;
+    final Map<String, WordEntry> byWord = <String, WordEntry>{
+      for (final WordEntry e in state) e.word: e,
+    };
+    for (final WordEntry entry in entries) {
+      byWord[entry.word] = entry;
+    }
+    state = byWord.values.toList(growable: false)
+      ..sort((WordEntry a, WordEntry b) => a.word.compareTo(b.word));
+    await _persist();
+  }
+
+  Future<void> removeWords(Set<String> words) async {
+    if (words.isEmpty) return;
+    final Set<String> keys = words
+        .map(normalizeLexeme)
+        .where((String w) => w.isNotEmpty)
+        .toSet();
+    final int before = state.length;
+    state = state
+        .where((WordEntry e) => !keys.contains(e.word))
+        .toList(growable: false);
+    if (state.length != before) {
+      await _persist();
+    }
   }
 
   Future<void> _persist() async {

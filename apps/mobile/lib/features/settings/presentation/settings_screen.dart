@@ -15,6 +15,9 @@ import '../../player/presentation/local_whisper_asr.dart';
 import '../../shared/data/word_pronunciation_service.dart';
 import '../../sync/data/acquire_api_client.dart';
 import '../../daily_review/presentation/daily_review_provider.dart';
+import '../../debug/demo_seed_service.dart';
+import '../../idle_jobs/idle_job_queue.dart';
+import '../../idle_jobs/idle_job_scheduler.dart';
 import '../../sync/data/phrase_sync_service.dart';
 import '../../sync/data/progress_sync_service.dart';
 import '../../sync/data/user_assets_service.dart';
@@ -1123,6 +1126,38 @@ class SettingsScreen extends ConsumerWidget {
           ),
           SizedBox(height: compact ? 20 : 24),
           SettingsGroupCard(
+            title: '体验与空闲任务',
+            icon: Icons.science_rounded,
+            children: <Widget>[
+              _ActionRow(
+                title: '注入演示数据',
+                description:
+                    '填充单词收藏、短语、今日复习、成长连续天、推荐词与空闲队列样例，便于核对各模块。',
+                icon: Icons.dataset_rounded,
+                onTap: () async {
+                  final DemoSeedReport report = await injectDemoSeed(ref);
+                  if (context.mounted) {
+                    _showMessage(context, report.message);
+                  }
+                },
+              ),
+              _ActionRow(
+                title: '清除演示数据',
+                description: '只删除演示样例，保留你自己的学习记录。',
+                icon: Icons.delete_sweep_rounded,
+                onTap: () async {
+                  final DemoSeedReport report = await clearDemoSeed(ref);
+                  if (context.mounted) {
+                    _showMessage(context, report.message);
+                  }
+                },
+              ),
+              const _IdleJobsToggleRow(),
+              const _IdleQueueStatusRow(),
+            ],
+          ),
+          SizedBox(height: compact ? 20 : 24),
+          SettingsGroupCard(
             title: '支持项目',
             icon: Icons.coffee_rounded,
             children: <Widget>[
@@ -1985,6 +2020,79 @@ class _SelectRow extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+class _IdleJobsToggleRow extends StatefulWidget {
+  const _IdleJobsToggleRow();
+
+  @override
+  State<_IdleJobsToggleRow> createState() => _IdleJobsToggleRowState();
+}
+
+class _IdleJobsToggleRowState extends State<_IdleJobsToggleRow> {
+  late bool _enabled = idleJobsEnabled();
+
+  @override
+  Widget build(BuildContext context) {
+    return _SwitchRow(
+      title: '空闲时自动补全（建议充电）',
+      description: '锁屏充电时调度字幕补全、生词 AI 与同步；关闭后仅手动触发。',
+      value: _enabled,
+      onChanged: (bool value) async {
+        await setIdleJobsEnabled(value);
+        if (value) {
+          await scheduleIdleJobs();
+        } else {
+          await cancelIdleJobsSchedule();
+        }
+        if (mounted) setState(() => _enabled = value);
+      },
+    );
+  }
+}
+
+class _IdleQueueStatusRow extends StatelessWidget {
+  const _IdleQueueStatusRow();
+
+  @override
+  Widget build(BuildContext context) {
+    final List<IdleJob> pending = IdleJobQueue.shared.pending;
+    final String summary = pending.isEmpty
+        ? '当前没有待处理的空闲任务'
+        : pending
+              .take(4)
+              .map((IdleJob j) => '${j.kind.label}:${j.key}')
+              .join(' · ');
+    return _ActionRow(
+      title: '空闲队列（${pending.length}）',
+      description: summary,
+      icon: Icons.queue_rounded,
+      onTap: () {
+        final List<IdleJob> all = IdleJobQueue.shared.load();
+        final String body = all.isEmpty
+            ? '队列为空'
+            : all
+                  .map(
+                    (IdleJob j) =>
+                        '${j.kind.label} · ${j.key} · ${j.status.name}',
+                  )
+                  .join('\n');
+        showDialog<void>(
+          context: context,
+          builder: (BuildContext context) => AlertDialog(
+            title: const Text('空闲任务队列'),
+            content: SingleChildScrollView(child: Text(body)),
+            actions: <Widget>[
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('关闭'),
+              ),
+            ],
+          ),
+        );
+      },
     );
   }
 }

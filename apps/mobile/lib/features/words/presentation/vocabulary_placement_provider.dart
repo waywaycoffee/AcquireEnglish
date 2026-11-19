@@ -121,6 +121,38 @@ class VocabularyPlacement extends Notifier<PlacementRow> {
 
   String get accountKey => _key;
 
+  /// Offline demo recommendations (no network). Marked with `demo: true`.
+  Future<void> seedDemoRecommendations() async {
+    final String key = _key;
+    final PlacementRow result = <String, dynamic>{
+      'estimate': 3200,
+      'testedAt': DateTime.now().toUtc().toIso8601String(),
+      'start': 2500,
+      'demo': true,
+      'words': <PlacementRow>[
+        <String, dynamic>{'word': 'serendipity', 'rank': 1},
+        <String, dynamic>{'word': 'ephemeral', 'rank': 2},
+        <String, dynamic>{'word': 'ubiquitous', 'rank': 3},
+        <String, dynamic>{'word': 'pragmatic', 'rank': 4},
+        <String, dynamic>{'word': 'resilient', 'rank': 5},
+        <String, dynamic>{'word': 'nuance', 'rank': 6},
+      ],
+    };
+    if (Hive.isBoxOpen('prefs')) {
+      await Hive.box<String>('prefs').put(key, jsonEncode(result));
+    }
+    if (_key == key) state = result;
+  }
+
+  Future<void> clearDemoRecommendations() async {
+    if (state['demo'] != true) return;
+    final String key = _key;
+    if (Hive.isBoxOpen('prefs')) {
+      await Hive.box<String>('prefs').delete(key);
+    }
+    if (_key == key) state = <String, dynamic>{};
+  }
+
   Future<List<PlacementRow>> _fetch(
     String endpoint, {
     Map<String, dynamic>? parameters,

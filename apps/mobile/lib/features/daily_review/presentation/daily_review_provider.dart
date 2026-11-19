@@ -362,6 +362,65 @@ class DailyReviewNotifier extends Notifier<DailyReviewState> {
         );
   }
 
+  /// Mark demo keys as already-learned and due now (so「今日背词」有复习项).
+  Future<void> seedDueKeys(List<String> keys) async {
+    if (keys.isEmpty) return;
+    final DateTime now = ref.read(reviewClockProvider)();
+    await _transaction((DailyReviewState current) {
+      DailyReviewState next = current.synchronize(
+        ref.read(reviewSourcesProvider),
+        now,
+      );
+      final Map<String, ReviewRecord> records =
+          Map<String, ReviewRecord>.from(next.records);
+      for (final String key in keys) {
+        final ReviewRecord? previous = records[key];
+        if (previous == null) continue;
+        final fsrs.Card card = fsrs.Card.fromMap(previous.card.toMap());
+        card.due = now
+            .toUtc()
+            .subtract(const Duration(hours: 1));
+        records[key] = ReviewRecord(
+          key: key,
+          order: previous.order,
+          addedAt: previous.addedAt,
+          card: card,
+          firstLearnedAt:
+              previous.firstLearnedAt ??
+              now.toUtc().subtract(const Duration(days: 2)),
+          reviews: previous.reviews > 0 ? previous.reviews : 1,
+          lapses: previous.lapses,
+          lastRating: previous.lastRating ?? fsrs.Rating.good.index,
+        );
+      }
+      return DailyReviewState(
+        records: Map<String, ReviewRecord>.unmodifiable(records),
+        days: next.days,
+        dailyNewLimit: next.dailyNewLimit,
+        nextOrder: next.nextOrder,
+        dueReviewsSinceNew: next.dueReviewsSinceNew,
+        storageError: next.storageError,
+      );
+    });
+  }
+
+  Future<void> removeKeys(Set<String> keys) async {
+    if (keys.isEmpty) return;
+    await _transaction((DailyReviewState current) {
+      final Map<String, ReviewRecord> records =
+          Map<String, ReviewRecord>.from(current.records)
+            ..removeWhere((String key, _) => keys.contains(key));
+      return DailyReviewState(
+        records: Map<String, ReviewRecord>.unmodifiable(records),
+        days: current.days,
+        dailyNewLimit: current.dailyNewLimit,
+        nextOrder: current.nextOrder,
+        dueReviewsSinceNew: current.dueReviewsSinceNew,
+        storageError: current.storageError,
+      );
+    });
+  }
+
   Future<void> grade(
     String key,
     fsrs.Rating rating, {

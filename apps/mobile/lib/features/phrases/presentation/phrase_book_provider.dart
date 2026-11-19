@@ -311,6 +311,30 @@ class PhraseBookNotifier extends Notifier<List<PhraseEntry>> {
     unawaited(_persist());
   }
 
+  /// Insert-or-replace by id (demo seed). Skips cloud push.
+  Future<void> upsertEntries(List<PhraseEntry> entries) async {
+    if (entries.isEmpty) return;
+    final Map<String, PhraseEntry> byId = <String, PhraseEntry>{
+      for (final PhraseEntry e in state) e.id: e,
+    };
+    for (final PhraseEntry entry in entries) {
+      byId[entry.id] = entry;
+    }
+    state = byId.values.toList(growable: false);
+    await _persist();
+  }
+
+  Future<void> removeIds(Set<String> ids) async {
+    if (ids.isEmpty) return;
+    final int before = state.length;
+    state = state
+        .where((PhraseEntry e) => !ids.contains(e.id))
+        .toList(growable: false);
+    if (state.length != before) {
+      await _persist();
+    }
+  }
+
   void markForReview(String id) {
     updatePhrase(
       id,
