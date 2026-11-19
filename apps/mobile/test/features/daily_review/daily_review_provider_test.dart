@@ -1,5 +1,9 @@
 import 'dart:io';
 
+import 'package:common_learn_english/features/authentication/presentation/account_storage.dart';
+import 'package:common_learn_english/features/authentication/presentation/auth_session.dart';
+import 'package:common_learn_english/features/sync/data/acquire_api_client.dart';
+import 'package:dio/dio.dart';
 import 'package:common_learn_english/features/daily_review/domain/daily_review.dart';
 import 'package:common_learn_english/features/daily_review/presentation/daily_review_provider.dart';
 import 'package:common_learn_english/features/phrases/presentation/phrase_book_provider.dart';
@@ -73,6 +77,103 @@ void main() {
       expect(restored.plan(sources, now).newAvailable, 0);
       expect(restored.plan(sources, now).waiting.single.key, 'phrase:1');
       await second.read(dailyReviewProvider.notifier).setDailyNewLimit(1);
+    },
+  );
+
+  test(
+    'cloud backup restores a new device and preserves concurrent changes',
+    () async {
+      const String account = 'review@example.test';
+      final Dio dio = Dio();
+      int revision = 0;
+      Map<String, dynamic>? cloud;
+      bool online = true;
+      dio.interceptors.add(
+        InterceptorsWrapper(
+          onRequest:
+              (RequestOptions options, RequestInterceptorHandler handler) {
+                expect(options.headers['Authorization'], 'Bearer test-token');
+                if (!online) {
+                  handler.reject(DioException(requestOptions: options));
+                  return;
+                }
+                if (options.method == 'PUT') {
+                  final Map<String, dynamic> data =
+                      options.data as Map<String, dynamic>;
+                  expect(data['revision'], revision);
+                  cloud = data['state'] as Map<String, dynamic>;
+                  revision++;
+                }
+                handler.resolve(
+                  Response<Map<String, dynamic>>(
+                    requestOptions: options,
+                    data: <String, dynamic>{
+                      'revision': revision,
+                      'state': cloud,
+                    },
+                  ),
+                );
+              },
+        ),
+      );
+      ProviderContainer newDevice() => ProviderContainer(
+        overrides: [
+          acquireApiClientProvider.overrideWithValue(AcquireApiClient(dio)),
+          reviewClockProvider.overrideWithValue(() => now),
+          reviewSourcesProvider.overrideWithValue(sources),
+        ],
+      );
+
+      final ProviderContainer first = newDevice();
+      await first
+          .read(authSessionProvider.notifier)
+          .signIn(accessToken: 'test-token', email: account);
+      final DailyReviewNotifier firstReview = first.read(
+        dailyReviewProvider.notifier,
+      );
+      await firstReview.grade(
+        'word:hello',
+        fsrs.Rating.good,
+        expectedReviews: 0,
+      );
+      online = false;
+      expect(await firstReview.syncCloudBackup(), contains('本机记录已保留'));
+      expect(first.read(dailyReviewProvider).records['word:hello']!.reviews, 1);
+      online = true;
+      expect(await firstReview.syncCloudBackup(), contains('已备份'));
+      expect(revision, 1);
+      final DateTime due = first
+          .read(dailyReviewProvider)
+          .records['word:hello']!
+          .card
+          .due;
+      first.dispose();
+
+      final Box<String> box = Hive.box<String>('prefs');
+      await box.delete(studyStorageKey(ReviewRepository.storageKey, account));
+      await box.delete(
+        studyStorageKey('${ReviewRepository.storageKey}:backup', account),
+      );
+      final ProviderContainer second = newDevice();
+      addTearDown(second.dispose);
+      final DailyReviewNotifier secondReview = second.read(
+        dailyReviewProvider.notifier,
+      );
+      expect(await secondReview.syncCloudBackup(), contains('已恢复'));
+      expect(
+        second.read(dailyReviewProvider).records['word:hello']!.card.due,
+        due,
+      );
+      expect(
+        second.read(dailyReviewProvider).records['word:hello']!.reviews,
+        1,
+      );
+      await secondReview.setDailyNewLimit(7);
+      cloud = <String, dynamic>{...cloud!, 'dailyNewLimit': 9};
+      revision++;
+      expect(await secondReview.syncCloudBackup(), contains('已保留两份'));
+      expect(second.read(dailyReviewProvider).dailyNewLimit, 7);
+      expect(cloud!['dailyNewLimit'], 9);
     },
   );
 

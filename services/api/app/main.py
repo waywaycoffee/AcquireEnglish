@@ -18,6 +18,7 @@ from app.routers import (
     preferences,
     progress,
     public_lexicon,
+    review_sync,
     rewards,
     shared_subtitles,
     vocab,
@@ -66,6 +67,7 @@ app.include_router(assets.router, prefix="/api")
 app.include_router(netdisk.router, prefix="/api")
 app.include_router(shared_subtitles.router, prefix="/api")
 app.include_router(rewards.router, prefix="/api")
+app.include_router(review_sync.router, prefix="/api")
 
 
 @app.get("/api/health")

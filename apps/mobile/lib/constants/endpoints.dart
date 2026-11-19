@@ -31,6 +31,7 @@ class Endpoints {
   static const String courses = 'api/courses';
   static const String progress = 'api/progress';
   static const String vocab = 'api/vocab';
+  static const String reviewBackup = 'api/review-backup';
   static const String phrases = 'api/phrases';
   static const String preferences = 'api/preferences';
   static const String dailyFeed = 'api/feed/daily';

@@ -1,11 +1,15 @@
 import 'dart:async';
 import 'dart:convert';
 
+import 'package:crypto/crypto.dart';
+import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:fsrs/fsrs.dart' as fsrs;
 import 'package:hive_ce/hive.dart';
 
 import '../../authentication/presentation/account_storage.dart';
+import '../../authentication/presentation/auth_session.dart';
+import '../../sync/data/acquire_api_client.dart';
 import '../../phrases/presentation/phrase_book_provider.dart';
 import '../../words/presentation/word_book_provider.dart';
 import '../../words/presentation/vocabulary_placement_provider.dart';
@@ -154,6 +158,7 @@ class DailyReviewNotifier extends Notifier<DailyReviewState> {
   Future<void> _pending = Future<void>.value();
   int _generation = 0;
   bool _disposed = false;
+  bool _syncing = false;
 
   @override
   DailyReviewState build() {
@@ -216,6 +221,93 @@ class DailyReviewNotifier extends Notifier<DailyReviewState> {
     _pending = operation;
     return operation;
   }
+
+  Future<String> syncCloudBackup() async {
+    final AuthSessionState session = ref.read(authSessionProvider);
+    final ReviewRepository repository = ref.read(reviewRepositoryProvider);
+    if (!session.isLoggedIn || repository.account.isEmpty) {
+      return '请先登录后再同步复习进度。';
+    }
+    if (_syncing) return '复习进度正在同步。';
+    _syncing = true;
+    final int generation = _generation;
+    bool currentSession() =>
+        !_disposed &&
+        generation == _generation &&
+        ref.read(authSessionProvider).accessToken == session.accessToken;
+    try {
+      await _pending;
+      if (!currentSession()) return '账号已切换，请重新同步。';
+      if (state.storageError != null) return state.storageError!;
+      final Box<String> prefs = Hive.box<String>('prefs');
+      final String checkpointKey = studyStorageKey(
+        '${ReviewRepository.storageKey}:backup',
+        repository.account,
+      );
+      final List<String> checkpoint = (prefs.get(checkpointKey) ?? '').split(
+        ':',
+      );
+      final int? lastRevision = int.tryParse(checkpoint.first);
+      final String localDigest = _reviewDigest(state);
+      final Map<String, dynamic> localState = state.toJson();
+      final AcquireApiClient api = ref.read(acquireApiClientProvider);
+      final cloud = await api.reviewBackup(session.accessToken);
+      if (!currentSession()) return '账号已切换，请重新同步。';
+      final DailyReviewState? remote = cloud.state == null
+          ? null
+          : DailyReviewState.fromJson(cloud.state!);
+      if (remote != null && _reviewDigest(remote) == localDigest) {
+        await prefs.put(checkpointKey, '${cloud.revision}:$localDigest');
+        return '本机与云端复习进度一致。';
+      }
+      final bool localUnchanged = checkpoint.last == localDigest;
+      final bool localHasProgress =
+          state.dailyNewLimit != const DailyReviewState().dailyNewLimit ||
+          state.days.isNotEmpty ||
+          state.records.values.any((ReviewRecord record) => record.reviews > 0);
+      if (remote != null && (localUnchanged || !localHasProgress)) {
+        await _transaction((DailyReviewState current) {
+          if (!currentSession() || _reviewDigest(current) != localDigest) {
+            throw StateError('复习进度已变化，请重新同步。');
+          }
+          return remote.synchronize(
+            ref.read(reviewSourcesProvider),
+            ref.read(reviewClockProvider)(),
+          );
+        });
+        if (!currentSession()) return '账号已切换，请重新同步。';
+        await prefs.put(
+          checkpointKey,
+          '${cloud.revision}:${_reviewDigest(state)}',
+        );
+        return '已恢复云端复习进度。';
+      }
+      if (cloud.revision != 0 && cloud.revision != lastRevision) {
+        return '本机和云端都有复习记录，已保留两份进度，等待合并。';
+      }
+      final uploaded = await api.reviewBackup(
+        session.accessToken,
+        revision: cloud.revision,
+        state: localState,
+      );
+      if (!currentSession()) return '账号已切换，请重新同步。';
+      await prefs.put(checkpointKey, '${uploaded.revision}:$localDigest');
+      return '已备份复习次数和下次复习时间。';
+    } on DioException catch (error) {
+      return error.response?.statusCode == 409
+          ? '云端复习记录刚更新，请重新同步。'
+          : '暂时无法同步复习进度，本机记录已保留。';
+    } on StateError catch (error) {
+      return error.message;
+    } catch (_) {
+      return '暂时无法同步复习进度，本机记录已保留。';
+    } finally {
+      _syncing = false;
+    }
+  }
+
+  String _reviewDigest(DailyReviewState value) =>
+      sha256.convert(utf8.encode(jsonEncode(value.toJson()))).toString();
 
   Future<void> setDailyNewLimit(int limit) =>
       _transaction((DailyReviewState current) => current.withLimit(limit));

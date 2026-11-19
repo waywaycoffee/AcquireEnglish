@@ -14,6 +14,7 @@ import '../../navigation/presentation/navigation_destination.dart';
 import '../../player/presentation/local_whisper_asr.dart';
 import '../../shared/data/word_pronunciation_service.dart';
 import '../../sync/data/acquire_api_client.dart';
+import '../../daily_review/presentation/daily_review_provider.dart';
 import '../../sync/data/phrase_sync_service.dart';
 import '../../sync/data/progress_sync_service.dart';
 import '../../sync/data/user_assets_service.dart';
@@ -1099,6 +1100,17 @@ class SettingsScreen extends ConsumerWidget {
                       '同步失败：${'$error'.replaceFirst('Exception: ', '')}',
                     );
                   }
+                },
+              ),
+              _ActionRow(
+                title: '同步复习进度',
+                description: '备份或恢复单词、短语和句子的复习次数与下次复习时间。',
+                icon: Icons.event_repeat_rounded,
+                onTap: () async {
+                  final String result = await ref
+                      .read(dailyReviewProvider.notifier)
+                      .syncCloudBackup();
+                  if (context.mounted) _showMessage(context, result);
                 },
               ),
               _ActionRow(

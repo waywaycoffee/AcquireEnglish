@@ -163,3 +163,30 @@ def test_f07_b23_short_link_detected_and_chinese_srt_guard():
     assert detect_source("https://b23.tv/abcdef") == "bilibili"
     assert _srt_looks_chinese("1\n00:00:00,000 --> 00:00:01,000\n你好世界\n")
     assert not _srt_looks_chinese("1\n00:00:00,000 --> 00:00:01,000\nHello world\n")
+
+
+@pytest.mark.asyncio
+async def test_review_backup_uses_account_scope_and_revision_guard():
+    transport = ASGITransport(app=fastapi_app)
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
+        token = await _sms_token(client)
+        other_token = await _sms_token(client, phone="13900006666")
+        headers = {"Authorization": f"Bearer {token}"}
+        other = {"Authorization": f"Bearer {other_token}"}
+        url = "/api/review-backup"
+        state = {
+            "version": 1, "dailyNewLimit": 5, "nextOrder": 1,
+            "records": [], "days": {"2026-11-19": {"reviews": 3}},
+        }
+        assert (await client.get(url)).status_code == 401
+        assert (await client.get(url, headers=headers)).json()["revision"] == 0
+        state1 = {"revision": 0, "state": state}
+        assert (await client.put(url, headers=headers, json=state1)).json()["revision"] == 1
+        assert (await client.put(url, headers=headers, json=state1)).status_code == 409
+        assert (await client.get(url, headers=other)).json() == {"revision": 0, "state": None}
+
+        state["dailyNewLimit"] = 8
+        state2 = {"revision": 1, "state": state}
+        assert (await client.put(url, headers=headers, json=state2)).json()["revision"] == 2
+        assert (await client.put(url, headers=headers, json=state2)).status_code == 409
+        assert (await client.get(url, headers=headers)).json()["state"]["dailyNewLimit"] == 8

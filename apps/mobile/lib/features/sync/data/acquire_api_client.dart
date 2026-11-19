@@ -608,6 +608,31 @@ class AcquireApiClient {
 
   final Dio _dio;
 
+  Future<({int revision, Map<String, dynamic>? state})> reviewBackup(
+    String token, {
+    int? revision,
+    Map<String, dynamic>? state,
+  }) async {
+    final Options options = Options(
+      headers: <String, String>{'Authorization': 'Bearer $token'},
+    );
+    final Response<Map<String, dynamic>> response = revision == null
+        ? await _dio.get<Map<String, dynamic>>(
+            Endpoints.reviewBackup,
+            options: options,
+          )
+        : await _dio.put<Map<String, dynamic>>(
+            Endpoints.reviewBackup,
+            data: <String, dynamic>{'revision': revision, 'state': state},
+            options: options,
+          );
+    final Map<String, dynamic> body = response.data!;
+    return (
+      revision: body['revision'] as int,
+      state: body['state'] as Map<String, dynamic>?,
+    );
+  }
+
   Future<AcquireTokenResult> login({
     required String email,
     required String password,
