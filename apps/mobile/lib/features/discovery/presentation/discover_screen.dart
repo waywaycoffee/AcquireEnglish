@@ -26,6 +26,7 @@ class DiscoverScreen extends ConsumerStatefulWidget {
 class _DiscoverScreenState extends ConsumerState<DiscoverScreen>
     with WidgetsBindingObserver {
   bool _loading = false;
+  bool _openingVideo = false;
 
   @override
   void initState() {
@@ -58,19 +59,25 @@ class _DiscoverScreenState extends ConsumerState<DiscoverScreen>
   }
 
   Future<void> _open(AcquireDailyFeedItemDto item) async {
-    final String? episodeId = await showBilibiliImportSheet(
-      context,
-      ref,
-      initialUrl: item.watchUrl,
-      startImmediately: true,
-    );
-    if (!mounted || episodeId == null) return;
-    await context.pushNamed<void>(
-      SGRoute.player.name,
-      pathParameters: <String, String>{'episodeId': episodeId},
-      queryParameters: const <String, String>{'autoplay': '1'},
-    );
-    if (mounted) await _refresh(force: true);
+    if (_openingVideo) return;
+    _openingVideo = true;
+    try {
+      final String? episodeId = await showBilibiliImportSheet(
+        context,
+        ref,
+        initialUrl: item.watchUrl,
+        startImmediately: true,
+      );
+      if (!mounted || episodeId == null) return;
+      await context.pushNamed<void>(
+        SGRoute.player.name,
+        pathParameters: <String, String>{'episodeId': episodeId},
+        queryParameters: const <String, String>{'autoplay': '1'},
+      );
+      if (mounted) await _refresh(force: true);
+    } finally {
+      _openingVideo = false;
+    }
   }
 
   @override

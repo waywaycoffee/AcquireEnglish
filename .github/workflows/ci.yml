@@ -56,3 +56,26 @@ jobs:
       - run: flutter pub get
       - run: flutter analyze --no-fatal-infos --no-fatal-warnings
       - run: flutter test --reporter expanded
+      - name: Build production-flavor validation APK
+        if: github.event_name == 'workflow_dispatch'
+        run: flutter build apk --debug --flavor prod --no-pub
+      - name: Record APK provenance
+        if: github.event_name == 'workflow_dispatch'
+        shell: pwsh
+        run: |
+          $apk = Get-Item build/app/outputs/flutter-apk/app-prod-debug.apk
+          @(
+            "commit=$env:GITHUB_SHA"
+            "run=$env:GITHUB_SERVER_URL/$env:GITHUB_REPOSITORY/actions/runs/$env:GITHUB_RUN_ID"
+            "package=com.acquire.english"
+            "sha256=$((Get-FileHash $apk.FullName -Algorithm SHA256).Hash)"
+          ) | Set-Content (Join-Path $apk.DirectoryName build-info.txt)
+      - name: Upload validation APK
+        if: github.event_name == 'workflow_dispatch'
+        uses: actions/upload-artifact@v4
+        with:
+          name: acquire-english-prod-debug-${{ github.sha }}
+          path: |
+            apps/mobile/build/app/outputs/flutter-apk/app-prod-debug.apk
+            apps/mobile/build/app/outputs/flutter-apk/build-info.txt
+          if-no-files-found: error
