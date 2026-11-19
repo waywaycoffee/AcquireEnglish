@@ -942,7 +942,10 @@ class WordBookNotifier extends Notifier<List<WordEntry>> {
     unawaited(_persist());
   }
 
-  List<WordEntry> dueQueue({int newWordLimit = 20}) {
+  List<WordEntry> dueQueue({
+    int newWordLimit = 20,
+    int reviewWordLimit = 50,
+  }) {
     final List<WordEntry> due = state
         .where((WordEntry e) => e.isDue)
         .toList(growable: false)
@@ -953,12 +956,30 @@ class WordBookNotifier extends Notifier<List<WordEntry>> {
       });
     final List<WordEntry> fresh = due
         .where((WordEntry e) => e.mastery == WordMastery.fresh)
-        .take(newWordLimit)
+        .take(newWordLimit.clamp(0, 200))
         .toList(growable: false);
     final List<WordEntry> review = due
         .where((WordEntry e) => e.mastery != WordMastery.fresh)
+        .take(reviewWordLimit.clamp(0, 500))
         .toList(growable: false);
-    return <WordEntry>[...fresh, ...review];
+    return <WordEntry>[...review, ...fresh];
+  }
+
+  /// Counts used by the words home / plan summary.
+  ({int dueReviews, int dueNew}) dueCounts() {
+    int dueReviews = 0;
+    int dueNew = 0;
+    for (final WordEntry e in state) {
+      if (!e.isDue) {
+        continue;
+      }
+      if (e.mastery == WordMastery.fresh) {
+        dueNew += 1;
+      } else {
+        dueReviews += 1;
+      }
+    }
+    return (dueReviews: dueReviews, dueNew: dueNew);
   }
 
   Future<WordEntry?> reviewWithGrade(String word, Sm2Grade grade) async {

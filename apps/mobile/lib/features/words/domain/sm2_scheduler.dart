@@ -36,6 +36,23 @@ class Sm2State {
 class Sm2Scheduler {
   const Sm2Scheduler();
 
+  /// Classic day ladder: 1 → 2 → 4 → 7 → 15 → 30, then ease-based growth.
+  static int _ebbinghausInterval({
+    required int reps,
+    required int previousInterval,
+    required double ease,
+    required double easyBoost,
+  }) {
+    const List<int> ladder = <int>[1, 2, 4, 7, 15, 30];
+    if (reps < ladder.length) {
+      final int base = ladder[reps];
+      return (base * easyBoost).round().clamp(1, 3650);
+    }
+    final int grown = ((previousInterval <= 0 ? 30 : previousInterval) * ease * easyBoost)
+        .round();
+    return grown.clamp(1, 3650);
+  }
+
   Sm2State review(Sm2State current, Sm2Grade grade, {DateTime? now}) {
     final DateTime today = now ?? DateTime.now();
     double ease = current.ease;
@@ -60,24 +77,23 @@ class Sm2Scheduler {
         reps += 1;
         break;
       case Sm2Grade.good:
-        if (reps == 0) {
-          interval = 1;
-        } else if (reps == 1) {
-          interval = 3;
-        } else {
-          interval = (interval * ease).round().clamp(1, 3650);
-        }
+        // Ebbinghaus-style day ladder, then ease growth.
+        interval = _ebbinghausInterval(
+          reps: reps,
+          previousInterval: interval,
+          ease: ease,
+          easyBoost: 1.0,
+        );
         reps += 1;
         break;
       case Sm2Grade.easy:
         ease = (ease + 0.15).clamp(1.3, 3.0);
-        if (reps == 0) {
-          interval = 2;
-        } else if (reps == 1) {
-          interval = 4;
-        } else {
-          interval = (interval * ease * 1.3).round().clamp(1, 3650);
-        }
+        interval = _ebbinghausInterval(
+          reps: reps,
+          previousInterval: interval,
+          ease: ease,
+          easyBoost: 1.3,
+        );
         reps += 1;
         break;
     }

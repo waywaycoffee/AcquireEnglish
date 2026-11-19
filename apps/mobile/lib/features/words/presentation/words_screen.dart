@@ -13,8 +13,11 @@ import '../../shared/presentation/pad/app_design_tokens.dart';
 import '../../shared/presentation/pad/pad_scaffold.dart';
 import '../../shared/presentation/pad/pad_top_bar.dart';
 import '../../shared/presentation/pill_segmented_control.dart';
+import '../domain/word_review_settings.dart';
 import 'word_book_provider.dart';
 import 'word_detail_screen.dart';
+import 'word_review_settings_provider.dart';
+import 'word_review_settings_sheet.dart';
 
 class WordsScreen extends ConsumerStatefulWidget {
   const WordsScreen({super.key});
@@ -118,6 +121,13 @@ class _WordsScreenState extends ConsumerState<WordsScreen> {
   @override
   Widget build(BuildContext context) {
     final List<WordEntry> entries = ref.watch(wordBookProvider);
+    final WordReviewSettings reviewSettings =
+        ref.watch(wordReviewSettingsProvider);
+    final ({int dueReviews, int dueNew}) due =
+        ref.read(wordBookProvider.notifier).dueCounts();
+    final int planNew = due.dueNew.clamp(0, reviewSettings.dailyNewLimit);
+    final int planReview =
+        due.dueReviews.clamp(0, reviewSettings.dailyReviewLimit);
     final List<WordEntry> filtered = entries
         .where((WordEntry entry) {
           return (!_favoritesOnly || entry.favorite) &&
@@ -135,6 +145,11 @@ class _WordsScreenState extends ConsumerState<WordsScreen> {
       topBar: PadTopBar(
         title: '单词本',
         actions: <Widget>[
+          IconButton(
+            tooltip: '背词计划设置',
+            onPressed: () => showWordReviewSettingsSheet(context),
+            icon: const Icon(Icons.tune_rounded),
+          ),
           TextButton.icon(
             onPressed: () {
               context.push(SGRoute.sm2Review.route);
@@ -160,6 +175,16 @@ class _WordsScreenState extends ConsumerState<WordsScreen> {
                   favorites: entries
                       .where((WordEntry item) => item.favorite)
                       .length,
+                ),
+                const SizedBox(height: 12),
+                _TodayPlanCard(
+                  planNew: planNew,
+                  planReview: planReview,
+                  newLimit: reviewSettings.dailyNewLimit,
+                  reviewLimit: reviewSettings.dailyReviewLimit,
+                  modes: reviewSettings.orderedModes,
+                  onStart: () => context.push(SGRoute.sm2Review.route),
+                  onSettings: () => showWordReviewSettingsSheet(context),
                 ),
                 const SizedBox(height: 20),
                 SizedBox(
@@ -293,6 +318,93 @@ class _WordsScreenState extends ConsumerState<WordsScreen> {
               ),
         )
         .toList(growable: false);
+  }
+}
+
+class _TodayPlanCard extends StatelessWidget {
+  const _TodayPlanCard({
+    required this.planNew,
+    required this.planReview,
+    required this.newLimit,
+    required this.reviewLimit,
+    required this.modes,
+    required this.onStart,
+    required this.onSettings,
+  });
+
+  final int planNew;
+  final int planReview;
+  final int newLimit;
+  final int reviewLimit;
+  final List<WordPracticeMode> modes;
+  final VoidCallback onStart;
+  final VoidCallback onSettings;
+
+  @override
+  Widget build(BuildContext context) {
+    final String modeText = modes.isEmpty
+        ? '认记'
+        : modes.map((WordPracticeMode m) => m.label).join(' · ');
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppDesignTokens.appWhite,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: AppDesignTokens.borderGray),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          Row(
+            children: <Widget>[
+              Expanded(
+                child: Text(
+                  '今日艾宾浩斯计划',
+                  style: TextStyle(
+                    fontWeight: FontWeight.w900,
+                    fontSize: 16,
+                    color: AppDesignTokens.textPrimary,
+                  ),
+                ),
+              ),
+              TextButton(
+                onPressed: onSettings,
+                child: const Text('设置'),
+              ),
+            ],
+          ),
+          Text(
+            '待新学 $planNew/$newLimit · 待复习 $planReview/$reviewLimit',
+            style: TextStyle(
+              color: AppDesignTokens.textSecondary,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            '练习：$modeText',
+            style: TextStyle(color: AppDesignTokens.textSecondary),
+          ),
+          const SizedBox(height: 12),
+          SizedBox(
+            width: double.infinity,
+            child: FilledButton.icon(
+              onPressed: onStart,
+              icon: const Icon(Icons.play_arrow_rounded),
+              label: Text(
+                planNew + planReview == 0 ? '查看今日背词' : '开始今日背词',
+              ),
+              style: FilledButton.styleFrom(
+                backgroundColor: AppDesignTokens.brandGreenDark,
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(vertical: 12),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }
 

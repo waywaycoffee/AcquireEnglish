@@ -1,0 +1,221 @@
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+
+import '../domain/word_review_settings.dart';
+import 'word_review_settings_provider.dart';
+
+Future<void> showWordReviewSettingsSheet(BuildContext context) {
+  return showModalBottomSheet<void>(
+    context: context,
+    isScrollControlled: true,
+    backgroundColor: const Color(0xFF1A2332),
+    shape: const RoundedRectangleBorder(
+      borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+    ),
+    builder: (BuildContext context) => const WordReviewSettingsSheet(),
+  );
+}
+
+class WordReviewSettingsSheet extends ConsumerStatefulWidget {
+  const WordReviewSettingsSheet({super.key});
+
+  @override
+  ConsumerState<WordReviewSettingsSheet> createState() =>
+      _WordReviewSettingsSheetState();
+}
+
+class _WordReviewSettingsSheetState
+    extends ConsumerState<WordReviewSettingsSheet> {
+  late final TextEditingController _newController;
+  late final TextEditingController _reviewController;
+
+  @override
+  void initState() {
+    super.initState();
+    final WordReviewSettings settings = ref.read(wordReviewSettingsProvider);
+    _newController = TextEditingController(text: '${settings.dailyNewLimit}');
+    _reviewController =
+        TextEditingController(text: '${settings.dailyReviewLimit}');
+  }
+
+  @override
+  void dispose() {
+    _newController.dispose();
+    _reviewController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _saveLimits() async {
+    final int? newLimit = int.tryParse(_newController.text.trim());
+    final int? reviewLimit = int.tryParse(_reviewController.text.trim());
+    if (newLimit == null || reviewLimit == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('请输入有效的数字')),
+      );
+      return;
+    }
+    await ref.read(wordReviewSettingsProvider.notifier).update(
+          ref.read(wordReviewSettingsProvider).copyWith(
+            dailyNewLimit: newLimit,
+            dailyReviewLimit: reviewLimit,
+          ),
+        );
+    if (mounted) {
+      Navigator.of(context).pop();
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final WordReviewSettings settings = ref.watch(wordReviewSettingsProvider);
+    final EdgeInsets padding = MediaQuery.viewInsetsOf(context);
+
+    return Padding(
+      padding: EdgeInsets.fromLTRB(20, 16, 20, 20 + padding.bottom),
+      child: SingleChildScrollView(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          mainAxisSize: MainAxisSize.min,
+          children: <Widget>[
+            Center(
+              child: Container(
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: const Color(0xFF475569),
+                  borderRadius: BorderRadius.circular(99),
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
+            const Text(
+              '背单词计划设置',
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 20,
+                fontWeight: FontWeight.w900,
+              ),
+            ),
+            const SizedBox(height: 6),
+            const Text(
+              '按艾宾浩斯遗忘曲线安排复习间隔；每日新学 / 复习数量与练习方式可自定义。',
+              style: TextStyle(color: Color(0xFF94A3B8), height: 1.4),
+            ),
+            const SizedBox(height: 18),
+            const Text(
+              '每日配额',
+              style: TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+            const SizedBox(height: 10),
+            Row(
+              children: <Widget>[
+                Expanded(
+                  child: _NumberField(
+                    label: '新学单词',
+                    controller: _newController,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: _NumberField(
+                    label: '复习单词',
+                    controller: _reviewController,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 20),
+            const Text(
+              '练习方式',
+              style: TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+            const SizedBox(height: 8),
+            ...WordPracticeMode.values.map((WordPracticeMode mode) {
+              final bool on = settings.isEnabled(mode);
+              return SwitchListTile(
+                contentPadding: EdgeInsets.zero,
+                value: on,
+                activeThumbColor: const Color(0xFF22C55E),
+                title: Text(
+                  mode.label,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                subtitle: Text(
+                  mode.hint,
+                  style: const TextStyle(color: Color(0xFF94A3B8)),
+                ),
+                onChanged: (bool value) {
+                  ref
+                      .read(wordReviewSettingsProvider.notifier)
+                      .setModeEnabled(mode, enabled: value);
+                },
+              );
+            }),
+            const SizedBox(height: 12),
+            FilledButton(
+              onPressed: _saveLimits,
+              style: FilledButton.styleFrom(
+                backgroundColor: const Color(0xFF22C55E),
+                padding: const EdgeInsets.symmetric(vertical: 14),
+              ),
+              child: const Text(
+                '保存计划',
+                style: TextStyle(fontWeight: FontWeight.w800),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _NumberField extends StatelessWidget {
+  const _NumberField({required this.label, required this.controller});
+
+  final String label;
+  final TextEditingController controller;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: <Widget>[
+        Text(
+          label,
+          style: const TextStyle(
+            color: Color(0xFF94A3B8),
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+        const SizedBox(height: 6),
+        TextField(
+          controller: controller,
+          keyboardType: TextInputType.number,
+          style: const TextStyle(color: Colors.white),
+          decoration: InputDecoration(
+            filled: true,
+            fillColor: const Color(0xFF0F172A),
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: const BorderSide(color: Color(0xFF334155)),
+            ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: const BorderSide(color: Color(0xFF334155)),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
