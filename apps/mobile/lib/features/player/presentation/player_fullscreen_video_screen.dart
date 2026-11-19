@@ -142,7 +142,6 @@ class PlayerFullscreenVideoScreen extends StatefulWidget {
 class _PlayerFullscreenVideoScreenState
     extends State<PlayerFullscreenVideoScreen> {
   static const double _episodePanelWidth = 280;
-  static const double _episodePanelGap = 12;
 
   bool _showEpisodePanel = false;
   /// Landscape study default: keep the transcript on the right of the video.
@@ -192,6 +191,12 @@ class _PlayerFullscreenVideoScreenState
         widget.selectedEmbeddedSubtitleId) {
       _selectedEmbeddedSubtitleId = widget.selectedEmbeddedSubtitleId;
     }
+    // Lines may arrive after open — keep the right-side transcript visible.
+    if (!oldWidget.playerState.hasLines &&
+        widget.playerState.hasLines &&
+        !_showSubtitlePanel) {
+      _showSubtitlePanel = true;
+    }
   }
 
   @override
@@ -229,39 +234,32 @@ class _PlayerFullscreenVideoScreenState
         _showEpisodePanel && widget.episodes.isNotEmpty;
     final bool showSubtitlePanel = _showSubtitlePanel && player.hasLines;
     final double subtitlePanelWidth = _resolvedSubtitlePanelWidth(context);
-    final double rightInset = showEpisodePanel
-        ? _episodePanelWidth + _episodePanelGap + 12
-        : showSubtitlePanel
-        ? subtitlePanelWidth + _episodePanelGap + 12
-        : 0;
     return Scaffold(
       backgroundColor: Colors.black,
-      body: Stack(
+      body: Row(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: <Widget>[
-          AnimatedPositioned(
-            duration: const Duration(milliseconds: 240),
-            curve: Curves.easeOutCubic,
-            left: 0,
-            top: 0,
-            bottom: 0,
-            right: rightInset,
-            child: PlayerVideoPanel(
-              episodeId: widget.activeEpisodeId,
-              // Side transcript replaces on-video burn when the right panel is open.
-              paintSubtitlesOnVideo:
-                  widget.paintSubtitlesOnVideo && !showSubtitlePanel,
-              line: line,
-              isPlaying: player.isPlaying,
-              speed: player.speed,
-              subtitleMode: player.subtitleMode,
-              subtitleModes: player.availableSubtitleModes,
-              embeddedSubtitleTracks: widget.embeddedSubtitleTracks,
-              selectedEmbeddedSubtitleId: _selectedEmbeddedSubtitleId,
-              currentWordIndex: player.currentWordIndex,
-              highlightWords: widget.highlightWords,
-              subtitleLetterCase: _subtitleLetterCase,
-              fontSize: _fontSize,
-              fontScale: _fontScale,
+          Expanded(
+            child: Stack(
+              fit: StackFit.expand,
+              children: <Widget>[
+                PlayerVideoPanel(
+                  episodeId: widget.activeEpisodeId,
+                  // Side transcript replaces on-video burn when the right panel is open.
+                  paintSubtitlesOnVideo:
+                      widget.paintSubtitlesOnVideo && !showSubtitlePanel,
+                  line: line,
+                  isPlaying: player.isPlaying,
+                  speed: player.speed,
+                  subtitleMode: player.subtitleMode,
+                  subtitleModes: player.availableSubtitleModes,
+                  embeddedSubtitleTracks: widget.embeddedSubtitleTracks,
+                  selectedEmbeddedSubtitleId: _selectedEmbeddedSubtitleId,
+                  currentWordIndex: player.currentWordIndex,
+                  highlightWords: widget.highlightWords,
+                  subtitleLetterCase: _subtitleLetterCase,
+                  fontSize: _fontSize,
+                  fontScale: _fontScale,
               onSelectFontSize: widget.onSelectFontSize == null
                   ? null
                   : (String value) {
@@ -367,91 +365,88 @@ class _PlayerFullscreenVideoScreenState
               videoDuration: widget.videoDuration,
               videoPosition: Duration(milliseconds: player.positionMs),
               videoErrorText: widget.videoErrorText,
-            ),
-          ),
-          Positioned(
-            top: backButtonTopInset,
-            left: 12,
-            child: AnimatedOpacity(
-              key: const ValueKey<String>('fullscreen-back-control'),
-              opacity: showBackControl ? 1 : 0,
-              duration: const Duration(milliseconds: 180),
-              child: IgnorePointer(
-                ignoring: !showBackControl,
-                child: IconButton(
-                  onPressed: widget.onExit,
-                  icon: const Icon(Icons.arrow_back_rounded),
-                  color: Colors.white,
-                  style: IconButton.styleFrom(backgroundColor: Colors.black54),
                 ),
-              ),
-            ),
-          ),
-          AnimatedPositioned(
-            duration: const Duration(milliseconds: 240),
-            curve: Curves.easeOutCubic,
-            top: 0,
-            right: showEpisodePanel ? 12 : -_episodePanelWidth - 24,
-            bottom: 0,
-            child: IgnorePointer(
-              ignoring: !showEpisodePanel,
-              child: AnimatedOpacity(
-                duration: const Duration(milliseconds: 180),
-                opacity: showEpisodePanel ? 1 : 0,
-                child: _FullscreenEpisodePanel(
-                  episodes: widget.episodes,
-                  activeEpisodeId: widget.activeEpisodeId,
-                  onOpenEpisode: (LibraryEpisodeItem episode) {
-                    if (episode.id == widget.activeEpisodeId) {
-                      return;
-                    }
-                    Navigator.of(context).pop<String>(episode.id);
-                  },
+                Positioned(
+                  top: backButtonTopInset,
+                  left: 12,
+                  child: AnimatedOpacity(
+                    key: const ValueKey<String>('fullscreen-back-control'),
+                    opacity: showBackControl ? 1 : 0,
+                    duration: const Duration(milliseconds: 180),
+                    child: IgnorePointer(
+                      ignoring: !showBackControl,
+                      child: IconButton(
+                        onPressed: widget.onExit,
+                        icon: const Icon(Icons.arrow_back_rounded),
+                        color: Colors.white,
+                        style: IconButton.styleFrom(
+                          backgroundColor: Colors.black54,
+                        ),
+                      ),
+                    ),
+                  ),
                 ),
-              ),
+                AnimatedPositioned(
+                  duration: const Duration(milliseconds: 240),
+                  curve: Curves.easeOutCubic,
+                  top: 0,
+                  right: showEpisodePanel ? 0 : -_episodePanelWidth - 24,
+                  bottom: 0,
+                  child: IgnorePointer(
+                    ignoring: !showEpisodePanel,
+                    child: AnimatedOpacity(
+                      duration: const Duration(milliseconds: 180),
+                      opacity: showEpisodePanel ? 1 : 0,
+                      child: _FullscreenEpisodePanel(
+                        episodes: widget.episodes,
+                        activeEpisodeId: widget.activeEpisodeId,
+                        onOpenEpisode: (LibraryEpisodeItem episode) {
+                          if (episode.id == widget.activeEpisodeId) {
+                            return;
+                          }
+                          Navigator.of(context).pop<String>(episode.id);
+                        },
+                      ),
+                    ),
+                  ),
+                ),
+              ],
             ),
           ),
           if (showSubtitlePanel)
-            AnimatedPositioned(
-              duration: const Duration(milliseconds: 240),
-              curve: Curves.easeOutCubic,
-              top: 0,
-              right: 12,
-              bottom: 0,
-              child: _FullscreenSubtitlePanel(
-                width: subtitlePanelWidth,
-                episodeId: widget.activeEpisodeId,
-                player: player,
-                fontScale: _fontScale,
-                highlightWords: widget.highlightWords,
-                subtitleLetterCase: _subtitleLetterCase,
-                subtitleWordHighlightStyle: widget.subtitleWordHighlightStyle,
-                subtitleWordHighlightBorderWidth:
-                    widget.subtitleWordHighlightBorderWidth,
-                savedVocabularyWords: widget.savedVocabularyWords,
-                keyVocabularyWords: widget.keyVocabularyWords,
-                onTapLine: (int index) =>
-                    _refresh(() => widget.onSelectLine(index)),
-                onCollectWord: widget.onCollectWord,
-                onCollectWordAtTime: widget.onCollectWordAtTime,
-                onFavoriteWord: widget.onFavoriteWord,
-                onBookmarkLine: widget.onBookmarkLine,
-                onLoopFromLine: (int index) =>
-                    _refresh(() => widget.onLoopFromLine(index)),
-                onDictationLine: widget.onDictationLine,
-                onAiExplain: widget.onAiExplain,
-                onAssessLine: _handleAssessLine,
-                pronunciationUnavailableReasonForLine:
-                    _lineAssessmentUnavailableReason,
-                onRegenerateAiLine: widget.onRegenerateAiLine,
-                onEditEnglishLine: widget.onEditEnglishLine,
-                onEditSubtitleLine: widget.onEditSubtitleLine,
-                onResegment: widget.onResegment,
-                onEditLineNote: widget.onEditLineNote,
-                lineNotesByStartMs: widget.lineNotesByStartMs,
-                onTogglePlaying: () => _refresh(widget.onTogglePlaying),
-                onPronounce: () => _refresh(widget.onSubtitleLookupOpen),
-              ),
+            _FullscreenSubtitlePanel(
+              width: subtitlePanelWidth,
+              episodeId: widget.activeEpisodeId,
+              player: player,
+              fontScale: _fontScale,
+              highlightWords: widget.highlightWords,
+              subtitleLetterCase: _subtitleLetterCase,
+              subtitleWordHighlightStyle: widget.subtitleWordHighlightStyle,
+              subtitleWordHighlightBorderWidth:
+                  widget.subtitleWordHighlightBorderWidth,
+              savedVocabularyWords: widget.savedVocabularyWords,
+              keyVocabularyWords: widget.keyVocabularyWords,
+              onTapLine: (int index) =>
+                  _refresh(() => widget.onSelectLine(index)),
+              onCollectWord: widget.onCollectWord,
+              onCollectWordAtTime: widget.onCollectWordAtTime,
+              onFavoriteWord: widget.onFavoriteWord,
+              onBookmarkLine: widget.onBookmarkLine,
+              onLoopFromLine: (int index) =>
+                  _refresh(() => widget.onLoopFromLine(index)),
+              onDictationLine: widget.onDictationLine,
+              onAiExplain: widget.onAiExplain,
+              onAssessLine: _handleAssessLine,
+              pronunciationUnavailableReasonForLine:
+                  _lineAssessmentUnavailableReason,
+              onRegenerateAiLine: widget.onRegenerateAiLine,
+              onEditEnglishLine: widget.onEditEnglishLine,
+              onEditSubtitleLine: widget.onEditSubtitleLine,
+              onResegment: widget.onResegment,
+              onEditLineNote: widget.onEditLineNote,
+              lineNotesByStartMs: widget.lineNotesByStartMs,
+              onTogglePlaying: () => _refresh(widget.onTogglePlaying),
+              onPronounce: () => _refresh(widget.onSubtitleLookupOpen),
             ),
         ],
       ),
@@ -546,12 +541,13 @@ class _FullscreenSubtitlePanel extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       width: width,
-      padding: const EdgeInsets.all(16),
-      decoration: const BoxDecoration(
-        color: Color(0xFFF8FAFC),
-        border: Border(left: BorderSide(color: Color(0xFFE2E8F0))),
+      padding: const EdgeInsets.fromLTRB(12, 12, 12, 8),
+      decoration: BoxDecoration(
+        color: AppDesignTokens.softWhite,
+        border: Border(left: BorderSide(color: AppDesignTokens.borderGray)),
       ),
       child: SafeArea(
+        left: false,
         bottom: false,
         child: PlayerTranscriptPanel(
           episodeId: episodeId,
