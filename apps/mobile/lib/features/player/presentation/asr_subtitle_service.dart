@@ -95,7 +95,7 @@ String humanizeAsrSubtitleError(Object error) {
               lower.contains('ggml') ||
               lower.contains('download') ||
               lower.contains('下载')))) {
-    return 'Whisper 模型下载失败：国内镜像不可用。请检查网络后重试，或使用已内置 base.en 的安装包。';
+    return 'Whisper 模型下载失败：国内镜像不可用。请检查网络后在「设置 → AI生成字幕」重试下载。';
   }
   if (lower.contains('whisper') &&
       (lower.contains('下载') ||

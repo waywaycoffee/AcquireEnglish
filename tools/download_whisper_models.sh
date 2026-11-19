@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
-# Fetch the default on-device Whisper model into the Flutter asset tree.
+# Optional local cache for developers. Whisper weights are NOT packaged into the
+# APK — the app downloads them on first use via hf-mirror.
+# Do not add assets/whisper/*.bin to pubspec.yaml.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
@@ -13,7 +15,7 @@ mkdir -p "$OUT_DIR"
 if [[ -f "$FILE" ]]; then
   ACTUAL="$(shasum -a 256 "$FILE" | awk '{print $1}')"
   if [[ "$ACTUAL" == "$EXPECTED_SHA" ]]; then
-    echo "Already present: $FILE"
+    echo "Already present (dev cache only, not shipped): $FILE"
     exit 0
   fi
   echo "Checksum mismatch — re-downloading"
@@ -37,4 +39,4 @@ if [[ "$ACTUAL" != "$EXPECTED_SHA" ]]; then
   exit 1
 fi
 ls -lh "$FILE"
-echo "OK"
+echo "OK (dev cache). App still downloads on first ASR use — do not list in pubspec."

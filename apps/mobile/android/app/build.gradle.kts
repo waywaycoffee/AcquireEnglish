@@ -68,25 +68,26 @@ android {
         }
     }
 
-    // Keep Whisper .bin uncompressed so first-run install can stream-copy from the APK.
-    androidResources {
-        noCompress += "bin"
-    }
 }
 
 dependencies {
     coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.5")
     implementation("androidx.documentfile:documentfile:1.0.1")
-    // google_mlkit_text_recognition marks script packs as compileOnly; include Chinese OCR.
-    implementation("com.google.mlkit:text-recognition-chinese:16.0.1")
+    // Unbundled ML Kit OCR: models download via Play Services on first use,
+    // instead of shipping ~10MB+/ABI TFLite packs inside the APK.
+    implementation("com.google.android.gms:play-services-mlkit-text-recognition:19.0.1")
+    implementation("com.google.android.gms:play-services-mlkit-text-recognition-chinese:16.0.1")
 }
 
 // AGP 8.11 cannot consume androidx.core 1.19 (needs AGP 9.1+).
-configurations.all {
+configurations.configureEach {
     resolutionStrategy {
         force("androidx.core:core:1.16.0")
         force("androidx.core:core-ktx:1.16.0")
     }
+    // Drop the Flutter plugin's bundled OCR AARs (keep API via Play Services).
+    exclude(group = "com.google.mlkit", module = "text-recognition")
+    exclude(group = "com.google.mlkit", module = "text-recognition-chinese")
 }
 
 flutter {

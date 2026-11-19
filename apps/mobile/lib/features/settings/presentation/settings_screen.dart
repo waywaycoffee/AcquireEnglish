@@ -820,7 +820,7 @@ class SettingsScreen extends ConsumerWidget {
                       Padding(
                         padding: const EdgeInsets.fromLTRB(16, 4, 16, 12),
                         child: Text(
-                          '默认本地 Whisper + base.en（安装包已内置）。'
+                          '默认本地 Whisper + base.en（首次使用时经国内镜像下载，约 141MB，不打进安装包）。'
                           '有可靠官方英文字幕时优先用官方、跳过识别；'
                           '硬字幕/双语课会忽略 B 站软字幕并走语音识别'
                           '（仅缺可靠英文时才 ASR，不每集重复识别）。',
@@ -862,7 +862,7 @@ class SettingsScreen extends ConsumerWidget {
                         _SelectRow(
                           title: '英语 Whisper 模型',
                           description:
-                              '英语口播用。推荐 base.en（安装包已内置）；弱设备用 tiny.en。',
+                              '英语口播用。推荐 base.en（首次下载）；弱设备用 tiny.en。',
                           value: whisperModel,
                           options: localWhisperModelOptions,
                           optionLabel: _whisperModelLabel,
@@ -1298,7 +1298,6 @@ class _LocalWhisperModelStatusRowState
   String _status = '正在检查模型…';
   double? _progress;
 
-  bool get _isBundledEnglish => widget.modelId == 'base.en';
   bool get _isChineseMultilingual =>
       widget.modelId == LocalWhisperAsr.defaultMultilingualModel ||
       widget.modelId == 'tiny';
@@ -1332,14 +1331,12 @@ class _LocalWhisperModelStatusRowState
       _ready = ready;
       if (ready) {
         _status = '$modelId 已就绪，可直接生成字幕';
-      } else if (_isBundledEnglish) {
-        _status = '$modelId 将从安装包内置资源安装，无需联网下载';
       } else if (widget.pendingHint != null) {
         _status = widget.pendingHint!;
       } else if (_isChineseMultilingual) {
         _status = '$modelId 未下载；开启中文语音识别后请在此下载（国内镜像）';
       } else {
-        _status = '$modelId 未下载，点此经国内镜像下载';
+        _status = '$modelId 未下载，点此经国内镜像首次下载（不占用安装包体积）';
       }
     });
   }
@@ -1351,11 +1348,9 @@ class _LocalWhisperModelStatusRowState
     setState(() {
       _busy = true;
       _progress = null;
-      _status = _isBundledEnglish
-          ? '正在安装内置模型 ${widget.modelId}…'
-          : (_isChineseMultilingual
-                ? '正在从国内镜像下载中文语音模型 ${widget.modelId}…'
-                : '正在从国内镜像准备 ${widget.modelId}…');
+      _status = _isChineseMultilingual
+          ? '正在从国内镜像下载中文语音模型 ${widget.modelId}…'
+          : '正在从国内镜像下载 ${widget.modelId}…';
     });
     try {
       await LocalWhisperAsr.instance.ensureModel(
@@ -1396,14 +1391,11 @@ class _LocalWhisperModelStatusRowState
     final String title = _ready
         ? (widget.titleWhenReady ?? '模型已就绪')
         : (_busy
-              ? (widget.titleWhenBusy ??
-                    (_isBundledEnglish ? '正在安装内置模型' : '正在下载模型'))
+              ? (widget.titleWhenBusy ?? '正在下载模型')
               : (widget.titleWhenIdle ??
-                    (_isBundledEnglish
-                        ? '安装内置 Whisper 模型'
-                        : (_isChineseMultilingual
-                              ? '下载中文语音模型'
-                              : '下载 Whisper 模型'))));
+                    (_isChineseMultilingual
+                        ? '下载中文语音模型'
+                        : '首次下载 Whisper 模型')));
     return Column(
       children: <Widget>[
         _ActionRow(

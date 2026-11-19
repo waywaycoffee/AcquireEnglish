@@ -68,8 +68,12 @@ class OcrSubtitleSampler {
     _positionMs = positionMs;
     _onCue = onCue;
     if (recognizeText == null) {
-      _latinRecognizer ??= TextRecognizer(script: TextRecognitionScript.latin);
-      // Chinese script pack may be missing on some builds; never crash playback.
+      // Unbundled ML Kit: first create() may download models via Play Services.
+      try {
+        _latinRecognizer ??= TextRecognizer(script: TextRecognitionScript.latin);
+      } catch (_) {
+        _latinRecognizer = null;
+      }
       try {
         _chineseRecognizer ??= TextRecognizer(
           script: TextRecognitionScript.chinese,

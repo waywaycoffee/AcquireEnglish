@@ -1,9 +1,7 @@
 import 'dart:async';
 import 'dart:io';
-import 'dart:typed_data';
 
 import 'package:flutter/foundation.dart';
-import 'package:flutter/services.dart';
 import 'package:whisper_cpp_flutter_plus/whisper_cpp_flutter_plus.dart';
 
 import '../../settings/presentation/settings_provider.dart';
@@ -11,6 +9,9 @@ import '../../settings/presentation/settings_provider.dart';
 typedef LocalWhisperProgress = void Function(double? fraction, String message);
 
 /// On-device Whisper.cpp ASR (English `.en` models + multilingual `tiny`/`base`).
+///
+/// Model weights are **never** shipped in the APK — first use downloads via
+/// domestic mirrors (hf-mirror) into the app documents cache.
 class LocalWhisperAsr {
   LocalWhisperAsr._();
 
@@ -27,19 +28,11 @@ class LocalWhisperAsr {
   static const String defaultModel = 'base.en';
   static const String defaultMultilingualModel = 'base';
 
-  /// Bundled default English model — avoids first-run Hugging Face download.
-  static const String _bundledBaseEnglishAsset =
-      'assets/whisper/ggml-base.en.bin';
-  static const MethodChannel _whisperAssetsChannel = MethodChannel(
-    'com.acquire.english/whisper_assets',
-  );
-
   final WhisperModelManager _models = WhisperModelManager();
   WhisperEngine? _engine;
   String? _loadedModelId;
   Future<void>? _ensureInFlight;
   Future<void> _engineGate = Future<void>.value();
-
   static bool isLocalProvider(LearningSettingsState settings) {
     return settings.asrProvider == providerName;
   }
@@ -157,24 +150,10 @@ class LocalWhisperAsr {
       onProgress?.call(null, '正在检查 Whisper 模型 $id…');
       final WhisperModelDescriptor? catalog = catalogDescriptorFor(id);
       if (catalog != null) {
-        File? cached = await _findCatalogModelOrClearCorrupt(catalog);
+        final File? cached = await _findCatalogModelOrClearCorrupt(catalog);
         if (cached != null) {
           onProgress?.call(1, '模型已就绪');
           return;
-        }
-        if (id == 'base.en') {
-          final bool seeded = await _seedBundledBaseEnglish(
-            catalog: catalog,
-            onProgress: onProgress,
-          );
-          if (seeded) {
-            return;
-          }
-          // Prefer mirrors only when the APK somehow lacks the bundled weights.
-          onProgress?.call(
-            null,
-            '内置模型安装失败，尝试镜像下载 base.en…',
-          );
         }
         await _downloadCatalogWithMirrors(catalog, onProgress: onProgress);
         return;
@@ -256,81 +235,6 @@ class LocalWhisperAsr {
     }
   }
 
-  Future<bool> _seedBundledBaseEnglish({
-    required WhisperModelDescriptor catalog,
-    LocalWhisperProgress? onProgress,
-  }) async {
-    final Directory dir = await _models.directory;
-    final File target = File('${dir.path}/${catalog.fileName}');
-    onProgress?.call(0.05, '正在安装内置 Whisper 模型 base.en…');
-
-    // 1) Native stream-copy from APK (avoids loading 141MB into Dart heap).
-    if (Platform.isAndroid) {
-      try {
-        final Object? raw = await _whisperAssetsChannel.invokeMethod<Object?>(
-          'copyBundledWhisperModel',
-          <String, Object?>{
-            'destPath': target.path,
-            'assetPath': 'flutter_assets/$_bundledBaseEnglishAsset',
-          },
-        );
-        debugPrint('whisper: native seed result=$raw');
-        final File? verified = await _findCatalogModelOrClearCorrupt(catalog);
-        if (verified != null) {
-          onProgress?.call(1, '内置模型已就绪');
-          return true;
-        }
-      } catch (error) {
-        debugPrint('whisper: native seed failed: $error');
-        onProgress?.call(0.1, '原生安装失败，改用资源解压…');
-      }
-    }
-
-    // 2) Dart AssetBundle fallback (may OOM on weak devices).
-    try {
-      onProgress?.call(0.15, '正在解压内置模型 base.en…');
-      final ByteData data = await rootBundle.load(_bundledBaseEnglishAsset);
-      final File partial = File('${target.path}.part');
-      final IOSink sink = partial.openWrite();
-      try {
-        final Uint8List bytes = data.buffer.asUint8List(
-          data.offsetInBytes,
-          data.lengthInBytes,
-        );
-        const int chunk = 1024 * 1024;
-        for (int offset = 0; offset < bytes.length; offset += chunk) {
-          final int end = (offset + chunk < bytes.length)
-              ? offset + chunk
-              : bytes.length;
-          sink.add(bytes.sublist(offset, end));
-          if (bytes.length > 0) {
-            onProgress?.call(
-              0.15 + 0.75 * (end / bytes.length),
-              '正在解压内置模型 base.en '
-              '${((end / bytes.length) * 100).clamp(0, 100).round()}%',
-            );
-          }
-        }
-      } finally {
-        await sink.close();
-      }
-      if (await target.exists()) {
-        await target.delete();
-      }
-      await partial.rename(target.path);
-      final File? verified = await _findCatalogModelOrClearCorrupt(catalog);
-      if (verified != null) {
-        onProgress?.call(1, '内置模型已就绪');
-        return true;
-      }
-      debugPrint('whisper: dart seed wrote file but SHA check failed');
-      return false;
-    } catch (error) {
-      debugPrint('whisper: dart seed failed: $error');
-      return false;
-    }
-  }
-
   Future<void> _downloadCatalogWithMirrors(
     WhisperModelDescriptor catalog, {
     LocalWhisperProgress? onProgress,
@@ -389,7 +293,7 @@ class LocalWhisperAsr {
         lower.contains('connection') ||
         lower.contains('huggingface')) {
       return 'Whisper 模型 $id 下载失败：国内镜像与备用源均不可用。'
-          '请检查网络后重试；base.en 也可使用已内置该模型的安装包。';
+          '请检查网络后在「设置 → AI生成字幕」重试下载。';
     }
     return 'Whisper 模型 $id 下载失败，请检查网络后重试。';
   }
