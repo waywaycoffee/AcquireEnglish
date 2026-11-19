@@ -36,3 +36,31 @@ curl -fsS https://acquireenglish.curlhairai.com/api/health
 
 默认 `API_BASE=https://acquireenglish.curlhairai.com/`（见 `apps/mobile/lib/constants/endpoints.dart`）。  
 也可在 App **设置 → 爱快账号 → 云端 API 地址** 覆盖。
+
+### Public lexicon
+
+The shared dictionary is a separate read-only SQLite database. The API serves
+`GET /api/public-lexicon/{word}` and `GET /api/public-lexicon/{word}/audio`.
+Use `PUBLIC_LEXICON_PATH` to set the snapshot location. It defaults to
+`public-lexicon.sqlite3` next to the service working tree. Empty fields denote
+missing source data.
+
+Build a staging snapshot with Python and `xlrd` installed:
+
+```sh
+python scripts/build_public_lexicon.py SUBTLEXusfrequencyabove1.xls ecdict.csv eng_sentences.tsv.bz2 staging.sqlite3
+python scripts/attach_lexicon_attribution.py staging.sqlite3 sentences_detailed.tar.bz2
+python scripts/build_lexicon_audio.py staging.sqlite3
+```
+
+The last command needs the eSpeak NG shared library and its en-us voice data.
+Build in staging, check the SQLite integrity and coverage, then atomically
+rename the snapshot into place on the same filesystem. Do not commit generated
+databases. Difficulty bands are frequency rank heuristics for this app.
+
+- Frequency data: [SUBTLEX-US, Brysbaert & New (2009)](https://www.ugent.be/pp/experimentele-psychologie/en/research/documents/subtlexus).
+- Dictionary: [ECDICT](https://github.com/skywind3000/ECDICT), MIT. The project
+  preserves the notice in `apps/mobile/assets/dictionary/LICENSE-ECDICT.txt`.
+- Examples: [Tatoeba contributors](https://tatoeba.org/en/downloads),
+  [CC BY 2.0 FR](https://creativecommons.org/licenses/by/2.0/fr/). Each response
+  includes the original sentence link and the contributor when available.

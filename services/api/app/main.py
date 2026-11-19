@@ -15,6 +15,7 @@ from app.routers import (
     livekit,
     preferences,
     progress,
+    public_lexicon,
     rewards,
     shared_subtitles,
     vocab,
@@ -51,6 +52,7 @@ app.include_router(auth.router, prefix="/api")
 app.include_router(courses.router, prefix="/api")
 app.include_router(progress.router, prefix="/api")
 app.include_router(vocab.router, prefix="/api")
+app.include_router(public_lexicon.router, prefix="/api")
 app.include_router(preferences.router, prefix="/api")
 app.include_router(feed.router, prefix="/api")
 app.include_router(imports.router, prefix="/api")
