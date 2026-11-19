@@ -111,10 +111,7 @@ class DailyFeedNotifier extends Notifier<List<AcquireDailyFeedItemDto>> {
       return list
           .cast<Map<String, dynamic>>()
           .map(AcquireDailyFeedItemDto.fromJson)
-          .where(
-            (AcquireDailyFeedItemDto item) =>
-                item.bvid.isNotEmpty && item.watchUrl.isNotEmpty,
-          )
+          .where(_isVerifiedRecommendation)
           .toList(growable: false);
     } catch (_) {
       return const <AcquireDailyFeedItemDto>[];
@@ -131,7 +128,7 @@ class DailyFeedNotifier extends Notifier<List<AcquireDailyFeedItemDto>> {
       final AcquireApiClient api = ref.read(acquireApiClientProvider);
       final List<AcquireDailyFeedItemDto> feed = await api.dailyFeed(date: day);
       if (_account != account) return;
-      state = feed;
+      state = feed.where(_isVerifiedRecommendation).toList(growable: false);
       if (Hive.isBoxOpen('prefs')) {
         final Box<String> box = Hive.box<String>('prefs');
         await box.put(
@@ -166,3 +163,9 @@ class DailyFeedNotifier extends Notifier<List<AcquireDailyFeedItemDto>> {
     return day != _localDay(DateTime.now());
   }
 }
+
+bool _isVerifiedRecommendation(AcquireDailyFeedItemDto item) =>
+    item.bvid.isNotEmpty &&
+    item.watchUrl.isNotEmpty &&
+    item.tags.contains('抽样英语原声') &&
+    !item.tags.contains('原声待确认');

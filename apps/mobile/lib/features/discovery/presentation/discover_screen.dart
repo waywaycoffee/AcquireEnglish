@@ -150,7 +150,7 @@ class _DiscoverScreenState extends ConsumerState<DiscoverScreen>
               )
             else if (feed.isEmpty && !_loading)
               const ListTile(
-                title: Text('暂未取得推荐'),
+                title: Text('暂未找到通过英文原声抽样的视频'),
                 subtitle: Text('正在筛选英文原声候选。可以稍后刷新，或换一组兴趣。'),
               )
             else ...<Widget>[
@@ -181,8 +181,7 @@ class _DiscoverScreenState extends ConsumerState<DiscoverScreen>
                     subtitle: Text(
                       <String>[
                         'B站',
-                        if (item.tags.contains('抽样英语原声')) '抽样英语原声',
-                        if (item.tags.contains('原声待确认')) '原声待确认',
+                        '抽样英语原声',
                         if (item.author.isNotEmpty) item.author,
                         if (item.durationSec != null)
                           '${(item.durationSec! / 60).ceil()} 分钟',
