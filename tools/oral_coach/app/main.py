@@ -9,15 +9,17 @@ from fastapi.responses import FileResponse, JSONResponse
 from pydantic import BaseModel, Field
 
 from .config import Settings
-from .pipeline import OralCoachPipeline
+from .pipeline import CoachSession, OralCoachPipeline, TurnResult
 from .providers.base import VideoContext
 
 settings = Settings.from_env()
 pipeline = OralCoachPipeline(settings)
 app = FastAPI(title='AcquireEnglish Oral Coach', version='0.1.0')
 
+_DIFFICULTY = r'^(A2|B1|B2|C1)$'
 
-class SessionCreate(BaseModel):
+
+class SessionFields(BaseModel):
     course_title: str = ''
     episode_title: str = ''
     current_english: str = ''
@@ -27,10 +29,14 @@ class SessionCreate(BaseModel):
     topic_summary: str = ''
     article_excerpt: str = ''
     talk_topics: list[str] = Field(default_factory=list)
-    difficulty: str = Field(default='B1', pattern=r'^(A2|B1|B2|C1)$')
+    difficulty: str = Field(default='B1', pattern=_DIFFICULTY)
     digital_human_id: str = 'mia'
     tts_voice: str = ''
     reply_language: str = 'en'
+
+
+class SessionCreate(SessionFields):
+    pass
 
 
 class ContextUpdate(BaseModel):
@@ -43,7 +49,7 @@ class ContextUpdate(BaseModel):
     topic_summary: str | None = None
     article_excerpt: str | None = None
     talk_topics: list[str] | None = None
-    difficulty: str | None = Field(default=None, pattern=r'^(A2|B1|B2|C1)$')
+    difficulty: str | None = Field(default=None, pattern=_DIFFICULTY)
     digital_human_id: str | None = None
     tts_voice: str | None = None
     reply_language: str | None = None
@@ -54,6 +60,75 @@ class TopicsBody(BaseModel):
     force: bool = False
     article_excerpt: str | None = None
     topic_summary: str | None = None
+
+
+class ConfirmBody(BaseModel):
+    draft_id: str
+    confirmed_text: str | None = None
+    tts_voice: str | None = None
+    digital_human_id: str | None = None
+    reply_language: str | None = None
+    text_only: bool = False
+
+
+class SpeakBody(BaseModel):
+    text: str = Field(min_length=1, max_length=4000)
+    digital_human_id: str = 'mia'
+    tts_voice: str = ''
+    language: str = 'en'
+
+
+def _require_session(sid: str) -> CoachSession:
+    session = pipeline.get(sid)
+    if not session:
+        raise HTTPException(404, 'Session not found.')
+    return session
+
+
+def _session_payload(
+    session: CoachSession,
+    *,
+    context: dict[str, Any] | None = None,
+    include_history: bool = False,
+) -> dict[str, Any]:
+    payload: dict[str, Any] = {
+        'id': session.id,
+        'difficulty': session.difficulty,
+        'digital_human_id': session.digital_human_id,
+        'tts_voice': session.tts_voice,
+        'reply_language': session.reply_language,
+        'context': context if context is not None else session.context.as_public_dict(),
+    }
+    if include_history:
+        payload['history'] = session.history
+    return payload
+
+
+def _turn_payload(result: TurnResult) -> dict[str, Any]:
+    return {
+        'session_id': result.session_id,
+        'transcript': result.transcript,
+        'pronunciation': result.pronunciation,
+        'coach_text': result.coach_text,
+        'corrections': result.corrections,
+        'difficulty': result.difficulty,
+        'tts_url': result.tts_url,
+        'avatar': result.avatar,
+        'providers': result.providers,
+    }
+
+
+async def _store_upload(sid: str, file: UploadFile) -> Path:
+    suffix = Path(file.filename or 'turn.wav').suffix or '.wav'
+    with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
+        while chunk := await file.read(1024 * 1024):
+            tmp.write(chunk)
+        tmp_path = Path(tmp.name)
+    if tmp_path.stat().st_size == 0:
+        raise HTTPException(422, 'Empty audio upload.')
+    stored = pipeline.settings.data_dir / 'audio' / f'{sid}-{tmp_path.name}'
+    stored.write_bytes(tmp_path.read_bytes())
+    return stored
 
 
 @app.middleware('http')
@@ -73,7 +148,6 @@ def health() -> dict[str, Any]:
         'ready': True,
         'providers': pipeline.provider_map(),
         'allow_lan': settings.allow_lan,
-        # Phone-facing public URL (nginx). Internal Tailscale stays in probe only.
         'livetalking_url': settings.livetalking_client_url,
         'livetalking_internal_url': settings.livetalking_url,
         'webrtc_ice_servers': settings.webrtc_ice_servers(),
@@ -107,72 +181,42 @@ def create_session(body: SessionCreate) -> dict[str, Any]:
     digital_human_id = str(payload.pop('digital_human_id', 'mia') or 'mia')
     tts_voice = str(payload.pop('tts_voice', '') or '')
     reply_language = str(payload.pop('reply_language', 'en') or 'en')
-    context = VideoContext(**payload)
     session = pipeline.create_session(
-        context,
+        VideoContext(**payload),
         digital_human_id=digital_human_id,
         tts_voice=tts_voice,
         reply_language=reply_language,
     )
     return {
-        'id': session.id,
-        'difficulty': session.difficulty,
-        'digital_human_id': session.digital_human_id,
-        'tts_voice': session.tts_voice,
-        'reply_language': session.reply_language,
-        'context': body.model_dump(),
+        **_session_payload(session, context=body.model_dump()),
         'providers': pipeline.provider_map(),
     }
 
 
 @app.patch('/api/sessions/{sid}/context')
 def patch_context(sid: str, body: ContextUpdate) -> dict[str, Any]:
-    session = pipeline.get(sid)
-    if not session:
-        raise HTTPException(404, 'Session not found.')
+    session = _require_session(sid)
     data = body.model_dump(exclude_unset=True)
     for key, value in data.items():
         if value is None:
             continue
         if key == 'digital_human_id':
             session.digital_human_id = str(value).strip().lower() or session.digital_human_id
-            continue
-        if key == 'tts_voice':
+        elif key == 'tts_voice':
             session.tts_voice = str(value).strip()
-            continue
-        if key == 'reply_language':
+        elif key == 'reply_language':
             session.reply_language = str(value).strip().lower() or session.reply_language
-            continue
-        setattr(session.context, key, value)
-        if key == 'difficulty':
-            session.difficulty = value
-    return {
-        'id': session.id,
-        'difficulty': session.difficulty,
-        'digital_human_id': session.digital_human_id,
-        'tts_voice': session.tts_voice,
-        'reply_language': session.reply_language,
-        'context': {
-            'course_title': session.context.course_title,
-            'episode_title': session.context.episode_title,
-            'current_english': session.context.current_english,
-            'current_chinese': session.context.current_chinese,
-            'previous_english': session.context.previous_english,
-            'next_english': session.context.next_english,
-            'topic_summary': session.context.topic_summary,
-            'article_excerpt': session.context.article_excerpt,
-            'talk_topics': session.context.talk_topics,
-            'difficulty': session.context.difficulty,
-        },
-    }
+        else:
+            setattr(session.context, key, value)
+            if key == 'difficulty':
+                session.difficulty = value
+    return _session_payload(session)
 
 
 @app.post('/api/sessions/{sid}/topics')
 async def generate_session_topics(sid: str, body: TopicsBody | None = None) -> dict[str, Any]:
     """Pre-read session transcript and generate oral Q&A topics."""
-    session = pipeline.get(sid)
-    if not session:
-        raise HTTPException(404, 'Session not found.')
+    session = _require_session(sid)
     payload = body or TopicsBody()
     if (payload.article_excerpt or '').strip():
         session.context.article_excerpt = payload.article_excerpt.strip()
@@ -194,19 +238,6 @@ async def generate_session_topics(sid: str, body: TopicsBody | None = None) -> d
     }
 
 
-async def _store_upload(sid: str, file: UploadFile) -> Path:
-    suffix = Path(file.filename or 'turn.wav').suffix or '.wav'
-    with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
-        while chunk := await file.read(1024 * 1024):
-            tmp.write(chunk)
-        tmp_path = Path(tmp.name)
-    if tmp_path.stat().st_size == 0:
-        raise HTTPException(422, 'Empty audio upload.')
-    stored = pipeline.settings.data_dir / 'audio' / f'{sid}-{tmp_path.name}'
-    stored.write_bytes(tmp_path.read_bytes())
-    return stored
-
-
 @app.post('/api/sessions/{sid}/draft')
 async def create_draft(
     sid: str,
@@ -214,9 +245,7 @@ async def create_draft(
     reference_text: str | None = Form(default=None),
 ) -> dict[str, Any]:
     """ASR + pronunciation only. Confirm before LLM."""
-    session = pipeline.get(sid)
-    if not session:
-        raise HTTPException(404, 'Session not found.')
+    session = _require_session(sid)
     try:
         stored = await _store_upload(sid, file)
         draft = await pipeline.create_draft(
@@ -238,22 +267,6 @@ async def create_draft(
         raise HTTPException(422, str(exc)) from None
     finally:
         await file.close()
-
-
-class ConfirmBody(BaseModel):
-    draft_id: str
-    confirmed_text: str | None = None
-    tts_voice: str | None = None
-    digital_human_id: str | None = None
-    reply_language: str | None = None
-    text_only: bool = False
-
-
-class SpeakBody(BaseModel):
-    text: str = Field(min_length=1, max_length=4000)
-    digital_human_id: str = 'mia'
-    tts_voice: str = ''
-    language: str = 'en'
 
 
 @app.post('/api/tts/speak')
@@ -279,9 +292,7 @@ async def speak_tts(body: SpeakBody) -> dict[str, Any]:
 
 @app.post('/api/sessions/{sid}/confirm')
 async def confirm_draft(sid: str, body: ConfirmBody) -> dict[str, Any]:
-    session = pipeline.get(sid)
-    if not session:
-        raise HTTPException(404, 'Session not found.')
+    session = _require_session(sid)
     try:
         result = await pipeline.confirm_draft(
             session,
@@ -296,17 +307,7 @@ async def confirm_draft(sid: str, body: ConfirmBody) -> dict[str, Any]:
         raise HTTPException(404, 'Draft not found or already used.') from None
     except Exception as exc:  # noqa: BLE001
         raise HTTPException(422, str(exc)) from None
-    return {
-        'session_id': result.session_id,
-        'transcript': result.transcript,
-        'pronunciation': result.pronunciation,
-        'coach_text': result.coach_text,
-        'corrections': result.corrections,
-        'difficulty': result.difficulty,
-        'tts_url': result.tts_url,
-        'avatar': result.avatar,
-        'providers': result.providers,
-    }
+    return _turn_payload(result)
 
 
 @app.post('/api/sessions/{sid}/turn')
@@ -317,9 +318,7 @@ async def turn(
     confirmed_text: str | None = Form(default=None),
 ) -> dict[str, Any]:
     """One-shot turn (auto-confirm). Prefer /draft + /confirm."""
-    session = pipeline.get(sid)
-    if not session:
-        raise HTTPException(404, 'Session not found.')
+    session = _require_session(sid)
     try:
         stored = await _store_upload(sid, file)
         result = await pipeline.run_turn(
@@ -329,17 +328,7 @@ async def turn(
             confirmed_text=confirmed_text,
             skip_confirm=True,
         )
-        return {
-            'session_id': result.session_id,
-            'transcript': result.transcript,
-            'pronunciation': result.pronunciation,
-            'coach_text': result.coach_text,
-            'corrections': result.corrections,
-            'difficulty': result.difficulty,
-            'tts_url': result.tts_url,
-            'avatar': result.avatar,
-            'providers': result.providers,
-        }
+        return _turn_payload(result)
     except HTTPException:
         raise
     except Exception as exc:  # noqa: BLE001 — surface provider setup errors to app
@@ -361,20 +350,5 @@ def get_tts(name: str):
 
 @app.get('/api/sessions/{sid}')
 def get_session(sid: str) -> dict[str, Any]:
-    session = pipeline.get(sid)
-    if not session:
-        raise HTTPException(404, 'Session not found.')
-    return {
-        'id': session.id,
-        'difficulty': session.difficulty,
-        'history': session.history,
-        'context': {
-            'course_title': session.context.course_title,
-            'episode_title': session.context.episode_title,
-            'current_english': session.context.current_english,
-            'current_chinese': session.context.current_chinese,
-            'previous_english': session.context.previous_english,
-            'next_english': session.context.next_english,
-            'difficulty': session.context.difficulty,
-        },
-    }
+    session = _require_session(sid)
+    return _session_payload(session, include_history=True)

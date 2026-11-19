@@ -19,20 +19,31 @@ class VideoContext:
     talk_topics: list[str] = field(default_factory=list)
     difficulty: str = 'B1'  # A2 / B1 / B2 / C1
 
+    def as_public_dict(self) -> dict[str, Any]:
+        return {
+            'course_title': self.course_title,
+            'episode_title': self.episode_title,
+            'current_english': self.current_english,
+            'current_chinese': self.current_chinese,
+            'previous_english': self.previous_english,
+            'next_english': self.next_english,
+            'topic_summary': self.topic_summary,
+            'article_excerpt': self.article_excerpt,
+            'talk_topics': list(self.talk_topics or []),
+            'difficulty': self.difficulty,
+        }
+
     def topic_blurb(self) -> str:
         bits = [b for b in (self.course_title, self.episode_title) if b.strip()]
         head = ' / '.join(bits) if bits else 'this video'
         summary = (self.topic_summary or '').strip()
         excerpt = (self.article_excerpt or '').strip()
         topics = [t.strip() for t in (self.talk_topics or []) if str(t).strip()]
-        topic_line = ''
-        if topics:
-            topic_line = ' Prepared oral topics: ' + ' | '.join(topics[:8]) + '.'
+        topic_line = (
+            f" Prepared oral topics: {' | '.join(topics[:8])}." if topics else ''
+        )
         if summary and excerpt:
-            return (
-                f'Video: {head}. Topic: {summary}. Excerpt: {excerpt[:3500]}.'
-                f'{topic_line}'
-            )
+            return f'Video: {head}. Topic: {summary}. Excerpt: {excerpt[:3500]}.{topic_line}'
         if summary:
             return f'Video: {head}. Topic: {summary}.{topic_line}'
         if excerpt:

@@ -242,18 +242,14 @@ class OralCoachPipeline:
             session.reply_language = reply_language.strip().lower()
 
         tts_url = None
-        avatar = {}
+        avatar: dict = {}
         if not text_only:
-            tts_name = f'{session.id}-{uuid.uuid4().hex[:8]}.mp3'
-            tts_path = str(self.settings.data_dir / 'tts' / tts_name)
-            tts = await self.tts.synthesize(
+            tts_url = await self.synthesize_speech(
                 reply.text,
-                tts_path,
-                voice=session.tts_voice or tts_voice,
                 digital_human_id=session.digital_human_id or digital_human_id,
+                tts_voice=session.tts_voice or tts_voice,
                 language=session.reply_language or reply_language or 'en',
             )
-            tts_url = f'/api/tts/{tts_name}' if tts.audio_path else None
             avatar = asdict(await self.avatar.cue(reply.text))
 
         return TurnResult(
@@ -278,13 +274,11 @@ class OralCoachPipeline:
         skip_confirm: bool = False,
     ) -> TurnResult:
         """Legacy one-shot turn. Prefer create_draft + confirm_draft."""
+        del skip_confirm  # kept for API compatibility with older clients
         draft = await self.create_draft(
             session, audio_path, reference_override=reference_override
         )
         text = confirmed_text if confirmed_text is not None else draft.transcript
-        if not skip_confirm and confirmed_text is None:
-            # Still one-shot for backward compat, but mark as auto-confirmed.
-            pass
         return await self.confirm_draft(session, draft.draft_id, confirmed_text=text)
 
     def store_upload(self, upload_name: str, source_path: Path) -> Path:

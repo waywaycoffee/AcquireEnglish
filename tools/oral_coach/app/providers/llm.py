@@ -158,7 +158,7 @@ async def generate_talk_topics(
     return normalized
 
 
-def _unused_talk_topics(
+def _remaining_talk_topics(
     context: VideoContext,
     history: list[dict[str, str]],
 ) -> list[str]:
@@ -168,13 +168,37 @@ def _unused_talk_topics(
     spoken = ' '.join(
         str(item.get('content') or '') for item in history[-12:]
     ).lower()
-    unused = []
-    for topic in topics:
-        key = topic.lower().rstrip('?')[:48]
-        if key and key in spoken:
-            continue
-        unused.append(topic)
+    unused = [
+        topic
+        for topic in topics
+        if (key := topic.lower().rstrip('?')[:48]) and key not in spoken
+    ]
     return unused or topics
+
+
+async def _openai_chat_json(
+    settings: Settings,
+    *,
+    messages: list[dict[str, str]],
+    temperature: float,
+    response_format: dict | None = None,
+) -> dict:
+    payload: dict = {
+        'model': settings.openai_model,
+        'temperature': temperature,
+        'messages': messages,
+    }
+    if response_format is not None:
+        payload['response_format'] = response_format
+    async with httpx.AsyncClient(timeout=60) as client:
+        response = await client.post(
+            f'{settings.openai_base_url}/chat/completions',
+            headers={'Authorization': f'Bearer {settings.openai_api_key}'},
+            json=payload,
+        )
+        response.raise_for_status()
+        content = response.json()['choices'][0]['message']['content']
+    return json.loads(content)
 
 
 def _pick_focus_bits(excerpt: str, topic: str) -> tuple[str, str]:
@@ -340,10 +364,9 @@ class OpenAiLlm:
                 'topics': ['question 1', 'question 2'],
             },
         }
-        payload: dict = {
-            'model': self.settings.openai_model,
-            'temperature': 0.5,
-            'messages': [
+        data = await _openai_chat_json(
+            self.settings,
+            messages=[
                 {
                     'role': 'system',
                     'content': (
@@ -353,17 +376,9 @@ class OpenAiLlm:
                 },
                 {'role': 'user', 'content': json.dumps(user, ensure_ascii=False)},
             ],
-            'response_format': {'type': 'json_object'},
-        }
-        async with httpx.AsyncClient(timeout=60) as client:
-            response = await client.post(
-                f'{self.settings.openai_base_url}/chat/completions',
-                headers={'Authorization': f'Bearer {self.settings.openai_api_key}'},
-                json=payload,
-            )
-            response.raise_for_status()
-            content = response.json()['choices'][0]['message']['content']
-        data = json.loads(content)
+            temperature=0.5,
+            response_format={'type': 'json_object'},
+        )
         raw = data.get('topics') or data.get('questions') or []
         if isinstance(raw, str):
             raw = [raw]
@@ -387,7 +402,7 @@ class OpenAiLlm:
         vocab, grammar = _pick_focus_bits(
             context.article_excerpt, context.topic_summary
         )
-        unused = _unused_talk_topics(context, history)
+        unused = _remaining_talk_topics(context, history)
         user = {
             'mode': 'video_guided_oral_practice',
             'video': context.topic_blurb(),
@@ -429,30 +444,22 @@ class OpenAiLlm:
                 'corrections': ['short grammar/vocab fixes when needed'],
             },
         }
-        payload: dict = {
-            'model': self.settings.openai_model,
-            'temperature': 0.55,
-            'messages': [
+        data = await _openai_chat_json(
+            self.settings,
+            messages=[
                 {
                     'role': 'system',
-                    'content': SYSTEM
-                    + ' Reply as compact JSON. The "text" field must be English'
-                    ' unless the learner asked for Chinese.',
+                    'content': (
+                        SYSTEM
+                        + ' Reply as compact JSON. The "text" field must be English'
+                        ' unless the learner asked for Chinese.'
+                    ),
                 },
                 {'role': 'user', 'content': json.dumps(user, ensure_ascii=False)},
             ],
-        }
-        # DeepSeek chat supports json_object; keep it for structured coach replies.
-        payload['response_format'] = {'type': 'json_object'}
-        async with httpx.AsyncClient(timeout=60) as client:
-            response = await client.post(
-                f'{self.settings.openai_base_url}/chat/completions',
-                headers={'Authorization': f'Bearer {self.settings.openai_api_key}'},
-                json=payload,
-            )
-            response.raise_for_status()
-            content = response.json()['choices'][0]['message']['content']
-        data = json.loads(content)
+            temperature=0.55,
+            response_format={'type': 'json_object'},
+        )
         fallback = _guided_fallback(context, learner_text)
         text = str(data.get('text') or '').strip() or fallback.text
         return LlmReply(
@@ -509,7 +516,7 @@ class OllamaLlm:
         vocab, grammar = _pick_focus_bits(
             context.article_excerpt, context.topic_summary
         )
-        unused = _unused_talk_topics(context, history)
+        unused = _remaining_talk_topics(context, history)
         prompt = (
             f'{SYSTEM}\n\n'
             f'Context: {context.topic_blurb()}\n'
