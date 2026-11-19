@@ -19,6 +19,7 @@ class DigitalHumanPersona {
   final String tagline;
   /// Local Flutter asset for idle stage / home picker.
   final String assetPath;
+  String get cartoonAssetPath => 'assets/img/digital_human/$id-cartoon.png';
   /// Matching LiveTalking `--avatar_id` when lip-sync backend is used.
   final String liveTalkingAvatarId;
   /// Microsoft Edge Neural voice for English replies.

@@ -415,6 +415,27 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
                     120,
                   ),
                   children: <Widget>[
+                    if (_pendingCollectionEpisodes(selectedCourse) > 0)
+                      Consumer(
+                        builder: (BuildContext context, WidgetRef ref, _) {
+                          final BilibiliCollectionDownloadProgress? progress =
+                              ref.watch(bilibiliCollectionDownloadProgressProvider);
+                          final bool downloading = progress?.courseId == selectedCourse.id &&
+                              progress?.done == false;
+                          return Align(
+                            alignment: Alignment.centerLeft,
+                            child: OutlinedButton.icon(
+                              onPressed: downloading ? null : () => unawaited(
+                                _confirmCollectionDownload(selectedCourse),
+                              ),
+                              icon: const Icon(Icons.download_outlined),
+                              label: Text(downloading
+                                  ? '正在下载合集'
+                                  : '下载剩余各集（${_pendingCollectionEpisodes(selectedCourse)}）'),
+                            ),
+                          );
+                        },
+                      ),
                     // Course-level download / 补字幕 progress stays at the very top.
                     Consumer(
                       builder: (BuildContext context, WidgetRef ref, _) {
@@ -1371,11 +1392,15 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
   void _openCourse(LibraryCourseData course) {
     setState(() {
       selectedCourse = course;
-      selectedEpisodeId = course.episodes.isEmpty ? '' : course.episodes.first.id;
+      selectedEpisodeId = course.episodes
+              .where((LibraryEpisodeItem item) =>
+                  !item.videoMissing && isUsableLocalVideoPath(item.videoAsset))
+              .firstOrNull?.id ??
+          course.episodes.firstOrNull?.id ??
+          '';
       showDetail = true;
     });
     _maybeBackfillBilibiliEpisodeCovers(course);
-    _maybeDownloadPendingBilibiliEpisodes(course);
   }
 
   void _maybeBackfillBilibiliEpisodeCovers(LibraryCourseData course) {
@@ -1402,23 +1427,36 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
     );
   }
 
-  void _maybeDownloadPendingBilibiliEpisodes(LibraryCourseData course) {
-    final bool isBili =
-        course.category == 'bilibili' ||
+  int _pendingCollectionEpisodes(LibraryCourseData course) {
+    final bool isBili = course.category == 'bilibili' ||
         course.sourceLabel.toLowerCase().contains('bilibili') ||
         course.id.startsWith('bilibili-');
-    if (!isBili || course.episodes.length <= 1) {
-      return;
-    }
-    final bool hasPending = course.episodes.any(
-      (LibraryEpisodeItem e) => e.videoMissing,
+    if (!isBili || course.episodes.length <= 1) return 0;
+    return course.episodes.where((LibraryEpisodeItem item) =>
+        item.videoMissing || !isUsableLocalVideoPath(item.videoAsset)).length;
+  }
+
+  Future<void> _confirmCollectionDownload(LibraryCourseData course) async {
+    final int count = _pendingCollectionEpisodes(course);
+    if (count == 0 || isBilibiliCollectionDownloadInFlight(course.id)) return;
+    final bool? confirmed = await showDialog<bool>(
+      context: context,
+      builder: (BuildContext dialogContext) => AlertDialog(
+        title: const Text('下载合集剩余各集？'),
+        content: Text('还有 $count 集未下载。继续后会在后台下载到本地。'),
+        actions: <Widget>[
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: const Text('继续试看'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            child: const Text('全部下载'),
+          ),
+        ],
+      ),
     );
-    if (!hasPending) {
-      return;
-    }
-    if (isBilibiliCollectionDownloadInFlight(course.id)) {
-      return;
-    }
+    if (!mounted || confirmed != true) return;
     final String cookie = ref
         .read(learningSettingsProvider)
         .resolvedBilibiliCookieHeader;
@@ -1463,7 +1501,6 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('请先下载本集视频，再补字幕')),
       );
-      _maybeDownloadPendingBilibiliEpisodes(course);
       return;
     }
     final bool wantEnglish = chip == SubtitleFillChip.english;

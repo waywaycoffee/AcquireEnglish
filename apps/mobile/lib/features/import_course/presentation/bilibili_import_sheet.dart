@@ -13,7 +13,6 @@ import '../../subtitle_completion/subtitle_completion_enqueue.dart';
 import '../../subtitle_completion/subtitle_completion_scheduler.dart';
 import '../../sync/data/acquire_api_client.dart';
 import '../../sync/data/personal_import_sync.dart';
-import '../data/bilibili_collection_download.dart';
 import '../data/bilibili_course_builder.dart';
 import '../data/bilibili_import_service.dart';
 import '../domain/bilibili_import.dart';
@@ -135,9 +134,9 @@ class _BilibiliImportFormState extends ConsumerState<_BilibiliImportForm> {
         // Auto-save to personal cloud; shared if official pack passes audit.
         final AuthSessionState auth = ref.read(authSessionProvider);
         if (auth.isLoggedIn) {
-          final LibraryEpisodeItem? ep = course.episodes.isEmpty
-              ? null
-              : course.episodes.first;
+          final LibraryEpisodeItem? ep = course.episodes
+              .where((LibraryEpisodeItem item) => !item.videoMissing)
+              .firstOrNull;
           unawaited(
             syncEpisodeSubtitlesToCloud(
               api: ref.read(acquireApiClientProvider),
@@ -159,34 +158,16 @@ class _BilibiliImportFormState extends ConsumerState<_BilibiliImportForm> {
       }
       setState(() => _busy = false);
       final String hint = bilibiliImportSuccessHint(meta);
-      final ProviderContainer container = ProviderScope.containerOf(context);
       final ScaffoldMessengerState messenger = ScaffoldMessenger.of(context);
-      // Keep downloading the rest of the 合集/分P in the background.
-      if (ok && course.episodes.length > 1) {
-        final LibraryCatalogNotifier catalog =
-            container.read(libraryCatalogProvider.notifier);
-        final BilibiliImportService downloadService = service;
-        final String courseId = course.id;
-        final BilibiliCollectionDownloadProgressNotifier progressNotifier =
-            container.read(
-              bilibiliCollectionDownloadProgressProvider.notifier,
-            );
-        unawaited(
-          downloadRemainingBilibiliEpisodes(
-            catalog: catalog,
-            readCourses: () => container.read(libraryCatalogProvider),
-            courseId: courseId,
-            service: downloadService,
-            progressNotifier: progressNotifier,
-          ),
-        );
-      }
+      final String success = course.episodes.length > 1
+          ? '已导入一集试看。想继续时，可在课程详情点「下载剩余各集」。'
+          : '已加入书库。$hint 缺失字幕会在课程页后台自动补全。';
       Navigator.of(context).pop();
       messenger.showSnackBar(
         SnackBar(
           content: Text(
             ok
-                ? '已加入书库。$hint 缺失字幕会在课程页后台自动补全。'
+                ? success
                 : '导入未完成，请重试',
           ),
         ),

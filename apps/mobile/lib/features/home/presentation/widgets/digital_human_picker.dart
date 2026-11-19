@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../player/data/digital_human_catalog.dart';
+import '../../../player/presentation/widgets/cartoon_coach_sprite.dart';
 import '../../../settings/presentation/settings_provider.dart';
 import '../../../shared/presentation/pad/app_design_tokens.dart';
 
@@ -24,10 +25,8 @@ class _DigitalHumanPickerState extends ConsumerState<DigitalHumanPicker> {
 
   @override
   Widget build(BuildContext context) {
-    final String selectedId = ref
-        .watch(learningSettingsProvider)
-        .digitalHumanId;
-    final DigitalHumanPersona selected = digitalHumanById(selectedId);
+    final LearningSettingsState settings = ref.watch(learningSettingsProvider);
+    final DigitalHumanPersona selected = settings.selectedDigitalHuman;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -63,9 +62,7 @@ class _DigitalHumanPickerState extends ConsumerState<DigitalHumanPicker> {
               icon: Icon(Icons.portrait),
             ),
           ],
-          selected: <bool>{
-            ref.watch(learningSettingsProvider).cartoonDigitalHuman,
-          },
+          selected: <bool>{settings.cartoonDigitalHuman},
           onSelectionChanged: (Set<bool> values) => ref
               .read(learningSettingsProvider.notifier)
               .setCartoonDigitalHuman(values.first),
@@ -96,6 +93,7 @@ class _DigitalHumanPickerState extends ConsumerState<DigitalHumanPicker> {
                 return _PersonaCard(
                   persona: persona,
                   selected: active,
+                  cartoon: settings.cartoonDigitalHuman,
                   onTap: () {
                     ref
                         .read(learningSettingsProvider.notifier)
@@ -130,11 +128,13 @@ class _PersonaCard extends StatelessWidget {
   const _PersonaCard({
     required this.persona,
     required this.selected,
+    required this.cartoon,
     required this.onTap,
   });
 
   final DigitalHumanPersona persona;
   final bool selected;
+  final bool cartoon;
   final VoidCallback onTap;
 
   @override
@@ -162,19 +162,23 @@ class _PersonaCard extends StatelessWidget {
             Expanded(
               child: ClipRRect(
                 borderRadius: BorderRadius.circular(14),
-                child: Image.asset(
-                  persona.assetPath,
-                  fit: BoxFit.cover,
-                  width: double.infinity,
-                  errorBuilder: (_, __, ___) => ColoredBox(
-                    color: AppDesignTokens.skyLight,
-                    child: Icon(
-                      Icons.face_retouching_natural_rounded,
-                      color: AppDesignTokens.brandGreenDark,
-                      size: 36,
-                    ),
-                  ),
-                ),
+                child: cartoon
+                    ? CartoonCoachSprite.portrait(
+                        asset: persona.cartoonAssetPath,
+                      )
+                    : Image.asset(
+                        persona.assetPath,
+                        fit: BoxFit.cover,
+                        width: double.infinity,
+                        errorBuilder: (_, __, ___) => ColoredBox(
+                          color: AppDesignTokens.skyLight,
+                          child: Icon(
+                            Icons.face_retouching_natural_rounded,
+                            color: AppDesignTokens.brandGreenDark,
+                            size: 36,
+                          ),
+                        ),
+                      ),
               ),
             ),
             const SizedBox(height: 8),

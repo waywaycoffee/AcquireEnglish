@@ -21,6 +21,7 @@ import '../../data/livetalking_client.dart';
 import '../../data/oral_coach_pipeline_client.dart';
 import '../../data/pronunciation_providers.dart';
 import '../../domain/pronunciation_assessment.dart';
+import 'cartoon_coach_sprite.dart';
 import 'coach_avatar_stage.dart';
 
 final RegExp _hanChars = RegExp(r'[\u4e00-\u9fff]');
@@ -479,7 +480,8 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
       setState(() {
         _liveConnected = false;
         _liveRenderer = null;
-        _error = 'LiveTalking 未接通，改用本地形象：'
+        _error =
+            'LiveTalking 未接通，改用本地形象：'
             '${'$error'.replaceFirst('Exception: ', '')}';
       });
     }
@@ -1216,11 +1218,11 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
         ? '外教在说…'
         : (_recordingActive
               ? '外教在听…'
-              : (_liveConnected
+              : (_liveConnected && !settings.cartoonDigitalHuman
                     ? '${persona.displayName} · 唇形'
                     : persona.displayName));
     final Widget? liveVideo =
-        _liveConnected && _liveRenderer != null
+        !settings.cartoonDigitalHuman && _liveConnected && _liveRenderer != null
         ? RTCVideoView(
             _liveRenderer!,
             objectFit: RTCVideoViewObjectFit.RTCVideoViewObjectFitCover,
@@ -1252,7 +1254,7 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
                 children: <Widget>[
                   CoachAvatarStage(
                     spriteAsset: settings.cartoonDigitalHuman
-                        ? 'assets/img/digital_human/${persona.id}-cartoon.png'
+                        ? persona.cartoonAssetPath
                         : null,
                     pulse: _orbPulse,
                     speaking: _coachSpeaking,
@@ -1372,6 +1374,9 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
                           bubble: bubble,
                           showZh: _showZhIndexes.contains(index),
                           coachAvatarAsset: persona.assetPath,
+                          cartoonAvatarAsset: settings.cartoonDigitalHuman
+                              ? persona.cartoonAssetPath
+                              : null,
                           onToggleZh: () => _toggleZh(index, bubble.zh),
                           onCopy: () => unawaited(_copyBubble(bubble.text)),
                           onSpeak: () => unawaited(_replayBubble(bubble.text)),
@@ -1604,6 +1609,7 @@ class _ConversationBubble extends StatelessWidget {
     required this.onCopy,
     required this.onSpeak,
     this.coachAvatarAsset,
+    this.cartoonAvatarAsset,
   });
 
   final _ChatBubble bubble;
@@ -1612,6 +1618,7 @@ class _ConversationBubble extends StatelessWidget {
   final VoidCallback onCopy;
   final VoidCallback onSpeak;
   final String? coachAvatarAsset;
+  final String? cartoonAvatarAsset;
 
   @override
   Widget build(BuildContext context) {
@@ -1630,19 +1637,27 @@ class _ConversationBubble extends StatelessWidget {
             : MainAxisAlignment.start,
         children: <Widget>[
           if (!mine) ...<Widget>[
-            CircleAvatar(
-              radius: 16,
-              backgroundColor: const Color(0xFF5B3FD4),
-              backgroundImage: avatar.isEmpty ? null : AssetImage(avatar),
-              onBackgroundImageError: avatar.isEmpty ? null : (_, __) {},
-              child: avatar.isEmpty
-                  ? const Icon(
-                      Icons.face_retouching_natural_rounded,
-                      size: 18,
-                      color: Colors.white,
-                    )
-                  : null,
-            ),
+            if (cartoonAvatarAsset case final String asset)
+              ClipOval(
+                child: SizedBox.square(
+                  dimension: 32,
+                  child: CartoonCoachSprite.portrait(asset: asset),
+                ),
+              )
+            else
+              CircleAvatar(
+                radius: 16,
+                backgroundColor: const Color(0xFF5B3FD4),
+                backgroundImage: avatar.isEmpty ? null : AssetImage(avatar),
+                onBackgroundImageError: avatar.isEmpty ? null : (_, __) {},
+                child: avatar.isEmpty
+                    ? const Icon(
+                        Icons.face_retouching_natural_rounded,
+                        size: 18,
+                        color: Colors.white,
+                      )
+                    : null,
+              ),
             const SizedBox(width: 8),
           ],
           Flexible(
