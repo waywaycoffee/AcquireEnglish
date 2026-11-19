@@ -9,108 +9,208 @@
       content="爱快英语：基于可理解性输入，用真实视频跟读、配音、听写，数字人口语外教陪练。"
     />
     <style>
+      :root {
+        --bg: #0b1220;
+        --card: #162033;
+        --border: rgba(120, 160, 220, 0.18);
+        --text: #e8eef8;
+        --muted: #93a4c3;
+        --accent: #93c5fd;
+      }
+      * { box-sizing: border-box; }
       body {
         margin: 0;
         font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-        color: #e8eef8;
-        background: #0b1220;
-        line-height: 1.6;
+        color: var(--text);
+        background: var(--bg);
+        line-height: 1.65;
       }
       main {
-        width: min(860px, calc(100% - 40px));
+        width: min(980px, calc(100% - 40px));
         margin: 0 auto;
-        padding: 40px 0 64px;
+        padding: 36px 0 72px;
       }
-      h1 {
-        font-size: 2rem;
-        line-height: 1.25;
+      header {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        margin-bottom: 28px;
       }
-      h2 {
-        margin-top: 36px;
+      header img {
+        width: 48px;
+        height: 48px;
+        border-radius: 12px;
       }
-      .muted {
-        color: #93a4c3;
+      h1 { font-size: clamp(1.8rem, 4vw, 2.4rem); line-height: 1.25; margin: 0 0 12px; }
+      h2 { margin-top: 40px; margin-bottom: 12px; }
+      h3 { margin: 0 0 8px; font-size: 1.05rem; }
+      .muted { color: var(--muted); }
+      .lead { color: var(--muted); font-size: 1.05rem; max-width: 46rem; }
+      .grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+        gap: 12px;
       }
       .card {
-        border: 1px solid rgba(120, 160, 220, 0.18);
+        border: 1px solid var(--border);
         border-radius: 14px;
         padding: 16px;
-        margin: 12px 0;
-        background: #162033;
+        background: var(--card);
       }
-      a {
-        color: #93c5fd;
+      .shots {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 14px;
       }
-      dt {
-        color: #93a4c3;
-        margin-top: 12px;
+      .shots figure {
+        margin: 0;
+        border: 1px solid var(--border);
+        border-radius: 14px;
+        padding: 10px;
+        background: var(--card);
       }
-      dd {
-        margin: 4px 0 0;
+      .shots img {
+        width: 100%;
+        border-radius: 10px;
+        display: block;
+        background: #000;
       }
+      .shots figcaption {
+        margin-top: 8px;
+        color: var(--muted);
+        font-size: 0.92rem;
+      }
+      ol.flow { padding-left: 1.2rem; }
+      ol.flow li { margin-bottom: 10px; }
+      dl { margin: 0; }
+      dt { color: var(--muted); margin-top: 12px; }
+      dd { margin: 4px 0 0; }
+      a { color: var(--accent); }
+      footer {
+        margin-top: 48px;
+        padding-top: 18px;
+        border-top: 1px solid var(--border);
+        color: var(--muted);
+        font-size: 0.92rem;
+      }
+      nav a { margin-right: 14px; }
     </style>
   </head>
   <body>
     <main>
-      <p class="muted">视频英语学习 App</p>
-      <h1>爱快英语 · Acquire English</h1>
-      <p>
-        基于可理解性输入理论，用真实视频学英语。跟读、配音、听写一体，数字人外教围绕字幕练口语，边看边说，学得更快更地道。
+      <header>
+        <img src="/brand/app-icon.png" alt="爱快英语图标" />
+        <div>
+          <strong>爱快英语 · Acquire English</strong>
+          <div class="muted">视频英语学习应用官网</div>
+        </div>
+      </header>
+
+      <nav>
+        <a href="#features">功能</a>
+        <a href="#shots">界面</a>
+        <a href="#flow">流程</a>
+        <a href="#info">应用信息</a>
+        <a href="/privacy.html">隐私政策</a>
+        <a href="/terms.html">用户协议</a>
+        <a href="/">动态官网</a>
+      </nav>
+
+      <p class="muted" style="margin-top: 28px">视频英语学习应用</p>
+      <h1>用真实视频学英语，边看边说</h1>
+      <p class="lead">
+        爱快英语（Acquire English）基于可理解性输入理论：导入真实视频，完成精听、跟读、配音、听写，
+        再用数字人口语外教围绕字幕练习表达。本页用于展示应用服务详情，无需登录即可浏览。
       </p>
 
-      <h2>产品能力</h2>
-      <div class="card">
-        <strong>真实视频输入</strong>
-        <p class="muted">支持 B 站 / YouTube / 本地视频课程，边看边学。</p>
-      </div>
-      <div class="card">
-        <strong>跟读 · 配音 · 听写</strong>
-        <p class="muted">影子跟读评分、配音回放分享、听写纠错。</p>
-      </div>
-      <div class="card">
-        <strong>数字人口语外教</strong>
-        <p class="muted">围绕字幕生成口语问答，引导回忆内容、词汇与语法并纠错。</p>
-      </div>
-      <div class="card">
-        <strong>账号与进度同步</strong>
-        <p class="muted">支持手机号登录、微信登录，课程与学习进度云端同步。</p>
+      <h2 id="features">核心服务</h2>
+      <div class="grid">
+        <article class="card"><h3>真实视频输入</h3><p class="muted">支持 B 站、YouTube、本地视频导入。</p></article>
+        <article class="card"><h3>双语字幕精听</h3><p class="muted">倍速、循环、双语字幕；可语音识别生成字幕。</p></article>
+        <article class="card"><h3>跟读评测</h3><p class="muted">影子跟读 / 看句读 / 藏句读，录音反馈发音。</p></article>
+        <article class="card"><h3>配音分享</h3><p class="muted">跟读录音配音回放，支持导出分享。</p></article>
+        <article class="card"><h3>听写练习</h3><p class="muted">听句写英文，难题可加入听写队列。</p></article>
+        <article class="card"><h3>数字人口语</h3><p class="muted">围绕视频提问、引导词汇语法并纠错。</p></article>
+        <article class="card"><h3>词卡短语</h3><p class="muted">点词查义、收藏词卡与句子复习。</p></article>
+        <article class="card"><h3>云端同步</h3><p class="muted">手机号 / 微信登录后同步课程与进度。</p></article>
       </div>
 
-      <h2>如何使用</h2>
-      <ol>
-        <li>导入或打开一节英语视频课程</li>
-        <li>观看字幕，用跟读 / 听写巩固句子</li>
-        <li>用数字人围绕视频内容练口语问答</li>
-        <li>收藏词卡与短语，多端继续学习</li>
+      <h2 id="shots">应用运行界面</h2>
+      <p class="muted">以下为真实 App 截图，便于了解产品形态与主要功能。</p>
+      <div class="shots">
+        <figure>
+          <img src="/shots/01-home-learn.png" alt="学习页截图" />
+          <figcaption>学习页：视频课程、导入入口与继续学习</figcaption>
+        </figure>
+        <figure>
+          <img src="/shots/03-home.png" alt="首页截图" />
+          <figcaption>首页：今日推荐与学习任务</figcaption>
+        </figure>
+        <figure>
+          <img src="/shots/02-player-modes.png" alt="播放器截图" />
+          <figcaption>播放器：字幕 / 跟读 / 陪练 / 听写 / 词卡</figcaption>
+        </figure>
+        <figure>
+          <img src="/shots/04-study.png" alt="学习模式截图" />
+          <figcaption>学习模式：精听与跟读练习</figcaption>
+        </figure>
+      </div>
+
+      <h2 id="flow">使用流程</h2>
+      <ol class="flow">
+        <li><strong>打开课程</strong>：从首页续学或书库选择视频课，也可导入新内容。</li>
+        <li><strong>看字幕精听</strong>：使用双语字幕、倍速与循环，先听懂再开口。</li>
+        <li><strong>跟读 / 听写</strong>：切换学习模式录音评分，或听写核对句子。</li>
+        <li><strong>口语陪练</strong>：数字人围绕视频内容提问，卡住时引导词汇与语法。</li>
       </ol>
 
-      <h2>应用信息</h2>
-      <dl>
-        <dt>应用名称</dt>
-        <dd>爱快英语（Acquire English）</dd>
-        <dt>产品形态</dt>
-        <dd>Android / iOS App + PC 网站</dd>
-        <dt>Android 包名</dt>
-        <dd>com.acquire.english</dd>
-        <dt>服务内容</dt>
-        <dd>英语视频学习、跟读评测、听写练习、数字人口语陪练、学习进度同步</dd>
-        <dt>官网</dt>
-        <dd>
-          <a href="https://acquireenglish.curlhairai.com/">https://acquireenglish.curlhairai.com/</a>
-        </dd>
-        <dt>产品介绍页（纯静态）</dt>
-        <dd>
-          <a href="https://acquireenglish.curlhairai.com/product.html"
-            >https://acquireenglish.curlhairai.com/product.html</a
-          >
-        </dd>
-        <dt>联系方式</dt>
-        <dd>support@curlhairai.com</dd>
-      </dl>
+      <h2 id="info">应用信息</h2>
+      <div class="card">
+        <dl>
+          <dt>应用名称</dt>
+          <dd>爱快英语（Acquire English）</dd>
+          <dt>应用简介</dt>
+          <dd>基于可理解性输入的视频英语学习工具，提供跟读、配音、听写与数字人口语陪练。</dd>
+          <dt>产品形态</dt>
+          <dd>Android / iOS 移动应用 + PC 网站</dd>
+          <dt>Android 包名</dt>
+          <dd>com.acquire.english</dd>
+          <dt>服务内容</dt>
+          <dd>英语视频学习、字幕精听、跟读评测、听写练习、数字人口语陪练、词卡复习、学习进度同步</dd>
+          <dt>上架状态</dt>
+          <dd>开发中 / 未上架应用市场</dd>
+          <dt>官网</dt>
+          <dd><a href="https://acquireenglish.curlhairai.com/">https://acquireenglish.curlhairai.com/</a></dd>
+          <dt>本页（纯静态，推荐审核填写）</dt>
+          <dd><a href="https://acquireenglish.curlhairai.com/product.html">https://acquireenglish.curlhairai.com/product.html</a></dd>
+          <dt>联系邮箱</dt>
+          <dd><a href="mailto:support@curlhairai.com">support@curlhairai.com</a></dd>
+        </dl>
+      </div>
 
-      <p class="muted" style="margin-top: 40px">
-        © 2026 爱快英语 Acquire English · 本站展示应用服务信息，学习功能登录后可用。
-      </p>
+      <h2>常见问题</h2>
+      <div class="card">
+        <h3>爱快英语是做什么的？</h3>
+        <p class="muted">面向英语学习者的视频学习 App，用真实视频完成精听、跟读、听写与口语练习。</p>
+      </div>
+      <div class="card">
+        <h3>需要登录才能看官网吗？</h3>
+        <p class="muted">不需要。本页与官网首页均可在未登录状态浏览产品详情。</p>
+      </div>
+      <div class="card">
+        <h3>支持哪些内容来源？</h3>
+        <p class="muted">支持 B 站、YouTube 以及本地视频导入；也可学习云端课程。</p>
+      </div>
+
+      <footer>
+        <p>© 2026 爱快英语 Acquire English</p>
+        <p>
+          <a href="/privacy.html">隐私政策</a> ·
+          <a href="/terms.html">用户协议</a> ·
+          <a href="/">返回官网</a>
+        </p>
+        <p>本站展示应用服务信息；学习功能登录后使用。</p>
+      </footer>
     </main>
   </body>
 </html>

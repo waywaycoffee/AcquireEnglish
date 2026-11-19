@@ -3,8 +3,10 @@ import { AuthProvider, useAuth } from "./auth";
 import HomePage from "./pages/HomePage";
 import LandingPage from "./pages/LandingPage";
 import LoginPage from "./pages/LoginPage";
+import PrivacyPage from "./pages/PrivacyPage";
 import RegisterPage from "./pages/RegisterPage";
 import StudyPage from "./pages/StudyPage";
+import TermsPage from "./pages/TermsPage";
 
 function Protected({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
@@ -26,6 +28,8 @@ export default function App() {
         {/* Public product site for WeChat / store review — no login wall */}
         <Route path="/" element={<LandingPage />} />
         <Route path="/about" element={<LandingPage />} />
+        <Route path="/privacy" element={<PrivacyPage />} />
+        <Route path="/terms" element={<TermsPage />} />
         <Route path="/login" element={<LoginPage />} />
         <Route path="/register" element={<RegisterPage />} />
         <Route
