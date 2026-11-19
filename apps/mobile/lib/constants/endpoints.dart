@@ -47,6 +47,10 @@ class Endpoints {
       'api/shared-subtitles/bilibili';
   static const String imports = 'api/imports';
   static const String importsAsset = 'api/imports/asset';
+  static const String netdiskStatus = 'api/netdisk/status';
+  static const String netdiskBind = 'api/netdisk/bind';
+  static const String netdiskList = 'api/netdisk/list';
+  static const String netdiskImport = 'api/netdisk/import';
   static const String rewardsShare = 'api/rewards/share';
   static const String rewardsPoints = 'api/rewards/points';
 

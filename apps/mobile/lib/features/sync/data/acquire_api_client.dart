@@ -927,6 +927,57 @@ class AcquireApiClient {
     return AcquirePhraseDto.fromJson(response.data as Map<String, dynamic>);
   }
 
+  Future<Map<String, dynamic>> netdiskStatus() async {
+    final Response<dynamic> response = await _dio.get(Endpoints.netdiskStatus);
+    return response.data as Map<String, dynamic>;
+  }
+
+  Future<Map<String, dynamic>> bindNetdisk({
+    required String provider,
+    required String credential,
+  }) async {
+    final Response<dynamic> response = await _dio.post(
+      Endpoints.netdiskBind,
+      data: <String, String>{
+        'provider': provider,
+        'credential': credential,
+      },
+    );
+    return response.data as Map<String, dynamic>;
+  }
+
+  Future<void> unbindNetdisk(String provider) async {
+    await _dio.delete<dynamic>('api/netdisk/bind/$provider');
+  }
+
+  Future<Map<String, dynamic>> listNetdisk({
+    required String provider,
+    String path = '',
+  }) async {
+    final Response<dynamic> response = await _dio.get(
+      Endpoints.netdiskList,
+      queryParameters: <String, dynamic>{
+        'provider': provider,
+        if (path.trim().isNotEmpty) 'path': path.trim(),
+      },
+    );
+    return response.data as Map<String, dynamic>;
+  }
+
+  Future<Map<String, dynamic>> importNetdiskVideos({
+    required String provider,
+    required List<String> paths,
+  }) async {
+    final Response<dynamic> response = await _dio.post(
+      Endpoints.netdiskImport,
+      data: <String, dynamic>{
+        'provider': provider,
+        'paths': paths,
+      },
+    );
+    return response.data as Map<String, dynamic>;
+  }
+
   Future<bool> liveKitConfigured() async {
     try {
       final Response<dynamic> response = await _dio.get(Endpoints.livekitStatus);

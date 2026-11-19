@@ -7,6 +7,7 @@ import '../../shared/presentation/pad/app_design_tokens.dart';
 import '../../shared/presentation/widgets/bilibili_brand_icon.dart';
 import 'bilibili_import_sheet.dart';
 import 'import_course_screen.dart';
+import 'netdisk_import_sheet.dart';
 import 'youtube_import_sheet.dart';
 
 /// Shared YouTube / B站 / 本地导入 entry used by 学习页 and 首页.
@@ -101,7 +102,34 @@ class CourseImportActionButtons extends ConsumerWidget {
             ),
             icon: const Icon(Icons.add_rounded, size: 18),
             label: const Text(
-              '导入',
+              '本地',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(fontWeight: FontWeight.w900),
+            ),
+          ),
+        ),
+        const SizedBox(width: 8),
+        Expanded(
+          child: FilledButton.icon(
+            onPressed: enabled
+                ? () {
+                    unawaited(showNetdiskImportSheet(context, ref));
+                  }
+                : null,
+            style: FilledButton.styleFrom(
+              backgroundColor: const Color(0xFF0F766E),
+              foregroundColor: Colors.white,
+              visualDensity: VisualDensity.standard,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(999),
+              ),
+              padding: pad,
+              elevation: 0,
+            ),
+            icon: const Icon(Icons.cloud_download_rounded, size: 18),
+            label: const Text(
+              '网盘',
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               style: TextStyle(fontWeight: FontWeight.w900),
@@ -144,7 +172,7 @@ Future<void> showCourseImportEntrySheet(
               ),
               const SizedBox(height: 6),
               Text(
-                '与学习页相同：YouTube、B站或本地视频',
+                'YouTube、B站、本地或自己的百度/夸克网盘',
                 textAlign: TextAlign.center,
                 style: TextStyle(
                   fontSize: 13,

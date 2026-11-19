@@ -62,11 +62,23 @@ class Settings(BaseSettings):
     livekit_api_key: str = ""
     livekit_api_secret: str = ""
 
+    # OpenList (AList fork) — personal Baidu / Quark mounts. Empty = netdisk import disabled.
+    openlist_base_url: str = ""
+    openlist_admin_user: str = "admin"
+    openlist_admin_password: str = ""
+    # Public base for OpenList links if different from openlist_base_url (nginx reverse proxy).
+    openlist_public_base: str = ""
 
     @property
     def cors_origin_list(self) -> list[str]:
         raw = [o.strip() for o in self.cors_origins.split(",") if o.strip()]
         return raw or ["*"]
+
+    @property
+    def openlist_configured(self) -> bool:
+        return bool(
+            self.openlist_base_url.strip() and self.openlist_admin_password.strip()
+        )
 
 
 settings = Settings()

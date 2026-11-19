@@ -1,0 +1,16 @@
+# OpenList sidecar for AcquireEnglish personal Baidu / Quark imports.
+# Run on the same ECS as the API; nginx proxies https://…/openlist/ → :5244
+#
+# ECS in CN often times out on docker.io — prefer DaoCloud pull-through:
+#   docker pull docker.m.daocloud.io/openlistteam/openlist:latest
+services:
+  openlist:
+    image: docker.m.daocloud.io/openlistteam/openlist:latest
+    container_name: acquireenglish-openlist
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:5244:5244"
+    volumes:
+      - ./data:/opt/openlist/data
+    environment:
+      - UMASK=022

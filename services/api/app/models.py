@@ -30,12 +30,43 @@ class User(Base):
         back_populates="user", uselist=False
     )
     link_courses: Mapped[list["UserLinkCourse"]] = relationship(back_populates="user")
+    netdisk_bindings: Mapped[list["UserNetdiskBinding"]] = relationship(
+        back_populates="user"
+    )
     entitlements: Mapped[list["UserEntitlement"]] = relationship(back_populates="user")
     orders: Mapped[list["Order"]] = relationship(back_populates="user")
     wallet: Mapped["WalletAccount | None"] = relationship(
         back_populates="user", uselist=False
     )
     points_ledger: Mapped[list["UserPointsLedger"]] = relationship(back_populates="user")
+
+
+class UserNetdiskBinding(Base):
+    """User's own Baidu / Quark drive bound via OpenList (no share-link import)."""
+
+    __tablename__ = "user_netdisk_bindings"
+    __table_args__ = (
+        UniqueConstraint("user_id", "provider", name="uq_user_netdisk_provider"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    user_id: Mapped[int] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), index=True
+    )
+    # baidu | quark
+    provider: Mapped[str] = mapped_column(String(16), index=True)
+    # Fernet token of the cookie / refresh material (never return raw to clients).
+    credential_enc: Mapped[str] = mapped_column(Text)
+    openlist_mount_path: Mapped[str] = mapped_column(String(255))
+    openlist_storage_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
+
+    user: Mapped[User] = relationship(back_populates="netdisk_bindings")
 
 
 class UserPointsLedger(Base):
