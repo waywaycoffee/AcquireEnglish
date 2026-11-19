@@ -1,23 +1,20 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
 import 'dart:math';
-import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
-import 'package:flutter_tts/flutter_tts.dart';
-import '../../domain/coach_animation_timeline.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:flutter_webrtc/flutter_webrtc.dart';
+import 'package:flutter_tts/flutter_tts.dart';
 import 'package:media_kit/media_kit.dart';
 import 'package:path_provider/path_provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../../authentication/presentation/auth_session.dart';
 import '../../../settings/presentation/settings_provider.dart';
 import '../../../sync/data/acquire_api_client.dart';
 import '../../data/digital_human_catalog.dart';
-import '../../data/livekit_oral_client.dart';
-import '../../data/livetalking_client.dart';
 import '../../data/oral_coach_pipeline_client.dart';
 import '../../data/pronunciation_providers.dart';
 import '../../domain/pronunciation_assessment.dart';
@@ -43,10 +40,7 @@ String preferEnglishCoachReply(
   final List<String> englishBits = text
       .split(RegExp(r'[。！？\n]+'))
       .map((String part) => part.trim())
-      .where(
-        (String part) =>
-            part.length >= 8 && !_hanChars.hasMatch(part),
-      )
+      .where((String part) => part.length >= 8 && !_hanChars.hasMatch(part))
       .toList(growable: false);
   if (englishBits.isNotEmpty) {
     return englishBits.join(' ');
@@ -154,6 +148,7 @@ class StudyOralCoachTab extends ConsumerStatefulWidget {
     this.courseTitle = '',
     this.episodeTitle = '',
     this.hasTranscript = false,
+    this.episodeId,
     super.key,
   });
 
@@ -165,6 +160,7 @@ class StudyOralCoachTab extends ConsumerStatefulWidget {
   final String courseTitle;
   final String episodeTitle;
   final bool hasTranscript;
+  final String? episodeId;
 
   @override
   ConsumerState<StudyOralCoachTab> createState() => _StudyOralCoachTabState();
@@ -176,42 +172,37 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
       Pcm16MonoAudio.expectedSampleRate * 2 * 60;
   static const Duration _sessionBudget = Duration(minutes: 3);
 
-  final LiveTalkingClient _liveClient = LiveTalkingClient();
-  String? _connectedPersonaId;
   final OralCoachPipelineClient _pipelineClient = OralCoachPipelineClient();
-  final LiveKitOralClient _liveKitClient = LiveKitOralClient();
   final List<_ChatBubble> _bubbles = <_ChatBubble>[];
   final Set<int> _showZhIndexes = <int>{};
   final ScrollController _chatScroll = ScrollController();
-  RTCVideoRenderer? _renderer;
   PronunciationMicrophone? _microphone;
   final Uint8List _recordingBuffer = Uint8List(_maxRecordingBytes);
   int _recordingBytesWritten = 0;
   StreamSubscription<Uint8List>? _recordingSubscription;
   Timer? _recordingLimitTimer;
   Timer? _sessionTicker;
-  Timer? _reconnectTimer;
   DateTime? _sessionStartedAt;
   Duration _sessionLeft = _sessionBudget;
   OralCoachSession? _session;
+  Future<void>? _sessionPreparation;
+  String? _historyKey;
+  bool _historyLoading = true;
+  Player? _speechPlayer;
   String? _learningSessionId;
-  bool _connecting = false;
   bool _busy = false;
   bool _recordingActive = false;
   bool _started = false;
-  bool _bootstrapped = false;
   String _status = '你可以开始说';
   String? _error;
   String _difficulty = 'B1';
-  List<Map<String, dynamic>> _iceServers = defaultLiveTalkingIceServers;
   late final AnimationController _orbPulse;
   bool _coachSpeaking = false;
   final FlutterTts _cartoonTts = FlutterTts();
-  CoachViseme _mouth = CoachViseme.closed;
-  Timer? _wordMouthTicker;
-  int _busyLineFailures = 0;
+
   /// Default English. Flip only when the learner asks for Chinese.
   bool _preferChineseReply = false;
+
   /// Pre-generated oral Q&A topics from the episode transcript.
   List<String> _talkTopics = const <String>[];
   int _topicCursor = 0;
@@ -224,101 +215,80 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
       duration: const Duration(milliseconds: 1400),
     )..repeat(reverse: true);
     _microphone = ref.read(pronunciationMicrophoneFactoryProvider)();
-    _liveKitClient.onScore = (_) {};
-    _liveKitClient.onStatus = (String status) {
-      if (!mounted || _busy || _recordingActive) {
-        return;
-      }
-      setState(() => _status = status);
-    };
+    _talkTopics = _localHeuristicTalkTopics();
+    final String? episodeId = widget.episodeId;
+    if (episodeId != null && episodeId.isNotEmpty) {
+      final String account = ref
+          .read(authSessionProvider)
+          .email
+          .trim()
+          .toLowerCase();
+      _historyKey =
+          'oralCoachHistory:${jsonEncode(<String>[account, episodeId])}';
+    }
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted) {
-        return;
-      }
-      unawaited(_bootstrapSession());
+      if (mounted) unawaited(_restoreHistoryAndStart());
     });
   }
 
   @override
   void dispose() {
-    _wordMouthTicker?.cancel();
     unawaited(_cartoonTts.stop());
+    unawaited(_speechPlayer?.stop());
     _orbPulse.dispose();
     _sessionTicker?.cancel();
-    _reconnectTimer?.cancel();
     _chatScroll.dispose();
-    _liveKitClient.onScore = null;
-    _liveKitClient.onStatus = null;
     unawaited(_releaseMic());
-    // Awaited hangup frees GPU session slots; fire-and-forget left zombies.
-    unawaited(_teardownLiveSessions());
     super.dispose();
   }
 
-  Future<void> _teardownLiveSessions() async {
-    try {
-      await _liveClient.disconnect();
-    } catch (_) {}
-    try {
-      await _liveKitClient.disconnect();
-    } catch (_) {}
+  Future<void> _restoreHistoryAndStart() async {
+    final String? key = _historyKey;
+    if (key != null) {
+      try {
+        final String? raw = await SharedPreferencesAsync().getString(key);
+        if (!mounted) return;
+        if (raw != null) {
+          final List<dynamic> rows = jsonDecode(raw) as List<dynamic>;
+          _bubbles.addAll(
+            rows.whereType<Map<String, dynamic>>().map(
+              (Map<String, dynamic> row) => _ChatBubble(
+                role: row['role'] as String,
+                text: row['text'] as String,
+                hint: row['hint'] == true,
+                zh: row['zh'] as String? ?? '',
+              ),
+            ),
+          );
+        }
+      } catch (_) {}
+    }
+    if (!mounted) return;
+    setState(() => _historyLoading = false);
+    _startTopicConversation();
   }
 
-  /// Auto open greeting — no "连接/开始" buttons.
-  ///
-  /// Default pipeline uses a local avatar + TTS (no LiveTalking WebRTC).
-  Future<void> _bootstrapSession() async {
-    if (_bootstrapped || !mounted) {
-      return;
-    }
-    _bootstrapped = true;
-    final LearningSettingsState settings = ref.read(learningSettingsProvider);
-    // Realtime lip-sync only when user explicitly chose LiveTalking backend.
-    if (settings.usesRealtimeLipSync) {
-      await _ensureDigitalHumanConnected(settings);
-      _scheduleReconnectIfNeeded();
-    }
-    if (!mounted) {
-      return;
-    }
-    if (!_started) {
-      await _startTopicConversation();
-    }
-  }
+  Future<void> _historyWrite = Future<void>.value();
 
-  void _scheduleReconnectIfNeeded() {
-    _reconnectTimer?.cancel();
-    final LearningSettingsState settings = ref.read(learningSettingsProvider);
-    if (!settings.usesRealtimeLipSync) {
-      return;
-    }
-    if (_busyLineFailures >= 3) {
-      return;
-    }
-    if (_liveClient.isConnected || _connecting) {
-      return;
-    }
-    _reconnectTimer = Timer.periodic(const Duration(seconds: 20), (_) {
-      if (!mounted || _connecting || _liveClient.isConnected) {
-        if (_liveClient.isConnected) {
-          _reconnectTimer?.cancel();
-        }
-        return;
-      }
-      if (_busyLineFailures >= 3 || _sessionLeft == Duration.zero) {
-        _reconnectTimer?.cancel();
-        return;
-      }
-      // Drop stale half-open peers before opening a new /offer slot.
-      unawaited(() async {
-        if (_liveClient.isConnected && !_liveClient.isSessionAlive) {
-          await _liveClient.disconnect();
-        }
-        await _ensureDigitalHumanConnected(
-          ref.read(learningSettingsProvider),
-          speakGreeting: false,
-        );
-      }());
+  void _saveHistory() {
+    final String? key = _historyKey;
+    if (key == null) return;
+    final String snapshot = jsonEncode(
+      _bubbles
+          .map(
+            (_ChatBubble bubble) => <String, Object>{
+              'role': bubble.role,
+              'text': bubble.text,
+              'hint': bubble.hint,
+              'zh': bubble.zh,
+            },
+          )
+          .toList(),
+    );
+    _historyWrite = _historyWrite.then((_) async {
+      try {
+        await SharedPreferencesAsync().setString(key, snapshot);
+      } catch (_) {}
     });
   }
 
@@ -375,41 +345,6 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
         .toList(growable: false);
   }
 
-  Future<void> _prepareTalkTopics(LearningSettingsState settings) async {
-    List<String> topics = const <String>[];
-    if (settings.usesOralCoachPipeline && _session != null) {
-      try {
-        topics = await _pipelineClient.generateTalkTopics(
-          session: _session!,
-          articleExcerpt: widget.articleExcerpt,
-          topicSummary: _topicLabel,
-          count: 8,
-          force: true,
-        );
-      } catch (_) {
-        topics = const <String>[];
-      }
-    }
-    if (topics.isEmpty) {
-      topics = _localHeuristicTalkTopics();
-    }
-    if (!mounted) {
-      return;
-    }
-    setState(() {
-      _talkTopics = topics;
-      _topicCursor = 0;
-    });
-    if (_session != null) {
-      try {
-        await _pipelineClient.updateContext(
-          session: _session!,
-          context: _videoContext(settings: settings),
-        );
-      } catch (_) {}
-    }
-  }
-
   String get _topicLabel {
     final String summary = widget.topicSummary.trim();
     if (summary.isNotEmpty) {
@@ -463,345 +398,72 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
         .replaceFirst(RegExp(r'^Exception:\s*'), '');
   }
 
-  Future<String> _resolveLiveTalkingUrl(
-    LearningSettingsState settings, {
-    String? preferredUrl,
-  }) async {
-    bool usable(String raw) {
-      final String v = raw.trim();
-      if (v.isEmpty || v.contains('127.0.0.1')) {
-        return false;
-      }
-      // Phones must not use Tailscale-only endpoints.
-      if (v.contains('100.115.252.55') || v.contains('ts.net')) {
-        return false;
-      }
-      return true;
-    }
-
-    final List<String> preferred = <String>[];
-    final String override = (preferredUrl ?? '').trim();
-    if (usable(override)) {
-      preferred.add(override.replaceAll(RegExp(r'/+$'), ''));
-    }
-    final String fromSettings = settings.resolvedOralCoachServerUrl;
-    if (usable(fromSettings)) {
-      preferred.add(fromSettings);
-    }
-    if (settings.usesOralCoachPipeline) {
-      try {
-        final Map<String, dynamic> health = await _pipelineClient.health(
-          settings.oralCoachPipelineUrl,
-        );
-        final String fromHealth = '${health['livetalking_url'] ?? ''}'.trim();
-        if (usable(fromHealth)) {
-          preferred.add(fromHealth.replaceAll(RegExp(r'/+$'), ''));
-        }
-        final List<Map<String, dynamic>> ice = _parseIceServers(
-          health['webrtc_ice_servers'],
-        );
-        if (ice.isNotEmpty) {
-          _iceServers = ice;
-        }
-      } catch (_) {}
-    }
-    return LiveTalkingClient.pickReachableBaseUrl(
-      preferred: preferred.isEmpty ? defaultLiveTalkingUrlPublic : preferred.first,
-      candidates: liveTalkingUrlCandidates,
-    );
-  }
-
-  List<Map<String, dynamic>> _parseIceServers(Object? raw) {
-    if (raw is! List) {
-      return const <Map<String, dynamic>>[];
-    }
-    final List<Map<String, dynamic>> out = <Map<String, dynamic>>[];
-    for (final Object? item in raw) {
-      if (item is! Map) {
-        continue;
-      }
-      final Map<String, dynamic> row = Map<String, dynamic>.from(item);
-      final Object? urls = row['urls'];
-      if (urls == null) {
-        continue;
-      }
-      out.add(row);
-    }
-    return out;
-  }
-
-  Future<List<Map<String, dynamic>>?> _fetchIceServers() async {
-    try {
-      final LearningSettingsState settings = ref.read(learningSettingsProvider);
-      final Map<String, dynamic> health = await _pipelineClient.health(
-        settings.oralCoachPipelineUrl,
-      );
-      final Object? raw = health['webrtc_ice_servers'];
-      if (raw is! List) {
-        return null;
-      }
-      final List<Map<String, dynamic>> out = <Map<String, dynamic>>[];
-      for (final Object? item in raw) {
-        if (item is Map) {
-          out.add(Map<String, dynamic>.from(item));
-        }
-      }
-      return out.isEmpty ? null : out;
-    } catch (_) {
-      return null;
-    }
-  }
-
-  Future<void> _connectLiveTalking(String serverUrl) async {
-    if (_connecting) {
-      return;
-    }
-    setState(() {
-      _connecting = true;
-      _error = null;
-      _status = '正在连接数字人…';
-    });
-    try {
-      final List<Map<String, dynamic>>? ice = await _fetchIceServers();
-      if (ice != null && ice.isNotEmpty) {
-        _iceServers = ice;
-      }
-      final DigitalHumanPersona persona =
-          ref.read(learningSettingsProvider).selectedDigitalHuman;
-      final RTCVideoRenderer renderer = await _liveClient.connect(
-        serverUrl,
-        avatar: persona.liveTalkingAvatarId,
-        iceServers: _iceServers,
-      );
-      if (!mounted) {
-        await _liveClient.disconnect();
-        return;
-      }
-      setState(() {
-        _renderer = renderer;
-        _connectedPersonaId = persona.id;
-        _error = '当前为 LiveTalking 服务示例形象；${persona.displayName} 的专属真人视频尚未部署。';
-        _busyLineFailures = 0;
-        _status = _liveClient.hasRemoteVideo
-            ? '你可以开始说'
-            : '画面加载中 · 可以先开口';
-        _connecting = false;
-      });
-      _reconnectTimer?.cancel();
-    } catch (error) {
-      if (!mounted) {
-        return;
-      }
-      final String msg = _pretty(error);
-      final bool busy = msg.contains('忙线') || msg.contains('会话');
-      if (busy) {
-        _busyLineFailures += 1;
-      }
-      setState(() {
-        _connecting = false;
-        _renderer = null;
-        _error = busy
-            ? (_busyLineFailures >= 3
-                  ? '外教线路繁忙，已改用头像对话'
-                  : '外教忙线，正在清理后重试…')
-            : msg;
-        _status = _busyLineFailures >= 3 ? '头像对话中' : '仍可语音对话 · 自动重连中';
-      });
-      if (_busyLineFailures < 3) {
-        _scheduleReconnectIfNeeded();
-      }
-    }
-  }
-
-  Future<void> _ensureDigitalHumanConnected(
-    LearningSettingsState settings, {
-    bool speakGreeting = false,
-    String? greetingText,
-    String? preferredUrl,
-  }) async {
-    if (!settings.usesRealtimeLipSync) {
-      return;
-    }
-    final String liveUrl = await _resolveLiveTalkingUrl(
-      settings,
-      preferredUrl: preferredUrl,
-    );
-    if (liveUrl.isEmpty) {
-      return;
-    }
-    final String? openBase = _liveClient.baseUrl;
-    final bool hostChanged =
-        openBase != null &&
-        openBase.isNotEmpty &&
-        liveUrl.replaceAll(RegExp(r'/+$'), '') != openBase;
-    if (_liveClient.isConnected && !_liveClient.isSessionAlive) {
-      await _liveClient.disconnect();
-    }
-    if (!_liveClient.isConnected || hostChanged || _connectedPersonaId != settings.digitalHumanId) {
-      await _connectLiveTalking(liveUrl);
-    }
-    if (speakGreeting &&
-        _liveClient.isConnected &&
-        (greetingText ?? '').trim().isNotEmpty) {
-      try {
-        await _liveClient.speak(greetingText!.trim(), type: 'echo');
-      } catch (error) {
-        if (mounted) {
-          setState(() => _error = _pretty(error));
-        }
-      }
-    }
-  }
+  bool _usesVoicePipeline(LearningSettingsState settings) =>
+      settings.oralCoachBackend != '本地 TTS' &&
+      settings.oralCoachPipelineUrl.trim().isNotEmpty;
 
   Future<void> _ensurePipelineSession(LearningSettingsState settings) async {
-    final String base = OralCoachPipelineClient.normalizeBaseUrl(
-      settings.oralCoachPipelineUrl,
-    );
-    if (_session != null && _session!.baseUrl != base) {
-      _session = null;
+    if (_session != null) return;
+    final Future<void> preparation = _sessionPreparation ??=
+        _createPipelineSession(settings, _sessionStartedAt);
+    try {
+      await preparation;
+    } finally {
+      if (identical(_sessionPreparation, preparation))
+        _sessionPreparation = null;
     }
-    if (_session != null) {
-      try {
-        await _pipelineClient.updateContext(
-          session: _session!,
-          context: _videoContext(settings: settings),
-        );
-      } catch (_) {
-        _session = null;
-      }
-      if (_session != null) {
-        return;
-      }
-    }
+  }
+
+  Future<void> _createPipelineSession(
+    LearningSettingsState settings,
+    DateTime? startedAt,
+  ) async {
     final OralCoachSession session = await _pipelineClient.createSession(
       rawBaseUrl: settings.oralCoachPipelineUrl,
       context: _videoContext(settings: settings),
     );
+    if (!mounted || !_started || startedAt != _sessionStartedAt) return;
     _session = session;
     _difficulty = session.difficulty;
   }
 
-  Future<bool> _playRemoteTts(String url, {String text = ''}) async {
-    Player? player;
+  Future<bool> _playRemoteTts(String url) async {
+    if (!mounted) return false;
+    final Player player = Player();
+    _speechPlayer = player;
     try {
-      player = Player();
+      final Future<bool> completed = player.stream.completed
+          .firstWhere((bool value) => value)
+          .timeout(const Duration(seconds: 45), onTimeout: () => false);
       await player.open(Media(url), play: true);
-      final DateTime deadline = DateTime.now().add(const Duration(seconds: 45));
-      Duration cueDuration = Duration.zero;
-      CoachAnimationTimeline? timeline;
-      while (mounted && DateTime.now().isBefore(deadline)) {
-        await Future<void>.delayed(const Duration(milliseconds: 40));
-        if (!mounted) return false;
-        final PlayerState playback = player.state;
-        if (playback.duration > Duration.zero &&
-            playback.duration != cueDuration &&
-            text.isNotEmpty) {
-          cueDuration = playback.duration;
-          timeline = CoachAnimationTimeline.estimate(text, cueDuration);
-        }
-        _setMouth(
-          timeline?.mouthAt(playback.position, playing: playback.playing) ??
-              CoachViseme.closed,
-        );
-        final bool ended =
-            player.state.completed ||
-            (!player.state.playing &&
-                player.state.position >= player.state.duration &&
-                player.state.duration > Duration.zero);
-        if (ended) {
-          return true;
-        }
-      }
-      return false;
+      return await completed;
     } catch (_) {
       return false;
     } finally {
-      try {
-        await player?.dispose();
-      } catch (_) {}
+      _speechPlayer = null;
+      await player.dispose();
     }
   }
 
-  void _setMouth(CoachViseme shape) {
-    if (mounted && _mouth != shape) {
-      setState(() => _mouth = shape);
-    }
-  }
-
-  void _animateLocalWord(String word) {
-    _wordMouthTicker?.cancel();
-    if (!mounted || word.trim().isEmpty) return;
-    final Duration estimate = Duration(milliseconds: (word.length * 55).clamp(140, 600));
-    final CoachAnimationTimeline timeline =
-        CoachAnimationTimeline.estimate(word, estimate);
-    final Stopwatch clock = Stopwatch()..start();
-    _setMouth(timeline.mouthAt(Duration.zero, playing: true));
-    _wordMouthTicker = Timer.periodic(const Duration(milliseconds: 32), (Timer timer) {
-      final Duration position = clock.elapsed;
-      _setMouth(timeline.mouthAt(position, playing: true));
-      if (position >= estimate) timer.cancel();
-    });
-  }
-
-  Future<void> _speakCoach(String text, LearningSettingsState settings) async {
+  Future<void> _speakCoach(
+    String text,
+    LearningSettingsState settings, {
+    String? ttsUrl,
+  }) async {
     final String speak = text.trim();
-    if (!mounted || speak.isEmpty) {
-      return;
-    }
-    final DigitalHumanPersona persona = settings.selectedDigitalHuman;
-    if (mounted) {
-      setState(() => _coachSpeaking = true);
-    }
+    if (!mounted || !_started || _coachSpeaking || speak.isEmpty) return;
+    setState(() => _coachSpeaking = true);
     try {
-      // Realtime lip-sync only for explicit LiveTalking backend.
-      if (settings.usesRealtimeLipSync) {
-        await _ensureDigitalHumanConnected(settings);
-        if (_liveClient.isConnected) {
-          try {
-            await _liveClient.speak(speak, type: 'echo');
-            return;
-          } catch (_) {}
-        }
-      }
-      // Prefer persona Edge voice (different timbre per digital human).
-      if (settings.usesOralCoachPipeline) {
-        try {
-          final String? ttsUrl = await _pipelineClient.synthesizeSpeech(
-            rawBaseUrl: settings.oralCoachPipelineUrl,
-            text: speak,
-            digitalHumanId: persona.id,
-            ttsVoice: persona.edgeVoice(chinese: _preferChineseReply),
-            language: _preferChineseReply ? 'zh' : 'en',
-          );
-          if (ttsUrl != null && ttsUrl.isNotEmpty) {
-            final bool played = await _playRemoteTts(ttsUrl, text: speak);
-            if (played) {
-              return;
-            }
-          }
-        } catch (_) {}
-      }
-      try {
-        _cartoonTts.setProgressHandler((
-          String text,
-          int start,
-          int end,
-          String word,
-        ) {
-          _animateLocalWord(word);
-        });
-        await _configureLocalPersonaVoice(persona);
-        await _cartoonTts.awaitSpeakCompletion(true);
-        await _cartoonTts.speak(speak).timeout(const Duration(seconds: 90));
-      } catch (_) {}
+      if (ttsUrl != null && ttsUrl.isNotEmpty && await _playRemoteTts(ttsUrl))
+        return;
+      if (!mounted || !_started) return;
+      await _configureLocalPersonaVoice(settings.selectedDigitalHuman);
+      await _cartoonTts.awaitSpeakCompletion(true);
+      if (!mounted || !_started) return;
+      await _cartoonTts.speak(speak).timeout(const Duration(seconds: 90));
+    } catch (_) {
     } finally {
-      _wordMouthTicker?.cancel();
-      if (mounted) {
-        setState(() {
-          _coachSpeaking = false;
-          _mouth = CoachViseme.closed;
-        });
-      }
+      if (mounted) setState(() => _coachSpeaking = false);
     }
   }
 
@@ -826,8 +488,9 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
           continue;
         }
         final String name = '${item['name'] ?? ''}'.toLowerCase();
-        final String voiceLocale =
-            '${item['locale'] ?? ''}'.toLowerCase().replaceAll('_', '-');
+        final String voiceLocale = '${item['locale'] ?? ''}'
+            .toLowerCase()
+            .replaceAll('_', '-');
         if (voiceLocale.isEmpty && name.isEmpty) {
           continue;
         }
@@ -874,7 +537,11 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
   }
 
   Future<void> _askPreparedTopic(int index) async {
-    if (_busy || index < 0 || index >= _talkTopics.length) {
+    if (_busy ||
+        _recordingActive ||
+        _coachSpeaking ||
+        index < 0 ||
+        index >= _talkTopics.length) {
       return;
     }
     final LearningSettingsState settings = ref.read(learningSettingsProvider);
@@ -898,83 +565,24 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
     }
   }
 
-  Future<void> _startTopicConversation() async {
-    if (_busy) {
-      return;
-    }
+  void _startTopicConversation() {
+    if (_busy || _historyLoading || _started) return;
     final LearningSettingsState settings = ref.read(learningSettingsProvider);
-    setState(() {
-      _busy = true;
-      _error = null;
-      _status = '正在开启主题对话…';
-    });
-    final DigitalHumanPersona persona = settings.selectedDigitalHuman;
     _preferChineseReply = false;
-    try {
-      if (settings.usesOralCoachPipeline) {
-        try {
-          if (mounted) {
-            setState(() => _status = '正在读取字幕并生成口语话题…');
-          }
-          await _ensurePipelineSession(settings);
-          await _prepareTalkTopics(settings);
-          if (settings.usesLiveKit &&
-              ref.read(authSessionProvider).isLoggedIn) {
-            try {
-              await _liveKitClient.connect(
-                api: ref.read(acquireApiClientProvider),
-                preferredUrl: settings.liveKitUrl,
-              );
-            } catch (_) {}
-          }
-        } catch (error) {
-          if (mounted) {
-            setState(() => _error = '管线暂不可用：${_pretty(error)}');
-          }
-          if (_talkTopics.isEmpty) {
-            await _prepareTalkTopics(settings);
-          }
-        }
-      } else if (_talkTopics.isEmpty) {
-        await _prepareTalkTopics(settings);
-      }
-      if (!mounted) return;
-      final String open = _openingCoachPrompt(persona.displayName);
-      setState(() {
-        _bubbles
-          ..clear()
-          ..add(_ChatBubble(role: 'coach', text: open));
-        _showZhIndexes.clear();
-      });
-      _scrollChatToEnd();
-      if (settings.usesRealtimeLipSync) {
-        await _ensureDigitalHumanConnected(
-          settings,
-          speakGreeting: true,
-          greetingText: open,
-        );
-      }
-      if (!_liveClient.isConnected) {
-        await _speakCoach(open, settings);
-      }
-      if (mounted) {
-        setState(() {
-          _started = true;
-          _busy = false;
-          _status = '你可以开始说';
-          _showZhIndexes.clear();
-        });
-        _armSessionClock();
-        _scrollChatToEnd();
-      }
-    } catch (error) {
-      if (mounted) {
-        setState(() {
-          _busy = false;
-          _error = _pretty(error);
-          _status = '开启失败';
-        });
-      }
+    final String? opening = _bubbles.isEmpty
+        ? _openingCoachPrompt(settings.selectedDigitalHuman.displayName)
+        : null;
+    setState(() {
+      _started = true;
+      _error = null;
+      _status = '你可以开始说';
+      if (opening != null)
+        _bubbles.add(_ChatBubble(role: 'coach', text: opening));
+    });
+    _armSessionClock();
+    _scrollChatToEnd();
+    if (_usesVoicePipeline(settings)) {
+      unawaited(_ensurePipelineSession(settings).catchError((Object _) {}));
     }
   }
 
@@ -1000,11 +608,11 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
   }
 
   Future<void> _startRecording() async {
-    if (_recordingActive || _busy) {
+    if (_recordingActive || _busy || _coachSpeaking) {
       return;
     }
     if (!_started) {
-      await _startTopicConversation();
+      _startTopicConversation();
       if (!_started) {
         return;
       }
@@ -1098,6 +706,7 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
       sampleRate: Pcm16MonoAudio.expectedSampleRate,
     ).trimLeadingSilence();
     _recordingBytesWritten = 0;
+    if (!mounted) return;
     if (!audio.hasSpeechEnergy) {
       if (mounted) {
         setState(() {
@@ -1109,6 +718,7 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
     }
 
     final LearningSettingsState settings = ref.read(learningSettingsProvider);
+    final DateTime? startedAt = _sessionStartedAt;
     String? path;
     try {
       final Directory directory = await getTemporaryDirectory();
@@ -1116,19 +726,27 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
           '${directory.path}/oral-topic-${DateTime.now().microsecondsSinceEpoch}.wav';
       await File(path).writeAsBytes(audio.toWav(), flush: true);
 
-      if (settings.usesOralCoachPipeline) {
+      if (!mounted || startedAt != _sessionStartedAt) return;
+      if (_usesVoicePipeline(settings)) {
+        final int messageCount = _bubbles.length;
         try {
           await _runPipelineFreeTalk(settings: settings, audioPath: path);
           return;
         } catch (error) {
+          if (!mounted || startedAt != _sessionStartedAt) return;
           if (mounted) {
             setState(() {
               _error = '管线暂不可用：${_pretty(error)} · 已用本地回复';
             });
           }
         }
+        await _runLocalFreeTalk(
+          settings: settings,
+          addVoiceNote: _bubbles.length == messageCount,
+        );
+      } else {
+        await _runLocalFreeTalk(settings: settings);
       }
-      await _runLocalFreeTalk(settings: settings);
     } catch (error) {
       if (mounted) {
         setState(() {
@@ -1151,6 +769,7 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
 
   Future<void> _runLocalFreeTalk({
     required LearningSettingsState settings,
+    bool addVoiceNote = true,
   }) async {
     final String reply = _guidedCoachFallback(
       topic: _topicLabel,
@@ -1159,9 +778,9 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
     );
     if (mounted) {
       setState(() {
-        _bubbles.add(
-          const _ChatBubble(role: 'user', text: '语音消息（暂无转写）'),
-        );
+        if (addVoiceNote) {
+          _bubbles.add(const _ChatBubble(role: 'user', text: '语音消息（暂无转写）'));
+        }
         _bubbles.add(_ChatBubble(role: 'coach', text: reply));
         _busy = false;
         _status = '你可以开始说';
@@ -1186,26 +805,16 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
     required String audioPath,
   }) async {
     await _ensurePipelineSession(settings);
-    final OralCoachSession session = _session!;
+    final OralCoachSession? session = _session;
+    if (!mounted || !_started || session == null) return;
     // Free talk: no subtitle-line reference — coach discusses the theme.
     final OralCoachDraftResult draft = await _pipelineClient.createDraft(
       session: session,
       audioPath: audioPath,
     );
-    if (!mounted) {
-      return;
-    }
-    setState(() {
-      _busy = false;
-      _status = '请核对你说的话';
-    });
-    final String? confirmed = await _confirmTranscriptDialog(draft.transcript);
-    if (!mounted || confirmed == null) {
-      if (mounted) {
-        setState(() => _status = '已取消本回合');
-      }
-      return;
-    }
+    if (!mounted || !identical(_session, session)) return;
+    final String confirmed = draft.transcript.trim();
+    if (confirmed.isEmpty) throw StateError('语音转写为空');
     _updateReplyLanguageFromLearner(confirmed);
     setState(() {
       _busy = true;
@@ -1221,7 +830,9 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
       digitalHumanId: persona.id,
       ttsVoice: persona.edgeVoice(chinese: _preferChineseReply),
       replyLanguage: _preferChineseReply ? 'zh' : 'en',
+      textOnly: true,
     );
+    if (!mounted || !identical(_session, session)) return;
     _difficulty = turn.difficulty;
     final String rawSpeak = turn.avatarText.trim().isNotEmpty
         ? turn.avatarText.trim()
@@ -1262,96 +873,17 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
     });
     _scrollChatToEnd();
 
-    bool avatarSpoke = false;
-    if (speakText.isNotEmpty && settings.usesRealtimeLipSync) {
-      await _ensureDigitalHumanConnected(
-        settings,
-        preferredUrl: turn.livetalkingUrl,
-      );
-      if (_liveClient.isConnected) {
-        if (mounted) {
-          setState(() => _coachSpeaking = true);
-        }
-        try {
-          await _liveClient.speak(speakText, type: 'echo');
-          avatarSpoke = true;
-        } catch (_) {
-          avatarSpoke = false;
-        } finally {
-          if (mounted) {
-            setState(() { _coachSpeaking = false; _mouth = CoachViseme.closed; });
-          }
-        }
-      }
-    }
-    if (!avatarSpoke) {
-      final String? ttsUrl = turn.ttsUrl?.trim();
-      bool playedRemote = false;
-      // Always prefer persona Edge TTS from the coach pipeline when available.
-      if (ttsUrl != null && ttsUrl.isNotEmpty) {
-        if (mounted) {
-          setState(() => _coachSpeaking = true);
-        }
-        try {
-          playedRemote = await _playRemoteTts(ttsUrl, text: speakText);
-        } finally {
-          if (mounted) {
-            setState(() {
-              _coachSpeaking = false;
-              _mouth = CoachViseme.closed;
-            });
-          }
-        }
-      }
-      if (!playedRemote && speakText.isNotEmpty) {
-        await _speakCoach(speakText, settings);
-      }
-    }
-
-    await _persistLearningTurn(turn);
-
-    if (mounted) {
+    unawaited(_persistLearningTurn(turn));
+    await _speakCoach(
+      speakText,
+      settings,
+      ttsUrl: speakText == rawSpeak ? turn.ttsUrl?.trim() : null,
+    );
+    if (mounted && _started) {
       setState(() {
         _busy = false;
         _status = '你可以开始说';
       });
-      _scrollChatToEnd();
-    }
-  }
-
-  Future<String?> _confirmTranscriptDialog(String draft) async {
-    final TextEditingController controller = TextEditingController(text: draft);
-    try {
-      return await showDialog<String>(
-        context: context,
-        barrierDismissible: false,
-        builder: (BuildContext context) {
-          return AlertDialog(
-            title: const Text('核对你说的话'),
-            content: TextField(
-              controller: controller,
-              maxLines: 4,
-              decoration: const InputDecoration(
-                labelText: '确认后发给数字人外教',
-                border: OutlineInputBorder(),
-              ),
-            ),
-            actions: <Widget>[
-              TextButton(
-                onPressed: () => Navigator.pop(context),
-                child: const Text('取消'),
-              ),
-              FilledButton(
-                onPressed: () =>
-                    Navigator.pop(context, controller.text.trim()),
-                child: const Text('发送'),
-              ),
-            ],
-          );
-        },
-      );
-    } finally {
-      controller.dispose();
     }
   }
 
@@ -1391,12 +923,12 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
   }
 
   Future<void> _onHoldStart() async {
-    if (_busy || _recordingActive) {
+    if (_busy || _recordingActive || _coachSpeaking) {
       return;
     }
     if (!_started) {
-      await _startTopicConversation();
-      if (!mounted || _busy) {
+      _startTopicConversation();
+      if (!mounted || !_started) {
         return;
       }
     }
@@ -1411,40 +943,35 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
   }
 
   Future<void> _hangUp() async {
+    if (!_started) return;
     if (_recordingActive) {
       await _stopRecordingAndSend();
     }
+    if (!mounted || !_started) return;
     _sessionTicker?.cancel();
     _sessionTicker = null;
-    _reconnectTimer?.cancel();
-    _reconnectTimer = null;
     _sessionStartedAt = null;
-    _coachSpeaking = false;
-    await _teardownLiveSessions();
-    if (!mounted) {
-      return;
-    }
     setState(() {
-      _renderer = null;
       _started = false;
-      _bootstrapped = false;
       _session = null;
+      _sessionPreparation = null;
+      _busy = false;
       _sessionLeft = _sessionBudget;
-      _busyLineFailures = 0;
-      _bubbles.clear();
-      _showZhIndexes.clear();
       _error = null;
       _status = '已结束 · 点麦克风重新开始';
     });
+    await _cartoonTts.stop();
+    await _speechPlayer?.stop();
   }
 
   void _scrollChatToEnd() {
+    _saveHistory();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!_chatScroll.hasClients) {
+      if (!mounted || !_chatScroll.hasClients) {
         return;
       }
       _chatScroll.animateTo(
-        _chatScroll.position.maxScrollExtent,
+        0,
         duration: const Duration(milliseconds: 220),
         curve: Curves.easeOut,
       );
@@ -1543,7 +1070,7 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
   @override
   Widget build(BuildContext context) {
     final LearningSettingsState settings = ref.watch(learningSettingsProvider);
-    final bool lipSync = settings.usesRealtimeLipSync;
+    final DigitalHumanPersona persona = settings.selectedDigitalHuman;
     final String orbHint = _recordingActive
         ? '正在听你说…'
         : (_busy
@@ -1551,15 +1078,9 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
               : (_status.trim().isNotEmpty
                     ? _status
                     : (_started ? '你可以开始说' : '点麦克风开始对话')));
-    final String stageLabel = _connecting
-        ? '正在连接真人唇形…'
-        : (_coachSpeaking
-              ? '外教在说…'
-              : (_recordingActive
-                    ? '外教在听…'
-                    : (lipSync && _liveClient.isConnected
-                          ? '真人唇形已连接'
-                          : '头像对话 · 节省算力')));
+    final String stageLabel = _coachSpeaking
+        ? '外教在说…'
+        : (_recordingActive ? '外教在听…' : persona.displayName);
 
     return ClipRRect(
       borderRadius: BorderRadius.circular(22),
@@ -1578,37 +1099,22 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
         ),
         child: Column(
           children: <Widget>[
-            // Upper stage: WebRTC only when LiveTalking backend; else avatar.
             Expanded(
               flex: 3,
               child: Stack(
                 fit: StackFit.expand,
                 children: <Widget>[
-                  if (lipSync && _renderer != null)
-                    RTCVideoView(
-                      _renderer!,
-                      objectFit:
-                          RTCVideoViewObjectFit.RTCVideoViewObjectFitCover,
-                    )
-                  else
-                    Builder(
-                      builder: (BuildContext context) {
-                        final DigitalHumanPersona persona = ref
-                            .watch(learningSettingsProvider)
-                            .selectedDigitalHuman;
-                        return CoachAvatarStage(
-                          spriteAsset: ref.watch(learningSettingsProvider).cartoonDigitalHuman ? 'assets/img/digital_human/${persona.id}-cartoon.png' : null,
-                          mouth: _mouth,
-                          thinking: _busy,
-                          pulse: _orbPulse,
-                          speaking: _coachSpeaking,
-                          listening: _recordingActive,
-                          label: stageLabel,
-                          imageAsset: persona.assetPath,
-                          displayName: persona.displayName,
-                        );
-                      },
-                    ),
+                  CoachAvatarStage(
+                    spriteAsset: settings.cartoonDigitalHuman
+                        ? 'assets/img/digital_human/${persona.id}-cartoon.png'
+                        : null,
+                    pulse: _orbPulse,
+                    speaking: _coachSpeaking,
+                    listening: _recordingActive,
+                    label: stageLabel,
+                    imageAsset: persona.assetPath,
+                    displayName: persona.displayName,
+                  ),
                   const DecoratedBox(
                     decoration: BoxDecoration(
                       gradient: LinearGradient(
@@ -1679,9 +1185,7 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
               child: _bubbles.isEmpty
                   ? Center(
                       child: Padding(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 28,
-                        ),
+                        padding: const EdgeInsets.symmetric(horizontal: 28),
                         child: Text(
                           _talkTopics.isEmpty
                               ? 'Hi~ 我会先读字幕，再围绕“$_topicLabel”生成口语问答。'
@@ -1698,23 +1202,19 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
                     )
                   : ListView.builder(
                       controller: _chatScroll,
+                      reverse: true,
                       padding: const EdgeInsets.fromLTRB(14, 8, 14, 4),
                       itemCount: _bubbles.length,
-                      itemBuilder: (BuildContext context, int index) {
+                      itemBuilder: (BuildContext context, int offset) {
+                        final int index = _bubbles.length - 1 - offset;
                         final _ChatBubble bubble = _bubbles[index];
-                        final DigitalHumanPersona persona = ref
-                            .watch(learningSettingsProvider)
-                            .selectedDigitalHuman;
                         return _ConversationBubble(
                           bubble: bubble,
                           showZh: _showZhIndexes.contains(index),
                           coachAvatarAsset: persona.assetPath,
-                          onToggleZh: () =>
-                              _toggleZh(index, bubble.zh),
-                          onCopy: () =>
-                              unawaited(_copyBubble(bubble.text)),
-                          onSpeak: () =>
-                              unawaited(_replayBubble(bubble.text)),
+                          onToggleZh: () => _toggleZh(index, bubble.zh),
+                          onCopy: () => unawaited(_copyBubble(bubble.text)),
+                          onSpeak: () => unawaited(_replayBubble(bubble.text)),
                         );
                       },
                     ),
@@ -1758,15 +1258,9 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
               ),
             GestureDetector(
               key: const ValueKey<String>('study-oral-coach-mic'),
-              onLongPressStart: _busy
-                  ? null
-                  : (_) => unawaited(_onHoldStart()),
-              onLongPressEnd: _busy
-                  ? null
-                  : (_) => unawaited(_onHoldEnd()),
-              onLongPressCancel: _busy
-                  ? null
-                  : () => unawaited(_onHoldEnd()),
+              onLongPressStart: _busy ? null : (_) => unawaited(_onHoldStart()),
+              onLongPressEnd: _busy ? null : (_) => unawaited(_onHoldEnd()),
+              onLongPressCancel: _busy ? null : () => unawaited(_onHoldEnd()),
               onTap: _busy
                   ? null
                   : () => unawaited(
@@ -1840,11 +1334,7 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
                           'Stuck? Retell one moment: "In the video, …" or ask me for a key word.';
                       setState(() {
                         _bubbles.add(
-                          _ChatBubble(
-                            role: 'coach',
-                            text: hint,
-                            hint: true,
-                          ),
+                          _ChatBubble(role: 'coach', text: hint, hint: true),
                         );
                         _status = '试试上面的提示';
                       });
@@ -1984,9 +1474,7 @@ class _ConversationBubble extends StatelessWidget {
               radius: 16,
               backgroundColor: const Color(0xFF5B3FD4),
               backgroundImage: avatar.isEmpty ? null : AssetImage(avatar),
-              onBackgroundImageError: avatar.isEmpty
-                  ? null
-                  : (_, __) {},
+              onBackgroundImageError: avatar.isEmpty ? null : (_, __) {},
               child: avatar.isEmpty
                   ? const Icon(
                       Icons.face_retouching_natural_rounded,

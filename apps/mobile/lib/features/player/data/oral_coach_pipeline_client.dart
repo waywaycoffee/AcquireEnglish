@@ -53,7 +53,11 @@ class OralCoachPipelineClient {
     if (id.isEmpty) {
       throw StateError('陪练会话创建失败。');
     }
-    return OralCoachSession(id: id, baseUrl: base, difficulty: '${body['difficulty'] ?? 'B1'}');
+    return OralCoachSession(
+      id: id,
+      baseUrl: base,
+      difficulty: '${body['difficulty'] ?? 'B1'}',
+    );
   }
 
   Future<void> updateContext({
@@ -156,11 +160,13 @@ class OralCoachPipelineClient {
     String? digitalHumanId,
     String? ttsVoice,
     String? replyLanguage,
+    bool textOnly = false,
   }) async {
     final Response<dynamic> response = await _dio.post<dynamic>(
       '${session.baseUrl}/api/sessions/${session.id}/confirm',
       data: <String, dynamic>{
         'draft_id': draftId,
+        if (textOnly) 'text_only': true,
         if ((confirmedText ?? '').trim().isNotEmpty)
           'confirmed_text': confirmedText!.trim(),
         if ((digitalHumanId ?? '').trim().isNotEmpty)

@@ -246,6 +246,7 @@ class ConfirmBody(BaseModel):
     tts_voice: str | None = None
     digital_human_id: str | None = None
     reply_language: str | None = None
+    text_only: bool = False
 
 
 class SpeakBody(BaseModel):
@@ -289,6 +290,7 @@ async def confirm_draft(sid: str, body: ConfirmBody) -> dict[str, Any]:
             tts_voice=body.tts_voice,
             digital_human_id=body.digital_human_id,
             reply_language=body.reply_language,
+            text_only=body.text_only,
         )
     except KeyError:
         raise HTTPException(404, 'Draft not found or already used.') from None

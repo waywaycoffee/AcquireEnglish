@@ -185,6 +185,7 @@ class OralCoachPipeline:
         tts_voice: str | None = None,
         digital_human_id: str | None = None,
         reply_language: str | None = None,
+        text_only: bool = False,
     ) -> TurnResult:
         draft = session.drafts.pop(draft_id, None)
         if draft is None:
@@ -240,16 +241,20 @@ class OralCoachPipeline:
         if (reply_language or '').strip():
             session.reply_language = reply_language.strip().lower()
 
-        tts_name = f'{session.id}-{uuid.uuid4().hex[:8]}.mp3'
-        tts_path = str(self.settings.data_dir / 'tts' / tts_name)
-        tts = await self.tts.synthesize(
-            reply.text,
-            tts_path,
-            voice=session.tts_voice or tts_voice,
-            digital_human_id=session.digital_human_id or digital_human_id,
-            language=session.reply_language or reply_language or 'en',
-        )
-        avatar = await self.avatar.cue(reply.text)
+        tts_url = None
+        avatar = {}
+        if not text_only:
+            tts_name = f'{session.id}-{uuid.uuid4().hex[:8]}.mp3'
+            tts_path = str(self.settings.data_dir / 'tts' / tts_name)
+            tts = await self.tts.synthesize(
+                reply.text,
+                tts_path,
+                voice=session.tts_voice or tts_voice,
+                digital_human_id=session.digital_human_id or digital_human_id,
+                language=session.reply_language or reply_language or 'en',
+            )
+            tts_url = f'/api/tts/{tts_name}' if tts.audio_path else None
+            avatar = asdict(await self.avatar.cue(reply.text))
 
         return TurnResult(
             session_id=session.id,
@@ -258,8 +263,8 @@ class OralCoachPipeline:
             coach_text=reply.text,
             corrections=reply.corrections,
             difficulty=session.difficulty,
-            tts_url=f'/api/tts/{tts_name}' if tts.audio_path else None,
-            avatar=asdict(avatar),
+            tts_url=tts_url,
+            avatar=avatar,
             providers=self.provider_map(),
         )
 

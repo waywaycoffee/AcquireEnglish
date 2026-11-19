@@ -3035,6 +3035,7 @@ Future<void> _settleChineseFillIfAlreadyPresent() async {
         courseTitle: courseTitle,
         episodeTitle: episodeTitle,
         hasTranscript: excerpt.isNotEmpty,
+        episodeId: courseContext.episode?.id ?? widget.episodeId,
       );
       await Navigator.of(context).push<void>(
         MaterialPageRoute<void>(

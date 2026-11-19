@@ -4,9 +4,7 @@ import 'package:flutter/material.dart';
 import '../../domain/coach_animation_timeline.dart';
 import 'cartoon_coach_sprite.dart';
 
-/// Local coach stage: circular photo avatar + fixed idle / speaking motions.
-///
-/// Replaces always-on LiveTalking WebRTC during conversation to save GPU.
+/// Coach portrait with a status ring for speaking and listening.
 class CoachAvatarStage extends StatelessWidget {
   const CoachAvatarStage({
     required this.pulse,
@@ -15,8 +13,6 @@ class CoachAvatarStage extends StatelessWidget {
     required this.label,
     this.imageAsset,
     this.spriteAsset,
-    this.mouth = CoachViseme.closed,
-    this.thinking = false,
     this.displayName,
     super.key,
   });
@@ -26,8 +22,6 @@ class CoachAvatarStage extends StatelessWidget {
   final bool listening;
   final String label;
   final String? spriteAsset;
-  final CoachViseme mouth;
-  final bool thinking;
   final String? imageAsset;
   final String? displayName;
 
@@ -66,10 +60,7 @@ class CoachAvatarStage extends StatelessWidget {
             Center(
               child: Transform.translate(
                 offset: Offset(0, bob),
-                child: Transform.scale(
-                  scale: scale,
-                  child: child,
-                ),
+                child: Transform.scale(scale: scale, child: child),
               ),
             ),
             Positioned(
@@ -89,18 +80,24 @@ class CoachAvatarStage extends StatelessWidget {
           ],
         );
       },
-      child: spriteAsset != null ? SizedBox(width: 260, height: 260,
-        child: AnimatedBuilder(animation: pulse, builder: (BuildContext context, Widget? child) => CartoonCoachSprite(
-          asset: spriteAsset!, mouth: mouth, phase: pulse.value,
-          motion: speaking ? CoachMotion.speaking : listening ? CoachMotion.listening : thinking ? CoachMotion.thinking : CoachMotion.idle,
-        )),
-      ) : _AvatarDisc(
-        speaking: speaking,
-        listening: listening,
-        pulse: pulse,
-        imageAsset: imageAsset,
-        displayName: displayName,
-      ),
+      child: spriteAsset != null
+          ? SizedBox(
+              width: 260,
+              height: 260,
+              child: CartoonCoachSprite(
+                asset: spriteAsset!,
+                mouth: CoachViseme.closed,
+                phase: 0,
+                motion: CoachMotion.idle,
+              ),
+            )
+          : _AvatarDisc(
+              speaking: speaking,
+              listening: listening,
+              pulse: pulse,
+              imageAsset: imageAsset,
+              displayName: displayName,
+            ),
     );
   }
 }
@@ -157,18 +154,11 @@ class _AvatarDisc extends StatelessWidget {
               Image.asset(
                 asset,
                 fit: BoxFit.cover,
-                errorBuilder: (_, __, ___) => _FallbackFace(
-                  displayName: displayName,
-                ),
+                errorBuilder: (_, __, ___) =>
+                    _FallbackFace(displayName: displayName),
               )
             else
               _FallbackFace(displayName: displayName),
-            Positioned(
-              left: 54,
-              right: 54,
-              bottom: 36,
-              child: _MouthBar(speaking: speaking, pulse: pulse),
-            ),
           ],
         ),
       ),
@@ -207,33 +197,6 @@ class _FallbackFace extends StatelessWidget {
           ],
         ),
       ),
-    );
-  }
-}
-
-/// Fixed “talking” motion — a simple mouth bar, not GPU lip-sync.
-class _MouthBar extends StatelessWidget {
-  const _MouthBar({required this.speaking, required this.pulse});
-
-  final bool speaking;
-  final Animation<double> pulse;
-
-  @override
-  Widget build(BuildContext context) {
-    return AnimatedBuilder(
-      animation: pulse,
-      builder: (BuildContext context, Widget? child) {
-        final double h = speaking ? 4.0 + pulse.value * 10.0 : 3.0;
-        final double w = speaking ? 28.0 + pulse.value * 8.0 : 22.0;
-        return Container(
-          width: w,
-          height: h,
-          decoration: BoxDecoration(
-            color: Colors.white.withValues(alpha: speaking ? 0.85 : 0.35),
-            borderRadius: BorderRadius.circular(8),
-          ),
-        );
-      },
     );
   }
 }
