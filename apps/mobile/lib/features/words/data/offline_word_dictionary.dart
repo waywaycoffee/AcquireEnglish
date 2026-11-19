@@ -1,9 +1,10 @@
 import 'dart:convert';
 
+import 'package:archive/archive.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-const String _dictionaryAsset = 'assets/dictionary/ecdict_core.json';
+const String _dictionaryAsset = 'assets/dictionary/ecdict_core.json.gz';
 
 final Provider<OfflineWordDictionary> offlineWordDictionaryProvider =
     Provider<OfflineWordDictionary>((Ref ref) => OfflineWordDictionary());
@@ -31,9 +32,12 @@ class OfflineWordDictionary {
   }
 
   Future<Map<String, OfflineWordDefinition>> _load() async {
+    final ByteData packed = await rootBundle.load(_dictionaryAsset);
+    final List<int> jsonBytes = const GZipDecoder().decodeBytes(
+      packed.buffer.asUint8List(),
+    );
     final Map<String, dynamic> decoded =
-        jsonDecode(await rootBundle.loadString(_dictionaryAsset))
-            as Map<String, dynamic>;
+        jsonDecode(utf8.decode(jsonBytes)) as Map<String, dynamic>;
     final Map<String, dynamic> rawEntries =
         decoded['entries'] as Map<String, dynamic>;
     return rawEntries.map((String word, dynamic value) {

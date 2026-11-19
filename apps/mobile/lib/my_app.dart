@@ -6,7 +6,6 @@ import 'package:flutter/services.dart';
 import 'package:flutter_foreground_task/flutter_foreground_task.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:google_fonts/google_fonts.dart';
 
 import 'config/theme/theme_logic.dart';
 import 'config/theme/theme_ui_model.dart';
@@ -249,7 +248,8 @@ ThemeData _buildTheme(Brightness brightness) {
     onSurface: isDark ? Colors.white : const Color(0xFF050505),
   );
 
-  final TextTheme textTheme = GoogleFonts.nunitoTextTheme().apply(
+  final TextTheme textTheme = ThemeData(brightness: brightness).textTheme.apply(
+    fontFamily: 'Nunito',
     bodyColor: colorScheme.onSurface,
     displayColor: colorScheme.onSurface,
   );
@@ -258,6 +258,7 @@ ThemeData _buildTheme(Brightness brightness) {
     useMaterial3: true,
     brightness: brightness,
     colorScheme: colorScheme,
+    fontFamily: 'Nunito',
     textTheme: textTheme,
     visualDensity: const VisualDensity(horizontal: -0.5, vertical: -0.5),
     scaffoldBackgroundColor: isDark

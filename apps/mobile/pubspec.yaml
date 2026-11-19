@@ -69,7 +69,6 @@ dependencies:
   open_filex: ^4.7.0
   intl: ^0.20.2
   stack_trace: ^1.11.0
-  google_fonts: ^8.2.0
   fl_chart: ^1.2.0
   android_id: ^0.5.1
   hive_ce: ^2.11.1
@@ -145,11 +144,11 @@ flutter:
   uses-material-design: true
 
   assets:
+    # sqlite3.wasm is only needed for web Anki export (kept small vs images).
     - assets/anki/sqlite3.wasm
     - assets/dictionary/
     - assets/translations/
     - assets/img/
-    - assets/img/digital_human/
 
   fonts:
     - family: Nunito

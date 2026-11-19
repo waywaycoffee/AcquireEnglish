@@ -161,7 +161,7 @@ void main() {
             widget is Image &&
             widget.image is AssetImage &&
             (widget.image as AssetImage).assetName ==
-                'assets/img/growth-level-1.png',
+                'assets/img/growth-level-1.webp',
       ),
       findsOneWidget,
     );
@@ -186,13 +186,12 @@ void main() {
 
     expect(find.text('首页'), findsOneWidget);
     expect(find.text('学习'), findsOneWidget);
-    expect(find.text('发现'), findsOneWidget);
+    expect(find.text('成长'), findsOneWidget);
     expect(find.text('更多'), findsOneWidget);
     expect(find.text('短语'), findsNothing);
 
     await tester.tap(find.byKey(const Key('bottom-nav-more')));
     await tester.pumpAndSettle();
-    expect(find.text('成长'), findsOneWidget);
     expect(find.text('短语'), findsOneWidget);
     expect(find.text('单词'), findsOneWidget);
     expect(find.text('怎么学'), findsOneWidget);

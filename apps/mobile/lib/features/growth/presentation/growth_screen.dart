@@ -453,7 +453,7 @@ class _LevelMembershipCard extends StatelessWidget {
               Expanded(
                 flex: 4,
                 child: Image.asset(
-                  'assets/img/growth-level-${profile.level}.png',
+                  'assets/img/growth-level-${profile.level}.webp',
                   fit: BoxFit.contain,
                   filterQuality: FilterQuality.high,
                 ),
@@ -995,7 +995,7 @@ class _CompanionArt extends StatelessWidget {
     child: Align(
       alignment: Alignment.bottomRight,
       child: Image.asset(
-        'assets/img/growth-companion.png',
+        'assets/img/growth-companion.webp',
         fit: BoxFit.contain,
         filterQuality: FilterQuality.high,
       ),

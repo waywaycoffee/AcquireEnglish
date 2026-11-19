@@ -29,9 +29,10 @@ android {
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName
-        // Drop x86/x86_64 emulator ABIs from release packages (phones are ARM).
+        // Sideload/release phones are overwhelmingly arm64; drop 32-bit + x86
+        // to shrink fat APKs. Prefer: flutter build apk --split-per-abi.
         ndk {
-            abiFilters += listOf("armeabi-v7a", "arm64-v8a")
+            abiFilters += listOf("arm64-v8a")
         }
     }
 

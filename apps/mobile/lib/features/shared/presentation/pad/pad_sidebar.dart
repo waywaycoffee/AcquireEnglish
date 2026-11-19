@@ -335,7 +335,7 @@ class _PadSidebarState extends ConsumerState<PadSidebar> {
                           child: SizedBox(
                             key: const Key('pad-sidebar-daily-english-entry'),
                             child: Image.asset(
-                              'assets/img/growth-level-${growth.level}.png',
+                              'assets/img/growth-level-${growth.level}.webp',
                               key: Key(
                                 'pad-sidebar-growth-avatar-${growth.level}',
                               ),

@@ -19,7 +19,7 @@ class DigitalHumanPersona {
   final String tagline;
   /// Local Flutter asset for idle stage / home picker.
   final String assetPath;
-  String get cartoonAssetPath => 'assets/img/digital_human/$id-cartoon.png';
+  String get cartoonAssetPath => 'assets/img/digital_human/$id-cartoon.webp';
   /// Matching LiveTalking `--avatar_id` when lip-sync backend is used.
   final String liveTalkingAvatarId;
   /// Microsoft Edge Neural voice for English replies.
@@ -51,7 +51,7 @@ const List<DigitalHumanPersona> digitalHumanCatalog =
         id: 'mia',
         displayName: 'Mia',
         tagline: '温柔耐心 · 美式英语',
-        assetPath: 'assets/img/digital_human/mia.jpg',
+        assetPath: 'assets/img/digital_human/mia.webp',
         liveTalkingAvatarId: 'wav2lip_avatar_glass_man',
         edgeVoiceEn: 'en-US-AriaNeural',
         edgeVoiceZh: 'zh-CN-XiaoxiaoNeural',
@@ -64,7 +64,7 @@ const List<DigitalHumanPersona> digitalHumanCatalog =
         id: 'leo',
         displayName: 'Leo',
         tagline: '清晰稳重 · 日常对话',
-        assetPath: 'assets/img/digital_human/leo.jpg',
+        assetPath: 'assets/img/digital_human/leo.webp',
         liveTalkingAvatarId: 'wav2lip_avatar_glass_man',
         edgeVoiceEn: 'en-US-GuyNeural',
         edgeVoiceZh: 'zh-CN-YunxiNeural',
@@ -77,7 +77,7 @@ const List<DigitalHumanPersona> digitalHumanCatalog =
         id: 'emma',
         displayName: 'Emma',
         tagline: '活泼鼓励 · 美式口语',
-        assetPath: 'assets/img/digital_human/emma.jpg',
+        assetPath: 'assets/img/digital_human/emma.webp',
         liveTalkingAvatarId: 'wav2lip256_avatar1',
         edgeVoiceEn: 'en-US-JennyNeural',
         edgeVoiceZh: 'zh-CN-XiaoyiNeural',
@@ -90,7 +90,7 @@ const List<DigitalHumanPersona> digitalHumanCatalog =
         id: 'arun',
         displayName: 'Arun',
         tagline: '友善细致 · 国际英语',
-        assetPath: 'assets/img/digital_human/arun.jpg',
+        assetPath: 'assets/img/digital_human/arun.webp',
         liveTalkingAvatarId: 'wav2lip256_avatar1',
         edgeVoiceEn: 'en-IN-PrabhatNeural',
         edgeVoiceZh: 'zh-CN-YunjianNeural',
