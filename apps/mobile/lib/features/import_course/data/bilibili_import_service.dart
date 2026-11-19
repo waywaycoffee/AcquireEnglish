@@ -1065,8 +1065,12 @@ class BilibiliImportService {
   /// a real file path on disk.
   Future<String> ensureLocalCacheForAsr(
     String rawInput, {
+    CancelToken? cancelToken,
     void Function(double? progress, String message)? onProgress,
   }) async {
+    if (cancelToken?.isCancelled ?? false) {
+      throw StateError('用户取消下载');
+    }
     onProgress?.call(null, '正在准备本地视频…');
     final _BilibiliVideoRef ref = await _resolveVideoRef(rawInput);
     final File? cached = await _existingCacheFile(ref.idKey);
@@ -1083,11 +1087,15 @@ class BilibiliImportService {
 
     Object? lastError;
     for (final String remoteUrl in remoteUrls) {
+      if (cancelToken?.isCancelled ?? false) {
+        throw StateError('用户取消下载');
+      }
       try {
         onProgress?.call(0, '正在下载视频供语音识别…');
         final File local = await _downloadPlayableToCache(
           mediaUrl: remoteUrl,
           idKey: ref.idKey,
+          cancelToken: cancelToken,
           onProgress: (double? p) {
             if (p == null) {
               onProgress?.call(null, '正在下载视频…');
@@ -1102,6 +1110,11 @@ class BilibiliImportService {
         return local.path;
       } catch (e) {
         lastError = e;
+        final String text = '$e';
+        if (text.contains('用户取消') ||
+            (e is DioException && CancelToken.isCancel(e))) {
+          throw StateError('用户取消下载');
+        }
       }
     }
     throw StateError(
@@ -1511,6 +1524,7 @@ class BilibiliImportService {
   Future<File> _downloadPlayableToCache({
     required String mediaUrl,
     required String idKey,
+    CancelToken? cancelToken,
     void Function(double? progress)? onProgress,
   }) async {
     final File? already = await _existingCacheFile(idKey);
@@ -1532,6 +1546,7 @@ class BilibiliImportService {
     final Future<File> download = _downloadPlayableToCacheUnlocked(
       mediaUrl: mediaUrl,
       idKey: idKey,
+      cancelToken: cancelToken,
       onProgress: onProgress,
     );
     for (final String alias in BilibiliImport.mediaIdKeyAliases(idKey)) {
@@ -1551,6 +1566,7 @@ class BilibiliImportService {
   Future<File> _downloadPlayableToCacheUnlocked({
     required String mediaUrl,
     required String idKey,
+    CancelToken? cancelToken,
     void Function(double? progress)? onProgress,
   }) async {
     final File? already = await _existingCacheFile(idKey);
@@ -1563,7 +1579,7 @@ class BilibiliImportService {
     if (temp.existsSync()) {
       await temp.delete();
     }
-    final CancelToken cancelToken = CancelToken();
+    final CancelToken token = cancelToken ?? CancelToken();
     // CDN often returns Content-Length then stalls at 0B; abort and try next URL.
     const Duration stallLimit = Duration(seconds: 35);
     Timer? stallTimer;
@@ -1572,8 +1588,8 @@ class BilibiliImportService {
     void armStallWatchdog() {
       stallTimer?.cancel();
       stallTimer = Timer(stallLimit, () {
-        if (!cancelToken.isCancelled) {
-          cancelToken.cancel('下载停滞超时（超过 ${stallLimit.inSeconds}s 无数据）');
+        if (!token.isCancelled) {
+          token.cancel('下载停滞超时（超过 ${stallLimit.inSeconds}s 无数据）');
         }
       });
     }
@@ -1583,7 +1599,7 @@ class BilibiliImportService {
       await _dio.download(
         mediaUrl,
         temp.path,
-        cancelToken: cancelToken,
+        cancelToken: token,
         options: Options(
           headers: _playHeadersWithAuth,
           // Anthology P1 alone can be 100MB+; keep the socket alive on slow nets.
@@ -1645,7 +1661,14 @@ class BilibiliImportService {
       }
       final String text = '$e';
       final bool cancelled = e is DioException && CancelToken.isCancel(e);
-      if (cancelled || text.contains('停滞超时')) {
+      if (cancelled) {
+        final String reason = '${token.cancelError?.message ?? ''}';
+        if (reason.contains('用户取消') || text.contains('用户取消')) {
+          throw StateError('用户取消下载');
+        }
+        throw StateError('B 站视频下载停滞超时，将尝试其他线路');
+      }
+      if (text.contains('停滞超时')) {
         throw StateError('B 站视频下载停滞超时，将尝试其他线路');
       }
       throw StateError('B 站视频缓存失败：$e');

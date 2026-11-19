@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:dio/dio.dart';
 import 'package:path_provider/path_provider.dart';
 
 import '../domain/bilibili_import.dart';
@@ -156,6 +157,7 @@ Future<BilibiliEpisodePrepareResult> prepareBilibiliEpisode({
   String? currentVideoAsset,
   String? existingEnSubtitlePath,
   String? existingZhSubtitlePath,
+  CancelToken? cancelToken,
   void Function(String message)? onProgress,
   Future<void> Function({
     required String? enSubtitlePath,
@@ -331,6 +333,7 @@ Future<BilibiliEpisodePrepareResult> prepareBilibiliEpisode({
     }
     final String localPath = await service.ensureLocalCacheForAsr(
       source,
+      cancelToken: cancelToken,
       onProgress: (double? progress, String message) {
         onProgress?.call(message);
       },
@@ -347,6 +350,11 @@ Future<BilibiliEpisodePrepareResult> prepareBilibiliEpisode({
       note: note,
     );
   } catch (e) {
+    final String text = '$e';
+    if (text.contains('用户取消') ||
+        (cancelToken?.isCancelled ?? false)) {
+      rethrow;
+    }
     // ignore: avoid_print
     print('bilibili.prepare video error: $e');
     return BilibiliEpisodePrepareResult(

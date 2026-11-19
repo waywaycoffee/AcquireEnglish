@@ -427,13 +427,32 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
                           return Align(
                             alignment: Alignment.centerLeft,
                             child: OutlinedButton.icon(
-                              onPressed: downloading ? null : () => unawaited(
-                                _confirmCollectionDownload(selectedCourse),
+                              onPressed: downloading
+                                  ? () {
+                                      requestCancelBilibiliCollectionDownload(
+                                        selectedCourse.id,
+                                      );
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                        const SnackBar(
+                                          content: Text('正在停止合集下载…'),
+                                        ),
+                                      );
+                                    }
+                                  : () => unawaited(
+                                        _confirmCollectionDownload(
+                                          selectedCourse,
+                                        ),
+                                      ),
+                              icon: Icon(
+                                downloading
+                                    ? Icons.stop_circle_outlined
+                                    : Icons.download_outlined,
                               ),
-                              icon: const Icon(Icons.download_outlined),
-                              label: Text(downloading
-                                  ? '正在下载合集'
-                                  : '下载剩余各集（${_pendingCollectionEpisodes(selectedCourse)}）'),
+                              label: Text(
+                                downloading
+                                    ? '停止下载'
+                                    : '下载剩余各集（${_pendingCollectionEpisodes(selectedCourse)}）',
+                              ),
                             ),
                           );
                         },
@@ -512,13 +531,36 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
                             children: <Widget>[
                               if (downloadMessage != null &&
                                   downloadValue != null) ...<Widget>[
-                                Text(
-                                  downloadMessage,
-                                  style: TextStyle(
-                                    fontSize: 13,
-                                    fontWeight: FontWeight.w700,
-                                    color: AppDesignTokens.textSecondary,
-                                  ),
+                                Row(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: <Widget>[
+                                    Expanded(
+                                      child: Text(
+                                        downloadMessage,
+                                        style: TextStyle(
+                                          fontSize: 13,
+                                          fontWeight: FontWeight.w700,
+                                          color: AppDesignTokens.textSecondary,
+                                        ),
+                                      ),
+                                    ),
+                                    if (showDownload)
+                                      TextButton(
+                                        onPressed: () {
+                                          requestCancelBilibiliCollectionDownload(
+                                            selectedCourse.id,
+                                          );
+                                          ScaffoldMessenger.of(
+                                            context,
+                                          ).showSnackBar(
+                                            const SnackBar(
+                                              content: Text('正在停止合集下载…'),
+                                            ),
+                                          );
+                                        },
+                                        child: const Text('停止'),
+                                      ),
+                                  ],
                                 ),
                                 const SizedBox(height: 8),
                                 ClipRRect(
@@ -2051,6 +2093,9 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
     );
     if (confirmed != true || !mounted) {
       return;
+    }
+    for (final String id in courseIds) {
+      requestCancelBilibiliCollectionDownload(id);
     }
     await ref.read(libraryCatalogProvider.notifier).deleteCourses(courseIds);
     if (!mounted) {

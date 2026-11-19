@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:developer' as developer;
 
+import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../library/presentation/library_catalog_provider.dart';
@@ -11,6 +12,8 @@ import 'bilibili_import_service.dart';
 import 'bilibili_multipage.dart';
 
 final Set<String> _inFlightCourseIds = <String>{};
+final Set<String> _cancelRequestedCourseIds = <String>{};
+final Map<String, CancelToken> _activeCancelTokens = <String, CancelToken>{};
 
 /// Episodes that failed recently — skip for a while so one stuck CDN URL
 /// cannot restart forever and spam「正在下载视频 0%」.
@@ -68,6 +71,23 @@ bool isBilibiliCollectionDownloadInFlight(String courseId) {
   return _inFlightCourseIds.contains(courseId);
 }
 
+/// Stop an in-flight 合集 download (between episodes and mid-file via Dio).
+void requestCancelBilibiliCollectionDownload(String courseId) {
+  final String id = courseId.trim();
+  if (id.isEmpty) {
+    return;
+  }
+  _cancelRequestedCourseIds.add(id);
+  final CancelToken? token = _activeCancelTokens[id];
+  if (token != null && !token.isCancelled) {
+    token.cancel('用户取消下载');
+  }
+}
+
+bool wasBilibiliCollectionDownloadCancelled(String courseId) {
+  return _cancelRequestedCourseIds.contains(courseId.trim());
+}
+
 /// Download remaining 合集/分P episodes that still only have a watch URL.
 Future<void> downloadRemainingBilibiliEpisodes({
   required LibraryCatalogNotifier catalog,
@@ -81,6 +101,7 @@ Future<void> downloadRemainingBilibiliEpisodes({
     onProgress?.call('合集下载进行中…', null);
     return;
   }
+  _cancelRequestedCourseIds.remove(courseId);
   try {
     LibraryCourseData? target;
     for (final LibraryCourseData course in readCourses()) {
@@ -138,6 +159,25 @@ Future<void> downloadRemainingBilibiliEpisodes({
     }
 
     for (int i = 0; i < pending.length; i++) {
+      if (_cancelRequestedCourseIds.contains(courseId)) {
+        publish(
+          message: '已停止合集下载（成功 $success，未下完已取消）',
+          progress: i / pending.length,
+          force: true,
+        );
+        progressNotifier?.update(
+          BilibiliCollectionDownloadProgress(
+            courseId: courseId,
+            message: '已停止合集下载（成功 $success）',
+            progress: (i / pending.length).clamp(0.0, 1.0),
+            done: true,
+            successCount: success,
+            failedCount: failed,
+          ),
+        );
+        return;
+      }
+
       LibraryCourseData? live;
       for (final LibraryCourseData course in readCourses()) {
         if (course.id == courseId) {
@@ -145,7 +185,21 @@ Future<void> downloadRemainingBilibiliEpisodes({
           break;
         }
       }
-      live ??= target;
+      // Course deleted while downloading — stop quietly.
+      if (live == null) {
+        _cancelRequestedCourseIds.add(courseId);
+        progressNotifier?.update(
+          BilibiliCollectionDownloadProgress(
+            courseId: courseId,
+            message: '课程已删除，下载已停止',
+            progress: 1,
+            done: true,
+            successCount: success,
+            failedCount: failed,
+          ),
+        );
+        return;
+      }
 
       final LibraryEpisodeItem episode = pending[i];
       final LibraryEpisodeItem current = live.episodes.firstWhere(
@@ -185,6 +239,8 @@ Future<void> downloadRemainingBilibiliEpisodes({
         progress: episodeBase + episodeSpan * 0.05,
         force: true,
       );
+      final CancelToken episodeToken = CancelToken();
+      _activeCancelTokens[courseId] = episodeToken;
       try {
         final BilibiliEpisodePrepareResult prepared =
             await prepareBilibiliEpisode(
@@ -193,6 +249,7 @@ Future<void> downloadRemainingBilibiliEpisodes({
               currentVideoAsset: current.videoAsset,
               existingEnSubtitlePath: current.enSubtitleAsset,
               existingZhSubtitlePath: current.cnSubtitleAsset,
+              cancelToken: episodeToken,
               onProgress: (String detail) {
                 // Prefer byte % from "正在下载视频 N%" when present.
                 final RegExpMatch? pct = RegExp(
@@ -273,6 +330,29 @@ Future<void> downloadRemainingBilibiliEpisodes({
           name: 'bilibili.collection',
         );
       } catch (e, st) {
+        final String errText = '$e';
+        final bool userCancel =
+            _cancelRequestedCourseIds.contains(courseId) ||
+            episodeToken.isCancelled ||
+            errText.contains('用户取消');
+        if (userCancel) {
+          publish(
+            message: '已停止合集下载（成功 $success）',
+            progress: i / pending.length,
+            force: true,
+          );
+          progressNotifier?.update(
+            BilibiliCollectionDownloadProgress(
+              courseId: courseId,
+              message: '已停止合集下载（成功 $success）',
+              progress: (i / pending.length).clamp(0.0, 1.0),
+              done: true,
+              successCount: success,
+              failedCount: failed,
+            ),
+          );
+          return;
+        }
         failed += 1;
         _episodeDownloadCooldownUntil[current.id] =
             DateTime.now().add(_episodeFailCooldown);
@@ -287,6 +367,10 @@ Future<void> downloadRemainingBilibiliEpisodes({
           error: e,
           stackTrace: st,
         );
+      } finally {
+        if (identical(_activeCancelTokens[courseId], episodeToken)) {
+          _activeCancelTokens.remove(courseId);
+        }
       }
     }
     final String doneMessage = failed == 0 && skippedCooldown == 0
@@ -306,5 +390,7 @@ Future<void> downloadRemainingBilibiliEpisodes({
     );
   } finally {
     _inFlightCourseIds.remove(courseId);
+    _activeCancelTokens.remove(courseId);
+    _cancelRequestedCourseIds.remove(courseId);
   }
 }
