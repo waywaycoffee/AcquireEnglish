@@ -70,6 +70,7 @@ import 'pronunciation_target_selection.dart';
 import 'subtitle_display_mode.dart';
 import 'subtitle_file_persist.dart';
 import 'subtitle_reference_review.dart';
+import 'ai_subtitle_resegment.dart';
 import 'subtitle_sentence_merge.dart';
 import 'subtitle_word_alignment.dart';
 import 'transcript_reader_session.dart';
@@ -2378,6 +2379,45 @@ Future<void> _settleChineseFillIfAlreadyPresent() async {
     await _editSubtitleLine(index, english, state.lines[index].chinese);
   }
 
+  bool _resegmentingSubtitles = false;
+
+  Future<void> _resegmentSubtitleLines(int index, int count) async {
+    if (_resegmentingSubtitles || index < 0 || index + count > state.lines.length) return;
+    final List<PlayerSubtitleLine> snapshot = state.lines;
+    final List<PlayerSubtitleLine> source = snapshot.sublist(index, index + count);
+    _resegmentingSubtitles = true;
+    _stopVideo();
+    _showMessage('AI 正在处理字幕…');
+    try {
+      final List<PlayerSubtitleLine> replacement = await resegmentSubtitles(
+        source: source,
+        merge: count > 1,
+        settings: ref.read(learningSettingsProvider),
+        formatTime: _formatTimestamp,
+      );
+      if (!mounted || !identical(snapshot, state.lines)) return;
+      final List<PlayerSubtitleLine> next = List<PlayerSubtitleLine>.of(snapshot)
+        ..replaceRange(index, index + count, replacement);
+      await persistManualSubtitleEdits(
+        episodeId: widget.episodeId,
+        lines: next,
+        sourceKey: _episodeSourceKey(),
+        videoPath: _videoAsset,
+      );
+      if (!mounted || !identical(snapshot, state.lines)) return;
+      setState(() {
+        state.replaceLines(next, preferredSubtitleMode: SubtitleDisplayMode.bilingual);
+        _referenceSubtitleLines = next;
+      });
+      unawaited(_syncManualSubtitlesToCloud(next));
+      _showMessage('字幕已保存');
+    } catch (_) {
+      if (mounted) _showMessage('字幕处理失败，请检查 AI 设置后重试');
+    } finally {
+      _resegmentingSubtitles = false;
+    }
+  }
+
   Future<void> _editSubtitleLine(
     int index,
     String english,
@@ -3115,6 +3155,7 @@ Future<void> _settleChineseFillIfAlreadyPresent() async {
                 : null,
             onEditEnglishLine: _editEnglishLine,
             onEditSubtitleLine: _editSubtitleLine,
+            onResegment: _resegmentSubtitleLines,
             onEditLineNote: _editLineNote,
             lineNotesByStartMs: _lineNotesByStartMs,
             studyDarkStyle: true,
@@ -4552,12 +4593,13 @@ Future<void> _settleChineseFillIfAlreadyPresent() async {
       line.english,
       line: line,
       courseContext: courseContext,
+      cardKind: VocabCardKind.pattern,
     );
     if (addedPhrase || addedCard) {
       ref.read(learningActivityProvider.notifier).recordPhraseSaved();
     }
     if (addedCard) {
-      _showMessage('已收藏句型到词卡，正在生成 AI 解析…');
+      _showMessage('已收藏句型到词卡');
     } else {
       _showMessage(
         addedPhrase ? '成功收藏当前句型到短语库！' : '该例句已经在您的短语库中！',
@@ -4581,10 +4623,13 @@ Future<void> _settleChineseFillIfAlreadyPresent() async {
       word,
       line: line,
       courseContext: courseContext,
+      cardKind: normalizeLexeme(word).contains(' ')
+          ? VocabCardKind.phrase
+          : null,
     );
     if (addedCard) {
       ref.read(learningActivityProvider.notifier).recordPhraseSaved();
-      _showMessage('已收藏「${normalizeLexeme(word)}」到词卡，正在生成 AI 解析…');
+      _showMessage('已收藏「${normalizeLexeme(word)}」到词卡');
       return;
     }
     // Fallback: keep whole-line phrase book for non-lexeme selections.
@@ -4635,6 +4680,7 @@ Future<void> _settleChineseFillIfAlreadyPresent() async {
     required PlayerSubtitleLine line,
     required PlayerCourseLookupResult courseContext,
     String? definitionCn,
+    VocabCardKind? cardKind,
   }) {
     final LibraryEpisodeItem? episode = courseContext.episode;
     final String lexeme = normalizeLexeme(raw);
@@ -4643,6 +4689,7 @@ Future<void> _settleChineseFillIfAlreadyPresent() async {
         .read(wordBookProvider.notifier)
         .addFavoriteWord(
           rawWord: lexeme,
+          cardKind: cardKind,
           episodeId: widget.episodeId,
           videoFileName: episode?.videoAsset
               ?.replaceAll(r'\', '/')
@@ -4897,6 +4944,7 @@ Future<void> _settleChineseFillIfAlreadyPresent() async {
                 : null,
             onEditEnglishLine: _editEnglishLine,
             onEditSubtitleLine: _editSubtitleLine,
+            onResegment: _resegmentSubtitleLines,
             onEditLineNote: _editLineNote,
             lineNotesByStartMs: _lineNotesByStartMs,
             fontScale: ref.read(learningSettingsProvider).fontScale,

@@ -509,9 +509,12 @@ class WordBookNotifier extends Notifier<List<WordEntry>> {
     required String sentence,
     required String chinese,
     String? generatedDefinition,
+    VocabCardKind? cardKind,
   }) {
     final String word = normalizeLexeme(rawWord);
-    if (!_isFavoriteableLexeme(word)) return false;
+    if (word.isEmpty || (cardKind == null && !_isFavoriteableLexeme(word))) {
+      return false;
+    }
     final String? definition = generatedDefinition?.trim();
     final String? validDefinition = definition == null || definition.isEmpty
         ? null
@@ -529,7 +532,7 @@ class WordBookNotifier extends Notifier<List<WordEntry>> {
       chinese: chinese.trim(),
       count: count == 0 ? 1 : count,
     );
-    final VocabCardKind kind = vocabCardKindForLexeme(word);
+    final VocabCardKind kind = cardKind ?? vocabCardKindForLexeme(word);
     if (entryIndex < 0) {
       state = <WordEntry>[
         WordEntry(

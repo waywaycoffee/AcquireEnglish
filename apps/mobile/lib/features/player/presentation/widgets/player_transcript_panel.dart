@@ -41,6 +41,7 @@ class PlayerTranscriptPanel extends StatefulWidget {
     this.onRegenerateAiLine,
     this.onEditEnglishLine,
     this.onEditSubtitleLine,
+    this.onResegment,
     this.onOpenSubtitleEditor,
     this.onEditLineNote,
     this.lineNotesByStartMs = const <int, String>{},
@@ -101,6 +102,7 @@ class PlayerTranscriptPanel extends StatefulWidget {
   final Future<void> Function(int index, String english)? onEditEnglishLine;
   final Future<void> Function(int index, String english, String chinese)?
   onEditSubtitleLine;
+  final Future<void> Function(int index, int count)? onResegment;
   final VoidCallback? onOpenSubtitleEditor;
   final Future<void> Function(int index, String note)? onEditLineNote;
   final Map<int, String> lineNotesByStartMs;
@@ -168,6 +170,7 @@ class _PlayerTranscriptPanelState extends State<PlayerTranscriptPanel> {
       onRegenerateAiLine: widget.onRegenerateAiLine,
       onEditEnglishLine: widget.onEditEnglishLine,
       onEditSubtitleLine: widget.onEditSubtitleLine,
+      onResegment: widget.onResegment,
       onOpenSubtitleEditor: widget.onOpenSubtitleEditor,
       onEditLineNote: widget.onEditLineNote,
       lineNotesByStartMs: widget.lineNotesByStartMs,

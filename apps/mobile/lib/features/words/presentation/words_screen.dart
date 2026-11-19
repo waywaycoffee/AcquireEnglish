@@ -1,3 +1,4 @@
+import '../../daily_review/presentation/daily_review_provider.dart';
 import 'dart:async';
 
 import 'package:alphabet_list_view/alphabet_list_view.dart';
@@ -370,6 +371,11 @@ class _WordCard extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final int reviews = entry.favorite
+        ? ref.watch(dailyReviewProvider.select(
+            (value) => value.records['word:${entry.word}']?.reviews ?? 0,
+          ))
+        : 0;
     final String translation =
         entry.definitionCn ?? entry.offlineDefinitionCn ?? '暂无释义';
     // Material (not DecoratedBox) so InkWell splash paints correctly.
@@ -402,6 +408,13 @@ class _WordCard extends ConsumerWidget {
                       overflow: TextOverflow.ellipsis,
                       style: const TextStyle(fontSize: 12, height: 1.2),
                     ),
+                    if (reviews > 0) Text('已复习 $reviews 次'),
+                    if (entry.sourceSentence.isNotEmpty) ...<Widget>[
+                      const SizedBox(height: 6),
+                      Text('视频原句 · ${entry.sourceSentence}'),
+                      if (entry.sourceSentenceCn.isNotEmpty)
+                        Text(entry.sourceSentenceCn),
+                    ],
                   ],
                 ),
               ),

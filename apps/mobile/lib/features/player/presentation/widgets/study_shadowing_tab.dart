@@ -6,6 +6,7 @@ import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:path_provider/path_provider.dart';
+import 'package:hive_ce/hive.dart';
 
 import '../../../settings/presentation/settings_provider.dart';
 import '../../../settings/data/pronunciation_credentials.dart';
@@ -547,6 +548,8 @@ class _StudyShadowingTabState extends ConsumerState<StudyShadowingTab> {
         _assessment = null;
         _message = reachedLimit ? '已达到 60 秒上限，正在评分…' : '录音完成，正在评分…';
       });
+      _recordPracticeAttempt();
+      widget.onPracticeCompleted?.call();
       _takeCreatedAt = DateTime.now();
       await _persistDubTake(path);
       await _scoreAfterRecording(path: path, audio: audio);
@@ -558,6 +561,27 @@ class _StudyShadowingTabState extends ConsumerState<StudyShadowingTab> {
         _finishingRecording = false;
         _message = '保存临时录音失败，请重试。';
       });
+    }
+  }
+
+  String? get _practiceCountKey {
+    final String? episode = widget.episodeId;
+    if (episode == null || episode.isEmpty) return null;
+    final PlayerSubtitleLine line = widget.line;
+    return 'shadowAttempts:$episode:${line.startMs}:${line.endMs}';
+  }
+
+  int get _practiceCount {
+    final String? key = _practiceCountKey;
+    if (key == null || !Hive.isBoxOpen('prefs')) return 0;
+    return int.tryParse(Hive.box<String>('prefs').get(key) ?? '') ?? 0;
+  }
+
+  void _recordPracticeAttempt() {
+    final String? key = _practiceCountKey;
+    if (key != null && Hive.isBoxOpen('prefs')) {
+      unawaited(Hive.box<String>('prefs').put(key, '${_practiceCount + 1}')
+          .catchError((Object _) {}));
     }
   }
 
@@ -695,7 +719,6 @@ class _StudyShadowingTabState extends ConsumerState<StudyShadowingTab> {
             _message = '发音评测完成';
           });
           await _persistDubTake(path);
-          widget.onPracticeCompleted?.call();
           return;
         } catch (error) {
           lastError = _prettyError(error);
@@ -746,7 +769,6 @@ class _StudyShadowingTabState extends ConsumerState<StudyShadowingTab> {
             () => _message = '录音已保存 · 暂未评分（${lastError ?? "识别不可用"}），可重试',
           );
         }
-        widget.onPracticeCompleted?.call();
         return;
       }
 
@@ -767,7 +789,6 @@ class _StudyShadowingTabState extends ConsumerState<StudyShadowingTab> {
         }
       });
       unawaited(_persistDubTake(path));
-      widget.onPracticeCompleted?.call();
     } finally {
       if (mounted && !_resourcesReleased) {
         setState(() => _voiceBusy = false);
@@ -917,6 +938,9 @@ class _StudyShadowingTabState extends ConsumerState<StudyShadowingTab> {
           child: ListView(
             padding: const EdgeInsets.fromLTRB(12, 12, 12, 8),
             children: <Widget>[
+              if (_practiceCount > 0)
+                Text('本句已跟读 $_practiceCount 次'),
+
               Container(
                 width: double.infinity,
                 padding: const EdgeInsets.fromLTRB(18, 20, 18, 20),

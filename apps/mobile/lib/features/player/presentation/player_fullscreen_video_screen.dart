@@ -55,6 +55,7 @@ class PlayerFullscreenVideoScreen extends StatefulWidget {
     this.onRegenerateAiLine,
     this.onEditEnglishLine,
     this.onEditSubtitleLine,
+    this.onResegment,
     this.onEditLineNote,
     this.lineNotesByStartMs = const <int, String>{},
     this.fontScale = 1,
@@ -114,6 +115,7 @@ class PlayerFullscreenVideoScreen extends StatefulWidget {
   final Future<void> Function(int index, String english)? onEditEnglishLine;
   final Future<void> Function(int index, String english, String chinese)?
   onEditSubtitleLine;
+  final Future<void> Function(int index, int count)? onResegment;
   final Future<void> Function(int index, String note)? onEditLineNote;
   final Map<int, String> lineNotesByStartMs;
   final double fontScale;
@@ -433,6 +435,7 @@ class _PlayerFullscreenVideoScreenState
                 onRegenerateAiLine: widget.onRegenerateAiLine,
                 onEditEnglishLine: widget.onEditEnglishLine,
                 onEditSubtitleLine: widget.onEditSubtitleLine,
+                onResegment: widget.onResegment,
                 onEditLineNote: widget.onEditLineNote,
                 lineNotesByStartMs: widget.lineNotesByStartMs,
                 onTogglePlaying: () => _refresh(widget.onTogglePlaying),
@@ -488,6 +491,7 @@ class _FullscreenSubtitlePanel extends StatelessWidget {
     this.onRegenerateAiLine,
     this.onEditEnglishLine,
     this.onEditSubtitleLine,
+    this.onResegment,
     this.onEditLineNote,
     this.lineNotesByStartMs = const <int, String>{},
     required this.onAssessLine,
@@ -517,6 +521,7 @@ class _FullscreenSubtitlePanel extends StatelessWidget {
   final Future<void> Function(int index, String english)? onEditEnglishLine;
   final Future<void> Function(int index, String english, String chinese)?
   onEditSubtitleLine;
+  final Future<void> Function(int index, int count)? onResegment;
   final Future<void> Function(int index, String note)? onEditLineNote;
   final Map<int, String> lineNotesByStartMs;
   final ValueChanged<int> onAssessLine;
@@ -563,6 +568,7 @@ class _FullscreenSubtitlePanel extends StatelessWidget {
           onRegenerateAiLine: onRegenerateAiLine,
           onEditEnglishLine: onEditEnglishLine,
           onEditSubtitleLine: onEditSubtitleLine,
+          onResegment: onResegment,
           onEditLineNote: onEditLineNote,
           lineNotesByStartMs: lineNotesByStartMs,
           loopingLineIndex: player.isLooping ? player.activeLineIndex : null,

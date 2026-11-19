@@ -7,6 +7,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../settings/data/api_usage_ledger.dart';
 import '../../settings/presentation/settings_provider.dart';
 import '../presentation/word_book_provider.dart';
+import 'offline_word_dictionary.dart';
 
 final Provider<VocabCardEnrichmentService> vocabCardEnrichmentServiceProvider =
     Provider<VocabCardEnrichmentService>(
@@ -69,6 +70,25 @@ class VocabCardEnrichmentService {
       return true;
     }
 
+    if (!force && existing.kind == VocabCardKind.word) {
+      OfflineWordDefinition? local;
+      try {
+        local = await _ref.read(offlineWordDictionaryProvider).lookup(word);
+      } catch (_) {
+        // A missing dictionary asset should not block online enrichment.
+      }
+      if (local != null && local.translation.trim().isNotEmpty) {
+        book.applyEnrichment(
+          rawWord: word,
+          phonetic: local.phonetic,
+          partOfSpeech: local.partOfSpeech,
+          definitionCn: existing.definitionCn ?? local.translation,
+          status: VocabEnrichmentStatus.ready,
+        );
+        return true;
+      }
+    }
+
     book.markEnrichmentPending(word);
     final LearningSettingsState settings = _ref.read(learningSettingsProvider);
     try {
@@ -93,10 +113,7 @@ class VocabCardEnrichmentService {
       );
       return true;
     } catch (_) {
-      book.applyEnrichment(
-        rawWord: word,
-        status: VocabEnrichmentStatus.failed,
-      );
+      book.applyEnrichment(rawWord: word, status: VocabEnrichmentStatus.failed);
       return false;
     }
   }

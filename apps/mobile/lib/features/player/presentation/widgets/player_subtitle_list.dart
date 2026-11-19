@@ -42,6 +42,7 @@ class PlayerSubtitleList extends StatefulWidget {
     required this.onLoopFromLine,
     required this.onDictationLine,
     required this.onAiExplain,
+    this.onResegment,
     this.loopingLineIndex,
     this.isPlaying = false,
     this.onTogglePlaying,
@@ -132,6 +133,7 @@ class PlayerSubtitleList extends StatefulWidget {
   final Future<void> Function(int index, String english)? onEditEnglishLine;
   final Future<void> Function(int index, String english, String chinese)?
   onEditSubtitleLine;
+  final Future<void> Function(int index, int count)? onResegment;
   final VoidCallback? onOpenSubtitleEditor;
   final Future<void> Function(int index, String note)? onEditLineNote;
   final Map<int, String> lineNotesByStartMs;
@@ -1031,6 +1033,27 @@ class _PlayerSubtitleListState extends State<PlayerSubtitleList> {
             final List<ContextMenuButtonItem> items = <ContextMenuButtonItem>[
               ...selectableRegionState.contextMenuButtonItems,
               ContextMenuButtonItem(
+                label: '收藏选中文字',
+                onPressed: () {
+                  final String text = (_lastSelectedPlainText ?? '').trim();
+                  ContextMenuController.removeAny();
+                  if (text.isNotEmpty && !text.contains('\n')) {
+                    final void Function(String, String)? collect =
+                        widget.onCollectWordAtTime;
+                    final String lower = text.toLowerCase();
+                    final Iterable<PlayerSubtitleLine> matches = widget.lines
+                        .where((PlayerSubtitleLine line) =>
+                            line.english.toLowerCase().contains(lower));
+                    if (collect != null && matches.length == 1) {
+                      collect(text, matches.first.startTime);
+                    } else {
+                      widget.onCollectWord(text);
+                    }
+                  }
+                  selectableRegionState.clearSelection();
+                },
+              ),
+              ContextMenuButtonItem(
                 label: '翻译',
                 onPressed: () {
                   ContextMenuController.removeAny();
@@ -1376,7 +1399,7 @@ class _PlayerSubtitleListState extends State<PlayerSubtitleList> {
                                       borderRadius: BorderRadius.circular(16),
                                     ),
                                   ),
-                                  child: const Icon(Icons.star_rounded),
+                                  child: const Icon(Icons.favorite_border_rounded),
                                 ),
                                 const SizedBox(width: 6),
                                 if (widget.onEditSubtitleLine !=
@@ -1994,6 +2017,19 @@ class _PlayerSubtitleListState extends State<PlayerSubtitleList> {
                   subtitle: const Text('分析句子结构、语法点与表达'),
                   onTap: () => Navigator.of(context).pop('ai-explain'),
                 ),
+                if (widget.onResegment != null) ...<Widget>[
+                  ListTile(
+                    leading: const Icon(Icons.content_cut),
+                    title: const Text('AI 拆分字幕'),
+                    onTap: () => Navigator.of(context).pop('split'),
+                  ),
+                  for (int count = 2; count <= 4 && index + count <= widget.lines.length; count++)
+                    ListTile(
+                      leading: const Icon(Icons.merge_type),
+                      title: Text('AI 合并从这里开始的 $count 段字幕'),
+                      onTap: () => Navigator.of(context).pop('merge:$count'),
+                    ),
+                ],
                 if (widget.onEditSubtitleLine != null ||
                     widget.onEditEnglishLine != null)
                   ListTile(
@@ -2077,6 +2113,14 @@ class _PlayerSubtitleListState extends State<PlayerSubtitleList> {
         return;
       case 'dictation':
         widget.onDictationLine(index);
+        return;
+      case 'split':
+        await widget.onResegment?.call(index, 1);
+        return;
+      case 'merge:2':
+      case 'merge:3':
+      case 'merge:4':
+        await widget.onResegment?.call(index, int.parse(action!.split(':').last));
         return;
       case 'ai-explain':
         widget.onAiExplain(index);
@@ -2231,6 +2275,15 @@ class _PlayerSubtitleListState extends State<PlayerSubtitleList> {
             return Builder(
               builder: (BuildContext wordContext) {
                 return InkWell(
+                  onLongPress: () {
+                    final void Function(String, String)? collect =
+                        widget.onCollectWordAtTime;
+                    if (collect == null) {
+                      widget.onCollectWord(token.value);
+                    } else {
+                      collect(token.value, contextTime);
+                    }
+                  },
                   onTap: () => _toggleDictionaryOverlay(
                     wordContext,
                     token.value,
