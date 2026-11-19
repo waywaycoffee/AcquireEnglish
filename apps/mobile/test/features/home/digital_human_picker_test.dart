@@ -32,7 +32,7 @@ void main() {
       photos.any(
         (Image image) =>
             image.image is AssetImage &&
-            (image.image as AssetImage).assetName.endsWith('/mia.jpg'),
+            (image.image as AssetImage).assetName.endsWith('/mia.webp'),
       ),
       isTrue,
     );
@@ -43,7 +43,7 @@ void main() {
     expect(
       sprites.any(
         (CartoonCoachSprite sprite) =>
-            sprite.asset.endsWith('/mia-cartoon.png') && sprite.frame == 0,
+            sprite.asset.endsWith('/mia-cartoon.webp') && sprite.frame == 0,
       ),
       isTrue,
     );

@@ -16,7 +16,7 @@ void main() {
   });
   testWidgets('atlas renders one bounded cell', (WidgetTester tester) async {
     await tester.pumpWidget(const MaterialApp(home: Center(child: SizedBox(width: 240, height: 240,
-      child: CartoonCoachSprite(asset: 'assets/img/digital_human/mia-cartoon.png', motion: CoachMotion.idle, mouth: CoachViseme.closed, phase: 0)))));
+      child: CartoonCoachSprite(asset: 'assets/img/digital_human/mia-cartoon.webp', motion: CoachMotion.idle, mouth: CoachViseme.closed, phase: 0)))));
     await tester.pumpAndSettle();
     expect(tester.takeException(), isNull);
     expect(tester.getSize(find.byType(ClipRect)), const Size(240, 240));

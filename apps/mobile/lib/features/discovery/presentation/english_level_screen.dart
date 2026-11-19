@@ -55,7 +55,7 @@ class _EnglishLevelScreenState extends ConsumerState<EnglishLevelScreen> {
               as Map<String, dynamic>;
       _stage = data['stage'] as String?;
       _work = data['work'] as String?;
-      _reading = data['reading'] as int?;
+      if (data['readingVersion'] == 2) _reading = data['reading'] as int?;
       _speaking = (data['speaking'] as num?)?.toDouble();
     } catch (_) {}
   }
@@ -68,6 +68,7 @@ class _EnglishLevelScreenState extends ConsumerState<EnglishLevelScreen> {
         'stage': _stage,
         'work': _work,
         'reading': _reading,
+        'readingVersion': 2,
         'speaking': _speaking,
       }),
     );
@@ -102,7 +103,7 @@ class _EnglishLevelScreenState extends ConsumerState<EnglishLevelScreen> {
       );
       await ref
           .read(learningPreferencesProvider.notifier)
-          .save(current.copyWith(level: level, dailyQuota: 10));
+          .save(current.copyWith(level: level));
     } finally {
       if (mounted) setState(() => _saving = false);
     }
@@ -182,7 +183,7 @@ class _EnglishLevelScreenState extends ConsumerState<EnglishLevelScreen> {
             estimate == null ? '完成三项测试后显示综合估计' : '综合估计 · $estimate',
             style: Theme.of(context).textTheme.titleLarge,
           ),
-          const Text('估计用于选择学习材料。口语项评估朗读表现。'),
+          const Text('结果用于推荐学习材料。题量较少，口语项只测朗读表现，因此级别为初步估计。'),
           if (estimate != null)
             TextButton(
               onPressed: _saving ? null : () => _apply(estimate),
@@ -333,6 +334,28 @@ const List<_ReadingQuestion> _readingQuestions = <_ReadingQuestion>[
       'As a device that reveals the limitations of memory',
     ],
     answer: 2,
+  ),
+  (
+    passage:
+        'The council calls the restrictions temporary, a description that is technically correct: the permits expire in December. But because renewal is automatic unless a councillor objects, the policy is more likely to persist than the announcement suggests.',
+    question: 'What distinction does the writer draw?',
+    choices: <String>[
+      'The announcement makes renewal sound compulsory.',
+      'The formal expiry date says little about how long the policy will last.',
+      'Individual councillors lack the power to challenge the permits.',
+    ],
+    answer: 1,
+  ),
+  (
+    passage:
+        'The essay does not dispute that the archive contains omissions. It disputes the comfort of treating them as accidents: what was repeatedly left unrecorded is as revealing as what was carefully preserved.',
+    question: 'What does the writer imply about the omissions?',
+    choices: <String>[
+      'Their pattern can reveal the priorities of those who kept the archive.',
+      'They make the remaining records inherently unreliable.',
+      'They can be explained by isolated administrative mistakes.',
+    ],
+    answer: 0,
   ),
 ];
 

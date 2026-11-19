@@ -412,12 +412,18 @@ void main() {
       await tester.tap(
         find.byKey(const ValueKey<String>('pronunciation-record-stop')),
       );
-      for (int i = 0; i < 8; i++) {
+      final Finder scoreButton = find.byKey(
+        const ValueKey<String>('pronunciation-score-button'),
+      );
+      final Stopwatch waitForRecording = Stopwatch()..start();
+      while (tester.widget<FilledButton>(scoreButton).onPressed == null &&
+          waitForRecording.elapsed < const Duration(seconds: 4)) {
         await tester.pump();
         await tester.runAsync(
           () => Future<void>.delayed(const Duration(milliseconds: 20)),
         );
       }
+      expect(tester.widget<FilledButton>(scoreButton).onPressed, isNotNull);
       final Completer<PronunciationCredentials> delayedKey =
           Completer<PronunciationCredentials>();
       store.pendingRead = delayedKey;
@@ -443,7 +449,9 @@ void main() {
       await tester.pump();
       expect(service.calls, 1);
       await tester.pumpAndSettle();
-      for (int i = 0; i < 8; i++) {
+      final Stopwatch waitForCleanup = Stopwatch()..start();
+      while (temp.listSync(recursive: true).whereType<File>().isNotEmpty &&
+          waitForCleanup.elapsed < const Duration(seconds: 4)) {
         await tester.pump();
         await tester.runAsync(
           () => Future<void>.delayed(const Duration(milliseconds: 20)),

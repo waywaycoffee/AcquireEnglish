@@ -159,13 +159,17 @@ class DailyReviewNotifier extends Notifier<DailyReviewState> {
   int _generation = 0;
   bool _disposed = false;
   bool _syncing = false;
+  Timer? _backupTimer;
 
   @override
   DailyReviewState build() {
     _disposed = false;
     final int generation = ++_generation;
     ref.onDispose(() {
-      if (generation == _generation) _disposed = true;
+      if (generation == _generation) {
+        _disposed = true;
+        _backupTimer?.cancel();
+      }
     });
     final ReviewRepository repository = ref.watch(reviewRepositoryProvider);
     final List<ReviewSource> sources = ref.read(reviewSourcesProvider);
@@ -220,6 +224,21 @@ class DailyReviewNotifier extends Notifier<DailyReviewState> {
     });
     _pending = operation;
     return operation;
+  }
+
+  void scheduleCloudBackup({
+    Duration delay = const Duration(seconds: 8),
+  }) {
+    if (!ref.read(authSessionProvider).isLoggedIn) return;
+    _backupTimer?.cancel();
+    _backupTimer = Timer(delay, () {
+      if (_disposed) return;
+      if (_syncing) {
+        scheduleCloudBackup();
+        return;
+      }
+      unawaited(syncCloudBackup());
+    });
   }
 
   Future<String> syncCloudBackup() async {
@@ -294,7 +313,11 @@ class DailyReviewNotifier extends Notifier<DailyReviewState> {
       await prefs.put(checkpointKey, '${uploaded.revision}:$localDigest');
       return '已备份复习次数和下次复习时间。';
     } on DioException catch (error) {
-      return error.response?.statusCode == 409
+      final int? status = error.response?.statusCode;
+      if (currentSession() && (status == null || status >= 500)) {
+        scheduleCloudBackup(delay: const Duration(minutes: 1));
+      }
+      return status == 409
           ? '云端复习记录刚更新，请重新同步。'
           : '暂时无法同步复习进度，本机记录已保留。';
     } on StateError catch (error) {
@@ -309,10 +332,14 @@ class DailyReviewNotifier extends Notifier<DailyReviewState> {
   String _reviewDigest(DailyReviewState value) =>
       sha256.convert(utf8.encode(jsonEncode(value.toJson()))).toString();
 
-  Future<void> setDailyNewLimit(int limit) =>
-      _transaction((DailyReviewState current) => current.withLimit(limit));
+  Future<void> setDailyNewLimit(int limit) async {
+    final int generation = _generation;
+    await _transaction((DailyReviewState current) => current.withLimit(limit));
+    if (!_disposed && generation == _generation) scheduleCloudBackup();
+  }
 
   Future<void> reviewToday(String key) async {
+    final int generation = _generation;
     await _transaction((DailyReviewState current) {
       if (!ref
           .read(reviewSourcesProvider)
@@ -321,7 +348,9 @@ class DailyReviewNotifier extends Notifier<DailyReviewState> {
       }
       return current.reviewToday(key, ref.read(reviewClockProvider)());
     });
-    if (_disposed || !key.startsWith('phrase:')) return;
+    if (_disposed || generation != _generation) return;
+    scheduleCloudBackup();
+    if (!key.startsWith('phrase:')) return;
     ref
         .read(phraseBookProvider.notifier)
         .updatePhrase(
@@ -360,6 +389,7 @@ class DailyReviewNotifier extends Notifier<DailyReviewState> {
       );
     });
     if (_disposed || generation != _generation) return;
+    scheduleCloudBackup();
     if (!_disposed &&
         gradedSource?.kind == ReviewKind.word &&
         (rating == fsrs.Rating.good || rating == fsrs.Rating.easy)) {
@@ -369,7 +399,9 @@ class DailyReviewNotifier extends Notifier<DailyReviewState> {
         accountAtReview: account,
       );
     }
-    if (_disposed || !key.startsWith('phrase:')) return;
+    if (_disposed || generation != _generation || !key.startsWith('phrase:')) {
+      return;
+    }
     final ReviewRecord record = state.records[key]!;
     // Keep the existing phrase-library due filter consistent with the one
     // authoritative FSRS schedule. Legacy review routes use the same screen.

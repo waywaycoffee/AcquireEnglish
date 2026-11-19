@@ -69,6 +69,9 @@ class _DailyReviewScreenState extends ConsumerState<DailyReviewScreen>
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) ref.read(dailyReviewProvider.notifier).scheduleCloudBackup();
+    });
     _timer = Timer.periodic(const Duration(seconds: 30), (_) {
       if (mounted) setState(() {});
     });
@@ -76,7 +79,10 @@ class _DailyReviewScreenState extends ConsumerState<DailyReviewScreen>
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.resumed && mounted) setState(() {});
+    if (state == AppLifecycleState.resumed && mounted) {
+      setState(() {});
+      ref.read(dailyReviewProvider.notifier).scheduleCloudBackup();
+    }
   }
 
   @override

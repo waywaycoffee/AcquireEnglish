@@ -56,6 +56,7 @@ class _RecordingState extends ConsumerState<SentenceRecordingButton> {
                 )
                 .toList();
             return Wrap(
+              crossAxisAlignment: WrapCrossAlignment.center,
               children: <Widget>[
                 IconButton(
                   icon: const Icon(Icons.graphic_eq, size: 18),
@@ -75,6 +76,10 @@ class _RecordingState extends ConsumerState<SentenceRecordingButton> {
                         );
                     }
                   },
+                ),
+                Text(
+                  '已跟读 ${versions.length} 次',
+                  style: Theme.of(context).textTheme.labelSmall,
                 ),
                 if (versions.length > 1)
                   PopupMenuButton<DubTake>(

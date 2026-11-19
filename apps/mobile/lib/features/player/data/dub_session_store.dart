@@ -65,6 +65,7 @@ class DubSessionStore {
   DubSessionStore.forDirectory(Directory directory) : _directory = directory;
   Directory? _directory;
 
+  final Map<String, Future<void>> _pendingSaves = <String, Future<void>>{};
   final ValueNotifier<int> revision = ValueNotifier<int>(0);
 
   static final DubSessionStore instance = DubSessionStore._();
@@ -124,6 +125,23 @@ class DubSessionStore {
   }
 
   Future<void> saveTake(DubTake take) async {
+    final String episodeId = take.episodeId;
+    final Future<void> previous =
+        _pendingSaves[episodeId] ?? Future<void>.value();
+    final Future<void> operation = previous
+        .catchError((Object _) {})
+        .then((_) => _saveTake(take));
+    _pendingSaves[episodeId] = operation;
+    try {
+      await operation;
+    } finally {
+      if (identical(_pendingSaves[episodeId], operation)) {
+        _pendingSaves.remove(episodeId);
+      }
+    }
+  }
+
+  Future<void> _saveTake(DubTake take) async {
     final Directory dir = await _episodeDir(take.episodeId);
     // Copy wav into durable session folder so temp cleanup won't delete it.
     final String durablePath =
