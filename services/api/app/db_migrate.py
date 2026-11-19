@@ -93,6 +93,13 @@ async def _ensure_preference_columns(conn: AsyncConnection) -> None:
         await conn.execute(
             text("ALTER TABLE user_preferences ADD COLUMN asr_api_key TEXT")
         )
+    if "followed_creators_json" not in existing:
+        await conn.execute(
+            text(
+                "ALTER TABLE user_preferences "
+                "ADD COLUMN followed_creators_json TEXT DEFAULT '[]'"
+            )
+        )
 
 
 async def _ensure_user_points_columns(conn: AsyncConnection) -> None:

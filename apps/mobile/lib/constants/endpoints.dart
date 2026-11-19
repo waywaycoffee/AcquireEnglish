@@ -35,6 +35,9 @@ class Endpoints {
   static const String phrases = 'api/phrases';
   static const String preferences = 'api/preferences';
   static const String dailyFeed = 'api/feed/daily';
+  static const String creatorsFollowed = 'api/creators/followed';
+  static const String creatorsFollow = 'api/creators/follow';
+  static const String creatorsUnfollow = 'api/creators/unfollow';
   static const String health = 'api/health';
   static const String assets = 'api/assets';
   static const String assetsSkus = 'api/assets/skus';

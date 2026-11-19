@@ -185,6 +185,8 @@ class UserPreference(Base):
     bilibili_cookie: Mapped[str | None] = mapped_column(Text, nullable=True)
     # Optional per-user DashScope / 百炼 API key for web AI subtitles.
     asr_api_key: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # JSON list of followed creators: [{source, creator_id, display_name, ...}].
+    followed_creators_json: Mapped[str] = mapped_column(Text, default="[]")
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
     )

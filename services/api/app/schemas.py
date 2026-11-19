@@ -151,6 +151,16 @@ class VocabOut(BaseModel):
     model_config = {"from_attributes": True}
 
 
+class FollowedCreator(BaseModel):
+    """A Bilibili UP or YouTube channel the user follows for Discover."""
+
+    source: str = Field(pattern=r"^(bilibili|youtube)$")
+    creator_id: str = Field(min_length=1, max_length=128)
+    display_name: str = Field(default="", max_length=120)
+    avatar_url: str | None = Field(default=None, max_length=512)
+    profile_url: str | None = Field(default=None, max_length=512)
+
+
 class PreferencesUpdate(BaseModel):
     level: str = Field(default="A2", max_length=16)
     tags: list[str] = Field(default_factory=lambda: ["slow", "daily"])
@@ -160,6 +170,8 @@ class PreferencesUpdate(BaseModel):
     # Full QR-login Cookie headers (SESSDATA + buvid + …) often exceed 4KB.
     bilibili_cookie: str | None = Field(default=None, max_length=16384)
     asr_api_key: str | None = Field(default=None, max_length=512)
+    # None = leave unchanged; list replaces the full follow set.
+    followed_creators: list[FollowedCreator] | None = None
 
 
 class PreferencesOut(BaseModel):
@@ -169,6 +181,23 @@ class PreferencesOut(BaseModel):
     notify_daily_feed: bool
     has_bilibili_cookie: bool = False
     has_asr_api_key: bool = False
+    followed_creators: list[FollowedCreator] = Field(default_factory=list)
+
+
+class CreatorFollowRequest(BaseModel):
+    """Follow via space/channel URL, or explicit ids when already known."""
+
+    url: str | None = Field(default=None, max_length=512)
+    source: str | None = Field(default=None, pattern=r"^(bilibili|youtube)$")
+    creator_id: str | None = Field(default=None, max_length=128)
+    display_name: str | None = Field(default=None, max_length=120)
+    avatar_url: str | None = Field(default=None, max_length=512)
+    profile_url: str | None = Field(default=None, max_length=512)
+
+
+class CreatorUnfollowRequest(BaseModel):
+    source: str = Field(pattern=r"^(bilibili|youtube)$")
+    creator_id: str = Field(min_length=1, max_length=128)
 
 
 class DailyFeedItemOut(BaseModel):
@@ -178,12 +207,14 @@ class DailyFeedItemOut(BaseModel):
     bvid: str
     title: str
     author: str = ""
+    authorId: str | None = None
     coverUrl: str | None = None
     durationSec: float | None = None
     watchUrl: str
     description: str | None = None
     tags: list[str] = []
     source: str = "bilibili"
+    reason: str = "interest"  # interest | followed
 
 
 # --- User assets (entitlements / orders / wallet) ---

@@ -9,6 +9,7 @@ from app.routers import (
     assets,
     auth,
     courses,
+    creators,
     feed,
     imports,
     learning,
@@ -59,6 +60,7 @@ app.include_router(vocab.router, prefix="/api")
 app.include_router(phrases.router, prefix="/api")
 app.include_router(public_lexicon.router, prefix="/api")
 app.include_router(preferences.router, prefix="/api")
+app.include_router(creators.router, prefix="/api")
 app.include_router(feed.router, prefix="/api")
 app.include_router(imports.router, prefix="/api")
 app.include_router(learning.router, prefix="/api")

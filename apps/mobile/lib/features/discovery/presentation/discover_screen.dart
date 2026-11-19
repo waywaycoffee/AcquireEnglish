@@ -15,6 +15,7 @@ import '../../shared/presentation/pad/pad_top_bar.dart';
 import '../../sync/data/acquire_api_client.dart';
 import '../../sync/presentation/daily_feed_provider.dart';
 import 'english_level_screen.dart';
+import 'followed_creators_screen.dart';
 
 class DiscoverScreen extends ConsumerStatefulWidget {
   const DiscoverScreen({super.key});
@@ -80,6 +81,34 @@ class _DiscoverScreenState extends ConsumerState<DiscoverScreen>
     }
   }
 
+  Future<void> _followAuthor(AcquireDailyFeedItemDto item) async {
+    final String? mid = item.authorId?.trim();
+    if (mid == null || mid.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('无法识别该 UP 主，请到「关注博主」粘贴空间链接。')),
+      );
+      return;
+    }
+    try {
+      await ref.read(acquireApiClientProvider).followCreator(
+            source: 'bilibili',
+            creatorId: mid,
+            displayName: item.author,
+          );
+      await ref.read(learningPreferencesProvider.notifier).pullRemote();
+      await _refresh(force: true);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('已关注 ${item.author.isEmpty ? mid : item.author}')),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('关注失败：$e')),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final bool loggedIn = ref.watch(authSessionProvider).isLoggedIn;
@@ -95,12 +124,19 @@ class _DiscoverScreenState extends ConsumerState<DiscoverScreen>
     final AcquirePreferencesDto preferences = ref.watch(
       learningPreferencesProvider,
     );
+    final List<AcquireDailyFeedItemDto> followed = feed
+        .where((AcquireDailyFeedItemDto e) => e.isFollowed)
+        .toList(growable: false);
+    final List<AcquireDailyFeedItemDto> interest = feed
+        .where((AcquireDailyFeedItemDto e) => !e.isFollowed)
+        .toList(growable: false);
+
     return PadScaffold(
       currentDestination: AppNavDestination.discover,
       showContinueLearning: false,
       topBar: PadTopBar(
         title: '发现',
-        description: '按兴趣与英语水平挑选每日学习视频',
+        description: '按兴趣与关注博主推荐，导入由你确认',
         actions: <Widget>[
           IconButton(
             tooltip: '刷新推荐',
@@ -138,6 +174,20 @@ class _DiscoverScreenState extends ConsumerState<DiscoverScreen>
                     ),
                   ),
                 ),
+                ActionChip(
+                  avatar: const Icon(Icons.person_add_alt_1_rounded, size: 18),
+                  label: Text(
+                    '关注博主 · ${preferences.followedCreators.length}',
+                  ),
+                  onPressed: () async {
+                    await Navigator.of(context).push<void>(
+                      MaterialPageRoute<void>(
+                        builder: (_) => const FollowedCreatorsScreen(),
+                      ),
+                    );
+                    if (mounted) unawaited(_refresh(force: true));
+                  },
+                ),
               ],
             ),
             const SizedBox(height: 16),
@@ -150,50 +200,104 @@ class _DiscoverScreenState extends ConsumerState<DiscoverScreen>
               )
             else if (feed.isEmpty && !_loading)
               const ListTile(
-                title: Text('暂未找到通过英文原声抽样的视频'),
-                subtitle: Text('正在筛选英文原声候选。可以稍后刷新，或换一组兴趣。'),
+                title: Text('暂无推荐视频'),
+                subtitle: Text('可换一组兴趣、关注博主，或稍后刷新。点开后自行导入。'),
               )
             else ...<Widget>[
+              if (followed.isNotEmpty) ...<Widget>[
+                Text(
+                  '关注的博主 · ${followed.length} 条',
+                  style: Theme.of(context).textTheme.titleLarge,
+                ),
+                const Text('来自你关注的 UP / 频道，点开后自行导入。'),
+                const SizedBox(height: 8),
+                for (final AcquireDailyFeedItemDto item in followed)
+                  _FeedCard(
+                    item: item,
+                    onOpen: () => _open(item),
+                    onFollow: null,
+                  ),
+                const SizedBox(height: 16),
+              ],
               Text(
-                '今日推荐 · ${feed.length} 条',
+                '兴趣推荐 · ${interest.length} 条',
                 style: Theme.of(context).textTheme.titleLarge,
               ),
-              const Text('点开视频后开始导入并下载到本地。'),
+              const Text('每类兴趣最多约 10 条；点开后开始导入并下载到本地。'),
               const SizedBox(height: 8),
-              for (final AcquireDailyFeedItemDto item in feed)
-                Card(
-                  child: ListTile(
-                    leading: item.coverUrl == null
-                        ? const Icon(Icons.ondemand_video_rounded)
-                        : Image.network(
-                            item.coverUrl!,
-                            width: 64,
-                            height: 46,
-                            fit: BoxFit.cover,
-                            errorBuilder: (_, __, ___) =>
-                                const Icon(Icons.ondemand_video_rounded),
-                          ),
-                    title: Text(
-                      item.title,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    subtitle: Text(
-                      <String>[
-                        'B站',
-                        '抽样英语原声',
-                        if (item.author.isNotEmpty) item.author,
-                        if (item.durationSec != null)
-                          '${(item.durationSec! / 60).ceil()} 分钟',
-                      ].join(' · '),
-                    ),
-                    trailing: const Icon(Icons.download_outlined),
-                    onTap: () => _open(item),
+              if (interest.isEmpty)
+                const ListTile(
+                  title: Text('暂无兴趣推荐'),
+                  subtitle: Text('试试更换兴趣标签后刷新。'),
+                )
+              else
+                for (final AcquireDailyFeedItemDto item in interest)
+                  _FeedCard(
+                    item: item,
+                    onOpen: () => _open(item),
+                    onFollow: item.authorId == null || item.authorId!.isEmpty
+                        ? null
+                        : () => _followAuthor(item),
                   ),
-                ),
             ],
           ],
         ),
+      ),
+    );
+  }
+}
+
+class _FeedCard extends StatelessWidget {
+  const _FeedCard({
+    required this.item,
+    required this.onOpen,
+    this.onFollow,
+  });
+
+  final AcquireDailyFeedItemDto item;
+  final VoidCallback onOpen;
+  final VoidCallback? onFollow;
+
+  @override
+  Widget build(BuildContext context) {
+    final bool verified = item.tags.contains('抽样英语原声');
+    final bool pending = item.tags.contains('原声待确认');
+    return Card(
+      child: ListTile(
+        leading: item.coverUrl == null
+            ? const Icon(Icons.ondemand_video_rounded)
+            : Image.network(
+                item.coverUrl!,
+                width: 64,
+                height: 46,
+                fit: BoxFit.cover,
+                errorBuilder: (_, __, ___) =>
+                    const Icon(Icons.ondemand_video_rounded),
+              ),
+        title: Text(
+          item.title,
+          maxLines: 2,
+          overflow: TextOverflow.ellipsis,
+        ),
+        subtitle: Text(
+          <String>[
+            'B站',
+            if (item.isFollowed) '关注',
+            if (verified) '抽样英语原声',
+            if (pending) '原声待确认',
+            if (item.author.isNotEmpty) item.author,
+            if (item.durationSec != null)
+              '${(item.durationSec! / 60).ceil()} 分钟',
+          ].join(' · '),
+        ),
+        trailing: onFollow == null
+            ? const Icon(Icons.download_outlined)
+            : IconButton(
+                tooltip: '关注该 UP',
+                icon: const Icon(Icons.person_add_alt_1_outlined),
+                onPressed: onFollow,
+              ),
+        onTap: onOpen,
       ),
     );
   }

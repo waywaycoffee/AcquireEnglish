@@ -4,6 +4,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
 from app.deps import get_current_user
+from app.followed_creators import dump_followed_creators, parse_followed_creators
 from app.models import User, UserPreference
 from app.schemas import PreferencesOut, PreferencesUpdate
 
@@ -17,6 +18,7 @@ def _default_prefs(user_id: int) -> UserPreference:
         tags_json='["slow","daily"]',
         daily_quota=10,
         notify_daily_feed=1,
+        followed_creators_json="[]",
     )
 
 
@@ -36,6 +38,9 @@ def _to_out(row: UserPreference) -> PreferencesOut:
         notify_daily_feed=bool(row.notify_daily_feed),
         has_bilibili_cookie=bool((row.bilibili_cookie or "").strip()),
         has_asr_api_key=bool((row.asr_api_key or "").strip()),
+        followed_creators=parse_followed_creators(
+            getattr(row, "followed_creators_json", None)
+        ),
     )
 
 
@@ -76,6 +81,8 @@ async def put_preferences(
         row.bilibili_cookie = payload.bilibili_cookie.strip() or None
     if payload.asr_api_key is not None:
         row.asr_api_key = payload.asr_api_key.strip() or None
+    if payload.followed_creators is not None:
+        row.followed_creators_json = dump_followed_creators(payload.followed_creators)
     await db.commit()
     await db.refresh(row)
     return _to_out(row)

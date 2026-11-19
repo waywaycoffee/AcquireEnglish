@@ -111,7 +111,7 @@ class DailyFeedNotifier extends Notifier<List<AcquireDailyFeedItemDto>> {
       return list
           .cast<Map<String, dynamic>>()
           .map(AcquireDailyFeedItemDto.fromJson)
-          .where(_isVerifiedRecommendation)
+          .where(_isUsableRecommendation)
           .toList(growable: false);
     } catch (_) {
       return const <AcquireDailyFeedItemDto>[];
@@ -128,21 +128,20 @@ class DailyFeedNotifier extends Notifier<List<AcquireDailyFeedItemDto>> {
       final AcquireApiClient api = ref.read(acquireApiClientProvider);
       final List<AcquireDailyFeedItemDto> feed = await api.dailyFeed(date: day);
       if (_account != account) return;
-      state = feed.where(_isVerifiedRecommendation).toList(growable: false);
+      final List<AcquireDailyFeedItemDto> usable =
+          feed.where(_isUsableRecommendation).toList(growable: false);
+      state = usable;
       if (Hive.isBoxOpen('prefs')) {
         final Box<String> box = Hive.box<String>('prefs');
         await box.put(
           '$_feedKey:$account',
           jsonEncode(
-            feed
+            usable
                 .map((AcquireDailyFeedItemDto item) => item.toJson())
                 .toList(growable: false),
           ),
         );
-        if (feed.isNotEmpty &&
-            !feed.any(
-              (AcquireDailyFeedItemDto item) => item.tags.contains('原声待确认'),
-            )) {
+        if (usable.isNotEmpty) {
           await box.put('$_feedSyncedAtKey:$account', day);
         }
         // Drop legacy course-pack feed cache so it cannot reappear as「学习课程」.
@@ -164,8 +163,6 @@ class DailyFeedNotifier extends Notifier<List<AcquireDailyFeedItemDto>> {
   }
 }
 
-bool _isVerifiedRecommendation(AcquireDailyFeedItemDto item) =>
-    item.bvid.isNotEmpty &&
-    item.watchUrl.isNotEmpty &&
-    item.tags.contains('抽样英语原声') &&
-    !item.tags.contains('原声待确认');
+/// Keep interest + followed recommendations; API already prefers English samples.
+bool _isUsableRecommendation(AcquireDailyFeedItemDto item) =>
+    item.bvid.isNotEmpty && item.watchUrl.isNotEmpty;

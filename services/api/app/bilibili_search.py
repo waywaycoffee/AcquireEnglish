@@ -52,6 +52,7 @@ class BilibiliSearchHit:
     watch_url: str
     description: str | None
     matched_tag: str
+    author_mid: str | None = None
 
 
 def keywords_for_preferences(level: str, tags: list[str]) -> list[tuple[str, str]]:
@@ -101,6 +102,17 @@ def _normalize_cover(pic: object) -> str | None:
     return raw
 
 
+def _author_mid(item: dict) -> str | None:
+    for key in ("mid", "upid", "uid"):
+        raw = item.get(key)
+        if raw is None:
+            continue
+        text = str(raw).strip()
+        if text.isdigit():
+            return text
+    return None
+
+
 def parse_search_result_item(item: dict, *, matched_tag: str) -> BilibiliSearchHit | None:
     bvid = str(item.get("bvid") or "").strip()
     if not bvid.startswith("BV"):
@@ -112,11 +124,12 @@ def parse_search_result_item(item: dict, *, matched_tag: str) -> BilibiliSearchH
         bvid=bvid,
         title=title,
         author=str(item.get("author") or item.get("uname") or "").strip() or "B站UP主",
-        cover_url=_normalize_cover(item.get("pic")),
-        duration_sec=_parse_duration(item.get("duration")),
+        cover_url=_normalize_cover(item.get("pic") or item.get("cover")),
+        duration_sec=_parse_duration(item.get("duration") or item.get("length")),
         watch_url=f"https://www.bilibili.com/video/{bvid}",
         description=_clean_title(str(item.get("description") or item.get("desc") or "")) or None,
         matched_tag=matched_tag,
+        author_mid=_author_mid(item),
     )
 
 
@@ -213,6 +226,122 @@ async def search_bilibili_videos(
     hits: list[BilibiliSearchHit] = []
     for row in rows:
         hit = parse_search_result_item(row, matched_tag=matched_tag)
+        if hit is not None:
+            hits.append(hit)
+        if len(hits) >= limit:
+            break
+    return hits
+
+
+_SPACE_MID = re.compile(r"(?:space\.bilibili\.com/|bilibili\.com/space/)(\d+)", re.I)
+
+
+def parse_bilibili_space_mid(url_or_id: str) -> str | None:
+    text = (url_or_id or "").strip()
+    if text.isdigit():
+        return text
+    match = _SPACE_MID.search(text)
+    return match.group(1) if match else None
+
+
+async def fetch_bilibili_creator_card(
+    mid: str, *, cookie: str | None = None
+) -> dict[str, str | None] | None:
+    """Return display_name / avatar / profile_url for a Bilibili mid."""
+    if not str(mid).isdigit():
+        return None
+    headers = _bilibili_headers(cookie)
+    try:
+        async with httpx.AsyncClient(
+            timeout=httpx.Timeout(12.0, connect=6.0),
+            headers=headers,
+            follow_redirects=True,
+        ) as client:
+            response = await client.get(
+                "https://api.bilibili.com/x/space/acc/info",
+                params={"mid": mid},
+            )
+            if response.status_code != 200:
+                return None
+            payload = response.json()
+            if not isinstance(payload, dict) or payload.get("code") != 0:
+                return None
+            data = payload.get("data") or {}
+            if not isinstance(data, dict):
+                return None
+            name = str(data.get("name") or "").strip() or f"UP{mid}"
+            face = _normalize_cover(data.get("face"))
+            return {
+                "creator_id": str(mid),
+                "display_name": name,
+                "avatar_url": face,
+                "profile_url": f"https://space.bilibili.com/{mid}",
+            }
+    except Exception:
+        return None
+
+
+async def list_bilibili_creator_videos(
+    mid: str,
+    *,
+    cookie: str | None = None,
+    limit: int = 10,
+    matched_tag: str = "followed",
+) -> list[BilibiliSearchHit]:
+    """List recent public uploads for a Bilibili UP (metadata only)."""
+    if not str(mid).isdigit():
+        return []
+    headers = _bilibili_headers(cookie)
+    page_size = max(1, min(int(limit), 20))
+    endpoints: list[tuple[str, dict[str, object]]] = [
+        (
+            "https://api.bilibili.com/x/space/wbi/arc/search",
+            {"mid": mid, "pn": 1, "ps": page_size, "order": "pubdate"},
+        ),
+        (
+            "https://api.bilibili.com/x/space/arc/search",
+            {"mid": mid, "pn": 1, "ps": page_size, "order": "pubdate"},
+        ),
+    ]
+    rows: list[dict] = []
+    try:
+        async with httpx.AsyncClient(
+            timeout=httpx.Timeout(14.0, connect=6.0),
+            headers=headers,
+            follow_redirects=True,
+        ) as client:
+            for url, params in endpoints:
+                try:
+                    response = await client.get(url, params=params)
+                    if response.status_code != 200:
+                        continue
+                    payload = response.json()
+                    if not isinstance(payload, dict) or payload.get("code") != 0:
+                        continue
+                    data = payload.get("data") or {}
+                    if not isinstance(data, dict):
+                        continue
+                    # wbi/arc/search → data.list.vlist ; some payloads nest under data.archives
+                    listing = data.get("list") if isinstance(data.get("list"), dict) else data
+                    vlist = None
+                    if isinstance(listing, dict):
+                        vlist = listing.get("vlist") or listing.get("archives")
+                    if isinstance(vlist, list) and vlist:
+                        rows = [row for row in vlist if isinstance(row, dict)]
+                        break
+                except Exception:
+                    continue
+    except Exception:
+        return []
+
+    hits: list[BilibiliSearchHit] = []
+    for row in rows:
+        # Space listing uses "title" / "bvid" / "author" / "pic" / "length"
+        enriched = dict(row)
+        if "author" not in enriched and "uname" not in enriched:
+            enriched["author"] = str(row.get("author") or "")
+        enriched.setdefault("mid", mid)
+        hit = parse_search_result_item(enriched, matched_tag=matched_tag)
         if hit is not None:
             hits.append(hit)
         if len(hits) >= limit:

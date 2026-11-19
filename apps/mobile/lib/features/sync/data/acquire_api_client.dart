@@ -326,11 +326,13 @@ class AcquireDailyFeedItemDto {
     required this.title,
     required this.watchUrl,
     this.author = '',
+    this.authorId,
     this.coverUrl,
     this.durationSec,
     this.description,
     this.tags = const <String>[],
     this.source = 'bilibili',
+    this.reason = 'interest',
   });
 
   factory AcquireDailyFeedItemDto.fromJson(Map<String, dynamic> json) =>
@@ -339,6 +341,7 @@ class AcquireDailyFeedItemDto {
         bvid: json['bvid'] as String? ?? '',
         title: json['title'] as String? ?? '',
         author: json['author'] as String? ?? '',
+        authorId: json['authorId'] as String?,
         coverUrl: json['coverUrl'] as String?,
         durationSec: (json['durationSec'] as num?)?.toDouble(),
         watchUrl: json['watchUrl'] as String? ?? '',
@@ -347,30 +350,71 @@ class AcquireDailyFeedItemDto {
             .map((dynamic e) => e.toString())
             .toList(growable: false),
         source: json['source'] as String? ?? 'bilibili',
+        reason: json['reason'] as String? ?? 'interest',
       );
 
   final String id;
   final String bvid;
   final String title;
   final String author;
+  final String? authorId;
   final String? coverUrl;
   final double? durationSec;
   final String watchUrl;
   final String? description;
   final List<String> tags;
   final String source;
+  /// `interest` | `followed`
+  final String reason;
+
+  bool get isFollowed => reason == 'followed' || tags.contains('followed');
 
   Map<String, dynamic> toJson() => <String, dynamic>{
         'id': id,
         'bvid': bvid,
         'title': title,
         'author': author,
+        'authorId': authorId,
         'coverUrl': coverUrl,
         'durationSec': durationSec,
         'watchUrl': watchUrl,
         'description': description,
         'tags': tags,
         'source': source,
+        'reason': reason,
+      };
+}
+
+class FollowedCreatorDto {
+  const FollowedCreatorDto({
+    required this.source,
+    required this.creatorId,
+    this.displayName = '',
+    this.avatarUrl,
+    this.profileUrl,
+  });
+
+  factory FollowedCreatorDto.fromJson(Map<String, dynamic> json) =>
+      FollowedCreatorDto(
+        source: json['source'] as String? ?? 'bilibili',
+        creatorId: json['creator_id'] as String? ?? '',
+        displayName: json['display_name'] as String? ?? '',
+        avatarUrl: json['avatar_url'] as String?,
+        profileUrl: json['profile_url'] as String?,
+      );
+
+  final String source;
+  final String creatorId;
+  final String displayName;
+  final String? avatarUrl;
+  final String? profileUrl;
+
+  Map<String, dynamic> toJson() => <String, dynamic>{
+        'source': source,
+        'creator_id': creatorId,
+        'display_name': displayName,
+        if (avatarUrl != null) 'avatar_url': avatarUrl,
+        if (profileUrl != null) 'profile_url': profileUrl,
       };
 }
 
@@ -409,6 +453,7 @@ class AcquirePreferencesDto {
     this.hasAsrApiKey = false,
     this.bilibiliCookie,
     this.asrApiKey,
+    this.followedCreators = const <FollowedCreatorDto>[],
   });
 
   factory AcquirePreferencesDto.fromJson(Map<String, dynamic> json) =>
@@ -421,6 +466,11 @@ class AcquirePreferencesDto {
         notifyDailyFeed: json['notify_daily_feed'] as bool? ?? true,
         hasBilibiliCookie: json['has_bilibili_cookie'] == true,
         hasAsrApiKey: json['has_asr_api_key'] == true,
+        followedCreators: (json['followed_creators'] as List<dynamic>? ??
+                const <dynamic>[])
+            .whereType<Map<String, dynamic>>()
+            .map(FollowedCreatorDto.fromJson)
+            .toList(growable: false),
       );
 
   final String level;
@@ -432,6 +482,7 @@ class AcquirePreferencesDto {
   /// Write-only: sent on PUT when non-null.
   final String? bilibiliCookie;
   final String? asrApiKey;
+  final List<FollowedCreatorDto> followedCreators;
 
   Map<String, dynamic> toJson() => <String, dynamic>{
     'level': level,
@@ -442,6 +493,7 @@ class AcquirePreferencesDto {
     'has_asr_api_key': hasAsrApiKey,
     if (bilibiliCookie != null) 'bilibili_cookie': bilibiliCookie,
     if (asrApiKey != null) 'asr_api_key': asrApiKey,
+    // Follows are managed via /api/creators/* — omit so prefs PUT cannot wipe them.
   };
 
   AcquirePreferencesDto copyWith({
@@ -453,6 +505,7 @@ class AcquirePreferencesDto {
     bool? hasAsrApiKey,
     String? bilibiliCookie,
     String? asrApiKey,
+    List<FollowedCreatorDto>? followedCreators,
   }) => AcquirePreferencesDto(
     level: level ?? this.level,
     tags: tags ?? this.tags,
@@ -462,6 +515,7 @@ class AcquirePreferencesDto {
     hasAsrApiKey: hasAsrApiKey ?? this.hasAsrApiKey,
     bilibiliCookie: bilibiliCookie ?? this.bilibiliCookie,
     asrApiKey: asrApiKey ?? this.asrApiKey,
+    followedCreators: followedCreators ?? this.followedCreators,
   );
 }
 
@@ -786,6 +840,70 @@ class AcquireApiClient {
           (AcquireDailyFeedItemDto item) =>
               item.bvid.isNotEmpty && item.watchUrl.isNotEmpty,
         )
+        .toList(growable: false);
+  }
+
+  Future<List<FollowedCreatorDto>> listFollowedCreators() async {
+    final Response<dynamic> response = await _dio.get(
+      Endpoints.creatorsFollowed,
+      options: Options(
+        extra: const <String, Object>{
+          'dio_cache_interceptor_force_refresh': true,
+        },
+      ),
+    );
+    return (response.data as List<dynamic>)
+        .cast<Map<String, dynamic>>()
+        .map(FollowedCreatorDto.fromJson)
+        .toList(growable: false);
+  }
+
+  Future<List<FollowedCreatorDto>> followCreator({
+    String? url,
+    String? source,
+    String? creatorId,
+    String? displayName,
+  }) async {
+    final Response<dynamic> response = await _dio.post(
+      Endpoints.creatorsFollow,
+      data: <String, dynamic>{
+        if (url != null && url.trim().isNotEmpty) 'url': url.trim(),
+        if (source != null) 'source': source,
+        if (creatorId != null) 'creator_id': creatorId,
+        if (displayName != null && displayName.trim().isNotEmpty)
+          'display_name': displayName.trim(),
+      },
+      options: Options(
+        extra: const <String, Object>{
+          'dio_cache_interceptor_force_refresh': true,
+        },
+      ),
+    );
+    return (response.data as List<dynamic>)
+        .cast<Map<String, dynamic>>()
+        .map(FollowedCreatorDto.fromJson)
+        .toList(growable: false);
+  }
+
+  Future<List<FollowedCreatorDto>> unfollowCreator({
+    required String source,
+    required String creatorId,
+  }) async {
+    final Response<dynamic> response = await _dio.post(
+      Endpoints.creatorsUnfollow,
+      data: <String, dynamic>{
+        'source': source,
+        'creator_id': creatorId,
+      },
+      options: Options(
+        extra: const <String, Object>{
+          'dio_cache_interceptor_force_refresh': true,
+        },
+      ),
+    );
+    return (response.data as List<dynamic>)
+        .cast<Map<String, dynamic>>()
+        .map(FollowedCreatorDto.fromJson)
         .toList(growable: false);
   }
 
