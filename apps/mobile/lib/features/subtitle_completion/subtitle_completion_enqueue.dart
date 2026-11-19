@@ -225,9 +225,25 @@ enum SubtitleFillChip { english, chinese }
   }
 
   // Product rules:
-  // - English missing → always ASR English (never ZH→EN translation).
-  // - Chinese missing while English exists → EN→ZH translation only.
-  // - Both missing → ASR English first, then translate Chinese.
+  // - English-spoken: ASR English; Chinese via EN→ZH (or official ZH).
+  // - Chinese-spoken: ASR Chinese (multilingual Whisper); English via ZH→EN.
+  // - Mixed teaching: multilingual Whisper auto; split lines by script.
+  // - Chinese chip with English already present → EN→ZH only (no Whisper).
+  if (spoken == SpokenLanguage.mixed && (needEn || needZh)) {
+    return (
+      needEnglish: needEn || needZh,
+      needChinese: needEn || needZh,
+      asrPrimary: SpokenLanguage.mixed,
+    );
+  }
+  if (spoken == SpokenLanguage.chinese && (needEn || needZh)) {
+    // Prefer speech Chinese; translate the other side afterward.
+    return (
+      needEnglish: needEn,
+      needChinese: needZh || needEn,
+      asrPrimary: SpokenLanguage.chinese,
+    );
+  }
   if (needEn) {
     return (
       needEnglish: true,
@@ -245,9 +261,7 @@ enum SubtitleFillChip { english, chinese }
   return (
     needEnglish: false,
     needChinese: false,
-    asrPrimary: spoken == SpokenLanguage.chinese
-        ? SpokenLanguage.chinese
-        : SpokenLanguage.english,
+    asrPrimary: spoken,
   );
 }
 
@@ -454,7 +468,13 @@ Future<void> enqueueSubtitleCompletionForCourse({
   SubtitleCompletionQueue? queue,
   String? bilibiliCookieHeader,
   bool networkFetchOfficial = true,
+  SpokenLanguage? forceSpokenLanguage,
 }) async {
+  final SpokenLanguage? spoken =
+      forceSpokenLanguage ??
+      (course.spokenLanguage.trim().isEmpty
+          ? null
+          : spokenLanguageFromCode(course.spokenLanguage));
   for (final LibraryEpisodeItem episode in course.episodes) {
     await enqueueSubtitleCompletionForEpisode(
       episodeId: episode.id,
@@ -469,6 +489,7 @@ Future<void> enqueueSubtitleCompletionForCourse({
       queue: queue,
       bilibiliCookieHeader: bilibiliCookieHeader,
       networkFetchOfficial: networkFetchOfficial,
+      forceSpokenLanguage: spoken,
     );
   }
 }
@@ -479,6 +500,7 @@ Future<void> enqueuePendingSubtitleCompletionsForCatalog({
   SubtitleCompletionQueue? queue,
   String? bilibiliCookieHeader,
   bool networkFetchOfficial = true,
+  SpokenLanguage? forceSpokenLanguage,
 }) async {
   final SubtitleCompletionQueue store = queue ?? SubtitleCompletionQueue.shared;
   for (final LibraryCourseData course in courses) {
@@ -487,6 +509,7 @@ Future<void> enqueuePendingSubtitleCompletionsForCatalog({
       queue: store,
       bilibiliCookieHeader: bilibiliCookieHeader,
       networkFetchOfficial: networkFetchOfficial,
+      forceSpokenLanguage: forceSpokenLanguage,
     );
   }
   SubtitleCompletionScheduler.instance.kick();

@@ -102,9 +102,13 @@ class SubtitleCompletionWorker {
     }
     final LearningSettingsState asrSettings = _settingsForAsr(settings);
     await queue.markRunning(job.episodeId);
-    final bool asrZh = job.asrPrimary.trim().toLowerCase().startsWith('zh');
+    final String asrPrimary = job.asrPrimary.trim().toLowerCase();
+    final bool asrZh = asrPrimary.startsWith('zh');
+    final bool asrMixed = asrPrimary == 'auto' || asrPrimary == 'mixed';
     final String label;
-    if (asrZh && job.needChinese) {
+    if (asrMixed) {
+      label = '正在识别中英混合口播…';
+    } else if (asrZh && job.needChinese) {
       label = job.needEnglish ? '正在语音生成中文字幕，随后翻译英文…' : '正在用语音生成中文字幕…';
     } else if (job.needEnglish) {
       label = job.needChinese ? '正在语音生成英文字幕，随后翻译中文…' : '正在用语音生成英文字幕…';
@@ -355,6 +359,32 @@ class SubtitleCompletionWorker {
           );
         }
       }
+      return;
+    }
+
+    final String asrPrimary = linked.asrPrimary.trim().toLowerCase();
+    if (asrPrimary.startsWith('zh')) {
+      await _runAsrChineseThenMaybeEnglish(
+        job: linked.copyWith(
+          needEnglish: needEnglish,
+          needChinese: needChinese || needEnglish,
+        ),
+        settings: settings,
+        onProgress: onProgress,
+        cancellationToken: cancellationToken,
+      );
+      return;
+    }
+    if (asrPrimary == 'auto' || asrPrimary == 'mixed') {
+      await _runAsrMixedBilingual(
+        job: linked.copyWith(
+          needEnglish: needEnglish || needChinese,
+          needChinese: needEnglish || needChinese,
+        ),
+        settings: settings,
+        onProgress: onProgress,
+        cancellationToken: cancellationToken,
+      );
       return;
     }
 
@@ -651,6 +681,148 @@ class SubtitleCompletionWorker {
         );
     if (files == null) {
       throw StateError('字幕保存失败');
+    }
+    await _notifyPersisted(job.episodeId, files);
+  }
+
+  /// Multilingual Whisper with language=auto for Chinese-English mixed teaching.
+  Future<void> _runAsrMixedBilingual({
+    required SubtitleCompletionJob job,
+    required LearningSettingsState settings,
+    SubtitleCompletionProgress? onProgress,
+    AsrSubtitleCancellationToken? cancellationToken,
+  }) async {
+    if (!isUsableLocalVideoPath(job.videoPath)) {
+      throw StateError('本地视频不可用，无法语音识别');
+    }
+    if (LocalWhisperAsr.isLocalProvider(settings) &&
+        !settings.enableChineseSpeechAsr) {
+      throw StateError('未开启中文语音识别。请到「设置 → AI生成字幕」开启，并下载多语言 Whisper 模型。');
+    }
+
+    onProgress?.call(job.episodeId, '正在识别中英混合口播…');
+    final String raw = await asrRunner.run(
+      episodeId: job.episodeId,
+      videoPath: job.videoPath,
+      settings: settings,
+      referenceSubtitleLines: const <PlayerSubtitleLine>[],
+      referenceSignatureOverride: 'pipeline=hear_video_auto',
+      forceRegenerate: true,
+      jobPipeline: 'hear_video_auto',
+      language: 'auto',
+      cancellationToken: cancellationToken,
+      onProgress: (AsrSubtitleProgress progress) {
+        onProgress?.call(job.episodeId, progress.label);
+      },
+    );
+    cancellationToken?.throwIfCancelled();
+    final List<PlayerSubtitleLine> asrLines = parseSubtitleLines(raw);
+    if (asrLines.isEmpty) {
+      throw StateError('语音识别未产出可用字幕');
+    }
+
+    MergedSubtitleBundle bundle = mergeAsrIntoSentences(
+      asrLines: asrLines
+          .where((PlayerSubtitleLine line) => looksEnglish(line.english))
+          .toList(growable: false),
+      chineseLines: asrLines
+          .where((PlayerSubtitleLine line) => looksChinese(line.chinese))
+          .map(
+            (PlayerSubtitleLine line) => PlayerSubtitleLine(
+              startTime: line.startTime,
+              english: '',
+              chinese: line.chinese,
+              startMs: line.startMs,
+              endMs: line.endMs,
+              words: line.words,
+            ),
+          )
+          .toList(growable: false),
+    );
+    // Segments that landed only on one side still become sentences.
+    if (bundle.sentences.isEmpty) {
+      bundle = MergedSubtitleBundle(
+        sentences: asrLines
+            .map(
+              (PlayerSubtitleLine line) => SubtitleSentence(
+                startMs: line.startMs,
+                endMs: line.endMs,
+                english: line.english,
+                chinese: line.chinese,
+                fragmentStartMs: <int>[line.startMs],
+                fragmentEndMs: <int>[line.endMs],
+              ),
+            )
+            .where(
+              (SubtitleSentence s) =>
+                  looksEnglish(s.english) || looksChinese(s.chinese),
+            )
+            .toList(growable: false),
+        fragments: asrLines
+            .map(
+              (PlayerSubtitleLine line) => SubtitleFragment(
+                startMs: line.startMs,
+                endMs: line.endMs,
+                english: line.english,
+                chinese: line.chinese,
+              ),
+            )
+            .where(
+              (SubtitleFragment f) =>
+                  looksEnglish(f.english) || looksChinese(f.chinese),
+            )
+            .toList(growable: false),
+      );
+    }
+    if (bundle.sentences.isEmpty) {
+      throw StateError('语音识别未产出可用字幕');
+    }
+
+    final bool anyChineseMissing = bundle.sentences.any(
+      (SubtitleSentence s) =>
+          looksEnglish(s.english) && !looksChinese(s.chinese),
+    );
+    final bool anyEnglishMissing = bundle.sentences.any(
+      (SubtitleSentence s) =>
+          looksChinese(s.chinese) && !looksEnglish(s.english),
+    );
+    int translatedChineseCount = 0;
+    if (job.needChinese && anyChineseMissing) {
+      onProgress?.call(job.episodeId, '正在补译中文字幕…');
+      final ({MergedSubtitleBundle bundle, int translatedCount}) filled =
+          await _fillBundleChinese(
+            bundle: bundle,
+            settings: settings,
+            cancellationToken: cancellationToken,
+          );
+      bundle = filled.bundle;
+      translatedChineseCount = filled.translatedCount;
+    }
+    if (job.needEnglish && anyEnglishMissing) {
+      onProgress?.call(job.episodeId, '正在补译英文字幕…');
+      bundle = await _fillBundleEnglish(
+        bundle: bundle,
+        settings: settings,
+        cancellationToken: cancellationToken,
+      );
+    }
+
+    final PersistedBilingualSubtitleFiles? files =
+        await persistAsrSentenceSubtitles(
+          episodeId: job.episodeId,
+          bundle: bundle,
+          sourceKey: job.sourceKey,
+          videoFingerprint: videoFileFingerprint(job.videoPath),
+          appSupportDirectory: _appSupportDirectory,
+        );
+    if (files == null) {
+      throw StateError('字幕保存失败');
+    }
+    if (translatedChineseCount > 0) {
+      await markHardsubChineseFromTranslation(
+        episodeId: job.episodeId,
+        appSupportDirectory: _appSupportDirectory,
+      );
     }
     await _notifyPersisted(job.episodeId, files);
   }

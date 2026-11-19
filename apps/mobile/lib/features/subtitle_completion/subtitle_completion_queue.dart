@@ -107,8 +107,11 @@ class SubtitleCompletionJob {
         : false;
     final String asrPrimaryRaw =
         '${raw['asrPrimary'] ?? 'en'}'.trim().toLowerCase();
-    final String asrPrimary =
-        asrPrimaryRaw.startsWith('zh') ? 'zh' : 'en';
+    final String asrPrimary = asrPrimaryRaw.startsWith('zh')
+        ? 'zh'
+        : (asrPrimaryRaw == 'auto' || asrPrimaryRaw == 'mixed'
+              ? 'auto'
+              : 'en');
     return SubtitleCompletionJob(
       episodeId: episodeId,
       videoPath: videoPath,
@@ -220,9 +223,10 @@ class SubtitleCompletionQueue {
         (SubtitleCompletionJob job) => job.episodeId == episodeId,
       );
       final int now = DateTime.now().millisecondsSinceEpoch;
-      final String primary = asrPrimary.trim().toLowerCase().startsWith('zh')
+      final String rawPrimary = asrPrimary.trim().toLowerCase();
+      final String primary = rawPrimary.startsWith('zh')
           ? 'zh'
-          : 'en';
+          : (rawPrimary == 'auto' || rawPrimary == 'mixed' ? 'auto' : 'en');
       if (index >= 0) {
         final SubtitleCompletionJob existing = jobs[index];
         if (existing.status == SubtitleCompletionStatus.done && !force) {

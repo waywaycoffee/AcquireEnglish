@@ -442,9 +442,10 @@ class AsrSubtitleJobRunner {
     String? jobPipeline,
     String language = 'en',
   }) async {
-    _activeAsrLanguage = language.trim().toLowerCase().startsWith('zh')
+    final String langHint = language.trim().toLowerCase();
+    _activeAsrLanguage = langHint.startsWith('zh')
         ? 'zh'
-        : 'en';
+        : (langHint == 'auto' || langHint == 'mixed' ? 'auto' : 'en');
     final List<PlayerSubtitleLine> usableReferenceLines =
         usableReferenceSubtitles(referenceSubtitleLines);
     // biliSub-style: official/imported English first; Whisper/cloud only if absent.

@@ -9,6 +9,8 @@ import '../../../library/presentation/library_catalog_provider.dart';
 import '../../../library/presentation/library_mock_data.dart';
 import '../../../shared/presentation/pad/app_design_tokens.dart';
 import '../../../shared/presentation/pad/pad_compact.dart';
+import '../../../settings/presentation/settings_provider.dart';
+import '../../../subtitle_completion/spoken_language.dart';
 import '../../../subtitle_completion/subtitle_completion_enqueue.dart';
 import '../../../subtitle_completion/subtitle_completion_scheduler.dart';
 import '../../domain/android_import_picker.dart';
@@ -128,6 +130,7 @@ class _ImportCourseFlowState extends ConsumerState<ImportCourseFlow> {
   double? onlineDownloadProgress;
   String? onlineDownloadProgressText;
   List<ImportMatchRow> parsedRows = const <ImportMatchRow>[];
+  SpokenLanguage spokenLanguage = SpokenLanguage.english;
 
   bool get _useAndroidDirectoryPicker =>
       !kIsWeb && defaultTargetPlatform == TargetPlatform.android;
@@ -334,6 +337,9 @@ class _ImportCourseFlowState extends ConsumerState<ImportCourseFlow> {
           courses: ref.watch(libraryCatalogProvider),
           targetCourseId: targetCourseId,
           courseTitleController: courseTitleController,
+          spokenLanguage: spokenLanguage,
+          onSpokenLanguageChanged: (SpokenLanguage value) =>
+              setState(() => spokenLanguage = value),
           onTargetCourseChanged: (String? value) =>
               setState(() => targetCourseId = value),
           child: ImportMatchTable(
@@ -537,6 +543,12 @@ class _ImportCourseFlowState extends ConsumerState<ImportCourseFlow> {
       if (!mounted) {
         return;
       }
+      if (spokenLanguage == SpokenLanguage.chinese ||
+          spokenLanguage == SpokenLanguage.mixed) {
+        ref
+            .read(learningSettingsProvider.notifier)
+            .setEnableChineseSpeechAsr(value: true);
+      }
       final bool imported = await ref
           .read(libraryCatalogProvider.notifier)
           .importCourseFromMatches(
@@ -545,6 +557,7 @@ class _ImportCourseFlowState extends ConsumerState<ImportCourseFlow> {
             subtitleFolder: selectedSubtitleSource ?? '',
             targetCourseId: targetCourseId,
             courseTitle: courseTitleController.text,
+            spokenLanguage: spokenLanguage.code,
             sourceLabel: switch (sourceMode) {
               ImportSourceMode.local => '本地资源',
               ImportSourceMode.direct => '在线视频',
@@ -560,6 +573,7 @@ class _ImportCourseFlowState extends ConsumerState<ImportCourseFlow> {
 
       if (imported) {
         // Import-time bilingual check + ASR/translate — not deferred to player open.
+        // Course.spokenLanguage (set above) drives Chinese / mixed Whisper path.
         await enqueuePendingSubtitleCompletionsForCatalog(
           courses: ref.read(libraryCatalogProvider),
         );
@@ -787,6 +801,8 @@ class _ImportDestinationStep extends StatelessWidget {
     required this.courses,
     required this.targetCourseId,
     required this.courseTitleController,
+    required this.spokenLanguage,
+    required this.onSpokenLanguageChanged,
     required this.onTargetCourseChanged,
     required this.child,
   });
@@ -794,6 +810,8 @@ class _ImportDestinationStep extends StatelessWidget {
   final List<LibraryCourseData> courses;
   final String? targetCourseId;
   final TextEditingController courseTitleController;
+  final SpokenLanguage spokenLanguage;
+  final ValueChanged<SpokenLanguage> onSpokenLanguageChanged;
   final ValueChanged<String?> onTargetCourseChanged;
   final Widget child;
 
@@ -848,6 +866,41 @@ class _ImportDestinationStep extends StatelessWidget {
             ),
           ),
         ],
+        const SizedBox(height: 16),
+        Text(
+          '口播语言',
+          style: TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.w700,
+            color: AppDesignTokens.textPrimary,
+          ),
+        ),
+        const SizedBox(height: 6),
+        Text(
+          '中英混合教学视频请选「中英混合」；会启用多语言 Whisper，识别中文讲解与英文例句。',
+          style: TextStyle(
+            fontSize: 13,
+            height: 1.4,
+            color: AppDesignTokens.textSecondary,
+          ),
+        ),
+        const SizedBox(height: 10),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: <Widget>[
+            for (final SpokenLanguage option in SpokenLanguage.values)
+              ChoiceChip(
+                label: Text(option.labelZh),
+                selected: spokenLanguage == option,
+                onSelected: (bool selected) {
+                  if (selected) {
+                    onSpokenLanguageChanged(option);
+                  }
+                },
+              ),
+          ],
+        ),
         const SizedBox(height: 28),
         child,
       ],

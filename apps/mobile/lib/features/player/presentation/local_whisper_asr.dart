@@ -6,6 +6,7 @@ import 'package:whisper_cpp_flutter_plus/whisper_cpp_flutter_plus.dart';
 
 import '../../../constants/model_cdn.dart';
 import '../../settings/presentation/settings_provider.dart';
+import 'bilingual_subtitle_helpers.dart';
 
 typedef LocalWhisperProgress = void Function(double? fraction, String message);
 
@@ -53,10 +54,19 @@ class LocalWhisperAsr {
     }
   }
 
-  /// English-only models cannot transcribe Chinese.
+  /// English-only models cannot transcribe Chinese / mixed speech.
   ///
-  /// Chinese speech ASR is opt-in ([LearningSettingsState.enableChineseSpeechAsr])
+  /// Chinese / mixed ASR is opt-in ([LearningSettingsState.enableChineseSpeechAsr])
   /// and uses the multilingual [defaultMultilingualModel] downloaded in Settings.
+  static bool needsMultilingualModel(String language) {
+    final String lang = language.trim().toLowerCase();
+    return lang.startsWith('zh') ||
+        lang == 'chinese' ||
+        lang == 'cn' ||
+        lang == 'auto' ||
+        lang == 'mixed';
+  }
+
   static String modelForLanguage(
     String modelId,
     String language, {
@@ -64,7 +74,7 @@ class LocalWhisperAsr {
   }) {
     final String lang = language.trim().toLowerCase();
     final String id = modelId.trim().isEmpty ? defaultModel : modelId.trim();
-    if (lang.startsWith('zh') || lang == 'chinese' || lang == 'cn') {
+    if (needsMultilingualModel(lang)) {
       if (!enableChineseSpeechAsr) {
         throw StateError(
           '未开启中文语音识别。请到「设置 → AI生成字幕」开启，并下载多语言 Whisper 模型。',
@@ -311,7 +321,7 @@ class LocalWhisperAsr {
       enableChineseSpeechAsr: settings.enableChineseSpeechAsr,
     );
     final String modelId = _normalizeModelId(requested);
-    if (lang.startsWith('zh') && !await isModelReady(modelId)) {
+    if (needsMultilingualModel(lang) && !await isModelReady(modelId)) {
       throw StateError(
         '中文语音模型尚未下载。请到「设置 → AI生成字幕」下载多语言 Whisper 模型（$modelId）。',
       );
@@ -370,9 +380,14 @@ class LocalWhisperAsr {
       modelId,
       onProgress: onProgress,
     );
+    final String whisperLang = language == 'auto' || language == 'mixed'
+        ? 'auto'
+        : (language.startsWith('zh') ? 'zh' : 'en');
     onProgress?.call(
       null,
-      language.startsWith('zh') ? '本地 Whisper 识别中文中…' : '本地 Whisper 识别英文中…',
+      whisperLang == 'auto'
+          ? '本地 Whisper 识别中英混合中…'
+          : (whisperLang == 'zh' ? '本地 Whisper 识别中文中…' : '本地 Whisper 识别英文中…'),
     );
 
     final Float32List samples;
@@ -384,7 +399,7 @@ class LocalWhisperAsr {
     if (samples.isEmpty) {
       return <String, Object?>{
         'version': 1,
-        'language': language.startsWith('zh') ? 'zh' : 'en',
+        'language': whisperLang,
         'lines': const <Map<String, Object?>>[],
       };
     }
@@ -392,7 +407,8 @@ class LocalWhisperAsr {
     final WhisperTask task = engine.transcribe(
       samples,
       options: TranscribeOptions(
-        language: language.startsWith('zh') ? 'zh' : 'en',
+        language: whisperLang,
+        detectLanguage: whisperLang == 'auto',
       ),
     );
     try {
@@ -403,7 +419,7 @@ class LocalWhisperAsr {
       return _resultToNormalized(
         result,
         offsetMs: offsetMs,
-        language: language.startsWith('zh') ? 'zh' : 'en',
+        language: whisperLang,
       );
     } catch (error) {
       try {
@@ -479,7 +495,8 @@ class LocalWhisperAsr {
     required int offsetMs,
     String language = 'en',
   }) {
-    final bool chinese = language.startsWith('zh');
+    final bool forceChinese = language.startsWith('zh');
+    final bool autoSplit = language == 'auto' || language == 'mixed';
     final List<Map<String, Object?>> lines = <Map<String, Object?>>[];
     for (final WhisperSegment segment in result.segments) {
       final String text = segment.text.trim();
@@ -512,21 +529,64 @@ class LocalWhisperAsr {
           'confidence': token.probability,
         });
       }
+      final ({String english, String chinese}) sides = _splitAsrText(
+        text,
+        forceChinese: forceChinese,
+        autoSplit: autoSplit,
+      );
       lines.add(<String, Object?>{
         'startMs': startMs,
         'endMs': endMs,
-        'english': chinese ? '' : text,
-        'chinese': chinese ? text : '',
+        'english': sides.english,
+        'chinese': sides.chinese,
         'words': words,
       });
     }
     return <String, Object?>{
       'version': 1,
       'language': result.language.isEmpty
-          ? (chinese ? 'zh' : 'en')
+          ? (autoSplit ? 'auto' : (forceChinese ? 'zh' : 'en'))
           : result.language,
       'lines': lines,
     };
+  }
+
+  /// Route one Whisper utterance into EN / ZH fields for mixed teaching audio.
+  static ({String english, String chinese}) _splitAsrText(
+    String text, {
+    required bool forceChinese,
+    required bool autoSplit,
+  }) {
+    if (!autoSplit) {
+      return forceChinese
+          ? (english: '', chinese: text)
+          : (english: text, chinese: '');
+    }
+    final bool hasZh = looksChinese(text);
+    final bool hasEn = looksEnglish(text);
+    if (hasZh && !hasEn) {
+      return (english: '', chinese: text);
+    }
+    if (hasEn && !hasZh) {
+      return (english: text, chinese: '');
+    }
+    if (hasZh && hasEn) {
+      int han = 0;
+      int latin = 0;
+      for (final int unit in text.runes) {
+        if (unit >= 0x4E00 && unit <= 0x9FFF) {
+          han += 1;
+        } else if ((unit >= 0x41 && unit <= 0x5A) ||
+            (unit >= 0x61 && unit <= 0x7A)) {
+          latin += 1;
+        }
+      }
+      if (han >= latin) {
+        return (english: '', chinese: text);
+      }
+      return (english: text, chinese: '');
+    }
+    return (english: text, chinese: '');
   }
 
   String _normalizeModelId(String raw) {

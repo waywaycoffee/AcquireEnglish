@@ -879,8 +879,8 @@ class SettingsScreen extends ConsumerWidget {
                         _SwitchRow(
                           title: '支持中文语音识别',
                           description:
-                              '可选。中文口播视频需另下多语言模型（base，约 142MB，国内镜像）。'
-                              '默认关闭，不影响英语课。',
+                              '中文口播 / 中英混合教学视频需另下多语言模型（base，约 142MB，官方服务器）。'
+                              '手工导入选「中英混合」时会自动开启。',
                           value: settings.enableChineseSpeechAsr,
                           onChanged: (bool value) {
                             ref
@@ -895,7 +895,7 @@ class SettingsScreen extends ConsumerWidget {
                             titleWhenIdle: '下载中文语音模型（base）',
                             titleWhenBusy: '正在下载中文语音模型',
                             pendingHint:
-                                'base 多语言模型未下载；点此经国内镜像下载后即可识别中文口播。',
+                                'base 多语言模型未下载；点此从官方服务器下载后即可识别中文 / 中英混合口播。',
                           ),
                       ] else ...<Widget>[
                         if (isTencentAsr) ...<Widget>[

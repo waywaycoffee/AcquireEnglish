@@ -17,6 +17,13 @@ void main() {
         SpokenLanguage.chinese,
       );
     });
+
+    test('detects mixed teaching markers', () {
+      expect(
+        inferSpokenLanguage(title: '中英混合 精讲跟读'),
+        SpokenLanguage.mixed,
+      );
+    });
   });
 
   group('planSubtitleFillOrder', () {
@@ -33,19 +40,40 @@ void main() {
       needChinese: true,
     );
 
-    test('both missing → always ASR EN then translate ZH', () {
-      for (final SpokenLanguage spoken in SpokenLanguage.values) {
-        final plan = planSubtitleFillOrder(need: both, spoken: spoken);
-        expect(plan.asrPrimary, SpokenLanguage.english);
-        expect(plan.needEnglish, isTrue);
-        expect(plan.needChinese, isTrue);
-      }
+    test('english-spoken both missing → ASR EN then translate ZH', () {
+      final plan = planSubtitleFillOrder(
+        need: both,
+        spoken: SpokenLanguage.english,
+      );
+      expect(plan.asrPrimary, SpokenLanguage.english);
+      expect(plan.needEnglish, isTrue);
+      expect(plan.needChinese, isTrue);
     });
 
-    test('english missing only → ASR english, never ZH→EN', () {
+    test('mixed teaching → multilingual auto ASR for both sides', () {
+      final plan = planSubtitleFillOrder(
+        need: both,
+        spoken: SpokenLanguage.mixed,
+      );
+      expect(plan.asrPrimary, SpokenLanguage.mixed);
+      expect(plan.needEnglish, isTrue);
+      expect(plan.needChinese, isTrue);
+    });
+
+    test('chinese-spoken → ASR Chinese first', () {
+      final plan = planSubtitleFillOrder(
+        need: both,
+        spoken: SpokenLanguage.chinese,
+      );
+      expect(plan.asrPrimary, SpokenLanguage.chinese);
+      expect(plan.needEnglish, isTrue);
+      expect(plan.needChinese, isTrue);
+    });
+
+    test('english missing only on english-spoken → ASR english', () {
       final plan = planSubtitleFillOrder(
         need: enOnly,
-        spoken: SpokenLanguage.chinese,
+        spoken: SpokenLanguage.english,
       );
       expect(plan.asrPrimary, SpokenLanguage.english);
       expect(plan.needEnglish, isTrue);
@@ -62,17 +90,6 @@ void main() {
       expect(plan.needEnglish, isTrue);
     });
 
-    test('tap chinese chip with EN missing → ASR EN first then ZH', () {
-      final plan = planSubtitleFillOrder(
-        need: both,
-        spoken: SpokenLanguage.english,
-        chip: SubtitleFillChip.chinese,
-      );
-      expect(plan.asrPrimary, SpokenLanguage.english);
-      expect(plan.needEnglish, isTrue);
-      expect(plan.needChinese, isTrue);
-    });
-
     test('tap chinese chip with EN present → translate only', () {
       final plan = planSubtitleFillOrder(
         need: zhOnly,
@@ -81,9 +98,10 @@ void main() {
       );
       expect(plan.needEnglish, isFalse);
       expect(plan.needChinese, isTrue);
+      expect(plan.asrPrimary, SpokenLanguage.english);
     });
 
-    test('chinese-spoken + ZH only → still EN→ZH translate, not ZH-ASR for EN', () {
+    test('chinese-spoken + ZH only → Chinese ASR, not EN→ZH', () {
       final plan = planSubtitleFillOrder(
         need: zhOnly,
         spoken: SpokenLanguage.chinese,
@@ -91,7 +109,7 @@ void main() {
       );
       expect(plan.needEnglish, isFalse);
       expect(plan.needChinese, isTrue);
-      expect(plan.asrPrimary, SpokenLanguage.english);
+      expect(plan.asrPrimary, SpokenLanguage.chinese);
     });
   });
 }

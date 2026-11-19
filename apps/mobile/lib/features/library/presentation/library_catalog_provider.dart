@@ -707,6 +707,7 @@ class LibraryCatalogNotifier extends Notifier<List<LibraryCourseData>> {
     String sourceLabel = '本地资源',
     String? targetCourseId,
     String? courseTitle,
+    String spokenLanguage = '',
   }) async {
     if (rows.isEmpty) {
       return false;
@@ -766,6 +767,9 @@ class LibraryCatalogNotifier extends Notifier<List<LibraryCourseData>> {
                     description: '已导入课程 ${mergedEpisodes.length} 集',
                     totalEpisodes: mergedEpisodes.length,
                     episodes: mergedEpisodes,
+                    spokenLanguage: spokenLanguage.trim().isEmpty
+                        ? course.spokenLanguage
+                        : spokenLanguage.trim(),
                     videoDirectories: <String>{
                       ...course.videoDirectories,
                       videoFolder,
@@ -796,6 +800,7 @@ class LibraryCatalogNotifier extends Notifier<List<LibraryCourseData>> {
             : courseTitle.trim(),
         description: '已导入课程 ${episodes.length} 集',
         sourceLabel: sourceLabel,
+        spokenLanguage: spokenLanguage.trim(),
         coverImage: '',
         level: '自定义',
         category: '自选课程',
@@ -842,6 +847,7 @@ class LibraryCatalogNotifier extends Notifier<List<LibraryCourseData>> {
       'title': course.title,
       'description': course.description,
       'sourceLabel': course.sourceLabel,
+      'spokenLanguage': course.spokenLanguage,
       'coverImage': course.coverImage,
       'level': course.level,
       'category': course.category,
@@ -911,6 +917,7 @@ class LibraryCatalogNotifier extends Notifier<List<LibraryCourseData>> {
               title: courseJson['title']! as String,
               description: courseJson['description']! as String,
               sourceLabel: courseJson['sourceLabel'] as String? ?? '本地资源',
+              spokenLanguage: courseJson['spokenLanguage'] as String? ?? '',
               coverImage: courseJson['coverImage']! as String,
               level: courseJson['level']! as String,
               category: courseJson['category']! as String,

@@ -122,6 +122,8 @@ class LibraryCourseData {
     required this.episodes,
     this.videoDirectories = const <String>[],
     this.subtitleDirectories = const <String>[],
+    /// Audio spoken language hint: `en` | `zh` | `auto` (mixed teaching).
+    this.spokenLanguage = '',
   });
 
   final String id;
@@ -141,6 +143,7 @@ class LibraryCourseData {
   final List<LibraryEpisodeItem> episodes;
   final List<String> videoDirectories;
   final List<String> subtitleDirectories;
+  final String spokenLanguage;
 
   LibraryCourseData copyWith({
     String? title,
@@ -159,6 +162,7 @@ class LibraryCourseData {
     List<LibraryEpisodeItem>? episodes,
     List<String>? videoDirectories,
     List<String>? subtitleDirectories,
+    String? spokenLanguage,
   }) {
     return LibraryCourseData(
       id: id,
@@ -178,6 +182,7 @@ class LibraryCourseData {
       episodes: episodes ?? this.episodes,
       videoDirectories: videoDirectories ?? this.videoDirectories,
       subtitleDirectories: subtitleDirectories ?? this.subtitleDirectories,
+      spokenLanguage: spokenLanguage ?? this.spokenLanguage,
     );
   }
 }

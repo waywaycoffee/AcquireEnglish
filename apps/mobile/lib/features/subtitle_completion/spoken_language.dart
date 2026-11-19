@@ -1,7 +1,16 @@
 import '../player/presentation/bilingual_subtitle_helpers.dart';
 
 /// Spoken language of the video audio (not the UI language).
-enum SpokenLanguage { english, chinese }
+enum SpokenLanguage {
+  /// English narration / listening material (default for this app).
+  english,
+
+  /// Mandarin narration; English is translation or rare inserts.
+  chinese,
+
+  /// Chinese-English mixed teaching (讲解 + 英文例句/跟读).
+  mixed,
+}
 
 const Set<String> _englishLearningMarkers = <String>{
   'english',
@@ -43,10 +52,28 @@ const Set<String> _chineseSpokenMarkers = <String>{
   'mandarin',
 };
 
+const Set<String> _mixedTeachingMarkers = <String>{
+  '中英混合',
+  '中英双语',
+  '双语教学',
+  '双语讲解',
+  '中文讲解',
+  '中文精讲',
+  '老师讲解',
+  '汉语讲解',
+  '双语课',
+  '中英对照讲解',
+  '英汉混合',
+  'code switch',
+  'codeswitch',
+  'mixed chinese',
+  'chinese english mix',
+};
+
 /// Infer spoken language for ASR-first fill.
 ///
-/// Defaults to English (this app is English learning). Chinese wins only with
-/// strong Chinese-spoken markers and no English-learning markers.
+/// Defaults to English (this app is English learning). Mixed / Chinese win only
+/// with explicit markers (or [force]).
 SpokenLanguage inferSpokenLanguage({
   String? title,
   String? description,
@@ -67,8 +94,12 @@ SpokenLanguage inferSpokenLanguage({
   }
 
   final String blob = '${title ?? ''} ${description ?? ''}'.toLowerCase();
+  final bool mixedMark = _mixedTeachingMarkers.any(blob.contains);
   final bool englishMark = _englishLearningMarkers.any(blob.contains);
   final bool chineseMark = _chineseSpokenMarkers.any(blob.contains);
+  if (mixedMark) {
+    return SpokenLanguage.mixed;
+  }
   if (chineseMark && !englishMark) {
     return SpokenLanguage.chinese;
   }
@@ -89,7 +120,10 @@ SpokenLanguage inferSpokenLanguage({
         latin += 1;
       }
     }
-    if (han >= 8 && latin <= 2 && looksChinese(titleText) && !looksEnglish(titleText)) {
+    if (han >= 8 &&
+        latin <= 2 &&
+        looksChinese(titleText) &&
+        !looksEnglish(titleText)) {
       return SpokenLanguage.chinese;
     }
   }
@@ -97,11 +131,35 @@ SpokenLanguage inferSpokenLanguage({
 }
 
 extension SpokenLanguageX on SpokenLanguage {
-  String get code => this == SpokenLanguage.chinese ? 'zh' : 'en';
+  /// Queue / Whisper primary hint: `en` | `zh` | `auto`.
+  String get code {
+    switch (this) {
+      case SpokenLanguage.chinese:
+        return 'zh';
+      case SpokenLanguage.mixed:
+        return 'auto';
+      case SpokenLanguage.english:
+        return 'en';
+    }
+  }
+
+  String get labelZh {
+    switch (this) {
+      case SpokenLanguage.english:
+        return '英语口播';
+      case SpokenLanguage.chinese:
+        return '中文口播';
+      case SpokenLanguage.mixed:
+        return '中英混合教学';
+    }
+  }
 }
 
 SpokenLanguage spokenLanguageFromCode(String? raw) {
   final String value = (raw ?? '').trim().toLowerCase();
+  if (value == 'auto' || value == 'mixed' || value == 'mix') {
+    return SpokenLanguage.mixed;
+  }
   if (value.startsWith('zh') || value == 'chinese' || value == 'cn') {
     return SpokenLanguage.chinese;
   }
