@@ -6,6 +6,7 @@ user's learning library and are meant to be imported on demand.
 
 from __future__ import annotations
 
+import asyncio
 import hashlib
 from datetime import date
 
@@ -13,6 +14,7 @@ from fastapi import APIRouter, Depends, Query
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.bilibili_audio_language import ENGLISH_TAG, UNVERIFIED_TAG, sample_audio_languages
 from app.bilibili_search import keywords_for_preferences, search_bilibili_videos
 from app.database import get_db
 from app.deps import get_current_user
@@ -66,13 +68,16 @@ async def daily_feed(
     per_tag = max(4, min(10, quota * 3))
     seen: set[str] = set()
     candidates: list[DailyFeedItemOut] = []
-    for tag, keyword in pairs:
-        hits = await search_bilibili_videos(
-            keyword,
-            matched_tag=tag,
-            cookie=cookie,
-            limit=per_tag,
+    batches = await asyncio.gather(*(
+        asyncio.wait_for(
+            search_bilibili_videos(keyword, matched_tag=tag, cookie=cookie, limit=per_tag),
+            timeout=6,
         )
+        for tag, keyword in pairs[:6]
+    ), return_exceptions=True)
+    for hits in batches:
+        if isinstance(hits, BaseException):
+            continue
         for hit in hits:
             if hit.bvid in seen or hit.bvid in already_imported:
                 continue
@@ -93,4 +98,12 @@ async def daily_feed(
             )
 
     candidates.sort(key=lambda item: _stable_rank(item.bvid, feed_day, user.id))
-    return candidates[:quota]
+    shortlist = candidates[: min(18, max(8, quota * 3))]
+    languages = await sample_audio_languages([item.bvid for item in shortlist], cookie=cookie)
+    english = [item for item in shortlist if languages.get(item.bvid) == "english"]
+    pending = [item for item in shortlist if languages.get(item.bvid, "unknown") == "unknown"]
+    for item in english:
+        item.tags.append(ENGLISH_TAG)
+    for item in pending:
+        item.tags.append(UNVERIFIED_TAG)
+    return (english + pending)[:quota]

@@ -7,8 +7,8 @@ import '../../authentication/presentation/auth_session.dart';
 import '../data/acquire_api_client.dart';
 
 const String _prefsKey = 'learning_preferences_v1';
-const String _feedKey = 'daily_feed_bili_v1';
-const String _feedSyncedAtKey = 'daily_feed_synced_at_v1';
+const String _feedKey = 'daily_feed_bili_v2';
+const String _feedSyncedAtKey = 'daily_feed_synced_at_v2';
 
 String _localDay(DateTime time) =>
     time.toLocal().toIso8601String().split('T').first;
@@ -142,7 +142,12 @@ class DailyFeedNotifier extends Notifier<List<AcquireDailyFeedItemDto>> {
                 .toList(growable: false),
           ),
         );
-        await box.put('$_feedSyncedAtKey:$account', day);
+        if (feed.isNotEmpty &&
+            !feed.any(
+              (AcquireDailyFeedItemDto item) => item.tags.contains('原声待确认'),
+            )) {
+          await box.put('$_feedSyncedAtKey:$account', day);
+        }
         // Drop legacy course-pack feed cache so it cannot reappear as「学习课程」.
         await box.delete('daily_feed_v1');
       }

@@ -64,3 +64,20 @@ databases. Difficulty bands are frequency rank heuristics for this app.
 - Examples: [Tatoeba contributors](https://tatoeba.org/en/downloads),
   [CC BY 2.0 FR](https://creativecommons.org/licenses/by/2.0/fr/). Each response
   includes the original sentence link and the contributor when available.
+
+### Discovery audio sampling
+
+The daily Bilibili feed checks up to three 8-second audio samples from the first
+part of a video that is at least 24 seconds long. It prioritizes candidates with
+at least two confident English samples and filters out candidates with a
+confident non-English sample. It labels unavailable or inconclusive samples
+"原声待确认".
+
+Install FFmpeg and the whisper.cpp tools `whisper-cli` and
+`whisper-vad-speech-segments`. Put the multilingual `ggml-tiny-q5_1.bin` and
+`ggml-silero-v6.2.0.bin` models in `.audio-language-models` under the service
+working directory, or set `AUDIO_LANGUAGE_MODELS` to that directory. See the
+[whisper.cpp model and VAD instructions](https://github.com/ggml-org/whisper.cpp).
+If audio or the models are unavailable, the feed can still return unverified
+candidates. Samples are temporary and classification results are cached in
+memory.
