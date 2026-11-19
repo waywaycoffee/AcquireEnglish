@@ -410,7 +410,7 @@ export default function StudyPage() {
     <div className="shell">
       <header className="topbar">
         <div>
-          <Link className="muted" to="/">
+          <Link className="muted" to="/app">
             ← 返回课程
           </Link>
           <div className="brand" style={{ marginTop: 8 }}>

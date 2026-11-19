@@ -247,3 +247,145 @@ input {
   cursor: pointer;
   box-shadow: 0 10px 30px rgba(37, 99, 235, 0.35);
 }
+
+/* Public product landing (WeChat / store review) */
+.landing {
+  width: min(980px, calc(100% - 40px));
+  margin: 0 auto;
+  padding: 28px 0 56px;
+}
+
+.landing-nav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 48px;
+}
+
+.landing-nav-actions {
+  display: flex;
+  gap: 10px;
+}
+
+.landing-hero h1 {
+  font-family: var(--font-display);
+  font-size: clamp(2rem, 5vw, 3.2rem);
+  line-height: 1.15;
+  letter-spacing: -0.03em;
+  margin: 10px 0 16px;
+}
+
+.landing-kicker {
+  color: #93c5fd;
+  font-weight: 600;
+  margin: 0;
+}
+
+.landing-lead {
+  max-width: 42rem;
+  color: var(--muted);
+  font-size: 1.1rem;
+  line-height: 1.7;
+  margin: 0 0 24px;
+}
+
+.landing-cta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.landing-section {
+  margin-top: 56px;
+}
+
+.landing-section h2 {
+  font-family: var(--font-display);
+  font-size: 1.6rem;
+  margin: 0 0 18px;
+}
+
+.landing-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+  gap: 14px;
+}
+
+.landing-card h3 {
+  margin: 0 0 8px;
+  font-size: 1.05rem;
+}
+
+.landing-card p {
+  margin: 0;
+  line-height: 1.55;
+}
+
+.landing-steps {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  gap: 12px;
+}
+
+.landing-steps li {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 14px 16px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: rgba(15, 23, 42, 0.45);
+}
+
+.landing-step-num {
+  width: 28px;
+  height: 28px;
+  border-radius: 999px;
+  display: grid;
+  place-items: center;
+  background: var(--accent-soft);
+  color: #dbeafe;
+  font-weight: 700;
+  flex: 0 0 auto;
+}
+
+.landing-meta {
+  display: grid;
+  gap: 14px;
+  margin: 0;
+}
+
+.landing-meta div {
+  display: grid;
+  gap: 4px;
+}
+
+.landing-meta dt {
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.landing-meta dd {
+  margin: 0;
+  line-height: 1.5;
+}
+
+.landing-footer {
+  margin-top: 64px;
+  padding-top: 20px;
+  border-top: 1px solid var(--border);
+  font-size: 0.9rem;
+}
+
+.landing-footer p {
+  margin: 0 0 6px;
+}
+
+a.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
