@@ -106,6 +106,16 @@ export default function HomePage() {
       {error ? <div className="error">{error}</div> : null}
 
       <section className="card" style={{ marginBottom: 24 }}>
+        <h2 style={{ fontFamily: "var(--font-display)", marginTop: 0 }}>网盘剧集导入</h2>
+        <p className="muted" style={{ marginTop: 0 }}>
+          百度 / 夸克 / 阿里 / 115 · 选中剧季文件夹 → 一门多集课 · 适合看美剧学英语
+        </p>
+        <Link className="btn" to="/app/netdisk">
+          打开网盘导入
+        </Link>
+      </section>
+
+      <section className="card" style={{ marginBottom: 24 }}>
         <h2 style={{ fontFamily: "var(--font-display)", marginTop: 0 }}>导入链接学习</h2>
         <p className="muted" style={{ marginTop: 0 }}>
           支持 YouTube / Bilibili（B站）粘贴链接 · 自动拉标题与字幕 · 与 App 共用账号课程

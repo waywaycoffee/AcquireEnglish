@@ -1144,12 +1144,60 @@ class AcquireApiClient {
   Future<Map<String, dynamic>> importNetdiskVideos({
     required String provider,
     required List<String> paths,
+    String? seriesFolder,
+    String? seriesTitle,
+  }) async {
+    // Chunk large selections; server accepts up to 200 per request.
+    final List<Map<String, dynamic>> allItems = <Map<String, dynamic>>[];
+    Map<String, dynamic>? seriesCourse;
+    for (int i = 0; i < paths.length; i += 200) {
+      final List<String> chunk = paths.sublist(
+        i,
+        i + 200 > paths.length ? paths.length : i + 200,
+      );
+      final Response<dynamic> response = await _dio.post(
+        Endpoints.netdiskImport,
+        data: <String, dynamic>{
+          'provider': provider,
+          'paths': chunk,
+          if (seriesFolder != null) 'series_folder': seriesFolder,
+          if (seriesTitle != null) 'series_title': seriesTitle,
+        },
+      );
+      final Map<String, dynamic> body = response.data as Map<String, dynamic>;
+      final List<dynamic> items =
+          (body['items'] as List<dynamic>?) ?? const <dynamic>[];
+      for (final dynamic row in items) {
+        if (row is Map<String, dynamic>) {
+          allItems.add(row);
+        } else if (row is Map) {
+          allItems.add(row.map((Object? k, Object? v) => MapEntry('$k', v)));
+        }
+      }
+      final Object? sc = body['series_course'];
+      if (sc is Map<String, dynamic>) {
+        seriesCourse = sc;
+      } else if (sc is Map) {
+        seriesCourse = sc.map((Object? k, Object? v) => MapEntry('$k', v));
+      }
+    }
+    return <String, dynamic>{
+      'items': allItems,
+      if (seriesCourse != null) 'series_course': seriesCourse,
+    };
+  }
+
+  Future<Map<String, dynamic>> importNetdiskSeries({
+    required String provider,
+    required String folderPath,
+    String? title,
   }) async {
     final Response<dynamic> response = await _dio.post(
-      Endpoints.netdiskImport,
+      Endpoints.netdiskImportSeries,
       data: <String, dynamic>{
         'provider': provider,
-        'paths': paths,
+        'folder_path': folderPath,
+        if (title != null && title.trim().isNotEmpty) 'title': title.trim(),
       },
     );
     return response.data as Map<String, dynamic>;

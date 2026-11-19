@@ -8,8 +8,9 @@ from app.services.netdisk_sidecars import (
 def test_is_subtitle_name() -> None:
     assert is_subtitle_name("a.srt")
     assert is_subtitle_name("a.VTT")
+    assert is_subtitle_name("a.ass")
+    assert is_subtitle_name("a.ssa")
     assert not is_subtitle_name("a.mp4")
-    assert not is_subtitle_name("a.ass")
 
 
 def test_assign_tagged_sidecars() -> None:
@@ -46,3 +47,16 @@ def test_normalize_vtt() -> None:
     assert srt is not None
     assert "-->" in srt
     assert "Hello" in srt
+
+
+def test_normalize_ass() -> None:
+    ass = (
+        "[Events]\n"
+        "Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text\n"
+        "Dialogue: 0,0:00:01.00,0:00:02.50,Default,,0,0,0,,{\\an8}Hello ASS\n"
+    )
+    srt = normalize_subtitle_text("show.en.ass", ass)
+    assert srt is not None
+    assert "00:00:01,000 --> 00:00:02,500" in srt
+    assert "Hello ASS" in srt
+    assert "{\\an8}" not in srt

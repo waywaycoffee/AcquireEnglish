@@ -3,6 +3,7 @@ import { AuthProvider, useAuth } from "./auth";
 import HomePage from "./pages/HomePage";
 import LandingPage from "./pages/LandingPage";
 import LoginPage from "./pages/LoginPage";
+import NetdiskPage from "./pages/NetdiskPage";
 import PhoneLoginPage from "./pages/PhoneLoginPage";
 import PrivacyPage from "./pages/PrivacyPage";
 import RegisterPage from "./pages/RegisterPage";
@@ -41,6 +42,14 @@ export default function App() {
           element={
             <Protected>
               <HomePage />
+            </Protected>
+          }
+        />
+        <Route
+          path="/app/netdisk"
+          element={
+            <Protected>
+              <NetdiskPage />
             </Protected>
           }
         />

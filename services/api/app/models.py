@@ -247,6 +247,10 @@ class UserLinkCourse(Base):
     cover_url: Mapped[str | None] = mapped_column(String(1024), nullable=True)
     # Local/custom poster bytes as base64 so new devices can restore without CDN.
     cover_image_base64: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # Netdisk TV-series grouping: same key → one multi-lesson CourseOut.
+    series_key: Mapped[str | None] = mapped_column(String(64), nullable=True, index=True)
+    series_title: Mapped[str | None] = mapped_column(String(512), nullable=True)
+    episode_index: Mapped[int | None] = mapped_column(Integer, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     user: Mapped[User] = relationship(back_populates="link_courses")

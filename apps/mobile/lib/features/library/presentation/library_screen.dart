@@ -1560,10 +1560,10 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
     final bool? confirmed = await showDialog<bool>(
       context: context,
       builder: (BuildContext dialogContext) => AlertDialog(
-        title: const Text('下载到本机？'),
-        content: const Text(
-          '在线播放若因网盘非会员限速卡顿，可下载到手机后再播。'
-          '同目录的字幕文件会一并关联。下载速度仍受网盘账号限制。',
+        title: const Text('下载本季到本机？'),
+        content: Text(
+          '共 $count 集待下载。建议「先下后学」：缺英文字幕的集下载后会自动补全。'
+          '在线播放若因网盘非会员限速卡顿，本地更稳。',
         ),
         actions: <Widget>[
           TextButton(
@@ -1572,7 +1572,7 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
           ),
           FilledButton(
             onPressed: () => Navigator.of(dialogContext).pop(true),
-            child: const Text('下载到本机'),
+            child: const Text('先下后学'),
           ),
         ],
       ),

@@ -13,6 +13,8 @@ async def ensure_schema_columns(conn: AsyncConnection) -> None:
     await _ensure_user_auth_columns(conn)
     await _ensure_preference_columns(conn)
     await _ensure_user_points_columns(conn)
+    await _ensure_link_course_series_columns(conn)
+    await _ensure_link_course_series_columns(conn)
 
 
 async def ensure_user_auth_columns(conn: AsyncConnection) -> None:
@@ -110,3 +112,75 @@ async def _ensure_user_points_columns(conn: AsyncConnection) -> None:
         await conn.execute(
             text("ALTER TABLE users ADD COLUMN points_balance INTEGER DEFAULT 0")
         )
+
+
+async def _ensure_link_course_series_columns(conn: AsyncConnection) -> None:
+    existing = await _existing_columns(conn, "user_link_courses")
+    if existing is None:
+        return
+    if "series_key" not in existing:
+        await conn.execute(
+            text("ALTER TABLE user_link_courses ADD COLUMN series_key VARCHAR(64)")
+        )
+    if "series_title" not in existing:
+        await conn.execute(
+            text("ALTER TABLE user_link_courses ADD COLUMN series_title VARCHAR(512)")
+        )
+    if "episode_index" not in existing:
+        await conn.execute(
+            text("ALTER TABLE user_link_courses ADD COLUMN episode_index INTEGER")
+        )
+    dialect = _dialect_name(conn)
+    try:
+        if dialect == "sqlite":
+            await conn.execute(
+                text(
+                    "CREATE INDEX IF NOT EXISTS ix_user_link_courses_series_key "
+                    "ON user_link_courses (series_key)"
+                )
+            )
+        else:
+            await conn.execute(
+                text(
+                    "CREATE INDEX IF NOT EXISTS ix_user_link_courses_series_key "
+                    "ON user_link_courses (series_key)"
+                )
+            )
+    except Exception:  # noqa: BLE001
+        pass
+
+
+async def _ensure_link_course_series_columns(conn: AsyncConnection) -> None:
+    existing = await _existing_columns(conn, "user_link_courses")
+    if existing is None:
+        return
+    if "series_key" not in existing:
+        await conn.execute(
+            text("ALTER TABLE user_link_courses ADD COLUMN series_key VARCHAR(64)")
+        )
+    if "series_title" not in existing:
+        await conn.execute(
+            text("ALTER TABLE user_link_courses ADD COLUMN series_title VARCHAR(512)")
+        )
+    if "episode_index" not in existing:
+        await conn.execute(
+            text("ALTER TABLE user_link_courses ADD COLUMN episode_index INTEGER")
+        )
+    dialect = _dialect_name(conn)
+    try:
+        if dialect == "sqlite":
+            await conn.execute(
+                text(
+                    "CREATE INDEX IF NOT EXISTS ix_user_link_courses_series_key "
+                    "ON user_link_courses (series_key)"
+                )
+            )
+        else:
+            await conn.execute(
+                text(
+                    "CREATE INDEX IF NOT EXISTS ix_user_link_courses_series_key "
+                    "ON user_link_courses (series_key)"
+                )
+            )
+    except Exception:  # noqa: BLE001
+        pass

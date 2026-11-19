@@ -57,6 +57,7 @@ class Endpoints {
   static const String netdiskBind = 'api/netdisk/bind';
   static const String netdiskList = 'api/netdisk/list';
   static const String netdiskImport = 'api/netdisk/import';
+  static const String netdiskImportSeries = 'api/netdisk/import-series';
   static const String rewardsShare = 'api/rewards/share';
   static const String rewardsPoints = 'api/rewards/points';
 

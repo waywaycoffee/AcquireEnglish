@@ -44,8 +44,18 @@ class _NetdiskImportSheetState extends ConsumerState<_NetdiskImportSheet> {
   bool _busy = false;
   bool _openlistReady = false;
   bool _bound = false;
+  bool _healthy = true;
+  String? _healthError;
   String? _error;
+  String? _listHint;
   String _mountPath = '';
+
+  static const List<(String, String)> _providers = <(String, String)>[
+    ('baidu', '百度'),
+    ('quark', '夸克'),
+    ('aliyun', '阿里'),
+    ('pan115', '115'),
+  ];
 
   @override
   void initState() {
@@ -59,6 +69,32 @@ class _NetdiskImportSheetState extends ConsumerState<_NetdiskImportSheet> {
   void dispose() {
     _credential.dispose();
     super.dispose();
+  }
+
+  String get _currentFolderPath {
+    if (_pathStack.isEmpty) {
+      return _mountPath;
+    }
+    return '$_mountPath/${_pathStack.join('/')}';
+  }
+
+  List<String> get _videoPathsInDir => _entries
+      .where((Map<String, dynamic> row) => row['is_dir'] != true)
+      .map((Map<String, dynamic> row) => '${row['path'] ?? ''}')
+      .where((String p) => p.isNotEmpty)
+      .toList(growable: false);
+
+  String _credentialHint() {
+    switch (_provider) {
+      case 'quark':
+        return '在浏览器登录 pan.quark.cn，复制 Cookie 粘贴到下方。';
+      case 'aliyun':
+        return '粘贴阿里云盘 Open 的 refresh_token（或含 refresh_token 的 JSON）。';
+      case 'pan115':
+        return '在浏览器登录 115，复制 Cookie 粘贴到下方。';
+      default:
+        return '粘贴百度网盘 Cookie（含 BDUSS/STOKEN）或 refresh_token。';
+    }
   }
 
   Future<void> _reloadStatus() async {
@@ -80,12 +116,17 @@ class _NetdiskImportSheetState extends ConsumerState<_NetdiskImportSheet> {
       final List<dynamic> providers =
           (status['providers'] as List<dynamic>?) ?? const <dynamic>[];
       bool bound = false;
+      bool healthy = true;
+      String? healthError;
       String mount = '';
       for (final dynamic row in providers) {
         if (row is! Map) continue;
         if ('${row['provider']}' == _provider) {
           bound = row['bound'] == true;
           mount = '${row['mount_path'] ?? ''}';
+          healthy = row['healthy'] != false;
+          final Object? err = row['error'];
+          healthError = err == null ? null : '$err';
         }
       }
       if (!mounted) return;
@@ -93,9 +134,11 @@ class _NetdiskImportSheetState extends ConsumerState<_NetdiskImportSheet> {
         _openlistReady = ready;
         _bound = bound;
         _mountPath = mount;
+        _healthy = healthy;
+        _healthError = healthError;
         _loading = false;
       });
-      if (bound) {
+      if (bound && healthy) {
         await _loadDir();
       }
     } catch (error) {
@@ -110,7 +153,7 @@ class _NetdiskImportSheetState extends ConsumerState<_NetdiskImportSheet> {
   Future<void> _bind() async {
     final String cred = _credential.text.trim();
     if (cred.length < 8) {
-      setState(() => _error = '请粘贴网盘 Cookie（或百度 refresh_token）');
+      setState(() => _error = '请粘贴有效的 Cookie / token');
       return;
     }
     setState(() {
@@ -119,9 +162,9 @@ class _NetdiskImportSheetState extends ConsumerState<_NetdiskImportSheet> {
     });
     try {
       await ref.read(acquireApiClientProvider).bindNetdisk(
-        provider: _provider,
-        credential: cred,
-      );
+            provider: _provider,
+            credential: cred,
+          );
       _credential.clear();
       await _reloadStatus();
     } catch (error) {
@@ -148,8 +191,10 @@ class _NetdiskImportSheetState extends ConsumerState<_NetdiskImportSheet> {
           .listNetdisk(provider: _provider, path: rel);
       final List<dynamic> raw =
           (data['entries'] as List<dynamic>?) ?? const <dynamic>[];
+      final String? hint = data['hint']?.toString();
       if (!mounted) return;
       setState(() {
+        _listHint = hint;
         _entries = raw
             .whereType<Map<Object?, Object?>>()
             .map(
@@ -177,35 +222,59 @@ class _NetdiskImportSheetState extends ConsumerState<_NetdiskImportSheet> {
     await _loadDir();
   }
 
-  Future<void> _importSelected() async {
-    if (_selected.isEmpty) return;
+  void _selectAllVideos() {
     setState(() {
-      _busy = true;
-      _error = null;
+      _selected
+        ..clear()
+        ..addAll(_videoPathsInDir);
     });
-    try {
-      final Map<String, dynamic> result = await ref
-          .read(acquireApiClientProvider)
-          .importNetdiskVideos(
-            provider: _provider,
-            paths: _selected.toList(growable: false),
-          );
-      await syncCloudCatalogAndFeed(ref);
-      final List<dynamic> items =
-          (result['items'] as List<dynamic>?) ?? const <dynamic>[];
-      final List<Map<Object?, Object?>> okItems = items
-          .whereType<Map<Object?, Object?>>()
-          .where((Map<Object?, Object?> row) => row['ok'] == true)
-          .toList(growable: false);
-      final AcquireApiClient api = ref.read(acquireApiClientProvider);
-      final LibraryCatalogNotifier catalog =
-          ref.read(libraryCatalogProvider.notifier);
-      final List<LibraryCourseData> courses = ref.read(libraryCatalogProvider);
+  }
+
+  Future<void> _finishImport(Map<String, dynamic> result) async {
+    await syncCloudCatalogAndFeed(ref);
+    final List<dynamic> items =
+        (result['items'] as List<dynamic>?) ?? const <dynamic>[];
+    final List<Map<Object?, Object?>> okItems = items
+        .whereType<Map<Object?, Object?>>()
+        .where((Map<Object?, Object?> row) => row['ok'] == true)
+        .toList(growable: false);
+    final Object? seriesRaw = result['series_course'];
+    String? seriesCourseId;
+    if (seriesRaw is Map) {
+      seriesCourseId = '${seriesRaw['id'] ?? ''}';
+    }
+    final AcquireApiClient api = ref.read(acquireApiClientProvider);
+    final LibraryCatalogNotifier catalog =
+        ref.read(libraryCatalogProvider.notifier);
+    final List<LibraryCourseData> courses = ref.read(libraryCatalogProvider);
+
+    if (seriesCourseId != null && seriesCourseId.isNotEmpty) {
+      LibraryCourseData? series;
+      for (final LibraryCourseData c in courses) {
+        if (c.id == seriesCourseId) {
+          series = c;
+          break;
+        }
+      }
+      if (series != null) {
+        for (final LibraryEpisodeItem ep in series.episodes) {
+          try {
+            await materializeNetdiskSoftsubs(
+              api: api,
+              catalog: catalog,
+              courseId: seriesCourseId,
+              episode: ep,
+              importId: parseNetdiskImportIdFromUrl(ep.enSubtitleAsset) ??
+                  parseNetdiskImportIdFromUrl(ep.cnSubtitleAsset) ??
+                  parseNetdiskImportIdFromUrl(ep.videoAsset),
+            );
+          } catch (_) {}
+        }
+      }
+    } else {
       for (final Map<Object?, Object?> row in okItems) {
         final String courseId = '${row['course_id'] ?? ''}';
-        if (courseId.isEmpty) {
-          continue;
-        }
+        if (courseId.isEmpty) continue;
         LibraryEpisodeItem? episode;
         for (final LibraryCourseData course in courses) {
           if (course.id == courseId && course.episodes.isNotEmpty) {
@@ -222,11 +291,61 @@ class _NetdiskImportSheetState extends ConsumerState<_NetdiskImportSheet> {
           );
         } catch (_) {}
       }
+    }
+
+    if (!mounted) return;
+    Navigator.of(context).pop();
+    final String msg = seriesCourseId != null && seriesCourseId.isNotEmpty
+        ? '已导入为合集课程（${okItems.length} 集）。缺英文字幕的集可「先下后学」自动补全。'
+        : '已导入 ${okItems.length} 个网盘视频到课程库';
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
+  }
+
+  Future<void> _importSelected() async {
+    if (_selected.isEmpty) return;
+    setState(() {
+      _busy = true;
+      _error = null;
+    });
+    try {
+      final Map<String, dynamic> result = await ref
+          .read(acquireApiClientProvider)
+          .importNetdiskVideos(
+            provider: _provider,
+            paths: _selected.toList(growable: false),
+            seriesFolder: _currentFolderPath.isEmpty ? null : _currentFolderPath,
+          );
+      await _finishImport(result);
+    } catch (error) {
       if (!mounted) return;
-      Navigator.of(context).pop();
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('已导入 ${okItems.length} 个网盘视频到课程库')),
-      );
+      setState(() {
+        _busy = false;
+        _error = '$error'.replaceFirst('Exception: ', '');
+      });
+    }
+  }
+
+  Future<void> _importFolderAsSeries() async {
+    if (_currentFolderPath.isEmpty) {
+      setState(() => _error = '请先进入剧季文件夹');
+      return;
+    }
+    if (_videoPathsInDir.isEmpty) {
+      setState(() => _error = '当前文件夹没有视频');
+      return;
+    }
+    setState(() {
+      _busy = true;
+      _error = null;
+    });
+    try {
+      final Map<String, dynamic> result = await ref
+          .read(acquireApiClientProvider)
+          .importNetdiskSeries(
+            provider: _provider,
+            folderPath: _currentFolderPath,
+          );
+      await _finishImport(result);
     } catch (error) {
       if (!mounted) return;
       setState(() {
@@ -238,7 +357,7 @@ class _NetdiskImportSheetState extends ConsumerState<_NetdiskImportSheet> {
 
   @override
   Widget build(BuildContext context) {
-    final double height = MediaQuery.sizeOf(context).height * 0.86;
+    final double height = MediaQuery.sizeOf(context).height * 0.9;
     return SafeArea(
       child: SizedBox(
         height: height,
@@ -266,23 +385,26 @@ class _NetdiskImportSheetState extends ConsumerState<_NetdiskImportSheet> {
                 ),
               ),
               const SizedBox(height: 12),
-              SegmentedButton<String>(
-                segments: const <ButtonSegment<String>>[
-                  ButtonSegment<String>(value: 'baidu', label: Text('百度网盘')),
-                  ButtonSegment<String>(value: 'quark', label: Text('夸克网盘')),
-                ],
-                selected: <String>{_provider},
-                onSelectionChanged: _busy
-                    ? null
-                    : (Set<String> next) {
-                        setState(() {
-                          _provider = next.first;
-                          _pathStack.clear();
-                          _entries = const <Map<String, dynamic>>[];
-                          _selected.clear();
-                        });
-                        unawaited(_reloadStatus());
-                      },
+              SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: SegmentedButton<String>(
+                  segments: <ButtonSegment<String>>[
+                    for (final (String value, String label) in _providers)
+                      ButtonSegment<String>(value: value, label: Text(label)),
+                  ],
+                  selected: <String>{_provider},
+                  onSelectionChanged: _busy
+                      ? null
+                      : (Set<String> next) {
+                          setState(() {
+                            _provider = next.first;
+                            _pathStack.clear();
+                            _entries = const <Map<String, dynamic>>[];
+                            _selected.clear();
+                          });
+                          unawaited(_reloadStatus());
+                        },
+                ),
               ),
               const SizedBox(height: 12),
               if (_loading)
@@ -297,9 +419,7 @@ class _NetdiskImportSheetState extends ConsumerState<_NetdiskImportSheet> {
                   ),
                 if (_openlistReady && !_bound) ...<Widget>[
                   Text(
-                    _provider == 'quark'
-                        ? '在浏览器登录 pan.quark.cn，复制 Cookie 粘贴到下方。'
-                        : '粘贴百度网盘 Cookie（含 BDUSS/STOKEN）或 refresh_token。',
+                    _credentialHint(),
                     style: TextStyle(
                       fontSize: 13,
                       color: AppDesignTokens.textSecondary,
@@ -320,7 +440,36 @@ class _NetdiskImportSheetState extends ConsumerState<_NetdiskImportSheet> {
                     child: Text(_busy ? '绑定中…' : '绑定并打开网盘'),
                   ),
                 ],
-                if (_openlistReady && _bound) ...<Widget>[
+                if (_openlistReady && _bound && !_healthy) ...<Widget>[
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFFFF1F0),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: const Color(0xFFFFCCC7)),
+                    ),
+                    child: Text(
+                      '授权可能已失效${_healthError == null ? '' : '：$_healthError'}。请解绑后重新绑定。',
+                      style: const TextStyle(
+                        color: Color(0xFFA8071A),
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  OutlinedButton(
+                    onPressed: _busy
+                        ? null
+                        : () async {
+                            await ref
+                                .read(acquireApiClientProvider)
+                                .unbindNetdisk(_provider);
+                            await _reloadStatus();
+                          },
+                    child: const Text('解绑并重新授权'),
+                  ),
+                ],
+                if (_openlistReady && _bound && _healthy) ...<Widget>[
                   Row(
                     children: <Widget>[
                       IconButton(
@@ -331,11 +480,17 @@ class _NetdiskImportSheetState extends ConsumerState<_NetdiskImportSheet> {
                         child: Text(
                           _pathStack.isEmpty
                               ? (_mountPath.isEmpty ? '根目录' : _mountPath)
-                              : '$_mountPath/${_pathStack.join('/')}',
+                              : _currentFolderPath,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: const TextStyle(fontWeight: FontWeight.w700),
                         ),
+                      ),
+                      TextButton(
+                        onPressed: _busy || _videoPathsInDir.isEmpty
+                            ? null
+                            : _selectAllVideos,
+                        child: const Text('全选'),
                       ),
                       TextButton(
                         onPressed: _busy
@@ -350,6 +505,17 @@ class _NetdiskImportSheetState extends ConsumerState<_NetdiskImportSheet> {
                       ),
                     ],
                   ),
+                  if (_listHint != null)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 8),
+                      child: Text(
+                        _listHint!,
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: AppDesignTokens.textSecondary,
+                        ),
+                      ),
+                    ),
                   if (_error != null)
                     Padding(
                       padding: const EdgeInsets.only(bottom: 8),
@@ -408,13 +574,24 @@ class _NetdiskImportSheetState extends ConsumerState<_NetdiskImportSheet> {
                           ),
                   ),
                   FilledButton(
+                    onPressed: _busy || _videoPathsInDir.isEmpty
+                        ? null
+                        : _importFolderAsSeries,
+                    child: Text(
+                      _busy
+                          ? '导入中…'
+                          : '导入本文件夹为课程（${_videoPathsInDir.length} 集）',
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  OutlinedButton(
                     onPressed: _busy || _selected.isEmpty
                         ? null
                         : _importSelected,
                     child: Text(
                       _busy
                           ? '导入中…'
-                          : '导入选中 ${_selected.length} 个视频',
+                          : '导入选中 ${_selected.length} 个视频（合并为本目录合集）',
                     ),
                   ),
                 ],

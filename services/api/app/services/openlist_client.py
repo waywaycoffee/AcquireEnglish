@@ -73,6 +73,10 @@ def driver_for(provider: str) -> str:
         return "BaiduNetdisk"
     if provider == "quark":
         return "Quark"
+    if provider == "aliyun":
+        return "AliyundriveOpen"
+    if provider == "pan115":
+        return "115 Cloud"
     raise OpenListError(f"不支持的网盘：{provider}")
 
 
@@ -85,6 +89,33 @@ def addition_for(provider: str, credential: str) -> str:
                 "root_folder_id": "0",
                 "order_by": "none",
                 "order_direction": "asc",
+            },
+            ensure_ascii=False,
+        )
+    if provider == "aliyun":
+        # AliyundriveOpen expects refresh_token (OAuth).
+        token = cred
+        if cred.lstrip().startswith("{"):
+            try:
+                parsed = json.loads(cred)
+                token = str(parsed.get("refresh_token") or cred)
+            except Exception:  # noqa: BLE001
+                token = cred
+        return json.dumps(
+            {
+                "refresh_token": token,
+                "root_folder_id": "root",
+                "order_by": "name",
+                "order_direction": "ASC",
+            },
+            ensure_ascii=False,
+        )
+    if provider == "pan115":
+        return json.dumps(
+            {
+                "cookie": cred,
+                "root_folder_id": "0",
+                "page_size": 1000,
             },
             ensure_ascii=False,
         )
@@ -226,6 +257,26 @@ class OpenListClient:
             },
         )
         return data if isinstance(data, dict) else {"content": []}
+
+    async def fs_list_all(
+        self, path: str, *, per_page: int = 200, max_pages: int = 50
+    ) -> list[dict[str, Any]]:
+        """Paginate OpenList fs/list until empty or max_pages."""
+        items: list[dict[str, Any]] = []
+        for page in range(1, max_pages + 1):
+            data = await self.fs_list(path, page=page, per_page=per_page)
+            content = data.get("content")
+            if not isinstance(content, list) or not content:
+                break
+            for row in content:
+                if isinstance(row, dict):
+                    items.append(row)
+            total = data.get("total")
+            if isinstance(total, int) and len(items) >= total:
+                break
+            if len(content) < per_page:
+                break
+        return items
 
     async def fs_get(self, path: str) -> dict[str, Any]:
         data = await self._request(

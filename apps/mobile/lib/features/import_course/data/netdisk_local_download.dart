@@ -7,6 +7,8 @@ import 'package:path_provider/path_provider.dart';
 
 import '../../library/presentation/library_catalog_provider.dart';
 import '../../library/presentation/library_mock_data.dart';
+import '../../subtitle_completion/subtitle_completion_enqueue.dart';
+import '../../subtitle_completion/subtitle_completion_scheduler.dart';
 import '../../sync/data/acquire_api_client.dart';
 import 'bilibili_episode_prepare.dart';
 
@@ -16,12 +18,16 @@ class NetdiskDownloadProgress {
     required this.message,
     required this.progress,
     this.done = false,
+    this.current = 0,
+    this.total = 0,
   });
 
   final String courseId;
   final String message;
   final double progress;
   final bool done;
+  final int current;
+  final int total;
 }
 
 class NetdiskDownloadProgressNotifier extends Notifier<NetdiskDownloadProgress?> {
@@ -43,14 +49,21 @@ final Set<String> _inFlightCourseIds = <String>{};
 
 bool isNetdiskCourse(LibraryCourseData course) {
   final String category = course.category.trim().toLowerCase();
-  if (category.endsWith('_netdisk')) {
+  if (course.id.startsWith('netdisk-series-')) {
+    return true;
+  }
+  if (category.endsWith('_netdisk') || category == 'netdisk') {
     return true;
   }
   if (course.id.startsWith('link-') &&
-      (category.contains('baidu') || category.contains('quark'))) {
+      (category.contains('baidu') ||
+          category.contains('quark') ||
+          category.contains('aliyun') ||
+          category.contains('pan115') ||
+          category.contains('netdisk'))) {
     return true;
   }
-  return course.id.startsWith('link-') && category.contains('netdisk');
+  return false;
 }
 
 bool isNetdiskDownloadInFlight(String courseId) =>
@@ -62,6 +75,23 @@ int? parseLinkImportId(String courseId) {
     return null;
   }
   return int.tryParse(id.substring('link-'.length));
+}
+
+int? parseNetdiskImportIdFromUrl(String? url) {
+  if (url == null || url.trim().isEmpty) {
+    return null;
+  }
+  final RegExp play = RegExp(r'/api/netdisk/play/(\d+)');
+  final Match? m1 = play.firstMatch(url);
+  if (m1 != null) {
+    return int.tryParse(m1.group(1)!);
+  }
+  final RegExp srt = RegExp(r'/api/imports/(\d+)/srt/');
+  final Match? m2 = srt.firstMatch(url);
+  if (m2 != null) {
+    return int.tryParse(m2.group(1)!);
+  }
+  return null;
 }
 
 int pendingNetdiskEpisodes(LibraryCourseData course) {
@@ -76,23 +106,29 @@ int pendingNetdiskEpisodes(LibraryCourseData course) {
       .length;
 }
 
-/// Write API softsubs for a netdisk `link-{id}` course onto disk and catalog.
+/// Write API softsubs for a netdisk import onto disk and catalog.
 Future<void> materializeNetdiskSoftsubs({
   required AcquireApiClient api,
   required LibraryCatalogNotifier catalog,
   required String courseId,
   LibraryEpisodeItem? episode,
+  int? importId,
 }) async {
-  final int? importId = parseLinkImportId(courseId);
-  if (importId == null) {
+  final int? resolvedId = importId ??
+      parseLinkImportId(courseId) ??
+      parseNetdiskImportIdFromUrl(episode?.enSubtitleAsset) ??
+      parseNetdiskImportIdFromUrl(episode?.cnSubtitleAsset) ??
+      parseNetdiskImportIdFromUrl(episode?.videoAsset) ??
+      parseNetdiskImportIdFromUrl(episode?.sourceUrl);
+  if (resolvedId == null) {
     return;
   }
   final String? enBody = await api.fetchPersonalImportSrt(
-    importId: importId,
+    importId: resolvedId,
     lang: 'en',
   );
   final String? zhBody = await api.fetchPersonalImportSrt(
-    importId: importId,
+    importId: resolvedId,
     lang: 'zh',
   );
   if ((enBody == null || enBody.trim().isEmpty) &&
@@ -100,7 +136,7 @@ Future<void> materializeNetdiskSoftsubs({
     return;
   }
   final Directory docs = await getApplicationDocumentsDirectory();
-  final Directory dir = Directory('${docs.path}/netdisk/$importId');
+  final Directory dir = Directory('${docs.path}/netdisk/$resolvedId');
   await dir.create(recursive: true);
   String? enPath;
   String? zhPath;
@@ -130,6 +166,7 @@ Future<void> downloadNetdiskCourseToLocal({
   required List<LibraryCourseData> Function() readCourses,
   required String courseId,
   NetdiskDownloadProgressNotifier? progressNotifier,
+  bool preferMissingSubtitlesFirst = true,
 }) async {
   if (!_inFlightCourseIds.add(courseId)) {
     progressNotifier?.update(
@@ -141,13 +178,21 @@ Future<void> downloadNetdiskCourseToLocal({
     );
     return;
   }
-  void publish(String message, double progress, {bool done = false}) {
+  void publish(
+    String message,
+    double progress, {
+    bool done = false,
+    int current = 0,
+    int total = 0,
+  }) {
     progressNotifier?.update(
       NetdiskDownloadProgress(
         courseId: courseId,
         message: message,
         progress: progress.clamp(0.0, 1.0),
         done: done,
+        current: current,
+        total: total,
       ),
     );
   }
@@ -178,21 +223,44 @@ Future<void> downloadNetdiskCourseToLocal({
       throw StateError('云端课程不存在或已失效');
     }
 
-    final int total = remoteCourse.lessons.length;
+    final List<AcquireLessonDto> lessons = List<AcquireLessonDto>.from(
+      remoteCourse.lessons,
+    );
+    if (preferMissingSubtitlesFirst) {
+      lessons.sort((AcquireLessonDto a, AcquireLessonDto b) {
+        final bool aMissing = a.subtitleEn.trim().isEmpty;
+        final bool bMissing = b.subtitleEn.trim().isEmpty;
+        if (aMissing == bMissing) {
+          return a.index.compareTo(b.index);
+        }
+        return aMissing ? -1 : 1;
+      });
+    }
+
+    final int total = lessons.length;
     int index = 0;
-    for (final AcquireLessonDto lesson in remoteCourse.lessons) {
+    for (final AcquireLessonDto lesson in lessons) {
       index += 1;
       final double base = (index - 1) / total;
       final double span = 1 / total;
-      publish('正在下载第 $index/$total 集…', base + span * 0.05);
+      publish(
+        '正在下载第 $index/$total 集…',
+        base + span * 0.05,
+        current: index,
+        total: total,
+      );
 
       final String playUrl = lesson.videoUrl.trim();
       if (playUrl.isEmpty) {
         continue;
       }
-      final int? importId = parseLinkImportId(courseId);
+      final int? importId =
+          parseNetdiskImportIdFromUrl(playUrl) ??
+          parseNetdiskImportIdFromUrl(lesson.subtitleEn) ??
+          parseLinkImportId(courseId);
       final String idKey =
-          importId?.toString() ?? courseId.replaceAll('/', '_');
+          importId?.toString() ??
+          '${courseId}_${lesson.id}'.replaceAll('/', '_');
       final File local = await _downloadPlayUrlToCache(
         playUrl: playUrl,
         idKey: idKey,
@@ -201,6 +269,8 @@ Future<void> downloadNetdiskCourseToLocal({
           publish(
             '正在下载第 $index/$total 集 ${(localP * 100).clamp(0, 100).round()}%',
             base + span * (0.1 + localP * 0.8),
+            current: index,
+            total: total,
           );
         },
       );
@@ -222,17 +292,37 @@ Future<void> downloadNetdiskCourseToLocal({
         api: api,
         catalog: catalog,
         courseId: courseId,
+        importId: importId,
         episode: ep ??
             (target.episodes.isNotEmpty ? target.episodes.first : null),
       );
+
       for (final LibraryCourseData course in readCourses()) {
         if (course.id == courseId) {
           target = course;
           break;
         }
       }
+      LibraryEpisodeItem? refreshed;
+      for (final LibraryEpisodeItem e in target.episodes) {
+        if (e.id == lesson.id) {
+          refreshed = e;
+          break;
+        }
+      }
+      if (refreshed != null) {
+        await enqueueSubtitleCompletionForEpisode(
+          episodeId: refreshed.id,
+          videoPath: local.path,
+          zhSubtitlePath: refreshed.cnSubtitleAsset,
+          enSubtitlePath: refreshed.enSubtitleAsset,
+          course: target,
+          episode: refreshed,
+        );
+        SubtitleCompletionScheduler.instance.kick(delay: Duration.zero);
+      }
     }
-    publish('下载完成，可离线播放', 1, done: true);
+    publish('下载完成，可离线播放', 1, done: true, current: total, total: total);
   } catch (e) {
     publish('下载失败：$e', 1, done: true);
     rethrow;
@@ -267,7 +357,6 @@ Future<File> _downloadPlayUrlToCache({
       followRedirects: true,
       maxRedirects: 8,
       headers: <String, dynamic>{
-        // Baidu rejects browser UA for many large-file links.
         'User-Agent': 'pan.baidu.com',
         'Referer': 'https://pan.baidu.com/',
       },

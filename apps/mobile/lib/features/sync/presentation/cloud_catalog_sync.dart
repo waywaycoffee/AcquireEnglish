@@ -21,8 +21,12 @@ Future<void> syncCloudCatalogAndFeed(dynamic ref) async {
         // Netdisk lessons already carry a signed /api/netdisk/play URL.
         .where(
           (AcquireCourseDto c) =>
+              c.id.startsWith('netdisk-series-') ||
               !c.id.startsWith('link-') ||
-              c.tags.any((String tag) => tag.endsWith('_netdisk')),
+              c.tags.any(
+                (String tag) =>
+                    tag.endsWith('_netdisk') || tag == 'netdisk' || tag == 'series',
+              ),
         )
         .map(mapAcquireCourseToLibrary)
         .toList(growable: false);

@@ -116,6 +116,55 @@ export const api = {
     request<Course>(`/api/courses/${id}`, {}, token),
   importLink: (token: string, url: string) =>
     request<Course>("/api/imports/link", { method: "POST", body: JSON.stringify({ url }) }, token),
+  netdiskStatus: (token: string) =>
+    request<{
+      openlist_configured: boolean;
+      providers: Array<{
+        provider: string;
+        bound: boolean;
+        mount_path?: string;
+        healthy?: boolean;
+        error?: string | null;
+        label?: string;
+      }>;
+    }>("/api/netdisk/status", {}, token),
+  netdiskBind: (token: string, provider: string, credential: string) =>
+    request("/api/netdisk/bind", {
+      method: "POST",
+      body: JSON.stringify({ provider, credential }),
+    }, token),
+  netdiskUnbind: (token: string, provider: string) =>
+    request(`/api/netdisk/bind/${provider}`, { method: "DELETE" }, token),
+  netdiskList: (token: string, provider: string, path = "") =>
+    request<{
+      provider: string;
+      path: string;
+      entries: Array<{
+        name: string;
+        path: string;
+        is_dir: boolean;
+        size?: number | null;
+        is_video?: boolean;
+      }>;
+      hint?: string | null;
+    }>(
+      `/api/netdisk/list?provider=${encodeURIComponent(provider)}${
+        path ? `&path=${encodeURIComponent(path)}` : ""
+      }`,
+      {},
+      token,
+    ),
+  netdiskImportSeries: (
+    token: string,
+    payload: { provider: string; folder_path: string; title?: string },
+  ) =>
+    request<{
+      items: Array<{ ok: boolean; title: string; course_id: string }>;
+      series_course?: Course | null;
+    }>("/api/netdisk/import-series", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }, token),
   fetchText: async (path: string, token?: string | null) => {
     const headers = new Headers();
     if (token) headers.set("Authorization", `Bearer ${token}`);

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from pathlib import PurePosixPath
 from typing import Literal
 
@@ -10,7 +11,7 @@ import httpx
 from app.link_import import _srt_looks_chinese, _vtt_to_srt
 from app.services.openlist_client import OpenListClient, OpenListError, public_raw_url
 
-SUBTITLE_SUFFIXES = (".srt", ".vtt")
+SUBTITLE_SUFFIXES = (".srt", ".vtt", ".ass", ".ssa")
 Lang = Literal["en", "zh"]
 
 _EN_TOKENS = ("en", "eng", "english", "en-us", "en_us", "en-gb", "en_gb")
@@ -110,6 +111,48 @@ def assign_sidecar_paths(
     return out
 
 
+def _ass_time_to_srt(ts: str) -> str:
+    """Convert ASS `H:MM:SS.cs` to SRT `HH:MM:SS,mmm`."""
+    parts = ts.strip().split(":")
+    if len(parts) != 3:
+        return "00:00:00,000"
+    try:
+        hours = int(parts[0])
+        minutes = int(parts[1])
+        sec_parts = parts[2].split(".")
+        seconds = int(sec_parts[0])
+        centis = int((sec_parts[1] + "00")[:2]) if len(sec_parts) > 1 else 0
+        millis = centis * 10
+    except ValueError:
+        return "00:00:00,000"
+    return f"{hours:02d}:{minutes:02d}:{seconds:02d},{millis:03d}"
+
+
+def _ass_to_srt(raw: str) -> str | None:
+    """Extract Dialogue lines from ASS/SSA into basic SRT."""
+    cues: list[str] = []
+    index = 1
+    for line in raw.splitlines():
+        if not line.startswith("Dialogue:"):
+            continue
+        body = line[len("Dialogue:") :].strip()
+        fields = body.split(",", 9)
+        if len(fields) < 10:
+            continue
+        start = _ass_time_to_srt(fields[1])
+        end = _ass_time_to_srt(fields[2])
+        text = fields[9]
+        text = re.sub(r"\{[^}]*\}", "", text)
+        text = text.replace(r"\N", "\n").replace(r"\n", "\n").strip()
+        if not text:
+            continue
+        cues.append(f"{index}\n{start} --> {end}\n{text}\n")
+        index += 1
+    if not cues:
+        return None
+    return "\n".join(cues) + "\n"
+
+
 def normalize_subtitle_text(filename: str, raw: str) -> str | None:
     text = (raw or "").strip()
     if not text:
@@ -117,6 +160,8 @@ def normalize_subtitle_text(filename: str, raw: str) -> str | None:
     lower = filename.lower()
     if lower.endswith(".vtt") or text.lstrip().startswith("WEBVTT"):
         return _vtt_to_srt(text)
+    if lower.endswith(".ass") or lower.endswith(".ssa"):
+        return _ass_to_srt(text)
     # Assume SRT / plain cue text.
     if "-->" in text:
         return text if text.endswith("\n") else text + "\n"
