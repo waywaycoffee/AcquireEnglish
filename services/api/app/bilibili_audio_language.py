@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 import math
 import os
 import re
@@ -24,6 +25,26 @@ _CACHE: dict[str, tuple[float, str]] = {}
 _PENDING: dict[str, asyncio.Task[str]] = {}
 _NETWORK_SLOTS = asyncio.Semaphore(3)
 _MODEL_LOCK = asyncio.Lock()
+logger = logging.getLogger(__name__)
+
+
+class BilibiliAudioSourceError(Exception):
+    def __init__(self, reason: str):
+        self.reason = reason
+        super().__init__(reason)
+
+
+def _response_data(response: httpx.Response) -> dict:
+    if response.status_code in (401, 403, 412, 429):
+        raise BilibiliAudioSourceError("source_access_restricted")
+    response.raise_for_status()
+    payload = response.json()
+    if payload.get("code") in (-101, -352, -403, -412, -509):
+        raise BilibiliAudioSourceError("source_access_restricted")
+    data = payload.get("data")
+    if not isinstance(data, dict):
+        raise BilibiliAudioSourceError("source_unavailable")
+    return data
 
 
 def sample_offsets(duration: float) -> list[float]:
@@ -47,15 +68,15 @@ async def _source(bvid: str, cookie: str | None = None) -> tuple[float, str]:
         view = await client.get(
             "https://api.bilibili.com/x/web-interface/view", params={"bvid": bvid}
         )
-        view.raise_for_status()
-        data = view.json()["data"]
+        data = _response_data(view)
         page = data["pages"][0]
         play = await client.get(
             "https://api.bilibili.com/x/player/playurl",
             params={"bvid": bvid, "cid": page["cid"], "fnval": 16},
         )
-        play.raise_for_status()
-        formats = play.json()["data"]["dash"]["audio"]
+        formats = (_response_data(play).get("dash") or {}).get("audio")
+        if not formats:
+            raise BilibiliAudioSourceError("audio_unavailable")
         audio = min(formats, key=lambda row: int(row.get("bandwidth") or 0))
     url = audio.get("baseUrl") or audio["base_url"]
     parts = urlsplit(url)
@@ -92,7 +113,7 @@ def _detect(clips: list[bytes]) -> list[tuple[str, float]]:
     whisper = models / "ggml-tiny-q5_1.bin"
     vad = models / "ggml-silero-v6.2.0.bin"
     if not whisper.is_file() or not vad.is_file():
-        return []
+        raise FileNotFoundError("Audio language models are missing")
     results: list[tuple[str, float]] = []
     with tempfile.TemporaryDirectory(prefix="ae-audio-sample-") as directory:
         path = str(Path(directory) / "clip.wav")
@@ -127,22 +148,41 @@ def _detect(clips: list[bytes]) -> list[tuple[str, float]]:
     return results
 
 
-async def _classify(bvid: str, cookie: str | None) -> str:
+async def audit_bilibili_audio(bvid: str, cookie: str | None = None) -> tuple[str, str]:
+    """Return the discovery classification and a stable reason for calibration."""
+    stage = "source"
     try:
         async with _NETWORK_SLOTS:
             duration, url = await _source(bvid, cookie)
             offsets = sample_offsets(duration)
-            clips = await asyncio.gather(*(_clip(url, offset) for offset in offsets))
+            if not offsets:
+                return "unknown", "video_too_short"
+            stage = "audio"
+            clips = await asyncio.gather(
+                *(_clip(url, offset) for offset in offsets), return_exceptions=True
+            )
+            available = [clip for clip in clips if isinstance(clip, bytes) and clip]
+            if len(available) < 2:
+                return "unknown", "audio_unavailable"
+            stage = "detector"
             async with _MODEL_LOCK:
-                samples = await asyncio.to_thread(_detect, clips)
+                samples = await asyncio.to_thread(_detect, available)
+        if any(lang != "en" and prob >= 0.6 for lang, prob in samples):
+            return "other", "non_english_speech"
+        if len(available) != len(offsets):
+            return "unknown", "audio_unavailable"
         if english_samples(samples):
-            result = "english"
-        elif any(lang != "en" and prob >= 0.6 for lang, prob in samples):
-            result = "other"
-        else:
-            result = "unknown"
+            return "english", "english_speech"
+        return "unknown", "insufficient_confident_speech"
+    except BilibiliAudioSourceError as error:
+        return "unknown", error.reason
     except Exception:
-        result = "unknown"
+        return "unknown", f"{stage}_unavailable"
+
+
+async def _classify(bvid: str, cookie: str | None) -> str:
+    result, reason = await audit_bilibili_audio(bvid, cookie)
+    logger.info("Bilibili audio sample bvid=%s result=%s reason=%s", bvid, result, reason)
     ttl = 300 if result == "unknown" else 7 * 86400
     if len(_CACHE) >= 4096:
         _CACHE.pop(next(iter(_CACHE)))
