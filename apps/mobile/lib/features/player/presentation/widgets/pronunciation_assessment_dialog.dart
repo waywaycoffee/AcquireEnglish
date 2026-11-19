@@ -31,9 +31,10 @@ Future<void> showPronunciationAssessmentDialog(
 }
 
 class PronunciationAssessmentDialog extends ConsumerStatefulWidget {
-  const PronunciationAssessmentDialog({required this.target, this.episodeId, super.key});
+  const PronunciationAssessmentDialog({required this.target, this.episodeId, this.onResult, super.key});
 
   final String? episodeId;
+  final ValueChanged<PronunciationAssessmentResult>? onResult;
 
   final PronunciationAssessmentTarget target;
 
@@ -94,7 +95,8 @@ class _PronunciationAssessmentDialogState
       }
     });
     WidgetsBinding.instance.addObserver(this);
-    unawaited(_loadReferenceAudio());
+    if (widget.target.videoSource.isNotEmpty) unawaited(_loadReferenceAudio());
+    else _loadingReference = false;
   }
 
   @override
@@ -460,6 +462,7 @@ class _PronunciationAssessmentDialogState
         _result = result;
         _assessing = false;
       });
+      widget.onResult?.call(result);
       await _saveTake();
     } on TimeoutException {
       final Future<void> Function()? cancel = _cancelAssessment;
@@ -793,7 +796,7 @@ class _PronunciationAssessmentDialogState
           spacing: compact ? 16 : 40,
           runSpacing: 8,
           children: <Widget>[
-            _buildLegend(
+            if (widget.target.videoSource.isNotEmpty) _buildLegend(
               label: '视频原声',
               color: _originalColor,
               audio: _reference?.audio,

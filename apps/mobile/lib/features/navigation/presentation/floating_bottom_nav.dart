@@ -16,7 +16,7 @@ class FloatingBottomNav extends StatelessWidget {
       <AppNavDestination>[
         AppNavDestination.home,
         AppNavDestination.library,
-        AppNavDestination.growth,
+        AppNavDestination.discover,
         AppNavDestination.review,
       ];
 

@@ -1,3 +1,4 @@
+import '../features/discovery/presentation/discover_screen.dart';
 import '../features/daily_review/domain/daily_review.dart';
 // ignore_for_file: prefer_function_declarations_over_variables
 
@@ -30,6 +31,7 @@ enum SGRoute {
   library,
   growth,
   review,
+  discover,
   reviewSession,
   sm2Review,
   vocabularyPlacement,
@@ -117,6 +119,12 @@ GoRouter goRouter(Ref ref) => GoRouter(
           const GrowthScreen(),
     ).fade(),
     GoRoute(
+      path: SGRoute.discover.route,
+      name: SGRoute.discover.name,
+      builder: (BuildContext context, GoRouterState state) =>
+          const DiscoverScreen(),
+    ).fade(),
+    GoRoute(
       path: SGRoute.review.route,
       name: SGRoute.review.name,
       builder: (BuildContext context, GoRouterState state) =>
@@ -133,6 +141,7 @@ GoRouter goRouter(Ref ref) => GoRouter(
       builder: (BuildContext context, GoRouterState state) => DailyReviewScreen(
         session: true,
         practice: state.uri.queryParameters['practice'] == '1',
+        expressions: state.uri.queryParameters['kind'] == 'expressions',
         recommended: state.uri.queryParameters['deck'] == 'recommended',
         practiceKind: ReviewKind.values
             .where(

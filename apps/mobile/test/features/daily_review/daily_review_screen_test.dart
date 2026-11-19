@@ -176,11 +176,11 @@ void main() {
     await tester.pumpWidget(const SizedBox.shrink());
   });
 
-  test('navigation places review between growth and phrases', () {
+  test('navigation places review between discovery and phrases', () {
     const List<AppNavDestination> nav = AppNavDestination.values;
     expect(
       nav.indexOf(AppNavDestination.review),
-      nav.indexOf(AppNavDestination.growth) + 1,
+      nav.indexOf(AppNavDestination.discover) + 1,
     );
     expect(
       nav.indexOf(AppNavDestination.phrases),

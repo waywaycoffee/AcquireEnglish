@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../discovery/presentation/english_level_screen.dart';
 import '../../player/presentation/widgets/study_shell_tokens.dart';
 import '../../sync/data/acquire_api_client.dart';
 import '../../sync/presentation/daily_feed_provider.dart';
@@ -15,7 +16,6 @@ class LearningPreferencesScreen extends ConsumerStatefulWidget {
 
 class _LearningPreferencesScreenState
     extends ConsumerState<LearningPreferencesScreen> {
-  static const List<String> _levels = <String>['A1', 'A2', 'B1', 'B2', 'C1'];
   static const List<({String id, String label})> _allTags =
       <({String id, String label})>[
         (id: 'slow', label: '慢速英语'),
@@ -56,7 +56,7 @@ class _LearningPreferencesScreenState
           const SizedBox(height: 8),
           Wrap(
             spacing: 8,
-            children: _levels.map((String level) {
+            children: englishLevels.map((String level) {
               final bool selected = _draft.level == level;
               return ChoiceChip(
                 label: Text(level),
@@ -77,7 +77,7 @@ class _LearningPreferencesScreenState
           ),
           const SizedBox(height: 6),
           const Text(
-            '只影响首页「每日推荐」，不会自动加入你的学习课程。',
+            '用于「发现」每日推荐，点开视频后才会导入和下载。',
             style: TextStyle(
               color: StudyShellTokens.textSecondary,
               fontSize: 13,
@@ -114,8 +114,8 @@ class _LearningPreferencesScreenState
           Slider(
             value: _draft.dailyQuota.toDouble(),
             min: 1,
-            max: 5,
-            divisions: 4,
+            max: 10,
+            divisions: 9,
             label: '${_draft.dailyQuota}',
             onChanged: (double value) {
               setState(
@@ -131,9 +131,7 @@ class _LearningPreferencesScreenState
             ),
             value: _draft.notifyDailyFeed,
             onChanged: (bool value) {
-              setState(
-                () => _draft = _draft.copyWith(notifyDailyFeed: value),
-              );
+              setState(() => _draft = _draft.copyWith(notifyDailyFeed: value));
             },
           ),
           const SizedBox(height: 16),

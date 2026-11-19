@@ -24,11 +24,13 @@ class DailyReviewScreen extends ConsumerStatefulWidget {
     this.session = false,
     this.practice = false,
     this.practiceKind,
+    this.expressions = false,
     this.recommended = false,
   });
   final bool session;
   final bool recommended;
   final bool practice;
+  final bool expressions;
   final ReviewKind? practiceKind;
   @override
   ConsumerState<DailyReviewScreen> createState() => _DailyReviewScreenState();
@@ -199,9 +201,13 @@ class _DailyReviewScreenState extends ConsumerState<DailyReviewScreen>
   ) {
     if (_deckKeys != null) return;
     final ReviewKind? kind = widget.practiceKind;
-    if (widget.practice && kind != null) {
+    if (widget.practice && (kind != null || widget.expressions)) {
       _deckKeys = sources
-          .where((ReviewSource source) => source.kind == kind)
+          .where(
+            (ReviewSource source) => widget.expressions
+                ? source.kind != ReviewKind.sentence
+                : source.kind == kind,
+          )
           .map((ReviewSource source) => source.key)
           .where(state.records.containsKey)
           .toList();
@@ -779,19 +785,29 @@ class _DailyReviewScreenState extends ConsumerState<DailyReviewScreen>
             ],
           ),
           if (!empty) ...<Widget>[
-            const SizedBox(height: 20),
+            const SizedBox(height: 12),
             Wrap(
               spacing: 8,
               children: <Widget>[
-                for (final ReviewKind kind in ReviewKind.values)
-                  ActionChip(
-                    label: Text('${kind.label} ${counts[kind]}'),
-                    onPressed: counts[kind] == 0
-                        ? null
-                        : () => context.push(
-                            '${SGRoute.reviewSession.route}?practice=1&kind=${kind.name}',
-                          ),
+                ActionChip(
+                  label: Text(
+                    '背单词 / 短语 ${counts[ReviewKind.word]! + counts[ReviewKind.phrase]!}',
                   ),
+                  onPressed:
+                      counts[ReviewKind.word]! + counts[ReviewKind.phrase]! == 0
+                      ? null
+                      : () => context.push(
+                          '${SGRoute.reviewSession.route}?practice=1&kind=expressions',
+                        ),
+                ),
+                ActionChip(
+                  label: Text('背句子 ${counts[ReviewKind.sentence]}'),
+                  onPressed: counts[ReviewKind.sentence] == 0
+                      ? null
+                      : () => context.push(
+                          '${SGRoute.reviewSession.route}?practice=1&kind=sentence',
+                        ),
+                ),
               ],
             ),
           ],

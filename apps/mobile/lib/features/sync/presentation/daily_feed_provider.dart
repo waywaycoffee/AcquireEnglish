@@ -3,11 +3,15 @@ import 'dart:convert';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hive_ce/hive.dart';
 
+import '../../authentication/presentation/auth_session.dart';
 import '../data/acquire_api_client.dart';
 
 const String _prefsKey = 'learning_preferences_v1';
 const String _feedKey = 'daily_feed_bili_v1';
 const String _feedSyncedAtKey = 'daily_feed_synced_at_v1';
+
+String _localDay(DateTime time) =>
+    time.toLocal().toIso8601String().split('T').first;
 
 final NotifierProvider<LearningPreferencesNotifier, AcquirePreferencesDto>
 learningPreferencesProvider =
@@ -43,7 +47,9 @@ class LearningPreferencesNotifier extends Notifier<AcquirePreferencesDto> {
   Future<void> save(AcquirePreferencesDto prefs) async {
     state = prefs;
     if (Hive.isBoxOpen('prefs')) {
-      await Hive.box<String>('prefs').put(_prefsKey, jsonEncode(prefs.toJson()));
+      await Hive.box<String>(
+        'prefs',
+      ).put(_prefsKey, jsonEncode(prefs.toJson()));
     }
     try {
       final AcquireApiClient api = ref.read(acquireApiClientProvider);
@@ -77,18 +83,26 @@ class LearningPreferencesNotifier extends Notifier<AcquirePreferencesDto> {
   Future<void> applyLocal(AcquirePreferencesDto prefs) async {
     state = prefs;
     if (Hive.isBoxOpen('prefs')) {
-      await Hive.box<String>('prefs').put(_prefsKey, jsonEncode(prefs.toJson()));
+      await Hive.box<String>(
+        'prefs',
+      ).put(_prefsKey, jsonEncode(prefs.toJson()));
     }
   }
 }
 
 class DailyFeedNotifier extends Notifier<List<AcquireDailyFeedItemDto>> {
+  String get _account =>
+      ref.read(authSessionProvider).email.trim().toLowerCase();
+
   @override
   List<AcquireDailyFeedItemDto> build() {
+    ref.watch(
+      authSessionProvider.select((AuthSessionState auth) => auth.email),
+    );
     if (!Hive.isBoxOpen('prefs')) {
       return const <AcquireDailyFeedItemDto>[];
     }
-    final String? raw = Hive.box<String>('prefs').get(_feedKey);
+    final String? raw = Hive.box<String>('prefs').get('$_feedKey:$_account');
     if (raw == null || raw.isEmpty) {
       return const <AcquireDailyFeedItemDto>[];
     }
@@ -112,23 +126,23 @@ class DailyFeedNotifier extends Notifier<List<AcquireDailyFeedItemDto>> {
       return;
     }
     try {
+      final String account = _account;
+      final String day = _localDay(DateTime.now());
       final AcquireApiClient api = ref.read(acquireApiClientProvider);
-      final List<AcquireDailyFeedItemDto> feed = await api.dailyFeed();
+      final List<AcquireDailyFeedItemDto> feed = await api.dailyFeed(date: day);
+      if (_account != account) return;
       state = feed;
       if (Hive.isBoxOpen('prefs')) {
         final Box<String> box = Hive.box<String>('prefs');
         await box.put(
-          _feedKey,
+          '$_feedKey:$account',
           jsonEncode(
             feed
                 .map((AcquireDailyFeedItemDto item) => item.toJson())
                 .toList(growable: false),
           ),
         );
-        await box.put(
-          _feedSyncedAtKey,
-          DateTime.now().toUtc().toIso8601String(),
-        );
+        await box.put('$_feedSyncedAtKey:$account', day);
         // Drop legacy course-pack feed cache so it cannot reappear as「学习课程」.
         await box.delete('daily_feed_v1');
       }
@@ -141,14 +155,9 @@ class DailyFeedNotifier extends Notifier<List<AcquireDailyFeedItemDto>> {
     if (!Hive.isBoxOpen('prefs')) {
       return true;
     }
-    final String? raw = Hive.box<String>('prefs').get(_feedSyncedAtKey);
-    if (raw == null) {
-      return true;
-    }
-    final DateTime? at = DateTime.tryParse(raw);
-    if (at == null) {
-      return true;
-    }
-    return DateTime.now().toUtc().difference(at) > const Duration(hours: 20);
+    final String? day = Hive.box<String>(
+      'prefs',
+    ).get('$_feedSyncedAtKey:$_account');
+    return day != _localDay(DateTime.now());
   }
 }

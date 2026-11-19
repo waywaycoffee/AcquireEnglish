@@ -49,7 +49,7 @@ async def daily_feed(
     pref = pref_result.scalar_one_or_none()
     level = (pref.level if pref else None) or "A2"
     tags = _parse_tags(pref.tags_json if pref else '["slow","daily"]')
-    quota = (pref.daily_quota if pref else None) or 2
+    quota = (pref.daily_quota if pref else None) or 10
     quota = max(1, min(int(quota), 10))
     cookie = (pref.bilibili_cookie if pref else None) or None
 

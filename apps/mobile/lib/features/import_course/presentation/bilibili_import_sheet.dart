@@ -22,6 +22,7 @@ Future<void> showBilibiliImportSheet(
   BuildContext context,
   WidgetRef ref, {
   String? initialUrl,
+  bool startImmediately = false,
 }) {
   return showModalBottomSheet<void>(
     context: context,
@@ -35,16 +36,17 @@ Future<void> showBilibiliImportSheet(
           top: 16,
           bottom: MediaQuery.viewInsetsOf(context).bottom + 16,
         ),
-        child: _BilibiliImportForm(initialUrl: initialUrl),
+        child: _BilibiliImportForm(initialUrl: initialUrl, startImmediately: startImmediately),
       );
     },
   );
 }
 
 class _BilibiliImportForm extends ConsumerStatefulWidget {
-  const _BilibiliImportForm({this.initialUrl});
+  const _BilibiliImportForm({this.initialUrl, required this.startImmediately});
 
   final String? initialUrl;
+  final bool startImmediately;
 
   @override
   ConsumerState<_BilibiliImportForm> createState() => _BilibiliImportFormState();
@@ -61,6 +63,11 @@ class _BilibiliImportFormState extends ConsumerState<_BilibiliImportForm> {
   void initState() {
     super.initState();
     _controller = TextEditingController(text: widget.initialUrl ?? '');
+    if (widget.startImmediately) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted && !_busy) unawaited(_submit());
+      });
+    }
   }
 
   @override

@@ -26,6 +26,14 @@ enum AppNavDestination {
     icon: LucideIcons.sprout,
     activeIcon: LucideIcons.trophy,
   ),
+  discover(
+    route: '/discover',
+    label: '发现',
+    title: '发现',
+    subtitle: '按兴趣和英语水平发现每日学习视频。',
+    icon: Icons.explore_outlined,
+    activeIcon: Icons.explore_rounded,
+  ),
   review(
     route: '/review',
     label: '复习',

@@ -15,7 +15,7 @@ def _default_prefs(user_id: int) -> UserPreference:
         user_id=user_id,
         level="A2",
         tags_json='["slow","daily"]',
-        daily_quota=2,
+        daily_quota=10,
         notify_daily_feed=1,
     )
 
@@ -32,7 +32,7 @@ def _to_out(row: UserPreference) -> PreferencesOut:
     return PreferencesOut(
         level=row.level or "A2",
         tags=[str(t) for t in tags],
-        daily_quota=row.daily_quota or 2,
+        daily_quota=row.daily_quota or 10,
         notify_daily_feed=bool(row.notify_daily_feed),
         has_bilibili_cookie=bool((row.bilibili_cookie or "").strip()),
         has_asr_api_key=bool((row.asr_api_key or "").strip()),
