@@ -5,6 +5,8 @@ import 'package:common_learn_english/features/daily_review/domain/daily_review.d
 import 'package:common_learn_english/features/daily_review/presentation/daily_review_provider.dart';
 import 'package:common_learn_english/features/daily_review/presentation/daily_review_screen.dart';
 import 'package:common_learn_english/features/navigation/presentation/navigation_destination.dart';
+import 'package:common_learn_english/features/words/domain/word_review_settings.dart';
+import 'package:common_learn_english/features/words/presentation/word_review_settings_provider.dart';
 import 'package:common_learn_english/features/settings/presentation/settings_provider.dart';
 import 'package:common_learn_english/features/shared/data/word_pronunciation_service.dart';
 import 'package:flutter/material.dart';
@@ -64,6 +66,61 @@ Widget app(ProviderContainer container, {bool session = false}) {
 }
 
 void main() {
+  testWidgets('a new word requires three correct choices and spellings', (
+    WidgetTester tester,
+  ) async {
+    tester.view.physicalSize = const Size(390, 900);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    final ProviderContainer container = makeContainer(<ReviewSource>[
+      sources.first,
+    ]);
+    addTearDown(container.dispose);
+    await container
+        .read(wordReviewSettingsProvider.notifier)
+        .update(
+          const WordReviewSettings(
+            recallStyle: WordRecallStyle.multipleChoice,
+            requireSpelling: true,
+          ),
+        );
+    await tester.pumpWidget(app(container, session: true));
+    await tester.pumpAndSettle();
+
+    Future<void> tapText(String text) async {
+      final Finder target = find.text(text);
+      await tester.ensureVisible(target);
+      await tester.pumpAndSettle();
+      await tester.tap(target);
+      await tester.pumpAndSettle();
+    }
+
+    await tapText('这是生词');
+    await tapText('稍后再练这词');
+    for (int pass = 0; pass < 3; pass++) {
+      expect(find.text('生词 · 今日已通过 $pass / 3 次'), findsOneWidget);
+      await tapText('你好');
+      await tapText('继续');
+      expect(find.text('拼写检查'), findsOneWidget);
+      if (pass == 0) {
+        await tester.enterText(find.byType(TextField), 'helo');
+        await tapText('检查拼写');
+        expect(find.text('拼写有误，请重试。'), findsOneWidget);
+      }
+      expect(
+        container.read(dailyReviewProvider).records['word:hello']!.reviews,
+        0,
+      );
+      await tester.enterText(find.byType(TextField), 'hello');
+      await tapText('检查拼写');
+    }
+    expect(
+      container.read(dailyReviewProvider).records['word:hello']!.reviews,
+      1,
+    );
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
+
   const String original = "AND I CAN'T AFFORD THESE PROJECTS.";
   const List<ReviewSource> uppercaseSources = <ReviewSource>[
     ReviewSource(

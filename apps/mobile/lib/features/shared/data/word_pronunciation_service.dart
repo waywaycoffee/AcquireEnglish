@@ -67,11 +67,13 @@ class WordPronunciationService {
   final WordPronunciationTtsClient _ttsClient;
 
   Player? _recordedPlayer;
+  Completer<bool>? _recordedCompletion;
 
   Future<void> speak(
     String text, {
     String language = 'en-US',
     String? recordedUrl,
+    bool allowSynthesisFallback = true,
   }) async {
     if (speakOverride != null) {
       await speakOverride!(text);
@@ -84,6 +86,10 @@ class WordPronunciationService {
     }
 
     if (recordedUrl != null && await _playRecording(recordedUrl)) return;
+
+    if (!allowSynthesisFallback) {
+      throw const WordPronunciationException('词库发音暂不可用。');
+    }
 
     await _ttsClient.speakText(
       normalizedText,
@@ -102,6 +108,7 @@ class WordPronunciationService {
       player = Player();
       _recordedPlayer = player;
       final Completer<bool> result = Completer<bool>();
+      _recordedCompletion = result;
       completed = player.stream.completed.listen((bool value) {
         if (value && !result.isCompleted) result.complete(true);
       });
@@ -117,6 +124,7 @@ class WordPronunciationService {
       await errors?.cancel();
       if (identical(_recordedPlayer, player)) {
         _recordedPlayer = null;
+        _recordedCompletion = null;
         await player?.dispose();
       }
     }
@@ -129,6 +137,9 @@ class WordPronunciationService {
     }
     final Player? player = _recordedPlayer;
     _recordedPlayer = null;
+    final Completer<bool>? playback = _recordedCompletion;
+    _recordedCompletion = null;
+    if (playback != null && !playback.isCompleted) playback.complete(true);
     await player?.dispose();
     await _ttsClient.stop();
   }

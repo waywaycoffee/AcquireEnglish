@@ -5,18 +5,27 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:fsrs/fsrs.dart' as fsrs;
 import 'package:go_router/go_router.dart';
+import 'package:hive_ce/hive.dart';
+
+import '../../authentication/presentation/auth_session.dart';
 
 import '../../../router/app_router.dart';
 import '../../navigation/presentation/navigation_destination.dart';
 import '../../settings/presentation/settings_provider.dart';
+import '../../shared/data/word_lookup_service.dart';
 import '../../shared/data/word_pronunciation_service.dart';
+import '../../shared/domain/word_lookup_entry.dart';
 import '../../shared/domain/subtitle_letter_case.dart';
 import '../../shared/presentation/pad/app_design_tokens.dart';
 import '../../shared/presentation/pad/pad_scaffold.dart';
 import '../../shared/presentation/pad/pad_top_bar.dart';
 import '../../words/presentation/vocabulary_placement_provider.dart';
+import '../../words/domain/word_review_settings.dart';
+import '../../words/presentation/word_review_settings_provider.dart';
+import '../../words/presentation/word_review_settings_sheet.dart';
 import '../domain/daily_review.dart';
 import 'daily_review_provider.dart';
+import 'review_spelling_screen.dart';
 
 class DailyReviewScreen extends ConsumerStatefulWidget {
   const DailyReviewScreen({
@@ -44,10 +53,16 @@ class _DailyReviewScreenState extends ConsumerState<DailyReviewScreen>
   List<String>? _deckKeys;
   final Set<String> _completedKeys = <String>{};
   final Set<String> _missedKeys = <String>{};
+  final Map<String, int> _freshPasses = <String, int>{};
+  String? _passStorageKey;
+  final Map<String, List<String>> _choices = <String, List<String>>{};
+  String? _playedWord;
+  bool _retryWord = false;
   bool _forward = true;
   bool _revealed = false;
   bool _saving = false;
   bool _speaking = false;
+  int _speechSequence = 0;
   WordPronunciationService? _speech;
 
   @override
@@ -69,7 +84,7 @@ class _DailyReviewScreenState extends ConsumerState<DailyReviewScreen>
     _timer?.cancel();
     _sessionScroll.dispose();
     WidgetsBinding.instance.removeObserver(this);
-    if (_speaking) unawaited(_speech?.stop());
+    _stopSpeech();
     super.dispose();
   }
 
@@ -84,6 +99,7 @@ class _DailyReviewScreenState extends ConsumerState<DailyReviewScreen>
         )
         .toList();
     final DateTime now = ref.read(reviewClockProvider)();
+    if (widget.session) _restoreWordPasses(now);
     final ReviewPlan plan = state.plan(sources, now);
     return PadScaffold(
       currentDestination: AppNavDestination.review,
@@ -101,6 +117,19 @@ class _DailyReviewScreenState extends ConsumerState<DailyReviewScreen>
         leading: widget.session
             ? PadBackButton(onPressed: _leaveSession, tooltip: '返回每日概览')
             : null,
+        actions: <Widget>[
+          if (widget.session &&
+              sources.any(
+                (ReviewSource source) => source.kind == ReviewKind.word,
+              ))
+            IconButton(
+              tooltip: '背词方式与拼写',
+              onPressed: _saving
+                  ? null
+                  : () => showWordReviewSettingsSheet(context),
+              icon: const Icon(Icons.tune_rounded),
+            ),
+        ],
         trailing: widget.session
             ? TextButton(
                 onPressed: _saving ? null : _leaveSession,
@@ -249,11 +278,13 @@ class _DailyReviewScreenState extends ConsumerState<DailyReviewScreen>
     final int index = keys.indexOf(_currentKey ?? '');
     final int next = index + offset;
     if (next < 0 || next >= keys.length) return;
-    if (_speaking) unawaited(_speech?.stop());
+    _stopSpeech();
     if (_sessionScroll.hasClients) _sessionScroll.jumpTo(0);
     setState(() {
       _forward = offset > 0;
       _currentKey = keys[next];
+      _playedWord = null;
+      _retryWord = false;
       _revealed = _completedKeys.contains(_currentKey);
     });
   }
@@ -289,6 +320,16 @@ class _DailyReviewScreenState extends ConsumerState<DailyReviewScreen>
     final Duration duration = MediaQuery.disableAnimationsOf(context)
         ? Duration.zero
         : const Duration(milliseconds: 220);
+
+    final ReviewSource? visible = finished ? null : byKey[_currentKey];
+    if (visible?.kind == ReviewKind.word && _playedWord != visible?.key) {
+      _playedWord = visible!.key;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted && _currentKey == visible.key) {
+          unawaited(_playWord(visible, silent: true));
+        }
+      });
+    }
 
     return Column(
       children: <Widget>[
@@ -828,6 +869,14 @@ class _DailyReviewScreenState extends ConsumerState<DailyReviewScreen>
   }
 
   Widget _buildStudy(ReviewSource source, ReviewRecord record) {
+    final WordReviewSettings options = ref.watch(wordReviewSettingsProvider);
+    final bool word = source.kind == ReviewKind.word;
+    final List<String> choices =
+        word && options.recallStyle == WordRecallStyle.multipleChoice
+        ? _choices.putIfAbsent(source.key, () => _meaningChoices(source))
+        : const <String>[];
+    final bool choiceMode = choices.length == 4;
+    final int? passes = _freshPasses[source.key];
     final bool completed = _completedKeys.contains(source.key);
     final DateTime now = ref.read(reviewClockProvider)();
     final String letterCase = ref.watch(
@@ -866,6 +915,7 @@ class _DailyReviewScreenState extends ConsumerState<DailyReviewScreen>
                   ),
               ],
             ),
+            if (passes != null) Text('生词 · 今日已通过 $passes / 3 次'),
             const SizedBox(height: 20),
             Text(
               source.answer != source.english ? '先回忆中文含义' : '先试着用英语说出来',
@@ -896,6 +946,12 @@ class _DailyReviewScreenState extends ConsumerState<DailyReviewScreen>
                     ),
                   ),
                 ),
+                if (word)
+                  IconButton(
+                    tooltip: '播放单词发音',
+                    onPressed: _speaking ? null : () => _playWord(source),
+                    icon: const Icon(Icons.volume_up_rounded),
+                  ),
                 IconButton(
                   tooltip: _speaking ? '正在朗读' : '听原句',
                   onPressed: _speaking || source.english.isEmpty
@@ -921,15 +977,33 @@ class _DailyReviewScreenState extends ConsumerState<DailyReviewScreen>
               ],
             ),
             const SizedBox(height: 22),
-            if (!_revealed && !completed)
-              FilledButton.icon(
-                key: const Key('daily-review-reveal'),
-                onPressed: () => setState(() => _revealed = true),
-                style: _primaryButtonStyle,
-                icon: const Icon(Icons.visibility_outlined),
-                label: const Text('显示答案'),
-              )
-            else ...<Widget>[
+            if (!_revealed && !completed) ...<Widget>[
+              if (choiceMode)
+                for (final String choice in choices)
+                  OutlinedButton(
+                    onPressed: () {
+                      if (choice == source.answer.trim()) {
+                        setState(() => _revealed = true);
+                      } else {
+                        _markUnknown(source);
+                      }
+                    },
+                    child: Text(choice),
+                  )
+              else
+                FilledButton.icon(
+                  key: const Key('daily-review-reveal'),
+                  onPressed: () => setState(() => _revealed = true),
+                  style: _primaryButtonStyle,
+                  icon: const Icon(Icons.visibility_outlined),
+                  label: const Text('显示答案'),
+                ),
+              if (word && (record.isNew || choiceMode))
+                TextButton(
+                  onPressed: () => _markUnknown(source),
+                  child: const Text('这是生词'),
+                ),
+            ] else ...<Widget>[
               const Divider(height: 24),
               Text(
                 source.answer.trim().isEmpty
@@ -961,19 +1035,38 @@ class _DailyReviewScreenState extends ConsumerState<DailyReviewScreen>
                     ),
                   ),
               ],
-              if (!completed && widget.practice) ...<Widget>[
+              if (!completed && _retryWord)
+                FilledButton(
+                  onPressed: () => _nextCard(source.key, complete: false),
+                  child: const Text('稍后再练这词'),
+                )
+              else if (!completed && choiceMode)
+                FilledButton(
+                  onPressed: _saving
+                      ? null
+                      : () => _grade(source, record, fsrs.Rating.good),
+                  child: const Text('继续'),
+                ),
+              if (!completed &&
+                  !_retryWord &&
+                  !choiceMode &&
+                  widget.practice) ...<Widget>[
                 const SizedBox(height: 24),
                 FilledButton.icon(
                   key: const Key('daily-review-practice-done'),
-                  onPressed: () => _advanceCard(source.key),
+                  onPressed: () => _grade(source, record, fsrs.Rating.good),
                   style: _primaryButtonStyle,
                   icon: const Icon(Icons.check_rounded),
                   label: const Text('记得，下一张'),
                 ),
                 OutlinedButton(
                   onPressed: () {
-                    _missedKeys.add(source.key);
-                    _advanceCard(source.key);
+                    if (word && (record.isNew || options.requireSpelling)) {
+                      _markUnknown(source);
+                    } else {
+                      _missedKeys.add(source.key);
+                      _advanceCard(source.key);
+                    }
                   },
                   child: const Text('没记住，稍后重练'),
                 ),
@@ -988,7 +1081,10 @@ class _DailyReviewScreenState extends ConsumerState<DailyReviewScreen>
                   ),
                 ),
               ],
-              if (!completed && !widget.practice) ...<Widget>[
+              if (!completed &&
+                  !_retryWord &&
+                  !choiceMode &&
+                  !widget.practice) ...<Widget>[
                 const SizedBox(height: 26),
                 const Text(
                   '刚才回忆得怎么样？忘记了就选“忘记”，不要选“费力想起”。',
@@ -1146,11 +1242,16 @@ class _DailyReviewScreenState extends ConsumerState<DailyReviewScreen>
     ),
   );
 
-  void _advanceCard(String key) {
-    if (_speaking) unawaited(_speech?.stop());
+  void _advanceCard(String key) => _nextCard(key, complete: true);
+
+  void _nextCard(String key, {required bool complete}) {
+    _stopSpeech();
     if (_sessionScroll.hasClients) _sessionScroll.jumpTo(0);
     setState(() {
-      _completedKeys.add(key);
+      if (complete) _completedKeys.add(key);
+      _retryWord = false;
+      _playedWord = null;
+      _choices.remove(key);
       final List<String> keys = _deckKeys ?? <String>[];
       final int index = keys.indexOf(key);
       final List<String> remaining = <String>[
@@ -1168,15 +1269,54 @@ class _DailyReviewScreenState extends ConsumerState<DailyReviewScreen>
     ReviewRecord record,
     fsrs.Rating rating,
   ) async {
-    if (widget.practice || _saving || _completedKeys.contains(source.key)) {
+    if (_saving || _completedKeys.contains(source.key)) {
       return;
     }
     setState(() => _saving = true);
     try {
+      final bool spellingRequired =
+          source.kind == ReviewKind.word &&
+          ref.read(wordReviewSettingsProvider).requireSpelling;
+      if (spellingRequired && rating == fsrs.Rating.again) {
+        _setWordPasses(source.key, 0);
+        _nextCard(source.key, complete: false);
+        return;
+      }
+      final bool passing =
+          rating == fsrs.Rating.good || rating == fsrs.Rating.easy;
+      final int? passes = _freshPasses[source.key];
+      if (passes != null && !passing) {
+        _setWordPasses(source.key, 0);
+        _nextCard(source.key, complete: false);
+        return;
+      }
+      if (spellingRequired) {
+        _stopSpeech();
+        final bool? spelled = await Navigator.of(context).push<bool>(
+          MaterialPageRoute<bool>(
+            builder: (_) => ReviewSpellingScreen(
+              word: source.question,
+              meaning: source.answer,
+            ),
+          ),
+        );
+        if (!mounted || spelled != true) return;
+      }
+      if (passes != null && passes < 2) {
+        _setWordPasses(source.key, passes + 1);
+        _nextCard(source.key, complete: false);
+        return;
+      }
+      if (widget.practice) {
+        if (passes != null) _setWordPasses(source.key, null);
+        _advanceCard(source.key);
+        return;
+      }
       await ref
           .read(dailyReviewProvider.notifier)
           .grade(source.key, rating, expectedReviews: record.reviews);
       if (!mounted) return;
+      if (passes != null) _setWordPasses(source.key, null);
       _advanceCard(source.key);
     } catch (_) {
       if (mounted) _message('这次进度未能保存，请重试；当前内容仍保留。');
@@ -1185,8 +1325,135 @@ class _DailyReviewScreenState extends ConsumerState<DailyReviewScreen>
     }
   }
 
+  void _restoreWordPasses(DateTime now) {
+    final String account = ref
+        .read(authSessionProvider)
+        .email
+        .trim()
+        .toLowerCase();
+    final String key = 'wordFirstDayPasses:${reviewDayKey(now)}:$account';
+    if (key == _passStorageKey) return;
+    _passStorageKey = key;
+    _freshPasses.clear();
+    if (!Hive.isBoxOpen('prefs')) return;
+    final String? stored = Hive.box<String>('prefs').get(key);
+    if (stored == null) return;
+    for (final String row in stored.split('\n')) {
+      final int tab = row.lastIndexOf('\t');
+      if (tab < 0) continue;
+      final int? count = int.tryParse(row.substring(tab + 1));
+      if (count != null && count >= 0 && count <= 2) {
+        _freshPasses[row.substring(0, tab)] = count;
+      }
+    }
+  }
+
+  void _setWordPasses(String source, int? count) {
+    if (count == null) {
+      _freshPasses.remove(source);
+    } else {
+      _freshPasses[source] = count;
+    }
+    final String? key = _passStorageKey;
+    if (key != null && Hive.isBoxOpen('prefs')) {
+      final String stored = _freshPasses.entries
+          .map((MapEntry<String, int> entry) => '${entry.key}\t${entry.value}')
+          .join('\n');
+      unawaited(
+        Hive.box<String>('prefs').put(key, stored).catchError((Object _) {}),
+      );
+    }
+  }
+
+  void _markUnknown(ReviewSource source) {
+    setState(() {
+      _setWordPasses(source.key, 0);
+      _retryWord = true;
+      _revealed = true;
+    });
+  }
+
+  List<String> _meaningChoices(ReviewSource source) {
+    final String answer = source.answer.trim();
+    if (answer.isEmpty) return const <String>[];
+    final Set<String> distractors = ref
+        .read(reviewSourcesProvider)
+        .where(
+          (ReviewSource candidate) =>
+              candidate.kind == ReviewKind.word &&
+              candidate.question != source.question,
+        )
+        .map((ReviewSource candidate) => candidate.answer.trim())
+        .where(
+          (String value) =>
+              value.isNotEmpty &&
+              value != answer &&
+              !answer.contains(value) &&
+              !value.contains(answer),
+        )
+        .toSet();
+    final List<String> candidates = distractors.toList()..shuffle();
+    if (candidates.length < 3) {
+      for (final String meaning in const <String>[
+        '安排会议',
+        '解释原因',
+        '选择路线',
+        '收集证据',
+        '减少开支',
+        '维持秩序',
+      ]) {
+        if (meaning != answer && !candidates.contains(meaning))
+          candidates.add(meaning);
+      }
+    }
+    return <String>[answer, ...candidates.take(3)]..shuffle();
+  }
+
+  void _stopSpeech() {
+    _speechSequence++;
+    if (!_speaking) return;
+    _speaking = false;
+    unawaited(_speech?.stop());
+  }
+
+  Future<void> _playWord(ReviewSource source, {bool silent = false}) async {
+    final int sequence = _speechSequence;
+    final LearningSettingsState settings = ref.read(learningSettingsProvider);
+    final WordLookupEntry? entry = await ref
+        .read(wordLookupServiceProvider)
+        .publicLookup
+        ?.call(source.question, settings);
+    if (!mounted ||
+        sequence != _speechSequence ||
+        _currentKey != source.key ||
+        _speaking)
+      return;
+    final String? url = entry?.audioUrl;
+    if (url == null) {
+      if (!silent) _message('词库发音暂不可用。');
+      return;
+    }
+    setState(() => _speaking = true);
+    try {
+      _speech = ref.read(wordPronunciationServiceProvider);
+      await _speech!.speak(
+        source.question,
+        recordedUrl: url,
+        allowSynthesisFallback: false,
+      );
+    } catch (_) {
+      if (mounted && sequence == _speechSequence && !silent) {
+        _message('词库发音暂不可用。');
+      }
+    } finally {
+      if (mounted && sequence == _speechSequence)
+        setState(() => _speaking = false);
+    }
+  }
+
   Future<void> _speak(String text) async {
     if (_speaking) return;
+    final int sequence = _speechSequence;
     setState(() => _speaking = true);
     try {
       _speech = ref.read(wordPronunciationServiceProvider);
@@ -1194,7 +1461,8 @@ class _DailyReviewScreenState extends ConsumerState<DailyReviewScreen>
     } catch (_) {
       if (mounted) _message('朗读失败，请检查设备的语音设置。');
     } finally {
-      if (mounted) setState(() => _speaking = false);
+      if (mounted && sequence == _speechSequence)
+        setState(() => _speaking = false);
     }
   }
 

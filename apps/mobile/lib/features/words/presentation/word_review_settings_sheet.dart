@@ -34,8 +34,9 @@ class _WordReviewSettingsSheetState
     super.initState();
     final WordReviewSettings settings = ref.read(wordReviewSettingsProvider);
     _newController = TextEditingController(text: '${settings.dailyNewLimit}');
-    _reviewController =
-        TextEditingController(text: '${settings.dailyReviewLimit}');
+    _reviewController = TextEditingController(
+      text: '${settings.dailyReviewLimit}',
+    );
   }
 
   @override
@@ -49,16 +50,17 @@ class _WordReviewSettingsSheetState
     final int? newLimit = int.tryParse(_newController.text.trim());
     final int? reviewLimit = int.tryParse(_reviewController.text.trim());
     if (newLimit == null || reviewLimit == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('请输入有效的数字')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('请输入有效的数字')));
       return;
     }
-    await ref.read(wordReviewSettingsProvider.notifier).update(
-          ref.read(wordReviewSettingsProvider).copyWith(
-            dailyNewLimit: newLimit,
-            dailyReviewLimit: reviewLimit,
-          ),
+    await ref
+        .read(wordReviewSettingsProvider.notifier)
+        .update(
+          ref
+              .read(wordReviewSettingsProvider)
+              .copyWith(dailyNewLimit: newLimit, dailyReviewLimit: reviewLimit),
         );
     if (mounted) {
       Navigator.of(context).pop();
@@ -98,10 +100,11 @@ class _WordReviewSettingsSheetState
             ),
             const SizedBox(height: 6),
             const Text(
-              '按艾宾浩斯遗忘曲线安排复习间隔；每日新学 / 复习数量与练习方式可自定义。',
+              '选择背词方式，并决定是否加入拼写检查。',
               style: TextStyle(color: Color(0xFF94A3B8), height: 1.4),
             ),
             const SizedBox(height: 18),
+            _WordRecallOptions(settings: settings),
             const Text(
               '每日配额',
               style: TextStyle(
@@ -127,39 +130,6 @@ class _WordReviewSettingsSheetState
                 ),
               ],
             ),
-            const SizedBox(height: 20),
-            const Text(
-              '练习方式',
-              style: TextStyle(
-                color: Colors.white,
-                fontWeight: FontWeight.w800,
-              ),
-            ),
-            const SizedBox(height: 8),
-            ...WordPracticeMode.values.map((WordPracticeMode mode) {
-              final bool on = settings.isEnabled(mode);
-              return SwitchListTile(
-                contentPadding: EdgeInsets.zero,
-                value: on,
-                activeThumbColor: const Color(0xFF22C55E),
-                title: Text(
-                  mode.label,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-                subtitle: Text(
-                  mode.hint,
-                  style: const TextStyle(color: Color(0xFF94A3B8)),
-                ),
-                onChanged: (bool value) {
-                  ref
-                      .read(wordReviewSettingsProvider.notifier)
-                      .setModeEnabled(mode, enabled: value);
-                },
-              );
-            }),
             const SizedBox(height: 12),
             FilledButton(
               onPressed: _saveLimits,
@@ -175,6 +145,46 @@ class _WordReviewSettingsSheetState
           ],
         ),
       ),
+    );
+  }
+}
+
+class _WordRecallOptions extends ConsumerWidget {
+  const _WordRecallOptions({required this.settings});
+
+  final WordReviewSettings settings;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final WordReviewSettingsNotifier notifier = ref.read(
+      wordReviewSettingsProvider.notifier,
+    );
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: <Widget>[
+        SegmentedButton<WordRecallStyle>(
+          segments: const <ButtonSegment<WordRecallStyle>>[
+            ButtonSegment(
+              value: WordRecallStyle.flashcard,
+              label: Text('Anki 翻卡'),
+            ),
+            ButtonSegment(
+              value: WordRecallStyle.multipleChoice,
+              label: Text('释义四选一'),
+            ),
+          ],
+          selected: <WordRecallStyle>{settings.recallStyle},
+          onSelectionChanged: (Set<WordRecallStyle> selected) =>
+              notifier.update(settings.copyWith(recallStyle: selected.first)),
+        ),
+        SwitchListTile(
+          contentPadding: EdgeInsets.zero,
+          title: const Text('拼写正确才算通过', style: TextStyle(color: Colors.white)),
+          value: settings.requireSpelling,
+          onChanged: (bool value) =>
+              notifier.update(settings.copyWith(requireSpelling: value)),
+        ),
+      ],
     );
   }
 }

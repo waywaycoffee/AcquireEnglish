@@ -37,8 +37,12 @@ extension WordPracticeModeX on WordPracticeMode {
   }
 }
 
+enum WordRecallStyle { flashcard, multipleChoice }
+
 class WordReviewSettings {
   const WordReviewSettings({
+    this.recallStyle = WordRecallStyle.flashcard,
+    this.requireSpelling = false,
     this.dailyNewLimit = 20,
     this.dailyReviewLimit = 50,
     this.enabledModes = const <WordPracticeMode>[
@@ -48,6 +52,8 @@ class WordReviewSettings {
     ],
   });
 
+  final WordRecallStyle recallStyle;
+  final bool requireSpelling;
   final int dailyNewLimit;
   final int dailyReviewLimit;
   final List<WordPracticeMode> enabledModes;
@@ -62,15 +68,21 @@ class WordReviewSettings {
   bool isEnabled(WordPracticeMode mode) => enabledModes.contains(mode);
 
   WordReviewSettings copyWith({
+    WordRecallStyle? recallStyle,
+    bool? requireSpelling,
     int? dailyNewLimit,
     int? dailyReviewLimit,
     List<WordPracticeMode>? enabledModes,
   }) {
-    final List<WordPracticeMode> modes =
-        enabledModes ?? this.enabledModes;
+    final List<WordPracticeMode> modes = enabledModes ?? this.enabledModes;
     return WordReviewSettings(
+      recallStyle: recallStyle ?? this.recallStyle,
+      requireSpelling: requireSpelling ?? this.requireSpelling,
       dailyNewLimit: (dailyNewLimit ?? this.dailyNewLimit).clamp(0, 200),
-      dailyReviewLimit: (dailyReviewLimit ?? this.dailyReviewLimit).clamp(0, 500),
+      dailyReviewLimit: (dailyReviewLimit ?? this.dailyReviewLimit).clamp(
+        0,
+        500,
+      ),
       enabledModes: modes.isEmpty
           ? const <WordPracticeMode>[WordPracticeMode.recognize]
           : List<WordPracticeMode>.unmodifiable(modes),
@@ -78,6 +90,8 @@ class WordReviewSettings {
   }
 
   Map<String, Object?> toJson() => <String, Object?>{
+    'recallStyle': recallStyle.name,
+    'requireSpelling': requireSpelling,
     'dailyNewLimit': dailyNewLimit,
     'dailyReviewLimit': dailyReviewLimit,
     'enabledModes': enabledModes.map((WordPracticeMode m) => m.name).toList(),
@@ -95,6 +109,10 @@ class WordReviewSettings {
       }
     }
     return WordReviewSettings(
+      recallStyle: json['recallStyle'] == WordRecallStyle.multipleChoice.name
+          ? WordRecallStyle.multipleChoice
+          : WordRecallStyle.flashcard,
+      requireSpelling: json['requireSpelling'] == true,
       dailyNewLimit: (json['dailyNewLimit'] as num?)?.toInt() ?? 20,
       dailyReviewLimit: (json['dailyReviewLimit'] as num?)?.toInt() ?? 50,
       enabledModes: modes.isEmpty
