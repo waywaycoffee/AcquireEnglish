@@ -4,7 +4,20 @@ import { api, type Course, type Preferences } from "../api";
 import { useAuth } from "../auth";
 
 const LEVELS = ["A1", "A2", "B1", "B2", "C1"];
-const TAGS = ["slow", "daily", "news", "ted", "travel", "business"];
+const TAGS: { id: string; label: string }[] = [
+  { id: "slow", label: "慢速英语" },
+  { id: "daily", label: "日常对话" },
+  { id: "news", label: "英语新闻" },
+  { id: "ted", label: "TED 演讲" },
+  { id: "travel", label: "旅游" },
+  { id: "business", label: "商务英语" },
+  { id: "games", label: "游戏" },
+  { id: "food", label: "美食" },
+  { id: "digital", label: "数码" },
+  { id: "vlog", label: "Vlog" },
+  { id: "tech", label: "科技" },
+  { id: "science", label: "科普" },
+];
 
 export default function HomePage() {
   const { user, token, logout } = useAuth();
@@ -133,20 +146,22 @@ export default function HomePage() {
         </div>
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 12 }}>
           {TAGS.map((tag) => {
-            const on = prefs.tags.includes(tag);
+            const on = prefs.tags.includes(tag.id);
             return (
               <button
-                key={tag}
+                key={tag.id}
                 type="button"
                 className={`chip ${on ? "on" : ""}`}
                 onClick={() =>
                   setPrefs((p) => ({
                     ...p,
-                    tags: on ? p.tags.filter((t) => t !== tag) : [...p.tags, tag],
+                    tags: on
+                      ? p.tags.filter((t) => t !== tag.id)
+                      : [...p.tags, tag.id],
                   }))
                 }
               >
-                {tag}
+                {tag.label}
               </button>
             );
           })}

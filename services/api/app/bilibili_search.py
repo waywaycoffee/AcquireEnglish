@@ -18,8 +18,14 @@ TAG_KEYWORDS: dict[str, str] = {
     "daily": "日常英语对话",
     "news": "英语新闻 VOA",
     "ted": "TED 英语演讲",
-    "travel": "旅行英语",
+    "travel": "英语 旅游",
     "business": "商务英语",
+    "games": "英语 游戏",
+    "food": "英语 美食",
+    "digital": "英语 数码",
+    "vlog": "english vlog",
+    "tech": "英语 科技",
+    "science": "科普 英语",
 }
 
 LEVEL_HINTS: dict[str, str] = {

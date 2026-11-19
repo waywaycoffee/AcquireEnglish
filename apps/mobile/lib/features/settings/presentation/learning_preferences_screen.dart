@@ -22,8 +22,14 @@ class _LearningPreferencesScreenState
         (id: 'daily', label: '日常对话'),
         (id: 'news', label: '英语新闻'),
         (id: 'ted', label: 'TED 演讲'),
-        (id: 'travel', label: '旅行英语'),
+        (id: 'travel', label: '旅游'),
         (id: 'business', label: '商务英语'),
+        (id: 'games', label: '游戏'),
+        (id: 'food', label: '美食'),
+        (id: 'digital', label: '数码'),
+        (id: 'vlog', label: 'Vlog'),
+        (id: 'tech', label: '科技'),
+        (id: 'science', label: '科普'),
       ];
 
   late AcquirePreferencesDto _draft;
