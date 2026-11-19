@@ -633,10 +633,31 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
                     ),
                     Align(
                       alignment: Alignment.centerRight,
-                      child: TextButton.icon(
-                        onPressed: () => _showResourceDirectory(selectedCourse),
-                        icon: const Icon(Icons.folder_open_outlined),
-                        label: const Text('资源目录'),
+                      child: Wrap(
+                        spacing: 8,
+                        children: <Widget>[
+                          TextButton.icon(
+                            onPressed: () =>
+                                _showResourceDirectory(selectedCourse),
+                            icon: const Icon(Icons.folder_open_outlined),
+                            label: const Text('资源目录'),
+                          ),
+                          TextButton.icon(
+                            onPressed: () => unawaited(
+                              _confirmDeleteCollection(selectedCourse),
+                            ),
+                            icon: const Icon(
+                              Icons.delete_outline_rounded,
+                              color: Color(0xFFC74A4A),
+                            ),
+                            label: Text(
+                              _isCollectionCourse(selectedCourse)
+                                  ? '删除合集'
+                                  : '删除课程',
+                              style: const TextStyle(color: Color(0xFFC74A4A)),
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                     SizedBox(height: compact ? 20 : 28),
@@ -1086,6 +1107,15 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
                     if (editMode)
                       _LibraryEditToolbar(
                         selectedCount: selectedCourseIds.length,
+                        allSelected:
+                            filteredCourses.isNotEmpty &&
+                            filteredCourses.every(
+                              (LibraryCourseData course) =>
+                                  selectedCourseIds.contains(course.id),
+                            ),
+                        onSelectAll: filteredCourses.isEmpty
+                            ? null
+                            : () => _toggleSelectAll(filteredCourses),
                         onEdit: selectedCourseIds.isEmpty
                             ? null
                             : _showBatchEditDialog,
@@ -1113,7 +1143,7 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
                           elevation: 0,
                         ),
                         child: const Text(
-                          '编辑',
+                          '多选删除',
                           style: TextStyle(fontWeight: FontWeight.w800),
                         ),
                       ),
@@ -1801,10 +1831,76 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
     return file?.path;
   }
 
+  bool _isCollectionCourse(LibraryCourseData course) {
+    if (course.id.startsWith('bilibili-season-')) {
+      return true;
+    }
+    if (course.episodes.length > 1) {
+      return true;
+    }
+    final String label = course.sourceLabel.toLowerCase();
+    return label.contains('合集') || label.contains('season');
+  }
+
+  /// Courses removed together when deleting a "合集".
+  /// Multi-episode / B站合集 = itself; otherwise peers sharing the same video dir.
+  List<LibraryCourseData> _collectionPeers(
+    LibraryCourseData course, {
+    List<LibraryCourseData>? catalog,
+  }) {
+    final List<LibraryCourseData> all =
+        catalog ?? ref.read(libraryCatalogProvider);
+    if (_isCollectionCourse(course)) {
+      return <LibraryCourseData>[course];
+    }
+    final String? dir = course.videoDirectories
+        .map((String path) => path.trim())
+        .where((String path) => path.isNotEmpty)
+        .firstOrNull;
+    if (dir == null) {
+      return <LibraryCourseData>[course];
+    }
+    final List<LibraryCourseData> peers = all
+        .where(
+          (LibraryCourseData item) => item.videoDirectories.any(
+            (String path) => path.trim() == dir,
+          ),
+        )
+        .toList(growable: false);
+    return peers.isEmpty ? <LibraryCourseData>[course] : peers;
+  }
+
+  void _toggleSelectAll(List<LibraryCourseData> courses) {
+    setState(() {
+      final bool allSelected = courses.isNotEmpty &&
+          courses.every(
+            (LibraryCourseData course) => selectedCourseIds.contains(course.id),
+          );
+      if (allSelected) {
+        selectedCourseIds.clear();
+      } else {
+        selectedCourseIds
+          ..clear()
+          ..addAll(courses.map((LibraryCourseData course) => course.id));
+      }
+    });
+  }
+
+  void _enterEditModeWith(LibraryCourseData course) {
+    setState(() {
+      editMode = true;
+      selectedCourseIds
+        ..clear()
+        ..add(course.id);
+    });
+  }
+
   Future<void> _showCourseContextMenu({
     required LibraryCourseData course,
     required Offset globalPosition,
   }) async {
+    final List<LibraryCourseData> peers = _collectionPeers(course);
+    final bool collection = _isCollectionCourse(course) || peers.length > 1;
     final String? action = await showMenu<String>(
       context: context,
       position: RelativeRect.fromLTRB(
@@ -1813,34 +1909,95 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
         globalPosition.dx,
         globalPosition.dy,
       ),
-      items: const <PopupMenuEntry<String>>[
+      items: <PopupMenuEntry<String>>[
+        const PopupMenuItem<String>(
+          value: 'multi',
+          child: Row(
+            children: <Widget>[
+              Icon(Icons.checklist_rounded, size: 20),
+              SizedBox(width: 10),
+              Text('多选删除'),
+            ],
+          ),
+        ),
+        if (collection)
+          PopupMenuItem<String>(
+            value: 'delete_collection',
+            child: Row(
+              children: <Widget>[
+                const Icon(Icons.folder_off_outlined, size: 20),
+                const SizedBox(width: 10),
+                Text(
+                  _isCollectionCourse(course)
+                      ? '删除整个合集（${course.episodes.length} 集）'
+                      : '删除同目录合集（${peers.length} 门）',
+                ),
+              ],
+            ),
+          ),
         PopupMenuItem<String>(
           value: 'delete',
           child: Row(
             children: <Widget>[
-              Icon(Icons.delete_outline_rounded, size: 20),
-              SizedBox(width: 10),
-              Text('删除课程'),
+              const Icon(Icons.delete_outline_rounded, size: 20),
+              const SizedBox(width: 10),
+              Text(collection ? '仅删除本课程' : '删除课程'),
             ],
           ),
         ),
       ],
     );
-    if (action != 'delete' || !mounted) {
+    if (!mounted || action == null) {
       return;
     }
+    switch (action) {
+      case 'multi':
+        _enterEditModeWith(course);
+      case 'delete_collection':
+        await _confirmDeleteCollection(course);
+      case 'delete':
+        await _confirmDeleteCourses(
+          courseIds: <String>{course.id},
+          title: '删除课程',
+          message: '确定删除「${course.title}」吗？删除后可重新导入。',
+        );
+    }
+  }
+
+  Future<void> _confirmDeleteCollection(LibraryCourseData course) async {
+    final List<LibraryCourseData> peers = _collectionPeers(course);
+    final bool multiEpisode = _isCollectionCourse(course);
+    final Set<String> ids =
+        peers.map((LibraryCourseData item) => item.id).toSet();
+    final String title = multiEpisode ? '删除整个合集' : '按合集删除';
+    final String message = multiEpisode
+        ? '将删除合集「${course.title}」及全部 ${course.episodes.length} 集，删除后可重新导入。'
+        : peers.length > 1
+        ? '将删除同目录下的 ${peers.length} 门课程（含「${course.title}」），删除后可重新导入。'
+        : '确定删除「${course.title}」吗？删除后可重新导入。';
     await _confirmDeleteCourses(
-      courseIds: <String>{course.id},
-      title: '删除课程',
-      message: '确定删除「${course.title}」吗？删除后可重新导入。',
+      courseIds: ids,
+      title: title,
+      message: message,
+      exitEditMode: true,
     );
+    if (!mounted) {
+      return;
+    }
+    if (showDetail && ids.contains(selectedCourse.id)) {
+      setState(() {
+        showDetail = false;
+        selectedCourse = emptyLibraryCourse;
+        selectedEpisodeId = '';
+      });
+    }
   }
 
   Future<void> _confirmDeleteSelectedCourses() async {
     await _confirmDeleteCourses(
       courseIds: Set<String>.from(selectedCourseIds),
-      title: '删除已选课程',
-      message: '将删除 ${selectedCourseIds.length} 个已选课程。',
+      title: '多选删除',
+      message: '将删除已选的 ${selectedCourseIds.length} 门课程。',
       exitEditMode: true,
     );
   }
@@ -2226,12 +2383,16 @@ class _CourseViewModeButton extends StatelessWidget {
 class _LibraryEditToolbar extends StatelessWidget {
   const _LibraryEditToolbar({
     required this.selectedCount,
+    required this.allSelected,
+    required this.onSelectAll,
     required this.onEdit,
     required this.onDelete,
     required this.onDone,
   });
 
   final int selectedCount;
+  final bool allSelected;
+  final VoidCallback? onSelectAll;
   final VoidCallback? onEdit;
   final VoidCallback? onDelete;
   final VoidCallback onDone;
@@ -2262,6 +2423,16 @@ class _LibraryEditToolbar extends StatelessWidget {
                 color: AppDesignTokens.primaryBlueDark,
               ),
             ),
+          ),
+          const SizedBox(width: 8),
+          _LibraryEditActionButton(
+            label: allSelected ? '取消全选' : '全选',
+            icon: allSelected
+                ? Icons.deselect_rounded
+                : Icons.select_all_rounded,
+            color: AppDesignTokens.primaryBlueDark,
+            background: AppDesignTokens.skyLight,
+            onTap: onSelectAll,
           ),
           const SizedBox(width: 8),
           _LibraryEditActionButton(
