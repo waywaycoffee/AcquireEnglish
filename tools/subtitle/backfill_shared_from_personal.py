@@ -10,31 +10,25 @@ Run on ECS from services/api with the app venv:
 from __future__ import annotations
 
 import asyncio
-import re
 import sys
 from pathlib import Path
 
 # Allow `python tools/...` from repo root or API cwd.
 _API_ROOT = Path(__file__).resolve().parents[2] / "services" / "api"
+if not (_API_ROOT / "app" / "database.py").is_file():
+    _API_ROOT = Path("/opt/acquireenglish/services/api")
 if _API_ROOT.is_dir():
     sys.path.insert(0, str(_API_ROOT))
 
 from sqlalchemy import select, text  # noqa: E402
 
 from app.database import Base, SessionLocal, engine  # noqa: E402
-from app.models import SharedBilibiliSubtitle, UserLinkCourse  # noqa: E402
-from app.shared_subtitle_quality import (  # noqa: E402
-    evaluate_shared_pack,
-    parse_srt_cues,
+from app.models import UserLinkCourse  # noqa: E402
+from app.shared_subtitle_quality import parse_srt_cues  # noqa: E402
+from app.shared_subtitle_store import (  # noqa: E402
+    parse_bvid_page,
+    upsert_shared_bilibili_pack,
 )
-
-
-def parse_page(external_id: str) -> tuple[str, int]:
-    eid = (external_id or "").strip()
-    match = re.match(r"^(BV[0-9A-Za-z]+)(?:-p(\d+))?$", eid, re.I)
-    if not match:
-        return eid.upper(), 1
-    return match.group(1).upper(), int(match.group(2) or 1)
 
 
 async def main() -> None:
@@ -46,7 +40,9 @@ async def main() -> None:
         rows = (await db.execute(select(UserLinkCourse))).scalars().all()
         groups: dict[tuple[str, int], list[UserLinkCourse]] = {}
         for row in rows:
-            groups.setdefault(parse_page(row.external_id), []).append(row)
+            if (row.source or "").lower() != "bilibili":
+                continue
+            groups.setdefault(parse_bvid_page(row.external_id), []).append(row)
 
         for (bvid, page), items in groups.items():
             best_en = ""
@@ -72,63 +68,33 @@ async def main() -> None:
             duration = (
                 raw_dur if 30 <= raw_dur <= 3 * 3600 else (last_sec if last_sec >= 30 else None)
             )
-            quality = evaluate_shared_pack(
-                en_srt=best_en,
-                zh_srt=best_zh or None,
+            result = await upsert_shared_bilibili_pack(
+                db,
+                bvid=bvid,
+                page=page,
                 duration_sec=duration,
+                subtitle_en_srt=best_en,
+                subtitle_zh_srt=best_zh or None,
+                uploader_user_id=uploader,
+                source_origin="asr",
+                commit=False,
             )
-            if not quality.passed:
-                quality = evaluate_shared_pack(
-                    en_srt=best_en,
-                    zh_srt=best_zh or None,
-                    duration_sec=None,
-                )
-            if not quality.passed:
-                print(f"SKIP {bvid} p{page}: {quality.reason}")
-                skipped += 1
-                continue
-
-            existing = (
-                await db.execute(
-                    select(SharedBilibiliSubtitle).where(
-                        SharedBilibiliSubtitle.bvid == bvid,
-                        SharedBilibiliSubtitle.page == page,
-                    )
-                )
-            ).scalar_one_or_none()
-            if existing is None:
-                db.add(
-                    SharedBilibiliSubtitle(
-                        bvid=bvid,
-                        page=page,
-                        duration_sec=duration,
-                        subtitle_en_srt=best_en,
-                        subtitle_zh_srt=best_zh or None,
-                        quality_score=quality.score,
-                        cue_count=quality.cue_count,
-                        en_hits=quality.en_hits,
-                        zh_hits=quality.zh_hits,
-                        uploader_user_id=uploader,
-                        source_origin="asr",
-                    )
+            if result.stored:
+                stored += 1
+                print(
+                    f"OK {bvid} p{page} cues={result.cue_count} "
+                    f"score={result.quality_score} zh={bool(best_zh)} "
+                    f"replaced={result.replaced}"
                 )
             else:
-                existing.subtitle_en_srt = best_en
-                existing.subtitle_zh_srt = best_zh or existing.subtitle_zh_srt
-                existing.quality_score = quality.score
-                existing.cue_count = quality.cue_count
-                existing.en_hits = quality.en_hits
-                existing.zh_hits = quality.zh_hits
-                existing.duration_sec = duration
-            stored += 1
-            print(
-                f"OK {bvid} p{page} cues={quality.cue_count} "
-                f"score={quality.score} zh={bool(best_zh)}"
-            )
+                skipped += 1
+                print(f"SKIP {bvid} p{page}: {result.reason or 'not stored'}")
         await db.commit()
 
     async with SessionLocal() as db:
-        total = (await db.execute(text("SELECT COUNT(*) FROM shared_bilibili_subtitles"))).scalar()
+        total = (
+            await db.execute(text("SELECT COUNT(*) FROM shared_bilibili_subtitles"))
+        ).scalar()
     print(f"DONE stored={stored} skipped={skipped} total={total}")
 
 

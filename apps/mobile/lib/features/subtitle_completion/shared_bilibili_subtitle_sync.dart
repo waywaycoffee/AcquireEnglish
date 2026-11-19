@@ -222,11 +222,22 @@ Future<void> tryUploadSharedBilibiliSubtitles({
         zhSrt = text;
       }
     }
-    final SharedSubtitleQualityResult quality = evaluateSharedSubtitlePack(
+    SharedSubtitleQualityResult quality = evaluateSharedSubtitlePack(
       enSrt: enSrt,
       zhSrt: zhSrt,
       durationSec: durationSec,
     );
+    // Client duration is often minutes*60 and fails the 70% coverage gate;
+    // retry without duration so good packs still reach the shared cache.
+    int? uploadDuration = durationSec;
+    if (!quality.passed && durationSec != null) {
+      quality = evaluateSharedSubtitlePack(
+        enSrt: enSrt,
+        zhSrt: zhSrt,
+        durationSec: null,
+      );
+      uploadDuration = null;
+    }
     if (!quality.passed) {
       return;
     }
@@ -234,7 +245,7 @@ Future<void> tryUploadSharedBilibiliSubtitles({
       bvid: ids.bvid,
       page: ids.page,
       cid: ids.cid,
-      durationSec: durationSec,
+      durationSec: uploadDuration,
       subtitleEnSrt: enSrt,
       subtitleZhSrt: zhSrt,
       sourceOrigin: sourceOrigin,

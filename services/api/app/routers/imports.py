@@ -13,6 +13,7 @@ from app.deps import get_current_user
 from app.link_import import import_link, to_course_out
 from app.models import User, UserLinkCourse, UserPreference
 from app.schemas import CourseOut
+from app.shared_subtitle_store import promote_personal_bilibili_to_shared
 
 router = APIRouter(prefix="/imports", tags=["imports"])
 
@@ -141,6 +142,21 @@ async def upsert_personal_asset(
             row.subtitle_zh_srt = zh
     await db.commit()
     await db.refresh(row)
+    # Server-side promote: personal bilibili EN packs also seed the shared cache
+    # (quality-gated). Client PUT /shared-subtitles remains optional redundancy.
+    if source == "bilibili" and (row.subtitle_en_srt or "").strip():
+        try:
+            await promote_personal_bilibili_to_shared(
+                db,
+                external_id=row.external_id,
+                subtitle_en_srt=row.subtitle_en_srt,
+                subtitle_zh_srt=row.subtitle_zh_srt,
+                duration_sec=int(row.duration_sec or 0) or None,
+                uploader_user_id=user.id,
+                source_origin="asr",
+            )
+        except Exception:
+            pass
     return _asset_out(row)
 
 
@@ -245,4 +261,17 @@ async def put_import_srt(
     else:
         row.subtitle_zh_srt = payload.srt
     await db.commit()
+    if row.source == "bilibili" and (row.subtitle_en_srt or "").strip():
+        try:
+            await promote_personal_bilibili_to_shared(
+                db,
+                external_id=row.external_id,
+                subtitle_en_srt=row.subtitle_en_srt,
+                subtitle_zh_srt=row.subtitle_zh_srt,
+                duration_sec=int(row.duration_sec or 0) or None,
+                uploader_user_id=user.id,
+                source_origin="asr",
+            )
+        except Exception:
+            pass
     return {"status": "ok", "lang": payload.lang}

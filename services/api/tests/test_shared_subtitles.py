@@ -216,3 +216,63 @@ async def test_put_and_get_roundtrip_and_upsert():
         assert got2.status_code == 200
         assert got2.json()["subtitle_zh_srt"]
         assert "你好" in got2.json()["subtitle_zh_srt"]
+
+
+@pytest.mark.asyncio
+async def test_put_retries_when_duration_coverage_fails():
+    """Coarse duration_sec (e.g. minutes*60) must not block a good EN pack."""
+    transport = ASGITransport(app=fastapi_app)
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
+        token = await _sms_token(client, phone="13900006666")
+        headers = {"Authorization": f"Bearer {token}"}
+        # 8 cues * 2s ≈ 16s of coverage; inflated duration would fail 70% gate.
+        en = _sample_en_srt(cues=8, gap_ms=2000)
+        put = await client.put(
+            "/api/shared-subtitles/bilibili",
+            headers=headers,
+            json={
+                "bvid": "BV1TESTDURRETRY1",
+                "page": 1,
+                "duration_sec": 600,
+                "subtitle_en_srt": en,
+                "source_origin": "asr",
+            },
+        )
+        assert put.status_code == 200, put.text
+        assert put.json()["stored"] is True
+        got = await client.get(
+            "/api/shared-subtitles/bilibili",
+            params={"bvid": "BV1TESTDURRETRY1", "page": 1},
+        )
+        assert got.status_code == 200
+
+
+@pytest.mark.asyncio
+async def test_personal_import_promotes_to_shared():
+    transport = ASGITransport(app=fastapi_app)
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
+        token = await _sms_token(client, phone="13900007777")
+        headers = {"Authorization": f"Bearer {token}"}
+        en = _sample_en_srt(cues=10)
+        zh = _sample_zh_srt(cues=10)
+        up = await client.put(
+            "/api/imports/asset",
+            headers=headers,
+            json={
+                "source": "bilibili",
+                "external_id": "BV1TESTPROMOTE01",
+                "title": "Promote test",
+                "watch_url": "https://www.bilibili.com/video/BV1TESTPROMOTE01",
+                "duration_sec": 600,
+                "subtitle_en_srt": en,
+                "subtitle_zh_srt": zh,
+            },
+        )
+        assert up.status_code == 200, up.text
+        got = await client.get(
+            "/api/shared-subtitles/bilibili",
+            params={"bvid": "BV1TESTPROMOTE01", "page": 1},
+        )
+        assert got.status_code == 200, got.text
+        assert "Hello world" in got.json()["subtitle_en_srt"]
+        assert got.json().get("subtitle_zh_srt")

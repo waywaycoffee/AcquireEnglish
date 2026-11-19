@@ -10,7 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.database import get_db
 from app.deps import get_current_user
 from app.models import SharedBilibiliSubtitle, User
-from app.shared_subtitle_quality import evaluate_shared_pack
+from app.shared_subtitle_store import normalize_bvid, upsert_shared_bilibili_pack
 
 router = APIRouter(prefix="/shared-subtitles", tags=["shared-subtitles"])
 
@@ -47,29 +47,6 @@ class SharedBilibiliSubtitleUpsertOut(BaseModel):
     reason: str = ""
 
 
-def _normalize_bvid(raw: str) -> str:
-    value = (raw or "").strip().upper()
-    if value.startswith("BV"):
-        return value
-    return value
-
-
-def _should_replace(
-    existing: SharedBilibiliSubtitle,
-    *,
-    new_score: float,
-    new_has_zh: bool,
-) -> bool:
-    old_score = float(existing.quality_score or 0.0)
-    if new_score > old_score + 1e-9:
-        return True
-    if abs(new_score - old_score) <= 1e-9:
-        old_has_zh = bool((existing.subtitle_zh_srt or "").strip())
-        if new_has_zh and not old_has_zh:
-            return True
-    return False
-
-
 @router.get("/bilibili", response_model=SharedBilibiliSubtitleOut)
 async def get_shared_bilibili_subtitle(
     bvid: str = Query(min_length=3, max_length=32),
@@ -77,7 +54,7 @@ async def get_shared_bilibili_subtitle(
     cid: int | None = Query(default=None, ge=1),
     db: AsyncSession = Depends(get_db),
 ) -> SharedBilibiliSubtitleOut:
-    key = _normalize_bvid(bvid)
+    key = normalize_bvid(bvid)
     result = await db.execute(
         select(SharedBilibiliSubtitle).where(
             SharedBilibiliSubtitle.bvid == key,
@@ -114,83 +91,32 @@ async def put_shared_bilibili_subtitle(
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> SharedBilibiliSubtitleUpsertOut:
-    bvid = _normalize_bvid(payload.bvid)
-    if not bvid:
-        raise HTTPException(status_code=400, detail="bvid required")
-
-    origin = (payload.source_origin or "asr").strip().lower()
-    if origin not in {"asr", "official", "mixed"}:
-        origin = "asr"
-
-    quality = evaluate_shared_pack(
-        en_srt=payload.subtitle_en_srt,
-        zh_srt=payload.subtitle_zh_srt,
+    result = await upsert_shared_bilibili_pack(
+        db,
+        bvid=payload.bvid,
+        page=payload.page,
+        cid=payload.cid,
         duration_sec=payload.duration_sec,
+        subtitle_en_srt=payload.subtitle_en_srt,
+        subtitle_zh_srt=payload.subtitle_zh_srt,
+        uploader_user_id=user.id,
+        source_origin=payload.source_origin or "asr",
+        commit=True,
     )
-    if not quality.passed:
+    # "existing better" stays 200 with stored=false; quality / validation → 422.
+    if (
+        not result.stored
+        and result.reason
+        and result.reason != "existing pack has equal or better quality"
+    ):
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail=quality.reason or "quality check failed",
+            detail=result.reason,
         )
-
-    result = await db.execute(
-        select(SharedBilibiliSubtitle).where(
-            SharedBilibiliSubtitle.bvid == bvid,
-            SharedBilibiliSubtitle.page == payload.page,
-        )
-    )
-    existing = result.scalar_one_or_none()
-    new_has_zh = bool((payload.subtitle_zh_srt or "").strip())
-
-    if existing is None:
-        row = SharedBilibiliSubtitle(
-            bvid=bvid,
-            page=payload.page,
-            cid=payload.cid,
-            duration_sec=payload.duration_sec,
-            subtitle_en_srt=payload.subtitle_en_srt,
-            subtitle_zh_srt=(payload.subtitle_zh_srt or None),
-            quality_score=quality.score,
-            cue_count=quality.cue_count,
-            en_hits=quality.en_hits,
-            zh_hits=quality.zh_hits,
-            uploader_user_id=user.id,
-            source_origin=origin,
-        )
-        db.add(row)
-        await db.commit()
-        return SharedBilibiliSubtitleUpsertOut(
-            stored=True,
-            replaced=False,
-            quality_score=quality.score,
-            cue_count=quality.cue_count,
-        )
-
-    if not _should_replace(
-        existing, new_score=quality.score, new_has_zh=new_has_zh
-    ):
-        return SharedBilibiliSubtitleUpsertOut(
-            stored=False,
-            replaced=False,
-            quality_score=float(existing.quality_score or 0.0),
-            cue_count=int(existing.cue_count or 0),
-            reason="existing pack has equal or better quality",
-        )
-
-    existing.cid = payload.cid or existing.cid
-    existing.duration_sec = payload.duration_sec or existing.duration_sec
-    existing.subtitle_en_srt = payload.subtitle_en_srt
-    existing.subtitle_zh_srt = payload.subtitle_zh_srt or existing.subtitle_zh_srt
-    existing.quality_score = quality.score
-    existing.cue_count = quality.cue_count
-    existing.en_hits = quality.en_hits
-    existing.zh_hits = quality.zh_hits
-    existing.uploader_user_id = user.id
-    existing.source_origin = origin
-    await db.commit()
     return SharedBilibiliSubtitleUpsertOut(
-        stored=True,
-        replaced=True,
-        quality_score=quality.score,
-        cue_count=quality.cue_count,
+        stored=result.stored,
+        replaced=result.replaced,
+        quality_score=result.quality_score,
+        cue_count=result.cue_count,
+        reason=result.reason,
     )

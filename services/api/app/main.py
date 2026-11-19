@@ -72,10 +72,40 @@ app.include_router(review_sync.router, prefix="/api")
 
 @app.get("/api/health")
 async def health() -> dict[str, str]:
-    from app.services.email_auth import email_mock_enabled, email_provider
-    from app.services.phone_auth import sms_mock_enabled, sms_provider
-    from app.services.livekit_tokens import livekit_configured
+    from sqlalchemy import func, select, text
 
+    from app.database import SessionLocal
+    from app.models import SharedBilibiliSubtitle
+    from app.services.email_auth import email_mock_enabled, email_provider
+    from app.services.livekit_tokens import livekit_configured
+    from app.services.phone_auth import sms_mock_enabled, sms_provider
+
+    shared_count = "unset"
+    personal_bili_en = "unset"
+    try:
+        async with SessionLocal() as db:
+            shared_count = str(
+                (
+                    await db.execute(select(func.count()).select_from(SharedBilibiliSubtitle))
+                ).scalar()
+                or 0
+            )
+            personal_bili_en = str(
+                (
+                    await db.execute(
+                        text(
+                            "SELECT COUNT(*) FROM user_link_courses "
+                            "WHERE source='bilibili' "
+                            "AND subtitle_en_srt IS NOT NULL "
+                            "AND TRIM(subtitle_en_srt) != ''"
+                        )
+                    )
+                ).scalar()
+                or 0
+            )
+    except Exception:
+        shared_count = "error"
+        personal_bili_en = "error"
     return {
         "status": "ok",
         "auth_sms_mock": str(sms_mock_enabled()).lower(),
@@ -85,6 +115,8 @@ async def health() -> dict[str, str]:
         "auth_wechat_mock": str(settings.wechat_mock_enabled).lower(),
         "auth_wechat_configured": str(settings.wechat_configured).lower(),
         "wechat_pay_configured": str(settings.wechat_pay_configured).lower(),
+        "shared_bilibili_subtitles": shared_count,
+        "personal_bilibili_en": personal_bili_en,
         "oral_coach": "https://acquireenglish.curlhairai.com/coach",
         "livekit": (
             (settings.livekit_url or "").strip()
