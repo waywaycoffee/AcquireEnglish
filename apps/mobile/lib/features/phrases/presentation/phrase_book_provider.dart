@@ -4,6 +4,9 @@ import 'dart:convert';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hive_ce/hive.dart';
 
+import '../../sync/data/acquire_api_client.dart';
+import '../../sync/data/phrase_sync_service.dart';
+
 const String _phraseBookStorageKey = 'phrase_book_v2';
 const Set<String> _legacySamplePhraseIds = <String>{
   'phrase-1',
@@ -202,28 +205,27 @@ class PhraseBookNotifier extends Notifier<List<PhraseEntry>> {
     int reviewCount = 0,
     String? collectedAt,
   }) {
-    state = <PhraseEntry>[
-      PhraseEntry(
-        id: 'phrase-${DateTime.now().microsecondsSinceEpoch}',
-        english: english,
-        chinese: chinese,
-        course: course,
-        episode: episode,
-        time: time,
-        rating: rating,
-        needsReview: needsReview,
-        today: today,
-        courseId: courseId,
-        episodeId: episodeId,
-        startTime: startTime ?? time,
-        endTime: endTime,
-        note: note,
-        collectedAt: collectedAt ?? DateTime.now().toIso8601String(),
-        reviewCount: reviewCount,
-      ),
-      ...state,
-    ];
+    final PhraseEntry created = PhraseEntry(
+      id: 'phrase-${DateTime.now().microsecondsSinceEpoch}',
+      english: english,
+      chinese: chinese,
+      course: course,
+      episode: episode,
+      time: time,
+      rating: rating,
+      needsReview: needsReview,
+      today: today,
+      courseId: courseId,
+      episodeId: episodeId,
+      startTime: startTime ?? time,
+      endTime: endTime,
+      note: note,
+      collectedAt: collectedAt ?? DateTime.now().toIso8601String(),
+      reviewCount: reviewCount,
+    );
+    state = <PhraseEntry>[created, ...state];
     unawaited(_persist());
+    unawaited(ref.read(phraseSyncServiceProvider).pushEntry(created));
   }
 
   bool addPhraseIfMissing({
@@ -285,10 +287,19 @@ class PhraseBookNotifier extends Notifier<List<PhraseEntry>> {
     String id,
     PhraseEntry Function(PhraseEntry current) update,
   ) {
-    state = state
-        .map((PhraseEntry item) => item.id == id ? update(item) : item)
-        .toList(growable: false);
+    PhraseEntry? updated;
+    state = state.map((PhraseEntry item) {
+      if (item.id != id) {
+        return item;
+      }
+      updated = update(item);
+      return updated!;
+    }).toList(growable: false);
     unawaited(_persist());
+    final PhraseEntry? row = updated;
+    if (row != null) {
+      unawaited(ref.read(phraseSyncServiceProvider).pushEntry(row));
+    }
   }
 
   void deletePhrase(String id) {
@@ -342,6 +353,71 @@ class PhraseBookNotifier extends Notifier<List<PhraseEntry>> {
           );
       }
     });
+  }
+
+  Future<void> mergeRemotePhrases(List<AcquirePhraseDto> remoteRows) async {
+    for (final AcquirePhraseDto row in remoteRows) {
+      final String clientId = row.clientId.trim();
+      if (clientId.isEmpty) {
+        continue;
+      }
+      final int remoteReviews = row.reviewCount;
+      final int index = state.indexWhere((PhraseEntry e) => e.id == clientId);
+      if (index < 0) {
+        state = <PhraseEntry>[
+          PhraseEntry(
+            id: clientId,
+            english: row.english,
+            chinese: row.chinese,
+            course: row.course,
+            episode: row.episode,
+            time: row.time,
+            rating: row.rating,
+            needsReview: row.needsReview,
+            today: false,
+            courseId: row.courseId,
+            episodeId: row.episodeId,
+            startTime: row.startTime,
+            endTime: row.endTime,
+            note: row.note,
+            collectedAt: row.collectedAt?.toIso8601String(),
+            lastReviewedAt: row.lastReviewedAt?.toIso8601String(),
+            nextReviewAt: row.nextReviewAt?.toIso8601String(),
+            reviewCount: remoteReviews,
+            lapseCount: row.lapseCount,
+          ),
+          ...state,
+        ];
+        continue;
+      }
+      final PhraseEntry local = state[index];
+      if (remoteReviews < local.reviewCount) {
+        continue;
+      }
+      final List<PhraseEntry> next = <PhraseEntry>[...state];
+      next[index] = local.copyWith(
+        english: row.english,
+        chinese: row.chinese,
+        course: row.course,
+        episode: row.episode,
+        time: row.time,
+        rating: row.rating,
+        needsReview: row.needsReview,
+        courseId: row.courseId ?? local.courseId,
+        episodeId: row.episodeId ?? local.episodeId,
+        startTime: row.startTime ?? local.startTime,
+        endTime: row.endTime ?? local.endTime,
+        note: row.note ?? local.note,
+        collectedAt: row.collectedAt?.toIso8601String() ?? local.collectedAt,
+        lastReviewedAt:
+            row.lastReviewedAt?.toIso8601String() ?? local.lastReviewedAt,
+        nextReviewAt: row.nextReviewAt?.toIso8601String() ?? local.nextReviewAt,
+        reviewCount: remoteReviews,
+        lapseCount: row.lapseCount,
+      );
+      state = next;
+    }
+    await _persist();
   }
 
   Future<void> _persist() async {

@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hive_ce/hive.dart';
 
 import '../data/acquire_api_client.dart';
+import '../data/phrase_sync_service.dart';
 import '../data/vocab_sync_service.dart';
 import 'cloud_catalog_sync.dart';
 import 'daily_feed_provider.dart';
@@ -53,6 +54,7 @@ class _DailyFeedLifecycleHostState extends ConsumerState<DailyFeedLifecycleHost>
     ref.invalidate(cloudCatalogSyncProvider);
     await ref.read(cloudCatalogSyncProvider.future);
     await ref.read(vocabSyncServiceProvider).pullAndMerge();
+    await ref.read(phraseSyncServiceProvider).pullAndMerge();
     if (!mounted || !showSnack) {
       return;
     }

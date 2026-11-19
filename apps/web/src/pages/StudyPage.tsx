@@ -2,7 +2,6 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { api, type Course, type Lesson } from "../api";
 import { useAuth } from "../auth";
-import { DEMO_EN_SRT, DEMO_ZH_SRT } from "../data/demoSubtitles";
 import { findActiveCueIndex, formatTime, parseSrt, type Cue } from "../lib/srt";
 
 type TabName = "字幕" | "跟读" | "听写" | "练习" | "词卡";
@@ -180,6 +179,8 @@ export default function StudyPage() {
   const [dictationResult, setDictationResult] = useState<boolean | null>(null);
   const [practiceChoice, setPracticeChoice] = useState<string | null>(null);
   const [practiceAnswered, setPracticeAnswered] = useState(false);
+  const [subsError, setSubsError] = useState<string | null>(null);
+  const [subsRetry, setSubsRetry] = useState(0);
 
   useEffect(() => {
     api
@@ -198,38 +199,37 @@ export default function StudyPage() {
       setDictationResult(null);
       setPracticeChoice(null);
       setPracticeAnswered(false);
+      setSubsError(null);
       if (!lesson) return;
       try {
         const enPath = lesson.subtitles?.en;
         const zhPath = lesson.subtitles?.zh;
-        if (enPath?.startsWith("/api/")) {
-          const enText = await api.fetchText(enPath, token);
-          if (!cancelled) setEnCues(parseSrt(enText));
-        } else if (enPath?.startsWith("http") && !enPath.includes("cdn.example.com")) {
-          const res = await fetch(enPath);
-          const enText = await res.text();
-          if (!cancelled) setEnCues(parseSrt(enText));
-        } else if (!enPath) {
-          if (!cancelled) setEnCues([]);
-        } else {
-          if (!cancelled) setEnCues(parseSrt(DEMO_EN_SRT));
+        async function loadOne(path: string | null | undefined): Promise<Cue[]> {
+          if (!path) return [];
+          if (path.includes("cdn.example.com")) {
+            throw new Error("字幕地址无效（示例 CDN），请重新导入课程");
+          }
+          if (path.startsWith("/api/")) {
+            const text = await api.fetchText(path, token);
+            return parseSrt(text);
+          }
+          if (path.startsWith("http")) {
+            const res = await fetch(path);
+            if (!res.ok) throw new Error(`字幕加载失败 HTTP ${res.status}`);
+            return parseSrt(await res.text());
+          }
+          throw new Error("字幕路径无法识别");
         }
-        if (zhPath?.startsWith("/api/")) {
-          const zhText = await api.fetchText(zhPath, token);
-          if (!cancelled) setZhCues(parseSrt(zhText));
-        } else if (zhPath?.startsWith("http") && !zhPath.includes("cdn.example.com")) {
-          const res = await fetch(zhPath);
-          const zhText = await res.text();
-          if (!cancelled) setZhCues(parseSrt(zhText));
-        } else if (!zhPath) {
-          if (!cancelled) setZhCues([]);
-        } else {
-          if (!cancelled) setZhCues(parseSrt(DEMO_ZH_SRT));
-        }
-      } catch {
+        const [en, zh] = await Promise.all([loadOne(enPath), loadOne(zhPath)]);
         if (!cancelled) {
-          setEnCues(parseSrt(DEMO_EN_SRT));
-          setZhCues(parseSrt(DEMO_ZH_SRT));
+          setEnCues(en);
+          setZhCues(zh);
+        }
+      } catch (err) {
+        if (!cancelled) {
+          setEnCues([]);
+          setZhCues([]);
+          setSubsError(err instanceof Error ? err.message : "字幕加载失败");
         }
       }
     }
@@ -237,7 +237,7 @@ export default function StudyPage() {
     return () => {
       cancelled = true;
     };
-  }, [lesson?.id, lesson?.subtitles?.en, lesson?.subtitles?.zh, token]);
+  }, [lesson?.id, lesson?.subtitles?.en, lesson?.subtitles?.zh, token, subsRetry]);
 
   useEffect(() => {
     if (videoRef.current) videoRef.current.playbackRate = rate;
@@ -421,6 +421,14 @@ export default function StudyPage() {
       </header>
 
       {error ? <div className="error">{error}</div> : null}
+      {subsError ? (
+        <div className="error" style={{ display: "grid", gap: 10 }}>
+          <div>字幕：{subsError}</div>
+          <button className="btn ghost" type="button" onClick={() => setSubsRetry((n) => n + 1)}>
+            重试加载字幕
+          </button>
+        </div>
+      ) : null}
 
       <div className="study-layout">
         <section className="card">

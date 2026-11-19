@@ -285,6 +285,60 @@ async def grant_from_sku(
     )
 
 
+async def consume_entitlement(
+    db: AsyncSession,
+    user_id: int,
+    *,
+    asset_kind: str,
+    asset_ref: str = "",
+    quantity: int = 1,
+    reason: str = "consume",
+) -> UserEntitlement:
+    """Decrement a countable entitlement (e.g. coach_quota minutes)."""
+    kind = asset_kind.strip()
+    qty = max(1, int(quantity))
+    rows = await list_active_entitlements(db, user_id)
+    candidates = [
+        row
+        for row in rows
+        if row.asset_kind == kind
+        and (not asset_ref.strip() or row.asset_ref == asset_ref.strip())
+        and row.quantity is not None
+        and int(row.quantity) > 0
+    ]
+    if not candidates:
+        raise ValueError("额度不足或权益已过期")
+    # Prefer soonest-expiring pack (None ends_at sorts last).
+    far = datetime(9999, 1, 1, tzinfo=timezone.utc)
+    candidates.sort(
+        key=lambda row: (_as_utc(row.ends_at) or far, row.id),
+    )
+    row = candidates[0]
+    available = int(row.quantity or 0)
+    if available < qty:
+        raise ValueError(f"额度不足（剩余 {available}）")
+    row.quantity = available - qty
+    if row.quantity <= 0:
+        row.status = "exhausted"
+        row.quantity = 0
+    meta = {}
+    try:
+        meta = json.loads(row.meta_json or "{}")
+        if not isinstance(meta, dict):
+            meta = {}
+    except Exception:  # noqa: BLE001
+        meta = {}
+    history = meta.get("consume_log")
+    if not isinstance(history, list):
+        history = []
+    history.append({"at": _utcnow().isoformat(), "qty": qty, "reason": reason})
+    meta["consume_log"] = history[-20:]
+    row.meta_json = json.dumps(meta, ensure_ascii=False)
+    await db.commit()
+    await db.refresh(row)
+    return row
+
+
 async def list_active_entitlements(
     db: AsyncSession, user_id: int
 ) -> list[UserEntitlement]:

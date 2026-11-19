@@ -25,6 +25,7 @@ class User(Base):
 
     progresses: Mapped[list["LessonProgress"]] = relationship(back_populates="user")
     vocab_items: Mapped[list["VocabItem"]] = relationship(back_populates="user")
+    phrase_items: Mapped[list["PhraseItem"]] = relationship(back_populates="user")
     preference: Mapped["UserPreference | None"] = relationship(
         back_populates="user", uselist=False
     )
@@ -92,6 +93,50 @@ class VocabItem(Base):
     )
 
     user: Mapped[User] = relationship(back_populates="vocab_items")
+
+
+class PhraseItem(Base):
+    __tablename__ = "phrase_items"
+    __table_args__ = (
+        UniqueConstraint("user_id", "client_id", name="uq_user_phrase_client"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    user_id: Mapped[int] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), index=True
+    )
+    client_id: Mapped[str] = mapped_column(String(120), index=True)
+    english: Mapped[str] = mapped_column(Text)
+    chinese: Mapped[str] = mapped_column(Text, default="")
+    course: Mapped[str] = mapped_column(String(240), default="")
+    episode: Mapped[str] = mapped_column(String(240), default="")
+    time: Mapped[str] = mapped_column(String(64), default="")
+    course_id: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    episode_id: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    start_time: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    end_time: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    note: Mapped[str | None] = mapped_column(Text, nullable=True)
+    rating: Mapped[int] = mapped_column(Integer, default=1)
+    needs_review: Mapped[int] = mapped_column(Integer, default=1)
+    review_count: Mapped[int] = mapped_column(Integer, default=0)
+    lapse_count: Mapped[int] = mapped_column(Integer, default=0)
+    collected_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    last_reviewed_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    next_review_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
+
+    user: Mapped[User] = relationship(back_populates="phrase_items")
 
 
 class UserPreference(Base):
@@ -165,6 +210,10 @@ class UserLinkCourse(Base):
     duration_sec: Mapped[int] = mapped_column(Integer, default=60)
     subtitle_en_srt: Mapped[str | None] = mapped_column(Text, nullable=True)
     subtitle_zh_srt: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # CDN / remote poster URL (Bilibili pic, YouTube thumb, etc.).
+    cover_url: Mapped[str | None] = mapped_column(String(1024), nullable=True)
+    # Local/custom poster bytes as base64 so new devices can restore without CDN.
+    cover_image_base64: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     user: Mapped[User] = relationship(back_populates="link_courses")

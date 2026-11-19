@@ -19,6 +19,7 @@ import '../features/library/presentation/library_screen.dart';
 import '../features/phrases/presentation/phrases_screen.dart';
 import '../features/player/presentation/player_screen.dart';
 import '../features/settings/presentation/settings_screen.dart';
+import '../features/learning/presentation/learning_review_screen.dart';
 import '../features/words/presentation/sm2_daily_session_screen.dart';
 import '../features/words/presentation/words_screen.dart';
 import '../features/words/presentation/vocabulary_placement_screen.dart';
@@ -38,6 +39,7 @@ enum SGRoute {
   phrases,
   words,
   phraseReview,
+  learningReview,
   guide,
   settings,
   importCourse,
@@ -56,6 +58,8 @@ enum SGRoute {
         return '/review/session';
       case SGRoute.sm2Review:
         return '/review/sm2';
+      case SGRoute.learningReview:
+        return '/review/learning';
       case SGRoute.loginPhone:
         return '/login/phone';
       case SGRoute.loginWechat:
@@ -156,6 +160,12 @@ GoRouter goRouter(Ref ref) => GoRouter(
       name: SGRoute.sm2Review.name,
       builder: (BuildContext context, GoRouterState state) =>
           const Sm2DailySessionScreen(),
+    ).fade(),
+    GoRoute(
+      path: SGRoute.learningReview.route,
+      name: SGRoute.learningReview.name,
+      builder: (BuildContext context, GoRouterState state) =>
+          const LearningReviewScreen(),
     ).fade(),
     GoRoute(
       path: SGRoute.phrases.route,

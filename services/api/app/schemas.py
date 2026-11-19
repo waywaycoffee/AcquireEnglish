@@ -229,6 +229,60 @@ class EntitlementGrantIn(BaseModel):
     meta: dict | None = None
 
 
+class EntitlementConsumeIn(BaseModel):
+    asset_kind: str = Field(min_length=2, max_length=32)
+    asset_ref: str = Field(default="", max_length=160)
+    quantity: int = Field(default=1, ge=1, le=1000)
+    reason: str = Field(default="consume", max_length=64)
+
+
+class PhraseCreate(BaseModel):
+    client_id: str = Field(min_length=1, max_length=120)
+    english: str = Field(min_length=1, max_length=2000)
+    chinese: str = Field(default="", max_length=2000)
+    course: str = Field(default="", max_length=240)
+    episode: str = Field(default="", max_length=240)
+    time: str = Field(default="", max_length=64)
+    course_id: str | None = None
+    episode_id: str | None = None
+    start_time: str | None = None
+    end_time: str | None = None
+    note: str | None = None
+    rating: int = Field(default=1, ge=1, le=5)
+    needs_review: bool = True
+    review_count: int = Field(default=0, ge=0)
+    lapse_count: int = Field(default=0, ge=0)
+    collected_at: datetime | None = None
+    last_reviewed_at: datetime | None = None
+    next_review_at: datetime | None = None
+
+
+class PhraseOut(BaseModel):
+    id: int
+    client_id: str
+    english: str
+    chinese: str
+    course: str
+    episode: str
+    time: str
+    course_id: str | None = None
+    episode_id: str | None = None
+    start_time: str | None = None
+    end_time: str | None = None
+    note: str | None = None
+    rating: int
+    needs_review: bool
+    review_count: int
+    lapse_count: int
+    collected_at: datetime | None = None
+    last_reviewed_at: datetime | None = None
+    next_review_at: datetime | None = None
+    created_at: datetime
+    updated_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
 class OrderItemIn(BaseModel):
     sku_code: str = Field(min_length=1, max_length=64)
     quantity: int = Field(default=1, ge=1, le=99)

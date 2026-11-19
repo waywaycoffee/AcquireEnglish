@@ -21,6 +21,7 @@
 | GET | `/api/assets/skus` | 上架 SKU |
 | GET | `/api/assets/entitlements` | 有效权益列表 |
 | POST | `/api/assets/entitlements/grant` | 发放/叠加权益（运营/活动） |
+| POST | `/api/assets/entitlements/consume` | 扣减可计数额度（如陪练分钟） |
 | POST | `/api/assets/orders` | 创建待支付订单 |
 | POST | `/api/assets/orders/{id}/mark-paid` | 模拟/人工支付履约（写权益） |
 

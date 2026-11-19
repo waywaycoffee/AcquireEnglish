@@ -153,7 +153,8 @@ class _WordsScreenState extends ConsumerState<WordsScreen> {
           ),
           TextButton.icon(
             onPressed: () {
-              context.push(SGRoute.sm2Review.route);
+              // Formal scheduler is FSRS daily review (not legacy SM-2).
+              context.push(SGRoute.reviewSession.route);
             },
             icon: const Icon(Icons.style_rounded),
             label: const Text('今日背词'),
@@ -203,7 +204,7 @@ class _WordsScreenState extends ConsumerState<WordsScreen> {
                   newLimit: reviewSettings.dailyNewLimit,
                   reviewLimit: reviewSettings.dailyReviewLimit,
                   modes: reviewSettings.orderedModes,
-                  onStart: () => context.push(SGRoute.sm2Review.route),
+                  onStart: () => context.push(SGRoute.reviewSession.route),
                   onSettings: () => showWordReviewSettingsSheet(context),
                 ),
                 const SizedBox(height: 20),

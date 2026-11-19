@@ -8,12 +8,15 @@ import 'package:go_router/go_router.dart';
 import '../../../constants/feature_flags.dart';
 import '../../../router/app_router.dart';
 import '../../../utils/url_utils.dart';
+import '../../authentication/presentation/account_hub_sheet.dart';
 import '../../authentication/presentation/auth_session.dart';
 import '../../navigation/presentation/navigation_destination.dart';
 import '../../player/presentation/local_whisper_asr.dart';
 import '../../shared/data/word_pronunciation_service.dart';
 import '../../sync/data/acquire_api_client.dart';
+import '../../sync/data/phrase_sync_service.dart';
 import '../../sync/data/progress_sync_service.dart';
+import '../../sync/data/user_assets_service.dart';
 import '../../sync/data/vocab_sync_service.dart';
 import '../../sync/presentation/daily_feed_provider.dart';
 import '../../shared/presentation/pad/app_design_tokens.dart';
@@ -69,12 +72,12 @@ class SettingsScreen extends ConsumerWidget {
 
     return PadScaffold(
       currentDestination: AppNavDestination.settings,
-      topBar: const PadTopBar(title: '英语学习休息室', subtitle: '设置'),
+      topBar: const PadTopBar(title: '英语学习休息室', subtitle: '我的'),
       body: ListView(
         padding: EdgeInsets.all(context.padPagePadding),
         children: <Widget>[
           Text(
-            '设置',
+            '我的',
             style: TextStyle(
               fontSize: compact ? 30 : 34,
               fontWeight: FontWeight.w900,
@@ -83,22 +86,11 @@ class SettingsScreen extends ConsumerWidget {
           ),
           SizedBox(height: compact ? 6 : 8),
           Text(
-            '管理您的学习体验',
+            '先登录账号，再管理学习体验',
             style: TextStyle(
               fontSize: compact ? 14 : 15,
               color: AppDesignTokens.textSecondary,
             ),
-          ),
-          SizedBox(height: context.padSectionGap),
-          const SettingsGroupCard(
-            title: '外观',
-            icon: Icons.palette_rounded,
-            children: <Widget>[
-              Padding(
-                padding: EdgeInsets.symmetric(vertical: 4),
-                child: ThemeWidget(),
-              ),
-            ],
           ),
           SizedBox(height: context.padSectionGap),
           SettingsGroupCard(
@@ -156,11 +148,52 @@ class SettingsScreen extends ConsumerWidget {
                   },
                 ),
                 _ActionRow(
+                  title: '试用资产 / 陪练额度',
+                  description: '查看余额、会员与口语陪练剩余分钟。',
+                  icon: Icons.account_balance_wallet_rounded,
+                  onTap: () async {
+                    try {
+                      final UserAssetsSnapshot snap =
+                          await ref.read(userAssetsServiceProvider).fetch();
+                      if (!context.mounted) {
+                        return;
+                      }
+                      final String membership =
+                          (snap.activeMembership ?? '').trim().isEmpty
+                          ? '无'
+                          : snap.activeMembership!;
+                      _showMessage(
+                        context,
+                        '余额 ${snap.balanceCredits} 分 · '
+                        '陪练 ${snap.coachMinutes} 分钟 · '
+                        '会员 $membership · '
+                        '词库 ${snap.vocabCount} · '
+                        '关联课 ${snap.linkCourseCount}',
+                      );
+                    } catch (error) {
+                      if (!context.mounted) {
+                        return;
+                      }
+                      _showMessage(
+                        context,
+                        '无法获取资产：${'$error'.replaceFirst('Exception: ', '')}',
+                      );
+                    }
+                  },
+                ),
+                _ActionRow(
+                  title: '口语错题 / 复习',
+                  description: '查看陪练纠错与到期表达复习。',
+                  icon: Icons.record_voice_over_rounded,
+                  onTap: () => context.push(SGRoute.learningReview.route),
+                ),
+                _ActionRow(
                   title: '退出登录',
                   description: '退出后云端同步将暂停，本地学习数据仍保留。',
                   danger: true,
                   icon: Icons.logout_rounded,
                   onTap: () async {
+                    await setSkipDefaultAccountLogin(skip: true);
                     await ref.read(authSessionProvider.notifier).signOut();
                     if (!context.mounted) {
                       return;
@@ -183,7 +216,24 @@ class SettingsScreen extends ConsumerWidget {
                   icon: Icons.person_add_alt_1_rounded,
                   onTap: () => context.push(SGRoute.register.route),
                 ),
+                _ActionRow(
+                  title: '使用默认账号 weiwei',
+                  description: '一键登录测试账号并同步云端字幕资产。',
+                  icon: Icons.bolt_rounded,
+                  onTap: () => showAccountHubSheet(context, ref),
+                ),
               ],
+            ],
+          ),
+          SizedBox(height: context.padSectionGap),
+          const SettingsGroupCard(
+            title: '外观',
+            icon: Icons.palette_rounded,
+            children: <Widget>[
+              Padding(
+                padding: EdgeInsets.symmetric(vertical: 4),
+                child: ThemeWidget(),
+              ),
             ],
           ),
           SizedBox(height: context.padSectionGap),
@@ -1008,7 +1058,7 @@ class SettingsScreen extends ConsumerWidget {
               _ActionRow(
                 title: '备份同步云端数据',
                 description: authSession.isLoggedIn
-                    ? '上传收藏生词并拉取云端进度 / 词库 / 学习偏好 / 私人字幕。'
+                    ? '上传收藏生词 / 短语并拉取云端进度 / 词库 / 学习偏好 / 私人字幕。'
                     : '请先登录爱快账号后再同步。',
                 icon: Icons.cloud_sync_rounded,
                 onTap: () async {
@@ -1020,7 +1070,11 @@ class SettingsScreen extends ConsumerWidget {
                     final int pushed = await ref
                         .read(vocabSyncServiceProvider)
                         .pushAllFavorites();
+                    final int phrasesPushed = await ref
+                        .read(phraseSyncServiceProvider)
+                        .pushAll();
                     await ref.read(vocabSyncServiceProvider).pullAndMerge();
+                    await ref.read(phraseSyncServiceProvider).pullAndMerge();
                     await ref
                         .read(progressSyncServiceProvider)
                         .pullIndexed();
@@ -1033,7 +1087,8 @@ class SettingsScreen extends ConsumerWidget {
                     }
                     _showMessage(
                       context,
-                      '已同步：上传 $pushed 个收藏词，并拉取云端词库、偏好与私人字幕',
+                      '已同步：上传 $pushed 个收藏词、$phrasesPushed 条短语，'
+                      '并拉取云端词库、短语、偏好与私人字幕',
                     );
                   } catch (error) {
                     if (!context.mounted) {

@@ -11,6 +11,7 @@ from app.database import get_db
 from app.deps import get_current_user
 from app.models import Order, ProductSku, User
 from app.schemas import (
+    EntitlementConsumeIn,
     EntitlementGrantIn,
     EntitlementOut,
     OrderCreateIn,
@@ -124,6 +125,30 @@ async def grant_entitlement(
         duration_days=payload.duration_days,
         meta=payload.meta,
     )
+    return EntitlementOut.model_validate(row)
+
+
+@router.post("/entitlements/consume", response_model=EntitlementOut)
+async def consume_entitlement(
+    payload: EntitlementConsumeIn,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> EntitlementOut:
+    """Consume countable quota (e.g. coach minutes)."""
+    try:
+        row = await assets_svc.consume_entitlement(
+            db,
+            user.id,
+            asset_kind=payload.asset_kind,
+            asset_ref=payload.asset_ref,
+            quantity=payload.quantity,
+            reason=payload.reason,
+        )
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_402_PAYMENT_REQUIRED,
+            detail=str(exc),
+        ) from exc
     return EntitlementOut.model_validate(row)
 
 

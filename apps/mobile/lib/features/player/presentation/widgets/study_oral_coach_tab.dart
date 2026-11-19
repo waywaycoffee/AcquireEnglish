@@ -7,6 +7,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_tts/flutter_tts.dart';
+import 'package:flutter_webrtc/flutter_webrtc.dart';
 import 'package:media_kit/media_kit.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -14,7 +15,9 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../../../authentication/presentation/auth_session.dart';
 import '../../../settings/presentation/settings_provider.dart';
 import '../../../sync/data/acquire_api_client.dart';
+import '../../../sync/data/user_assets_service.dart';
 import '../../data/digital_human_catalog.dart';
+import '../../data/livetalking_client.dart';
 import '../../data/oral_coach_pipeline_client.dart';
 import '../../data/pronunciation_providers.dart';
 import '../../domain/pronunciation_assessment.dart';
@@ -173,6 +176,7 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
   static const Duration _sessionBudget = Duration(minutes: 3);
 
   final OralCoachPipelineClient _pipelineClient = OralCoachPipelineClient();
+  final LiveTalkingClient _liveTalking = LiveTalkingClient();
   final List<_ChatBubble> _bubbles = <_ChatBubble>[];
   final Set<int> _showZhIndexes = <int>{};
   final ScrollController _chatScroll = ScrollController();
@@ -186,6 +190,11 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
   Duration _sessionLeft = _sessionBudget;
   OralCoachSession? _session;
   Future<void>? _sessionPreparation;
+  Future<void>? _liveTalkingPreparation;
+  RTCVideoRenderer? _liveRenderer;
+  bool _liveConnected = false;
+  bool _quotaConsumed = false;
+  int? _coachMinutesLeft;
   String? _historyKey;
   bool _historyLoading = true;
   Player? _speechPlayer;
@@ -235,6 +244,7 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
   void dispose() {
     unawaited(_cartoonTts.stop());
     unawaited(_speechPlayer?.stop());
+    unawaited(_liveTalking.disconnect());
     _orbPulse.dispose();
     _sessionTicker?.cancel();
     _chatScroll.dispose();
@@ -402,6 +412,9 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
       settings.oralCoachBackend != '本地 TTS' &&
       settings.oralCoachPipelineUrl.trim().isNotEmpty;
 
+  bool _wantsLiveTalking(LearningSettingsState settings) =>
+      settings.usesRealtimeLipSync;
+
   Future<void> _ensurePipelineSession(LearningSettingsState settings) async {
     if (_session != null) return;
     final Future<void> preparation = _sessionPreparation ??=
@@ -411,6 +424,85 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
     } finally {
       if (identical(_sessionPreparation, preparation))
         _sessionPreparation = null;
+    }
+  }
+
+  Future<void> _ensureLiveTalking(LearningSettingsState settings) async {
+    if (!_wantsLiveTalking(settings)) {
+      return;
+    }
+    if (_liveTalking.isConnected && _liveRenderer != null) {
+      _liveConnected = true;
+      return;
+    }
+    final Future<void> preparation = _liveTalkingPreparation ??=
+        _connectLiveTalking(settings, _sessionStartedAt);
+    try {
+      await preparation;
+    } finally {
+      if (identical(_liveTalkingPreparation, preparation)) {
+        _liveTalkingPreparation = null;
+      }
+    }
+  }
+
+  Future<void> _connectLiveTalking(
+    LearningSettingsState settings,
+    DateTime? startedAt,
+  ) async {
+    try {
+      final String baseUrl = await LiveTalkingClient.pickReachableBaseUrl(
+        preferred: settings.resolvedOralCoachServerUrl,
+      );
+      final RTCVideoRenderer renderer = await _liveTalking.connect(
+        baseUrl,
+        avatar: settings.selectedDigitalHuman.liveTalkingAvatarId,
+        iceServers: defaultLiveTalkingIceServers,
+      );
+      if (!mounted || !_started || startedAt != _sessionStartedAt) {
+        await _liveTalking.disconnect();
+        return;
+      }
+      setState(() {
+        _liveRenderer = renderer;
+        _liveConnected = _liveTalking.isConnected;
+        if (_liveTalking.hasRemoteVideo) {
+          _status = '数字人已连接';
+        } else {
+          _status = '数字人已建连 · 等待画面';
+        }
+      });
+    } catch (error) {
+      if (!mounted || startedAt != _sessionStartedAt) {
+        return;
+      }
+      setState(() {
+        _liveConnected = false;
+        _liveRenderer = null;
+        _error = 'LiveTalking 未接通，改用本地形象：'
+            '${'$error'.replaceFirst('Exception: ', '')}';
+      });
+    }
+  }
+
+  Future<void> _consumeCoachQuotaIfNeeded() async {
+    if (_quotaConsumed || !ref.read(authSessionProvider).isLoggedIn) {
+      return;
+    }
+    _quotaConsumed = true;
+    try {
+      final int left = await ref
+          .read(userAssetsServiceProvider)
+          .consumeCoachMinutes(minutes: 1, reason: 'oral_coach_session');
+      if (!mounted) {
+        return;
+      }
+      setState(() => _coachMinutesLeft = left);
+    } catch (_) {
+      // Trial/quota may be exhausted — still allow local TTS fallback.
+      if (mounted) {
+        setState(() => _coachMinutesLeft = 0);
+      }
     }
   }
 
@@ -454,6 +546,20 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
     if (!mounted || !_started || _coachSpeaking || speak.isEmpty) return;
     setState(() => _coachSpeaking = true);
     try {
+      if (_wantsLiveTalking(settings)) {
+        await _ensureLiveTalking(settings);
+        if (_liveTalking.isConnected) {
+          try {
+            await _liveTalking.speak(speak, type: 'echo', interrupt: true);
+            // Approximate lip-sync duration so mic unlocks after talk.
+            final int waitMs = (speak.length * 55).clamp(1200, 12000);
+            await Future<void>.delayed(Duration(milliseconds: waitMs));
+            return;
+          } catch (_) {
+            // Fall through to TTS.
+          }
+        }
+      }
       if (ttsUrl != null && ttsUrl.isNotEmpty && await _playRemoteTts(ttsUrl))
         return;
       if (!mounted || !_started) return;
@@ -581,8 +687,12 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
     });
     _armSessionClock();
     _scrollChatToEnd();
+    unawaited(_consumeCoachQuotaIfNeeded());
     if (_usesVoicePipeline(settings)) {
       unawaited(_ensurePipelineSession(settings).catchError((Object _) {}));
+    }
+    if (_wantsLiveTalking(settings)) {
+      unawaited(_ensureLiveTalking(settings).catchError((Object _) {}));
     }
   }
 
@@ -919,6 +1029,25 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
           text: turn.coachText,
         );
       }
+      final List<String> corrections = turn.corrections
+          .map((String item) => item.trim())
+          .where((String item) => item.isNotEmpty)
+          .take(5)
+          .toList(growable: false);
+      if (corrections.isNotEmpty) {
+        await api.finalizeLearningFeedback(
+          sessionId: sid,
+          items: corrections
+              .map(
+                (String suggestion) => <String, String>{
+                  'quote': turn.transcript,
+                  'suggestion': suggestion,
+                  'reason': 'oral_coach_correction',
+                },
+              )
+              .toList(growable: false),
+        );
+      }
     } catch (_) {}
   }
 
@@ -951,10 +1080,15 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
     _sessionTicker?.cancel();
     _sessionTicker = null;
     _sessionStartedAt = null;
+    _liveTalkingPreparation = null;
+    await _liveTalking.disconnect();
     setState(() {
       _started = false;
       _session = null;
       _sessionPreparation = null;
+      _liveRenderer = null;
+      _liveConnected = false;
+      _quotaConsumed = false;
       _busy = false;
       _sessionLeft = _sessionBudget;
       _error = null;
@@ -1080,7 +1214,19 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
                     : (_started ? '你可以开始说' : '点麦克风开始对话')));
     final String stageLabel = _coachSpeaking
         ? '外教在说…'
-        : (_recordingActive ? '外教在听…' : persona.displayName);
+        : (_recordingActive
+              ? '外教在听…'
+              : (_liveConnected
+                    ? '${persona.displayName} · 唇形'
+                    : persona.displayName));
+    final Widget? liveVideo =
+        _liveConnected && _liveRenderer != null
+        ? RTCVideoView(
+            _liveRenderer!,
+            objectFit: RTCVideoViewObjectFit.RTCVideoViewObjectFitCover,
+            mirror: false,
+          )
+        : null;
 
     return ClipRRect(
       borderRadius: BorderRadius.circular(22),
@@ -1114,6 +1260,7 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
                     label: stageLabel,
                     imageAsset: persona.assetPath,
                     displayName: persona.displayName,
+                    liveVideo: liveVideo,
                   ),
                   const DecoratedBox(
                     decoration: BoxDecoration(
@@ -1155,6 +1302,19 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
                   const Expanded(
                     child: Text('对话记录', style: TextStyle(color: Colors.white)),
                   ),
+                  if (_coachMinutesLeft != null) ...<Widget>[
+                    _GlassChip(
+                      onTap: null,
+                      child: Text(
+                        '陪练 ${_coachMinutesLeft!} 分',
+                        style: const TextStyle(
+                          color: Colors.white70,
+                          fontSize: 11,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                  ],
                   _GlassChip(
                     onTap: _showSceneSheet,
                     child: Text(

@@ -14,6 +14,7 @@ class CoachAvatarStage extends StatelessWidget {
     this.imageAsset,
     this.spriteAsset,
     this.displayName,
+    this.liveVideo,
     super.key,
   });
 
@@ -25,8 +26,34 @@ class CoachAvatarStage extends StatelessWidget {
   final String? imageAsset;
   final String? displayName;
 
+  /// LiveTalking WebRTC remote video (full-bleed). When set, replaces still/cartoon.
+  final Widget? liveVideo;
+
   @override
   Widget build(BuildContext context) {
+    if (liveVideo != null) {
+      return Stack(
+        fit: StackFit.expand,
+        children: <Widget>[
+          const ColoredBox(color: Color(0xFF18122A)),
+          liveVideo!,
+          Positioned(
+            left: 24,
+            right: 24,
+            bottom: 28,
+            child: Text(
+              label,
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: Colors.white.withValues(alpha: 0.78),
+                fontWeight: FontWeight.w700,
+                fontSize: 14,
+              ),
+            ),
+          ),
+        ],
+      );
+    }
     return AnimatedBuilder(
       animation: pulse,
       builder: (BuildContext context, Widget? child) {

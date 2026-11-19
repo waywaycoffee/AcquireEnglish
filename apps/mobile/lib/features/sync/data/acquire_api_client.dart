@@ -113,7 +113,10 @@ class PersonalImportAsset {
     required this.hasEn,
     required this.hasZh,
     required this.courseId,
+    this.hasCover = false,
     this.author,
+    this.coverUrl,
+    this.coverImageUrl,
     this.subtitleEnUrl,
     this.subtitleZhUrl,
   });
@@ -129,7 +132,10 @@ class PersonalImportAsset {
         durationSec: (json['duration_sec'] as num?)?.toInt() ?? 60,
         hasEn: json['has_en'] == true,
         hasZh: json['has_zh'] == true,
+        hasCover: json['has_cover'] == true,
         courseId: '${json['course_id'] ?? 'link-${json['id']}'}',
+        coverUrl: (json['cover_url'] as String?)?.trim(),
+        coverImageUrl: (json['cover_image_url'] as String?)?.trim(),
         subtitleEnUrl: json['subtitle_en_url'] as String?,
         subtitleZhUrl: json['subtitle_zh_url'] as String?,
       );
@@ -143,7 +149,10 @@ class PersonalImportAsset {
   final int durationSec;
   final bool hasEn;
   final bool hasZh;
+  final bool hasCover;
   final String courseId;
+  final String? coverUrl;
+  final String? coverImageUrl;
   final String? subtitleEnUrl;
   final String? subtitleZhUrl;
 }
@@ -500,6 +509,100 @@ class AcquireVocabDto {
   final DateTime createdAt;
 }
 
+class AcquirePhraseDto {
+  const AcquirePhraseDto({
+    required this.clientId,
+    required this.english,
+    required this.chinese,
+    required this.course,
+    required this.episode,
+    required this.time,
+    this.id,
+    this.courseId,
+    this.episodeId,
+    this.startTime,
+    this.endTime,
+    this.note,
+    this.rating = 1,
+    this.needsReview = true,
+    this.reviewCount = 0,
+    this.lapseCount = 0,
+    this.collectedAt,
+    this.lastReviewedAt,
+    this.nextReviewAt,
+  });
+
+  factory AcquirePhraseDto.fromJson(Map<String, dynamic> json) =>
+      AcquirePhraseDto(
+        id: json['id'] as int?,
+        clientId: '${json['client_id'] ?? ''}',
+        english: '${json['english'] ?? ''}',
+        chinese: '${json['chinese'] ?? ''}',
+        course: '${json['course'] ?? ''}',
+        episode: '${json['episode'] ?? ''}',
+        time: '${json['time'] ?? ''}',
+        courseId: json['course_id'] as String?,
+        episodeId: json['episode_id'] as String?,
+        startTime: json['start_time'] as String?,
+        endTime: json['end_time'] as String?,
+        note: json['note'] as String?,
+        rating: (json['rating'] as num?)?.toInt() ?? 1,
+        needsReview: json['needs_review'] == true || json['needs_review'] == 1,
+        reviewCount: (json['review_count'] as num?)?.toInt() ?? 0,
+        lapseCount: (json['lapse_count'] as num?)?.toInt() ?? 0,
+        collectedAt: json['collected_at'] == null
+            ? null
+            : DateTime.tryParse('${json['collected_at']}'),
+        lastReviewedAt: json['last_reviewed_at'] == null
+            ? null
+            : DateTime.tryParse('${json['last_reviewed_at']}'),
+        nextReviewAt: json['next_review_at'] == null
+            ? null
+            : DateTime.tryParse('${json['next_review_at']}'),
+      );
+
+  final int? id;
+  final String clientId;
+  final String english;
+  final String chinese;
+  final String course;
+  final String episode;
+  final String time;
+  final String? courseId;
+  final String? episodeId;
+  final String? startTime;
+  final String? endTime;
+  final String? note;
+  final int rating;
+  final bool needsReview;
+  final int reviewCount;
+  final int lapseCount;
+  final DateTime? collectedAt;
+  final DateTime? lastReviewedAt;
+  final DateTime? nextReviewAt;
+
+  Map<String, dynamic> toJson() => <String, dynamic>{
+    'client_id': clientId,
+    'english': english,
+    'chinese': chinese,
+    'course': course,
+    'episode': episode,
+    'time': time,
+    'course_id': courseId,
+    'episode_id': episodeId,
+    'start_time': startTime,
+    'end_time': endTime,
+    'note': note,
+    'rating': rating,
+    'needs_review': needsReview,
+    'review_count': reviewCount,
+    'lapse_count': lapseCount,
+    'collected_at': collectedAt?.toUtc().toIso8601String(),
+    'last_reviewed_at': lastReviewedAt?.toUtc().toIso8601String(),
+    'next_review_at': nextReviewAt?.toUtc().toIso8601String(),
+  };
+}
+
 class AcquireApiClient {
   AcquireApiClient(this._dio);
 
@@ -768,6 +871,62 @@ class AcquireApiClient {
     );
   }
 
+  Future<List<Map<String, dynamic>>> listDueLearningReviews() async {
+    final Response<dynamic> response = await _dio.get(
+      Endpoints.learningReviewsDue,
+    );
+    return (response.data as List<dynamic>).cast<Map<String, dynamic>>();
+  }
+
+  Future<void> completeLearningReview({
+    required String reviewId,
+    required bool independentOk,
+  }) async {
+    await _dio.post<dynamic>(
+      '${Endpoints.learningReviews}/$reviewId/complete',
+      data: <String, dynamic>{'independent_ok': independentOk},
+    );
+  }
+
+  Future<Map<String, dynamic>> getAssets() async {
+    final Response<dynamic> response = await _dio.get(Endpoints.assets);
+    return response.data as Map<String, dynamic>;
+  }
+
+  Future<Map<String, dynamic>> consumeEntitlement({
+    required String assetKind,
+    String assetRef = '',
+    int quantity = 1,
+    String reason = 'consume',
+  }) async {
+    final Response<dynamic> response = await _dio.post(
+      Endpoints.assetsConsume,
+      data: <String, dynamic>{
+        'asset_kind': assetKind,
+        'asset_ref': assetRef,
+        'quantity': quantity,
+        'reason': reason,
+      },
+    );
+    return response.data as Map<String, dynamic>;
+  }
+
+  Future<List<AcquirePhraseDto>> listPhrases() async {
+    final Response<dynamic> response = await _dio.get(Endpoints.phrases);
+    return (response.data as List<dynamic>)
+        .cast<Map<String, dynamic>>()
+        .map(AcquirePhraseDto.fromJson)
+        .toList(growable: false);
+  }
+
+  Future<AcquirePhraseDto> upsertPhrase(AcquirePhraseDto phrase) async {
+    final Response<dynamic> response = await _dio.post(
+      Endpoints.phrases,
+      data: phrase.toJson(),
+    );
+    return AcquirePhraseDto.fromJson(response.data as Map<String, dynamic>);
+  }
+
   Future<bool> liveKitConfigured() async {
     try {
       final Response<dynamic> response = await _dio.get(Endpoints.livekitStatus);
@@ -852,6 +1011,8 @@ class AcquireApiClient {
     int durationSec = 60,
     String? subtitleEnSrt,
     String? subtitleZhSrt,
+    String? coverUrl,
+    String? coverImageBase64,
   }) async {
     final Response<dynamic> response = await _dio.put(
       Endpoints.importsAsset,
@@ -864,6 +1025,10 @@ class AcquireApiClient {
         'duration_sec': durationSec,
         if (subtitleEnSrt != null) 'subtitle_en_srt': subtitleEnSrt,
         if (subtitleZhSrt != null) 'subtitle_zh_srt': subtitleZhSrt,
+        if (coverUrl != null && coverUrl.trim().isNotEmpty)
+          'cover_url': coverUrl.trim(),
+        if (coverImageBase64 != null && coverImageBase64.trim().isNotEmpty)
+          'cover_image_base64': coverImageBase64.trim(),
       },
       options: Options(
         extra: const <String, Object>{
@@ -874,6 +1039,36 @@ class AcquireApiClient {
     return PersonalImportAsset.fromJson(
       response.data as Map<String, dynamic>,
     );
+  }
+
+  Future<List<int>?> fetchPersonalImportCover({required int importId}) async {
+    try {
+      final Response<List<int>> response = await _dio.get<List<int>>(
+        '${Endpoints.imports}/$importId/cover',
+        options: Options(
+          responseType: ResponseType.bytes,
+          validateStatus: (int? status) =>
+              status != null &&
+              ((status >= 200 && status < 300) || status == 404),
+          extra: const <String, Object>{
+            'dio_cache_interceptor_force_refresh': true,
+          },
+        ),
+      );
+      if (response.statusCode == 404) {
+        return null;
+      }
+      final List<int>? data = response.data;
+      if (data == null || data.length < 256) {
+        return null;
+      }
+      return data;
+    } on DioException catch (error) {
+      if (error.response?.statusCode == 404) {
+        return null;
+      }
+      rethrow;
+    }
   }
 
   Future<String?> fetchPersonalImportSrt({

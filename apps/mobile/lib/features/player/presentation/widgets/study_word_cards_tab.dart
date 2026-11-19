@@ -130,7 +130,7 @@ class _StudyWordCardsTabState extends ConsumerState<StudyWordCardsTab> {
         Padding(
           padding: const EdgeInsets.fromLTRB(2, 0, 2, 10),
           child: FilledButton.icon(
-            onPressed: () => context.push(SGRoute.sm2Review.route),
+            onPressed: () => context.push(SGRoute.reviewSession.route),
             icon: const Icon(Icons.style_rounded, size: 18),
             label: const Text('开始今日背单词'),
             style: FilledButton.styleFrom(
