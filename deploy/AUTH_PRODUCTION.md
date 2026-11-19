@@ -1,6 +1,6 @@
-# 生产环境：邮箱验证码 / 手机验证码 / 微信登录配置
+# 生产环境：手机验证码 / 微信登录配置
 
-App 与 API 已支持邮箱验证码注册，以及手机/微信「未注册自动建号」。生产要关掉 mock，填入真实密钥。
+App 与 API 已支持「未注册自动建号」。生产要关掉 mock，填入真实密钥。
 
 ## 当前生产探针
 
@@ -12,36 +12,15 @@ curl -fsS https://acquireenglish.curlhairai.com/api/health
 
 | 字段 | 目标值 |
 |------|--------|
-| `auth_email_mock` | `false`（配好 SMTP 后） |
-| `auth_email_provider` | `smtp`（或 `webhook`） |
 | `auth_sms_mock` | `false` |
 | `auth_sms_provider` | `aliyun`（或 `webhook`） |
+| `auth_email_mock` | `false` |
+| `auth_email_provider` | `smtp`（或 `webhook`） |
 | `auth_wechat_mock` | `false` |
 | `auth_wechat_configured` | `true` |
 
-## 0. 邮箱注册验证码
-
-注册流程：`POST /api/auth/email/send` → 用户填码 → `POST /api/auth/register`（必带 `code`）。
-
-开发默认 `AUTH_EMAIL_MOCK=true`（响应里带 `debug_code`）。生产关掉 mock 并配置 SMTP：
-
-```bash
-AUTH_EMAIL_MOCK=false
-SMTP_HOST=smtp.example.com
-SMTP_PORT=465
-SMTP_USER=...
-SMTP_PASSWORD=...
-SMTP_FROM=noreply@example.com
-SMTP_USE_SSL=true
-```
-
-或改用 webhook：`AUTH_EMAIL_WEBHOOK_URL=https://...`（POST JSON `{email, code, purpose}`）。
-
-```bash
-curl -fsS -X POST https://acquireenglish.curlhairai.com/api/auth/email/send \
-  -H 'Content-Type: application/json' \
-  -d '{"email":"you@example.com"}'
-```
+> 生产机通过 systemd `PRODUCTION_MODE=true` 禁用 email/wechat mock。  
+> 未配置 SMTP/Webhook 时，邮箱注册接口会返回「邮箱注册暂未开放」。
 
 ## 1. 阿里云短信
 
@@ -68,7 +47,37 @@ curl -fsS -X POST https://acquireenglish.curlhairai.com/api/auth/sms/send \
 # 应无 debug_code；真机会收到短信
 ```
 
-## 2. 微信开放平台（App 登录）
+## 2. 邮箱注册（阿里云邮件推送 SMTP）
+
+`PRODUCTION_MODE=true` 时不会使用 `AUTH_EMAIL_MOCK`。必须配置真实发信：
+
+```bash
+AUTH_EMAIL_MOCK=false
+SMTP_HOST=smtpdm.aliyun.com
+SMTP_PORT=465
+SMTP_USE_SSL=true
+SMTP_USE_TLS=false
+SMTP_USER=你的发信地址@已验证域名
+SMTP_PASSWORD=SMTP密码
+SMTP_FROM=你的发信地址@已验证域名
+```
+
+当前生产复用与 CurlHair 相同的阿里云邮件推送发信账号（`smtpdm.aliyun.com:465`）。  
+发信域名须在阿里云邮件推送控制台完成验证；`SMTP_FROM` 必须是已通过验证的发信地址。
+
+验证：
+
+```bash
+curl -fsS https://acquireenglish.curlhairai.com/api/health
+# auth_email_provider 应为 smtp
+
+curl -fsS -X POST https://acquireenglish.curlhairai.com/api/auth/email/send \
+  -H 'Content-Type: application/json' \
+  -d '{"email":"你的邮箱"}'
+# 应返回 ok:true 且无 debug_code；邮箱收到验证码后再调 /api/auth/register
+```
+
+## 3. 微信开放平台（App 登录）
 
 1. [微信开放平台](https://open.weixin.qq.com/) 创建移动应用，拿到 **AppID / AppSecret**
 2. Android：配置应用签名与包名（与正式包一致）
@@ -91,7 +100,7 @@ flutter build apk --dart-define=WECHAT_APP_ID=wx........ \
 
 未配置 AppID 时，App 仍走开发 mock code（仅联调）。
 
-## 3. 新用户试用资产
+## 4. 新用户试用资产
 
 首次邮箱 / 手机 / 微信注册成功后会自动发放：
 
@@ -101,7 +110,7 @@ flutter build apk --dart-define=WECHAT_APP_ID=wx........ \
 
 可用 `GET /api/assets` 验证。
 
-## 4. 服务器一键写入示例
+## 5. 服务器一键写入示例
 
 在 ECS 上（勿把真实密钥提交进 Git）：
 
