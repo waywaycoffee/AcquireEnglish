@@ -7,6 +7,7 @@ import re
 from typing import Any, Literal
 
 from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi.responses import RedirectResponse
 from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -16,6 +17,7 @@ from app.database import get_db
 from app.deps import get_current_user
 from app.models import User, UserLinkCourse, UserNetdiskBinding
 from app.services.netdisk_crypto import encrypt_credential
+from app.services.netdisk_play import signed_play_url, verify_play
 from app.services.openlist_client import (
     OpenListClient,
     OpenListError,
@@ -329,8 +331,8 @@ async def import_netdisk_videos(
             continue
 
         title = str(meta.get("name") or path.rsplit("/", 1)[-1])
-        raw_url = str(meta.get("raw_url") or "").strip()
-        watch_url = raw_url or public_raw_url(path)
+        # Persist the OpenList path. Playback mints a fresh upstream URL.
+        watch_url = path
         external_id = _external_id(payload.provider, path)
         source = f"{payload.provider}_netdisk"
 
@@ -357,16 +359,49 @@ async def import_netdisk_videos(
             link.title = title[:512]
             link.watch_url = watch_url[:1024]
         await db.flush()
-        course_id = f"link-{source}-{external_id}"
         items.append(
             NetdiskImportItemOut(
                 path=path,
-                course_id=course_id,
+                course_id=f"link-{link.id}",
                 title=title,
-                watch_url=watch_url,
+                watch_url=signed_play_url(link.id, user.id),
                 ok=True,
             )
         )
 
     await db.commit()
     return NetdiskImportOut(items=items)
+
+
+@router.get("/play/{import_id}")
+async def play_netdisk_video(
+    import_id: int,
+    uid: int,
+    exp: int,
+    sig: str,
+    db: AsyncSession = Depends(get_db),
+) -> RedirectResponse:
+    """Refresh the upstream URL and redirect the player. No bearer token."""
+    _require_openlist()
+    if not verify_play(import_id, uid, exp, sig):
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "播放链接无效或已过期")
+    result = await db.execute(
+        select(UserLinkCourse).where(
+            UserLinkCourse.id == import_id,
+            UserLinkCourse.user_id == uid,
+        )
+    )
+    row = result.scalar_one_or_none()
+    if row is None or not str(row.source).endswith("_netdisk"):
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "课程不存在")
+    path = (row.watch_url or "").strip()
+    if not path.startswith("/"):
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "网盘路径无效")
+    try:
+        meta = await OpenListClient().fs_get(path)
+    except OpenListError as exc:
+        raise HTTPException(status.HTTP_502_BAD_GATEWAY, f"无法获取播放地址：{exc}") from exc
+    raw_url = str(meta.get("raw_url") or "").strip()
+    if not raw_url:
+        raw_url = public_raw_url(path)
+    return RedirectResponse(raw_url, status_code=status.HTTP_302_FOUND)

@@ -331,6 +331,11 @@ def to_course_out(row_id: int, payload: LinkImportPayload | None = None, *, row=
 
     lesson_id = f"{course_id}-01"
     tag = source
+    video_url = watch_url
+    if row is not None and str(source).endswith("_netdisk"):
+        from app.services.netdisk_play import signed_play_url
+
+        video_url = signed_play_url(row.id, row.user_id)
     return {
         "id": course_id,
         "title": title,
@@ -345,7 +350,7 @@ def to_course_out(row_id: int, payload: LinkImportPayload | None = None, *, row=
                 "title": title,
                 "index": 1,
                 "durationSec": float(duration_sec),
-                "videoUrl": watch_url,
+                "videoUrl": video_url,
                 "subtitles": {
                     "en": f"/api/imports/{row.id}/srt/en" if row is not None and has_en else "",
                     "zh": f"/api/imports/{row.id}/srt/zh" if row is not None and has_zh else None,

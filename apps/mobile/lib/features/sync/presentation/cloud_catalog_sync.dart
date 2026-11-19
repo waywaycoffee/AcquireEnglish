@@ -17,9 +17,13 @@ Future<void> syncCloudCatalogAndFeed(dynamic ref) async {
     // Never merge unplayable placeholder packs (cdn.example.com demo catalog).
     final List<LibraryCourseData> mapped = courses
         .where((AcquireCourseDto c) => !isPlaceholderCloudCourse(c))
-        // Personal link-* assets are restored separately (video re-download +
-        // DB softsubs). Merging raw watch URLs as playable files is wrong.
-        .where((AcquireCourseDto c) => !c.id.startsWith('link-'))
+        // B站/YouTube link-* assets are restored separately (local re-download).
+        // Netdisk lessons already carry a signed /api/netdisk/play URL.
+        .where(
+          (AcquireCourseDto c) =>
+              !c.id.startsWith('link-') ||
+              c.tags.any((String tag) => tag.endsWith('_netdisk')),
+        )
         .map(mapAcquireCourseToLibrary)
         .toList(growable: false);
     await (ref.read(libraryCatalogProvider.notifier) as LibraryCatalogNotifier)
