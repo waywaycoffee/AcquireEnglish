@@ -7,11 +7,16 @@ import 'auth_session.dart';
 
 const String _legacyOwnerKey = 'study-data:legacy-owner';
 
+/// Mirrors [studyAccountProvider] for non-Riverpod call sites (e.g. player
+/// StatefulWidgets). Updated whenever the provider rebuilds.
+String lastStudyAccount = '';
+
 final studyAccountProvider = Provider<String>((Ref ref) {
   final AuthSessionState session = ref.watch(authSessionProvider);
   final String account = session.isLoggedIn
       ? session.email.trim().toLowerCase()
       : '';
+  lastStudyAccount = account;
   if (account.isNotEmpty && Hive.isBoxOpen('prefs')) {
     final Box<String> box = Hive.box<String>('prefs');
     if (!box.containsKey(_legacyOwnerKey)) {

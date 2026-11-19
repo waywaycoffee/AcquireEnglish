@@ -82,7 +82,10 @@ class _DailyReviewScreenState extends ConsumerState<DailyReviewScreen>
       if (!mounted) return;
       final DailyReviewNotifier review = ref.read(dailyReviewProvider.notifier);
       review.scheduleCloudBackup();
-      unawaited(review.drainEncounterSoftCredits());
+      // Soft encounter grades only during an active session, not overview open.
+      if (widget.session) {
+        unawaited(review.drainEncounterSoftCredits());
+      }
     });
     _timer = Timer.periodic(const Duration(seconds: 30), (_) {
       if (mounted) setState(() {});
@@ -321,6 +324,7 @@ class _DailyReviewScreenState extends ConsumerState<DailyReviewScreen>
       _currentKey = keys[next];
       _playedWord = null;
       _retryWord = false;
+      _modeStep = 0;
       _revealed = _completedKeys.contains(_currentKey);
     });
   }

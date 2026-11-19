@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../daily_review/presentation/daily_review_provider.dart';
 import '../domain/word_review_settings.dart';
 import 'word_review_settings_provider.dart';
 
@@ -62,6 +63,10 @@ class _WordReviewSettingsSheetState
               .read(wordReviewSettingsProvider)
               .copyWith(dailyNewLimit: newLimit, dailyReviewLimit: reviewLimit),
         );
+    // Keep FSRS daily-new quota in sync with the words-plan setting.
+    if (ref.read(dailyReviewProvider).dailyNewLimit != newLimit) {
+      await ref.read(dailyReviewProvider.notifier).setDailyNewLimit(newLimit);
+    }
     if (mounted) {
       Navigator.of(context).pop();
     }

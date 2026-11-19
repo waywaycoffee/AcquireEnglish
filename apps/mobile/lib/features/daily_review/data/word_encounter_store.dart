@@ -9,7 +9,7 @@ const String _encounterKey = 'word_encounters_v1';
 
 /// Light “再遇” counts while watching video (LingQ-style encounters).
 class WordEncounterStore {
-  WordEncounterStore({this.account = ''});
+  WordEncounterStore({String? account}) : account = account ?? lastStudyAccount;
 
   final String account;
 
@@ -50,10 +50,11 @@ class WordEncounterStore {
     final int next = ((dayMap[word] as num?)?.toInt() ?? 0) + 1;
     dayMap[word] = next;
     root[day] = dayMap;
-    // Keep ~14 days.
-    final List<String> keys = root.keys.toList()..sort();
-    while (keys.length > 14) {
-      root.remove(keys.removeAt(0));
+    // Keep ~14 days of day maps; never drop the soft-credit queue key.
+    final List<String> dayKeys =
+        root.keys.where((String k) => k != '_soft').toList()..sort();
+    while (dayKeys.length > 14) {
+      root.remove(dayKeys.removeAt(0));
     }
     // Third encounter in a day → soft credit queue for FSRS Good bump.
     if (next == 3) {
@@ -70,13 +71,36 @@ class WordEncounterStore {
     return next;
   }
 
-  Future<List<String>> takeSoftCredits() async {
+  /// Peek soft credits without clearing (use [acknowledgeSoftCredits] after grade).
+  List<String> peekSoftCredits() {
     final Map<String, dynamic> root = _load();
-    final List<String> pending = ((root['_soft'] as List?) ?? const <dynamic>[])
+    return ((root['_soft'] as List?) ?? const <dynamic>[])
         .map((dynamic e) => '$e')
         .where((String e) => e.startsWith('word:'))
         .toList(growable: false);
+  }
+
+  Future<void> acknowledgeSoftCredits(Iterable<String> appliedKeys) async {
+    final Set<String> applied = appliedKeys.toSet();
+    if (applied.isEmpty) return;
+    final Map<String, dynamic> root = _load();
+    final List<String> pending = ((root['_soft'] as List?) ?? const <dynamic>[])
+        .map((dynamic e) => '$e')
+        .where((String e) => e.startsWith('word:') && !applied.contains(e))
+        .toList(growable: false);
+    if (pending.isEmpty) {
+      root.remove('_soft');
+    } else {
+      root['_soft'] = pending;
+    }
+    await _save(root);
+  }
+
+  @Deprecated('Use peekSoftCredits + acknowledgeSoftCredits')
+  Future<List<String>> takeSoftCredits() async {
+    final List<String> pending = peekSoftCredits();
     if (pending.isEmpty) return const <String>[];
+    final Map<String, dynamic> root = _load();
     root.remove('_soft');
     await _save(root);
     return pending;

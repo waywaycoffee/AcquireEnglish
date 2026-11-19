@@ -424,13 +424,15 @@ class DailyReviewNotifier extends Notifier<DailyReviewState> {
   }
 
   /// Apply LingQ-style soft consolidations queued after 3 in-video encounters.
+  /// Skipped keys stay queued until the card is due / learned.
   Future<void> drainEncounterSoftCredits() async {
     final WordEncounterStore store = WordEncounterStore(
       account: ref.read(studyAccountProvider),
     );
-    final List<String> keys = await store.takeSoftCredits();
+    final List<String> keys = store.peekSoftCredits();
     if (keys.isEmpty) return;
     final DateTime now = ref.read(reviewClockProvider)();
+    final List<String> applied = <String>[];
     for (final String key in keys) {
       final ReviewRecord? record = state.records[key];
       if (record == null || record.isNew) continue;
@@ -441,9 +443,13 @@ class DailyReviewNotifier extends Notifier<DailyReviewState> {
           fsrs.Rating.good,
           expectedReviews: record.reviews,
         );
+        applied.add(key);
       } catch (_) {
         // Card may have been removed or concurrently graded.
       }
+    }
+    if (applied.isNotEmpty) {
+      await store.acknowledgeSoftCredits(applied);
     }
   }
 
