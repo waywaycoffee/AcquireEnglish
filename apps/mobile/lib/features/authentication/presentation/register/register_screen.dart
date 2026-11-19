@@ -10,6 +10,7 @@ import '../../../sync/data/acquire_api_client.dart';
 import '../../../sync/presentation/cloud_catalog_sync.dart';
 import '../../domain/register_response.dart';
 import '../account_hub_sheet.dart';
+import '../legal/registration_agreement_checkbox.dart';
 import '../login/login_controller.dart';
 
 class RegisterScreen extends ConsumerStatefulWidget {
@@ -29,6 +30,8 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
   bool _obscure = true;
   bool _submitting = false;
   bool _sendingCode = false;
+  bool _agreedToTerms = false;
+  String? _agreementError;
   int _codeCooldown = 0;
   String? _debugCode;
   Timer? _cooldownTimer;
@@ -111,7 +114,15 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
     if (!(_formKey.currentState?.validate() ?? false) || _submitting) {
       return;
     }
-    setState(() => _submitting = true);
+    if (!_agreedToTerms) {
+      setState(() => _agreementError = '请先阅读并同意用户协议与版权声明');
+      _toast('请先勾选同意用户协议与版权声明');
+      return;
+    }
+    setState(() {
+      _agreementError = null;
+      _submitting = true;
+    });
     try {
       final RegisterResponse result = await ref
           .read(loginControllerProvider.notifier)
@@ -304,7 +315,20 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                     },
                     decoration: _decoration('再输入一次密码'),
                   ),
-                  const SizedBox(height: 24),
+                  const SizedBox(height: 18),
+                  RegistrationAgreementCheckbox(
+                    value: _agreedToTerms,
+                    errorText: _agreementError,
+                    onChanged: (bool? next) {
+                      setState(() {
+                        _agreedToTerms = next ?? false;
+                        if (_agreedToTerms) {
+                          _agreementError = null;
+                        }
+                      });
+                    },
+                  ),
+                  const SizedBox(height: 20),
                   SizedBox(
                     width: double.infinity,
                     height: 52,

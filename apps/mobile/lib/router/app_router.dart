@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
+import '../features/authentication/presentation/legal/user_agreement_screen.dart';
 import '../features/authentication/presentation/login/login_screen.dart';
 import '../features/authentication/presentation/login/phone_login_screen.dart';
 import '../features/authentication/presentation/login/wechat_mock_login_screen.dart';
@@ -48,6 +49,7 @@ enum SGRoute {
   loginWechat,
   player,
   register,
+  userAgreement,
   forgotPassword,
   editProfile,
   changePassword;
@@ -98,6 +100,12 @@ GoRouter goRouter(Ref ref) => GoRouter(
       path: SGRoute.register.route,
       builder: (BuildContext context, GoRouterState state) {
         return const RegisterScreen();
+      },
+    ).fade(),
+    GoRoute(
+      path: SGRoute.userAgreement.route,
+      builder: (BuildContext context, GoRouterState state) {
+        return const UserAgreementScreen();
       },
     ).fade(),
     GoRoute(

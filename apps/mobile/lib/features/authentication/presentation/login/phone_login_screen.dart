@@ -8,6 +8,7 @@ import '../../../../router/app_router.dart';
 import '../../../shared/presentation/pad/app_design_tokens.dart';
 import '../../../sync/data/acquire_api_client.dart';
 import '../../domain/login_response.dart';
+import '../legal/registration_agreement_checkbox.dart';
 import 'login_controller.dart';
 import 'login_flow_helpers.dart';
 
@@ -25,6 +26,8 @@ class _PhoneLoginScreenState extends ConsumerState<PhoneLoginScreen> {
   late final TextEditingController _smsCodeController;
   bool _submitting = false;
   bool _sendingSms = false;
+  bool _agreedToTerms = false;
+  String? _agreementError;
   int _smsCooldown = 0;
   Timer? _cooldownTimer;
   String? _debugSmsCode;
@@ -107,7 +110,15 @@ class _PhoneLoginScreenState extends ConsumerState<PhoneLoginScreen> {
     if (!(_formKey.currentState?.validate() ?? false) || _submitting) {
       return;
     }
-    setState(() => _submitting = true);
+    if (!_agreedToTerms) {
+      setState(() => _agreementError = '请先阅读并同意用户协议与版权声明');
+      _toast('请先勾选同意用户协议与版权声明');
+      return;
+    }
+    setState(() {
+      _agreementError = null;
+      _submitting = true;
+    });
     try {
       final LoginResponse result = await ref
           .read(loginControllerProvider.notifier)
@@ -265,7 +276,20 @@ class _PhoneLoginScreenState extends ConsumerState<PhoneLoginScreen> {
                       ),
                     ],
                   ),
-                  const SizedBox(height: 28),
+                  const SizedBox(height: 18),
+                  RegistrationAgreementCheckbox(
+                    value: _agreedToTerms,
+                    errorText: _agreementError,
+                    onChanged: (bool? next) {
+                      setState(() {
+                        _agreedToTerms = next ?? false;
+                        if (_agreedToTerms) {
+                          _agreementError = null;
+                        }
+                      });
+                    },
+                  ),
+                  const SizedBox(height: 20),
                   SizedBox(
                     width: double.infinity,
                     height: 52,

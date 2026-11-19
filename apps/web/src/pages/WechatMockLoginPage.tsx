@@ -21,6 +21,7 @@ export default function WechatMockLoginPage() {
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [advanced, setAdvanced] = useState(false);
+  const [agreed, setAgreed] = useState(false);
 
   useEffect(() => {
     setCode(loadOrCreateCode());
@@ -36,8 +37,12 @@ export default function WechatMockLoginPage() {
 
   async function onAgree(e?: FormEvent) {
     e?.preventDefault();
-    setSubmitting(true);
     setError(null);
+    if (!agreed) {
+      setError("请先阅读并勾选同意《用户协议与版权声明》");
+      return;
+    }
+    setSubmitting(true);
     try {
       const trimmed = code.trim();
       if (!trimmed) {
@@ -75,7 +80,20 @@ export default function WechatMockLoginPage() {
           <span>显示昵称</span>
           <input value={nickname} onChange={(e) => setNickname(e.target.value)} />
         </label>
-        <button className="btn wechat-btn" type="submit" disabled={submitting}>
+        <label className="field" style={{ display: "flex", gap: 10, alignItems: "flex-start" }}>
+          <input
+            type="checkbox"
+            checked={agreed}
+            onChange={(e) => setAgreed(e.target.checked)}
+            style={{ marginTop: 4 }}
+          />
+          <span>
+            我已阅读并同意
+            <Link to="/terms">《用户协议与版权声明》</Link>
+            。确认所有视频均由本人自行导入、自行学习；本软件不提供视频爬取功能。
+          </span>
+        </label>
+        <button className="btn wechat-btn" type="submit" disabled={submitting || !agreed}>
           {submitting ? "登录中…" : "同意"}
         </button>
         <button

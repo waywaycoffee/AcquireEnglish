@@ -14,6 +14,7 @@ export default function RegisterPage() {
   const [sendingCode, setSendingCode] = useState(false);
   const [cooldown, setCooldown] = useState(0);
   const [hint, setHint] = useState<string | null>(null);
+  const [agreed, setAgreed] = useState(false);
 
   useEffect(() => {
     if (cooldown <= 0) return;
@@ -47,8 +48,12 @@ export default function RegisterPage() {
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
-    setSubmitting(true);
     setError(null);
+    if (!agreed) {
+      setError("请先阅读并勾选同意《用户协议与版权声明》");
+      return;
+    }
+    setSubmitting(true);
     try {
       await register(email, password, code, displayName || undefined);
       navigate("/app");
@@ -105,7 +110,20 @@ export default function RegisterPage() {
             required
           />
         </label>
-        <button className="btn" type="submit" disabled={submitting}>
+        <label className="field" style={{ display: "flex", gap: 10, alignItems: "flex-start" }}>
+          <input
+            type="checkbox"
+            checked={agreed}
+            onChange={(e) => setAgreed(e.target.checked)}
+            style={{ marginTop: 4 }}
+          />
+          <span>
+            我已阅读并同意
+            <Link to="/terms">《用户协议与版权声明》</Link>
+            。确认所有视频均由本人自行导入、自行学习；本软件不提供视频爬取功能。
+          </span>
+        </label>
+        <button className="btn" type="submit" disabled={submitting || !agreed}>
           {submitting ? "注册中…" : "注册并登录"}
         </button>
         <p className="muted" style={{ marginTop: 16 }}>

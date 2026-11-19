@@ -14,6 +14,7 @@ export default function PhoneLoginPage() {
   const [sending, setSending] = useState(false);
   const [cooldown, setCooldown] = useState(0);
   const [mock, setMock] = useState(false);
+  const [agreed, setAgreed] = useState(false);
 
   useEffect(() => {
     if (cooldown <= 0) return;
@@ -50,8 +51,12 @@ export default function PhoneLoginPage() {
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
-    setSubmitting(true);
     setError(null);
+    if (!agreed) {
+      setError("请先阅读并勾选同意《用户协议与版权声明》");
+      return;
+    }
+    setSubmitting(true);
     try {
       const res = await api.loginWithSms(phone.trim(), code.trim());
       applyToken(res.access_token, res.user);
@@ -104,7 +109,20 @@ export default function PhoneLoginPage() {
             </button>
           </div>
         </label>
-        <button className="btn" type="submit" disabled={submitting}>
+        <label className="field" style={{ display: "flex", gap: 10, alignItems: "flex-start" }}>
+          <input
+            type="checkbox"
+            checked={agreed}
+            onChange={(e) => setAgreed(e.target.checked)}
+            style={{ marginTop: 4 }}
+          />
+          <span>
+            我已阅读并同意
+            <Link to="/terms">《用户协议与版权声明》</Link>
+            。确认所有视频均由本人自行导入、自行学习；本软件不提供视频爬取功能。
+          </span>
+        </label>
+        <button className="btn" type="submit" disabled={submitting || !agreed}>
           {submitting ? "登录中…" : "登录 / 自动注册"}
         </button>
         <p className="muted" style={{ marginTop: 16 }}>

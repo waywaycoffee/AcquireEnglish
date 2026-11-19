@@ -8,6 +8,7 @@ import '../../../../router/app_router.dart';
 import '../../../shared/presentation/pad/app_design_tokens.dart';
 import '../../data/wechat_auth_helper.dart';
 import '../../domain/login_response.dart';
+import '../legal/registration_agreement_checkbox.dart';
 import 'login_controller.dart';
 import 'login_flow_helpers.dart';
 
@@ -25,6 +26,8 @@ class _WechatMockLoginScreenState extends ConsumerState<WechatMockLoginScreen> {
   bool _loadingCode = true;
   bool _submitting = false;
   bool _advanced = false;
+  bool _agreedToTerms = false;
+  String? _agreementError;
 
   static const Color _wechatGreen = Color(0xFF07C160);
 
@@ -94,6 +97,11 @@ class _WechatMockLoginScreenState extends ConsumerState<WechatMockLoginScreen> {
 
   Future<void> _agreeMock() async {
     if (_submitting) {
+      return;
+    }
+    if (!_agreedToTerms) {
+      setState(() => _agreementError = '请先阅读并同意用户协议与版权声明');
+      _toast('请先勾选同意用户协议与版权声明');
       return;
     }
     final String code = _codeController.text.trim();
@@ -277,7 +285,20 @@ class _WechatMockLoginScreenState extends ConsumerState<WechatMockLoginScreen> {
                             ),
                           ),
                         ],
-                        const SizedBox(height: 28),
+                        const SizedBox(height: 20),
+                        RegistrationAgreementCheckbox(
+                          value: _agreedToTerms,
+                          errorText: _agreementError,
+                          onChanged: (bool? next) {
+                            setState(() {
+                              _agreedToTerms = next ?? false;
+                              if (_agreedToTerms) {
+                                _agreementError = null;
+                              }
+                            });
+                          },
+                        ),
+                        const SizedBox(height: 20),
                         SizedBox(
                           width: double.infinity,
                           height: 48,
