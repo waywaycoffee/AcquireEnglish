@@ -18,6 +18,7 @@ from app.deps import get_current_user
 from app.models import User, UserLinkCourse, UserNetdiskBinding
 from app.services.netdisk_crypto import encrypt_credential
 from app.services.netdisk_play import signed_play_url, verify_play
+from app.services.netdisk_sidecars import load_sidecars_for_video
 from app.services.openlist_client import (
     OpenListClient,
     OpenListError,
@@ -70,6 +71,8 @@ class NetdiskImportItemOut(BaseModel):
     watch_url: str
     ok: bool
     error: str | None = None
+    has_en: bool = False
+    has_zh: bool = False
 
 
 class NetdiskImportOut(BaseModel):
@@ -358,6 +361,17 @@ async def import_netdisk_videos(
         else:
             link.title = title[:512]
             link.watch_url = watch_url[:1024]
+
+        # Same-folder .srt/.vtt → personal softsubs for the learning player.
+        try:
+            sidecars = await load_sidecars_for_video(client, path)
+        except Exception:  # noqa: BLE001
+            sidecars = {}
+        if sidecars.get("en"):
+            link.subtitle_en_srt = sidecars["en"]
+        if sidecars.get("zh"):
+            link.subtitle_zh_srt = sidecars["zh"]
+
         await db.flush()
         items.append(
             NetdiskImportItemOut(
@@ -366,6 +380,8 @@ async def import_netdisk_videos(
                 title=title,
                 watch_url=signed_play_url(link.id, user.id),
                 ok=True,
+                has_en=bool(link.subtitle_en_srt),
+                has_zh=bool(link.subtitle_zh_srt),
             )
         )
 

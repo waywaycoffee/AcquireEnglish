@@ -11,6 +11,7 @@ import '../../import_course/data/bilibili_collection_download.dart';
 import '../../import_course/data/bilibili_cover_refresh.dart';
 import '../../import_course/data/bilibili_episode_cover_backfill.dart';
 import '../../import_course/data/bilibili_import_service.dart';
+import '../../import_course/data/netdisk_local_download.dart';
 import '../../import_course/presentation/course_import_entry.dart';
 import '../../import_course/presentation/widgets/import_course_flow.dart';
 import '../../navigation/presentation/navigation_destination.dart';
@@ -34,6 +35,7 @@ import '../../subtitle_completion/subtitle_completion_enqueue.dart';
 import '../../subtitle_completion/subtitle_completion_queue.dart';
 import '../../subtitle_completion/subtitle_completion_scheduler.dart';
 import '../../subtitle_completion/subtitle_completion_status_provider.dart';
+import '../../sync/data/acquire_api_client.dart';
 import '../../words/data/offline_word_dictionary.dart';
 import 'library_browse.dart';
 import 'library_catalog_provider.dart';
@@ -436,6 +438,35 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
                           );
                         },
                       ),
+                    if (pendingNetdiskEpisodes(selectedCourse) > 0)
+                      Consumer(
+                        builder: (BuildContext context, WidgetRef ref, _) {
+                          final NetdiskDownloadProgress? progress =
+                              ref.watch(netdiskDownloadProgressProvider);
+                          final bool downloading =
+                              progress?.courseId == selectedCourse.id &&
+                              progress?.done == false;
+                          return Padding(
+                            padding: const EdgeInsets.only(bottom: 8),
+                            child: Align(
+                              alignment: Alignment.centerLeft,
+                              child: OutlinedButton.icon(
+                                onPressed: downloading
+                                    ? null
+                                    : () => unawaited(
+                                          _confirmNetdiskDownload(selectedCourse),
+                                        ),
+                                icon: const Icon(Icons.download_for_offline_outlined),
+                                label: Text(
+                                  downloading
+                                      ? '正在下载到本机'
+                                      : '下载到本机（在线慢时可离线播）',
+                                ),
+                              ),
+                            ),
+                          );
+                        },
+                      ),
                     // Course-level download / 补字幕 progress stays at the very top.
                     Consumer(
                       builder: (BuildContext context, WidgetRef ref, _) {
@@ -443,6 +474,8 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
                             ref.watch(
                               bilibiliCollectionDownloadProgressProvider,
                             );
+                        final NetdiskDownloadProgress? netdiskProgress =
+                            ref.watch(netdiskDownloadProgressProvider);
                         final SubtitleCompletionCourseUi? subtitleFill = ref
                             .watch(subtitleCompletionStatusProvider)
                             .forCourse(
@@ -455,19 +488,32 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
                             progress != null &&
                             progress.courseId == selectedCourse.id &&
                             !progress.done;
+                        final bool showNetdiskDownload =
+                            netdiskProgress != null &&
+                            netdiskProgress.courseId == selectedCourse.id &&
+                            !netdiskProgress.done;
                         final bool showSubtitle =
                             subtitleFill != null && subtitleFill.showBanner;
-                        if (!showDownload && !showSubtitle) {
+                        if (!showDownload &&
+                            !showNetdiskDownload &&
+                            !showSubtitle) {
                           return const SizedBox.shrink();
                         }
+                        final String? downloadMessage = showNetdiskDownload
+                            ? netdiskProgress.message
+                            : (showDownload ? progress.message : null);
+                        final double? downloadValue = showNetdiskDownload
+                            ? netdiskProgress.progress
+                            : (showDownload ? progress.progress : null);
                         return Padding(
                           padding: const EdgeInsets.only(bottom: 16),
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: <Widget>[
-                              if (showDownload) ...<Widget>[
+                              if (downloadMessage != null &&
+                                  downloadValue != null) ...<Widget>[
                                 Text(
-                                  progress.message,
+                                  downloadMessage,
                                   style: TextStyle(
                                     fontSize: 13,
                                     fontWeight: FontWeight.w700,
@@ -478,7 +524,7 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
                                 ClipRRect(
                                   borderRadius: BorderRadius.circular(999),
                                   child: LinearProgressIndicator(
-                                    value: progress.progress.clamp(0.05, 1),
+                                    value: downloadValue.clamp(0.05, 1),
                                     minHeight: 8,
                                     backgroundColor: AppDesignTokens.softGray,
                                     valueColor: AlwaysStoppedAnimation<Color>(
@@ -487,7 +533,8 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
                                   ),
                                 ),
                               ],
-                              if (showDownload && showSubtitle)
+                              if ((showDownload || showNetdiskDownload) &&
+                                  showSubtitle)
                                 const SizedBox(height: 12),
                               if (showSubtitle) ...<Widget>[
                                 Row(
@@ -1472,6 +1519,59 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
         service: BilibiliImportService.withCookie(cookie),
         progressNotifier: progressNotifier,
       ),
+    );
+  }
+
+  Future<void> _confirmNetdiskDownload(LibraryCourseData course) async {
+    final int count = pendingNetdiskEpisodes(course);
+    if (count == 0 || isNetdiskDownloadInFlight(course.id)) {
+      return;
+    }
+    final bool? confirmed = await showDialog<bool>(
+      context: context,
+      builder: (BuildContext dialogContext) => AlertDialog(
+        title: const Text('下载到本机？'),
+        content: const Text(
+          '在线播放若因网盘非会员限速卡顿，可下载到手机后再播。'
+          '同目录的字幕文件会一并关联。下载速度仍受网盘账号限制。',
+        ),
+        actions: <Widget>[
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: const Text('继续在线看'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            child: const Text('下载到本机'),
+          ),
+        ],
+      ),
+    );
+    if (!mounted || confirmed != true) {
+      return;
+    }
+    final ProviderContainer container = ProviderScope.containerOf(context);
+    final NetdiskDownloadProgressNotifier progressNotifier =
+        container.read(netdiskDownloadProgressProvider.notifier);
+    unawaited(
+      downloadNetdiskCourseToLocal(
+        api: container.read(acquireApiClientProvider),
+        catalog: container.read(libraryCatalogProvider.notifier),
+        readCourses: () => container.read(libraryCatalogProvider),
+        courseId: course.id,
+        progressNotifier: progressNotifier,
+      ).catchError((Object error) {
+        if (!mounted) {
+          return;
+        }
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              '网盘下载失败：${'$error'.replaceFirst('Exception: ', '')}',
+            ),
+          ),
+        );
+      }),
     );
   }
 

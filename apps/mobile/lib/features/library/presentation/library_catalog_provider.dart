@@ -343,7 +343,11 @@ class LibraryCatalogNotifier extends Notifier<List<LibraryCourseData>> {
               value.contains('${Platform.pathSeparator}bilibili${Platform.pathSeparator}') ||
               value.contains('/bilibili/') ||
               value.contains(r'\bilibili\');
-          return asr || official;
+          final bool netdisk =
+              value.contains('${Platform.pathSeparator}netdisk${Platform.pathSeparator}') ||
+              value.contains('/netdisk/') ||
+              value.contains(r'\netdisk\');
+          return asr || official || netdisk;
         }
 
         final String? nextEn;

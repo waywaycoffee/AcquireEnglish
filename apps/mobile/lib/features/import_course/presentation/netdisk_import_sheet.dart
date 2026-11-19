@@ -4,9 +4,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../authentication/presentation/auth_session.dart';
+import '../../library/presentation/library_catalog_provider.dart';
+import '../../library/presentation/library_mock_data.dart';
 import '../../shared/presentation/pad/app_design_tokens.dart';
 import '../../sync/data/acquire_api_client.dart';
 import '../../sync/presentation/cloud_catalog_sync.dart';
+import '../data/netdisk_local_download.dart';
 
 Future<void> showNetdiskImportSheet(BuildContext context, WidgetRef ref) {
   return showModalBottomSheet<void>(
@@ -188,16 +191,41 @@ class _NetdiskImportSheetState extends ConsumerState<_NetdiskImportSheet> {
             paths: _selected.toList(growable: false),
           );
       await syncCloudCatalogAndFeed(ref);
-      if (!mounted) return;
       final List<dynamic> items =
           (result['items'] as List<dynamic>?) ?? const <dynamic>[];
-      final int ok = items
+      final List<Map<Object?, Object?>> okItems = items
           .whereType<Map<Object?, Object?>>()
           .where((Map<Object?, Object?> row) => row['ok'] == true)
-          .length;
+          .toList(growable: false);
+      final AcquireApiClient api = ref.read(acquireApiClientProvider);
+      final LibraryCatalogNotifier catalog =
+          ref.read(libraryCatalogProvider.notifier);
+      final List<LibraryCourseData> courses = ref.read(libraryCatalogProvider);
+      for (final Map<Object?, Object?> row in okItems) {
+        final String courseId = '${row['course_id'] ?? ''}';
+        if (courseId.isEmpty) {
+          continue;
+        }
+        LibraryEpisodeItem? episode;
+        for (final LibraryCourseData course in courses) {
+          if (course.id == courseId && course.episodes.isNotEmpty) {
+            episode = course.episodes.first;
+            break;
+          }
+        }
+        try {
+          await materializeNetdiskSoftsubs(
+            api: api,
+            catalog: catalog,
+            courseId: courseId,
+            episode: episode,
+          );
+        } catch (_) {}
+      }
+      if (!mounted) return;
       Navigator.of(context).pop();
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('已导入 $ok 个网盘视频到课程库')),
+        SnackBar(content: Text('已导入 ${okItems.length} 个网盘视频到课程库')),
       );
     } catch (error) {
       if (!mounted) return;
