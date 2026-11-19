@@ -212,6 +212,94 @@ input {
   width: min(420px, 100%);
 }
 
+.login-method-stack {
+  display: grid;
+  gap: 10px;
+  margin-top: 8px;
+}
+
+.login-method {
+  display: grid;
+  gap: 4px;
+  text-align: left;
+  border: 0;
+  border-radius: 14px;
+  padding: 14px 16px;
+  color: #fff;
+  cursor: pointer;
+  text-decoration: none;
+}
+
+.login-method strong {
+  font-size: 1.02rem;
+}
+
+.login-method span {
+  opacity: 0.9;
+  font-size: 0.86rem;
+  line-height: 1.35;
+}
+
+.login-method.wechat {
+  background: #07c160;
+}
+
+.login-method.phone {
+  background: #1cb0f6;
+}
+
+.login-method.email {
+  background: #46a302;
+  width: 100%;
+}
+
+.auth-mock-banner {
+  margin: 0 0 14px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: rgba(250, 204, 21, 0.14);
+  border: 1px solid rgba(250, 204, 21, 0.35);
+  color: #fde68a;
+  font-size: 0.9rem;
+  line-height: 1.4;
+}
+
+.wechat-mock-card {
+  width: min(460px, 100%);
+}
+
+.wechat-mock-hero {
+  margin: 8px 0 18px;
+}
+
+.wechat-mock-badge {
+  display: inline-block;
+  margin-bottom: 10px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: rgba(7, 193, 96, 0.16);
+  color: #86efac;
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+
+.wechat-mock-hero h1 {
+  margin: 0 0 8px;
+  font-size: 1.35rem;
+}
+
+.wechat-mock-perms {
+  margin: 14px 0 0;
+  padding-left: 18px;
+  color: var(--muted);
+  line-height: 1.55;
+}
+
+.wechat-btn {
+  background: #07c160;
+  width: 100%;
+}
+
 .controls {
   display: flex;
   align-items: center;

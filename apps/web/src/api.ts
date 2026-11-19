@@ -77,11 +77,28 @@ export type EmailSendResult = {
   debug_code?: string | null;
 };
 
+export type SmsSendResult = EmailSendResult;
+
 export const api = {
   sendEmailCode: (email: string) =>
     request<EmailSendResult>("/api/auth/email/send", {
       method: "POST",
       body: JSON.stringify({ email }),
+    }),
+  sendSmsCode: (phone: string) =>
+    request<SmsSendResult>("/api/auth/sms/send", {
+      method: "POST",
+      body: JSON.stringify({ phone }),
+    }),
+  loginWithSms: (phone: string, code: string) =>
+    request<TokenResponse>("/api/auth/sms/login", {
+      method: "POST",
+      body: JSON.stringify({ phone, code }),
+    }),
+  loginWithWechat: (code: string, nickname?: string) =>
+    request<TokenResponse>("/api/auth/wechat/login", {
+      method: "POST",
+      body: JSON.stringify({ code, nickname }),
     }),
   register: (email: string, password: string, code: string, display_name?: string) =>
     request<TokenResponse>("/api/auth/register", {

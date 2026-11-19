@@ -3,10 +3,12 @@ import { AuthProvider, useAuth } from "./auth";
 import HomePage from "./pages/HomePage";
 import LandingPage from "./pages/LandingPage";
 import LoginPage from "./pages/LoginPage";
+import PhoneLoginPage from "./pages/PhoneLoginPage";
 import PrivacyPage from "./pages/PrivacyPage";
 import RegisterPage from "./pages/RegisterPage";
 import StudyPage from "./pages/StudyPage";
 import TermsPage from "./pages/TermsPage";
+import WechatMockLoginPage from "./pages/WechatMockLoginPage";
 
 function Protected({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
@@ -31,6 +33,8 @@ export default function App() {
         <Route path="/privacy" element={<PrivacyPage />} />
         <Route path="/terms" element={<TermsPage />} />
         <Route path="/login" element={<LoginPage />} />
+        <Route path="/login/phone" element={<PhoneLoginPage />} />
+        <Route path="/login/wechat" element={<WechatMockLoginPage />} />
         <Route path="/register" element={<RegisterPage />} />
         <Route
           path="/app"

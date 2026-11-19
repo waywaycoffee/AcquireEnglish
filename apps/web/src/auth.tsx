@@ -5,6 +5,7 @@ type AuthState = {
   token: string | null;
   user: User | null;
   loading: boolean;
+  applyToken: (token: string, user: User) => void;
   login: (email: string, password: string) => Promise<void>;
   sendEmailCode: (email: string) => Promise<{
     expiresIn: number;
@@ -59,6 +60,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       token,
       user,
       loading,
+      applyToken(nextToken, nextUser) {
+        localStorage.setItem(TOKEN_KEY, nextToken);
+        setToken(nextToken);
+        setUser(nextUser);
+      },
       async login(email, password) {
         const res = await api.login(email, password);
         localStorage.setItem(TOKEN_KEY, res.access_token);

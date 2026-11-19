@@ -1,0 +1,383 @@
+import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
+
+import '../../../../constants/assets.dart';
+import '../../../../router/app_router.dart';
+import '../../../shared/presentation/pad/app_design_tokens.dart';
+import '../../data/wechat_auth_helper.dart';
+import '../../domain/login_response.dart';
+import 'login_controller.dart';
+import 'login_flow_helpers.dart';
+
+/// Full-screen mock of WeChat OAuth consent (used when WECHAT_APP_ID is unset).
+class WechatMockLoginScreen extends ConsumerStatefulWidget {
+  const WechatMockLoginScreen({super.key});
+
+  @override
+  ConsumerState<WechatMockLoginScreen> createState() =>
+      _WechatMockLoginScreenState();
+}
+
+class _WechatMockLoginScreenState extends ConsumerState<WechatMockLoginScreen> {
+  late final TextEditingController _codeController;
+  bool _loadingCode = true;
+  bool _submitting = false;
+  bool _advanced = false;
+
+  static const Color _wechatGreen = Color(0xFF07C160);
+
+  @override
+  void initState() {
+    super.initState();
+    _codeController = TextEditingController();
+    _bootstrap();
+  }
+
+  Future<void> _bootstrap() async {
+    if (WechatAuthHelper.isConfigured) {
+      // Real SDK path: skip mock UI.
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          _submitRealWechat();
+        }
+      });
+      return;
+    }
+    final String code = await loadOrCreateWechatMockCode();
+    if (!mounted) {
+      return;
+    }
+    setState(() {
+      _codeController.text = code;
+      _loadingCode = false;
+    });
+  }
+
+  @override
+  void dispose() {
+    _codeController.dispose();
+    super.dispose();
+  }
+
+  void _toast(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+  }
+
+  Future<void> _submitRealWechat() async {
+    if (_submitting) {
+      return;
+    }
+    setState(() => _submitting = true);
+    try {
+      final String code = await WechatAuthHelper.requestAuthCode();
+      final LoginResponse result = await ref
+          .read(loginControllerProvider.notifier)
+          .loginWithWechat(code: code);
+      await completeLoginAndGoHome(
+        ref,
+        context,
+        result,
+        isNew: result.isNewUser,
+      );
+    } catch (error) {
+      if (mounted) {
+        _toast('$error'.replaceFirst('Exception: ', ''));
+        setState(() {
+          _submitting = false;
+          _loadingCode = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _agreeMock() async {
+    if (_submitting) {
+      return;
+    }
+    final String code = _codeController.text.trim();
+    if (code.isEmpty) {
+      _toast('请填写模拟授权码');
+      return;
+    }
+    setState(() => _submitting = true);
+    try {
+      await saveWechatMockCode(code);
+      final LoginResponse result = await ref
+          .read(loginControllerProvider.notifier)
+          .loginWithWechat(code: code);
+      await completeLoginAndGoHome(
+        ref,
+        context,
+        result,
+        isNew: result.isNewUser,
+      );
+    } catch (error) {
+      if (mounted) {
+        _toast('$error'.replaceFirst('Exception: ', ''));
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _submitting = false);
+      }
+    }
+  }
+
+  Future<void> _resetIdentity() async {
+    final String fresh =
+        'mock_device_${DateTime.now().millisecondsSinceEpoch}';
+    _codeController.text = fresh;
+    await saveWechatMockCode(fresh);
+    setState(() {});
+    _toast('已生成新的模拟微信身份');
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (WechatAuthHelper.isConfigured && _loadingCode) {
+      return Scaffold(
+        backgroundColor: AppDesignTokens.softWhite,
+        body: const Center(child: CircularProgressIndicator()),
+      );
+    }
+
+    return Scaffold(
+      backgroundColor: const Color(0xFFF7F7F7),
+      appBar: AppBar(
+        backgroundColor: Colors.white,
+        elevation: 0,
+        foregroundColor: const Color(0xFF111111),
+        title: const Text('微信登录'),
+        actions: <Widget>[
+          if (!WechatAuthHelper.isConfigured)
+            TextButton(
+              onPressed: () => setState(() => _advanced = !_advanced),
+              child: Text(
+                _advanced ? '收起' : '开发选项',
+                style: const TextStyle(color: Color(0xFF576B95)),
+              ),
+            ),
+        ],
+      ),
+      body: SafeArea(
+        child: _loadingCode
+            ? const Center(child: CircularProgressIndicator())
+            : ListView(
+                padding: const EdgeInsets.fromLTRB(20, 16, 20, 28),
+                children: <Widget>[
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.fromLTRB(18, 14, 18, 14),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFFFF8E8),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: const Color(0xFFFFE0A3)),
+                    ),
+                    child: const Text(
+                      '开发模拟页：当前未配置 WECHAT_APP_ID，授权不会跳转微信 App， '
+                      '同意后将用下方身份码完成服务端登录/自动注册。',
+                      style: TextStyle(
+                        color: Color(0xFF8A5A00),
+                        height: 1.4,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 22),
+                  Container(
+                    padding: const EdgeInsets.fromLTRB(22, 28, 22, 28),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(16),
+                      boxShadow: const <BoxShadow>[
+                        BoxShadow(
+                          color: Color(0x14000000),
+                          blurRadius: 18,
+                          offset: Offset(0, 8),
+                        ),
+                      ],
+                    ),
+                    child: Column(
+                      children: <Widget>[
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(14),
+                          child: Image.asset(
+                            Assets.logoLockup,
+                            height: 64,
+                            fit: BoxFit.contain,
+                          ),
+                        ),
+                        const SizedBox(height: 18),
+                        const Text(
+                          '爱快英语 申请使用',
+                          style: TextStyle(
+                            fontSize: 20,
+                            fontWeight: FontWeight.w800,
+                            color: Color(0xFF111111),
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        const Text(
+                          '你的微信头像、昵称与 OpenID（模拟）',
+                          style: TextStyle(
+                            fontSize: 14,
+                            color: Color(0xFF888888),
+                          ),
+                        ),
+                        const SizedBox(height: 22),
+                        const _PermissionRow(
+                          icon: Icons.person_outline_rounded,
+                          text: '获取你的公开信息（昵称、头像）',
+                        ),
+                        const SizedBox(height: 10),
+                        const _PermissionRow(
+                          icon: Icons.verified_user_outlined,
+                          text: '用于账号登录与跨设备同步学习进度',
+                        ),
+                        if (_advanced) ...<Widget>[
+                          const SizedBox(height: 22),
+                          Align(
+                            alignment: Alignment.centerLeft,
+                            child: Text(
+                              '模拟授权码（同一码 = 同一微信账号）',
+                              style: TextStyle(
+                                fontWeight: FontWeight.w700,
+                                color: AppDesignTokens.textSecondary,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          TextField(
+                            controller: _codeController,
+                            decoration: InputDecoration(
+                              filled: true,
+                              fillColor: const Color(0xFFF5F5F5),
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(12),
+                                borderSide: BorderSide.none,
+                              ),
+                              suffixIcon: IconButton(
+                                tooltip: '复制',
+                                onPressed: () async {
+                                  await Clipboard.setData(
+                                    ClipboardData(text: _codeController.text),
+                                  );
+                                  _toast('已复制模拟授权码');
+                                },
+                                icon: const Icon(Icons.copy_rounded, size: 20),
+                              ),
+                            ),
+                          ),
+                          Align(
+                            alignment: Alignment.centerRight,
+                            child: TextButton(
+                              onPressed: _submitting ? null : _resetIdentity,
+                              child: const Text('换一个新身份'),
+                            ),
+                          ),
+                        ],
+                        const SizedBox(height: 28),
+                        SizedBox(
+                          width: double.infinity,
+                          height: 48,
+                          child: FilledButton(
+                            onPressed: _submitting ? null : _agreeMock,
+                            style: FilledButton.styleFrom(
+                              backgroundColor: _wechatGreen,
+                              foregroundColor: Colors.white,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                            ),
+                            child: _submitting
+                                ? const SizedBox(
+                                    width: 22,
+                                    height: 22,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2.4,
+                                      color: Colors.white,
+                                    ),
+                                  )
+                                : const Text(
+                                    '同意',
+                                    style: TextStyle(
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.w800,
+                                    ),
+                                  ),
+                          ),
+                        ),
+                        const SizedBox(height: 10),
+                        SizedBox(
+                          width: double.infinity,
+                          height: 48,
+                          child: OutlinedButton(
+                            onPressed: _submitting
+                                ? null
+                                : () => Navigator.of(context).maybePop(),
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: const Color(0xFF576B95),
+                              side: const BorderSide(color: Color(0xFFD9D9D9)),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                            ),
+                            child: const Text(
+                              '拒绝',
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 18),
+                  Center(
+                    child: TextButton(
+                      onPressed: () => context.push(SGRoute.loginPhone.route),
+                      child: Text(
+                        '改用手机号登录',
+                        style: TextStyle(
+                          color: AppDesignTokens.primaryBlue,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+      ),
+    );
+  }
+}
+
+class _PermissionRow extends StatelessWidget {
+  const _PermissionRow({required this.icon, required this.text});
+
+  final IconData icon;
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: <Widget>[
+        Icon(icon, size: 20, color: const Color(0xFF07C160)),
+        const SizedBox(width: 10),
+        Expanded(
+          child: Text(
+            text,
+            style: const TextStyle(
+              fontSize: 14,
+              color: Color(0xFF333333),
+              height: 1.35,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}

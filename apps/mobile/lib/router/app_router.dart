@@ -6,6 +6,8 @@ import 'package:go_router/go_router.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import '../features/authentication/presentation/login/login_screen.dart';
+import '../features/authentication/presentation/login/phone_login_screen.dart';
+import '../features/authentication/presentation/login/wechat_mock_login_screen.dart';
 import '../features/authentication/presentation/register/register_screen.dart';
 import '../features/daily_review/presentation/daily_review_screen.dart';
 import '../features/growth/presentation/growth_screen.dart';
@@ -36,6 +38,8 @@ enum SGRoute {
   settings,
   importCourse,
   login,
+  loginPhone,
+  loginWechat,
   player,
   register,
   forgotPassword,
@@ -48,6 +52,10 @@ enum SGRoute {
         return '/review/session';
       case SGRoute.sm2Review:
         return '/review/sm2';
+      case SGRoute.loginPhone:
+        return '/login/phone';
+      case SGRoute.loginWechat:
+        return '/login/wechat';
       default:
         return '/${toString().replaceAll('SGRoute.', '')}';
     }
@@ -64,6 +72,18 @@ GoRouter goRouter(Ref ref) => GoRouter(
       path: SGRoute.login.route,
       builder: (BuildContext context, GoRouterState state) {
         return const LoginScreen();
+      },
+    ).fade(),
+    GoRoute(
+      path: SGRoute.loginPhone.route,
+      builder: (BuildContext context, GoRouterState state) {
+        return const PhoneLoginScreen();
+      },
+    ).fade(),
+    GoRoute(
+      path: SGRoute.loginWechat.route,
+      builder: (BuildContext context, GoRouterState state) {
+        return const WechatMockLoginScreen();
       },
     ).fade(),
     GoRoute(
