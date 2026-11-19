@@ -145,7 +145,8 @@ class _PlayerFullscreenVideoScreenState
   static const double _episodePanelGap = 12;
 
   bool _showEpisodePanel = false;
-  bool _showSubtitlePanel = false;
+  /// Landscape study default: keep the transcript on the right of the video.
+  late bool _showSubtitlePanel = widget.playerState.hasLines;
   bool _showControls = true;
   Timer? _refreshTimer;
   late String _subtitleLetterCase = widget.subtitleLetterCase;
@@ -168,6 +169,12 @@ class _PlayerFullscreenVideoScreenState
         setState(() {});
       }
     });
+  }
+
+  double _resolvedSubtitlePanelWidth(BuildContext context) {
+    final double screenWidth = MediaQuery.sizeOf(context).width;
+    // Keep video dominant; clamp so phones still leave ~60% for the picture.
+    return (screenWidth * 0.38).clamp(240.0, _subtitlePanelWidth);
   }
 
   @override
@@ -221,10 +228,11 @@ class _PlayerFullscreenVideoScreenState
     final bool showEpisodePanel =
         _showEpisodePanel && widget.episodes.isNotEmpty;
     final bool showSubtitlePanel = _showSubtitlePanel && player.hasLines;
+    final double subtitlePanelWidth = _resolvedSubtitlePanelWidth(context);
     final double rightInset = showEpisodePanel
         ? _episodePanelWidth + _episodePanelGap + 12
         : showSubtitlePanel
-        ? _subtitlePanelWidth + _episodePanelGap + 12
+        ? subtitlePanelWidth + _episodePanelGap + 12
         : 0;
     return Scaffold(
       backgroundColor: Colors.black,
@@ -239,7 +247,9 @@ class _PlayerFullscreenVideoScreenState
             right: rightInset,
             child: PlayerVideoPanel(
               episodeId: widget.activeEpisodeId,
-              paintSubtitlesOnVideo: widget.paintSubtitlesOnVideo,
+              // Side transcript replaces on-video burn when the right panel is open.
+              paintSubtitlesOnVideo:
+                  widget.paintSubtitlesOnVideo && !showSubtitlePanel,
               line: line,
               isPlaying: player.isPlaying,
               speed: player.speed,
@@ -409,6 +419,7 @@ class _PlayerFullscreenVideoScreenState
               right: 12,
               bottom: 0,
               child: _FullscreenSubtitlePanel(
+                width: subtitlePanelWidth,
                 episodeId: widget.activeEpisodeId,
                 player: player,
                 fontScale: _fontScale,
@@ -471,6 +482,7 @@ const double _subtitlePanelWidth = 390;
 
 class _FullscreenSubtitlePanel extends StatelessWidget {
   const _FullscreenSubtitlePanel({
+    required this.width,
     required this.episodeId,
     required this.player,
     required this.subtitleLetterCase,
@@ -500,6 +512,7 @@ class _FullscreenSubtitlePanel extends StatelessWidget {
     required this.onPronounce,
   });
 
+  final double width;
   final String episodeId;
   final PlayerMockState player;
   final String subtitleLetterCase;
@@ -532,7 +545,7 @@ class _FullscreenSubtitlePanel extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      width: _subtitlePanelWidth,
+      width: width,
       padding: const EdgeInsets.all(16),
       decoration: const BoxDecoration(
         color: Color(0xFFF8FAFC),
