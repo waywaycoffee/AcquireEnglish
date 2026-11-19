@@ -341,6 +341,7 @@ Future<void> enqueueSubtitleCompletionForEpisode({
   }
 
   // Shared community cache: after official softsubs, before local Whisper.
+  bool usedSharedCache = false;
   final AcquireApiClient? sharedApi = resolveSharedBilibiliSubtitleApi(
     sharedSubtitleApi,
   );
@@ -360,6 +361,13 @@ Future<void> enqueueSubtitleCompletionForEpisode({
         videoAsset: videoPath,
       );
       if (ids != null) {
+        SubtitleCompletionStatusHub.instance.reportProgress(
+          episodeId,
+          kSubtitleSharedCacheLookupLabel,
+          status: SubtitleCompletionStatus.running,
+          needEnglish: missingEn,
+          needChinese: missingZh,
+        );
         final ({String? enPath, String? zhPath})? shared =
             await tryApplySharedBilibiliSubtitles(
               api: sharedApi,
@@ -369,11 +377,20 @@ Future<void> enqueueSubtitleCompletionForEpisode({
         if (shared != null) {
           if (missingEn && isUsableSubtitlePath(shared.enPath)) {
             enPath = shared.enPath;
+            usedSharedCache = true;
           }
           if (missingZh &&
               !sourcePolicy.ignoreOfficialChinese &&
               isUsableSubtitlePath(shared.zhPath)) {
             zhPath = shared.zhPath;
+            usedSharedCache = true;
+          }
+          if (usedSharedCache) {
+            SubtitleCompletionStatusHub.instance.reportSharedApplied(
+              episodeId: episodeId,
+              enPath: enPath,
+              zhPath: zhPath,
+            );
           }
         }
       }
@@ -393,7 +410,26 @@ Future<void> enqueueSubtitleCompletionForEpisode({
     appSupportDirectory: appSupportDirectory,
   );
   if (!detected.any && chip == null) {
+    // Full shared-cache hit: honest ready copy, never fake Whisper progress.
+    if (usedSharedCache) {
+      SubtitleCompletionStatusHub.instance.reportProgress(
+        episodeId,
+        kSubtitleSharedCacheReadyDetailLabel,
+        status: SubtitleCompletionStatus.done,
+        needEnglish: false,
+        needChinese: false,
+      );
+    }
     return;
+  }
+  if (usedSharedCache) {
+    SubtitleCompletionStatusHub.instance.reportProgress(
+      episodeId,
+      kSubtitleSharedCachePartialLabel,
+      status: SubtitleCompletionStatus.running,
+      needEnglish: detected.needEnglish || detected.needProofread,
+      needChinese: detected.needChinese,
+    );
   }
 
   final bool hasReliableEn =

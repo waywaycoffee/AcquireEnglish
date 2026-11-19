@@ -22,6 +22,7 @@ import 'features/shared/presentation/pad/app_design_tokens.dart';
 import 'features/subtitle_completion/shared_bilibili_subtitle_sync.dart';
 import 'features/subtitle_completion/subtitle_completion_runtime.dart';
 import 'features/subtitle_completion/subtitle_completion_scheduler.dart';
+import 'features/subtitle_completion/subtitle_completion_status_hub.dart';
 import 'features/subtitle_completion/subtitle_completion_status_provider.dart';
 import 'features/subtitle_completion/overlay_permission_host.dart';
 import 'features/sync/data/acquire_api_client.dart';
@@ -59,6 +60,35 @@ class _MyAppState extends ConsumerState<MyApp> with WidgetsBindingObserver {
       configureSharedBilibiliSubtitleApi(
         ref.read(acquireApiClientProvider),
       );
+      // Shared-cache hit (no Whisper job): adopt local EN/ZH paths into catalog.
+      SubtitleCompletionStatusHub.instance.bindSharedApplied(({
+        required String episodeId,
+        String? enPath,
+        String? zhPath,
+      }) {
+        unawaited(() async {
+          final List<LibraryCourseData> courses = ref.read(
+            libraryCatalogProvider,
+          );
+          for (final LibraryCourseData course in courses) {
+            for (final LibraryEpisodeItem episode in course.episodes) {
+              if (episode.id != episodeId) {
+                continue;
+              }
+              await ref.read(libraryCatalogProvider.notifier).updateEpisodeLocalMedia(
+                    courseId: course.id,
+                    episodeId: episodeId,
+                    enSubtitlePath: enPath,
+                    zhSubtitlePath: zhPath,
+                  );
+              unawaited(
+                ref.read(subtitleCompletionStatusProvider.notifier).refresh(),
+              );
+              return;
+            }
+          }
+        }());
+      });
       unawaited(SubtitleCompletionRuntime.instance.init());
       SubtitleCompletionScheduler.instance.attach(
         settingsReader: () => ref.read(learningSettingsProvider),
@@ -140,6 +170,7 @@ class _MyAppState extends ConsumerState<MyApp> with WidgetsBindingObserver {
 
   @override
   void dispose() {
+    SubtitleCompletionStatusHub.instance.bindSharedApplied(null);
     SubtitleCompletionScheduler.instance.detach();
     unawaited(SubtitleCompletionRuntime.instance.dispose());
     WidgetsBinding.instance.removeObserver(this);

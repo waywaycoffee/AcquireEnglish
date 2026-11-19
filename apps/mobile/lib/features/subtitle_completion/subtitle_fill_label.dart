@@ -30,6 +30,10 @@ double progressFractionFromSubtitleLabel(String label) {
   if (live.isEmpty) {
     return 0.08;
   }
+  // Shared/cloud cache ready — not local Whisper progress.
+  if (isSubtitleSharedCacheReadyLabel(live)) {
+    return 1.0;
+  }
   final RegExpMatch? pct =
       RegExp(r'（(\d{1,3})%）').firstMatch(live) ??
       RegExp(r'(?<![0-9:])(\d{1,3})%').firstMatch(live);
@@ -49,4 +53,44 @@ double progressFractionFromSubtitleLabel(String label) {
     }
   }
   return 0.08;
+}
+
+/// Honest copy when Bilibili shared/cloud subtitle cache fully satisfies needs.
+const String kSubtitleSharedCacheReadyLabel = '字幕已就绪（秒开）';
+
+/// Transparent hint that a verified shared pack was used (not local Whisper).
+const String kSubtitleSharedCacheHintLabel = '已使用校验字幕缓存以加快导入';
+
+/// Combined ready + hint for status chips / course banner.
+const String kSubtitleSharedCacheReadyDetailLabel =
+    '$kSubtitleSharedCacheReadyLabel · $kSubtitleSharedCacheHintLabel';
+
+/// Partial shared hit: cache helped, local fill still running for the rest.
+const String kSubtitleSharedCachePartialLabel =
+    '已使用校验字幕缓存，正在补齐其余字幕…';
+
+/// Looking up shared pack before local Whisper (not ASR progress).
+const String kSubtitleSharedCacheLookupLabel = '正在检查校验字幕缓存…';
+
+bool isSubtitleSharedCacheReadyLabel(String? label) {
+  final String live = (label ?? '').trim();
+  if (live.isEmpty) {
+    return false;
+  }
+  // Exclude in-progress shared-cache messages (lookup / partial fill).
+  if (live.contains('正在补齐') || live.contains('正在检查')) {
+    return false;
+  }
+  return live.contains('秒开') ||
+      (live.contains('校验字幕缓存') && live.contains('已就绪'));
+}
+
+bool isSubtitleFillTerminalLabel(String? label) {
+  final String live = (label ?? '').trim();
+  if (live.isEmpty) {
+    return false;
+  }
+  return live.contains('已补全') ||
+      live.contains('失败') ||
+      isSubtitleSharedCacheReadyLabel(live);
 }

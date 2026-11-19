@@ -72,29 +72,18 @@ class SubtitleCompletionEpisodeUi {
 
   /// 0–1 progress for list-page bars; null when idle/unknown.
   double? get progressFraction {
+    final String live = (label ?? '').trim();
+    if (isSubtitleSharedCacheReadyLabel(live)) {
+      return 1.0;
+    }
     if (!isActive) {
       return null;
     }
-    final String live = (label ?? '').trim();
-    final RegExpMatch? pct =
-        RegExp(r'（(\d{1,3})%）').firstMatch(live) ??
-        RegExp(r'(\d{1,3})%').firstMatch(live);
-    if (pct != null) {
-      final int value = int.tryParse(pct.group(1) ?? '') ?? 0;
-      return (value / 100).clamp(0.0, 1.0);
+    // Lookup / partial shared-cache labels are not Whisper % — keep a modest bar.
+    if (live.contains('校验字幕缓存')) {
+      return live.contains('正在补齐') ? 0.55 : 0.18;
     }
-    final RegExpMatch? frac = RegExp(r'(\d+)\s*/\s*(\d+)').firstMatch(live);
-    if (frac != null) {
-      final int done = int.tryParse(frac.group(1) ?? '') ?? 0;
-      final int total = int.tryParse(frac.group(2) ?? '') ?? 0;
-      if (total > 0) {
-        return (done / total).clamp(0.0, 1.0);
-      }
-    }
-    if (status == SubtitleCompletionStatus.running) {
-      return 0.12;
-    }
-    return 0.05;
+    return progressFractionFromSubtitleLabel(live);
   }
 
   /// Progress text for the English fill chip (null = keep default chip label).
@@ -208,7 +197,10 @@ class SubtitleCompletionCourseUi {
   final int totalTracked;
   final String? activeEpisodeId;
 
-  bool get showBanner => activeCount > 0 || failedCount > 0;
+  bool get showBanner =>
+      activeCount > 0 ||
+      failedCount > 0 ||
+      isSubtitleSharedCacheReadyLabel(message);
 
   String get compactProgressLabel {
     final int pct = ((progress.clamp(0.0, 1.0)) * 100).round().clamp(0, 99);
@@ -329,7 +321,14 @@ class SubtitleCompletionStatusState {
               e.status == SubtitleCompletionStatus.done,
         )
         .length;
-    if (active == 0 && failed == 0) {
+    SubtitleCompletionEpisodeUi? sharedReady;
+    for (final SubtitleCompletionEpisodeUi job in jobs) {
+      if (isSubtitleSharedCacheReadyLabel(job.label)) {
+        sharedReady = job;
+        break;
+      }
+    }
+    if (active == 0 && failed == 0 && sharedReady == null) {
       return null;
     }
     SubtitleCompletionEpisodeUi? running;
@@ -355,7 +354,7 @@ class SubtitleCompletionStatusState {
           }
         }
       }
-      return running ?? pending;
+      return running ?? pending ?? sharedReady;
     }();
     final String liveFocus = (focus?.label ?? activeLabel ?? '').trim();
     final String focusLabel = liveFocus.isNotEmpty
@@ -373,6 +372,8 @@ class SubtitleCompletionStatusState {
           : '排队补字幕：$focusLabel';
     } else if (failedJob != null) {
       message = failed > 1 ? '$failed 集字幕补全失败，可点重试' : failedJob.displayLabel;
+    } else if (sharedReady != null) {
+      message = sharedReady.displayLabel;
     } else {
       message = '字幕补全进行中…';
     }
@@ -424,9 +425,27 @@ class SubtitleCompletionStatusNotifier
   SubtitleCompletionStatusState build() {
     void onHub() => unawaited(refresh());
     SubtitleCompletionStatusHub.instance.bind(onHub);
+    SubtitleCompletionStatusHub.instance.bindProgress(
+      (
+        String episodeId,
+        String label, {
+        SubtitleCompletionStatus? status,
+        bool? needEnglish,
+        bool? needChinese,
+      }) {
+        reportProgress(
+          episodeId,
+          label,
+          status: status,
+          needEnglish: needEnglish,
+          needChinese: needChinese,
+        );
+      },
+    );
     ref.onDispose(() {
       _poll?.cancel();
       SubtitleCompletionStatusHub.instance.unbind(onHub);
+      SubtitleCompletionStatusHub.instance.bindProgress(null);
     });
     // Initial load + light poll so import/enqueue from other code paths shows up.
     Future<void>.microtask(refresh);
@@ -479,12 +498,14 @@ class SubtitleCompletionStatusNotifier
     }
     // Keep optimistic chip/banner rows that were reported before the queue
     // file finished writing (avoids the course banner disappearing on tap).
+    // Also keep shared-cache "秒开" done rows so honest UX is visible briefly.
     for (final MapEntry<String, SubtitleCompletionEpisodeUi> entry
         in state.byEpisodeId.entries) {
       if (next.containsKey(entry.key)) {
         continue;
       }
-      if (entry.value.isActive) {
+      if (entry.value.isActive ||
+          isSubtitleSharedCacheReadyLabel(entry.value.label)) {
         next[entry.key] = entry.value;
       }
     }
@@ -520,7 +541,7 @@ class SubtitleCompletionStatusNotifier
       lastError: existing?.lastError,
       attempts: existing?.attempts ?? 0,
     );
-    final bool clearActive = trimmed.contains('已补全') || trimmed.contains('失败');
+    final bool clearActive = isSubtitleFillTerminalLabel(trimmed);
     state = SubtitleCompletionStatusState(
       byEpisodeId: Map<String, SubtitleCompletionEpisodeUi>.unmodifiable(next),
       activeEpisodeId: clearActive ? null : episodeId,
