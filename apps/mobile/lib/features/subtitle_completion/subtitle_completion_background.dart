@@ -58,9 +58,9 @@ Future<void> scheduleSubtitleCompletionNudge() async {
   }
   try {
     await Workmanager().registerOneOffTask(
-      '${kSubtitleCompletionTask}_${DateTime.now().millisecondsSinceEpoch}',
       kSubtitleCompletionTask,
-      existingWorkPolicy: ExistingWorkPolicy.append,
+      kSubtitleCompletionTask,
+      existingWorkPolicy: ExistingWorkPolicy.keep,
       constraints: Constraints(
         networkType: NetworkType.notRequired,
         requiresBatteryNotLow: true,

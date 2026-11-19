@@ -73,6 +73,7 @@ android {
 dependencies {
     coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.5")
     implementation("androidx.documentfile:documentfile:1.0.1")
+    implementation("androidx.work:work-runtime:2.11.2")
     // Unbundled ML Kit OCR: models download via Play Services on first use,
     // instead of shipping ~10MB+/ABI TFLite packs inside the APK.
     implementation("com.google.android.gms:play-services-mlkit-text-recognition:19.0.1")
