@@ -28,6 +28,7 @@ class WordDetailDialog extends ConsumerStatefulWidget {
 
 class _WordDetailDialogState extends ConsumerState<WordDetailDialog> {
   OfflineWordDefinition? _offlineDefinition;
+  WordLookupEntry? _publicEntry;
   bool _loadingOfflineDefinition = true;
   bool _translatingWithApi = false;
   bool _enriching = false;
@@ -39,9 +40,7 @@ class _WordDetailDialogState extends ConsumerState<WordDetailDialog> {
   void initState() {
     super.initState();
     _loadOfflineDefinition();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      unawaited(_ensureEnrichment());
-    });
+    unawaited(_loadPublicEntry());
   }
 
   Future<void> _ensureEnrichment({bool force = false}) async {
@@ -89,6 +88,19 @@ class _WordDetailDialogState extends ConsumerState<WordDetailDialog> {
     }
   }
 
+  Future<void> _loadPublicEntry() async {
+    final WordLookupEntry? entry = await ref
+        .read(wordLookupServiceProvider)
+        .publicLookup
+        ?.call(widget.word, ref.read(learningSettingsProvider));
+    if (!mounted) return;
+    if (entry != null) setState(() => _publicEntry = entry);
+    if (entry == null ||
+        (entry.definitionCn.isEmpty && entry.definitionEn.isEmpty)) {
+      await _ensureEnrichment();
+    }
+  }
+
   Future<void> _translateWithApi(WordEntry entry) async {
     if (_translatingWithApi) return;
     setState(() => _translatingWithApi = true);
@@ -96,7 +108,7 @@ class _WordDetailDialogState extends ConsumerState<WordDetailDialog> {
         .read(wordLookupServiceProvider)
         .lookupWord(
           rawWord: entry.word,
-          contextSentence: entry.occurrences.first.sentence,
+          contextSentence: entry.sourceSentence,
           settings: ref.read(learningSettingsProvider),
         );
     if (!mounted) return;
@@ -114,7 +126,12 @@ class _WordDetailDialogState extends ConsumerState<WordDetailDialog> {
     if (_speakingText != null) return;
     setState(() => _speakingText = text);
     try {
-      await ref.read(wordPronunciationServiceProvider).speak(text);
+      await ref
+          .read(wordPronunciationServiceProvider)
+          .speak(
+            text,
+            recordedUrl: text == widget.word ? _publicEntry?.audioUrl : null,
+          );
     } on WordPronunciationException catch (error) {
       if (mounted) _showMessage(error.message);
     } catch (_) {
@@ -302,6 +319,7 @@ class _WordDetailDialogState extends ConsumerState<WordDetailDialog> {
                   _WordHeader(
                     entry: entry,
                     definition: offline,
+                    publicEntry: _publicEntry,
                     loading: _loadingOfflineDefinition,
                     speaking: _speakingText == entry.word,
                     onSpeak: () => _speak(entry.word),
@@ -310,12 +328,31 @@ class _WordDetailDialogState extends ConsumerState<WordDetailDialog> {
                         .toggleFavorite(entry.word),
                   ),
                   const SizedBox(height: 16),
+                  if (_publicEntry
+                      case final WordLookupEntry shared) ...<Widget>[
+                    ListTile(
+                      contentPadding: EdgeInsets.zero,
+                      title: const Text('公共词库'),
+                      subtitle: SelectableText(
+                        <String>[
+                          if (shared.definitionCn.isNotEmpty)
+                            shared.definitionCn,
+                          if (shared.definitionEn.isNotEmpty)
+                            shared.definitionEn,
+                          if (shared.exampleSentenceEn.isNotEmpty)
+                            '例句 · ${shared.exampleSentenceEn}',
+                          if (shared.exampleCredit case final String credit)
+                            credit,
+                        ].join('\n\n'),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                  ],
                   _AiEnrichmentCard(
                     entry: entry,
                     enriching: _enriching,
-                    onRegenerate: () => unawaited(
-                      _ensureEnrichment(force: true),
-                    ),
+                    onRegenerate: () =>
+                        unawaited(_ensureEnrichment(force: true)),
                   ),
                   const SizedBox(height: 16),
                   _DefinitionCard(
@@ -370,6 +407,7 @@ class _WordHeader extends StatelessWidget {
   const _WordHeader({
     required this.entry,
     required this.definition,
+    required this.publicEntry,
     required this.loading,
     required this.speaking,
     required this.onSpeak,
@@ -378,6 +416,7 @@ class _WordHeader extends StatelessWidget {
 
   final WordEntry entry;
   final OfflineWordDefinition? definition;
+  final WordLookupEntry? publicEntry;
   final bool loading;
   final bool speaking;
   final VoidCallback onSpeak;
@@ -414,7 +453,7 @@ class _WordHeader extends StatelessWidget {
                   ),
                 ),
               ),
-              if (loading)
+              if (loading && publicEntry == null)
                 const Padding(
                   padding: EdgeInsets.only(top: 6),
                   child: Text('正在加载离线词典…'),
@@ -424,16 +463,22 @@ class _WordHeader extends StatelessWidget {
                   padding: const EdgeInsets.only(top: 6),
                   child: Text(
                     <String>[
-                      entry.phonetic ?? '',
-                      entry.partOfSpeech ?? '',
-                      if ((entry.phonetic ?? '').isEmpty)
-                        definition?.phonetic ?? '',
-                      if ((entry.partOfSpeech ?? '').isEmpty)
-                        definition?.partOfSpeech ?? '',
-                    ].where((String item) => item.isNotEmpty).toSet().join(' · '),
-                    style: TextStyle(
-                      color: AppDesignTokens.textSecondary,
-                    ),
+                          publicEntry?.phonetic ?? entry.phonetic ?? '',
+                          publicEntry?.type.isNotEmpty == true
+                              ? publicEntry!.type
+                              : entry.partOfSpeech ?? '',
+                          if (publicEntry == null &&
+                              (entry.phonetic ?? '').isEmpty)
+                            definition?.phonetic ?? '',
+                          if (publicEntry?.level?.isNotEmpty ?? false)
+                            '${publicEntry!.level} · 词频估算',
+                          if ((entry.partOfSpeech ?? '').isEmpty)
+                            definition?.partOfSpeech ?? '',
+                        ]
+                        .where((String item) => item.isNotEmpty)
+                        .toSet()
+                        .join(' · '),
+                    style: TextStyle(color: AppDesignTokens.textSecondary),
                   ),
                 ),
             ],

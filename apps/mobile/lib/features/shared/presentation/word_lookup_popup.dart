@@ -140,7 +140,14 @@ class _WordLookupPopupCardState extends ConsumerState<WordLookupPopupCard> {
     try {
       await ref
           .read(wordPronunciationServiceProvider)
-          .speak(text, language: language);
+          .speak(
+            text,
+            language: language,
+            recordedUrl:
+                language == 'en-US' && text.trim().toLowerCase() == entry.word
+                ? entry.audioUrl
+                : null,
+          );
     } on WordPronunciationException catch (error) {
       if (mounted) {
         _showMessage(error.message);
@@ -230,6 +237,14 @@ class _WordLookupPopupCardState extends ConsumerState<WordLookupPopupCard> {
                 ),
               ),
             ),
+            if (_entry?.audioUrl != null)
+              IconButton(
+                tooltip: '播放词库发音',
+                onPressed: _isPronouncing
+                    ? null
+                    : () => _handlePronounce(_entry!.word),
+                icon: const Icon(Icons.volume_up_outlined),
+              ),
             if (widget.onFavorite != null)
               IconButton(
                 tooltip: isFavorite ? '取消收藏' : '收藏到词卡',
@@ -391,11 +406,18 @@ class _WordLookupPopupBody extends StatelessWidget {
                 foregroundColor: AppDesignTokens.textSecondary,
                 backgroundColor: const Color(0xFFF4F6F4),
               ),
-            _InfoChip(
-              label: entry.type,
-              foregroundColor: AppDesignTokens.textSecondary,
-              backgroundColor: const Color(0xFFF4F6F4),
-            ),
+            if (entry.type.isNotEmpty)
+              _InfoChip(
+                label: entry.type,
+                foregroundColor: AppDesignTokens.textSecondary,
+                backgroundColor: const Color(0xFFF4F6F4),
+              ),
+            if (entry.level?.isNotEmpty ?? false)
+              _InfoChip(
+                label: '${entry.level} · 词频估算',
+                foregroundColor: AppDesignTokens.brandGreenDark,
+                backgroundColor: const Color(0xFFF2FBEA),
+              ),
           ],
         ),
         const SizedBox(height: 14),
@@ -538,7 +560,7 @@ class _WordLookupPopupBody extends StatelessWidget {
                   children: <Widget>[
                     Expanded(
                       child: Text(
-                        '新句子',
+                        entry.exampleCredit == null ? '新句子' : '词库例句',
                         style: TextStyle(
                           fontSize: 12,
                           fontWeight: FontWeight.w700,
@@ -571,9 +593,14 @@ class _WordLookupPopupBody extends StatelessWidget {
             ],
           ),
         ),
+        if (entry.exampleCredit != null && exampleSentence.isNotEmpty)
+          SelectableText(
+            entry.exampleCredit!,
+            style: const TextStyle(fontSize: 11),
+          ),
         const SizedBox(height: 8),
         Text(
-          '翻译来源：${entry.sourceLabel}',
+          '来源：${entry.sourceLabel}',
           style: TextStyle(fontSize: 12, color: AppDesignTokens.textSecondary),
         ),
       ],

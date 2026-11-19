@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_tts/flutter_tts.dart';
+import 'package:media_kit/media_kit.dart';
 
 import '../../settings/presentation/settings_provider.dart';
 
@@ -65,7 +66,13 @@ class WordPronunciationService {
   final double selectedRate;
   final WordPronunciationTtsClient _ttsClient;
 
-  Future<void> speak(String text, {String language = 'en-US'}) async {
+  Player? _recordedPlayer;
+
+  Future<void> speak(
+    String text, {
+    String language = 'en-US',
+    String? recordedUrl,
+  }) async {
     if (speakOverride != null) {
       await speakOverride!(text);
       return;
@@ -76,6 +83,8 @@ class WordPronunciationService {
       return;
     }
 
+    if (recordedUrl != null && await _playRecording(recordedUrl)) return;
+
     await _ttsClient.speakText(
       normalizedText,
       language: language,
@@ -85,11 +94,42 @@ class WordPronunciationService {
     );
   }
 
+  Future<bool> _playRecording(String url) async {
+    Player? player;
+    StreamSubscription<bool>? completed;
+    StreamSubscription<String>? errors;
+    try {
+      player = Player();
+      _recordedPlayer = player;
+      final Completer<bool> result = Completer<bool>();
+      completed = player.stream.completed.listen((bool value) {
+        if (value && !result.isCompleted) result.complete(true);
+      });
+      errors = player.stream.error.listen((String _) {
+        if (!result.isCompleted) result.complete(false);
+      });
+      await player.open(Media(url)).timeout(const Duration(seconds: 4));
+      return await result.future.timeout(const Duration(seconds: 8));
+    } catch (_) {
+      return false;
+    } finally {
+      await completed?.cancel();
+      await errors?.cancel();
+      if (identical(_recordedPlayer, player)) {
+        _recordedPlayer = null;
+        await player?.dispose();
+      }
+    }
+  }
+
   Future<void> stop() async {
     if (stopOverride != null) {
       await stopOverride!();
       return;
     }
+    final Player? player = _recordedPlayer;
+    _recordedPlayer = null;
+    await player?.dispose();
     await _ttsClient.stop();
   }
 }

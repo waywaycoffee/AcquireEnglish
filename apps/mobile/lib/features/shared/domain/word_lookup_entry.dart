@@ -8,6 +8,9 @@ class WordLookupEntry {
     required this.exampleSentenceEn,
     required this.definitionCn,
     required this.sourceLabel,
+    this.level,
+    this.audioUrl,
+    this.exampleCredit,
     this.contextMeaningCn,
   });
 
@@ -21,6 +24,9 @@ class WordLookupEntry {
       exampleSentenceEn: json['exampleSentenceEn'] as String? ?? '',
       definitionCn: json['definitionCn'] as String? ?? '',
       sourceLabel: json['sourceLabel'] as String? ?? '',
+      level: json['level'] as String?,
+      audioUrl: json['audioUrl'] as String?,
+      exampleCredit: json['exampleCredit'] as String?,
       contextMeaningCn: json['contextMeaningCn'] as String?,
     );
   }
@@ -33,6 +39,9 @@ class WordLookupEntry {
   final String exampleSentenceEn;
   final String definitionCn;
   final String sourceLabel;
+  final String? level;
+  final String? audioUrl;
+  final String? exampleCredit;
   final String? contextMeaningCn;
 
   Map<String, dynamic> toJson() => <String, dynamic>{
@@ -44,6 +53,9 @@ class WordLookupEntry {
     'exampleSentenceEn': exampleSentenceEn,
     'definitionCn': definitionCn,
     'sourceLabel': sourceLabel,
+    'level': level,
+    'audioUrl': audioUrl,
+    'exampleCredit': exampleCredit,
     'contextMeaningCn': contextMeaningCn,
   };
 }

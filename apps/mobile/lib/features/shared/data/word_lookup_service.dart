@@ -43,6 +43,7 @@ final Provider<WordLookupService> wordLookupServiceProvider =
         if (prefs != null) unawaited(prefs.put('usageClientId', client));
       }
       return WordLookupService(
+        publicLookup: PublicLexiconLookup().lookup,
         clientId: session.isLoggedIn && session.email.isNotEmpty
             ? sha256
                   .convert(utf8.encode(session.email.toLowerCase()))
@@ -54,27 +55,115 @@ final Provider<WordLookupService> wordLookupServiceProvider =
       );
     });
 
+class PublicLexiconLookup {
+  final Dio _dio = Dio(
+    BaseOptions(
+      connectTimeout: const Duration(seconds: 2),
+      receiveTimeout: const Duration(seconds: 2),
+    ),
+  );
+  final Map<Uri, WordLookupEntry> _cache = <Uri, WordLookupEntry>{};
+
+  Future<WordLookupEntry?> lookup(
+    String word,
+    LearningSettingsState settings,
+  ) async {
+    final String key = word.trim().toLowerCase().replaceAll('’', "'");
+    if (!RegExp(r"^[a-z]+(?:'[a-z]+)*$").hasMatch(key)) return null;
+    final Uri? base = Uri.tryParse(settings.resolvedCloudApiBaseUrl);
+    if (base == null ||
+        !<String>{'https', 'http'}.contains(base.scheme) ||
+        base.host.isEmpty) {
+      return null;
+    }
+    final Uri url = base.resolve(
+      'api/public-lexicon/${Uri.encodeComponent(key)}',
+    );
+    final WordLookupEntry? cached = _cache[url];
+    if (cached != null) return cached;
+    try {
+      final Response<Map<String, dynamic>> response = await _dio
+          .getUri<Map<String, dynamic>>(url)
+          .timeout(const Duration(seconds: 3));
+      final Map<String, dynamic>? row = response.data;
+      if (row == null || row['word'] != key) return null;
+      String field(String name) => (row[name] as String?)?.trim() ?? '';
+      final Object? credit = row['example_source'];
+      final Object? author = credit is Map<String, dynamic>
+          ? credit['author']
+          : null;
+      final WordLookupEntry entry = WordLookupEntry(
+        word: key,
+        phonetic: field('phonetic'),
+        type: field('part_of_speech'),
+        definitionCn: field('definition_cn'),
+        definitionEn: field('definition_en'),
+        usageEn: '',
+        exampleSentenceEn: field('example_en'),
+        sourceLabel: '公共词库',
+        level: field('level'),
+        audioUrl: row['audio_available'] == true
+            ? '${url.toString()}/audio'
+            : null,
+        exampleCredit: credit == null
+            ? null
+            : [
+                'Tatoeba',
+                if (author is String && author.isNotEmpty) author,
+                'CC BY 2.0 FR',
+                if (credit is Map<String, dynamic> && credit['url'] is String)
+                  credit['url'] as String,
+              ].join(' · '),
+      );
+      if (_cache.length >= 256) _cache.remove(_cache.keys.first);
+      _cache[url] = entry;
+      return entry;
+    } catch (_) {
+      return null;
+    }
+  }
+}
+
 class WordLookupService {
   static final OfflineWordDictionary _dictionary = OfflineWordDictionary();
 
-  Future<WordLookupEntry?> _offlineEntry(String word, String? sentence, String status) async {
+  Future<WordLookupEntry?> _offlineEntry(
+    String word,
+    String? sentence,
+    String status,
+  ) async {
     try {
       final OfflineWordDefinition? entry = await _dictionary.lookup(word);
       if (entry == null) return null;
-      return WordLookupEntry(word: word, phonetic: entry.phonetic,
-        type: entry.partOfSpeech, definitionCn: entry.translation,
-        definitionEn: "", usageEn: status,
-        exampleSentenceEn: "", contextMeaningCn: null,
-        sourceLabel: "离线词典");
-    } catch (_) { return null; }
+      return WordLookupEntry(
+        word: word,
+        phonetic: entry.phonetic,
+        type: entry.partOfSpeech,
+        definitionCn: entry.translation,
+        definitionEn: "",
+        usageEn: status,
+        exampleSentenceEn: "",
+        contextMeaningCn: null,
+        sourceLabel: "离线词典",
+      );
+    } catch (_) {
+      return null;
+    }
   }
+
   const WordLookupService({
+    this.publicLookup,
     this.remoteLookupOverride,
     this.httpRequestOverride,
     this.clientId = '',
     this.clientKind = 'anonymous',
   });
 
+  final Future<WordLookupEntry?> Function(
+    String word,
+    LearningSettingsState settings,
+  )?
+  publicLookup;
   final String clientId;
   final String clientKind;
   final WordLookupRemoteLookup? remoteLookupOverride;
@@ -121,9 +210,20 @@ class WordLookupService {
     }
 
     final String normalizedWord = _normalizeWord(phrase);
+    final WordLookupEntry? shared = await publicLookup?.call(
+      normalizedWord,
+      settings,
+    );
+    if (shared != null &&
+        (shared.definitionCn.isNotEmpty || shared.definitionEn.isNotEmpty)) {
+      return shared;
+    }
     if (!_canUseRemoteProvider(settings)) {
-      final WordLookupEntry? offline = await _offlineEntry(normalizedWord, contextSentence,
-        'AI 解析未配置，请在设置中配置翻译模型。');
+      final WordLookupEntry? offline = await _offlineEntry(
+        normalizedWord,
+        contextSentence,
+        'AI 解析未配置，请在设置中配置翻译模型。',
+      );
       if (offline != null) return offline;
       return _buildUnavailableEntry(
         rawWord: normalizedWord,
@@ -144,8 +244,11 @@ class WordLookupService {
               settings: settings,
             ).timeout(const Duration(seconds: 12));
     } catch (_) {
-      final WordLookupEntry? offline = await _offlineEntry(normalizedWord, contextSentence,
-        'AI 解析暂不可用，当前显示离线释义。请检查模型地址、网络和 API 配置。');
+      final WordLookupEntry? offline = await _offlineEntry(
+        normalizedWord,
+        contextSentence,
+        'AI 解析暂不可用，当前显示离线释义。请检查模型地址、网络和 API 配置。',
+      );
       if (offline != null) return offline;
       return _buildUnavailableEntry(
         rawWord: normalizedWord,
