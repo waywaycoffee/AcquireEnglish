@@ -1,15 +1,30 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hive_ce/hive.dart';
 
+import '../../daily_review/presentation/daily_review_provider.dart';
 import '../domain/word_review_settings.dart';
 
 const String kWordReviewSettingsKey = 'word_review_prefs_v1';
 
 class WordReviewSettingsNotifier extends Notifier<WordReviewSettings> {
   @override
-  WordReviewSettings build() => _load();
+  WordReviewSettings build() {
+    final WordReviewSettings settings = _load();
+    // Align FSRS new quota with the words-plan setting on boot.
+    Future<void>.microtask(() {
+      try {
+        unawaited(
+          ref
+              .read(dailyReviewProvider.notifier)
+              .syncNewLimitFromWordSettings(settings.dailyNewLimit),
+        );
+      } catch (_) {}
+    });
+    return settings;
+  }
 
   WordReviewSettings _load() {
     if (!Hive.isBoxOpen('prefs')) {
@@ -39,10 +54,19 @@ class WordReviewSettingsNotifier extends Notifier<WordReviewSettings> {
     );
   }
 
-  Future<void> update(WordReviewSettings next) => _persist(next);
+  Future<void> update(WordReviewSettings next) async {
+    await _persist(next);
+    await ref
+        .read(dailyReviewProvider.notifier)
+        .syncNewLimitFromWordSettings(next.dailyNewLimit);
+  }
 
-  Future<void> setDailyNewLimit(int value) =>
-      _persist(state.copyWith(dailyNewLimit: value));
+  Future<void> setDailyNewLimit(int value) async {
+    await _persist(state.copyWith(dailyNewLimit: value));
+    await ref
+        .read(dailyReviewProvider.notifier)
+        .syncNewLimitFromWordSettings(value);
+  }
 
   Future<void> setDailyReviewLimit(int value) =>
       _persist(state.copyWith(dailyReviewLimit: value));

@@ -424,7 +424,7 @@ class DailyReviewNotifier extends Notifier<DailyReviewState> {
   }
 
   /// Apply LingQ-style soft consolidations queued after 3 in-video encounters.
-  /// Skipped keys stay queued until the card is due / learned.
+  /// Due cards get a Good grade; not-yet-due cards are pulled forward to today.
   Future<void> drainEncounterSoftCredits() async {
     final WordEncounterStore store = WordEncounterStore(
       account: ref.read(studyAccountProvider),
@@ -436,13 +436,18 @@ class DailyReviewNotifier extends Notifier<DailyReviewState> {
     for (final String key in keys) {
       final ReviewRecord? record = state.records[key];
       if (record == null || record.isNew) continue;
-      if (record.card.due.isAfter(now)) continue;
       try {
-        await grade(
-          key,
-          fsrs.Rating.good,
-          expectedReviews: record.reviews,
-        );
+        if (record.card.due.isAfter(now)) {
+          await _transaction(
+            (DailyReviewState current) => current.reviewToday(key, now),
+          );
+        } else {
+          await grade(
+            key,
+            fsrs.Rating.good,
+            expectedReviews: record.reviews,
+          );
+        }
         applied.add(key);
       } catch (_) {
         // Card may have been removed or concurrently graded.
@@ -451,6 +456,13 @@ class DailyReviewNotifier extends Notifier<DailyReviewState> {
     if (applied.isNotEmpty) {
       await store.acknowledgeSoftCredits(applied);
     }
+  }
+
+  /// Keep FSRS new-learn quota aligned with the words-plan setting.
+  Future<void> syncNewLimitFromWordSettings(int wordPlanLimit) async {
+    final int next = wordPlanLimit.clamp(0, 200);
+    if (state.dailyNewLimit == next) return;
+    await setDailyNewLimit(next);
   }
 
   Future<void> grade(

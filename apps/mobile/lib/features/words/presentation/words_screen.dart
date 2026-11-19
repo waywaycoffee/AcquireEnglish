@@ -39,7 +39,8 @@ class _WordsScreenState extends ConsumerState<WordsScreen> {
       await ref.read(dailyReviewProvider.notifier).setDailyNewLimit(newLimit);
     }
     if (!mounted) return;
-    context.push(SGRoute.reviewSession.route);
+    // Word-home plan must not interleave phrases/sentences.
+    context.push('${SGRoute.reviewSession.route}?kind=word');
   }
 
   String _query = '';
@@ -204,6 +205,14 @@ class _WordsScreenState extends ConsumerState<WordsScreen> {
                   streak: streak,
                 ),
                 const SizedBox(height: 12),
+                _PhaseBreakdown(
+                  counts: _phaseCounts(
+                    entries.where((WordEntry e) => e.favorite),
+                    reviewState,
+                    now,
+                  ),
+                ),
+                const SizedBox(height: 12),
                 Wrap(
                   spacing: 8,
                   children: <Widget>[
@@ -226,7 +235,7 @@ class _WordsScreenState extends ConsumerState<WordsScreen> {
                         avatar: const Icon(Icons.replay_rounded, size: 18),
                         label: Text('错词本 $missedCount'),
                         onPressed: () => context.push(
-                          '${SGRoute.reviewSession.route}?practice=1&kind=word',
+                          '${SGRoute.reviewSession.route}?deck=missed&kind=word',
                         ),
                       ),
                   ],
@@ -360,6 +369,22 @@ class _WordsScreenState extends ConsumerState<WordsScreen> {
     );
   }
 
+  Map<FsrsWordPhase, int> _phaseCounts(
+    Iterable<WordEntry> favorites,
+    DailyReviewState reviewState,
+    DateTime now,
+  ) {
+    final Map<FsrsWordPhase, int> counts = <FsrsWordPhase, int>{
+      for (final FsrsWordPhase phase in FsrsWordPhase.values) phase: 0,
+    };
+    for (final WordEntry entry in favorites) {
+      final ReviewRecord? record = reviewState.records['word:${entry.word}'];
+      final FsrsWordPhase phase = fsrsWordPhase(record, now);
+      counts[phase] = (counts[phase] ?? 0) + 1;
+    }
+    return counts;
+  }
+
   List<AlphabetListViewItemGroup> _buildGroups(List<WordEntry> entries) {
     final Map<String, List<WordEntry>> groups = <String, List<WordEntry>>{};
     for (final WordEntry entry in entries) {
@@ -491,6 +516,30 @@ class _TodayPlanCard extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+class _PhaseBreakdown extends StatelessWidget {
+  const _PhaseBreakdown({required this.counts});
+
+  final Map<FsrsWordPhase, int> counts;
+
+  @override
+  Widget build(BuildContext context) {
+    return Wrap(
+      spacing: 8,
+      runSpacing: 8,
+      children: <Widget>[
+        for (final FsrsWordPhase phase in FsrsWordPhase.values)
+          Chip(
+            visualDensity: VisualDensity.compact,
+            label: Text(
+              '${fsrsWordPhaseLabel(phase)} ${counts[phase] ?? 0}',
+              style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 12),
+            ),
+          ),
+      ],
     );
   }
 }

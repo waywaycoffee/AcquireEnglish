@@ -150,18 +150,20 @@ GoRouter goRouter(Ref ref) => GoRouter(
     GoRoute(
       path: SGRoute.reviewSession.route,
       name: SGRoute.reviewSession.name,
-      builder: (BuildContext context, GoRouterState state) => DailyReviewScreen(
-        session: true,
-        practice: state.uri.queryParameters['practice'] == '1',
-        expressions: state.uri.queryParameters['kind'] == 'expressions',
-        recommended: state.uri.queryParameters['deck'] == 'recommended',
-        practiceKind: ReviewKind.values
-            .where(
-              (ReviewKind kind) =>
-                  kind.name == state.uri.queryParameters['kind'],
-            )
-            .firstOrNull,
-      ),
+      builder: (BuildContext context, GoRouterState state) {
+        final String? kindName = state.uri.queryParameters['kind'];
+        return DailyReviewScreen(
+          session: true,
+          practice: state.uri.queryParameters['practice'] == '1',
+          expressions: kindName == 'expressions',
+          recommended: state.uri.queryParameters['deck'] == 'recommended',
+          missedOnly: state.uri.queryParameters['deck'] == 'missed',
+          focusWord: state.uri.queryParameters['focus'],
+          practiceKind: ReviewKind.values
+              .where((ReviewKind kind) => kind.name == kindName)
+              .firstOrNull,
+        );
+      },
     ).fade(),
     GoRoute(
       path: SGRoute.sm2Review.route,

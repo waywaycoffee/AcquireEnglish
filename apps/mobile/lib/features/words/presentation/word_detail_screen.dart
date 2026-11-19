@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../router/app_router.dart';
 import '../../library/presentation/course_directory_relink.dart';
 import '../../library/presentation/library_catalog_provider.dart';
 import '../../settings/presentation/settings_provider.dart';
@@ -329,6 +330,23 @@ class _WordDetailDialogState extends ConsumerState<WordDetailDialog> {
                         .read(wordBookProvider.notifier)
                         .toggleFavorite(entry.word),
                   ),
+                  if (entry.favorite) ...<Widget>[
+                    const SizedBox(height: 12),
+                    SizedBox(
+                      width: double.infinity,
+                      child: OutlinedButton.icon(
+                        onPressed: () {
+                          final GoRouter router = GoRouter.of(context);
+                          Navigator.of(context, rootNavigator: true).pop();
+                          router.push(
+                            '${SGRoute.reviewSession.route}?practice=1&kind=word&focus=${Uri.encodeComponent(entry.word)}',
+                          );
+                        },
+                        icon: const Icon(Icons.style_rounded),
+                        label: const Text('复习此词'),
+                      ),
+                    ),
+                  ],
                   const SizedBox(height: 16),
                   Builder(
                     builder: (BuildContext context) {

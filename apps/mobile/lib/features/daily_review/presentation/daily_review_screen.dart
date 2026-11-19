@@ -43,12 +43,20 @@ class DailyReviewScreen extends ConsumerStatefulWidget {
     this.practiceKind,
     this.expressions = false,
     this.recommended = false,
+    this.missedOnly = false,
+    this.focusWord,
   });
   final bool session;
   final bool recommended;
   final bool practice;
   final bool expressions;
   final ReviewKind? practiceKind;
+
+  /// Only cards currently in the missed-word book.
+  final bool missedOnly;
+
+  /// Prefer / restrict to this lemma (word detail “复习此词”).
+  final String? focusWord;
   @override
   ConsumerState<DailyReviewScreen> createState() => _DailyReviewScreenState();
 }
@@ -112,16 +120,35 @@ class _DailyReviewScreenState extends ConsumerState<DailyReviewScreen>
     super.dispose();
   }
 
+  List<ReviewSource> _filteredSources() {
+    Iterable<ReviewSource> sources = ref.watch(reviewSourcesProvider).where(
+      (ReviewSource source) =>
+          source.key.startsWith('recommended:') == widget.recommended,
+    );
+    if (widget.expressions) {
+      sources = sources.where(
+        (ReviewSource source) => source.kind != ReviewKind.sentence,
+      );
+    } else if (widget.practiceKind != null) {
+      sources = sources.where(
+        (ReviewSource source) => source.kind == widget.practiceKind,
+      );
+    }
+    final String? focus = widget.focusWord?.trim().toLowerCase();
+    if (focus != null && focus.isNotEmpty) {
+      sources = sources.where(
+        (ReviewSource source) =>
+            source.kind == ReviewKind.word &&
+            source.question.trim().toLowerCase() == focus,
+      );
+    }
+    return sources.toList(growable: false);
+  }
+
   @override
   Widget build(BuildContext context) {
     final DailyReviewState state = ref.watch(dailyReviewProvider);
-    final List<ReviewSource> sources = ref
-        .watch(reviewSourcesProvider)
-        .where(
-          (ReviewSource source) =>
-              source.key.startsWith('recommended:') == widget.recommended,
-        )
-        .toList();
+    final List<ReviewSource> sources = _filteredSources();
     final DateTime now = ref.read(reviewClockProvider)();
     if (widget.session) _restoreWordPasses(now);
     final ReviewPlan plan = state.plan(sources, now);
@@ -132,11 +159,25 @@ class _DailyReviewScreenState extends ConsumerState<DailyReviewScreen>
       topBar: PadTopBar(
         title: widget.recommended
             ? '推荐背词'
+            : widget.missedOnly
+            ? '错词本'
             : widget.session
-            ? (widget.practice ? '自由复习' : '正在复习')
+            ? (widget.practice
+                  ? (widget.focusWord != null && widget.focusWord!.isNotEmpty
+                        ? '复习此词'
+                        : '自由复习')
+                  : (widget.practiceKind == ReviewKind.word
+                        ? '今日背词'
+                        : '正在复习'))
             : '每日复习',
         description: widget.session
-            ? (widget.practice ? '随时再练，不改变复习计划。' : null)
+            ? (widget.missedOnly
+                  ? '优先重练标记为「忘记」的词。'
+                  : widget.practice
+                  ? '随时再练，不改变复习计划。'
+                  : widget.practiceKind == ReviewKind.word
+                  ? '仅安排收藏单词的新学与到期复习。'
+                  : null)
             : '复习单词、短语和收藏句子。',
         leading: widget.session
             ? PadBackButton(onPressed: _leaveSession, tooltip: '返回每日概览')
@@ -253,17 +294,41 @@ class _DailyReviewScreenState extends ConsumerState<DailyReviewScreen>
     DateTime now,
   ) {
     if (_deckKeys != null) return;
+    final Set<String> activeKeys = sources
+        .map((ReviewSource source) => source.key)
+        .toSet();
+    final MissedReviewBook missedBook = MissedReviewBook(
+      account: ref.read(studyAccountProvider),
+    );
+
+    if (widget.missedOnly) {
+      final List<String> missed = missedBook.prioritize(activeKeys);
+      _deckKeys = missed.isNotEmpty
+          ? missed
+          : sources
+                .map((ReviewSource s) => s.key)
+                .where(state.records.containsKey)
+                .toList();
+      _currentKey = _deckKeys!.firstOrNull;
+      return;
+    }
+
     final ReviewKind? kind = widget.practiceKind;
     if (widget.practice && (kind != null || widget.expressions)) {
-      _deckKeys = sources
-          .where(
-            (ReviewSource source) => widget.expressions
-                ? source.kind != ReviewKind.sentence
-                : source.kind == kind,
-          )
+      final List<String> keys = sources
           .map((ReviewSource source) => source.key)
           .where(state.records.containsKey)
           .toList();
+      // Prefer focus word at the front when provided.
+      final String? focusKey = widget.focusWord == null
+          ? null
+          : 'word:${widget.focusWord!.trim().toLowerCase()}';
+      if (focusKey != null && keys.contains(focusKey)) {
+        keys
+          ..remove(focusKey)
+          ..insert(0, focusKey);
+      }
+      _deckKeys = keys;
       _currentKey = _deckKeys!.firstOrNull;
       return;
     }
@@ -276,13 +341,13 @@ class _DailyReviewScreenState extends ConsumerState<DailyReviewScreen>
       _currentKey = _deckKeys!.firstOrNull;
       return;
     }
-    final List<ReviewRecord> due = <ReviewRecord>[...plan.due];
-    final Set<String> activeKeys = sources
-        .map((ReviewSource source) => source.key)
-        .toSet();
-    final List<String> missedPriority = MissedReviewBook(
-      account: ref.read(studyAccountProvider),
-    ).prioritize(activeKeys);
+
+    final int reviewCap = ref
+        .read(wordReviewSettingsProvider)
+        .dailyReviewLimit
+        .clamp(0, 500);
+    List<ReviewRecord> due = <ReviewRecord>[...plan.due];
+    final List<String> missedPriority = missedBook.prioritize(activeKeys);
     if (missedPriority.isNotEmpty) {
       due.sort((ReviewRecord a, ReviewRecord b) {
         final int ai = missedPriority.indexOf(a.key);
@@ -294,6 +359,9 @@ class _DailyReviewScreenState extends ConsumerState<DailyReviewScreen>
         if (bMissed) return 1;
         return a.order.compareTo(b.order);
       });
+    }
+    if (reviewCap > 0 && due.length > reviewCap) {
+      due = due.take(reviewCap).toList(growable: false);
     }
     final List<ReviewRecord> fresh = plan.waiting
         .take(plan.newAvailable)
