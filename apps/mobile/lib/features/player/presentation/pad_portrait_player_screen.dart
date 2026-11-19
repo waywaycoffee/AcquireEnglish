@@ -4599,7 +4599,7 @@ Future<void> _settleChineseFillIfAlreadyPresent() async {
       ref.read(learningActivityProvider.notifier).recordPhraseSaved();
     }
     if (addedCard) {
-      _showMessage('已收藏句型到词卡');
+      _showMessage('已收藏句型到单词本');
     } else {
       _showMessage(
         addedPhrase ? '成功收藏当前句型到短语库！' : '该例句已经在您的短语库中！',
@@ -4629,7 +4629,7 @@ Future<void> _settleChineseFillIfAlreadyPresent() async {
     );
     if (addedCard) {
       ref.read(learningActivityProvider.notifier).recordPhraseSaved();
-      _showMessage('已收藏「${normalizeLexeme(word)}」到词卡');
+      _showMessage('已收藏「${normalizeLexeme(word)}」到单词本');
       return;
     }
     // Fallback: keep whole-line phrase book for non-lexeme selections.
@@ -4670,7 +4670,7 @@ Future<void> _settleChineseFillIfAlreadyPresent() async {
     );
     _showMessage(
       added
-          ? '已收藏到词卡「$lexeme」，正在生成 AI 解析 / 助记 / 例句…'
+          ? '已收藏到单词本「$lexeme」，正在生成 AI 解析 / 助记 / 例句…'
           : '未能收藏，请选择英文单词、词组或短句型。',
     );
   }

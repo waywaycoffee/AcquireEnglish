@@ -34,7 +34,7 @@ class WordLookupPopupCard extends ConsumerStatefulWidget {
   final VoidCallback onClose;
   final VoidCallback? onCollect;
 
-  /// Called with the card's Chinese definition when favoriting to 词卡.
+  /// Called with the card's Chinese definition when favoriting to 单词本.
   final void Function(String? definitionCn)? onFavorite;
   final VoidCallback? onPronounce;
   final String? episodeId;
@@ -247,11 +247,11 @@ class _WordLookupPopupCardState extends ConsumerState<WordLookupPopupCard> {
               ),
             if (widget.onFavorite != null)
               IconButton(
-                tooltip: isFavorite ? '取消收藏' : '收藏到词卡',
+                tooltip: isFavorite ? '取消收藏' : '收藏到单词本',
                 onPressed: () {
                   if (isFavorite) {
                     ref.read(wordBookProvider.notifier).toggleFavorite(word);
-                    _showMessage('已从词卡取消收藏');
+                    _showMessage('已从单词本取消收藏');
                   } else {
                     final String fromEntry = (_entry?.definitionCn ?? '')
                         .trim();

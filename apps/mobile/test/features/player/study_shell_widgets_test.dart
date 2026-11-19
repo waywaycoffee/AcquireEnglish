@@ -40,7 +40,7 @@ void main() {
     expect(find.text('数字人'), findsOneWidget);
     expect(find.text('听写'), findsOneWidget);
     expect(find.text('练习'), findsOneWidget);
-    expect(find.text('词卡'), findsOneWidget);
+    expect(find.text('背单词'), findsOneWidget);
 
     await tester.tap(find.byKey(const ValueKey<String>('study-tab-coach')));
     await tester.pumpAndSettle();
@@ -95,7 +95,7 @@ void main() {
     expect(find.text('双语'), findsWidgets);
     expect(find.text('英语口语'), findsOneWidget);
     expect(find.text('跟读'), findsNothing);
-    expect(find.text('词卡'), findsNothing);
+    expect(find.text('背单词'), findsNothing);
 
     await tester.tap(
       find.byKey(const ValueKey<String>('study-chip-subtitle-label')),

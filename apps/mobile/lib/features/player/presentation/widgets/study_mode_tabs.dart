@@ -25,7 +25,7 @@ extension StudyModeTabLabel on StudyModeTab {
       case StudyModeTab.practice:
         return '练习';
       case StudyModeTab.wordCards:
-        return '词卡';
+        return '背单词';
     }
   }
 }

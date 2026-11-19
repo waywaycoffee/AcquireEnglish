@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
+import '../../../../router/app_router.dart';
 import '../../../words/data/offline_word_dictionary.dart';
 import '../../domain/episode_word_cards.dart';
 import 'study_shell_tokens.dart';
 
-/// Episode vocabulary deck inspired by Shadow Talk「词卡」.
+/// Episode vocabulary deck + entry to the daily 背单词 plan.
 class StudyWordCardsTab extends ConsumerStatefulWidget {
   const StudyWordCardsTab({
     required this.cards,
@@ -125,9 +127,25 @@ class _StudyWordCardsTabState extends ConsumerState<StudyWordCardsTab> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: <Widget>[
+        Padding(
+          padding: const EdgeInsets.fromLTRB(2, 0, 2, 10),
+          child: FilledButton.icon(
+            onPressed: () => context.push(SGRoute.sm2Review.route),
+            icon: const Icon(Icons.style_rounded, size: 18),
+            label: const Text('开始今日背单词'),
+            style: FilledButton.styleFrom(
+              backgroundColor: colors.accent,
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(vertical: 12),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(14),
+              ),
+            ),
+          ),
+        ),
         SingleChildScrollView(
           scrollDirection: Axis.horizontal,
-          padding: const EdgeInsets.fromLTRB(2, 4, 2, 10),
+          padding: const EdgeInsets.fromLTRB(2, 0, 2, 10),
           child: Row(
             children: <Widget>[
               _FilterChip(
@@ -164,7 +182,7 @@ class _StudyWordCardsTabState extends ConsumerState<StudyWordCardsTab> {
           child: filtered.isEmpty
               ? Center(
                   child: Text(
-                    '本集暂无词卡\n在字幕里点词收藏后会出现在这里',
+                    '本集暂无单词\n在字幕里点词收藏后会出现在这里',
                     textAlign: TextAlign.center,
                     style: TextStyle(
                       color: colors.textSecondary,
