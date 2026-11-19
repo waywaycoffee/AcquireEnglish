@@ -473,7 +473,9 @@ class _TodayReviewBanner extends StatelessWidget {
     return Container(
       padding: EdgeInsets.all(compact ? 18 : 22),
       decoration: BoxDecoration(
-        color: const Color(0xFFF0FAE8),
+        color: AppDesignTokens.isDark
+            ? const Color(0xFF1E3A2A)
+            : const Color(0xFFF0FAE8),
         borderRadius: BorderRadius.circular(22),
         border: Border.all(color: AppDesignTokens.brandGreen, width: 2),
         boxShadow: AppDesignTokens.toyCardShadow,

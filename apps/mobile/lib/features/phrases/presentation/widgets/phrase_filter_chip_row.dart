@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../../../shared/presentation/pad/app_design_tokens.dart';
+
 class PhraseFilterChipRow extends StatelessWidget {
   const PhraseFilterChipRow({
     required this.title,
@@ -21,10 +23,10 @@ class PhraseFilterChipRow extends StatelessWidget {
       children: <Widget>[
         Text(
           title,
-          style: const TextStyle(
+          style: TextStyle(
             fontSize: 12,
             fontWeight: FontWeight.w700,
-            color: Color(0xFF53625A),
+            color: AppDesignTokens.textSecondary,
           ),
         ),
         const SizedBox(height: 8),
@@ -38,18 +40,22 @@ class PhraseFilterChipRow extends StatelessWidget {
                   label: Text(option),
                   selected: isActive,
                   onSelected: (_) => onSelected(option),
-                  selectedColor: const Color(0xFFE5F5EA),
-                  backgroundColor: const Color(0xFFF2F4F6),
+                  selectedColor: AppDesignTokens.isDark
+                      ? const Color(0xFF1E3A2A)
+                      : const Color(0xFFE5F5EA),
+                  backgroundColor: AppDesignTokens.softGray,
                   labelStyle: TextStyle(
                     color: isActive
-                        ? const Color(0xFF0F7A43)
-                        : const Color(0xFF53625A),
+                        ? (AppDesignTokens.isDark
+                              ? AppDesignTokens.brandGreen
+                              : const Color(0xFF0F7A43))
+                        : AppDesignTokens.textSecondary,
                     fontWeight: isActive ? FontWeight.w700 : FontWeight.w600,
                   ),
                   side: BorderSide(
                     color: isActive
-                        ? const Color(0xFF0F7A43)
-                        : const Color(0xFFDCE4DA),
+                        ? AppDesignTokens.brandGreenDark
+                        : AppDesignTokens.borderGray,
                   ),
                 );
               })

@@ -454,7 +454,7 @@ class _WordHeader extends StatelessWidget {
   Widget build(BuildContext context) => Container(
     padding: const EdgeInsets.all(22),
     decoration: BoxDecoration(
-      color: Colors.white,
+      color: AppDesignTokens.appWhite,
       borderRadius: BorderRadius.circular(22),
     ),
     child: Row(
@@ -465,9 +465,10 @@ class _WordHeader extends StatelessWidget {
             children: <Widget>[
               Text(
                 entry.word,
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 30,
                   fontWeight: FontWeight.w900,
+                  color: AppDesignTokens.textPrimary,
                 ),
               ),
               const SizedBox(height: 10),
@@ -733,7 +734,7 @@ class _OccurrenceCard extends StatelessWidget {
   Widget build(BuildContext context) => Container(
     padding: const EdgeInsets.all(16),
     decoration: BoxDecoration(
-      color: Colors.white,
+      color: AppDesignTokens.appWhite,
       borderRadius: BorderRadius.circular(18),
     ),
     child: Column(
@@ -741,11 +742,15 @@ class _OccurrenceCard extends StatelessWidget {
       children: <Widget>[
         Text(
           '${occurrence.course} · ${occurrence.episode} · ${contextItem.time}',
+          style: TextStyle(color: AppDesignTokens.textSecondary),
         ),
         const SizedBox(height: 8),
         Text(
           displaySentence,
-          style: const TextStyle(fontWeight: FontWeight.w800),
+          style: TextStyle(
+            fontWeight: FontWeight.w800,
+            color: AppDesignTokens.textPrimary,
+          ),
         ),
         if (contextItem.chinese.isNotEmpty) ...<Widget>[
           const SizedBox(height: 6),

@@ -225,11 +225,16 @@ class _WordsScreenState extends ConsumerState<WordsScreen> {
                 const SizedBox(height: 16),
                 TextField(
                   onChanged: (String value) => setState(() => _query = value),
+                  style: TextStyle(color: AppDesignTokens.textPrimary),
                   decoration: InputDecoration(
                     hintText: _favoritesOnly ? '搜索收藏的单词' : '搜索学过的单词',
-                    prefixIcon: const Icon(Icons.search_rounded),
+                    hintStyle: TextStyle(color: AppDesignTokens.textSecondary),
+                    prefixIcon: Icon(
+                      Icons.search_rounded,
+                      color: AppDesignTokens.textSecondary,
+                    ),
                     filled: true,
-                    fillColor: Colors.white,
+                    fillColor: AppDesignTokens.appWhite,
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(18),
                       borderSide: BorderSide.none,
@@ -247,6 +252,9 @@ class _WordsScreenState extends ConsumerState<WordsScreen> {
                                 ? '还没有收藏单词，点击单词旁的收藏图标就能加入。'
                                 : '播放带英文字幕的视频后，单词会自动出现在这里。',
                             textAlign: TextAlign.center,
+                            style: TextStyle(
+                              color: AppDesignTokens.textSecondary,
+                            ),
                           ),
                         )
                       : AlphabetListView(
@@ -514,7 +522,7 @@ class _WordCard extends ConsumerWidget {
         entry.definitionCn ?? entry.offlineDefinitionCn ?? '暂无释义';
     // Material (not DecoratedBox) so InkWell splash paints correctly.
     return Material(
-      color: Colors.white,
+      color: AppDesignTokens.appWhite,
       borderRadius: BorderRadius.circular(14),
       clipBehavior: Clip.antiAlias,
       child: InkWell(
@@ -530,9 +538,10 @@ class _WordCard extends ConsumerWidget {
                   children: <Widget>[
                     Text(
                       entry.word,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 17,
                         fontWeight: FontWeight.w900,
+                        color: AppDesignTokens.textPrimary,
                       ),
                     ),
                     const SizedBox(height: 2),
@@ -540,14 +549,37 @@ class _WordCard extends ConsumerWidget {
                       translation,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(fontSize: 12, height: 1.2),
+                      style: TextStyle(
+                        fontSize: 12,
+                        height: 1.2,
+                        color: AppDesignTokens.textSecondary,
+                      ),
                     ),
-                    if (reviews > 0) Text('已复习 $reviews 次'),
+                    if (reviews > 0)
+                      Text(
+                        '已复习 $reviews 次',
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: AppDesignTokens.textSecondary,
+                        ),
+                      ),
                     if (entry.sourceSentence.isNotEmpty) ...<Widget>[
                       const SizedBox(height: 6),
-                      Text('视频原句 · ${entry.sourceSentence}'),
+                      Text(
+                        '视频原句 · ${entry.sourceSentence}',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: AppDesignTokens.textSecondary,
+                        ),
+                      ),
                       if (entry.sourceSentenceCn.isNotEmpty)
-                        Text(entry.sourceSentenceCn),
+                        Text(
+                          entry.sourceSentenceCn,
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: AppDesignTokens.textSecondary,
+                          ),
+                        ),
                     ],
                   ],
                 ),
@@ -559,9 +591,10 @@ class _WordCard extends ConsumerWidget {
                   children: <Widget>[
                     Text(
                       '${entry.occurrenceCount} 次',
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 13,
                         fontWeight: FontWeight.w800,
+                        color: AppDesignTokens.textPrimary,
                       ),
                     ),
                     Text(
@@ -580,6 +613,7 @@ class _WordCard extends ConsumerWidget {
                     .read(wordBookProvider.notifier)
                     .toggleFavorite(entry.word),
                 visualDensity: VisualDensity.compact,
+                color: AppDesignTokens.textPrimary,
                 icon: Icon(
                   entry.favorite
                       ? Icons.bookmark_rounded

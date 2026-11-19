@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../../../shared/presentation/pad/app_design_tokens.dart';
+
 class PhraseFilterBar extends StatelessWidget {
   const PhraseFilterBar({
     required this.selected,
@@ -23,32 +25,37 @@ class PhraseFilterBar extends StatelessWidget {
           .map((String value) {
             final bool active = value == selected;
             final bool review = value == '需要复习';
+            final Color activeBg = review
+                ? const Color(0xFF8F1D1D)
+                : AppDesignTokens.brandGreenDark;
+            final Color idleBg = review
+                ? (AppDesignTokens.isDark
+                      ? const Color(0xFF3A2222)
+                      : const Color(0xFFFFF0F0))
+                : AppDesignTokens.softGray;
+            final Color idleFg = review
+                ? (AppDesignTokens.isDark
+                      ? const Color(0xFFFFB4B4)
+                      : const Color(0xFF8F1D1D))
+                : AppDesignTokens.textSecondary;
             return ChoiceChip(
               label: Text(review ? '$value ($reviewCount)' : value),
               selected: active,
               onSelected: (_) => onSelected(value),
-              selectedColor: review
-                  ? const Color(0xFF8F1D1D)
-                  : const Color(0xFF0F7A43),
-              backgroundColor: review
-                  ? const Color(0xFFFFF0F0)
-                  : const Color(0xFFF2F4F6),
+              selectedColor: activeBg,
+              backgroundColor: idleBg,
               labelStyle: TextStyle(
-                color: active
-                    ? Colors.white
-                    : review
-                    ? const Color(0xFF8F1D1D)
-                    : const Color(0xFF4D5A52),
+                color: active ? Colors.white : idleFg,
                 fontWeight: active ? FontWeight.w800 : FontWeight.w600,
               ),
               side: BorderSide(
                 color: active
-                    ? (review
-                          ? const Color(0xFF8F1D1D)
-                          : const Color(0xFF0F7A43))
+                    ? activeBg
                     : (review
-                          ? const Color(0xFFF0B7B7)
-                          : const Color(0xFFDCE3DC)),
+                          ? (AppDesignTokens.isDark
+                                ? const Color(0xFF6A3A3A)
+                                : const Color(0xFFF0B7B7))
+                          : AppDesignTokens.borderGray),
               ),
             );
           })

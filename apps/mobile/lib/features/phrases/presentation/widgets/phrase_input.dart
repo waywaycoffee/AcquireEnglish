@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../../../shared/presentation/pad/app_design_tokens.dart';
+
 class PhraseInput extends StatelessWidget {
   const PhraseInput({
     required this.label,
@@ -19,19 +21,21 @@ class PhraseInput extends StatelessWidget {
       children: <Widget>[
         Text(
           label,
-          style: const TextStyle(
+          style: TextStyle(
             fontSize: 12,
             fontWeight: FontWeight.w700,
-            color: Color(0xFF53625A),
+            color: AppDesignTokens.textSecondary,
           ),
         ),
         const SizedBox(height: 8),
         TextField(
           controller: controller,
+          style: TextStyle(color: AppDesignTokens.textPrimary),
           decoration: InputDecoration(
             hintText: hint,
+            hintStyle: TextStyle(color: AppDesignTokens.textSecondary),
             filled: true,
-            fillColor: const Color(0xFFF8F9FB),
+            fillColor: AppDesignTokens.softGray,
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(14),
               borderSide: BorderSide.none,
