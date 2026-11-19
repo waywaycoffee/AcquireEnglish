@@ -47,6 +47,8 @@ class MainActivity : FlutterActivity(), MethodChannel.MethodCallHandler {
     private lateinit var audioToolsChannel: MethodChannel
     private lateinit var orientationChannel: MethodChannel
     private lateinit var subtitleOverlayChannel: MethodChannel
+    private lateinit var ocrAssetsChannel: MethodChannel
+    private var ocrAssetPathRegistered: Boolean = false
     private val subtitleFloatingBall: SubtitleFloatingBall
         get() = SubtitleFloatingBall.get(this)
     private var pendingResult: MethodChannel.Result? = null
@@ -146,6 +148,11 @@ class MainActivity : FlutterActivity(), MethodChannel.MethodCallHandler {
             "com.acquire.english/subtitle_overlay",
         )
         subtitleOverlayChannel.setMethodCallHandler(this)
+        ocrAssetsChannel = MethodChannel(
+            flutterEngine.dartExecutor.binaryMessenger,
+            "com.acquire.english/ocr_assets",
+        )
+        ocrAssetsChannel.setMethodCallHandler(this)
     }
 
     override fun onMethodCall(call: MethodCall, result: MethodChannel.Result) {
@@ -163,6 +170,8 @@ class MainActivity : FlutterActivity(), MethodChannel.MethodCallHandler {
             "shareVideoToMoments" -> handleShareVideoToMoments(call, result)
             "captureFrameAt" -> handleCaptureFrameAt(call, result)
             "setOrientation" -> handleSetOrientation(call, result)
+            "isOcrAssetPackReady" -> result.success(isOcrAssetPackReady())
+            "installOcrAssetPack" -> handleInstallOcrAssetPack(call, result)
             "canDrawOverlays" -> result.success(subtitleFloatingBall.canDrawOverlays())
             "openOverlaySettings" -> {
                 subtitleFloatingBall.openOverlaySettings()
@@ -201,6 +210,113 @@ class MainActivity : FlutterActivity(), MethodChannel.MethodCallHandler {
                 }
             }
             else -> result.notImplemented()
+        }
+    }
+
+    private fun ocrModelsRoot(): File {
+        return File(filesDir, "ocr_asset_pack")
+    }
+
+    private fun isOcrAssetPackReady(): Boolean {
+        val marker = File(ocrModelsRoot(), "mlkit-google-ocr-models/.ae_ready")
+        if (!marker.exists()) {
+            return false
+        }
+        return registerOcrAssetPath(ocrModelsRoot())
+    }
+
+    private fun registerOcrAssetPath(packDir: File): Boolean {
+        val models = File(packDir, "mlkit-google-ocr-models")
+        if (!models.isDirectory) {
+            return false
+        }
+        if (ocrAssetPathRegistered) {
+            return true
+        }
+        return try {
+            val method = android.content.res.AssetManager::class.java
+                .getDeclaredMethod("addAssetPath", String::class.java)
+            method.isAccessible = true
+            val cookie = method.invoke(assets, packDir.absolutePath) as? Int ?: 0
+            ocrAssetPathRegistered = cookie != 0
+            ocrAssetPathRegistered
+        } catch (_: Exception) {
+            false
+        }
+    }
+
+    private fun handleInstallOcrAssetPack(call: MethodCall, result: MethodChannel.Result) {
+        val zipPath = call.argument<String>("zipPath")?.trim().orEmpty()
+        val destDir = call.argument<String>("destDir")?.trim().orEmpty()
+            .ifEmpty { ocrModelsRoot().absolutePath }
+        if (zipPath.isEmpty()) {
+            result.error("bad_args", "zipPath is required", null)
+            return
+        }
+        Thread {
+            try {
+                val zip = File(zipPath)
+                require(zip.exists() && zip.length() > 1024L) { "ocr zip missing" }
+                val pack = File(destDir)
+                if (!pack.exists() && !pack.mkdirs()) {
+                    error("unable to create ocr pack dir")
+                }
+                val modelsDir = File(pack, "mlkit-google-ocr-models")
+                if (modelsDir.exists()) {
+                    modelsDir.deleteRecursively()
+                }
+                unzipTo(zip, pack)
+                require(modelsDir.isDirectory) { "ocr models folder missing after unzip" }
+                val marker = File(modelsDir, ".ae_ready")
+                marker.writeText(System.currentTimeMillis().toString())
+                val ok = registerOcrAssetPath(pack)
+                require(ok) { "failed to register ocr asset path" }
+                postResult(
+                    result,
+                    mapOf(
+                        "ok" to true,
+                        "path" to pack.absolutePath,
+                        "bytes" to zip.length(),
+                    ),
+                )
+            } catch (exception: Exception) {
+                Handler(Looper.getMainLooper()).post {
+                    result.error(
+                        "ocr_asset_install_failed",
+                        exception.message,
+                        null,
+                    )
+                }
+            }
+        }.start()
+    }
+
+    private fun unzipTo(zipFile: File, destDir: File) {
+        java.util.zip.ZipInputStream(zipFile.inputStream().buffered()).use { zis ->
+            var entry = zis.nextEntry
+            val buffer = ByteArray(64 * 1024)
+            while (entry != null) {
+                val outFile = File(destDir, entry.name)
+                val canonicalDest = destDir.canonicalPath
+                val canonicalOut = outFile.canonicalPath
+                require(canonicalOut.startsWith(canonicalDest + File.separator) || canonicalOut == canonicalDest) {
+                    "zip path traversal: ${entry.name}"
+                }
+                if (entry.isDirectory) {
+                    outFile.mkdirs()
+                } else {
+                    outFile.parentFile?.mkdirs()
+                    FileOutputStream(outFile).use { output ->
+                        while (true) {
+                            val read = zis.read(buffer)
+                            if (read <= 0) break
+                            output.write(buffer, 0, read)
+                        }
+                    }
+                }
+                zis.closeEntry()
+                entry = zis.nextEntry
+            }
         }
     }
 

@@ -68,16 +68,24 @@ android {
         }
     }
 
+    // Keep native OCR .so in the APK, but strip model assets — those are
+    // downloaded on first use from https://acquireenglish.curlhairai.com/models/ocr/
+    packaging {
+        resources {
+            excludes += setOf(
+                "**/mlkit-google-ocr-models/**",
+            )
+        }
+    }
 }
 
 dependencies {
     coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.5")
     implementation("androidx.documentfile:documentfile:1.0.1")
     implementation("androidx.work:work-runtime:2.11.2")
-    // Unbundled ML Kit OCR: models download via Play Services on first use,
-    // instead of shipping ~10MB+/ABI TFLite packs inside the APK.
-    implementation("com.google.android.gms:play-services-mlkit-text-recognition:19.0.1")
-    implementation("com.google.android.gms:play-services-mlkit-text-recognition-chinese:16.0.1")
+    // Bundled ML Kit API + native pipeline; model assets fetched from official CDN.
+    implementation("com.google.mlkit:text-recognition:16.0.1")
+    implementation("com.google.mlkit:text-recognition-chinese:16.0.1")
 }
 
 // AGP 8.11 cannot consume androidx.core 1.19 (needs AGP 9.1+).
@@ -86,9 +94,6 @@ configurations.configureEach {
         force("androidx.core:core:1.16.0")
         force("androidx.core:core-ktx:1.16.0")
     }
-    // Drop the Flutter plugin's bundled OCR AARs (keep API via Play Services).
-    exclude(group = "com.google.mlkit", module = "text-recognition")
-    exclude(group = "com.google.mlkit", module = "text-recognition-chinese")
 }
 
 flutter {

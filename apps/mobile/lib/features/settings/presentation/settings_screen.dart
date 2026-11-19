@@ -820,7 +820,7 @@ class SettingsScreen extends ConsumerWidget {
                       Padding(
                         padding: const EdgeInsets.fromLTRB(16, 4, 16, 12),
                         child: Text(
-                          '默认本地 Whisper + base.en（首次使用时经国内镜像下载，约 141MB，不打进安装包）。'
+                          '默认本地 Whisper + base.en（首次使用时从官方服务器下载，约 141MB，不打进安装包）。'
                           '有可靠官方英文字幕时优先用官方、跳过识别；'
                           '硬字幕/双语课会忽略 B 站软字幕并走语音识别'
                           '（仅缺可靠英文时才 ASR，不每集重复识别）。',
@@ -1334,9 +1334,9 @@ class _LocalWhisperModelStatusRowState
       } else if (widget.pendingHint != null) {
         _status = widget.pendingHint!;
       } else if (_isChineseMultilingual) {
-        _status = '$modelId 未下载；开启中文语音识别后请在此下载（国内镜像）';
+        _status = '$modelId 未下载；开启中文语音识别后请在此下载（官方服务器）';
       } else {
-        _status = '$modelId 未下载，点此经国内镜像首次下载（不占用安装包体积）';
+        _status = '$modelId 未下载，点此从官方服务器首次下载（不占用安装包体积）';
       }
     });
   }
@@ -1349,8 +1349,8 @@ class _LocalWhisperModelStatusRowState
       _busy = true;
       _progress = null;
       _status = _isChineseMultilingual
-          ? '正在从国内镜像下载中文语音模型 ${widget.modelId}…'
-          : '正在从国内镜像下载 ${widget.modelId}…';
+          ? '正在从官方服务器下载中文语音模型 ${widget.modelId}…'
+          : '正在从官方服务器下载 ${widget.modelId}…';
     });
     try {
       await LocalWhisperAsr.instance.ensureModel(

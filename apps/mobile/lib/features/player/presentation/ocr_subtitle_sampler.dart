@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:io';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:google_mlkit_text_recognition/google_mlkit_text_recognition.dart';
 import 'package:image/image.dart' as img;
@@ -8,6 +9,7 @@ import 'package:media_kit/media_kit.dart';
 import 'package:path_provider/path_provider.dart';
 
 import 'bilingual_subtitle_helpers.dart';
+import 'local_ocr_models.dart';
 
 typedef OcrFrameCapturer =
     Future<Uint8List?> Function({
@@ -68,7 +70,12 @@ class OcrSubtitleSampler {
     _positionMs = positionMs;
     _onCue = onCue;
     if (recognizeText == null) {
-      // Unbundled ML Kit: first create() may download models via Play Services.
+      // Model assets come from the official ECS pack (not packaged in the APK).
+      try {
+        await LocalOcrModels.instance.ensureModels();
+      } catch (error) {
+        debugPrint('ocr: ensureModels failed: $error');
+      }
       try {
         _latinRecognizer ??= TextRecognizer(script: TextRecognitionScript.latin);
       } catch (_) {

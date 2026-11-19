@@ -4,14 +4,15 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:whisper_cpp_flutter_plus/whisper_cpp_flutter_plus.dart';
 
+import '../../../constants/model_cdn.dart';
 import '../../settings/presentation/settings_provider.dart';
 
 typedef LocalWhisperProgress = void Function(double? fraction, String message);
 
 /// On-device Whisper.cpp ASR (English `.en` models + multilingual `tiny`/`base`).
 ///
-/// Model weights are **never** shipped in the APK — first use downloads via
-/// domestic mirrors (hf-mirror) into the app documents cache.
+/// Model weights are **never** shipped in the APK — first use downloads from
+/// the official ECS/website CDN, with public mirrors only as fallback.
 class LocalWhisperAsr {
   LocalWhisperAsr._();
 
@@ -82,31 +83,29 @@ class LocalWhisperAsr {
   }
 
   static Uri smallEnglishUri() {
-    return Uri.parse(
-      'https://hf-mirror.com/ggerganov/whisper.cpp/resolve/main/ggml-small.en.bin',
-    );
+    return Uri.parse(ModelCdn.whisperUrl('ggml-small.en.bin'));
   }
 
-  /// Domestic mirrors only for normal installs — huggingface.co is often unreachable
-  /// from CN networks and must not be the first (or only) attempt.
+  /// Official ECS + website first — then domestic mirrors — Hugging Face last.
   static List<Uri> _downloadUrisFor(WhisperModelDescriptor catalog) {
     final String path = catalog.uri.path;
     final String query = catalog.uri.hasQuery ? '?${catalog.uri.query}' : '';
     final String fileName = catalog.fileName;
     return <Uri>[
-      // Primary CN mirror (hf-mirror.com).
+      for (final String url in ModelCdn.whisperOfficialUrls(fileName))
+        Uri.parse(url),
       Uri.parse('https://hf-mirror.com$path$query'),
-      // Same mirror, branch tip (works when revision pin 404s on the mirror).
       Uri.parse(
         'https://hf-mirror.com/ggerganov/whisper.cpp/resolve/main/$fileName',
       ),
-      // Last resort only — many CN networks time out here.
       catalog.uri,
     ];
   }
 
   static List<Uri> _smallEnglishDownloadUris() {
     return <Uri>[
+      for (final String url in ModelCdn.whisperOfficialUrls('ggml-small.en.bin'))
+        Uri.parse(url),
       Uri.parse(
         'https://hf-mirror.com/ggerganov/whisper.cpp/resolve/main/ggml-small.en.bin',
       ),
@@ -117,6 +116,9 @@ class LocalWhisperAsr {
   }
 
   static bool _isDomesticMirrorHost(String host) {
+    if (ModelCdn.isOfficialHost(host)) {
+      return true;
+    }
     final String h = host.toLowerCase();
     return h.contains('hf-mirror') ||
         h.contains('modelscope') ||
@@ -167,17 +169,12 @@ class LocalWhisperAsr {
         onProgress?.call(1, '模型已就绪');
         return;
       }
-      onProgress?.call(0, '正在从国内镜像下载 small.en（约 466MB）…');
+      onProgress?.call(0, '正在从官方服务器下载 small.en（约 466MB）…');
       Object? lastError;
       for (final Uri uri in _smallEnglishDownloadUris()) {
         try {
-          final bool domestic = _isDomesticMirrorHost(uri.host);
-          onProgress?.call(
-            0,
-            domestic
-                ? '正在从国内镜像（${uri.host}）下载 small.en…'
-                : '国内镜像不可用，回退 ${uri.host}…',
-          );
+          final String source = _downloadSourceLabel(uri.host);
+          onProgress?.call(0, '正在从$source下载 small.en…');
           await for (final ModelDownloadProgress progress in _models.download(
             uri,
             'ggml-small.en.bin',
@@ -186,11 +183,8 @@ class LocalWhisperAsr {
             onProgress?.call(
               fraction,
               fraction == null
-                  ? (domestic
-                        ? '正在从国内镜像下载 small.en…'
-                        : '正在下载 small.en…')
-                  : '${domestic ? '国内镜像' : uri.host} small.en '
-                        '${(fraction * 100).clamp(0, 100).round()}%',
+                  ? '正在从$source下载 small.en…'
+                  : '$source small.en ${(fraction * 100).clamp(0, 100).round()}%',
             );
           }
           lastError = null;
@@ -242,18 +236,13 @@ class LocalWhisperAsr {
     final String id = catalog.id;
     onProgress?.call(
       0,
-      '正在从国内镜像下载 $id（约 ${_sizeLabel(catalog.approximateBytes)}）…',
+      '正在从官方服务器下载 $id（约 ${_sizeLabel(catalog.approximateBytes)}）…',
     );
     Object? lastError;
     for (final Uri uri in _downloadUrisFor(catalog)) {
-      final bool domestic = _isDomesticMirrorHost(uri.host);
+      final String source = _downloadSourceLabel(uri.host);
       try {
-        onProgress?.call(
-          0,
-          domestic
-              ? '正在从国内镜像（${uri.host}）下载 $id…'
-              : '国内镜像不可用，回退 ${uri.host}…',
-        );
+        onProgress?.call(0, '正在从$source下载 $id…');
         await for (final ModelDownloadProgress progress
             in _models.download(
           uri,
@@ -264,9 +253,8 @@ class LocalWhisperAsr {
           onProgress?.call(
             fraction,
             fraction == null
-                ? (domestic ? '正在从国内镜像下载 $id…' : '正在下载 $id…')
-                : '${domestic ? '国内镜像' : uri.host} $id '
-                      '${(fraction * 100).clamp(0, 100).round()}%',
+                ? '正在从$source下载 $id…'
+                : '$source $id ${(fraction * 100).clamp(0, 100).round()}%',
           );
         }
         final File? verified = await _findCatalogModelOrClearCorrupt(catalog);
@@ -283,6 +271,16 @@ class LocalWhisperAsr {
     throw StateError(_modelDownloadFailureMessage(id, lastError));
   }
 
+  static String _downloadSourceLabel(String host) {
+    if (ModelCdn.isOfficialHost(host)) {
+      return '官方服务器';
+    }
+    if (_isDomesticMirrorHost(host)) {
+      return '国内镜像（$host）';
+    }
+    return host;
+  }
+
   String _modelDownloadFailureMessage(String id, Object? error) {
     final String detail = error == null ? '' : error.toString();
     final String lower = detail.toLowerCase();
@@ -292,7 +290,7 @@ class LocalWhisperAsr {
         lower.contains('network') ||
         lower.contains('connection') ||
         lower.contains('huggingface')) {
-      return 'Whisper 模型 $id 下载失败：国内镜像与备用源均不可用。'
+      return 'Whisper 模型 $id 下载失败：官方服务器与备用源均不可用。'
           '请检查网络后在「设置 → AI生成字幕」重试下载。';
     }
     return 'Whisper 模型 $id 下载失败，请检查网络后重试。';
