@@ -1,5 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../authentication/data/wechat_pay_helper.dart';
 import 'acquire_api_client.dart';
 
 class UserAssetsSnapshot {
@@ -73,5 +74,36 @@ class UserAssetsService {
     );
     final UserAssetsSnapshot snap = await fetch();
     return snap.coachMinutes;
+  }
+
+  /// Create an order and launch WeChat App payment.
+  ///
+  /// Requires server merchant credentials (`wechat_pay_configured=true`).
+  Future<Map<String, dynamic>> purchaseWithWechat({
+    required String skuCode,
+    int quantity = 1,
+  }) async {
+    final AcquireApiClient api = _ref.read(acquireApiClientProvider);
+    final Map<String, dynamic> order = await api.createAssetOrder(
+      items: <({String skuCode, int quantity})>[
+        (skuCode: skuCode, quantity: quantity),
+      ],
+      provider: 'wechat',
+    );
+    final int orderId = (order['id'] as num).toInt();
+    final Map<String, dynamic> prepay = await api.createWechatPrepay(
+      orderId: orderId,
+    );
+    await WechatPayHelper.pay(
+      appId: '${prepay['app_id']}',
+      partnerId: '${prepay['partner_id']}',
+      prepayId: '${prepay['prepay_id']}',
+      packageValue: '${prepay['package_value']}',
+      nonceStr: '${prepay['nonce_str']}',
+      timestamp: (prepay['timestamp'] as num).toInt(),
+      sign: '${prepay['sign']}',
+      signType: '${prepay['sign_type'] ?? 'RSA'}',
+    );
+    return order;
   }
 }

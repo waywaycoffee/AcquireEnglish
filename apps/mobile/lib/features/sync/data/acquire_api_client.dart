@@ -918,6 +918,40 @@ class AcquireApiClient {
     return response.data as Map<String, dynamic>;
   }
 
+  Future<List<Map<String, dynamic>>> listAssetSkus() async {
+    final Response<dynamic> response = await _dio.get(Endpoints.assetsSkus);
+    return (response.data as List<dynamic>).cast<Map<String, dynamic>>();
+  }
+
+  Future<Map<String, dynamic>> createAssetOrder({
+    required List<({String skuCode, int quantity})> items,
+    String provider = 'wechat',
+  }) async {
+    final Response<dynamic> response = await _dio.post(
+      Endpoints.assetsOrders,
+      data: <String, dynamic>{
+        'provider': provider,
+        'items': <Map<String, dynamic>>[
+          for (final ({String skuCode, int quantity}) item in items)
+            <String, dynamic>{
+              'sku_code': item.skuCode,
+              'quantity': item.quantity,
+            },
+        ],
+      },
+    );
+    return response.data as Map<String, dynamic>;
+  }
+
+  Future<Map<String, dynamic>> createWechatPrepay({
+    required int orderId,
+  }) async {
+    final Response<dynamic> response = await _dio.post(
+      '${Endpoints.assetsOrders}/$orderId/wechat-prepay',
+    );
+    return response.data as Map<String, dynamic>;
+  }
+
   Future<Map<String, dynamic>> consumeEntitlement({
     required String assetKind,
     String assetRef = '',

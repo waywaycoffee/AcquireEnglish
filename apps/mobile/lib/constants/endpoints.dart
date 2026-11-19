@@ -37,6 +37,8 @@ class Endpoints {
   static const String dailyFeed = 'api/feed/daily';
   static const String health = 'api/health';
   static const String assets = 'api/assets';
+  static const String assetsSkus = 'api/assets/skus';
+  static const String assetsOrders = 'api/assets/orders';
   static const String assetsConsume = 'api/assets/entitlements/consume';
   static const String learningSessions = 'api/learning/sessions';
   static const String learningWrongItems = 'api/learning/wrong-items';

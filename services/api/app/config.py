@@ -58,6 +58,16 @@ class Settings(BaseSettings):
     wechat_app_id: str = ""
     wechat_app_secret: str = ""
 
+    # WeChat Pay (App 支付). Requires merchant credentials beyond AppID/Secret.
+    wechat_mch_id: str = ""
+    wechat_mch_serial_no: str = ""
+    wechat_mch_api_v3_key: str = ""
+    # PEM private key body (-----BEGIN PRIVATE KEY-----...) or absolute path.
+    wechat_mch_private_key: str = ""
+    wechat_pay_notify_url: str = (
+        "https://acquireenglish.curlhairai.com/api/assets/wechat/notify"
+    )
+
     # LiveKit (optional full-duplex). Empty = App uses HTTP oral_coach.
     livekit_url: str = ""
     livekit_api_key: str = ""
@@ -85,6 +95,17 @@ class Settings(BaseSettings):
     def wechat_mock_enabled(self) -> bool:
         return not self.production_mode and (
             self.auth_wechat_mock or not self.wechat_configured
+        )
+
+    @property
+    def wechat_pay_configured(self) -> bool:
+        return bool(
+            self.wechat_app_id.strip()
+            and self.wechat_mch_id.strip()
+            and self.wechat_mch_serial_no.strip()
+            and self.wechat_mch_api_v3_key.strip()
+            and self.wechat_mch_private_key.strip()
+            and self.wechat_pay_notify_url.strip()
         )
 
     @property

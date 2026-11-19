@@ -84,6 +84,7 @@ async def health() -> dict[str, str]:
         "auth_email_provider": email_provider(),
         "auth_wechat_mock": str(settings.wechat_mock_enabled).lower(),
         "auth_wechat_configured": str(settings.wechat_configured).lower(),
+        "wechat_pay_configured": str(settings.wechat_pay_configured).lower(),
         "oral_coach": "https://acquireenglish.curlhairai.com/coach",
         "livekit": (
             (settings.livekit_url or "").strip()

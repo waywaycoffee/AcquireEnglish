@@ -2,7 +2,10 @@
 
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, HTTPException, status
+import json
+
+from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi.responses import JSONResponse
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
@@ -20,8 +23,15 @@ from app.schemas import (
     ProductSkuOut,
     UserAssetsOut,
     WalletOut,
+    WeChatAppPrepayOut,
 )
 from app.services import user_assets as assets_svc
+from app.services.wechat_pay import (
+    WeChatPayError,
+    create_app_prepay,
+    decrypt_resource,
+    parse_out_trade_no_order_id,
+)
 
 router = APIRouter(prefix="/assets", tags=["assets"])
 
@@ -209,3 +219,139 @@ async def mark_order_paid(
         sku_result = await db.execute(select(ProductSku).where(ProductSku.id.in_(sku_ids)))
         skus = {s.id: s for s in sku_result.scalars().all()}
     return _order_out(order, skus)
+
+
+@router.post(
+    "/orders/{order_id}/wechat-prepay",
+    response_model=WeChatAppPrepayOut,
+)
+async def create_wechat_prepay(
+    order_id: int,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> WeChatAppPrepayOut:
+    """Create WeChat App pay parameters for a pending order."""
+    result = await db.execute(
+        select(Order)
+        .where(Order.id == order_id, Order.user_id == user.id)
+        .options(selectinload(Order.items))
+    )
+    order = result.scalar_one_or_none()
+    if order is None:
+        raise HTTPException(status_code=404, detail="order_not_found")
+    if order.status == "paid":
+        raise HTTPException(status_code=400, detail="order_already_paid")
+    if order.status not in {"pending", "created", ""}:
+        raise HTTPException(status_code=400, detail=f"order_not_payable:{order.status}")
+
+    sku_ids = [item.sku_id for item in (order.items or [])]
+    title = f"AcquireEnglish#{order.id}"
+    if sku_ids:
+        sku_result = await db.execute(select(ProductSku).where(ProductSku.id.in_(sku_ids)))
+        titles = [s.title for s in sku_result.scalars().all() if s.title]
+        if titles:
+            title = " / ".join(titles)[:120]
+
+    try:
+        prepay = await create_app_prepay(
+            order_id=order.id,
+            description=title,
+            amount_cents=int(order.amount_cents or 0),
+            out_trade_no=order.provider_ref if order.provider == "wechat" else None,
+        )
+    except WeChatPayError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+
+    order.provider = "wechat"
+    order.provider_ref = prepay.out_trade_no
+    meta = {}
+    try:
+        meta = json.loads(order.meta_json or "{}")
+        if not isinstance(meta, dict):
+            meta = {}
+    except Exception:
+        meta = {}
+    meta["wechat_prepay_id"] = prepay.prepay_id
+    order.meta_json = json.dumps(meta, ensure_ascii=False)
+    await db.commit()
+
+    return WeChatAppPrepayOut(
+        order_id=order.id,
+        out_trade_no=prepay.out_trade_no,
+        app_id=prepay.app_id,
+        partner_id=prepay.partner_id,
+        prepay_id=prepay.prepay_id,
+        package_value=prepay.package_value,
+        nonce_str=prepay.nonce_str,
+        timestamp=prepay.timestamp,
+        sign=prepay.sign,
+        sign_type=prepay.sign_type,
+    )
+
+
+@router.post("/wechat/notify")
+async def wechat_pay_notify(
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+) -> JSONResponse:
+    """WeChat Pay APIv3 payment notification callback."""
+    try:
+        payload = await request.json()
+    except Exception:
+        return JSONResponse(
+            status_code=400,
+            content={"code": "FAIL", "message": "invalid json"},
+        )
+    resource = payload.get("resource") if isinstance(payload, dict) else None
+    if not isinstance(resource, dict):
+        return JSONResponse(
+            status_code=400,
+            content={"code": "FAIL", "message": "missing resource"},
+        )
+    try:
+        decrypted = decrypt_resource(resource)
+    except WeChatPayError as exc:
+        return JSONResponse(
+            status_code=500,
+            content={"code": "FAIL", "message": str(exc)},
+        )
+
+    trade_state = str(decrypted.get("trade_state") or "").upper()
+    out_trade_no = str(decrypted.get("out_trade_no") or "").strip()
+    transaction_id = str(decrypted.get("transaction_id") or "").strip()
+    order_id = parse_out_trade_no_order_id(out_trade_no)
+    if order_id is None:
+        return JSONResponse(
+            status_code=400,
+            content={"code": "FAIL", "message": "bad out_trade_no"},
+        )
+
+    result = await db.execute(
+        select(Order).where(Order.id == order_id).options(selectinload(Order.items))
+    )
+    order = result.scalar_one_or_none()
+    if order is None:
+        return JSONResponse(
+            status_code=404,
+            content={"code": "FAIL", "message": "order_not_found"},
+        )
+
+    if trade_state == "SUCCESS":
+        if order.status != "paid":
+            order.provider = "wechat"
+            order.provider_ref = out_trade_no or order.provider_ref
+            meta = {}
+            try:
+                meta = json.loads(order.meta_json or "{}")
+                if not isinstance(meta, dict):
+                    meta = {}
+            except Exception:
+                meta = {}
+            if transaction_id:
+                meta["wechat_transaction_id"] = transaction_id
+            order.meta_json = json.dumps(meta, ensure_ascii=False)
+            await db.commit()
+            await assets_svc.mark_order_paid(db, order)
+        return JSONResponse(content={"code": "SUCCESS", "message": "成功"})
+
+    return JSONResponse(content={"code": "SUCCESS", "message": "ignored"})

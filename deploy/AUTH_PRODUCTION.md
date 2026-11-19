@@ -77,10 +77,11 @@ curl -fsS -X POST https://acquireenglish.curlhairai.com/api/auth/email/send \
 # 应返回 ok:true 且无 debug_code；邮箱收到验证码后再调 /api/auth/register
 ```
 
-## 3. 微信开放平台（App 登录）
+## 3. 微信开放平台（App 登录 / 自动注册）
 
 1. [微信开放平台](https://open.weixin.qq.com/) 创建移动应用，拿到 **AppID / AppSecret**
-2. Android：配置应用签名与包名（与正式包一致）
+2. Android：包名 `com.acquire.english`，应用签名填证书 **MD5**（小写无冒号）  
+   当前 debug 签名 MD5：`d5a921c1234aef0b8eb6d4871f80e988`
 3. iOS：配置 Bundle ID + Universal Link  
    默认：`https://acquireenglish.curlhairai.com/wechat/`
 4. API `.env`：
@@ -91,14 +92,37 @@ WECHAT_APP_ID=wx........
 WECHAT_APP_SECRET=...
 ```
 
-5. App 正式包编译：
+5. App 正式包编译（App 只需要 AppID，Secret 留在服务端）：
 
 ```bash
+flutter build apk --debug --flavor prod --dart-define-from-file=.env
+# 或
 flutter build apk --dart-define=WECHAT_APP_ID=wx........ \
   --dart-define=WECHAT_UNIVERSAL_LINK=https://acquireenglish.curlhairai.com/wechat/
 ```
 
-未配置 AppID 时，App 仍走开发 mock code（仅联调）。
+未配置 AppID 时，App 仍走开发 mock code（仅联调）。  
+首次微信授权成功会自动建号并发放试用资产（见下节）。
+
+## 3b. 微信支付（App 支付）
+
+Open Platform 的 AppID/AppSecret **不够**完成收款，还需微信支付商户平台：
+
+```bash
+WECHAT_MCH_ID=商户号
+WECHAT_MCH_SERIAL_NO=商户API证书序列号
+WECHAT_MCH_API_V3_KEY=APIv3密钥(32位)
+WECHAT_MCH_PRIVATE_KEY=-----BEGIN PRIVATE KEY-----...  # 或 apiclient_key.pem 绝对路径
+WECHAT_PAY_NOTIFY_URL=https://acquireenglish.curlhairai.com/api/assets/wechat/notify
+```
+
+API：
+
+- `POST /api/assets/orders`（`provider=wechat`）创建待支付订单
+- `POST /api/assets/orders/{id}/wechat-prepay` 返回 App 调起参数
+- `POST /api/assets/wechat/notify` 支付结果回调 → 自动履约发权益
+
+健康检查字段：`wechat_pay_configured=true` 表示商户凭证齐全。
 
 ## 4. 新用户试用资产
 

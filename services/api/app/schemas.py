@@ -312,6 +312,19 @@ class OrderOut(BaseModel):
     paid_at: datetime | None = None
 
 
+class WeChatAppPrepayOut(BaseModel):
+    order_id: int
+    out_trade_no: str
+    app_id: str
+    partner_id: str
+    prepay_id: str
+    package_value: str
+    nonce_str: str
+    timestamp: int
+    sign: str
+    sign_type: str = "RSA"
+
+
 class WalletOut(BaseModel):
     balance_credits: int
     updated_at: datetime | None = None
