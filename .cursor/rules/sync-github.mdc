@@ -1,0 +1,15 @@
+---
+description: Keep local/ECS changes synced with GitHub after every modification
+alwaysApply: true
+---
+
+# Sync with GitHub after changes
+
+After finishing a code or deploy change in this project:
+
+1. Ensure the change exists in the local git working tree (pull ECS-only fixes back if needed).
+2. Commit with a concise message focused on why.
+3. Push to `origin` (`main` unless on another branch).
+4. Do not leave production-only patches that diverge from GitHub (especially `services/api` and `tools/oral_coach`).
+
+If push cannot complete (network/auth), report the blocker and leave files ready to commit.
