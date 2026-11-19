@@ -7,6 +7,8 @@ from app.database import get_db
 from app.deps import get_current_user
 from app.models import User
 from app.schemas import (
+    EmailSendIn,
+    EmailSendOut,
     SmsLoginIn,
     SmsSendIn,
     SmsSendOut,
@@ -17,6 +19,13 @@ from app.schemas import (
     WechatLoginIn,
 )
 from app.security import create_access_token, hash_password, verify_password
+from app.services.email_auth import (
+    deliver_email_code,
+    email_mock_enabled,
+    issue_email_code,
+    normalize_email,
+    verify_email_code,
+)
 from app.services.phone_auth import (
     deliver_sms,
     issue_sms_code,
@@ -53,16 +62,51 @@ async def _seed_trial_if_new(db: AsyncSession, user: User, *, is_new: bool) -> N
         pass
 
 
+@router.post("/email/send", response_model=EmailSendOut)
+async def email_send(payload: EmailSendIn, db: AsyncSession = Depends(get_db)) -> EmailSendOut:
+    try:
+        email = normalize_email(str(payload.email))
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+    existing = await db.execute(select(User).where(User.email == email))
+    if existing.scalar_one_or_none():
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="该邮箱已注册")
+    code = issue_email_code(email)
+    try:
+        await deliver_email_code(email, code)
+    except Exception as exc:  # noqa: BLE001
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=f"验证码发送失败：{exc}",
+        ) from exc
+    mock = email_mock_enabled()
+    return EmailSendOut(
+        ok=True,
+        expires_in=settings.auth_email_code_ttl_seconds,
+        mock=mock,
+        debug_code=code if mock else None,
+    )
+
+
 @router.post("/register", response_model=TokenOut)
 async def register(payload: UserCreate, db: AsyncSession = Depends(get_db)) -> TokenOut:
-    existing = await db.execute(select(User).where(User.email == payload.email.lower()))
+    try:
+        email = normalize_email(str(payload.email))
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+    existing = await db.execute(select(User).where(User.email == email))
     if existing.scalar_one_or_none():
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Email already registered")
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="该邮箱已注册")
+    if not verify_email_code(email, payload.code):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="邮箱验证码错误或已过期",
+        )
 
     user = User(
-        email=payload.email.lower(),
+        email=email,
         hashed_password=hash_password(payload.password),
-        display_name=payload.display_name or payload.email.split("@")[0],
+        display_name=payload.display_name or email.split("@")[0],
     )
     db.add(user)
     await db.commit()

@@ -1,6 +1,6 @@
-# 生产环境：手机验证码 / 微信登录配置
+# 生产环境：邮箱验证码 / 手机验证码 / 微信登录配置
 
-App 与 API 已支持「未注册自动建号」。生产要关掉 mock，填入真实密钥。
+App 与 API 已支持邮箱验证码注册，以及手机/微信「未注册自动建号」。生产要关掉 mock，填入真实密钥。
 
 ## 当前生产探针
 
@@ -12,10 +12,36 @@ curl -fsS https://acquireenglish.curlhairai.com/api/health
 
 | 字段 | 目标值 |
 |------|--------|
+| `auth_email_mock` | `false`（配好 SMTP 后） |
+| `auth_email_provider` | `smtp`（或 `webhook`） |
 | `auth_sms_mock` | `false` |
 | `auth_sms_provider` | `aliyun`（或 `webhook`） |
 | `auth_wechat_mock` | `false` |
 | `auth_wechat_configured` | `true` |
+
+## 0. 邮箱注册验证码
+
+注册流程：`POST /api/auth/email/send` → 用户填码 → `POST /api/auth/register`（必带 `code`）。
+
+开发默认 `AUTH_EMAIL_MOCK=true`（响应里带 `debug_code`）。生产关掉 mock 并配置 SMTP：
+
+```bash
+AUTH_EMAIL_MOCK=false
+SMTP_HOST=smtp.example.com
+SMTP_PORT=465
+SMTP_USER=...
+SMTP_PASSWORD=...
+SMTP_FROM=noreply@example.com
+SMTP_USE_SSL=true
+```
+
+或改用 webhook：`AUTH_EMAIL_WEBHOOK_URL=https://...`（POST JSON `{email, code, purpose}`）。
+
+```bash
+curl -fsS -X POST https://acquireenglish.curlhairai.com/api/auth/email/send \
+  -H 'Content-Type: application/json' \
+  -d '{"email":"you@example.com"}'
+```
 
 ## 1. 阿里云短信
 

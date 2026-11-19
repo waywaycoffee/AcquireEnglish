@@ -22,10 +22,18 @@ class FakeAuthRepository implements AuthenticationRepository {
   Future<RegisterResponse> register(
     String email,
     String password, {
+    required String code,
     String? displayName,
   }) async {
-    if (email.isEmpty || password.isEmpty) throw Exception('Empty');
+    if (email.isEmpty || password.isEmpty || code.isEmpty) {
+      throw Exception('Empty');
+    }
     return const RegisterResponse(id: 1, token: 'fake_token');
+  }
+
+  @override
+  Future<AcquireSmsSendResult> sendEmailCode(String email) async {
+    return const AcquireSmsSendResult(expiresIn: 300, mock: true, debugCode: '123456');
   }
 
   @override
@@ -127,6 +135,7 @@ void main() {
       await controller.register(
         email: 'eve.holt@reqres.in',
         password: 'pistol',
+        code: '123456',
       );
 
       expect(controller.state.requireValue.rememberMe, isTrue);
@@ -136,7 +145,7 @@ void main() {
       await container.read(loginControllerProvider.future);
 
       expect(
-        () => controller.register(email: '', password: ''),
+        () => controller.register(email: '', password: '', code: ''),
         throwsException,
       );
     });

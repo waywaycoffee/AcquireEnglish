@@ -76,18 +76,28 @@ class LoginController extends _$LoginController {
   Future<RegisterResponse> register({
     required String email,
     required String password,
+    required String code,
     String? displayName,
   }) async {
     final String trimmedEmail = email.trim();
+    final String trimmedCode = code.trim();
     if (trimmedEmail.isEmpty || password.isEmpty) {
       throw Exception('请输入邮箱和密码');
+    }
+    if (trimmedCode.isEmpty) {
+      throw Exception('请输入邮箱验证码');
     }
     if (password.length < 6) {
       throw Exception('密码至少 6 位');
     }
     final RegisterResponse registerResponse = await ref
         .read(authenticationRepositoryProvider)
-        .register(trimmedEmail, password, displayName: displayName);
+        .register(
+          trimmedEmail,
+          password,
+          code: trimmedCode,
+          displayName: displayName,
+        );
     if (registerResponse.token.isEmpty) {
       throw Exception('注册失败');
     }
@@ -95,6 +105,14 @@ class LoginController extends _$LoginController {
         .read(userRepositoryProvider.notifier)
         .cacheUser(LoginCredentials(email: trimmedEmail, password: ''));
     return registerResponse;
+  }
+
+  Future<AcquireSmsSendResult> sendEmailCode({required String email}) {
+    final String trimmed = email.trim();
+    if (trimmed.isEmpty) {
+      throw Exception('请输入邮箱');
+    }
+    return ref.read(authenticationRepositoryProvider).sendEmailCode(trimmed);
   }
 
   Future<AcquireSmsSendResult> sendSmsCode({required String phone}) {

@@ -70,11 +70,23 @@ async function request<T>(path: string, init: RequestInit = {}, token?: string |
   return res.json() as Promise<T>;
 }
 
+export type EmailSendResult = {
+  ok: boolean;
+  expires_in: number;
+  mock: boolean;
+  debug_code?: string | null;
+};
+
 export const api = {
-  register: (email: string, password: string, display_name?: string) =>
+  sendEmailCode: (email: string) =>
+    request<EmailSendResult>("/api/auth/email/send", {
+      method: "POST",
+      body: JSON.stringify({ email }),
+    }),
+  register: (email: string, password: string, code: string, display_name?: string) =>
     request<TokenResponse>("/api/auth/register", {
       method: "POST",
-      body: JSON.stringify({ email, password, display_name }),
+      body: JSON.stringify({ email, password, code, display_name }),
     }),
   login: (email: string, password: string) =>
     request<TokenResponse>("/api/auth/login", {

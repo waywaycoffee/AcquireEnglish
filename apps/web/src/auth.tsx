@@ -6,7 +6,17 @@ type AuthState = {
   user: User | null;
   loading: boolean;
   login: (email: string, password: string) => Promise<void>;
-  register: (email: string, password: string, displayName?: string) => Promise<void>;
+  sendEmailCode: (email: string) => Promise<{
+    expiresIn: number;
+    mock: boolean;
+    debugCode?: string | null;
+  }>;
+  register: (
+    email: string,
+    password: string,
+    code: string,
+    displayName?: string,
+  ) => Promise<void>;
   logout: () => void;
 };
 
@@ -55,8 +65,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setToken(res.access_token);
         setUser(res.user);
       },
-      async register(email, password, displayName) {
-        const res = await api.register(email, password, displayName);
+      async sendEmailCode(email) {
+        const res = await api.sendEmailCode(email);
+        return {
+          expiresIn: res.expires_in,
+          mock: res.mock,
+          debugCode: res.debug_code,
+        };
+      },
+      async register(email, password, code, displayName) {
+        const res = await api.register(email, password, code, displayName);
         localStorage.setItem(TOKEN_KEY, res.access_token);
         setToken(res.access_token);
         setUser(res.user);

@@ -39,6 +39,19 @@ class Settings(BaseSettings):
     aliyun_sms_template_code: str = ""
     aliyun_sms_region: str = "cn-hangzhou"
 
+    # Email registration verification code.
+    auth_email_mock: bool = True
+    auth_email_code_ttl_seconds: int = 300
+    auth_email_mock_code: str = "123456"
+    auth_email_webhook_url: str = ""
+    smtp_host: str = ""
+    smtp_port: int = 465
+    smtp_user: str = ""
+    smtp_password: str = ""
+    smtp_from: str = ""
+    smtp_use_ssl: bool = True
+    smtp_use_tls: bool = False
+
     # WeChat mobile app login (code → openid). Mock uses the code as openid.
     auth_wechat_mock: bool = True
     wechat_app_id: str = ""

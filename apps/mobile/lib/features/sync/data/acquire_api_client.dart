@@ -519,6 +519,7 @@ class AcquireApiClient {
   Future<AcquireTokenResult> register({
     required String email,
     required String password,
+    required String code,
     String? displayName,
   }) async {
     final Response<dynamic> response = await _dio.post(
@@ -526,10 +527,21 @@ class AcquireApiClient {
       data: <String, dynamic>{
         'email': email,
         'password': password,
+        'code': code,
         if (displayName != null) 'display_name': displayName,
       },
     );
     return AcquireTokenResult.fromJson(response.data as Map<String, dynamic>);
+  }
+
+  Future<AcquireSmsSendResult> sendEmailCode({required String email}) async {
+    final Response<dynamic> response = await _dio.post(
+      Endpoints.emailSend,
+      data: <String, String>{'email': email},
+    );
+    return AcquireSmsSendResult.fromJson(
+      response.data as Map<String, dynamic>,
+    );
   }
 
   Future<AcquireSmsSendResult> sendSmsCode({required String phone}) async {

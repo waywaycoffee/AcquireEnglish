@@ -7,6 +7,8 @@ class UserCreate(BaseModel):
     email: EmailStr
     password: str = Field(min_length=6, max_length=128)
     display_name: str | None = Field(default=None, max_length=120)
+    # Email verification code from /auth/email/send
+    code: str = Field(min_length=4, max_length=8)
 
 
 class UserLogin(BaseModel):
@@ -58,6 +60,18 @@ class SmsSendOut(BaseModel):
 class SmsLoginIn(BaseModel):
     phone: str = Field(min_length=8, max_length=20)
     code: str = Field(min_length=4, max_length=8)
+
+
+class EmailSendIn(BaseModel):
+    email: EmailStr
+
+
+class EmailSendOut(BaseModel):
+    ok: bool = True
+    expires_in: int
+    mock: bool = False
+    # Only returned when AUTH_EMAIL_MOCK=true (dev convenience).
+    debug_code: str | None = None
 
 
 class WechatLoginIn(BaseModel):

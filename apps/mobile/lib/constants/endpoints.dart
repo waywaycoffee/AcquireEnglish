@@ -23,6 +23,7 @@ class Endpoints {
 
   static const String login = 'api/auth/login';
   static const String register = 'api/auth/register';
+  static const String emailSend = 'api/auth/email/send';
   static const String smsSend = 'api/auth/sms/send';
   static const String smsLogin = 'api/auth/sms/login';
   static const String wechatLogin = 'api/auth/wechat/login';

@@ -13,12 +13,15 @@ abstract class AuthenticationRepository {
   /// Authenticates a user with the given [email] and [password].
   Future<LoginResponse> login(String email, String password);
 
-  /// Registers a new user with the given [email] and [password].
+  /// Registers a new user with the given [email], [password], and email [code].
   Future<RegisterResponse> register(
     String email,
     String password, {
+    required String code,
     String? displayName,
   });
+
+  Future<AcquireSmsSendResult> sendEmailCode(String email);
 
   Future<AcquireSmsSendResult> sendSmsCode(String phone);
 
@@ -88,12 +91,14 @@ class HttpAuthRepository implements AuthenticationRepository {
   Future<RegisterResponse> register(
     String email,
     String password, {
+    required String code,
     String? displayName,
   }) async {
     try {
       final AcquireTokenResult result = await _api.register(
         email: email,
         password: password,
+        code: code,
         displayName: displayName,
       );
       await _session.signIn(
@@ -103,10 +108,22 @@ class HttpAuthRepository implements AuthenticationRepository {
       );
       return RegisterResponse(id: result.user.id, token: result.accessToken);
     } on DioException catch (e) {
+      if (e.response?.statusCode == 401) {
+        throw Exception('邮箱验证码错误或已过期');
+      }
       if (e.response?.statusCode == 400) {
-        throw Exception('该邮箱已注册');
+        throw Exception(_dioMessage(e, '该邮箱已注册'));
       }
       throw Exception(_dioMessage(e, '注册失败，请检查网络后重试'));
+    }
+  }
+
+  @override
+  Future<AcquireSmsSendResult> sendEmailCode(String email) async {
+    try {
+      return await _api.sendEmailCode(email: email);
+    } on DioException catch (e) {
+      throw Exception(_dioMessage(e, '邮箱验证码发送失败'));
     }
   }
 

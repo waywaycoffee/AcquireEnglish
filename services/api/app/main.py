@@ -63,6 +63,7 @@ app.include_router(rewards.router, prefix="/api")
 
 @app.get("/api/health")
 async def health() -> dict[str, str]:
+    from app.services.email_auth import email_mock_enabled, email_provider
     from app.services.phone_auth import sms_mock_enabled, sms_provider
     from app.services.livekit_tokens import livekit_configured
 
@@ -74,6 +75,8 @@ async def health() -> dict[str, str]:
         "status": "ok",
         "auth_sms_mock": str(sms_mock_enabled()).lower(),
         "auth_sms_provider": sms_provider(),
+        "auth_email_mock": str(email_mock_enabled()).lower(),
+        "auth_email_provider": email_provider(),
         "auth_wechat_mock": str(wechat_mock).lower(),
         "auth_wechat_configured": str(wechat_ready).lower(),
         "oral_coach": "https://acquireenglish.curlhairai.com/coach",

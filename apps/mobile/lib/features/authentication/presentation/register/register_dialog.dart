@@ -16,17 +16,20 @@ class RegisterDialog extends ConsumerStatefulWidget {
 class _RegisterDialogState extends ConsumerState<RegisterDialog> {
   late final TextEditingController _emailController;
   late final TextEditingController _passwordController;
+  late final TextEditingController _codeController;
   @override
   void initState() {
     super.initState();
     _emailController = TextEditingController();
     _passwordController = TextEditingController();
+    _codeController = TextEditingController();
   }
 
   @override
   void dispose() {
     _emailController.dispose();
     _passwordController.dispose();
+    _codeController.dispose();
     super.dispose();
   }
 
@@ -75,6 +78,25 @@ class _RegisterDialogState extends ConsumerState<RegisterDialog> {
             ),
             const Gap(20),
             Text(
+              'Verification code',
+              style: context.textTheme.titleMedium?.copyWith(
+                color: context.colorScheme.primary,
+              ),
+            ),
+            const Gap(10),
+            TextField(
+              controller: _codeController,
+              keyboardType: TextInputType.number,
+              decoration: InputDecoration(
+                hintText: 'Email verification code',
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(10),
+                  borderSide: BorderSide(color: context.colorScheme.primary),
+                ),
+              ),
+            ),
+            const Gap(20),
+            Text(
               'Password',
               style: context.textTheme.titleMedium?.copyWith(
                 color: context.colorScheme.primary,
@@ -114,6 +136,7 @@ class _RegisterDialogState extends ConsumerState<RegisterDialog> {
                         .register(
                           email: _emailController.text,
                           password: _passwordController.text,
+                          code: _codeController.text,
                         )
                         .then((RegisterResponse value) {
                           if (context.mounted) {

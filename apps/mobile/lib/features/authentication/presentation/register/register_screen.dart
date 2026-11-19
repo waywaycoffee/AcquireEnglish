@@ -6,8 +6,10 @@ import 'package:go_router/go_router.dart';
 
 import '../../../../router/app_router.dart';
 import '../../../shared/presentation/pad/app_design_tokens.dart';
+import '../../../sync/data/acquire_api_client.dart';
 import '../../../sync/presentation/cloud_catalog_sync.dart';
 import '../../domain/register_response.dart';
+import '../account_hub_sheet.dart';
 import '../login/login_controller.dart';
 
 class RegisterScreen extends ConsumerStatefulWidget {
@@ -21,27 +23,88 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
   final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
   late final TextEditingController _nameController;
   late final TextEditingController _emailController;
+  late final TextEditingController _codeController;
   late final TextEditingController _passwordController;
   late final TextEditingController _confirmController;
   bool _obscure = true;
   bool _submitting = false;
+  bool _sendingCode = false;
+  int _codeCooldown = 0;
+  String? _debugCode;
+  Timer? _cooldownTimer;
 
   @override
   void initState() {
     super.initState();
     _nameController = TextEditingController();
     _emailController = TextEditingController();
+    _codeController = TextEditingController();
     _passwordController = TextEditingController();
     _confirmController = TextEditingController();
   }
 
   @override
   void dispose() {
+    _cooldownTimer?.cancel();
     _nameController.dispose();
     _emailController.dispose();
+    _codeController.dispose();
     _passwordController.dispose();
     _confirmController.dispose();
     super.dispose();
+  }
+
+  Future<void> _sendCode() async {
+    if (_sendingCode || _codeCooldown > 0) {
+      return;
+    }
+    final String email = _emailController.text.trim();
+    if (email.isEmpty) {
+      _toast('请输入邮箱');
+      return;
+    }
+    if (!RegExp(r'^[^\s@]+@[^\s@]+\.[^\s@]+$').hasMatch(email)) {
+      _toast('邮箱格式不正确');
+      return;
+    }
+    setState(() => _sendingCode = true);
+    try {
+      final AcquireSmsSendResult sent = await ref
+          .read(loginControllerProvider.notifier)
+          .sendEmailCode(email: email);
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _codeCooldown = sent.expiresIn.clamp(30, 120);
+        _debugCode = sent.debugCode;
+        if (sent.debugCode != null && _codeController.text.isEmpty) {
+          _codeController.text = sent.debugCode!;
+        }
+      });
+      _cooldownTimer?.cancel();
+      _cooldownTimer = Timer.periodic(const Duration(seconds: 1), (Timer t) {
+        if (!mounted) {
+          t.cancel();
+          return;
+        }
+        if (_codeCooldown <= 1) {
+          t.cancel();
+          setState(() => _codeCooldown = 0);
+          return;
+        }
+        setState(() => _codeCooldown -= 1);
+      });
+      _toast(sent.mock ? '已发送（开发模式，验证码已自动填入）' : '验证码已发送到邮箱');
+    } catch (error) {
+      if (mounted) {
+        _toast('$error'.replaceFirst('Exception: ', ''));
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _sendingCode = false);
+      }
+    }
   }
 
   Future<void> _submit() async {
@@ -55,6 +118,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
           .register(
             email: _emailController.text,
             password: _passwordController.text,
+            code: _codeController.text,
             displayName: _nameController.text.trim().isEmpty
                 ? null
                 : _nameController.text.trim(),
@@ -63,6 +127,10 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
         return;
       }
       if (result.token.isNotEmpty) {
+        await setSkipDefaultAccountLogin(skip: false);
+        if (!mounted) {
+          return;
+        }
         ScaffoldMessenger.of(
           context,
         ).showSnackBar(const SnackBar(content: Text('注册成功')));
@@ -82,6 +150,10 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
         setState(() => _submitting = false);
       }
     }
+  }
+
+  void _toast(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
   }
 
   @override
@@ -108,7 +180,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
             ),
             const SizedBox(height: 8),
             Text(
-              '用于同步课程进度、词库与学习偏好。',
+              '先获取邮箱验证码，再设置密码完成注册。',
               style: TextStyle(
                 fontSize: 14,
                 color: AppDesignTokens.textSecondary,
@@ -147,6 +219,46 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                       return null;
                     },
                     decoration: _decoration('name@example.com'),
+                  ),
+                  const SizedBox(height: 14),
+                  _label('邮箱验证码'),
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: <Widget>[
+                      Expanded(
+                        child: TextFormField(
+                          controller: _codeController,
+                          keyboardType: TextInputType.number,
+                          textInputAction: TextInputAction.next,
+                          style: TextStyle(color: AppDesignTokens.textPrimary),
+                          validator: (String? value) {
+                            if (value == null || value.trim().isEmpty) {
+                              return '请输入验证码';
+                            }
+                            if (value.trim().length < 4) {
+                              return '验证码格式不正确';
+                            }
+                            return null;
+                          },
+                          decoration: _decoration(
+                            _debugCode == null ? '邮箱验证码' : '验证码（已填开发码）',
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      SizedBox(
+                        height: 52,
+                        child: OutlinedButton(
+                          onPressed:
+                              (_sendingCode || _codeCooldown > 0) ? null : _sendCode,
+                          child: Text(
+                            _codeCooldown > 0
+                                ? '${_codeCooldown}s'
+                                : (_sendingCode ? '发送中' : '获取验证码'),
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                   const SizedBox(height: 14),
                   _label('密码'),
