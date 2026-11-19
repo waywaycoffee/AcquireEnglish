@@ -18,6 +18,7 @@ import '../../data/voice_practice_client.dart';
 import '../../domain/pronunciation_assessment.dart';
 import '../player_mock_state.dart';
 import 'comparison_waveform_painter.dart';
+import 'shadow_hundred_stats_card.dart';
 import 'study_shell_tokens.dart';
 
 /// How the practice sentence is shown while shadowing.
@@ -938,8 +939,25 @@ class _StudyShadowingTabState extends ConsumerState<StudyShadowingTab> {
           child: ListView(
             padding: const EdgeInsets.fromLTRB(12, 12, 12, 8),
             children: <Widget>[
+              if ((widget.episodeId ?? '').trim().isNotEmpty) ...<Widget>[
+                ShadowHundredStatsCard(
+                  episodeId: widget.episodeId!.trim(),
+                  compact: true,
+                ),
+                const SizedBox(height: 10),
+              ],
               if (_practiceCount > 0)
-                Text('本句已跟读 $_practiceCount 次'),
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 8),
+                  child: Text(
+                    '本句已跟读 $_practiceCount 次',
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                      color: shell.textSecondary,
+                    ),
+                  ),
+                ),
 
               Container(
                 width: double.infinity,
