@@ -5,11 +5,13 @@ import 'package:flutter/services.dart';
 import 'package:media_kit/media_kit.dart';
 import 'package:screen_brightness/screen_brightness.dart';
 
+import '../../../daily_review/data/word_encounter_store.dart';
 import '../../../settings/presentation/settings_provider.dart'
     show playerFontOptions, playerFontScales;
 import '../../../shared/domain/subtitle_letter_case.dart';
 import '../../../shared/presentation/pad/app_design_tokens.dart';
 import '../../../shared/presentation/word_lookup_popup.dart';
+import '../../../words/presentation/word_book_provider.dart' show normalizeWord;
 import '../player_mock_state.dart';
 import '../player_native_subtitles.dart';
 import '../subtitle_display_mode.dart';
@@ -293,6 +295,23 @@ class _PlayerVideoPanelState extends State<PlayerVideoPanel> {
   }
 
   void _openSubtitleLookup(BuildContext anchorContext, String word) {
+    final String normalized = normalizeWord(word);
+    if (normalized.isNotEmpty &&
+        widget.savedVocabularyWords.contains(normalized)) {
+      unawaited(() async {
+        final int count = await WordEncounterStore().record(normalized);
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              count >= 3
+                  ? '片中再遇「$normalized」· 今日第 $count 次（轻量巩固已记）'
+                  : '片中再遇「$normalized」· 今日第 $count 次',
+            ),
+          ),
+        );
+      }());
+    }
     _closeSubtitleLookup();
     widget.onSubtitleLookupOpen?.call();
     _setControlsVisible(false);

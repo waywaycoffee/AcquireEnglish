@@ -1,11 +1,15 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart'
     show RenderAbstractViewport, RevealedOffset, SelectedContent;
 import 'package:flutter/services.dart';
 
+import '../../../daily_review/data/word_encounter_store.dart';
 import '../../../shared/domain/subtitle_letter_case.dart';
 import '../../../shared/presentation/pad/app_design_tokens.dart';
 import '../../../shared/presentation/word_lookup_popup.dart';
+import '../../../words/presentation/word_book_provider.dart' show normalizeWord;
 import '../player_mock_state.dart';
 import '../subtitle_display_mode.dart';
 import '../subtitle_language_sanitize.dart';
@@ -657,6 +661,23 @@ class _PlayerSubtitleListState extends State<PlayerSubtitleList> {
     });
   }
 
+  void _recordEncounterIfSaved(String rawWord) {
+    final String word = normalizeWord(rawWord);
+    if (word.isEmpty || !widget.savedVocabularyWords.contains(word)) {
+      return;
+    }
+    unawaited(() async {
+      final int count = await WordEncounterStore().record(word);
+      if (!mounted) return;
+      _showMessage(
+        context,
+        count >= 3
+            ? '片中再遇「$word」· 今日第 $count 次（轻量巩固已记）'
+            : '片中再遇「$word」· 今日第 $count 次',
+      );
+    }());
+  }
+
   void _toggleDictionaryOverlay(
     BuildContext anchorContext,
     String rawWord,
@@ -669,6 +690,7 @@ class _PlayerSubtitleListState extends State<PlayerSubtitleList> {
       return;
     }
 
+    _recordEncounterIfSaved(rawWord);
     _removeDictionaryOverlay(notify: false, emitClosed: false);
     widget.onDictionaryOpened?.call();
 

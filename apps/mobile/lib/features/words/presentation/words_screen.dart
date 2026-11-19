@@ -10,6 +10,7 @@ import '../../anki_export/presentation/anki_export_sheet.dart';
 import '../../authentication/presentation/account_storage.dart';
 import '../../daily_review/data/missed_review_book.dart';
 import '../../daily_review/domain/daily_review.dart';
+import '../../daily_review/domain/review_week_stats.dart';
 import '../../daily_review/presentation/daily_review_provider.dart';
 import '../../daily_review/presentation/fsrs_word_status.dart';
 import '../../navigation/presentation/navigation_destination.dart';
@@ -240,6 +241,10 @@ class _WordsScreenState extends ConsumerState<WordsScreen> {
                   streak: streak,
                   onStart: () => unawaited(_startTodayReview(newLimit)),
                   onSettings: () => showWordReviewSettingsSheet(context),
+                ),
+                const SizedBox(height: 12),
+                _WeekStatsCard(
+                  stats: ReviewWeekStats.fromState(reviewState, now),
                 ),
                 const SizedBox(height: 20),
                 SizedBox(
@@ -482,6 +487,97 @@ class _TodayPlanCard extends StatelessWidget {
                 foregroundColor: Colors.white,
                 padding: const EdgeInsets.symmetric(vertical: 12),
               ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _WeekStatsCard extends StatelessWidget {
+  const _WeekStatsCard({required this.stats});
+
+  final ReviewWeekStats stats;
+
+  @override
+  Widget build(BuildContext context) {
+    final int maxTotal = stats.days.fold<int>(
+      1,
+      (int m, ReviewDayStat d) => d.total > m ? d.total : m,
+    );
+    final int keepPct = (stats.retentionHint * 100).round();
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppDesignTokens.appWhite,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: AppDesignTokens.borderGray),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          Text(
+            '近 7 日 · 复习 ${stats.totalReviews} · 新学 ${stats.totalNew}',
+            style: TextStyle(
+              fontWeight: FontWeight.w900,
+              color: AppDesignTokens.textPrimary,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            '活跃天数占比 $keepPct%（有学习记录的天数 / 7）',
+            style: TextStyle(color: AppDesignTokens.textSecondary),
+          ),
+          const SizedBox(height: 12),
+          SizedBox(
+            height: 56,
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: <Widget>[
+                for (final ReviewDayStat day in stats.days)
+                  Expanded(
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 3),
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.end,
+                        children: <Widget>[
+                          Expanded(
+                            child: Align(
+                              alignment: Alignment.bottomCenter,
+                              child: FractionallySizedBox(
+                                heightFactor: (day.total / maxTotal).clamp(
+                                  0.08,
+                                  1.0,
+                                ),
+                                widthFactor: 1,
+                                child: DecoratedBox(
+                                  decoration: BoxDecoration(
+                                    color: day.total == 0
+                                        ? const Color(0xFFE8E8E8)
+                                        : AppDesignTokens.brandGreenDark,
+                                    borderRadius: BorderRadius.circular(6),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            day.dayKey.length >= 10
+                                ? day.dayKey.substring(8)
+                                : day.dayKey,
+                            style: const TextStyle(
+                              fontSize: 10,
+                              color: Color(0xFF626262),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+              ],
             ),
           ),
         ],

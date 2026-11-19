@@ -25,7 +25,10 @@ import '../../words/presentation/word_review_settings_provider.dart';
 import '../../words/presentation/word_review_settings_sheet.dart';
 import '../../authentication/presentation/account_storage.dart';
 import '../data/missed_review_book.dart';
+import '../data/word_encounter_store.dart';
+import '../domain/cloze_sentence.dart';
 import '../domain/daily_review.dart';
+import '../domain/weakest_rating.dart';
 import 'daily_review_provider.dart';
 import 'review_spelling_screen.dart';
 
@@ -66,13 +69,20 @@ class _DailyReviewScreenState extends ConsumerState<DailyReviewScreen>
   bool _speaking = false;
   int _speechSequence = 0;
   WordPronunciationService? _speech;
+  /// Index into [WordReviewSettings.orderedModes] for the current word card.
+  int _modeStep = 0;
+  final Map<String, List<fsrs.Rating>> _stageRatings =
+      <String, List<fsrs.Rating>>{};
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) ref.read(dailyReviewProvider.notifier).scheduleCloudBackup();
+      if (!mounted) return;
+      final DailyReviewNotifier review = ref.read(dailyReviewProvider.notifier);
+      review.scheduleCloudBackup();
+      unawaited(review.drainEncounterSoftCredits());
     });
     _timer = Timer.periodic(const Duration(seconds: 30), (_) {
       if (mounted) setState(() {});
@@ -894,11 +904,28 @@ class _DailyReviewScreenState extends ConsumerState<DailyReviewScreen>
     return '当前没有需要立即复习的内容。$waiting$next';
   }
 
+  List<WordPracticeMode> _modesFor(ReviewSource source) {
+    if (source.kind != ReviewKind.word) {
+      return const <WordPracticeMode>[WordPracticeMode.recognize];
+    }
+    return ref.read(wordReviewSettingsProvider).orderedModes;
+  }
+
+  WordPracticeMode _currentMode(ReviewSource source) {
+    final List<WordPracticeMode> modes = _modesFor(source);
+    if (modes.isEmpty) return WordPracticeMode.recognize;
+    return modes[_modeStep.clamp(0, modes.length - 1)];
+  }
+
   Widget _buildStudy(ReviewSource source, ReviewRecord record) {
     final WordReviewSettings options = ref.watch(wordReviewSettingsProvider);
     final bool word = source.kind == ReviewKind.word;
+    final WordPracticeMode mode = _currentMode(source);
+    final bool speakStage = word && mode == WordPracticeMode.speak;
     final List<String> choices =
-        word && options.recallStyle == WordRecallStyle.multipleChoice
+        word &&
+            !speakStage &&
+            options.recallStyle == WordRecallStyle.multipleChoice
         ? _choices.putIfAbsent(source.key, () => _meaningChoices(source))
         : const <String>[];
     final bool choiceMode = choices.length == 4;
@@ -910,6 +937,25 @@ class _DailyReviewScreenState extends ConsumerState<DailyReviewScreen>
         (LearningSettingsState settings) => settings.subtitleLetterCase,
       ),
     );
+    final bool useCloze =
+        word &&
+        !speakStage &&
+        source.english.trim().isNotEmpty &&
+        sentenceContainsWord(source.english, source.question);
+    final String frontText = speakStage
+        ? source.question
+        : useCloze && !_revealed
+        ? clozeSentence(source.english, source.question)
+        : source.question;
+    final int encounterToday = word
+        ? WordEncounterStore(
+            account: ref.read(studyAccountProvider),
+          ).todayCount(source.question, now)
+        : 0;
+    final List<WordPracticeMode> modes = _modesFor(source);
+    final String stageLabel = word && modes.length > 1
+        ? ' · ${mode.label} ${_modeStep + 1}/${modes.length}'
+        : '';
     return _ReviewSurface(
       child: ConstrainedBox(
         constraints: BoxConstraints(
@@ -926,7 +972,7 @@ class _DailyReviewScreenState extends ConsumerState<DailyReviewScreen>
                         ? '自由练习'
                         : record.isNew
                         ? '首次学习'
-                        : '到期复习'}',
+                        : '到期复习'}$stageLabel',
                     style: const TextStyle(
                       color: Color(0xFF377D05),
                       fontSize: 13,
@@ -942,18 +988,35 @@ class _DailyReviewScreenState extends ConsumerState<DailyReviewScreen>
               ],
             ),
             if (passes != null) Text('生词 · 今日已通过 $passes / 3 次'),
+            if (encounterToday > 0)
+              Text(
+                '片中再遇 · 今日 $encounterToday 次',
+                style: const TextStyle(
+                  fontSize: 12,
+                  color: Color(0xFF925600),
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
             const SizedBox(height: 20),
             Text(
-              source.answer != source.english ? '先回忆中文含义' : '先试着用英语说出来',
+              speakStage
+                  ? '听示范后跟读，再自评发音把握'
+                  : useCloze && !_revealed
+                  ? '根据原句回忆被挖空的单词'
+                  : source.answer != source.english
+                  ? '先回忆中文含义'
+                  : '先试着用英语说出来',
               textAlign: TextAlign.center,
               style: const TextStyle(fontSize: 14, color: Color(0xFF626262)),
             ),
             const SizedBox(height: 18),
             SelectableText(
-              source.question,
+              frontText,
               textAlign: TextAlign.center,
               style: TextStyle(
-                fontSize: source.kind == ReviewKind.word ? 34 : 25,
+                fontSize: source.kind == ReviewKind.word
+                    ? (useCloze && !_revealed ? 22 : 34)
+                    : 25,
                 height: 1.45,
                 fontWeight: FontWeight.w800,
                 color: AppDesignTokens.textPrimary,
@@ -1003,7 +1066,36 @@ class _DailyReviewScreenState extends ConsumerState<DailyReviewScreen>
               ],
             ),
             const SizedBox(height: 22),
-            if (!_revealed && !completed) ...<Widget>[
+            if (speakStage && !completed) ...<Widget>[
+              FilledButton.tonalIcon(
+                onPressed: _speaking ? null : () => _playWord(source),
+                icon: const Icon(Icons.volume_up_rounded),
+                label: const Text('听示范发音'),
+              ),
+              const SizedBox(height: 8),
+              const Text(
+                '跟读一遍后，按真实把握自评（评分会与前面关卡取最弱一环写入 FSRS）。',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 12,
+                  height: 1.6,
+                  color: Color(0xFF626262),
+                ),
+              ),
+              const SizedBox(height: 16),
+              _ratingButtons(
+                source: source,
+                record: record,
+                now: now,
+                practice: widget.practice,
+                speakHints: true,
+              ),
+              if (_saving)
+                const Padding(
+                  padding: EdgeInsets.only(top: 12),
+                  child: LinearProgressIndicator(),
+                ),
+            ] else if (!_revealed && !completed) ...<Widget>[
               if (choiceMode)
                 for (final String choice in choices)
                   OutlinedButton(
@@ -1022,7 +1114,7 @@ class _DailyReviewScreenState extends ConsumerState<DailyReviewScreen>
                   onPressed: () => setState(() => _revealed = true),
                   style: _primaryButtonStyle,
                   icon: const Icon(Icons.visibility_outlined),
-                  label: const Text('显示答案'),
+                  label: Text(useCloze ? '显示答案与原词' : '显示答案'),
                 ),
               if (word && (record.isNew || choiceMode))
                 TextButton(
@@ -1126,96 +1218,11 @@ class _DailyReviewScreenState extends ConsumerState<DailyReviewScreen>
                   ),
                 ),
                 const SizedBox(height: 12),
-                LayoutBuilder(
-                  builder: (BuildContext context, BoxConstraints constraints) {
-                    return Wrap(
-                      spacing: 8,
-                      runSpacing: 10,
-                      children: <Widget>[
-                        for (final (
-                              fsrs.Rating rating,
-                              String label,
-                              String hint,
-                              Color color,
-                            )
-                            in <(fsrs.Rating, String, String, Color)>[
-                              (
-                                fsrs.Rating.again,
-                                '忘记',
-                                '没想起 · 重学',
-                                const Color(0xFFAF3434),
-                              ),
-                              (
-                                fsrs.Rating.hard,
-                                '费力想起',
-                                '想对了，但吃力',
-                                const Color(0xFF925600),
-                              ),
-                              (
-                                fsrs.Rating.good,
-                                '记得',
-                                '正常回忆出来',
-                                const Color(0xFF377D05),
-                              ),
-                              (
-                                fsrs.Rating.easy,
-                                '很轻松',
-                                '立刻轻松答对',
-                                const Color(0xFF0874A8),
-                              ),
-                            ])
-                          SizedBox(
-                            width: constraints.maxWidth < 520
-                                ? (constraints.maxWidth - 8) / 2
-                                : (constraints.maxWidth - 24) / 4,
-                            child: OutlinedButton(
-                              key: Key('daily-review-rate-${rating.name}'),
-                              style: OutlinedButton.styleFrom(
-                                foregroundColor: color,
-                                minimumSize: const Size(0, 84),
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 8,
-                                  vertical: 10,
-                                ),
-                              ),
-                              onPressed: _saving
-                                  ? null
-                                  : () => _grade(source, record, rating),
-                              child: Column(
-                                mainAxisSize: MainAxisSize.min,
-                                children: <Widget>[
-                                  Text(
-                                    label,
-                                    style: const TextStyle(
-                                      fontSize: 14,
-                                      fontWeight: FontWeight.w800,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 4),
-                                  Text(
-                                    hint,
-                                    textAlign: TextAlign.center,
-                                    style: const TextStyle(
-                                      fontSize: 11,
-                                      height: 1.4,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 4),
-                                  Text(
-                                    '预计 ${_formatReviewDelay(record.scheduledCard(rating, now).due, now)}',
-                                    textAlign: TextAlign.center,
-                                    style: const TextStyle(
-                                      fontSize: 11,
-                                      height: 1.4,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ),
-                      ],
-                    );
-                  },
+                _ratingButtons(
+                  source: source,
+                  record: record,
+                  now: now,
+                  practice: false,
                 ),
               ],
               if (_saving)
@@ -1237,6 +1244,102 @@ class _DailyReviewScreenState extends ConsumerState<DailyReviewScreen>
           ],
         ),
       ),
+    );
+  }
+
+  Widget _ratingButtons({
+    required ReviewSource source,
+    required ReviewRecord record,
+    required DateTime now,
+    required bool practice,
+    bool speakHints = false,
+  }) {
+    return LayoutBuilder(
+      builder: (BuildContext context, BoxConstraints constraints) {
+        return Wrap(
+          spacing: 8,
+          runSpacing: 10,
+          children: <Widget>[
+            for (final (
+                  fsrs.Rating rating,
+                  String label,
+                  String hint,
+                  Color color,
+                )
+                in <(fsrs.Rating, String, String, Color)>[
+                  (
+                    fsrs.Rating.again,
+                    speakHints ? '跟读困难' : '忘记',
+                    speakHints ? '读不准或读不出' : '没想起 · 重学',
+                    const Color(0xFFAF3434),
+                  ),
+                  (
+                    fsrs.Rating.hard,
+                    speakHints ? '勉强过关' : '费力想起',
+                    speakHints ? '能读但吃力' : '想对了，但吃力',
+                    const Color(0xFF925600),
+                  ),
+                  (
+                    fsrs.Rating.good,
+                    speakHints ? '跟读顺利' : '记得',
+                    speakHints ? '基本正确' : '正常回忆出来',
+                    const Color(0xFF377D05),
+                  ),
+                  (
+                    fsrs.Rating.easy,
+                    speakHints ? '很流利' : '很轻松',
+                    speakHints ? '发音清晰自信' : '立刻轻松答对',
+                    const Color(0xFF0874A8),
+                  ),
+                ])
+              SizedBox(
+                width: constraints.maxWidth < 520
+                    ? (constraints.maxWidth - 8) / 2
+                    : (constraints.maxWidth - 24) / 4,
+                child: OutlinedButton(
+                  key: Key('daily-review-rate-${rating.name}'),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: color,
+                    minimumSize: const Size(0, 84),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 10,
+                    ),
+                  ),
+                  onPressed: _saving
+                      ? null
+                      : () => _grade(source, record, rating),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: <Widget>[
+                      Text(
+                        label,
+                        style: const TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        hint,
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(fontSize: 11, height: 1.4),
+                      ),
+                      if (!practice && !speakHints) ...<Widget>[
+                        const SizedBox(height: 4),
+                        Text(
+                          '预计 ${_formatReviewDelay(record.scheduledCard(rating, now).due, now)}',
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(fontSize: 11, height: 1.4),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+              ),
+          ],
+        );
+      },
     );
   }
 
@@ -1283,6 +1386,8 @@ class _DailyReviewScreenState extends ConsumerState<DailyReviewScreen>
       _retryWord = false;
       _playedWord = null;
       _choices.remove(key);
+      _stageRatings.remove(key);
+      _modeStep = 0;
       final List<String> keys = _deckKeys ?? <String>[];
       final int index = keys.indexOf(key);
       final List<String> remaining = <String>[
@@ -1295,6 +1400,24 @@ class _DailyReviewScreenState extends ConsumerState<DailyReviewScreen>
     });
   }
 
+  Future<SpellStageResult?> _runSpellStage(ReviewSource source) async {
+    _stopSpeech();
+    final bool preferListen =
+        source.answer.trim().isEmpty && source.english.trim().isNotEmpty;
+    return Navigator.of(context).push<SpellStageResult>(
+      MaterialPageRoute<SpellStageResult>(
+        builder: (_) => ReviewSpellingScreen(
+          word: source.question,
+          meaning: source.answer,
+          prompt: preferListen
+              ? SpellPromptKind.listen
+              : SpellPromptKind.meaning,
+          onListen: () => unawaited(_playWord(source, silent: true)),
+        ),
+      ),
+    );
+  }
+
   Future<void> _grade(
     ReviewSource source,
     ReviewRecord record,
@@ -1305,55 +1428,130 @@ class _DailyReviewScreenState extends ConsumerState<DailyReviewScreen>
     }
     setState(() => _saving = true);
     try {
-      final bool spellingRequired =
-          source.kind == ReviewKind.word &&
-          ref.read(wordReviewSettingsProvider).requireSpelling;
-      if (spellingRequired && rating == fsrs.Rating.again) {
-        _setWordPasses(source.key, 0);
-        _nextCard(source.key, complete: false);
+      if (source.kind == ReviewKind.word) {
+        await _gradeWordPipeline(source, record, rating);
         return;
       }
-      final bool passing =
-          rating == fsrs.Rating.good || rating == fsrs.Rating.easy;
-      final int? passes = _freshPasses[source.key];
-      if (passes != null && !passing) {
-        _setWordPasses(source.key, 0);
-        _nextCard(source.key, complete: false);
-        return;
-      }
-      if (spellingRequired) {
-        _stopSpeech();
-        final bool? spelled = await Navigator.of(context).push<bool>(
-          MaterialPageRoute<bool>(
-            builder: (_) => ReviewSpellingScreen(
-              word: source.question,
-              meaning: source.answer,
-            ),
-          ),
-        );
-        if (!mounted || spelled != true) return;
-      }
-      if (passes != null && passes < 2) {
-        _setWordPasses(source.key, passes + 1);
-        _nextCard(source.key, complete: false);
-        return;
-      }
-      if (widget.practice) {
-        if (passes != null) _setWordPasses(source.key, null);
-        _advanceCard(source.key);
-        return;
-      }
-      await ref
-          .read(dailyReviewProvider.notifier)
-          .grade(source.key, rating, expectedReviews: record.reviews);
-      if (!mounted) return;
-      if (passes != null) _setWordPasses(source.key, null);
-      _advanceCard(source.key);
+      await _finishGrade(source, record, rating);
     } catch (_) {
       if (mounted) _message('这次进度未能保存，请重试；当前内容仍保留。');
     } finally {
       if (mounted) setState(() => _saving = false);
     }
+  }
+
+  Future<void> _gradeWordPipeline(
+    ReviewSource source,
+    ReviewRecord record,
+    fsrs.Rating rating,
+  ) async {
+    final WordReviewSettings options = ref.read(wordReviewSettingsProvider);
+    final List<WordPracticeMode> modes = options.orderedModes;
+    final WordPracticeMode mode = modes.isEmpty
+        ? WordPracticeMode.recognize
+        : modes[_modeStep.clamp(0, modes.length - 1)];
+    final List<fsrs.Rating> collected = _stageRatings.putIfAbsent(
+      source.key,
+      () => <fsrs.Rating>[],
+    );
+
+    if (mode == WordPracticeMode.recognize || mode == WordPracticeMode.speak) {
+      collected.add(rating);
+    }
+
+    // Advance through remaining modes (spell is a pushed stage).
+    int step = _modeStep + 1;
+    while (step < modes.length) {
+      final WordPracticeMode next = modes[step];
+      if (next == WordPracticeMode.spell) {
+        final SpellStageResult? spelled = await _runSpellStage(source);
+        if (!mounted) return;
+        if (spelled == null) {
+          // User cancelled spelling — keep card, drop this stage attempt.
+          if (collected.isNotEmpty) collected.removeLast();
+          return;
+        }
+        collected.add(spelled.rating);
+        step += 1;
+        continue;
+      }
+      if (next == WordPracticeMode.speak) {
+        setState(() {
+          _modeStep = step;
+          _revealed = false;
+          _retryWord = false;
+        });
+        return;
+      }
+      // recognize mid-pipeline shouldn't happen with orderedModes; skip.
+      step += 1;
+    }
+
+    final bool spellAsStage = modes.contains(WordPracticeMode.spell);
+    final bool spellingRequired = options.requireSpelling && !spellAsStage;
+    final fsrs.Rating staged = collected.isEmpty
+        ? rating
+        : weakestRating(collected);
+
+    if (spellingRequired && staged == fsrs.Rating.again) {
+      _setWordPasses(source.key, 0);
+      _stageRatings.remove(source.key);
+      _nextCard(source.key, complete: false);
+      return;
+    }
+    final bool passing =
+        staged == fsrs.Rating.good || staged == fsrs.Rating.easy;
+    final int? passes = _freshPasses[source.key];
+    if (passes != null && !passing) {
+      _setWordPasses(source.key, 0);
+      _stageRatings.remove(source.key);
+      _nextCard(source.key, complete: false);
+      return;
+    }
+    if (spellingRequired) {
+      final SpellStageResult? spelled = await _runSpellStage(source);
+      if (!mounted || spelled == null) return;
+      if (spelled.rating == fsrs.Rating.again) {
+        _setWordPasses(source.key, 0);
+        _stageRatings.remove(source.key);
+        _nextCard(source.key, complete: false);
+        return;
+      }
+      collected.add(spelled.rating);
+    }
+
+    final fsrs.Rating finalRating = collected.isEmpty
+        ? staged
+        : weakestRating(collected);
+
+    if (passes != null && passes < 2) {
+      _setWordPasses(source.key, passes + 1);
+      _stageRatings.remove(source.key);
+      _nextCard(source.key, complete: false);
+      return;
+    }
+    await _finishGrade(source, record, finalRating);
+  }
+
+  Future<void> _finishGrade(
+    ReviewSource source,
+    ReviewRecord record,
+    fsrs.Rating rating,
+  ) async {
+    final int? passes = _freshPasses[source.key];
+    if (widget.practice) {
+      if (passes != null) _setWordPasses(source.key, null);
+      _stageRatings.remove(source.key);
+      _advanceCard(source.key);
+      return;
+    }
+    await ref
+        .read(dailyReviewProvider.notifier)
+        .grade(source.key, rating, expectedReviews: record.reviews);
+    if (!mounted) return;
+    if (passes != null) _setWordPasses(source.key, null);
+    _stageRatings.remove(source.key);
+    _advanceCard(source.key);
   }
 
   void _restoreWordPasses(DateTime now) {

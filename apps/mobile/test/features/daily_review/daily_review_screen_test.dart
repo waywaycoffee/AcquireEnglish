@@ -36,12 +36,22 @@ const List<ReviewSource> sources = <ReviewSource>[
   ),
 ];
 
+class _RecognizeOnlySettings extends WordReviewSettingsNotifier {
+  @override
+  WordReviewSettings build() => const WordReviewSettings(
+    enabledModes: <WordPracticeMode>[WordPracticeMode.recognize],
+  );
+}
+
 ProviderContainer makeContainer([List<ReviewSource> items = sources]) =>
     ProviderContainer(
       // ignore: always_specify_types
       overrides: [
         reviewSourcesProvider.overrideWithValue(items),
         reviewClockProvider.overrideWithValue(() => DateTime(2026, 10, 23, 9)),
+        // Keep classic single-stage cards in widget tests; multi-stage is
+        // covered by domain helpers + manual QA with settings toggles.
+        wordReviewSettingsProvider.overrideWith(_RecognizeOnlySettings.new),
       ],
     );
 Widget app(ProviderContainer container, {bool session = false}) {
@@ -82,6 +92,7 @@ void main() {
           const WordReviewSettings(
             recallStyle: WordRecallStyle.multipleChoice,
             requireSpelling: true,
+            enabledModes: <WordPracticeMode>[WordPracticeMode.recognize],
           ),
         );
     await tester.pumpWidget(app(container, session: true));
@@ -190,6 +201,7 @@ void main() {
       overrides: [
         reviewSourcesProvider.overrideWithValue(sources),
         reviewClockProvider.overrideWithValue(() => DateTime(2026, 10, 23, 9)),
+        wordReviewSettingsProvider.overrideWith(_RecognizeOnlySettings.new),
         wordPronunciationServiceProvider.overrideWithValue(
           WordPronunciationService(
             speakOverride: (String text) {
@@ -266,7 +278,9 @@ void main() {
           find.byKey(const Key('daily-review-session-progress')),
           findsOneWidget,
         );
-        expect(find.text('hello'), findsOneWidget);
+        // Cloze front hides the bare word when an original sentence exists.
+        expect(find.text('_____ there.'), findsOneWidget);
+        expect(find.text('hello'), findsNothing);
         expect(find.text('你好'), findsNothing);
         expect(find.byKey(const Key('daily-review-rate-good')), findsNothing);
         await tester.ensureVisible(
@@ -323,7 +337,7 @@ void main() {
       addTearDown(container.dispose);
       await tester.pumpWidget(app(container, session: true));
       await tester.pumpAndSettle();
-      expect(find.text('hello'), findsOneWidget);
+      expect(find.text('_____ there.'), findsOneWidget);
       expect(
         tester
             .widget<OutlinedButton>(
@@ -455,7 +469,7 @@ void main() {
         find.byKey(const Key('daily-review-session-scroll')),
       );
       expect(sessionList.controller!.offset, 0);
-      expect(find.text('hello').hitTestable(), findsOneWidget);
+      expect(find.text('_____ there.').hitTestable(), findsOneWidget);
       expect(tester.takeException(), isNull);
       await tester.pumpWidget(const SizedBox.shrink());
     },
@@ -504,7 +518,7 @@ void main() {
       expect(find.text('这轮自由复习完成了'), findsOneWidget);
       await tester.tap(find.text('再练一轮'));
       await tester.pumpAndSettle();
-      expect(find.text('hello'), findsOneWidget);
+      expect(find.text('_____ there.'), findsOneWidget);
       expect(jsonEncode(container.read(dailyReviewProvider).toJson()), saved);
       await tester.pumpWidget(const SizedBox.shrink());
     },
@@ -521,6 +535,7 @@ void main() {
             sources.first,
           ]),
           reviewClockProvider.overrideWithValue(() => time),
+          wordReviewSettingsProvider.overrideWith(_RecognizeOnlySettings.new),
         ],
       );
       addTearDown(container.dispose);

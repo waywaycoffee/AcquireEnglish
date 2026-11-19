@@ -100,11 +100,14 @@ class _WordReviewSettingsSheetState
             ),
             const SizedBox(height: 6),
             const Text(
-              '选择背词方式，并决定是否加入拼写检查。',
+              '认记可叠加拼写、跟读；多关卡时 FSRS 按最弱一环记分。',
               style: TextStyle(color: Color(0xFF94A3B8), height: 1.4),
             ),
             const SizedBox(height: 18),
             _WordRecallOptions(settings: settings),
+            const SizedBox(height: 8),
+            _WordModeOptions(settings: settings),
+            const SizedBox(height: 12),
             const Text(
               '每日配额',
               style: TextStyle(
@@ -179,11 +182,55 @@ class _WordRecallOptions extends ConsumerWidget {
         ),
         SwitchListTile(
           contentPadding: EdgeInsets.zero,
-          title: const Text('拼写正确才算通过', style: TextStyle(color: Colors.white)),
+          title: const Text(
+            '认记后强制拼写门禁',
+            style: TextStyle(color: Colors.white),
+          ),
+          subtitle: const Text(
+            '未开启「拼写」关卡时生效；开启拼写关卡后由关卡本身计分',
+            style: TextStyle(color: Color(0xFF94A3B8), fontSize: 12),
+          ),
           value: settings.requireSpelling,
           onChanged: (bool value) =>
               notifier.update(settings.copyWith(requireSpelling: value)),
         ),
+      ],
+    );
+  }
+}
+
+class _WordModeOptions extends ConsumerWidget {
+  const _WordModeOptions({required this.settings});
+
+  final WordReviewSettings settings;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final WordReviewSettingsNotifier notifier = ref.read(
+      wordReviewSettingsProvider.notifier,
+    );
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: <Widget>[
+        const Text(
+          '练习关卡',
+          style: TextStyle(color: Colors.white, fontWeight: FontWeight.w800),
+        ),
+        const SizedBox(height: 6),
+        for (final WordPracticeMode mode in WordPracticeMode.values)
+          SwitchListTile(
+            contentPadding: EdgeInsets.zero,
+            title: Text(mode.label, style: const TextStyle(color: Colors.white)),
+            subtitle: Text(
+              mode.hint,
+              style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 12),
+            ),
+            value: settings.isEnabled(mode),
+            onChanged: mode == WordPracticeMode.recognize
+                ? null
+                : (bool value) =>
+                      notifier.setModeEnabled(mode, enabled: value),
+          ),
       ],
     );
   }

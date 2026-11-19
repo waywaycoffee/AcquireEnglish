@@ -14,6 +14,7 @@ import '../../sync/data/acquire_api_client.dart';
 import '../../words/presentation/vocabulary_placement_provider.dart';
 import '../../words/presentation/word_book_provider.dart';
 import '../data/missed_review_book.dart';
+import '../data/word_encounter_store.dart';
 import '../domain/daily_review.dart';
 
 final Provider<DateTime Function()> reviewClockProvider =
@@ -420,6 +421,30 @@ class DailyReviewNotifier extends Notifier<DailyReviewState> {
         storageError: current.storageError,
       );
     });
+  }
+
+  /// Apply LingQ-style soft consolidations queued after 3 in-video encounters.
+  Future<void> drainEncounterSoftCredits() async {
+    final WordEncounterStore store = WordEncounterStore(
+      account: ref.read(studyAccountProvider),
+    );
+    final List<String> keys = await store.takeSoftCredits();
+    if (keys.isEmpty) return;
+    final DateTime now = ref.read(reviewClockProvider)();
+    for (final String key in keys) {
+      final ReviewRecord? record = state.records[key];
+      if (record == null || record.isNew) continue;
+      if (record.card.due.isAfter(now)) continue;
+      try {
+        await grade(
+          key,
+          fsrs.Rating.good,
+          expectedReviews: record.reviews,
+        );
+      } catch (_) {
+        // Card may have been removed or concurrently graded.
+      }
+    }
   }
 
   Future<void> grade(
