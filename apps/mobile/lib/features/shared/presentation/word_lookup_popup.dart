@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../phrases/presentation/phrase_book_provider.dart';
 import '../../settings/presentation/settings_provider.dart';
 import '../../words/presentation/word_book_provider.dart';
+import '../../words/presentation/widgets/phonics_syllable_blocks.dart';
 import '../data/word_lookup_service.dart';
 import '../data/word_pronunciation_service.dart';
 import '../domain/word_lookup_entry.dart';
@@ -348,6 +349,12 @@ class _WordLookupPopupCardState extends ConsumerState<WordLookupPopupCard> {
             ),
           ],
         ),
+        const SizedBox(height: 8),
+        PhonicsSyllableBlocks(
+          word: _entry?.word ?? widget.rawWord,
+          compact: true,
+        ),
+        const SizedBox(height: 8),
         if (widget.maxHeight == null)
           body
         else

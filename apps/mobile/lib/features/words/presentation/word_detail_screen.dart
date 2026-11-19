@@ -14,8 +14,10 @@ import '../../shared/domain/word_lookup_entry.dart';
 import '../../shared/presentation/pad/app_design_tokens.dart';
 import '../data/offline_word_dictionary.dart';
 import '../data/vocab_card_enrichment_service.dart';
+import '../domain/word_morphology.dart';
 import 'word_book_provider.dart';
 import 'word_video_relink.dart';
+import 'widgets/phonics_syllable_blocks.dart';
 
 class WordDetailDialog extends ConsumerStatefulWidget {
   const WordDetailDialog({required this.word, super.key});
@@ -328,6 +330,32 @@ class _WordDetailDialogState extends ConsumerState<WordDetailDialog> {
                         .toggleFavorite(entry.word),
                   ),
                   const SizedBox(height: 16),
+                  Builder(
+                    builder: (BuildContext context) {
+                      final MorphologyInsight morph =
+                          analyzeWordMorphology(entry.word);
+                      return Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: <Widget>[
+                          RootsAffixesCard(
+                            affixes: morph.affixes,
+                            aiText: entry.rootsAffixesCn ?? '',
+                          ),
+                          if (morph.affixes.isNotEmpty ||
+                              (entry.rootsAffixesCn ?? '')
+                                  .trim()
+                                  .isNotEmpty) ...<Widget>[
+                            const SizedBox(height: 16),
+                          ],
+                          EtymologyCard(
+                            localHint: morph.etymologyHintCn,
+                            aiText: entry.etymologyCn ?? '',
+                          ),
+                          const SizedBox(height: 16),
+                        ],
+                      );
+                    },
+                  ),
                   if (_publicEntry
                       case final WordLookupEntry shared) ...<Widget>[
                     ListTile(
@@ -442,8 +470,10 @@ class _WordHeader extends StatelessWidget {
                   fontWeight: FontWeight.w900,
                 ),
               ),
+              const SizedBox(height: 10),
+              PhonicsSyllableBlocks(word: entry.word, compact: true),
               Padding(
-                padding: const EdgeInsets.only(top: 4),
+                padding: const EdgeInsets.only(top: 8),
                 child: Text(
                   entry.kind.labelCn,
                   style: TextStyle(
@@ -569,6 +599,18 @@ class _AiEnrichmentCard extends StatelessWidget {
             const SizedBox(height: 4),
             Text(entry.mnemonicCn!),
           ],
+          if ((entry.rootsAffixesCn ?? '').trim().isNotEmpty) ...<Widget>[
+            const SizedBox(height: 12),
+            const Text('AI 词根词缀', style: TextStyle(fontWeight: FontWeight.w800)),
+            const SizedBox(height: 4),
+            Text(entry.rootsAffixesCn!),
+          ],
+          if ((entry.etymologyCn ?? '').trim().isNotEmpty) ...<Widget>[
+            const SizedBox(height: 12),
+            const Text('AI 词源', style: TextStyle(fontWeight: FontWeight.w800)),
+            const SizedBox(height: 4),
+            Text(entry.etymologyCn!),
+          ],
           if ((entry.aiExampleEn ?? '').trim().isNotEmpty) ...<Widget>[
             const SizedBox(height: 12),
             const Text('AI 例句', style: TextStyle(fontWeight: FontWeight.w800)),
@@ -611,7 +653,9 @@ class _AiEnrichmentCard extends StatelessWidget {
                     child: CircularProgressIndicator(strokeWidth: 2),
                   )
                 : const Icon(Icons.auto_awesome_rounded),
-            label: Text(enriching ? 'AI 生成中…' : '重新生成 AI 解析 / 助记 / 例句'),
+            label: Text(
+              enriching ? 'AI 生成中…' : '重新生成 AI 解析 / 助记 / 词根 / 溯源 / 例句',
+            ),
           ),
         ],
       ),

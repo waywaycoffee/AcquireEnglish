@@ -22,6 +22,8 @@ class VocabCardEnrichmentResult {
     this.definitionEn = '',
     this.analysisCn = '',
     this.mnemonicCn = '',
+    this.rootsAffixesCn = '',
+    this.etymologyCn = '',
     this.aiExampleEn = '',
     this.aiExampleCn = '',
   });
@@ -32,6 +34,8 @@ class VocabCardEnrichmentResult {
   final String definitionEn;
   final String analysisCn;
   final String mnemonicCn;
+  final String rootsAffixesCn;
+  final String etymologyCn;
   final String aiExampleEn;
   final String aiExampleCn;
 }
@@ -107,6 +111,8 @@ class VocabCardEnrichmentService {
         definitionEn: result.definitionEn,
         analysisCn: result.analysisCn,
         mnemonicCn: result.mnemonicCn,
+        rootsAffixesCn: result.rootsAffixesCn,
+        etymologyCn: result.etymologyCn,
         aiExampleEn: result.aiExampleEn,
         aiExampleCn: result.aiExampleCn,
         status: VocabEnrichmentStatus.ready,
@@ -154,12 +160,15 @@ class VocabCardEnrichmentService {
             'content':
                 'You help Chinese learners build vocabulary cards. '
                 'Return strict JSON with keys: phonetic, partOfSpeech, definitionCn, '
-                'definitionEn, analysisCn, mnemonicCn, aiExampleEn, aiExampleCn. '
+                'definitionEn, analysisCn, mnemonicCn, rootsAffixesCn, etymologyCn, '
+                'aiExampleEn, aiExampleCn. '
                 'analysisCn = brief Chinese explanation of meaning/usage in context. '
                 'mnemonicCn = a vivid Chinese memory tip (谐音/联想均可，简洁有趣). '
+                'rootsAffixesCn = Chinese note on useful prefixes/roots/suffixes and 1-2 related words. '
+                'etymologyCn = short Chinese etymology / word-origin story (Latin/Greek/Old English if relevant). '
                 'aiExampleEn = one new natural English example (not copying the source). '
                 'aiExampleCn = Chinese translation of that example. '
-                'Keep each field short (under 60 Chinese chars / 20 English words).',
+                'Keep each field short (under 80 Chinese chars / 25 English words).',
           },
           <String, String>{
             'role': 'user',
@@ -168,7 +177,7 @@ class VocabCardEnrichmentService {
                 'Lexeme: "$word"\n'
                 'Source sentence: "${contextSentence.trim()}"\n'
                 'Source Chinese: "${contextChinese.trim()}"\n'
-                'Fill the vocabulary card JSON.',
+                'Fill the vocabulary card JSON including roots/affixes and etymology.',
           },
         ],
       },
@@ -201,6 +210,8 @@ class VocabCardEnrichmentService {
       definitionEn: '${decoded['definitionEn'] ?? ''}'.trim(),
       analysisCn: '${decoded['analysisCn'] ?? ''}'.trim(),
       mnemonicCn: '${decoded['mnemonicCn'] ?? ''}'.trim(),
+      rootsAffixesCn: '${decoded['rootsAffixesCn'] ?? ''}'.trim(),
+      etymologyCn: '${decoded['etymologyCn'] ?? ''}'.trim(),
       aiExampleEn: '${decoded['aiExampleEn'] ?? ''}'.trim(),
       aiExampleCn: '${decoded['aiExampleCn'] ?? ''}'.trim(),
     );

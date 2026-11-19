@@ -169,6 +169,8 @@ class WordEntry {
     this.definitionEn,
     this.analysisCn,
     this.mnemonicCn,
+    this.rootsAffixesCn,
+    this.etymologyCn,
     this.aiExampleEn,
     this.aiExampleCn,
     this.enrichmentStatus = VocabEnrichmentStatus.none,
@@ -199,6 +201,8 @@ class WordEntry {
       definitionEn: json['definitionEn'] as String?,
       analysisCn: json['analysisCn'] as String?,
       mnemonicCn: json['mnemonicCn'] as String?,
+      rootsAffixesCn: json['rootsAffixesCn'] as String?,
+      etymologyCn: json['etymologyCn'] as String?,
       aiExampleEn: json['aiExampleEn'] as String?,
       aiExampleCn: json['aiExampleCn'] as String?,
       enrichmentStatus: vocabEnrichmentStatusFromName(
@@ -226,6 +230,8 @@ class WordEntry {
   final String? definitionEn;
   final String? analysisCn;
   final String? mnemonicCn;
+  final String? rootsAffixesCn;
+  final String? etymologyCn;
   final String? aiExampleEn;
   final String? aiExampleCn;
   final VocabEnrichmentStatus enrichmentStatus;
@@ -292,6 +298,8 @@ class WordEntry {
     String? definitionEn,
     String? analysisCn,
     String? mnemonicCn,
+    String? rootsAffixesCn,
+    String? etymologyCn,
     String? aiExampleEn,
     String? aiExampleCn,
     VocabEnrichmentStatus? enrichmentStatus,
@@ -312,6 +320,8 @@ class WordEntry {
     definitionEn: definitionEn ?? this.definitionEn,
     analysisCn: analysisCn ?? this.analysisCn,
     mnemonicCn: mnemonicCn ?? this.mnemonicCn,
+    rootsAffixesCn: rootsAffixesCn ?? this.rootsAffixesCn,
+    etymologyCn: etymologyCn ?? this.etymologyCn,
     aiExampleEn: aiExampleEn ?? this.aiExampleEn,
     aiExampleCn: aiExampleCn ?? this.aiExampleCn,
     enrichmentStatus: enrichmentStatus ?? this.enrichmentStatus,
@@ -333,6 +343,8 @@ class WordEntry {
     'definitionEn': definitionEn,
     'analysisCn': analysisCn,
     'mnemonicCn': mnemonicCn,
+    'rootsAffixesCn': rootsAffixesCn,
+    'etymologyCn': etymologyCn,
     'aiExampleEn': aiExampleEn,
     'aiExampleCn': aiExampleCn,
     'enrichmentStatus': enrichmentStatus.name,
@@ -643,6 +655,8 @@ class WordBookNotifier extends Notifier<List<WordEntry>> {
     String? definitionEn,
     String? analysisCn,
     String? mnemonicCn,
+    String? rootsAffixesCn,
+    String? etymologyCn,
     String? aiExampleEn,
     String? aiExampleCn,
     required VocabEnrichmentStatus status,
@@ -661,6 +675,8 @@ class WordBookNotifier extends Notifier<List<WordEntry>> {
       definitionEn: _prefer(definitionEn, entry.definitionEn),
       analysisCn: _prefer(analysisCn, entry.analysisCn),
       mnemonicCn: _prefer(mnemonicCn, entry.mnemonicCn),
+      rootsAffixesCn: _prefer(rootsAffixesCn, entry.rootsAffixesCn),
+      etymologyCn: _prefer(etymologyCn, entry.etymologyCn),
       aiExampleEn: _prefer(aiExampleEn, entry.aiExampleEn),
       aiExampleCn: _prefer(aiExampleCn, entry.aiExampleCn),
       enrichmentStatus: status,
@@ -808,6 +824,8 @@ class WordBookNotifier extends Notifier<List<WordEntry>> {
         definitionEn: entry.definitionEn,
         analysisCn: entry.analysisCn,
         mnemonicCn: entry.mnemonicCn,
+        rootsAffixesCn: entry.rootsAffixesCn,
+        etymologyCn: entry.etymologyCn,
         aiExampleEn: entry.aiExampleEn,
         aiExampleCn: entry.aiExampleCn,
         enrichmentStatus: entry.enrichmentStatus,
