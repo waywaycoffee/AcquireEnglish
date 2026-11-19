@@ -21,6 +21,7 @@ import '../../shared/presentation/pad/pad_top_bar.dart';
 import '../../sync/data/acquire_api_client.dart';
 import '../../sync/presentation/cloud_catalog_sync.dart';
 import '../../sync/presentation/daily_feed_provider.dart';
+import '../../words/presentation/vocabulary_placement_provider.dart';
 import 'learning_dashboard_provider.dart';
 import 'widgets/digital_human_picker.dart';
 import 'widgets/pad_home_hero.dart';
@@ -42,6 +43,7 @@ class _PadHomeScreenState extends ConsumerState<PadHomeScreen> {
     ref.watch(bilibiliCoverRefreshProvider);
     final LearningDashboardStats stats = ref.watch(learningDashboardProvider);
     final UserGrowth growth = ref.watch(userGrowthProvider);
+    final int? vocabulary = ref.watch(predictedVocabularyProvider);
     final List<LibraryCourseData> courses = ref.watch(
       recentLearningCoursesProvider,
     );
@@ -101,7 +103,21 @@ class _PadHomeScreenState extends ConsumerState<PadHomeScreen> {
       message: '正在打开课程...',
       child: PadScaffold(
         currentDestination: AppNavDestination.home,
-        topBar: const PadTopBar(title: '爱快英语', subtitle: '首页'),
+        topBar: PadTopBar(
+          title: '爱快英语',
+          subtitle: '首页',
+          actions: <Widget>[
+            TextButton(
+              key: const Key('home-vocabulary-estimate'),
+              onPressed: () => context.push(SGRoute.vocabularyPlacement.route),
+              style: TextButton.styleFrom(
+                padding: const EdgeInsets.symmetric(horizontal: 6),
+                textStyle: const TextStyle(fontSize: 12),
+              ),
+              child: Text(vocabulary == null ? '测词汇量' : '词汇量 ≈ $vocabulary'),
+            ),
+          ],
+        ),
         body: ListView(
           key: const ValueKey<String>('home-page-scroll'),
           padding: EdgeInsets.all(pagePadding),

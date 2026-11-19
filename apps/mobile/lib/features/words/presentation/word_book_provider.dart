@@ -9,6 +9,8 @@ import '../data/offline_word_dictionary.dart';
 import '../domain/sm2_scheduler.dart';
 import '../domain/vocab_card_kind.dart';
 
+import 'vocabulary_placement_provider.dart';
+
 export '../domain/vocab_card_kind.dart';
 
 const String _wordBookStorageKey = 'word_book_v1';
@@ -985,12 +987,19 @@ class WordBookNotifier extends Notifier<List<WordEntry>> {
   Future<WordEntry?> reviewWithGrade(String word, Sm2Grade grade) async {
     const Sm2Scheduler scheduler = Sm2Scheduler();
     WordEntry? updated;
+    final VocabularyPlacement placement = ref.read(vocabularyPlacementProvider.notifier);
+    final String account = placement.accountKey;
+    bool newlyKnown = false;
     state = state
         .map((WordEntry entry) {
           if (entry.word != word) {
             return entry;
           }
           final Sm2State next = scheduler.review(entry.sm2, grade);
+          newlyKnown = entry.kind == VocabCardKind.word &&
+              entry.mastery.index < WordMastery.known.index &&
+              next.mastery.index >= WordMastery.known.index &&
+              (grade == Sm2Grade.good || grade == Sm2Grade.easy);
           updated = entry.copyWith(
             ease: next.ease,
             intervalDays: next.intervalDays,
@@ -1003,6 +1012,9 @@ class WordBookNotifier extends Notifier<List<WordEntry>> {
         })
         .toList(growable: false);
     await _persist();
+    if (newlyKnown) {
+      await placement.recordLearnedWord(word, accountAtReview: account);
+    }
     await _bumpStreak();
     return updated;
   }

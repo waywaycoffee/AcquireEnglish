@@ -14,9 +14,22 @@ final vocabularyPlacementProvider =
       VocabularyPlacement.new,
     );
 
-final recommendedWordsProvider = Provider<Set<String>>((Ref ref) {
+final predictedVocabularyProvider = Provider<int?>((Ref ref) {
   final PlacementRow profile = ref.watch(vocabularyPlacementProvider);
-  return (profile['words'] as List<dynamic>? ?? const <dynamic>[])
+  final int? estimate = profile['estimate'] as int?;
+  if (estimate == null) return null;
+  final List<dynamic> learned =
+      profile['learnedWords'] as List<dynamic>? ?? const <dynamic>[];
+  return estimate + learned.length;
+});
+
+final recommendedWordsProvider = Provider<Set<String>>((Ref ref) {
+  final Object? words = ref.watch(
+    vocabularyPlacementProvider.select(
+      (PlacementRow profile) => profile['words'],
+    ),
+  );
+  return (words as List<dynamic>? ?? const <dynamic>[])
       .cast<PlacementRow>()
       .map((PlacementRow row) => row['word'] as String)
       .toSet();
@@ -59,6 +72,7 @@ class VocabularyPlacement extends Notifier<PlacementRow> {
     if (words.isEmpty) throw StateError('推荐词库为空');
     final PlacementRow result = <String, dynamic>{
       'estimate': estimate,
+      'testedAt': DateTime.now().toUtc().toIso8601String(),
       'start': start,
       'words': words,
     };
@@ -68,6 +82,44 @@ class VocabularyPlacement extends Notifier<PlacementRow> {
     }
     if (_key == key) state = result;
   }
+
+  Future<void> recordLearnedWord(
+    String rawWord, {
+    DateTime? previouslyLearnedAt,
+    String? accountAtReview,
+  }) async {
+    if (state['estimate'] == null) return;
+    final String key = _key;
+    if (accountAtReview != null && key != accountAtReview) return;
+    final DateTime? testedAt = DateTime.tryParse(
+      state['testedAt'] as String? ?? '',
+    );
+    if (previouslyLearnedAt != null &&
+        (testedAt == null || previouslyLearnedAt.isBefore(testedAt))) {
+      return;
+    }
+    final String word = rawWord.trim().toLowerCase().replaceAll('’', "'");
+    if (!RegExp(r"^[a-z]+(?:[-'][a-z]+)*$").hasMatch(word)) return;
+    final Set<String> learned = <String>{
+      ...(state['learnedWords'] as List<dynamic>? ?? const <dynamic>[])
+          .cast<String>(),
+    };
+    if (!learned.add(word)) return;
+    final PlacementRow result = <String, dynamic>{
+      ...state,
+      'learnedWords': learned.toList(),
+    };
+    state = result;
+    if (Hive.isBoxOpen('prefs')) {
+      try {
+        await Hive.box<String>('prefs').put(key, jsonEncode(result));
+      } catch (_) {
+        // Updating the estimate must not invalidate a completed review.
+      }
+    }
+  }
+
+  String get accountKey => _key;
 
   Future<List<PlacementRow>> _fetch(
     String endpoint, {

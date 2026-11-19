@@ -102,7 +102,12 @@ reviewSourcesProvider = Provider<List<ReviewSource>>((Ref ref) {
   // append to the persistent order and never jump ahead of waiting items.
   return List<ReviewSource>.unmodifiable(<ReviewSource>[
     for (final PlacementRow row
-        in (ref.watch(vocabularyPlacementProvider)['words'] as List<dynamic>? ??
+        in (ref.watch(
+                      vocabularyPlacementProvider.select(
+                        (PlacementRow profile) => profile['words'],
+                      ),
+                    )
+                    as List<dynamic>? ??
                 const <dynamic>[])
             .cast<PlacementRow>())
       ReviewSource(
@@ -227,12 +232,19 @@ class DailyReviewNotifier extends Notifier<DailyReviewState> {
     fsrs.Rating rating, {
     required int expectedReviews,
   }) async {
+    final VocabularyPlacement placement = ref.read(
+      vocabularyPlacementProvider.notifier,
+    );
+    final String account = placement.accountKey;
+    DateTime? previouslyLearnedAt;
+    ReviewSource? gradedSource;
     await _transaction((DailyReviewState current) {
-      if (!ref
+      gradedSource = ref
           .read(reviewSourcesProvider)
-          .any((ReviewSource source) => source.key == key)) {
-        throw StateError('这条内容已不在收藏中。');
-      }
+          .where((ReviewSource source) => source.key == key)
+          .firstOrNull;
+      if (gradedSource == null) throw StateError('这条内容已不在收藏中。');
+      previouslyLearnedAt = current.records[key]?.firstLearnedAt;
       return current.grade(
         key,
         rating,
@@ -240,6 +252,15 @@ class DailyReviewNotifier extends Notifier<DailyReviewState> {
         expectedReviews: expectedReviews,
       );
     });
+    if (!_disposed &&
+        gradedSource?.kind == ReviewKind.word &&
+        (rating == fsrs.Rating.good || rating == fsrs.Rating.easy)) {
+      await placement.recordLearnedWord(
+        gradedSource!.question,
+        previouslyLearnedAt: previouslyLearnedAt,
+        accountAtReview: account,
+      );
+    }
     if (_disposed || !key.startsWith('phrase:')) return;
     final ReviewRecord record = state.records[key]!;
     // Keep the existing phrase-library due filter consistent with the one
