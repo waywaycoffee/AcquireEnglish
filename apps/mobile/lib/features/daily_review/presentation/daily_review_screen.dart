@@ -23,6 +23,8 @@ import '../../words/presentation/vocabulary_placement_provider.dart';
 import '../../words/domain/word_review_settings.dart';
 import '../../words/presentation/word_review_settings_provider.dart';
 import '../../words/presentation/word_review_settings_sheet.dart';
+import '../../authentication/presentation/account_storage.dart';
+import '../data/missed_review_book.dart';
 import '../domain/daily_review.dart';
 import 'daily_review_provider.dart';
 import 'review_spelling_screen.dart';
@@ -259,6 +261,24 @@ class _DailyReviewScreenState extends ConsumerState<DailyReviewScreen>
       return;
     }
     final List<ReviewRecord> due = <ReviewRecord>[...plan.due];
+    final Set<String> activeKeys = sources
+        .map((ReviewSource source) => source.key)
+        .toSet();
+    final List<String> missedPriority = MissedReviewBook(
+      account: ref.read(studyAccountProvider),
+    ).prioritize(activeKeys);
+    if (missedPriority.isNotEmpty) {
+      due.sort((ReviewRecord a, ReviewRecord b) {
+        final int ai = missedPriority.indexOf(a.key);
+        final int bi = missedPriority.indexOf(b.key);
+        final bool aMissed = ai >= 0;
+        final bool bMissed = bi >= 0;
+        if (aMissed && bMissed) return ai.compareTo(bi);
+        if (aMissed) return -1;
+        if (bMissed) return 1;
+        return a.order.compareTo(b.order);
+      });
+    }
     final List<ReviewRecord> fresh = plan.waiting
         .take(plan.newAvailable)
         .toList();
@@ -1071,6 +1091,11 @@ class _DailyReviewScreenState extends ConsumerState<DailyReviewScreen>
                       _markUnknown(source);
                     } else {
                       _missedKeys.add(source.key);
+                      unawaited(
+                        MissedReviewBook(
+                          account: ref.read(studyAccountProvider),
+                        ).markMissed(source.key),
+                      );
                       _advanceCard(source.key);
                     }
                   },

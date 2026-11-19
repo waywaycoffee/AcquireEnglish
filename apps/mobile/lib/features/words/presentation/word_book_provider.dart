@@ -1148,6 +1148,9 @@ class WordBookNotifier extends Notifier<List<WordEntry>> {
     await _persist();
   }
 
+  /// Public wrapper so FSRS grading can keep the words-page streak accurate.
+  Future<void> bumpReviewStreak() => _bumpStreak();
+
   int reviewStreak() {
     if (!Hive.isBoxOpen('prefs')) {
       return 0;

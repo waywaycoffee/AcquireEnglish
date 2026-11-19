@@ -9,10 +9,11 @@ import 'package:hive_ce/hive.dart';
 
 import '../../authentication/presentation/account_storage.dart';
 import '../../authentication/presentation/auth_session.dart';
-import '../../sync/data/acquire_api_client.dart';
 import '../../phrases/presentation/phrase_book_provider.dart';
-import '../../words/presentation/word_book_provider.dart';
+import '../../sync/data/acquire_api_client.dart';
 import '../../words/presentation/vocabulary_placement_provider.dart';
+import '../../words/presentation/word_book_provider.dart';
+import '../data/missed_review_book.dart';
 import '../domain/daily_review.dart';
 
 final Provider<DateTime Function()> reviewClockProvider =
@@ -449,6 +450,16 @@ class DailyReviewNotifier extends Notifier<DailyReviewState> {
     });
     if (_disposed || generation != _generation) return;
     scheduleCloudBackup();
+    final MissedReviewBook missed = MissedReviewBook(
+      account: ref.read(studyAccountProvider),
+    );
+    if (rating == fsrs.Rating.again) {
+      await missed.markMissed(key);
+    } else if (rating == fsrs.Rating.good || rating == fsrs.Rating.easy) {
+      await missed.clearKey(key);
+    }
+    // Keep the words-page streak in sync with the authoritative FSRS path.
+    await ref.read(wordBookProvider.notifier).bumpReviewStreak();
     if (!_disposed &&
         gradedSource?.kind == ReviewKind.word &&
         (rating == fsrs.Rating.good || rating == fsrs.Rating.easy)) {

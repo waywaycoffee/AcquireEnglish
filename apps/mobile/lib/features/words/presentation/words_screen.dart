@@ -1,5 +1,3 @@
-import 'vocabulary_placement_provider.dart';
-import '../../daily_review/presentation/daily_review_provider.dart';
 import 'dart:async';
 
 import 'package:alphabet_list_view/alphabet_list_view.dart';
@@ -9,12 +7,18 @@ import 'package:go_router/go_router.dart';
 
 import '../../../router/app_router.dart';
 import '../../anki_export/presentation/anki_export_sheet.dart';
+import '../../authentication/presentation/account_storage.dart';
+import '../../daily_review/data/missed_review_book.dart';
+import '../../daily_review/domain/daily_review.dart';
+import '../../daily_review/presentation/daily_review_provider.dart';
+import '../../daily_review/presentation/fsrs_word_status.dart';
 import '../../navigation/presentation/navigation_destination.dart';
 import '../../shared/presentation/pad/app_design_tokens.dart';
 import '../../shared/presentation/pad/pad_scaffold.dart';
 import '../../shared/presentation/pad/pad_top_bar.dart';
 import '../../shared/presentation/pill_segmented_control.dart';
 import '../domain/word_review_settings.dart';
+import 'vocabulary_placement_provider.dart';
 import 'word_book_provider.dart';
 import 'word_detail_screen.dart';
 import 'word_review_settings_provider.dart';
@@ -28,6 +32,15 @@ class WordsScreen extends ConsumerStatefulWidget {
 }
 
 class _WordsScreenState extends ConsumerState<WordsScreen> {
+  Future<void> _startTodayReview(int newLimit) async {
+    final DailyReviewState state = ref.read(dailyReviewProvider);
+    if (state.dailyNewLimit != newLimit) {
+      await ref.read(dailyReviewProvider.notifier).setDailyNewLimit(newLimit);
+    }
+    if (!mounted) return;
+    context.push(SGRoute.reviewSession.route);
+  }
+
   String _query = '';
   bool _favoritesOnly = true;
 
@@ -124,11 +137,24 @@ class _WordsScreenState extends ConsumerState<WordsScreen> {
     final List<WordEntry> entries = ref.watch(wordBookProvider);
     final WordReviewSettings reviewSettings =
         ref.watch(wordReviewSettingsProvider);
-    final ({int dueReviews, int dueNew}) due =
-        ref.read(wordBookProvider.notifier).dueCounts();
-    final int planNew = due.dueNew.clamp(0, reviewSettings.dailyNewLimit);
-    final int planReview =
-        due.dueReviews.clamp(0, reviewSettings.dailyReviewLimit);
+    final DailyReviewState reviewState = ref.watch(dailyReviewProvider);
+    final List<ReviewSource> wordSources = ref
+        .watch(reviewSourcesProvider)
+        .where((ReviewSource s) => s.key.startsWith('word:'))
+        .toList(growable: false);
+    final DateTime now = DateTime.now();
+    final int newLimit = reviewSettings.dailyNewLimit.clamp(0, 100);
+    final ReviewPlan wordPlan = reviewState
+        .withLimit(newLimit)
+        .plan(wordSources, now);
+    final int planNew = wordPlan.newAvailable;
+    final int planReview = wordPlan.due.length
+        .clamp(0, reviewSettings.dailyReviewLimit)
+        .toInt();
+    final int streak = ref.read(wordBookProvider.notifier).reviewStreak();
+    final int missedCount = MissedReviewBook(
+      account: ref.watch(studyAccountProvider),
+    ).keys().where((String key) => key.startsWith('word:')).length;
     final List<WordEntry> filtered = entries
         .where((WordEntry entry) {
           return (!_favoritesOnly || entry.favorite) &&
@@ -152,10 +178,7 @@ class _WordsScreenState extends ConsumerState<WordsScreen> {
             icon: const Icon(Icons.tune_rounded),
           ),
           TextButton.icon(
-            onPressed: () {
-              // Formal scheduler is FSRS daily review (not legacy SM-2).
-              context.push(SGRoute.reviewSession.route);
-            },
+            onPressed: () => unawaited(_startTodayReview(newLimit)),
             icon: const Icon(Icons.style_rounded),
             label: const Text('今日背词'),
           ),
@@ -177,6 +200,7 @@ class _WordsScreenState extends ConsumerState<WordsScreen> {
                   favorites: entries
                       .where((WordEntry item) => item.favorite)
                       .length,
+                  streak: streak,
                 ),
                 const SizedBox(height: 12),
                 Wrap(
@@ -196,16 +220,25 @@ class _WordsScreenState extends ConsumerState<WordsScreen> {
                         '${SGRoute.reviewSession.route}?practice=1&kind=word',
                       ),
                     ),
+                    if (missedCount > 0)
+                      ActionChip(
+                        avatar: const Icon(Icons.replay_rounded, size: 18),
+                        label: Text('错词本 $missedCount'),
+                        onPressed: () => context.push(
+                          '${SGRoute.reviewSession.route}?practice=1&kind=word',
+                        ),
+                      ),
                   ],
                 ),
-                if (MediaQuery.sizeOf(context).width >= 600)
+                const SizedBox(height: 12),
                 _TodayPlanCard(
                   planNew: planNew,
                   planReview: planReview,
-                  newLimit: reviewSettings.dailyNewLimit,
+                  newLimit: newLimit,
                   reviewLimit: reviewSettings.dailyReviewLimit,
                   modes: reviewSettings.orderedModes,
-                  onStart: () => context.push(SGRoute.reviewSession.route),
+                  streak: streak,
+                  onStart: () => unawaited(_startTodayReview(newLimit)),
                   onSettings: () => showWordReviewSettingsSheet(context),
                 ),
                 const SizedBox(height: 20),
@@ -358,6 +391,7 @@ class _TodayPlanCard extends StatelessWidget {
     required this.newLimit,
     required this.reviewLimit,
     required this.modes,
+    required this.streak,
     required this.onStart,
     required this.onSettings,
   });
@@ -367,11 +401,14 @@ class _TodayPlanCard extends StatelessWidget {
   final int newLimit;
   final int reviewLimit;
   final List<WordPracticeMode> modes;
+  final int streak;
   final VoidCallback onStart;
   final VoidCallback onSettings;
 
   @override
   Widget build(BuildContext context) {
+    final int remaining = planNew + planReview;
+    final bool cleared = remaining == 0;
     final String modeText = modes.isEmpty
         ? '认记'
         : modes.map((WordPracticeMode m) => m.label).join(' · ');
@@ -390,7 +427,7 @@ class _TodayPlanCard extends StatelessWidget {
             children: <Widget>[
               Expanded(
                 child: Text(
-                  '今日艾宾浩斯计划',
+                  cleared ? '今日背词已清完' : '今日背词',
                   style: TextStyle(
                     fontWeight: FontWeight.w900,
                     fontSize: 16,
@@ -398,6 +435,18 @@ class _TodayPlanCard extends StatelessWidget {
                   ),
                 ),
               ),
+              if (streak > 0)
+                Padding(
+                  padding: const EdgeInsets.only(right: 8),
+                  child: Text(
+                    '连续 $streak 天',
+                    style: TextStyle(
+                      color: AppDesignTokens.brandGreenDark,
+                      fontWeight: FontWeight.w800,
+                      fontSize: 13,
+                    ),
+                  ),
+                ),
               TextButton(
                 onPressed: onSettings,
                 child: const Text('设置'),
@@ -405,7 +454,10 @@ class _TodayPlanCard extends StatelessWidget {
             ],
           ),
           Text(
-            '待新学 $planNew/$newLimit · 待复习 $planReview/$reviewLimit',
+            cleared
+                ? '新学与复习都完成了，明天再来。'
+                : '待新学 $planNew/$newLimit · 待复习 $planReview'
+                    '${reviewLimit < 500 ? '/$reviewLimit' : ''}',
             style: TextStyle(
               color: AppDesignTokens.textSecondary,
               fontWeight: FontWeight.w700,
@@ -413,7 +465,7 @@ class _TodayPlanCard extends StatelessWidget {
           ),
           const SizedBox(height: 4),
           Text(
-            '练习：$modeText',
+            'FSRS 间隔复习 · $modeText',
             style: TextStyle(color: AppDesignTokens.textSecondary),
           ),
           const SizedBox(height: 12),
@@ -421,10 +473,10 @@ class _TodayPlanCard extends StatelessWidget {
             width: double.infinity,
             child: FilledButton.icon(
               onPressed: onStart,
-              icon: const Icon(Icons.play_arrow_rounded),
-              label: Text(
-                planNew + planReview == 0 ? '查看今日背词' : '开始今日背词',
+              icon: Icon(
+                cleared ? Icons.check_circle_outline : Icons.play_arrow_rounded,
               ),
+              label: Text(cleared ? '再看一眼今日计划' : '一键开始（$remaining）'),
               style: FilledButton.styleFrom(
                 backgroundColor: AppDesignTokens.brandGreenDark,
                 foregroundColor: Colors.white,
@@ -443,10 +495,12 @@ class _Summary extends StatelessWidget {
     required this.entries,
     required this.videos,
     required this.favorites,
+    required this.streak,
   });
   final int entries;
   final int videos;
   final int favorites;
+  final int streak;
 
   @override
   Widget build(BuildContext context) => Container(
@@ -460,6 +514,7 @@ class _Summary extends StatelessWidget {
         _Metric(value: '$entries', label: '已见单词'),
         _Metric(value: '$videos', label: '覆盖视频'),
         _Metric(value: '$favorites', label: '收藏单词'),
+        _Metric(value: '$streak', label: '连续天'),
       ],
     ),
   );
@@ -513,11 +568,17 @@ class _WordCard extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final int reviews = entry.favorite
-        ? ref.watch(dailyReviewProvider.select(
-            (value) => value.records['word:${entry.word}']?.reviews ?? 0,
-          ))
-        : 0;
+    final ReviewRecord? record = entry.favorite
+        ? ref.watch(
+            dailyReviewProvider.select(
+              (DailyReviewState value) => value.records['word:${entry.word}'],
+            ),
+          )
+        : null;
+    final int reviews = record?.reviews ?? 0;
+    final FsrsWordPhase phase = entry.favorite
+        ? fsrsWordPhase(record, DateTime.now())
+        : FsrsWordPhase.fresh;
     final String translation =
         entry.definitionCn ?? entry.offlineDefinitionCn ?? '暂无释义';
     // Material (not DecoratedBox) so InkWell splash paints correctly.
@@ -536,13 +597,40 @@ class _WordCard extends ConsumerWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: <Widget>[
-                    Text(
-                      entry.word,
-                      style: TextStyle(
-                        fontSize: 17,
-                        fontWeight: FontWeight.w900,
-                        color: AppDesignTokens.textPrimary,
-                      ),
+                    Row(
+                      children: <Widget>[
+                        Flexible(
+                          child: Text(
+                            entry.word,
+                            style: TextStyle(
+                              fontSize: 17,
+                              fontWeight: FontWeight.w900,
+                              color: AppDesignTokens.textPrimary,
+                            ),
+                          ),
+                        ),
+                        if (entry.favorite) ...<Widget>[
+                          const SizedBox(width: 8),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 2,
+                            ),
+                            decoration: BoxDecoration(
+                              color: AppDesignTokens.softGray,
+                              borderRadius: BorderRadius.circular(999),
+                            ),
+                            child: Text(
+                              fsrsWordPhaseLabel(phase),
+                              style: TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w800,
+                                color: AppDesignTokens.textSecondary,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ],
                     ),
                     const SizedBox(height: 2),
                     Text(
