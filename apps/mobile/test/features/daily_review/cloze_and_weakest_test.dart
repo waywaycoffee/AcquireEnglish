@@ -1,5 +1,6 @@
 import 'package:common_learn_english/features/daily_review/domain/cloze_sentence.dart';
 import 'package:common_learn_english/features/daily_review/domain/weakest_rating.dart';
+import 'package:common_learn_english/features/player/domain/pronunciation_assessment.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:fsrs/fsrs.dart' as fsrs;
 
@@ -34,5 +35,14 @@ void main() {
       ratingFromSpellResult(correct: true, hadMistake: false),
       fsrs.Rating.good,
     );
+  });
+
+  test('word-only pronunciation target skips video validation', () {
+    final PronunciationAssessmentTarget target =
+        PronunciationAssessmentTarget.wordOnly('hello');
+    expect(target.hasVideoClip, isFalse);
+    expect(target.validationError, isNull);
+    expect(ratingFromPronunciationScore(90), fsrs.Rating.easy);
+    expect(ratingFromPronunciationScore(50), fsrs.Rating.again);
   });
 }

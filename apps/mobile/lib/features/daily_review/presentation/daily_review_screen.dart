@@ -24,6 +24,9 @@ import '../../words/domain/word_review_settings.dart';
 import '../../words/presentation/word_review_settings_provider.dart';
 import '../../words/presentation/word_review_settings_sheet.dart';
 import '../../authentication/presentation/account_storage.dart';
+import '../../player/domain/pronunciation_assessment.dart';
+import '../../player/presentation/widgets/pronunciation_assessment_dialog.dart';
+import '../../settings/data/pronunciation_credentials.dart';
 import '../data/missed_review_book.dart';
 import '../data/word_encounter_store.dart';
 import '../domain/cloze_sentence.dart';
@@ -1076,9 +1079,19 @@ class _DailyReviewScreenState extends ConsumerState<DailyReviewScreen>
                 icon: const Icon(Icons.volume_up_rounded),
                 label: const Text('听示范发音'),
               ),
+              const SizedBox(height: 10),
+              FilledButton.icon(
+                key: const Key('daily-review-speak-assess'),
+                onPressed: _saving
+                    ? null
+                    : () => unawaited(_openSpeakAssessment(source, record)),
+                style: _primaryButtonStyle,
+                icon: const Icon(Icons.mic_rounded),
+                label: const Text('录音并云端打分'),
+              ),
               const SizedBox(height: 8),
               const Text(
-                '跟读一遍后，按真实把握自评（评分会与前面关卡取最弱一环写入 FSRS）。',
+                '优先用腾讯云跟读评分；未配置密钥时可下方自评。分数会与前面关卡取最弱一环写入 FSRS。',
                 textAlign: TextAlign.center,
                 style: TextStyle(
                   fontSize: 12,
@@ -1419,6 +1432,37 @@ class _DailyReviewScreenState extends ConsumerState<DailyReviewScreen>
           onListen: () => unawaited(_playWord(source, silent: true)),
         ),
       ),
+    );
+  }
+
+  Future<void> _openSpeakAssessment(
+    ReviewSource source,
+    ReviewRecord record,
+  ) async {
+    _stopSpeech();
+    PronunciationCredentials credentials = const PronunciationCredentials();
+    try {
+      credentials = await ref.read(pronunciationCredentialsProvider.future);
+    } catch (_) {
+      credentials = const PronunciationCredentials();
+    }
+    if (!mounted) return;
+    if (!credentials.isComplete) {
+      _message('请先在「设置 → 跟读评测」填写腾讯云密钥，或使用下方自评。');
+      return;
+    }
+    final PronunciationAssessmentTarget target =
+        PronunciationAssessmentTarget.wordOnly(source.question);
+    await showPronunciationAssessmentDialog(
+      context,
+      target: target,
+      episodeId: source.episodeId,
+      onResult: (PronunciationAssessmentResult result) {
+        final fsrs.Rating rating = ratingFromPronunciationScore(
+          result.suggestedScore ?? result.accuracy,
+        );
+        unawaited(_grade(source, record, rating));
+      },
     );
   }
 

@@ -161,6 +161,9 @@ Verified example (2026-11-15 ~00:14 UTC+8): `connection_state=connected`, tracks
 - [ ] LiveTalking / avatar URL: `http://100.115.252.55:8010` (Tailscale) *(manual)*
 - [ ] Login: email works; SMS uses mock code **123456**; WeChat mock login works without real App secrets *(manual)*
 - [ ] Preferences: Bilibili cookie / ASR key fields save without displaying secrets again *(manual)*
+- [ ] 跟读评测：设置页保存腾讯云 SOE 密钥后，播放器跟读可出分 *(manual — 见 deploy/TENCENT_SOE_SETUP.md)*
+- [ ] 背单词：开启拼写/跟读关卡；Cloze 原句卡；「录音并云端打分」可出分并进入下一关 *(manual)*
+- [ ] 单词页：今日计划 FSRS 数字、错词本入口、近 7 日热力 *(manual)*
 - [ ] No crash on cold start / resume *(manual)*
 
 ---

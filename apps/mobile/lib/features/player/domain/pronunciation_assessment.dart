@@ -10,19 +10,35 @@ class PronunciationAssessmentTarget {
     required this.videoDuration,
   });
 
+  /// Word-card speak stage: SOE scores [text] without extracting video audio.
+  factory PronunciationAssessmentTarget.wordOnly(String word) {
+    return PronunciationAssessmentTarget(
+      text: word.trim(),
+      videoSource: '',
+      startMs: 0,
+      endMs: 0,
+      videoDuration: Duration.zero,
+    );
+  }
+
   final String text;
   final String videoSource;
   final int startMs;
   final int endMs;
   final Duration videoDuration;
 
+  bool get hasVideoClip => videoSource.trim().isNotEmpty;
+
   String? get validationError {
-    if (text.trim().isEmpty || !_containsEnglish(text)) return '当前句没有可评测的英文字幕。';
+    if (text.trim().isEmpty || !_containsEnglish(text)) {
+      return hasVideoClip ? '当前句没有可评测的英文字幕。' : '没有可评测的英文单词。';
+    }
+    if (wordCount > 120) return '这句超过 120 个英文单词，暂不支持评测。';
+    if (!hasVideoClip) return null;
     if (startMs < 0 || endMs <= startMs) return '字幕时间无效，暂时无法评测。';
     if (videoDuration <= Duration.zero) return '视频时长暂不可用。';
     if (startMs >= videoDuration.inMilliseconds) return '字幕超出视频范围。';
     if (endMs - startMs > 60000) return '单句片段超过 60 秒，暂不支持评测。';
-    if (wordCount > 120) return '这句超过 120 个英文单词，暂不支持评测。';
     return null;
   }
 

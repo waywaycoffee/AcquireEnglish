@@ -114,13 +114,38 @@ pronunciationCredentialsProvider =
       PronunciationCredentials
     >(PronunciationCredentialsNotifier.new);
 
+/// Optional compile-time inject (CI / release scripts), never commit real values.
+PronunciationCredentials pronunciationCredentialsFromEnvironment() {
+  const String appId = String.fromEnvironment('TENCENT_SOE_APP_ID');
+  const String secretId = String.fromEnvironment('TENCENT_SOE_SECRET_ID');
+  const String secretKey = String.fromEnvironment('TENCENT_SOE_SECRET_KEY');
+  return PronunciationCredentials(
+    appId: appId,
+    secretId: secretId,
+    secretKey: secretKey,
+  );
+}
+
 class PronunciationCredentialsNotifier
     extends AsyncNotifier<PronunciationCredentials> {
   Future<void> _writeQueue = Future<void>.value();
 
   @override
-  Future<PronunciationCredentials> build() {
-    return ref.read(pronunciationCredentialStoreProvider).read();
+  Future<PronunciationCredentials> build() async {
+    final PronunciationCredentialStore store = ref.read(
+      pronunciationCredentialStoreProvider,
+    );
+    final PronunciationCredentials stored = await store.read();
+    if (stored.isComplete) return stored;
+    final PronunciationCredentials fromEnv =
+        pronunciationCredentialsFromEnvironment();
+    if (!fromEnv.isComplete) return stored;
+    try {
+      await store.write(fromEnv);
+    } catch (_) {
+      return fromEnv;
+    }
+    return fromEnv;
   }
 
   Future<void> saveCredentials({

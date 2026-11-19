@@ -147,7 +147,8 @@ class _PronunciationSettingsCardState
     if (credentials.value?.isComplete ?? false) {
       return '密钥已保存在$_storageLabel中。';
     }
-    return '尚未配置；保存后即可启用评分。';
+    return '尚未配置；保存后即可启用评分。也可在构建时注入 '
+        'TENCENT_SOE_APP_ID / SECRET_ID / SECRET_KEY。';
   }
 
   void _setControllers(PronunciationCredentials value) {

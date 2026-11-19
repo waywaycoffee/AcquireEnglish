@@ -531,6 +531,53 @@ class _WeekStatsCard extends StatelessWidget {
             style: TextStyle(color: AppDesignTokens.textSecondary),
           ),
           const SizedBox(height: 12),
+          Text(
+            '热力',
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w800,
+              color: AppDesignTokens.textSecondary,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Row(
+            children: <Widget>[
+              for (final ReviewDayStat day in stats.days)
+                Expanded(
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 3),
+                    child: AspectRatio(
+                      aspectRatio: 1,
+                      child: Tooltip(
+                        message:
+                            '${day.dayKey} · 新学 ${day.newLearned} · 复习 ${day.reviews}',
+                        child: DecoratedBox(
+                          decoration: BoxDecoration(
+                            color: _heatColor(day.total, maxTotal),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Center(
+                            child: Text(
+                              day.dayKey.length >= 10
+                                  ? day.dayKey.substring(8)
+                                  : day.dayKey,
+                              style: TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w800,
+                                color: day.total == 0
+                                    ? const Color(0xFF8A8A8A)
+                                    : Colors.white,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+            ],
+          ),
+          const SizedBox(height: 14),
           SizedBox(
             height: 56,
             child: Row(
@@ -554,9 +601,7 @@ class _WeekStatsCard extends StatelessWidget {
                                 widthFactor: 1,
                                 child: DecoratedBox(
                                   decoration: BoxDecoration(
-                                    color: day.total == 0
-                                        ? const Color(0xFFE8E8E8)
-                                        : AppDesignTokens.brandGreenDark,
+                                    color: _heatColor(day.total, maxTotal),
                                     borderRadius: BorderRadius.circular(6),
                                   ),
                                 ),
@@ -565,9 +610,7 @@ class _WeekStatsCard extends StatelessWidget {
                           ),
                           const SizedBox(height: 4),
                           Text(
-                            day.dayKey.length >= 10
-                                ? day.dayKey.substring(8)
-                                : day.dayKey,
+                            '${day.total}',
                             style: const TextStyle(
                               fontSize: 10,
                               color: Color(0xFF626262),
@@ -583,6 +626,16 @@ class _WeekStatsCard extends StatelessWidget {
         ],
       ),
     );
+  }
+
+  static Color _heatColor(int total, int maxTotal) {
+    if (total <= 0) return const Color(0xFFE8E8E8);
+    final double t = (total / maxTotal).clamp(0.2, 1.0);
+    return Color.lerp(
+      const Color(0xFFB7E38C),
+      AppDesignTokens.brandGreenDark,
+      t,
+    )!;
   }
 }
 

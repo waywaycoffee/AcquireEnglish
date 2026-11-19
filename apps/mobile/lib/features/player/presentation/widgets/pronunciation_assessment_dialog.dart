@@ -20,13 +20,17 @@ Future<void> showPronunciationAssessmentDialog(
   BuildContext context, {
   required PronunciationAssessmentTarget target,
   String? episodeId,
+  ValueChanged<PronunciationAssessmentResult>? onResult,
 }) {
   return showDialog<void>(
     context: context,
     useSafeArea: false,
     barrierColor: Colors.transparent,
-    builder: (BuildContext context) =>
-        PronunciationAssessmentDialog(target: target, episodeId: episodeId),
+    builder: (BuildContext context) => PronunciationAssessmentDialog(
+      target: target,
+      episodeId: episodeId,
+      onResult: onResult,
+    ),
   );
 }
 
