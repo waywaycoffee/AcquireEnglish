@@ -14,13 +14,17 @@ def test_keywords_for_preferences_maps_tags_and_level():
 
 
 def test_keywords_for_preferences_maps_theme_tags():
-    pairs = keywords_for_preferences("A2", ["games", "food", "travel", "vlog", "science"])
+    pairs = keywords_for_preferences(
+        "A2", ["games", "food", "travel", "vlog", "science", "drama", "sports"]
+    )
     assert pairs == [
         ("games", "英语 游戏 初级英语"),
         ("food", "英语 美食 初级英语"),
         ("travel", "英语 旅游 初级英语"),
         ("vlog", "english vlog 初级英语"),
         ("science", "科普 英语 初级英语"),
+        ("drama", "英语 美剧 初级英语"),
+        ("sports", "英语 体育 初级英语"),
     ]
 
 

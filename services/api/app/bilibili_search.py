@@ -26,6 +26,8 @@ TAG_KEYWORDS: dict[str, str] = {
     "vlog": "english vlog",
     "tech": "英语 科技",
     "science": "科普 英语",
+    "drama": "英语 美剧",
+    "sports": "英语 体育",
 }
 
 LEVEL_HINTS: dict[str, str] = {

@@ -17,6 +17,8 @@ const TAGS: { id: string; label: string }[] = [
   { id: "vlog", label: "Vlog" },
   { id: "tech", label: "科技" },
   { id: "science", label: "科普" },
+  { id: "drama", label: "美剧" },
+  { id: "sports", label: "体育" },
 ];
 
 export default function HomePage() {
