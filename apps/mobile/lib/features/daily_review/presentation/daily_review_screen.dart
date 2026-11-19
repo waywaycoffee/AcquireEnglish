@@ -22,9 +22,11 @@ class DailyReviewScreen extends ConsumerStatefulWidget {
     super.key,
     this.session = false,
     this.practice = false,
+    this.practiceKind,
   });
   final bool session;
   final bool practice;
+  final ReviewKind? practiceKind;
   @override
   ConsumerState<DailyReviewScreen> createState() => _DailyReviewScreenState();
 }
@@ -36,6 +38,7 @@ class _DailyReviewScreenState extends ConsumerState<DailyReviewScreen>
   String? _currentKey;
   List<String>? _deckKeys;
   final Set<String> _completedKeys = <String>{};
+  final Set<String> _missedKeys = <String>{};
   bool _forward = true;
   bool _revealed = false;
   bool _saving = false;
@@ -79,7 +82,7 @@ class _DailyReviewScreenState extends ConsumerState<DailyReviewScreen>
         title: widget.session ? (widget.practice ? '自由复习' : '正在复习') : '每日复习',
         description: widget.session
             ? (widget.practice ? '随时再练，不改变复习计划。' : null)
-            : '单词和短语，一起慢慢记牢。',
+            : '复习单词、短语和收藏句子。',
         leading: widget.session
             ? PadBackButton(onPressed: _leaveSession, tooltip: '返回每日概览')
             : null,
@@ -182,6 +185,16 @@ class _DailyReviewScreenState extends ConsumerState<DailyReviewScreen>
     DateTime now,
   ) {
     if (_deckKeys != null) return;
+    final ReviewKind? kind = widget.practiceKind;
+    if (widget.practice && kind != null) {
+      _deckKeys = sources
+          .where((ReviewSource source) => source.kind == kind)
+          .map((ReviewSource source) => source.key)
+          .where(state.records.containsKey)
+          .toList();
+      _currentKey = _deckKeys!.firstOrNull;
+      return;
+    }
     if (widget.practice) {
       _deckKeys = _practiceRecords(
         state,
@@ -368,12 +381,27 @@ class _DailyReviewScreenState extends ConsumerState<DailyReviewScreen>
                                   style: _primaryButtonStyle,
                                   child: const Text('返回每日概览'),
                                 ),
+                                if (widget.practice &&
+                                    keys.any(_missedKeys.contains))
+                                  TextButton(
+                                    onPressed: () => setState(() {
+                                      _deckKeys = keys
+                                          .where(_missedKeys.contains)
+                                          .toList();
+                                      _currentKey = _deckKeys!.first;
+                                      _missedKeys.clear();
+                                      _completedKeys.clear();
+                                      _revealed = false;
+                                    }),
+                                    child: const Text('重练没记住的卡片'),
+                                  ),
                                 if (widget.practice ||
                                     plan.next != null) ...<Widget>[
                                   const SizedBox(height: 12),
                                   TextButton(
                                     onPressed: () => setState(() {
                                       _deckKeys = null;
+                                      _missedKeys.clear();
                                       _completedKeys.clear();
                                       _revealed = false;
                                     }),
@@ -618,6 +646,12 @@ class _DailyReviewScreenState extends ConsumerState<DailyReviewScreen>
   ) {
     final bool empty = sources.isEmpty;
     final bool done = plan.next == null;
+    final Map<ReviewKind, int> counts = <ReviewKind, int>{
+      for (final ReviewKind kind in ReviewKind.values)
+        kind: sources
+            .where((ReviewSource source) => source.kind == kind)
+            .length,
+    };
     final bool canPractice = _practiceRecords(state, sources, now).isNotEmpty;
     final String title = empty
         ? '把想记住的表达带到这里'
@@ -710,6 +744,23 @@ class _DailyReviewScreenState extends ConsumerState<DailyReviewScreen>
               label: const Text('调整每天新学数量'),
             ),
           ],
+          if (!empty) ...<Widget>[
+            const SizedBox(height: 20),
+            Wrap(
+              spacing: 8,
+              children: <Widget>[
+                for (final ReviewKind kind in ReviewKind.values)
+                  ActionChip(
+                    label: Text('${kind.label} ${counts[kind]}'),
+                    onPressed: counts[kind] == 0
+                        ? null
+                        : () => context.push(
+                            '${SGRoute.reviewSession.route}?practice=1&kind=${kind.name}',
+                          ),
+                  ),
+              ],
+            ),
+          ],
         ],
       ),
     );
@@ -746,7 +797,7 @@ class _DailyReviewScreenState extends ConsumerState<DailyReviewScreen>
               children: <Widget>[
                 Expanded(
                   child: Text(
-                    '${source.kind == ReviewKind.word ? '单词' : '短语'} · ${widget.practice
+                    '${source.kind.label} · ${widget.practice
                         ? '自由练习'
                         : record.isNew
                         ? '首次学习'
@@ -767,7 +818,7 @@ class _DailyReviewScreenState extends ConsumerState<DailyReviewScreen>
             ),
             const SizedBox(height: 20),
             Text(
-              source.kind == ReviewKind.word ? '想想它的含义，试着说一句' : '试着用英语说出来',
+              source.answer != source.english ? '先回忆中文含义' : '先试着用英语说出来',
               textAlign: TextAlign.center,
               style: const TextStyle(fontSize: 14, color: Color(0xFF626262)),
             ),
@@ -833,7 +884,8 @@ class _DailyReviewScreenState extends ConsumerState<DailyReviewScreen>
               Text(
                 source.answer.trim().isEmpty
                     ? '暂无单词释义，可以结合下方原句回忆，或在单词本补充。'
-                    : source.kind == ReviewKind.phrase
+                    : source.kind != ReviewKind.word &&
+                          source.answer == source.english
                     ? formatSubtitleLetterCase(source.answer, letterCase)
                     : source.answer,
                 style: TextStyle(
@@ -843,7 +895,7 @@ class _DailyReviewScreenState extends ConsumerState<DailyReviewScreen>
                   color: AppDesignTokens.textPrimary,
                 ),
               ),
-              if (source.kind == ReviewKind.word &&
+              if (source.answer != source.english &&
                   source.english.isNotEmpty) ...<Widget>[
                 const SizedBox(height: 16),
                 Text(
@@ -866,7 +918,14 @@ class _DailyReviewScreenState extends ConsumerState<DailyReviewScreen>
                   onPressed: () => _advanceCard(source.key),
                   style: _primaryButtonStyle,
                   icon: const Icon(Icons.check_rounded),
-                  label: const Text('练好了，下一张'),
+                  label: const Text('记得，下一张'),
+                ),
+                OutlinedButton(
+                  onPressed: () {
+                    _missedKeys.add(source.key);
+                    _advanceCard(source.key);
+                  },
+                  child: const Text('没记住，稍后重练'),
                 ),
                 const SizedBox(height: 10),
                 const Text(

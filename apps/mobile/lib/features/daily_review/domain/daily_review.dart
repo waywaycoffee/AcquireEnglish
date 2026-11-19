@@ -2,7 +2,14 @@ import 'dart:math' as math;
 
 import 'package:fsrs/fsrs.dart' as fsrs;
 
-enum ReviewKind { word, phrase }
+enum ReviewKind {
+  word('单词'),
+  phrase('短语'),
+  sentence('收藏句子');
+
+  const ReviewKind(this.label);
+  final String label;
+}
 
 class ReviewSource {
   const ReviewSource({

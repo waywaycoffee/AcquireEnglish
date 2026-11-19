@@ -53,7 +53,11 @@ reviewSourcesProvider = Provider<List<ReviewSource>>((Ref ref) {
     final WordContext? context = occurrence?.contexts.firstOrNull;
     return ReviewSource(
       key: 'word:${word.word}',
-      kind: ReviewKind.word,
+      kind: switch (word.kind) {
+        VocabCardKind.word => ReviewKind.word,
+        VocabCardKind.phrase => ReviewKind.phrase,
+        VocabCardKind.pattern => ReviewKind.sentence,
+      },
       question: word.word,
       answer: (word.definitionCn?.trim().isNotEmpty ?? false)
           ? word.definitionCn!
@@ -75,7 +79,9 @@ reviewSourcesProvider = Provider<List<ReviewSource>>((Ref ref) {
       .map(
         (PhraseEntry phrase) => ReviewSource(
           key: 'phrase:${phrase.id}',
-          kind: ReviewKind.phrase,
+          kind: phrase.episodeId != null || phrase.courseId != null
+              ? ReviewKind.sentence
+              : ReviewKind.phrase,
           question: phrase.chinese.trim().isEmpty
               ? '听原句，尝试用英语复述'
               : phrase.chinese.replaceFirst(RegExp(r' \(生词: .*\)$'), ''),

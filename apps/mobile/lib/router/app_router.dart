@@ -1,3 +1,4 @@
+import '../features/daily_review/domain/daily_review.dart';
 // ignore_for_file: prefer_function_declarations_over_variables
 
 import 'package:flutter/material.dart';
@@ -105,6 +106,12 @@ GoRouter goRouter(Ref ref) => GoRouter(
       builder: (BuildContext context, GoRouterState state) => DailyReviewScreen(
         session: true,
         practice: state.uri.queryParameters['practice'] == '1',
+        practiceKind: ReviewKind.values
+            .where(
+              (ReviewKind kind) =>
+                  kind.name == state.uri.queryParameters['kind'],
+            )
+            .firstOrNull,
       ),
     ).fade(),
     GoRoute(
