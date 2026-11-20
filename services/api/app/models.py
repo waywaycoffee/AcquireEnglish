@@ -634,3 +634,40 @@ class MembershipCoupon(Base):
     kind: Mapped[str] = mapped_column(String(16))
     value: Mapped[int] = mapped_column(Integer)
     used: Mapped[int] = mapped_column(Integer, default=0)
+
+
+class DeskInvite(Base):
+    __tablename__ = "desk_invites"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    sender_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    target_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    status: Mapped[str] = mapped_column(String(16), default="pending")
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class DeskMember(Base):
+    __tablename__ = "desk_members"
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), primary_key=True)
+    desk_id: Mapped[int] = mapped_column(ForeignKey("desk_invites.id", ondelete="CASCADE"), index=True)
+    share_activity: Mapped[int] = mapped_column(Integer, default=0)
+    share_videos: Mapped[int] = mapped_column(Integer, default=0)
+    share_library: Mapped[int] = mapped_column(Integer, default=0)
+
+
+class DeskBlock(Base):
+    __tablename__ = "desk_blocks"
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), primary_key=True)
+    blocked_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), primary_key=True)
+
+
+class DeskLibraryWord(Base):
+    __tablename__ = "desk_library_words"
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), primary_key=True)
+    word: Mapped[str] = mapped_column(String(120), primary_key=True)
+
+
+class DeskLibrarySnapshot(Base):
+    __tablename__ = "desk_library_snapshots"
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), primary_key=True)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())

@@ -88,9 +88,9 @@ class SyllabusBooksNotifier extends Notifier<SyllabusBooksState> {
         // Missing asset in tests — skip.
       }
     }
+    if (!ref.mounted) return;
     final ({List<SyllabusBook> imported, String active, Map<String, Set<String>> learned})
     persisted = _loadPersisted();
-    if (!ref.mounted) return;
     state = SyllabusBooksState(
       builtin: List<SyllabusBook>.unmodifiable(builtin),
       imported: persisted.imported,

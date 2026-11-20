@@ -1546,6 +1546,13 @@ class AcquireApiClient {
         .toList(growable: false);
   }
 
+  Future<Map<String, dynamic>> studyDeskRequest(String method, String path, {Map<String, dynamic>? data, Map<String, dynamic>? query}) async {
+    final Response<dynamic> response = await _dio.request<dynamic>(
+      'api/study-desk$path', options: Options(method: method), data: data, queryParameters: query,
+    );
+    return response.data as Map<String, dynamic>;
+  }
+
   Future<List<SimilarUserDto>> communitySimilarUsers() async {
     final Response<dynamic> response = await _dio.get(
       Endpoints.communitySimilarUsers,
