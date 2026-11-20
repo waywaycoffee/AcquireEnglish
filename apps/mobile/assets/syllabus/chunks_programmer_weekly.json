@@ -1,0 +1,197 @@
+{
+  "id": "chunks_programmer_weekly",
+  "title": "程序员每周十句",
+  "examTag": "WEEKLY",
+  "kind": "pattern",
+  "disclaimer": "整理自 fltenwall/The-English-For-Programmer（MIT）《互联网人的英语私教课》每周一起背10句，致谢原作者与课程。",
+  "words": [
+    {
+      "word": "don t jump to conclusions perhaps it was his daughter he was dancing with",
+      "gloss": "别匆忙下结论，和他跳舞的没准是他女儿呢。"
+    },
+    {
+      "word": "the workers approached the manager with a request for shorter working hours",
+      "gloss": "工人们找经理要求减少工作时间。"
+    },
+    {
+      "word": "his sober approach to the crisis averted a catastrophe",
+      "gloss": "他对危机的冷静处理避免了一场大灾难。"
+    },
+    {
+      "word": "you need to work hard opportunities don t just come out of thin air",
+      "gloss": "你得努力啦，机会不会凭空产生（天上不会掉馅饼）。"
+    },
+    {
+      "word": "social media technologies have given companies access to an unprecedented flood of new analytics metrics and user data",
+      "gloss": "有了社交网络之后，企业获取了空前大量的新分析方法、度量指标和用户数据。"
+    },
+    {
+      "word": "steve jobs was a gifted communicator and he used this skill to capture the attention of millions",
+      "gloss": "乔布斯是一个有天赋的沟通者，他用这种技巧吸引了数百万人的注意力。"
+    },
+    {
+      "word": "apple will unveil a inch touchscreen tablet device in january and ship the product in march",
+      "gloss": "苹果将于一月份推出10英寸触屏平板电脑，并于三月份发货。"
+    },
+    {
+      "word": "we define an iteration as a phase or a milestone",
+      "gloss": "我们将一次迭代定义为一个阶段或一个里程碑。"
+    },
+    {
+      "word": "her husband was unsympathetic and she felt she had no one to turn to",
+      "gloss": "她的丈夫不懂得体恤人，她觉得无人可以依靠。"
+    },
+    {
+      "word": "life is full of trade offs you cannot have your cake and eat it too",
+      "gloss": "生活充满了取舍。鱼和熊掌不可兼得。"
+    },
+    {
+      "word": "point break was a breakout film for kathryn bigelow in",
+      "gloss": "凯瑟琳·毕格罗于1991年拍摄了《惊爆点》，该片突破了她之前的风格。"
+    },
+    {
+      "word": "i have little knowledge of computer and business can i still learn navisio",
+      "gloss": "我对计算机和商业知之甚少，我还能学习Navision系统吗？"
+    },
+    {
+      "word": "i was juggling books shopping bags and the baby",
+      "gloss": "我手里又是书，又是购物袋，还抱着孩子，跟演杂技一样。"
+    },
+    {
+      "word": "my computer keeps going funny",
+      "gloss": "我的计算机老出故障。"
+    },
+    {
+      "word": "what jock had done was beyond my comprehension",
+      "gloss": "我无法理解乔克的所作所为。"
+    },
+    {
+      "word": "major breakthroughs have been made in the reform of china s ownership structure",
+      "gloss": "中国所有制结构改革也取得了重大突破。"
+    },
+    {
+      "word": "they bring suggestions and tradeoffs to the table some of which are included in the revised spec",
+      "gloss": "他们会提供建议和取舍方案，其中某些建议会反映在修订后的产品设计规范中。"
+    },
+    {
+      "word": "after each project their product understanding deepens and they start to develop better and better product instincts",
+      "gloss": "每完成一个项目，他们对产品的理解就会加深，他们开始培养起越来越好的产品直觉。"
+    },
+    {
+      "word": "children do not know by instinct the difference between right and wrong",
+      "gloss": "儿童并非生来就会分辨是非。"
+    },
+    {
+      "word": "tell us what you bring to the table not just what you want",
+      "gloss": "告诉我们你能给公司带来什么，而不仅仅是你想要什么。"
+    },
+    {
+      "word": "i don t see the relevance of your question",
+      "gloss": "我不懂你提的这个问题有什么意义。（口气非常强烈甚至不礼貌）"
+    },
+    {
+      "word": "all happy families resemble one another each unhappy family is unhappy in its own way",
+      "gloss": "幸福的家庭都是相似的，不幸的家庭各有各的不幸。"
+    },
+    {
+      "word": "although i don t like him i agree he is a good manager",
+      "gloss": "虽然我不喜欢他，但我承认他是一个出色的经理人。"
+    },
+    {
+      "word": "i m sorry i think sleep deprivation contributed to my outburst just then",
+      "gloss": "抱歉，睡眠不足让我刚才情绪失控了。"
+    },
+    {
+      "word": "the second benefit is teams ability to safely experiment and fail fast",
+      "gloss": "第二个好处是团队能够安全地进行实验并获得“快速失败”的能力。"
+    },
+    {
+      "word": "i empowered my agent to close the deal",
+      "gloss": "我授权我的经纪人完成这笔交易。"
+    },
+    {
+      "word": "the third benefit open source offers is a better way of building software",
+      "gloss": "开源的第三个好处是提高软件开发质量。"
+    },
+    {
+      "word": "this led to software developers taking more care in the software they were writing",
+      "gloss": "这也使得软件开发人员在编写软件时更加用心。"
+    },
+    {
+      "word": "open source is evolving at a rapid pace and developers learn new open source technologies every few years",
+      "gloss": "开源软件发展迅猛，开发人员每隔几年就要学习新的开源技术。"
+    },
+    {
+      "word": "establishing a high level of trust among remote managers and employees starts with having good meeting rituals",
+      "gloss": "在远程工作过程中，经理和员工之间的高度信任始于一套良好的会议仪式。"
+    },
+    {
+      "word": "managers must lead by example because what you do is more important than what you say",
+      "gloss": "经理们必须以身作则，因为你的行动比你的言辞更重要。"
+    },
+    {
+      "word": "joe left my house around pm and was hit by a car about minutes later",
+      "gloss": "乔下午五点左右离开我家，大约三十分钟后就被车撞了。"
+    },
+    {
+      "word": "while remote work is very appealing to some employees it does come with some trade offs",
+      "gloss": "虽然远程工作对一些员工来说很有吸引力，但也一定有得有失。"
+    },
+    {
+      "word": "pets exercise and getting into nature can also help improve mental well being",
+      "gloss": "养宠物、运动和融入大自然也可以帮助改善心理健康。"
+    },
+    {
+      "word": "several demonstrators broke through the barriers despite warnings from the police",
+      "gloss": "几名示威者不顾警方的警告，冲破了封锁线。"
+    },
+    {
+      "word": "statistics disprove the myth that women are worse drivers than men",
+      "gloss": "统计数据驳斥了女司机不如男司机的成见。"
+    },
+    {
+      "word": "ill health often goes with poverty",
+      "gloss": "疾病往往伴随贫困而来。"
+    },
+    {
+      "word": "what are the responsibilities that goes with becoming a father",
+      "gloss": "成为父亲之后要承担哪些责任？"
+    },
+    {
+      "word": "this wine goes particularly well with seafood",
+      "gloss": "这款葡萄酒特别适合搭配海鲜。"
+    },
+    {
+      "word": "the music doesn t go with the mood of the film",
+      "gloss": "配乐和这部电影的基调不搭。"
+    },
+    {
+      "word": "many employees complain that their bosses are poor communicators and bad at giving clear instructions",
+      "gloss": "很多员工抱怨他们老板不善于沟通，无法下达明确的指令。"
+    },
+    {
+      "word": "he emphasized that managers had to be more communicative with their staff",
+      "gloss": "他强调，管理人员要加强与员工的沟通交流。"
+    },
+    {
+      "word": "the test evaluates students communicative skills",
+      "gloss": "该项测试主要考核学生的沟通能力。"
+    },
+    {
+      "word": "my daughter is very difficult uncommunicative and moody",
+      "gloss": "我女儿很难相处，不愿跟人交流，又非常情绪化。"
+    },
+    {
+      "word": "the bill drew support from across the political spectrum",
+      "gloss": "该项法案赢得了各政治派别的支持。"
+    },
+    {
+      "word": "the two articles here represent opposite ends of the spectrum",
+      "gloss": "这两篇文章代表着截然不同的两派观点。"
+    },
+    {
+      "word": "we think that outside china alibaba will struggle to gain traction as will oracle salesforce and sap",
+      "gloss": "我们认为，在中国以外的地区，阿里巴巴将努力争取获得更多客户的认可，甲骨文、Salesforce和SAP也是如此。"
+    }
+  ]
+}

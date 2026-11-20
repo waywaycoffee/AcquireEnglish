@@ -109,4 +109,21 @@ ok
       expect(key.startsWith('syllabus:cet6_core:'), isFalse);
     });
   });
+
+  group('chunk books assets', () {
+    test('conversational 1000 sample parses as pattern book', () {
+      final SyllabusBook book = SyllabusBook.fromJson(<String, dynamic>{
+        'id': 'chunks_conversational_1000',
+        'title': '口语常用语块 1000',
+        'examTag': 'CHUNK',
+        'kind': 'pattern',
+        'words': <Object>[
+          <String, String>{'word': 'be careful', 'gloss': ''},
+          <String, String>{'word': 'good idea', 'gloss': ''},
+        ],
+      });
+      expect(book.isPatternBook, isTrue);
+      expect(book.wordCount, 2);
+    });
+  });
 }

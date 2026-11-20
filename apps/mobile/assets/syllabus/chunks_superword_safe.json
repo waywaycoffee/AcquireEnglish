@@ -1,0 +1,1897 @@
+{
+  "id": "chunks_superword_safe",
+  "title": "短句习语精选",
+  "examTag": "IDIOM",
+  "kind": "pattern",
+  "disclaimer": "筛选自 ysc/superword sentences.txt：已排除带影视作品标注的条目（跳过约 148 条），仅保留偏习语/谚语/通用短句；上游版权请自行核对。",
+  "words": [
+    {
+      "word": "it's a deal",
+      "gloss": "一言为定！"
+    },
+    {
+      "word": "to be is to do",
+      "gloss": "活着就是奋斗！"
+    },
+    {
+      "word": "trick or treat",
+      "gloss": "不给糖就捣蛋！(万圣节风俗)"
+    },
+    {
+      "word": "he's a crackpot",
+      "gloss": "他真是朵奇葩。"
+    },
+    {
+      "word": "i am behind you",
+      "gloss": "我挺你！"
+    },
+    {
+      "word": "she turns me on",
+      "gloss": "她让我眼前一亮。"
+    },
+    {
+      "word": "you are gorgeous",
+      "gloss": "你真漂亮！"
+    },
+    {
+      "word": "go with the flow",
+      "gloss": "顺其自然。"
+    },
+    {
+      "word": "it's almost here",
+      "gloss": "它，不日而至！(iPhone5发布会邀请)"
+    },
+    {
+      "word": "it's sink or swim",
+      "gloss": "成败全靠自己！"
+    },
+    {
+      "word": "i want to see john",
+      "gloss": "我想去厕所。"
+    },
+    {
+      "word": "no cross no crown",
+      "gloss": "不经历风雨，怎么见彩虹。"
+    },
+    {
+      "word": "come on be honest",
+      "gloss": "拜托，诚实点！"
+    },
+    {
+      "word": "speak of the devil",
+      "gloss": "说曹操曹操到。"
+    },
+    {
+      "word": "you're in the pink",
+      "gloss": "你的气色真好！"
+    },
+    {
+      "word": "keep your shirt on",
+      "gloss": "要淡定！(俚语)"
+    },
+    {
+      "word": "he has big muscles",
+      "gloss": "他肌肉很发达。"
+    },
+    {
+      "word": "my mouth is watering",
+      "gloss": "我要流口水了!"
+    },
+    {
+      "word": "so what do you think",
+      "gloss": "元芳，你怎么看？"
+    },
+    {
+      "word": "elders are treasures",
+      "gloss": "家有一老，如有一宝。"
+    },
+    {
+      "word": "dreams can come true",
+      "gloss": "梦想是可以成真的!（苏珊大妈）"
+    },
+    {
+      "word": "look before you leap",
+      "gloss": "三思而后行。(谚语)"
+    },
+    {
+      "word": "she is an ace dancer",
+      "gloss": "她是个王牌舞蹈演员。"
+    },
+    {
+      "word": "inspire a generation",
+      "gloss": "激励一代人。(2012伦敦奥运会口号)"
+    },
+    {
+      "word": "labor vanquishes all",
+      "gloss": "劳动征服一切。(维吉尔)"
+    },
+    {
+      "word": "i'm a laundry virgin",
+      "gloss": "我从没洗过衣服。"
+    },
+    {
+      "word": "don't boil the ocean",
+      "gloss": "不要好高骛远。"
+    },
+    {
+      "word": "she's pretty stacked",
+      "gloss": "她的身材婀娜多姿。"
+    },
+    {
+      "word": "the weather is rotten",
+      "gloss": "天气真糟糕。"
+    },
+    {
+      "word": "she's a rough diamond",
+      "gloss": "她是个内秀的人。"
+    },
+    {
+      "word": "that's as easy as pie",
+      "gloss": "这事易如反掌。"
+    },
+    {
+      "word": "she's so honey lipped",
+      "gloss": "她嘴特别甜。"
+    },
+    {
+      "word": "god is shining on you",
+      "gloss": "你真走运。"
+    },
+    {
+      "word": "every dog has its day",
+      "gloss": "每个人都有时来运转的一天。"
+    },
+    {
+      "word": "he's a man of his word",
+      "gloss": "他是个靠谱的人。"
+    },
+    {
+      "word": "you are the one for me",
+      "gloss": "你是我的梦中情人。"
+    },
+    {
+      "word": "we have good chemistry",
+      "gloss": "我们一见如故。"
+    },
+    {
+      "word": "practice makes perfect",
+      "gloss": "熟能生巧。"
+    },
+    {
+      "word": "money will come and go",
+      "gloss": "钱财乃身外之物。"
+    },
+    {
+      "word": "more haste less speed",
+      "gloss": "欲速则不达。(谚语)"
+    },
+    {
+      "word": "music is my painkiller",
+      "gloss": "音乐就是我的止痛药。"
+    },
+    {
+      "word": "to make each day count",
+      "gloss": "要让每一天都有所值。"
+    },
+    {
+      "word": "over thinking ruins you",
+      "gloss": "想得太多会毁了你。"
+    },
+    {
+      "word": "why is he tailgating us",
+      "gloss": "他干嘛一直贴在我们屁股后面？"
+    },
+    {
+      "word": "i'm at a loss for words",
+      "gloss": "我很无语。"
+    },
+    {
+      "word": "i wasn't born yesterday",
+      "gloss": "我又不是三岁小孩。"
+    },
+    {
+      "word": "how thick could you get",
+      "gloss": "你能再“二”一点吗？"
+    },
+    {
+      "word": "great minds think alike",
+      "gloss": "英雄所见略同。"
+    },
+    {
+      "word": "don't teach fish to swim",
+      "gloss": "谚语：不要班门弄斧。"
+    },
+    {
+      "word": "curiosity killed the cat",
+      "gloss": "好奇会惹祸。(俚语)"
+    },
+    {
+      "word": "she's got a curvy figure",
+      "gloss": "她身材很正点。"
+    },
+    {
+      "word": "it's dogged that does it",
+      "gloss": "世上无难事，只怕有心人。"
+    },
+    {
+      "word": "a lazy youth a lousy age",
+      "gloss": "少壮不努力，老大徒伤悲。"
+    },
+    {
+      "word": "i am ordinary yet unique",
+      "gloss": "我很平凡，但我独一无二。"
+    },
+    {
+      "word": "she has a lot on the ball",
+      "gloss": "她是一个能干的人。"
+    },
+    {
+      "word": "penny wise pound foolish",
+      "gloss": "贪小便宜吃大亏。"
+    },
+    {
+      "word": "everyday life inspires me",
+      "gloss": "生活每天都在激励我。（艾薇儿）"
+    },
+    {
+      "word": "i've got a job in the bag",
+      "gloss": "我已经十拿九稳地找到一份工作了。"
+    },
+    {
+      "word": "we have nothing in common",
+      "gloss": "我们没有共同语言。"
+    },
+    {
+      "word": "i think it's a fat chance",
+      "gloss": "我觉得希望渺茫。"
+    },
+    {
+      "word": "can we go thrift shopping",
+      "gloss": "咱俩去趟二手店呗？"
+    },
+    {
+      "word": "our attitude defines life",
+      "gloss": "态度决定命运。"
+    },
+    {
+      "word": "i'm cheerful and outgoing",
+      "gloss": "我乐观开朗。"
+    },
+    {
+      "word": "that's really really nice",
+      "gloss": "这真真是极好的。(甄嬛体)"
+    },
+    {
+      "word": "she's a good time charlie",
+      "gloss": "她是个乐天派。"
+    },
+    {
+      "word": "potter what's your hurry",
+      "gloss": "波特！你急着去干什么？"
+    },
+    {
+      "word": "i'm the king of the world",
+      "gloss": "我是世界之王！"
+    },
+    {
+      "word": "she's really a shopaholic",
+      "gloss": "她真是个购物狂。"
+    },
+    {
+      "word": "she has a taste in fashion",
+      "gloss": "她眼光很独到。"
+    },
+    {
+      "word": "honesty is the best policy",
+      "gloss": "做人以诚信为本。"
+    },
+    {
+      "word": "can you give me a discount",
+      "gloss": "能给我打个折吗？"
+    },
+    {
+      "word": "a teacher affects eternity",
+      "gloss": "老师的影响力是永恒的。"
+    },
+    {
+      "word": "freedom lies in being bold",
+      "gloss": "自由源于勇敢。—罗伯特·佛洛斯特"
+    },
+    {
+      "word": "can i get a refill please",
+      "gloss": "我能续杯吗？"
+    },
+    {
+      "word": "i'm not old age is nothing",
+      "gloss": "我不老！年龄不是问题！(李娜)"
+    },
+    {
+      "word": "the bag is a cheap knockoff",
+      "gloss": "这包是个山寨货。"
+    },
+    {
+      "word": "opportunity knocks but once",
+      "gloss": "机不可失，时不再来。"
+    },
+    {
+      "word": "have you booked your ticket",
+      "gloss": "你定上火车票了吗？"
+    },
+    {
+      "word": "being the third wheel sucks",
+      "gloss": "当电灯泡神马的最讨厌了！"
+    },
+    {
+      "word": "love is trembling happiness",
+      "gloss": "爱，是颤抖着的幸福。（纪伯伦）"
+    },
+    {
+      "word": "mama thank you for who i am",
+      "gloss": "妈妈，谢谢你成就了我。"
+    },
+    {
+      "word": "it's easy once you know how",
+      "gloss": "一旦你明白，就会很简单。"
+    },
+    {
+      "word": "you are the apple of my eye",
+      "gloss": "你是我的掌上明珠。"
+    },
+    {
+      "word": "as you pray move your feet",
+      "gloss": "当你祈祷的时候，同时也要采取行动。"
+    },
+    {
+      "word": "done is better than perfect",
+      "gloss": "比完美更重要的是完成。"
+    },
+    {
+      "word": "rumor stops at indifference",
+      "gloss": "谣言止于漠不关心者。"
+    },
+    {
+      "word": "you'll always have next year",
+      "gloss": "将来机会多得是。"
+    },
+    {
+      "word": "a young idler an old beggar",
+      "gloss": "少壮不努力，老大徒伤悲。"
+    },
+    {
+      "word": "wherever i go there you are",
+      "gloss": "无论我去哪里，总有你在。"
+    },
+    {
+      "word": "dreams are necessary to life",
+      "gloss": "梦想是生活的必需品。"
+    },
+    {
+      "word": "good or bad we must all live",
+      "gloss": "无论生活是悲是喜，我们都须承受。"
+    },
+    {
+      "word": "it's hot enough to melt hell",
+      "gloss": "这天热得足以把地狱熔化！"
+    },
+    {
+      "word": "strike while the iron is hot",
+      "gloss": "趁热打铁。"
+    },
+    {
+      "word": "may treasures fill your home",
+      "gloss": "财源广进！"
+    },
+    {
+      "word": "let's go on a shopping spree",
+      "gloss": "我们疯狂购物去吧！"
+    },
+    {
+      "word": "i don't want the dead end job",
+      "gloss": "我不想做没有前途的工作。"
+    },
+    {
+      "word": "learn real english in context",
+      "gloss": "遨游真实语境，学习地道英语！"
+    },
+    {
+      "word": "what goes around comes around",
+      "gloss": "出来混迟早要还的。"
+    },
+    {
+      "word": "i couldn't get through to you",
+      "gloss": "我打不通你电话。"
+    },
+    {
+      "word": "sit tight i'm gonna floor it",
+      "gloss": "坐好，我要开始飙车了！"
+    },
+    {
+      "word": "be innocent just like a child",
+      "gloss": "保持一颗童心。"
+    },
+    {
+      "word": "shit happens but life goes on",
+      "gloss": "坑爹的事时有发生，但生活总得继续。"
+    },
+    {
+      "word": "two heads are better than one",
+      "gloss": "三个臭皮匠顶过一个诸葛亮。"
+    },
+    {
+      "word": "would you prefer white or red",
+      "gloss": "你喜欢喝白葡萄酒还是红葡萄酒？"
+    },
+    {
+      "word": "do or do not there is no try",
+      "gloss": "要么做，要么滚！没有试试看这一说。"
+    },
+    {
+      "word": "hi july please go easy on me",
+      "gloss": "你好，七月！希望这个月好过点！"
+    },
+    {
+      "word": "man's nature at birth is good",
+      "gloss": "人之初，性本善。"
+    },
+    {
+      "word": "it's just a storm in a teacup",
+      "gloss": "没什么可大惊小怪的。"
+    },
+    {
+      "word": "love is making you go bananas",
+      "gloss": "恋爱把你变得疯疯癫癫的。"
+    },
+    {
+      "word": "my bank account is in the red",
+      "gloss": "我的银行存款已出现赤字。"
+    },
+    {
+      "word": "my love for you will never die",
+      "gloss": "我对你的爱，爱，爱不完…"
+    },
+    {
+      "word": "east or west home is the best",
+      "gloss": "金窝银窝不如自家的草窝。"
+    },
+    {
+      "word": "you have the ball at your feet",
+      "gloss": "我看好你哦！(俚语)"
+    },
+    {
+      "word": "only dead fish follow the flow",
+      "gloss": "只有死鱼才随波逐流。(芬兰谚语)"
+    },
+    {
+      "word": "life is tough but i'm tougher",
+      "gloss": "生活很艰苦，但我更坚强。"
+    },
+    {
+      "word": "man he's as slow as christmas",
+      "gloss": "天啊，他开车真是有够慢的！"
+    },
+    {
+      "word": "john is such an apple polisher",
+      "gloss": "约翰是个马屁精。"
+    },
+    {
+      "word": "always bring your own sunshine",
+      "gloss": "时刻带着自己的阳光。"
+    },
+    {
+      "word": "he who laughs last laughs best",
+      "gloss": "谁笑到最后，谁就笑得最好。"
+    },
+    {
+      "word": "for you a thousand times over",
+      "gloss": "为你，千千万万次都心甘情愿。"
+    },
+    {
+      "word": "actions speak louder than words",
+      "gloss": "事实胜于雄辩。"
+    },
+    {
+      "word": "courage is grace under pressure",
+      "gloss": "勇气就是压力下的优雅。(海明威)"
+    },
+    {
+      "word": "every cloud has a silver lining",
+      "gloss": "守得云开见月明。"
+    },
+    {
+      "word": "chance favors the prepared mind",
+      "gloss": "机会眷顾那些有准备的人。—路易斯·巴斯德"
+    },
+    {
+      "word": "may you be happy and prosperous",
+      "gloss": "恭喜发财！"
+    },
+    {
+      "word": "be careful of what you fish for",
+      "gloss": "对你调查的东西要小心哦。"
+    },
+    {
+      "word": "every life deserves our respect",
+      "gloss": "每一个生命都应该被尊重。"
+    },
+    {
+      "word": "she really takes a shine to you",
+      "gloss": "她真喜欢上你了哦。"
+    },
+    {
+      "word": "opportunity seldom knocks twice",
+      "gloss": "机不可失，时不再来。"
+    },
+    {
+      "word": "you can be happy no matter what",
+      "gloss": "开心一点吧，管它会怎样。"
+    },
+    {
+      "word": "life is short and time is swift",
+      "gloss": "人生短暂，时光飞逝。"
+    },
+    {
+      "word": "you're still wet behind the ears",
+      "gloss": "你还嫩点儿。"
+    },
+    {
+      "word": "live to learn not learn to live",
+      "gloss": "活着就要学习，学习不是为了活着。(培根)"
+    },
+    {
+      "word": "if not now when if not me who",
+      "gloss": "此时此刻，舍我其谁！(马云)"
+    },
+    {
+      "word": "today is a red letter day for us",
+      "gloss": "今天对我们来说是个值得庆祝的喜庆日子。"
+    },
+    {
+      "word": "without risk there is no reward",
+      "gloss": "不入虎穴，焉得虎子。"
+    },
+    {
+      "word": "all things are obedient to money",
+      "gloss": "有钱能使鬼推磨。"
+    },
+    {
+      "word": "catch one's heart never be apart",
+      "gloss": "愿得一人心，白首不相离。"
+    },
+    {
+      "word": "always wear your invisible crown",
+      "gloss": "永远戴着属于你的隐形王冠。"
+    },
+    {
+      "word": "smile while you still have teeth",
+      "gloss": "趁年轻还有一口好牙，多笑笑吧！"
+    },
+    {
+      "word": "life is not fair get used to it",
+      "gloss": "生活是不公平的，去适应它！(比尔·盖茨)"
+    },
+    {
+      "word": "never lose the child like wonder",
+      "gloss": "永远不要失去孩童般的好奇心。(兰迪·波许)"
+    },
+    {
+      "word": "one today is worth two tomorrows",
+      "gloss": "今日之时最珍贵，明日之时不可待。"
+    },
+    {
+      "word": "dare and the world always yields",
+      "gloss": "大胆挑战，世界总会让步。(W.M. 萨克雷)"
+    },
+    {
+      "word": "birds of a feather flock together",
+      "gloss": "物以类聚，人以群分。"
+    },
+    {
+      "word": "this cell phone sure is hot stuff",
+      "gloss": "这款手机真够棒的!"
+    },
+    {
+      "word": "may everything fall into your lap",
+      "gloss": "万事如意！"
+    },
+    {
+      "word": "after a hurricane comes a rainbow",
+      "gloss": "风雨之后总会见彩虹。"
+    },
+    {
+      "word": "be generous with your compliments",
+      "gloss": "不要吝惜你的赞美。"
+    },
+    {
+      "word": "happiness consists in contentment",
+      "gloss": "知足常乐。"
+    },
+    {
+      "word": "may wealth come generously to you",
+      "gloss": "祝你财源广进。"
+    },
+    {
+      "word": "smoking is harmful to your health",
+      "gloss": "吸烟有害健康！"
+    },
+    {
+      "word": "sorry seems to be the hardest word",
+      "gloss": "难以开口说抱歉。"
+    },
+    {
+      "word": "never put the plow before the oxen",
+      "gloss": "永远不要本末倒置。"
+    },
+    {
+      "word": "don't let dream just be your dream",
+      "gloss": "别让梦想只停留在梦里。"
+    },
+    {
+      "word": "a child is not a vase to be filled",
+      "gloss": "孩子不是一个等着被填满的瓶子。—弗朗索瓦‧拉伯雷"
+    },
+    {
+      "word": "well done is better than well said",
+      "gloss": "说得好不如做得好。(富兰克林)"
+    },
+    {
+      "word": "i feel strongly that i can make it",
+      "gloss": "我坚信，我会成功。"
+    },
+    {
+      "word": "youth comes but once in a lifetime",
+      "gloss": "人生不过一次少年。（五四青年节）"
+    },
+    {
+      "word": "the only limit is your imagination",
+      "gloss": "唯一的局限是你的想象力。"
+    },
+    {
+      "word": "no great thing is created suddenly",
+      "gloss": "没有任何伟大的事是突然产生的。—爱比克泰德"
+    },
+    {
+      "word": "your future depends on your dreams",
+      "gloss": "你的梦想决定着你的未来。"
+    },
+    {
+      "word": "to be prepared is half the victory",
+      "gloss": "做好准备是成功的一半。—米格尔‧德·赛万提斯"
+    },
+    {
+      "word": "his persistence gained him victory",
+      "gloss": "他一拼到底，赢得胜利！"
+    },
+    {
+      "word": "sometimes you can be really thick",
+      "gloss": "有时候，你可真够“二”的。"
+    },
+    {
+      "word": "keep trying don't give up the ship",
+      "gloss": "继续努力! 别放弃!"
+    },
+    {
+      "word": "i'm who i'm i have nothing to hide",
+      "gloss": "我就是我，无须掩藏。(Adam Lambert)"
+    },
+    {
+      "word": "try and fail but don't fail to try",
+      "gloss": "尝试后可能会放弃，但千万不能放弃尝试。"
+    },
+    {
+      "word": "happy girls are the prettiest girls",
+      "gloss": "快乐的女孩是最美的！(奥黛丽·赫本)"
+    },
+    {
+      "word": "take the moment and make it perfect",
+      "gloss": "抓住当下，让它成为完美时刻。"
+    },
+    {
+      "word": "dreams are made possible if you try",
+      "gloss": "只要努力，梦想就会实现。"
+    },
+    {
+      "word": "single is simple double is trouble",
+      "gloss": "一个人很简单，两个人很麻烦。"
+    },
+    {
+      "word": "no one but ourselves can degrade us",
+      "gloss": "没人能够贬低我们，除非是我们自己。"
+    },
+    {
+      "word": "think big goals and win big success",
+      "gloss": "目标远大则成就伟大。"
+    },
+    {
+      "word": "love makes man grow up or sink down",
+      "gloss": "爱情，要么让人成熟，要么让人堕落。"
+    },
+    {
+      "word": "god helps those who help themselves",
+      "gloss": "自助者，天助。"
+    },
+    {
+      "word": "i'm fine with her either way brother",
+      "gloss": "兄弟，她什么样子我都接受。"
+    },
+    {
+      "word": "constant dropping wears away a stone",
+      "gloss": "滴水穿石。"
+    },
+    {
+      "word": "life is a journey not a destination",
+      "gloss": "人生就是一场旅行，而不是一个终点。(Ralph Waldo Emerson)"
+    },
+    {
+      "word": "life isn't always a bowl of cherries",
+      "gloss": "生活并不总是美好的。"
+    },
+    {
+      "word": "life is not all great keep vigilant",
+      "gloss": "人生无常，要随时保持警觉。(Martin Freeman, British actor)"
+    },
+    {
+      "word": "i will love you till the end of time",
+      "gloss": "我会爱你到海枯石烂。"
+    },
+    {
+      "word": "she got cold feet before her wedding",
+      "gloss": "她逃婚了。"
+    },
+    {
+      "word": "an apple a day keeps the doctor away",
+      "gloss": "每天听一遍小苹果，医生都不敢治我。"
+    },
+    {
+      "word": "life isn't fair but it's still good",
+      "gloss": "生活是不公平的，但还算过得去。"
+    },
+    {
+      "word": "don't waste life in doubts and fears",
+      "gloss": "不要把生命浪费在疑惑和恐惧中。(爱默生)"
+    },
+    {
+      "word": "he dreams of living in a decent life",
+      "gloss": "他梦想着过体面的生活。"
+    },
+    {
+      "word": "penny and penny laid up will be many",
+      "gloss": "积少成多。(谚语)"
+    },
+    {
+      "word": "chance favors only the prepared mind",
+      "gloss": "机会总眷顾有准备的人。"
+    },
+    {
+      "word": "there's no one i'd rather be than me",
+      "gloss": "除了我自己，我不愿作任何人。"
+    },
+    {
+      "word": "his daughter is the apple of his eye",
+      "gloss": "女儿是他的掌上明珠。"
+    },
+    {
+      "word": "tom is the black sheep of his family",
+      "gloss": "汤姆是个败家子。"
+    },
+    {
+      "word": "have the faith for a better tomorrow",
+      "gloss": "要相信明天会更好！"
+    },
+    {
+      "word": "dreams without execution are nothing",
+      "gloss": "梦想不付出行动，等于白扯。"
+    },
+    {
+      "word": "michelle i have never loved you more",
+      "gloss": "米歇尔，我对你的爱无以复加。(奥巴马)"
+    },
+    {
+      "word": "there is a tide in the affairs of men",
+      "gloss": "人生总有涨潮时。"
+    },
+    {
+      "word": "the best things in life aren't things",
+      "gloss": "生活中最美好的事情是无形的。"
+    },
+    {
+      "word": "i like criticism it makes you strong",
+      "gloss": "我喜欢别人的批评，它使你强壮。—勒布朗‧詹姆斯"
+    },
+    {
+      "word": "the wind really chills me to the bone",
+      "gloss": "这寒风真是刺骨。"
+    },
+    {
+      "word": "each moment of your life is a picture",
+      "gloss": "生命中的每一刻都是一幅画。"
+    },
+    {
+      "word": "an eye finds more truth than two ears",
+      "gloss": "百闻不如一见。"
+    },
+    {
+      "word": "all drunken days have their tomorrows",
+      "gloss": "今日花天酒地，明日潦倒穷途。"
+    },
+    {
+      "word": "heal the world make it a better place",
+      "gloss": "拯救这世界，让它成为更美好的家园。"
+    },
+    {
+      "word": "dad one day i'll make you proud of me",
+      "gloss": "爸爸，总有一天，我会成为你的骄傲！"
+    },
+    {
+      "word": "you are more beautiful than you think",
+      "gloss": "你，要比你想象的更美丽。"
+    },
+    {
+      "word": "hang in there everything will be fine",
+      "gloss": "坚持住，一切都会好起来的！"
+    },
+    {
+      "word": "hold on it gets better than you know",
+      "gloss": "挺住，事情会比你想像中要好！"
+    },
+    {
+      "word": "they are really childhood sweethearts",
+      "gloss": "他们真是青梅竹马。"
+    },
+    {
+      "word": "it is the time to witness the miracle",
+      "gloss": "接下来，就是见证奇迹的时刻。（魔术师刘谦）"
+    },
+    {
+      "word": "the rough road often leads to the top",
+      "gloss": "艰难的道路经常通往高处。"
+    },
+    {
+      "word": "every man is a poet when he is in love",
+      "gloss": "每个恋爱中的人都是诗人。—柏拉图"
+    },
+    {
+      "word": "hello may all my wishes come true",
+      "gloss": "你好，2014！希望一切愿望都能实现！"
+    },
+    {
+      "word": "do one thing at a time and do it well",
+      "gloss": "一次只做一件事，并做到最好！"
+    },
+    {
+      "word": "take away love and our earth is a tomb",
+      "gloss": "没了爱，地球就是一座坟墓。—罗伯特‧勃朗宁"
+    },
+    {
+      "word": "any time spent being unhappy is wasted",
+      "gloss": "任何不快乐的时光都是浪费。"
+    },
+    {
+      "word": "there can be miracles when you believe",
+      "gloss": "当你充满信心，奇迹就会出现。[惠特尼·休斯顿]"
+    },
+    {
+      "word": "we all have stories we won't ever tell",
+      "gloss": "我们都有一些不会讲出来的故事。"
+    },
+    {
+      "word": "to a crazy ship all winds are contrary",
+      "gloss": "对于一只漫无目标的船而言，任何方向的风都是逆风。"
+    },
+    {
+      "word": "a day without laughter is a day wasted",
+      "gloss": "没有笑声的一天是浪费了的一天。(卓别林)"
+    },
+    {
+      "word": "seize the opportunity when it comes up",
+      "gloss": "当机会来临时要好好把握。(林书豪)"
+    },
+    {
+      "word": "lights off for earth hour count me in",
+      "gloss": "地球日熄灯1小时，算我一个！"
+    },
+    {
+      "word": "you are the sunshine that makes my day",
+      "gloss": "你就是让我快乐的阳光。"
+    },
+    {
+      "word": "sometimes you have to be your own hero",
+      "gloss": "有时候，你必须做自己的英雄。"
+    },
+    {
+      "word": "may the new year bring you good fortune",
+      "gloss": "迎春接福！"
+    },
+    {
+      "word": "life is a series of commas not periods",
+      "gloss": "人生是一系列的逗号，不是句号。—马修·麦康纳"
+    },
+    {
+      "word": "you are such a couch potato on weekends",
+      "gloss": "你一到周末就变宅男。"
+    },
+    {
+      "word": "the good seaman is known in bad weather",
+      "gloss": "惊涛骇浪，方显英雄本色。"
+    },
+    {
+      "word": "love all trust a few do wrong to none",
+      "gloss": "爱所有人，相信一些人，不负任何人。(莎士比亚)"
+    },
+    {
+      "word": "you are helpless against those you love",
+      "gloss": "你对谁有爱意，你就对谁无能为力。"
+    },
+    {
+      "word": "all shall be well jack shall have jill",
+      "gloss": "有情人终成眷属。"
+    },
+    {
+      "word": "anything unattempted remains impossible",
+      "gloss": "不去尝试，就什么也不可能。"
+    },
+    {
+      "word": "don't moon away the mid autumn festival",
+      "gloss": "找点事儿做吧，不要虚度了中秋佳节。"
+    },
+    {
+      "word": "hope never abandons you you abandon it",
+      "gloss": "希望从未舍弃你，是你舍弃希望。—乔治·温伯格"
+    },
+    {
+      "word": "i wish you a happy dragon boat festival",
+      "gloss": "端午节快乐！"
+    },
+    {
+      "word": "president barack obama wins re election",
+      "gloss": "奥巴马连任美国总统。"
+    },
+    {
+      "word": "she had a bright and bubbly personality",
+      "gloss": "她性格活泼开朗。"
+    },
+    {
+      "word": "victory belongs to the most persevering",
+      "gloss": "坚持到底就是胜利！(拿破仑)"
+    },
+    {
+      "word": "pray for boston pray for the lost souls",
+      "gloss": "为波士顿祈祷，为逝去的生命祈祷！"
+    },
+    {
+      "word": "a man can be destroyed but not defeated",
+      "gloss": "人可以被毁灭，但不可以被打败。"
+    },
+    {
+      "word": "cease to struggle and you cease to live",
+      "gloss": "生命不止，奋斗不息。（Thomas Carlyle）"
+    },
+    {
+      "word": "the unexamined life is not worth living",
+      "gloss": "混混噩噩的生活不值得一过。—苏格拉底"
+    },
+    {
+      "word": "goals determine what you're going to be",
+      "gloss": "奋斗目标决定你将成为怎样的人。"
+    },
+    {
+      "word": "a winner is a dreamer who never gives up",
+      "gloss": "成功者是坚持梦想不放弃的人。(Nelson Mandela)"
+    },
+    {
+      "word": "may you have a wonderful valentine's day",
+      "gloss": "愿你有个美好的情人节！"
+    },
+    {
+      "word": "the roughest road often leads to the top",
+      "gloss": "最艰难的道路经常通往最高处。—克莉斯蒂娜‧阿奎莱拉"
+    },
+    {
+      "word": "life begins on the other side of despair",
+      "gloss": "在绝望的另一端，往往就是生活开始的地方。（法国哲学大师让-保罗·萨特的名言）"
+    },
+    {
+      "word": "there is nothing permanent except change",
+      "gloss": "唯一不变的是变化。"
+    },
+    {
+      "word": "the darkest hour is that before the dawn",
+      "gloss": "黎明前是最黑暗的。"
+    },
+    {
+      "word": "we're here to put a dent in the universe",
+      "gloss": "我们存在，只为改变世界。(Steve Jobs)"
+    },
+    {
+      "word": "what doesn't kill you makes you stronger",
+      "gloss": "磨难会让你更强大。"
+    },
+    {
+      "word": "you have to be empty in order to be full",
+      "gloss": "空杯心态，才能容纳更多。"
+    },
+    {
+      "word": "a moment on the lips forever on the hips",
+      "gloss": "贪得一时嘴馋，平添一生赘肉。"
+    },
+    {
+      "word": "the leap year comes around quadrennially",
+      "gloss": "闰年每四年一次。"
+    },
+    {
+      "word": "if winter comes can spring be far behind",
+      "gloss": "冬天来了，春天还会远吗？(雪莱)"
+    },
+    {
+      "word": "energy and persistence conquer all things",
+      "gloss": "动力及坚持战胜一切。—本杰明‧富兰克林"
+    },
+    {
+      "word": "believe that you have it and you have it",
+      "gloss": "只要相信你能拥有，你就能真的能拥有。"
+    },
+    {
+      "word": "nobody gets to write your destiny but you",
+      "gloss": "除了你自己，没有人能书写你的命运。(奥巴马)"
+    },
+    {
+      "word": "may you always get more than you wish for",
+      "gloss": "年年有余！"
+    },
+    {
+      "word": "if you are fine the sun will always shine",
+      "gloss": "你若安好，便是晴天。(祈福雅安！)"
+    },
+    {
+      "word": "if you love life life will love you back",
+      "gloss": "热爱生活，生活也会厚爱你。(Arthur Rubinstein)"
+    },
+    {
+      "word": "you can't do it unless you can imagine it",
+      "gloss": "除非你能想像，否则你做不到。—乔治‧卢卡斯"
+    },
+    {
+      "word": "once i've done that it's a piece of cake",
+      "gloss": "一旦我做到了这一点，接下来的事情就是小菜一碟。"
+    },
+    {
+      "word": "a smooth sea never made a skilled mariner",
+      "gloss": "平静的海面造就不了纯熟的水手。"
+    },
+    {
+      "word": "believe in yourself when no one else does",
+      "gloss": "即使没人相信你也不能绝望。(林书豪)"
+    },
+    {
+      "word": "you miss of the shots you never take",
+      "gloss": "不试，100%没希望。(希尼·克罗斯比)"
+    },
+    {
+      "word": "there are no mistakes only opportunities",
+      "gloss": "没有错误，只有机会。(Tina Fey)"
+    },
+    {
+      "word": "gentlemen seek harmony but not uniformity",
+      "gloss": "君子和而不同。"
+    },
+    {
+      "word": "yesterday's sun can't dry today's clothes",
+      "gloss": "好汉不提当年勇。"
+    },
+    {
+      "word": "i see red whenever i hear that man's name",
+      "gloss": "我一听到那个人的名字心里便火冒三丈。"
+    },
+    {
+      "word": "happiness is good health and a bad memory",
+      "gloss": "幸福是良好的健康加上糟糕的记性。"
+    },
+    {
+      "word": "just hold to your dream and never give up",
+      "gloss": "坚持你的梦想，永不放弃。"
+    },
+    {
+      "word": "it's never too late to do the right thing",
+      "gloss": "做正确的事永远都不迟。"
+    },
+    {
+      "word": "happiness is a journey not a destination",
+      "gloss": "幸福是一段旅程，而不是终点。"
+    },
+    {
+      "word": "would you like to pig out with us tonight",
+      "gloss": "今晚想不想跟我们一起去胡吃海喝一顿？"
+    },
+    {
+      "word": "one who frequently looks back can't go far",
+      "gloss": "频频回头的人，是走不了远路的。"
+    },
+    {
+      "word": "those who can't lose will never win either",
+      "gloss": "输不起的人，往往也赢不了。"
+    },
+    {
+      "word": "liberty consists in doing what one desires",
+      "gloss": "自由就是做想做的事。（约翰•斯图尔特•密尔）"
+    },
+    {
+      "word": "life is too short to be anything but happy",
+      "gloss": "活着就要快乐，因为我们会死很久。(光棍节快乐！)"
+    },
+    {
+      "word": "what is any ocean but a multitude of drops",
+      "gloss": "没有众多的水滴又哪来的海洋呢？"
+    },
+    {
+      "word": "always be a first rate version of yourself",
+      "gloss": "做最好的自己！"
+    },
+    {
+      "word": "the harder you fall the higher you bounce",
+      "gloss": "你跌得越重，反弹得就越高。"
+    },
+    {
+      "word": "the rose s in her hand the flavor in mine",
+      "gloss": "赠人玫瑰，手有余香。"
+    },
+    {
+      "word": "i'd rather be a happy fool than a sad sage",
+      "gloss": "做个悲伤的智者，不如做个开心的傻子。"
+    },
+    {
+      "word": "mother a word that means the world to me",
+      "gloss": "“妈妈”这个词对我来说意味着整个世界。(Howard Johnson)"
+    },
+    {
+      "word": "blind love mistakes a harelip for a dimple",
+      "gloss": "情人眼里出西施。"
+    },
+    {
+      "word": "the only way to have a friend is to be one",
+      "gloss": "交到朋友的唯一方法是自己先作为一个朋友。—拉尔夫‧爱默生"
+    },
+    {
+      "word": "victory won't come to me unless i go to it",
+      "gloss": "胜利是不会向我走来的，我必须自己走向胜利。(穆尔)"
+    },
+    {
+      "word": "drunkenness reveals what soberness conceals",
+      "gloss": "酒后吐真言。"
+    },
+    {
+      "word": "your greatness is measured by your horizons",
+      "gloss": "你的成就是由你的眼界来衡量的。—米开朗基罗"
+    },
+    {
+      "word": "in calm water every ship has a good captain",
+      "gloss": "在平静的海面，每艘船都有一位好船长。—格罗弗‧克里夫兰"
+    },
+    {
+      "word": "don't hide run you'll make it to tomorrow",
+      "gloss": "别躲避，奔跑吧，你就会找到明天。"
+    },
+    {
+      "word": "whether you fail or fly at least you tried",
+      "gloss": "不管是一飞冲天还是跌入谷底，至少，你尝试过！"
+    },
+    {
+      "word": "you never know what you can do till you try",
+      "gloss": "不亲试一下，你永远不知道自己能够做什么。"
+    },
+    {
+      "word": "courage is being afraid but going on anyhow",
+      "gloss": "勇气就是虽感恐惧，但仍会前行。"
+    },
+    {
+      "word": "we'll have a fresh start for the year ahead",
+      "gloss": "一元复始，万象更新。"
+    },
+    {
+      "word": "youth is too short to be anything but crazy",
+      "gloss": "再不疯狂就老了。"
+    },
+    {
+      "word": "tough times never last but tough people do",
+      "gloss": "艰难的时光不会太久，但坚强的人会走到最后。（罗伯特·舒勒）"
+    },
+    {
+      "word": "friend is who can give you strength at last",
+      "gloss": "朋友，是在最后可以给你力量的人。"
+    },
+    {
+      "word": "life is about learning to dance in the rain",
+      "gloss": "人生是要学会在雨中舞蹈。(邓文迪)"
+    },
+    {
+      "word": "i would rather he remember me the way i was",
+      "gloss": "我只愿他记得我当初的样子。"
+    },
+    {
+      "word": "people die of fright and live of confidence",
+      "gloss": "人们因惧怕而亡，因自信而生。—亨利•大卫•梭罗"
+    },
+    {
+      "word": "can you can a can as a canner can can a can",
+      "gloss": "你能像罐装工人一样罐装罐头吗？"
+    },
+    {
+      "word": "however long the night the dawn will break",
+      "gloss": "不管黑夜多长，黎明总会到来。"
+    },
+    {
+      "word": "without ceres and bacchus venus grows cold",
+      "gloss": "没有面包哪来的爱情。"
+    },
+    {
+      "word": "if you would be loved love and be loveable",
+      "gloss": "要想被人爱，就要付出爱，并让自己可爱。(Benjamin Franklin)"
+    },
+    {
+      "word": "the purpose of life is to enjoy every moment",
+      "gloss": "享受每时每刻才是生活的真谛。"
+    },
+    {
+      "word": "i fell in love with you the moment i saw you",
+      "gloss": "见到你的那一瞬间，我就爱上你了。"
+    },
+    {
+      "word": "where the more different you are the better",
+      "gloss": "你们之间越是不同，越好。(Glee)"
+    },
+    {
+      "word": "grow old along with me the best is yet to be",
+      "gloss": "执子之手，与子偕老。"
+    },
+    {
+      "word": "if your ship doesn't come in swim out to it",
+      "gloss": "如果你等的船没有向你驶来，那你就朝它游过去吧。(Jonathan Winters)"
+    },
+    {
+      "word": "time is a file that wears and makes no noise",
+      "gloss": "岁月是把杀猪刀。"
+    },
+    {
+      "word": "enjoy when you can and endure when you must",
+      "gloss": "该享受时纵情享受，该忍受时拼命忍受。"
+    },
+    {
+      "word": "nothing really matters except to live or die",
+      "gloss": "世上除了生死，其他都是小事。"
+    },
+    {
+      "word": "the greatest risk in life is to risk nothing",
+      "gloss": "人生中最大的风险是过没有任何风险的生活。"
+    },
+    {
+      "word": "it's the saddest part of my day leaving you",
+      "gloss": "离开你是我一天中最难过的时刻。"
+    },
+    {
+      "word": "great minds have purpose others have wishes",
+      "gloss": "伟大的人有目标，平庸的人只有愿望。(Washington Irving)"
+    },
+    {
+      "word": "good fortune favors the brave and courageous",
+      "gloss": "好运总是眷顾那些勇敢的人。"
+    },
+    {
+      "word": "jingle bells jingle bells jingle all the way",
+      "gloss": "叮叮当，叮叮当，铃儿响叮当……"
+    },
+    {
+      "word": "a smile is the most inviting of all gestures",
+      "gloss": "微笑是所有姿态中，最诱人的一种。"
+    },
+    {
+      "word": "gardens are not made by sitting in the shade",
+      "gloss": "花园不是在树荫下坐着就能建成的。—鲁德亚德•吉卜林"
+    },
+    {
+      "word": "i find that your adam's apple isn't apparent",
+      "gloss": "我发现你的喉结不明显。"
+    },
+    {
+      "word": "the soul is not where it lives but it loves",
+      "gloss": "爱之所在，亦心之所在。"
+    },
+    {
+      "word": "i have a woman's body and a child's emotions",
+      "gloss": "我有一个女人的身体和一颗孩子的心。(伊丽莎白·泰勒)"
+    },
+    {
+      "word": "sometimes love is not a feeling but a choice",
+      "gloss": "有时候，爱不是一种感觉，而是一种选择。"
+    },
+    {
+      "word": "my success is based on persistence not luck",
+      "gloss": "我的成功基于坚持，而非运气。(雅诗·兰黛)"
+    },
+    {
+      "word": "don't let yesterday use up too much of today",
+      "gloss": "别留念昨天了，把握好今天吧。(Will Rogers)"
+    },
+    {
+      "word": "miracles happen to those who believe in them",
+      "gloss": "相信奇迹的人，才能创造奇迹。"
+    },
+    {
+      "word": "every time i see you you look more beautiful",
+      "gloss": "三八节的问候：每次见到你，你都更漂亮了。"
+    },
+    {
+      "word": "take time to enjoy the simple things in life",
+      "gloss": "慢慢享受生活中的简单。"
+    },
+    {
+      "word": "the arbor day originated in the united states",
+      "gloss": "植树节起源于美国。"
+    },
+    {
+      "word": "those who stand for nothing fall for anything",
+      "gloss": "如果你毫无信仰，你将一事无成。—亚历山大·汉密尔顿"
+    },
+    {
+      "word": "every man is the architect of his own fortune",
+      "gloss": "每个人都是自己命运的建筑师。—克劳狄"
+    },
+    {
+      "word": "sometimes you have to fall before you can fly",
+      "gloss": "有时候，你得先跌下去，才能飞起来。"
+    },
+    {
+      "word": "it's okay to have flaws which makes you real",
+      "gloss": "有点缺点没关系，这样才真实。"
+    },
+    {
+      "word": "act enthusiastic and you will be enthusiastic",
+      "gloss": "带着激情做事，你就会有激情。(卡耐基)"
+    },
+    {
+      "word": "tears are the words which the heart can't say",
+      "gloss": "眼泪是心无法诉说的话语。"
+    },
+    {
+      "word": "we don't know what we've got until we lose it",
+      "gloss": "人们总在失去后才懂得珍惜。"
+    },
+    {
+      "word": "why is nine afraid of seven seven eight nine",
+      "gloss": "为什么9会害怕7？因为7会把9“吃掉”。"
+    },
+    {
+      "word": "live in the future then build what's missing",
+      "gloss": "活在未来，然后创造出现在还没有的部分。（保罗·格雷厄姆）"
+    },
+    {
+      "word": "there's many a slip twixt the cup and the lip",
+      "gloss": "世事往往会功亏一篑。"
+    },
+    {
+      "word": "say your love today the chance may come late",
+      "gloss": "爱就要勇敢表白，谁知道明天和意外哪个先来。"
+    },
+    {
+      "word": "home is not only where it is but who they are",
+      "gloss": "家是那个魂牵梦绕的地方，还有那些一直牵挂的人。"
+    },
+    {
+      "word": "life gets better not by chance but by change",
+      "gloss": "生活变得美好，不是偶然，而是我们努力改变的结果。"
+    },
+    {
+      "word": "everyone has his own way of finding happiness",
+      "gloss": "每个人都有各自找到幸福的方式。"
+    },
+    {
+      "word": "i am pretty useless at everything except music",
+      "gloss": "我除了音乐一无所能。"
+    },
+    {
+      "word": "stop being who you were and become who you are",
+      "gloss": "不再做过去的自己，而去成为真正的自己。—保罗·科尔贺"
+    },
+    {
+      "word": "the golden week of national day is approaching",
+      "gloss": "十一黄金周要来啦！"
+    },
+    {
+      "word": "i am a slow walker but i never walk backwards",
+      "gloss": "我走得很慢，但从不后退。(林肯)"
+    },
+    {
+      "word": "strive to make every day joyful and meaningful",
+      "gloss": "努力让每一天都开心有意义！"
+    },
+    {
+      "word": "love the life you live live the life you love",
+      "gloss": "喜欢自己过的生活，过自己喜欢的生活。"
+    },
+    {
+      "word": "there will be no forgetting september the th",
+      "gloss": "人们不会忘记9.11这一天。(乔治·w·布什)"
+    },
+    {
+      "word": "some people say we live in a dog eat dog world",
+      "gloss": "有人说，我们生活在一个竞争激烈的世界里。"
+    },
+    {
+      "word": "sometimes silence expresses more than words do",
+      "gloss": "有时候，沉默比话语表达得更多。"
+    },
+    {
+      "word": "what makes life dreary is the want of a motive",
+      "gloss": "没有了目的，人生便暗淡无光。(George Eliot)"
+    },
+    {
+      "word": "i really feel in the pink after a long holiday",
+      "gloss": "长假过后，我的确感到身体舒适。"
+    },
+    {
+      "word": "all happiness depends on a leisurely breakfast",
+      "gloss": "早餐决定一天的幸福指数！"
+    },
+    {
+      "word": "my life didn't please me so i created my life",
+      "gloss": "我的生活不曾取悦于我，所以我创造了自己的生活。(Coco Chanel)"
+    },
+    {
+      "word": "even the most boring times in life are limited",
+      "gloss": "生命中再无聊的时光也是限量版。"
+    },
+    {
+      "word": "genius only means hard working all one's life",
+      "gloss": "天才只意味着终身不懈的努力。 (俄国化学家，门捷列耶夫)"
+    },
+    {
+      "word": "as long as we're happy that's all that matters",
+      "gloss": "只要现在是开心的，这就足够了！"
+    },
+    {
+      "word": "even without the sun sunflower can still smile",
+      "gloss": "没有太阳，向日葵依然可以微笑。"
+    },
+    {
+      "word": "try your best even if the task seems difficult",
+      "gloss": "全力以赴，即使任务看起来超有难度。"
+    },
+    {
+      "word": "there are no shortcuts to any place worth going",
+      "gloss": "值得去的地方没有捷径。"
+    },
+    {
+      "word": "things do not happen things are made to happen",
+      "gloss": "事情不会自己发生，事情都是人做出来的。(美国前总统约翰.肯尼迪John F. Kennedy)"
+    },
+    {
+      "word": "pleasure in the job puts perfection in the work",
+      "gloss": "工作中的愉悦，让作品得以完美。—亚里斯多德"
+    },
+    {
+      "word": "the way to a man's heart is through his stomach",
+      "gloss": "要抓住男人的心，先抓住男人的胃。"
+    },
+    {
+      "word": "it is not the mountain we conquer but ourselves",
+      "gloss": "我们要征服的不是高山，而是自己。"
+    },
+    {
+      "word": "there is nothing impossible to him who will try",
+      "gloss": "对于肯尝试的人来说，没有什么是不可能的。"
+    },
+    {
+      "word": "sometimes the right path is not the easiest one",
+      "gloss": "对的那条路，往往不是最好走的。"
+    },
+    {
+      "word": "be true to yourself and everything will be fine",
+      "gloss": "做真实的自己，一切都会好起来的。(Ellen DeGeneres)"
+    },
+    {
+      "word": "if you obey all the rules you miss all the fun",
+      "gloss": "如果一切都循规蹈矩，人生还有什么乐趣？！"
+    },
+    {
+      "word": "do not pray for easy lives pray to be stronger",
+      "gloss": "与其祈求生活平淡点，还不如祈求自己强大点。"
+    },
+    {
+      "word": "distance doesn't ruin a relationship doubts do",
+      "gloss": "毁灭感情的不是距离，而是怀疑。"
+    },
+    {
+      "word": "even the big shot has to carry his wife's purse",
+      "gloss": "再牛X的男人也要帮媳妇拎包。"
+    },
+    {
+      "word": "if you fail to prepare you're prepared to fail",
+      "gloss": "不备而战，不战而败。(马克·施皮茨)"
+    },
+    {
+      "word": "my dear roommate thank you for sparing my life",
+      "gloss": "亲爱的室友，感谢你当年的不杀之恩。"
+    },
+    {
+      "word": "the best accessory a girl can own is confidence",
+      "gloss": "女生最好的饰品就是自信。"
+    },
+    {
+      "word": "there are so many beautiful reasons to be happy",
+      "gloss": "有太多太多美好的理由让你笑对生活。"
+    },
+    {
+      "word": "you are the first ray of sunshine at every dawn",
+      "gloss": "你是我每天清晨的第一缕阳光。"
+    },
+    {
+      "word": "failure is never quite so frightening as regret",
+      "gloss": "比失败更令人恐惧的是懊悔。"
+    },
+    {
+      "word": "a smile is a curve that sets everything straight",
+      "gloss": "微笑是一道弧线，却能把一切摆平。(Phyllis Diller)"
+    },
+    {
+      "word": "if you are very hungry you can eat like a horse",
+      "gloss": "如果你非常饿，就狼吞虎咽的吃吧！"
+    },
+    {
+      "word": "what i'm doing right now i'm chasing perfection",
+      "gloss": "我现在所做的，是为了追求更加完美。（科比）"
+    },
+    {
+      "word": "the world has changed and we must change with it",
+      "gloss": "世界已今非昔比，我们也要与时俱进。（奥巴马）"
+    },
+    {
+      "word": "growing old is mandatory growing up is optional",
+      "gloss": "变老是注定的，而成长却是可以选择的。(Chili Davis)"
+    },
+    {
+      "word": "all things in their being are good for something",
+      "gloss": "天生我才必有用。"
+    },
+    {
+      "word": "if you are passionate about something pursue it",
+      "gloss": "如果你想要，就勇敢去追逐！"
+    },
+    {
+      "word": "love when you are ready not when you are lonely",
+      "gloss": "不要因为寂寞而爱错人。"
+    },
+    {
+      "word": "if you don't make a choice the choice makes you",
+      "gloss": "你不主导命运，就会被命运主导。"
+    },
+    {
+      "word": "life does not have to be perfect to be wonderful",
+      "gloss": "精彩的人生不必苛求完美。(Annette Funicello)"
+    },
+    {
+      "word": "being silent is the perfect way to show contempt",
+      "gloss": "沉默是表示轻蔑的最好方式。(萧伯纳)"
+    },
+    {
+      "word": "by failing to prepare you are preparing to fail",
+      "gloss": "不做准备，那就准备失败吧。(Benjamin Franklin)"
+    },
+    {
+      "word": "what you do today can improve all your tomorrows",
+      "gloss": "今天你做好的事情，将改善你未来的每一天。(Ralph Marston)"
+    },
+    {
+      "word": "no dream is too big and no dreamer is too small",
+      "gloss": "梦想再大也不嫌大，追梦的人再小也不嫌小。"
+    },
+    {
+      "word": "don't follow the crowd let the crowd follow you",
+      "gloss": "不要随波逐流，要引领潮流。(Margaret Thatcher)"
+    },
+    {
+      "word": "don't ever underestimate the heart of a champion",
+      "gloss": "永远不要低估一颗冠军的心。(Rudy Tomjanovich)"
+    },
+    {
+      "word": "there is a breath of spring in the gentle breeze",
+      "gloss": "吹面不寒杨柳风。"
+    },
+    {
+      "word": "a girl should be two things classy and fabulous",
+      "gloss": "每个女孩都该做到两点：有品位并光芒四射。"
+    },
+    {
+      "word": "life is like live tv show there is no rehearsal",
+      "gloss": "人生没有彩排，只有现场直播。"
+    },
+    {
+      "word": "age wrinkles the body quitting wrinkles the soul",
+      "gloss": "年龄让身体起皱，放弃让灵魂起皱。—道格拉斯•麦克阿瑟"
+    },
+    {
+      "word": "be who you are and never ever apologize for that",
+      "gloss": "坚持做自己，并永远不要为此而后悔！"
+    },
+    {
+      "word": "apple plans to unveil a new ipad early this month",
+      "gloss": "苹果公司计划在本月揭开新iPad的神秘面纱。"
+    },
+    {
+      "word": "good luck is another name for tenacity of purpose",
+      "gloss": "好运不过是坚持不懈的结果。(Ralph Waldo Emerson)"
+    },
+    {
+      "word": "be it ever so humble there is no place like home",
+      "gloss": "休嫌它寒微贫贱，天涯无处似家园。"
+    },
+    {
+      "word": "have you fallen into the trap on april fool's day",
+      "gloss": "愚人节你上当了吗？"
+    },
+    {
+      "word": "let's burn incense in the memory of our pure past",
+      "gloss": "焚香纪念我们逝去的节操。"
+    },
+    {
+      "word": "let us fall in love with each other in the spring",
+      "gloss": "春天，让我们恋爱吧！"
+    },
+    {
+      "word": "they showed a brazen disregard for user's privacy",
+      "gloss": "他们明目张胆地无视用户的隐私权。"
+    },
+    {
+      "word": "the so called life all depends on who you meet",
+      "gloss": "所谓人生，便是取决于遇见谁。"
+    },
+    {
+      "word": "beware of the scalpers you may get a fake ticket",
+      "gloss": "小心票贩子！你可能会买到假票。"
+    },
+    {
+      "word": "correction does much but encouragement does more",
+      "gloss": "纠正作用很大，但鼓励的作用更大。—歌德"
+    },
+    {
+      "word": "a leader does not impose a decision he moulds it",
+      "gloss": "领导者不强加决定于他人，他促使一个决定成形。(Nelson Mandela)"
+    },
+    {
+      "word": "happiness lies in the consciousness we have of it",
+      "gloss": "幸福在于自知拥有幸福。"
+    },
+    {
+      "word": "the arbor day is up let's go planting some trees",
+      "gloss": "植树节到了，我们去种树吧！"
+    },
+    {
+      "word": "your heart is free have the courage to follow it",
+      "gloss": "你的心是自由的，要有勇气追随它。"
+    },
+    {
+      "word": "don't people have the power to fight against life",
+      "gloss": "人类不是有权利为自己的生命而战斗吗？"
+    },
+    {
+      "word": "your face haunts my dreams like the rain at night",
+      "gloss": "萦绕梦中，犹若夜雨，画的都是你的影。—泰戈尔"
+    },
+    {
+      "word": "i like people who make me laugh in spite of myself",
+      "gloss": "我喜欢那些让我笑起来的人，就算是我不想笑的时候。"
+    },
+    {
+      "word": "highways go toll free during national day holidays",
+      "gloss": "国庆期间高速公路免费通行。"
+    },
+    {
+      "word": "do what you can with what you have where you are",
+      "gloss": "在你所处的位置，用你所有的资源，做你力所能及的事。(西奥多·罗斯福)"
+    },
+    {
+      "word": "people tend to confuse bad decisions with bad luck",
+      "gloss": "没有糟糕的运气，只有糟糕的决定。"
+    },
+    {
+      "word": "he does not do any honest work and live off others",
+      "gloss": "他不务正业，专吃白食。"
+    },
+    {
+      "word": "technology is at its very best when it s invisible",
+      "gloss": "最棒的科技都是无形的。"
+    },
+    {
+      "word": "whatever is worth doing at all is worth doing well",
+      "gloss": "凡是值得做的事，就值得做好。"
+    },
+    {
+      "word": "i can't wait to spend the rest of my life with you",
+      "gloss": "我迫不及待想和你白头到老。"
+    },
+    {
+      "word": "it's time to start living the life you've imagined",
+      "gloss": "是时候开始过自己想要的生活了！"
+    },
+    {
+      "word": "talent wins games but teamwork wins championships",
+      "gloss": "天才能赢得比赛，但是团队合作才能取得冠军。"
+    },
+    {
+      "word": "everyone's got a life that no one else knows about",
+      "gloss": "每个人都有自己的人生，冷暖自知。"
+    },
+    {
+      "word": "never give up your dreams miracles happen everyday",
+      "gloss": "别放弃梦想，奇迹每天都在上演。"
+    },
+    {
+      "word": "life is like a journey with an unknown destination",
+      "gloss": "生命就像一次不知目的地的旅行。"
+    },
+    {
+      "word": "it's never too late to be what you might have been",
+      "gloss": "勇敢做自己，永远都不迟。（乔治·艾略特）"
+    },
+    {
+      "word": "change is not merely necessary to life it is life",
+      "gloss": "改变不只是人生的必需品，改变本身就是人生。—艾尔文·托夫勒"
+    },
+    {
+      "word": "hats off to our diligent readers on new year's eve",
+      "gloss": "向除夕还在学每日一句的同学致敬！"
+    },
+    {
+      "word": "i keep silence doesn't mean i don't know anything",
+      "gloss": "我沉默，不代表我不知道。"
+    },
+    {
+      "word": "be happy for this moment this moment is your life",
+      "gloss": "享受当下的快乐，因为这一刻正是你的人生。(Omar Khayyam)"
+    },
+    {
+      "word": "youth is not a time of life it is a state of mind",
+      "gloss": "青春不是一段年华，而是一种心境。"
+    },
+    {
+      "word": "everything comes to him who hustles while he waits",
+      "gloss": "等待时也匆忙做事的人，可以得到一切。—汤玛斯·爱迪生"
+    },
+    {
+      "word": "eventually you'll learn to cry that on the inside",
+      "gloss": "终有一天，你会学会让泪往心里流。"
+    },
+    {
+      "word": "housewives are busy doing spring festival shopping",
+      "gloss": "主妇们忙着置办年货。"
+    },
+    {
+      "word": "i can accept failure but i can't accept not trying",
+      "gloss": "我可以接受失败，但我不能接受从不去尝试。(迈克·乔丹)"
+    },
+    {
+      "word": "scarlett was crowned sexiest woman alive once again",
+      "gloss": "斯嘉丽再次被评为最性感女星。"
+    },
+    {
+      "word": "the more you know the more you know you don't know",
+      "gloss": "你知道的越多，你会发现你不知道的也就越多。"
+    },
+    {
+      "word": "talking the talk is not as good as walking the walk",
+      "gloss": "喊破嗓子不如甩开膀子。"
+    },
+    {
+      "word": "for my part i travel not to go anywhere but to go",
+      "gloss": "对我而言，旅行的重点不是去哪里，而是出发。"
+    },
+    {
+      "word": "a smile is the shortest distance between two people",
+      "gloss": "微笑是人与人之间最短的距离。"
+    },
+    {
+      "word": "every new day is another chance to change your life",
+      "gloss": "每天都会是改变命运的机会。"
+    },
+    {
+      "word": "all seeds only come to life once having been buried",
+      "gloss": "那一切都是种子，只有埋葬，才有生机。(顾城)"
+    },
+    {
+      "word": "mr zhang made an apology for his son's taking drugs",
+      "gloss": "张先生为他儿子吸毒道歉。"
+    },
+    {
+      "word": "failure is not falling down but refusing to get up",
+      "gloss": "失败不是跌倒，而是拒绝爬起来。"
+    },
+    {
+      "word": "image a new story for your life and start living it",
+      "gloss": "为你的生命想一个全新剧本，并去倾情出演吧！"
+    },
+    {
+      "word": "lift up your head princess if not the crown falls",
+      "gloss": "我的公主，请抬起你的头，不然皇冠会掉下来的……"
+    },
+    {
+      "word": "there is no point in living if you can't feel alive",
+      "gloss": "活着没有生气，那活着也没有意义。"
+    },
+    {
+      "word": "the best way to predict your future is to create it",
+      "gloss": "预测未来的最好方式就是去创造它。"
+    },
+    {
+      "word": "to change who you are change who you think you are",
+      "gloss": "想要改变自己，就要先改变你对自己的看法。"
+    },
+    {
+      "word": "if you wait all that happens is that you get older",
+      "gloss": "如果你等待，发生的只有变老。"
+    },
+    {
+      "word": "life is measured by thought and action not by time",
+      "gloss": "生命的价值是用思想和行为来衡量的，而不是寿命的长短。"
+    },
+    {
+      "word": "stop trying to find a rewind it's life not a movie",
+      "gloss": "别妄想着倒带，这是生活，不是电影。"
+    },
+    {
+      "word": "when we're together even the coldest day feels warm",
+      "gloss": "和相爱的你在一起，即使最寒冷的日子都充满了暖意。"
+    },
+    {
+      "word": "life is either a daring adventure or nothing at all",
+      "gloss": "生活要么大胆尝试，要么什么都不是。"
+    },
+    {
+      "word": "stop being a chicken and try the rollercoaster ride",
+      "gloss": "别那么胆小，来玩过山车啊！"
+    },
+    {
+      "word": "a book must be the axe for the frozen sea inside us",
+      "gloss": "所谓书，必须是砍向我们内心冰封大海的斧头。（卡夫卡）"
+    },
+    {
+      "word": "just trust yourself then you will know how to live",
+      "gloss": "只要相信自己，你就会懂得如何去生活。"
+    },
+    {
+      "word": "a fabulous breakfast matters more than anything else",
+      "gloss": "一顿美好的早餐比什么都重要。"
+    },
+    {
+      "word": "there is no key to happiness the door is always open",
+      "gloss": "这世界上没有通往幸福之门的钥匙，因为那个门总是打开的。"
+    },
+    {
+      "word": "every accomplishment starts with the decision to try",
+      "gloss": "每一个成就都始于勇于尝试的决心。—盖尔‧德弗斯"
+    },
+    {
+      "word": "if you are not brave enough no one will back you up",
+      "gloss": "你不勇敢，没人替你坚强。"
+    },
+    {
+      "word": "today is an opportunity to get better don't waste it",
+      "gloss": "今天是一个让一切变得更好的机会，别浪费。"
+    },
+    {
+      "word": "to travel hopefully is a better thing than to arrive",
+      "gloss": "带着希望旅行比到达目的地更美好。(Robert Louis Stevenson)"
+    },
+    {
+      "word": "don't follow others' steps when making your own trip",
+      "gloss": "不要踩着别人的脚印，找自己的路。"
+    },
+    {
+      "word": "the beginning is the most important part of the work",
+      "gloss": "开始阶段是工作最重要的部分。"
+    },
+    {
+      "word": "i hope you have a most happy and prosperous new year",
+      "gloss": "谨祝新年快乐幸福，大吉大利。"
+    },
+    {
+      "word": "beauty is an attitude it has nothing to do with age",
+      "gloss": "美是一种态度，与年"
+    }
+  ]
+}

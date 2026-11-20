@@ -1,0 +1,1609 @@
+{
+  "id": "chunks_phonics_cvc",
+  "title": "自然拼读 · CVC 语块",
+  "examTag": "CVC",
+  "kind": "word",
+  "disclaimer": "词表整理自 SeanMcP/reading consonant-vowel-patterns（见上游 LICENSE），筛选真实英语词用于拼读跟读。",
+  "words": [
+    {
+      "word": "bac",
+      "gloss": ""
+    },
+    {
+      "word": "bad",
+      "gloss": ""
+    },
+    {
+      "word": "bag",
+      "gloss": ""
+    },
+    {
+      "word": "bah",
+      "gloss": ""
+    },
+    {
+      "word": "bal",
+      "gloss": ""
+    },
+    {
+      "word": "bam",
+      "gloss": ""
+    },
+    {
+      "word": "ban",
+      "gloss": ""
+    },
+    {
+      "word": "bap",
+      "gloss": ""
+    },
+    {
+      "word": "bar",
+      "gloss": ""
+    },
+    {
+      "word": "bas",
+      "gloss": ""
+    },
+    {
+      "word": "bat",
+      "gloss": ""
+    },
+    {
+      "word": "bed",
+      "gloss": ""
+    },
+    {
+      "word": "beg",
+      "gloss": ""
+    },
+    {
+      "word": "bel",
+      "gloss": ""
+    },
+    {
+      "word": "ben",
+      "gloss": ""
+    },
+    {
+      "word": "bes",
+      "gloss": ""
+    },
+    {
+      "word": "bet",
+      "gloss": ""
+    },
+    {
+      "word": "bib",
+      "gloss": ""
+    },
+    {
+      "word": "bid",
+      "gloss": ""
+    },
+    {
+      "word": "big",
+      "gloss": ""
+    },
+    {
+      "word": "bin",
+      "gloss": ""
+    },
+    {
+      "word": "bis",
+      "gloss": ""
+    },
+    {
+      "word": "bit",
+      "gloss": ""
+    },
+    {
+      "word": "biz",
+      "gloss": ""
+    },
+    {
+      "word": "bob",
+      "gloss": ""
+    },
+    {
+      "word": "bod",
+      "gloss": ""
+    },
+    {
+      "word": "bog",
+      "gloss": ""
+    },
+    {
+      "word": "bon",
+      "gloss": ""
+    },
+    {
+      "word": "bop",
+      "gloss": ""
+    },
+    {
+      "word": "bor",
+      "gloss": ""
+    },
+    {
+      "word": "bos",
+      "gloss": ""
+    },
+    {
+      "word": "bot",
+      "gloss": ""
+    },
+    {
+      "word": "bow",
+      "gloss": ""
+    },
+    {
+      "word": "bub",
+      "gloss": ""
+    },
+    {
+      "word": "bud",
+      "gloss": ""
+    },
+    {
+      "word": "bug",
+      "gloss": ""
+    },
+    {
+      "word": "bum",
+      "gloss": ""
+    },
+    {
+      "word": "bun",
+      "gloss": ""
+    },
+    {
+      "word": "bur",
+      "gloss": ""
+    },
+    {
+      "word": "bus",
+      "gloss": ""
+    },
+    {
+      "word": "but",
+      "gloss": ""
+    },
+    {
+      "word": "cab",
+      "gloss": ""
+    },
+    {
+      "word": "cad",
+      "gloss": ""
+    },
+    {
+      "word": "cag",
+      "gloss": ""
+    },
+    {
+      "word": "cam",
+      "gloss": ""
+    },
+    {
+      "word": "can",
+      "gloss": ""
+    },
+    {
+      "word": "cap",
+      "gloss": ""
+    },
+    {
+      "word": "car",
+      "gloss": ""
+    },
+    {
+      "word": "cat",
+      "gloss": ""
+    },
+    {
+      "word": "caw",
+      "gloss": ""
+    },
+    {
+      "word": "cel",
+      "gloss": ""
+    },
+    {
+      "word": "cep",
+      "gloss": ""
+    },
+    {
+      "word": "cid",
+      "gloss": ""
+    },
+    {
+      "word": "cig",
+      "gloss": ""
+    },
+    {
+      "word": "cit",
+      "gloss": ""
+    },
+    {
+      "word": "cob",
+      "gloss": ""
+    },
+    {
+      "word": "cod",
+      "gloss": ""
+    },
+    {
+      "word": "cog",
+      "gloss": ""
+    },
+    {
+      "word": "col",
+      "gloss": ""
+    },
+    {
+      "word": "con",
+      "gloss": ""
+    },
+    {
+      "word": "cop",
+      "gloss": ""
+    },
+    {
+      "word": "cor",
+      "gloss": ""
+    },
+    {
+      "word": "cos",
+      "gloss": ""
+    },
+    {
+      "word": "cot",
+      "gloss": ""
+    },
+    {
+      "word": "cow",
+      "gloss": ""
+    },
+    {
+      "word": "cox",
+      "gloss": ""
+    },
+    {
+      "word": "coz",
+      "gloss": ""
+    },
+    {
+      "word": "cub",
+      "gloss": ""
+    },
+    {
+      "word": "cud",
+      "gloss": ""
+    },
+    {
+      "word": "cum",
+      "gloss": ""
+    },
+    {
+      "word": "cup",
+      "gloss": ""
+    },
+    {
+      "word": "cur",
+      "gloss": ""
+    },
+    {
+      "word": "cut",
+      "gloss": ""
+    },
+    {
+      "word": "dab",
+      "gloss": ""
+    },
+    {
+      "word": "dad",
+      "gloss": ""
+    },
+    {
+      "word": "dag",
+      "gloss": ""
+    },
+    {
+      "word": "dah",
+      "gloss": ""
+    },
+    {
+      "word": "dak",
+      "gloss": ""
+    },
+    {
+      "word": "dal",
+      "gloss": ""
+    },
+    {
+      "word": "dam",
+      "gloss": ""
+    },
+    {
+      "word": "dan",
+      "gloss": ""
+    },
+    {
+      "word": "dap",
+      "gloss": ""
+    },
+    {
+      "word": "das",
+      "gloss": ""
+    },
+    {
+      "word": "daw",
+      "gloss": ""
+    },
+    {
+      "word": "deb",
+      "gloss": ""
+    },
+    {
+      "word": "deg",
+      "gloss": ""
+    },
+    {
+      "word": "del",
+      "gloss": ""
+    },
+    {
+      "word": "den",
+      "gloss": ""
+    },
+    {
+      "word": "dev",
+      "gloss": ""
+    },
+    {
+      "word": "dew",
+      "gloss": ""
+    },
+    {
+      "word": "dib",
+      "gloss": ""
+    },
+    {
+      "word": "did",
+      "gloss": ""
+    },
+    {
+      "word": "dig",
+      "gloss": ""
+    },
+    {
+      "word": "dim",
+      "gloss": ""
+    },
+    {
+      "word": "din",
+      "gloss": ""
+    },
+    {
+      "word": "dip",
+      "gloss": ""
+    },
+    {
+      "word": "dis",
+      "gloss": ""
+    },
+    {
+      "word": "dit",
+      "gloss": ""
+    },
+    {
+      "word": "div",
+      "gloss": ""
+    },
+    {
+      "word": "dob",
+      "gloss": ""
+    },
+    {
+      "word": "doc",
+      "gloss": ""
+    },
+    {
+      "word": "dod",
+      "gloss": ""
+    },
+    {
+      "word": "dog",
+      "gloss": ""
+    },
+    {
+      "word": "dol",
+      "gloss": ""
+    },
+    {
+      "word": "dom",
+      "gloss": ""
+    },
+    {
+      "word": "don",
+      "gloss": ""
+    },
+    {
+      "word": "dop",
+      "gloss": ""
+    },
+    {
+      "word": "dor",
+      "gloss": ""
+    },
+    {
+      "word": "dos",
+      "gloss": ""
+    },
+    {
+      "word": "dot",
+      "gloss": ""
+    },
+    {
+      "word": "dow",
+      "gloss": ""
+    },
+    {
+      "word": "dub",
+      "gloss": ""
+    },
+    {
+      "word": "dud",
+      "gloss": ""
+    },
+    {
+      "word": "dug",
+      "gloss": ""
+    },
+    {
+      "word": "dun",
+      "gloss": ""
+    },
+    {
+      "word": "dup",
+      "gloss": ""
+    },
+    {
+      "word": "dux",
+      "gloss": ""
+    },
+    {
+      "word": "fad",
+      "gloss": ""
+    },
+    {
+      "word": "fag",
+      "gloss": ""
+    },
+    {
+      "word": "fan",
+      "gloss": ""
+    },
+    {
+      "word": "far",
+      "gloss": ""
+    },
+    {
+      "word": "fat",
+      "gloss": ""
+    },
+    {
+      "word": "fed",
+      "gloss": ""
+    },
+    {
+      "word": "fen",
+      "gloss": ""
+    },
+    {
+      "word": "fet",
+      "gloss": ""
+    },
+    {
+      "word": "few",
+      "gloss": ""
+    },
+    {
+      "word": "fez",
+      "gloss": ""
+    },
+    {
+      "word": "fib",
+      "gloss": ""
+    },
+    {
+      "word": "fid",
+      "gloss": ""
+    },
+    {
+      "word": "fig",
+      "gloss": ""
+    },
+    {
+      "word": "fin",
+      "gloss": ""
+    },
+    {
+      "word": "fir",
+      "gloss": ""
+    },
+    {
+      "word": "fit",
+      "gloss": ""
+    },
+    {
+      "word": "fix",
+      "gloss": ""
+    },
+    {
+      "word": "fob",
+      "gloss": ""
+    },
+    {
+      "word": "fog",
+      "gloss": ""
+    },
+    {
+      "word": "fon",
+      "gloss": ""
+    },
+    {
+      "word": "fop",
+      "gloss": ""
+    },
+    {
+      "word": "for",
+      "gloss": ""
+    },
+    {
+      "word": "fox",
+      "gloss": ""
+    },
+    {
+      "word": "fub",
+      "gloss": ""
+    },
+    {
+      "word": "fud",
+      "gloss": ""
+    },
+    {
+      "word": "fug",
+      "gloss": ""
+    },
+    {
+      "word": "fum",
+      "gloss": ""
+    },
+    {
+      "word": "fun",
+      "gloss": ""
+    },
+    {
+      "word": "fur",
+      "gloss": ""
+    },
+    {
+      "word": "gab",
+      "gloss": ""
+    },
+    {
+      "word": "gad",
+      "gloss": ""
+    },
+    {
+      "word": "gag",
+      "gloss": ""
+    },
+    {
+      "word": "gal",
+      "gloss": ""
+    },
+    {
+      "word": "gam",
+      "gloss": ""
+    },
+    {
+      "word": "gan",
+      "gloss": ""
+    },
+    {
+      "word": "gap",
+      "gloss": ""
+    },
+    {
+      "word": "gar",
+      "gloss": ""
+    },
+    {
+      "word": "gas",
+      "gloss": ""
+    },
+    {
+      "word": "gat",
+      "gloss": ""
+    },
+    {
+      "word": "gaw",
+      "gloss": ""
+    },
+    {
+      "word": "ged",
+      "gloss": ""
+    },
+    {
+      "word": "gel",
+      "gloss": ""
+    },
+    {
+      "word": "gem",
+      "gloss": ""
+    },
+    {
+      "word": "gen",
+      "gloss": ""
+    },
+    {
+      "word": "ger",
+      "gloss": ""
+    },
+    {
+      "word": "get",
+      "gloss": ""
+    },
+    {
+      "word": "gib",
+      "gloss": ""
+    },
+    {
+      "word": "gid",
+      "gloss": ""
+    },
+    {
+      "word": "gif",
+      "gloss": ""
+    },
+    {
+      "word": "gig",
+      "gloss": ""
+    },
+    {
+      "word": "gin",
+      "gloss": ""
+    },
+    {
+      "word": "gip",
+      "gloss": ""
+    },
+    {
+      "word": "git",
+      "gloss": ""
+    },
+    {
+      "word": "gob",
+      "gloss": ""
+    },
+    {
+      "word": "god",
+      "gloss": ""
+    },
+    {
+      "word": "gon",
+      "gloss": ""
+    },
+    {
+      "word": "gor",
+      "gloss": ""
+    },
+    {
+      "word": "gos",
+      "gloss": ""
+    },
+    {
+      "word": "got",
+      "gloss": ""
+    },
+    {
+      "word": "gul",
+      "gloss": ""
+    },
+    {
+      "word": "gum",
+      "gloss": ""
+    },
+    {
+      "word": "gun",
+      "gloss": ""
+    },
+    {
+      "word": "gup",
+      "gloss": ""
+    },
+    {
+      "word": "gur",
+      "gloss": ""
+    },
+    {
+      "word": "gus",
+      "gloss": ""
+    },
+    {
+      "word": "gut",
+      "gloss": ""
+    },
+    {
+      "word": "gym",
+      "gloss": ""
+    },
+    {
+      "word": "gyp",
+      "gloss": ""
+    },
+    {
+      "word": "had",
+      "gloss": ""
+    },
+    {
+      "word": "hag",
+      "gloss": ""
+    },
+    {
+      "word": "hah",
+      "gloss": ""
+    },
+    {
+      "word": "ham",
+      "gloss": ""
+    },
+    {
+      "word": "han",
+      "gloss": ""
+    },
+    {
+      "word": "hap",
+      "gloss": ""
+    },
+    {
+      "word": "hat",
+      "gloss": ""
+    },
+    {
+      "word": "haw",
+      "gloss": ""
+    },
+    {
+      "word": "hem",
+      "gloss": ""
+    },
+    {
+      "word": "hen",
+      "gloss": ""
+    },
+    {
+      "word": "hep",
+      "gloss": ""
+    },
+    {
+      "word": "her",
+      "gloss": ""
+    },
+    {
+      "word": "het",
+      "gloss": ""
+    },
+    {
+      "word": "hew",
+      "gloss": ""
+    },
+    {
+      "word": "hex",
+      "gloss": ""
+    },
+    {
+      "word": "hic",
+      "gloss": ""
+    },
+    {
+      "word": "hid",
+      "gloss": ""
+    },
+    {
+      "word": "him",
+      "gloss": ""
+    },
+    {
+      "word": "hin",
+      "gloss": ""
+    },
+    {
+      "word": "hip",
+      "gloss": ""
+    },
+    {
+      "word": "his",
+      "gloss": ""
+    },
+    {
+      "word": "hit",
+      "gloss": ""
+    },
+    {
+      "word": "hob",
+      "gloss": ""
+    },
+    {
+      "word": "hod",
+      "gloss": ""
+    },
+    {
+      "word": "hog",
+      "gloss": ""
+    },
+    {
+      "word": "hon",
+      "gloss": ""
+    },
+    {
+      "word": "hop",
+      "gloss": ""
+    },
+    {
+      "word": "hot",
+      "gloss": ""
+    },
+    {
+      "word": "how",
+      "gloss": ""
+    },
+    {
+      "word": "hox",
+      "gloss": ""
+    },
+    {
+      "word": "hub",
+      "gloss": ""
+    },
+    {
+      "word": "hug",
+      "gloss": ""
+    },
+    {
+      "word": "huh",
+      "gloss": ""
+    },
+    {
+      "word": "hum",
+      "gloss": ""
+    },
+    {
+      "word": "hun",
+      "gloss": ""
+    },
+    {
+      "word": "hup",
+      "gloss": ""
+    },
+    {
+      "word": "hut",
+      "gloss": ""
+    },
+    {
+      "word": "hyp",
+      "gloss": ""
+    },
+    {
+      "word": "jab",
+      "gloss": ""
+    },
+    {
+      "word": "jag",
+      "gloss": ""
+    },
+    {
+      "word": "jam",
+      "gloss": ""
+    },
+    {
+      "word": "jap",
+      "gloss": ""
+    },
+    {
+      "word": "jar",
+      "gloss": ""
+    },
+    {
+      "word": "jaw",
+      "gloss": ""
+    },
+    {
+      "word": "jet",
+      "gloss": ""
+    },
+    {
+      "word": "jew",
+      "gloss": ""
+    },
+    {
+      "word": "jib",
+      "gloss": ""
+    },
+    {
+      "word": "jig",
+      "gloss": ""
+    },
+    {
+      "word": "jin",
+      "gloss": ""
+    },
+    {
+      "word": "job",
+      "gloss": ""
+    },
+    {
+      "word": "jog",
+      "gloss": ""
+    },
+    {
+      "word": "jot",
+      "gloss": ""
+    },
+    {
+      "word": "jow",
+      "gloss": ""
+    },
+    {
+      "word": "jud",
+      "gloss": ""
+    },
+    {
+      "word": "jug",
+      "gloss": ""
+    },
+    {
+      "word": "jun",
+      "gloss": ""
+    },
+    {
+      "word": "jut",
+      "gloss": ""
+    },
+    {
+      "word": "kaf",
+      "gloss": ""
+    },
+    {
+      "word": "kat",
+      "gloss": ""
+    },
+    {
+      "word": "kaw",
+      "gloss": ""
+    },
+    {
+      "word": "keb",
+      "gloss": ""
+    },
+    {
+      "word": "ked",
+      "gloss": ""
+    },
+    {
+      "word": "kef",
+      "gloss": ""
+    },
+    {
+      "word": "keg",
+      "gloss": ""
+    },
+    {
+      "word": "ken",
+      "gloss": ""
+    },
+    {
+      "word": "kep",
+      "gloss": ""
+    },
+    {
+      "word": "ket",
+      "gloss": ""
+    },
+    {
+      "word": "kex",
+      "gloss": ""
+    },
+    {
+      "word": "kid",
+      "gloss": ""
+    },
+    {
+      "word": "kin",
+      "gloss": ""
+    },
+    {
+      "word": "kip",
+      "gloss": ""
+    },
+    {
+      "word": "kit",
+      "gloss": ""
+    },
+    {
+      "word": "kob",
+      "gloss": ""
+    },
+    {
+      "word": "kon",
+      "gloss": ""
+    },
+    {
+      "word": "kop",
+      "gloss": ""
+    },
+    {
+      "word": "kor",
+      "gloss": ""
+    },
+    {
+      "word": "kos",
+      "gloss": ""
+    },
+    {
+      "word": "lab",
+      "gloss": ""
+    },
+    {
+      "word": "lac",
+      "gloss": ""
+    },
+    {
+      "word": "lad",
+      "gloss": ""
+    },
+    {
+      "word": "lag",
+      "gloss": ""
+    },
+    {
+      "word": "lam",
+      "gloss": ""
+    },
+    {
+      "word": "lap",
+      "gloss": ""
+    },
+    {
+      "word": "lar",
+      "gloss": ""
+    },
+    {
+      "word": "las",
+      "gloss": ""
+    },
+    {
+      "word": "lat",
+      "gloss": ""
+    },
+    {
+      "word": "law",
+      "gloss": ""
+    },
+    {
+      "word": "lax",
+      "gloss": ""
+    },
+    {
+      "word": "led",
+      "gloss": ""
+    },
+    {
+      "word": "leg",
+      "gloss": ""
+    },
+    {
+      "word": "lek",
+      "gloss": ""
+    },
+    {
+      "word": "les",
+      "gloss": ""
+    },
+    {
+      "word": "let",
+      "gloss": ""
+    },
+    {
+      "word": "lev",
+      "gloss": ""
+    },
+    {
+      "word": "lew",
+      "gloss": ""
+    },
+    {
+      "word": "lex",
+      "gloss": ""
+    },
+    {
+      "word": "lid",
+      "gloss": ""
+    },
+    {
+      "word": "lin",
+      "gloss": ""
+    },
+    {
+      "word": "lip",
+      "gloss": ""
+    },
+    {
+      "word": "lis",
+      "gloss": ""
+    },
+    {
+      "word": "lit",
+      "gloss": ""
+    },
+    {
+      "word": "lob",
+      "gloss": ""
+    },
+    {
+      "word": "lod",
+      "gloss": ""
+    },
+    {
+      "word": "log",
+      "gloss": ""
+    },
+    {
+      "word": "lop",
+      "gloss": ""
+    },
+    {
+      "word": "lot",
+      "gloss": ""
+    },
+    {
+      "word": "low",
+      "gloss": ""
+    },
+    {
+      "word": "lox",
+      "gloss": ""
+    },
+    {
+      "word": "lug",
+      "gloss": ""
+    },
+    {
+      "word": "lum",
+      "gloss": ""
+    },
+    {
+      "word": "lur",
+      "gloss": ""
+    },
+    {
+      "word": "lux",
+      "gloss": ""
+    },
+    {
+      "word": "mac",
+      "gloss": ""
+    },
+    {
+      "word": "mad",
+      "gloss": ""
+    },
+    {
+      "word": "mag",
+      "gloss": ""
+    },
+    {
+      "word": "mal",
+      "gloss": ""
+    },
+    {
+      "word": "mam",
+      "gloss": ""
+    },
+    {
+      "word": "man",
+      "gloss": ""
+    },
+    {
+      "word": "map",
+      "gloss": ""
+    },
+    {
+      "word": "mar",
+      "gloss": ""
+    },
+    {
+      "word": "mas",
+      "gloss": ""
+    },
+    {
+      "word": "mat",
+      "gloss": ""
+    },
+    {
+      "word": "maw",
+      "gloss": ""
+    },
+    {
+      "word": "max",
+      "gloss": ""
+    },
+    {
+      "word": "meg",
+      "gloss": ""
+    },
+    {
+      "word": "mel",
+      "gloss": ""
+    },
+    {
+      "word": "mem",
+      "gloss": ""
+    },
+    {
+      "word": "men",
+      "gloss": ""
+    },
+    {
+      "word": "mes",
+      "gloss": ""
+    },
+    {
+      "word": "met",
+      "gloss": ""
+    },
+    {
+      "word": "mew",
+      "gloss": ""
+    },
+    {
+      "word": "mib",
+      "gloss": ""
+    },
+    {
+      "word": "mid",
+      "gloss": ""
+    },
+    {
+      "word": "mig",
+      "gloss": ""
+    },
+    {
+      "word": "mil",
+      "gloss": ""
+    },
+    {
+      "word": "mim",
+      "gloss": ""
+    },
+    {
+      "word": "mir",
+      "gloss": ""
+    },
+    {
+      "word": "mix",
+      "gloss": ""
+    },
+    {
+      "word": "mob",
+      "gloss": ""
+    },
+    {
+      "word": "mod",
+      "gloss": ""
+    },
+    {
+      "word": "mog",
+      "gloss": ""
+    },
+    {
+      "word": "mon",
+      "gloss": ""
+    },
+    {
+      "word": "mop",
+      "gloss": ""
+    },
+    {
+      "word": "mor",
+      "gloss": ""
+    },
+    {
+      "word": "mot",
+      "gloss": ""
+    },
+    {
+      "word": "mow",
+      "gloss": ""
+    },
+    {
+      "word": "mud",
+      "gloss": ""
+    },
+    {
+      "word": "mug",
+      "gloss": ""
+    },
+    {
+      "word": "mum",
+      "gloss": ""
+    },
+    {
+      "word": "mun",
+      "gloss": ""
+    },
+    {
+      "word": "mus",
+      "gloss": ""
+    },
+    {
+      "word": "mux",
+      "gloss": ""
+    },
+    {
+      "word": "nab",
+      "gloss": ""
+    },
+    {
+      "word": "nag",
+      "gloss": ""
+    },
+    {
+      "word": "nam",
+      "gloss": ""
+    },
+    {
+      "word": "nan",
+      "gloss": ""
+    },
+    {
+      "word": "nap",
+      "gloss": ""
+    },
+    {
+      "word": "nat",
+      "gloss": ""
+    },
+    {
+      "word": "naw",
+      "gloss": ""
+    },
+    {
+      "word": "neb",
+      "gloss": ""
+    },
+    {
+      "word": "ned",
+      "gloss": ""
+    },
+    {
+      "word": "nef",
+      "gloss": ""
+    },
+    {
+      "word": "nep",
+      "gloss": ""
+    },
+    {
+      "word": "net",
+      "gloss": ""
+    },
+    {
+      "word": "new",
+      "gloss": ""
+    },
+    {
+      "word": "nib",
+      "gloss": ""
+    },
+    {
+      "word": "nid",
+      "gloss": ""
+    },
+    {
+      "word": "nil",
+      "gloss": ""
+    },
+    {
+      "word": "nim",
+      "gloss": ""
+    },
+    {
+      "word": "nip",
+      "gloss": ""
+    },
+    {
+      "word": "nit",
+      "gloss": ""
+    },
+    {
+      "word": "nix",
+      "gloss": ""
+    },
+    {
+      "word": "nob",
+      "gloss": ""
+    },
+    {
+      "word": "nod",
+      "gloss": ""
+    },
+    {
+      "word": "nog",
+      "gloss": ""
+    },
+    {
+      "word": "non",
+      "gloss": ""
+    },
+    {
+      "word": "nor",
+      "gloss": ""
+    },
+    {
+      "word": "not",
+      "gloss": ""
+    },
+    {
+      "word": "now",
+      "gloss": ""
+    },
+    {
+      "word": "nub",
+      "gloss": ""
+    },
+    {
+      "word": "nun",
+      "gloss": ""
+    },
+    {
+      "word": "nut",
+      "gloss": ""
+    },
+    {
+      "word": "pac",
+      "gloss": ""
+    },
+    {
+      "word": "pad",
+      "gloss": ""
+    },
+    {
+      "word": "pah",
+      "gloss": ""
+    },
+    {
+      "word": "pal",
+      "gloss": ""
+    },
+    {
+      "word": "pam",
+      "gloss": ""
+    },
+    {
+      "word": "pan",
+      "gloss": ""
+    },
+    {
+      "word": "pap",
+      "gloss": ""
+    },
+    {
+      "word": "par",
+      "gloss": ""
+    },
+    {
+      "word": "pat",
+      "gloss": ""
+    },
+    {
+      "word": "paw",
+      "gloss": ""
+    },
+    {
+      "word": "pax",
+      "gloss": ""
+    },
+    {
+      "word": "ped",
+      "gloss": ""
+    },
+    {
+      "word": "peg",
+      "gloss": ""
+    },
+    {
+      "word": "pen",
+      "gloss": ""
+    },
+    {
+      "word": "pep",
+      "gloss": ""
+    },
+    {
+      "word": "per",
+      "gloss": ""
+    },
+    {
+      "word": "pes",
+      "gloss": ""
+    },
+    {
+      "word": "pet",
+      "gloss": ""
+    },
+    {
+      "word": "pew",
+      "gloss": ""
+    },
+    {
+      "word": "pic",
+      "gloss": ""
+    },
+    {
+      "word": "pig",
+      "gloss": ""
+    },
+    {
+      "word": "pin",
+      "gloss": ""
+    },
+    {
+      "word": "pip",
+      "gloss": ""
+    },
+    {
+      "word": "pir",
+      "gloss": ""
+    },
+    {
+      "word": "pit",
+      "gloss": ""
+    },
+    {
+      "word": "pix",
+      "gloss": ""
+    },
+    {
+      "word": "pod",
+      "gloss": ""
+    },
+    {
+      "word": "poh",
+      "gloss": ""
+    },
+    {
+      "word": "pol",
+      "gloss": ""
+    },
+    {
+      "word": "pom",
+      "gloss": ""
+    },
+    {
+      "word": "pop",
+      "gloss": ""
+    },
+    {
+      "word": "pot",
+      "gloss": ""
+    },
+    {
+      "word": "pow",
+      "gloss": ""
+    }
+  ]
+}

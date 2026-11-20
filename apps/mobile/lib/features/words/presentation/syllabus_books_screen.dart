@@ -150,8 +150,8 @@ class _SyllabusBooksScreenState extends ConsumerState<SyllabusBooksScreen> {
                 const SizedBox(height: 16),
                 Text(
                   isPattern
-                      ? '内置日常口语句型；也可导入 CSV/TXT（每行一句型，或 pattern,释义）。'
-                      : '内置四级/六级自建核心表；也可从在线词库按需下载，或用 CSV/TXT 导入。',
+                      ? '内置语块/口语句型书（口语1000、程序员句型、习语精选等）；也可导入 CSV/TXT（每行一句型，或 pattern,释义）。'
+                      : '内置四级/六级核心表与 CVC/CVCe 拼读语块；也可从在线词库下载，或用 CSV/TXT 导入。',
                   style: const TextStyle(height: 1.5, color: Color(0xFF626262)),
                 ),
                 if (!isPattern) ...<Widget>[

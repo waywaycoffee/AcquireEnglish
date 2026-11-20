@@ -1,0 +1,4081 @@
+{
+  "id": "chunks_conversational_1000",
+  "title": "口语常用语块 1000",
+  "examTag": "CHUNK",
+  "kind": "pattern",
+  "disclaimer": "源自 ronaldaug/english-conversational-data（common-1000）。仓库未附正式 LICENSE，仅作学习语块包；若上游变更许可请同步调整。",
+  "words": [
+    {
+      "word": "be careful",
+      "gloss": ""
+    },
+    {
+      "word": "be careful driving",
+      "gloss": ""
+    },
+    {
+      "word": "can you translate this for me",
+      "gloss": ""
+    },
+    {
+      "word": "chicago is very different from boston",
+      "gloss": ""
+    },
+    {
+      "word": "don't worry",
+      "gloss": ""
+    },
+    {
+      "word": "everyone knows it",
+      "gloss": ""
+    },
+    {
+      "word": "everything is ready",
+      "gloss": ""
+    },
+    {
+      "word": "excellent",
+      "gloss": ""
+    },
+    {
+      "word": "from time to time",
+      "gloss": ""
+    },
+    {
+      "word": "good idea",
+      "gloss": ""
+    },
+    {
+      "word": "he likes it very much",
+      "gloss": ""
+    },
+    {
+      "word": "help",
+      "gloss": ""
+    },
+    {
+      "word": "he's coming soon",
+      "gloss": ""
+    },
+    {
+      "word": "he's right",
+      "gloss": ""
+    },
+    {
+      "word": "he's very annoying",
+      "gloss": ""
+    },
+    {
+      "word": "he's very famous",
+      "gloss": ""
+    },
+    {
+      "word": "how are you",
+      "gloss": ""
+    },
+    {
+      "word": "how's work going",
+      "gloss": ""
+    },
+    {
+      "word": "hurry",
+      "gloss": ""
+    },
+    {
+      "word": "i ate already",
+      "gloss": ""
+    },
+    {
+      "word": "i can't hear you",
+      "gloss": ""
+    },
+    {
+      "word": "i'd like to go for a walk",
+      "gloss": ""
+    },
+    {
+      "word": "i don't know how to use it",
+      "gloss": ""
+    },
+    {
+      "word": "i don't like him",
+      "gloss": ""
+    },
+    {
+      "word": "i don't like it",
+      "gloss": ""
+    },
+    {
+      "word": "i don't speak very well",
+      "gloss": ""
+    },
+    {
+      "word": "i don't understand",
+      "gloss": ""
+    },
+    {
+      "word": "i don't want it",
+      "gloss": ""
+    },
+    {
+      "word": "i don't want that",
+      "gloss": ""
+    },
+    {
+      "word": "i don't want to bother you",
+      "gloss": ""
+    },
+    {
+      "word": "i feel good",
+      "gloss": ""
+    },
+    {
+      "word": "if you need my help please let me know",
+      "gloss": ""
+    },
+    {
+      "word": "i get off of work at",
+      "gloss": ""
+    },
+    {
+      "word": "i have a headache",
+      "gloss": ""
+    },
+    {
+      "word": "i hope you and your wife have a nice trip",
+      "gloss": ""
+    },
+    {
+      "word": "i know",
+      "gloss": ""
+    },
+    {
+      "word": "i like her",
+      "gloss": ""
+    },
+    {
+      "word": "i'll call you when i leave",
+      "gloss": ""
+    },
+    {
+      "word": "i'll come back later",
+      "gloss": ""
+    },
+    {
+      "word": "i'll pay",
+      "gloss": ""
+    },
+    {
+      "word": "i'll take it",
+      "gloss": ""
+    },
+    {
+      "word": "i'll take you to the bus stop",
+      "gloss": ""
+    },
+    {
+      "word": "i lost my watch",
+      "gloss": ""
+    },
+    {
+      "word": "i love you",
+      "gloss": ""
+    },
+    {
+      "word": "i'm an american",
+      "gloss": ""
+    },
+    {
+      "word": "i'm cleaning my room",
+      "gloss": ""
+    },
+    {
+      "word": "i'm cold",
+      "gloss": ""
+    },
+    {
+      "word": "i'm coming to pick you up",
+      "gloss": ""
+    },
+    {
+      "word": "i'm going to leave",
+      "gloss": ""
+    },
+    {
+      "word": "i'm good and you",
+      "gloss": ""
+    },
+    {
+      "word": "i'm happy",
+      "gloss": ""
+    },
+    {
+      "word": "i'm hungry",
+      "gloss": ""
+    },
+    {
+      "word": "i'm married",
+      "gloss": ""
+    },
+    {
+      "word": "i'm not busy",
+      "gloss": ""
+    },
+    {
+      "word": "i'm not married",
+      "gloss": ""
+    },
+    {
+      "word": "i'm not ready yet",
+      "gloss": ""
+    },
+    {
+      "word": "i'm not sure",
+      "gloss": ""
+    },
+    {
+      "word": "i'm sorry we're sold out",
+      "gloss": ""
+    },
+    {
+      "word": "i'm thirsty",
+      "gloss": ""
+    },
+    {
+      "word": "i'm very busy i don't have time now",
+      "gloss": ""
+    },
+    {
+      "word": "i need to change clothes",
+      "gloss": ""
+    },
+    {
+      "word": "i need to go home",
+      "gloss": ""
+    },
+    {
+      "word": "i only want a snack",
+      "gloss": ""
+    },
+    {
+      "word": "is mr smith an american",
+      "gloss": ""
+    },
+    {
+      "word": "is that enough",
+      "gloss": ""
+    },
+    {
+      "word": "i think it's very good",
+      "gloss": ""
+    },
+    {
+      "word": "i think it tastes good",
+      "gloss": ""
+    },
+    {
+      "word": "i thought the clothes were cheaper",
+      "gloss": ""
+    },
+    {
+      "word": "it's longer than miles",
+      "gloss": ""
+    },
+    {
+      "word": "i've been here for two days",
+      "gloss": ""
+    },
+    {
+      "word": "i've heard texas is a beautiful place",
+      "gloss": ""
+    },
+    {
+      "word": "i've never seen that before",
+      "gloss": ""
+    },
+    {
+      "word": "i was about to leave the restaurant when my friends arrived",
+      "gloss": ""
+    },
+    {
+      "word": "just a little",
+      "gloss": ""
+    },
+    {
+      "word": "just a moment",
+      "gloss": ""
+    },
+    {
+      "word": "let me check",
+      "gloss": ""
+    },
+    {
+      "word": "let me think about it",
+      "gloss": ""
+    },
+    {
+      "word": "let's go have a look",
+      "gloss": ""
+    },
+    {
+      "word": "let's practice english",
+      "gloss": ""
+    },
+    {
+      "word": "may i speak to mrs smith please",
+      "gloss": ""
+    },
+    {
+      "word": "more than that",
+      "gloss": ""
+    },
+    {
+      "word": "never mind",
+      "gloss": ""
+    },
+    {
+      "word": "next time",
+      "gloss": ""
+    },
+    {
+      "word": "no",
+      "gloss": ""
+    },
+    {
+      "word": "nonsense",
+      "gloss": ""
+    },
+    {
+      "word": "no thank you",
+      "gloss": ""
+    },
+    {
+      "word": "nothing else",
+      "gloss": ""
+    },
+    {
+      "word": "not recently",
+      "gloss": ""
+    },
+    {
+      "word": "not yet",
+      "gloss": ""
+    },
+    {
+      "word": "of course",
+      "gloss": ""
+    },
+    {
+      "word": "okay",
+      "gloss": ""
+    },
+    {
+      "word": "please fill out this form",
+      "gloss": ""
+    },
+    {
+      "word": "please take me to this address",
+      "gloss": ""
+    },
+    {
+      "word": "please write it down",
+      "gloss": ""
+    },
+    {
+      "word": "really",
+      "gloss": ""
+    },
+    {
+      "word": "right here",
+      "gloss": ""
+    },
+    {
+      "word": "right there",
+      "gloss": ""
+    },
+    {
+      "word": "see you later",
+      "gloss": ""
+    },
+    {
+      "word": "see you tomorrow",
+      "gloss": ""
+    },
+    {
+      "word": "see you tonight",
+      "gloss": ""
+    },
+    {
+      "word": "she's pretty",
+      "gloss": ""
+    },
+    {
+      "word": "sorry to bother you",
+      "gloss": ""
+    },
+    {
+      "word": "stop",
+      "gloss": ""
+    },
+    {
+      "word": "take a chance",
+      "gloss": ""
+    },
+    {
+      "word": "take it outside",
+      "gloss": ""
+    },
+    {
+      "word": "tell me",
+      "gloss": ""
+    },
+    {
+      "word": "thanks for everything",
+      "gloss": ""
+    },
+    {
+      "word": "thanks for your help",
+      "gloss": ""
+    },
+    {
+      "word": "thank you",
+      "gloss": ""
+    },
+    {
+      "word": "thank you miss",
+      "gloss": ""
+    },
+    {
+      "word": "thank you sir",
+      "gloss": ""
+    },
+    {
+      "word": "thank you very much",
+      "gloss": ""
+    },
+    {
+      "word": "that looks great",
+      "gloss": ""
+    },
+    {
+      "word": "that's alright",
+      "gloss": ""
+    },
+    {
+      "word": "that's enough",
+      "gloss": ""
+    },
+    {
+      "word": "that's fine",
+      "gloss": ""
+    },
+    {
+      "word": "that's it",
+      "gloss": ""
+    },
+    {
+      "word": "that smells bad",
+      "gloss": ""
+    },
+    {
+      "word": "that's not fair",
+      "gloss": ""
+    },
+    {
+      "word": "that's not right",
+      "gloss": ""
+    },
+    {
+      "word": "that's right",
+      "gloss": ""
+    },
+    {
+      "word": "that's too bad",
+      "gloss": ""
+    },
+    {
+      "word": "that's too many",
+      "gloss": ""
+    },
+    {
+      "word": "that's too much",
+      "gloss": ""
+    },
+    {
+      "word": "the book is under the table",
+      "gloss": ""
+    },
+    {
+      "word": "they'll be right back",
+      "gloss": ""
+    },
+    {
+      "word": "they're the same",
+      "gloss": ""
+    },
+    {
+      "word": "they're very busy",
+      "gloss": ""
+    },
+    {
+      "word": "this doesn't work",
+      "gloss": ""
+    },
+    {
+      "word": "this is very difficult",
+      "gloss": ""
+    },
+    {
+      "word": "this is very important",
+      "gloss": ""
+    },
+    {
+      "word": "try it",
+      "gloss": ""
+    },
+    {
+      "word": "very good thanks",
+      "gloss": ""
+    },
+    {
+      "word": "we like it very much",
+      "gloss": ""
+    },
+    {
+      "word": "would you take a message please",
+      "gloss": ""
+    },
+    {
+      "word": "yes really",
+      "gloss": ""
+    },
+    {
+      "word": "you're beautiful",
+      "gloss": ""
+    },
+    {
+      "word": "you're very nice",
+      "gloss": ""
+    },
+    {
+      "word": "you're very smart",
+      "gloss": ""
+    },
+    {
+      "word": "your things are all here",
+      "gloss": ""
+    },
+    {
+      "word": "certainly",
+      "gloss": ""
+    },
+    {
+      "word": "good afternoon",
+      "gloss": ""
+    },
+    {
+      "word": "good evening sir",
+      "gloss": ""
+    },
+    {
+      "word": "good luck",
+      "gloss": ""
+    },
+    {
+      "word": "good morning",
+      "gloss": ""
+    },
+    {
+      "word": "great",
+      "gloss": ""
+    },
+    {
+      "word": "happy birthday",
+      "gloss": ""
+    },
+    {
+      "word": "have a good trip",
+      "gloss": ""
+    },
+    {
+      "word": "hello",
+      "gloss": ""
+    },
+    {
+      "word": "hi",
+      "gloss": ""
+    },
+    {
+      "word": "nice to meet you",
+      "gloss": ""
+    },
+    {
+      "word": "please call me",
+      "gloss": ""
+    },
+    {
+      "word": "about kilometers",
+      "gloss": ""
+    },
+    {
+      "word": "a one way ticket",
+      "gloss": ""
+    },
+    {
+      "word": "are you going to help her",
+      "gloss": ""
+    },
+    {
+      "word": "a round trip ticket",
+      "gloss": ""
+    },
+    {
+      "word": "at what time",
+      "gloss": ""
+    },
+    {
+      "word": "can i make an appointment for next wednesday",
+      "gloss": ""
+    },
+    {
+      "word": "can you repeat that please",
+      "gloss": ""
+    },
+    {
+      "word": "does this road go to new york",
+      "gloss": ""
+    },
+    {
+      "word": "do you have enough money",
+      "gloss": ""
+    },
+    {
+      "word": "do you know how to cook",
+      "gloss": ""
+    },
+    {
+      "word": "do you know what this says",
+      "gloss": ""
+    },
+    {
+      "word": "do you want me to come and pick you up",
+      "gloss": ""
+    },
+    {
+      "word": "follow me",
+      "gloss": ""
+    },
+    {
+      "word": "from here to there",
+      "gloss": ""
+    },
+    {
+      "word": "go straight ahead",
+      "gloss": ""
+    },
+    {
+      "word": "have you arrived",
+      "gloss": ""
+    },
+    {
+      "word": "have you been to boston",
+      "gloss": ""
+    },
+    {
+      "word": "how do i get there",
+      "gloss": ""
+    },
+    {
+      "word": "how do i get to daniel street",
+      "gloss": ""
+    },
+    {
+      "word": "how do i get to the american embassy",
+      "gloss": ""
+    },
+    {
+      "word": "how long does it take by car",
+      "gloss": ""
+    },
+    {
+      "word": "how long does it take to get to georgia",
+      "gloss": ""
+    },
+    {
+      "word": "how long is the flight",
+      "gloss": ""
+    },
+    {
+      "word": "how was the movie",
+      "gloss": ""
+    },
+    {
+      "word": "i'd like to make a phone call",
+      "gloss": ""
+    },
+    {
+      "word": "i'd like to make a reservation",
+      "gloss": ""
+    },
+    {
+      "word": "i have a question i want to ask you i want to ask you a question",
+      "gloss": ""
+    },
+    {
+      "word": "i'll take that one also",
+      "gloss": ""
+    },
+    {
+      "word": "i'm coming right now",
+      "gloss": ""
+    },
+    {
+      "word": "i'm going home in four days",
+      "gloss": ""
+    },
+    {
+      "word": "i'm leaving tomorrow",
+      "gloss": ""
+    },
+    {
+      "word": "i'm looking for the post office",
+      "gloss": ""
+    },
+    {
+      "word": "is this pen yours",
+      "gloss": ""
+    },
+    {
+      "word": "i wish i had one",
+      "gloss": ""
+    },
+    {
+      "word": "one ticket to new york please",
+      "gloss": ""
+    },
+    {
+      "word": "one way or round trip",
+      "gloss": ""
+    },
+    {
+      "word": "please speak slower",
+      "gloss": ""
+    },
+    {
+      "word": "please take me to the airport",
+      "gloss": ""
+    },
+    {
+      "word": "that way",
+      "gloss": ""
+    },
+    {
+      "word": "the plane departs at p",
+      "gloss": ""
+    },
+    {
+      "word": "they arrived yesterday",
+      "gloss": ""
+    },
+    {
+      "word": "turn around",
+      "gloss": ""
+    },
+    {
+      "word": "turn left",
+      "gloss": ""
+    },
+    {
+      "word": "turn right",
+      "gloss": ""
+    },
+    {
+      "word": "what time are you going to the bus station",
+      "gloss": ""
+    },
+    {
+      "word": "when did this happen",
+      "gloss": ""
+    },
+    {
+      "word": "when did you arrive in boston",
+      "gloss": ""
+    },
+    {
+      "word": "when does he arrive",
+      "gloss": ""
+    },
+    {
+      "word": "when does it arrive",
+      "gloss": ""
+    },
+    {
+      "word": "when does the bank open",
+      "gloss": ""
+    },
+    {
+      "word": "when does the bus leave",
+      "gloss": ""
+    },
+    {
+      "word": "when do we arrive",
+      "gloss": ""
+    },
+    {
+      "word": "when do we leave",
+      "gloss": ""
+    },
+    {
+      "word": "where can i mail this",
+      "gloss": ""
+    },
+    {
+      "word": "where is she from",
+      "gloss": ""
+    },
+    {
+      "word": "where is the bathroom",
+      "gloss": ""
+    },
+    {
+      "word": "why not",
+      "gloss": ""
+    },
+    {
+      "word": "will you remind me",
+      "gloss": ""
+    },
+    {
+      "word": "dollars",
+      "gloss": ""
+    },
+    {
+      "word": "cents",
+      "gloss": ""
+    },
+    {
+      "word": "a few",
+      "gloss": ""
+    },
+    {
+      "word": "a little",
+      "gloss": ""
+    },
+    {
+      "word": "call the police",
+      "gloss": ""
+    },
+    {
+      "word": "did your wife like california",
+      "gloss": ""
+    },
+    {
+      "word": "do you have any coffee",
+      "gloss": ""
+    },
+    {
+      "word": "do you have anything cheaper",
+      "gloss": ""
+    },
+    {
+      "word": "do you take credit cards",
+      "gloss": ""
+    },
+    {
+      "word": "how are you paying",
+      "gloss": ""
+    },
+    {
+      "word": "how many people are there in new york",
+      "gloss": ""
+    },
+    {
+      "word": "how much are these earrings",
+      "gloss": ""
+    },
+    {
+      "word": "how much does it cost per day",
+      "gloss": ""
+    },
+    {
+      "word": "how much does this cost",
+      "gloss": ""
+    },
+    {
+      "word": "how much do i owe you",
+      "gloss": ""
+    },
+    {
+      "word": "how much is it to go to miami",
+      "gloss": ""
+    },
+    {
+      "word": "how much money do you make",
+      "gloss": ""
+    },
+    {
+      "word": "i'd like to eat at th street restaurant",
+      "gloss": ""
+    },
+    {
+      "word": "i don't have a girlfriend",
+      "gloss": ""
+    },
+    {
+      "word": "i don't have any money",
+      "gloss": ""
+    },
+    {
+      "word": "i have a reservation",
+      "gloss": ""
+    },
+    {
+      "word": "i'll have the same thing",
+      "gloss": ""
+    },
+    {
+      "word": "i'll pay for dinner",
+      "gloss": ""
+    },
+    {
+      "word": "i'll pay for the tickets",
+      "gloss": ""
+    },
+    {
+      "word": "i'm years old",
+      "gloss": ""
+    },
+    {
+      "word": "i need to practice my english",
+      "gloss": ""
+    },
+    {
+      "word": "isn't it",
+      "gloss": ""
+    },
+    {
+      "word": "is that ok",
+      "gloss": ""
+    },
+    {
+      "word": "is there any mail for me",
+      "gloss": ""
+    },
+    {
+      "word": "it's pm",
+      "gloss": ""
+    },
+    {
+      "word": "it's is a quarter past nine",
+      "gloss": ""
+    },
+    {
+      "word": "please come in",
+      "gloss": ""
+    },
+    {
+      "word": "sorry we don't accept credit cards",
+      "gloss": ""
+    },
+    {
+      "word": "sorry we only accept cash",
+      "gloss": ""
+    },
+    {
+      "word": "that restaurant is not expensive",
+      "gloss": ""
+    },
+    {
+      "word": "that's too expensive",
+      "gloss": ""
+    },
+    {
+      "word": "there are many people here",
+      "gloss": ""
+    },
+    {
+      "word": "they charge dollars per day",
+      "gloss": ""
+    },
+    {
+      "word": "what's the exchange rate for dollars",
+      "gloss": ""
+    },
+    {
+      "word": "what's the phone number",
+      "gloss": ""
+    },
+    {
+      "word": "where can i buy tickets",
+      "gloss": ""
+    },
+    {
+      "word": "where would you like to meet",
+      "gloss": ""
+    },
+    {
+      "word": "which one is better",
+      "gloss": ""
+    },
+    {
+      "word": "across from the post office",
+      "gloss": ""
+    },
+    {
+      "word": "at o'clock",
+      "gloss": ""
+    },
+    {
+      "word": "be quiet",
+      "gloss": ""
+    },
+    {
+      "word": "can you recommend a good restaurant",
+      "gloss": ""
+    },
+    {
+      "word": "here it is",
+      "gloss": ""
+    },
+    {
+      "word": "here you are",
+      "gloss": ""
+    },
+    {
+      "word": "he's in the kitchen",
+      "gloss": ""
+    },
+    {
+      "word": "he studies at boston university",
+      "gloss": ""
+    },
+    {
+      "word": "how far is it",
+      "gloss": ""
+    },
+    {
+      "word": "how far is it to chicago",
+      "gloss": ""
+    },
+    {
+      "word": "how many miles is it to pennsylvania",
+      "gloss": ""
+    },
+    {
+      "word": "i'd like a single room",
+      "gloss": ""
+    },
+    {
+      "word": "i like to watch tv",
+      "gloss": ""
+    },
+    {
+      "word": "it's delicious",
+      "gloss": ""
+    },
+    {
+      "word": "it's half past",
+      "gloss": ""
+    },
+    {
+      "word": "it's less than dollars",
+      "gloss": ""
+    },
+    {
+      "word": "it's more than dollars",
+      "gloss": ""
+    },
+    {
+      "word": "it's near the supermarket",
+      "gloss": ""
+    },
+    {
+      "word": "it's not suppose to rain today",
+      "gloss": ""
+    },
+    {
+      "word": "it's ok",
+      "gloss": ""
+    },
+    {
+      "word": "it's on th street",
+      "gloss": ""
+    },
+    {
+      "word": "it's really hot",
+      "gloss": ""
+    },
+    {
+      "word": "it's suppose to rain tomorrow",
+      "gloss": ""
+    },
+    {
+      "word": "i was going to the library",
+      "gloss": ""
+    },
+    {
+      "word": "i was in the library",
+      "gloss": ""
+    },
+    {
+      "word": "let's go",
+      "gloss": ""
+    },
+    {
+      "word": "maybe",
+      "gloss": ""
+    },
+    {
+      "word": "more than miles",
+      "gloss": ""
+    },
+    {
+      "word": "my house is close to the bank",
+      "gloss": ""
+    },
+    {
+      "word": "near the bank",
+      "gloss": ""
+    },
+    {
+      "word": "on the left",
+      "gloss": ""
+    },
+    {
+      "word": "on the right",
+      "gloss": ""
+    },
+    {
+      "word": "on the second floor",
+      "gloss": ""
+    },
+    {
+      "word": "outside the hotel",
+      "gloss": ""
+    },
+    {
+      "word": "over here",
+      "gloss": ""
+    },
+    {
+      "word": "over there",
+      "gloss": ""
+    },
+    {
+      "word": "the book is behind the table",
+      "gloss": ""
+    },
+    {
+      "word": "the book is in front of the table",
+      "gloss": ""
+    },
+    {
+      "word": "the book is near the table",
+      "gloss": ""
+    },
+    {
+      "word": "the book is next to the table",
+      "gloss": ""
+    },
+    {
+      "word": "the book is on top of the table",
+      "gloss": ""
+    },
+    {
+      "word": "there are some books on the table",
+      "gloss": ""
+    },
+    {
+      "word": "there's a book under the table",
+      "gloss": ""
+    },
+    {
+      "word": "we're from california",
+      "gloss": ""
+    },
+    {
+      "word": "what's the address",
+      "gloss": ""
+    },
+    {
+      "word": "where are you going",
+      "gloss": ""
+    },
+    {
+      "word": "where is it",
+      "gloss": ""
+    },
+    {
+      "word": "where would you like to go",
+      "gloss": ""
+    },
+    {
+      "word": "who won",
+      "gloss": ""
+    },
+    {
+      "word": "can i see your passport please",
+      "gloss": ""
+    },
+    {
+      "word": "can i take a message",
+      "gloss": ""
+    },
+    {
+      "word": "can i try it on",
+      "gloss": ""
+    },
+    {
+      "word": "can we sit over there",
+      "gloss": ""
+    },
+    {
+      "word": "did you come with your family",
+      "gloss": ""
+    },
+    {
+      "word": "do you think it's possible",
+      "gloss": ""
+    },
+    {
+      "word": "here's my number",
+      "gloss": ""
+    },
+    {
+      "word": "he's not in right now",
+      "gloss": ""
+    },
+    {
+      "word": "hi is mrs smith there please",
+      "gloss": ""
+    },
+    {
+      "word": "i'd like some water too please",
+      "gloss": ""
+    },
+    {
+      "word": "i'd like to buy a bottle of water please",
+      "gloss": ""
+    },
+    {
+      "word": "i'd like to buy something",
+      "gloss": ""
+    },
+    {
+      "word": "i'd like to go to the store",
+      "gloss": ""
+    },
+    {
+      "word": "i'd like to rent a car",
+      "gloss": ""
+    },
+    {
+      "word": "i'd like to send a fax",
+      "gloss": ""
+    },
+    {
+      "word": "i'd like to send this to america",
+      "gloss": ""
+    },
+    {
+      "word": "i'd like to speak to mr smith please",
+      "gloss": ""
+    },
+    {
+      "word": "i have three children two girls and one boy",
+      "gloss": ""
+    },
+    {
+      "word": "i'll be right back",
+      "gloss": ""
+    },
+    {
+      "word": "i'll call back later",
+      "gloss": ""
+    },
+    {
+      "word": "i'll call you on friday",
+      "gloss": ""
+    },
+    {
+      "word": "i'll teach you",
+      "gloss": ""
+    },
+    {
+      "word": "i'm ok",
+      "gloss": ""
+    },
+    {
+      "word": "i need some tissues",
+      "gloss": ""
+    },
+    {
+      "word": "is there an english speaking guide",
+      "gloss": ""
+    },
+    {
+      "word": "i want to give you a gift",
+      "gloss": ""
+    },
+    {
+      "word": "male or female",
+      "gloss": ""
+    },
+    {
+      "word": "my cell phone doesn't have good reception",
+      "gloss": ""
+    },
+    {
+      "word": "my cell phone doesn't work",
+      "gloss": ""
+    },
+    {
+      "word": "please take off your shoes",
+      "gloss": ""
+    },
+    {
+      "word": "sorry i think i have the wrong number",
+      "gloss": ""
+    },
+    {
+      "word": "what is the area code",
+      "gloss": ""
+    },
+    {
+      "word": "what's the name of the company you work for",
+      "gloss": ""
+    },
+    {
+      "word": "what's wrong",
+      "gloss": ""
+    },
+    {
+      "word": "what's your address",
+      "gloss": ""
+    },
+    {
+      "word": "where can i find a hospital",
+      "gloss": ""
+    },
+    {
+      "word": "where's the closest restaurant",
+      "gloss": ""
+    },
+    {
+      "word": "where's the pharmacy",
+      "gloss": ""
+    },
+    {
+      "word": "who are you",
+      "gloss": ""
+    },
+    {
+      "word": "who is that",
+      "gloss": ""
+    },
+    {
+      "word": "who would you like to speak to",
+      "gloss": ""
+    },
+    {
+      "word": "will you take me home",
+      "gloss": ""
+    },
+    {
+      "word": "would you like water or milk",
+      "gloss": ""
+    },
+    {
+      "word": "days ago",
+      "gloss": ""
+    },
+    {
+      "word": "hours",
+      "gloss": ""
+    },
+    {
+      "word": "all day",
+      "gloss": ""
+    },
+    {
+      "word": "a long time ago",
+      "gloss": ""
+    },
+    {
+      "word": "are they coming this evening",
+      "gloss": ""
+    },
+    {
+      "word": "are you comfortable",
+      "gloss": ""
+    },
+    {
+      "word": "are your children with you",
+      "gloss": ""
+    },
+    {
+      "word": "as soon as possible",
+      "gloss": ""
+    },
+    {
+      "word": "at o'clock in the afternoon",
+      "gloss": ""
+    },
+    {
+      "word": "at th street",
+      "gloss": ""
+    },
+    {
+      "word": "at o'clock at night evening",
+      "gloss": ""
+    },
+    {
+      "word": "at o'clock in the morning",
+      "gloss": ""
+    },
+    {
+      "word": "at what time did it happen",
+      "gloss": ""
+    },
+    {
+      "word": "can i help you",
+      "gloss": ""
+    },
+    {
+      "word": "do you have a swimming pool",
+      "gloss": ""
+    },
+    {
+      "word": "do you have this in size",
+      "gloss": ""
+    },
+    {
+      "word": "do you think you'll be back by",
+      "gloss": ""
+    },
+    {
+      "word": "everyday i get up at am",
+      "gloss": ""
+    },
+    {
+      "word": "every week",
+      "gloss": ""
+    },
+    {
+      "word": "expiration date",
+      "gloss": ""
+    },
+    {
+      "word": "have you been waiting long",
+      "gloss": ""
+    },
+    {
+      "word": "he'll be back in minutes",
+      "gloss": ""
+    },
+    {
+      "word": "his family is coming tomorrow",
+      "gloss": ""
+    },
+    {
+      "word": "how about saturday",
+      "gloss": ""
+    },
+    {
+      "word": "how long are you going to stay",
+      "gloss": ""
+    },
+    {
+      "word": "how long are you going to stay in california",
+      "gloss": ""
+    },
+    {
+      "word": "how long will it take",
+      "gloss": ""
+    },
+    {
+      "word": "how much altogether",
+      "gloss": ""
+    },
+    {
+      "word": "how much will it cost",
+      "gloss": ""
+    },
+    {
+      "word": "i don't have enough money",
+      "gloss": ""
+    },
+    {
+      "word": "i'm getting ready to go out",
+      "gloss": ""
+    },
+    {
+      "word": "i'm just looking shopping",
+      "gloss": ""
+    },
+    {
+      "word": "i'm worried too",
+      "gloss": ""
+    },
+    {
+      "word": "it'll be cold this evening",
+      "gloss": ""
+    },
+    {
+      "word": "it rained very hard today",
+      "gloss": ""
+    },
+    {
+      "word": "it's dollars",
+      "gloss": ""
+    },
+    {
+      "word": "it's am",
+      "gloss": ""
+    },
+    {
+      "word": "it's",
+      "gloss": ""
+    },
+    {
+      "word": "it's a quarter to",
+      "gloss": ""
+    },
+    {
+      "word": "it's going to snow today",
+      "gloss": ""
+    },
+    {
+      "word": "it's here",
+      "gloss": ""
+    },
+    {
+      "word": "it's there",
+      "gloss": ""
+    },
+    {
+      "word": "i've already seen it",
+      "gloss": ""
+    },
+    {
+      "word": "john is going on vacation tomorrow",
+      "gloss": ""
+    },
+    {
+      "word": "my birthday is august th",
+      "gloss": ""
+    },
+    {
+      "word": "now or later",
+      "gloss": ""
+    },
+    {
+      "word": "october nd",
+      "gloss": ""
+    },
+    {
+      "word": "she wants to know when you're coming",
+      "gloss": ""
+    },
+    {
+      "word": "sometimes i go to sleep at pm sometimes at pm",
+      "gloss": ""
+    },
+    {
+      "word": "there's plenty of time",
+      "gloss": ""
+    },
+    {
+      "word": "the whole day",
+      "gloss": ""
+    },
+    {
+      "word": "we're late",
+      "gloss": ""
+    },
+    {
+      "word": "what day are they coming over",
+      "gloss": ""
+    },
+    {
+      "word": "what day of the week is it",
+      "gloss": ""
+    },
+    {
+      "word": "what is today's date",
+      "gloss": ""
+    },
+    {
+      "word": "what's your religion",
+      "gloss": ""
+    },
+    {
+      "word": "what time are they arriving",
+      "gloss": ""
+    },
+    {
+      "word": "what time did you get up",
+      "gloss": ""
+    },
+    {
+      "word": "what time did you go to sleep",
+      "gloss": ""
+    },
+    {
+      "word": "what time did you wake up",
+      "gloss": ""
+    },
+    {
+      "word": "what time does it start",
+      "gloss": ""
+    },
+    {
+      "word": "what time do you think you'll arrive",
+      "gloss": ""
+    },
+    {
+      "word": "what time is it",
+      "gloss": ""
+    },
+    {
+      "word": "when are they coming",
+      "gloss": ""
+    },
+    {
+      "word": "when are you coming back",
+      "gloss": ""
+    },
+    {
+      "word": "when are you going to pick up your friend",
+      "gloss": ""
+    },
+    {
+      "word": "when are you leaving",
+      "gloss": ""
+    },
+    {
+      "word": "when are you moving",
+      "gloss": ""
+    },
+    {
+      "word": "when is the next bus to philidalphia",
+      "gloss": ""
+    },
+    {
+      "word": "when is your birthday",
+      "gloss": ""
+    },
+    {
+      "word": "when i went to the store they didn't have any apples",
+      "gloss": ""
+    },
+    {
+      "word": "when was the last time you talked to your mother",
+      "gloss": ""
+    },
+    {
+      "word": "when will he be back",
+      "gloss": ""
+    },
+    {
+      "word": "when will it be ready",
+      "gloss": ""
+    },
+    {
+      "word": "where are you going to go",
+      "gloss": ""
+    },
+    {
+      "word": "are you busy",
+      "gloss": ""
+    },
+    {
+      "word": "can we have some more bread please",
+      "gloss": ""
+    },
+    {
+      "word": "do you have any money",
+      "gloss": ""
+    },
+    {
+      "word": "for how many nights",
+      "gloss": ""
+    },
+    {
+      "word": "how long will you be staying",
+      "gloss": ""
+    },
+    {
+      "word": "i'd like a map of the city",
+      "gloss": ""
+    },
+    {
+      "word": "i'd like a non smoking room",
+      "gloss": ""
+    },
+    {
+      "word": "i'd like a room",
+      "gloss": ""
+    },
+    {
+      "word": "i'd like a room with two beds please",
+      "gloss": ""
+    },
+    {
+      "word": "i need a doctor",
+      "gloss": ""
+    },
+    {
+      "word": "is there a nightclub in town",
+      "gloss": ""
+    },
+    {
+      "word": "is there a restaurant in the hotel",
+      "gloss": ""
+    },
+    {
+      "word": "is there a store near here",
+      "gloss": ""
+    },
+    {
+      "word": "sorry we don't have any vacancies",
+      "gloss": ""
+    },
+    {
+      "word": "take me to the marriott hotel",
+      "gloss": ""
+    },
+    {
+      "word": "what's the charge per night hotel",
+      "gloss": ""
+    },
+    {
+      "word": "what time is check out",
+      "gloss": ""
+    },
+    {
+      "word": "where is the airport",
+      "gloss": ""
+    },
+    {
+      "word": "where's the mail box",
+      "gloss": ""
+    },
+    {
+      "word": "are you here alone",
+      "gloss": ""
+    },
+    {
+      "word": "can i bring my friend",
+      "gloss": ""
+    },
+    {
+      "word": "can i have a receipt please",
+      "gloss": ""
+    },
+    {
+      "word": "can it be cheaper",
+      "gloss": ""
+    },
+    {
+      "word": "can we have a menu please",
+      "gloss": ""
+    },
+    {
+      "word": "can you hold this for me",
+      "gloss": ""
+    },
+    {
+      "word": "do you have any children",
+      "gloss": ""
+    },
+    {
+      "word": "do you know how much it costs",
+      "gloss": ""
+    },
+    {
+      "word": "have you eaten at that restaurant",
+      "gloss": ""
+    },
+    {
+      "word": "have you eaten yet",
+      "gloss": ""
+    },
+    {
+      "word": "have you ever had potato soup",
+      "gloss": ""
+    },
+    {
+      "word": "he likes juice but he doesn't like milk",
+      "gloss": ""
+    },
+    {
+      "word": "here is your salad",
+      "gloss": ""
+    },
+    {
+      "word": "here's your order",
+      "gloss": ""
+    },
+    {
+      "word": "how does it taste",
+      "gloss": ""
+    },
+    {
+      "word": "how many people restaurant",
+      "gloss": ""
+    },
+    {
+      "word": "i agree",
+      "gloss": ""
+    },
+    {
+      "word": "i'd like a table near the window",
+      "gloss": ""
+    },
+    {
+      "word": "i'd like to call the united states",
+      "gloss": ""
+    },
+    {
+      "word": "i haven't been there",
+      "gloss": ""
+    },
+    {
+      "word": "i haven't finished eating",
+      "gloss": ""
+    },
+    {
+      "word": "i like it",
+      "gloss": ""
+    },
+    {
+      "word": "i'll give you a call",
+      "gloss": ""
+    },
+    {
+      "word": "i'll have a cup of tea please",
+      "gloss": ""
+    },
+    {
+      "word": "i'll have a glass of water please",
+      "gloss": ""
+    },
+    {
+      "word": "i'm from america",
+      "gloss": ""
+    },
+    {
+      "word": "i'm going to bed",
+      "gloss": ""
+    },
+    {
+      "word": "i'm here on business",
+      "gloss": ""
+    },
+    {
+      "word": "i'm sorry",
+      "gloss": ""
+    },
+    {
+      "word": "i only have dollars",
+      "gloss": ""
+    },
+    {
+      "word": "i think i need to see a doctor",
+      "gloss": ""
+    },
+    {
+      "word": "it's august th",
+      "gloss": ""
+    },
+    {
+      "word": "i understand",
+      "gloss": ""
+    },
+    {
+      "word": "june rd",
+      "gloss": ""
+    },
+    {
+      "word": "the food was delicious",
+      "gloss": ""
+    },
+    {
+      "word": "there are some apples in the refrigerator",
+      "gloss": ""
+    },
+    {
+      "word": "there's a restaurant near here",
+      "gloss": ""
+    },
+    {
+      "word": "there's a restaurant over there but i don't think it's very good",
+      "gloss": ""
+    },
+    {
+      "word": "waiter",
+      "gloss": ""
+    },
+    {
+      "word": "waitress",
+      "gloss": ""
+    },
+    {
+      "word": "we can eat italian or chinese food",
+      "gloss": ""
+    },
+    {
+      "word": "we'll have two glasses of water please",
+      "gloss": ""
+    },
+    {
+      "word": "what are you going to have",
+      "gloss": ""
+    },
+    {
+      "word": "what do you recommend",
+      "gloss": ""
+    },
+    {
+      "word": "what's your email address",
+      "gloss": ""
+    },
+    {
+      "word": "what would you like to drink",
+      "gloss": ""
+    },
+    {
+      "word": "what would you like to eat",
+      "gloss": ""
+    },
+    {
+      "word": "where is an atm",
+      "gloss": ""
+    },
+    {
+      "word": "where is there a doctor who speaks english",
+      "gloss": ""
+    },
+    {
+      "word": "which one",
+      "gloss": ""
+    },
+    {
+      "word": "would you ask him to come here",
+      "gloss": ""
+    },
+    {
+      "word": "would you like a glass of water",
+      "gloss": ""
+    },
+    {
+      "word": "would you like coffee or tea",
+      "gloss": ""
+    },
+    {
+      "word": "would you like something to drink",
+      "gloss": ""
+    },
+    {
+      "word": "would you like some water",
+      "gloss": ""
+    },
+    {
+      "word": "would you like some wine",
+      "gloss": ""
+    },
+    {
+      "word": "would you like to go for a walk",
+      "gloss": ""
+    },
+    {
+      "word": "would you like to watch tv",
+      "gloss": ""
+    },
+    {
+      "word": "are you american",
+      "gloss": ""
+    },
+    {
+      "word": "are you coming this evening",
+      "gloss": ""
+    },
+    {
+      "word": "are you free tonight",
+      "gloss": ""
+    },
+    {
+      "word": "are you going to take a plane or train",
+      "gloss": ""
+    },
+    {
+      "word": "are you hungry",
+      "gloss": ""
+    },
+    {
+      "word": "are you sure",
+      "gloss": ""
+    },
+    {
+      "word": "are you working tomorrow",
+      "gloss": ""
+    },
+    {
+      "word": "business is good",
+      "gloss": ""
+    },
+    {
+      "word": "cheers",
+      "gloss": ""
+    },
+    {
+      "word": "did it snow yesterday",
+      "gloss": ""
+    },
+    {
+      "word": "did you get my email",
+      "gloss": ""
+    },
+    {
+      "word": "did you take your medicine",
+      "gloss": ""
+    },
+    {
+      "word": "do you feel better",
+      "gloss": ""
+    },
+    {
+      "word": "do you go to florida often",
+      "gloss": ""
+    },
+    {
+      "word": "do you have another one",
+      "gloss": ""
+    },
+    {
+      "word": "do you know where there's a store that sells towels",
+      "gloss": ""
+    },
+    {
+      "word": "do you like it here",
+      "gloss": ""
+    },
+    {
+      "word": "do you like the book",
+      "gloss": ""
+    },
+    {
+      "word": "do you need anything",
+      "gloss": ""
+    },
+    {
+      "word": "do you play any sports",
+      "gloss": ""
+    },
+    {
+      "word": "do you sell medicine store",
+      "gloss": ""
+    },
+    {
+      "word": "do you study english",
+      "gloss": ""
+    },
+    {
+      "word": "do you want to come with me",
+      "gloss": ""
+    },
+    {
+      "word": "do you want to go with me",
+      "gloss": ""
+    },
+    {
+      "word": "excuse me",
+      "gloss": ""
+    },
+    {
+      "word": "give me a call",
+      "gloss": ""
+    },
+    {
+      "word": "has your brother been to california",
+      "gloss": ""
+    },
+    {
+      "word": "have they met her yet",
+      "gloss": ""
+    },
+    {
+      "word": "have you done this before",
+      "gloss": ""
+    },
+    {
+      "word": "how long have you been here",
+      "gloss": ""
+    },
+    {
+      "word": "how long have you been in america",
+      "gloss": ""
+    },
+    {
+      "word": "how long have you lived here",
+      "gloss": ""
+    },
+    {
+      "word": "how many children do you have",
+      "gloss": ""
+    },
+    {
+      "word": "how many languages do you speak",
+      "gloss": ""
+    },
+    {
+      "word": "how many people do you have in your family",
+      "gloss": ""
+    },
+    {
+      "word": "how much would you like",
+      "gloss": ""
+    },
+    {
+      "word": "how old are you",
+      "gloss": ""
+    },
+    {
+      "word": "i bought a shirt yesterday",
+      "gloss": ""
+    },
+    {
+      "word": "i don't feel well",
+      "gloss": ""
+    },
+    {
+      "word": "i have pain in my arm",
+      "gloss": ""
+    },
+    {
+      "word": "i have to wash my clothes",
+      "gloss": ""
+    },
+    {
+      "word": "i have two sisters",
+      "gloss": ""
+    },
+    {
+      "word": "i'll tell him you called",
+      "gloss": ""
+    },
+    {
+      "word": "i'm",
+      "gloss": ""
+    },
+    {
+      "word": "i'm '",
+      "gloss": ""
+    },
+    {
+      "word": "i'm allergic to seafood",
+      "gloss": ""
+    },
+    {
+      "word": "i'm american",
+      "gloss": ""
+    },
+    {
+      "word": "i'm a size",
+      "gloss": ""
+    },
+    {
+      "word": "i'm fine and you",
+      "gloss": ""
+    },
+    {
+      "word": "i'm not afraid",
+      "gloss": ""
+    },
+    {
+      "word": "i'm sick",
+      "gloss": ""
+    },
+    {
+      "word": "i remember",
+      "gloss": ""
+    },
+    {
+      "word": "i speak a little english",
+      "gloss": ""
+    },
+    {
+      "word": "is your house like this one",
+      "gloss": ""
+    },
+    {
+      "word": "is your husband also from boston",
+      "gloss": ""
+    },
+    {
+      "word": "it's not very expensive",
+      "gloss": ""
+    },
+    {
+      "word": "i've been there",
+      "gloss": ""
+    },
+    {
+      "word": "let's share",
+      "gloss": ""
+    },
+    {
+      "word": "my daughter is here",
+      "gloss": ""
+    },
+    {
+      "word": "my father has been there",
+      "gloss": ""
+    },
+    {
+      "word": "my father is a lawyer",
+      "gloss": ""
+    },
+    {
+      "word": "my grandmother passed away last year",
+      "gloss": ""
+    },
+    {
+      "word": "my name is john smith",
+      "gloss": ""
+    },
+    {
+      "word": "my son",
+      "gloss": ""
+    },
+    {
+      "word": "my son studies computers",
+      "gloss": ""
+    },
+    {
+      "word": "no i'm american",
+      "gloss": ""
+    },
+    {
+      "word": "no this is the first time",
+      "gloss": ""
+    },
+    {
+      "word": "our children are in america",
+      "gloss": ""
+    },
+    {
+      "word": "she's an expert",
+      "gloss": ""
+    },
+    {
+      "word": "she's older than me",
+      "gloss": ""
+    },
+    {
+      "word": "that car is similar to my car",
+      "gloss": ""
+    },
+    {
+      "word": "this is mrs smith",
+      "gloss": ""
+    },
+    {
+      "word": "this is my mother",
+      "gloss": ""
+    },
+    {
+      "word": "this is the first time i've been here",
+      "gloss": ""
+    },
+    {
+      "word": "we have two boys and one girl",
+      "gloss": ""
+    },
+    {
+      "word": "what are you going to do tonight",
+      "gloss": ""
+    },
+    {
+      "word": "what are your hobbies",
+      "gloss": ""
+    },
+    {
+      "word": "what do you study",
+      "gloss": ""
+    },
+    {
+      "word": "what do you want to do",
+      "gloss": ""
+    },
+    {
+      "word": "what school did you go to",
+      "gloss": ""
+    },
+    {
+      "word": "what's your favorite movie",
+      "gloss": ""
+    },
+    {
+      "word": "what's your last name",
+      "gloss": ""
+    },
+    {
+      "word": "what's your name",
+      "gloss": ""
+    },
+    {
+      "word": "where are the t shirts",
+      "gloss": ""
+    },
+    {
+      "word": "where did you go",
+      "gloss": ""
+    },
+    {
+      "word": "where did you learn english",
+      "gloss": ""
+    },
+    {
+      "word": "where did you work before you worked here",
+      "gloss": ""
+    },
+    {
+      "word": "where do you live",
+      "gloss": ""
+    },
+    {
+      "word": "where were you",
+      "gloss": ""
+    },
+    {
+      "word": "who sent this letter",
+      "gloss": ""
+    },
+    {
+      "word": "would you like to buy this",
+      "gloss": ""
+    },
+    {
+      "word": "your children are very well behaved",
+      "gloss": ""
+    },
+    {
+      "word": "your daughter",
+      "gloss": ""
+    },
+    {
+      "word": "you're smarter than him",
+      "gloss": ""
+    },
+    {
+      "word": "you speak english very well",
+      "gloss": ""
+    },
+    {
+      "word": "are there any concerts",
+      "gloss": ""
+    },
+    {
+      "word": "do you want to go to the movies",
+      "gloss": ""
+    },
+    {
+      "word": "have you seen this movie",
+      "gloss": ""
+    },
+    {
+      "word": "he said you like to watch movies",
+      "gloss": ""
+    },
+    {
+      "word": "how tall are you",
+      "gloss": ""
+    },
+    {
+      "word": "is the bank far",
+      "gloss": ""
+    },
+    {
+      "word": "is there a movie theater nearby",
+      "gloss": ""
+    },
+    {
+      "word": "what do people usually do in the summer in los angeles",
+      "gloss": ""
+    },
+    {
+      "word": "what kind of music do you like",
+      "gloss": ""
+    },
+    {
+      "word": "what's your favorite food",
+      "gloss": ""
+    },
+    {
+      "word": "what time does the movie start",
+      "gloss": ""
+    },
+    {
+      "word": "who was your teacher",
+      "gloss": ""
+    },
+    {
+      "word": "would you like to have dinner with me",
+      "gloss": ""
+    },
+    {
+      "word": "would you like to rent a movie",
+      "gloss": ""
+    },
+    {
+      "word": "can i have a glass of water please",
+      "gloss": ""
+    },
+    {
+      "word": "can i use your phone",
+      "gloss": ""
+    },
+    {
+      "word": "do you have any vacancies",
+      "gloss": ""
+    },
+    {
+      "word": "do you have the number for a taxi",
+      "gloss": ""
+    },
+    {
+      "word": "do you know her",
+      "gloss": ""
+    },
+    {
+      "word": "do you know where she is",
+      "gloss": ""
+    },
+    {
+      "word": "do you play basketball",
+      "gloss": ""
+    },
+    {
+      "word": "fill it up please gas station",
+      "gloss": ""
+    },
+    {
+      "word": "he needs some new clothes",
+      "gloss": ""
+    },
+    {
+      "word": "how much is that",
+      "gloss": ""
+    },
+    {
+      "word": "how much is this",
+      "gloss": ""
+    },
+    {
+      "word": "i believe you",
+      "gloss": ""
+    },
+    {
+      "word": "i'd like the number for the hilton hotel please",
+      "gloss": ""
+    },
+    {
+      "word": "i'd like to buy a phone card please",
+      "gloss": ""
+    },
+    {
+      "word": "i'd like to go home",
+      "gloss": ""
+    },
+    {
+      "word": "i'd like to go shopping",
+      "gloss": ""
+    },
+    {
+      "word": "if you like it i can buy more",
+      "gloss": ""
+    },
+    {
+      "word": "i'm a beginner",
+      "gloss": ""
+    },
+    {
+      "word": "i'm full",
+      "gloss": ""
+    },
+    {
+      "word": "i'm just kidding",
+      "gloss": ""
+    },
+    {
+      "word": "i'm single",
+      "gloss": ""
+    },
+    {
+      "word": "i speak two languages",
+      "gloss": ""
+    },
+    {
+      "word": "i thought he said something else",
+      "gloss": ""
+    },
+    {
+      "word": "it's not too far",
+      "gloss": ""
+    },
+    {
+      "word": "i usually drink coffee at breakfast",
+      "gloss": ""
+    },
+    {
+      "word": "sorry we don't have any",
+      "gloss": ""
+    },
+    {
+      "word": "the books are expensive",
+      "gloss": ""
+    },
+    {
+      "word": "try it on",
+      "gloss": ""
+    },
+    {
+      "word": "what do you want to buy",
+      "gloss": ""
+    },
+    {
+      "word": "what size",
+      "gloss": ""
+    },
+    {
+      "word": "what time does the store open",
+      "gloss": ""
+    },
+    {
+      "word": "when does the plane arrive",
+      "gloss": ""
+    },
+    {
+      "word": "where are you",
+      "gloss": ""
+    },
+    {
+      "word": "would you like something to eat",
+      "gloss": ""
+    },
+    {
+      "word": "am i pronouncing it correctly",
+      "gloss": ""
+    },
+    {
+      "word": "can you do me a favor",
+      "gloss": ""
+    },
+    {
+      "word": "can you help me",
+      "gloss": ""
+    },
+    {
+      "word": "can you please say that again",
+      "gloss": ""
+    },
+    {
+      "word": "can you show me",
+      "gloss": ""
+    },
+    {
+      "word": "can you throw that away for me",
+      "gloss": ""
+    },
+    {
+      "word": "does anyone here speak english",
+      "gloss": ""
+    },
+    {
+      "word": "don't do that",
+      "gloss": ""
+    },
+    {
+      "word": "do you believe that",
+      "gloss": ""
+    },
+    {
+      "word": "do you have a pencil",
+      "gloss": ""
+    },
+    {
+      "word": "do you smoke",
+      "gloss": ""
+    },
+    {
+      "word": "do you speak english",
+      "gloss": ""
+    },
+    {
+      "word": "excuse me what did you say",
+      "gloss": ""
+    },
+    {
+      "word": "forget it",
+      "gloss": ""
+    },
+    {
+      "word": "how do you pronounce that",
+      "gloss": ""
+    },
+    {
+      "word": "how do you say it in english",
+      "gloss": ""
+    },
+    {
+      "word": "how do you spell it",
+      "gloss": ""
+    },
+    {
+      "word": "how do you spell the word seattle",
+      "gloss": ""
+    },
+    {
+      "word": "i can swim",
+      "gloss": ""
+    },
+    {
+      "word": "i can't hear you clearly",
+      "gloss": ""
+    },
+    {
+      "word": "i don't mind",
+      "gloss": ""
+    },
+    {
+      "word": "i don't speak english very well",
+      "gloss": ""
+    },
+    {
+      "word": "i don't think so",
+      "gloss": ""
+    },
+    {
+      "word": "i don't understand what your saying",
+      "gloss": ""
+    },
+    {
+      "word": "is there air conditioning in the room",
+      "gloss": ""
+    },
+    {
+      "word": "i think you have too many clothes",
+      "gloss": ""
+    },
+    {
+      "word": "i trust you",
+      "gloss": ""
+    },
+    {
+      "word": "i understand now",
+      "gloss": ""
+    },
+    {
+      "word": "let's meet in front of the hotel",
+      "gloss": ""
+    },
+    {
+      "word": "please sit down",
+      "gloss": ""
+    },
+    {
+      "word": "please speak english",
+      "gloss": ""
+    },
+    {
+      "word": "please speak more slowly",
+      "gloss": ""
+    },
+    {
+      "word": "sorry i didn't hear clearly",
+      "gloss": ""
+    },
+    {
+      "word": "that means friend",
+      "gloss": ""
+    },
+    {
+      "word": "that's wrong",
+      "gloss": ""
+    },
+    {
+      "word": "try to say it",
+      "gloss": ""
+    },
+    {
+      "word": "what does this mean",
+      "gloss": ""
+    },
+    {
+      "word": "what does this say",
+      "gloss": ""
+    },
+    {
+      "word": "what does this word mean",
+      "gloss": ""
+    },
+    {
+      "word": "what's the exchange rate",
+      "gloss": ""
+    },
+    {
+      "word": "whose book is that",
+      "gloss": ""
+    },
+    {
+      "word": "why aren't you going",
+      "gloss": ""
+    },
+    {
+      "word": "why are you laughing",
+      "gloss": ""
+    },
+    {
+      "word": "why did you do that",
+      "gloss": ""
+    },
+    {
+      "word": "are you allergic to anything",
+      "gloss": ""
+    },
+    {
+      "word": "are you ready",
+      "gloss": ""
+    },
+    {
+      "word": "call me",
+      "gloss": ""
+    },
+    {
+      "word": "did you send me flowers",
+      "gloss": ""
+    },
+    {
+      "word": "do you sell batteries",
+      "gloss": ""
+    },
+    {
+      "word": "i don't care",
+      "gloss": ""
+    },
+    {
+      "word": "i give up",
+      "gloss": ""
+    },
+    {
+      "word": "never give up",
+      "gloss": ""
+    },
+    {
+      "word": "i got in an accident",
+      "gloss": ""
+    },
+    {
+      "word": "i have a cold",
+      "gloss": ""
+    },
+    {
+      "word": "i have one in my car",
+      "gloss": ""
+    },
+    {
+      "word": "i made this cake",
+      "gloss": ""
+    },
+    {
+      "word": "i'm a teacher",
+      "gloss": ""
+    },
+    {
+      "word": "i'm self employed",
+      "gloss": ""
+    },
+    {
+      "word": "i still have a lot to do",
+      "gloss": ""
+    },
+    {
+      "word": "i still haven't decided",
+      "gloss": ""
+    },
+    {
+      "word": "it depends on the weather",
+      "gloss": ""
+    },
+    {
+      "word": "it's very cold today",
+      "gloss": ""
+    },
+    {
+      "word": "my luggage is missing",
+      "gloss": ""
+    },
+    {
+      "word": "my stomach hurts",
+      "gloss": ""
+    },
+    {
+      "word": "my throat is sore",
+      "gloss": ""
+    },
+    {
+      "word": "my watch has been stolen",
+      "gloss": ""
+    },
+    {
+      "word": "take this medicine",
+      "gloss": ""
+    },
+    {
+      "word": "the accident happened at the intersection",
+      "gloss": ""
+    },
+    {
+      "word": "there has been a car accident",
+      "gloss": ""
+    },
+    {
+      "word": "where can i exchange u s dollars",
+      "gloss": ""
+    },
+    {
+      "word": "where do you work",
+      "gloss": ""
+    },
+    {
+      "word": "where's the nearest hospital",
+      "gloss": ""
+    },
+    {
+      "word": "where's the post office",
+      "gloss": ""
+    },
+    {
+      "word": "and you",
+      "gloss": ""
+    },
+    {
+      "word": "anything else",
+      "gloss": ""
+    },
+    {
+      "word": "are they the same",
+      "gloss": ""
+    },
+    {
+      "word": "are you afraid",
+      "gloss": ""
+    },
+    {
+      "word": "are you going to attend their wedding",
+      "gloss": ""
+    },
+    {
+      "word": "are you married",
+      "gloss": ""
+    },
+    {
+      "word": "are you okay",
+      "gloss": ""
+    },
+    {
+      "word": "are you sick",
+      "gloss": ""
+    },
+    {
+      "word": "behind the bank",
+      "gloss": ""
+    },
+    {
+      "word": "can i borrow some money",
+      "gloss": ""
+    },
+    {
+      "word": "can i have the bill please",
+      "gloss": ""
+    },
+    {
+      "word": "can you call back later",
+      "gloss": ""
+    },
+    {
+      "word": "can you call me back later",
+      "gloss": ""
+    },
+    {
+      "word": "can you carry this for me",
+      "gloss": ""
+    },
+    {
+      "word": "can you fix this",
+      "gloss": ""
+    },
+    {
+      "word": "can you give me an example",
+      "gloss": ""
+    },
+    {
+      "word": "can you speak louder please",
+      "gloss": ""
+    },
+    {
+      "word": "can you swim",
+      "gloss": ""
+    },
+    {
+      "word": "does he like the school",
+      "gloss": ""
+    },
+    {
+      "word": "do you accept u s dollars",
+      "gloss": ""
+    },
+    {
+      "word": "do you have a girlfriend",
+      "gloss": ""
+    },
+    {
+      "word": "do you have an appointment",
+      "gloss": ""
+    },
+    {
+      "word": "do you have a problem",
+      "gloss": ""
+    },
+    {
+      "word": "do you hear that",
+      "gloss": ""
+    },
+    {
+      "word": "do you know how to get to the marriott hotel",
+      "gloss": ""
+    },
+    {
+      "word": "do you know what this means",
+      "gloss": ""
+    },
+    {
+      "word": "do you know where i can get a taxi",
+      "gloss": ""
+    },
+    {
+      "word": "do you know where my glasses are",
+      "gloss": ""
+    },
+    {
+      "word": "do you like your co workers",
+      "gloss": ""
+    },
+    {
+      "word": "do you need anything else",
+      "gloss": ""
+    },
+    {
+      "word": "do you understand",
+      "gloss": ""
+    },
+    {
+      "word": "give me the pen",
+      "gloss": ""
+    },
+    {
+      "word": "how do you know",
+      "gloss": ""
+    },
+    {
+      "word": "how is she",
+      "gloss": ""
+    },
+    {
+      "word": "how long is it",
+      "gloss": ""
+    },
+    {
+      "word": "how many",
+      "gloss": ""
+    },
+    {
+      "word": "how much is it",
+      "gloss": ""
+    },
+    {
+      "word": "i have a lot of things to do",
+      "gloss": ""
+    },
+    {
+      "word": "in minutes",
+      "gloss": ""
+    },
+    {
+      "word": "is anyone else coming",
+      "gloss": ""
+    },
+    {
+      "word": "is everything ok",
+      "gloss": ""
+    },
+    {
+      "word": "is it cold outside",
+      "gloss": ""
+    },
+    {
+      "word": "is it far from here",
+      "gloss": ""
+    },
+    {
+      "word": "is it hot",
+      "gloss": ""
+    },
+    {
+      "word": "is it raining",
+      "gloss": ""
+    },
+    {
+      "word": "is there anything cheaper",
+      "gloss": ""
+    },
+    {
+      "word": "is your son here",
+      "gloss": ""
+    },
+    {
+      "word": "should i wait",
+      "gloss": ""
+    },
+    {
+      "word": "the big one or the small one",
+      "gloss": ""
+    },
+    {
+      "word": "the cars are american",
+      "gloss": ""
+    },
+    {
+      "word": "were there any problems",
+      "gloss": ""
+    },
+    {
+      "word": "were you at the library last night",
+      "gloss": ""
+    },
+    {
+      "word": "what are you doing",
+      "gloss": ""
+    },
+    {
+      "word": "what are you thinking about",
+      "gloss": ""
+    },
+    {
+      "word": "what are you two talking about",
+      "gloss": ""
+    },
+    {
+      "word": "what did you do last night",
+      "gloss": ""
+    },
+    {
+      "word": "what did you do yesterday",
+      "gloss": ""
+    },
+    {
+      "word": "what did you think",
+      "gloss": ""
+    },
+    {
+      "word": "what do they study",
+      "gloss": ""
+    },
+    {
+      "word": "what do you have",
+      "gloss": ""
+    },
+    {
+      "word": "what do you think",
+      "gloss": ""
+    },
+    {
+      "word": "what happened",
+      "gloss": ""
+    },
+    {
+      "word": "what is it",
+      "gloss": ""
+    },
+    {
+      "word": "what is that",
+      "gloss": ""
+    },
+    {
+      "word": "what should i wear",
+      "gloss": ""
+    },
+    {
+      "word": "what's in it",
+      "gloss": ""
+    },
+    {
+      "word": "what's the temperature",
+      "gloss": ""
+    },
+    {
+      "word": "what's this",
+      "gloss": ""
+    },
+    {
+      "word": "what's up",
+      "gloss": ""
+    },
+    {
+      "word": "what's going on",
+      "gloss": ""
+    },
+    {
+      "word": "where are you from",
+      "gloss": ""
+    },
+    {
+      "word": "where can i rent a car",
+      "gloss": ""
+    },
+    {
+      "word": "where did it happen",
+      "gloss": ""
+    },
+    {
+      "word": "where did you learn it",
+      "gloss": ""
+    },
+    {
+      "word": "where is he",
+      "gloss": ""
+    },
+    {
+      "word": "where is he from",
+      "gloss": ""
+    },
+    {
+      "word": "where have you been so long",
+      "gloss": ""
+    },
+    {
+      "word": "which is better the spaghetti or chicken salad",
+      "gloss": ""
+    },
+    {
+      "word": "which one do you want",
+      "gloss": ""
+    },
+    {
+      "word": "which one is cheaper",
+      "gloss": ""
+    },
+    {
+      "word": "which one is the best",
+      "gloss": ""
+    },
+    {
+      "word": "which school does he go to",
+      "gloss": ""
+    },
+    {
+      "word": "who are they",
+      "gloss": ""
+    },
+    {
+      "word": "who are you looking for",
+      "gloss": ""
+    },
+    {
+      "word": "who is it inquiring about who is on the phone",
+      "gloss": ""
+    },
+    {
+      "word": "who's calling",
+      "gloss": ""
+    },
+    {
+      "word": "who's that man over there",
+      "gloss": ""
+    },
+    {
+      "word": "who taught you that",
+      "gloss": ""
+    },
+    {
+      "word": "why did you say that",
+      "gloss": ""
+    },
+    {
+      "word": "will you pass me the salt please",
+      "gloss": ""
+    },
+    {
+      "word": "will you put this in the car for me",
+      "gloss": ""
+    },
+    {
+      "word": "would you ask him to call me back please",
+      "gloss": ""
+    },
+    {
+      "word": "yes",
+      "gloss": ""
+    },
+    {
+      "word": "you have a very nice car",
+      "gloss": ""
+    },
+    {
+      "word": "you look like my sister",
+      "gloss": ""
+    },
+    {
+      "word": "dollars per hour",
+      "gloss": ""
+    },
+    {
+      "word": "are you waiting for someone",
+      "gloss": ""
+    },
+    {
+      "word": "are you working today",
+      "gloss": ""
+    },
+    {
+      "word": "bring me my shirt please",
+      "gloss": ""
+    },
+    {
+      "word": "do you like to watch tv",
+      "gloss": ""
+    },
+    {
+      "word": "do you like your boss",
+      "gloss": ""
+    },
+    {
+      "word": "have you finished studying",
+      "gloss": ""
+    },
+    {
+      "word": "he's an engineer",
+      "gloss": ""
+    },
+    {
+      "word": "he's very hard working",
+      "gloss": ""
+    },
+    {
+      "word": "he works at a computer company in new york",
+      "gloss": ""
+    },
+    {
+      "word": "how long have you worked here",
+      "gloss": ""
+    },
+    {
+      "word": "how many hours a week do you work",
+      "gloss": ""
+    },
+    {
+      "word": "how much money do you have",
+      "gloss": ""
+    },
+    {
+      "word": "how's the weather",
+      "gloss": ""
+    },
+    {
+      "word": "how was the trip",
+      "gloss": ""
+    },
+    {
+      "word": "i forget",
+      "gloss": ""
+    },
+    {
+      "word": "i'm good",
+      "gloss": ""
+    },
+    {
+      "word": "i'm ready",
+      "gloss": ""
+    },
+    {
+      "word": "i still have a lot of things to buy",
+      "gloss": ""
+    },
+    {
+      "word": "i've seen it",
+      "gloss": ""
+    },
+    {
+      "word": "what does he do for work",
+      "gloss": ""
+    },
+    {
+      "word": "what does your father do for work",
+      "gloss": ""
+    },
+    {
+      "word": "what do you do for work",
+      "gloss": ""
+    },
+    {
+      "word": "what do your parents do for work",
+      "gloss": ""
+    },
+    {
+      "word": "what's the matter",
+      "gloss": ""
+    },
+    {
+      "word": "what time do you go to work everyday",
+      "gloss": ""
+    },
+    {
+      "word": "when do you arrive in the u s",
+      "gloss": ""
+    },
+    {
+      "word": "when do you get off work",
+      "gloss": ""
+    },
+    {
+      "word": "where did you put it",
+      "gloss": ""
+    },
+    {
+      "word": "where does it hurt",
+      "gloss": ""
+    },
+    {
+      "word": "where do you want to go",
+      "gloss": ""
+    },
+    {
+      "word": "come here",
+      "gloss": ""
+    },
+    {
+      "word": "does it often snow in the winter in massachusetts",
+      "gloss": ""
+    },
+    {
+      "word": "do you think it'll rain today",
+      "gloss": ""
+    },
+    {
+      "word": "do you think it's going to rain tomorrow",
+      "gloss": ""
+    },
+    {
+      "word": "how's business",
+      "gloss": ""
+    },
+    {
+      "word": "is it close",
+      "gloss": ""
+    },
+    {
+      "word": "is it possible",
+      "gloss": ""
+    },
+    {
+      "word": "is it ready",
+      "gloss": ""
+    },
+    {
+      "word": "it costs dollars per hour",
+      "gloss": ""
+    },
+    {
+      "word": "it hurts here",
+      "gloss": ""
+    },
+    {
+      "word": "it's far from here",
+      "gloss": ""
+    },
+    {
+      "word": "it's going to be hot today",
+      "gloss": ""
+    },
+    {
+      "word": "it's north of here",
+      "gloss": ""
+    },
+    {
+      "word": "it's over there",
+      "gloss": ""
+    },
+    {
+      "word": "it's raining",
+      "gloss": ""
+    },
+    {
+      "word": "it's too late",
+      "gloss": ""
+    },
+    {
+      "word": "it's very important",
+      "gloss": ""
+    },
+    {
+      "word": "it will arrive shortly",
+      "gloss": ""
+    },
+    {
+      "word": "the roads are slippery",
+      "gloss": ""
+    },
+    {
+      "word": "what's the room rate",
+      "gloss": ""
+    },
+    {
+      "word": "what will the weather be like tomorrow",
+      "gloss": ""
+    },
+    {
+      "word": "amy is john's girlfriend",
+      "gloss": ""
+    },
+    {
+      "word": "he always does that for me",
+      "gloss": ""
+    },
+    {
+      "word": "he broke the window",
+      "gloss": ""
+    },
+    {
+      "word": "he doesn't look like a nurse",
+      "gloss": ""
+    },
+    {
+      "word": "he has a nice car",
+      "gloss": ""
+    },
+    {
+      "word": "he never gives me anything",
+      "gloss": ""
+    },
+    {
+      "word": "he said this is a nice place",
+      "gloss": ""
+    },
+    {
+      "word": "he's an american",
+      "gloss": ""
+    },
+    {
+      "word": "he's a very good student",
+      "gloss": ""
+    },
+    {
+      "word": "he's faster than me",
+      "gloss": ""
+    },
+    {
+      "word": "he thinks we don't want to go",
+      "gloss": ""
+    },
+    {
+      "word": "his room is very small",
+      "gloss": ""
+    },
+    {
+      "word": "his son",
+      "gloss": ""
+    },
+    {
+      "word": "how are your parents",
+      "gloss": ""
+    },
+    {
+      "word": "how do i use this",
+      "gloss": ""
+    },
+    {
+      "word": "i came with my family",
+      "gloss": ""
+    },
+    {
+      "word": "i'd like to exchange this for dollars",
+      "gloss": ""
+    },
+    {
+      "word": "i'd like to use the internet",
+      "gloss": ""
+    },
+    {
+      "word": "i don't have time right now",
+      "gloss": ""
+    },
+    {
+      "word": "i don't know",
+      "gloss": ""
+    },
+    {
+      "word": "i have money",
+      "gloss": ""
+    },
+    {
+      "word": "i haven't had lunch yet",
+      "gloss": ""
+    },
+    {
+      "word": "i have to go to the post office",
+      "gloss": ""
+    },
+    {
+      "word": "i like italian food",
+      "gloss": ""
+    },
+    {
+      "word": "i live in california",
+      "gloss": ""
+    },
+    {
+      "word": "i'll talk to you soon",
+      "gloss": ""
+    },
+    {
+      "word": "i made a mistake",
+      "gloss": ""
+    },
+    {
+      "word": "i'm bored",
+      "gloss": ""
+    },
+    {
+      "word": "i'm going to america next year",
+      "gloss": ""
+    },
+    {
+      "word": "i'm going to go have dinner",
+      "gloss": ""
+    },
+    {
+      "word": "i'm tired",
+      "gloss": ""
+    },
+    {
+      "word": "i'm very well thank you",
+      "gloss": ""
+    },
+    {
+      "word": "i need another key",
+      "gloss": ""
+    },
+    {
+      "word": "i need this to get there by tomorrow",
+      "gloss": ""
+    },
+    {
+      "word": "i need to go now",
+      "gloss": ""
+    },
+    {
+      "word": "is it suppose to rain tomorrow",
+      "gloss": ""
+    },
+    {
+      "word": "is john there please phone call",
+      "gloss": ""
+    },
+    {
+      "word": "is this a safe area",
+      "gloss": ""
+    },
+    {
+      "word": "is this mr smith",
+      "gloss": ""
+    },
+    {
+      "word": "is this the bus to new york",
+      "gloss": ""
+    },
+    {
+      "word": "is this your book",
+      "gloss": ""
+    },
+    {
+      "word": "i still have to brush my teeth and take a shower",
+      "gloss": ""
+    },
+    {
+      "word": "is your father home",
+      "gloss": ""
+    },
+    {
+      "word": "i think so",
+      "gloss": ""
+    },
+    {
+      "word": "i think those shoes are very good looking",
+      "gloss": ""
+    },
+    {
+      "word": "it's very windy",
+      "gloss": ""
+    },
+    {
+      "word": "it takes hours by car",
+      "gloss": ""
+    },
+    {
+      "word": "i've never done that",
+      "gloss": ""
+    },
+    {
+      "word": "i've worked there for five years",
+      "gloss": ""
+    },
+    {
+      "word": "i want to buy something",
+      "gloss": ""
+    },
+    {
+      "word": "i want to contact our embassy",
+      "gloss": ""
+    },
+    {
+      "word": "i want to send this package to the united states",
+      "gloss": ""
+    },
+    {
+      "word": "i want to show you something",
+      "gloss": ""
+    },
+    {
+      "word": "i went to the supermarket and then to the computer store",
+      "gloss": ""
+    },
+    {
+      "word": "my car isn't working",
+      "gloss": ""
+    },
+    {
+      "word": "nobody is helping us",
+      "gloss": ""
+    },
+    {
+      "word": "nobody is there right now",
+      "gloss": ""
+    },
+    {
+      "word": "one like that",
+      "gloss": ""
+    },
+    {
+      "word": "open the door",
+      "gloss": ""
+    },
+    {
+      "word": "open the window",
+      "gloss": ""
+    },
+    {
+      "word": "pick up your clothes",
+      "gloss": ""
+    },
+    {
+      "word": "please",
+      "gloss": ""
+    },
+    {
+      "word": "please count this for me",
+      "gloss": ""
+    },
+    {
+      "word": "please tell her john called",
+      "gloss": ""
+    },
+    {
+      "word": "please tell me",
+      "gloss": ""
+    },
+    {
+      "word": "please wait for me",
+      "gloss": ""
+    },
+    {
+      "word": "she's going with me tomorrow",
+      "gloss": ""
+    },
+    {
+      "word": "it seems she likes it",
+      "gloss": ""
+    },
+    {
+      "word": "some books",
+      "gloss": ""
+    },
+    {
+      "word": "someone does that for me",
+      "gloss": ""
+    },
+    {
+      "word": "someone is coming",
+      "gloss": ""
+    },
+    {
+      "word": "sorry i don't have a pencil",
+      "gloss": ""
+    },
+    {
+      "word": "start the car",
+      "gloss": ""
+    },
+    {
+      "word": "take me downtown",
+      "gloss": ""
+    },
+    {
+      "word": "tell him that i need to talk to him",
+      "gloss": ""
+    },
+    {
+      "word": "that car over there is mine",
+      "gloss": ""
+    },
+    {
+      "word": "that looks old",
+      "gloss": ""
+    },
+    {
+      "word": "that's a good school",
+      "gloss": ""
+    },
+    {
+      "word": "that's her book",
+      "gloss": ""
+    },
+    {
+      "word": "that's not enough",
+      "gloss": ""
+    },
+    {
+      "word": "the car is fixed",
+      "gloss": ""
+    },
+    {
+      "word": "these books are ours",
+      "gloss": ""
+    },
+    {
+      "word": "the tv is broken",
+      "gloss": ""
+    },
+    {
+      "word": "they haven't met her yet",
+      "gloss": ""
+    },
+    {
+      "word": "they're planning to come next year",
+      "gloss": ""
+    },
+    {
+      "word": "they're waiting for us",
+      "gloss": ""
+    },
+    {
+      "word": "this room is a mess",
+      "gloss": ""
+    },
+    {
+      "word": "those men are speaking english",
+      "gloss": ""
+    },
+    {
+      "word": "what color is that car",
+      "gloss": ""
+    },
+    {
+      "word": "what do you think of these shoes",
+      "gloss": ""
+    },
+    {
+      "word": "when would you like to meet",
+      "gloss": ""
+    },
+    {
+      "word": "where does your wife work",
+      "gloss": ""
+    },
+    {
+      "word": "where is main street",
+      "gloss": ""
+    },
+    {
+      "word": "where is my shirt",
+      "gloss": ""
+    },
+    {
+      "word": "where is the bus station",
+      "gloss": ""
+    },
+    {
+      "word": "which road should i take",
+      "gloss": ""
+    },
+    {
+      "word": "you're right",
+      "gloss": ""
+    },
+    {
+      "word": "your house is very nice",
+      "gloss": ""
+    },
+    {
+      "word": "is it raining outside",
+      "gloss": ""
+    },
+    {
+      "word": "can you pass me the salt please",
+      "gloss": ""
+    },
+    {
+      "word": "i need to buy some groceries",
+      "gloss": ""
+    },
+    {
+      "word": "have you seen my keys",
+      "gloss": ""
+    },
+    {
+      "word": "let's go for a walk in the park",
+      "gloss": ""
+    },
+    {
+      "word": "i'm looking for a new job",
+      "gloss": ""
+    },
+    {
+      "word": "do you have any plans for the weekend",
+      "gloss": ""
+    },
+    {
+      "word": "i'm so tired i need a nap",
+      "gloss": ""
+    },
+    {
+      "word": "did you finish your homework",
+      "gloss": ""
+    },
+    {
+      "word": "i love the smell of fresh coffee",
+      "gloss": ""
+    },
+    {
+      "word": "let's grab a bite to eat",
+      "gloss": ""
+    },
+    {
+      "word": "how was your day",
+      "gloss": ""
+    },
+    {
+      "word": "i can't find my phone",
+      "gloss": ""
+    },
+    {
+      "word": "have you heard the latest news",
+      "gloss": ""
+    },
+    {
+      "word": "i'm thinking of redecorating my living room",
+      "gloss": ""
+    },
+    {
+      "word": "i'm excited for the upcoming vacation",
+      "gloss": ""
+    },
+    {
+      "word": "let's meet for coffee tomorrow",
+      "gloss": ""
+    },
+    {
+      "word": "have you tried the new restaurant downtown",
+      "gloss": ""
+    },
+    {
+      "word": "i need to book a flight for my business trip",
+      "gloss": ""
+    },
+    {
+      "word": "the weather is perfect for a picnic",
+      "gloss": ""
+    },
+    {
+      "word": "what's your favorite book",
+      "gloss": ""
+    },
+    {
+      "word": "let's go for a hike this weekend",
+      "gloss": ""
+    },
+    {
+      "word": "i'm thinking of adopting a pet",
+      "gloss": ""
+    },
+    {
+      "word": "do you prefer tea or coffee",
+      "gloss": ""
+    },
+    {
+      "word": "i have a dentist appointment next week",
+      "gloss": ""
+    },
+    {
+      "word": "have you ever been skydiving",
+      "gloss": ""
+    },
+    {
+      "word": "i'm learning how to play the guitar",
+      "gloss": ""
+    },
+    {
+      "word": "can you recommend a good movie to watch",
+      "gloss": ""
+    },
+    {
+      "word": "i'm craving some ice cream right now",
+      "gloss": ""
+    },
+    {
+      "word": "how do you like your steak cooked",
+      "gloss": ""
+    },
+    {
+      "word": "let's go shopping for new clothes",
+      "gloss": ""
+    },
+    {
+      "word": "have you ever traveled abroad",
+      "gloss": ""
+    },
+    {
+      "word": "i'm planning a surprise party for my friend",
+      "gloss": ""
+    },
+    {
+      "word": "what's your favorite type of music",
+      "gloss": ""
+    },
+    {
+      "word": "i need to renew my driver's license",
+      "gloss": ""
+    },
+    {
+      "word": "let's organize a game night with friends",
+      "gloss": ""
+    },
+    {
+      "word": "do you enjoy cooking or baking",
+      "gloss": ""
+    },
+    {
+      "word": "i'm considering starting a new hobby",
+      "gloss": ""
+    },
+    {
+      "word": "have you ever tried sushi",
+      "gloss": ""
+    },
+    {
+      "word": "let's go to the beach this summer",
+      "gloss": ""
+    },
+    {
+      "word": "what's your opinion on social media",
+      "gloss": ""
+    },
+    {
+      "word": "i'm thinking of starting a garden",
+      "gloss": ""
+    },
+    {
+      "word": "do you prefer summer or winter",
+      "gloss": ""
+    },
+    {
+      "word": "let's have a barbecue in the backyard",
+      "gloss": ""
+    },
+    {
+      "word": "have you ever been to a music festival",
+      "gloss": ""
+    },
+    {
+      "word": "i'm planning to redecorate my bedroom",
+      "gloss": ""
+    },
+    {
+      "word": "what's your favorite holiday destination",
+      "gloss": ""
+    },
+    {
+      "word": "let's go for a bike ride in the park",
+      "gloss": ""
+    },
+    {
+      "word": "do you enjoy going to concerts",
+      "gloss": ""
+    },
+    {
+      "word": "i need to schedule a check up with my doctor",
+      "gloss": ""
+    },
+    {
+      "word": "have you ever gone camping",
+      "gloss": ""
+    },
+    {
+      "word": "what's your favorite outdoor activity",
+      "gloss": ""
+    },
+    {
+      "word": "let's try a new restaurant every month",
+      "gloss": ""
+    },
+    {
+      "word": "do you like watching sports games",
+      "gloss": ""
+    },
+    {
+      "word": "i'm considering taking up yoga",
+      "gloss": ""
+    },
+    {
+      "word": "what's your favorite childhood memory",
+      "gloss": ""
+    },
+    {
+      "word": "let's have a movie marathon this weekend",
+      "gloss": ""
+    },
+    {
+      "word": "have you ever tried rock climbing",
+      "gloss": ""
+    },
+    {
+      "word": "i'm thinking of volunteering at a local shelter",
+      "gloss": ""
+    },
+    {
+      "word": "do you enjoy going to art galleries",
+      "gloss": ""
+    }
+  ]
+}

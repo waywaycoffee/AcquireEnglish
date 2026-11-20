@@ -1,0 +1,1209 @@
+{
+  "id": "chunks_phonics_cvce",
+  "title": "自然拼读 · CVCe（Magic e）",
+  "examTag": "CVCe",
+  "kind": "word",
+  "disclaimer": "词表整理自 SeanMcP/reading consonant-vowel-patterns（见上游 LICENSE），筛选真实英语词用于拼读跟读。",
+  "words": [
+    {
+      "word": "babe",
+      "gloss": ""
+    },
+    {
+      "word": "bade",
+      "gloss": ""
+    },
+    {
+      "word": "bake",
+      "gloss": ""
+    },
+    {
+      "word": "bale",
+      "gloss": ""
+    },
+    {
+      "word": "bane",
+      "gloss": ""
+    },
+    {
+      "word": "bare",
+      "gloss": ""
+    },
+    {
+      "word": "base",
+      "gloss": ""
+    },
+    {
+      "word": "bate",
+      "gloss": ""
+    },
+    {
+      "word": "bene",
+      "gloss": ""
+    },
+    {
+      "word": "bere",
+      "gloss": ""
+    },
+    {
+      "word": "bice",
+      "gloss": ""
+    },
+    {
+      "word": "bide",
+      "gloss": ""
+    },
+    {
+      "word": "bike",
+      "gloss": ""
+    },
+    {
+      "word": "bile",
+      "gloss": ""
+    },
+    {
+      "word": "bine",
+      "gloss": ""
+    },
+    {
+      "word": "bite",
+      "gloss": ""
+    },
+    {
+      "word": "bode",
+      "gloss": ""
+    },
+    {
+      "word": "boke",
+      "gloss": ""
+    },
+    {
+      "word": "bole",
+      "gloss": ""
+    },
+    {
+      "word": "bone",
+      "gloss": ""
+    },
+    {
+      "word": "bore",
+      "gloss": ""
+    },
+    {
+      "word": "bote",
+      "gloss": ""
+    },
+    {
+      "word": "bute",
+      "gloss": ""
+    },
+    {
+      "word": "byre",
+      "gloss": ""
+    },
+    {
+      "word": "cade",
+      "gloss": ""
+    },
+    {
+      "word": "cage",
+      "gloss": ""
+    },
+    {
+      "word": "cake",
+      "gloss": ""
+    },
+    {
+      "word": "came",
+      "gloss": ""
+    },
+    {
+      "word": "cane",
+      "gloss": ""
+    },
+    {
+      "word": "cape",
+      "gloss": ""
+    },
+    {
+      "word": "care",
+      "gloss": ""
+    },
+    {
+      "word": "case",
+      "gloss": ""
+    },
+    {
+      "word": "cate",
+      "gloss": ""
+    },
+    {
+      "word": "cave",
+      "gloss": ""
+    },
+    {
+      "word": "cede",
+      "gloss": ""
+    },
+    {
+      "word": "cepe",
+      "gloss": ""
+    },
+    {
+      "word": "cere",
+      "gloss": ""
+    },
+    {
+      "word": "cete",
+      "gloss": ""
+    },
+    {
+      "word": "cine",
+      "gloss": ""
+    },
+    {
+      "word": "cite",
+      "gloss": ""
+    },
+    {
+      "word": "cive",
+      "gloss": ""
+    },
+    {
+      "word": "code",
+      "gloss": ""
+    },
+    {
+      "word": "coke",
+      "gloss": ""
+    },
+    {
+      "word": "cole",
+      "gloss": ""
+    },
+    {
+      "word": "come",
+      "gloss": ""
+    },
+    {
+      "word": "cone",
+      "gloss": ""
+    },
+    {
+      "word": "cope",
+      "gloss": ""
+    },
+    {
+      "word": "core",
+      "gloss": ""
+    },
+    {
+      "word": "cote",
+      "gloss": ""
+    },
+    {
+      "word": "cove",
+      "gloss": ""
+    },
+    {
+      "word": "coze",
+      "gloss": ""
+    },
+    {
+      "word": "cube",
+      "gloss": ""
+    },
+    {
+      "word": "cuke",
+      "gloss": ""
+    },
+    {
+      "word": "cure",
+      "gloss": ""
+    },
+    {
+      "word": "cute",
+      "gloss": ""
+    },
+    {
+      "word": "cyme",
+      "gloss": ""
+    },
+    {
+      "word": "dace",
+      "gloss": ""
+    },
+    {
+      "word": "dale",
+      "gloss": ""
+    },
+    {
+      "word": "dame",
+      "gloss": ""
+    },
+    {
+      "word": "dare",
+      "gloss": ""
+    },
+    {
+      "word": "date",
+      "gloss": ""
+    },
+    {
+      "word": "daze",
+      "gloss": ""
+    },
+    {
+      "word": "dele",
+      "gloss": ""
+    },
+    {
+      "word": "deme",
+      "gloss": ""
+    },
+    {
+      "word": "dene",
+      "gloss": ""
+    },
+    {
+      "word": "dere",
+      "gloss": ""
+    },
+    {
+      "word": "dice",
+      "gloss": ""
+    },
+    {
+      "word": "dike",
+      "gloss": ""
+    },
+    {
+      "word": "dime",
+      "gloss": ""
+    },
+    {
+      "word": "dine",
+      "gloss": ""
+    },
+    {
+      "word": "dire",
+      "gloss": ""
+    },
+    {
+      "word": "dite",
+      "gloss": ""
+    },
+    {
+      "word": "dive",
+      "gloss": ""
+    },
+    {
+      "word": "doge",
+      "gloss": ""
+    },
+    {
+      "word": "dole",
+      "gloss": ""
+    },
+    {
+      "word": "dome",
+      "gloss": ""
+    },
+    {
+      "word": "done",
+      "gloss": ""
+    },
+    {
+      "word": "dope",
+      "gloss": ""
+    },
+    {
+      "word": "dose",
+      "gloss": ""
+    },
+    {
+      "word": "dote",
+      "gloss": ""
+    },
+    {
+      "word": "dove",
+      "gloss": ""
+    },
+    {
+      "word": "doze",
+      "gloss": ""
+    },
+    {
+      "word": "dude",
+      "gloss": ""
+    },
+    {
+      "word": "duke",
+      "gloss": ""
+    },
+    {
+      "word": "dune",
+      "gloss": ""
+    },
+    {
+      "word": "dupe",
+      "gloss": ""
+    },
+    {
+      "word": "dure",
+      "gloss": ""
+    },
+    {
+      "word": "dyke",
+      "gloss": ""
+    },
+    {
+      "word": "dyne",
+      "gloss": ""
+    },
+    {
+      "word": "face",
+      "gloss": ""
+    },
+    {
+      "word": "fade",
+      "gloss": ""
+    },
+    {
+      "word": "fake",
+      "gloss": ""
+    },
+    {
+      "word": "fame",
+      "gloss": ""
+    },
+    {
+      "word": "fare",
+      "gloss": ""
+    },
+    {
+      "word": "fate",
+      "gloss": ""
+    },
+    {
+      "word": "faze",
+      "gloss": ""
+    },
+    {
+      "word": "feme",
+      "gloss": ""
+    },
+    {
+      "word": "fice",
+      "gloss": ""
+    },
+    {
+      "word": "fife",
+      "gloss": ""
+    },
+    {
+      "word": "fike",
+      "gloss": ""
+    },
+    {
+      "word": "file",
+      "gloss": ""
+    },
+    {
+      "word": "fine",
+      "gloss": ""
+    },
+    {
+      "word": "fire",
+      "gloss": ""
+    },
+    {
+      "word": "five",
+      "gloss": ""
+    },
+    {
+      "word": "fore",
+      "gloss": ""
+    },
+    {
+      "word": "fume",
+      "gloss": ""
+    },
+    {
+      "word": "fuse",
+      "gloss": ""
+    },
+    {
+      "word": "fuze",
+      "gloss": ""
+    },
+    {
+      "word": "fyke",
+      "gloss": ""
+    },
+    {
+      "word": "gade",
+      "gloss": ""
+    },
+    {
+      "word": "gage",
+      "gloss": ""
+    },
+    {
+      "word": "gale",
+      "gloss": ""
+    },
+    {
+      "word": "game",
+      "gloss": ""
+    },
+    {
+      "word": "gane",
+      "gloss": ""
+    },
+    {
+      "word": "gape",
+      "gloss": ""
+    },
+    {
+      "word": "gare",
+      "gloss": ""
+    },
+    {
+      "word": "gate",
+      "gloss": ""
+    },
+    {
+      "word": "gave",
+      "gloss": ""
+    },
+    {
+      "word": "gaze",
+      "gloss": ""
+    },
+    {
+      "word": "gene",
+      "gloss": ""
+    },
+    {
+      "word": "gibe",
+      "gloss": ""
+    },
+    {
+      "word": "give",
+      "gloss": ""
+    },
+    {
+      "word": "gone",
+      "gloss": ""
+    },
+    {
+      "word": "gore",
+      "gloss": ""
+    },
+    {
+      "word": "gude",
+      "gloss": ""
+    },
+    {
+      "word": "gule",
+      "gloss": ""
+    },
+    {
+      "word": "gyre",
+      "gloss": ""
+    },
+    {
+      "word": "gyte",
+      "gloss": ""
+    },
+    {
+      "word": "gyve",
+      "gloss": ""
+    },
+    {
+      "word": "hade",
+      "gloss": ""
+    },
+    {
+      "word": "hake",
+      "gloss": ""
+    },
+    {
+      "word": "hale",
+      "gloss": ""
+    },
+    {
+      "word": "hame",
+      "gloss": ""
+    },
+    {
+      "word": "hare",
+      "gloss": ""
+    },
+    {
+      "word": "hate",
+      "gloss": ""
+    },
+    {
+      "word": "have",
+      "gloss": ""
+    },
+    {
+      "word": "haze",
+      "gloss": ""
+    },
+    {
+      "word": "hele",
+      "gloss": ""
+    },
+    {
+      "word": "heme",
+      "gloss": ""
+    },
+    {
+      "word": "here",
+      "gloss": ""
+    },
+    {
+      "word": "hide",
+      "gloss": ""
+    },
+    {
+      "word": "hike",
+      "gloss": ""
+    },
+    {
+      "word": "hire",
+      "gloss": ""
+    },
+    {
+      "word": "hive",
+      "gloss": ""
+    },
+    {
+      "word": "hole",
+      "gloss": ""
+    },
+    {
+      "word": "home",
+      "gloss": ""
+    },
+    {
+      "word": "hone",
+      "gloss": ""
+    },
+    {
+      "word": "hope",
+      "gloss": ""
+    },
+    {
+      "word": "hose",
+      "gloss": ""
+    },
+    {
+      "word": "hove",
+      "gloss": ""
+    },
+    {
+      "word": "howe",
+      "gloss": ""
+    },
+    {
+      "word": "huge",
+      "gloss": ""
+    },
+    {
+      "word": "hyke",
+      "gloss": ""
+    },
+    {
+      "word": "hyle",
+      "gloss": ""
+    },
+    {
+      "word": "jade",
+      "gloss": ""
+    },
+    {
+      "word": "jake",
+      "gloss": ""
+    },
+    {
+      "word": "jane",
+      "gloss": ""
+    },
+    {
+      "word": "jape",
+      "gloss": ""
+    },
+    {
+      "word": "jete",
+      "gloss": ""
+    },
+    {
+      "word": "jibe",
+      "gloss": ""
+    },
+    {
+      "word": "jive",
+      "gloss": ""
+    },
+    {
+      "word": "joke",
+      "gloss": ""
+    },
+    {
+      "word": "jube",
+      "gloss": ""
+    },
+    {
+      "word": "juke",
+      "gloss": ""
+    },
+    {
+      "word": "jupe",
+      "gloss": ""
+    },
+    {
+      "word": "jure",
+      "gloss": ""
+    },
+    {
+      "word": "jute",
+      "gloss": ""
+    },
+    {
+      "word": "kale",
+      "gloss": ""
+    },
+    {
+      "word": "kame",
+      "gloss": ""
+    },
+    {
+      "word": "kibe",
+      "gloss": ""
+    },
+    {
+      "word": "kike",
+      "gloss": ""
+    },
+    {
+      "word": "kipe",
+      "gloss": ""
+    },
+    {
+      "word": "kite",
+      "gloss": ""
+    },
+    {
+      "word": "kore",
+      "gloss": ""
+    },
+    {
+      "word": "kyle",
+      "gloss": ""
+    },
+    {
+      "word": "kyte",
+      "gloss": ""
+    },
+    {
+      "word": "lace",
+      "gloss": ""
+    },
+    {
+      "word": "lade",
+      "gloss": ""
+    },
+    {
+      "word": "lake",
+      "gloss": ""
+    },
+    {
+      "word": "lame",
+      "gloss": ""
+    },
+    {
+      "word": "lane",
+      "gloss": ""
+    },
+    {
+      "word": "late",
+      "gloss": ""
+    },
+    {
+      "word": "lave",
+      "gloss": ""
+    },
+    {
+      "word": "laze",
+      "gloss": ""
+    },
+    {
+      "word": "lice",
+      "gloss": ""
+    },
+    {
+      "word": "life",
+      "gloss": ""
+    },
+    {
+      "word": "like",
+      "gloss": ""
+    },
+    {
+      "word": "lime",
+      "gloss": ""
+    },
+    {
+      "word": "line",
+      "gloss": ""
+    },
+    {
+      "word": "lire",
+      "gloss": ""
+    },
+    {
+      "word": "lite",
+      "gloss": ""
+    },
+    {
+      "word": "live",
+      "gloss": ""
+    },
+    {
+      "word": "lobe",
+      "gloss": ""
+    },
+    {
+      "word": "lode",
+      "gloss": ""
+    },
+    {
+      "word": "loge",
+      "gloss": ""
+    },
+    {
+      "word": "loke",
+      "gloss": ""
+    },
+    {
+      "word": "lone",
+      "gloss": ""
+    },
+    {
+      "word": "lope",
+      "gloss": ""
+    },
+    {
+      "word": "lore",
+      "gloss": ""
+    },
+    {
+      "word": "lose",
+      "gloss": ""
+    },
+    {
+      "word": "lote",
+      "gloss": ""
+    },
+    {
+      "word": "love",
+      "gloss": ""
+    },
+    {
+      "word": "lube",
+      "gloss": ""
+    },
+    {
+      "word": "luce",
+      "gloss": ""
+    },
+    {
+      "word": "luge",
+      "gloss": ""
+    },
+    {
+      "word": "luke",
+      "gloss": ""
+    },
+    {
+      "word": "lune",
+      "gloss": ""
+    },
+    {
+      "word": "lure",
+      "gloss": ""
+    },
+    {
+      "word": "lute",
+      "gloss": ""
+    },
+    {
+      "word": "luxe",
+      "gloss": ""
+    },
+    {
+      "word": "lyre",
+      "gloss": ""
+    },
+    {
+      "word": "lyse",
+      "gloss": ""
+    },
+    {
+      "word": "mace",
+      "gloss": ""
+    },
+    {
+      "word": "made",
+      "gloss": ""
+    },
+    {
+      "word": "mage",
+      "gloss": ""
+    },
+    {
+      "word": "make",
+      "gloss": ""
+    },
+    {
+      "word": "male",
+      "gloss": ""
+    },
+    {
+      "word": "mane",
+      "gloss": ""
+    },
+    {
+      "word": "mare",
+      "gloss": ""
+    },
+    {
+      "word": "mate",
+      "gloss": ""
+    },
+    {
+      "word": "maze",
+      "gloss": ""
+    },
+    {
+      "word": "mere",
+      "gloss": ""
+    },
+    {
+      "word": "mese",
+      "gloss": ""
+    },
+    {
+      "word": "mete",
+      "gloss": ""
+    },
+    {
+      "word": "mice",
+      "gloss": ""
+    },
+    {
+      "word": "mike",
+      "gloss": ""
+    },
+    {
+      "word": "mile",
+      "gloss": ""
+    },
+    {
+      "word": "mime",
+      "gloss": ""
+    },
+    {
+      "word": "mine",
+      "gloss": ""
+    },
+    {
+      "word": "mire",
+      "gloss": ""
+    },
+    {
+      "word": "mise",
+      "gloss": ""
+    },
+    {
+      "word": "mite",
+      "gloss": ""
+    },
+    {
+      "word": "mode",
+      "gloss": ""
+    },
+    {
+      "word": "moke",
+      "gloss": ""
+    },
+    {
+      "word": "mole",
+      "gloss": ""
+    },
+    {
+      "word": "mome",
+      "gloss": ""
+    },
+    {
+      "word": "mope",
+      "gloss": ""
+    },
+    {
+      "word": "more",
+      "gloss": ""
+    },
+    {
+      "word": "mose",
+      "gloss": ""
+    },
+    {
+      "word": "mote",
+      "gloss": ""
+    },
+    {
+      "word": "move",
+      "gloss": ""
+    },
+    {
+      "word": "mule",
+      "gloss": ""
+    },
+    {
+      "word": "mure",
+      "gloss": ""
+    },
+    {
+      "word": "muse",
+      "gloss": ""
+    },
+    {
+      "word": "mute",
+      "gloss": ""
+    },
+    {
+      "word": "name",
+      "gloss": ""
+    },
+    {
+      "word": "nane",
+      "gloss": ""
+    },
+    {
+      "word": "nape",
+      "gloss": ""
+    },
+    {
+      "word": "nave",
+      "gloss": ""
+    },
+    {
+      "word": "naze",
+      "gloss": ""
+    },
+    {
+      "word": "nete",
+      "gloss": ""
+    },
+    {
+      "word": "neve",
+      "gloss": ""
+    },
+    {
+      "word": "nice",
+      "gloss": ""
+    },
+    {
+      "word": "nide",
+      "gloss": ""
+    },
+    {
+      "word": "nife",
+      "gloss": ""
+    },
+    {
+      "word": "nine",
+      "gloss": ""
+    },
+    {
+      "word": "node",
+      "gloss": ""
+    },
+    {
+      "word": "nome",
+      "gloss": ""
+    },
+    {
+      "word": "none",
+      "gloss": ""
+    },
+    {
+      "word": "nope",
+      "gloss": ""
+    },
+    {
+      "word": "nose",
+      "gloss": ""
+    },
+    {
+      "word": "note",
+      "gloss": ""
+    },
+    {
+      "word": "nude",
+      "gloss": ""
+    },
+    {
+      "word": "nuke",
+      "gloss": ""
+    },
+    {
+      "word": "pace",
+      "gloss": ""
+    },
+    {
+      "word": "page",
+      "gloss": ""
+    },
+    {
+      "word": "pale",
+      "gloss": ""
+    },
+    {
+      "word": "pane",
+      "gloss": ""
+    },
+    {
+      "word": "pape",
+      "gloss": ""
+    },
+    {
+      "word": "pare",
+      "gloss": ""
+    },
+    {
+      "word": "pate",
+      "gloss": ""
+    },
+    {
+      "word": "pave",
+      "gloss": ""
+    },
+    {
+      "word": "pele",
+      "gloss": ""
+    },
+    {
+      "word": "pice",
+      "gloss": ""
+    },
+    {
+      "word": "pike",
+      "gloss": ""
+    },
+    {
+      "word": "pile",
+      "gloss": ""
+    },
+    {
+      "word": "pine",
+      "gloss": ""
+    },
+    {
+      "word": "pipe",
+      "gloss": ""
+    },
+    {
+      "word": "pise",
+      "gloss": ""
+    },
+    {
+      "word": "pize",
+      "gloss": ""
+    },
+    {
+      "word": "poke",
+      "gloss": ""
+    },
+    {
+      "word": "pole",
+      "gloss": ""
+    },
+    {
+      "word": "pome",
+      "gloss": ""
+    },
+    {
+      "word": "pone",
+      "gloss": ""
+    },
+    {
+      "word": "pope",
+      "gloss": ""
+    },
+    {
+      "word": "pore",
+      "gloss": ""
+    },
+    {
+      "word": "pose",
+      "gloss": ""
+    },
+    {
+      "word": "pote",
+      "gloss": ""
+    },
+    {
+      "word": "puce",
+      "gloss": ""
+    },
+    {
+      "word": "puke",
+      "gloss": ""
+    },
+    {
+      "word": "pule",
+      "gloss": ""
+    },
+    {
+      "word": "pure",
+      "gloss": ""
+    },
+    {
+      "word": "pyre",
+      "gloss": ""
+    },
+    {
+      "word": "race",
+      "gloss": ""
+    },
+    {
+      "word": "rage",
+      "gloss": ""
+    },
+    {
+      "word": "rake",
+      "gloss": ""
+    },
+    {
+      "word": "rale",
+      "gloss": ""
+    },
+    {
+      "word": "rape",
+      "gloss": ""
+    },
+    {
+      "word": "rare",
+      "gloss": ""
+    },
+    {
+      "word": "rase",
+      "gloss": ""
+    }
+  ]
+}

@@ -12,6 +12,14 @@ const List<String> kBuiltinSyllabusAssetPaths = <String>[
   'assets/syllabus/cet4_core.json',
   'assets/syllabus/cet6_core.json',
   'assets/syllabus/daily_patterns.json',
+  // Pattern / chunk books (see assets/syllabus/CHUNKS_SOURCES.md).
+  'assets/syllabus/chunks_conversational_1000.json',
+  'assets/syllabus/chunks_programmer_speak.json',
+  'assets/syllabus/chunks_programmer_weekly.json',
+  'assets/syllabus/chunks_superword_safe.json',
+  // Phonics chunk word lists.
+  'assets/syllabus/chunks_phonics_cvc.json',
+  'assets/syllabus/chunks_phonics_cvce.json',
 ];
 
 class SyllabusBooksState {

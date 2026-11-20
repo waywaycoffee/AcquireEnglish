@@ -1,0 +1,1029 @@
+{
+  "id": "chunks_programmer_speak",
+  "title": "程序员口语句型（Crazily Speak）",
+  "examTag": "SPEAK",
+  "kind": "pattern",
+  "disclaimer": "整理自 fltenwall/The-English-For-Programmer（MIT）900/Notes Crazily Speak 系列，致谢原作者。",
+  "words": [
+    {
+      "word": "how are you dong",
+      "gloss": ""
+    },
+    {
+      "word": "great fine i'm doing well",
+      "gloss": ""
+    },
+    {
+      "word": "how are you",
+      "gloss": ""
+    },
+    {
+      "word": "how is everything",
+      "gloss": ""
+    },
+    {
+      "word": "how is everything with you",
+      "gloss": ""
+    },
+    {
+      "word": "how is everything going",
+      "gloss": ""
+    },
+    {
+      "word": "how is world with you",
+      "gloss": ""
+    },
+    {
+      "word": "how's your family they're great",
+      "gloss": ""
+    },
+    {
+      "word": "i'm really gald to see you",
+      "gloss": ""
+    },
+    {
+      "word": "i'm really gald to meet you",
+      "gloss": ""
+    },
+    {
+      "word": "i'm really gald to see you too",
+      "gloss": ""
+    },
+    {
+      "word": "good to see you",
+      "gloss": ""
+    },
+    {
+      "word": "good to see you again",
+      "gloss": ""
+    },
+    {
+      "word": "i'm gald to see you again",
+      "gloss": ""
+    },
+    {
+      "word": "please to see you again",
+      "gloss": ""
+    },
+    {
+      "word": "nice to meet you",
+      "gloss": ""
+    },
+    {
+      "word": "pleased to meet you",
+      "gloss": ""
+    },
+    {
+      "word": "it's so nice to meet you",
+      "gloss": ""
+    },
+    {
+      "word": "it's a pleasure to meet you",
+      "gloss": ""
+    },
+    {
+      "word": "i'm very gald to meet you",
+      "gloss": ""
+    },
+    {
+      "word": "nice meeting you",
+      "gloss": ""
+    },
+    {
+      "word": "it was a pleasure meeting you",
+      "gloss": ""
+    },
+    {
+      "word": "nice talking to you",
+      "gloss": ""
+    },
+    {
+      "word": "it's been nice talking to you",
+      "gloss": ""
+    },
+    {
+      "word": "i'm sorry i'm so late",
+      "gloss": ""
+    },
+    {
+      "word": "i'm sorry i can't come",
+      "gloss": ""
+    },
+    {
+      "word": "i'm sorry i can't help",
+      "gloss": ""
+    },
+    {
+      "word": "i'm sorry i overslept",
+      "gloss": ""
+    },
+    {
+      "word": "i'm sorry i lost your book",
+      "gloss": ""
+    },
+    {
+      "word": "i'm sorry i dialed the wrong number",
+      "gloss": ""
+    },
+    {
+      "word": "i'm sorry i took you for someone else",
+      "gloss": ""
+    },
+    {
+      "word": "i'm sorry i have to cancel the appointment",
+      "gloss": ""
+    },
+    {
+      "word": "i'm sorry i didn't notice you",
+      "gloss": ""
+    },
+    {
+      "word": "i'm sorry i forgot to tell you",
+      "gloss": ""
+    },
+    {
+      "word": "i'm sorry i forgot your name",
+      "gloss": ""
+    },
+    {
+      "word": "that's ok but next time be sure to be on time please",
+      "gloss": ""
+    },
+    {
+      "word": "isn't it a small world",
+      "gloss": ""
+    },
+    {
+      "word": "what a small world",
+      "gloss": ""
+    },
+    {
+      "word": "wow a small world",
+      "gloss": ""
+    },
+    {
+      "word": "isn't it a lovely place",
+      "gloss": ""
+    },
+    {
+      "word": "isn't it pleasure weather",
+      "gloss": ""
+    },
+    {
+      "word": "isn't it a coincidence",
+      "gloss": ""
+    },
+    {
+      "word": "isn't it an interesting story",
+      "gloss": ""
+    },
+    {
+      "word": "isn't it a wonderful idea",
+      "gloss": ""
+    },
+    {
+      "word": "isn't it a strange dream",
+      "gloss": ""
+    },
+    {
+      "word": "isn't it a silly question",
+      "gloss": ""
+    },
+    {
+      "word": "isn't it a mystery",
+      "gloss": ""
+    },
+    {
+      "word": "isn't it a mirable",
+      "gloss": ""
+    },
+    {
+      "word": "how's everthing here",
+      "gloss": ""
+    },
+    {
+      "word": "everything is ok great",
+      "gloss": ""
+    },
+    {
+      "word": "everything is ready",
+      "gloss": ""
+    },
+    {
+      "word": "everything is going fine",
+      "gloss": ""
+    },
+    {
+      "word": "thank you for everything",
+      "gloss": ""
+    },
+    {
+      "word": "everything's taken good care of",
+      "gloss": ""
+    },
+    {
+      "word": "everything will be just fine",
+      "gloss": ""
+    },
+    {
+      "word": "you are everything to me",
+      "gloss": ""
+    },
+    {
+      "word": "money is everything to him",
+      "gloss": ""
+    },
+    {
+      "word": "tell me everything about it",
+      "gloss": ""
+    },
+    {
+      "word": "how's everything here",
+      "gloss": ""
+    },
+    {
+      "word": "hey everything is great take a seat and i'll tell you all about it",
+      "gloss": ""
+    },
+    {
+      "word": "thanks but i'm in a hurry give me a call some time",
+      "gloss": ""
+    },
+    {
+      "word": "ok see you",
+      "gloss": ""
+    },
+    {
+      "word": "you look so beautiful",
+      "gloss": ""
+    },
+    {
+      "word": "you look nice",
+      "gloss": ""
+    },
+    {
+      "word": "you look great",
+      "gloss": ""
+    },
+    {
+      "word": "you look good",
+      "gloss": ""
+    },
+    {
+      "word": "you look awesome",
+      "gloss": ""
+    },
+    {
+      "word": "you look like a millon dollars",
+      "gloss": ""
+    },
+    {
+      "word": "do you mean it",
+      "gloss": ""
+    },
+    {
+      "word": "yes i mean it",
+      "gloss": ""
+    },
+    {
+      "word": "you really mean it",
+      "gloss": ""
+    },
+    {
+      "word": "how about a cup of coffee i would like coffee",
+      "gloss": ""
+    },
+    {
+      "word": "how about some beers",
+      "gloss": ""
+    },
+    {
+      "word": "how about seeing a movie tonight",
+      "gloss": ""
+    },
+    {
+      "word": "how about having a picnic this weekend",
+      "gloss": ""
+    },
+    {
+      "word": "how about eating out tonight",
+      "gloss": ""
+    },
+    {
+      "word": "how about a cup of coffee",
+      "gloss": ""
+    },
+    {
+      "word": "that would be great",
+      "gloss": ""
+    },
+    {
+      "word": "do you take cream or sugar",
+      "gloss": ""
+    },
+    {
+      "word": "i'd like it black",
+      "gloss": ""
+    },
+    {
+      "word": "that's a neat idea something is clever",
+      "gloss": ""
+    },
+    {
+      "word": "that's a good great nice beautiful idea",
+      "gloss": ""
+    },
+    {
+      "word": "that's a good question",
+      "gloss": ""
+    },
+    {
+      "word": "that sounds great",
+      "gloss": ""
+    },
+    {
+      "word": "that sounds terrific",
+      "gloss": ""
+    },
+    {
+      "word": "that sounds like a good idea",
+      "gloss": ""
+    },
+    {
+      "word": "that sounds like a great idea",
+      "gloss": ""
+    },
+    {
+      "word": "do you want to go out tonight",
+      "gloss": ""
+    },
+    {
+      "word": "well that's a great idea",
+      "gloss": ""
+    },
+    {
+      "word": "how about a movie",
+      "gloss": ""
+    },
+    {
+      "word": "perfect",
+      "gloss": ""
+    },
+    {
+      "word": "ok let's meet at",
+      "gloss": ""
+    },
+    {
+      "word": "i'm afraid i must be going",
+      "gloss": ""
+    },
+    {
+      "word": "i'm afraid it's too late",
+      "gloss": ""
+    },
+    {
+      "word": "i'm afraid you're wrong",
+      "gloss": ""
+    },
+    {
+      "word": "i'm afraid there's no hope",
+      "gloss": ""
+    },
+    {
+      "word": "i'm afraid i can't do this for you",
+      "gloss": ""
+    },
+    {
+      "word": "that's too bad can't you stay a little longer",
+      "gloss": ""
+    },
+    {
+      "word": "i'm afraid i can't let's chat some more next time ok",
+      "gloss": ""
+    },
+    {
+      "word": "don't let me down",
+      "gloss": ""
+    },
+    {
+      "word": "don't give up",
+      "gloss": ""
+    },
+    {
+      "word": "don't be late",
+      "gloss": ""
+    },
+    {
+      "word": "don't do that",
+      "gloss": ""
+    },
+    {
+      "word": "don't mention it",
+      "gloss": ""
+    },
+    {
+      "word": "don't trick me",
+      "gloss": ""
+    },
+    {
+      "word": "don't say a word",
+      "gloss": "保密🤐/闭嘴)"
+    },
+    {
+      "word": "don't worry about it you can count on me",
+      "gloss": ""
+    },
+    {
+      "word": "don't waste my time",
+      "gloss": ""
+    },
+    {
+      "word": "don't get me wrong",
+      "gloss": "不要误解我的意思)"
+    },
+    {
+      "word": "don't miss the boat chance opportunity",
+      "gloss": ""
+    },
+    {
+      "word": "don't take any chances risks",
+      "gloss": ""
+    },
+    {
+      "word": "i had a really bad day",
+      "gloss": ""
+    },
+    {
+      "word": "everyday is a wonderful day",
+      "gloss": ""
+    },
+    {
+      "word": "i'm really sorry",
+      "gloss": ""
+    },
+    {
+      "word": "you're really lucky",
+      "gloss": ""
+    },
+    {
+      "word": "you're really something great",
+      "gloss": ""
+    },
+    {
+      "word": "the exam was really difficult",
+      "gloss": ""
+    },
+    {
+      "word": "the weather is really awful",
+      "gloss": ""
+    },
+    {
+      "word": "his english is really good",
+      "gloss": ""
+    },
+    {
+      "word": "he's working really hard",
+      "gloss": ""
+    },
+    {
+      "word": "it was really not my fault",
+      "gloss": ""
+    },
+    {
+      "word": "you really shouldn't say that about her",
+      "gloss": ""
+    },
+    {
+      "word": "i really need your help",
+      "gloss": ""
+    },
+    {
+      "word": "i had a really bad day today",
+      "gloss": ""
+    },
+    {
+      "word": "really i'm sorry to hear that what happend",
+      "gloss": ""
+    },
+    {
+      "word": "i was late this morning",
+      "gloss": ""
+    },
+    {
+      "word": "that's awful try to get up earlier next time",
+      "gloss": ""
+    },
+    {
+      "word": "may i use the phone sure go ahead",
+      "gloss": ""
+    },
+    {
+      "word": "may i use borrow your mobile phone",
+      "gloss": ""
+    },
+    {
+      "word": "may i come in",
+      "gloss": ""
+    },
+    {
+      "word": "may i use your bathroom",
+      "gloss": ""
+    },
+    {
+      "word": "may i ask you a question",
+      "gloss": ""
+    },
+    {
+      "word": "may i ask you something",
+      "gloss": ""
+    },
+    {
+      "word": "i'm sure you'll enjoy it",
+      "gloss": ""
+    },
+    {
+      "word": "i enjoy losing face",
+      "gloss": ""
+    },
+    {
+      "word": "i enjor yelling english",
+      "gloss": ""
+    },
+    {
+      "word": "i enjoy working with all of you",
+      "gloss": ""
+    },
+    {
+      "word": "i enjoy travelling",
+      "gloss": ""
+    },
+    {
+      "word": "i enjoy teaching",
+      "gloss": ""
+    },
+    {
+      "word": "i enjoy helping people",
+      "gloss": ""
+    },
+    {
+      "word": "i enjoy wathcing tv",
+      "gloss": ""
+    },
+    {
+      "word": "i enjoy every day of my life",
+      "gloss": ""
+    },
+    {
+      "word": "i enjoy working with you very much",
+      "gloss": ""
+    },
+    {
+      "word": "are you kidding me",
+      "gloss": ""
+    },
+    {
+      "word": "are you trying to cheat me",
+      "gloss": ""
+    },
+    {
+      "word": "are you trying to kill me",
+      "gloss": ""
+    },
+    {
+      "word": "are you challenging me",
+      "gloss": ""
+    },
+    {
+      "word": "you know what i lost my job today",
+      "gloss": ""
+    },
+    {
+      "word": "no i'm serious i really don't know what to do next",
+      "gloss": ""
+    },
+    {
+      "word": "keep your head up try to find a new job it's not that hard",
+      "gloss": ""
+    },
+    {
+      "word": "why don't you join us",
+      "gloss": ""
+    },
+    {
+      "word": "why don't you try",
+      "gloss": ""
+    },
+    {
+      "word": "why don't you do as i do",
+      "gloss": ""
+    },
+    {
+      "word": "why don't listen to me",
+      "gloss": ""
+    },
+    {
+      "word": "why don't you learn chinese",
+      "gloss": ""
+    },
+    {
+      "word": "why don't you cooperate with me",
+      "gloss": ""
+    },
+    {
+      "word": "why don't you work with me",
+      "gloss": ""
+    },
+    {
+      "word": "why don't you join the english club",
+      "gloss": ""
+    },
+    {
+      "word": "why don't you study hard",
+      "gloss": ""
+    },
+    {
+      "word": "i felt feel the same way",
+      "gloss": ""
+    },
+    {
+      "word": "the same to you",
+      "gloss": ""
+    },
+    {
+      "word": "it's all the same",
+      "gloss": ""
+    },
+    {
+      "word": "we work in the same company",
+      "gloss": ""
+    },
+    {
+      "word": "we went to the same university",
+      "gloss": ""
+    },
+    {
+      "word": "we're from the same hometown",
+      "gloss": ""
+    },
+    {
+      "word": "let's meet at the same time tomorrow",
+      "gloss": ""
+    },
+    {
+      "word": "the piano concert last night was really amazing",
+      "gloss": ""
+    },
+    {
+      "word": "i felt the same way",
+      "gloss": ""
+    },
+    {
+      "word": "i hope i can learn to play the piano as well as that performer",
+      "gloss": ""
+    },
+    {
+      "word": "if you work hard i'm sure you can make it someday",
+      "gloss": ""
+    },
+    {
+      "word": "how can i thank all of you",
+      "gloss": ""
+    },
+    {
+      "word": "how can i do this",
+      "gloss": ""
+    },
+    {
+      "word": "how can i afford it",
+      "gloss": ""
+    },
+    {
+      "word": "how can i forget it",
+      "gloss": ""
+    },
+    {
+      "word": "how can i accept it",
+      "gloss": ""
+    },
+    {
+      "word": "how can i marry him",
+      "gloss": ""
+    },
+    {
+      "word": "you've done so much for me how can i thank all of you",
+      "gloss": ""
+    },
+    {
+      "word": "it was really nothing",
+      "gloss": ""
+    },
+    {
+      "word": "no seriously i really appreciate it",
+      "gloss": ""
+    },
+    {
+      "word": "ok well if you really want to thank us you can buy us dinner",
+      "gloss": ""
+    },
+    {
+      "word": "i'd like to meet your daughter someday",
+      "gloss": ""
+    },
+    {
+      "word": "i'd like to speak to mr lee",
+      "gloss": ""
+    },
+    {
+      "word": "i'd like to talk to you for a minute",
+      "gloss": ""
+    },
+    {
+      "word": "i'd like to know more about your company",
+      "gloss": ""
+    },
+    {
+      "word": "why are you back so early",
+      "gloss": ""
+    },
+    {
+      "word": "why are you always late",
+      "gloss": ""
+    },
+    {
+      "word": "why are you always sike",
+      "gloss": ""
+    },
+    {
+      "word": "why are you so upset",
+      "gloss": ""
+    },
+    {
+      "word": "why are you so excited",
+      "gloss": ""
+    },
+    {
+      "word": "tonight's meeting was cancelled",
+      "gloss": ""
+    },
+    {
+      "word": "why was that",
+      "gloss": ""
+    },
+    {
+      "word": "my boss had to fly to hongkong tonight",
+      "gloss": ""
+    },
+    {
+      "word": "i'm exhausted i'm dead tired i'm beat i'm dying here",
+      "gloss": ""
+    },
+    {
+      "word": "i'm tired",
+      "gloss": ""
+    },
+    {
+      "word": "i'm sleepy",
+      "gloss": ""
+    },
+    {
+      "word": "i'm hungry",
+      "gloss": ""
+    },
+    {
+      "word": "i'm thirsty",
+      "gloss": ""
+    },
+    {
+      "word": "i'm starving",
+      "gloss": "要饿死了).(Don't say I'm starved ❌ which means you are dead)"
+    },
+    {
+      "word": "i'm broke it means someone is no money don't say i'm broken",
+      "gloss": ""
+    },
+    {
+      "word": "i'm finished",
+      "gloss": "我吃完了/我做完了/我完蛋了...~It's the end of me.)"
+    },
+    {
+      "word": "oh i'm exhausted",
+      "gloss": ""
+    },
+    {
+      "word": "did you have a tough day",
+      "gloss": ""
+    },
+    {
+      "word": "yes i did i had lots of work to do throughout the day",
+      "gloss": ""
+    },
+    {
+      "word": "why didn't you tell me",
+      "gloss": ""
+    },
+    {
+      "word": "why didn't you wait for me",
+      "gloss": ""
+    },
+    {
+      "word": "why didn't you let me know earlier",
+      "gloss": ""
+    },
+    {
+      "word": "why didn't you call me",
+      "gloss": ""
+    },
+    {
+      "word": "what do you recommend",
+      "gloss": ""
+    },
+    {
+      "word": "what do you think",
+      "gloss": ""
+    },
+    {
+      "word": "what do you suggest",
+      "gloss": ""
+    },
+    {
+      "word": "what do you like",
+      "gloss": ""
+    },
+    {
+      "word": "i appreciate your help",
+      "gloss": ""
+    },
+    {
+      "word": "i appreciate your cooperation",
+      "gloss": ""
+    },
+    {
+      "word": "i appreciate your understanding",
+      "gloss": ""
+    },
+    {
+      "word": "i apprecaite your courage",
+      "gloss": ""
+    },
+    {
+      "word": "don't forget to invite linda for dinner",
+      "gloss": ""
+    },
+    {
+      "word": "don't forget to tell him",
+      "gloss": ""
+    },
+    {
+      "word": "don't forget to take your id card",
+      "gloss": ""
+    },
+    {
+      "word": "don't forget to give me a call when you arrive",
+      "gloss": ""
+    },
+    {
+      "word": "sounds terrific i sure do",
+      "gloss": ""
+    },
+    {
+      "word": "maybe you should do it again",
+      "gloss": ""
+    },
+    {
+      "word": "maybe you should tell her about it",
+      "gloss": ""
+    },
+    {
+      "word": "maybe you should say sorry to her",
+      "gloss": ""
+    },
+    {
+      "word": "maybe you should try crazy english",
+      "gloss": ""
+    },
+    {
+      "word": "maybe you should say english crazily from today",
+      "gloss": ""
+    },
+    {
+      "word": "women never make mistakes it's always husband's fault",
+      "gloss": ""
+    },
+    {
+      "word": "you look upset what's going on",
+      "gloss": ""
+    },
+    {
+      "word": "i tried to hang the painting on the wall but it fell down",
+      "gloss": ""
+    },
+    {
+      "word": "maybe you should do it again here i'll help you",
+      "gloss": ""
+    },
+    {
+      "word": "finding a good job is not easy these days",
+      "gloss": ""
+    },
+    {
+      "word": "saying is easy doing is diffucult",
+      "gloss": ""
+    },
+    {
+      "word": "driving is exciting",
+      "gloss": ""
+    },
+    {
+      "word": "lying is a bad habit",
+      "gloss": ""
+    },
+    {
+      "word": "i prefer hot weather to cold weather",
+      "gloss": ""
+    },
+    {
+      "word": "i prefer tea to coffee",
+      "gloss": ""
+    },
+    {
+      "word": "i prefer swiming to running",
+      "gloss": ""
+    },
+    {
+      "word": "i prefer winter to summer",
+      "gloss": ""
+    },
+    {
+      "word": "i guess it's going to rain",
+      "gloss": ""
+    },
+    {
+      "word": "i guess you are right",
+      "gloss": ""
+    },
+    {
+      "word": "i guess i need a doctor",
+      "gloss": ""
+    },
+    {
+      "word": "i guess he won't come",
+      "gloss": ""
+    },
+    {
+      "word": "i promise i won't do it again",
+      "gloss": ""
+    },
+    {
+      "word": "i promise i won't do anything stupid",
+      "gloss": ""
+    },
+    {
+      "word": "that's a stupid thing i've ever heard",
+      "gloss": ""
+    },
+    {
+      "word": "i promise i'll never lie again",
+      "gloss": ""
+    },
+    {
+      "word": "i promise to pay your back",
+      "gloss": ""
+    },
+    {
+      "word": "please don't use my computer without asking",
+      "gloss": ""
+    },
+    {
+      "word": "i'm crazy about american movies",
+      "gloss": ""
+    },
+    {
+      "word": "i'm crazy about chinese food",
+      "gloss": ""
+    },
+    {
+      "word": "i'm crazy about possibility in this country",
+      "gloss": ""
+    },
+    {
+      "word": "i'm crazy about sports",
+      "gloss": ""
+    },
+    {
+      "word": "what do you do in your leisure time",
+      "gloss": ""
+    },
+    {
+      "word": "i like watching movies",
+      "gloss": ""
+    },
+    {
+      "word": "really so do i",
+      "gloss": ""
+    },
+    {
+      "word": "i'm crazy about movies",
+      "gloss": ""
+    }
+  ]
+}
