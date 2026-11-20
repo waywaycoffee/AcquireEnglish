@@ -539,3 +539,14 @@ class VocabPkChallenge(Base):
     completed_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
     )
+
+
+class MembershipCoupon(Base):
+    __tablename__ = "membership_coupons"
+    __table_args__ = (UniqueConstraint("user_id", "reward_code", name="uq_member_reward"),)
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)
+    reward_code: Mapped[str] = mapped_column(String(64))
+    kind: Mapped[str] = mapped_column(String(16))
+    value: Mapped[int] = mapped_column(Integer)
+    used: Mapped[int] = mapped_column(Integer, default=0)

@@ -56,8 +56,9 @@ class UserAssetsService {
   final Ref _ref;
 
   Future<UserAssetsSnapshot> fetch() async {
-    final Map<String, dynamic> json =
-        await _ref.read(acquireApiClientProvider).getAssets();
+    final Map<String, dynamic> json = await _ref
+        .read(acquireApiClientProvider)
+        .getAssets();
     return UserAssetsSnapshot.fromJson(json);
   }
 
@@ -66,12 +67,14 @@ class UserAssetsService {
     int minutes = 1,
     String reason = 'oral_coach',
   }) async {
-    await _ref.read(acquireApiClientProvider).consumeEntitlement(
-      assetKind: 'coach_quota',
-      assetRef: 'coach',
-      quantity: minutes,
-      reason: reason,
-    );
+    await _ref
+        .read(acquireApiClientProvider)
+        .consumeEntitlement(
+          assetKind: 'coach_quota',
+          assetRef: 'coach',
+          quantity: minutes,
+          reason: reason,
+        );
     final UserAssetsSnapshot snap = await fetch();
     return snap.coachMinutes;
   }
@@ -82,6 +85,7 @@ class UserAssetsService {
   Future<Map<String, dynamic>> purchaseWithWechat({
     required String skuCode,
     int quantity = 1,
+    int? couponId,
   }) async {
     final AcquireApiClient api = _ref.read(acquireApiClientProvider);
     final Map<String, dynamic> order = await api.createAssetOrder(
@@ -89,6 +93,7 @@ class UserAssetsService {
         (skuCode: skuCode, quantity: quantity),
       ],
       provider: 'wechat',
+      couponId: couponId,
     );
     final int orderId = (order['id'] as num).toInt();
     final Map<String, dynamic> prepay = await api.createWechatPrepay(

@@ -182,3 +182,33 @@ async def test_payment_callback_rejects_wrong_amount(monkeypatch):
         assert response.status_code == 400
         history = await client.get("/api/assets/orders", headers=headers)
         assert history.json()[0]["status"] == "pending"
+
+
+@pytest.mark.asyncio
+async def test_learning_coupons_and_discount():
+    from app.models import UserStudyStatsDaily, UserEntitlement
+    from sqlalchemy import select
+    async with AsyncClient(transport=ASGITransport(app=fastapi_app), base_url="http://test") as client:
+        headers = {"Authorization": f"Bearer {await _sms_token(client)}"}
+        assert (await client.post('/api/assets/membership-rewards/study300/claim', headers=headers)).status_code == 400
+        async with SessionLocal() as db:
+            trial = (await db.execute(select(UserEntitlement))).scalars().first()
+            user_id = trial.user_id
+            db.add(UserStudyStatsDaily(user_id=user_id, day='2026-11-20', study_seconds=18000))
+            await db.commit()
+        claim = await client.post('/api/assets/membership-rewards/study300/claim', headers=headers)
+        assert claim.status_code == 200, claim.text
+        coupon_id = claim.json()['id']
+        assert (await client.post('/api/assets/membership-rewards/study300/claim', headers=headers)).status_code == 409
+        payload = {'provider': 'wechat', 'coupon_id': coupon_id, 'items': [{'sku_code': 'membership.pro.monthly', 'quantity': 1}]}
+        order = await client.post('/api/assets/orders', headers=headers, json=payload)
+        assert order.status_code == 201, order.text
+        assert order.json()['amount_cents'] == 2300
+        assert (await client.post('/api/assets/orders', headers=headers, json=payload)).status_code == 400
+        days = await client.post('/api/assets/membership-rewards/study60/claim', headers=headers)
+        assert days.status_code == 200
+        url = f"/api/assets/membership-coupons/{days.json()['id']}/redeem"
+        assert (await client.post(url, headers=headers)).status_code == 200
+        assert (await client.post(url, headers=headers)).status_code == 409
+        skus = (await client.get('/api/assets/skus', headers=headers)).json()
+        assert {'membership.pro.daily', 'membership.pro.monthly', 'membership.pro.yearly'} <= {s['sku_code'] for s in skus}

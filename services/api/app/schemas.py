@@ -320,6 +320,7 @@ class OrderItemIn(BaseModel):
 
 
 class OrderCreateIn(BaseModel):
+    coupon_id: int | None = None
     items: list[OrderItemIn] = Field(min_length=1)
     provider: str = Field(default="mock", max_length=24)
 

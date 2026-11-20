@@ -1047,14 +1047,27 @@ class AcquireApiClient {
     return (response.data as List<dynamic>).cast<Map<String, dynamic>>();
   }
 
+  Future<Map<String, dynamic>> membershipRewards() async =>
+      (await _dio.get('${Endpoints.assets}/membership-rewards')).data as Map<String, dynamic>;
+
+  Future<void> claimMembershipReward(String code) async {
+    await _dio.post('${Endpoints.assets}/membership-rewards/$code/claim');
+  }
+
+  Future<void> redeemMembershipCoupon(int id) async {
+    await _dio.post('${Endpoints.assets}/membership-coupons/$id/redeem');
+  }
+
   Future<Map<String, dynamic>> createAssetOrder({
     required List<({String skuCode, int quantity})> items,
     String provider = 'wechat',
+    int? couponId,
   }) async {
     final Response<dynamic> response = await _dio.post(
       Endpoints.assetsOrders,
       data: <String, dynamic>{
         'provider': provider,
+        if (couponId != null) 'coupon_id': couponId,
         'items': <Map<String, dynamic>>[
           for (final ({String skuCode, int quantity}) item in items)
             <String, dynamic>{

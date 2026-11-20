@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
@@ -22,7 +23,9 @@ class _MembershipScreenState extends ConsumerState<MembershipScreen> {
   String? _paymentMessage;
   bool _loading = false;
   bool _paying = false;
-  bool _agreed = false;
+  Map<String, dynamic>? _rewards;
+  int? _couponId;
+  bool _rewardBusy = false;
 
   @override
   void initState() {
@@ -42,12 +45,14 @@ class _MembershipScreenState extends ConsumerState<MembershipScreen> {
         api.getAssets(),
         api.listAssetSkus(),
         api.listAssetOrders(),
+        api.membershipRewards(),
       ]);
       if (!mounted) return;
       setState(() {
+        _rewards = results[3] as Map<String, dynamic>;
         _assets = results[0] as Map<String, dynamic>;
         _skus = (results[1] as List<Map<String, dynamic>>)
-            .where((s) => s['currency'] == 'CNY')
+            .where((s) => s['currency'] == 'CNY' && s['kind'] == 'membership')
             .toList();
         _orders = results[2] as List<Map<String, dynamic>>;
         _selected ??= _skus.isEmpty ? null : _skus.first['sku_code'] as String;
@@ -63,7 +68,13 @@ class _MembershipScreenState extends ConsumerState<MembershipScreen> {
       '¥${((cents as num? ?? 0) / 100).toStringAsFixed(2)}';
 
   Future<void> _pay() async {
-    if (_paying || !_agreed || _selected == null) return;
+    if (_paying) return;
+    if (_selected == null) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('套餐尚未加载，请刷新后选择套餐。')));
+      return;
+    }
     final sku = _skus.firstWhere((s) => s['sku_code'] == _selected);
     final confirmed = await showModalBottomSheet<bool>(
       context: context,
@@ -78,6 +89,8 @@ class _MembershipScreenState extends ConsumerState<MembershipScreen> {
               Text('确认订单', style: Theme.of(context).textTheme.titleLarge),
               const SizedBox(height: 20),
               Text('${sku['title']} · ${_money(sku['price_cents'])}'),
+              Text(_couponId == null ? '未使用抵扣券' : '已选择抵扣券，以服务端结算金额为准'),
+              const Text('确认即表示同意当前价格和有效期；一次性付款，不自动续费。'),
               const ListTile(
                 contentPadding: EdgeInsets.zero,
                 leading: Icon(
@@ -104,7 +117,7 @@ class _MembershipScreenState extends ConsumerState<MembershipScreen> {
     try {
       final order = await ref
           .read(userAssetsServiceProvider)
-          .purchaseWithWechat(skuCode: _selected!);
+          .purchaseWithWechat(skuCode: _selected!, couponId: _couponId);
       bool paid = false;
       for (var attempt = 0; attempt < 5; attempt++) {
         final orders = await ref
@@ -122,15 +135,135 @@ class _MembershipScreenState extends ConsumerState<MembershipScreen> {
               ? '支付成功，权益已到账。'
               : '微信已返回，正在等待到账确认。请稍后刷新我的订单，勿重复付款。',
         );
-    } catch (_) {
-      if (mounted)
-        setState(() => _paymentMessage = '支付未完成或暂时无法确认。若已扣款，请刷新订单核对；未扣款可稍后重试。');
+    } catch (error) {
+      String message = '支付未完成。若已扣款请刷新订单，勿重复付款。';
+      if (error is DioException) {
+        final data = error.response?.data;
+        message = data is Map && data['detail'] != null
+            ? '${data['detail']}'
+            : '无法连接支付服务，请检查网络后重试。';
+      } else if (error is StateError) {
+        message = '${error.message}';
+      }
+      if (mounted) {
+        setState(() => _paymentMessage = message);
+        await showDialog<void>(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: const Text('暂未完成支付'),
+            content: Text(message),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('知道了'),
+              ),
+            ],
+          ),
+        );
+      }
     } finally {
       if (mounted) {
         setState(() => _paying = false);
         await _load();
       }
     }
+  }
+
+  Future<void> _rewardAction(Future<void> Function() action) async {
+    setState(() => _rewardBusy = true);
+    try {
+      await action();
+      await _load();
+    } catch (error) {
+      if (mounted)
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('操作失败，可能已领取或学习时长不足，请刷新后重试。')),
+        );
+    } finally {
+      if (mounted) setState(() => _rewardBusy = false);
+    }
+  }
+
+  Widget _rewardCard() {
+    final coupons = (_rewards?['coupons'] as List<dynamic>?) ?? [];
+    final rewards = (_rewards?['rewards'] as List<dynamic>?) ?? [];
+    final minutes = (_rewards?['study_minutes'] as num?)?.toInt() ?? 0;
+    return _card(
+      Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text('学习赚会员', style: Theme.of(context).textTheme.titleLarge),
+          Text('已同步学习 $minutes 分钟 · 每档奖励限领一次'),
+          const Text('时长券领取后兑换生效；现金券仅抵扣会员订单，满10元可用，不提现、不叠加。提交订单即占用，请勿重复下单。'),
+          for (final reward in rewards)
+            ListTile(
+              contentPadding: EdgeInsets.zero,
+              title: Text('${reward['title']}'),
+              subtitle: Text('进度 $minutes / ${reward['minutes']} 分钟'),
+              trailing: TextButton(
+                onPressed:
+                    _rewardBusy ||
+                        _paying ||
+                        minutes < (reward['minutes'] as num) ||
+                        coupons.any((c) => c['code'] == reward['code']) ||
+                        (reward['code'] == 'welcome' &&
+                            _assets?['active_membership'] != null)
+                    ? null
+                    : () => _rewardAction(
+                        () => ref
+                            .read(acquireApiClientProvider)
+                            .claimMembershipReward('${reward['code']}'),
+                      ),
+                child: Text(
+                  coupons.any((c) => c['code'] == reward['code'])
+                      ? '已领取'
+                      : '领取',
+                ),
+              ),
+            ),
+          const Divider(),
+          const Text('我的优惠券'),
+          if (coupons.isEmpty) const Text('暂无优惠券，完成学习即可领取'),
+          for (final coupon in coupons)
+            ListTile(
+              contentPadding: EdgeInsets.zero,
+              title: Text(
+                coupon['kind'] == 'days'
+                    ? '会员 ${coupon['value']} 天券'
+                    : '${_money(coupon['value'])} 会员抵扣券',
+              ),
+              trailing: TextButton(
+                onPressed: coupon['used'] == true || _rewardBusy || _paying
+                    ? null
+                    : () {
+                        if (coupon['kind'] == 'days') {
+                          _rewardAction(
+                            () => ref
+                                .read(acquireApiClientProvider)
+                                .redeemMembershipCoupon(coupon['id'] as int),
+                          );
+                        } else {
+                          setState(
+                            () => _couponId = _couponId == coupon['id']
+                                ? null
+                                : coupon['id'] as int,
+                          );
+                        }
+                      },
+                child: Text(
+                  coupon['used'] == true
+                      ? '已使用 / 已占用'
+                      : coupon['kind'] == 'days'
+                      ? '立即兑换'
+                      : _couponId == coupon['id']
+                      ? '取消选择'
+                      : '用于购卡',
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
   }
 
   Widget _card(Widget child) => Card(
@@ -141,7 +274,8 @@ class _MembershipScreenState extends ConsumerState<MembershipScreen> {
   Widget build(BuildContext context) {
     final loggedIn = ref.watch(authSessionProvider).isLoggedIn;
     final membership = _assets?['active_membership'];
-    final entitlements = (_assets?['entitlements'] as List<dynamic>?) ?? <dynamic>[];
+    final entitlements =
+        (_assets?['entitlements'] as List<dynamic>?) ?? <dynamic>[];
     final memberships = entitlements.whereType<Map<String, dynamic>>().where(
       (e) => e['asset_kind'] == 'membership' && e['status'] == 'active',
     );
@@ -219,13 +353,17 @@ class _MembershipScreenState extends ConsumerState<MembershipScreen> {
                                   '学习积分：${(_assets?['wallet'] as Map<String, dynamic>?)?['balance_credits'] ?? 0}',
                                 ),
                                 for (final e
-                                    in entitlements.whereType<Map<String, dynamic>>().where(
-                                      (e) => e['asset_kind'] == 'coach_quota',
-                                    ))
+                                    in entitlements
+                                        .whereType<Map<String, dynamic>>()
+                                        .where(
+                                          (e) =>
+                                              e['asset_kind'] == 'coach_quota',
+                                        ))
                                   Text('口语陪练剩余：${e['quantity'] ?? 0} 分钟'),
                               ],
                             ),
                           ),
+                          _rewardCard(),
                           const SizedBox(height: 16),
                           Text(
                             '选择权益套餐',
@@ -279,27 +417,12 @@ class _MembershipScreenState extends ConsumerState<MembershipScreen> {
                                       ),
                               ),
                             ),
-                          CheckboxListTile(
-                            value: _agreed,
-                            onChanged: _paying
-                                ? null
-                                : (v) => setState(() => _agreed = v ?? false),
-                            title: const Text('我已确认套餐价格、有效期与一次性付款方式'),
-                            controlAffinity: ListTileControlAffinity.leading,
-                          ),
                           const Text(
                             '支付完成后由服务端确认到账。续费有效期在现有有效期基础上顺延；本页面不启用自动扣费。',
                           ),
                           const SizedBox(height: 12),
                           FilledButton.icon(
-                            onPressed:
-                                _agreed &&
-                                    !_paying &&
-                                    !_loading &&
-                                    _error == null &&
-                                    _selected != null
-                                ? _pay
-                                : null,
+                            onPressed: _paying ? null : _pay,
                             icon: const Icon(Icons.account_balance_wallet),
                             label: Text(_paying ? '等待支付结果…' : '使用微信支付'),
                           ),

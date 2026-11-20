@@ -21,7 +21,12 @@ class WechatPayHelper {
     String signType = 'RSA',
     Duration timeout = const Duration(minutes: 3),
   }) async {
-    await WechatAuthHelper.ensureRegistered();
+    if (appId.trim().isEmpty) throw StateError('服务端未配置微信支付 AppID');
+    final bool registered = await _fluwx.registerApi(
+      appId: appId.trim(),
+      universalLink: WechatAuthHelper.universalLink,
+    );
+    if (!registered) throw StateError('微信支付 SDK 注册失败');
     final bool installed = await _fluwx.isWeChatInstalled;
     if (!installed) {
       throw StateError('未安装微信，无法完成支付。');

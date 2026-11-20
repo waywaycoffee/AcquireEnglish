@@ -193,6 +193,7 @@ async def create_order(
             user,
             sku_codes=[(item.sku_code, item.quantity) for item in payload.items],
             provider=payload.provider,
+            coupon_id=payload.coupon_id,
         )
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
@@ -386,3 +387,58 @@ async def wechat_pay_notify(
         return JSONResponse(content={"code": "SUCCESS", "message": "成功"})
 
     return JSONResponse(content={"code": "SUCCESS", "message": "ignored"})
+
+
+REWARDS = {
+    "welcome": {"title": "非会员体验券", "minutes": 0, "kind": "days", "value": 1},
+    "study60": {"title": "学习1小时 · 会员1天", "minutes": 60, "kind": "days", "value": 1},
+    "study300": {"title": "学习5小时 · 5元抵扣券", "minutes": 300, "kind": "cash", "value": 500},
+    "study600": {"title": "学习10小时 · 会员3天", "minutes": 600, "kind": "days", "value": 3},
+    "study1800": {"title": "学习30小时 · 20元抵扣券", "minutes": 1800, "kind": "cash", "value": 2000},
+}
+
+
+@router.get("/membership-rewards")
+async def membership_rewards(user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+    from sqlalchemy import func
+    from app.models import MembershipCoupon, UserStudyStatsDaily
+    seconds = await db.scalar(select(func.sum(UserStudyStatsDaily.study_seconds)).where(UserStudyStatsDaily.user_id == user.id))
+    rows = (await db.execute(select(MembershipCoupon).where(MembershipCoupon.user_id == user.id))).scalars().all()
+    return {"study_minutes": int(seconds or 0) // 60, "rewards": [{"code": code, **spec} for code, spec in REWARDS.items()],
+            "coupons": [{"id": r.id, "code": r.reward_code, "kind": r.kind, "value": r.value, "used": bool(r.used)} for r in rows]}
+
+
+@router.post("/membership-rewards/{code}/claim")
+async def claim_membership_reward(code: str, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+    from sqlalchemy.exc import IntegrityError
+    from app.models import MembershipCoupon
+    spec = REWARDS.get(code)
+    if spec is None:
+        raise HTTPException(404, "reward_not_found")
+    data = await membership_rewards(user, db)
+    if data["study_minutes"] < spec["minutes"]:
+        raise HTTPException(400, "学习时长不足")
+    if code == "welcome" and (await assets_svc.build_assets_summary(db, user))["active_membership"]:
+        raise HTTPException(400, "体验券仅限当前非会员领取")
+    row = MembershipCoupon(user_id=user.id, reward_code=code, kind=spec["kind"], value=spec["value"], used=0)
+    db.add(row)
+    try:
+        await db.commit()
+    except IntegrityError:
+        await db.rollback()
+        raise HTTPException(409, "该奖励已领取")
+    return {"id": row.id}
+
+
+@router.post("/membership-coupons/{coupon_id}/redeem")
+async def redeem_membership_coupon(coupon_id: int, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+    from sqlalchemy import update
+    from app.models import MembershipCoupon
+    row = await db.get(MembershipCoupon, coupon_id)
+    if row is None or row.user_id != user.id or row.kind != "days":
+        raise HTTPException(400, "时长券不可用")
+    result = await db.execute(update(MembershipCoupon).where(MembershipCoupon.id == coupon_id, MembershipCoupon.used == 0).values(used=1))
+    if result.rowcount != 1:
+        raise HTTPException(409, "优惠券已使用")
+    await assets_svc.grant_entitlement(db, user.id, asset_kind="membership", asset_ref="pro", source="coupon", duration_days=row.value)
+    return {"status": "redeemed"}

@@ -21,6 +21,8 @@ from app.models import (
 )
 
 DEFAULT_SKUS: list[dict] = [
+    {"sku_code": "membership.pro.daily", "kind": "membership", "title": "Pro 日卡", "ref_id": "pro", "price_cents": 300, "duration_days": 1},
+    {"sku_code": "membership.pro.yearly", "kind": "membership", "title": "Pro 年卡", "ref_id": "pro", "price_cents": 19800, "duration_days": 365},
     {
         "sku_code": "membership.pro.monthly",
         "kind": "membership",
@@ -374,6 +376,7 @@ async def create_order(
     *,
     sku_codes: list[tuple[str, int]],
     provider: str = "mock",
+    coupon_id: int | None = None,
 ) -> Order:
     items: list[tuple[ProductSku, int]] = []
     amount = 0
@@ -408,6 +411,23 @@ async def create_order(
                 unit_price_cents=sku.price_cents,
             )
         )
+    if coupon_id is not None:
+        from app.models import MembershipCoupon
+        from sqlalchemy import update
+        if len(items) != 1 or items[0][0].kind != "membership" or items[0][1] != 1:
+            raise ValueError("抵扣券仅限单张会员卡")
+        coupon = await db.get(MembershipCoupon, coupon_id)
+        if coupon is None or coupon.user_id != user.id or coupon.kind != "cash" or coupon.used:
+            raise ValueError("优惠券不可用")
+        if amount < 1000:
+            raise ValueError("抵扣券满10元可用")
+        result = await db.execute(update(MembershipCoupon).where(
+            MembershipCoupon.id == coupon_id, MembershipCoupon.used == 0
+        ).values(used=1))
+        if result.rowcount != 1:
+            raise ValueError("优惠券已被使用")
+        order.amount_cents = max(1, amount - coupon.value)
+        order.meta_json = json.dumps({"coupon_id": coupon_id, "discount_cents": coupon.value})
     await db.commit()
     await db.refresh(order)
     return order
