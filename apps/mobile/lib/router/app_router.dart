@@ -23,6 +23,7 @@ import '../features/review_hub/presentation/review_hub_screen.dart';
 import '../features/settings/presentation/settings_screen.dart';
 import '../features/learning/presentation/learning_review_screen.dart';
 import '../features/words/presentation/sm2_daily_session_screen.dart';
+import '../features/words/presentation/syllabus_books_screen.dart';
 import '../features/words/presentation/words_screen.dart';
 import '../features/words/presentation/vocabulary_placement_screen.dart';
 import 'fade_extension.dart';
@@ -159,12 +160,15 @@ GoRouter goRouter(Ref ref) => GoRouter(
       name: SGRoute.reviewSession.name,
       builder: (BuildContext context, GoRouterState state) {
         final String? kindName = state.uri.queryParameters['kind'];
+        final String? deck = state.uri.queryParameters['deck'];
         return DailyReviewScreen(
           session: true,
           practice: state.uri.queryParameters['practice'] == '1',
           expressions: kindName == 'expressions',
-          recommended: state.uri.queryParameters['deck'] == 'recommended',
-          missedOnly: state.uri.queryParameters['deck'] == 'missed',
+          recommended: deck == 'recommended',
+          missedOnly: deck == 'missed',
+          syllabusOnly: deck == 'syllabus',
+          syllabusBookId: state.uri.queryParameters['book'],
           focusWord: state.uri.queryParameters['focus'],
           weakOnly: state.uri.queryParameters['weak'] == '1',
           sourceLabel: state.uri.queryParameters['source'],
@@ -196,6 +200,11 @@ GoRouter goRouter(Ref ref) => GoRouter(
       path: SGRoute.words.route,
       builder: (BuildContext context, GoRouterState state) =>
           const WordsScreen(),
+    ).fade(),
+    GoRoute(
+      path: '/words/syllabus',
+      builder: (BuildContext context, GoRouterState state) =>
+          const SyllabusBooksScreen(),
     ).fade(),
     GoRoute(
       path: SGRoute.phraseReview.route,

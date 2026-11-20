@@ -48,6 +48,8 @@ class DailyReviewScreen extends ConsumerStatefulWidget {
     this.weakOnly = false,
     this.sourceLabel,
     this.sourceEpisodeId,
+    this.syllabusOnly = false,
+    this.syllabusBookId,
   });
   final bool session;
   final bool recommended;
@@ -63,6 +65,12 @@ class DailyReviewScreen extends ConsumerStatefulWidget {
   final bool weakOnly;
   final String? sourceLabel;
   final String? sourceEpisodeId;
+
+  /// Only syllabus book cards (`syllabus:…` keys).
+  final bool syllabusOnly;
+
+  /// When set with [syllabusOnly], restrict to one book id.
+  final String? syllabusBookId;
   @override
   ConsumerState<DailyReviewScreen> createState() => _DailyReviewScreenState();
 }
@@ -131,12 +139,21 @@ class _DailyReviewScreenState extends ConsumerState<DailyReviewScreen>
   }
 
   List<ReviewSource> _filteredSources() {
-    Iterable<ReviewSource> sources = ref
-        .watch(reviewSourcesProvider)
-        .where(
-          (ReviewSource source) =>
-              source.key.startsWith('recommended:') == widget.recommended,
-        );
+    Iterable<ReviewSource> sources = ref.watch(reviewSourcesProvider);
+    if (widget.syllabusOnly) {
+      final String? bookId = widget.syllabusBookId?.trim();
+      sources = sources.where((ReviewSource source) {
+        if (!source.key.startsWith('syllabus:')) return false;
+        if (bookId == null || bookId.isEmpty) return true;
+        return source.key.startsWith('syllabus:$bookId:');
+      });
+    } else {
+      sources = sources.where(
+        (ReviewSource source) =>
+            source.key.startsWith('recommended:') == widget.recommended &&
+            !source.key.startsWith('syllabus:'),
+      );
+    }
     if (widget.expressions) {
       sources = sources.where(
         (ReviewSource source) => source.kind != ReviewKind.sentence,
@@ -206,7 +223,9 @@ class _DailyReviewScreenState extends ConsumerState<DailyReviewScreen>
       showContinueLearning: false,
       showNavigation: !widget.session,
       topBar: PadTopBar(
-        title: widget.recommended
+        title: widget.syllabusOnly
+            ? '考纲词书'
+            : widget.recommended
             ? '推荐背词'
             : widget.missedOnly
             ? '错词本'
@@ -218,7 +237,9 @@ class _DailyReviewScreenState extends ConsumerState<DailyReviewScreen>
                   : (widget.practiceKind == ReviewKind.word ? '今日背词' : '正在复习'))
             : '每日复习',
         description: widget.session
-            ? (widget.missedOnly
+            ? (widget.syllabusOnly
+                  ? '自建考纲核心词 / 导入词书，走同一套 FSRS。'
+                  : widget.missedOnly
                   ? '优先重练标记为「忘记」的词。'
                   : widget.practice
                   ? '随时再练，不改变复习计划。'

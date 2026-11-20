@@ -12,6 +12,8 @@ import '../../authentication/presentation/auth_session.dart';
 import '../../avatar/presentation/avatar_provider.dart';
 import '../../phrases/presentation/phrase_book_provider.dart';
 import '../../sync/data/acquire_api_client.dart';
+import '../../words/domain/syllabus_book.dart';
+import '../../words/presentation/syllabus_books_provider.dart';
 import '../../words/presentation/vocabulary_placement_provider.dart';
 import '../../words/presentation/word_book_provider.dart';
 import '../data/missed_review_book.dart';
@@ -122,6 +124,21 @@ reviewSourcesProvider = Provider<List<ReviewSource>>((Ref ref) {
         ),
       )
       .toList();
+  final SyllabusBooksState syllabus = ref.watch(syllabusBooksProvider);
+  final List<ReviewSource> syllabusSources = <ReviewSource>[
+    for (final SyllabusBook book in syllabus.all)
+      for (final SyllabusWord entry in book.words)
+        ReviewSource(
+          key: syllabusReviewKey(book.id, entry.word),
+          kind: ReviewKind.word,
+          question: entry.word,
+          answer: entry.gloss,
+          english: '',
+          chinese: '',
+          sourceLabel: '${book.title} · ${book.examTag}',
+        ),
+  ];
+
   // Mix the two sources when first enrolling a legacy library; future additions
   // append to the persistent order and never jump ahead of waiting items.
   return List<ReviewSource>.unmodifiable(<ReviewSource>[
@@ -143,6 +160,7 @@ reviewSourcesProvider = Provider<List<ReviewSource>>((Ref ref) {
         chinese: '',
         sourceLabel: '公共词库 · 词频第 ${row['rank']} 位',
       ),
+    ...syllabusSources,
     for (
       int i = 0;
       i < wordSources.length || i < phraseSources.length;
@@ -523,6 +541,14 @@ class DailyReviewNotifier extends Notifier<DailyReviewState> {
         previouslyLearnedAt: previouslyLearnedAt,
         accountAtReview: account,
       );
+      if (key.startsWith('syllabus:')) {
+        final List<String> parts = key.split(':');
+        if (parts.length >= 3) {
+          await ref
+              .read(syllabusBooksProvider.notifier)
+              .recordLearned(parts[1], gradedSource!.question);
+        }
+      }
     }
     if (_disposed || generation != _generation || !key.startsWith('phrase:')) {
       return;

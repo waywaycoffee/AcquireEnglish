@@ -70,7 +70,7 @@
 | P2 背词 speak → 腾讯云 SOE | ✅ 代码已接；需本机/CI 配置密钥，见 `deploy/TENCENT_SOE_SETUP.md` |
 | 今日背词单词专属会话 / 错词本会话 / 复习上限 | ✅ `?kind=word` · `?deck=missed` · `dailyReviewLimit` |
 | 词详情「复习此词」· 掌握阶段汇总 · 配额同步 | ✅ |
-| 考纲词书 / 卡通配图词书 | 明确不做 |
+| 考纲词书（四级/六级自建 + CSV/TXT 导入） | ✅ v1 已交付；卡通配图词书仍不做 |
 | 真机覆盖安装 | ⛔ 签名不一致（需与机上同 keystore） |
 
 

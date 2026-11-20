@@ -147,6 +147,7 @@ flutter:
     # sqlite3.wasm is only needed for web Anki export (kept small vs images).
     - assets/anki/sqlite3.wasm
     - assets/dictionary/
+    - assets/syllabus/
     - assets/translations/
     - assets/img/
     - assets/img/digital_human/

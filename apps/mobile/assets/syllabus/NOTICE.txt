@@ -1,0 +1,11 @@
+Syllabus word books (CET4/CET6 core)
+====================================
+
+These bundled lists are frequency-band subsets derived from the project's
+local ECDICT core asset for study UX. They are NOT official Ministry of
+Education syllabus transcripts and must not be marketed as such.
+
+Chinese glosses come from the same offline dictionary pipeline already
+shipped with the app. Rebuild with:
+
+  python scripts/build_syllabus_books.py
