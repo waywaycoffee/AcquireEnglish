@@ -88,7 +88,7 @@ import 'widgets/study_dictation_tab.dart';
 import 'widgets/study_loop_sheet.dart';
 import 'widgets/study_mode_tabs.dart';
 import 'widgets/study_practice_tab.dart';
-import 'widgets/study_oral_coach_tab.dart';
+import '../../digital_human/presentation/study_oral_coach_tab.dart';
 import 'widgets/study_shadowing_tab.dart';
 import 'widgets/study_shell_tokens.dart';
 import 'widgets/study_top_bar.dart';
@@ -736,14 +736,18 @@ class PadPortraitPlayerScreenState
           'ep=${widget.episodeId}',
         );
       }
-      // ASR English + official ZH softsub: merge CC instead of EN→ZH translate.
-      if (isUsableSubtitlePath(zhSub) ||
-          resolvedLines.every(
-            (PlayerSubtitleLine l) => !looksChinese(l.chinese),
-          )) {
+      // ASR English + official ZH softsub: always try merge when ZH is missing.
+      if (!resolvedLines.any(
+        (PlayerSubtitleLine l) => looksChinese(l.chinese),
+      )) {
         String? officialZhPath = isUsableSubtitlePath(zhSub) ? zhSub : null;
         officialZhPath ??= await existingOfficialBilibiliSubtitle(
           idKey: officialSourceKey,
+          fileName: 'zh.srt',
+        );
+        // Uppercased cache folders still hold the right zh.srt — try aliases.
+        officialZhPath ??= await existingOfficialBilibiliSubtitle(
+          idKey: (officialSourceKey ?? '').toUpperCase(),
           fileName: 'zh.srt',
         );
         if (isUsableSubtitlePath(officialZhPath)) {
@@ -1086,11 +1090,12 @@ class PadPortraitPlayerScreenState
         print('bilibili.prepare expand pages error: $e');
       }
     }
+    final LibraryCourseData? resolvedCourse = resource.course ?? course;
     final bool isSeason =
-        (resource.course ?? course)?.id.startsWith('bilibili-season-') ?? false;
-    final String? source =
+        resolvedCourse?.id.startsWith('bilibili-season-') ?? false;
+    final String? rawSource =
         bilibiliSourceForEpisode(
-          course: resource.course ?? course,
+          course: resolvedCourse,
           episode: resource.episode,
           videoAsset: resource.videoAsset,
         ) ??
@@ -1098,11 +1103,37 @@ class PadPortraitPlayerScreenState
         // Course description is ONE BV — never reuse it for other 合集分集.
         (isSeason
             ? null
-            : _bilibiliRecoverSource(resource.course?.description ?? ''));
-    if (source == null || source.isEmpty) {
+            : _bilibiliRecoverSource(resolvedCourse?.description ?? ''));
+    if (rawSource == null || rawSource.isEmpty) {
       return const BilibiliEpisodePrepareResult(
         note: '无法识别本集 B 站来源（合集分集需各自 BV）',
       );
+    }
+    String source = rawSource;
+    // Catalog may hold uppercased BVs (view/playurl → 啥都木有). Repair via
+    // aid= on the URL or UGC season archives, then persist the canonical URL.
+    try {
+      final String repaired = await repairBilibiliSourceCase(
+        service: service,
+        source: source,
+        course: resolvedCourse,
+        episode: resource.episode,
+      );
+      if (repaired != source) {
+        // ignore: avoid_print
+        print(
+          'bilibili.prepare repaired source $source -> $repaired '
+          'ep=${widget.episodeId}',
+        );
+        source = repaired;
+        await _persistBilibiliEpisodeAssets(
+          resource: resource,
+          sourceUrl: repaired,
+        );
+      }
+    } catch (e) {
+      // ignore: avoid_print
+      print('bilibili.prepare source repair error: $e');
     }
     String? currentVideoAsset = resource.videoAsset;
     if (!isUsableLocalVideoPath(currentVideoAsset)) {
@@ -1328,8 +1359,18 @@ class PadPortraitPlayerScreenState
       final BilibiliImportService service = BilibiliImportService.withCookie(
         ref.read(learningSettingsProvider).resolvedBilibiliCookieHeader,
       );
+      final PlayerCourseLookupResult lookup = resolvePlayerCourseForEpisode(
+        courses: ref.read(libraryCatalogProvider),
+        episodeId: widget.episodeId,
+      );
+      final String playSource = await repairBilibiliSourceCase(
+        service: service,
+        source: biliSource,
+        course: lookup.course,
+        episode: lookup.episode,
+      );
       // Prefer the import cache before resolvePlayable starts a CDN download.
-      final String? cached = await service.findExistingLocalCache(biliSource);
+      final String? cached = await service.findExistingLocalCache(playSource);
       if (isUsableLocalVideoPath(cached)) {
         await _persistLocalBilibiliVideo(cached!);
         if (mounted) {
@@ -1339,7 +1380,7 @@ class PadPortraitPlayerScreenState
         return (uri: cached, headers: null);
       }
       final BilibiliPlayableMedia media = await service
-          .resolvePlayableForPlayback(biliSource, onProgress: onProgress);
+          .resolvePlayableForPlayback(playSource, onProgress: onProgress);
       // Always write the cache/local path back so the next open skips prepare
       // and does not look like a fresh download.
       if (media.isLocalFile) {

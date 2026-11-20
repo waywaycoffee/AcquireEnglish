@@ -24,7 +24,7 @@ import '../../sync/presentation/cloud_catalog_sync.dart';
 import '../../sync/presentation/daily_feed_provider.dart';
 import '../../words/presentation/vocabulary_placement_provider.dart';
 import 'learning_dashboard_provider.dart';
-import 'widgets/digital_human_picker.dart';
+import '../../digital_human/presentation/digital_human_picker.dart';
 import 'widgets/home_membership_section.dart';
 import 'widgets/pad_home_hero.dart';
 

@@ -26,6 +26,7 @@ import '../features/learning/presentation/learning_review_screen.dart';
 import '../features/words/presentation/sm2_daily_session_screen.dart';
 import '../features/words/presentation/lilinji_catalog_screen.dart';
 import '../features/words/domain/syllabus_book.dart';
+import '../features/digital_human/presentation/digital_human_coach_screen.dart';
 import '../features/words/presentation/server_syllabus_catalog_screen.dart';
 import '../features/words/presentation/syllabus_books_screen.dart';
 import '../features/words/presentation/words_screen.dart';
@@ -234,6 +235,17 @@ GoRouter goRouter(Ref ref) => GoRouter(
       path: '/words/syllabus/catalog',
       builder: (BuildContext context, GoRouterState state) =>
           const LilinjiCatalogScreen(),
+    ).fade(),
+    GoRoute(
+      path: '/digital-human',
+      builder: (BuildContext context, GoRouterState state) {
+        final String? scenario =
+            state.uri.queryParameters['scenario']?.trim();
+        return DigitalHumanCoachScreen(
+          initialScenarioId:
+              (scenario == null || scenario.isEmpty) ? null : scenario,
+        );
+      },
     ).fade(),
     GoRoute(
       path: SGRoute.phraseReview.route,

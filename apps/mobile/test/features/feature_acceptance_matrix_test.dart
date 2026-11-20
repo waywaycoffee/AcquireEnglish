@@ -2,7 +2,7 @@ import 'dart:io';
 
 import 'package:common_learn_english/features/import_course/data/bilibili_course_builder.dart';
 import 'package:common_learn_english/features/import_course/data/bilibili_import_service.dart';
-import 'package:common_learn_english/features/player/data/oral_coach_pipeline_client.dart';
+import 'package:common_learn_english/features/digital_human/data/oral_coach_pipeline_client.dart';
 import 'package:common_learn_english/features/player/presentation/bilingual_subtitle_helpers.dart';
 import 'package:common_learn_english/features/player/presentation/player_mock_state.dart';
 import 'package:common_learn_english/features/settings/presentation/settings_provider.dart';

@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import '../../../lib/features/player/domain/coach_animation_timeline.dart';
+import '../../../lib/features/digital_human/domain/coach_animation_timeline.dart';
 void main() {
   test('mouth follows audio time, pauses, gaps and seeks', () {
     final CoachAnimationTimeline timeline = CoachAnimationTimeline(const <CoachMouthCue>[

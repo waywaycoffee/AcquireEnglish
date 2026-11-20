@@ -1,4 +1,4 @@
-import 'package:common_learn_english/features/player/data/oral_coach_pipeline_client.dart';
+import 'package:common_learn_english/features/digital_human/data/oral_coach_pipeline_client.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {

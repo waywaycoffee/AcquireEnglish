@@ -1,10 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
-import '../../../player/data/digital_human_catalog.dart';
-import '../../../player/presentation/widgets/cartoon_coach_sprite.dart';
-import '../../../settings/presentation/settings_provider.dart';
-import '../../../shared/presentation/pad/app_design_tokens.dart';
+import '../../settings/presentation/settings_provider.dart';
+import '../../shared/presentation/pad/app_design_tokens.dart';
+import '../data/digital_human_catalog.dart';
+import 'widgets/cartoon_coach_sprite.dart';
 
 /// Home-page row: pick a near-real digital-human coach persona.
 class DigitalHumanPicker extends ConsumerStatefulWidget {
@@ -104,20 +105,28 @@ class _DigitalHumanPickerState extends ConsumerState<DigitalHumanPicker> {
             ),
           ),
         ),
-        Align(
-          alignment: Alignment.centerRight,
-          child: TextButton(
-            onPressed: () {
-              if (_personas.hasClients) {
-                _personas.animateTo(
-                  _personas.position.maxScrollExtent,
-                  duration: const Duration(milliseconds: 280),
-                  curve: Curves.easeOut,
-                );
-              }
-            },
-            child: const Text('更多数字人 ›'),
-          ),
+        Row(
+          children: <Widget>[
+            Expanded(
+              child: FilledButton.tonalIcon(
+                onPressed: () => context.push('/digital-human'),
+                icon: const Icon(Icons.record_voice_over_rounded),
+                label: const Text('开始情景口语'),
+              ),
+            ),
+            TextButton(
+              onPressed: () {
+                if (_personas.hasClients) {
+                  _personas.animateTo(
+                    _personas.position.maxScrollExtent,
+                    duration: const Duration(milliseconds: 280),
+                    curve: Curves.easeOut,
+                  );
+                }
+              },
+              child: const Text('更多 ›'),
+            ),
+          ],
         ),
       ],
     );

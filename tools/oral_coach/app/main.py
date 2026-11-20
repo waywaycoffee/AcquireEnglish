@@ -33,6 +33,10 @@ class SessionFields(BaseModel):
     digital_human_id: str = 'mia'
     tts_voice: str = ''
     reply_language: str = 'en'
+    scenario_task_id: str = ''
+    scenario_title: str = ''
+    scenario_goal: str = ''
+    scenario_prompt: str = ''
 
 
 class SessionCreate(SessionFields):
@@ -53,6 +57,10 @@ class ContextUpdate(BaseModel):
     digital_human_id: str | None = None
     tts_voice: str | None = None
     reply_language: str | None = None
+    scenario_task_id: str | None = None
+    scenario_title: str | None = None
+    scenario_goal: str | None = None
+    scenario_prompt: str | None = None
 
 
 class TopicsBody(BaseModel):

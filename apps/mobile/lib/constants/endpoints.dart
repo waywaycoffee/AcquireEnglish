@@ -62,6 +62,7 @@ class Endpoints {
   static const String assetsSkus = 'api/assets/skus';
   static const String assetsOrders = 'api/assets/orders';
   static const String assetsConsume = 'api/assets/entitlements/consume';
+  static const String learningTasks = 'api/learning/tasks';
   static const String learningSessions = 'api/learning/sessions';
   static const String learningWrongItems = 'api/learning/wrong-items';
   static const String learningReviews = 'api/learning/reviews';

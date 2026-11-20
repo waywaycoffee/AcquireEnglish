@@ -1,5 +1,5 @@
-import 'package:common_learn_english/features/home/presentation/widgets/digital_human_picker.dart';
-import 'package:common_learn_english/features/player/presentation/widgets/cartoon_coach_sprite.dart';
+import 'package:common_learn_english/features/digital_human/presentation/digital_human_picker.dart';
+import 'package:common_learn_english/features/digital_human/presentation/widgets/cartoon_coach_sprite.dart';
 import 'package:common_learn_english/features/settings/presentation/settings_provider.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';

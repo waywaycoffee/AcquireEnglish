@@ -9,7 +9,7 @@ import '../../../constants/endpoints.dart';
 import '../../../constants/env_config.dart';
 import '../../../data/repository/network_repository.dart';
 import '../../authentication/presentation/auth_session.dart';
-import '../../player/data/digital_human_catalog.dart';
+import '../../digital_human/data/digital_human_catalog.dart';
 import '../../shared/domain/subtitle_letter_case.dart';
 import '../../sync/data/acquire_api_client.dart';
 

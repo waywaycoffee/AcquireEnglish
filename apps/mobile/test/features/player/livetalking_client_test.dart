@@ -1,4 +1,4 @@
-import 'package:common_learn_english/features/player/data/livetalking_client.dart';
+import 'package:common_learn_english/features/digital_human/data/livetalking_client.dart';
 import 'package:common_learn_english/features/settings/presentation/settings_provider.dart';
 import 'package:flutter_test/flutter_test.dart';
 

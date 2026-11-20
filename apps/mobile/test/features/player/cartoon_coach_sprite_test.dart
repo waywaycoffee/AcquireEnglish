@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import '../../../lib/features/player/domain/coach_animation_timeline.dart';
-import '../../../lib/features/player/presentation/widgets/cartoon_coach_sprite.dart';
+import '../../../lib/features/digital_human/domain/coach_animation_timeline.dart';
+import '../../../lib/features/digital_human/presentation/widgets/cartoon_coach_sprite.dart';
 void main() {
   test('fixed actions and visemes select matching atlas cells', () {
     CartoonCoachSprite sprite(CoachMotion motion, CoachViseme mouth, double phase) => CartoonCoachSprite(asset: '', motion: motion, mouth: mouth, phase: phase);

@@ -18,6 +18,11 @@ class VideoContext:
     # Pre-generated oral Q&A prompts grounded in the transcript.
     talk_topics: list[str] = field(default_factory=list)
     difficulty: str = 'B1'  # A2 / B1 / B2 / C1
+    # Optional scenario-dialogue task (restaurant / hotel / weekend / …).
+    scenario_task_id: str = ''
+    scenario_title: str = ''
+    scenario_goal: str = ''
+    scenario_prompt: str = ''
 
     def as_public_dict(self) -> dict[str, Any]:
         return {
@@ -31,9 +36,23 @@ class VideoContext:
             'article_excerpt': self.article_excerpt,
             'talk_topics': list(self.talk_topics or []),
             'difficulty': self.difficulty,
+            'scenario_task_id': self.scenario_task_id,
+            'scenario_title': self.scenario_title,
+            'scenario_goal': self.scenario_goal,
+            'scenario_prompt': self.scenario_prompt,
         }
 
     def topic_blurb(self) -> str:
+        scenario_title = (self.scenario_title or '').strip()
+        scenario_goal = (self.scenario_goal or '').strip()
+        scenario_prompt = (self.scenario_prompt or '').strip()
+        if scenario_title and self.scenario_task_id not in {'', 'video_line'}:
+            bits = [
+                f'Scenario: {scenario_title}.',
+                f'Learner goal: {scenario_goal}.' if scenario_goal else '',
+                f'Opening prompt: {scenario_prompt}.' if scenario_prompt else '',
+            ]
+            return ' '.join(b for b in bits if b)
         bits = [b for b in (self.course_title, self.episode_title) if b.strip()]
         head = ' / '.join(bits) if bits else 'this video'
         summary = (self.topic_summary or '').strip()

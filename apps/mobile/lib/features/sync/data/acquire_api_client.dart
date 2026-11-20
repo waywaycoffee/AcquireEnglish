@@ -5,6 +5,7 @@ import '../../../constants/endpoints.dart';
 import '../../../data/repository/network_repository.dart';
 import '../../avatar/data/avatar_models.dart';
 import '../../community/data/community_models.dart';
+import '../../digital_human/domain/learning_scenario.dart';
 import '../../words/domain/foundation_media.dart';
 import '../../words/domain/server_syllabus_catalog.dart';
 import '../../words/domain/syllabus_book.dart';
@@ -946,6 +947,27 @@ class AcquireApiClient {
       },
     );
     return AcquireVocabDto.fromJson(response.data as Map<String, dynamic>);
+  }
+
+  Future<List<LearningScenario>> fetchLearningTasks() async {
+    try {
+      final Response<dynamic> response = await _dio.get(Endpoints.learningTasks);
+      final Object? data = response.data;
+      if (data is! List) return LearningScenario.seeds;
+      final List<LearningScenario> items = <LearningScenario>[];
+      for (final Object? row in data) {
+        if (row is! Map) continue;
+        final LearningScenario task = LearningScenario.fromJson(
+          Map<String, dynamic>.from(row),
+        );
+        if (task.id.isNotEmpty && task.prompt.isNotEmpty) {
+          items.add(task);
+        }
+      }
+      return items.isEmpty ? LearningScenario.seeds : items;
+    } catch (_) {
+      return LearningScenario.seeds;
+    }
   }
 
   Future<String> startLearningSession({

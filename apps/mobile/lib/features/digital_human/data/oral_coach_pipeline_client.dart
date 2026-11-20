@@ -284,6 +284,10 @@ class OralCoachVideoContext {
     this.digitalHumanId = 'mia',
     this.ttsVoice = '',
     this.replyLanguage = 'en',
+    this.scenarioTaskId = '',
+    this.scenarioTitle = '',
+    this.scenarioGoal = '',
+    this.scenarioPrompt = '',
   });
 
   final String courseTitle;
@@ -306,6 +310,12 @@ class OralCoachVideoContext {
   final String ttsVoice;
   final String replyLanguage;
 
+  /// Optional scenario-dialogue task (restaurant / hotel / weekend / …).
+  final String scenarioTaskId;
+  final String scenarioTitle;
+  final String scenarioGoal;
+  final String scenarioPrompt;
+
   Map<String, Object?> toJson() => <String, Object?>{
     'course_title': courseTitle,
     'episode_title': episodeTitle,
@@ -320,6 +330,10 @@ class OralCoachVideoContext {
     'digital_human_id': digitalHumanId,
     if (ttsVoice.trim().isNotEmpty) 'tts_voice': ttsVoice.trim(),
     'reply_language': replyLanguage,
+    if (scenarioTaskId.trim().isNotEmpty) 'scenario_task_id': scenarioTaskId.trim(),
+    if (scenarioTitle.trim().isNotEmpty) 'scenario_title': scenarioTitle.trim(),
+    if (scenarioGoal.trim().isNotEmpty) 'scenario_goal': scenarioGoal.trim(),
+    if (scenarioPrompt.trim().isNotEmpty) 'scenario_prompt': scenarioPrompt.trim(),
   };
 }
 

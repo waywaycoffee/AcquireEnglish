@@ -12,17 +12,18 @@ import 'package:media_kit/media_kit.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-import '../../../authentication/presentation/auth_session.dart';
-import '../../../settings/presentation/settings_provider.dart';
-import '../../../sync/data/acquire_api_client.dart';
-import '../../../sync/data/user_assets_service.dart';
-import '../../data/digital_human_catalog.dart';
-import '../../data/livetalking_client.dart';
-import '../../data/oral_coach_pipeline_client.dart';
-import '../../data/pronunciation_providers.dart';
-import '../../domain/pronunciation_assessment.dart';
-import 'cartoon_coach_sprite.dart';
-import 'coach_avatar_stage.dart';
+import '../../authentication/presentation/auth_session.dart';
+import '../../player/data/pronunciation_providers.dart';
+import '../../player/domain/pronunciation_assessment.dart';
+import '../../settings/presentation/settings_provider.dart';
+import '../../sync/data/acquire_api_client.dart';
+import '../../sync/data/user_assets_service.dart';
+import '../data/digital_human_catalog.dart';
+import '../data/livetalking_client.dart';
+import '../data/oral_coach_pipeline_client.dart';
+import '../domain/learning_scenario.dart';
+import 'widgets/cartoon_coach_sprite.dart';
+import 'widgets/coach_avatar_stage.dart';
 
 final RegExp _hanChars = RegExp(r'[\u4e00-\u9fff]');
 
@@ -153,6 +154,8 @@ class StudyOralCoachTab extends ConsumerStatefulWidget {
     this.episodeTitle = '',
     this.hasTranscript = false,
     this.episodeId,
+    this.initialScenarioId,
+    this.standalone = false,
     super.key,
   });
 
@@ -165,6 +168,12 @@ class StudyOralCoachTab extends ConsumerStatefulWidget {
   final String episodeTitle;
   final bool hasTranscript;
   final String? episodeId;
+
+  /// Prefers a scenario-dialogue task (e.g. restaurant / hotel).
+  final String? initialScenarioId;
+
+  /// Opened outside the video player (module entry).
+  final bool standalone;
 
   @override
   ConsumerState<StudyOralCoachTab> createState() => _StudyOralCoachTabState();
@@ -217,6 +226,9 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
   List<String> _talkTopics = const <String>[];
   int _topicCursor = 0;
 
+  List<LearningScenario> _scenarios = LearningScenario.seeds;
+  LearningScenario? _activeScenario;
+
   @override
   void initState() {
     super.initState();
@@ -226,6 +238,11 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
     )..repeat(reverse: true);
     _microphone = ref.read(pronunciationMicrophoneFactoryProvider)();
     _talkTopics = _localHeuristicTalkTopics();
+    _activeScenario = _resolveScenario(
+      widget.initialScenarioId,
+      LearningScenario.seeds,
+      preferVideo: !widget.standalone && widget.hasTranscript,
+    );
     final String? episodeId = widget.episodeId;
     if (episodeId != null && episodeId.isNotEmpty) {
       final String account = ref
@@ -237,8 +254,50 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
           'oralCoachHistory:${jsonEncode(<String>[account, episodeId])}';
     }
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) unawaited(_restoreHistoryAndStart());
+      if (mounted) unawaited(_bootstrapScenariosAndStart());
     });
+  }
+
+  LearningScenario? _resolveScenario(
+    String? preferredId,
+    List<LearningScenario> pool, {
+    required bool preferVideo,
+  }) {
+    final String want = (preferredId ?? '').trim();
+    if (want.isNotEmpty) {
+      for (final LearningScenario item in pool) {
+        if (item.id == want) return item;
+      }
+    }
+    if (preferVideo) {
+      for (final LearningScenario item in pool) {
+        if (item.isVideoGrounded) return item;
+      }
+    }
+    for (final LearningScenario item in pool) {
+      if (!item.isVideoGrounded) return item;
+    }
+    return pool.isEmpty ? null : pool.first;
+  }
+
+  Future<void> _bootstrapScenariosAndStart() async {
+    try {
+      final List<LearningScenario> remote = await ref
+          .read(acquireApiClientProvider)
+          .fetchLearningTasks();
+      if (mounted && remote.isNotEmpty) {
+        setState(() {
+          _scenarios = remote;
+          _activeScenario = _resolveScenario(
+            _activeScenario?.id ?? widget.initialScenarioId,
+            remote,
+            preferVideo: !widget.standalone && widget.hasTranscript,
+          );
+        });
+      }
+    } catch (_) {}
+    if (!mounted) return;
+    await _restoreHistoryAndStart();
   }
 
   @override
@@ -304,9 +363,19 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
   }
 
   String _openingCoachPrompt(String coachName) {
+    final LearningScenario? scenario = _activeScenario;
+    if (scenario != null && !scenario.isVideoGrounded) {
+      return 'Hi, I\'m $coachName! Today\'s scene is “${scenario.title}”. '
+          'Goal: ${scenario.goal}. '
+          'I\'ll role-play with you and correct grammar as we go. '
+          'Let\'s start: ${scenario.prompt} '
+          '(Say “用中文” anytime if you want Chinese.)';
+    }
     final String firstTopic = _talkTopics.isNotEmpty
         ? _talkTopics.first
-        : 'What happened in the video?';
+        : (scenario?.prompt.isNotEmpty == true
+              ? scenario!.prompt
+              : 'What happened in the video?');
     return 'Hi, I\'m $coachName! I already read the subtitles for “$_topicLabel” '
         'and prepared ${_talkTopics.isEmpty ? 'some' : '${_talkTopics.length}'} '
         'oral practice questions. '
@@ -376,16 +445,23 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
     final LearningSettingsState resolved =
         settings ?? ref.read(learningSettingsProvider);
     final DigitalHumanPersona persona = resolved.selectedDigitalHuman;
+    final LearningScenario? scenario = _activeScenario;
     return OralCoachVideoContext(
       courseTitle: widget.courseTitle,
       episodeTitle: widget.episodeTitle,
-      topicSummary: _topicLabel,
+      topicSummary: scenario != null && !scenario.isVideoGrounded
+          ? scenario.title
+          : _topicLabel,
       articleExcerpt: widget.articleExcerpt,
       talkTopics: _talkTopics,
-      difficulty: _difficulty,
+      difficulty: scenario?.difficulty ?? _difficulty,
       digitalHumanId: persona.id,
       ttsVoice: persona.edgeVoice(chinese: _preferChineseReply),
       replyLanguage: _preferChineseReply ? 'zh' : 'en',
+      scenarioTaskId: scenario?.id ?? '',
+      scenarioTitle: scenario?.title ?? '',
+      scenarioGoal: scenario?.goal ?? '',
+      scenarioPrompt: scenario?.prompt ?? '',
     );
   }
 
@@ -696,6 +772,46 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
     if (_wantsLiveTalking(settings)) {
       unawaited(_ensureLiveTalking(settings).catchError((Object _) {}));
     }
+    if (opening != null) {
+      unawaited(_speakCoach(opening, settings));
+    }
+  }
+
+  Future<void> _applyScenario(LearningScenario scenario) async {
+    if (_busy || _coachSpeaking) return;
+    final LearningSettingsState settings = ref.read(learningSettingsProvider);
+    setState(() {
+      _activeScenario = scenario;
+      _difficulty = scenario.difficulty;
+      _learningSessionId = null;
+      _talkTopics = scenario.isVideoGrounded
+          ? _localHeuristicTalkTopics()
+          : <String>[
+              scenario.prompt,
+              'Can you add one more detail to that?',
+              'Please ask me a follow-up question in this scene.',
+            ];
+      _topicCursor = 0;
+      _bubbles.clear();
+      _started = false;
+      _sessionTicker?.cancel();
+      _sessionStartedAt = null;
+      _error = null;
+      _status = '已切换场景：${scenario.title}';
+    });
+    _saveHistory();
+    if (_session != null && _usesVoicePipeline(settings)) {
+      try {
+        await _pipelineClient.updateContext(
+          session: _session!,
+          context: _videoContext(settings: settings),
+        );
+      } catch (_) {
+        _session = null;
+        _sessionPreparation = null;
+      }
+    }
+    _startTopicConversation();
   }
 
   void _armSessionClock() {
@@ -1008,9 +1124,13 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
       String? sid = _learningSessionId;
       if (sid == null || sid.isEmpty) {
         sid = await api.startLearningSession(
-          taskId: 'video_topic',
-          courseTitle: widget.courseTitle,
-          currentEnglish: _topicLabel,
+          taskId: _activeScenario?.id ?? 'video_line',
+          courseTitle: widget.courseTitle.isNotEmpty
+              ? widget.courseTitle
+              : (_activeScenario?.title ?? ''),
+          currentEnglish: _activeScenario?.prompt.isNotEmpty == true
+              ? _activeScenario!.prompt
+              : _topicLabel,
         );
         _learningSessionId = sid;
       }
@@ -1155,41 +1275,91 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
     showModalBottomSheet<void>(
       context: context,
       backgroundColor: const Color(0xFF1B1530),
+      isScrollControlled: true,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
       builder: (BuildContext context) {
-        return Padding(
-          padding: const EdgeInsets.fromLTRB(20, 16, 20, 28),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: <Widget>[
-              const Text(
-                '当前场景',
-                style: TextStyle(
-                  color: Colors.white70,
-                  fontSize: 13,
-                  fontWeight: FontWeight.w600,
+        final LearningScenario? active = _activeScenario;
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(20, 16, 20, 28),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: <Widget>[
+                const Text(
+                  '情景对话',
+                  style: TextStyle(
+                    color: Colors.white70,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                  ),
                 ),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                _topicLabel,
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 17,
-                  fontWeight: FontWeight.w800,
+                const SizedBox(height: 6),
+                Text(
+                  active == null
+                      ? _topicLabel
+                      : '${active.title} · ${active.difficulty}',
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 17,
+                    fontWeight: FontWeight.w800,
+                  ),
                 ),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                widget.hasTranscript
-                    ? '围绕本集视频 / 文章主题自由对话'
-                    : '暂无字幕摘要 · 仍可按标题自由聊',
-                style: const TextStyle(color: Colors.white54, fontSize: 13),
-              ),
-            ],
+                const SizedBox(height: 6),
+                Text(
+                  active?.goal.isNotEmpty == true
+                      ? active!.goal
+                      : (widget.hasTranscript
+                            ? '围绕本集视频 / 文章主题自由对话'
+                            : '选择场景后，数字人会主动带你练对话'),
+                  style: const TextStyle(color: Colors.white54, fontSize: 13),
+                ),
+                const SizedBox(height: 14),
+                ..._scenarios.map((LearningScenario scenario) {
+                  final bool selected = scenario.id == active?.id;
+                  return Padding(
+                    padding: const EdgeInsets.only(bottom: 8),
+                    child: ListTile(
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(14),
+                        side: BorderSide(
+                          color: selected
+                              ? const Color(0xFF8B7CFF)
+                              : Colors.white24,
+                        ),
+                      ),
+                      tileColor: Colors.white.withValues(alpha: 0.06),
+                      title: Text(
+                        scenario.title,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      subtitle: Text(
+                        scenario.goal,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          color: Colors.white60,
+                          fontSize: 12,
+                        ),
+                      ),
+                      trailing: Text(
+                        scenario.difficulty,
+                        style: const TextStyle(color: Colors.white54),
+                      ),
+                      onTap: () {
+                        Navigator.pop(context);
+                        unawaited(_applyScenario(scenario));
+                      },
+                    ),
+                  );
+                }),
+              ],
+            ),
           ),
         );
       },
@@ -1349,9 +1519,12 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
                       child: Padding(
                         padding: const EdgeInsets.symmetric(horizontal: 28),
                         child: Text(
-                          _talkTopics.isEmpty
-                              ? 'Hi~ 我会先读字幕，再围绕“$_topicLabel”生成口语问答。'
-                              : '已准备 ${_talkTopics.length} 个口语话题，点下方话题或直接说话。',
+                          _activeScenario != null &&
+                                  !_activeScenario!.isVideoGrounded
+                              ? '数字人将主动教你「${_activeScenario!.title}」情景对话。点上方时钟可换场景。'
+                              : (_talkTopics.isEmpty
+                                    ? 'Hi~ 我会先读字幕，再围绕“$_topicLabel”生成口语问答。'
+                                    : '已准备 ${_talkTopics.length} 个口语话题，点下方话题或直接说话。'),
                           textAlign: TextAlign.center,
                           style: TextStyle(
                             color: Colors.white.withValues(alpha: 0.78),

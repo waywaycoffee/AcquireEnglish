@@ -61,7 +61,8 @@ class ReviewCompleteIn(BaseModel):
 
 
 @router.get("/tasks")
-async def tasks(_: User = Depends(get_current_user)) -> list[dict]:
+async def tasks() -> list[dict]:
+    """Scenario catalogue is public; starting a session still requires login."""
     return [t.__dict__ for t in get_store().list_tasks()]
 
 
