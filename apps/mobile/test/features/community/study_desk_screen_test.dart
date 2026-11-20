@@ -1,3 +1,4 @@
+import 'package:common_learn_english/features/avatar/data/avatar_models.dart';
 import 'package:common_learn_english/features/authentication/presentation/auth_session.dart';
 import 'package:common_learn_english/features/community/presentation/study_desk_screen.dart';
 import 'package:common_learn_english/features/sync/data/acquire_api_client.dart';
@@ -15,6 +16,8 @@ class FakeAuth extends AuthSession {
 
 class FakeDeskApi extends AcquireApiClient {
   FakeDeskApi() : super(Dio());
+  @override
+  Future<AvatarMeDto> cosmeticsMe() async => AvatarMeDto.empty;
   final List<({String method, String path, Map<String, dynamic>? data})>
   requests = [];
   bool paired = false;
@@ -95,10 +98,18 @@ void main() {
             .every((s) => !s.value),
         true,
       );
-      await tester.scrollUntilVisible(find.text('对方尚未共享收藏词库'), 200, scrollable: find.byType(Scrollable).first);
+      await tester.scrollUntilVisible(
+        find.text('对方尚未共享收藏词库'),
+        200,
+        scrollable: find.byType(Scrollable).first,
+      );
       expect(find.text('对方尚未共享收藏词库'), findsOneWidget);
       final Finder toggle = find.text('共享收藏单词（不含私有原句）');
-      await tester.scrollUntilVisible(toggle, -150, scrollable: find.byType(Scrollable).first);
+      await tester.scrollUntilVisible(
+        toggle,
+        -150,
+        scrollable: find.byType(Scrollable).first,
+      );
       await tester.ensureVisible(toggle);
       await tester.tap(toggle);
       await tester.pumpAndSettle();

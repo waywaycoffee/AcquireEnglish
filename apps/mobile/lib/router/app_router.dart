@@ -1,3 +1,4 @@
+import '../features/community/presentation/public_learning_card_screen.dart';
 import '../features/community/presentation/community_screen.dart';
 import '../features/daily_review/domain/daily_review.dart';
 // ignore_for_file: prefer_function_declarations_over_variables
@@ -84,6 +85,11 @@ enum SGRoute {
 GoRouter goRouter(Ref ref) => GoRouter(
   initialLocation: SGRoute.home.route,
   routes: <GoRoute>[
+    GoRoute(
+      path: '/shared/:token',
+      builder: (BuildContext context, GoRouterState state) =>
+          PublicLearningCardScreen(token: state.pathParameters['token']!),
+    ),
     GoRoute(
       path: SGRoute.membership.route,
       builder: (context, state) => const MembershipScreen(),

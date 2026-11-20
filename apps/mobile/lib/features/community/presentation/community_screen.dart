@@ -21,6 +21,7 @@ import 'community_leaderboard_tab.dart';
 import 'community_people_tab.dart';
 import 'community_provider.dart';
 import 'study_desk_screen.dart';
+import 'community_social_screen.dart';
 
 class CommunityScreen extends ConsumerStatefulWidget {
   const CommunityScreen({super.key});
@@ -70,6 +71,17 @@ class _CommunityScreenState extends ConsumerState<CommunityScreen> {
         title: '社区',
         description: '分享 B 站视频，找搭子一起练',
         actions: <Widget>[
+          IconButton(
+            tooltip: '消息、收藏与管理',
+            icon: const Icon(Icons.notifications_outlined),
+            onPressed: loggedIn
+                ? () => Navigator.of(context).push<void>(
+                    MaterialPageRoute<void>(
+                      builder: (_) => const CommunitySocialScreen(),
+                    ),
+                  )
+                : null,
+          ),
           TextButton.icon(
             icon: const Icon(Icons.groups_outlined),
             label: const Text('一起练'),

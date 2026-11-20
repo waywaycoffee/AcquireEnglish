@@ -27,22 +27,23 @@ from app.models import (
     User,
     UserPreference,
     UserStudyStatsDaily,
+    UserAvatarLoadout,
     VocabItem,
     VocabPkChallenge,
 )
+from app.routers.community_social import post_guard, blocked_ids, notice
 from app.services.bilibili_reply import post_video_reply
 from app.services.community_classify import classify_share_text, extract_bvid
 
-router = APIRouter(prefix="/community", tags=["community"])
+router = APIRouter(prefix="/community", tags=["community"], dependencies=[Depends(post_guard)])
 
-PostKind = Literal["team_invite", "share_bilibili", "feedback"]
+PostKind = Literal["team_invite", "share_bilibili", "feedback", "learning_result", "method", "question"]
 LeaderboardMetric = Literal["study_today", "study_week", "vocab"]
 PkStatus = Literal["pending", "completed", "declined"]
 
 _DAY_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 _LEGACY_KIND = {
     "share_link": "share_bilibili",
-    "method": "feedback",
     "podcast_placeholder": "feedback",
 }
 
@@ -134,6 +135,7 @@ class CommunityPostOut(BaseModel):
     author_name: str
     author_id: int
     author_level: str | None = None
+    author_avatar: dict[str, str] = Field(default_factory=dict)
     created_at: datetime
     bilibili_open_url: str | None = None
 
@@ -197,6 +199,7 @@ def _serialize_post(
     author: User | None,
     author_level: str | None,
     liked_by_me: bool,
+    author_avatar: dict[str, str] | None = None,
 ) -> CommunityPostOut:
     kind = _normalize_kind(post.kind)
     bvid = post.bvid or extract_bvid(post.link_url or "")
@@ -216,6 +219,7 @@ def _serialize_post(
         liked_by_me=liked_by_me,
         author_name=_public_name(author) if author else "学员",
         author_id=post.user_id,
+        author_avatar=author_avatar or {},
         author_level=author_level,
         created_at=post.created_at,
         bilibili_open_url=_bilibili_open_url(bvid, post.link_url),
@@ -377,16 +381,27 @@ async def update_my_profile(
 @router.get("/feed", response_model=list[CommunityPostOut])
 async def community_feed(
     kind: PostKind | None = None,
+    before: int | None = None,
+    following: bool = False,
+    bookmarked: bool = False,
     limit: int = Query(default=40, ge=1, le=100),
     db: AsyncSession = Depends(get_db),
     user: User = Depends(get_current_user),
 ) -> list[CommunityPostOut]:
     stmt: Select[tuple[CommunityPost]] = (
         select(CommunityPost)
-        .where(CommunityPost.status == "visible")
-        .order_by(CommunityPost.created_at.desc())
+        .where(CommunityPost.status == "visible", CommunityPost.user_id.not_in(blocked_ids(user.id)))
+        .order_by(CommunityPost.id.desc())
         .limit(limit)
     )
+    if before:
+        stmt = stmt.where(CommunityPost.id < before)
+    if following:
+        from app.models import CommunityFollow
+        stmt = stmt.where(CommunityPost.user_id.in_(select(CommunityFollow.target_id).where(CommunityFollow.user_id == user.id)))
+    if bookmarked:
+        from app.models import CommunityBookmark
+        stmt = stmt.where(CommunityPost.id.in_(select(CommunityBookmark.post_id).where(CommunityBookmark.user_id == user.id)))
     if kind is not None:
         stmt = stmt.where(CommunityPost.kind == kind)
     posts = list((await db.execute(stmt)).scalars().all())
@@ -419,6 +434,7 @@ async def community_feed(
             )
         ).scalars().all()
     }
+    avatar_rows = (await db.execute(select(UserAvatarLoadout).where(UserAvatarLoadout.user_id.in_(author_ids)))).scalars().all()
     out: list[CommunityPostOut] = []
     for post in posts:
         author = users.get(post.user_id)
@@ -429,6 +445,7 @@ async def community_feed(
                 author=author,
                 author_level=pref.level if pref else None,
                 liked_by_me=post.id in liked_ids,
+                author_avatar={r.slot: r.sku for r in avatar_rows if r.user_id == post.user_id},
             )
         )
     return out
@@ -440,6 +457,9 @@ async def create_post(
     db: AsyncSession = Depends(get_db),
     user: User = Depends(get_current_user),
 ) -> CommunityPostOut:
+    recent_posts = await db.scalar(select(func.count()).select_from(CommunityPost).where(CommunityPost.user_id == user.id, CommunityPost.created_at >= datetime.now(timezone.utc) - timedelta(days=1)))
+    if recent_posts >= 10:
+        raise HTTPException(429, "每天最多发布10条内容")
     kind = payload.kind
     title = (payload.title or "").strip()
     body = (payload.body or "").strip()
@@ -550,6 +570,7 @@ async def like_post(
     if existing is None:
         db.add(CommunityPostLike(post_id=post_id, user_id=user.id))
         post.like_count = int(post.like_count or 0) + 1
+        await notice(db, post.user_id, user.id, f"like:{post.id}:{user.id}", f"{_public_name(user)}赞了你的帖子", post.id)
     else:
         await db.delete(existing)
         post.like_count = max(0, int(post.like_count or 0) - 1)
@@ -1055,7 +1076,7 @@ async def list_comments(
     rows = (
         await db.execute(
             select(CommunityComment)
-            .where(CommunityComment.post_id == post_id)
+            .where(CommunityComment.post_id == post_id, CommunityComment.user_id.not_in(blocked_ids(user.id)))
             .order_by(CommunityComment.created_at.asc())
             .limit(100)
         )
@@ -1102,6 +1123,9 @@ async def create_comment(
     ).scalar_one_or_none()
     if post is None or post.status != "visible":
         raise HTTPException(status_code=404, detail="post not found")
+    recent_count = await db.scalar(select(func.count()).select_from(CommunityComment).where(CommunityComment.user_id == user.id, CommunityComment.created_at >= datetime.now(timezone.utc) - timedelta(hours=1)))
+    if recent_count >= 30:
+        raise HTTPException(429, "评论过于频繁，请稍后再试")
     body = payload.body.strip()
     if not body:
         raise HTTPException(status_code=400, detail="empty comment")
@@ -1142,6 +1166,8 @@ async def create_comment(
     )
     db.add(row)
     post.comment_count = int(post.comment_count or 0) + 1
+    await db.flush()
+    await notice(db, post.user_id, user.id, f"comment:{row.id}", f"{_public_name(user)}回复了你的帖子", post.id)
     await db.commit()
     await db.refresh(row)
     return CommunityCommentOut(

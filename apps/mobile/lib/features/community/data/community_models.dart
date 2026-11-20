@@ -42,13 +42,14 @@ class CommunityPostDto {
     this.englishLevel,
     this.commentCount = 0,
     this.authorLevel,
+    this.authorAvatar = const <String, String>{},
     this.bilibiliOpenUrl,
   });
 
   factory CommunityPostDto.fromJson(Map<String, dynamic> json) {
     String kind = (json['kind'] as String?) ?? 'feedback';
     if (kind == 'share_link') kind = 'share_bilibili';
-    if (kind == 'method' || kind == 'podcast_placeholder') kind = 'feedback';
+    if (kind == 'podcast_placeholder') kind = 'feedback';
     return CommunityPostDto(
       id: json['id'] as int,
       kind: kind,
@@ -65,6 +66,7 @@ class CommunityPostDto {
       likedByMe: json['liked_by_me'] == true,
       authorName: (json['author_name'] as String?) ?? '学员',
       authorId: (json['author_id'] as num?)?.toInt() ?? 0,
+      authorAvatar: (json['author_avatar'] as Map<String, dynamic>? ?? <String, dynamic>{}).cast<String, String>(),
       authorLevel: json['author_level'] as String?,
       bilibiliOpenUrl: json['bilibili_open_url'] as String?,
       createdAt: DateTime.tryParse((json['created_at'] as String?) ?? '') ??
@@ -88,6 +90,7 @@ class CommunityPostDto {
   final String authorName;
   final int authorId;
   final String? authorLevel;
+  final Map<String, String> authorAvatar;
   final String? bilibiliOpenUrl;
   final DateTime createdAt;
 

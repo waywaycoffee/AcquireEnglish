@@ -2,11 +2,7 @@ import 'package:flutter/material.dart';
 
 /// Lightweight paper-doll preview using colored layers (no external art required).
 class AvatarPreview extends StatelessWidget {
-  const AvatarPreview({
-    super.key,
-    required this.loadout,
-    this.height = 180,
-  });
+  const AvatarPreview({super.key, required this.loadout, this.height = 180});
 
   final Map<String, String> loadout;
   final double height;
@@ -29,8 +25,21 @@ class AvatarPreview extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final String? base = loadout['body'] ?? 'body.cartoon1';
+    if (base != null && RegExp(r'^body\.cartoon[1-6]$').hasMatch(base)) {
+      return SizedBox(
+        height: height,
+        width: height * .72,
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(16),
+          child: Image.asset(
+            'assets/img/avatar_cartoon_${base.substring(base.length - 1)}.png',
+            fit: BoxFit.contain,
+          ),
+        ),
+      );
+    }
     final String? bg = loadout['bg'];
-    final String? body = loadout['body'] ?? 'body.default';
     final String? hair = loadout['hair'];
     final String? top = loadout['top'];
     final String? bottom = loadout['bottom'];
@@ -88,7 +97,7 @@ class AvatarPreview extends StatelessWidget {
               width: height * 0.26,
               height: height * 0.26,
               decoration: BoxDecoration(
-                color: _colorFor(body, const Color(0xFFF2C9A0)),
+                color: const Color(0xFFF2C9A0),
                 shape: BoxShape.circle,
                 border: Border.all(color: Colors.black12),
               ),

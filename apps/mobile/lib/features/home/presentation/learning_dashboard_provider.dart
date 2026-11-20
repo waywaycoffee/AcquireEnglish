@@ -1,3 +1,4 @@
+import '../../sync/data/study_activity_service.dart';
 import 'dart:async';
 import 'dart:convert';
 import 'dart:math';
@@ -99,6 +100,7 @@ class LearningActivityNotifier extends Notifier<LearningActivityState> {
     if (duration <= Duration.zero) {
       return;
     }
+    ref.read(studyActivityServiceProvider).playback(duration);
     final DateTime at = occurredAt ?? DateTime.now();
     final String dayKey = _dayKey(at);
     final LearningDailyRecord previous =

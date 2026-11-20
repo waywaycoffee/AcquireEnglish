@@ -5,9 +5,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../authentication/presentation/auth_session.dart';
+import '../../avatar/presentation/avatar_preview.dart';
+import '../../avatar/presentation/avatar_provider.dart';
 import '../../sync/data/acquire_api_client.dart';
 import '../../words/presentation/word_book_provider.dart';
 import 'study_pk_screen.dart';
+import 'study_play_screen.dart';
 
 class StudyDeskScreen extends ConsumerStatefulWidget {
   const StudyDeskScreen({super.key});
@@ -120,6 +123,42 @@ class _StudyDeskScreenState extends ConsumerState<StudyDeskScreen>
           _desk = null;
           _error = _message(error);
         });
+    } finally {
+      if (mounted && version == _generation) setState(() => _busy = false);
+    }
+  }
+
+  Future<void> _loadMoreLibrary() async {
+    if (_busy || _library == null) return;
+    final int version = _generation;
+    final String token = ref.read(authSessionProvider).accessToken;
+    final List<dynamic> existing = List<dynamic>.of(
+      _library!['words'] as List<dynamic>,
+    );
+    setState(() => _busy = true);
+    try {
+      final Map<String, dynamic> next = await _request(
+        'GET',
+        '/library',
+        query: {
+          'category': _category,
+          'q': _search.text.trim(),
+          'offset': existing.length,
+        },
+      );
+      if (!mounted ||
+          version != _generation ||
+          token != ref.read(authSessionProvider).accessToken)
+        return;
+      setState(
+        () => _library = {
+          ...next,
+          'words': [...existing, ...(next['words'] as List<dynamic>)],
+        },
+      );
+    } catch (error) {
+      if (mounted && version == _generation)
+        setState(() => _libraryError = _message(error));
     } finally {
       if (mounted && version == _generation) setState(() => _busy = false);
     }
@@ -242,10 +281,44 @@ class _StudyDeskScreenState extends ConsumerState<StudyDeskScreen>
                         child: const Text('重试'),
                       ),
                     ]),
+                  FilledButton.icon(
+                    onPressed: _busy
+                        ? null
+                        : () => Navigator.of(context).push<void>(
+                            MaterialPageRoute<void>(
+                              builder: (_) => const StudyPlayScreen(),
+                            ),
+                          ),
+                    icon: const Icon(Icons.sports_martial_arts),
+                    label: const Text('打卡 · 大比武 · 背包'),
+                  ),
                   if (_desk != null) ...<Widget>[
                     _card(peer == null ? '邀请一个人，一起坚持' : '我的同桌 · ${peer['name']}', <
                       Widget
                     >[
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                        children: <Widget>[
+                          AvatarPreview(
+                            loadout:
+                                ref
+                                    .watch(avatarMeProvider)
+                                    .asData
+                                    ?.value
+                                    .loadout ??
+                                <String, String>{'body': 'body.cartoon1'},
+                            height: 130,
+                          ),
+                          if (peer != null)
+                            AvatarPreview(
+                              loadout:
+                                  (peer['avatar'] as Map<String, dynamic>? ??
+                                          <String, dynamic>{})
+                                      .cast<String, String>(),
+                              height: 130,
+                            ),
+                        ],
+                      ),
                       SelectableText('我的同桌编号：${_desk!['my_id']}'),
                       const Text('每人一位正式同桌，双方确认后建立关系。邀请有效期24小时。'),
                       if (peer == null) ...<Widget>[
@@ -370,6 +443,26 @@ class _StudyDeskScreenState extends ConsumerState<StudyDeskScreen>
                                   }),
                           ),
                       ]),
+                      OutlinedButton.icon(
+                        onPressed: _busy
+                            ? null
+                            : () => _action(() async {
+                                final Map<String, dynamic> result =
+                                    await _request('POST', '/encourage');
+                                if (mounted)
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(
+                                      content: Text(
+                                        result['sent'] == true
+                                            ? '鼓励已送达，同一位同桌每天最多一次。'
+                                            : '今天已鼓励过，或对方关闭了通知。',
+                                      ),
+                                    ),
+                                  );
+                              }),
+                        icon: const Icon(Icons.favorite_border),
+                        label: const Text('给同桌一个鼓励'),
+                      ),
                       _activityCard(),
                       _libraryCard(),
                       _card('近期单词 PK', <Widget>[
@@ -576,7 +669,10 @@ class _StudyDeskScreenState extends ConsumerState<StudyDeskScreen>
           ),
         if ((_library!['total'] as num) >
             (_library!['words'] as List<dynamic>).length)
-          const Text('当前显示前50条，请搜索缩小范围。'),
+          TextButton(
+            onPressed: _busy ? null : _loadMoreLibrary,
+            child: const Text('加载更多收藏单词'),
+          ),
       ],
     ]);
   }

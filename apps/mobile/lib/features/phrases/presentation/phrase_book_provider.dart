@@ -170,7 +170,10 @@ class PhraseBookNotifier extends Notifier<List<PhraseEntry>> {
   List<PhraseEntry> build() {
     _studyAccount = ref.watch(studyAccountProvider);
     if (!Hive.isBoxOpen('prefs')) return const <PhraseEntry>[];
-    final String? stored = readStudyStorage(_phraseBookStorageKey, _studyAccount);
+    final String? stored = readStudyStorage(
+      _phraseBookStorageKey,
+      _studyAccount,
+    );
     if (stored == null || stored.isEmpty) return const <PhraseEntry>[];
     try {
       return (jsonDecode(stored) as List<Object?>)
@@ -191,6 +194,44 @@ class PhraseBookNotifier extends Notifier<List<PhraseEntry>> {
     required String episode,
     required String time,
   }) => '$course|$episode|$time|${english.trim().toLowerCase()}';
+
+  Future<bool> addSharedLearningCard({
+    required String token,
+    required String english,
+    required String chinese,
+    required String title,
+  }) async {
+    if (state.any(
+      (PhraseEntry p) =>
+          p.english.trim().toLowerCase() == english.trim().toLowerCase(),
+    ))
+      return false;
+    final List<PhraseEntry> previous = state;
+    final PhraseEntry created = PhraseEntry(
+      id: 'shared-$token',
+      english: english.trim(),
+      chinese: chinese.trim(),
+      course: '公开学习卡',
+      episode: title,
+      time: '',
+      rating: 1,
+      needsReview: true,
+      today: true,
+      collectedAt: DateTime.now().toIso8601String(),
+      note: 'shared:$token',
+    );
+    final List<PhraseEntry> next = <PhraseEntry>[created, ...previous];
+    state = next;
+    try {
+      await _persist();
+    } catch (_) {
+      if (ref.mounted && identical(state, next)) state = previous;
+      rethrow;
+    }
+    if (ref.mounted)
+      unawaited(ref.read(phraseSyncServiceProvider).pushEntry(created));
+    return true;
+  }
 
   void addPhrase({
     required String english,
@@ -292,13 +333,15 @@ class PhraseBookNotifier extends Notifier<List<PhraseEntry>> {
     PhraseEntry Function(PhraseEntry current) update,
   ) {
     PhraseEntry? updated;
-    state = state.map((PhraseEntry item) {
-      if (item.id != id) {
-        return item;
-      }
-      updated = update(item);
-      return updated!;
-    }).toList(growable: false);
+    state = state
+        .map((PhraseEntry item) {
+          if (item.id != id) {
+            return item;
+          }
+          updated = update(item);
+          return updated!;
+        })
+        .toList(growable: false);
     unawaited(_persist());
     final PhraseEntry? row = updated;
     if (row != null) {

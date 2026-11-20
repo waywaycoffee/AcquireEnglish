@@ -11,6 +11,9 @@ from app.routers import (
     community,
     study_desk,
     study_pk,
+    study_play,
+    community_social,
+    learning_cards,
     cosmetics,
     courses,
     creators,
@@ -74,6 +77,9 @@ app.include_router(feed.router, prefix="/api")
 app.include_router(community.router, prefix="/api")
 app.include_router(study_desk.router, prefix="/api")
 app.include_router(study_pk.router, prefix="/api")
+app.include_router(study_play.router, prefix="/api")
+app.include_router(community_social.router, prefix="/api")
+app.include_router(learning_cards.router, prefix="/api")
 app.include_router(imports.router, prefix="/api")
 app.include_router(learning.router, prefix="/api")
 app.include_router(livekit.router, prefix="/api")

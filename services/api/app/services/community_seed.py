@@ -14,6 +14,14 @@ _SEED_EMAIL = "community.seed@acquire.local"
 
 
 async def ensure_community_seed(db: AsyncSession) -> None:
+    from app.config import settings
+    if settings.production_mode:
+        # Historical demo rows remain recoverable, but never impersonate live users.
+        from sqlalchemy import update
+        seed_ids = select(User.id).where(User.email == _SEED_EMAIL)
+        await db.execute(update(CommunityPost).where(CommunityPost.user_id.in_(seed_ids)).values(status='hidden'))
+        await db.commit()
+        return
     count = int(
         (await db.execute(select(func.count()).select_from(CommunityPost))).scalar()
         or 0

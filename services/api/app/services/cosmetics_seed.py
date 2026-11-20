@@ -130,8 +130,12 @@ _CATALOG: list[dict[str, object]] = [
     },
 ]
 
+for index, title in enumerate(["小乐 · 少年套装", "小禾 · 少年套装", "阿森 · 青年套装", "小柚 · 青年套装", "星野 · 青年套装", "小晴 · 青年套装"], 1):
+    _CATALOG.append({"sku": f"body.cartoon{index}", "slot": "body", "title": title, "price_points": 0, "asset_key": f"avatar_cartoon_{index}", "sort_order": index})
+
 FREE_STARTER_SKUS = [
     "body.default",
+    *[f"body.cartoon{i}" for i in range(1, 7)],
     "hair.default",
     "top.default",
     "bottom.default",

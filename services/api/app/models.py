@@ -709,3 +709,113 @@ class DeskPkAnswer(Base):
     question_index: Mapped[int] = mapped_column(Integer, primary_key=True)
     choice: Mapped[int | None] = mapped_column(Integer, nullable=True)
     correct: Mapped[int] = mapped_column(Integer)
+
+
+class StudyActivityClock(Base):
+    __tablename__ = "study_activity_clocks"
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), primary_key=True)
+    first_seen: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    last_tick: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+
+
+class StudyRewardDay(Base):
+    __tablename__ = "study_reward_days"
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), primary_key=True)
+    day: Mapped[str] = mapped_column(String(10), primary_key=True)
+    seconds: Mapped[int] = mapped_column(Integer, default=0)
+    review_target: Mapped[int] = mapped_column(Integer, default=5)
+    target_locked: Mapped[int] = mapped_column(Integer, default=0)
+
+
+class StudyReviewEvidence(Base):
+    __tablename__ = "study_review_evidence"
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), primary_key=True)
+    day: Mapped[str] = mapped_column(String(10), primary_key=True)
+    card_key: Mapped[str] = mapped_column(String(240), primary_key=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class StudyCheckin(Base):
+    __tablename__ = "study_checkins"
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), primary_key=True)
+    day: Mapped[str] = mapped_column(String(10), primary_key=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class DeskBattle(Base):
+    __tablename__ = "desk_battles"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    desk_id: Mapped[int] = mapped_column(Integer, index=True)
+    pending_desk_id: Mapped[int | None] = mapped_column(Integer, nullable=True, unique=True)
+    sender_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"))
+    target_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"))
+    status: Mapped[str] = mapped_column(String(16), default="pending")
+    result_json: Mapped[str | None] = mapped_column(Text, nullable=True)
+    seed: Mapped[str] = mapped_column(String(64))
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class CommunityFollow(Base):
+    __tablename__ = "community_follows"
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), primary_key=True)
+    target_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), primary_key=True)
+
+
+class CommunityBookmark(Base):
+    __tablename__ = "community_bookmarks"
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), primary_key=True)
+    post_id: Mapped[int] = mapped_column(ForeignKey("community_posts.id", ondelete="CASCADE"), primary_key=True)
+
+
+class CommunityNotice(Base):
+    __tablename__ = "community_notices"
+    __table_args__ = (UniqueConstraint("user_id", "event_key", name="uq_community_notice_event"),)
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    actor_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"))
+    event_key: Mapped[str] = mapped_column(String(120))
+    text: Mapped[str] = mapped_column(String(240))
+    post_id: Mapped[int | None] = mapped_column(ForeignKey("community_posts.id", ondelete="CASCADE"), nullable=True)
+    read: Mapped[int] = mapped_column(Integer, default=0)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class CommunityReport(Base):
+    __tablename__ = "community_reports"
+    __table_args__ = (UniqueConstraint("user_id", "post_id", name="uq_community_report"),)
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"))
+    post_id: Mapped[int] = mapped_column(ForeignKey("community_posts.id", ondelete="CASCADE"))
+    reason: Mapped[str] = mapped_column(String(500))
+    status: Mapped[str] = mapped_column(String(16), default="pending")
+    review_note: Mapped[str] = mapped_column(String(500), default="")
+    reviewed_by: Mapped[int | None] = mapped_column(ForeignKey("users.id"), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    reviewed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
+class PublicLearningCard(Base):
+    __tablename__ = "public_learning_cards"
+    token: Mapped[str] = mapped_column(String(48), primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    post_id: Mapped[int] = mapped_column(ForeignKey("community_posts.id", ondelete="CASCADE"))
+    active: Mapped[int] = mapped_column(Integer, default=1)
+    expression: Mapped[str] = mapped_column(String(240))
+    meaning: Mapped[str] = mapped_column(String(500))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class StudyChallengeMember(Base):
+    __tablename__ = "study_challenge_members"
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), primary_key=True)
+    challenge_id: Mapped[str] = mapped_column(String(32), primary_key=True)
+    joined_day: Mapped[str] = mapped_column(String(10))
+    reward_claimed: Mapped[int] = mapped_column(Integer, default=0)
+    active: Mapped[int] = mapped_column(Integer, default=1)
+
+
+class CommunityNoticePreference(Base):
+    __tablename__ = "community_notice_preferences"
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), primary_key=True)
+    enabled: Mapped[int] = mapped_column(Integer, default=1)

@@ -13,14 +13,17 @@ import '../../sync/data/acquire_api_client.dart';
 import '../../sync/presentation/daily_feed_provider.dart';
 import '../data/community_models.dart';
 import 'community_provider.dart';
+import 'community_post_actions.dart';
+import '../../avatar/presentation/avatar_preview.dart';
 
 class CommunityFeedTab extends ConsumerWidget {
   const CommunityFeedTab({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final AsyncValue<List<CommunityPostDto>> async =
-        ref.watch(communityFeedProvider);
+    final AsyncValue<List<CommunityPostDto>> async = ref.watch(
+      communityFeedProvider,
+    );
 
     return Stack(
       children: <Widget>[
@@ -49,10 +52,33 @@ class CommunityFeedTab extends ConsumerWidget {
               return ListView.separated(
                 physics: const AlwaysScrollableScrollPhysics(),
                 padding: const EdgeInsets.fromLTRB(16, 12, 16, 88),
-                itemCount: posts.length,
+                itemCount: posts.length + 1,
                 separatorBuilder: (_, __) => const SizedBox(height: 12),
                 itemBuilder: (BuildContext context, int index) {
-                  return _PostCard(post: posts[index]);
+                  if (index == posts.length)
+                    return TextButton(
+                      onPressed:
+                          ref.read(communityFeedProvider.notifier).hasMore
+                          ? () async {
+                              try {
+                                await ref
+                                    .read(communityFeedProvider.notifier)
+                                    .loadMore();
+                              } catch (_) {
+                                if (context.mounted)
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(content: Text('加载更多失败，请重试')),
+                                  );
+                              }
+                            }
+                          : null,
+                      child: Text(
+                        ref.read(communityFeedProvider.notifier).hasMore
+                            ? '加载更多'
+                            : '已显示全部内容',
+                      ),
+                    );
+                  return CommunityPostCard(post: posts[index]);
                 },
               );
             },
@@ -109,6 +135,21 @@ class CommunityFeedTab extends ConsumerWidget {
               onTap: () => Navigator.pop(ctx, 'team_invite'),
             ),
             ListTile(
+              leading: const Icon(Icons.emoji_events_outlined),
+              title: const Text('分享学习成果'),
+              onTap: () => Navigator.pop(ctx, 'learning_result'),
+            ),
+            ListTile(
+              leading: const Icon(Icons.lightbulb_outline),
+              title: const Text('分享学习方法'),
+              onTap: () => Navigator.pop(ctx, 'method'),
+            ),
+            ListTile(
+              leading: const Icon(Icons.help_outline),
+              title: const Text('学习问答'),
+              onTap: () => Navigator.pop(ctx, 'question'),
+            ),
+            ListTile(
               leading: const Icon(Icons.bug_report_outlined),
               title: const Text('吐槽软件功能'),
               subtitle: const Text('反馈缺陷与体验问题'),
@@ -127,8 +168,8 @@ class CommunityFeedTab extends ConsumerWidget {
   }
 }
 
-class _PostCard extends ConsumerWidget {
-  const _PostCard({required this.post});
+class CommunityPostCard extends ConsumerWidget {
+  const CommunityPostCard({required this.post});
 
   final CommunityPostDto post;
 
@@ -139,7 +180,13 @@ class _PostCard extends ConsumerWidget {
       case 'share_bilibili':
         return '分享';
       case 'feedback':
-        return '吐槽';
+        return '反馈';
+      case 'learning_result':
+        return '学习成果';
+      case 'method':
+        return '学习方法';
+      case 'question':
+        return '学习问答';
       default:
         return post.kind;
     }
@@ -173,6 +220,9 @@ class _PostCard extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final CommunityPostDto post =
+        ref.watch(communityPostUpdatesProvider)[this.post.id] ?? this.post;
+
     final String? cover = post.linkCover?.trim();
     return HubSurface(
       onTap: () => unawaited(_openComments(context, ref)),
@@ -182,23 +232,7 @@ class _PostCard extends ConsumerWidget {
         children: <Widget>[
           Row(
             children: <Widget>[
-              Container(
-                width: 36,
-                height: 36,
-                decoration: BoxDecoration(
-                  color: _kindTint,
-                  shape: BoxShape.circle,
-                ),
-                alignment: Alignment.center,
-                child: Text(
-                  post.authorName.isEmpty
-                      ? '?'
-                      : String.fromCharCode(
-                          post.authorName.runes.first,
-                        ),
-                  style: const TextStyle(fontWeight: FontWeight.w800),
-                ),
-              ),
+              AvatarPreview(loadout: post.authorAvatar, height: 52),
               const SizedBox(width: 10),
               Expanded(
                 child: Column(
@@ -315,7 +349,9 @@ class _PostCard extends ConsumerWidget {
             children: <Widget>[
               InkWell(
                 onTap: () => unawaited(
-                  ref.read(communityFeedProvider.notifier).toggleLike(post.id),
+                  ref
+                      .read(communityFeedProvider.notifier)
+                      .toggleLike(post.id, enabled: !post.likedByMe),
                 ),
                 borderRadius: BorderRadius.circular(8),
                 child: Row(
@@ -384,6 +420,7 @@ class _PostCard extends ConsumerWidget {
                 ),
             ],
           ),
+          CommunityPostActions(post: post),
         ],
       ),
     );
@@ -468,9 +505,7 @@ class _PostCard extends ConsumerWidget {
               ),
               TextField(
                 controller: level,
-                decoration: const InputDecoration(
-                  labelText: '英语难度（如 A2 / B1）',
-                ),
+                decoration: const InputDecoration(labelText: '英语难度（如 A2 / B1）'),
               ),
               TextField(
                 controller: reason,
@@ -493,21 +528,23 @@ class _PostCard extends ConsumerWidget {
     );
     if (ok != true || !context.mounted) return;
     try {
-      await ref.read(acquireApiClientProvider).requestCommunityReclassify(
+      await ref
+          .read(acquireApiClientProvider)
+          .requestCommunityReclassify(
             postId: post.id,
             interestTag: tag.text.trim(),
             englishLevel: level.text.trim(),
             reason: reason.text.trim(),
           );
       if (!context.mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('已提交归类纠错，审核通过后会更新')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('已提交归类纠错，审核通过后会更新')));
     } catch (e) {
       if (!context.mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('提交失败：$e')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('提交失败：$e')));
     }
   }
 }
@@ -543,10 +580,9 @@ class _CommentsSheetState extends ConsumerState<_CommentsSheet> {
   Future<void> _load() async {
     setState(() => _loading = true);
     try {
-      final List<CommunityCommentDto> rows =
-          await ref.read(acquireApiClientProvider).communityComments(
-                widget.post.id,
-              );
+      final List<CommunityCommentDto> rows = await ref
+          .read(acquireApiClientProvider)
+          .communityComments(widget.post.id);
       if (!mounted) return;
       setState(() {
         _comments = rows;
@@ -555,17 +591,18 @@ class _CommentsSheetState extends ConsumerState<_CommentsSheet> {
     } catch (e) {
       if (!mounted) return;
       setState(() => _loading = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('评论加载失败：$e')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('评论加载失败：$e')));
     }
   }
 
   Future<void> _submit() async {
     final String text = _body.text.trim();
     if (text.isEmpty || _busy) return;
-    final bool hasCookie =
-        ref.read(learningPreferencesProvider).hasBilibiliCookie;
+    final bool hasCookie = ref
+        .read(learningPreferencesProvider)
+        .hasBilibiliCookie;
     if (_mirror && !hasCookie) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('请先在设置中授权 B 站 Cookie，再同步评论')),
@@ -574,12 +611,13 @@ class _CommentsSheetState extends ConsumerState<_CommentsSheet> {
     }
     setState(() => _busy = true);
     try {
-      final CommunityCommentDto created =
-          await ref.read(acquireApiClientProvider).createCommunityComment(
-                postId: widget.post.id,
-                body: text,
-                mirrorToBilibili: _mirror,
-              );
+      final CommunityCommentDto created = await ref
+          .read(acquireApiClientProvider)
+          .createCommunityComment(
+            postId: widget.post.id,
+            body: text,
+            mirrorToBilibili: _mirror,
+          );
       if (!mounted) return;
       _body.clear();
       setState(() {
@@ -587,16 +625,16 @@ class _CommentsSheetState extends ConsumerState<_CommentsSheet> {
         _busy = false;
       });
       if (created.mirroredToBilibili) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('已同步到 B 站视频评论区')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('已同步到 B 站视频评论区')));
       }
     } catch (e) {
       if (!mounted) return;
       setState(() => _busy = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('发送失败：$e')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('发送失败：$e')));
     }
   }
 
@@ -620,22 +658,22 @@ class _CommentsSheetState extends ConsumerState<_CommentsSheet> {
               child: _loading
                   ? const Center(child: CircularProgressIndicator())
                   : _comments.isEmpty
-                      ? const Center(child: Text('还没有评论，来说两句吧'))
-                      : ListView.separated(
-                          itemCount: _comments.length,
-                          separatorBuilder: (_, __) => const Divider(height: 1),
-                          itemBuilder: (BuildContext context, int index) {
-                            final CommunityCommentDto c = _comments[index];
-                            return ListTile(
-                              contentPadding: EdgeInsets.zero,
-                              title: Text(c.authorName),
-                              subtitle: Text(c.body),
-                              trailing: c.mirroredToBilibili
-                                  ? const Icon(Icons.sync, size: 18)
-                                  : null,
-                            );
-                          },
-                        ),
+                  ? const Center(child: Text('还没有评论，来说两句吧'))
+                  : ListView.separated(
+                      itemCount: _comments.length,
+                      separatorBuilder: (_, __) => const Divider(height: 1),
+                      itemBuilder: (BuildContext context, int index) {
+                        final CommunityCommentDto c = _comments[index];
+                        return ListTile(
+                          contentPadding: EdgeInsets.zero,
+                          title: Text(c.authorName),
+                          subtitle: Text(c.body),
+                          trailing: c.mirroredToBilibili
+                              ? const Icon(Icons.sync, size: 18)
+                              : null,
+                        );
+                      },
+                    ),
             ),
             if (canMirror)
               SwitchListTile(
@@ -700,7 +738,13 @@ class _ComposeSheetState extends ConsumerState<_ComposeSheet> {
       case 'share_bilibili':
         return '分享你喜欢的 B 站视频';
       default:
-        return '吐槽软件功能';
+        return widget.kind == 'learning_result'
+            ? '分享学习成果'
+            : widget.kind == 'method'
+            ? '分享学习方法'
+            : widget.kind == 'question'
+            ? '提出学习问题'
+            : '反馈软件功能';
     }
   }
 
@@ -728,16 +772,14 @@ class _ComposeSheetState extends ConsumerState<_ComposeSheet> {
     if (widget.kind == 'share_bilibili') {
       final String link = _link.text.trim();
       if (link.isEmpty) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('请粘贴 B 站视频链接')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('请粘贴 B 站视频链接')));
         return;
       }
       if (_isYoutubeUrl(link)) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('因政策原因，暂时不支持分享 YouTube 视频，请改用 B 站链接'),
-          ),
+          const SnackBar(content: Text('因政策原因，暂时不支持分享 YouTube 视频，请改用 B 站链接')),
         );
         return;
       }
@@ -750,25 +792,27 @@ class _ComposeSheetState extends ConsumerState<_ComposeSheet> {
     }
     setState(() => _busy = true);
     try {
-      await ref.read(communityFeedProvider.notifier).createPost(
+      await ref
+          .read(communityFeedProvider.notifier)
+          .createPost(
             kind: widget.kind,
             title: _title.text.trim(),
             body: _body.text.trim(),
-            linkUrl:
-                widget.kind == 'share_bilibili' ? _link.text.trim() : null,
-            linkTitle:
-                widget.kind == 'share_bilibili' ? _title.text.trim() : null,
+            linkUrl: widget.kind == 'share_bilibili' ? _link.text.trim() : null,
+            linkTitle: widget.kind == 'share_bilibili'
+                ? _title.text.trim()
+                : null,
           );
       if (!mounted) return;
       Navigator.of(context).pop();
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('已发布')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('已发布')));
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('发布失败：$e')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('发布失败：$e')));
     } finally {
       if (mounted) setState(() => _busy = false);
     }

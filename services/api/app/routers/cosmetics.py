@@ -6,8 +6,10 @@ from datetime import date
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
-from sqlalchemy import select
+from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.exc import IntegrityError
+from app.services.study_rewards import insert
 
 from app.database import get_db
 from app.deps import get_current_user
@@ -94,38 +96,13 @@ async def _points_row(db: AsyncSession, user_id: int) -> UserReviewPoints:
 
 
 async def _ensure_starter_kit(db: AsyncSession, user_id: int) -> None:
-    owned = {
-        r.sku
-        for r in (
-            await db.execute(
-                select(UserCosmeticInventory).where(
-                    UserCosmeticInventory.user_id == user_id
-                )
-            )
-        ).scalars().all()
-    }
-    for sku in FREE_STARTER_SKUS:
-        if sku in owned:
-            continue
-        db.add(UserCosmeticInventory(user_id=user_id, sku=sku))
-    loadout_rows = (
-        await db.execute(
-            select(UserAvatarLoadout).where(UserAvatarLoadout.user_id == user_id)
-        )
-    ).scalars().all()
-    equipped = {r.slot: r.sku for r in loadout_rows}
-    defaults = {
-        "body": "body.default",
-        "hair": "hair.default",
-        "top": "top.default",
-        "bottom": "bottom.default",
-        "bg": "bg.default",
-    }
-    for slot, sku in defaults.items():
-        if slot in equipped:
-            continue
-        db.add(UserAvatarLoadout(user_id=user_id, slot=slot, sku=sku))
-    await db.flush()
+    await db.execute(insert(db, UserCosmeticInventory).values([
+        {"user_id": user_id, "sku": sku} for sku in FREE_STARTER_SKUS
+    ]).on_conflict_do_nothing())
+    defaults = {"body": "body.cartoon1", "hair": "hair.default", "top": "top.default", "bottom": "bottom.default", "bg": "bg.default"}
+    await db.execute(insert(db, UserAvatarLoadout).values([
+        {"user_id": user_id, "slot": slot, "sku": sku} for slot, sku in defaults.items()
+    ]).on_conflict_do_nothing())
 
 
 async def _today_earn_count(
@@ -170,6 +147,10 @@ async def earn_points(
     db: AsyncSession = Depends(get_db),
     user: User = Depends(get_current_user),
 ) -> EarnOut:
+    from app.config import settings
+    if settings.production_mode:
+        points = await _points_row(db, user.id)
+        return EarnOut(awarded=False, delta=0, balance=int(points.balance or 0), reason="use_verified_study_checkin")
     spec = _EARN_TABLE.get(payload.reason)
     if spec is None:
         raise HTTPException(status_code=400, detail="unknown earn reason")
@@ -341,7 +322,9 @@ async def purchase(
     price = int(item.price_points or 0)
     if int(points.balance or 0) < price:
         raise HTTPException(status_code=400, detail="insufficient review points")
-    points.balance = int(points.balance or 0) - price
+    changed = await db.execute(update(UserReviewPoints).where(UserReviewPoints.user_id == user.id, UserReviewPoints.balance >= price).values(balance=UserReviewPoints.balance - price))
+    if changed.rowcount != 1:
+        raise HTTPException(status_code=400, detail="insufficient review points")
     db.add(UserCosmeticInventory(user_id=user.id, sku=item.sku))
     db.add(
         ReviewPointsLedger(
@@ -352,7 +335,12 @@ async def purchase(
             meta_json=f'{{"sku":"{item.sku}"}}',
         )
     )
-    await db.commit()
+    try:
+        await db.commit()
+    except IntegrityError:
+        await db.rollback()
+        if (await db.execute(select(UserCosmeticInventory).where(UserCosmeticInventory.user_id == user.id, UserCosmeticInventory.sku == payload.sku))).first() is None:
+            raise HTTPException(409, "购买状态已更新，请刷新后重试")
     return await me(db=db, user=user)
 
 
@@ -383,6 +371,9 @@ async def equip(
         return await me(db=db, user=user)
 
     sku = payload.sku.strip()
+    body = (await db.execute(select(UserAvatarLoadout).where(UserAvatarLoadout.user_id == user.id, UserAvatarLoadout.slot == "body"))).scalar_one_or_none()
+    if slot in {"hair", "top", "bottom", "accessory"} and body and body.sku.startswith("body.cartoon"):
+        body.sku = "body.default"  # Compatibility for legacy single-slot clients; new UI previews the switch.
     item = (
         await db.execute(
             select(CosmeticItem).where(CosmeticItem.sku == sku, CosmeticItem.active == 1)
@@ -407,5 +398,26 @@ async def equip(
         db.add(UserAvatarLoadout(user_id=user.id, slot=slot, sku=sku))
     else:
         existing.sku = sku
+    await db.commit()
+    return await me(db=db, user=user)
+
+
+class EquipSetIn(BaseModel):
+    loadout: dict[str, str] = Field(min_length=1, max_length=6)
+
+
+@router.put('/equip-set', response_model=AvatarMeOut)
+async def equip_set(payload: EquipSetIn, db: AsyncSession = Depends(get_db), user: User = Depends(get_current_user)):
+    from sqlalchemy import delete
+    if 'body' not in payload.loadout or any(slot not in _SLOTS for slot in payload.loadout):
+        raise HTTPException(400, '装扮槽位错误')
+    await _ensure_starter_kit(db, user.id)
+    for slot, sku in payload.loadout.items():
+        item = (await db.execute(select(CosmeticItem).where(CosmeticItem.sku == sku, CosmeticItem.active == 1))).scalar_one_or_none()
+        owned = (await db.execute(select(UserCosmeticInventory).where(UserCosmeticInventory.user_id == user.id, UserCosmeticInventory.sku == sku))).scalar_one_or_none()
+        if item is None or item.slot != slot or (owned is None and item.price_points > 0):
+            raise HTTPException(400, '装扮未拥有或与槽位不匹配')
+    await db.execute(delete(UserAvatarLoadout).where(UserAvatarLoadout.user_id == user.id))
+    db.add_all([UserAvatarLoadout(user_id=user.id, slot=slot, sku=sku) for slot, sku in payload.loadout.items()])
     await db.commit()
     return await me(db=db, user=user)

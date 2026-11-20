@@ -31,11 +31,9 @@ class AvatarMeNotifier extends AsyncNotifier<AvatarMeDto> {
   }) async {
     if (!ref.read(authSessionProvider).isLoggedIn) return null;
     try {
-      final ReviewPointsEarnResult result =
-          await ref.read(acquireApiClientProvider).earnReviewPoints(
-                reason: reason,
-                clientEventId: clientEventId,
-              );
+      final ReviewPointsEarnResult result = await ref
+          .read(acquireApiClientProvider)
+          .earnReviewPoints(reason: reason, clientEventId: clientEventId);
       if (result.awarded) {
         final AvatarMeDto? current = state.asData?.value;
         if (current != null) {
@@ -58,15 +56,29 @@ class AvatarMeNotifier extends AsyncNotifier<AvatarMeDto> {
   }
 
   Future<void> purchase(String sku) async {
-    final AvatarMeDto next =
-        await ref.read(acquireApiClientProvider).purchaseCosmetic(sku);
-    state = AsyncData<AvatarMeDto>(next);
+    final String token = ref.read(authSessionProvider).accessToken;
+    final AvatarMeDto next = await ref
+        .read(acquireApiClientProvider)
+        .purchaseCosmetic(sku);
+    if (ref.mounted && token == ref.read(authSessionProvider).accessToken)
+      state = AsyncData<AvatarMeDto>(next);
+  }
+
+  Future<void> equipSet(Map<String, String> loadout) async {
+    final String token = ref.read(authSessionProvider).accessToken;
+    final AvatarMeDto next = await ref
+        .read(acquireApiClientProvider)
+        .equipCosmeticSet(loadout);
+    if (ref.mounted && token == ref.read(authSessionProvider).accessToken)
+      state = AsyncData<AvatarMeDto>(next);
   }
 
   Future<void> equip({required String slot, String? sku}) async {
+    final String token = ref.read(authSessionProvider).accessToken;
     final AvatarMeDto next = await ref
         .read(acquireApiClientProvider)
         .equipCosmetic(slot: slot, sku: sku);
-    state = AsyncData<AvatarMeDto>(next);
+    if (ref.mounted && token == ref.read(authSessionProvider).accessToken)
+      state = AsyncData<AvatarMeDto>(next);
   }
 }

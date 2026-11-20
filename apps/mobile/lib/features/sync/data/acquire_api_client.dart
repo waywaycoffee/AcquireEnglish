@@ -1471,11 +1471,14 @@ class AcquireApiClient {
         },
       );
 
-  Future<List<CommunityPostDto>> communityFeed({String? kind}) async {
+  Future<List<CommunityPostDto>> communityFeed({String? kind, int? before, bool following = false, bool bookmarked = false}) async {
     final Response<dynamic> response = await _dio.get(
       Endpoints.communityFeed,
       queryParameters: <String, dynamic>{
         if (kind != null && kind.isNotEmpty) 'kind': kind,
+        if (before != null) 'before': before,
+        if (following) 'following': true,
+        if (bookmarked) 'bookmarked': true,
       },
       options: _noCache,
     );
@@ -1546,14 +1549,41 @@ class AcquireApiClient {
         .toList(growable: false);
   }
 
+  Future<CommunityPostDto> setCommunityLike(int postId, bool enabled) async {
+    final Map<String, dynamic> data = await socialRequest('PUT', '/posts/$postId/like', data: <String, dynamic>{'enabled': enabled});
+    return CommunityPostDto.fromJson(data);
+  }
+
+  Future<Map<String, dynamic>> moderationRequest(String method, String path, String token, {Map<String, dynamic>? data}) async {
+    final Response<dynamic> response = await _dio.request<dynamic>('api/community-social/moderation$path', options: Options(method: method, headers: <String, String>{'X-Community-Admin-Token': token}, extra: _noCache.extra), data: data);
+    return response.data as Map<String, dynamic>;
+  }
+
+  Future<Map<String, dynamic>> socialRequest(String method, String path, {Map<String, dynamic>? data}) async {
+    final Response<dynamic> response = await _dio.request<dynamic>('api/community-social$path', options: Options(method: method, extra: _noCache.extra), data: data);
+    return response.data as Map<String, dynamic>;
+  }
+
+  Future<Map<String, dynamic>> learningCardRequest(String method, String path, {Map<String, dynamic>? data}) async {
+    final Response<dynamic> response = await _dio.request<dynamic>('api/learning-cards$path', options: Options(method: method, extra: _noCache.extra), data: data);
+    final Map<String, dynamic> result = response.data as Map<String, dynamic>;
+    if (result['public_path'] is String) result['share_url'] = Uri.parse(_dio.options.baseUrl).resolve(result['public_path'] as String).toString();
+    return result;
+  }
+
+  Future<Map<String, dynamic>> studyPlayRequest(String method, String path, {Map<String, dynamic>? data}) async {
+    final Response<dynamic> response = await _dio.request<dynamic>('api/study-play$path', options: Options(method: method, extra: _noCache.extra), data: data);
+    return response.data as Map<String, dynamic>;
+  }
+
   Future<Map<String, dynamic>> studyPkRequest(String method, String path, {Map<String, dynamic>? data}) async {
-    final Response<dynamic> response = await _dio.request<dynamic>('api/study-pk$path', options: Options(method: method), data: data);
+    final Response<dynamic> response = await _dio.request<dynamic>('api/study-pk$path', options: Options(method: method, extra: _noCache.extra), data: data);
     return response.data as Map<String, dynamic>;
   }
 
   Future<Map<String, dynamic>> studyDeskRequest(String method, String path, {Map<String, dynamic>? data, Map<String, dynamic>? query}) async {
     final Response<dynamic> response = await _dio.request<dynamic>(
-      'api/study-desk$path', options: Options(method: method), data: data, queryParameters: query,
+      'api/study-desk$path', options: Options(method: method, extra: _noCache.extra), data: data, queryParameters: query,
     );
     return response.data as Map<String, dynamic>;
   }
@@ -1723,6 +1753,11 @@ class AcquireApiClient {
       data: <String, dynamic>{'sku': sku},
       options: _noCache,
     );
+    return AvatarMeDto.fromJson(response.data as Map<String, dynamic>);
+  }
+
+  Future<AvatarMeDto> equipCosmeticSet(Map<String, String> loadout) async {
+    final Response<dynamic> response = await _dio.put<dynamic>('api/cosmetics/equip-set', data: <String, dynamic>{'loadout': loadout});
     return AvatarMeDto.fromJson(response.data as Map<String, dynamic>);
   }
 

@@ -1,3 +1,8 @@
+import '../../community/presentation/study_play_screen.dart';
+import 'dart:convert';
+import '../data/review_session_draft.dart';
+import '../../community/presentation/publish_learning_result_screen.dart';
+import '../../sync/data/study_activity_service.dart';
 import 'dart:async';
 
 import 'package:flutter/material.dart';
@@ -78,6 +83,11 @@ class DailyReviewScreen extends ConsumerStatefulWidget {
 class _DailyReviewScreenState extends ConsumerState<DailyReviewScreen>
     with WidgetsBindingObserver {
   Timer? _timer;
+  Timer? _activeTimer;
+  int _activeMilliseconds = 0;
+  DateTime _lastInteraction = DateTime.now();
+  bool _draftInitialized = false;
+
   final ScrollController _sessionScroll = ScrollController();
   String? _currentKey;
   List<String>? _deckKeys;
@@ -116,6 +126,19 @@ class _DailyReviewScreenState extends ConsumerState<DailyReviewScreen>
         unawaited(review.drainEncounterSoftCredits());
       }
     });
+    _activeTimer = Timer.periodic(const Duration(seconds: 1), (_) {
+      if (mounted &&
+          widget.session &&
+          ModalRoute.of(context)?.isCurrent == true &&
+          (WidgetsBinding.instance.lifecycleState == null ||
+              WidgetsBinding.instance.lifecycleState ==
+                  AppLifecycleState.resumed) &&
+          DateTime.now().difference(_lastInteraction) <
+              const Duration(seconds: 60) &&
+          !(_deckKeys?.every(_completedKeys.contains) ?? false)) {
+        _activeMilliseconds += 1000;
+      }
+    });
     _timer = Timer.periodic(const Duration(seconds: 30), (_) {
       if (mounted) setState(() {});
     });
@@ -123,6 +146,8 @@ class _DailyReviewScreenState extends ConsumerState<DailyReviewScreen>
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.paused && mounted)
+      unawaited(_persistDraft());
     if (state == AppLifecycleState.resumed && mounted) {
       setState(() {});
       ref.read(dailyReviewProvider.notifier).scheduleCloudBackup();
@@ -132,6 +157,7 @@ class _DailyReviewScreenState extends ConsumerState<DailyReviewScreen>
   @override
   void dispose() {
     _timer?.cancel();
+    _activeTimer?.cancel();
     _sessionScroll.dispose();
     WidgetsBinding.instance.removeObserver(this);
     _stopSpeech();
@@ -213,6 +239,21 @@ class _DailyReviewScreenState extends ConsumerState<DailyReviewScreen>
 
   @override
   Widget build(BuildContext context) {
+    ref.listen<String>(studyAccountProvider, (String? previous, String next) {
+      if (previous != null && previous != next) {
+        _stopSpeech();
+        setState(() {
+          _deckKeys = null;
+          _currentKey = null;
+          _completedKeys.clear();
+          _sessionRatings.clear();
+          _missedKeys.clear();
+          _stageRatings.clear();
+          _draftInitialized = false;
+          _activeMilliseconds = 0;
+        });
+      }
+    });
     final DailyReviewState state = ref.watch(dailyReviewProvider);
     final List<ReviewSource> sources = _filteredSources();
     final DateTime now = ref.read(reviewClockProvider)();
@@ -277,7 +318,10 @@ class _DailyReviewScreenState extends ConsumerState<DailyReviewScreen>
               ),
       ),
       body: widget.session && state.storageError == null
-          ? _buildSessionBody(state, sources, plan, now)
+          ? Listener(
+              onPointerDown: (_) => _lastInteraction = DateTime.now(),
+              child: _buildSessionBody(state, sources, plan, now),
+            )
           : LayoutBuilder(
               builder: (BuildContext context, BoxConstraints constraints) {
                 final bool compact = constraints.maxWidth < 600;
@@ -322,6 +366,54 @@ class _DailyReviewScreenState extends ConsumerState<DailyReviewScreen>
     );
   }
 
+  ReviewSessionDraftStore get _draftStore => ReviewSessionDraftStore(
+    account: ref.read(studyAccountProvider),
+    scope: jsonEncode(<Object?>[
+      widget.practice,
+      widget.practiceKind?.name ?? _overviewKind?.name,
+      widget.expressions,
+      widget.recommended,
+      widget.missedOnly,
+      widget.focusWord,
+      widget.weakOnly,
+      widget.sourceLabel,
+      widget.sourceEpisodeId,
+      widget.syllabusOnly,
+      widget.syllabusBookId,
+    ]),
+  );
+
+  Future<void> _persistDraft() async {
+    if (!mounted || !widget.session || _deckKeys == null) return;
+    final ReviewSessionDraftStore store = _draftStore;
+    try {
+      if (_deckKeys!.every(_completedKeys.contains)) {
+        await store.clear();
+        return;
+      }
+      final DailyReviewState state = ref.read(dailyReviewProvider);
+      await store.save(
+        ReviewSessionDraft(
+          keys: List<String>.of(_deckKeys!),
+          versions: <String, int>{
+            for (final String key in _deckKeys!)
+              if (state.records[key] != null) key: state.records[key]!.reviews,
+          },
+          completed: Set<String>.of(_completedKeys),
+          ratings: _sessionRatings.map(
+            (String key, fsrs.Rating value) =>
+                MapEntry<String, int>(key, value.index),
+          ),
+          current: _currentKey,
+          updatedAt: ref.read(reviewClockProvider)(),
+          activeMilliseconds: _activeMilliseconds,
+        ),
+      );
+    } catch (_) {
+      if (mounted) _message('评分仍保存在复习记录中，但本轮位置未能保存。');
+    }
+  }
+
   String _sessionRoute({
     bool practice = false,
     String? label,
@@ -337,8 +429,10 @@ class _DailyReviewScreenState extends ConsumerState<DailyReviewScreen>
     },
   ).toString();
 
-  void _leaveSession() {
+  Future<void> _leaveSession() async {
     if (_saving) return;
+    await _persistDraft();
+    if (!mounted) return;
     if (context.canPop()) {
       context.pop();
     } else {
@@ -377,6 +471,44 @@ class _DailyReviewScreenState extends ConsumerState<DailyReviewScreen>
     DateTime now,
   ) {
     if (_deckKeys != null) return;
+    final ReviewSessionDraft? draft = _draftStore.load(now);
+    if (draft != null) {
+      final Set<String> active = sources
+          .map((ReviewSource source) => source.key)
+          .toSet();
+      final List<String> valid = draft.keys
+          .where(
+            (String key) =>
+                active.contains(key) &&
+                state.records.containsKey(key) &&
+                (draft.completed.contains(key) ||
+                    state.records[key]!.reviews == draft.versions[key]),
+          )
+          .toList();
+      if (valid.any((String key) => !draft.completed.contains(key))) {
+        _deckKeys = valid;
+        _completedKeys.addAll(draft.completed.where(valid.contains));
+        for (final MapEntry<String, int> row in draft.ratings.entries) {
+          if (_completedKeys.contains(row.key) &&
+              row.value >= 0 &&
+              row.value < fsrs.Rating.values.length)
+            _sessionRatings[row.key] = fsrs.Rating.values[row.value];
+        }
+        _missedKeys.addAll(
+          _sessionRatings.entries
+              .where(
+                (MapEntry<String, fsrs.Rating> r) =>
+                    r.value == fsrs.Rating.again || r.value == fsrs.Rating.hard,
+              )
+              .map((MapEntry<String, fsrs.Rating> r) => r.key),
+        );
+        _currentKey = valid.contains(draft.current)
+            ? draft.current
+            : valid.firstWhere((String key) => !_completedKeys.contains(key));
+        _activeMilliseconds = draft.activeMilliseconds;
+        return;
+      }
+    }
     final Set<String> activeKeys = sources
         .map((ReviewSource source) => source.key)
         .toSet();
@@ -486,6 +618,7 @@ class _DailyReviewScreenState extends ConsumerState<DailyReviewScreen>
       _modeStep = 0;
       _revealed = _completedKeys.contains(_currentKey);
     });
+    unawaited(_persistDraft());
   }
 
   Widget _buildSessionBody(
@@ -495,6 +628,12 @@ class _DailyReviewScreenState extends ConsumerState<DailyReviewScreen>
     DateTime now,
   ) {
     _prepareDeck(plan, state, sources, now);
+    if (!_draftInitialized) {
+      _draftInitialized = true;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) unawaited(_persistDraft());
+      });
+    }
     final Map<String, ReviewSource> byKey = <String, ReviewSource>{
       for (final ReviewSource source in sources) source.key: source,
     };
@@ -641,6 +780,9 @@ class _DailyReviewScreenState extends ConsumerState<DailyReviewScreen>
                                     '本轮已保存 ${_sessionRatings.length} 条评分',
                                     key: const Key('review-saved-summary'),
                                   ),
+                                  Text(
+                                    '本轮有效互动约 ${(_activeMilliseconds / 60000).ceil()} 分钟 · 长时间无操作不累计',
+                                  ),
                                   Wrap(
                                     spacing: 12,
                                     children: <Widget>[
@@ -669,6 +811,24 @@ class _DailyReviewScreenState extends ConsumerState<DailyReviewScreen>
                                       ),
                                     ),
                                   TextButton(
+                                    onPressed: () async {
+                                      await ref
+                                          .read(studyActivityServiceProvider)
+                                          .touchReview();
+                                      await ref
+                                          .read(dailyReviewProvider.notifier)
+                                          .syncCloudBackup();
+                                      if (mounted)
+                                        Navigator.of(context).push<void>(
+                                          MaterialPageRoute<void>(
+                                            builder: (_) =>
+                                                const StudyPlayScreen(),
+                                          ),
+                                        );
+                                    },
+                                    child: const Text('同步并去一起练打卡'),
+                                  ),
+                                  TextButton(
                                     onPressed: () => _showResultPreview(),
                                     child: const Text('预览学习成果'),
                                   ),
@@ -690,6 +850,8 @@ class _DailyReviewScreenState extends ConsumerState<DailyReviewScreen>
                                       _missedKeys.clear();
                                       _completedKeys.clear();
                                       _sessionRatings.clear();
+                                      _activeMilliseconds = 0;
+                                      _draftInitialized = false;
                                       _revealed = false;
                                     }),
                                     child: const Text('重练没记住的卡片'),
@@ -703,6 +865,8 @@ class _DailyReviewScreenState extends ConsumerState<DailyReviewScreen>
                                       _missedKeys.clear();
                                       _completedKeys.clear();
                                       _sessionRatings.clear();
+                                      _activeMilliseconds = 0;
+                                      _draftInitialized = false;
                                       _revealed = false;
                                     }),
                                     child: Text(
@@ -1014,7 +1178,13 @@ class _DailyReviewScreenState extends ConsumerState<DailyReviewScreen>
               onPressed: () => context.push(_sessionRoute()),
               style: _primaryButtonStyle,
               icon: const Icon(Icons.play_arrow_rounded),
-              label: Text(plan.today.reviews > 0 ? '再次复习' : '开始今日复习'),
+              label: Text(
+                _draftStore.load(now) != null
+                    ? '继续上次复习'
+                    : plan.today.reviews > 0
+                    ? '再次复习'
+                    : '开始今日复习',
+              ),
             )
           else if (empty)
             FilledButton.icon(
@@ -1587,6 +1757,19 @@ class _DailyReviewScreenState extends ConsumerState<DailyReviewScreen>
         content: Text('$text\n\n不含录音、具体词条或个人课程。复制后可自行编辑分享，不会自动发布。'),
         actions: <Widget>[
           TextButton(
+            onPressed: () {
+              Navigator.pop(context);
+              Navigator.of(this.context).push<void>(
+                MaterialPageRoute<void>(
+                  builder: (_) =>
+                      PublishLearningResultScreen(initialText: text),
+                ),
+              );
+            },
+            child: const Text('编辑与发布'),
+          ),
+
+          TextButton(
             onPressed: () => Navigator.pop(context),
             child: const Text('取消'),
           ),
@@ -1926,6 +2109,7 @@ class _DailyReviewScreenState extends ConsumerState<DailyReviewScreen>
       _forward = true;
       _revealed = false;
     });
+    unawaited(_persistDraft());
   }
 
   Future<SpellStageResult?> _runSpellStage(ReviewSource source) async {
@@ -2130,6 +2314,7 @@ class _DailyReviewScreenState extends ConsumerState<DailyReviewScreen>
         .read(dailyReviewProvider.notifier)
         .grade(source.key, rating, expectedReviews: record.reviews);
     if (!mounted) return;
+    unawaited(ref.read(studyActivityServiceProvider).touchReview());
     _sessionRatings[source.key] = rating;
     if (rating == fsrs.Rating.again || rating == fsrs.Rating.hard)
       _missedKeys.add(source.key);

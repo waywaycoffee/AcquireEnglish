@@ -53,6 +53,8 @@ async def upload(
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> ReviewDownload:
+    previous = await db.get(ReviewBackup, user.id)
+    previous_payload = previous.payload if previous else None
     encoded = json.dumps(payload.state.model_dump(), ensure_ascii=False, separators=(",", ":"))
     if len(encoded.encode("utf-8")) > 16 * 1024 * 1024:
         raise HTTPException(413, "Review backup is too large")
@@ -72,4 +74,10 @@ async def upload(
     except IntegrityError as error:
         await db.rollback()
         raise HTTPException(409, "Review backup changed; pull it before uploading again") from error
+    try:
+        from app.services.study_rewards import record_review_evidence
+        await record_review_evidence(db, user.id, payload.state.model_dump(), previous_payload)
+        await db.commit()
+    except Exception:
+        await db.rollback()  # Backup is already committed; never lose it for reward accounting.
     return ReviewDownload(revision=revision, state=payload.state)

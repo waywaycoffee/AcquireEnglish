@@ -1,4 +1,5 @@
 import os
+from datetime import date
 
 os.environ["DATABASE_URL"] = "sqlite+aiosqlite:///./test_community.db"
 os.environ["AUTH_SMS_MOCK"] = "true"
@@ -93,13 +94,13 @@ async def test_study_stats_leaderboard_similar_and_pk():
         stats = await client.post(
             "/api/community/study-stats",
             headers=headers_a,
-            json={"day": "2026-11-20", "study_seconds": 1800, "vocab_count": 120},
+            json={"day": date.today().isoformat(), "study_seconds": 1800, "vocab_count": 120},
         )
         assert stats.status_code == 200, stats.text
         await client.post(
             "/api/community/study-stats",
             headers=headers_b,
-            json={"day": "2026-11-20", "study_seconds": 600, "vocab_count": 40},
+            json={"day": date.today().isoformat(), "study_seconds": 600, "vocab_count": 40},
         )
 
         board = await client.get(

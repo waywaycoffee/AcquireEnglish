@@ -152,6 +152,9 @@ async def create(payload: CreateIn, user: User = Depends(get_current_user), db: 
     row = DeskWordPk(desk_id=me.desk_id, active_desk_id=me.desk_id, sender_id=user.id, target_id=peer.user_id, status='pending', days=payload.days, questions_json=json.dumps(questions[:payload.count], ensure_ascii=False), expires_at=now() + timedelta(hours=24))
     db.add(row)
     try:
+        await db.flush()
+        from app.routers.community_social import notice
+        await notice(db, peer.user_id, user.id, f'pk-invite:{row.id}', '同桌邀请你进行近期学习单词PK，请到一起练处理')
         await db.commit()
     except IntegrityError:
         await db.rollback()
@@ -171,6 +174,8 @@ async def invitation(match_id: int, action: Literal['accept', 'decline', 'cancel
     if changed.rowcount != 1:
         raise HTTPException(409, '邀请已被处理')
     if status == 'active':
+        from app.routers.community_social import notice
+        await notice(db, row.sender_id, user.id, f'pk-accepted:{row.id}', '同桌已接受单词PK，请到一起练开始答题')
         db.add_all([DeskPkRun(match_id=match_id, user_id=row.sender_id), DeskPkRun(match_id=match_id, user_id=row.target_id)])
     try:
         await db.commit()
@@ -178,6 +183,12 @@ async def invitation(match_id: int, action: Literal['accept', 'decline', 'cancel
         await db.rollback()
         raise HTTPException(409, '邀请已被处理')
     return {'status': status}
+
+
+async def completed_notices(db, row):
+    from app.routers.community_social import notice
+    for recipient, actor in [(row.sender_id, row.target_id), (row.target_id, row.sender_id)]:
+        await notice(db, recipient, actor, f'pk-result:{row.id}', '单词PK双方已完成，请到一起练查看成绩与逐题复盘')
 
 
 @router.get('/{match_id}')
@@ -188,6 +199,7 @@ async def view(match_id: int, user: User = Depends(get_current_user), db: AsyncS
         finished = await db.scalar(select(func.count()).select_from(DeskPkRun).where(DeskPkRun.match_id == match_id, DeskPkRun.next_index == len(questions)))
         if finished == 2:
             row.status, row.active_desk_id = 'completed', None
+            await completed_notices(db, row)
             await db.commit()
     result = {'id': row.id, 'status': row.status, 'count': len(questions), 'question': None, 'result': None}
     if row.status == 'completed':
@@ -228,6 +240,7 @@ async def answer(match_id: int, payload: AnswerIn, user: User = Depends(get_curr
         finished = await db.scalar(select(func.count()).select_from(DeskPkRun).where(DeskPkRun.match_id == match_id, DeskPkRun.next_index == len(questions)))
         if finished == 2:
             await db.execute(update(DeskWordPk).where(DeskWordPk.id == match_id).values(status='completed', active_desk_id=None))
+            await completed_notices(db, row)
         await db.commit()
     except IntegrityError:
         await db.rollback()

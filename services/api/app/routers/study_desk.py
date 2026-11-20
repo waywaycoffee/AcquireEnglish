@@ -12,7 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.database import get_db
 from app.deps import get_current_user
 from app.models import (DeskInvite, DeskMember, DeskBlock, DeskLibraryWord, DeskLibrarySnapshot,
-                        LessonProgress, User, UserLinkCourse, UserStudyStatsDaily)
+                        LessonProgress, User, UserLinkCourse, UserStudyStatsDaily, UserAvatarLoadout)
 from app.course_data import get_course
 
 
@@ -74,7 +74,8 @@ async def overview(user: User = Depends(get_current_user), db: AsyncSession = De
     if me:
         _, member = await pair(db, user.id)
         other = await db.get(User, member.user_id)
-        peer = {'id': other.id, 'name': name(other), 'sharing': {
+        avatar_rows = (await db.execute(select(UserAvatarLoadout).where(UserAvatarLoadout.user_id == other.id))).scalars().all()
+        peer = {'id': other.id, 'name': name(other), 'avatar': {r.slot: r.sku for r in avatar_rows}, 'sharing': {
             'activity': bool(member.share_activity), 'videos': bool(member.share_videos),
             'library': bool(member.share_library)}}
     rows = (await db.execute(select(DeskInvite).where(
@@ -114,6 +115,9 @@ async def invite(payload: InviteIn, user: User = Depends(get_current_user), db: 
         raise HTTPException(429, '每天最多发起5次邀请')
     row = DeskInvite(sender_id=user.id, target_id=target.id, status='pending', expires_at=now() + timedelta(hours=24))
     db.add(row)
+    await db.flush()
+    from app.routers.community_social import notice
+    await notice(db, target.id, user.id, f'desk-invite:{row.id}', f'{name(user)}邀请你成为同桌，请进入一起练处理')
     await db.commit()
     return {'id': row.id}
 
@@ -138,6 +142,9 @@ async def act(invite_id: int, action: Literal['accept', 'decline', 'cancel'], us
             db.add_all([DeskMember(user_id=row.sender_id, desk_id=row.id), DeskMember(user_id=row.target_id, desk_id=row.id)])
             await db.flush()
             await db.execute(update(DeskInvite).where(DeskInvite.id != invite_id, DeskInvite.status == 'pending', or_(DeskInvite.sender_id.in_([row.sender_id, row.target_id]), DeskInvite.target_id.in_([row.sender_id, row.target_id]))).values(status='superseded'))
+        if action == 'accept':
+            from app.routers.community_social import notice
+            await notice(db, row.sender_id, user.id, f'desk-accepted:{row.id}', '对方接受了同桌邀请，可以到一起练设置共享权限')
         await db.commit()
     except IntegrityError:
         await db.rollback()
@@ -159,6 +166,10 @@ async def sharing(payload: ConsentIn, user: User = Depends(get_current_user), db
 async def leave(user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
     me = await db.get(DeskMember, user.id)
     if me:
+        other = (await db.execute(select(DeskMember).where(DeskMember.desk_id == me.desk_id, DeskMember.user_id != user.id))).scalar_one_or_none()
+        if other:
+            from app.routers.community_social import notice
+            await notice(db, other.user_id, user.id, f'desk-left:{me.desk_id}', '对方已解除同桌关系，学习共享已停止')
         await db.execute(delete(DeskMember).where(DeskMember.desk_id == me.desk_id))
         await db.commit()
     return {'status': 'left'}
@@ -247,3 +258,13 @@ async def library(category: Literal['common', 'mine', 'peer'] = 'common', q: str
                        'mine_only': len(mine - theirs), 'peer_only': len(theirs - mine)},
             'words': matching[offset:offset + limit], 'total': len(matching),
             'vocabulary_estimate': None, 'note': '收藏量不代表词汇量；仅比较双方最近同步的收藏单词，不包含私有原句。'}
+
+
+@router.post('/encourage')
+async def encourage(user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+    from app.services.study_rewards import day_key
+    from app.routers.community_social import notice
+    me, peer = await pair(db, user.id)
+    sent = await notice(db, peer.user_id, user.id, f'encourage:{day_key()}:{user.id}', f'{name(user)}给你一个鼓励：今天也一起学一点吧！')
+    await db.commit()
+    return {'sent': sent}

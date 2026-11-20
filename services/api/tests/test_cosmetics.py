@@ -89,3 +89,26 @@ async def test_earn_purchase_and_equip():
         )
         assert equip.status_code == 200, equip.text
         assert equip.json()["loadout"].get("accessory") == "accessory.book"
+
+
+@pytest.mark.asyncio
+async def test_templates_and_atomic_loadout_reject_unowned_without_partial_save():
+    async with AsyncClient(transport=ASGITransport(app=fastapi_app), base_url='http://test') as client:
+        h = await _login(client, '13900004401')
+        initial = (await client.get('/api/cosmetics/me', headers=h)).json()
+        assert all(f'body.cartoon{i}' in initial['inventory'] for i in range(1, 7))
+        good = await client.put('/api/cosmetics/equip-set', headers=h, json={'loadout': {'body': 'body.cartoon4'}})
+        assert good.status_code == 200 and good.json()['loadout']['body'] == 'body.cartoon4'
+        bad = await client.put('/api/cosmetics/equip-set', headers=h, json={'loadout': {'body': 'body.cartoon2', 'accessory': 'accessory.headphones'}})
+        assert bad.status_code == 400
+        assert (await client.get('/api/cosmetics/me', headers=h)).json()['loadout']['body'] == 'body.cartoon4'
+
+
+@pytest.mark.asyncio
+async def test_production_cannot_claim_legacy_client_reported_points(monkeypatch):
+    from app.config import settings
+    async with AsyncClient(transport=ASGITransport(app=fastapi_app), base_url='http://test') as client:
+        h = await _login(client, '13900004401')
+        monkeypatch.setattr(settings, 'production_mode', True)
+        r = await client.post('/api/cosmetics/earn', headers=h, json={'reason': 'fsrs_easy', 'client_event_id': 'forged-event'})
+        assert r.status_code == 200 and not r.json()['awarded'] and r.json()['balance'] == 0
