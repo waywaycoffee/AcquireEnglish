@@ -86,6 +86,16 @@ reviewSourcesProvider = Provider<List<ReviewSource>>((Ref ref) {
       sourceLabel: occurrence == null
           ? '单词本'
           : '${occurrence.course} · ${occurrence.episode}',
+      relatedSources: <ReviewSourceLink>[
+        for (final WordOccurrence item in word.occurrences)
+          ReviewSourceLink(
+            label: '${item.course} · ${item.episode}',
+            episodeId: item.episodeId,
+            time: item.contexts.firstOrNull?.time ?? item.time,
+            english: item.contexts.firstOrNull?.sentence ?? item.sentence,
+            chinese: item.contexts.firstOrNull?.chinese ?? item.chinese,
+          ),
+      ],
       episodeId: occurrence?.episodeId,
       time: context?.time ?? occurrence?.time,
     );

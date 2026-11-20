@@ -11,6 +11,21 @@ enum ReviewKind {
   final String label;
 }
 
+class ReviewSourceLink {
+  const ReviewSourceLink({
+    required this.label,
+    this.episodeId,
+    this.time,
+    this.english = '',
+    this.chinese = '',
+  });
+  final String label;
+  final String? episodeId;
+  final String? time;
+  final String english;
+  final String chinese;
+}
+
 class ReviewSource {
   const ReviewSource({
     required this.key,
@@ -22,6 +37,7 @@ class ReviewSource {
     required this.sourceLabel,
     this.episodeId,
     this.time,
+    this.relatedSources = const <ReviewSourceLink>[],
     this.legacyLastReview,
     this.legacyDue,
     this.legacyReviewCount = 0,
@@ -36,6 +52,34 @@ class ReviewSource {
   final String sourceLabel;
   final String? episodeId;
   final String? time;
+  final List<ReviewSourceLink> relatedSources;
+
+  ReviewSource forContext({String? label, String? episode}) {
+    final ReviewSourceLink? link = relatedSources
+        .where(
+          (ReviewSourceLink link) =>
+              (episode != null && link.episodeId == episode) ||
+              (label != null && link.label == label),
+        )
+        .firstOrNull;
+    if (link == null) return this;
+    return ReviewSource(
+      key: key,
+      kind: kind,
+      question: question,
+      answer: answer,
+      english: link.english.isEmpty ? english : link.english,
+      chinese: link.chinese.isEmpty ? chinese : link.chinese,
+      sourceLabel: link.label,
+      episodeId: link.episodeId,
+      time: link.time,
+      relatedSources: relatedSources,
+      legacyLastReview: legacyLastReview,
+      legacyDue: legacyDue,
+      legacyReviewCount: legacyReviewCount,
+    );
+  }
+
   final DateTime? legacyLastReview;
   final DateTime? legacyDue;
   final int legacyReviewCount;

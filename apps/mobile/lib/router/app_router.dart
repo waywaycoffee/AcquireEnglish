@@ -166,6 +166,9 @@ GoRouter goRouter(Ref ref) => GoRouter(
           recommended: state.uri.queryParameters['deck'] == 'recommended',
           missedOnly: state.uri.queryParameters['deck'] == 'missed',
           focusWord: state.uri.queryParameters['focus'],
+          weakOnly: state.uri.queryParameters['weak'] == '1',
+          sourceLabel: state.uri.queryParameters['source'],
+          sourceEpisodeId: state.uri.queryParameters['sourceEpisode'],
           practiceKind: ReviewKind.values
               .where((ReviewKind kind) => kind.name == kindName)
               .firstOrNull,

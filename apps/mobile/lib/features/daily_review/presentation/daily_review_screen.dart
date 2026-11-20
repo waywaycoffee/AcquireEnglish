@@ -45,6 +45,9 @@ class DailyReviewScreen extends ConsumerStatefulWidget {
     this.recommended = false,
     this.missedOnly = false,
     this.focusWord,
+    this.weakOnly = false,
+    this.sourceLabel,
+    this.sourceEpisodeId,
   });
   final bool session;
   final bool recommended;
@@ -57,6 +60,9 @@ class DailyReviewScreen extends ConsumerStatefulWidget {
 
   /// Prefer / restrict to this lemma (word detail “复习此词”).
   final String? focusWord;
+  final bool weakOnly;
+  final String? sourceLabel;
+  final String? sourceEpisodeId;
   @override
   ConsumerState<DailyReviewScreen> createState() => _DailyReviewScreenState();
 }
@@ -77,6 +83,9 @@ class _DailyReviewScreenState extends ConsumerState<DailyReviewScreen>
   bool _forward = true;
   bool _revealed = false;
   bool _saving = false;
+  ReviewKind? _overviewKind;
+  final Map<String, fsrs.Rating> _sessionRatings = <String, fsrs.Rating>{};
+
   bool _speaking = false;
   int _speechSequence = 0;
   WordPronunciationService? _speech;
@@ -145,7 +154,44 @@ class _DailyReviewScreenState extends ConsumerState<DailyReviewScreen>
             source.question.trim().toLowerCase() == focus,
       );
     }
-    return sources.toList(growable: false);
+    if (widget.weakOnly) {
+      final DailyReviewState review = ref.watch(dailyReviewProvider);
+      sources = sources.where((ReviewSource source) {
+        final int? last = review.records[source.key]?.lastRating;
+        return last == fsrs.Rating.again.index ||
+            last == fsrs.Rating.hard.index;
+      });
+    }
+    if (!widget.session && _overviewKind != null) {
+      sources = sources.where(
+        (ReviewSource source) => source.kind == _overviewKind,
+      );
+    }
+    if (widget.sourceLabel != null || widget.sourceEpisodeId != null) {
+      sources = sources.where(
+        (ReviewSource source) =>
+            (widget.sourceEpisodeId != null &&
+                (source.episodeId == widget.sourceEpisodeId ||
+                    source.relatedSources.any(
+                      (ReviewSourceLink link) =>
+                          link.episodeId == widget.sourceEpisodeId,
+                    ))) ||
+            (widget.sourceLabel != null &&
+                (source.sourceLabel == widget.sourceLabel ||
+                    source.relatedSources.any(
+                      (ReviewSourceLink link) =>
+                          link.label == widget.sourceLabel,
+                    ))),
+      );
+    }
+    return sources
+        .map(
+          (ReviewSource source) => source.forContext(
+            label: widget.sourceLabel,
+            episode: widget.sourceEpisodeId,
+          ),
+        )
+        .toList(growable: false);
   }
 
   @override
@@ -255,6 +301,21 @@ class _DailyReviewScreenState extends ConsumerState<DailyReviewScreen>
     );
   }
 
+  String _sessionRoute({
+    bool practice = false,
+    String? label,
+    String? episodeId,
+  }) => Uri(
+    path: SGRoute.reviewSession.route,
+    queryParameters: <String, String>{
+      if (practice) 'practice': '1',
+      if (_overviewKind != null) 'kind': _overviewKind!.name,
+      if (widget.recommended) 'deck': 'recommended',
+      if (label != null) 'source': label,
+      if (episodeId != null) 'sourceEpisode': episodeId,
+    },
+  ).toString();
+
   void _leaveSession() {
     if (_saving) return;
     if (context.canPop()) {
@@ -315,7 +376,12 @@ class _DailyReviewScreenState extends ConsumerState<DailyReviewScreen>
     }
 
     final ReviewKind? kind = widget.practiceKind;
-    if (widget.practice && (kind != null || widget.expressions)) {
+    if (widget.practice &&
+        (kind != null ||
+            widget.expressions ||
+            widget.sourceLabel != null ||
+            widget.sourceEpisodeId != null ||
+            widget.weakOnly)) {
       final List<String> keys = sources
           .map((ReviewSource source) => source.key)
           .where(state.records.containsKey)
@@ -547,6 +613,45 @@ class _DailyReviewScreenState extends ConsumerState<DailyReviewScreen>
                                     color: AppDesignTokens.textSecondary,
                                   ),
                                 ),
+                                if (!widget.practice &&
+                                    _sessionRatings.isNotEmpty) ...<Widget>[
+                                  const SizedBox(height: 16),
+                                  Text(
+                                    '本轮已保存 ${_sessionRatings.length} 条评分',
+                                    key: const Key('review-saved-summary'),
+                                  ),
+                                  Wrap(
+                                    spacing: 12,
+                                    children: <Widget>[
+                                      for (final fsrs.Rating rating
+                                          in fsrs.Rating.values)
+                                        Text(
+                                          '${const <String>['忘记', '吃力', '记得', '很轻松'][rating.index]} ${_sessionRatings.values.where((fsrs.Rating value) => value == rating).length}',
+                                        ),
+                                    ],
+                                  ),
+                                  if (_missedKeys.isNotEmpty)
+                                    TextButton(
+                                      onPressed: () => context.push(
+                                        Uri(
+                                          path: SGRoute.reviewSession.route,
+                                          queryParameters: <String, String>{
+                                            'practice': '1',
+                                            'weak': '1',
+                                            if (widget.recommended)
+                                              'deck': 'recommended',
+                                          },
+                                        ).toString(),
+                                      ),
+                                      child: Text(
+                                        '自由巩固薄弱项（${_missedKeys.length} 条本轮反馈）',
+                                      ),
+                                    ),
+                                  TextButton(
+                                    onPressed: () => _showResultPreview(),
+                                    child: const Text('预览学习成果'),
+                                  ),
+                                ],
                                 const SizedBox(height: 24),
                                 FilledButton(
                                   onPressed: _leaveSession,
@@ -563,6 +668,7 @@ class _DailyReviewScreenState extends ConsumerState<DailyReviewScreen>
                                       _currentKey = _deckKeys!.first;
                                       _missedKeys.clear();
                                       _completedKeys.clear();
+                                      _sessionRatings.clear();
                                       _revealed = false;
                                     }),
                                     child: const Text('重练没记住的卡片'),
@@ -575,6 +681,7 @@ class _DailyReviewScreenState extends ConsumerState<DailyReviewScreen>
                                       _deckKeys = null;
                                       _missedKeys.clear();
                                       _completedKeys.clear();
+                                      _sessionRatings.clear();
                                       _revealed = false;
                                     }),
                                     child: Text(
@@ -883,7 +990,7 @@ class _DailyReviewScreenState extends ConsumerState<DailyReviewScreen>
           if (!empty && !done)
             FilledButton.icon(
               key: const Key('daily-review-start'),
-              onPressed: () => context.push(SGRoute.reviewSession.route),
+              onPressed: () => context.push(_sessionRoute()),
               style: _primaryButtonStyle,
               icon: const Icon(Icons.play_arrow_rounded),
               label: Text(plan.today.reviews > 0 ? '再次复习' : '开始今日复习'),
@@ -898,8 +1005,7 @@ class _DailyReviewScreenState extends ConsumerState<DailyReviewScreen>
           else if (canPractice) ...<Widget>[
             FilledButton.icon(
               key: const Key('daily-review-again'),
-              onPressed: () =>
-                  context.push('${SGRoute.reviewSession.route}?practice=1'),
+              onPressed: () => context.push(_sessionRoute(practice: true)),
               style: _primaryButtonStyle,
               icon: const Icon(Icons.replay_rounded),
               label: const Text('再次复习'),
@@ -961,6 +1067,24 @@ class _DailyReviewScreenState extends ConsumerState<DailyReviewScreen>
             ],
           ),
           const SizedBox(height: 24),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: <Widget>[
+              ChoiceChip(
+                label: const Text('全部内容'),
+                selected: _overviewKind == null,
+                onSelected: (_) => setState(() => _overviewKind = null),
+              ),
+              for (final ReviewKind kind in ReviewKind.values)
+                ChoiceChip(
+                  label: Text(kind.label),
+                  selected: _overviewKind == kind,
+                  onSelected: (_) => setState(() => _overviewKind = kind),
+                ),
+            ],
+          ),
+          const SizedBox(height: 12),
           _buildLearningConnections(state, sources),
           const SizedBox(height: 20),
           Text(
@@ -1432,6 +1556,31 @@ class _DailyReviewScreenState extends ConsumerState<DailyReviewScreen>
     );
   }
 
+  Future<void> _showResultPreview() async {
+    final String text =
+        '今天在爱快英语完成了 ${_sessionRatings.length} 条计划复习。\n一点点坚持，把学过的内容真正记住。';
+    await showDialog<void>(
+      context: context,
+      builder: (BuildContext context) => AlertDialog(
+        title: const Text('学习成果预览'),
+        content: Text('$text\n\n不含录音、具体词条或个人课程。复制后可自行编辑分享，不会自动发布。'),
+        actions: <Widget>[
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('取消'),
+          ),
+          TextButton(
+            onPressed: () async {
+              await Clipboard.setData(ClipboardData(text: text));
+              if (context.mounted) Navigator.pop(context);
+            },
+            child: const Text('复制文案'),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildLearningConnections(
     DailyReviewState state,
     List<ReviewSource> sources,
@@ -1439,9 +1588,14 @@ class _DailyReviewScreenState extends ConsumerState<DailyReviewScreen>
     final Map<String, List<ReviewSource>> groups =
         <String, List<ReviewSource>>{};
     for (final ReviewSource source in sources) {
-      groups
-          .putIfAbsent(source.sourceLabel, () => <ReviewSource>[])
-          .add(source);
+      for (final String label in <String>{
+        source.sourceLabel,
+        ...source.relatedSources.map((ReviewSourceLink link) => link.label),
+      }) {
+        groups
+            .putIfAbsent(label, () => <ReviewSource>[])
+            .add(source.forContext(label: label));
+      }
     }
     return Material(
       color: AppDesignTokens.appWhite,
@@ -1491,6 +1645,24 @@ class _DailyReviewScreenState extends ConsumerState<DailyReviewScreen>
                 ),
               ),
               children: <Widget>[
+                Wrap(
+                  spacing: 8,
+                  children: <Widget>[
+                    TextButton.icon(
+                      icon: const Icon(Icons.play_arrow),
+                      label: const Text('开始这组计划复习'),
+                      onPressed: () =>
+                          context.push(_sessionRoute(label: group.key)),
+                    ),
+                    TextButton.icon(
+                      icon: const Icon(Icons.replay),
+                      label: const Text('自由练习这组'),
+                      onPressed: () => context.push(
+                        _sessionRoute(practice: true, label: group.key),
+                      ),
+                    ),
+                  ],
+                ),
                 for (final ReviewSource source in group.value)
                   ListTile(
                     contentPadding: const EdgeInsets.symmetric(horizontal: 8),
@@ -1792,6 +1964,9 @@ class _DailyReviewScreenState extends ConsumerState<DailyReviewScreen>
     if (_saving || _completedKeys.contains(source.key)) {
       return;
     }
+    final List<fsrs.Rating>? previousStages = _stageRatings[source.key] == null
+        ? null
+        : List<fsrs.Rating>.of(_stageRatings[source.key]!);
     setState(() => _saving = true);
     try {
       if (source.kind == ReviewKind.word) {
@@ -1800,6 +1975,11 @@ class _DailyReviewScreenState extends ConsumerState<DailyReviewScreen>
       }
       await _finishGrade(source, record, rating);
     } catch (_) {
+      if (previousStages == null) {
+        _stageRatings.remove(source.key);
+      } else {
+        _stageRatings[source.key] = previousStages;
+      }
       if (mounted) {
         await showDialog<void>(
           context: context,
@@ -1929,6 +2109,9 @@ class _DailyReviewScreenState extends ConsumerState<DailyReviewScreen>
         .read(dailyReviewProvider.notifier)
         .grade(source.key, rating, expectedReviews: record.reviews);
     if (!mounted) return;
+    _sessionRatings[source.key] = rating;
+    if (rating == fsrs.Rating.again || rating == fsrs.Rating.hard)
+      _missedKeys.add(source.key);
     if (passes != null) _setWordPasses(source.key, null);
     _stageRatings.remove(source.key);
     _advanceCard(source.key);

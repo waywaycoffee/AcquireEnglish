@@ -54,9 +54,14 @@ ProviderContainer makeContainer([List<ReviewSource> items = sources]) =>
         wordReviewSettingsProvider.overrideWith(_RecognizeOnlySettings.new),
       ],
     );
-Widget app(ProviderContainer container, {bool session = false}) {
+Widget app(
+  ProviderContainer container, {
+  bool session = false,
+  String? initialLocation,
+}) {
   final GoRouter router = GoRouter(
-    initialLocation: session ? '/review/session' : '/review',
+    initialLocation:
+        initialLocation ?? (session ? '/review/session' : '/review'),
     routes: <GoRoute>[
       GoRoute(path: '/review', builder: (_, __) => const DailyReviewScreen()),
       GoRoute(
@@ -64,6 +69,9 @@ Widget app(ProviderContainer container, {bool session = false}) {
         builder: (_, GoRouterState state) => DailyReviewScreen(
           session: true,
           practice: state.uri.queryParameters['practice'] == '1',
+          sourceLabel: state.uri.queryParameters['source'],
+          sourceEpisodeId: state.uri.queryParameters['sourceEpisode'],
+          weakOnly: state.uri.queryParameters['weak'] == '1',
         ),
       ),
     ],
@@ -76,6 +84,100 @@ Widget app(ProviderContainer container, {bool session = false}) {
 }
 
 void main() {
+  testWidgets(
+    'source-scoped plan only grades selected source and summarizes saved ratings',
+    (WidgetTester tester) async {
+      final ProviderContainer container = makeContainer();
+      addTearDown(container.dispose);
+      await tester.pumpWidget(
+        app(
+          container,
+          initialLocation: Uri(
+            path: '/review/session',
+            queryParameters: <String, String>{'source': '课程 · 02'},
+          ).toString(),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(find.text('很高兴见到你。'), findsOneWidget);
+      expect(find.text('hello'), findsNothing);
+      final Finder reveal = find.byKey(const Key('daily-review-reveal'));
+      await tester.ensureVisible(reveal);
+      await tester.tap(reveal);
+      await tester.pumpAndSettle();
+      final Finder good = find.byKey(const Key('daily-review-rate-good'));
+      await tester.ensureVisible(good);
+      await tester.tap(good);
+      await tester.pumpAndSettle();
+      final DailyReviewState state = container.read(dailyReviewProvider);
+      expect(state.records['phrase:1']!.reviews, 1);
+      expect(state.records['word:hello']!.reviews, 0);
+      expect(find.byKey(const Key('review-saved-summary')), findsOneWidget);
+      expect(find.text('记得 1'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'secondary video source uses its own sentence without duplicating the word',
+    (WidgetTester tester) async {
+      const ReviewSource linked = ReviewSource(
+        key: 'word:hello',
+        kind: ReviewKind.word,
+        question: 'hello',
+        answer: '你好',
+        english: 'Hello there.',
+        chinese: '你好。',
+        sourceLabel: '视频 A',
+        episodeId: 'a',
+        relatedSources: <ReviewSourceLink>[
+          ReviewSourceLink(
+            label: '视频 A',
+            episodeId: 'a',
+            english: 'Hello there.',
+          ),
+          ReviewSourceLink(
+            label: '视频 B',
+            episodeId: 'b',
+            time: '00:15',
+            english: 'Hello again.',
+            chinese: '又见面了。',
+          ),
+        ],
+      );
+      final ProviderContainer container = makeContainer(<ReviewSource>[linked]);
+      addTearDown(container.dispose);
+      await tester.pumpWidget(
+        app(
+          container,
+          initialLocation: Uri(
+            path: '/review/session',
+            queryParameters: <String, String>{
+              'source': '视频 B',
+              'practice': '1',
+            },
+          ).toString(),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(find.textContaining('视频 B'), findsWidgets);
+      expect(container.read(dailyReviewProvider).records.length, 1);
+      final Finder reveal = find.byKey(const Key('daily-review-reveal'));
+      await tester.ensureVisible(reveal);
+      await tester.tap(reveal);
+      await tester.pumpAndSettle();
+      expect(
+        find.textContaining(RegExp('hello again', caseSensitive: false)),
+        findsWidgets,
+      );
+      expect(
+        container.read(dailyReviewProvider).records['word:hello']!.reviews,
+        0,
+      );
+      expect(tester.takeException(), isNull);
+    },
+  );
+
   testWidgets('a new word requires three correct choices and spellings', (
     WidgetTester tester,
   ) async {
