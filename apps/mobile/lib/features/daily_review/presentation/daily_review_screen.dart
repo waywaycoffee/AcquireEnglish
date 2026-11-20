@@ -960,6 +960,8 @@ class _DailyReviewScreenState extends ConsumerState<DailyReviewScreen>
                 ),
             ],
           ),
+          const SizedBox(height: 24),
+          _buildLearningConnections(state, sources),
           const SizedBox(height: 20),
           Text(
             '本周坚持的痕迹',
@@ -1426,6 +1428,156 @@ class _DailyReviewScreenState extends ConsumerState<DailyReviewScreen>
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildLearningConnections(
+    DailyReviewState state,
+    List<ReviewSource> sources,
+  ) {
+    final Map<String, List<ReviewSource>> groups =
+        <String, List<ReviewSource>>{};
+    for (final ReviewSource source in sources) {
+      groups
+          .putIfAbsent(source.sourceLabel, () => <ReviewSource>[])
+          .add(source);
+    }
+    return Material(
+      color: AppDesignTokens.appWhite,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: <Widget>[
+          Text(
+            '从你学过的内容中复习',
+            style: TextStyle(
+              fontSize: 20,
+              fontWeight: FontWeight.w800,
+              color: AppDesignTokens.textPrimary,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            '视频里收藏的单词、句子和短语会保留来源。未收藏的内容不会自动加入计划。',
+            style: TextStyle(
+              fontSize: 13,
+              height: 1.6,
+              color: AppDesignTokens.textSecondary,
+            ),
+          ),
+          const SizedBox(height: 12),
+          for (final MapEntry<String, List<ReviewSource>> group
+              in groups.entries)
+            ExpansionTile(
+              tilePadding: EdgeInsets.zero,
+              leading: Icon(
+                group.value.any((ReviewSource s) => s.episodeId != null)
+                    ? Icons.ondemand_video_outlined
+                    : Icons.bookmark_outline,
+                color: AppDesignTokens.brandGreenDark,
+              ),
+              title: Text(
+                group.key,
+                style: TextStyle(
+                  fontWeight: FontWeight.w700,
+                  color: AppDesignTokens.textPrimary,
+                ),
+              ),
+              subtitle: Text(
+                '${group.value.length} 条关联内容 · 已学 ${group.value.where((ReviewSource s) => (state.records[s.key]?.reviews ?? 0) > 0).length} 条',
+                style: TextStyle(
+                  fontSize: 12,
+                  color: AppDesignTokens.textSecondary,
+                ),
+              ),
+              children: <Widget>[
+                for (final ReviewSource source in group.value)
+                  ListTile(
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 8),
+                    title: Text(
+                      source.kind == ReviewKind.word
+                          ? source.question
+                          : source.english,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    subtitle: Text(
+                      '${source.kind.label} · ${source.time ?? '我的收藏'}',
+                      style: TextStyle(color: AppDesignTokens.textSecondary),
+                    ),
+                    trailing: source.episodeId == null
+                        ? null
+                        : IconButton(
+                            tooltip: '回到收藏时的视频',
+                            icon: const Icon(Icons.play_circle_outline),
+                            onPressed: () => context.pushNamed(
+                              SGRoute.player.name,
+                              pathParameters: <String, String>{
+                                'episodeId': source.episodeId!,
+                              },
+                              queryParameters: <String, String>{
+                                if (source.time != null)
+                                  'startTime': source.time!,
+                                'autoplay': '1',
+                              },
+                            ),
+                          ),
+                    onTap: () => showDialog<void>(
+                      context: context,
+                      builder: (BuildContext context) => AlertDialog(
+                        title: Text(source.question),
+                        content: SingleChildScrollView(
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: <Widget>[
+                              Text(source.answer),
+                              if (source.english.isNotEmpty) ...<Widget>[
+                                const SizedBox(height: 16),
+                                Text(source.english),
+                              ],
+                              if (source.chinese.isNotEmpty)
+                                Text(source.chinese),
+                              const SizedBox(height: 16),
+                              Text(
+                                '来源：${source.sourceLabel} ${source.time ?? ''}',
+                              ),
+                              const SizedBox(height: 8),
+                              Text(
+                                (state.records[source.key]?.reviews ?? 0) > 0
+                                    ? '已在你的复习计划中学习过'
+                                    : '已收藏，等待新学安排',
+                              ),
+                            ],
+                          ),
+                        ),
+                        actions: <Widget>[
+                          TextButton(
+                            onPressed: () => Navigator.pop(context),
+                            child: const Text('关闭'),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          const SizedBox(height: 12),
+          OutlinedButton.icon(
+            onPressed: () =>
+                context.push('${SGRoute.reviewSession.route}?deck=recommended'),
+            icon: const Icon(Icons.menu_book_outlined),
+            label: const Text('进入背词计划 · 推荐词库'),
+          ),
+          Text(
+            '推荐背词与视频收藏分别标明来源；浏览词条不算完成，只有实际复习才更新计划。',
+            style: TextStyle(
+              fontSize: 12,
+              height: 1.6,
+              color: AppDesignTokens.textSecondary,
+            ),
+          ),
+        ],
       ),
     );
   }
