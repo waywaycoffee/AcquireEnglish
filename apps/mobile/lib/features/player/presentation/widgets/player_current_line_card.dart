@@ -8,6 +8,7 @@ import '../../../shared/presentation/word_lookup_popup.dart';
 import '../player_mock_state.dart';
 import '../subtitle_display_mode.dart';
 import '../subtitle_language_sanitize.dart';
+import 'subtitle_chunk_highlight.dart';
 import 'subtitle_vocabulary_highlight.dart';
 
 class PlayerCurrentLineCard extends StatefulWidget {
@@ -20,6 +21,7 @@ class PlayerCurrentLineCard extends StatefulWidget {
     required this.highlightWords,
     this.savedVocabularyWords = const <String>{},
     this.keyVocabularyWords = const <String>{},
+    this.chunkHighlighter,
     required this.onBookmark,
     required this.onCollectWord,
     this.onCollectWordAtTime,
@@ -37,6 +39,7 @@ class PlayerCurrentLineCard extends StatefulWidget {
   final bool highlightWords;
   final Set<String> savedVocabularyWords;
   final Set<String> keyVocabularyWords;
+  final SubtitleChunkHighlighter? chunkHighlighter;
   final VoidCallback onBookmark;
   final ValueChanged<String> onCollectWord;
   final void Function(String word, String time)? onCollectWordAtTime;
@@ -188,7 +191,7 @@ class _PlayerCurrentLineCardState extends State<PlayerCurrentLineCard> {
                 const SizedBox(width: 10),
                 Expanded(
                   child: Text(
-                    '点词开卡 · 长按选短语起点',
+                    '点词开卡 · 长按选短语 · 自动标语块',
                     style: TextStyle(
                       color: AppDesignTokens.textSecondary,
                       fontSize: 12,
@@ -216,91 +219,115 @@ class _PlayerCurrentLineCardState extends State<PlayerCurrentLineCard> {
               Wrap(
                 spacing: 6,
                 runSpacing: 6,
-                children: _tokens
-                    .asMap()
-                    .entries
-                    .map((MapEntry<int, String> wordEntry) {
-                      final int index = wordEntry.key;
-                      final String token = wordEntry.value;
-                      final bool selectedToken =
-                          selectedWord != null &&
-                          (selectedWord == token ||
-                              (selectedWord!.contains(' ') &&
-                                  selectedWord!
-                                      .split(RegExp(r'\s+'))
-                                      .contains(token)));
-                      final bool phraseAnchor = _phraseAnchorIndex == index;
-                      final bool karaoke =
-                          highlightEnabled &&
-                          index == widget.currentWordIndex;
-                      final SubtitleVocabMark vocabMark =
-                          SubtitleVocabularyHighlight.resolve(
-                            rawToken: token,
-                            savedWords: widget.savedVocabularyWords,
-                            keyWords: widget.keyVocabularyWords,
-                          );
-                      final Color vocabFill = SubtitleVocabularyHighlight.fill(
-                        vocabMark,
-                        onDarkVideo: false,
-                      );
-                      final Color fill = phraseAnchor
-                          ? const Color(0xFFD6ECFF)
-                          : vocabMark != SubtitleVocabMark.none
-                          ? vocabFill
-                          : selectedToken || karaoke
-                          ? const Color(0xFFDFF8C8)
-                          : Colors.transparent;
-                      final Color borderColor = phraseAnchor
-                          ? AppDesignTokens.primaryBlueDark
-                          : karaoke
-                          ? AppDesignTokens.brandGreen
-                          : SubtitleVocabularyHighlight.border(
-                              vocabMark,
-                              onDarkVideo: false,
+                children: () {
+                  final Map<int, SubtitleChunkSpan> chunkHits =
+                      widget.chunkHighlighter?.matchLine(english) ??
+                      const <int, SubtitleChunkSpan>{};
+                  return _tokens
+                      .asMap()
+                      .entries
+                      .map((MapEntry<int, String> wordEntry) {
+                        final int index = wordEntry.key;
+                        final String token = wordEntry.value;
+                        final bool selectedToken =
+                            selectedWord != null &&
+                            (selectedWord == token ||
+                                (selectedWord!.contains(' ') &&
+                                    selectedWord!
+                                        .split(RegExp(r'\s+'))
+                                        .contains(token)));
+                        final bool phraseAnchor = _phraseAnchorIndex == index;
+                        final bool karaoke =
+                            highlightEnabled &&
+                            index == widget.currentWordIndex;
+                        final SubtitleChunkSpan? chunkSpan = chunkHits[index];
+                        final SubtitleVocabMark vocabMark =
+                            SubtitleVocabularyHighlight.resolve(
+                              rawToken: token,
+                              savedWords: widget.savedVocabularyWords,
+                              keyWords: widget.keyVocabularyWords,
                             );
-                      final double borderWidth =
-                          phraseAnchor || karaoke ? 1.5 : 0;
-                      final Color wordColor =
-                          SubtitleVocabularyHighlight.textColor(
-                        vocabMark,
-                        fallback: AppDesignTokens.textPrimary,
-                        onDarkVideo: false,
-                      );
-
-                      return InkWell(
-                        onTap: () => _selectToken(index),
-                        onLongPress: () => _beginPhraseSelection(index),
-                        borderRadius: BorderRadius.circular(8),
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 6,
-                            vertical: 2,
-                          ),
-                          decoration: BoxDecoration(
-                            color: fill,
-                            borderRadius: BorderRadius.circular(8),
-                            border: Border.all(
-                              color: borderColor,
-                              width: borderWidth,
-                            ),
-                          ),
-                          child: Text(
-                            token,
-                            style: TextStyle(
-                              fontSize: englishFontSize,
-                              fontWeight: SubtitleVocabularyHighlight.fontWeight(
+                        final Color vocabFill =
+                            SubtitleVocabularyHighlight.fill(
+                          vocabMark,
+                          onDarkVideo: false,
+                        );
+                        final Color chunkFill = chunkSpan == null
+                            ? Colors.transparent
+                            : SubtitleChunkHighlighter.fill(
+                                chunkSpan.kind,
+                                onDarkVideo: false,
+                              );
+                        final Color fill = phraseAnchor
+                            ? const Color(0xFFD6ECFF)
+                            : vocabMark != SubtitleVocabMark.none
+                            ? vocabFill
+                            : chunkSpan != null
+                            ? chunkFill
+                            : selectedToken || karaoke
+                            ? const Color(0xFFDFF8C8)
+                            : Colors.transparent;
+                        final Color borderColor = phraseAnchor
+                            ? AppDesignTokens.primaryBlueDark
+                            : karaoke
+                            ? AppDesignTokens.brandGreen
+                            : SubtitleVocabularyHighlight.border(
                                 vocabMark,
-                                karaoke: karaoke,
-                                activeLine: true,
+                                onDarkVideo: false,
+                              );
+                        final double borderWidth =
+                            phraseAnchor || karaoke ? 1.5 : 0;
+                        final Color wordColor = vocabMark !=
+                                SubtitleVocabMark.none
+                            ? SubtitleVocabularyHighlight.textColor(
+                                vocabMark,
+                                fallback: AppDesignTokens.textPrimary,
+                                onDarkVideo: false,
+                              )
+                            : chunkSpan == null
+                            ? AppDesignTokens.textPrimary
+                            : SubtitleChunkHighlighter.textColor(
+                                chunkSpan.kind,
+                                fallback: AppDesignTokens.textPrimary,
+                                onDarkVideo: false,
+                              );
+
+                        return InkWell(
+                          onTap: () => _selectToken(index),
+                          onLongPress: () => _beginPhraseSelection(index),
+                          borderRadius: BorderRadius.circular(8),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 6,
+                              vertical: 2,
+                            ),
+                            decoration: BoxDecoration(
+                              color: fill,
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(
+                                color: borderColor,
+                                width: borderWidth,
                               ),
-                              height: 1.22,
-                              color: wordColor,
+                            ),
+                            child: Text(
+                              token,
+                              style: TextStyle(
+                                fontSize: englishFontSize,
+                                fontWeight:
+                                    SubtitleVocabularyHighlight.fontWeight(
+                                  vocabMark,
+                                  karaoke: karaoke,
+                                  activeLine: true,
+                                ),
+                                height: 1.22,
+                                color: wordColor,
+                              ),
                             ),
                           ),
-                        ),
-                      );
-                    })
-                    .toList(growable: false),
+                        );
+                      })
+                      .toList(growable: false);
+                }(),
               ),
             if (showChineseTempPrimary)
               Text(

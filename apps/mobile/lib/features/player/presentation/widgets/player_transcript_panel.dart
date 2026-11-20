@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../../shared/presentation/pad/app_design_tokens.dart';
 import '../player_mock_state.dart';
 import 'player_subtitle_list.dart';
+import 'subtitle_chunk_highlight.dart';
 
 class PlayerTranscriptPanel extends StatefulWidget {
   const PlayerTranscriptPanel({
@@ -18,6 +19,7 @@ class PlayerTranscriptPanel extends StatefulWidget {
     this.subtitleWordHighlightBorderWidth = 2.5,
     this.savedVocabularyWords = const <String>{},
     this.keyVocabularyWords = const <String>{},
+    this.chunkHighlighter,
     required this.onTapLine,
     required this.onCollectWord,
     this.onCollectWordAtTime,
@@ -78,6 +80,7 @@ class PlayerTranscriptPanel extends StatefulWidget {
   final double subtitleWordHighlightBorderWidth;
   final Set<String> savedVocabularyWords;
   final Set<String> keyVocabularyWords;
+  final SubtitleChunkHighlighter? chunkHighlighter;
   final ValueChanged<int> onTapLine;
   final ValueChanged<String> onCollectWord;
   final void Function(String word, String time)? onCollectWordAtTime;
@@ -147,6 +150,7 @@ class _PlayerTranscriptPanelState extends State<PlayerTranscriptPanel> {
       subtitleWordHighlightBorderWidth: widget.subtitleWordHighlightBorderWidth,
       savedVocabularyWords: widget.savedVocabularyWords,
       keyVocabularyWords: widget.keyVocabularyWords,
+      chunkHighlighter: widget.chunkHighlighter,
       onCollectWord: widget.onCollectWord,
       onCollectWordAtTime: widget.onCollectWordAtTime,
       onFavoriteWord: widget.onFavoriteWord,

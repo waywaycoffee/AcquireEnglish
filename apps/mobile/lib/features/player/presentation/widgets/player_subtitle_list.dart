@@ -16,6 +16,7 @@ import '../subtitle_display_mode.dart';
 import '../subtitle_language_sanitize.dart';
 import 'study_shell_tokens.dart';
 import 'sentence_recording_button.dart';
+import 'subtitle_chunk_highlight.dart';
 import 'subtitle_vocabulary_highlight.dart';
 import 'subtitle_word_highlight_style.dart';
 
@@ -39,6 +40,7 @@ class PlayerSubtitleList extends StatefulWidget {
     this.subtitleWordHighlightBorderWidth = 2.5,
     this.savedVocabularyWords = const <String>{},
     this.keyVocabularyWords = const <String>{},
+    this.chunkHighlighter,
     required this.onTapLine,
     required this.onCollectWord,
     this.onCollectWordAtTime,
@@ -105,6 +107,7 @@ class PlayerSubtitleList extends StatefulWidget {
   final double subtitleWordHighlightBorderWidth;
   final Set<String> savedVocabularyWords;
   final Set<String> keyVocabularyWords;
+  final SubtitleChunkHighlighter? chunkHighlighter;
   final ValueChanged<int> onTapLine;
   final ValueChanged<String> onCollectWord;
   final void Function(String word, String time)? onCollectWordAtTime;
@@ -1669,6 +1672,56 @@ class _PlayerSubtitleListState extends State<PlayerSubtitleList> {
         widget.showAiCompleteButton;
     return Column(
       children: <Widget>[
+        if (widget.chunkHighlighter != null)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(10, 0, 10, 6),
+            child: Row(
+              children: <Widget>[
+                for (final SubtitleChunkKind kind in SubtitleChunkKind.values) ...<
+                  Widget
+                >[
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 3,
+                    ),
+                    decoration: BoxDecoration(
+                      color: SubtitleChunkHighlighter.fill(
+                        kind,
+                        onDarkVideo: widget.studyDarkStyle,
+                      ),
+                      borderRadius: BorderRadius.circular(999),
+                    ),
+                    child: Text(
+                      kind.labelCn,
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w800,
+                        color: SubtitleChunkHighlighter.textColor(
+                          kind,
+                          fallback: toolbarColor,
+                          onDarkVideo: widget.studyDarkStyle,
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 6),
+                ],
+                Expanded(
+                  child: Text(
+                    '字幕自动标出常用语块/词组/用法',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                      color: toolbarColor,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
         if (showBilingualChip)
           Padding(
             padding: const EdgeInsets.fromLTRB(8, 0, 8, 6),
@@ -2280,6 +2333,9 @@ class _PlayerSubtitleListState extends State<PlayerSubtitleList> {
     final StudyShellColors? shell = shellColors;
     final int? phraseAnchor =
         _phraseAnchorLine == text ? _phraseAnchorIndex : null;
+    final Map<int, SubtitleChunkSpan> chunkHits =
+        widget.chunkHighlighter?.matchLine(text) ??
+        const <int, SubtitleChunkSpan>{};
 
     return Wrap(
       spacing: 4,
@@ -2297,6 +2353,7 @@ class _PlayerSubtitleListState extends State<PlayerSubtitleList> {
                 index == highlightIndex;
             final bool phraseSelected = phraseAnchor != null &&
                 index == phraseAnchor;
+            final SubtitleChunkSpan? chunkSpan = chunkHits[index];
             final SubtitleVocabMark vocabMark =
                 SubtitleVocabularyHighlight.resolve(
                   rawToken: token.value,
@@ -2310,17 +2367,34 @@ class _PlayerSubtitleListState extends State<PlayerSubtitleList> {
               fallback: baseWordColor,
               onDarkVideo: false,
             );
-            final Color wordColor = karaoke && vocabMark == SubtitleVocabMark.none
+            final Color chunkWordColor = chunkSpan == null
+                ? vocabWordColor
+                : SubtitleChunkHighlighter.textColor(
+                    chunkSpan.kind,
+                    fallback: vocabWordColor,
+                    onDarkVideo: false,
+                  );
+            final Color wordColor = karaoke &&
+                    vocabMark == SubtitleVocabMark.none &&
+                    chunkSpan == null
                 ? SubtitleWordHighlightStyle.textColor(
                     widget.subtitleWordHighlightStyle,
                     highlighted: true,
-                    fallback: vocabWordColor,
+                    fallback: chunkWordColor,
                   )
-                : vocabWordColor;
+                : vocabMark != SubtitleVocabMark.none
+                ? vocabWordColor
+                : chunkWordColor;
             final Color vocabFill = SubtitleVocabularyHighlight.fill(
               vocabMark,
               onDarkVideo: false,
             );
+            final Color chunkFill = chunkSpan == null
+                ? Colors.transparent
+                : SubtitleChunkHighlighter.fill(
+                    chunkSpan.kind,
+                    onDarkVideo: false,
+                  );
             final Color karaokeFill = SubtitleWordHighlightStyle.background(
               widget.subtitleWordHighlightStyle,
               highlighted: karaoke,
@@ -2332,6 +2406,8 @@ class _PlayerSubtitleListState extends State<PlayerSubtitleList> {
                 ? phraseFill
                 : vocabMark != SubtitleVocabMark.none
                 ? vocabFill
+                : chunkSpan != null
+                ? chunkFill
                 : karaokeFill;
             final Color karaokeBorder = SubtitleWordHighlightStyle.borderColor(
               widget.subtitleWordHighlightStyle,

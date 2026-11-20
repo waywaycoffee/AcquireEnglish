@@ -17,6 +17,7 @@ import '../player_native_subtitles.dart';
 import '../subtitle_display_mode.dart';
 import '../subtitle_language_sanitize.dart';
 import 'hardsub_mosaic_cover.dart';
+import 'subtitle_chunk_highlight.dart';
 import 'subtitle_vocabulary_highlight.dart';
 import 'subtitle_word_highlight_style.dart';
 
@@ -38,6 +39,7 @@ class PlayerVideoPanel extends StatefulWidget {
     this.subtitleWordHighlightBorderWidth = 2.5,
     this.savedVocabularyWords = const <String>{},
     this.keyVocabularyWords = const <String>{},
+    this.chunkHighlighter,
     required this.speed,
     required this.isShadowing,
     required this.isLooping,
@@ -114,6 +116,7 @@ class PlayerVideoPanel extends StatefulWidget {
   final double subtitleWordHighlightBorderWidth;
   final Set<String> savedVocabularyWords;
   final Set<String> keyVocabularyWords;
+  final SubtitleChunkHighlighter? chunkHighlighter;
   final String speed;
   final bool isShadowing;
   final bool isLooping;
@@ -1457,6 +1460,9 @@ class _PlayerVideoPanelState extends State<PlayerVideoPanel> {
         style: style,
       );
     }
+    final Map<int, SubtitleChunkSpan> chunkHits =
+        widget.chunkHighlighter?.matchLine(text) ??
+        const <int, SubtitleChunkSpan>{};
 
     return Wrap(
       alignment: WrapAlignment.center,
@@ -1469,6 +1475,7 @@ class _PlayerVideoPanelState extends State<PlayerVideoPanel> {
             final bool karaoke =
                 widget.highlightWords &&
                 entry.key == widget.currentWordIndex;
+            final SubtitleChunkSpan? chunkSpan = chunkHits[entry.key];
             final SubtitleVocabMark vocabMark =
                 SubtitleVocabularyHighlight.resolve(
                   rawToken: entry.value,
@@ -1480,24 +1487,47 @@ class _PlayerVideoPanelState extends State<PlayerVideoPanel> {
               fallback: style.color ?? Colors.white,
               onDarkVideo: true,
             );
-            final Color wordColor = karaoke && vocabMark == SubtitleVocabMark.none
+            final Color chunkWordColor = chunkSpan == null
+                ? vocabWordColor
+                : SubtitleChunkHighlighter.textColor(
+                    chunkSpan.kind,
+                    fallback: vocabWordColor,
+                    onDarkVideo: true,
+                  );
+            final Color wordColor = karaoke &&
+                    vocabMark == SubtitleVocabMark.none &&
+                    chunkSpan == null
                 ? SubtitleWordHighlightStyle.textColor(
                     widget.subtitleWordHighlightStyle,
                     highlighted: true,
                     fallback: AppDesignTokens.brandGreen,
                   )
-                : vocabWordColor;
+                : vocabMark != SubtitleVocabMark.none
+                ? vocabWordColor
+                : chunkWordColor;
+            final Color? chunkBg = chunkSpan == null
+                ? null
+                : SubtitleChunkHighlighter.fill(
+                    chunkSpan.kind,
+                    onDarkVideo: true,
+                  );
             return Builder(
               builder: (BuildContext tokenContext) {
                 return GestureDetector(
                   key: ValueKey<String>('video-subtitle-word-${entry.key}'),
                   behavior: HitTestBehavior.opaque,
                   onTap: () => _openSubtitleLookup(tokenContext, entry.value),
-                  child: Padding(
+                  child: Container(
                     padding: const EdgeInsets.symmetric(
                       horizontal: 3,
                       vertical: 1,
                     ),
+                    decoration: chunkBg == null
+                        ? null
+                        : BoxDecoration(
+                            color: chunkBg.withValues(alpha: 0.88),
+                            borderRadius: BorderRadius.circular(6),
+                          ),
                     child: Text(
                       entry.value,
                       style: style.copyWith(

@@ -14,6 +14,7 @@ import 'player_mock_state.dart';
 import 'pronunciation_target_selection.dart';
 import 'widgets/player_transcript_panel.dart';
 import 'widgets/player_video_panel.dart';
+import 'widgets/subtitle_chunk_highlight.dart';
 
 class PlayerFullscreenVideoScreen extends StatefulWidget {
   const PlayerFullscreenVideoScreen({
@@ -24,6 +25,7 @@ class PlayerFullscreenVideoScreen extends StatefulWidget {
     this.subtitleWordHighlightBorderWidth = 2.5,
     this.savedVocabularyWords = const <String>{},
     this.keyVocabularyWords = const <String>{},
+    this.chunkHighlighter,
     required this.isMuted,
     required this.volumeLevel,
     required this.onTogglePlaying,
@@ -83,6 +85,7 @@ class PlayerFullscreenVideoScreen extends StatefulWidget {
   final double subtitleWordHighlightBorderWidth;
   final Set<String> savedVocabularyWords;
   final Set<String> keyVocabularyWords;
+  final SubtitleChunkHighlighter? chunkHighlighter;
   final bool isMuted;
   final double volumeLevel;
   final VoidCallback onTogglePlaying;
@@ -283,6 +286,7 @@ class _PlayerFullscreenVideoScreenState
                   widget.subtitleWordHighlightBorderWidth,
               savedVocabularyWords: widget.savedVocabularyWords,
               keyVocabularyWords: widget.keyVocabularyWords,
+              chunkHighlighter: widget.chunkHighlighter,
               isShadowing: player.isShadowing,
               isLooping: player.isLooping,
               isMuted: _isMuted,
@@ -435,6 +439,7 @@ class _PlayerFullscreenVideoScreenState
                   widget.subtitleWordHighlightBorderWidth,
               savedVocabularyWords: widget.savedVocabularyWords,
               keyVocabularyWords: widget.keyVocabularyWords,
+              chunkHighlighter: widget.chunkHighlighter,
               onTapLine: (int index) =>
                   _refresh(() => widget.onSelectLine(index)),
               onCollectWord: widget.onCollectWord,
@@ -496,6 +501,7 @@ class _FullscreenSubtitlePanel extends StatelessWidget {
     required this.subtitleWordHighlightBorderWidth,
     this.savedVocabularyWords = const <String>{},
     this.keyVocabularyWords = const <String>{},
+    this.chunkHighlighter,
     required this.onTapLine,
     required this.onCollectWord,
     this.onCollectWordAtTime,
@@ -526,6 +532,7 @@ class _FullscreenSubtitlePanel extends StatelessWidget {
   final double subtitleWordHighlightBorderWidth;
   final Set<String> savedVocabularyWords;
   final Set<String> keyVocabularyWords;
+  final SubtitleChunkHighlighter? chunkHighlighter;
   final ValueChanged<int> onTapLine;
   final ValueChanged<String> onCollectWord;
   final void Function(String word, String time)? onCollectWordAtTime;
@@ -572,6 +579,7 @@ class _FullscreenSubtitlePanel extends StatelessWidget {
           subtitleWordHighlightBorderWidth: subtitleWordHighlightBorderWidth,
           savedVocabularyWords: savedVocabularyWords,
           keyVocabularyWords: keyVocabularyWords,
+          chunkHighlighter: chunkHighlighter,
           onTapLine: onTapLine,
           onCollectWord: onCollectWord,
           onCollectWordAtTime: onCollectWordAtTime,

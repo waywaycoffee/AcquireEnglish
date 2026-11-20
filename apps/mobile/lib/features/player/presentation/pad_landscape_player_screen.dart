@@ -75,6 +75,8 @@ import 'widgets/player_top_bar.dart';
 import 'widgets/player_transcript_panel.dart';
 import 'widgets/player_video_panel.dart';
 import 'widgets/pronunciation_assessment_dialog.dart';
+import 'subtitle_chunk_lexicon_provider.dart';
+import 'widgets/subtitle_chunk_highlight.dart';
 import 'widgets/subtitle_vocabulary_highlight.dart';
 
 class PadLandscapePlayerScreen extends ConsumerStatefulWidget {
@@ -632,14 +634,17 @@ class PadLandscapePlayerScreenState
           'ep=${widget.episodeId}',
         );
       }
-      // ASR English + official ZH softsub: merge CC instead of EN→ZH translate.
-      if (isUsableSubtitlePath(zhSub) ||
-          resolvedLines.every(
-            (PlayerSubtitleLine l) => !looksChinese(l.chinese),
-          )) {
+      // ASR English + official ZH softsub: always try merge when ZH is missing.
+      if (!resolvedLines.any(
+        (PlayerSubtitleLine l) => looksChinese(l.chinese),
+      )) {
         String? officialZhPath = isUsableSubtitlePath(zhSub) ? zhSub : null;
         officialZhPath ??= await existingOfficialBilibiliSubtitle(
           idKey: officialSourceKey,
+          fileName: 'zh.srt',
+        );
+        officialZhPath ??= await existingOfficialBilibiliSubtitle(
+          idKey: (officialSourceKey ?? '').toUpperCase(),
           fileName: 'zh.srt',
         );
         if (isUsableSubtitlePath(officialZhPath)) {
@@ -962,22 +967,47 @@ class PadLandscapePlayerScreenState
         print('bilibili.prepare expand pages error: $e');
       }
     }
+    final LibraryCourseData? resolvedCourse = resource.course ?? course;
     final bool isSeason =
-        (resource.course ?? course)?.id.startsWith('bilibili-season-') ?? false;
-    final String? source =
+        resolvedCourse?.id.startsWith('bilibili-season-') ?? false;
+    final String? rawSource =
         bilibiliSourceForEpisode(
-          course: resource.course ?? course,
+          course: resolvedCourse,
           episode: resource.episode,
           videoAsset: resource.videoAsset,
         ) ??
         _bilibiliRecoverSource(resource.videoAsset ?? '') ??
         (isSeason
             ? null
-            : _bilibiliRecoverSource(resource.course?.description ?? ''));
-    if (source == null || source.isEmpty) {
+            : _bilibiliRecoverSource(resolvedCourse?.description ?? ''));
+    if (rawSource == null || rawSource.isEmpty) {
       return const BilibiliEpisodePrepareResult(
         note: '无法识别本集 B 站来源（合集分集需各自 BV）',
       );
+    }
+    String source = rawSource;
+    try {
+      final String repaired = await repairBilibiliSourceCase(
+        service: service,
+        source: source,
+        course: resolvedCourse,
+        episode: resource.episode,
+      );
+      if (repaired != source) {
+        // ignore: avoid_print
+        print(
+          'bilibili.prepare repaired source $source -> $repaired '
+          'ep=${widget.episodeId}',
+        );
+        source = repaired;
+        await _persistBilibiliEpisodeAssets(
+          resource: resource,
+          sourceUrl: repaired,
+        );
+      }
+    } catch (e) {
+      // ignore: avoid_print
+      print('bilibili.prepare source repair error: $e');
     }
     String? currentVideoAsset = resource.videoAsset;
     if (!isUsableLocalVideoPath(currentVideoAsset)) {
@@ -1200,7 +1230,17 @@ class PadLandscapePlayerScreenState
       final BilibiliImportService service = BilibiliImportService.withCookie(
         ref.read(learningSettingsProvider).resolvedBilibiliCookieHeader,
       );
-      final String? cached = await service.findExistingLocalCache(biliSource);
+      final PlayerCourseLookupResult lookup = resolvePlayerCourseForEpisode(
+        courses: ref.read(libraryCatalogProvider),
+        episodeId: widget.episodeId,
+      );
+      final String playSource = await repairBilibiliSourceCase(
+        service: service,
+        source: biliSource,
+        course: lookup.course,
+        episode: lookup.episode,
+      );
+      final String? cached = await service.findExistingLocalCache(playSource);
       if (isUsableLocalVideoPath(cached)) {
         await _persistLocalBilibiliVideo(cached!);
         if (mounted) {
@@ -1210,7 +1250,7 @@ class PadLandscapePlayerScreenState
         return (uri: cached, headers: null);
       }
       final BilibiliPlayableMedia media = await service
-          .resolvePlayableForPlayback(biliSource, onProgress: onProgress);
+          .resolvePlayableForPlayback(playSource, onProgress: onProgress);
       if (media.isLocalFile) {
         await _persistLocalBilibiliVideo(media.uri);
         if (mounted) {
@@ -2568,6 +2608,10 @@ Future<void> _settleChineseFillIfAlreadyPresent() async {
         );
     final Set<String> keyVocabularyWords =
         ref.watch(recommendedWordsProvider);
+    final SubtitleChunkHighlighter? chunkHighlighter = ref
+        .watch(subtitleChunkHighlighterProvider)
+        .asData
+        ?.value;
     final bool canGenerateAiSubtitles =
         (_videoAsset?.isNotEmpty ?? false) && !_usingAiSubtitles;
     final LearningDashboardStats dashboard = ref.watch(
@@ -2672,6 +2716,7 @@ Future<void> _settleChineseFillIfAlreadyPresent() async {
                                   settings.subtitleWordHighlightBorderWidth,
                               savedVocabularyWords: savedVocabularyWords,
                               keyVocabularyWords: keyVocabularyWords,
+                              chunkHighlighter: chunkHighlighter,
                               isShadowing: state.isShadowing,
                               isLooping: state.isLooping,
                               isMuted: _isMuted,
@@ -2798,6 +2843,7 @@ Future<void> _settleChineseFillIfAlreadyPresent() async {
                                       savedVocabularyWords:
                                           savedVocabularyWords,
                                       keyVocabularyWords: keyVocabularyWords,
+                                      chunkHighlighter: chunkHighlighter,
                                       onTapLine: _goToLine,
                                       onCollectWord: (String word) =>
                                           _handleCollectWord(
@@ -2888,6 +2934,7 @@ Future<void> _settleChineseFillIfAlreadyPresent() async {
                                       savedVocabularyWords:
                                           savedVocabularyWords,
                                       keyVocabularyWords: keyVocabularyWords,
+                                      chunkHighlighter: chunkHighlighter,
                                       onTapLine: (_) {},
                                       onCollectWord: (_) {},
                                       onBookmarkLine: (_) {},
@@ -4059,6 +4106,10 @@ Future<void> _settleChineseFillIfAlreadyPresent() async {
         );
     final Set<String> keyVocabularyWords =
         ref.read(recommendedWordsProvider);
+    final SubtitleChunkHighlighter? chunkHighlighter = ref
+        .read(subtitleChunkHighlighterProvider)
+        .asData
+        ?.value;
     final PlayerCourseLookupResult courseContext =
         resolvePlayerCourseForEpisode(
           courses: ref.read(libraryCatalogProvider),
@@ -4081,6 +4132,7 @@ Future<void> _settleChineseFillIfAlreadyPresent() async {
             subtitleWordHighlightBorderWidth: subtitleWordHighlightBorderWidth,
             savedVocabularyWords: savedVocabularyWords,
             keyVocabularyWords: keyVocabularyWords,
+            chunkHighlighter: chunkHighlighter,
             isMuted: _isMuted,
             volumeLevel: _volumeLevel,
             onTogglePlaying: _handleTogglePlaying,

@@ -79,8 +79,10 @@ import 'widgets/ai_grammar_analysis_sheet.dart';
 import 'widgets/ai_subtitle_generation_progress_dialog.dart';
 import 'widgets/hardsub_mosaic_cover.dart';
 import 'widgets/player_subtitle_list.dart';
+import 'subtitle_chunk_lexicon_provider.dart';
 import 'widgets/player_transcript_panel.dart';
 import 'widgets/player_video_panel.dart';
+import 'widgets/subtitle_chunk_highlight.dart';
 import 'widgets/subtitle_vocabulary_highlight.dart';
 import 'widgets/pronunciation_assessment_dialog.dart';
 import 'widgets/study_bottom_controls.dart';
@@ -2854,6 +2856,10 @@ Future<void> _settleChineseFillIfAlreadyPresent() async {
         );
     final Set<String> keyVocabularyWords =
         ref.watch(recommendedWordsProvider);
+    final SubtitleChunkHighlighter? chunkHighlighter = ref
+        .watch(subtitleChunkHighlighterProvider)
+        .asData
+        ?.value;
     final bool canGenerateAiSubtitles =
         (_videoAsset?.isNotEmpty ?? false) && !_usingAiSubtitles;
     if (widget.autoOpenFullscreen &&
@@ -2946,6 +2952,7 @@ Future<void> _settleChineseFillIfAlreadyPresent() async {
                             settings.subtitleWordHighlightBorderWidth,
                           savedVocabularyWords: savedVocabularyWords,
                           keyVocabularyWords: keyVocabularyWords,
+                          chunkHighlighter: chunkHighlighter,
                         isShadowing: state.isShadowing,
                         isLooping: state.isLooping,
                         isMuted: _isMuted,
@@ -3052,6 +3059,7 @@ Future<void> _settleChineseFillIfAlreadyPresent() async {
                           activeLine: activeLine,
                             savedVocabularyWords: savedVocabularyWords,
                             keyVocabularyWords: keyVocabularyWords,
+                            chunkHighlighter: chunkHighlighter,
                         ),
                       ),
                     ),
@@ -3140,6 +3148,7 @@ Future<void> _settleChineseFillIfAlreadyPresent() async {
     required PlayerSubtitleLine activeLine,
     required Set<String> savedVocabularyWords,
     required Set<String> keyVocabularyWords,
+    SubtitleChunkHighlighter? chunkHighlighter,
   }) {
     switch (_studyTab) {
       case StudyModeTab.subtitles:
@@ -3162,6 +3171,7 @@ Future<void> _settleChineseFillIfAlreadyPresent() async {
                 : const <int, List<PlayerSubtitleLine>>{},
             savedVocabularyWords: savedVocabularyWords,
             keyVocabularyWords: keyVocabularyWords,
+            chunkHighlighter: chunkHighlighter,
             onTapLine: _goToLine,
             onCollectWord: (String word) =>
                 _handleCollectWord(word, courseContext),
@@ -3239,6 +3249,7 @@ Future<void> _settleChineseFillIfAlreadyPresent() async {
             subtitleLetterCase: settings.subtitleLetterCase,
             savedVocabularyWords: savedVocabularyWords,
             keyVocabularyWords: keyVocabularyWords,
+            chunkHighlighter: chunkHighlighter,
             onTapLine: (_) {},
             onCollectWord: (_) {},
             onBookmarkLine: (_) {},
@@ -4936,6 +4947,10 @@ Future<void> _settleChineseFillIfAlreadyPresent() async {
         );
     final Set<String> keyVocabularyWords =
         ref.read(recommendedWordsProvider);
+    final SubtitleChunkHighlighter? chunkHighlighter = ref
+        .read(subtitleChunkHighlighterProvider)
+        .asData
+        ?.value;
     final PlayerCourseLookupResult courseContext =
         resolvePlayerCourseForEpisode(
           courses: ref.read(libraryCatalogProvider),
@@ -4958,6 +4973,7 @@ Future<void> _settleChineseFillIfAlreadyPresent() async {
             subtitleWordHighlightBorderWidth: subtitleWordHighlightBorderWidth,
             savedVocabularyWords: savedVocabularyWords,
             keyVocabularyWords: keyVocabularyWords,
+            chunkHighlighter: chunkHighlighter,
             isMuted: _isMuted,
             volumeLevel: _volumeLevel,
             onTogglePlaying: _handleTogglePlaying,
