@@ -24,10 +24,13 @@ import '../../shared/domain/subtitle_letter_case.dart';
 import '../../shared/presentation/pad/app_design_tokens.dart';
 import '../../shared/presentation/pad/pad_scaffold.dart';
 import '../../shared/presentation/pad/pad_top_bar.dart';
+import '../../words/domain/foundation_media.dart';
+import '../../words/presentation/foundation_media_provider.dart';
 import '../../words/presentation/vocabulary_placement_provider.dart';
 import '../../words/domain/word_review_settings.dart';
 import '../../words/presentation/word_review_settings_provider.dart';
 import '../../words/presentation/word_review_settings_sheet.dart';
+import 'foundation_media_video_sheet.dart';
 import '../../authentication/presentation/account_storage.dart';
 import '../../player/domain/pronunciation_assessment.dart';
 import '../../player/presentation/widgets/pronunciation_assessment_dialog.dart';
@@ -255,6 +258,8 @@ class _DailyReviewScreenState extends ConsumerState<DailyReviewScreen>
       }
     });
     final DailyReviewState state = ref.watch(dailyReviewProvider);
+    // Prefetch remote real-person demo media for foundation / phonics books.
+    ref.watch(foundationMediaManifestProvider);
     final List<ReviewSource> sources = _filteredSources();
     final DateTime now = ref.read(reviewClockProvider)();
     if (widget.session) _restoreWordPasses(now);
@@ -265,7 +270,7 @@ class _DailyReviewScreenState extends ConsumerState<DailyReviewScreen>
       showNavigation: !widget.session,
       topBar: PadTopBar(
         title: widget.syllabusOnly
-            ? '考纲词书'
+            ? '学习书库'
             : widget.recommended
             ? '推荐背词'
             : widget.missedOnly
@@ -1535,9 +1540,15 @@ class _DailyReviewScreenState extends ConsumerState<DailyReviewScreen>
                   tooltip: _speaking ? '正在朗读' : '听原句',
                   onPressed: _speaking || source.english.isEmpty
                       ? null
-                      : () => _speak(source.english),
+                      : () => _speakSource(source),
                   icon: const Icon(Icons.volume_up_outlined),
                 ),
+                if (_foundationMediaFor(source)?.hasVideo ?? false)
+                  IconButton(
+                    tooltip: '看真人示范视频',
+                    onPressed: () => unawaited(_openFoundationVideo(source)),
+                    icon: const Icon(Icons.face_retouching_natural_rounded),
+                  ),
                 if (source.episodeId != null)
                   IconButton(
                     tooltip: '回到原视频',
@@ -1562,6 +1573,14 @@ class _DailyReviewScreenState extends ConsumerState<DailyReviewScreen>
                 icon: const Icon(Icons.volume_up_rounded),
                 label: const Text('听示范发音'),
               ),
+              if (_foundationMediaFor(source)?.hasVideo ?? false) ...<Widget>[
+                const SizedBox(height: 10),
+                FilledButton.tonalIcon(
+                  onPressed: () => unawaited(_openFoundationVideo(source)),
+                  icon: const Icon(Icons.videocam_rounded),
+                  label: const Text('看真人示范视频'),
+                ),
+              ],
               const SizedBox(height: 10),
               FilledButton.icon(
                 key: const Key('daily-review-speak-assess'),
@@ -2414,8 +2433,59 @@ class _DailyReviewScreenState extends ConsumerState<DailyReviewScreen>
     unawaited(_speech?.stop());
   }
 
+  FoundationMediaItem? _foundationMediaFor(ReviewSource source) {
+    final AsyncValue<FoundationMediaManifest> async =
+        ref.read(foundationMediaManifestProvider);
+    final FoundationMediaManifest? manifest = async.asData?.value;
+    if (manifest == null) return null;
+    return foundationMediaForReviewKey(manifest, source.key);
+  }
+
+  Future<void> _openFoundationVideo(ReviewSource source) async {
+    final FoundationMediaItem? item = _foundationMediaFor(source);
+    final String? url = item?.videoUrl;
+    if (url == null || url.isEmpty) {
+      _message('暂无真人示范视频，可上传到服务器后自动出现。');
+      return;
+    }
+    await showFoundationMediaVideoSheet(
+      context,
+      title: source.question,
+      videoUrl: url,
+    );
+  }
+
   Future<void> _playWord(ReviewSource source, {bool silent = false}) async {
     final int sequence = _speechSequence;
+    final FoundationMediaItem? foundation = _foundationMediaFor(source);
+    final String? foundationAudio = foundation?.audioUrl;
+    if (foundationAudio != null && foundationAudio.isNotEmpty) {
+      if (!mounted ||
+          sequence != _speechSequence ||
+          _currentKey != source.key ||
+          _speaking) {
+        return;
+      }
+      setState(() => _speaking = true);
+      try {
+        _speech = ref.read(wordPronunciationServiceProvider);
+        await _speech!.speak(
+          source.question,
+          recordedUrl: foundationAudio,
+          allowSynthesisFallback: true,
+        );
+      } catch (_) {
+        if (mounted && sequence == _speechSequence && !silent) {
+          _message('示范音频播放失败。');
+        }
+      } finally {
+        if (mounted && sequence == _speechSequence) {
+          setState(() => _speaking = false);
+        }
+      }
+      return;
+    }
+
     final LearningSettingsState settings = ref.read(learningSettingsProvider);
     final WordLookupEntry? entry = await ref
         .read(wordLookupServiceProvider)
@@ -2428,6 +2498,11 @@ class _DailyReviewScreenState extends ConsumerState<DailyReviewScreen>
       return;
     final String? url = entry?.audioUrl;
     if (url == null) {
+      // Fall back to TTS for foundation / pattern cards without lexicon audio.
+      if (source.key.startsWith('syllabus:')) {
+        await _speak(source.question);
+        return;
+      }
       if (!silent) _message('词库发音暂不可用。');
       return;
     }
@@ -2447,6 +2522,34 @@ class _DailyReviewScreenState extends ConsumerState<DailyReviewScreen>
       if (mounted && sequence == _speechSequence)
         setState(() => _speaking = false);
     }
+  }
+
+  Future<void> _speakSource(ReviewSource source) async {
+    final FoundationMediaItem? foundation = _foundationMediaFor(source);
+    final String? audio = foundation?.audioUrl;
+    if (audio != null && audio.isNotEmpty) {
+      if (_speaking) return;
+      final int sequence = _speechSequence;
+      setState(() => _speaking = true);
+      try {
+        _speech = ref.read(wordPronunciationServiceProvider);
+        await _speech!.speak(
+          source.english.isEmpty ? source.question : source.english,
+          recordedUrl: audio,
+          allowSynthesisFallback: true,
+        );
+      } catch (_) {
+        if (mounted) _message('示范音频播放失败。');
+      } finally {
+        if (mounted && sequence == _speechSequence) {
+          setState(() => _speaking = false);
+        }
+      }
+      return;
+    }
+    await _speak(
+      source.english.isEmpty ? source.question : source.english,
+    );
   }
 
   Future<void> _speak(String text) async {

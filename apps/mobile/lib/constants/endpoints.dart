@@ -79,6 +79,9 @@ class Endpoints {
   static const String netdiskImportSeries = 'api/netdisk/import-series';
   static const String rewardsShare = 'api/rewards/share';
   static const String rewardsPoints = 'api/rewards/points';
+  static const String foundationMediaManifest = 'api/foundation/media/manifest';
+  static const String foundationMediaLookup = 'api/foundation/media/lookup';
+  static const String foundationMediaUpload = 'api/foundation/media/upload';
 
   /// Kept for Dio header compatibility; AcquireEnglish API ignores it.
   static const String apiKey = '';

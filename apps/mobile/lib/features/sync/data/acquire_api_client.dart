@@ -5,6 +5,7 @@ import '../../../constants/endpoints.dart';
 import '../../../data/repository/network_repository.dart';
 import '../../avatar/data/avatar_models.dart';
 import '../../community/data/community_models.dart';
+import '../../words/domain/foundation_media.dart';
 
 final Provider<AcquireApiClient> acquireApiClientProvider =
     Provider<AcquireApiClient>((Ref ref) {
@@ -1438,6 +1439,51 @@ class AcquireApiClient {
       return (data['balance'] as num?)?.toInt() ?? 0;
     }
     return 0;
+  }
+
+  Future<FoundationMediaManifest> foundationMediaManifest({
+    bool refresh = false,
+  }) async {
+    final Response<dynamic> response = await _dio.get(
+      Endpoints.foundationMediaManifest,
+      queryParameters: refresh ? <String, dynamic>{'refresh': true} : null,
+    );
+    final Object? data = response.data;
+    if (data is Map<String, dynamic>) {
+      return FoundationMediaManifest.fromJson(data);
+    }
+    if (data is Map) {
+      return FoundationMediaManifest.fromJson(
+        Map<String, dynamic>.from(data),
+      );
+    }
+    return FoundationMediaManifest.empty;
+  }
+
+  Future<FoundationMediaItem?> foundationMediaLookup({
+    required String bookId,
+    required String key,
+  }) async {
+    try {
+      final Response<dynamic> response = await _dio.get(
+        Endpoints.foundationMediaLookup,
+        queryParameters: <String, dynamic>{
+          'book_id': bookId,
+          'key': key,
+        },
+      );
+      final Object? data = response.data;
+      if (data is Map<String, dynamic>) {
+        return FoundationMediaItem.fromJson(data);
+      }
+      if (data is Map) {
+        return FoundationMediaItem.fromJson(Map<String, dynamic>.from(data));
+      }
+    } on DioException catch (error) {
+      if (error.response?.statusCode == 404) return null;
+      rethrow;
+    }
+    return null;
   }
 
   Future<AcquireShareRewardResult> claimShareReward({

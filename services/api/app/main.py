@@ -1,7 +1,9 @@
 from contextlib import asynccontextmanager
+from pathlib import Path
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 
 from app.config import settings
 from app.database import Base, engine
@@ -18,6 +20,7 @@ from app.routers import (
     courses,
     creators,
     feed,
+    foundation_media,
     imports,
     learning,
     livekit,
@@ -89,6 +92,16 @@ app.include_router(shared_subtitles.router, prefix="/api")
 app.include_router(rewards.router, prefix="/api")
 app.include_router(cosmetics.router, prefix="/api")
 app.include_router(review_sync.router, prefix="/api")
+app.include_router(foundation_media.router, prefix="/api")
+
+# Zero-foundation IPA / phonics real-person media (uploaded, not embedded).
+_foundation_dir = Path(settings.media_cache_dir).expanduser() / "foundation"
+_foundation_dir.mkdir(parents=True, exist_ok=True)
+app.mount(
+    "/media/foundation",
+    StaticFiles(directory=str(_foundation_dir)),
+    name="foundation_media",
+)
 
 
 @app.get("/api/health")

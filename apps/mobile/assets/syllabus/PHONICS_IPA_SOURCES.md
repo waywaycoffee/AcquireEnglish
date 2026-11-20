@@ -13,3 +13,10 @@
 | chunks_phonics_cvc / cvce | SeanMcP/reading | 已归入零基础 |
 
 未内嵌原站整页 HTML/MP3（体积过大）；App 提供可跟读条目 + 原站链接。
+
+## 真人音视频（服务器）
+
+口型 / 真人示范请上传到 API 服务器，由 App 从网络播放：
+
+见 `tools/foundation_media/README.md`  
+接口：`GET /api/foundation/media/manifest` · `POST /api/foundation/media/upload`
