@@ -17,6 +17,7 @@ import 'community_hot_tab.dart';
 import 'community_leaderboard_tab.dart';
 import 'community_people_tab.dart';
 import 'community_provider.dart';
+import 'community_preview_screen.dart';
 
 class CommunityScreen extends ConsumerStatefulWidget {
   const CommunityScreen({super.key});
@@ -72,6 +73,15 @@ class _CommunityScreenState extends ConsumerState<CommunityScreen>
         title: '社区',
         description: '以 B 站视频帖为主：分享、组队、吐槽与互动',
         actions: <Widget>[
+          TextButton.icon(
+            icon: const Icon(Icons.auto_awesome_outlined),
+            label: const Text('社区全景预览'),
+            onPressed: () => Navigator.of(context).push<void>(
+              MaterialPageRoute<void>(
+                builder: (_) => const CommunityPreviewScreen(),
+              ),
+            ),
+          ),
           IconButton(
             tooltip: '刷新',
             onPressed: loggedIn ? () => unawaited(_refreshAll()) : null,
@@ -106,9 +116,7 @@ class _CommunityScreenState extends ConsumerState<CommunityScreen>
                 ),
                 ActionChip(
                   avatar: const Icon(Icons.person_add_alt_1_rounded, size: 18),
-                  label: Text(
-                    '关注博主 · ${preferences.followedCreators.length}',
-                  ),
+                  label: Text('关注博主 · ${preferences.followedCreators.length}'),
                   onPressed: () => Navigator.of(context).push<void>(
                     MaterialPageRoute<void>(
                       builder: (_) => const FollowedCreatorsScreen(),
