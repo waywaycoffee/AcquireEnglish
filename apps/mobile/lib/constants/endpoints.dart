@@ -48,6 +48,8 @@ class Endpoints {
   static const String communityMe = 'api/community/me';
   static const String communityPk = 'api/community/pk';
   static const String communityPkMine = 'api/community/pk/mine';
+  static const String communityReclassifyRequests =
+      'api/community/reclassify-requests';
   static const String health = 'api/health';
   static const String assets = 'api/assets';
   static const String assetsSkus = 'api/assets/skus';

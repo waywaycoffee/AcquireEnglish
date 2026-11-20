@@ -70,7 +70,7 @@ class _CommunityScreenState extends ConsumerState<CommunityScreen>
       showContinueLearning: false,
       topBar: PadTopBar(
         title: '社区',
-        description: '欢迎分享你喜欢的 B 站视频和博主',
+        description: '以 B 站视频帖为主：分享、组队、吐槽与互动',
         actions: <Widget>[
           IconButton(
             tooltip: '刷新',

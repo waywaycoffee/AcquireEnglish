@@ -37,26 +37,40 @@ class CommunityPostDto {
     this.linkUrl,
     this.linkTitle,
     this.linkCover,
+    this.bvid,
+    this.interestTag,
+    this.englishLevel,
+    this.commentCount = 0,
     this.authorLevel,
+    this.bilibiliOpenUrl,
   });
 
-  factory CommunityPostDto.fromJson(Map<String, dynamic> json) =>
-      CommunityPostDto(
-        id: json['id'] as int,
-        kind: (json['kind'] as String?) ?? 'method',
-        title: (json['title'] as String?) ?? '',
-        body: (json['body'] as String?) ?? '',
-        linkUrl: json['link_url'] as String?,
-        linkTitle: json['link_title'] as String?,
-        linkCover: json['link_cover'] as String?,
-        likeCount: (json['like_count'] as num?)?.toInt() ?? 0,
-        likedByMe: json['liked_by_me'] == true,
-        authorName: (json['author_name'] as String?) ?? '学员',
-        authorId: (json['author_id'] as num?)?.toInt() ?? 0,
-        authorLevel: json['author_level'] as String?,
-        createdAt: DateTime.tryParse((json['created_at'] as String?) ?? '') ??
-            DateTime.fromMillisecondsSinceEpoch(0),
-      );
+  factory CommunityPostDto.fromJson(Map<String, dynamic> json) {
+    String kind = (json['kind'] as String?) ?? 'feedback';
+    if (kind == 'share_link') kind = 'share_bilibili';
+    if (kind == 'method' || kind == 'podcast_placeholder') kind = 'feedback';
+    return CommunityPostDto(
+      id: json['id'] as int,
+      kind: kind,
+      title: (json['title'] as String?) ?? '',
+      body: (json['body'] as String?) ?? '',
+      linkUrl: json['link_url'] as String?,
+      linkTitle: json['link_title'] as String?,
+      linkCover: json['link_cover'] as String?,
+      bvid: json['bvid'] as String?,
+      interestTag: json['interest_tag'] as String?,
+      englishLevel: json['english_level'] as String?,
+      likeCount: (json['like_count'] as num?)?.toInt() ?? 0,
+      commentCount: (json['comment_count'] as num?)?.toInt() ?? 0,
+      likedByMe: json['liked_by_me'] == true,
+      authorName: (json['author_name'] as String?) ?? '学员',
+      authorId: (json['author_id'] as num?)?.toInt() ?? 0,
+      authorLevel: json['author_level'] as String?,
+      bilibiliOpenUrl: json['bilibili_open_url'] as String?,
+      createdAt: DateTime.tryParse((json['created_at'] as String?) ?? '') ??
+          DateTime.fromMillisecondsSinceEpoch(0),
+    );
+  }
 
   final int id;
   final String kind;
@@ -65,14 +79,53 @@ class CommunityPostDto {
   final String? linkUrl;
   final String? linkTitle;
   final String? linkCover;
+  final String? bvid;
+  final String? interestTag;
+  final String? englishLevel;
   final int likeCount;
+  final int commentCount;
   final bool likedByMe;
   final String authorName;
   final int authorId;
   final String? authorLevel;
+  final String? bilibiliOpenUrl;
   final DateTime createdAt;
 
-  bool get isShareLink => kind == 'share_link';
+  bool get isShareBilibili => kind == 'share_bilibili';
+  bool get isTeamInvite => kind == 'team_invite';
+  bool get isFeedback => kind == 'feedback';
+}
+
+class CommunityCommentDto {
+  const CommunityCommentDto({
+    required this.id,
+    required this.postId,
+    required this.body,
+    required this.authorName,
+    required this.authorId,
+    required this.createdAt,
+    this.mirroredToBilibili = false,
+  });
+
+  factory CommunityCommentDto.fromJson(Map<String, dynamic> json) =>
+      CommunityCommentDto(
+        id: json['id'] as int,
+        postId: (json['post_id'] as num?)?.toInt() ?? 0,
+        body: (json['body'] as String?) ?? '',
+        authorName: (json['author_name'] as String?) ?? '学员',
+        authorId: (json['author_id'] as num?)?.toInt() ?? 0,
+        mirroredToBilibili: json['mirrored_to_bilibili'] == true,
+        createdAt: DateTime.tryParse((json['created_at'] as String?) ?? '') ??
+            DateTime.fromMillisecondsSinceEpoch(0),
+      );
+
+  final int id;
+  final int postId;
+  final String body;
+  final String authorName;
+  final int authorId;
+  final bool mirroredToBilibili;
+  final DateTime createdAt;
 }
 
 class LeaderboardEntryDto {

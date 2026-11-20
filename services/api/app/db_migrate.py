@@ -15,6 +15,7 @@ async def ensure_schema_columns(conn: AsyncConnection) -> None:
     await _ensure_user_points_columns(conn)
     await _ensure_link_course_series_columns(conn)
     await _ensure_link_course_series_columns(conn)
+    await _ensure_community_post_columns(conn)
 
 
 async def ensure_user_auth_columns(conn: AsyncConnection) -> None:
@@ -150,37 +151,38 @@ async def _ensure_link_course_series_columns(conn: AsyncConnection) -> None:
         pass
 
 
-async def _ensure_link_course_series_columns(conn: AsyncConnection) -> None:
-    existing = await _existing_columns(conn, "user_link_courses")
+async def _ensure_community_post_columns(conn: AsyncConnection) -> None:
+    existing = await _existing_columns(conn, "community_posts")
     if existing is None:
         return
-    if "series_key" not in existing:
-        await conn.execute(
-            text("ALTER TABLE user_link_courses ADD COLUMN series_key VARCHAR(64)")
+    alters: list[tuple[str, str]] = [
+        ("bvid", "ALTER TABLE community_posts ADD COLUMN bvid VARCHAR(32)"),
+        (
+            "interest_tag",
+            "ALTER TABLE community_posts ADD COLUMN interest_tag VARCHAR(32)",
+        ),
+        (
+            "english_level",
+            "ALTER TABLE community_posts ADD COLUMN english_level VARCHAR(16)",
+        ),
+        (
+            "comment_count",
+            "ALTER TABLE community_posts ADD COLUMN comment_count INTEGER DEFAULT 0",
+        ),
+    ]
+    for col, sql in alters:
+        if col not in existing:
+            await conn.execute(text(sql))
+    # Normalize legacy kinds.
+    await conn.execute(
+        text(
+            "UPDATE community_posts SET kind='share_bilibili' "
+            "WHERE kind IN ('share_link')"
         )
-    if "series_title" not in existing:
-        await conn.execute(
-            text("ALTER TABLE user_link_courses ADD COLUMN series_title VARCHAR(512)")
+    )
+    await conn.execute(
+        text(
+            "UPDATE community_posts SET kind='feedback' "
+            "WHERE kind IN ('method', 'podcast_placeholder')"
         )
-    if "episode_index" not in existing:
-        await conn.execute(
-            text("ALTER TABLE user_link_courses ADD COLUMN episode_index INTEGER")
-        )
-    dialect = _dialect_name(conn)
-    try:
-        if dialect == "sqlite":
-            await conn.execute(
-                text(
-                    "CREATE INDEX IF NOT EXISTS ix_user_link_courses_series_key "
-                    "ON user_link_courses (series_key)"
-                )
-            )
-        else:
-            await conn.execute(
-                text(
-                    "CREATE INDEX IF NOT EXISTS ix_user_link_courses_series_key "
-                    "ON user_link_courses (series_key)"
-                )
-            )
-    except Exception:  # noqa: BLE001
-        pass
+    )

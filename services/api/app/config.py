@@ -79,6 +79,8 @@ class Settings(BaseSettings):
     openlist_admin_password: str = ""
     # Public base for OpenList links if different from openlist_base_url (nginx reverse proxy).
     openlist_public_base: str = ""
+    # Optional token for approving community reclassify requests (header X-Community-Admin-Token).
+    community_admin_token: str = ""
 
     def validate_auth_configuration(self) -> None:
         if self.production_mode and (

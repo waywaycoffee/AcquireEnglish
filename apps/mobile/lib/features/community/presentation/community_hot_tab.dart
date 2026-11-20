@@ -39,7 +39,7 @@ class CommunityHotTab extends ConsumerWidget {
               ),
               const SizedBox(height: 4),
               Text(
-                '欢迎在「动态」分享你觉得好听的片子，帮助同学发现好内容。',
+                '欢迎发「分享 B 站视频」帖；点进帖子可评论，授权后还能同步到 B 站。',
                 style: Theme.of(context).textTheme.bodySmall,
               ),
               const SizedBox(height: 8),

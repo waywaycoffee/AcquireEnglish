@@ -50,9 +50,9 @@ async def test_community_feed_seed_and_create_like():
             "/api/community/posts",
             headers=headers,
             json={
-                "kind": "method",
-                "title": "影子跟读打卡",
-                "body": "每天跟读 10 句。",
+                "kind": "feedback",
+                "title": "导入太慢了",
+                "body": "合集导入希望有进度条。",
             },
         )
         assert created.status_code == 201, created.text
@@ -141,22 +141,26 @@ async def test_hot_shares_and_creators():
     async with AsyncClient(transport=transport, base_url="http://test") as client:
         headers = await _login(client, "13900003304")
         url = "https://www.bilibili.com/video/BV1xx411c7mD"
-        await client.post(
+        first = await client.post(
             "/api/community/posts",
             headers=headers,
             json={
-                "kind": "share_link",
-                "title": "分享1",
-                "body": "好片",
+                "kind": "share_bilibili",
+                "title": "分享1 英语新闻",
+                "body": "好片 A2",
                 "link_url": url,
                 "link_title": "好片",
             },
         )
+        assert first.status_code == 201, first.text
+        assert first.json()["interest_tag"]
+        assert first.json()["english_level"]
+        post_id = first.json()["id"]
         await client.post(
             "/api/community/posts",
             headers=headers,
             json={
-                "kind": "share_link",
+                "kind": "share_bilibili",
                 "body": "再推一次",
                 "link_url": url,
             },
@@ -164,6 +168,25 @@ async def test_hot_shares_and_creators():
         hot = await client.get("/api/community/hot-shares", headers=headers)
         assert hot.status_code == 200
         assert any(row["share_count"] >= 2 for row in hot.json())
+
+        comment = await client.post(
+            f"/api/community/posts/{post_id}/comments",
+            headers=headers,
+            json={"body": "一起练！", "mirror_to_bilibili": False},
+        )
+        assert comment.status_code == 201, comment.text
+
+        reclass = await client.post(
+            f"/api/community/posts/{post_id}/reclassify",
+            headers=headers,
+            json={
+                "interest_tag": "news",
+                "english_level": "B1",
+                "reason": "更像新闻",
+            },
+        )
+        assert reclass.status_code == 201, reclass.text
+        assert reclass.json()["status"] == "pending"
 
         await client.put(
             "/api/preferences",
@@ -190,10 +213,22 @@ async def test_hot_shares_and_creators():
             "/api/community/posts",
             headers=headers,
             json={
-                "kind": "share_link",
+                "kind": "share_bilibili",
                 "title": "yt",
                 "link_url": "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
             },
         )
         assert blocked.status_code == 400
         assert "YouTube" in blocked.json()["detail"]
+
+        team = await client.post(
+            "/api/community/posts",
+            headers=headers,
+            json={
+                "kind": "team_invite",
+                "title": "找搭子",
+                "body": "每天精听 20 分钟",
+            },
+        )
+        assert team.status_code == 201, team.text
+        assert team.json()["kind"] == "team_invite"

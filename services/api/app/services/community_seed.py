@@ -47,26 +47,28 @@ async def ensure_community_seed(db: AsyncSession) -> None:
     samples = [
         CommunityPost(
             user_id=seed_user.id,
+            kind="share_bilibili",
+            title="适合精听的新闻短片",
+            body="语速适中，字幕干净，适合 A2–B1。欢迎一起练！",
+            link_url="https://www.bilibili.com/video/BV1GJ411x7h7",
+            link_title="示例分享 · 新闻短片",
+            bvid="BV1GJ411x7h7",
+            interest_tag="news",
+            english_level="B1",
+        ),
+        CommunityPost(
+            user_id=seed_user.id,
+            kind="team_invite",
+            title="找一位 B1 精听搭子",
+            body="每天 20 分钟影子跟读，互相打卡词汇量。欢迎同水平来组队。",
+            english_level="B1",
+            interest_tag="daily",
+        ),
+        CommunityPost(
+            user_id=seed_user.id,
             kind="feedback",
             title="希望导入进度能显示剩余时间",
             body="B 站合集导入时转圈比较久，如果能看到大概剩余时间会安心很多。",
-        ),
-        CommunityPost(
-            user_id=seed_user.id,
-            kind="method",
-            title="我的三遍精听法",
-            body=(
-                "第一遍只听不看字幕，第二遍跟读影子跟读，第三遍收藏生词。"
-                "每天 20 分钟比周末突击更稳。"
-            ),
-        ),
-        CommunityPost(
-            user_id=seed_user.id,
-            kind="share_link",
-            title="适合精听的新闻短片",
-            body="语速适中，字幕干净，适合 A2–B1。",
-            link_url="https://www.bilibili.com/video/BV1GJ411x7h7",
-            link_title="示例分享 · 新闻短片",
         ),
     ]
     for post in samples:

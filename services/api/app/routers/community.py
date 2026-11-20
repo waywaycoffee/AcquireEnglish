@@ -14,27 +14,41 @@ from pydantic import BaseModel, Field
 from sqlalchemy import Select, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.config import settings
 from app.database import get_db
 from app.deps import get_current_user
 from app.followed_creators import parse_followed_creators
 from app.models import (
+    CommunityComment,
     CommunityPost,
     CommunityPostLike,
     CommunityProfile,
+    CommunityReclassifyRequest,
     User,
     UserPreference,
     UserStudyStatsDaily,
     VocabItem,
     VocabPkChallenge,
 )
+from app.services.bilibili_reply import post_video_reply
+from app.services.community_classify import classify_share_text, extract_bvid
 
 router = APIRouter(prefix="/community", tags=["community"])
 
-PostKind = Literal["feedback", "method", "share_link", "podcast_placeholder"]
+PostKind = Literal["team_invite", "share_bilibili", "feedback"]
 LeaderboardMetric = Literal["study_today", "study_week", "vocab"]
 PkStatus = Literal["pending", "completed", "declined"]
 
 _DAY_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
+_LEGACY_KIND = {
+    "share_link": "share_bilibili",
+    "method": "feedback",
+    "podcast_placeholder": "feedback",
+}
+
+
+def _normalize_kind(kind: str) -> str:
+    return _LEGACY_KIND.get(kind, kind)
 
 
 def _public_name(user: User) -> str:
@@ -111,12 +125,17 @@ class CommunityPostOut(BaseModel):
     link_url: str | None = None
     link_title: str | None = None
     link_cover: str | None = None
+    bvid: str | None = None
+    interest_tag: str | None = None
+    english_level: str | None = None
     like_count: int
+    comment_count: int = 0
     liked_by_me: bool = False
     author_name: str
     author_id: int
     author_level: str | None = None
     created_at: datetime
+    bilibili_open_url: str | None = None
 
 
 class CommunityPostCreate(BaseModel):
@@ -126,6 +145,81 @@ class CommunityPostCreate(BaseModel):
     link_url: str | None = Field(default=None, max_length=1024)
     link_title: str | None = Field(default=None, max_length=512)
     link_cover: str | None = Field(default=None, max_length=1024)
+
+
+class CommunityCommentOut(BaseModel):
+    id: int
+    post_id: int
+    body: str
+    author_name: str
+    author_id: int
+    mirrored_to_bilibili: bool = False
+    created_at: datetime
+
+
+class CommunityCommentCreate(BaseModel):
+    body: str = Field(min_length=1, max_length=2000)
+    mirror_to_bilibili: bool = False
+
+
+class ReclassifyRequestIn(BaseModel):
+    interest_tag: str = Field(min_length=1, max_length=32)
+    english_level: str = Field(min_length=1, max_length=16)
+    reason: str = Field(default="", max_length=500)
+
+
+class ReclassifyRequestOut(BaseModel):
+    id: int
+    post_id: int
+    suggested_interest_tag: str
+    suggested_english_level: str
+    reason: str
+    status: str
+    created_at: datetime
+
+
+class ReclassifyReviewIn(BaseModel):
+    approve: bool
+    note: str = Field(default="", max_length=500)
+
+
+def _bilibili_open_url(bvid: str | None, link_url: str | None) -> str | None:
+    if bvid:
+        return f"https://www.bilibili.com/video/{bvid}"
+    if link_url and _host_is_bilibili(urlparse(link_url).netloc.split("@")[-1].split(":")[0]):
+        return link_url
+    return None
+
+
+def _serialize_post(
+    post: CommunityPost,
+    *,
+    author: User | None,
+    author_level: str | None,
+    liked_by_me: bool,
+) -> CommunityPostOut:
+    kind = _normalize_kind(post.kind)
+    bvid = post.bvid or extract_bvid(post.link_url or "")
+    return CommunityPostOut(
+        id=post.id,
+        kind=kind,
+        title=post.title or "",
+        body=post.body or "",
+        link_url=post.link_url,
+        link_title=post.link_title,
+        link_cover=post.link_cover,
+        bvid=bvid,
+        interest_tag=post.interest_tag,
+        english_level=post.english_level,
+        like_count=int(post.like_count or 0),
+        comment_count=int(post.comment_count or 0),
+        liked_by_me=liked_by_me,
+        author_name=_public_name(author) if author else "学员",
+        author_id=post.user_id,
+        author_level=author_level,
+        created_at=post.created_at,
+        bilibili_open_url=_bilibili_open_url(bvid, post.link_url),
+    )
 
 
 class StudyStatsIn(BaseModel):
@@ -330,20 +424,11 @@ async def community_feed(
         author = users.get(post.user_id)
         pref = prefs.get(post.user_id)
         out.append(
-            CommunityPostOut(
-                id=post.id,
-                kind=post.kind,
-                title=post.title or "",
-                body=post.body or "",
-                link_url=post.link_url,
-                link_title=post.link_title,
-                link_cover=post.link_cover,
-                like_count=int(post.like_count or 0),
-                liked_by_me=post.id in liked_ids,
-                author_name=_public_name(author) if author else "学员",
-                author_id=post.user_id,
+            _serialize_post(
+                post,
+                author=author,
                 author_level=pref.level if pref else None,
-                created_at=post.created_at,
+                liked_by_me=post.id in liked_ids,
             )
         )
     return out
@@ -355,41 +440,75 @@ async def create_post(
     db: AsyncSession = Depends(get_db),
     user: User = Depends(get_current_user),
 ) -> CommunityPostOut:
-    if payload.kind == "podcast_placeholder":
-        raise HTTPException(
-            status_code=status.HTTP_501_NOT_IMPLEMENTED,
-            detail="podcast upload coming soon",
-        )
+    kind = payload.kind
     title = (payload.title or "").strip()
     body = (payload.body or "").strip()
     link_url = None
     link_title = payload.link_title
-    if payload.kind == "share_link":
+    bvid: str | None = None
+    interest_tag: str | None = None
+    english_level: str | None = None
+
+    if kind == "share_bilibili":
         if not payload.link_url:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="share_link requires link_url",
+                detail="分享 B 站视频需要填写链接",
             )
         link_url = _normalize_share_link(payload.link_url)
+        bvid = extract_bvid(link_url)
+        if not bvid:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="无法识别 BV 号，请粘贴完整 B 站视频链接",
+            )
         if not link_title:
-            host = urlparse(link_url).netloc or "分享链接"
-            link_title = host
+            link_title = bvid
         if not title:
-            title = "分享了一个学习视频"
-    elif not title and not body:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="title or body required",
+            title = "分享了一个 B 站学习视频"
+        interest_tag, english_level = classify_share_text(
+            title=title, body=body, link_title=link_title or ""
         )
+    elif kind == "team_invite":
+        if not title and not body:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="组队邀请需要标题或内容",
+            )
+        if not title:
+            title = "组队邀请"
+        pref = (
+            await db.execute(
+                select(UserPreference).where(UserPreference.user_id == user.id)
+            )
+        ).scalar_one_or_none()
+        english_level = pref.level if pref else "A2"
+        tags = _parse_tags(pref.tags_json if pref else None)
+        interest_tag = tags[0] if tags else "daily"
+        profile = await _ensure_profile(db, user)
+        profile.looking_for_partner = 1
+    elif kind == "feedback":
+        if not title and not body:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="吐槽需要标题或内容",
+            )
+        if not title:
+            title = "功能吐槽"
+    else:
+        raise HTTPException(status_code=400, detail="unsupported post kind")
 
     post = CommunityPost(
         user_id=user.id,
-        kind=payload.kind,
+        kind=kind,
         title=title,
         body=body,
         link_url=link_url,
         link_title=link_title,
         link_cover=payload.link_cover,
+        bvid=bvid,
+        interest_tag=interest_tag,
+        english_level=english_level,
     )
     db.add(post)
     await db.commit()
@@ -399,20 +518,11 @@ async def create_post(
             select(UserPreference).where(UserPreference.user_id == user.id)
         )
     ).scalar_one_or_none()
-    return CommunityPostOut(
-        id=post.id,
-        kind=post.kind,
-        title=post.title or "",
-        body=post.body or "",
-        link_url=post.link_url,
-        link_title=post.link_title,
-        link_cover=post.link_cover,
-        like_count=0,
-        liked_by_me=False,
-        author_name=_public_name(user),
-        author_id=user.id,
+    return _serialize_post(
+        post,
+        author=user,
         author_level=pref.level if pref else None,
-        created_at=post.created_at,
+        liked_by_me=False,
     )
 
 
@@ -454,20 +564,11 @@ async def like_post(
             select(UserPreference).where(UserPreference.user_id == post.user_id)
         )
     ).scalar_one_or_none()
-    return CommunityPostOut(
-        id=post.id,
-        kind=post.kind,
-        title=post.title or "",
-        body=post.body or "",
-        link_url=post.link_url,
-        link_title=post.link_title,
-        link_cover=post.link_cover,
-        like_count=int(post.like_count or 0),
-        liked_by_me=liked,
-        author_name=_public_name(author) if author else "学员",
-        author_id=post.user_id,
+    return _serialize_post(
+        post,
+        author=author,
         author_level=pref.level if pref else None,
-        created_at=post.created_at,
+        liked_by_me=liked,
     )
 
 
@@ -729,7 +830,7 @@ async def hot_shares(
         await db.execute(
             select(CommunityPost)
             .where(
-                CommunityPost.kind == "share_link",
+                CommunityPost.kind.in_(("share_bilibili", "share_link")),
                 CommunityPost.status == "visible",
                 CommunityPost.link_url.is_not(None),
             )
@@ -937,3 +1038,265 @@ async def my_pk_challenges(
             )
         )
     return out
+
+
+@router.get("/posts/{post_id}/comments", response_model=list[CommunityCommentOut])
+async def list_comments(
+    post_id: int,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(get_current_user),
+) -> list[CommunityCommentOut]:
+    _ = user
+    post = (
+        await db.execute(select(CommunityPost).where(CommunityPost.id == post_id))
+    ).scalar_one_or_none()
+    if post is None or post.status != "visible":
+        raise HTTPException(status_code=404, detail="post not found")
+    rows = (
+        await db.execute(
+            select(CommunityComment)
+            .where(CommunityComment.post_id == post_id)
+            .order_by(CommunityComment.created_at.asc())
+            .limit(100)
+        )
+    ).scalars().all()
+    if not rows:
+        return []
+    users = {
+        u.id: u
+        for u in (
+            await db.execute(
+                select(User).where(User.id.in_({r.user_id for r in rows}))
+            )
+        ).scalars().all()
+    }
+    return [
+        CommunityCommentOut(
+            id=row.id,
+            post_id=row.post_id,
+            body=row.body,
+            author_name=_public_name(users[row.user_id])
+            if row.user_id in users
+            else "学员",
+            author_id=row.user_id,
+            mirrored_to_bilibili=bool(row.mirrored_to_bilibili),
+            created_at=row.created_at,
+        )
+        for row in rows
+    ]
+
+
+@router.post(
+    "/posts/{post_id}/comments",
+    response_model=CommunityCommentOut,
+    status_code=201,
+)
+async def create_comment(
+    post_id: int,
+    payload: CommunityCommentCreate,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(get_current_user),
+) -> CommunityCommentOut:
+    post = (
+        await db.execute(select(CommunityPost).where(CommunityPost.id == post_id))
+    ).scalar_one_or_none()
+    if post is None or post.status != "visible":
+        raise HTTPException(status_code=404, detail="post not found")
+    body = payload.body.strip()
+    if not body:
+        raise HTTPException(status_code=400, detail="empty comment")
+
+    mirrored = 0
+    bili_rpid: str | None = None
+    if payload.mirror_to_bilibili:
+        kind = _normalize_kind(post.kind)
+        bvid = post.bvid or extract_bvid(post.link_url or "")
+        if kind != "share_bilibili" or not bvid:
+            raise HTTPException(
+                status_code=400,
+                detail="仅 B 站视频帖可同步评论到 B 站",
+            )
+        pref = (
+            await db.execute(
+                select(UserPreference).where(UserPreference.user_id == user.id)
+            )
+        ).scalar_one_or_none()
+        cookie = (pref.bilibili_cookie or "").strip() if pref else ""
+        if not cookie:
+            raise HTTPException(
+                status_code=400,
+                detail="请先在设置中授权 B 站 Cookie，再一键同步评论",
+            )
+        result = await post_video_reply(bvid=bvid, message=body, cookie=cookie)
+        if not result.ok:
+            raise HTTPException(status_code=400, detail=f"同步 B 站失败：{result.message}")
+        mirrored = 1
+        bili_rpid = str(result.bili_rpid) if result.bili_rpid else None
+
+    row = CommunityComment(
+        post_id=post_id,
+        user_id=user.id,
+        body=body,
+        mirrored_to_bilibili=mirrored,
+        bili_rpid=bili_rpid,
+    )
+    db.add(row)
+    post.comment_count = int(post.comment_count or 0) + 1
+    await db.commit()
+    await db.refresh(row)
+    return CommunityCommentOut(
+        id=row.id,
+        post_id=row.post_id,
+        body=row.body,
+        author_name=_public_name(user),
+        author_id=user.id,
+        mirrored_to_bilibili=bool(row.mirrored_to_bilibili),
+        created_at=row.created_at,
+    )
+
+
+@router.post(
+    "/posts/{post_id}/reclassify",
+    response_model=ReclassifyRequestOut,
+    status_code=201,
+)
+async def request_reclassify(
+    post_id: int,
+    payload: ReclassifyRequestIn,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(get_current_user),
+) -> ReclassifyRequestOut:
+    post = (
+        await db.execute(select(CommunityPost).where(CommunityPost.id == post_id))
+    ).scalar_one_or_none()
+    if post is None or post.status != "visible":
+        raise HTTPException(status_code=404, detail="post not found")
+    if _normalize_kind(post.kind) != "share_bilibili":
+        raise HTTPException(status_code=400, detail="仅视频分享帖可申请重新归类")
+
+    req = CommunityReclassifyRequest(
+        post_id=post_id,
+        user_id=user.id,
+        suggested_interest_tag=payload.interest_tag.strip().lower(),
+        suggested_english_level=payload.english_level.strip().upper(),
+        reason=(payload.reason or "").strip(),
+        status="pending",
+    )
+    db.add(req)
+    await db.flush()
+
+    # Collaborative auto-approve: 2+ pending votes with the same suggestion.
+    twins = (
+        await db.execute(
+            select(CommunityReclassifyRequest).where(
+                CommunityReclassifyRequest.post_id == post_id,
+                CommunityReclassifyRequest.status == "pending",
+                CommunityReclassifyRequest.suggested_interest_tag
+                == req.suggested_interest_tag,
+                CommunityReclassifyRequest.suggested_english_level
+                == req.suggested_english_level,
+            )
+        )
+    ).scalars().all()
+    if len(twins) >= 2:
+        post.interest_tag = req.suggested_interest_tag
+        post.english_level = req.suggested_english_level
+        now = datetime.now(timezone.utc)
+        for twin in twins:
+            twin.status = "approved"
+            twin.reviewed_at = now
+            twin.reviewed_by = user.id
+
+    await db.commit()
+    await db.refresh(req)
+    return ReclassifyRequestOut(
+        id=req.id,
+        post_id=req.post_id,
+        suggested_interest_tag=req.suggested_interest_tag,
+        suggested_english_level=req.suggested_english_level,
+        reason=req.reason or "",
+        status=req.status,
+        created_at=req.created_at,
+    )
+
+
+@router.get("/reclassify-requests", response_model=list[ReclassifyRequestOut])
+async def list_reclassify_requests(
+    status_filter: str = Query(default="pending", alias="status"),
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(get_current_user),
+) -> list[ReclassifyRequestOut]:
+    _ = user
+    rows = (
+        await db.execute(
+            select(CommunityReclassifyRequest)
+            .where(CommunityReclassifyRequest.status == status_filter)
+            .order_by(CommunityReclassifyRequest.created_at.desc())
+            .limit(100)
+        )
+    ).scalars().all()
+    return [
+        ReclassifyRequestOut(
+            id=r.id,
+            post_id=r.post_id,
+            suggested_interest_tag=r.suggested_interest_tag,
+            suggested_english_level=r.suggested_english_level,
+            reason=r.reason or "",
+            status=r.status,
+            created_at=r.created_at,
+        )
+        for r in rows
+    ]
+
+
+@router.post("/reclassify-requests/{request_id}/review", response_model=ReclassifyRequestOut)
+async def review_reclassify_request(
+    request_id: int,
+    payload: ReclassifyReviewIn,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(get_current_user),
+    admin_token: str | None = Query(default=None),
+) -> ReclassifyRequestOut:
+    expected = (settings.community_admin_token or "").strip()
+    provided = (admin_token or "").strip()
+    if expected and provided != expected:
+        raise HTTPException(status_code=403, detail="admin token required")
+    if not expected:
+        # No admin token configured: allow any logged-in reviewer (MVP ops).
+        pass
+
+    req = (
+        await db.execute(
+            select(CommunityReclassifyRequest).where(
+                CommunityReclassifyRequest.id == request_id
+            )
+        )
+    ).scalar_one_or_none()
+    if req is None:
+        raise HTTPException(status_code=404, detail="request not found")
+    if req.status != "pending":
+        raise HTTPException(status_code=400, detail="already reviewed")
+
+    req.status = "approved" if payload.approve else "rejected"
+    req.reviewed_by = user.id
+    req.reviewed_at = datetime.now(timezone.utc)
+    if payload.approve:
+        post = (
+            await db.execute(
+                select(CommunityPost).where(CommunityPost.id == req.post_id)
+            )
+        ).scalar_one_or_none()
+        if post is not None:
+            post.interest_tag = req.suggested_interest_tag
+            post.english_level = req.suggested_english_level
+    await db.commit()
+    await db.refresh(req)
+    return ReclassifyRequestOut(
+        id=req.id,
+        post_id=req.post_id,
+        suggested_interest_tag=req.suggested_interest_tag,
+        suggested_english_level=req.suggested_english_level,
+        reason=req.reason or "",
+        status=req.status,
+        created_at=req.created_at,
+    )

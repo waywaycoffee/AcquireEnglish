@@ -1616,4 +1616,48 @@ class AcquireApiClient {
         .map(VocabPkDto.fromJson)
         .toList(growable: false);
   }
+
+  Future<List<CommunityCommentDto>> communityComments(int postId) async {
+    final Response<dynamic> response = await _dio.get(
+      '${Endpoints.communityPosts}/$postId/comments',
+      options: _noCache,
+    );
+    return (response.data as List<dynamic>)
+        .cast<Map<String, dynamic>>()
+        .map(CommunityCommentDto.fromJson)
+        .toList(growable: false);
+  }
+
+  Future<CommunityCommentDto> createCommunityComment({
+    required int postId,
+    required String body,
+    bool mirrorToBilibili = false,
+  }) async {
+    final Response<dynamic> response = await _dio.post(
+      '${Endpoints.communityPosts}/$postId/comments',
+      data: <String, dynamic>{
+        'body': body,
+        'mirror_to_bilibili': mirrorToBilibili,
+      },
+      options: _noCache,
+    );
+    return CommunityCommentDto.fromJson(response.data as Map<String, dynamic>);
+  }
+
+  Future<void> requestCommunityReclassify({
+    required int postId,
+    required String interestTag,
+    required String englishLevel,
+    String reason = '',
+  }) async {
+    await _dio.post<Map<String, dynamic>>(
+      '${Endpoints.communityPosts}/$postId/reclassify',
+      data: <String, dynamic>{
+        'interest_tag': interestTag,
+        'english_level': englishLevel,
+        'reason': reason,
+      },
+      options: _noCache,
+    );
+  }
 }

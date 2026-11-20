@@ -390,7 +390,7 @@ class ReviewBackup(Base):
 
 
 class CommunityPost(Base):
-    """User-generated community posts (feedback / method / share_link)."""
+    """User-generated community posts (team_invite / share_bilibili / feedback)."""
 
     __tablename__ = "community_posts"
 
@@ -398,18 +398,67 @@ class CommunityPost(Base):
     user_id: Mapped[int] = mapped_column(
         ForeignKey("users.id", ondelete="CASCADE"), index=True
     )
-    # feedback | method | share_link | podcast_placeholder
+    # team_invite | share_bilibili | feedback
+    # legacy: method | share_link | podcast_placeholder
     kind: Mapped[str] = mapped_column(String(32), index=True)
     title: Mapped[str] = mapped_column(String(200), default="")
     body: Mapped[str] = mapped_column(Text, default="")
     link_url: Mapped[str | None] = mapped_column(String(1024), nullable=True)
     link_title: Mapped[str | None] = mapped_column(String(512), nullable=True)
     link_cover: Mapped[str | None] = mapped_column(String(1024), nullable=True)
+    bvid: Mapped[str | None] = mapped_column(String(32), nullable=True, index=True)
+    interest_tag: Mapped[str | None] = mapped_column(String(32), nullable=True, index=True)
+    english_level: Mapped[str | None] = mapped_column(String(16), nullable=True, index=True)
     like_count: Mapped[int] = mapped_column(Integer, default=0)
+    comment_count: Mapped[int] = mapped_column(Integer, default=0)
     # visible | hidden
     status: Mapped[str] = mapped_column(String(16), default="visible", index=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
+    )
+
+
+class CommunityComment(Base):
+    __tablename__ = "community_comments"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    post_id: Mapped[int] = mapped_column(
+        ForeignKey("community_posts.id", ondelete="CASCADE"), index=True
+    )
+    user_id: Mapped[int] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), index=True
+    )
+    body: Mapped[str] = mapped_column(Text)
+    mirrored_to_bilibili: Mapped[int] = mapped_column(Integer, default=0)
+    bili_rpid: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+
+
+class CommunityReclassifyRequest(Base):
+    __tablename__ = "community_reclassify_requests"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    post_id: Mapped[int] = mapped_column(
+        ForeignKey("community_posts.id", ondelete="CASCADE"), index=True
+    )
+    user_id: Mapped[int] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), index=True
+    )
+    suggested_interest_tag: Mapped[str] = mapped_column(String(32))
+    suggested_english_level: Mapped[str] = mapped_column(String(16))
+    reason: Mapped[str] = mapped_column(Text, default="")
+    # pending | approved | rejected
+    status: Mapped[str] = mapped_column(String(16), default="pending", index=True)
+    reviewed_by: Mapped[int | None] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+    reviewed_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
     )
 
 
