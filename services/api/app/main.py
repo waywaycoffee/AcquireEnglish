@@ -9,6 +9,7 @@ from app.routers import (
     assets,
     auth,
     community,
+    cosmetics,
     courses,
     creators,
     feed,
@@ -40,8 +41,10 @@ async def lifespan(_: FastAPI):
     async with SessionLocal() as session:
         await ensure_default_skus(session)
         from app.services.community_seed import ensure_community_seed
+        from app.services.cosmetics_seed import ensure_cosmetics_catalog
 
         await ensure_community_seed(session)
+        await ensure_cosmetics_catalog(session)
     yield
 
 
@@ -74,6 +77,7 @@ app.include_router(assets.router, prefix="/api")
 app.include_router(netdisk.router, prefix="/api")
 app.include_router(shared_subtitles.router, prefix="/api")
 app.include_router(rewards.router, prefix="/api")
+app.include_router(cosmetics.router, prefix="/api")
 app.include_router(review_sync.router, prefix="/api")
 
 

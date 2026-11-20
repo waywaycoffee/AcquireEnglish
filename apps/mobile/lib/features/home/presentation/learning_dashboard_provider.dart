@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hive_ce/hive.dart';
 
 import '../../authentication/presentation/auth_session.dart';
+import '../../avatar/presentation/avatar_provider.dart';
 import '../../library/presentation/library_catalog_provider.dart';
 import '../../library/presentation/library_mock_data.dart';
 import '../../sync/data/acquire_api_client.dart';
@@ -98,18 +99,45 @@ class LearningActivityNotifier extends Notifier<LearningActivityState> {
     if (duration <= Duration.zero) {
       return;
     }
-    _updateDay(occurredAt ?? DateTime.now(), (LearningDailyRecord record) {
+    final DateTime at = occurredAt ?? DateTime.now();
+    final String dayKey = _dayKey(at);
+    final LearningDailyRecord previous =
+        state.records[dayKey] ?? LearningDailyRecord.empty(dayKey);
+    final int beforeBuckets = previous.studyMilliseconds ~/
+        const Duration(minutes: 10).inMilliseconds;
+    _updateDay(at, (LearningDailyRecord record) {
       return record.copyWith(
         studyMilliseconds: record.studyMilliseconds + duration.inMilliseconds,
       );
     });
+    final LearningDailyRecord next =
+        state.records[dayKey] ?? LearningDailyRecord.empty(dayKey);
+    final int afterBuckets =
+        next.studyMilliseconds ~/ const Duration(minutes: 10).inMilliseconds;
+    if (afterBuckets > beforeBuckets) {
+      for (int n = beforeBuckets + 1; n <= afterBuckets && n <= 5; n++) {
+        unawaited(
+          _earnPoints(
+            reason: 'study_10min',
+            clientEventId: 'study_10min:$dayKey:$n',
+          ),
+        );
+      }
+    }
   }
 
   void recordSentenceStudy({
     required String sentenceKey,
     DateTime? occurredAt,
   }) {
-    _updateDay(occurredAt ?? DateTime.now(), (LearningDailyRecord record) {
+    final DateTime at = occurredAt ?? DateTime.now();
+    final String dayKey = _dayKey(at);
+    final LearningDailyRecord previous =
+        state.records[dayKey] ?? LearningDailyRecord.empty(dayKey);
+    if (previous.learnedSentenceKeys.contains(sentenceKey)) {
+      return;
+    }
+    _updateDay(at, (LearningDailyRecord record) {
       if (record.learnedSentenceKeys.contains(sentenceKey)) {
         return record;
       }
@@ -120,15 +148,30 @@ class LearningActivityNotifier extends Notifier<LearningActivityState> {
         },
       );
     });
+    unawaited(
+      _earnPoints(
+        reason: 'sentence_study',
+        clientEventId: 'sentence_study:$dayKey:$sentenceKey',
+      ),
+    );
   }
 
   void recordShadowingToggle({required bool enabled, DateTime? occurredAt}) {
     if (!enabled) {
       return;
     }
-    _updateDay(occurredAt ?? DateTime.now(), (LearningDailyRecord record) {
+    final DateTime at = occurredAt ?? DateTime.now();
+    final String dayKey = _dayKey(at);
+    _updateDay(at, (LearningDailyRecord record) {
       return record.copyWith(shadowingCount: record.shadowingCount + 1);
     });
+    final int count = state.records[dayKey]?.shadowingCount ?? 0;
+    unawaited(
+      _earnPoints(
+        reason: 'shadowing',
+        clientEventId: 'shadowing:$dayKey:$count',
+      ),
+    );
   }
 
   void recordPhraseSaved({DateTime? occurredAt}) {
@@ -235,6 +278,19 @@ class LearningActivityNotifier extends Notifier<LearningActivityState> {
       _studySyncTimer = null;
       unawaited(_syncStudyStats());
     });
+  }
+
+  Future<void> _earnPoints({
+    required String reason,
+    required String clientEventId,
+  }) async {
+    if (!ref.read(authSessionProvider).isLoggedIn) return;
+    try {
+      await ref.read(avatarMeProvider.notifier).earn(
+            reason: reason,
+            clientEventId: clientEventId,
+          );
+    } catch (_) {}
   }
 
   Future<void> _syncStudyStats() async {

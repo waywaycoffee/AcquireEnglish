@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../avatar/presentation/avatar_provider.dart';
 import '../../shared/presentation/pad/app_design_tokens.dart';
 import '../../sync/data/acquire_api_client.dart';
 
@@ -62,6 +63,12 @@ class _LearningReviewScreenState extends ConsumerState<LearningReviewScreen> {
       await ref.read(acquireApiClientProvider).completeLearningReview(
         reviewId: id,
         independentOk: ok,
+      );
+      unawaited(
+        ref.read(avatarMeProvider.notifier).earn(
+              reason: 'oral_review',
+              clientEventId: 'oral_review:$id',
+            ),
       );
       await _reload();
     } catch (error) {

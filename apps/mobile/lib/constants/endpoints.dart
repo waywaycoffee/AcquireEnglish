@@ -50,6 +50,13 @@ class Endpoints {
   static const String communityPkMine = 'api/community/pk/mine';
   static const String communityReclassifyRequests =
       'api/community/reclassify-requests';
+  static const String cosmeticsBalance = 'api/cosmetics/balance';
+  static const String cosmeticsEarn = 'api/cosmetics/earn';
+  static const String cosmeticsCatalog = 'api/cosmetics/catalog';
+  static const String cosmeticsMe = 'api/cosmetics/me';
+  static const String cosmeticsPurchase = 'api/cosmetics/purchase';
+  static const String cosmeticsEquip = 'api/cosmetics/equip';
+  static const String learningSummary = 'api/learning/summary';
   static const String health = 'api/health';
   static const String assets = 'api/assets';
   static const String assetsSkus = 'api/assets/skus';

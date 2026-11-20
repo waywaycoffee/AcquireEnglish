@@ -37,8 +37,8 @@ enum AppNavDestination {
   review(
     route: '/review',
     label: '复习',
-    title: '每日复习',
-    subtitle: '统一安排收藏的单词和短语，继续未完成的记忆练习。',
+    title: '复习枢纽',
+    subtitle: '视频、单词短语、跟读与口语错题总览，还有形象换装。',
     icon: Icons.event_repeat_outlined,
     activeIcon: Icons.event_repeat_rounded,
   ),

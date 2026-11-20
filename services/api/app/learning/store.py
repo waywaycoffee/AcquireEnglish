@@ -86,7 +86,8 @@ class LearningStore:
                   quote TEXT NOT NULL,
                   suggestion TEXT NOT NULL,
                   reason TEXT NOT NULL,
-                  created_at TEXT NOT NULL
+                  created_at TEXT NOT NULL,
+                  user_id INTEGER
                 );
                 CREATE TABLE IF NOT EXISTS reviews (
                   id TEXT PRIMARY KEY,
@@ -94,7 +95,8 @@ class LearningStore:
                   source_quote TEXT NOT NULL,
                   due_at TEXT NOT NULL,
                   interval_days INTEGER NOT NULL,
-                  status TEXT NOT NULL
+                  status TEXT NOT NULL,
+                  user_id INTEGER
                 );
                 """
             )
@@ -125,6 +127,29 @@ class LearningStore:
                 conn.execute('ALTER TABLE sessions ADD COLUMN user_id INTEGER')
             if 'context_json' not in cols:
                 conn.execute('ALTER TABLE sessions ADD COLUMN context_json TEXT')
+            wrong_cols = {
+                row['name']
+                for row in conn.execute('PRAGMA table_info(wrong_items)').fetchall()
+            }
+            if 'user_id' not in wrong_cols:
+                conn.execute('ALTER TABLE wrong_items ADD COLUMN user_id INTEGER')
+            review_cols = {
+                row['name']
+                for row in conn.execute('PRAGMA table_info(reviews)').fetchall()
+            }
+            if 'user_id' not in review_cols:
+                conn.execute('ALTER TABLE reviews ADD COLUMN user_id INTEGER')
+            # Backfill user_id from owning session when possible.
+            conn.execute(
+                """
+                UPDATE wrong_items
+                SET user_id = (
+                  SELECT sessions.user_id FROM sessions
+                  WHERE sessions.id = wrong_items.session_id
+                )
+                WHERE user_id IS NULL
+                """
+            )
 
     def list_tasks(self) -> list[TaskDefinition]:
         with self._connect() as conn:
@@ -252,8 +277,9 @@ class LearningStore:
             for item in verified:
                 wid = uuid.uuid4().hex
                 conn.execute(
-                    'INSERT INTO wrong_items(id,session_id,quote,suggestion,reason,created_at) '
-                    'VALUES(?,?,?,?,?,?)',
+                    'INSERT INTO wrong_items'
+                    '(id,session_id,quote,suggestion,reason,created_at,user_id) '
+                    'VALUES(?,?,?,?,?,?,?)',
                     (
                         wid,
                         session_id,
@@ -261,11 +287,14 @@ class LearningStore:
                         item.suggestion,
                         item.reason,
                         utcnow().isoformat(),
+                        user_id,
                     ),
                 )
         return verified
 
-    def save_expression_for_review(self, expression: str, source_quote: str) -> ReviewItem:
+    def save_expression_for_review(
+        self, expression: str, source_quote: str, *, user_id: int
+    ) -> ReviewItem:
         rid = uuid.uuid4().hex
         # First review is due immediately; successful complete_review advances SRS.
         due = utcnow()
@@ -278,8 +307,9 @@ class LearningStore:
         )
         with self._connect() as conn:
             conn.execute(
-                'INSERT INTO reviews(id,expression,source_quote,due_at,interval_days,status) '
-                'VALUES(?,?,?,?,?,?)',
+                'INSERT INTO reviews'
+                '(id,expression,source_quote,due_at,interval_days,status,user_id) '
+                'VALUES(?,?,?,?,?,?,?)',
                 (
                     item.id,
                     item.expression,
@@ -287,16 +317,18 @@ class LearningStore:
                     item.due_at.isoformat(),
                     item.interval_days,
                     item.status,
+                    user_id,
                 ),
             )
         return item
 
-    def due_reviews(self) -> list[ReviewItem]:
+    def due_reviews(self, *, user_id: int) -> list[ReviewItem]:
         now = utcnow().isoformat()
         with self._connect() as conn:
             rows = conn.execute(
-                "SELECT * FROM reviews WHERE status='pending' AND due_at<=? ORDER BY due_at",
-                (now,),
+                "SELECT * FROM reviews WHERE status='pending' AND due_at<=? "
+                "AND user_id=? ORDER BY due_at",
+                (now, user_id),
             ).fetchall()
         return [
             ReviewItem(
@@ -310,13 +342,18 @@ class LearningStore:
             for r in rows
         ]
 
-    def complete_review(self, review_id: str, *, independent_ok: bool) -> None:
+    def complete_review(
+        self, review_id: str, *, user_id: int, independent_ok: bool
+    ) -> None:
         """On independent success: 1d → 3d → 7d. Otherwise keep pending with +1d."""
         with self._connect() as conn:
             row = conn.execute(
-                'SELECT interval_days FROM reviews WHERE id=?', (review_id,)
+                'SELECT interval_days, user_id FROM reviews WHERE id=?', (review_id,)
             ).fetchone()
             if row is None:
+                raise KeyError(review_id)
+            owner = row['user_id']
+            if owner is not None and int(owner) != int(user_id):
                 raise KeyError(review_id)
             interval = int(row['interval_days'])
             if independent_ok:
@@ -333,9 +370,29 @@ class LearningStore:
                     (due.isoformat(), review_id),
                 )
 
-    def list_wrong_items(self, limit: int = 50) -> list[dict]:
+    def list_wrong_items(self, *, user_id: int, limit: int = 50) -> list[dict]:
         with self._connect() as conn:
             rows = conn.execute(
-                'SELECT * FROM wrong_items ORDER BY created_at DESC LIMIT ?', (limit,)
+                'SELECT * FROM wrong_items WHERE user_id=? '
+                'ORDER BY created_at DESC LIMIT ?',
+                (user_id, limit),
             ).fetchall()
         return [dict(r) for r in rows]
+
+    def count_wrong_items(self, *, user_id: int) -> int:
+        with self._connect() as conn:
+            row = conn.execute(
+                'SELECT COUNT(*) AS c FROM wrong_items WHERE user_id=?',
+                (user_id,),
+            ).fetchone()
+        return int(row['c'] if row else 0)
+
+    def count_due_reviews(self, *, user_id: int) -> int:
+        now = utcnow().isoformat()
+        with self._connect() as conn:
+            row = conn.execute(
+                "SELECT COUNT(*) AS c FROM reviews WHERE status='pending' "
+                "AND due_at<=? AND user_id=?",
+                (now, user_id),
+            ).fetchone()
+        return int(row['c'] if row else 0)

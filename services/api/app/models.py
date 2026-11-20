@@ -516,6 +516,90 @@ class CommunityProfile(Base):
     )
 
 
+class UserReviewPoints(Base):
+    """Spendable review points for avatar cosmetics (separate from share points)."""
+
+    __tablename__ = "user_review_points"
+
+    user_id: Mapped[int] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), primary_key=True
+    )
+    balance: Mapped[int] = mapped_column(Integer, default=0)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
+
+
+class ReviewPointsLedger(Base):
+    __tablename__ = "review_points_ledger"
+    __table_args__ = (
+        UniqueConstraint("user_id", "client_event_id", name="uq_review_points_event"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    user_id: Mapped[int] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), index=True
+    )
+    delta: Mapped[int] = mapped_column(Integer)
+    reason: Mapped[str] = mapped_column(String(64), index=True)
+    client_event_id: Mapped[str] = mapped_column(String(128), index=True)
+    meta_json: Mapped[str] = mapped_column(Text, default="{}")
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+
+
+class CosmeticItem(Base):
+    __tablename__ = "cosmetic_items"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    sku: Mapped[str] = mapped_column(String(64), unique=True, index=True)
+    # body | hair | top | bottom | accessory | bg
+    slot: Mapped[str] = mapped_column(String(24), index=True)
+    title: Mapped[str] = mapped_column(String(120))
+    price_points: Mapped[int] = mapped_column(Integer, default=0)
+    asset_key: Mapped[str] = mapped_column(String(120), default="")
+    preview_url: Mapped[str | None] = mapped_column(String(512), nullable=True)
+    active: Mapped[int] = mapped_column(Integer, default=1)
+    sort_order: Mapped[int] = mapped_column(Integer, default=0)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+
+
+class UserCosmeticInventory(Base):
+    __tablename__ = "user_cosmetic_inventory"
+    __table_args__ = (
+        UniqueConstraint("user_id", "sku", name="uq_user_cosmetic_sku"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    user_id: Mapped[int] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), index=True
+    )
+    sku: Mapped[str] = mapped_column(String(64), index=True)
+    acquired_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+
+
+class UserAvatarLoadout(Base):
+    __tablename__ = "user_avatar_loadout"
+    __table_args__ = (
+        UniqueConstraint("user_id", "slot", name="uq_user_avatar_slot"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    user_id: Mapped[int] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), index=True
+    )
+    slot: Mapped[str] = mapped_column(String(24))
+    sku: Mapped[str] = mapped_column(String(64))
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
+
+
 class VocabPkChallenge(Base):
     __tablename__ = "vocab_pk_challenges"
 

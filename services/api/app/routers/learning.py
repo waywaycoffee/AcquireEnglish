@@ -131,13 +131,26 @@ async def finalize_feedback(
 
 
 @router.get("/wrong-items")
-async def wrong_items(_: User = Depends(get_current_user)) -> list[dict]:
-    return get_store().list_wrong_items()
+async def wrong_items(user: User = Depends(get_current_user)) -> list[dict]:
+    return get_store().list_wrong_items(user_id=user.id)
+
+
+@router.get("/summary")
+async def learning_summary(user: User = Depends(get_current_user)) -> dict:
+    store = get_store()
+    return {
+        "wrong_item_count": store.count_wrong_items(user_id=user.id),
+        "due_review_count": store.count_due_reviews(user_id=user.id),
+    }
 
 
 @router.post("/reviews")
-async def save_review(body: ReviewSaveIn, _: User = Depends(get_current_user)) -> dict:
-    item = get_store().save_expression_for_review(body.expression, body.source_quote)
+async def save_review(
+    body: ReviewSaveIn, user: User = Depends(get_current_user)
+) -> dict:
+    item = get_store().save_expression_for_review(
+        body.expression, body.source_quote, user_id=user.id
+    )
     return {
         "id": item.id,
         "due_at": item.due_at.isoformat(),
@@ -146,7 +159,7 @@ async def save_review(body: ReviewSaveIn, _: User = Depends(get_current_user)) -
 
 
 @router.get("/reviews/due")
-async def due_reviews(_: User = Depends(get_current_user)) -> list[dict]:
+async def due_reviews(user: User = Depends(get_current_user)) -> list[dict]:
     return [
         {
             "id": r.id,
@@ -155,7 +168,7 @@ async def due_reviews(_: User = Depends(get_current_user)) -> list[dict]:
             "due_at": r.due_at.isoformat(),
             "interval_days": r.interval_days,
         }
-        for r in get_store().due_reviews()
+        for r in get_store().due_reviews(user_id=user.id)
     ]
 
 
@@ -163,10 +176,12 @@ async def due_reviews(_: User = Depends(get_current_user)) -> list[dict]:
 async def complete_review(
     review_id: str,
     body: ReviewCompleteIn,
-    _: User = Depends(get_current_user),
+    user: User = Depends(get_current_user),
 ) -> dict:
     try:
-        get_store().complete_review(review_id, independent_ok=body.independent_ok)
+        get_store().complete_review(
+            review_id, user_id=user.id, independent_ok=body.independent_ok
+        )
     except KeyError:
         raise HTTPException(404, "review not found") from None
     return {"ok": True}

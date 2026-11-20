@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../constants/endpoints.dart';
 import '../../../data/repository/network_repository.dart';
+import '../../avatar/data/avatar_models.dart';
 import '../../community/data/community_models.dart';
 
 final Provider<AcquireApiClient> acquireApiClientProvider =
@@ -1676,6 +1677,67 @@ class AcquireApiClient {
         'reason': reason,
       },
       options: _noCache,
+    );
+  }
+
+  Future<AvatarMeDto> cosmeticsMe() async {
+    final Response<dynamic> response = await _dio.get(
+      Endpoints.cosmeticsMe,
+      options: _noCache,
+    );
+    return AvatarMeDto.fromJson(response.data as Map<String, dynamic>);
+  }
+
+  Future<ReviewPointsEarnResult> earnReviewPoints({
+    required String reason,
+    required String clientEventId,
+  }) async {
+    final Response<dynamic> response = await _dio.post(
+      Endpoints.cosmeticsEarn,
+      data: <String, dynamic>{
+        'reason': reason,
+        'client_event_id': clientEventId,
+      },
+      options: _noCache,
+    );
+    return ReviewPointsEarnResult.fromJson(
+      response.data as Map<String, dynamic>,
+    );
+  }
+
+  Future<AvatarMeDto> purchaseCosmetic(String sku) async {
+    final Response<dynamic> response = await _dio.post(
+      Endpoints.cosmeticsPurchase,
+      data: <String, dynamic>{'sku': sku},
+      options: _noCache,
+    );
+    return AvatarMeDto.fromJson(response.data as Map<String, dynamic>);
+  }
+
+  Future<AvatarMeDto> equipCosmetic({
+    required String slot,
+    String? sku,
+  }) async {
+    final Response<dynamic> response = await _dio.put(
+      Endpoints.cosmeticsEquip,
+      data: <String, dynamic>{
+        'slot': slot,
+        'sku': sku,
+      },
+      options: _noCache,
+    );
+    return AvatarMeDto.fromJson(response.data as Map<String, dynamic>);
+  }
+
+  Future<({int wrongItemCount, int dueReviewCount})> learningSummary() async {
+    final Response<dynamic> response = await _dio.get(
+      Endpoints.learningSummary,
+      options: _noCache,
+    );
+    final Map<String, dynamic> body = response.data as Map<String, dynamic>;
+    return (
+      wrongItemCount: (body['wrong_item_count'] as num?)?.toInt() ?? 0,
+      dueReviewCount: (body['due_review_count'] as num?)?.toInt() ?? 0,
     );
   }
 }

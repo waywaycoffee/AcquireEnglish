@@ -9,6 +9,7 @@ import 'package:hive_ce/hive.dart';
 
 import '../../authentication/presentation/account_storage.dart';
 import '../../authentication/presentation/auth_session.dart';
+import '../../avatar/presentation/avatar_provider.dart';
 import '../../phrases/presentation/phrase_book_provider.dart';
 import '../../sync/data/acquire_api_client.dart';
 import '../../words/presentation/vocabulary_placement_provider.dart';
@@ -500,6 +501,7 @@ class DailyReviewNotifier extends Notifier<DailyReviewState> {
       await missed.markMissed(key);
     } else if (rating == fsrs.Rating.good || rating == fsrs.Rating.easy) {
       await missed.clearKey(key);
+      unawaited(_earnReviewPoints(key: key, rating: rating));
     }
     // Keep the words-page streak in sync with the authoritative FSRS path.
     await ref.read(wordBookProvider.notifier).bumpReviewStreak();
@@ -530,5 +532,25 @@ class DailyReviewNotifier extends Notifier<DailyReviewState> {
             lapseCount: record.lapses,
           ),
         );
+  }
+
+  Future<void> _earnReviewPoints({
+    required String key,
+    required fsrs.Rating rating,
+  }) async {
+    if (!ref.read(authSessionProvider).isLoggedIn) return;
+    final String reason =
+        rating == fsrs.Rating.easy ? 'fsrs_easy' : 'fsrs_good';
+    final String day = reviewDayKey(ref.read(reviewClockProvider)());
+    final String digest = sha1.convert(utf8.encode('$reason:$key:$day')).toString();
+    final AvatarMeNotifier avatar = ref.read(avatarMeProvider.notifier);
+    await avatar.earn(
+      reason: reason,
+      clientEventId: 'fsrs:$digest',
+    );
+    await avatar.earn(
+      reason: 'daily_review_checkin',
+      clientEventId: 'daily_review_checkin:$day',
+    );
   }
 }
