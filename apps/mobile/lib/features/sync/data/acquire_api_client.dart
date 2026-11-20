@@ -1042,6 +1042,11 @@ class AcquireApiClient {
     return (response.data as List<dynamic>).cast<Map<String, dynamic>>();
   }
 
+  Future<List<Map<String, dynamic>>> listAssetOrders() async {
+    final Response<dynamic> response = await _dio.get(Endpoints.assetsOrders);
+    return (response.data as List<dynamic>).cast<Map<String, dynamic>>();
+  }
+
   Future<Map<String, dynamic>> createAssetOrder({
     required List<({String skuCode, int quantity})> items,
     String provider = 'wechat',

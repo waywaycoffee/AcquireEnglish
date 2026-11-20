@@ -25,6 +25,7 @@ import '../features/words/presentation/sm2_daily_session_screen.dart';
 import '../features/words/presentation/words_screen.dart';
 import '../features/words/presentation/vocabulary_placement_screen.dart';
 import 'fade_extension.dart';
+import '../features/membership/presentation/membership_screen.dart';
 
 part 'app_router.g.dart';
 
@@ -43,6 +44,7 @@ enum SGRoute {
   learningReview,
   guide,
   settings,
+  membership,
   importCourse,
   login,
   loginPhone,
@@ -78,6 +80,10 @@ enum SGRoute {
 GoRouter goRouter(Ref ref) => GoRouter(
   initialLocation: SGRoute.home.route,
   routes: <GoRoute>[
+    GoRoute(
+      path: SGRoute.membership.route,
+      builder: (context, state) => const MembershipScreen(),
+    ).fade(),
     GoRoute(
       path: SGRoute.login.route,
       builder: (BuildContext context, GoRouterState state) {

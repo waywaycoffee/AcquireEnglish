@@ -97,6 +97,16 @@ class SettingsScreen extends ConsumerWidget {
             ),
           ),
           SizedBox(height: context.padSectionGap),
+          Card(
+            child: ListTile(
+              leading: const Icon(Icons.workspace_premium_rounded),
+              title: const Text('Pro 会员中心'),
+              subtitle: const Text('会员状态 · 权益套餐 · 微信支付 · 我的订单'),
+              trailing: const Icon(Icons.chevron_right),
+              onTap: () => context.push(SGRoute.membership.route),
+            ),
+          ),
+          SizedBox(height: context.padSectionGap),
           SettingsGroupCard(
             title: '爱快账号',
             icon: Icons.person_rounded,

@@ -10,6 +10,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
+from app.config import settings
 from app.database import get_db
 from app.deps import get_current_user
 from app.models import Order, ProductSku, User
@@ -125,6 +126,8 @@ async def grant_entitlement(
     db: AsyncSession = Depends(get_db),
 ) -> EntitlementOut:
     """Grant/upsert an entitlement for the current user (ops / promo / mock pay)."""
+    if settings.production_mode:
+        raise HTTPException(status_code=403, detail="manual_grant_disabled")
     row = await assets_svc.grant_entitlement(
         db,
         user.id,
@@ -160,6 +163,22 @@ async def consume_entitlement(
             detail=str(exc),
         ) from exc
     return EntitlementOut.model_validate(row)
+
+
+@router.get("/orders", response_model=list[OrderOut])
+async def list_orders(
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> list[OrderOut]:
+    result = await db.execute(
+        select(Order).where(Order.user_id == user.id)
+        .options(selectinload(Order.items)).order_by(Order.id.desc()).limit(50)
+    )
+    orders = result.scalars().all()
+    sku_ids = {item.sku_id for order in orders for item in order.items}
+    skus = await db.execute(select(ProductSku).where(ProductSku.id.in_(sku_ids)))
+    by_id = {sku.id: sku for sku in skus.scalars().all()}
+    return [_order_out(order, by_id) for order in orders]
 
 
 @router.post("/orders", response_model=OrderOut, status_code=status.HTTP_201_CREATED)
@@ -198,6 +217,8 @@ async def mark_order_paid(
     db: AsyncSession = Depends(get_db),
 ) -> OrderOut:
     """Mock / manual payment fulfillment — grants entitlements from order items."""
+    if settings.production_mode:
+        raise HTTPException(status_code=403, detail="manual_payment_disabled")
     result = await db.execute(
         select(Order)
         .where(Order.id == order_id, Order.user_id == user.id)
@@ -337,6 +358,16 @@ async def wechat_pay_notify(
         )
 
     if trade_state == "SUCCESS":
+        amount = decrypted.get("amount") or {}
+        if (
+            order.provider != "wechat"
+            or order.provider_ref != out_trade_no
+            or decrypted.get("appid") != settings.wechat_app_id
+            or decrypted.get("mchid") != settings.wechat_mch_id
+            or amount.get("total") != order.amount_cents
+            or amount.get("currency") != order.currency
+        ):
+            return JSONResponse(status_code=400, content={"code": "FAIL", "message": "payment_mismatch"})
         if order.status != "paid":
             order.provider = "wechat"
             order.provider_ref = out_trade_no or order.provider_ref

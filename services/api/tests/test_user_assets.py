@@ -123,3 +123,62 @@ async def test_order_mark_paid_grants_minutes_and_credits():
             if e["asset_kind"] == "digital_human_quota"
         ]
         assert dh and dh[0]["quantity"] == 30
+
+
+@pytest.mark.asyncio
+async def test_order_history_is_owned_and_authenticated():
+    async with AsyncClient(transport=ASGITransport(app=fastapi_app), base_url="http://test") as client:
+        assert (await client.get("/api/assets/orders")).status_code == 401
+        owner = {"Authorization": f"Bearer {await _sms_token(client, '13900006666')}"}
+        other = {"Authorization": f"Bearer {await _sms_token(client, '13900007777')}"}
+        created = await client.post("/api/assets/orders", headers=owner, json={
+            "provider": "wechat", "items": [{"sku_code": "membership.pro.monthly", "quantity": 1}],
+        })
+        assert created.status_code == 201
+        history = await client.get("/api/assets/orders", headers=owner)
+        assert history.status_code == 200
+        assert history.json()[0]["id"] == created.json()["id"]
+        assert history.json()[0]["amount_cents"] == 2800
+        assert (await client.get("/api/assets/orders", headers=other)).json() == []
+
+
+@pytest.mark.asyncio
+async def test_production_disables_self_grant_and_manual_payment(monkeypatch):
+    from app.config import settings
+    async with AsyncClient(transport=ASGITransport(app=fastapi_app), base_url="http://test") as client:
+        headers = {"Authorization": f"Bearer {await _sms_token(client)}"}
+        monkeypatch.setattr(settings, "production_mode", True)
+        grant = await client.post("/api/assets/entitlements/grant", headers=headers, json={
+            "asset_kind": "membership", "asset_ref": "pro", "duration_days": 30,
+        })
+        assert grant.status_code == 403
+        paid = await client.post("/api/assets/orders/1/mark-paid", headers=headers)
+        assert paid.status_code == 403
+
+
+@pytest.mark.asyncio
+async def test_payment_callback_rejects_wrong_amount(monkeypatch):
+    from app.config import settings
+    from app.routers import assets
+    from app.services.wechat_pay import build_out_trade_no
+    from app.models import Order
+    async with AsyncClient(transport=ASGITransport(app=fastapi_app), base_url="http://test") as client:
+        headers = {"Authorization": f"Bearer {await _sms_token(client)}"}
+        created = await client.post("/api/assets/orders", headers=headers, json={
+            "provider": "wechat", "items": [{"sku_code": "membership.pro.monthly", "quantity": 1}],
+        })
+        order_id = created.json()["id"]
+        trade_no = build_out_trade_no(order_id)
+        async with SessionLocal() as db:
+            order = await db.get(Order, order_id)
+            order.provider_ref = trade_no
+            await db.commit()
+        monkeypatch.setattr(assets, "decrypt_resource", lambda _: {
+            "trade_state": "SUCCESS", "out_trade_no": trade_no,
+            "appid": settings.wechat_app_id, "mchid": settings.wechat_mch_id,
+            "amount": {"total": 1, "currency": "CNY"},
+        })
+        response = await client.post("/api/assets/wechat/notify", json={"resource": {}})
+        assert response.status_code == 400
+        history = await client.get("/api/assets/orders", headers=headers)
+        assert history.json()[0]["status"] == "pending"
