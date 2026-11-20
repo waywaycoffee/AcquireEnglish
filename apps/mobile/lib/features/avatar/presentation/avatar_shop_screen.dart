@@ -3,6 +3,8 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../shared/presentation/pad/app_design_tokens.dart';
+import '../../shared/presentation/pad/hub_ui.dart';
 import '../data/avatar_models.dart';
 import 'avatar_preview.dart';
 import 'avatar_provider.dart';
@@ -14,9 +16,7 @@ class AvatarShopScreen extends ConsumerStatefulWidget {
   ConsumerState<AvatarShopScreen> createState() => _AvatarShopScreenState();
 }
 
-class _AvatarShopScreenState extends ConsumerState<AvatarShopScreen>
-    with SingleTickerProviderStateMixin {
-  late final TabController _tabs;
+class _AvatarShopScreenState extends ConsumerState<AvatarShopScreen> {
   static const List<String> _slots = <String>[
     'hair',
     'top',
@@ -32,82 +32,135 @@ class _AvatarShopScreenState extends ConsumerState<AvatarShopScreen>
     'bg': '背景',
   };
 
-  @override
-  void initState() {
-    super.initState();
-    _tabs = TabController(length: _slots.length, vsync: this);
-  }
-
-  @override
-  void dispose() {
-    _tabs.dispose();
-    super.dispose();
-  }
+  String _slot = 'hair';
 
   @override
   Widget build(BuildContext context) {
     final AsyncValue<AvatarMeDto> async = ref.watch(avatarMeProvider);
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('衣柜商城'),
-        bottom: TabBar(
-          controller: _tabs,
-          isScrollable: true,
-          tabs: <Tab>[
-            for (final String slot in _slots) Tab(text: _labels[slot] ?? slot),
-          ],
-        ),
-      ),
-      body: async.when(
-        loading: () => const Center(child: CircularProgressIndicator()),
-        error: (Object e, StackTrace st) => Center(child: Text('加载失败：$e')),
-        data: (AvatarMeDto me) {
-          return Column(
-            children: <Widget>[
-              Padding(
-                padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
-                child: Row(
-                  children: <Widget>[
-                    AvatarPreview(loadout: me.loadout, height: 140),
-                    const SizedBox(width: 16),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: <Widget>[
-                          Text(
-                            '复习积分 ${me.balance}',
-                            style: Theme.of(context).textTheme.titleLarge,
+      backgroundColor: AppDesignTokens.softWhite,
+      body: SafeArea(
+        child: async.when(
+          loading: () => const Center(child: CircularProgressIndicator()),
+          error: (Object e, StackTrace st) => Center(child: Text('加载失败：$e')),
+          data: (AvatarMeDto me) {
+            final List<CosmeticItemDto> items = me.catalog
+                .where((CosmeticItemDto i) => i.slot == _slot)
+                .toList(growable: false);
+            return Column(
+              children: <Widget>[
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(12, 8, 16, 0),
+                  child: Row(
+                    children: <Widget>[
+                      IconButton(
+                        onPressed: () => Navigator.of(context).maybePop(),
+                        style: IconButton.styleFrom(
+                          backgroundColor: AppDesignTokens.appWhite,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(14),
                           ),
-                          const SizedBox(height: 6),
-                          const Text(
-                            '完成复习、跟读与口语纠错可获得积分，用来换装扮。',
-                            style: TextStyle(height: 1.4),
+                        ),
+                        icon: const Icon(Icons.arrow_back_rounded),
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        '衣柜商城',
+                        style: TextStyle(
+                          fontSize: 24,
+                          fontWeight: FontWeight.w900,
+                          color: AppDesignTokens.textPrimary,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Expanded(
+                  child: ListView(
+                    padding: const EdgeInsets.fromLTRB(16, 12, 16, 28),
+                    children: <Widget>[
+                      HubSurface(
+                        child: Row(
+                          children: <Widget>[
+                            AvatarPreview(loadout: me.loadout, height: 150),
+                            const SizedBox(width: 14),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: <Widget>[
+                                  Text(
+                                    '复习积分 ${me.balance}',
+                                    style: TextStyle(
+                                      fontSize: 22,
+                                      fontWeight: FontWeight.w900,
+                                      color: AppDesignTokens.textPrimary,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 8),
+                                  Text(
+                                    '完成复习、跟读与口语纠错可获得积分',
+                                    style: TextStyle(
+                                      fontSize: 13,
+                                      height: 1.35,
+                                      fontWeight: FontWeight.w600,
+                                      color: AppDesignTokens.textSecondary,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 14),
+                      SingleChildScrollView(
+                        scrollDirection: Axis.horizontal,
+                        child: Row(
+                          children: <Widget>[
+                            for (final String slot in _slots) ...<Widget>[
+                              HubPill(
+                                label: _labels[slot] ?? slot,
+                                selected: _slot == slot,
+                                onTap: () => setState(() => _slot = slot),
+                              ),
+                              const SizedBox(width: 8),
+                            ],
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 14),
+                      if (items.isEmpty)
+                        HubSurface(
+                          child: Text(
+                            '暂无该分类装扮',
+                            style: TextStyle(
+                              color: AppDesignTokens.textSecondary,
+                              fontWeight: FontWeight.w600,
+                            ),
                           ),
+                        )
+                      else
+                        for (final CosmeticItemDto item in items) ...<Widget>[
+                          _ShopItemRow(
+                            item: item,
+                            owned: item.owned ||
+                                me.inventory.contains(item.sku) ||
+                                item.pricePoints == 0,
+                            equipped: me.loadout[_slot] == item.sku,
+                            onBuy: () => unawaited(_buy(item.sku)),
+                            onEquip: () => unawaited(
+                              _equip(slot: _slot, sku: item.sku),
+                            ),
+                          ),
+                          const SizedBox(height: 10),
                         ],
-                      ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
-              ),
-              const Divider(height: 1),
-              Expanded(
-                child: TabBarView(
-                  controller: _tabs,
-                  children: <Widget>[
-                    for (final String slot in _slots)
-                      _SlotList(
-                        slot: slot,
-                        me: me,
-                        onBuy: (String sku) => unawaited(_buy(sku)),
-                        onEquip: (String sku) =>
-                            unawaited(_equip(slot: slot, sku: sku)),
-                      ),
-                  ],
-                ),
-              ),
-            ],
-          );
-        },
+              ],
+            );
+          },
+        ),
       ),
     );
   }
@@ -139,62 +192,89 @@ class _AvatarShopScreenState extends ConsumerState<AvatarShopScreen>
   }
 }
 
-class _SlotList extends StatelessWidget {
-  const _SlotList({
-    required this.slot,
-    required this.me,
+class _ShopItemRow extends StatelessWidget {
+  const _ShopItemRow({
+    required this.item,
+    required this.owned,
+    required this.equipped,
     required this.onBuy,
     required this.onEquip,
   });
 
-  final String slot;
-  final AvatarMeDto me;
-  final void Function(String sku) onBuy;
-  final void Function(String sku) onEquip;
+  final CosmeticItemDto item;
+  final bool owned;
+  final bool equipped;
+  final VoidCallback onBuy;
+  final VoidCallback onEquip;
 
   @override
   Widget build(BuildContext context) {
-    final List<CosmeticItemDto> items = me.catalog
-        .where((CosmeticItemDto i) => i.slot == slot)
-        .toList(growable: false);
-    if (items.isEmpty) {
-      return const Center(child: Text('暂无该分类装扮'));
-    }
-    return ListView.separated(
-      padding: const EdgeInsets.all(16),
-      itemCount: items.length,
-      separatorBuilder: (_, __) => const SizedBox(height: 8),
-      itemBuilder: (BuildContext context, int index) {
-        final CosmeticItemDto item = items[index];
-        final bool owned =
-            item.owned || me.inventory.contains(item.sku) || item.pricePoints == 0;
-        final bool equipped = me.loadout[slot] == item.sku;
-        return ListTile(
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
-            side: BorderSide(
-              color: equipped
-                  ? Theme.of(context).colorScheme.primary
-                  : Colors.black12,
+    return HubSurface(
+      padding: const EdgeInsets.all(14),
+      child: Row(
+        children: <Widget>[
+          Container(
+            width: 52,
+            height: 52,
+            decoration: BoxDecoration(
+              color: owned
+                  ? const Color(0xFFE8F8D8)
+                  : AppDesignTokens.skyLight,
+              borderRadius: BorderRadius.circular(14),
             ),
           ),
-          title: Text(item.title),
-          subtitle: Text(
-            owned
-                ? (equipped ? '已装备' : '已拥有')
-                : '${item.pricePoints} 积分',
-          ),
-          trailing: owned
-              ? TextButton(
-                  onPressed: equipped ? null : () => onEquip(item.sku),
-                  child: Text(equipped ? '穿着中' : '装备'),
-                )
-              : FilledButton(
-                  onPressed: () => onBuy(item.sku),
-                  child: const Text('购买'),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: <Widget>[
+                Text(
+                  item.title,
+                  style: TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w800,
+                    color: AppDesignTokens.textPrimary,
+                  ),
                 ),
-        );
-      },
+                const SizedBox(height: 4),
+                Text(
+                  owned
+                      ? (equipped ? '已装备' : '已拥有')
+                      : '${item.pricePoints} 积分',
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: AppDesignTokens.textSecondary,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          if (owned)
+            TextButton(
+              onPressed: equipped ? null : onEquip,
+              child: Text(
+                equipped ? '穿着中' : '装备',
+                style: const TextStyle(fontWeight: FontWeight.w800),
+              ),
+            )
+          else
+            FilledButton(
+              onPressed: onBuy,
+              style: FilledButton.styleFrom(
+                backgroundColor: AppDesignTokens.brandGreen,
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+              child: const Text(
+                '购买',
+                style: TextStyle(fontWeight: FontWeight.w800),
+              ),
+            ),
+        ],
+      ),
     );
   }
 }

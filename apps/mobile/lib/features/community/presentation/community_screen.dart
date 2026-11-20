@@ -8,6 +8,8 @@ import '../../discovery/presentation/english_level_screen.dart';
 import '../../discovery/presentation/followed_creators_screen.dart';
 import '../../navigation/presentation/navigation_destination.dart';
 import '../../settings/presentation/learning_preferences_screen.dart';
+import '../../shared/presentation/pad/app_design_tokens.dart';
+import '../../shared/presentation/pad/hub_ui.dart';
 import '../../shared/presentation/pad/pad_scaffold.dart';
 import '../../shared/presentation/pad/pad_top_bar.dart';
 import '../../sync/data/acquire_api_client.dart';
@@ -17,7 +19,6 @@ import 'community_hot_tab.dart';
 import 'community_leaderboard_tab.dart';
 import 'community_people_tab.dart';
 import 'community_provider.dart';
-import 'community_preview_screen.dart';
 
 class CommunityScreen extends ConsumerStatefulWidget {
   const CommunityScreen({super.key});
@@ -26,21 +27,8 @@ class CommunityScreen extends ConsumerStatefulWidget {
   ConsumerState<CommunityScreen> createState() => _CommunityScreenState();
 }
 
-class _CommunityScreenState extends ConsumerState<CommunityScreen>
-    with SingleTickerProviderStateMixin {
-  late final TabController _tabs;
-
-  @override
-  void initState() {
-    super.initState();
-    _tabs = TabController(length: 4, vsync: this);
-  }
-
-  @override
-  void dispose() {
-    _tabs.dispose();
-    super.dispose();
-  }
+class _CommunityScreenState extends ConsumerState<CommunityScreen> {
+  int _tab = 0;
 
   Future<void> _refreshAll() async {
     await Future.wait(<Future<void>>[
@@ -66,22 +54,20 @@ class _CommunityScreenState extends ConsumerState<CommunityScreen>
       },
     );
 
+    final List<Widget> pages = <Widget>[
+      const CommunityFeedTab(),
+      const CommunityHotTab(),
+      const CommunityPeopleTab(),
+      const CommunityLeaderboardTab(),
+    ];
+
     return PadScaffold(
       currentDestination: AppNavDestination.discover,
       showContinueLearning: false,
       topBar: PadTopBar(
         title: '社区',
-        description: '以 B 站视频帖为主：分享、组队、吐槽与互动',
+        description: '分享 B 站视频，找搭子一起练',
         actions: <Widget>[
-          TextButton.icon(
-            icon: const Icon(Icons.auto_awesome_outlined),
-            label: const Text('社区全景预览'),
-            onPressed: () => Navigator.of(context).push<void>(
-              MaterialPageRoute<void>(
-                builder: (_) => const CommunityPreviewScreen(),
-              ),
-            ),
-          ),
           IconButton(
             tooltip: '刷新',
             onPressed: loggedIn ? () => unawaited(_refreshAll()) : null,
@@ -92,72 +78,151 @@ class _CommunityScreenState extends ConsumerState<CommunityScreen>
       body: Column(
         children: <Widget>[
           Padding(
-            padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
-            child: Wrap(
-              spacing: 8,
-              runSpacing: 8,
+            padding: const EdgeInsets.fromLTRB(16, 4, 16, 0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: <Widget>[
-                ActionChip(
-                  avatar: const Icon(Icons.tune_rounded, size: 18),
-                  label: const Text('兴趣标签'),
-                  onPressed: () => Navigator.of(context).push<void>(
-                    MaterialPageRoute<void>(
-                      builder: (_) => const LearningPreferencesScreen(),
-                    ),
+                Container(
+                  padding: const EdgeInsets.all(4),
+                  decoration: BoxDecoration(
+                    color: AppDesignTokens.softGray,
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  child: Row(
+                    children: <Widget>[
+                      for (final (int i, String label) in <(int, String)>[
+                        (0, '动态'),
+                        (1, '热门'),
+                        (2, '搭子'),
+                        (3, '排行'),
+                      ])
+                        Expanded(
+                          child: _SegTab(
+                            label: label,
+                            selected: _tab == i,
+                            onTap: () => setState(() => _tab = i),
+                          ),
+                        ),
+                    ],
                   ),
                 ),
-                ActionChip(
-                  label: Text('英语水平 · ${preferences.level}'),
-                  onPressed: () => Navigator.of(context).push<void>(
-                    MaterialPageRoute<void>(
-                      builder: (_) => const EnglishLevelScreen(),
-                    ),
-                  ),
-                ),
-                ActionChip(
-                  avatar: const Icon(Icons.person_add_alt_1_rounded, size: 18),
-                  label: Text('关注博主 · ${preferences.followedCreators.length}'),
-                  onPressed: () => Navigator.of(context).push<void>(
-                    MaterialPageRoute<void>(
-                      builder: (_) => const FollowedCreatorsScreen(),
-                    ),
+                const SizedBox(height: 10),
+                SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: Row(
+                    children: <Widget>[
+                      HubPill(
+                        label: '找搭子',
+                        background: const Color(0xFFE8F8D8),
+                        foreground: AppDesignTokens.brandGreenDark,
+                        onTap: () {
+                          setState(() => _tab = 2);
+                          unawaited(
+                            Navigator.of(context).push<void>(
+                              MaterialPageRoute<void>(
+                                builder: (_) =>
+                                    const FollowedCreatorsScreen(),
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+                      const SizedBox(width: 8),
+                      HubPill(
+                        label: '英语水平 · ${preferences.level}',
+                        background: const Color(0xFFFFF1D6),
+                        foreground: AppDesignTokens.orange,
+                        onTap: () => Navigator.of(context).push<void>(
+                          MaterialPageRoute<void>(
+                            builder: (_) => const EnglishLevelScreen(),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      HubPill(
+                        label: '兴趣标签',
+                        onTap: () => Navigator.of(context).push<void>(
+                          MaterialPageRoute<void>(
+                            builder: (_) => const LearningPreferencesScreen(),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      HubPill(
+                        label: '关注博主 · ${preferences.followedCreators.length}',
+                        onTap: () => Navigator.of(context).push<void>(
+                          MaterialPageRoute<void>(
+                            builder: (_) => const FollowedCreatorsScreen(),
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               ],
             ),
           ),
-          TabBar(
-            controller: _tabs,
-            isScrollable: true,
-            tabs: const <Tab>[
-              Tab(text: '动态'),
-              Tab(text: '榜单'),
-              Tab(text: '找人'),
-              Tab(text: '热门'),
-            ],
-          ),
+          const SizedBox(height: 8),
           Expanded(
             child: loggedIn
-                ? TabBarView(
-                    controller: _tabs,
-                    children: const <Widget>[
-                      CommunityFeedTab(),
-                      CommunityLeaderboardTab(),
-                      CommunityPeopleTab(),
-                      CommunityHotTab(),
-                    ],
-                  )
+                ? IndexedStack(index: _tab, children: pages)
                 : ListView(
                     padding: const EdgeInsets.all(24),
-                    children: const <Widget>[
-                      Text(
-                        '登录后可看学习时长榜、兴趣相近的人，发帖吐槽，或分享你喜欢的 B 站视频与博主。',
-                        style: TextStyle(fontSize: 15, height: 1.5),
+                    children: <Widget>[
+                      HubSurface(
+                        child: Text(
+                          '登录后可看学习时长榜、兴趣相近的人，发帖吐槽，或分享你喜欢的 B 站视频与博主。',
+                          style: TextStyle(
+                            fontSize: 15,
+                            height: 1.5,
+                            fontWeight: FontWeight.w600,
+                            color: AppDesignTokens.textPrimary,
+                          ),
+                        ),
                       ),
                     ],
                   ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _SegTab extends StatelessWidget {
+  const _SegTab({
+    required this.label,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(12),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 160),
+        height: 36,
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          color: selected ? AppDesignTokens.appWhite : Colors.transparent,
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            fontSize: 13,
+            fontWeight: selected ? FontWeight.w800 : FontWeight.w700,
+            color: selected
+                ? AppDesignTokens.textPrimary
+                : AppDesignTokens.textSecondary,
+          ),
+        ),
       ),
     );
   }

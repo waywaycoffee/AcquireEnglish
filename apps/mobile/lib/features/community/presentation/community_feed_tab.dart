@@ -7,6 +7,8 @@ import 'package:go_router/go_router.dart';
 import '../../../router/app_router.dart';
 import '../../../utils/url_utils.dart';
 import '../../import_course/presentation/bilibili_import_sheet.dart';
+import '../../shared/presentation/pad/app_design_tokens.dart';
+import '../../shared/presentation/pad/hub_ui.dart';
 import '../../sync/data/acquire_api_client.dart';
 import '../../sync/presentation/daily_feed_provider.dart';
 import '../data/community_models.dart';
@@ -48,7 +50,7 @@ class CommunityFeedTab extends ConsumerWidget {
                 physics: const AlwaysScrollableScrollPhysics(),
                 padding: const EdgeInsets.fromLTRB(16, 12, 16, 88),
                 itemCount: posts.length,
-                separatorBuilder: (_, __) => const SizedBox(height: 10),
+                separatorBuilder: (_, __) => const SizedBox(height: 12),
                 itemBuilder: (BuildContext context, int index) {
                   return _PostCard(post: posts[index]);
                 },
@@ -59,10 +61,18 @@ class CommunityFeedTab extends ConsumerWidget {
         Positioned(
           right: 16,
           bottom: 16,
-          child: FloatingActionButton.extended(
-            onPressed: () => _showComposer(context, ref),
-            icon: const Icon(Icons.edit_outlined),
-            label: const Text('发帖'),
+          child: DecoratedBox(
+            decoration: const BoxDecoration(
+              boxShadow: AppDesignTokens.toyButtonShadow,
+              shape: BoxShape.circle,
+            ),
+            child: FloatingActionButton(
+              onPressed: () => _showComposer(context, ref),
+              backgroundColor: AppDesignTokens.brandGreen,
+              foregroundColor: Colors.white,
+              elevation: 0,
+              child: const Icon(Icons.add_rounded, size: 28),
+            ),
           ),
         ),
       ],
@@ -127,7 +137,7 @@ class _PostCard extends ConsumerWidget {
       case 'team_invite':
         return '组队';
       case 'share_bilibili':
-        return 'B站';
+        return '分享';
       case 'feedback':
         return '吐槽';
       default:
@@ -135,116 +145,260 @@ class _PostCard extends ConsumerWidget {
     }
   }
 
+  Color get _kindTint {
+    switch (post.kind) {
+      case 'team_invite':
+        return const Color(0xFFE8F8D8);
+      case 'feedback':
+        return AppDesignTokens.pinkLight;
+      default:
+        return AppDesignTokens.skyLight;
+    }
+  }
+
+  String get _metaLine {
+    final String level = post.authorLevel ?? post.englishLevel ?? '';
+    final String when = _relative(post.createdAt);
+    if (level.isEmpty) return when;
+    return '$when · $level';
+  }
+
+  String _relative(DateTime time) {
+    final Duration d = DateTime.now().difference(time.toLocal());
+    if (d.inMinutes < 60) return '${d.inMinutes.clamp(1, 59)} 分钟前';
+    if (d.inHours < 24) return '${d.inHours} 小时前';
+    if (d.inDays < 7) return '${d.inDays} 天前';
+    return '${time.month}/${time.day}';
+  }
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    return Material(
-      color: Theme.of(context).colorScheme.surfaceContainerHighest.withValues(
-            alpha: 0.45,
-          ),
-      borderRadius: BorderRadius.circular(14),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(14),
-        onTap: () => unawaited(_openComments(context, ref)),
-        child: Padding(
-          padding: const EdgeInsets.all(14),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+    final String? cover = post.linkCover?.trim();
+    return HubSurface(
+      onTap: () => unawaited(_openComments(context, ref)),
+      padding: const EdgeInsets.all(14),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          Row(
             children: <Widget>[
-              Row(
-                children: <Widget>[
-                  Chip(
-                    label: Text(_kindLabel),
-                    visualDensity: VisualDensity.compact,
-                    padding: EdgeInsets.zero,
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      '${post.authorName}'
-                      '${post.authorLevel == null ? '' : ' · ${post.authorLevel}'}',
-                      style: Theme.of(context).textTheme.labelLarge,
+              Container(
+                width: 36,
+                height: 36,
+                decoration: BoxDecoration(
+                  color: _kindTint,
+                  shape: BoxShape.circle,
+                ),
+                alignment: Alignment.center,
+                child: Text(
+                  post.authorName.isEmpty
+                      ? '?'
+                      : String.fromCharCode(
+                          post.authorName.runes.first,
+                        ),
+                  style: const TextStyle(fontWeight: FontWeight.w800),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: <Widget>[
+                    Text(
+                      post.authorName,
+                      maxLines: 1,
                       overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w800,
+                        color: AppDesignTokens.textPrimary,
+                      ),
                     ),
+                    Text(
+                      _metaLine,
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                        color: AppDesignTokens.textSecondary,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              HubPill(label: _kindLabel, background: _kindTint),
+            ],
+          ),
+          if (post.isShareBilibili) ...<Widget>[
+            const SizedBox(height: 12),
+            ClipRRect(
+              borderRadius: BorderRadius.circular(16),
+              child: AspectRatio(
+                aspectRatio: 16 / 9,
+                child: Stack(
+                  fit: StackFit.expand,
+                  children: <Widget>[
+                    if (cover != null && cover.isNotEmpty)
+                      Image.network(
+                        cover,
+                        fit: BoxFit.cover,
+                        errorBuilder: (_, __, ___) => _coverFallback(),
+                      )
+                    else
+                      _coverFallback(),
+                    Center(
+                      child: Container(
+                        width: 44,
+                        height: 44,
+                        decoration: BoxDecoration(
+                          color: Colors.white.withValues(alpha: 0.85),
+                          shape: BoxShape.circle,
+                        ),
+                        child: Icon(
+                          Icons.play_arrow_rounded,
+                          color: AppDesignTokens.textPrimary,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+          if (post.title.isNotEmpty) ...<Widget>[
+            const SizedBox(height: 12),
+            Text(
+              post.title,
+              style: TextStyle(
+                fontSize: 15,
+                height: 1.35,
+                fontWeight: FontWeight.w700,
+                color: AppDesignTokens.textPrimary,
+              ),
+            ),
+          ],
+          if (post.body.isNotEmpty) ...<Widget>[
+            const SizedBox(height: 6),
+            Text(
+              post.body,
+              maxLines: 3,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                height: 1.45,
+                fontWeight: FontWeight.w600,
+                color: AppDesignTokens.textSecondary,
+              ),
+            ),
+          ],
+          if (post.isShareBilibili) ...<Widget>[
+            const SizedBox(height: 10),
+            Wrap(
+              spacing: 8,
+              runSpacing: 6,
+              children: <Widget>[
+                if (post.interestTag != null)
+                  HubPill(label: '兴趣 · ${post.interestTag}'),
+                if (post.englishLevel != null)
+                  HubPill(
+                    label: '难度 · ${post.englishLevel}',
+                    background: const Color(0xFFFFF1D6),
+                    foreground: AppDesignTokens.orange,
                   ),
-                  IconButton(
-                    tooltip: post.likedByMe ? '取消赞' : '点赞',
-                    onPressed: () => unawaited(
-                      ref
-                          .read(communityFeedProvider.notifier)
-                          .toggleLike(post.id),
-                    ),
-                    icon: Icon(
+                HubPill(
+                  label: '归类有误？',
+                  onTap: () => unawaited(_requestReclassify(context, ref)),
+                ),
+              ],
+            ),
+          ],
+          const SizedBox(height: 12),
+          Row(
+            children: <Widget>[
+              InkWell(
+                onTap: () => unawaited(
+                  ref.read(communityFeedProvider.notifier).toggleLike(post.id),
+                ),
+                borderRadius: BorderRadius.circular(8),
+                child: Row(
+                  children: <Widget>[
+                    Icon(
                       post.likedByMe
                           ? Icons.favorite_rounded
                           : Icons.favorite_border_rounded,
-                      color: post.likedByMe ? Colors.redAccent : null,
+                      size: 18,
+                      color: post.likedByMe
+                          ? Colors.redAccent
+                          : AppDesignTokens.textSecondary,
+                    ),
+                    const SizedBox(width: 4),
+                    Text(
+                      '${post.likeCount}',
+                      style: TextStyle(
+                        fontWeight: FontWeight.w700,
+                        color: AppDesignTokens.textSecondary,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 18),
+              Icon(
+                Icons.chat_bubble_outline_rounded,
+                size: 18,
+                color: AppDesignTokens.textSecondary,
+              ),
+              const SizedBox(width: 4),
+              Text(
+                '${post.commentCount}',
+                style: TextStyle(
+                  fontWeight: FontWeight.w700,
+                  color: AppDesignTokens.textSecondary,
+                ),
+              ),
+              const Spacer(),
+              if (post.isShareBilibili)
+                TextButton.icon(
+                  onPressed: () => unawaited(_openLink(context, ref)),
+                  icon: Icon(
+                    Icons.play_circle_outline,
+                    size: 18,
+                    color: AppDesignTokens.primaryBlueDark,
+                  ),
+                  label: Text(
+                    '我也想学',
+                    style: TextStyle(
+                      fontWeight: FontWeight.w800,
+                      color: AppDesignTokens.primaryBlueDark,
                     ),
                   ),
-                  Text('${post.likeCount}'),
-                ],
-              ),
-              if (post.title.isNotEmpty) ...<Widget>[
-                Text(
-                  post.title,
-                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.w700,
-                      ),
                 ),
-                const SizedBox(height: 6),
-              ],
-              if (post.body.isNotEmpty)
-                Text(post.body, style: const TextStyle(height: 1.45)),
-              if (post.isShareBilibili) ...<Widget>[
-                const SizedBox(height: 8),
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 4,
-                  children: <Widget>[
-                    if (post.interestTag != null)
-                      Chip(
-                        label: Text('兴趣 · ${post.interestTag}'),
-                        visualDensity: VisualDensity.compact,
-                      ),
-                    if (post.englishLevel != null)
-                      Chip(
-                        label: Text('难度 · ${post.englishLevel}'),
-                        visualDensity: VisualDensity.compact,
-                      ),
-                    ActionChip(
-                      label: const Text('归类有误？'),
-                      onPressed: () =>
-                          unawaited(_requestReclassify(context, ref)),
+              if (post.isShareBilibili)
+                TextButton(
+                  onPressed: () => unawaited(_openBilibiliLike(context)),
+                  child: Text(
+                    'B 站',
+                    style: TextStyle(
+                      fontWeight: FontWeight.w800,
+                      color: AppDesignTokens.primaryBlueDark,
                     ),
-                  ],
+                  ),
                 ),
-                const SizedBox(height: 8),
-                Wrap(
-                  spacing: 8,
-                  children: <Widget>[
-                    OutlinedButton.icon(
-                      onPressed: () => unawaited(_openLink(context, ref)),
-                      icon: const Icon(Icons.play_circle_outline),
-                      label: Text(
-                        post.linkTitle?.isNotEmpty == true
-                            ? '我也想学 · ${post.linkTitle}'
-                            : '我也想学',
-                      ),
-                    ),
-                    OutlinedButton.icon(
-                      onPressed: () => unawaited(_openBilibiliLike(context)),
-                      icon: const Icon(Icons.thumb_up_alt_outlined),
-                      label: const Text('去 B 站点赞'),
-                    ),
-                  ],
-                ),
-              ],
-              const SizedBox(height: 6),
-              Text(
-                '评论 ${post.commentCount} · 点进帖子互动',
-                style: Theme.of(context).textTheme.bodySmall,
-              ),
             ],
           ),
+        ],
+      ),
+    );
+  }
+
+  Widget _coverFallback() {
+    return const DecoratedBox(
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: <Color>[
+            AppDesignTokens.primaryBlue,
+            AppDesignTokens.brandGreen,
+          ],
         ),
       ),
     );
