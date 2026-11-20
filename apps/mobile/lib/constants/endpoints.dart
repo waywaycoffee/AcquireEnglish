@@ -38,6 +38,16 @@ class Endpoints {
   static const String creatorsFollowed = 'api/creators/followed';
   static const String creatorsFollow = 'api/creators/follow';
   static const String creatorsUnfollow = 'api/creators/unfollow';
+  static const String communityFeed = 'api/community/feed';
+  static const String communityPosts = 'api/community/posts';
+  static const String communityLeaderboard = 'api/community/leaderboard';
+  static const String communityStudyStats = 'api/community/study-stats';
+  static const String communitySimilarUsers = 'api/community/similar-users';
+  static const String communityHotShares = 'api/community/hot-shares';
+  static const String communityHotCreators = 'api/community/hot-creators';
+  static const String communityMe = 'api/community/me';
+  static const String communityPk = 'api/community/pk';
+  static const String communityPkMine = 'api/community/pk/mine';
   static const String health = 'api/health';
   static const String assets = 'api/assets';
   static const String assetsSkus = 'api/assets/skus';

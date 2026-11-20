@@ -5,8 +5,10 @@ import 'dart:math';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hive_ce/hive.dart';
 
+import '../../authentication/presentation/auth_session.dart';
 import '../../library/presentation/library_catalog_provider.dart';
 import '../../library/presentation/library_mock_data.dart';
+import '../../sync/data/acquire_api_client.dart';
 
 const int _checkInStudyMinuteTarget = 10;
 const int _checkInSentenceTarget = 30;
@@ -76,10 +78,15 @@ int _buildProgressPart({required int value, required int target}) {
 
 class LearningActivityNotifier extends Notifier<LearningActivityState> {
   Timer? _persistTimer;
+  Timer? _studySyncTimer;
+  DateTime? _lastStudySyncAt;
 
   @override
   LearningActivityState build() {
-    ref.onDispose(() => _persistTimer?.cancel());
+    ref.onDispose(() {
+      _persistTimer?.cancel();
+      _studySyncTimer?.cancel();
+    });
     return LearningActivityState.fromJson(
       Hive.isBoxOpen('prefs')
           ? Hive.box<String>('prefs').get(_learningActivityStorageKey)
@@ -194,6 +201,7 @@ class LearningActivityNotifier extends Notifier<LearningActivityState> {
     );
     state = LearningActivityState(records: records);
     _schedulePersist();
+    _scheduleStudyStatsSync();
   }
 
   bool _meetsCheckInRequirements(LearningDailyRecord record) {
@@ -216,6 +224,42 @@ class LearningActivityNotifier extends Notifier<LearningActivityState> {
         ).put(_learningActivityStorageKey, state.toJson()),
       );
     });
+  }
+
+  void _scheduleStudyStatsSync() {
+    if (!ref.read(authSessionProvider).isLoggedIn) {
+      return;
+    }
+    _studySyncTimer?.cancel();
+    _studySyncTimer = Timer(const Duration(seconds: 8), () {
+      _studySyncTimer = null;
+      unawaited(_syncStudyStats());
+    });
+  }
+
+  Future<void> _syncStudyStats() async {
+    if (!ref.read(authSessionProvider).isLoggedIn) {
+      return;
+    }
+    final DateTime now = DateTime.now();
+    if (_lastStudySyncAt != null &&
+        now.difference(_lastStudySyncAt!) < const Duration(seconds: 20)) {
+      return;
+    }
+    _lastStudySyncAt = now;
+    final LearningDailyRecord today = state.today;
+    final int seconds = today.studyMilliseconds ~/ 1000;
+    if (seconds <= 0) {
+      return;
+    }
+    try {
+      await ref.read(acquireApiClientProvider).upsertCommunityStudyStats(
+            day: today.dayKey,
+            studySeconds: seconds,
+          );
+    } catch (_) {
+      // Best-effort; local learning stats remain source of truth offline.
+    }
   }
 }
 

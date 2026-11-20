@@ -8,6 +8,7 @@ from app.database import Base, engine
 from app.routers import (
     assets,
     auth,
+    community,
     courses,
     creators,
     feed,
@@ -38,6 +39,9 @@ async def lifespan(_: FastAPI):
         await ensure_schema_columns(conn)
     async with SessionLocal() as session:
         await ensure_default_skus(session)
+        from app.services.community_seed import ensure_community_seed
+
+        await ensure_community_seed(session)
     yield
 
 
@@ -62,6 +66,7 @@ app.include_router(public_lexicon.router, prefix="/api")
 app.include_router(preferences.router, prefix="/api")
 app.include_router(creators.router, prefix="/api")
 app.include_router(feed.router, prefix="/api")
+app.include_router(community.router, prefix="/api")
 app.include_router(imports.router, prefix="/api")
 app.include_router(learning.router, prefix="/api")
 app.include_router(livekit.router, prefix="/api")

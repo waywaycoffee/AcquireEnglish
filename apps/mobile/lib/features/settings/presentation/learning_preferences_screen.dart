@@ -85,7 +85,7 @@ class _LearningPreferencesScreenState
           ),
           const SizedBox(height: 6),
           const Text(
-            '用于「发现」每日推荐，点开视频后才会导入和下载。',
+            '用于首页每日推荐与社区找相似的人；点开视频后才会导入和下载。',
             style: TextStyle(
               color: StudyShellTokens.textSecondary,
               fontSize: 13,

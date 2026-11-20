@@ -186,7 +186,7 @@ void main() {
 
     expect(find.text('首页'), findsOneWidget);
     expect(find.text('学习'), findsOneWidget);
-    expect(find.text('发现'), findsOneWidget);
+    expect(find.text('社区'), findsOneWidget);
     expect(find.text('复习'), findsOneWidget);
     expect(find.text('更多'), findsOneWidget);
     expect(find.text('短语'), findsNothing);

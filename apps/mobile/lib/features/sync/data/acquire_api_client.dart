@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../constants/endpoints.dart';
 import '../../../data/repository/network_repository.dart';
+import '../../community/data/community_models.dart';
 
 final Provider<AcquireApiClient> acquireApiClientProvider =
     Provider<AcquireApiClient>((Ref ref) {
@@ -1443,5 +1444,176 @@ class AcquireApiClient {
     return AcquireShareRewardResult.fromJson(
       response.data as Map<String, dynamic>,
     );
+  }
+
+  Options get _noCache => Options(
+        extra: const <String, Object>{
+          'dio_cache_interceptor_force_refresh': true,
+        },
+      );
+
+  Future<List<CommunityPostDto>> communityFeed({String? kind}) async {
+    final Response<dynamic> response = await _dio.get(
+      Endpoints.communityFeed,
+      queryParameters: <String, dynamic>{
+        if (kind != null && kind.isNotEmpty) 'kind': kind,
+      },
+      options: _noCache,
+    );
+    return (response.data as List<dynamic>)
+        .cast<Map<String, dynamic>>()
+        .map(CommunityPostDto.fromJson)
+        .toList(growable: false);
+  }
+
+  Future<CommunityPostDto> createCommunityPost({
+    required String kind,
+    String title = '',
+    String body = '',
+    String? linkUrl,
+    String? linkTitle,
+    String? linkCover,
+  }) async {
+    final Response<dynamic> response = await _dio.post(
+      Endpoints.communityPosts,
+      data: <String, dynamic>{
+        'kind': kind,
+        'title': title,
+        'body': body,
+        if (linkUrl != null) 'link_url': linkUrl,
+        if (linkTitle != null) 'link_title': linkTitle,
+        if (linkCover != null) 'link_cover': linkCover,
+      },
+      options: _noCache,
+    );
+    return CommunityPostDto.fromJson(response.data as Map<String, dynamic>);
+  }
+
+  Future<CommunityPostDto> likeCommunityPost(int postId) async {
+    final Response<dynamic> response = await _dio.post(
+      '${Endpoints.communityPosts}/$postId/like',
+      options: _noCache,
+    );
+    return CommunityPostDto.fromJson(response.data as Map<String, dynamic>);
+  }
+
+  Future<void> upsertCommunityStudyStats({
+    required String day,
+    required int studySeconds,
+    int? vocabCount,
+  }) async {
+    await _dio.post<Map<String, dynamic>>(
+      Endpoints.communityStudyStats,
+      data: <String, dynamic>{
+        'day': day,
+        'study_seconds': studySeconds,
+        if (vocabCount != null) 'vocab_count': vocabCount,
+      },
+      options: _noCache,
+    );
+  }
+
+  Future<List<LeaderboardEntryDto>> communityLeaderboard({
+    String metric = 'study_week',
+  }) async {
+    final Response<dynamic> response = await _dio.get(
+      Endpoints.communityLeaderboard,
+      queryParameters: <String, dynamic>{'metric': metric},
+      options: _noCache,
+    );
+    return (response.data as List<dynamic>)
+        .cast<Map<String, dynamic>>()
+        .map(LeaderboardEntryDto.fromJson)
+        .toList(growable: false);
+  }
+
+  Future<List<SimilarUserDto>> communitySimilarUsers() async {
+    final Response<dynamic> response = await _dio.get(
+      Endpoints.communitySimilarUsers,
+      options: _noCache,
+    );
+    return (response.data as List<dynamic>)
+        .cast<Map<String, dynamic>>()
+        .map(SimilarUserDto.fromJson)
+        .toList(growable: false);
+  }
+
+  Future<List<HotShareDto>> communityHotShares() async {
+    final Response<dynamic> response = await _dio.get(
+      Endpoints.communityHotShares,
+      options: _noCache,
+    );
+    return (response.data as List<dynamic>)
+        .cast<Map<String, dynamic>>()
+        .map(HotShareDto.fromJson)
+        .toList(growable: false);
+  }
+
+  Future<List<HotCreatorDto>> communityHotCreators() async {
+    final Response<dynamic> response = await _dio.get(
+      Endpoints.communityHotCreators,
+      options: _noCache,
+    );
+    return (response.data as List<dynamic>)
+        .cast<Map<String, dynamic>>()
+        .map(HotCreatorDto.fromJson)
+        .toList(growable: false);
+  }
+
+  Future<CommunityProfileDto> getCommunityProfile() async {
+    final Response<dynamic> response = await _dio.get(
+      Endpoints.communityMe,
+      options: _noCache,
+    );
+    return CommunityProfileDto.fromJson(response.data as Map<String, dynamic>);
+  }
+
+  Future<CommunityProfileDto> updateCommunityProfile({
+    String? bio,
+    bool? lookingForPartner,
+    bool? showOnLeaderboard,
+    String? englishLevel,
+  }) async {
+    final Response<dynamic> response = await _dio.put(
+      Endpoints.communityMe,
+      data: <String, dynamic>{
+        if (bio != null) 'bio': bio,
+        if (lookingForPartner != null)
+          'looking_for_partner': lookingForPartner,
+        if (showOnLeaderboard != null)
+          'show_on_leaderboard': showOnLeaderboard,
+        if (englishLevel != null) 'english_level': englishLevel,
+      },
+      options: _noCache,
+    );
+    return CommunityProfileDto.fromJson(response.data as Map<String, dynamic>);
+  }
+
+  Future<VocabPkDto> createVocabPk({required int opponentId}) async {
+    final Response<dynamic> response = await _dio.post(
+      Endpoints.communityPk,
+      data: <String, dynamic>{'opponent_id': opponentId},
+      options: _noCache,
+    );
+    return VocabPkDto.fromJson(response.data as Map<String, dynamic>);
+  }
+
+  Future<VocabPkDto> acceptVocabPk(int challengeId) async {
+    final Response<dynamic> response = await _dio.post(
+      '${Endpoints.communityPk}/$challengeId/accept',
+      options: _noCache,
+    );
+    return VocabPkDto.fromJson(response.data as Map<String, dynamic>);
+  }
+
+  Future<List<VocabPkDto>> myVocabPkChallenges() async {
+    final Response<dynamic> response = await _dio.get(
+      Endpoints.communityPkMine,
+      options: _noCache,
+    );
+    return (response.data as List<dynamic>)
+        .cast<Map<String, dynamic>>()
+        .map(VocabPkDto.fromJson)
+        .toList(growable: false);
   }
 }

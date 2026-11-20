@@ -387,3 +387,106 @@ class ReviewBackup(Base):
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), primary_key=True)
     revision: Mapped[int] = mapped_column(Integer, nullable=False)
     payload: Mapped[str] = mapped_column(Text, nullable=False)
+
+
+class CommunityPost(Base):
+    """User-generated community posts (feedback / method / share_link)."""
+
+    __tablename__ = "community_posts"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    user_id: Mapped[int] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), index=True
+    )
+    # feedback | method | share_link | podcast_placeholder
+    kind: Mapped[str] = mapped_column(String(32), index=True)
+    title: Mapped[str] = mapped_column(String(200), default="")
+    body: Mapped[str] = mapped_column(Text, default="")
+    link_url: Mapped[str | None] = mapped_column(String(1024), nullable=True)
+    link_title: Mapped[str | None] = mapped_column(String(512), nullable=True)
+    link_cover: Mapped[str | None] = mapped_column(String(1024), nullable=True)
+    like_count: Mapped[int] = mapped_column(Integer, default=0)
+    # visible | hidden
+    status: Mapped[str] = mapped_column(String(16), default="visible", index=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+
+
+class CommunityPostLike(Base):
+    __tablename__ = "community_post_likes"
+    __table_args__ = (
+        UniqueConstraint("post_id", "user_id", name="uq_community_post_like"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    post_id: Mapped[int] = mapped_column(
+        ForeignKey("community_posts.id", ondelete="CASCADE"), index=True
+    )
+    user_id: Mapped[int] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), index=True
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+
+
+class UserStudyStatsDaily(Base):
+    """Per-user daily study seconds + vocab snapshot for leaderboards."""
+
+    __tablename__ = "user_study_stats_daily"
+    __table_args__ = (
+        UniqueConstraint("user_id", "day", name="uq_user_study_day"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    user_id: Mapped[int] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), index=True
+    )
+    # YYYY-MM-DD in client local calendar (or UTC day string from client).
+    day: Mapped[str] = mapped_column(String(10), index=True)
+    study_seconds: Mapped[int] = mapped_column(Integer, default=0)
+    vocab_count: Mapped[int] = mapped_column(Integer, default=0)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
+
+
+class CommunityProfile(Base):
+    __tablename__ = "community_profiles"
+
+    user_id: Mapped[int] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), primary_key=True
+    )
+    bio: Mapped[str] = mapped_column(String(280), default="")
+    looking_for_partner: Mapped[int] = mapped_column(Integer, default=0)
+    show_on_leaderboard: Mapped[int] = mapped_column(Integer, default=1)
+    english_level: Mapped[str | None] = mapped_column(String(16), nullable=True)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
+
+
+class VocabPkChallenge(Base):
+    __tablename__ = "vocab_pk_challenges"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    challenger_id: Mapped[int] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), index=True
+    )
+    opponent_id: Mapped[int] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), index=True
+    )
+    # pending | completed | declined
+    status: Mapped[str] = mapped_column(String(16), default="pending", index=True)
+    challenger_vocab: Mapped[int] = mapped_column(Integer, default=0)
+    opponent_vocab: Mapped[int] = mapped_column(Integer, default=0)
+    winner_id: Mapped[int | None] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+    completed_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )

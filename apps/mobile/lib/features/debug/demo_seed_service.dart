@@ -352,7 +352,7 @@ Future<DemoSeedReport> injectDemoSeed(WidgetRef ref) async {
   );
   lines.add('空闲队列：已放入演示 pending 任务（设置里可看）');
 
-  lines.add('图书馆/发现/ASR：需真实导入或网络，未伪造可播资源');
+  lines.add('图书馆/社区/ASR：需真实导入或网络，未伪造可播资源');
   return DemoSeedReport(lines: lines);
 }
 

@@ -1,4 +1,4 @@
-import '../features/discovery/presentation/discover_screen.dart';
+import '../features/community/presentation/community_screen.dart';
 import '../features/daily_review/domain/daily_review.dart';
 // ignore_for_file: prefer_function_declarations_over_variables
 
@@ -134,7 +134,7 @@ GoRouter goRouter(Ref ref) => GoRouter(
       path: SGRoute.discover.route,
       name: SGRoute.discover.name,
       builder: (BuildContext context, GoRouterState state) =>
-          const DiscoverScreen(),
+          const CommunityScreen(),
     ).fade(),
     GoRoute(
       path: SGRoute.review.route,

@@ -28,11 +28,11 @@ enum AppNavDestination {
   ),
   discover(
     route: '/discover',
-    label: '发现',
-    title: '发现',
-    subtitle: '按兴趣和英语水平发现每日学习视频。',
-    icon: Icons.explore_outlined,
-    activeIcon: Icons.explore_rounded,
+    label: '社区',
+    title: '社区',
+    subtitle: '学习时长榜、找搭子、分享视频与发帖交流。',
+    icon: Icons.groups_outlined,
+    activeIcon: Icons.groups_rounded,
   ),
   review(
     route: '/review',

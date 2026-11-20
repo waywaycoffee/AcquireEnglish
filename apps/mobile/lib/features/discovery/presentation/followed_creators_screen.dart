@@ -90,7 +90,7 @@ class _FollowedCreatorsScreenState extends ConsumerState<FollowedCreatorsScreen>
         return;
       }
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('已关注。发现页会推荐其视频，导入仍需手动确认。')),
+        const SnackBar(content: Text('已关注。首页会推荐其视频，导入仍需手动确认。')),
       );
     } catch (e) {
       if (!mounted) {
@@ -148,7 +148,7 @@ class _FollowedCreatorsScreenState extends ConsumerState<FollowedCreatorsScreen>
         padding: const EdgeInsets.all(16),
         children: <Widget>[
           const Text(
-            '粘贴 B 站空间或 YouTube 频道链接。关注后其视频会出现在发现推荐，'
+            '粘贴 B 站空间或 YouTube 频道链接。关注后其视频会出现在首页推荐，'
             '点开后仍需自行导入到本地。',
             style: TextStyle(color: StudyShellTokens.textSecondary),
           ),
@@ -186,7 +186,7 @@ class _FollowedCreatorsScreenState extends ConsumerState<FollowedCreatorsScreen>
           else if (_creators.isEmpty)
             const ListTile(
               title: Text('还没有关注博主'),
-              subtitle: Text('关注后，对方新视频会出现在发现页推荐。'),
+              subtitle: Text('关注后，对方新视频会出现在首页推荐。'),
             )
           else
             for (final FollowedCreatorDto c in _creators)
