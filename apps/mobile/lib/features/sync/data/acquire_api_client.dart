@@ -1546,6 +1546,11 @@ class AcquireApiClient {
         .toList(growable: false);
   }
 
+  Future<Map<String, dynamic>> studyPkRequest(String method, String path, {Map<String, dynamic>? data}) async {
+    final Response<dynamic> response = await _dio.request<dynamic>('api/study-pk$path', options: Options(method: method), data: data);
+    return response.data as Map<String, dynamic>;
+  }
+
   Future<Map<String, dynamic>> studyDeskRequest(String method, String path, {Map<String, dynamic>? data, Map<String, dynamic>? query}) async {
     final Response<dynamic> response = await _dio.request<dynamic>(
       'api/study-desk$path', options: Options(method: method), data: data, queryParameters: query,

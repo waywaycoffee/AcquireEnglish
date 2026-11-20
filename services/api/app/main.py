@@ -10,6 +10,7 @@ from app.routers import (
     auth,
     community,
     study_desk,
+    study_pk,
     cosmetics,
     courses,
     creators,
@@ -72,6 +73,7 @@ app.include_router(creators.router, prefix="/api")
 app.include_router(feed.router, prefix="/api")
 app.include_router(community.router, prefix="/api")
 app.include_router(study_desk.router, prefix="/api")
+app.include_router(study_pk.router, prefix="/api")
 app.include_router(imports.router, prefix="/api")
 app.include_router(learning.router, prefix="/api")
 app.include_router(livekit.router, prefix="/api")

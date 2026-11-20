@@ -671,3 +671,41 @@ class DeskLibrarySnapshot(Base):
     __tablename__ = "desk_library_snapshots"
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), primary_key=True)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class DeskPkPermission(Base):
+    __tablename__ = "desk_pk_permissions"
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), primary_key=True)
+    desk_id: Mapped[int] = mapped_column(Integer)
+    enabled: Mapped[int] = mapped_column(Integer, default=0)
+
+
+class DeskWordPk(Base):
+    __tablename__ = "desk_word_pks"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    desk_id: Mapped[int] = mapped_column(Integer, index=True)
+    active_desk_id: Mapped[int | None] = mapped_column(Integer, nullable=True, unique=True)
+    sender_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"))
+    target_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"))
+    status: Mapped[str] = mapped_column(String(16), default="pending")
+    days: Mapped[int] = mapped_column(Integer)
+    questions_json: Mapped[str] = mapped_column(Text)
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class DeskPkRun(Base):
+    __tablename__ = "desk_pk_runs"
+    match_id: Mapped[int] = mapped_column(ForeignKey("desk_word_pks.id", ondelete="CASCADE"), primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), primary_key=True)
+    next_index: Mapped[int] = mapped_column(Integer, default=0)
+    question_started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
+class DeskPkAnswer(Base):
+    __tablename__ = "desk_pk_answers"
+    match_id: Mapped[int] = mapped_column(ForeignKey("desk_word_pks.id", ondelete="CASCADE"), primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), primary_key=True)
+    question_index: Mapped[int] = mapped_column(Integer, primary_key=True)
+    choice: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    correct: Mapped[int] = mapped_column(Integer)

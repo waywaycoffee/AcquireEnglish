@@ -7,6 +7,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../authentication/presentation/auth_session.dart';
 import '../../sync/data/acquire_api_client.dart';
 import '../../words/presentation/word_book_provider.dart';
+import 'study_pk_screen.dart';
 
 class StudyDeskScreen extends ConsumerStatefulWidget {
   const StudyDeskScreen({super.key});
@@ -371,6 +372,19 @@ class _StudyDeskScreenState extends ConsumerState<StudyDeskScreen>
                       ]),
                       _activityCard(),
                       _libraryCard(),
+                      _card('近期单词 PK', <Widget>[
+                        const Text('从双方实际学过的共同单词中比赛，查看谁记得更多。'),
+                        FilledButton(
+                          onPressed: _busy
+                              ? null
+                              : () => Navigator.of(context).push<void>(
+                                  MaterialPageRoute<void>(
+                                    builder: (_) => const StudyPkScreen(),
+                                  ),
+                                ),
+                          child: const Text('进入单词PK'),
+                        ),
+                      ]),
                       _card('关系管理', <Widget>[
                         TextButton(
                           onPressed: _busy
