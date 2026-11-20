@@ -70,7 +70,7 @@ class _CommunityScreenState extends ConsumerState<CommunityScreen>
       showContinueLearning: false,
       topBar: PadTopBar(
         title: '社区',
-        description: '时长榜、找搭子、分享视频，一起练英语',
+        description: '欢迎分享你喜欢的 B 站视频和博主',
         actions: <Widget>[
           IconButton(
             tooltip: '刷新',
@@ -143,7 +143,7 @@ class _CommunityScreenState extends ConsumerState<CommunityScreen>
                     padding: const EdgeInsets.all(24),
                     children: const <Widget>[
                       Text(
-                        '登录后可看学习时长榜、兴趣相近的人，发帖吐槽或分享学习视频。',
+                        '登录后可看学习时长榜、兴趣相近的人，发帖吐槽，或分享你喜欢的 B 站视频与博主。',
                         style: TextStyle(fontSize: 15, height: 1.5),
                       ),
                     ],

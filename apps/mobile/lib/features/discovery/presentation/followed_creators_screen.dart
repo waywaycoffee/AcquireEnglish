@@ -7,7 +7,7 @@ import '../../player/presentation/widgets/study_shell_tokens.dart';
 import '../../sync/data/acquire_api_client.dart';
 import '../../sync/presentation/daily_feed_provider.dart';
 
-/// Manage followed Bilibili / YouTube creators for Discover recommendations.
+/// Manage followed Bilibili creators for Home recommendations.
 class FollowedCreatorsScreen extends ConsumerStatefulWidget {
   const FollowedCreatorsScreen({super.key});
 
@@ -64,9 +64,25 @@ class _FollowedCreatorsScreenState extends ConsumerState<FollowedCreatorsScreen>
     }
   }
 
+  bool _looksLikeYoutube(String url) {
+    final Uri? uri = Uri.tryParse(url);
+    if (uri == null) return false;
+    final String host = uri.host.toLowerCase().replaceFirst('www.', '');
+    return host == 'youtu.be' ||
+        host == 'youtube.com' ||
+        host == 'm.youtube.com' ||
+        host.endsWith('.youtube.com');
+  }
+
   Future<void> _followFromUrl() async {
     final String url = _urlController.text.trim();
     if (url.isEmpty || _busy) {
+      return;
+    }
+    if (_looksLikeYoutube(url)) {
+      setState(() {
+        _error = '因政策原因，暂时不支持关注 YouTube 博主，请粘贴 B 站空间链接。';
+      });
       return;
     }
     setState(() {
@@ -148,16 +164,16 @@ class _FollowedCreatorsScreenState extends ConsumerState<FollowedCreatorsScreen>
         padding: const EdgeInsets.all(16),
         children: <Widget>[
           const Text(
-            '粘贴 B 站空间或 YouTube 频道链接。关注后其视频会出现在首页推荐，'
-            '点开后仍需自行导入到本地。',
+            '粘贴你喜欢的 B 站 UP 主空间链接。关注后其视频会出现在首页推荐，'
+            '点开后仍需自行导入。因政策原因，YouTube 博主暂时不支持关注。',
             style: TextStyle(color: StudyShellTokens.textSecondary),
           ),
           const SizedBox(height: 12),
           TextField(
             controller: _urlController,
             decoration: const InputDecoration(
-              labelText: '博主主页链接',
-              hintText: 'https://space.bilibili.com/… 或 YouTube 频道',
+              labelText: 'B 站空间链接',
+              hintText: 'https://space.bilibili.com/…',
               border: OutlineInputBorder(),
             ),
             textInputAction: TextInputAction.done,
@@ -186,7 +202,7 @@ class _FollowedCreatorsScreenState extends ConsumerState<FollowedCreatorsScreen>
           else if (_creators.isEmpty)
             const ListTile(
               title: Text('还没有关注博主'),
-              subtitle: Text('关注后，对方新视频会出现在首页推荐。'),
+              subtitle: Text('把喜欢的 B 站博主加进来，首页会优先推他们的新片。'),
             )
           else
             for (final FollowedCreatorDto c in _creators)

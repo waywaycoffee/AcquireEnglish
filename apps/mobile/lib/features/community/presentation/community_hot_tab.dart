@@ -34,12 +34,17 @@ class CommunityHotTab extends ConsumerWidget {
             padding: const EdgeInsets.fromLTRB(16, 12, 16, 32),
             children: <Widget>[
               Text(
-                '大家在分享的视频',
+                '大家喜欢的 B 站视频',
                 style: Theme.of(context).textTheme.titleMedium,
+              ),
+              const SizedBox(height: 4),
+              Text(
+                '欢迎在「动态」分享你觉得好听的片子，帮助同学发现好内容。',
+                style: Theme.of(context).textTheme.bodySmall,
               ),
               const SizedBox(height: 8),
               if (data.shares.isEmpty)
-                const Text('还没有人分享链接。去「动态」发一条分享吧。')
+                const Text('还没有人分享。去「动态」贴一条你喜欢的 B 站链接吧。')
               else
                 for (final HotShareDto share in data.shares)
                   ListTile(
@@ -68,33 +73,29 @@ class CommunityHotTab extends ConsumerWidget {
                   ),
               const SizedBox(height: 24),
               Text(
-                '大家在关注的博主',
+                '大家喜欢的 B 站博主',
                 style: Theme.of(context).textTheme.titleMedium,
               ),
               const SizedBox(height: 4),
               Text(
-                '关注后，新视频会出现在首页推荐；导入仍需你确认。',
+                '关注后新视频会出现在首页推荐；导入仍需你确认。YouTube 博主因政策原因暂时不可关注。',
                 style: Theme.of(context).textTheme.bodySmall,
               ),
               const SizedBox(height: 8),
               if (data.creators.isEmpty)
-                const Text('暂无聚合数据。去关注几位博主吧。')
+                const Text('暂无聚合数据。去「关注博主」添加你喜欢的 B 站 UP 主吧。')
               else
                 for (final HotCreatorDto creator in data.creators)
                   ListTile(
                     contentPadding: EdgeInsets.zero,
-                    leading: Icon(
-                      creator.source == 'youtube'
-                          ? Icons.play_circle_outline
-                          : Icons.person_outline,
-                    ),
+                    leading: const Icon(Icons.person_outline),
                     title: Text(
                       creator.displayName.isEmpty
                           ? creator.creatorId
                           : creator.displayName,
                     ),
                     subtitle: Text(
-                      '${creator.source} · ${creator.followerCount} 人关注',
+                      'B站 · ${creator.followerCount} 人关注',
                     ),
                     trailing: TextButton(
                       onPressed: () =>

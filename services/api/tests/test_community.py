@@ -185,3 +185,15 @@ async def test_hot_shares_and_creators():
         creators = await client.get("/api/community/hot-creators", headers=headers)
         assert creators.status_code == 200
         assert any(row["creator_id"] == "12345" for row in creators.json())
+
+        blocked = await client.post(
+            "/api/community/posts",
+            headers=headers,
+            json={
+                "kind": "share_link",
+                "title": "yt",
+                "link_url": "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
+            },
+        )
+        assert blocked.status_code == 400
+        assert "YouTube" in blocked.json()["detail"]

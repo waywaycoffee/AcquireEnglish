@@ -34,7 +34,10 @@ class CommunityFeedTab extends ConsumerWidget {
                   physics: const AlwaysScrollableScrollPhysics(),
                   padding: const EdgeInsets.all(24),
                   children: const <Widget>[
-                    Text('还没有动态。点右下角发帖吐槽、分享方法或视频链接。'),
+                    Text(
+                      '还没有动态。点右下角发帖，欢迎分享你觉得好听的 B 站视频，'
+                      '或到「关注博主」收藏喜欢的 UP 主。',
+                    ),
                   ],
                 );
               }
@@ -83,7 +86,8 @@ class CommunityFeedTab extends ConsumerWidget {
             ),
             ListTile(
               leading: const Icon(Icons.link),
-              title: const Text('分享视频链接'),
+              title: const Text('分享 B 站视频'),
+              subtitle: const Text('推荐你觉得适合精听的片子'),
               onTap: () => Navigator.pop(ctx, 'share_link'),
             ),
             ListTile(
@@ -251,14 +255,56 @@ class _ComposeSheetState extends ConsumerState<_ComposeSheet> {
       case 'feedback':
         return '吐槽缺陷';
       case 'share_link':
-        return '分享视频链接';
+        return '分享你喜欢的 B 站视频';
       default:
         return '分享学习方法';
     }
   }
 
+  bool _isYoutubeUrl(String url) {
+    final Uri? uri = Uri.tryParse(url);
+    if (uri == null) return false;
+    final String host = uri.host.toLowerCase().replaceFirst('www.', '');
+    return host == 'youtu.be' ||
+        host == 'youtube.com' ||
+        host == 'm.youtube.com' ||
+        host.endsWith('.youtube.com');
+  }
+
+  bool _isBilibiliUrl(String url) {
+    final Uri? uri = Uri.tryParse(url);
+    if (uri == null) return false;
+    final String host = uri.host.toLowerCase().replaceFirst('www.', '');
+    return host == 'bilibili.com' ||
+        host.endsWith('.bilibili.com') ||
+        host == 'b23.tv';
+  }
+
   Future<void> _submit() async {
     if (_busy) return;
+    if (widget.kind == 'share_link') {
+      final String link = _link.text.trim();
+      if (link.isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('请粘贴 B 站视频链接')),
+        );
+        return;
+      }
+      if (_isYoutubeUrl(link)) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('因政策原因，暂时不支持分享 YouTube 视频，请改用 B 站链接'),
+          ),
+        );
+        return;
+      }
+      if (!_isBilibiliUrl(link)) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('目前仅支持 bilibili.com / b23.tv 链接')),
+        );
+        return;
+      }
+    }
     setState(() => _busy = true);
     try {
       await ref.read(communityFeedProvider.notifier).createPost(
@@ -317,11 +363,16 @@ class _ComposeSheetState extends ConsumerState<_ComposeSheet> {
             ),
             if (widget.kind == 'share_link') ...<Widget>[
               const SizedBox(height: 10),
+              Text(
+                '把你觉得适合练听力的 B 站片子分享给大家。YouTube 因政策原因暂时不支持。',
+                style: Theme.of(context).textTheme.bodySmall,
+              ),
+              const SizedBox(height: 10),
               TextField(
                 controller: _link,
                 decoration: const InputDecoration(
-                  labelText: '视频链接',
-                  hintText: 'https://www.bilibili.com/video/…',
+                  labelText: 'B 站视频链接',
+                  hintText: 'https://www.bilibili.com/video/… 或 b23.tv/…',
                   border: OutlineInputBorder(),
                 ),
               ),

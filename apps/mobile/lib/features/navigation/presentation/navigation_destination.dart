@@ -30,7 +30,7 @@ enum AppNavDestination {
     route: '/discover',
     label: '社区',
     title: '社区',
-    subtitle: '学习时长榜、找搭子、分享视频与发帖交流。',
+    subtitle: '分享喜欢的 B 站视频与博主，找搭子一起练。',
     icon: Icons.groups_outlined,
     activeIcon: Icons.groups_rounded,
   ),

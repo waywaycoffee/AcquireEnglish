@@ -79,17 +79,14 @@ async def follow_creator(
             )
         else:
             yt = parse_youtube_channel(url)
-            if yt is None:
+            if yt is not None:
                 raise HTTPException(
                     status_code=400,
-                    detail="Unsupported URL. Paste a Bilibili space or YouTube channel link.",
+                    detail="因政策原因，暂时不支持关注 YouTube 博主，请改用 B 站空间链接",
                 )
-            creator = FollowedCreator(
-                source="youtube",
-                creator_id=yt["creator_id"],
-                display_name=yt.get("display_name") or yt["creator_id"],
-                avatar_url=None,
-                profile_url=yt.get("profile_url"),
+            raise HTTPException(
+                status_code=400,
+                detail="请粘贴 B 站空间链接（space.bilibili.com）",
             )
     elif payload.source and payload.creator_id:
         source = payload.source
@@ -97,6 +94,11 @@ async def follow_creator(
         display = (payload.display_name or "").strip()
         avatar = payload.avatar_url
         profile = payload.profile_url
+        if source == "youtube":
+            raise HTTPException(
+                status_code=400,
+                detail="因政策原因，暂时不支持关注 YouTube 博主，请改用 B 站空间链接",
+            )
         if source == "bilibili":
             mid = parse_bilibili_space_mid(creator_id) or (
                 creator_id if creator_id.isdigit() else None
@@ -117,12 +119,9 @@ async def follow_creator(
                 profile_url=profile or f"https://space.bilibili.com/{mid}",
             )
         else:
-            creator = FollowedCreator(
-                source="youtube",
-                creator_id=creator_id.lstrip("@"),
-                display_name=display or creator_id,
-                avatar_url=avatar,
-                profile_url=profile,
+            raise HTTPException(
+                status_code=400,
+                detail="目前仅支持关注 B 站博主",
             )
     else:
         raise HTTPException(status_code=400, detail="Provide url or source+creator_id")

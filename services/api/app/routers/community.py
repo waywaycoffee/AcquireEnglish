@@ -194,7 +194,20 @@ class VocabPkOut(BaseModel):
     i_am_challenger: bool = False
 
 
-def _normalize_link(url: str) -> str:
+def _host_is_bilibili(host: str) -> bool:
+    h = (host or "").lower().removeprefix("www.")
+    return h == "bilibili.com" or h.endswith(".bilibili.com") or h == "b23.tv"
+
+
+def _host_is_youtube(host: str) -> bool:
+    h = (host or "").lower().removeprefix("www.")
+    return h in {"youtube.com", "youtu.be", "m.youtube.com", "youtube-nocookie.com"} or h.endswith(
+        ".youtube.com"
+    )
+
+
+def _normalize_share_link(url: str) -> str:
+    """Community share_link: Bilibili only (YouTube temporarily unsupported)."""
     text = (url or "").strip()
     if not text:
         return ""
@@ -203,6 +216,17 @@ def _normalize_link(url: str) -> str:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="link_url must be http(s)",
+        )
+    host = parsed.netloc.split("@")[-1].split(":")[0]
+    if _host_is_youtube(host):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="因政策原因，暂时不支持分享 YouTube 视频，请改用 B 站链接",
+        )
+    if not _host_is_bilibili(host):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="目前仅支持分享 B 站视频链接（bilibili.com / b23.tv）",
         )
     return text
 
@@ -346,7 +370,7 @@ async def create_post(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="share_link requires link_url",
             )
-        link_url = _normalize_link(payload.link_url)
+        link_url = _normalize_share_link(payload.link_url)
         if not link_title:
             host = urlparse(link_url).netloc or "分享链接"
             link_title = host
@@ -717,6 +741,9 @@ async def hot_shares(
         url = (post.link_url or "").strip()
         if not url:
             continue
+        host = urlparse(url).netloc.split("@")[-1].split(":")[0]
+        if not _host_is_bilibili(host):
+            continue
         bucket = buckets.get(url)
         if bucket is None:
             buckets[url] = {
@@ -750,6 +777,9 @@ async def hot_creators(
     meta: dict[tuple[str, str], dict[str, str | None]] = {}
     for pref in prefs:
         for creator in parse_followed_creators(pref.followed_creators_json):
+            # Community hot list highlights Bilibili creators only.
+            if creator.source != "bilibili":
+                continue
             key = (creator.source, creator.creator_id)
             counter[key] += 1
             if key not in meta:
