@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../authentication/presentation/auth_session.dart';
@@ -78,6 +79,38 @@ class _CommunityScreenState extends ConsumerState<CommunityScreen> {
       body: Column(
         children: <Widget>[
           Padding(
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
+            child: Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Theme.of(context).colorScheme.primaryContainer,
+                borderRadius: BorderRadius.circular(16),
+              ),
+              child: Row(
+                children: <Widget>[
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: <Widget>[
+                        Text(
+                          '一起学，更容易坚持',
+                          style: Theme.of(context).textTheme.titleLarge,
+                        ),
+                        const SizedBox(height: 6),
+                        const Text('发现一个好表达，开始今天的学习。'),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  FilledButton(
+                    onPressed: () => context.go('/library'),
+                    child: const Text('去学习'),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          Padding(
             padding: const EdgeInsets.fromLTRB(16, 4, 16, 0),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -120,8 +153,7 @@ class _CommunityScreenState extends ConsumerState<CommunityScreen> {
                           unawaited(
                             Navigator.of(context).push<void>(
                               MaterialPageRoute<void>(
-                                builder: (_) =>
-                                    const FollowedCreatorsScreen(),
+                                builder: (_) => const FollowedCreatorsScreen(),
                               ),
                             ),
                           );

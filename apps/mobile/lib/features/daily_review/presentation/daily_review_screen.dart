@@ -80,6 +80,7 @@ class _DailyReviewScreenState extends ConsumerState<DailyReviewScreen>
   bool _speaking = false;
   int _speechSequence = 0;
   WordPronunciationService? _speech;
+
   /// Index into [WordReviewSettings.orderedModes] for the current word card.
   int _modeStep = 0;
   final Map<String, List<fsrs.Rating>> _stageRatings =
@@ -121,10 +122,12 @@ class _DailyReviewScreenState extends ConsumerState<DailyReviewScreen>
   }
 
   List<ReviewSource> _filteredSources() {
-    Iterable<ReviewSource> sources = ref.watch(reviewSourcesProvider).where(
-      (ReviewSource source) =>
-          source.key.startsWith('recommended:') == widget.recommended,
-    );
+    Iterable<ReviewSource> sources = ref
+        .watch(reviewSourcesProvider)
+        .where(
+          (ReviewSource source) =>
+              source.key.startsWith('recommended:') == widget.recommended,
+        );
     if (widget.expressions) {
       sources = sources.where(
         (ReviewSource source) => source.kind != ReviewKind.sentence,
@@ -166,9 +169,7 @@ class _DailyReviewScreenState extends ConsumerState<DailyReviewScreen>
                   ? (widget.focusWord != null && widget.focusWord!.isNotEmpty
                         ? '复习此词'
                         : '自由复习')
-                  : (widget.practiceKind == ReviewKind.word
-                        ? '今日背词'
-                        : '正在复习'))
+                  : (widget.practiceKind == ReviewKind.word ? '今日背词' : '正在复习'))
             : '每日复习',
         description: widget.session
             ? (widget.missedOnly
@@ -231,7 +232,7 @@ class _DailyReviewScreenState extends ConsumerState<DailyReviewScreen>
                               _ReviewSurface(
                                 child: Text(
                                   state.storageError!,
-                                  style: const TextStyle(
+                                  style: TextStyle(
                                     color: Color(0xFF9B2828),
                                     height: 1.6,
                                   ),
@@ -522,7 +523,7 @@ class _DailyReviewScreenState extends ConsumerState<DailyReviewScreen>
                                       : widget.practice
                                       ? '这轮自由复习完成了'
                                       : '这一轮，完成了',
-                                  style: const TextStyle(
+                                  style: TextStyle(
                                     fontSize: 26,
                                     fontWeight: FontWeight.w900,
                                   ),
@@ -792,10 +793,10 @@ class _DailyReviewScreenState extends ConsumerState<DailyReviewScreen>
                     const SizedBox(height: 6),
                     Text(
                       body,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 14,
                         height: 1.7,
-                        color: Color(0xFF626262),
+                        color: AppDesignTokens.textSecondary,
                       ),
                     ),
                   ],
@@ -827,10 +828,10 @@ class _DailyReviewScreenState extends ConsumerState<DailyReviewScreen>
     final String title = empty
         ? '把想记住的表达带到这里'
         : done
-        ? '这一轮，完成了'
+        ? '今天暂时没有到期内容'
         : plan.today.reviews > 0
         ? '继续今天的记忆练习'
-        : '今天，也给记忆一点时间';
+        : '把学过的，真正记住';
     return _ReviewSurface(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -856,13 +857,19 @@ class _DailyReviewScreenState extends ConsumerState<DailyReviewScreen>
                 : done
                 ? _completionText(plan, state.dailyNewLimit, now)
                 : '先尝试回忆，再揭晓答案。每次如实反馈，系统会安排适合它的下次见面时间。',
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 15,
               height: 1.65,
-              color: Color(0xFF626262),
+              color: AppDesignTokens.textSecondary,
             ),
           ),
-          const SizedBox(height: 28),
+          const SizedBox(height: 16),
+          if (!empty && !done)
+            Text(
+              '约 ${(plan.remaining * 20 / 60).ceil()} 分钟 · 可随时暂停',
+              style: TextStyle(color: AppDesignTokens.textSecondary),
+            ),
+          const SizedBox(height: 20),
           Wrap(
             spacing: 28,
             runSpacing: 20,
@@ -898,12 +905,12 @@ class _DailyReviewScreenState extends ConsumerState<DailyReviewScreen>
               label: const Text('再次复习'),
             ),
             const SizedBox(height: 10),
-            const Text(
+            Text(
               '当前没有到期内容，可以自由练习已学内容，不改变复习计划或新学额度。',
               style: TextStyle(
                 fontSize: 13,
                 height: 1.6,
-                color: Color(0xFF626262),
+                color: AppDesignTokens.textSecondary,
               ),
             ),
           ],
@@ -915,6 +922,97 @@ class _DailyReviewScreenState extends ConsumerState<DailyReviewScreen>
               label: const Text('调整每天新学数量'),
             ),
           ],
+          const SizedBox(height: 20),
+          Row(
+            children: <Widget>[
+              for (final ReviewKind kind in ReviewKind.values)
+                Expanded(
+                  child: Padding(
+                    padding: const EdgeInsets.only(right: 8),
+                    child: Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: AppDesignTokens.softGray,
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: <Widget>[
+                          Text(
+                            '${counts[kind]}',
+                            style: TextStyle(
+                              fontSize: 24,
+                              fontWeight: FontWeight.w800,
+                              color: AppDesignTokens.textPrimary,
+                            ),
+                          ),
+                          Text(
+                            '${kind.label}收藏',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: AppDesignTokens.textSecondary,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+            ],
+          ),
+          const SizedBox(height: 20),
+          Text(
+            '本周坚持的痕迹',
+            style: TextStyle(
+              fontWeight: FontWeight.w800,
+              color: AppDesignTokens.textPrimary,
+            ),
+          ),
+          const SizedBox(height: 10),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: <Widget>[
+              for (int day = 0; day < 7; day++)
+                Builder(
+                  builder: (BuildContext context) {
+                    final DateTime date = DateTime(
+                      now.year,
+                      now.month,
+                      now.day - now.weekday + 1 + day,
+                    );
+                    final bool studied =
+                        (state.days[reviewDayKey(date)]?.reviews ?? 0) > 0;
+                    return Column(
+                      children: <Widget>[
+                        Text(
+                          const <String>[
+                            '一',
+                            '二',
+                            '三',
+                            '四',
+                            '五',
+                            '六',
+                            '日',
+                          ][day],
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: AppDesignTokens.textSecondary,
+                          ),
+                        ),
+                        const SizedBox(height: 6),
+                        Icon(
+                          studied ? Icons.check_circle : Icons.circle_outlined,
+                          size: 24,
+                          color: studied
+                              ? AppDesignTokens.brandGreen
+                              : AppDesignTokens.borderGray,
+                        ),
+                      ],
+                    );
+                  },
+                ),
+            ],
+          ),
           const SizedBox(height: 16),
           Wrap(
             spacing: 8,
@@ -1048,7 +1146,7 @@ class _DailyReviewScreenState extends ConsumerState<DailyReviewScreen>
                         : record.isNew
                         ? '首次学习'
                         : '到期复习'}$stageLabel',
-                    style: const TextStyle(
+                    style: TextStyle(
                       color: Color(0xFF377D05),
                       fontSize: 13,
                       fontWeight: FontWeight.w800,
@@ -1066,7 +1164,7 @@ class _DailyReviewScreenState extends ConsumerState<DailyReviewScreen>
             if (encounterToday > 0)
               Text(
                 '片中再遇 · 今日 $encounterToday 次',
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 12,
                   color: Color(0xFF925600),
                   fontWeight: FontWeight.w700,
@@ -1082,7 +1180,7 @@ class _DailyReviewScreenState extends ConsumerState<DailyReviewScreen>
                   ? '先回忆中文含义'
                   : '先试着用英语说出来',
               textAlign: TextAlign.center,
-              style: const TextStyle(fontSize: 14, color: Color(0xFF626262)),
+              style: TextStyle(fontSize: 14, color: Color(0xFF626262)),
             ),
             const SizedBox(height: 18),
             SelectableText(
@@ -1103,10 +1201,10 @@ class _DailyReviewScreenState extends ConsumerState<DailyReviewScreen>
                 Expanded(
                   child: Text(
                     '${source.sourceLabel}${source.time == null ? '' : ' · ${source.time}'}',
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 12,
                       height: 1.5,
-                      color: Color(0xFF626262),
+                      color: AppDesignTokens.textSecondary,
                     ),
                   ),
                 ),
@@ -1158,13 +1256,13 @@ class _DailyReviewScreenState extends ConsumerState<DailyReviewScreen>
                 label: const Text('录音并云端打分'),
               ),
               const SizedBox(height: 8),
-              const Text(
+              Text(
                 '优先用腾讯云跟读评分；未配置密钥时可下方自评。分数会与前面关卡取最弱一环写入 FSRS。',
                 textAlign: TextAlign.center,
                 style: TextStyle(
                   fontSize: 12,
                   height: 1.6,
-                  color: Color(0xFF626262),
+                  color: AppDesignTokens.textSecondary,
                 ),
               ),
               const SizedBox(height: 16),
@@ -1227,14 +1325,14 @@ class _DailyReviewScreenState extends ConsumerState<DailyReviewScreen>
                 const SizedBox(height: 16),
                 Text(
                   formatSubtitleLetterCase(source.english, letterCase),
-                  style: const TextStyle(fontSize: 16, height: 1.6),
+                  style: TextStyle(fontSize: 16, height: 1.6),
                 ),
                 if (source.chinese.isNotEmpty)
                   Text(
                     source.chinese,
-                    style: const TextStyle(
+                    style: TextStyle(
                       height: 1.6,
-                      color: Color(0xFF626262),
+                      color: AppDesignTokens.textSecondary,
                     ),
                   ),
               ],
@@ -1279,13 +1377,13 @@ class _DailyReviewScreenState extends ConsumerState<DailyReviewScreen>
                   child: const Text('没记住，稍后重练'),
                 ),
                 const SizedBox(height: 10),
-                const Text(
+                Text(
                   '自由练习不评分，不改变下次到期时间或新学额度。',
                   textAlign: TextAlign.center,
                   style: TextStyle(
                     fontSize: 12,
                     height: 1.6,
-                    color: Color(0xFF626262),
+                    color: AppDesignTokens.textSecondary,
                   ),
                 ),
               ],
@@ -1294,12 +1392,12 @@ class _DailyReviewScreenState extends ConsumerState<DailyReviewScreen>
                   !choiceMode &&
                   !widget.practice) ...<Widget>[
                 const SizedBox(height: 26),
-                const Text(
+                Text(
                   '刚才回忆得怎么样？忘记了就选“忘记”，不要选“费力想起”。',
                   style: TextStyle(
                     fontSize: 12,
                     height: 1.6,
-                    color: Color(0xFF626262),
+                    color: AppDesignTokens.textSecondary,
                   ),
                 ),
                 const SizedBox(height: 12),
@@ -1324,7 +1422,7 @@ class _DailyReviewScreenState extends ConsumerState<DailyReviewScreen>
                   ? '先回忆，再揭晓；随时都能再练一轮'
                   : '先回忆，再揭晓；如实反馈就好',
               textAlign: TextAlign.center,
-              style: const TextStyle(fontSize: 12, color: Color(0xFF626262)),
+              style: TextStyle(fontSize: 12, color: Color(0xFF626262)),
             ),
           ],
         ),
@@ -1399,7 +1497,7 @@ class _DailyReviewScreenState extends ConsumerState<DailyReviewScreen>
                     children: <Widget>[
                       Text(
                         label,
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 14,
                           fontWeight: FontWeight.w800,
                         ),
@@ -1408,14 +1506,14 @@ class _DailyReviewScreenState extends ConsumerState<DailyReviewScreen>
                       Text(
                         hint,
                         textAlign: TextAlign.center,
-                        style: const TextStyle(fontSize: 11, height: 1.4),
+                        style: TextStyle(fontSize: 11, height: 1.4),
                       ),
                       if (!practice && !speakHints) ...<Widget>[
                         const SizedBox(height: 4),
                         Text(
                           '预计 ${_formatReviewDelay(record.scheduledCard(rating, now).due, now)}',
                           textAlign: TextAlign.center,
-                          style: const TextStyle(fontSize: 11, height: 1.4),
+                          style: TextStyle(fontSize: 11, height: 1.4),
                         ),
                       ],
                     ],
@@ -1442,18 +1540,18 @@ class _DailyReviewScreenState extends ConsumerState<DailyReviewScreen>
           ),
         ),
         const SizedBox(height: 8),
-        const Text(
+        Text(
           '到期内容按等待时间优先复习；每完成 4 次到期复习，穿插 1 条新学。新内容按入队顺序轮到，未完成的会保留。',
           style: TextStyle(fontSize: 13, height: 1.7, color: Color(0xFF626262)),
         ),
         if (plan.waiting.length > limit && limit > 0) ...<Widget>[
           const SizedBox(height: 8),
-          const Text(
+          Text(
             '如果收藏速度持续超过学习速度，待学会增加。可以调整新学数量，或先放慢新增节奏。',
             style: TextStyle(
               fontSize: 12,
               height: 1.6,
-              color: Color(0xFF626262),
+              color: AppDesignTokens.textSecondary,
             ),
           ),
         ],
@@ -1550,7 +1648,21 @@ class _DailyReviewScreenState extends ConsumerState<DailyReviewScreen>
       }
       await _finishGrade(source, record, rating);
     } catch (_) {
-      if (mounted) _message('这次进度未能保存，请重试；当前内容仍保留。');
+      if (mounted) {
+        await showDialog<void>(
+          context: context,
+          builder: (BuildContext context) => AlertDialog(
+            title: const Text('这条评分还没有保存'),
+            content: const Text('当前内容仍保留，请关闭提示后重新评分。保存成功前不会计为完成。'),
+            actions: <Widget>[
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('返回当前卡片'),
+              ),
+            ],
+          ),
+        );
+      }
     } finally {
       if (mounted) setState(() => _saving = false);
     }
@@ -1835,7 +1947,7 @@ class _DailyReviewScreenState extends ConsumerState<DailyReviewScreen>
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: <Widget>[
-                const Text(
+                Text(
                   '复习设置',
                   style: TextStyle(fontSize: 22, fontWeight: FontWeight.w800),
                 ),
@@ -1860,7 +1972,7 @@ class _DailyReviewScreenState extends ConsumerState<DailyReviewScreen>
                   },
                 ),
                 const SizedBox(height: 18),
-                const Text(
+                Text(
                   '更改设置不会清空收藏或已有进度。到期复习不受新学数量限制。',
                   style: TextStyle(height: 1.6, color: Color(0xFF626262)),
                 ),
