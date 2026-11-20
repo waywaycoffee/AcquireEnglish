@@ -92,6 +92,11 @@ class SyllabusBooksScreen extends ConsumerWidget {
         leading: PadBackButton(onPressed: () => context.pop()),
         actions: <Widget>[
           TextButton.icon(
+            onPressed: () => context.push('/words/syllabus/catalog'),
+            icon: const Icon(Icons.cloud_download_outlined),
+            label: const Text('在线词库'),
+          ),
+          TextButton.icon(
             onPressed: () => unawaited(_import(context, ref)),
             icon: const Icon(Icons.upload_file_rounded),
             label: const Text('导入'),
@@ -104,8 +109,14 @@ class SyllabusBooksScreen extends ConsumerWidget {
               padding: const EdgeInsets.all(20),
               children: <Widget>[
                 const Text(
-                  '内置词书基于公开词典词频筛选的自建核心表，释义来自本机词典。可用 CSV/TXT 导入自己的词表。',
+                  '内置四级/六级自建核心表；也可从在线词库（lilinji/English）按需下载，或用 CSV/TXT 导入。',
                   style: TextStyle(height: 1.5, color: Color(0xFF626262)),
+                ),
+                const SizedBox(height: 12),
+                FilledButton.tonalIcon(
+                  onPressed: () => context.push('/words/syllabus/catalog'),
+                  icon: const Icon(Icons.cloud_download_outlined),
+                  label: const Text('浏览并下载词书'),
                 ),
                 const SizedBox(height: 16),
                 if (state.all.isEmpty)

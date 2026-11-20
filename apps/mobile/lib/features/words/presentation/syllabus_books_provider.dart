@@ -203,24 +203,35 @@ class SyllabusBooksNotifier extends Notifier<SyllabusBooksState> {
     if (words.isEmpty) return null;
     final String id =
         'import_${DateTime.now().millisecondsSinceEpoch}_${words.length}';
-    final SyllabusBook book = SyllabusBook(
-      id: id,
-      title: title.trim().isEmpty ? '导入词书' : title.trim(),
-      examTag: 'IMPORT',
-      disclaimer: '用户导入词表。',
-      words: words,
-      builtin: false,
+    return saveImportedBook(
+      SyllabusBook(
+        id: id,
+        title: title.trim().isEmpty ? '导入词书' : title.trim(),
+        examTag: 'IMPORT',
+        disclaimer: '用户导入词表。',
+        words: words,
+        builtin: false,
+      ),
     );
+  }
+
+  /// Upsert an imported / downloaded book (same [SyllabusBook.id] replaces).
+  Future<SyllabusBook> saveImportedBook(SyllabusBook book) async {
+    final List<SyllabusBook> next = <SyllabusBook>[
+      for (final SyllabusBook item in state.imported)
+        if (item.id != book.id) item,
+      book,
+    ];
     state = state.copyWith(
-      imported: List<SyllabusBook>.unmodifiable(<SyllabusBook>[
-        ...state.imported,
-        book,
-      ]),
+      imported: List<SyllabusBook>.unmodifiable(next),
       activeBookId: book.id,
     );
     await _persist();
     return book;
   }
+
+  bool hasImportedId(String id) =>
+      state.imported.any((SyllabusBook b) => b.id == id);
 
   Future<void> deleteImported(String bookId) async {
     final List<SyllabusBook> next = state.imported
