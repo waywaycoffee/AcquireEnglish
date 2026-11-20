@@ -130,11 +130,11 @@ reviewSourcesProvider = Provider<List<ReviewSource>>((Ref ref) {
       for (final SyllabusWord entry in book.words)
         ReviewSource(
           key: syllabusReviewKey(book.id, entry.word),
-          kind: ReviewKind.word,
+          kind: book.isPatternBook ? ReviewKind.sentence : ReviewKind.word,
           question: entry.word,
           answer: entry.gloss,
-          english: '',
-          chinese: '',
+          english: book.isPatternBook ? entry.word : '',
+          chinese: book.isPatternBook ? entry.gloss : '',
           sourceLabel: '${book.title} · ${book.examTag}',
         ),
   ];

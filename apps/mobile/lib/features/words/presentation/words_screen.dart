@@ -225,6 +225,31 @@ class _WordsScreenState extends ConsumerState<WordsScreen> {
                               ),
                             ),
                             const SizedBox(height: 12),
+                            Row(
+                              children: <Widget>[
+                                Expanded(
+                                  child: _BookTypeCard(
+                                    title: '词书',
+                                    subtitle: '四级/六级与在线词库',
+                                    icon: Icons.menu_book_rounded,
+                                    onTap: () =>
+                                        context.push('/words/syllabus'),
+                                  ),
+                                ),
+                                const SizedBox(width: 10),
+                                Expanded(
+                                  child: _BookTypeCard(
+                                    title: '句型书',
+                                    subtitle: '日常口语句型练习',
+                                    icon: Icons.format_quote_rounded,
+                                    onTap: () => context.push(
+                                      '/words/syllabus?tab=pattern',
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 10),
                             Wrap(
                               spacing: 8,
                               runSpacing: 8,
@@ -236,11 +261,6 @@ class _WordsScreenState extends ConsumerState<WordsScreen> {
                                         ? SGRoute.vocabularyPlacement.route
                                         : '${SGRoute.reviewSession.route}?deck=recommended',
                                   ),
-                                ),
-                                ActionChip(
-                                  label: const Text('考纲词书'),
-                                  onPressed: () =>
-                                      context.push('/words/syllabus'),
                                 ),
                                 ActionChip(
                                   label: const Text('背收藏单词'),
@@ -440,6 +460,79 @@ class _WordsScreenState extends ConsumerState<WordsScreen> {
               ),
         )
         .toList(growable: false);
+  }
+}
+
+class _BookTypeCard extends StatelessWidget {
+  const _BookTypeCard({
+    required this.title,
+    required this.subtitle,
+    required this.icon,
+    required this.onTap,
+  });
+
+  final String title;
+  final String subtitle;
+  final IconData icon;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: AppDesignTokens.appWhite,
+      borderRadius: BorderRadius.circular(18),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(18),
+        child: Container(
+          padding: const EdgeInsets.fromLTRB(14, 14, 14, 12),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(color: AppDesignTokens.borderGray),
+          ),
+          child: Row(
+            children: <Widget>[
+              Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                  color: const Color(0xFFEAF5E5),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Icon(icon, color: AppDesignTokens.brandGreenDark),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: <Widget>[
+                    Text(
+                      title,
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w900,
+                        color: AppDesignTokens.textPrimary,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      subtitle,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: AppDesignTokens.textSecondary,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 }
 

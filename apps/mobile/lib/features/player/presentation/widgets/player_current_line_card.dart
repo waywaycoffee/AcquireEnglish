@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 
 import '../../../shared/domain/subtitle_letter_case.dart';
@@ -21,6 +23,7 @@ class PlayerCurrentLineCard extends StatefulWidget {
     required this.onBookmark,
     required this.onCollectWord,
     this.onCollectWordAtTime,
+    this.onFavoriteWord,
     this.episodeId,
     this.onPronounce,
     super.key,
@@ -37,6 +40,7 @@ class PlayerCurrentLineCard extends StatefulWidget {
   final VoidCallback onBookmark;
   final ValueChanged<String> onCollectWord;
   final void Function(String word, String time)? onCollectWordAtTime;
+  final void Function(String word, [String? definitionCn])? onFavoriteWord;
   final String? episodeId;
   final VoidCallback? onPronounce;
 
@@ -46,6 +50,7 @@ class PlayerCurrentLineCard extends StatefulWidget {
 
 class _PlayerCurrentLineCardState extends State<PlayerCurrentLineCard> {
   String? selectedWord;
+  int? _phraseAnchorIndex;
   List<String> _tokens = const <String>[];
 
   @override
@@ -64,6 +69,7 @@ class _PlayerCurrentLineCardState extends State<PlayerCurrentLineCard> {
         oldWidget.subtitleLetterCase != widget.subtitleLetterCase ||
         oldWidget.line.words.length != widget.line.words.length) {
       selectedWord = null;
+      _phraseAnchorIndex = null;
       _tokens = _buildTokens(
         formatSubtitleLetterCase(
           widget.line.english,
@@ -87,6 +93,33 @@ class _PlayerCurrentLineCardState extends State<PlayerCurrentLineCard> {
           );
     }
     return spaceTokens;
+  }
+
+  void _selectToken(int index) {
+    final int? anchor = _phraseAnchorIndex;
+    if (anchor != null && anchor != index) {
+      final int start = math.min(anchor, index);
+      final int end = math.max(anchor, index);
+      setState(() {
+        selectedWord = _tokens.sublist(start, end + 1).join(' ');
+        _phraseAnchorIndex = null;
+      });
+      return;
+    }
+    setState(() {
+      selectedWord = _tokens[index];
+      _phraseAnchorIndex = null;
+    });
+  }
+
+  void _beginPhraseSelection(int index) {
+    setState(() {
+      _phraseAnchorIndex = index;
+      selectedWord = null;
+    });
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(const SnackBar(content: Text('已选起点，再点一个词组成短语')));
   }
 
   @override
@@ -155,7 +188,7 @@ class _PlayerCurrentLineCardState extends State<PlayerCurrentLineCard> {
                 const SizedBox(width: 10),
                 Expanded(
                   child: Text(
-                    '今日句子 · 点单词可打开学习卡',
+                    '点词开卡 · 长按选短语起点',
                     style: TextStyle(
                       color: AppDesignTokens.textSecondary,
                       fontSize: 12,
@@ -189,7 +222,14 @@ class _PlayerCurrentLineCardState extends State<PlayerCurrentLineCard> {
                     .map((MapEntry<int, String> wordEntry) {
                       final int index = wordEntry.key;
                       final String token = wordEntry.value;
-                      final bool selectedToken = selectedWord == token;
+                      final bool selectedToken =
+                          selectedWord != null &&
+                          (selectedWord == token ||
+                              (selectedWord!.contains(' ') &&
+                                  selectedWord!
+                                      .split(RegExp(r'\s+'))
+                                      .contains(token)));
+                      final bool phraseAnchor = _phraseAnchorIndex == index;
                       final bool karaoke =
                           highlightEnabled &&
                           index == widget.currentWordIndex;
@@ -203,18 +243,23 @@ class _PlayerCurrentLineCardState extends State<PlayerCurrentLineCard> {
                         vocabMark,
                         onDarkVideo: false,
                       );
-                      final Color fill = vocabMark != SubtitleVocabMark.none
+                      final Color fill = phraseAnchor
+                          ? const Color(0xFFD6ECFF)
+                          : vocabMark != SubtitleVocabMark.none
                           ? vocabFill
                           : selectedToken || karaoke
                           ? const Color(0xFFDFF8C8)
                           : Colors.transparent;
-                      final Color borderColor = karaoke
+                      final Color borderColor = phraseAnchor
+                          ? AppDesignTokens.primaryBlueDark
+                          : karaoke
                           ? AppDesignTokens.brandGreen
                           : SubtitleVocabularyHighlight.border(
                               vocabMark,
                               onDarkVideo: false,
                             );
-                      final double borderWidth = karaoke ? 1.5 : 0;
+                      final double borderWidth =
+                          phraseAnchor || karaoke ? 1.5 : 0;
                       final Color wordColor =
                           SubtitleVocabularyHighlight.textColor(
                         vocabMark,
@@ -223,11 +268,8 @@ class _PlayerCurrentLineCardState extends State<PlayerCurrentLineCard> {
                       );
 
                       return InkWell(
-                        onTap: () {
-                          setState(() {
-                            selectedWord = token;
-                          });
-                        },
+                        onTap: () => _selectToken(index),
+                        onLongPress: () => _beginPhraseSelection(index),
                         borderRadius: BorderRadius.circular(8),
                         child: Container(
                           padding: const EdgeInsets.symmetric(
@@ -298,6 +340,10 @@ class _PlayerCurrentLineCardState extends State<PlayerCurrentLineCard> {
                     widget.onCollectWord(selectedWord!);
                   }
                 },
+                onFavorite: widget.onFavoriteWord == null
+                    ? null
+                    : (String? definitionCn) =>
+                          widget.onFavoriteWord!(selectedWord!, definitionCn),
                 onPronounce: widget.onPronounce,
                 onClose: () {
                   setState(() {

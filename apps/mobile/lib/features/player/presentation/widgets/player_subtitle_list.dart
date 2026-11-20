@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart'
@@ -170,6 +171,9 @@ class _PlayerSubtitleListState extends State<PlayerSubtitleList> {
   int _scrollFollowGeneration = 0;
   DateTime? _userDragPausedAt;
   String? _lastSelectedPlainText;
+  /// Line text used as phrase-selection key (space-split chips can't drag-select).
+  String? _phraseAnchorLine;
+  int? _phraseAnchorIndex;
   int? _inlineEditIndex;
   TextEditingController? _inlineEnglishController;
   TextEditingController? _inlineChineseController;
@@ -1055,22 +1059,12 @@ class _PlayerSubtitleListState extends State<PlayerSubtitleList> {
             final List<ContextMenuButtonItem> items = <ContextMenuButtonItem>[
               ...selectableRegionState.contextMenuButtonItems,
               ContextMenuButtonItem(
-                label: '收藏选中文字',
+                label: '查看选中',
                 onPressed: () {
-                  final String text = (_lastSelectedPlainText ?? '').trim();
                   ContextMenuController.removeAny();
+                  final String text = (_lastSelectedPlainText ?? '').trim();
                   if (text.isNotEmpty && !text.contains('\n')) {
-                    final void Function(String, String)? collect =
-                        widget.onCollectWordAtTime;
-                    final String lower = text.toLowerCase();
-                    final Iterable<PlayerSubtitleLine> matches = widget.lines
-                        .where((PlayerSubtitleLine line) =>
-                            line.english.toLowerCase().contains(lower));
-                    if (collect != null && matches.length == 1) {
-                      collect(text, matches.first.startTime);
-                    } else {
-                      widget.onCollectWord(text);
-                    }
+                    _openLookupForSelectedText(text);
                   }
                   selectableRegionState.clearSelection();
                 },
@@ -2204,6 +2198,68 @@ class _PlayerSubtitleListState extends State<PlayerSubtitleList> {
     }
   }
 
+  void _clearPhraseSelection({bool notify = true}) {
+    if (_phraseAnchorLine == null && _phraseAnchorIndex == null) return;
+    if (!notify) {
+      _phraseAnchorLine = null;
+      _phraseAnchorIndex = null;
+      return;
+    }
+    if (!mounted) {
+      _phraseAnchorLine = null;
+      _phraseAnchorIndex = null;
+      return;
+    }
+    setState(() {
+      _phraseAnchorLine = null;
+      _phraseAnchorIndex = null;
+    });
+  }
+
+  void _beginPhraseSelection(String lineText, int index) {
+    setState(() {
+      _phraseAnchorLine = lineText;
+      _phraseAnchorIndex = index;
+    });
+    _showMessage(context, '已选起点，再点一个词组成短语');
+  }
+
+  void _openPhraseOrWordLookup({
+    required BuildContext wordContext,
+    required String lineText,
+    required String contextTime,
+    required List<_WordToken> tokens,
+    required int index,
+  }) {
+    final int? anchor = _phraseAnchorIndex;
+    final String? anchorLine = _phraseAnchorLine;
+    if (anchorLine == lineText && anchor != null && anchor != index) {
+      final int start = math.min(anchor, index);
+      final int end = math.max(anchor, index);
+      final String phrase = tokens
+          .sublist(start, end + 1)
+          .map((_WordToken t) => t.value)
+          .join(' ');
+      _clearPhraseSelection(notify: false);
+      _toggleDictionaryOverlay(
+        wordContext,
+        phrase,
+        lineText,
+        '$lineText-phrase-$start-$end',
+        contextTime,
+      );
+      return;
+    }
+    _clearPhraseSelection(notify: false);
+    _toggleDictionaryOverlay(
+      wordContext,
+      tokens[index].value,
+      lineText,
+      '$lineText-$index',
+      contextTime,
+    );
+  }
+
   Widget _buildWordLine(
     String text,
     int? highlightIndex,
@@ -2222,6 +2278,8 @@ class _PlayerSubtitleListState extends State<PlayerSubtitleList> {
         .map((String word) => _WordToken(value: word))
         .toList(growable: false);
     final StudyShellColors? shell = shellColors;
+    final int? phraseAnchor =
+        _phraseAnchorLine == text ? _phraseAnchorIndex : null;
 
     return Wrap(
       spacing: 4,
@@ -2237,13 +2295,14 @@ class _PlayerSubtitleListState extends State<PlayerSubtitleList> {
                 widget.highlightWords &&
                 highlightIndex != null &&
                 index == highlightIndex;
+            final bool phraseSelected = phraseAnchor != null &&
+                index == phraseAnchor;
             final SubtitleVocabMark vocabMark =
                 SubtitleVocabularyHighlight.resolve(
                   rawToken: token.value,
                   savedWords: widget.savedVocabularyWords,
                   keyWords: widget.keyVocabularyWords,
                 );
-            final String tokenId = '$text-$index';
             final Color baseWordColor =
                 shell?.textPrimary ?? AppDesignTokens.textPrimary;
             final Color vocabWordColor = SubtitleVocabularyHighlight.textColor(
@@ -2266,8 +2325,14 @@ class _PlayerSubtitleListState extends State<PlayerSubtitleList> {
               widget.subtitleWordHighlightStyle,
               highlighted: karaoke,
             );
-            final Color highlightFill =
-                vocabMark != SubtitleVocabMark.none ? vocabFill : karaokeFill;
+            final Color phraseFill = phraseSelected
+                ? const Color(0xFFD6ECFF)
+                : Colors.transparent;
+            final Color highlightFill = phraseSelected
+                ? phraseFill
+                : vocabMark != SubtitleVocabMark.none
+                ? vocabFill
+                : karaokeFill;
             final Color karaokeBorder = SubtitleWordHighlightStyle.borderColor(
               widget.subtitleWordHighlightStyle,
               highlighted: karaoke,
@@ -2276,7 +2341,11 @@ class _PlayerSubtitleListState extends State<PlayerSubtitleList> {
               vocabMark,
               onDarkVideo: false,
             );
-            final Color highlightBorder = karaoke ? karaokeBorder : vocabBorder;
+            final Color highlightBorder = phraseSelected
+                ? AppDesignTokens.primaryBlueDark
+                : karaoke
+                ? karaokeBorder
+                : vocabBorder;
             final TextDecoration? highlightDecoration =
                 SubtitleWordHighlightStyle.textDecoration(
                   widget.subtitleWordHighlightStyle,
@@ -2287,7 +2356,9 @@ class _PlayerSubtitleListState extends State<PlayerSubtitleList> {
                   widget.subtitleWordHighlightStyle,
                   highlighted: karaoke,
                 );
-            final double borderWidth = karaoke
+            final double borderWidth = phraseSelected
+                ? 1.5
+                : karaoke
                 ? SubtitleWordHighlightStyle.borderWidth(
                     widget.subtitleWordHighlightStyle,
                     highlighted: karaoke,
@@ -2298,21 +2369,14 @@ class _PlayerSubtitleListState extends State<PlayerSubtitleList> {
             return Builder(
               builder: (BuildContext wordContext) {
                 return InkWell(
-                  onLongPress: () {
-                    final void Function(String, String)? collect =
-                        widget.onCollectWordAtTime;
-                    if (collect == null) {
-                      widget.onCollectWord(token.value);
-                    } else {
-                      collect(token.value, contextTime);
-                    }
-                  },
-                  onTap: () => _toggleDictionaryOverlay(
-                    wordContext,
-                    token.value,
-                    text,
-                    tokenId,
-                    contextTime,
+                  // Long-press starts phrase range; favorite only via word card.
+                  onLongPress: () => _beginPhraseSelection(text, index),
+                  onTap: () => _openPhraseOrWordLookup(
+                    wordContext: wordContext,
+                    lineText: text,
+                    contextTime: contextTime,
+                    tokens: tokens,
+                    index: index,
                   ),
                   borderRadius: BorderRadius.circular(8),
                   child: Container(

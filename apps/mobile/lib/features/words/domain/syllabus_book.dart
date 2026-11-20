@@ -1,3 +1,30 @@
+enum SyllabusBookKind {
+  word,
+  pattern;
+
+  static SyllabusBookKind fromName(String? raw) {
+    switch ((raw ?? '').trim().toLowerCase()) {
+      case 'pattern':
+      case 'sentence':
+      case '短语':
+      case '句型':
+        return SyllabusBookKind.pattern;
+      default:
+        return SyllabusBookKind.word;
+    }
+  }
+
+  String get storageName => switch (this) {
+    SyllabusBookKind.word => 'word',
+    SyllabusBookKind.pattern => 'pattern',
+  };
+
+  String get labelCn => switch (this) {
+    SyllabusBookKind.word => '词书',
+    SyllabusBookKind.pattern => '句型书',
+  };
+}
+
 class SyllabusWord {
   const SyllabusWord({required this.word, this.gloss = ''});
 
@@ -23,6 +50,7 @@ class SyllabusBook {
     required this.words,
     this.disclaimer = '',
     this.builtin = true,
+    this.kind = SyllabusBookKind.word,
   });
 
   factory SyllabusBook.fromJson(
@@ -50,6 +78,7 @@ class SyllabusBook {
       disclaimer: '${json['disclaimer'] ?? ''}'.trim(),
       words: List<SyllabusWord>.unmodifiable(words),
       builtin: json['builtin'] as bool? ?? builtin,
+      kind: SyllabusBookKind.fromName('${json['kind'] ?? ''}'),
     );
   }
 
@@ -59,8 +88,11 @@ class SyllabusBook {
   final String disclaimer;
   final List<SyllabusWord> words;
   final bool builtin;
+  final SyllabusBookKind kind;
 
   int get wordCount => words.length;
+
+  bool get isPatternBook => kind == SyllabusBookKind.pattern;
 
   Map<String, Object?> toJson() => <String, Object?>{
     'id': id,
@@ -68,12 +100,17 @@ class SyllabusBook {
     'examTag': examTag,
     'disclaimer': disclaimer,
     'builtin': builtin,
+    'kind': kind.storageName,
     'words': words.map((SyllabusWord w) => w.toJson()).toList(),
   };
 }
 
 /// Parse CSV/TXT word lists: one word per line, or `word,gloss`.
-List<SyllabusWord> parseSyllabusImport(String raw) {
+/// When [allowPhrases] is true, keeps multi-word lines for 句型书 import.
+List<SyllabusWord> parseSyllabusImport(
+  String raw, {
+  bool allowPhrases = false,
+}) {
   final List<SyllabusWord> out = <SyllabusWord>[];
   final Set<String> seen = <String>{};
   for (final String line in raw.split(RegExp(r'\r?\n'))) {
@@ -92,7 +129,15 @@ List<SyllabusWord> parseSyllabusImport(String raw) {
     } else {
       word = trimmed;
     }
-    word = word.toLowerCase().replaceAll(RegExp("[^a-z'-]"), '');
+    if (allowPhrases) {
+      word = word
+          .toLowerCase()
+          .replaceAll(RegExp(r"[^a-z'\s]+"), ' ')
+          .replaceAll(RegExp(r'\s+'), ' ')
+          .trim();
+    } else {
+      word = word.toLowerCase().replaceAll(RegExp("[^a-z'-]"), '');
+    }
     if (word.length < 2 || !seen.add(word)) continue;
     out.add(SyllabusWord(word: word, gloss: gloss));
   }

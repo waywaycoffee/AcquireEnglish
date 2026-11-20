@@ -10,13 +10,23 @@ import '../../navigation/presentation/navigation_destination.dart';
 import '../../shared/presentation/pad/app_design_tokens.dart';
 import '../../shared/presentation/pad/pad_scaffold.dart';
 import '../../shared/presentation/pad/pad_top_bar.dart';
+import '../../shared/presentation/pill_segmented_control.dart';
 import '../domain/syllabus_book.dart';
 import 'syllabus_books_provider.dart';
 
-class SyllabusBooksScreen extends ConsumerWidget {
-  const SyllabusBooksScreen({super.key});
+class SyllabusBooksScreen extends ConsumerStatefulWidget {
+  const SyllabusBooksScreen({super.key, this.initialKind = SyllabusBookKind.word});
 
-  Future<void> _import(BuildContext context, WidgetRef ref) async {
+  final SyllabusBookKind initialKind;
+
+  @override
+  ConsumerState<SyllabusBooksScreen> createState() => _SyllabusBooksScreenState();
+}
+
+class _SyllabusBooksScreenState extends ConsumerState<SyllabusBooksScreen> {
+  late SyllabusBookKind _kind = widget.initialKind;
+
+  Future<void> _import(BuildContext context) async {
     final XFile? file = await openFile(
       acceptedTypeGroups: const <XTypeGroup>[
         XTypeGroup(
@@ -24,7 +34,7 @@ class SyllabusBooksScreen extends ConsumerWidget {
           extensions: <String>['txt', 'csv', 'tsv'],
         ),
       ],
-      confirmButtonText: '导入词表',
+      confirmButtonText: _kind == SyllabusBookKind.pattern ? '导入句型' : '导入词表',
     );
     if (file == null) return;
     final String raw = await file.readAsString();
@@ -34,16 +44,20 @@ class SyllabusBooksScreen extends ConsumerWidget {
     );
     if (!context.mounted) return;
     final TextEditingController title = TextEditingController(
-      text: suggested.isEmpty ? '导入词书' : suggested,
+      text: suggested.isEmpty
+          ? (_kind == SyllabusBookKind.pattern ? '导入句型书' : '导入词书')
+          : suggested,
     );
     final String? name = await showDialog<String>(
       context: context,
       builder: (BuildContext ctx) => AlertDialog(
-        title: const Text('命名词书'),
+        title: Text(_kind == SyllabusBookKind.pattern ? '命名句型书' : '命名词书'),
         content: TextField(
           controller: title,
           autofocus: true,
-          decoration: const InputDecoration(labelText: '词书名称'),
+          decoration: InputDecoration(
+            labelText: _kind == SyllabusBookKind.pattern ? '句型书名称' : '词书名称',
+          ),
         ),
         actions: <Widget>[
           TextButton(
@@ -61,14 +75,17 @@ class SyllabusBooksScreen extends ConsumerWidget {
     if (name == null || !context.mounted) return;
     final SyllabusBook? book = await ref
         .read(syllabusBooksProvider.notifier)
-        .importBook(title: name, rawText: raw);
+        .importBook(title: name, rawText: raw, kind: _kind);
     if (!context.mounted) return;
+    final String unit = _kind == SyllabusBookKind.pattern ? '句型' : '词';
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(
           book == null
-              ? '未识别到有效单词（每行一词，或 word,释义）'
-              : '已导入「${book.title}」· ${book.wordCount} 词',
+              ? (_kind == SyllabusBookKind.pattern
+                    ? '未识别到有效句型（每行一句型，或 pattern,释义）'
+                    : '未识别到有效单词（每行一词，或 word,释义）')
+              : '已导入「${book.title}」· ${book.wordCount} $unit',
         ),
       ),
     );
@@ -81,25 +98,31 @@ class SyllabusBooksScreen extends ConsumerWidget {
   }
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  Widget build(BuildContext context) {
     final SyllabusBooksState state = ref.watch(syllabusBooksProvider);
+    final List<SyllabusBook> books = state.booksOf(_kind);
+    final bool isPattern = _kind == SyllabusBookKind.pattern;
+
     return PadScaffold(
       currentDestination: AppNavDestination.words,
       showContinueLearning: false,
       topBar: PadTopBar(
-        title: '考纲词书',
-        description: '自建四级/六级核心词 + 本地导入；非教育部原文转载。',
+        title: '学习书库',
+        description: isPattern
+            ? '选择句型书跟读与替换练习；也可导入自建句型表。'
+            : '选择词书开始背词；可下载在线词库或本地导入。',
         leading: PadBackButton(onPressed: () => context.pop()),
         actions: <Widget>[
+          if (!isPattern)
+            TextButton.icon(
+              onPressed: () => context.push('/words/syllabus/catalog'),
+              icon: const Icon(Icons.cloud_download_outlined),
+              label: const Text('在线词库'),
+            ),
           TextButton.icon(
-            onPressed: () => context.push('/words/syllabus/catalog'),
-            icon: const Icon(Icons.cloud_download_outlined),
-            label: const Text('在线词库'),
-          ),
-          TextButton.icon(
-            onPressed: () => unawaited(_import(context, ref)),
+            onPressed: () => unawaited(_import(context)),
             icon: const Icon(Icons.upload_file_rounded),
-            label: const Text('导入'),
+            label: Text(isPattern ? '导入句型' : '导入'),
           ),
         ],
       ),
@@ -108,23 +131,48 @@ class SyllabusBooksScreen extends ConsumerWidget {
           : ListView(
               padding: const EdgeInsets.all(20),
               children: <Widget>[
-                const Text(
-                  '内置四级/六级自建核心表；也可从在线词库（lilinji/English）按需下载，或用 CSV/TXT 导入。',
-                  style: TextStyle(height: 1.5, color: Color(0xFF626262)),
-                ),
-                const SizedBox(height: 12),
-                FilledButton.tonalIcon(
-                  onPressed: () => context.push('/words/syllabus/catalog'),
-                  icon: const Icon(Icons.cloud_download_outlined),
-                  label: const Text('浏览并下载词书'),
+                PillSegmentedControl<SyllabusBookKind>(
+                  value: _kind,
+                  options: const <SegmentOption<SyllabusBookKind>>[
+                    SegmentOption<SyllabusBookKind>(
+                      value: SyllabusBookKind.word,
+                      label: '词书',
+                    ),
+                    SegmentOption<SyllabusBookKind>(
+                      value: SyllabusBookKind.pattern,
+                      label: '句型书',
+                    ),
+                  ],
+                  onValueChanged: (SyllabusBookKind value) {
+                    setState(() => _kind = value);
+                  },
                 ),
                 const SizedBox(height: 16),
-                if (state.all.isEmpty)
-                  const Padding(
-                    padding: EdgeInsets.only(top: 40),
-                    child: Center(child: Text('暂无词书，请导入或检查资源包。')),
+                Text(
+                  isPattern
+                      ? '内置日常口语句型；也可导入 CSV/TXT（每行一句型，或 pattern,释义）。'
+                      : '内置四级/六级自建核心表；也可从在线词库按需下载，或用 CSV/TXT 导入。',
+                  style: const TextStyle(height: 1.5, color: Color(0xFF626262)),
+                ),
+                if (!isPattern) ...<Widget>[
+                  const SizedBox(height: 12),
+                  FilledButton.tonalIcon(
+                    onPressed: () => context.push('/words/syllabus/catalog'),
+                    icon: const Icon(Icons.cloud_download_outlined),
+                    label: const Text('浏览并下载词书'),
                   ),
-                for (final SyllabusBook book in state.all) ...<Widget>[
+                ],
+                const SizedBox(height: 16),
+                if (books.isEmpty)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 40),
+                    child: Center(
+                      child: Text(
+                        isPattern ? '暂无句型书，请导入。' : '暂无词书，请导入或检查资源包。',
+                      ),
+                    ),
+                  ),
+                for (final SyllabusBook book in books) ...<Widget>[
                   _BookCard(
                     book: book,
                     learned: state.learnedCount(book.id),
@@ -171,9 +219,8 @@ class _BookCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final int remaining = (book.wordCount - learned).clamp(0, book.wordCount);
-    final double progress = book.wordCount == 0
-        ? 0
-        : learned / book.wordCount;
+    final double progress = book.wordCount == 0 ? 0 : learned / book.wordCount;
+    final String unit = book.isPatternBook ? '句型' : '词';
     return Material(
       color: AppDesignTokens.appWhite,
       borderRadius: BorderRadius.circular(20),
@@ -212,7 +259,7 @@ class _BookCard extends StatelessWidget {
                   ),
                   if (onDelete != null)
                     IconButton(
-                      tooltip: '删除导入词书',
+                      tooltip: book.isPatternBook ? '删除导入句型书' : '删除导入词书',
                       onPressed: onDelete,
                       icon: const Icon(Icons.delete_outline_rounded),
                     ),
@@ -221,8 +268,8 @@ class _BookCard extends StatelessWidget {
               const SizedBox(height: 6),
               Text(
                 book.disclaimer.isEmpty
-                    ? '共 ${book.wordCount} 词 · 已学 $learned · 剩余 $remaining'
-                    : '${book.disclaimer}\n共 ${book.wordCount} 词 · 已学 $learned · 剩余 $remaining',
+                    ? '共 ${book.wordCount} $unit · 已学 $learned · 剩余 $remaining'
+                    : '${book.disclaimer}\n共 ${book.wordCount} $unit · 已学 $learned · 剩余 $remaining',
                 style: const TextStyle(
                   height: 1.45,
                   color: Color(0xFF626262),
@@ -245,7 +292,11 @@ class _BookCard extends StatelessWidget {
                 child: FilledButton.icon(
                   onPressed: onStart,
                   icon: const Icon(Icons.play_arrow_rounded),
-                  label: Text(remaining == 0 ? '再练一轮' : '开始背这本'),
+                  label: Text(
+                    remaining == 0
+                        ? '再练一轮'
+                        : (book.isPatternBook ? '开始练这本' : '开始背这本'),
+                  ),
                   style: FilledButton.styleFrom(
                     backgroundColor: AppDesignTokens.brandGreenDark,
                     foregroundColor: Colors.white,

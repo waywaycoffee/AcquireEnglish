@@ -11,6 +11,7 @@ const String kSyllabusStateKey = 'syllabus_books_v1';
 const List<String> kBuiltinSyllabusAssetPaths = <String>[
   'assets/syllabus/cet4_core.json',
   'assets/syllabus/cet6_core.json',
+  'assets/syllabus/daily_patterns.json',
 ];
 
 class SyllabusBooksState {
@@ -29,6 +30,10 @@ class SyllabusBooksState {
   final bool ready;
 
   List<SyllabusBook> get all => <SyllabusBook>[...builtin, ...imported];
+
+  List<SyllabusBook> booksOf(SyllabusBookKind kind) => all
+      .where((SyllabusBook book) => book.kind == kind)
+      .toList(growable: false);
 
   SyllabusBook? bookById(String id) {
     for (final SyllabusBook book in all) {
@@ -198,19 +203,27 @@ class SyllabusBooksNotifier extends Notifier<SyllabusBooksState> {
   Future<SyllabusBook?> importBook({
     required String title,
     required String rawText,
+    SyllabusBookKind kind = SyllabusBookKind.word,
   }) async {
-    final List<SyllabusWord> words = parseSyllabusImport(rawText);
+    final List<SyllabusWord> words = parseSyllabusImport(
+      rawText,
+      allowPhrases: kind == SyllabusBookKind.pattern,
+    );
     if (words.isEmpty) return null;
     final String id =
         'import_${DateTime.now().millisecondsSinceEpoch}_${words.length}';
+    final bool isPattern = kind == SyllabusBookKind.pattern;
     return saveImportedBook(
       SyllabusBook(
         id: id,
-        title: title.trim().isEmpty ? '导入词书' : title.trim(),
-        examTag: 'IMPORT',
-        disclaimer: '用户导入词表。',
+        title: title.trim().isEmpty
+            ? (isPattern ? '导入句型书' : '导入词书')
+            : title.trim(),
+        examTag: isPattern ? 'PATTERN' : 'IMPORT',
+        disclaimer: isPattern ? '用户导入句型表。' : '用户导入词表。',
         words: words,
         builtin: false,
+        kind: kind,
       ),
     );
   }
