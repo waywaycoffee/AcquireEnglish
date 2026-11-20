@@ -69,13 +69,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     }
   }
 
-  void _openWechat() {
-    context.push(SGRoute.loginWechat.route);
-  }
+  void _openWechat() => context.push(SGRoute.loginWechat.route);
 
-  void _openPhone() {
-    context.push(SGRoute.loginPhone.route);
-  }
+  void _openPhone() => context.push(SGRoute.loginPhone.route);
 
   @override
   Widget build(BuildContext context) {
@@ -98,102 +94,213 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
     return Scaffold(
       backgroundColor: AppDesignTokens.softWhite,
-      appBar: AppBar(
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        foregroundColor: AppDesignTokens.textPrimary,
-        title: const Text('登录'),
-        actions: <Widget>[
-          TextButton(
-            onPressed: () => context.push(SGRoute.register.route),
-            child: Text(
-              '邮箱注册',
-              style: TextStyle(
-                color: AppDesignTokens.brandGreenDark,
-                fontWeight: FontWeight.w800,
-              ),
-            ),
-          ),
-        ],
-      ),
       body: SafeArea(
         child: ListView(
-          padding: const EdgeInsets.fromLTRB(24, 12, 24, 32),
+          padding: const EdgeInsets.fromLTRB(24, 8, 24, 28),
           children: <Widget>[
+            Align(
+              alignment: Alignment.centerLeft,
+              child: IconButton(
+                onPressed: () => context.go(SGRoute.home.route),
+                style: IconButton.styleFrom(
+                  backgroundColor: AppDesignTokens.appWhite,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                ),
+                icon: const Icon(Icons.close_rounded),
+              ),
+            ),
             const SizedBox(height: 8),
             Center(
               child: Image.asset(
                 Assets.logoLockup,
-                height: 120,
+                height: 96,
                 fit: BoxFit.contain,
               ),
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: 18),
             Text(
-              '选择登录方式',
+              '欢迎来到爱快英语',
               textAlign: TextAlign.center,
               style: TextStyle(
-                fontSize: 22,
+                fontSize: 26,
                 fontWeight: FontWeight.w900,
                 color: AppDesignTokens.textPrimary,
               ),
             ),
             const SizedBox(height: 8),
             Text(
-              '微信 / 手机号未注册将自动创建账号；邮箱可用于已有账号登录。',
+              '用真实视频练听力与跟读。微信一键登录，未注册也会自动开号。',
               textAlign: TextAlign.center,
               style: TextStyle(
                 fontSize: 14,
+                height: 1.45,
+                fontWeight: FontWeight.w600,
                 color: AppDesignTokens.textSecondary,
-                height: 1.4,
               ),
             ),
-            const SizedBox(height: 24),
-            _MethodCard(
-              color: const Color(0xFF07C160),
-              icon: Icons.chat_bubble_rounded,
-              title: wechatMock ? '微信登录（模拟）' : '微信登录',
-              subtitle: wechatMock
-                  ? '未配置 AppID，进入授权模拟页完成登录'
-                  : '跳转微信 App 授权后自动登录',
-              onTap: _submitting ? null : _openWechat,
-            ),
-            const SizedBox(height: 12),
-            _MethodCard(
-              color: AppDesignTokens.primaryBlueDark,
-              icon: Icons.sms_rounded,
-              title: '手机号登录',
-              subtitle: '短信验证码登录；模拟模式下验证码自动填入',
-              onTap: _submitting ? null : _openPhone,
-            ),
-            const SizedBox(height: 12),
-            _MethodCard(
-              color: AppDesignTokens.brandGreenDark,
-              icon: Icons.mail_outline_rounded,
-              title: '邮箱登录',
-              subtitle: '使用邮箱与密码登录已有账号',
-              onTap: _submitting
-                  ? null
-                  : () => setState(() => _showEmailForm = !_showEmailForm),
-              trailing: Icon(
-                _showEmailForm
-                    ? Icons.keyboard_arrow_up_rounded
-                    : Icons.keyboard_arrow_down_rounded,
-                color: Colors.white,
+            const SizedBox(height: 28),
+            Material(
+              color: Colors.transparent,
+              child: InkWell(
+                onTap: _submitting ? null : _openWechat,
+                borderRadius: BorderRadius.circular(24),
+                child: Ink(
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(24),
+                    gradient: const LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: <Color>[
+                        Color(0xFF07C160),
+                        Color(0xFF06AD56),
+                      ],
+                    ),
+                    boxShadow: const <BoxShadow>[
+                      BoxShadow(
+                        color: Color(0x4006AD56),
+                        blurRadius: 18,
+                        offset: Offset(0, 10),
+                      ),
+                    ],
+                  ),
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(20, 22, 20, 22),
+                    child: Row(
+                      children: <Widget>[
+                        Container(
+                          width: 56,
+                          height: 56,
+                          decoration: BoxDecoration(
+                            color: Colors.white.withValues(alpha: 0.2),
+                            borderRadius: BorderRadius.circular(18),
+                          ),
+                          child: const Icon(
+                            Icons.chat_bubble_rounded,
+                            color: Colors.white,
+                            size: 28,
+                          ),
+                        ),
+                        const SizedBox(width: 14),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: <Widget>[
+                              Text(
+                                wechatMock ? '微信登录 / 注册（模拟）' : '微信一键登录 / 注册',
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.w900,
+                                ),
+                              ),
+                              const SizedBox(height: 6),
+                              Text(
+                                wechatMock
+                                    ? '开发环境：进入授权模拟页完成登录'
+                                    : '跳转微信授权，新用户自动创建账号',
+                                style: TextStyle(
+                                  color: Colors.white.withValues(alpha: 0.9),
+                                  fontSize: 13,
+                                  height: 1.35,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const Icon(
+                          Icons.arrow_forward_rounded,
+                          color: Colors.white,
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
               ),
+            ),
+            const SizedBox(height: 18),
+            Row(
+              children: <Widget>[
+                Expanded(child: Divider(color: AppDesignTokens.borderGray)),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 10),
+                  child: Text(
+                    '其他方式',
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                      color: AppDesignTokens.textSecondary,
+                    ),
+                  ),
+                ),
+                Expanded(child: Divider(color: AppDesignTokens.borderGray)),
+              ],
+            ),
+            const SizedBox(height: 14),
+            Row(
+              children: <Widget>[
+                Expanded(
+                  child: _SecondaryMethod(
+                    icon: Icons.sms_rounded,
+                    label: '手机号',
+                    color: AppDesignTokens.primaryBlueDark,
+                    onTap: _submitting ? null : _openPhone,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: _SecondaryMethod(
+                    icon: Icons.mail_outline_rounded,
+                    label: '邮箱',
+                    color: AppDesignTokens.brandGreenDark,
+                    onTap: _submitting
+                        ? null
+                        : () => setState(
+                              () => _showEmailForm = !_showEmailForm,
+                            ),
+                  ),
+                ),
+              ],
             ),
             if (_showEmailForm) ...<Widget>[
               const SizedBox(height: 16),
               _buildEmailForm(showPassword),
             ],
-            const SizedBox(height: 20),
+            const SizedBox(height: 22),
+            Center(
+              child: TextButton(
+                onPressed: () => context.push(SGRoute.register.route),
+                child: Text(
+                  '邮箱注册新账号',
+                  style: TextStyle(
+                    color: AppDesignTokens.primaryBlueDark,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ),
+            ),
             Center(
               child: TextButton(
                 onPressed: () => context.go(SGRoute.home.route),
                 child: Text(
                   '先逛逛，稍后再登录',
-                  style: TextStyle(color: AppDesignTokens.textSecondary),
+                  style: TextStyle(
+                    color: AppDesignTokens.textSecondary,
+                    fontWeight: FontWeight.w600,
+                  ),
                 ),
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              '登录即表示你了解我们将使用公开资料创建学习账号，并同步进度。',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 11,
+                height: 1.4,
+                color: AppDesignTokens.textSecondary,
               ),
             ),
           ],
@@ -210,19 +317,20 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
         decoration: BoxDecoration(
           color: AppDesignTokens.appWhite,
           borderRadius: BorderRadius.circular(18),
-          border: Border.all(color: AppDesignTokens.borderGray),
+          boxShadow: AppDesignTokens.toyCardShadow,
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: <Widget>[
             Text(
-              '邮箱',
+              '邮箱登录',
               style: TextStyle(
-                fontWeight: FontWeight.w800,
+                fontWeight: FontWeight.w900,
+                fontSize: 16,
                 color: AppDesignTokens.textPrimary,
               ),
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: 12),
             TextFormField(
               controller: _emailController,
               keyboardType: TextInputType.emailAddress,
@@ -231,9 +339,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
               style: TextStyle(color: AppDesignTokens.textPrimary),
               validator: (String? value) {
                 final String text = value?.trim() ?? '';
-                if (text.isEmpty) {
-                  return '请输入邮箱';
-                }
+                if (text.isEmpty) return '请输入邮箱';
                 if (!RegExp(r'^[^\s@]+@[^\s@]+\.[^\s@]+$').hasMatch(text)) {
                   return '邮箱格式不正确';
                 }
@@ -241,15 +347,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
               },
               decoration: _fieldDecoration('name@example.com'),
             ),
-            const SizedBox(height: 16),
-            Text(
-              '密码',
-              style: TextStyle(
-                fontWeight: FontWeight.w800,
-                color: AppDesignTokens.textPrimary,
-              ),
-            ),
-            const SizedBox(height: 8),
+            const SizedBox(height: 12),
             TextFormField(
               controller: _passwordController,
               obscureText: !showPassword,
@@ -258,9 +356,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
               style: TextStyle(color: AppDesignTokens.textPrimary),
               onFieldSubmitted: (_) => _submitEmail(),
               validator: (String? value) {
-                if (value == null || value.isEmpty) {
-                  return '请输入密码';
-                }
+                if (value == null || value.isEmpty) return '请输入密码';
                 return null;
               },
               decoration: _fieldDecoration('请输入密码').copyWith(
@@ -279,17 +375,17 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                 ),
               ),
             ),
-            const SizedBox(height: 20),
+            const SizedBox(height: 16),
             SizedBox(
               width: double.infinity,
-              height: 52,
+              height: 48,
               child: FilledButton(
                 onPressed: _submitting ? null : _submitEmail,
                 style: FilledButton.styleFrom(
                   backgroundColor: AppDesignTokens.brandGreen,
                   foregroundColor: AppDesignTokens.onAccent,
                   shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(16),
+                    borderRadius: BorderRadius.circular(14),
                   ),
                 ),
                 child: _submitting
@@ -308,19 +404,6 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                           fontWeight: FontWeight.w900,
                         ),
                       ),
-              ),
-            ),
-            const SizedBox(height: 4),
-            Center(
-              child: TextButton(
-                onPressed: () => context.push(SGRoute.register.route),
-                child: Text(
-                  '还没有账号？邮箱注册',
-                  style: TextStyle(
-                    color: AppDesignTokens.primaryBlue,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
               ),
             ),
           ],
@@ -355,74 +438,44 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   );
 }
 
-class _MethodCard extends StatelessWidget {
-  const _MethodCard({
-    required this.color,
+class _SecondaryMethod extends StatelessWidget {
+  const _SecondaryMethod({
     required this.icon,
-    required this.title,
-    required this.subtitle,
+    required this.label,
+    required this.color,
     required this.onTap,
-    this.trailing,
   });
 
-  final Color color;
   final IconData icon;
-  final String title;
-  final String subtitle;
+  final String label;
+  final Color color;
   final VoidCallback? onTap;
-  final Widget? trailing;
 
   @override
   Widget build(BuildContext context) {
     return Material(
-      color: color,
+      color: AppDesignTokens.appWhite,
       borderRadius: BorderRadius.circular(18),
       child: InkWell(
         onTap: onTap,
         borderRadius: BorderRadius.circular(18),
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(18, 18, 16, 18),
-          child: Row(
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: 18),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(color: AppDesignTokens.borderGray),
+          ),
+          child: Column(
             children: <Widget>[
-              Container(
-                width: 44,
-                height: 44,
-                decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.18),
-                  borderRadius: BorderRadius.circular(14),
-                ),
-                child: Icon(icon, color: Colors.white),
-              ),
-              const SizedBox(width: 14),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: <Widget>[
-                    Text(
-                      title,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 17,
-                        fontWeight: FontWeight.w900,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      subtitle,
-                      style: TextStyle(
-                        color: Colors.white.withValues(alpha: 0.88),
-                        fontSize: 13,
-                        height: 1.3,
-                      ),
-                    ),
-                  ],
+              Icon(icon, color: color, size: 26),
+              const SizedBox(height: 8),
+              Text(
+                label,
+                style: TextStyle(
+                  fontWeight: FontWeight.w800,
+                  color: AppDesignTokens.textPrimary,
                 ),
               ),
-              trailing ??
-                  const Icon(
-                    Icons.chevron_right_rounded,
-                    color: Colors.white,
-                  ),
             ],
           ),
         ),

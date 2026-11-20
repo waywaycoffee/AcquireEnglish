@@ -25,6 +25,7 @@ import '../../sync/presentation/daily_feed_provider.dart';
 import '../../words/presentation/vocabulary_placement_provider.dart';
 import 'learning_dashboard_provider.dart';
 import 'widgets/digital_human_picker.dart';
+import 'widgets/home_membership_section.dart';
 import 'widgets/pad_home_hero.dart';
 
 class PadHomeScreen extends ConsumerStatefulWidget {
@@ -138,6 +139,8 @@ class _PadHomeScreenState extends ConsumerState<PadHomeScreen> {
               growth: growth,
               displayName: ref.watch(authSessionProvider).displayName,
             ),
+            SizedBox(height: compact ? 18 : 20),
+            const HomeMembershipSection(),
             SizedBox(height: compact ? 24 : 28),
             PadHomeHero(
               onTap: () => openCourse(
