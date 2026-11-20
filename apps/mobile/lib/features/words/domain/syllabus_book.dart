@@ -106,6 +106,26 @@ class SyllabusBook {
 
   bool get isFoundationBook => kind == SyllabusBookKind.foundation;
 
+  SyllabusBook copyWith({
+    String? id,
+    String? title,
+    String? examTag,
+    String? disclaimer,
+    List<SyllabusWord>? words,
+    bool? builtin,
+    SyllabusBookKind? kind,
+  }) {
+    return SyllabusBook(
+      id: id ?? this.id,
+      title: title ?? this.title,
+      examTag: examTag ?? this.examTag,
+      disclaimer: disclaimer ?? this.disclaimer,
+      words: words ?? this.words,
+      builtin: builtin ?? this.builtin,
+      kind: kind ?? this.kind,
+    );
+  }
+
   Map<String, Object?> toJson() => <String, Object?>{
     'id': id,
     'title': title,

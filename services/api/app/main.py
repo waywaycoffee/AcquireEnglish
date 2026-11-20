@@ -21,6 +21,7 @@ from app.routers import (
     creators,
     feed,
     foundation_media,
+    syllabus_books,
     imports,
     learning,
     livekit,
@@ -93,6 +94,7 @@ app.include_router(rewards.router, prefix="/api")
 app.include_router(cosmetics.router, prefix="/api")
 app.include_router(review_sync.router, prefix="/api")
 app.include_router(foundation_media.router, prefix="/api")
+app.include_router(syllabus_books.router, prefix="/api")
 
 # Zero-foundation IPA / phonics real-person media (uploaded, not embedded).
 _foundation_dir = Path(settings.media_cache_dir).expanduser() / "foundation"

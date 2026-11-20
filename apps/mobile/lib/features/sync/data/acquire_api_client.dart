@@ -6,6 +6,8 @@ import '../../../data/repository/network_repository.dart';
 import '../../avatar/data/avatar_models.dart';
 import '../../community/data/community_models.dart';
 import '../../words/domain/foundation_media.dart';
+import '../../words/domain/server_syllabus_catalog.dart';
+import '../../words/domain/syllabus_book.dart';
 
 final Provider<AcquireApiClient> acquireApiClientProvider =
     Provider<AcquireApiClient>((Ref ref) {
@@ -1439,6 +1441,47 @@ class AcquireApiClient {
       return (data['balance'] as num?)?.toInt() ?? 0;
     }
     return 0;
+  }
+
+  Future<ServerSyllabusCatalog> fetchSyllabusCatalog({
+    SyllabusBookKind? kind,
+    bool refresh = false,
+  }) async {
+    final Map<String, dynamic> query = <String, dynamic>{};
+    if (kind != null) query['kind'] = kind.storageName;
+    if (refresh) query['refresh'] = true;
+    final Response<dynamic> response = await _dio.get(
+      Endpoints.syllabusCatalog,
+      queryParameters: query.isEmpty ? null : query,
+    );
+    final Object? data = response.data;
+    if (data is Map<String, dynamic>) {
+      return ServerSyllabusCatalog.fromJson(data);
+    }
+    if (data is Map) {
+      return ServerSyllabusCatalog.fromJson(Map<String, dynamic>.from(data));
+    }
+    return ServerSyllabusCatalog.empty;
+  }
+
+  Future<SyllabusBook> downloadSyllabusBook(String bookId) async {
+    final Response<dynamic> response = await _dio.get(
+      Endpoints.syllabusBook(bookId),
+    );
+    final Object? data = response.data;
+    final Map<String, dynamic> json;
+    if (data is Map<String, dynamic>) {
+      json = data;
+    } else if (data is Map) {
+      json = Map<String, dynamic>.from(data);
+    } else {
+      throw StateError('词书响应格式错误');
+    }
+    final SyllabusBook book = SyllabusBook.fromJson(json, builtin: false);
+    if (book.id.isEmpty || book.words.isEmpty) {
+      throw StateError('词书为空或无效');
+    }
+    return book;
   }
 
   Future<FoundationMediaManifest> foundationMediaManifest({

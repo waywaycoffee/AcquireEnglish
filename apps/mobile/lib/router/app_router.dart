@@ -26,6 +26,7 @@ import '../features/learning/presentation/learning_review_screen.dart';
 import '../features/words/presentation/sm2_daily_session_screen.dart';
 import '../features/words/presentation/lilinji_catalog_screen.dart';
 import '../features/words/domain/syllabus_book.dart';
+import '../features/words/presentation/server_syllabus_catalog_screen.dart';
 import '../features/words/presentation/syllabus_books_screen.dart';
 import '../features/words/presentation/words_screen.dart';
 import '../features/words/presentation/vocabulary_placement_screen.dart';
@@ -217,6 +218,16 @@ GoRouter goRouter(Ref ref) => GoRouter(
           tab.isEmpty ? 'word' : tab,
         );
         return SyllabusBooksScreen(initialKind: kind);
+      },
+    ).fade(),
+    GoRoute(
+      path: '/words/syllabus/cloud',
+      builder: (BuildContext context, GoRouterState state) {
+        final String tab = (state.uri.queryParameters['tab'] ?? '').trim();
+        final SyllabusBookKind kind = SyllabusBookKind.fromName(
+          tab.isEmpty ? 'word' : tab,
+        );
+        return ServerSyllabusCatalogScreen(initialKind: kind);
       },
     ).fade(),
     GoRoute(

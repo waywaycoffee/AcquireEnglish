@@ -82,6 +82,9 @@ class Endpoints {
   static const String foundationMediaManifest = 'api/foundation/media/manifest';
   static const String foundationMediaLookup = 'api/foundation/media/lookup';
   static const String foundationMediaUpload = 'api/foundation/media/upload';
+  static const String syllabusCatalog = 'api/syllabus/catalog';
+  static String syllabusBook(String bookId) =>
+      'api/syllabus/books/${Uri.encodeComponent(bookId)}';
 
   /// Kept for Dio header compatibility; AcquireEnglish API ignores it.
   static const String apiKey = '';

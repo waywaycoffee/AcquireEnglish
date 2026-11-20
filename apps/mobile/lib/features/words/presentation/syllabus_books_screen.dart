@@ -135,19 +135,21 @@ class _SyllabusBooksScreenState extends ConsumerState<SyllabusBooksScreen> {
       topBar: PadTopBar(
         title: '学习书库',
         description: switch (_kind) {
-          SyllabusBookKind.pattern => '选择句型书跟读与替换练习；也可导入自建句型表。',
+          SyllabusBookKind.pattern =>
+            '从云端下载句型书到本地后练习；也可导入自建句型表。',
           SyllabusBookKind.foundation =>
-            '国际音标与自然拼读零基础路线；规则、音素、例词可跟读练习。',
-          SyllabusBookKind.word => '选择词书开始背词；可下载在线词库或本地导入。',
+            '从云端下载音标/拼读书到本地后练习；也可导入自建表。',
+          SyllabusBookKind.word => '从云端下载词书到本地后背词；也可导入或开源词库。',
         },
         leading: PadBackButton(onPressed: () => context.pop()),
         actions: <Widget>[
-          if (_kind == SyllabusBookKind.word)
-            TextButton.icon(
-              onPressed: () => context.push('/words/syllabus/catalog'),
-              icon: const Icon(Icons.cloud_download_outlined),
-              label: const Text('在线词库'),
+          TextButton.icon(
+            onPressed: () => context.push(
+              '/words/syllabus/cloud?tab=${Uri.encodeComponent(_kind.storageName)}',
             ),
+            icon: const Icon(Icons.cloud_download_outlined),
+            label: const Text('云端书库'),
+          ),
           TextButton.icon(
             onPressed: () => unawaited(_import(context)),
             icon: const Icon(Icons.upload_file_rounded),
@@ -188,20 +190,32 @@ class _SyllabusBooksScreenState extends ConsumerState<SyllabusBooksScreen> {
                 Text(
                   switch (_kind) {
                     SyllabusBookKind.pattern =>
-                      '内置语块/口语句型书（口语1000、程序员句型、习语精选等）；也可导入 CSV/TXT。',
+                      '正式书本在服务器托管；下载后出现在本列表，也可导入 CSV/TXT。',
                     SyllabusBookKind.foundation =>
-                      '内置 IPA 48 音素、拼读规则/组合、拼音迁移课纲、CMUdict 对照等；也可导入自建表。',
+                      '正式书本在服务器托管；下载后出现在本列表，也可导入自建表。',
                     SyllabusBookKind.word =>
-                      '内置四级/六级核心表；也可从在线词库下载，或用 CSV/TXT 导入。',
+                      '正式词书在服务器托管；下载后离线可用。开源词库与 CSV/TXT 导入仍可用。',
                   },
                   style: const TextStyle(height: 1.5, color: Color(0xFF626262)),
                 ),
+                const SizedBox(height: 12),
+                FilledButton.tonalIcon(
+                  onPressed: () => context.push(
+                    '/words/syllabus/cloud?tab=${Uri.encodeComponent(_kind.storageName)}',
+                  ),
+                  icon: const Icon(Icons.cloud_download_outlined),
+                  label: Text(switch (_kind) {
+                    SyllabusBookKind.pattern => '浏览并下载句型书',
+                    SyllabusBookKind.foundation => '浏览并下载零基础书',
+                    SyllabusBookKind.word => '浏览并下载词书',
+                  }),
+                ),
                 if (_kind == SyllabusBookKind.word) ...<Widget>[
-                  const SizedBox(height: 12),
-                  FilledButton.tonalIcon(
+                  const SizedBox(height: 8),
+                  OutlinedButton.icon(
                     onPressed: () => context.push('/words/syllabus/catalog'),
-                    icon: const Icon(Icons.cloud_download_outlined),
-                    label: const Text('浏览并下载词书'),
+                    icon: const Icon(Icons.public_outlined),
+                    label: const Text('更多开源词库（lilinji）'),
                   ),
                 ],
                 const SizedBox(height: 16),
@@ -211,10 +225,10 @@ class _SyllabusBooksScreenState extends ConsumerState<SyllabusBooksScreen> {
                     child: Center(
                       child: Text(
                         isPattern
-                            ? '暂无句型书，请导入。'
+                            ? '本地暂无句型书，请先从云端下载或导入。'
                             : isFoundation
-                            ? '暂无零基础书，请导入或检查资源包。'
-                            : '暂无词书，请导入或检查资源包。',
+                            ? '本地暂无零基础书，请先从云端下载或导入。'
+                            : '本地暂无词书，请先从云端下载或导入。',
                       ),
                     ),
                   ),

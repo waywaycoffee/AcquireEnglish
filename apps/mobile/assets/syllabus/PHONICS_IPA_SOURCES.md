@@ -12,7 +12,8 @@
 | foundation_ipa_cmudict_phones | cmusphinx/cmudict | 需致谢 |
 | chunks_phonics_cvc / cvce | SeanMcP/reading | 已归入零基础 |
 
-未内嵌原站整页 HTML/MP3（体积过大）；App 提供可跟读条目 + 原站链接。
+未内嵌原站整页 HTML/MP3（体积过大）。词表 JSON 托管在 API：
+`GET /api/syllabus/catalog` · `GET /api/syllabus/books/{id}`；App 下载后本地学习。
 
 ## 真人音视频（服务器）
 

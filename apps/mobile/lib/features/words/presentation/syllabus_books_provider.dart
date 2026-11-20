@@ -8,31 +8,10 @@ import '../../authentication/presentation/account_storage.dart';
 import '../domain/syllabus_book.dart';
 
 const String kSyllabusStateKey = 'syllabus_books_v1';
-const List<String> kBuiltinSyllabusAssetPaths = <String>[
-  'assets/syllabus/cet4_core.json',
-  'assets/syllabus/cet6_core.json',
-  'assets/syllabus/daily_patterns.json',
-  // Pattern / chunk books (see assets/syllabus/CHUNKS_SOURCES.md).
-  'assets/syllabus/chunks_conversational_1000.json',
-  'assets/syllabus/chunks_programmer_speak.json',
-  'assets/syllabus/chunks_programmer_weekly.json',
-  'assets/syllabus/chunks_superword_safe.json',
-  // Zero-foundation IPA / phonics (see assets/syllabus/PHONICS_IPA_SOURCES.md).
-  'assets/syllabus/foundation_ipa_48.json',
-  'assets/syllabus/foundation_ipa_cmudict_phones.json',
-  'assets/syllabus/foundation_ipa_vowel_drill.json',
-  'assets/syllabus/foundation_ipa_crash_course.json',
-  'assets/syllabus/foundation_ipa_sheffield_listening.json',
-  'assets/syllabus/foundation_phonics_combos.json',
-  'assets/syllabus/foundation_phonics_irregulars.json',
-  'assets/syllabus/foundation_phonics_sentences.json',
-  'assets/syllabus/foundation_phonics_word_groups.json',
-  'assets/syllabus/foundation_phonics_rules_100.json',
-  'assets/syllabus/foundation_phonics_categories.json',
-  'assets/syllabus/foundation_phonics_helper_course.json',
-  'assets/syllabus/chunks_phonics_cvc.json',
-  'assets/syllabus/chunks_phonics_cvce.json',
-];
+/// First-party books live on the API (`/api/syllabus/*`) and are stored locally
+/// only after the user downloads them. Keep this empty to avoid shipping large
+/// JSON inside the APK; notice/source markdown may remain under assets/syllabus.
+const List<String> kBuiltinSyllabusAssetPaths = <String>[];
 
 class SyllabusBooksState {
   const SyllabusBooksState({
@@ -116,12 +95,20 @@ class SyllabusBooksNotifier extends Notifier<SyllabusBooksState> {
     if (!ref.mounted) return;
     final ({List<SyllabusBook> imported, String active, Map<String, Set<String>> learned})
     persisted = _loadPersisted();
+    final List<SyllabusBook> available = <SyllabusBook>[
+      ...builtin,
+      ...persisted.imported,
+    ];
+    String active = persisted.active;
+    final bool activeOk =
+        active.isNotEmpty && available.any((SyllabusBook b) => b.id == active);
+    if (!activeOk) {
+      active = available.isNotEmpty ? available.first.id : '';
+    }
     state = SyllabusBooksState(
       builtin: List<SyllabusBook>.unmodifiable(builtin),
       imported: persisted.imported,
-      activeBookId: persisted.active.isNotEmpty
-          ? persisted.active
-          : (builtin.isNotEmpty ? builtin.first.id : ''),
+      activeBookId: active,
       learnedByBook: persisted.learned,
       ready: true,
     );

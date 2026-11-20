@@ -230,7 +230,7 @@ class _WordsScreenState extends ConsumerState<WordsScreen> {
                                 Expanded(
                                   child: _BookTypeCard(
                                     title: '词书',
-                                    subtitle: '四级/六级与在线词库',
+                                    subtitle: '云端词书 · 下载到本地',
                                     icon: Icons.menu_book_rounded,
                                     onTap: () =>
                                         context.push('/words/syllabus'),

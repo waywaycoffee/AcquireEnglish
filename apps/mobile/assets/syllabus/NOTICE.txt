@@ -1,36 +1,39 @@
-Syllabus word books (CET4/CET6 core)
-====================================
+Syllabus word / pattern / foundation books
+==========================================
 
-These bundled lists are frequency-band subsets derived from the project's
-local ECDICT core asset for study UX. They are NOT official Ministry of
-Education syllabus transcripts and must not be marketed as such.
+First-party study lists are hosted on the AcquireEnglish API
+(`GET /api/syllabus/catalog`, `GET /api/syllabus/books/{id}`) and are
+downloaded into local app storage only when the user chooses to.
 
-Chinese glosses come from the same offline dictionary pipeline already
-shipped with the app. Rebuild with:
+They are NOT official Ministry of Education syllabus transcripts and must
+not be marketed as such. Chinese glosses come from the offline dictionary
+pipeline already shipped with the app. Rebuild source JSON with:
 
   python scripts/build_syllabus_books.py
 
+Server copy lives under services/api/data/syllabus/.
+
 Optional online catalog (user-initiated download only)
 ------------------------------------------------------
-The in-app “在线词库” browser fetches lists from the community repo
+The in-app “开源词库” browser fetches lists from the community repo
 https://github.com/lilinji/English on demand. Files are stored locally as
 user word books. Content copyright remains with original authors /
 publishers; personal study use only — do not redistribute commercially.
 
 Chunk / pattern books
 ---------------------
-See CHUNKS_SOURCES.md. Bundled sources include:
+See CHUNKS_SOURCES.md. Server-hosted sources include:
 - fltenwall/The-English-For-Programmer (MIT)
 - ronaldaug/english-conversational-data (no LICENSE; study packaging)
 - ysc/superword sentences (film-attributed lines excluded)
 - SeanMcP/reading consonant-vowel-patterns (upstream LICENSE)
 
-NOT bundled: hucaixue/Oral-English-8000-* (likely textbook reprint, no
+NOT packaged: hucaixue/Oral-English-8000-* (likely textbook reprint, no
 license). iwangjie/English-Chunks has no static corpus to import.
 
 Zero-foundation IPA / phonics
 -----------------------------
-See PHONICS_IPA_SOURCES.md. Bundled from scott-lei/phonics-app,
+See PHONICS_IPA_SOURCES.md. Server-hosted from scott-lei/phonics-app,
 cocojojo5213/phonics-app, RichardoZhao/Phonics-Helper (MIT),
 nk2028/ipa-practise (CC0), CMUdict phone map, plus course outlines for
 jhnwnstd IPA Crash Course and Sheffield learnipa (links in disclaimers).

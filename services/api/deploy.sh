@@ -14,7 +14,7 @@ PATH_REMOTE="${DEPLOY_PATH:-/opt/acquireenglish/services/api}"
 PUBLIC_BASE="${PUBLIC_API_BASE:-https://acquireenglish.curlhairai.com}"
 
 echo "==> Sync app code to $HOST:$PATH_REMOTE (no --delete; keep remote-only modules)"
-ssh "$HOST" "mkdir -p '$PATH_REMOTE/app/services' '$PATH_REMOTE/app/routers'"
+ssh "$HOST" "mkdir -p '$PATH_REMOTE/app/services' '$PATH_REMOTE/app/routers' '$PATH_REMOTE/data/syllabus'"
 rsync -az \
   --exclude '.venv' \
   --exclude '__pycache__' \
@@ -25,6 +25,10 @@ rsync -az \
   --exclude 'docker-compose.yml' \
   "$ROOT/app/" "$HOST:$PATH_REMOTE/app/"
 rsync -az "$ROOT/requirements.txt" "$HOST:$PATH_REMOTE/requirements.txt"
+if [[ -d "$ROOT/data/syllabus" ]]; then
+  echo "==> Sync first-party syllabus books"
+  rsync -az "$ROOT/data/syllabus/" "$HOST:$PATH_REMOTE/data/syllabus/"
+fi
 
 echo "==> restart systemd (skip pip unless FORCE_PIP=1; remote venv is py3.14 and pip may hang)"
 if [[ "${FORCE_PIP:-0}" == "1" ]]; then
