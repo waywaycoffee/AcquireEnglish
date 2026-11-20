@@ -64,6 +64,7 @@ BilibiliSharedSubtitleIds? resolveBilibiliSharedSubtitleIds({
     caseSensitive: false,
   ).firstMatch(rawKey);
   if (keyMatch != null) {
+    // Canonicalize BV case for cache keys; URL extract keeps source casing.
     bvid = keyMatch.group(1)!.toUpperCase();
     page = int.tryParse(keyMatch.group(2) ?? '') ?? 1;
   }
@@ -76,7 +77,7 @@ BilibiliSharedSubtitleIds? resolveBilibiliSharedSubtitleIds({
     if (extracted == null || extracted.isEmpty) {
       return null;
     }
-    bvid = extracted.toUpperCase();
+    bvid = extracted;
   }
 
   // UGC 合集: numberStr is episode index, NOT multi-P ?p=. Inventing page from

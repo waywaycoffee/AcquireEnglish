@@ -283,7 +283,7 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    await tester.tap(find.widgetWithText(FilledButton, '编辑'));
+    await tester.tap(find.text('多选删除'));
     await tester.pumpAndSettle();
 
     await tester.tap(find.byType(Checkbox).first);
@@ -317,7 +317,7 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    await tester.tap(find.widgetWithText(FilledButton, '编辑'));
+    await tester.tap(find.text('多选删除'));
     await tester.pumpAndSettle();
 
     await tester.tap(find.byType(Checkbox).first);
@@ -375,7 +375,7 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    await tester.tap(find.widgetWithText(FilledButton, '编辑'));
+    await tester.tap(find.text('多选删除'));
     await tester.pumpAndSettle();
     await tester.tap(find.byType(Checkbox).first);
     await tester.pumpAndSettle();

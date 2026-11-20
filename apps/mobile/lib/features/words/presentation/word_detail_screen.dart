@@ -282,13 +282,14 @@ class _WordDetailDialogState extends ConsumerState<WordDetailDialog> {
         child: Padding(padding: EdgeInsets.all(24), child: Text('该单词已不在单词本中。')),
       );
     }
-    final OfflineWordDefinition? offline = _offlineDefinition;
-    final String letterCase = ref.watch(
-      learningSettingsProvider.select(
-        (LearningSettingsState s) => s.subtitleLetterCase,
-      ),
-    );
-    return Dialog(
+  return Consumer(
+    builder: (BuildContext context, WidgetRef ref, Widget? child) {
+      final OfflineWordDefinition? offline = _offlineDefinition;
+      final WordEntry entry = ref
+          .watch(wordBookProvider)
+          .firstWhere((WordEntry item) => item.word == widget.word);
+      final String letterCase = ref.watch(learningSettingsProvider).subtitleLetterCase;
+      return Dialog(
       insetPadding: const EdgeInsets.all(20),
       child: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 820, maxHeight: 760),
@@ -417,35 +418,24 @@ class _WordDetailDialogState extends ConsumerState<WordDetailDialog> {
                     ),
                   ),
                   const SizedBox(height: 10),
-                  for (final WordOccurrence occurrence in entry.occurrences)
-                    for (final WordContext contextItem in occurrence.contexts)
-                      Padding(
-                        padding: const EdgeInsets.only(bottom: 12),
-                        child: _OccurrenceCard(
-                          occurrence: occurrence,
-                          contextItem: contextItem,
-                          displaySentence: formatSubtitleLetterCase(
-                            contextItem.sentence,
-                            letterCase,
-                          ),
-                          speaking: _speakingText == contextItem.sentence,
-                          onSpeak: () => _speak(contextItem.sentence),
-                          onOpenVideo: () =>
-                              _openVideo(occurrence, contextItem),
-                          translating: _translatingContextKeys.contains(
-                            '${occurrence.episodeId}:${contextItem.lineKey}',
-                          ),
-                          onTranslate: () =>
-                              _translateContext(entry, occurrence, contextItem),
-                        ),
-                      ),
+                  _OccurrenceSentenceList(
+                    entry: entry,
+                    subtitleLetterCase: letterCase,
+                    speakingText: _speakingText,
+                    translatingContextKeys: _translatingContextKeys,
+                    onSpeak: _speak,
+                    onOpenVideo: _openVideo,
+                    onTranslate: _translateContext,
+                  ),
                 ],
               ),
             ),
           ],
         ),
       ),
-    );
+      );
+    },
+  );
   }
 }
 
@@ -725,6 +715,62 @@ class _DefinitionCard extends StatelessWidget {
       ],
     ),
   );
+}
+
+class _OccurrenceSentenceList extends StatelessWidget {
+  const _OccurrenceSentenceList({
+    required this.entry,
+    required this.subtitleLetterCase,
+    required this.speakingText,
+    required this.translatingContextKeys,
+    required this.onSpeak,
+    required this.onOpenVideo,
+    required this.onTranslate,
+  });
+
+  final WordEntry entry;
+  final String subtitleLetterCase;
+  final String? speakingText;
+  final Set<String> translatingContextKeys;
+  final Future<void> Function(String text) onSpeak;
+  final Future<void> Function(
+    WordOccurrence occurrence,
+    WordContext contextItem,
+  ) onOpenVideo;
+  final Future<void> Function(
+    WordEntry entry,
+    WordOccurrence occurrence,
+    WordContext contextItem,
+  ) onTranslate;
+
+  @override
+  Widget build(BuildContext context) {
+    final String letterCase = subtitleLetterCase;
+    return Column(
+      children: <Widget>[
+        for (final WordOccurrence occurrence in entry.occurrences)
+          for (final WordContext contextItem in occurrence.contexts)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 12),
+              child: _OccurrenceCard(
+                occurrence: occurrence,
+                contextItem: contextItem,
+                displaySentence: formatSubtitleLetterCase(
+                  contextItem.sentence,
+                  letterCase,
+                ),
+                speaking: speakingText == contextItem.sentence,
+                onSpeak: () => onSpeak(contextItem.sentence),
+                onOpenVideo: () => onOpenVideo(occurrence, contextItem),
+                translating: translatingContextKeys.contains(
+                  '${occurrence.episodeId}:${contextItem.lineKey}',
+                ),
+                onTranslate: () => onTranslate(entry, occurrence, contextItem),
+              ),
+            ),
+      ],
+    );
+  }
 }
 
 class _OccurrenceCard extends StatelessWidget {

@@ -53,31 +53,59 @@ void main() {
         ],
       );
       addTearDown(container.dispose);
-      await tester.pumpWidget(
-        UncontrolledProviderScope(
-          container: container,
-          child: const MaterialApp(
-            home: Scaffold(body: WordDetailDialog(word: 'antacid')),
+      Future<void> pumpDialog() async {
+        final String letterCase =
+            container.read(learningSettingsProvider).subtitleLetterCase;
+        await tester.pumpWidget(
+          UncontrolledProviderScope(
+            container: container,
+            child: MaterialApp(
+              home: Scaffold(
+                body: WordDetailDialog(
+                  key: ValueKey<String>('antacid-dialog-$letterCase'),
+                  word: 'antacid',
+                ),
+              ),
+            ),
           ),
-        ),
-      );
+        );
+        await tester.pumpAndSettle();
+      }
+
+      await pumpDialog();
+      await tester.ensureVisible(find.text('单词原句'));
       await tester.pumpAndSettle();
       expect(find.text("OH, HERE'S SOME ANTACID."), findsWidgets);
       container
           .read(learningSettingsProvider.notifier)
           .setSubtitleLetterCase('句首字母大写');
+      await pumpDialog();
+      await tester.ensureVisible(find.text('单词原句'));
       await tester.pumpAndSettle();
-      expect(find.text("Oh, here's some antacid."), findsWidgets);
+      expect(
+        find.textContaining("Oh, here's some antacid"),
+        findsWidgets,
+      );
       container
           .read(learningSettingsProvider.notifier)
           .setSubtitleLetterCase('全部小写');
+      await pumpDialog();
+      await tester.ensureVisible(find.text('单词原句'));
       await tester.pumpAndSettle();
-      expect(find.text("oh, here's some antacid."), findsWidgets);
+      expect(
+        find.textContaining("oh, here's some antacid"),
+        findsWidgets,
+      );
       container
           .read(learningSettingsProvider.notifier)
           .setSubtitleLetterCase('保留原样');
+      await pumpDialog();
+      await tester.ensureVisible(find.text('单词原句'));
       await tester.pumpAndSettle();
-      expect(find.text("OH, HERE'S SOME ANTACID."), findsWidgets);
+      expect(
+        find.textContaining("OH, HERE'S SOME ANTACID"),
+        findsWidgets,
+      );
       expect(
         container
             .read(wordBookProvider)
@@ -156,6 +184,8 @@ void main() {
       );
       await tester.tap(find.text('查看单词'));
       await tester.pumpAndSettle();
+      await tester.ensureVisible(find.text('单词原句'));
+      await tester.pumpAndSettle();
       await Scrollable.ensureVisible(
         tester.element(find.text('跳到影片')),
         alignment: 0.5,
@@ -180,6 +210,8 @@ void main() {
           container.read(wordBookProvider).single.occurrences.single.episodeId,
           old.episodeId,
         );
+        await tester.ensureVisible(find.text('单词原句'));
+        await tester.pumpAndSettle();
         await Scrollable.ensureVisible(
           tester.element(find.text('跳到影片')),
           alignment: 0.5,

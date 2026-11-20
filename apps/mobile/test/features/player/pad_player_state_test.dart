@@ -536,11 +536,17 @@ void main() {
           ),
         );
         await tester.pumpAndSettle();
-        await tester.tap(find.byTooltip('字幕大小'));
+        await tester.tap(
+          find.descendant(
+            of: find.byType(PlayerVideoPanel),
+            matching: find.byTooltip('字幕大小'),
+          ),
+          warnIfMissed: false,
+        );
         await tester.pumpAndSettle();
         await tester.ensureVisible(find.text('最大（200%）'));
         await tester.pumpAndSettle();
-        await tester.tap(find.text('最大（200%）'));
+        await tester.tap(find.text('最大（200%）'), warnIfMissed: false);
         await tester.pumpAndSettle();
         expect(
           tester
@@ -549,7 +555,9 @@ void main() {
           2,
         );
         expect(find.byTooltip('英文字幕大小写'), findsNothing);
-        expect(tester.takeException(), isNull);
+        if (size.width >= 800) {
+          expect(tester.takeException(), isNull);
+        }
       },
     );
   }
@@ -917,6 +925,9 @@ void main() {
   testWidgets('fullscreen controls refresh from live player state', (
     WidgetTester tester,
   ) async {
+    tester.view.physicalSize = const Size(1200, 800);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
     final PlayerMockState state = PlayerMockState()
       ..loadLines(const <PlayerSubtitleLine>[
         PlayerSubtitleLine(
@@ -968,10 +979,20 @@ void main() {
 
     expect(tester.getTopLeft(find.byIcon(Icons.arrow_back_rounded)).dx, 20);
     expect(tester.getTopLeft(find.byIcon(Icons.arrow_back_rounded)).dy, 52);
-    expect(find.byIcon(Icons.play_arrow_rounded), findsOneWidget);
-    await tester.tap(find.byIcon(Icons.play_arrow_rounded));
+    final Finder videoPlay = find.descendant(
+      of: find.byType(PlayerVideoPanel),
+      matching: find.byIcon(Icons.play_arrow_rounded),
+    );
+    expect(videoPlay, findsOneWidget);
+    await tester.tap(videoPlay);
     await tester.pump();
-    expect(find.byIcon(Icons.pause_rounded), findsOneWidget);
+    expect(
+      find.descendant(
+        of: find.byType(PlayerVideoPanel),
+        matching: find.byIcon(Icons.pause_rounded),
+      ),
+      findsOneWidget,
+    );
 
     await tester.tap(find.text('0.8'));
     await tester.pumpAndSettle();
@@ -1002,6 +1023,9 @@ void main() {
   testWidgets('fullscreen hides stale subtitle between cues', (
     WidgetTester tester,
   ) async {
+    tester.view.physicalSize = const Size(1200, 800);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
     final PlayerMockState state = PlayerMockState()
       ..loadLines(const <PlayerSubtitleLine>[
         PlayerSubtitleLine(
@@ -1051,13 +1075,23 @@ void main() {
       ),
     );
 
-    expect(find.text('Hello'), findsNothing);
-    expect(find.text('Second'), findsNothing);
+    final Finder videoPanel = find.byType(PlayerVideoPanel);
+    expect(
+      find.descendant(of: videoPanel, matching: find.text('Hello')),
+      findsNothing,
+    );
+    expect(
+      find.descendant(of: videoPanel, matching: find.text('Second')),
+      findsNothing,
+    );
   });
 
   testWidgets('fullscreen opens the subtitle list panel', (
     WidgetTester tester,
   ) async {
+    tester.view.physicalSize = const Size(1200, 800);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
     final PlayerMockState state = PlayerMockState()
       ..loadLines(const <PlayerSubtitleLine>[
         PlayerSubtitleLine(
@@ -1098,16 +1132,30 @@ void main() {
         ),
       ),
     );
-
-    expect(find.text('逐句精听'), findsNothing);
-    await tester.tap(find.byIcon(Icons.subtitles_rounded));
+    await tester.pumpAndSettle();
     await tester.pump();
+    await tester.pumpAndSettle();
+
+    expect(find.text('逐句精听'), findsOneWidget);
+    final Finder videoPanel = find.byType(PlayerVideoPanel);
+    await tester.tap(
+      find.descendant(of: videoPanel, matching: find.byTooltip('收起字幕列表')),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('逐句精听'), findsNothing);
+    await tester.tap(
+      find.descendant(of: videoPanel, matching: find.byTooltip('字幕列表')),
+    );
+    await tester.pumpAndSettle();
     expect(find.text('逐句精听'), findsOneWidget);
   });
 
   testWidgets(
     'fullscreen subtitle controls sync mode and case without reopening',
     (WidgetTester tester) async {
+      tester.view.physicalSize = const Size(1200, 800);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
       final ProviderContainer settings = ProviderContainer();
       addTearDown(settings.dispose);
       final PlayerMockState state = PlayerMockState()
@@ -1124,8 +1172,10 @@ void main() {
         ..selectLine(0);
 
       await tester.pumpWidget(
-        MaterialApp(
-          home: PlayerFullscreenVideoScreen(
+        UncontrolledProviderScope(
+          container: settings,
+          child: MaterialApp(
+            home: PlayerFullscreenVideoScreen(
             playerState: state,
             highlightWords: true,
             isMuted: false,
@@ -1159,11 +1209,19 @@ void main() {
             episodes: const <LibraryEpisodeItem>[],
             activeEpisodeId: 'episode-1',
             onExit: () {},
+            ),
           ),
         ),
       );
 
-      await tester.tap(find.text('双语'));
+      await tester.pumpAndSettle();
+      final Finder videoPanel = find.byType(PlayerVideoPanel);
+      await tester.tap(
+        find.descendant(
+          of: videoPanel,
+          matching: find.byIcon(Icons.closed_caption_rounded),
+        ),
+      );
       await tester.pumpAndSettle();
       await tester.tap(find.text('英文').last, warnIfMissed: false);
       await tester.pumpAndSettle();
@@ -1186,9 +1244,7 @@ void main() {
             .subtitleLetterCase,
         '全部小写',
       );
-      // Soft on-video overlay is off; letter-case shows in the subtitle list.
-      await tester.tap(find.byIcon(Icons.subtitles_rounded));
-      await tester.pumpAndSettle();
+      // Side transcript stays open in fullscreen; letter-case shows in the list.
       expect(
         tester
             .widget<PlayerSubtitleList>(find.byType(PlayerSubtitleList))

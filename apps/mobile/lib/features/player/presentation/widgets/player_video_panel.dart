@@ -1793,37 +1793,44 @@ class _ControlDock extends StatelessWidget {
               ),
               SizedBox(width: tiny ? 8 : 12),
               Expanded(
-                child: SliderTheme(
-                  data: SliderTheme.of(context).copyWith(
-                    trackHeight: tiny ? 8 : 10,
-                    thumbShape: RoundSliderThumbShape(
-                      enabledThumbRadius: tiny ? 6 : 8,
-                    ),
-                    overlayShape: RoundSliderOverlayShape(
-                      overlayRadius: tiny ? 10 : 14,
-                    ),
-                    activeTrackColor: AppDesignTokens.brandGreen,
-                    inactiveTrackColor: fullscreen
-                        ? Colors.white24
-                        : AppDesignTokens.softGray,
-                    thumbColor: AppDesignTokens.brandGreen,
-                    overlayColor: AppDesignTokens.brandGreen.withValues(
-                      alpha: 0.15,
-                    ),
-                  ),
-                  // Keep the Slider's OverlayPortal in the same semantics
-                  // subtree during route and subtitle transitions. Flutter
-                  // 3.44 can otherwise send an orphan node to the native AX
-                  // bridge and crash on macOS (flutter/flutter#190357).
-                  child: Overlay.wrap(
-                    alwaysSizeToContent: true,
-                    clipBehavior: Clip.none,
-                    child: Slider(
-                      key: const ValueKey<String>('player-seek-slider'),
-                      value: videoProgress.clamp(0.0, 1.0),
-                      onChanged: onSeek,
-                    ),
-                  ),
+                child: LayoutBuilder(
+                  builder: (BuildContext context, BoxConstraints constraints) {
+                    if (constraints.maxWidth < 48) {
+                      return SizedBox(height: tiny ? 28 : 36);
+                    }
+                    return SliderTheme(
+                      data: SliderTheme.of(context).copyWith(
+                        trackHeight: tiny ? 8 : 10,
+                        thumbShape: RoundSliderThumbShape(
+                          enabledThumbRadius: tiny ? 6 : 8,
+                        ),
+                        overlayShape: RoundSliderOverlayShape(
+                          overlayRadius: tiny ? 10 : 14,
+                        ),
+                        activeTrackColor: AppDesignTokens.brandGreen,
+                        inactiveTrackColor: fullscreen
+                            ? Colors.white24
+                            : AppDesignTokens.softGray,
+                        thumbColor: AppDesignTokens.brandGreen,
+                        overlayColor: AppDesignTokens.brandGreen.withValues(
+                          alpha: 0.15,
+                        ),
+                      ),
+                      // Keep the Slider's OverlayPortal in the same semantics
+                      // subtree during route and subtitle transitions. Flutter
+                      // 3.44 can otherwise send an orphan node to the native AX
+                      // bridge and crash on macOS (flutter/flutter#190357).
+                      child: Overlay.wrap(
+                        alwaysSizeToContent: true,
+                        clipBehavior: Clip.none,
+                        child: Slider(
+                          key: const ValueKey<String>('player-seek-slider'),
+                          value: videoProgress.clamp(0.0, 1.0),
+                          onChanged: onSeek,
+                        ),
+                      ),
+                    );
+                  },
                 ),
               ),
               SizedBox(width: tiny ? 8 : 12),

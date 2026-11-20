@@ -144,8 +144,8 @@ class _PlayerFullscreenVideoScreenState
   static const double _episodePanelWidth = 280;
 
   bool _showEpisodePanel = false;
-  /// Landscape study default: keep the transcript on the right of the video.
-  late bool _showSubtitlePanel = widget.playerState.hasLines;
+  /// Wide screens open the side transcript; phones start with video-only width.
+  late bool _showSubtitlePanel = false;
   bool _showControls = true;
   Timer? _refreshTimer;
   late String _subtitleLetterCase = widget.subtitleLetterCase;
@@ -166,6 +166,15 @@ class _PlayerFullscreenVideoScreenState
     ) {
       if (mounted && widget.playerState.isPlaying) {
         setState(() {});
+      }
+    });
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) {
+        return;
+      }
+      final double width = MediaQuery.sizeOf(context).width;
+      if (width >= 720 && widget.playerState.hasLines && !_showSubtitlePanel) {
+        setState(() => _showSubtitlePanel = true);
       }
     });
   }

@@ -194,107 +194,130 @@ class _WordsScreenState extends ConsumerState<WordsScreen> {
         child: Center(
           child: ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: 1200),
-            child: Column(
-              children: <Widget>[
-                _Summary(
-                  entries: entries.length,
-                  videos: coveredVideos,
-                  favorites: entries
-                      .where((WordEntry item) => item.favorite)
-                      .length,
-                  streak: streak,
-                ),
-                const SizedBox(height: 12),
-                _PhaseBreakdown(
-                  counts: _phaseCounts(
-                    entries.where((WordEntry e) => e.favorite),
-                    reviewState,
-                    now,
-                  ),
-                ),
-                const SizedBox(height: 12),
-                Wrap(
-                  spacing: 8,
+            child: LayoutBuilder(
+              builder: (BuildContext context, BoxConstraints constraints) {
+                final double headerCap = (constraints.maxHeight * 0.45).clamp(
+                  160.0,
+                  380.0,
+                );
+                return Column(
                   children: <Widget>[
-                    ActionChip(
-                      label: const Text('背推荐单词'),
-                      onPressed: () => context.push(
-                        ref.read(recommendedWordsProvider).isEmpty
-                            ? SGRoute.vocabularyPlacement.route
-                            : '${SGRoute.reviewSession.route}?deck=recommended',
-                      ),
-                    ),
-                    ActionChip(
-                      label: const Text('考纲词书'),
-                      onPressed: () => context.push('/words/syllabus'),
-                    ),
-                    ActionChip(
-                      label: const Text('背收藏单词'),
-                      onPressed: () => context.push(
-                        '${SGRoute.reviewSession.route}?practice=1&kind=word',
-                      ),
-                    ),
-                    if (missedCount > 0)
-                      ActionChip(
-                        avatar: const Icon(Icons.replay_rounded, size: 18),
-                        label: Text('错词本 $missedCount'),
-                        onPressed: () => context.push(
-                          '${SGRoute.reviewSession.route}?deck=missed&kind=word',
+                    ConstrainedBox(
+                      constraints: BoxConstraints(maxHeight: headerCap),
+                      child: SingleChildScrollView(
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: <Widget>[
+                            _Summary(
+                              entries: entries.length,
+                              videos: coveredVideos,
+                              favorites: entries
+                                  .where((WordEntry item) => item.favorite)
+                                  .length,
+                              streak: streak,
+                            ),
+                            const SizedBox(height: 12),
+                            _PhaseBreakdown(
+                              counts: _phaseCounts(
+                                entries.where((WordEntry e) => e.favorite),
+                                reviewState,
+                                now,
+                              ),
+                            ),
+                            const SizedBox(height: 12),
+                            Wrap(
+                              spacing: 8,
+                              runSpacing: 8,
+                              children: <Widget>[
+                                ActionChip(
+                                  label: const Text('背推荐单词'),
+                                  onPressed: () => context.push(
+                                    ref.read(recommendedWordsProvider).isEmpty
+                                        ? SGRoute.vocabularyPlacement.route
+                                        : '${SGRoute.reviewSession.route}?deck=recommended',
+                                  ),
+                                ),
+                                ActionChip(
+                                  label: const Text('考纲词书'),
+                                  onPressed: () =>
+                                      context.push('/words/syllabus'),
+                                ),
+                                ActionChip(
+                                  label: const Text('背收藏单词'),
+                                  onPressed: () => context.push(
+                                    '${SGRoute.reviewSession.route}?practice=1&kind=word',
+                                  ),
+                                ),
+                                if (missedCount > 0)
+                                  ActionChip(
+                                    avatar: const Icon(
+                                      Icons.replay_rounded,
+                                      size: 18,
+                                    ),
+                                    label: Text('错词本 $missedCount'),
+                                    onPressed: () => context.push(
+                                      '${SGRoute.reviewSession.route}?deck=missed&kind=word',
+                                    ),
+                                  ),
+                              ],
+                            ),
+                            const SizedBox(height: 12),
+                            _TodayPlanCard(
+                              planNew: planNew,
+                              planReview: planReview,
+                              newLimit: newLimit,
+                              reviewLimit: reviewSettings.dailyReviewLimit,
+                              modes: reviewSettings.orderedModes,
+                              streak: streak,
+                              onStart: () =>
+                                  unawaited(_startTodayReview(newLimit)),
+                              onSettings: () =>
+                                  showWordReviewSettingsSheet(context),
+                            ),
+                            const SizedBox(height: 12),
+                            _WeekStatsCard(
+                              stats: ReviewWeekStats.fromState(reviewState, now),
+                            ),
+                          ],
                         ),
                       ),
-                  ],
-                ),
-                const SizedBox(height: 12),
-                _TodayPlanCard(
-                  planNew: planNew,
-                  planReview: planReview,
-                  newLimit: newLimit,
-                  reviewLimit: reviewSettings.dailyReviewLimit,
-                  modes: reviewSettings.orderedModes,
-                  streak: streak,
-                  onStart: () => unawaited(_startTodayReview(newLimit)),
-                  onSettings: () => showWordReviewSettingsSheet(context),
-                ),
-                const SizedBox(height: 12),
-                _WeekStatsCard(
-                  stats: ReviewWeekStats.fromState(reviewState, now),
-                ),
-                const SizedBox(height: 20),
-                SizedBox(
-                  key: const Key('words-view-tabs'),
-                  width: double.infinity,
-                  child: PillSegmentedControl<bool>(
-                    value: _favoritesOnly,
-                    options: const <SegmentOption<bool>>[
-                      SegmentOption<bool>(value: true, label: '已收藏'),
-                      SegmentOption<bool>(value: false, label: '全部单词'),
-                    ],
-                    onValueChanged: (bool value) =>
-                        setState(() => _favoritesOnly = value),
-                  ),
-                ),
-                const SizedBox(height: 16),
-                TextField(
-                  onChanged: (String value) => setState(() => _query = value),
-                  style: TextStyle(color: AppDesignTokens.textPrimary),
-                  decoration: InputDecoration(
-                    hintText: _favoritesOnly ? '搜索收藏的单词' : '搜索学过的单词',
-                    hintStyle: TextStyle(color: AppDesignTokens.textSecondary),
-                    prefixIcon: Icon(
-                      Icons.search_rounded,
-                      color: AppDesignTokens.textSecondary,
                     ),
-                    filled: true,
-                    fillColor: AppDesignTokens.appWhite,
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(18),
-                      borderSide: BorderSide.none,
+                    const SizedBox(height: 20),
+                    SizedBox(
+                      key: const Key('words-view-tabs'),
+                      width: double.infinity,
+                      child: PillSegmentedControl<bool>(
+                        value: _favoritesOnly,
+                        options: const <SegmentOption<bool>>[
+                          SegmentOption<bool>(value: true, label: '已收藏'),
+                          SegmentOption<bool>(value: false, label: '全部单词'),
+                        ],
+                        onValueChanged: (bool value) =>
+                            setState(() => _favoritesOnly = value),
+                      ),
                     ),
-                  ),
-                ),
-                const SizedBox(height: 18),
-                Expanded(
-                  child: filtered.isEmpty
+                    const SizedBox(height: 16),
+                    TextField(
+                      onChanged: (String value) => setState(() => _query = value),
+                      style: TextStyle(color: AppDesignTokens.textPrimary),
+                      decoration: InputDecoration(
+                        hintText: _favoritesOnly ? '搜索收藏的单词' : '搜索学过的单词',
+                        hintStyle: TextStyle(color: AppDesignTokens.textSecondary),
+                        prefixIcon: Icon(
+                          Icons.search_rounded,
+                          color: AppDesignTokens.textSecondary,
+                        ),
+                        filled: true,
+                        fillColor: AppDesignTokens.appWhite,
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(18),
+                          borderSide: BorderSide.none,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 18),
+                    Expanded(
+                      child: filtered.isEmpty
                       ? Center(
                           child: Text(
                             _query.trim().isNotEmpty
@@ -364,8 +387,10 @@ class _WordsScreenState extends ConsumerState<WordsScreen> {
                             ),
                           ),
                         ),
-                ),
-              ],
+                    ),
+                  ],
+                );
+              },
             ),
           ),
         ),
