@@ -1,0 +1,57 @@
+{
+  "id": "foundation_phonics_sentences",
+  "title": "自然拼读 · 跟读例句",
+  "examTag": "PHONICS",
+  "kind": "foundation",
+  "disclaimer": "整理自 scott-lei/phonics-app 句子跟读库。",
+  "words": [
+    {
+      "word": "the cat sat on the mat.",
+      "gloss": "猫坐在垫子上。"
+    },
+    {
+      "word": "a black bag is in the hand.",
+      "gloss": "一个黑包在手里。"
+    },
+    {
+      "word": "the pig is big and fit.",
+      "gloss": "这只猪又大又壮。"
+    },
+    {
+      "word": "fish and chips are on the dish.",
+      "gloss": "鱼和薯条在盘子里。"
+    },
+    {
+      "word": "the rain is on the way.",
+      "gloss": "雨在路上。"
+    },
+    {
+      "word": "play a game with the tape.",
+      "gloss": "用带子玩个游戏。"
+    },
+    {
+      "word": "she sells shells by the shore.",
+      "gloss": "她在海边卖贝壳。"
+    },
+    {
+      "word": "the ship is in the shop.",
+      "gloss": "船在商店里。"
+    },
+    {
+      "word": "this is my mother.",
+      "gloss": "这是我妈妈。"
+    },
+    {
+      "word": "three thin things.",
+      "gloss": "三样薄东西。"
+    },
+    {
+      "word": "the cake is on the plate.",
+      "gloss": "蛋糕在盘子里。"
+    },
+    {
+      "word": "my bike is white.",
+      "gloss": "我的自行车是白色的。"
+    }
+  ]
+}

@@ -34,7 +34,11 @@ class _SyllabusBooksScreenState extends ConsumerState<SyllabusBooksScreen> {
           extensions: <String>['txt', 'csv', 'tsv'],
         ),
       ],
-      confirmButtonText: _kind == SyllabusBookKind.pattern ? '导入句型' : '导入词表',
+      confirmButtonText: switch (_kind) {
+        SyllabusBookKind.pattern => '导入句型',
+        SyllabusBookKind.foundation => '导入音标/拼读',
+        SyllabusBookKind.word => '导入词表',
+      },
     );
     if (file == null) return;
     final String raw = await file.readAsString();
@@ -45,18 +49,30 @@ class _SyllabusBooksScreenState extends ConsumerState<SyllabusBooksScreen> {
     if (!context.mounted) return;
     final TextEditingController title = TextEditingController(
       text: suggested.isEmpty
-          ? (_kind == SyllabusBookKind.pattern ? '导入句型书' : '导入词书')
+          ? switch (_kind) {
+              SyllabusBookKind.pattern => '导入句型书',
+              SyllabusBookKind.foundation => '导入零基础书',
+              SyllabusBookKind.word => '导入词书',
+            }
           : suggested,
     );
     final String? name = await showDialog<String>(
       context: context,
       builder: (BuildContext ctx) => AlertDialog(
-        title: Text(_kind == SyllabusBookKind.pattern ? '命名句型书' : '命名词书'),
+        title: Text(switch (_kind) {
+          SyllabusBookKind.pattern => '命名句型书',
+          SyllabusBookKind.foundation => '命名零基础书',
+          SyllabusBookKind.word => '命名词书',
+        }),
         content: TextField(
           controller: title,
           autofocus: true,
           decoration: InputDecoration(
-            labelText: _kind == SyllabusBookKind.pattern ? '句型书名称' : '词书名称',
+            labelText: switch (_kind) {
+              SyllabusBookKind.pattern => '句型书名称',
+              SyllabusBookKind.foundation => '零基础书名称',
+              SyllabusBookKind.word => '词书名称',
+            },
           ),
         ),
         actions: <Widget>[
@@ -77,14 +93,23 @@ class _SyllabusBooksScreenState extends ConsumerState<SyllabusBooksScreen> {
         .read(syllabusBooksProvider.notifier)
         .importBook(title: name, rawText: raw, kind: _kind);
     if (!context.mounted) return;
-    final String unit = _kind == SyllabusBookKind.pattern ? '句型' : '词';
+    final String unit = switch (_kind) {
+      SyllabusBookKind.pattern => '句型',
+      SyllabusBookKind.foundation => '条目',
+      SyllabusBookKind.word => '词',
+    };
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(
           book == null
-              ? (_kind == SyllabusBookKind.pattern
-                    ? '未识别到有效句型（每行一句型，或 pattern,释义）'
-                    : '未识别到有效单词（每行一词，或 word,释义）')
+              ? switch (_kind) {
+                  SyllabusBookKind.pattern =>
+                    '未识别到有效句型（每行一句型，或 pattern,释义）',
+                  SyllabusBookKind.foundation =>
+                    '未识别到有效条目（每行一词/音标，或 item,释义）',
+                  SyllabusBookKind.word =>
+                    '未识别到有效单词（每行一词，或 word,释义）',
+                }
               : '已导入「${book.title}」· ${book.wordCount} $unit',
         ),
       ),
@@ -102,18 +127,22 @@ class _SyllabusBooksScreenState extends ConsumerState<SyllabusBooksScreen> {
     final SyllabusBooksState state = ref.watch(syllabusBooksProvider);
     final List<SyllabusBook> books = state.booksOf(_kind);
     final bool isPattern = _kind == SyllabusBookKind.pattern;
+    final bool isFoundation = _kind == SyllabusBookKind.foundation;
 
     return PadScaffold(
       currentDestination: AppNavDestination.words,
       showContinueLearning: false,
       topBar: PadTopBar(
         title: '学习书库',
-        description: isPattern
-            ? '选择句型书跟读与替换练习；也可导入自建句型表。'
-            : '选择词书开始背词；可下载在线词库或本地导入。',
+        description: switch (_kind) {
+          SyllabusBookKind.pattern => '选择句型书跟读与替换练习；也可导入自建句型表。',
+          SyllabusBookKind.foundation =>
+            '国际音标与自然拼读零基础路线；规则、音素、例词可跟读练习。',
+          SyllabusBookKind.word => '选择词书开始背词；可下载在线词库或本地导入。',
+        },
         leading: PadBackButton(onPressed: () => context.pop()),
         actions: <Widget>[
-          if (!isPattern)
+          if (_kind == SyllabusBookKind.word)
             TextButton.icon(
               onPressed: () => context.push('/words/syllabus/catalog'),
               icon: const Icon(Icons.cloud_download_outlined),
@@ -122,7 +151,11 @@ class _SyllabusBooksScreenState extends ConsumerState<SyllabusBooksScreen> {
           TextButton.icon(
             onPressed: () => unawaited(_import(context)),
             icon: const Icon(Icons.upload_file_rounded),
-            label: Text(isPattern ? '导入句型' : '导入'),
+            label: Text(switch (_kind) {
+              SyllabusBookKind.pattern => '导入句型',
+              SyllabusBookKind.foundation => '导入',
+              SyllabusBookKind.word => '导入',
+            }),
           ),
         ],
       ),
@@ -142,6 +175,10 @@ class _SyllabusBooksScreenState extends ConsumerState<SyllabusBooksScreen> {
                       value: SyllabusBookKind.pattern,
                       label: '句型书',
                     ),
+                    SegmentOption<SyllabusBookKind>(
+                      value: SyllabusBookKind.foundation,
+                      label: '零基础',
+                    ),
                   ],
                   onValueChanged: (SyllabusBookKind value) {
                     setState(() => _kind = value);
@@ -149,12 +186,17 @@ class _SyllabusBooksScreenState extends ConsumerState<SyllabusBooksScreen> {
                 ),
                 const SizedBox(height: 16),
                 Text(
-                  isPattern
-                      ? '内置语块/口语句型书（口语1000、程序员句型、习语精选等）；也可导入 CSV/TXT（每行一句型，或 pattern,释义）。'
-                      : '内置四级/六级核心表与 CVC/CVCe 拼读语块；也可从在线词库下载，或用 CSV/TXT 导入。',
+                  switch (_kind) {
+                    SyllabusBookKind.pattern =>
+                      '内置语块/口语句型书（口语1000、程序员句型、习语精选等）；也可导入 CSV/TXT。',
+                    SyllabusBookKind.foundation =>
+                      '内置 IPA 48 音素、拼读规则/组合、拼音迁移课纲、CMUdict 对照等；也可导入自建表。',
+                    SyllabusBookKind.word =>
+                      '内置四级/六级核心表；也可从在线词库下载，或用 CSV/TXT 导入。',
+                  },
                   style: const TextStyle(height: 1.5, color: Color(0xFF626262)),
                 ),
-                if (!isPattern) ...<Widget>[
+                if (_kind == SyllabusBookKind.word) ...<Widget>[
                   const SizedBox(height: 12),
                   FilledButton.tonalIcon(
                     onPressed: () => context.push('/words/syllabus/catalog'),
@@ -168,7 +210,11 @@ class _SyllabusBooksScreenState extends ConsumerState<SyllabusBooksScreen> {
                     padding: const EdgeInsets.only(top: 40),
                     child: Center(
                       child: Text(
-                        isPattern ? '暂无句型书，请导入。' : '暂无词书，请导入或检查资源包。',
+                        isPattern
+                            ? '暂无句型书，请导入。'
+                            : isFoundation
+                            ? '暂无零基础书，请导入或检查资源包。'
+                            : '暂无词书，请导入或检查资源包。',
                       ),
                     ),
                   ),
@@ -220,7 +266,11 @@ class _BookCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final int remaining = (book.wordCount - learned).clamp(0, book.wordCount);
     final double progress = book.wordCount == 0 ? 0 : learned / book.wordCount;
-    final String unit = book.isPatternBook ? '句型' : '词';
+    final String unit = switch (book.kind) {
+      SyllabusBookKind.pattern => '句型',
+      SyllabusBookKind.foundation => '条目',
+      SyllabusBookKind.word => '词',
+    };
     return Material(
       color: AppDesignTokens.appWhite,
       borderRadius: BorderRadius.circular(20),
@@ -295,7 +345,11 @@ class _BookCard extends StatelessWidget {
                   label: Text(
                     remaining == 0
                         ? '再练一轮'
-                        : (book.isPatternBook ? '开始练这本' : '开始背这本'),
+                        : switch (book.kind) {
+                            SyllabusBookKind.pattern => '开始练这本',
+                            SyllabusBookKind.foundation => '开始练这本',
+                            SyllabusBookKind.word => '开始背这本',
+                          },
                   ),
                   style: FilledButton.styleFrom(
                     backgroundColor: AppDesignTokens.brandGreenDark,

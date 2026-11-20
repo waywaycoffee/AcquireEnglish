@@ -1,0 +1,49 @@
+{
+  "id": "foundation_ipa_sheffield_listening",
+  "title": "IPA 听辨路线（Sheffield）",
+  "examTag": "LISTEN",
+  "kind": "foundation",
+  "disclaimer": "分类整理自 https://learnipa.github.io/ ；在线视频听辨请访问原站。",
+  "words": [
+    {
+      "word": "plosives",
+      "gloss": "塞音听辨"
+    },
+    {
+      "word": "nasals",
+      "gloss": "鼻音听辨"
+    },
+    {
+      "word": "trills taps flaps",
+      "gloss": "颤音/闪音"
+    },
+    {
+      "word": "fricatives",
+      "gloss": "擦音听辨"
+    },
+    {
+      "word": "laterals approximants",
+      "gloss": "边音/近音"
+    },
+    {
+      "word": "pulmonics",
+      "gloss": "肺气流辅音"
+    },
+    {
+      "word": "non pulmonics",
+      "gloss": "非肺气流辅音"
+    },
+    {
+      "word": "primary cardinal vowels",
+      "gloss": "基本定位元音"
+    },
+    {
+      "word": "secondary cardinal vowels",
+      "gloss": "次定位元音"
+    },
+    {
+      "word": "places of articulation drill",
+      "gloss": "按部位听辨"
+    }
+  ]
+}

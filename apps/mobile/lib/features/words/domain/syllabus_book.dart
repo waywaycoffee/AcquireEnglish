@@ -1,6 +1,7 @@
 enum SyllabusBookKind {
   word,
-  pattern;
+  pattern,
+  foundation;
 
   static SyllabusBookKind fromName(String? raw) {
     switch ((raw ?? '').trim().toLowerCase()) {
@@ -9,6 +10,13 @@ enum SyllabusBookKind {
       case '短语':
       case '句型':
         return SyllabusBookKind.pattern;
+      case 'foundation':
+      case 'phonics':
+      case 'ipa':
+      case '零基础':
+      case '音标':
+      case '自然拼读':
+        return SyllabusBookKind.foundation;
       default:
         return SyllabusBookKind.word;
     }
@@ -17,11 +25,13 @@ enum SyllabusBookKind {
   String get storageName => switch (this) {
     SyllabusBookKind.word => 'word',
     SyllabusBookKind.pattern => 'pattern',
+    SyllabusBookKind.foundation => 'foundation',
   };
 
   String get labelCn => switch (this) {
     SyllabusBookKind.word => '词书',
     SyllabusBookKind.pattern => '句型书',
+    SyllabusBookKind.foundation => '零基础',
   };
 }
 
@@ -93,6 +103,8 @@ class SyllabusBook {
   int get wordCount => words.length;
 
   bool get isPatternBook => kind == SyllabusBookKind.pattern;
+
+  bool get isFoundationBook => kind == SyllabusBookKind.foundation;
 
   Map<String, Object?> toJson() => <String, Object?>{
     'id': id,

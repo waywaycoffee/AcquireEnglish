@@ -2,7 +2,7 @@
   "id": "chunks_phonics_cvc",
   "title": "自然拼读 · CVC 语块",
   "examTag": "CVC",
-  "kind": "word",
+  "kind": "foundation",
   "disclaimer": "词表整理自 SeanMcP/reading consonant-vowel-patterns（见上游 LICENSE），筛选真实英语词用于拼读跟读。",
   "words": [
     {

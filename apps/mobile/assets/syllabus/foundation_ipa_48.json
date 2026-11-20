@@ -1,0 +1,685 @@
+{
+  "id": "foundation_ipa_48",
+  "title": "国际音标 48 音素",
+  "examTag": "IPA48",
+  "kind": "foundation",
+  "disclaimer": "整理自 scott-lei/phonics-app 48 音素库（自称 MIT）：音素卡 + 例词。",
+  "words": [
+    {
+      "word": "short a",
+      "gloss": "/æ/ · 嘴巴张大，舌尖抵下齿 · 拼写 a"
+    },
+    {
+      "word": "cat",
+      "gloss": "/kæt/ 猫"
+    },
+    {
+      "word": "map",
+      "gloss": "/mæp/ 地图"
+    },
+    {
+      "word": "bag",
+      "gloss": "/bæɡ/ 包"
+    },
+    {
+      "word": "short e",
+      "gloss": "/e/ · 嘴微张，舌位比 /æ/ 高 · 拼写 e,ea"
+    },
+    {
+      "word": "bed",
+      "gloss": "/bed/ 床"
+    },
+    {
+      "word": "pen",
+      "gloss": "/pen/ 钢笔"
+    },
+    {
+      "word": "red",
+      "gloss": "/red/ 红色的"
+    },
+    {
+      "word": "short i",
+      "gloss": "/ɪ/ · 嘴扁平，舌前部抬起 · 拼写 i,y,ui"
+    },
+    {
+      "word": "sit",
+      "gloss": "/sɪt/ 坐"
+    },
+    {
+      "word": "pig",
+      "gloss": "/pɪɡ/ 猪"
+    },
+    {
+      "word": "big",
+      "gloss": "/bɪɡ/ 大的"
+    },
+    {
+      "word": "short o",
+      "gloss": "/ɒ/ · 嘴张大成圆形 · 拼写 o,a"
+    },
+    {
+      "word": "hot",
+      "gloss": "/hɒt/ 热的"
+    },
+    {
+      "word": "dog",
+      "gloss": "/dɒɡ/ 狗"
+    },
+    {
+      "word": "box",
+      "gloss": "/bɒks/ 盒子"
+    },
+    {
+      "word": "short u",
+      "gloss": "/ʌ/ · 嘴半开，舌位中央 · 拼写 u,o,ou"
+    },
+    {
+      "word": "cup",
+      "gloss": "/kʌp/ 杯子"
+    },
+    {
+      "word": "bus",
+      "gloss": "/bʌs/ 公共汽车"
+    },
+    {
+      "word": "sun",
+      "gloss": "/sʌn/ 太阳"
+    },
+    {
+      "word": "short oo",
+      "gloss": "/ʊ/ · 嘴唇微圆，舌后部抬起 · 拼写 oo,u,o"
+    },
+    {
+      "word": "book",
+      "gloss": "/bʊk/ 书"
+    },
+    {
+      "word": "look",
+      "gloss": "/lʊk/ 看"
+    },
+    {
+      "word": "good",
+      "gloss": "/ɡʊd/ 好的"
+    },
+    {
+      "word": "short schwa",
+      "gloss": "/ə/ · 英语里最放松的元音，嘴唇自然半开、不圆唇，几乎都出现在非重读音节 · 拼写 a,e,o,er,or"
+    },
+    {
+      "word": "about",
+      "gloss": "/əˈbaʊt/ 关于"
+    },
+    {
+      "word": "banana",
+      "gloss": "/bəˈnɑːnə/ 香蕉"
+    },
+    {
+      "word": "teacher",
+      "gloss": "/ˈtiːtʃə/ 老师"
+    },
+    {
+      "word": "long ee",
+      "gloss": "/iː/ · 嘴角向两边拉开，像微笑 · 拼写 ee,ea,e,ie,ey"
+    },
+    {
+      "word": "see",
+      "gloss": "/siː/ 看见"
+    },
+    {
+      "word": "tree",
+      "gloss": "/triː/ 树"
+    },
+    {
+      "word": "eat",
+      "gloss": "/iːt/ 吃"
+    },
+    {
+      "word": "long ar",
+      "gloss": "/ɑː/ · 嘴张大，舌位靠后 · 拼写 ar,a,al"
+    },
+    {
+      "word": "car",
+      "gloss": "/kɑː/ 汽车"
+    },
+    {
+      "word": "park",
+      "gloss": "/pɑːk/ 公园"
+    },
+    {
+      "word": "far",
+      "gloss": "/fɑː/ 远的"
+    },
+    {
+      "word": "long or",
+      "gloss": "/ɔː/ · 嘴唇收圆前突 · 拼写 or,oor,aw,au,al"
+    },
+    {
+      "word": "fork",
+      "gloss": "/fɔːk/ 叉子"
+    },
+    {
+      "word": "horse",
+      "gloss": "/hɔːs/ 马"
+    },
+    {
+      "word": "door",
+      "gloss": "/dɔː/ 门"
+    },
+    {
+      "word": "long oo",
+      "gloss": "/uː/ · 嘴唇收圆前突，比 /ʊ/ 更紧 · 拼写 oo,u,ue,o,ui"
+    },
+    {
+      "word": "moon",
+      "gloss": "/muːn/ 月亮"
+    },
+    {
+      "word": "food",
+      "gloss": "/fuːd/ 食物"
+    },
+    {
+      "word": "blue",
+      "gloss": "/bluː/ 蓝色的"
+    },
+    {
+      "word": "long er",
+      "gloss": "/ɜː/ · 嘴半开，舌位中央，不圆唇 · 拼写 er,ir,ur,or,ear"
+    },
+    {
+      "word": "bird",
+      "gloss": "/bɜːd/ 鸟"
+    },
+    {
+      "word": "girl",
+      "gloss": "/ɡɜːl/ 女孩"
+    },
+    {
+      "word": "turn",
+      "gloss": "/tɜːn/ 转弯"
+    },
+    {
+      "word": "diph ei",
+      "gloss": "/eɪ/ · 从 /e/ 滑向 /ɪ/，口型由半开到扁平 · 拼写 a_e,ai,ay,ey,ea"
+    },
+    {
+      "word": "rain",
+      "gloss": "/reɪn/ 雨"
+    },
+    {
+      "word": "day",
+      "gloss": "/deɪ/ 天；日"
+    },
+    {
+      "word": "cake",
+      "gloss": "/keɪk/ 蛋糕"
+    },
+    {
+      "word": "diph ai",
+      "gloss": "/aɪ/ · 从 /a/ 滑向 /ɪ/，口型由大到扁 · 拼写 i_e,igh,y,ie"
+    },
+    {
+      "word": "bike",
+      "gloss": "/baɪk/ 自行车"
+    },
+    {
+      "word": "my",
+      "gloss": "/maɪ/ 我的"
+    },
+    {
+      "word": "high",
+      "gloss": "/haɪ/ 高的"
+    },
+    {
+      "word": "diph oi",
+      "gloss": "/ɔɪ/ · 从 /ɔ/ 滑向 /ɪ/，嘴唇由圆变扁 · 拼写 oi,oy"
+    },
+    {
+      "word": "coin",
+      "gloss": "/kɔɪn/ 硬币"
+    },
+    {
+      "word": "boy",
+      "gloss": "/bɔɪ/ 男孩"
+    },
+    {
+      "word": "join",
+      "gloss": "/dʒɔɪn/ 加入"
+    },
+    {
+      "word": "diph ou",
+      "gloss": "/əʊ/ · 从 /ə/ 滑向 /ʊ/，口型由中到圆 · 拼写 o_e,oa,ow,o,oe"
+    },
+    {
+      "word": "nose",
+      "gloss": "/nəʊz/ 鼻子"
+    },
+    {
+      "word": "home",
+      "gloss": "/həʊm/ 家"
+    },
+    {
+      "word": "boat",
+      "gloss": "/bəʊt/ 船"
+    },
+    {
+      "word": "diph au",
+      "gloss": "/aʊ/ · 从 /a/ 滑向 /ʊ/，口型由大收圆 · 拼写 ou,ow"
+    },
+    {
+      "word": "house",
+      "gloss": "/haʊs/ 房子"
+    },
+    {
+      "word": "cow",
+      "gloss": "/kaʊ/ 奶牛"
+    },
+    {
+      "word": "now",
+      "gloss": "/naʊ/ 现在"
+    },
+    {
+      "word": "diph ia",
+      "gloss": "/ɪə/ · 从 /ɪ/ 滑向 /ə/，口型由扁到中 · 拼写 ear,eer,ere"
+    },
+    {
+      "word": "hear",
+      "gloss": "/hɪə/ 听见"
+    },
+    {
+      "word": "near",
+      "gloss": "/nɪə/ 近的"
+    },
+    {
+      "word": "deer",
+      "gloss": "/dɪə/ 鹿"
+    },
+    {
+      "word": "diph ea",
+      "gloss": "/eə/ · 从 /e/ 滑向 /ə/，口型由半开到中 · 拼写 air,are,ear,ere"
+    },
+    {
+      "word": "hair",
+      "gloss": "/heə/ 头发"
+    },
+    {
+      "word": "chair",
+      "gloss": "/tʃeə/ 椅子"
+    },
+    {
+      "word": "bear",
+      "gloss": "/beə/ 熊"
+    },
+    {
+      "word": "diph ua",
+      "gloss": "/ʊə/ · 从 /ʊ/ 滑向 /ə/，口型由圆到中 · 拼写 oor,our,ure"
+    },
+    {
+      "word": "poor",
+      "gloss": "/pʊə/ 贫穷的"
+    },
+    {
+      "word": "tour",
+      "gloss": "/tʊə/ 旅行"
+    },
+    {
+      "word": "sure",
+      "gloss": "/ʃʊə/ 确定的"
+    },
+    {
+      "word": "cons p",
+      "gloss": "/p/ · 双唇紧闭后突然放开 · 拼写 p,pp"
+    },
+    {
+      "word": "cons t",
+      "gloss": "/t/ · 舌尖抵上齿龈后放开 · 拼写 t,tt,ed"
+    },
+    {
+      "word": "top",
+      "gloss": "/tɒp/ 顶部"
+    },
+    {
+      "word": "cons k",
+      "gloss": "/k/ · 舌后部抵软腭后放开 · 拼写 k,c,ck,ch"
+    },
+    {
+      "word": "cons f",
+      "gloss": "/f/ · 上齿轻触下唇，气流挤出 · 拼写 f,ff,ph,gh"
+    },
+    {
+      "word": "fish",
+      "gloss": "/fɪʃ/ 鱼"
+    },
+    {
+      "word": "fan",
+      "gloss": "/fæn/ 扇子"
+    },
+    {
+      "word": "phone",
+      "gloss": "/fəʊn/ 电话"
+    },
+    {
+      "word": "cons s",
+      "gloss": "/s/ · 舌尖靠近上齿龈，气流挤出 · 拼写 s,ss,c,ce"
+    },
+    {
+      "word": "city",
+      "gloss": "/ˈsɪti/ 城市"
+    },
+    {
+      "word": "cons sh",
+      "gloss": "/ʃ/ · 舌面靠近硬腭，气流挤出 · 拼写 sh,ti,ci,s"
+    },
+    {
+      "word": "ship",
+      "gloss": "/ʃɪp/ 船"
+    },
+    {
+      "word": "cons ch",
+      "gloss": "/tʃ/ · /t/ 和 /ʃ/ 快速连发 · 拼写 ch,tch,t"
+    },
+    {
+      "word": "much",
+      "gloss": "/mʌtʃ/ 许多"
+    },
+    {
+      "word": "watch",
+      "gloss": "/wɒtʃ/ 手表"
+    },
+    {
+      "word": "cons th",
+      "gloss": "/θ/ · 舌尖轻触上齿，气流挤出 · 拼写 th"
+    },
+    {
+      "word": "think",
+      "gloss": "/θɪŋk/ 想"
+    },
+    {
+      "word": "three",
+      "gloss": "/θriː/ 三"
+    },
+    {
+      "word": "mouth",
+      "gloss": "/maʊθ/ 嘴"
+    },
+    {
+      "word": "cons h",
+      "gloss": "/h/ · 气流从喉部自由流出 · 拼写 h,wh"
+    },
+    {
+      "word": "hat",
+      "gloss": "/hæt/ 帽子"
+    },
+    {
+      "word": "who",
+      "gloss": "/huː/ 谁"
+    },
+    {
+      "word": "cons tr",
+      "gloss": "/tr/ · 舌尖抵上齿龈后放开并立刻卷向 /r/，两个音快速连发（破擦音） · 拼写 tr"
+    },
+    {
+      "word": "train",
+      "gloss": "/treɪn/ 火车"
+    },
+    {
+      "word": "try",
+      "gloss": "/traɪ/ 尝试"
+    },
+    {
+      "word": "cons ts",
+      "gloss": "/ts/ · /t/ 与 /s/ 快速连发，舌尖先抵齿龈再送气，声带不振动 · 拼写 ts,tes"
+    },
+    {
+      "word": "cats",
+      "gloss": "/kæts/ 猫（复数）"
+    },
+    {
+      "word": "seats",
+      "gloss": "/siːts/ 座位（复数）"
+    },
+    {
+      "word": "gets",
+      "gloss": "/ɡets/ 得到（三单）"
+    },
+    {
+      "word": "cons b",
+      "gloss": "/b/ · 双唇紧闭后放开，声带振动 · 拼写 b,bb"
+    },
+    {
+      "word": "baby",
+      "gloss": "/ˈbeɪbi/ 婴儿"
+    },
+    {
+      "word": "cons d",
+      "gloss": "/d/ · 舌尖抵上齿龈后放开，声带振动 · 拼写 d,dd,ed"
+    },
+    {
+      "word": "dad",
+      "gloss": "/dæd/ 爸爸"
+    },
+    {
+      "word": "cons g",
+      "gloss": "/ɡ/ · 舌后部抵软腭后放开，声带振动 · 拼写 g,gg,gh"
+    },
+    {
+      "word": "go",
+      "gloss": "/ɡəʊ/ 去"
+    },
+    {
+      "word": "cons v",
+      "gloss": "/v/ · 上齿轻触下唇，声带振动 · 拼写 v,ve"
+    },
+    {
+      "word": "van",
+      "gloss": "/væn/ 货车"
+    },
+    {
+      "word": "love",
+      "gloss": "/lʌv/ 爱"
+    },
+    {
+      "word": "seven",
+      "gloss": "/ˈsevn/ 七"
+    },
+    {
+      "word": "cons z",
+      "gloss": "/z/ · 舌尖靠近上齿龈，声带振动 · 拼写 z,s,zz,se"
+    },
+    {
+      "word": "zoo",
+      "gloss": "/zuː/ 动物园"
+    },
+    {
+      "word": "zip",
+      "gloss": "/zɪp/ 拉链"
+    },
+    {
+      "word": "is",
+      "gloss": "/ɪz/ 是"
+    },
+    {
+      "word": "cons zh",
+      "gloss": "/ʒ/ · 舌面靠近硬腭，声带振动 · 拼写 si,su,ge"
+    },
+    {
+      "word": "measure",
+      "gloss": "/ˈmeʒə/ 测量"
+    },
+    {
+      "word": "vision",
+      "gloss": "/ˈvɪʒn/ 视觉"
+    },
+    {
+      "word": "pleasure",
+      "gloss": "/ˈpleʒə/ 愉快"
+    },
+    {
+      "word": "cons j",
+      "gloss": "/dʒ/ · /d/ 和 /ʒ/ 快速连发 · 拼写 j,g,dge,ge"
+    },
+    {
+      "word": "jam",
+      "gloss": "/dʒæm/ 果酱"
+    },
+    {
+      "word": "jump",
+      "gloss": "/dʒʌmp/ 跳"
+    },
+    {
+      "word": "bridge",
+      "gloss": "/brɪdʒ/ 桥"
+    },
+    {
+      "word": "cons dh",
+      "gloss": "/ð/ · 舌尖轻触上齿，声带振动 · 拼写 th"
+    },
+    {
+      "word": "this",
+      "gloss": "/ðɪs/ 这个"
+    },
+    {
+      "word": "mother",
+      "gloss": "/ˈmʌðə/ 母亲"
+    },
+    {
+      "word": "they",
+      "gloss": "/ðeɪ/ 他们"
+    },
+    {
+      "word": "cons m",
+      "gloss": "/m/ · 双唇闭合，气流从鼻腔出 · 拼写 m,mm,mb"
+    },
+    {
+      "word": "man",
+      "gloss": "/mæn/ 男人"
+    },
+    {
+      "word": "mum",
+      "gloss": "/mʌm/ 妈妈"
+    },
+    {
+      "word": "summer",
+      "gloss": "/ˈsʌmə/ 夏天"
+    },
+    {
+      "word": "cons n",
+      "gloss": "/n/ · 舌尖抵上齿龈，气流从鼻腔出 · 拼写 n,nn,kn,gn"
+    },
+    {
+      "word": "net",
+      "gloss": "/net/ 网"
+    },
+    {
+      "word": "nine",
+      "gloss": "/naɪn/ 九"
+    },
+    {
+      "word": "cons ng",
+      "gloss": "/ŋ/ · 舌后部抵软腭，气流从鼻腔出 · 拼写 ng,n"
+    },
+    {
+      "word": "sing",
+      "gloss": "/sɪŋ/ 唱歌"
+    },
+    {
+      "word": "long",
+      "gloss": "/lɒŋ/ 长的"
+    },
+    {
+      "word": "bank",
+      "gloss": "/bæŋk/ 银行"
+    },
+    {
+      "word": "cons l",
+      "gloss": "/l/ · 舌尖抵上齿龈，气流从舌两侧出 · 拼写 l,ll"
+    },
+    {
+      "word": "leg",
+      "gloss": "/leɡ/ 腿"
+    },
+    {
+      "word": "bell",
+      "gloss": "/bel/ 铃"
+    },
+    {
+      "word": "light",
+      "gloss": "/laɪt/ 光"
+    },
+    {
+      "word": "cons r",
+      "gloss": "/r/ · 舌尖卷起不触上腭 · 拼写 r,rr,wr"
+    },
+    {
+      "word": "run",
+      "gloss": "/rʌn/ 跑"
+    },
+    {
+      "word": "carry",
+      "gloss": "/ˈkæri/ 携带"
+    },
+    {
+      "word": "cons w",
+      "gloss": "/w/ · 双唇收圆前突 · 拼写 w,wh"
+    },
+    {
+      "word": "wet",
+      "gloss": "/wet/ 湿的"
+    },
+    {
+      "word": "win",
+      "gloss": "/wɪn/ 赢"
+    },
+    {
+      "word": "queen",
+      "gloss": "/kwiːn/ 女王"
+    },
+    {
+      "word": "cons y",
+      "gloss": "/j/ · 舌面靠近硬腭 · 拼写 y,u,i"
+    },
+    {
+      "word": "yes",
+      "gloss": "/jes/ 是的"
+    },
+    {
+      "word": "yellow",
+      "gloss": "/ˈjeləʊ/ 黄色的"
+    },
+    {
+      "word": "music",
+      "gloss": "/ˈmjuːzɪk/ 音乐"
+    },
+    {
+      "word": "cons dr",
+      "gloss": "/dr/ · /d/ 与 /r/ 快速连发，声带振动，不要读成汉语的「珠」 · 拼写 dr"
+    },
+    {
+      "word": "dream",
+      "gloss": "/driːm/ 梦"
+    },
+    {
+      "word": "dress",
+      "gloss": "/dres/ 连衣裙"
+    },
+    {
+      "word": "drive",
+      "gloss": "/draɪv/ 驾驶"
+    },
+    {
+      "word": "cons dz",
+      "gloss": "/dz/ · /d/ 与 /z/ 快速连发，声带振动，末尾的 /z/ 要拖出声音 · 拼写 ds,des"
+    },
+    {
+      "word": "beds",
+      "gloss": "/bedz/ 床（复数）"
+    },
+    {
+      "word": "hands",
+      "gloss": "/hændz/ 手（复数）"
+    },
+    {
+      "word": "needs",
+      "gloss": "/niːdz/ 需要（三单）"
+    }
+  ]
+}

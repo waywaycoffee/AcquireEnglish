@@ -1,0 +1,73 @@
+{
+  "id": "foundation_phonics_categories",
+  "title": "自然拼读 · 16 类路线图",
+  "examTag": "MAP",
+  "kind": "foundation",
+  "disclaimer": "整理自 cocojojo5213/phonics-app categories。",
+  "words": [
+    {
+      "word": "single consonant letters (most common sounds)",
+      "gloss": "单辅音字母（基础音）"
+    },
+    {
+      "word": "short vowels",
+      "gloss": "短元音"
+    },
+    {
+      "word": "consonant digraphs/trigraphs",
+      "gloss": "辅音字母组合 Digraphs/Trigraphs"
+    },
+    {
+      "word": "consonant blends",
+      "gloss": "辅音连读 Blends"
+    },
+    {
+      "word": "common ending spelling patterns",
+      "gloss": "常见拼写规律（词尾）"
+    },
+    {
+      "word": "silent-e (vce)",
+      "gloss": "魔法E（VCe）"
+    },
+    {
+      "word": "long vowel teams",
+      "gloss": "长元音字母组合 Vowel Teams"
+    },
+    {
+      "word": "r-controlled vowels",
+      "gloss": "R 控制元音（Bossy R）"
+    },
+    {
+      "word": "other vowel teams (diphthongs/variant vowels)",
+      "gloss": "其他元音组合（双元音/变体元音）"
+    },
+    {
+      "word": "soft c/g and y variants",
+      "gloss": "软音 C/G 与 Y 的多种用法"
+    },
+    {
+      "word": "inflectional endings",
+      "gloss": "常见词尾变化（语法词尾）"
+    },
+    {
+      "word": "spelling changes with suffixes",
+      "gloss": "加后缀时的拼写变化"
+    },
+    {
+      "word": "six syllable types (multisyllable decoding)",
+      "gloss": "六大音节类型（读多音节词的规则）"
+    },
+    {
+      "word": "schwa (unstressed syllables)",
+      "gloss": "弱读音 Schwa（非重读音节）"
+    },
+    {
+      "word": "syllable division rules (multisyllabic decoding)",
+      "gloss": "音节划分规则（多音节拆分）"
+    },
+    {
+      "word": "consonant voicing tendencies",
+      "gloss": "辅音清浊变化（发音倾向）"
+    }
+  ]
+}

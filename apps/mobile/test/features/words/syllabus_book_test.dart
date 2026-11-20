@@ -126,4 +126,21 @@ ok
       expect(book.wordCount, 2);
     });
   });
+
+  group('foundation books', () {
+    test('parses phonics/ipa kind', () {
+      final SyllabusBook book = SyllabusBook.fromJson(<String, dynamic>{
+        'id': 'foundation_ipa_48',
+        'title': '国际音标 48 音素',
+        'examTag': 'IPA48',
+        'kind': 'foundation',
+        'words': <Object>[
+          <String, String>{'word': 'short a', 'gloss': '/æ/'},
+        ],
+      });
+      expect(book.isFoundationBook, isTrue);
+      expect(SyllabusBookKind.fromName('ipa'), SyllabusBookKind.foundation);
+      expect(SyllabusBookKind.fromName('自然拼读'), SyllabusBookKind.foundation);
+    });
+  });
 }

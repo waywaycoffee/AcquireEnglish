@@ -1,0 +1,305 @@
+{
+  "id": "foundation_phonics_irregulars",
+  "title": "自然拼读 · 例外规则",
+  "examTag": "EXCEPT",
+  "kind": "foundation",
+  "disclaimer": "整理自 scott-lei/phonics-app 不规则规则库。",
+  "words": [
+    {
+      "word": "c 在 e / i / y 前",
+      "gloss": "发 /s/，否则发 /k/"
+    },
+    {
+      "word": "city",
+      "gloss": "/ˈsɪti/ 城市 c + i → /s/"
+    },
+    {
+      "word": "cent",
+      "gloss": "/sent/ 分（货币） c + e → /s/"
+    },
+    {
+      "word": "cycle",
+      "gloss": "/ˈsaɪkl/ 循环 c + y → /s/"
+    },
+    {
+      "word": "cat",
+      "gloss": "/kæt/ 猫 c + a → /k/"
+    },
+    {
+      "word": "cup",
+      "gloss": "/kʌp/ 杯子 c + u → /k/"
+    },
+    {
+      "word": "cold",
+      "gloss": "/kəʊld/ 冷的 c + o → /k/"
+    },
+    {
+      "word": "g 在 e / i / y 前",
+      "gloss": "常发 /dʒ/，但有特例"
+    },
+    {
+      "word": "giant",
+      "gloss": "/ˈdʒaɪənt/ 巨人 g + i → /dʒ/"
+    },
+    {
+      "word": "gym",
+      "gloss": "/dʒɪm/ 体育馆 g + y → /dʒ/"
+    },
+    {
+      "word": "age",
+      "gloss": "/eɪdʒ/ 年龄 g + e → /dʒ/"
+    },
+    {
+      "word": "give",
+      "gloss": "/ɡɪv/ 给 特例：仍发 /ɡ/"
+    },
+    {
+      "word": "girl",
+      "gloss": "/ɡɜːl/ 女孩 特例：仍发 /ɡ/"
+    },
+    {
+      "word": "get",
+      "gloss": "/ɡet/ 得到 特例：仍发 /ɡ/"
+    },
+    {
+      "word": "y 的多重发音",
+      "gloss": "词首 /j/，词尾单音节 /aɪ/，词尾多音节 /i/"
+    },
+    {
+      "word": "yes",
+      "gloss": "/jes/ 是的 词首 → /j/"
+    },
+    {
+      "word": "my",
+      "gloss": "/maɪ/ 我的 词尾（单音节）→ /aɪ/"
+    },
+    {
+      "word": "fly",
+      "gloss": "/flaɪ/ 飞 词尾（单音节）→ /aɪ/"
+    },
+    {
+      "word": "happy",
+      "gloss": "/ˈhæpi/ 快乐的 词尾（多音节）→ /i/"
+    },
+    {
+      "word": "baby",
+      "gloss": "/ˈbeɪbi/ 婴儿 词尾（多音节）→ /i/"
+    },
+    {
+      "word": "x 的多重发音",
+      "gloss": "通常发 /ks/，有时发 /ɡz/ 或 /z/"
+    },
+    {
+      "word": "box",
+      "gloss": "/bɒks/ 盒子 通常 → /ks/"
+    },
+    {
+      "word": "six",
+      "gloss": "/sɪks/ 六 通常 → /ks/"
+    },
+    {
+      "word": "exam",
+      "gloss": "/ɪɡˈzæm/ 考试 有时 → /ɡz/"
+    },
+    {
+      "word": "exact",
+      "gloss": "/ɪɡˈzækt/ 精确的 有时 → /ɡz/"
+    },
+    {
+      "word": "xylophone",
+      "gloss": "/ˈzaɪləfəʊn/ 木琴 有时 → /z/"
+    },
+    {
+      "word": "o 的特殊发音",
+      "gloss": "在 m / n / v 前常发 /ʌ/"
+    },
+    {
+      "word": "love",
+      "gloss": "/lʌv/ 爱 o 在 v 前 → /ʌ/"
+    },
+    {
+      "word": "come",
+      "gloss": "/kʌm/ 来 o 在 m 前 → /ʌ/"
+    },
+    {
+      "word": "son",
+      "gloss": "/sʌn/ 儿子 o 在 n 前 → /ʌ/"
+    },
+    {
+      "word": "money",
+      "gloss": "/ˈmʌni/ 钱 o 在 n 前 → /ʌ/"
+    },
+    {
+      "word": "不发音字母 kn",
+      "gloss": "词首 k 不发音"
+    },
+    {
+      "word": "know",
+      "gloss": "/nəʊ/ 知道 k 不发音"
+    },
+    {
+      "word": "knee",
+      "gloss": "/niː/ 膝盖 k 不发音"
+    },
+    {
+      "word": "knife",
+      "gloss": "/naɪf/ 刀 k 不发音"
+    },
+    {
+      "word": "knock",
+      "gloss": "/nɒk/ 敲 k 不发音"
+    },
+    {
+      "word": "不发音字母 wr",
+      "gloss": "词首 w 不发音"
+    },
+    {
+      "word": "write",
+      "gloss": "/raɪt/ 写 w 不发音"
+    },
+    {
+      "word": "wrong",
+      "gloss": "/rɒŋ/ 错误的 w 不发音"
+    },
+    {
+      "word": "wrist",
+      "gloss": "/rɪst/ 手腕 w 不发音"
+    },
+    {
+      "word": "wrap",
+      "gloss": "/ræp/ 包裹 w 不发音"
+    },
+    {
+      "word": "不发音字母 mb",
+      "gloss": "词尾 b 不发音"
+    },
+    {
+      "word": "lamb",
+      "gloss": "/læm/ 羔羊 b 不发音"
+    },
+    {
+      "word": "climb",
+      "gloss": "/klaɪm/ 爬 b 不发音"
+    },
+    {
+      "word": "comb",
+      "gloss": "/kəʊm/ 梳子 b 不发音"
+    },
+    {
+      "word": "thumb",
+      "gloss": "/θʌm/ 拇指 b 不发音"
+    },
+    {
+      "word": "不发音字母 gh",
+      "gloss": "gh 不发音或发 /f/"
+    },
+    {
+      "word": "night",
+      "gloss": "/naɪt/ 夜晚 gh 不发音"
+    },
+    {
+      "word": "high",
+      "gloss": "/haɪ/ 高的 gh 不发音"
+    },
+    {
+      "word": "through",
+      "gloss": "/θruː/ 穿过 gh 不发音"
+    },
+    {
+      "word": "laugh",
+      "gloss": "/lɑːf/ 笑 gh 发 /f/"
+    },
+    {
+      "word": "enough",
+      "gloss": "/ɪˈnʌf/ 足够的 gh 发 /f/"
+    },
+    {
+      "word": "不发音字母 e",
+      "gloss": "词尾 e 不发音，使前面元音发长音"
+    },
+    {
+      "word": "cake",
+      "gloss": "/keɪk/ 蛋糕 词尾 e 不发音，a 发 /eɪ/"
+    },
+    {
+      "word": "bike",
+      "gloss": "/baɪk/ 自行车 词尾 e 不发音，i 发 /aɪ/"
+    },
+    {
+      "word": "nose",
+      "gloss": "/nəʊz/ 鼻子 词尾 e 不发音，o 发 /əʊ/"
+    },
+    {
+      "word": "cute",
+      "gloss": "/kjuːt/ 可爱的 词尾 e 不发音，u 发 /juː/"
+    },
+    {
+      "word": "-tion 结尾",
+      "gloss": "发 /ʃən/"
+    },
+    {
+      "word": "nation",
+      "gloss": "/ˈneɪʃn/ 国家 -tion → /ʃən/"
+    },
+    {
+      "word": "station",
+      "gloss": "/ˈsteɪʃn/ 车站 -tion → /ʃən/"
+    },
+    {
+      "word": "action",
+      "gloss": "/ˈækʃn/ 行动 -tion → /ʃən/"
+    },
+    {
+      "word": "-sion 结尾",
+      "gloss": "发 /ʒən/ 或 /ʃən/"
+    },
+    {
+      "word": "vision",
+      "gloss": "/ˈvɪʒn/ 视觉 -sion → /ʒən/"
+    },
+    {
+      "word": "decision",
+      "gloss": "/dɪˈsɪʒn/ 决定 -sion → /ʒən/"
+    },
+    {
+      "word": "mission",
+      "gloss": "/ˈmɪʃn/ 任务 -sion → /ʃən/"
+    },
+    {
+      "word": "-ough 多种发音",
+      "gloss": "多种读法，需单独记忆"
+    },
+    {
+      "word": "though",
+      "gloss": "/ðəʊ/ 虽然 发 /əʊ/"
+    },
+    {
+      "word": "cough",
+      "gloss": "/kɒf/ 咳嗽 发 /ɒf/"
+    },
+    {
+      "word": "tough",
+      "gloss": "/tʌf/ 艰难的 发 /ʌf/"
+    },
+    {
+      "word": "thought",
+      "gloss": "/θɔːt/ 想法 发 /ɔːt/"
+    },
+    {
+      "word": "双写辅音",
+      "gloss": "只发一次音"
+    },
+    {
+      "word": "letter",
+      "gloss": "/ˈletə/ 信 tt 只发一次 /t/"
+    },
+    {
+      "word": "summer",
+      "gloss": "/ˈsʌmə/ 夏天 mm 只发一次 /m/"
+    },
+    {
+      "word": "rabbit",
+      "gloss": "/ˈræbɪt/ 兔子 bb 只发一次 /b/"
+    }
+  ]
+}

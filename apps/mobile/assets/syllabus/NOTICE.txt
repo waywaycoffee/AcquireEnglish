@@ -27,3 +27,10 @@ See CHUNKS_SOURCES.md. Bundled sources include:
 
 NOT bundled: hucaixue/Oral-English-8000-* (likely textbook reprint, no
 license). iwangjie/English-Chunks has no static corpus to import.
+
+Zero-foundation IPA / phonics
+-----------------------------
+See PHONICS_IPA_SOURCES.md. Bundled from scott-lei/phonics-app,
+cocojojo5213/phonics-app, RichardoZhao/Phonics-Helper (MIT),
+nk2028/ipa-practise (CC0), CMUdict phone map, plus course outlines for
+jhnwnstd IPA Crash Course and Sheffield learnipa (links in disclaimers).

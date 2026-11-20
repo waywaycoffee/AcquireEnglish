@@ -1,0 +1,1189 @@
+{
+  "id": "foundation_phonics_rules_100",
+  "title": "自然拼读 · 100+ 规则",
+  "examTag": "RULES",
+  "kind": "foundation",
+  "disclaimer": "压缩自 cocojojo5213/phonics-app rules-master.json（请按 README 署名）。",
+  "words": [
+    {
+      "word": "b",
+      "gloss": "/b/ · 字母 b 常见音 /b/"
+    },
+    {
+      "word": "bat",
+      "gloss": "/b/ · b|a|t"
+    },
+    {
+      "word": "bed",
+      "gloss": "/b/ · b|e|d"
+    },
+    {
+      "word": "c",
+      "gloss": "/k/ · 字母 c 硬音 /k/（常在 a,o,u 前）"
+    },
+    {
+      "word": "cat",
+      "gloss": "/k/ · c|a|t"
+    },
+    {
+      "word": "cap",
+      "gloss": "/k/ · c|a|p"
+    },
+    {
+      "word": "d",
+      "gloss": "/d/ · 字母 d 常见音 /d/"
+    },
+    {
+      "word": "dog",
+      "gloss": "/d/ · d|o|g"
+    },
+    {
+      "word": "dad",
+      "gloss": "/d/ · d|a|d"
+    },
+    {
+      "word": "f",
+      "gloss": "/f/ · 字母 f 常见音 /f/"
+    },
+    {
+      "word": "fan",
+      "gloss": "/f/ · f|a|n"
+    },
+    {
+      "word": "fig",
+      "gloss": "/f/ · f|i|g"
+    },
+    {
+      "word": "g",
+      "gloss": "/g/ · 字母 g 硬音 /g/（常在 a,o,u 前）"
+    },
+    {
+      "word": "gap",
+      "gloss": "/g/ · g|a|p"
+    },
+    {
+      "word": "got",
+      "gloss": "/g/ · g|o|t"
+    },
+    {
+      "word": "h",
+      "gloss": "/h/ · 字母 h 常见音 /h/"
+    },
+    {
+      "word": "hat",
+      "gloss": "/h/ · h|a|t"
+    },
+    {
+      "word": "hen",
+      "gloss": "/h/ · h|e|n"
+    },
+    {
+      "word": "j",
+      "gloss": "/dʒ/ · 字母 j 常见音 /dʒ/（像中文“j”）"
+    },
+    {
+      "word": "jam",
+      "gloss": "/dʒ/ · j|a|m"
+    },
+    {
+      "word": "jet",
+      "gloss": "/dʒ/ · j|e|t"
+    },
+    {
+      "word": "k",
+      "gloss": "/k/ · 字母 k 常见音 /k/"
+    },
+    {
+      "word": "kit",
+      "gloss": "/k/ · k|i|t"
+    },
+    {
+      "word": "kick",
+      "gloss": "/k/ · k|i|ck"
+    },
+    {
+      "word": "l",
+      "gloss": "/l/ · 字母 l 常见音 /l/"
+    },
+    {
+      "word": "lip",
+      "gloss": "/l/ · l|i|p"
+    },
+    {
+      "word": "leg",
+      "gloss": "/l/ · l|e|g"
+    },
+    {
+      "word": "m",
+      "gloss": "/m/ · 字母 m 常见音 /m/"
+    },
+    {
+      "word": "map",
+      "gloss": "/m/ · m|a|p"
+    },
+    {
+      "word": "men",
+      "gloss": "/m/ · m|e|n"
+    },
+    {
+      "word": "n",
+      "gloss": "/n/ · 字母 n 常见音 /n/"
+    },
+    {
+      "word": "nap",
+      "gloss": "/n/ · n|a|p"
+    },
+    {
+      "word": "net",
+      "gloss": "/n/ · n|e|t"
+    },
+    {
+      "word": "p",
+      "gloss": "/p/ · 字母 p 常见音 /p/"
+    },
+    {
+      "word": "pan",
+      "gloss": "/p/ · p|a|n"
+    },
+    {
+      "word": "pen",
+      "gloss": "/p/ · p|e|n"
+    },
+    {
+      "word": "qu",
+      "gloss": "/kw/ · 字母组合 qu 常见音 /kw/"
+    },
+    {
+      "word": "quit",
+      "gloss": "/kw/ · qu|i|t"
+    },
+    {
+      "word": "quiz",
+      "gloss": "/kw/ · qu|i|z"
+    },
+    {
+      "word": "r",
+      "gloss": "/r/ · 字母 r 常见音 /r/（美式卷舌）"
+    },
+    {
+      "word": "rag",
+      "gloss": "/r/ · r|a|g"
+    },
+    {
+      "word": "red",
+      "gloss": "/r/ · r|e|d"
+    },
+    {
+      "word": "s",
+      "gloss": "/s/ · 字母 s 常见音 /s/"
+    },
+    {
+      "word": "sun",
+      "gloss": "/s/ · s|u|n"
+    },
+    {
+      "word": "sip",
+      "gloss": "/s/ · s|i|p"
+    },
+    {
+      "word": "t",
+      "gloss": "/t/ · 字母 t 常见音 /t/"
+    },
+    {
+      "word": "top",
+      "gloss": "/t/ · t|o|p"
+    },
+    {
+      "word": "ten",
+      "gloss": "/t/ · t|e|n"
+    },
+    {
+      "word": "v",
+      "gloss": "/v/ · 字母 v 常见音 /v/"
+    },
+    {
+      "word": "van",
+      "gloss": "/v/ · v|a|n"
+    },
+    {
+      "word": "vet",
+      "gloss": "/v/ · v|e|t"
+    },
+    {
+      "word": "w",
+      "gloss": "/w/ · 字母 w 常见音 /w/"
+    },
+    {
+      "word": "web",
+      "gloss": "/w/ · w|e|b"
+    },
+    {
+      "word": "win",
+      "gloss": "/w/ · w|i|n"
+    },
+    {
+      "word": "x",
+      "gloss": "/ks/ · 字母 x 常见音 /ks/"
+    },
+    {
+      "word": "box",
+      "gloss": "/ks/ · b|o|x"
+    },
+    {
+      "word": "fox",
+      "gloss": "/ks/ · f|o|x"
+    },
+    {
+      "word": "y",
+      "gloss": "/j/ · 字母 y 作辅音时发 /j/（像 yes 开头）"
+    },
+    {
+      "word": "yes",
+      "gloss": "/j/ · y|e|s"
+    },
+    {
+      "word": "yam",
+      "gloss": "/j/ · y|a|m"
+    },
+    {
+      "word": "z",
+      "gloss": "/z/ · 字母 z 常见音 /z/"
+    },
+    {
+      "word": "zip",
+      "gloss": "/z/ · z|i|p"
+    },
+    {
+      "word": "zag",
+      "gloss": "/z/ · z|a|g"
+    },
+    {
+      "word": "a",
+      "gloss": "/æ/ · 短 a"
+    },
+    {
+      "word": "e",
+      "gloss": "/ɛ/ · 短 e"
+    },
+    {
+      "word": "i",
+      "gloss": "/ɪ/ · 短 i"
+    },
+    {
+      "word": "sit",
+      "gloss": "/ɪ/ · s|i|t"
+    },
+    {
+      "word": "pig",
+      "gloss": "/ɪ/ · p|i|g"
+    },
+    {
+      "word": "o",
+      "gloss": "/ɑ/ · 短 o"
+    },
+    {
+      "word": "hot",
+      "gloss": "/ɑ/ · h|o|t"
+    },
+    {
+      "word": "mop",
+      "gloss": "/ɑ/ · m|o|p"
+    },
+    {
+      "word": "u",
+      "gloss": "/ʌ/ · 短 u"
+    },
+    {
+      "word": "cup",
+      "gloss": "/ʌ/ · c|u|p"
+    },
+    {
+      "word": "ch",
+      "gloss": "/tʃ/ · ch 发 /tʃ/"
+    },
+    {
+      "word": "chip",
+      "gloss": "/tʃ/ · ch|i|p"
+    },
+    {
+      "word": "chop",
+      "gloss": "/tʃ/ · ch|o|p"
+    },
+    {
+      "word": "ck",
+      "gloss": "/k/ · ck 常在词尾读 /k/（多跟短元音）"
+    },
+    {
+      "word": "back",
+      "gloss": "/k/ · b|a|ck"
+    },
+    {
+      "word": "neck",
+      "gloss": "/k/ · n|e|ck"
+    },
+    {
+      "word": "ng",
+      "gloss": "/ŋ/ · ng 常读 /ŋ/"
+    },
+    {
+      "word": "sing",
+      "gloss": "/ŋ/ · s|i|ng"
+    },
+    {
+      "word": "ring",
+      "gloss": "/ŋ/ · r|i|ng"
+    },
+    {
+      "word": "nk",
+      "gloss": "/ŋk/ · nk 常读 /ŋk/"
+    },
+    {
+      "word": "sink",
+      "gloss": "/ŋk/ · s|i|nk"
+    },
+    {
+      "word": "pink",
+      "gloss": "/ŋk/ · p|i|nk"
+    },
+    {
+      "word": "ph",
+      "gloss": "/f/ · ph 常读 /f/"
+    },
+    {
+      "word": "phone",
+      "gloss": "/f/ · p|h|o|n|e"
+    },
+    {
+      "word": "photo",
+      "gloss": "/f/ · ph|o|t|o"
+    },
+    {
+      "word": "sh",
+      "gloss": "/ʃ/ · sh 发 /ʃ/"
+    },
+    {
+      "word": "ship",
+      "gloss": "/ʃ/ · sh|i|p"
+    },
+    {
+      "word": "shop",
+      "gloss": "/ʃ/ · sh|o|p"
+    },
+    {
+      "word": "th",
+      "gloss": "/ð/ · th 浊音 /ð/"
+    },
+    {
+      "word": "this",
+      "gloss": "/ð/ · th|i|s"
+    },
+    {
+      "word": "that",
+      "gloss": "/ð/ · th|a|t"
+    },
+    {
+      "word": "thin",
+      "gloss": "/θ/ · th|i|n"
+    },
+    {
+      "word": "thumb",
+      "gloss": "/θ/ · th|u|mb"
+    },
+    {
+      "word": "wh",
+      "gloss": "/w/ · wh 常读 /w/"
+    },
+    {
+      "word": "when",
+      "gloss": "/w/ · wh|e|n"
+    },
+    {
+      "word": "what",
+      "gloss": "/w/ · wh|a|t"
+    },
+    {
+      "word": "kn",
+      "gloss": "/n/ · kn：k 不发音，kn 发 /n/"
+    },
+    {
+      "word": "knee",
+      "gloss": "/n/ · kn|ee"
+    },
+    {
+      "word": "knife",
+      "gloss": "/n/ · k|n|i|f|e"
+    },
+    {
+      "word": "mb",
+      "gloss": "/m/ · mb：词尾 b 不发音"
+    },
+    {
+      "word": "lamb",
+      "gloss": "/m/ · l|a|mb"
+    },
+    {
+      "word": "comb",
+      "gloss": "/m/ · c|o|mb"
+    },
+    {
+      "word": "wr",
+      "gloss": "/r/ · wr：w 不发音，wr 发 /r/"
+    },
+    {
+      "word": "wrap",
+      "gloss": "/r/ · wr|a|p"
+    },
+    {
+      "word": "wren",
+      "gloss": "/r/ · wr|e|n"
+    },
+    {
+      "word": "bl|cl|fl|gl|pl|sl",
+      "gloss": "None · 辅音连读（不合并成新音）"
+    },
+    {
+      "word": "blot",
+      "gloss": "None · bl|o|t"
+    },
+    {
+      "word": "clap",
+      "gloss": "None · cl|a|p"
+    },
+    {
+      "word": "br|cr|dr|fr|gr|pr|tr",
+      "gloss": "None · 辅音连读（不合并成新音）"
+    },
+    {
+      "word": "brag",
+      "gloss": "None · b|r|a|g"
+    },
+    {
+      "word": "crab",
+      "gloss": "None · c|r|a|b"
+    },
+    {
+      "word": "sc|sk|sl|sm|sn|sp|st|sw",
+      "gloss": "None · 辅音连读（不合并成新音）"
+    },
+    {
+      "word": "stop",
+      "gloss": "None · s|t|o|p"
+    },
+    {
+      "word": "spin",
+      "gloss": "None · s|p|i|n"
+    },
+    {
+      "word": "thr|str|spl|spr|scr",
+      "gloss": "None · 辅音连读（不合并成新音）"
+    },
+    {
+      "word": "string",
+      "gloss": "None · s|t|r|i|ng"
+    },
+    {
+      "word": "le",
+      "gloss": "/əl/ · 词尾拼写规律"
+    },
+    {
+      "word": "apple",
+      "gloss": "/əl/ · a|p|p|le"
+    },
+    {
+      "word": "little",
+      "gloss": "/əl/ · l|i|t|t|le"
+    },
+    {
+      "word": "dge",
+      "gloss": "/dʒ/ · 词尾拼写规律"
+    },
+    {
+      "word": "badge",
+      "gloss": "/dʒ/ · b|a|dge"
+    },
+    {
+      "word": "edge",
+      "gloss": "/dʒ/ · e|dge"
+    },
+    {
+      "word": "ff|ll|ss|zz",
+      "gloss": "None · 词尾拼写规律"
+    },
+    {
+      "word": "off",
+      "gloss": "None · o|ff"
+    },
+    {
+      "word": "bell",
+      "gloss": "None · b|e|ll"
+    },
+    {
+      "word": "tch",
+      "gloss": "/tʃ/ · 词尾拼写规律"
+    },
+    {
+      "word": "catch",
+      "gloss": "/tʃ/ · c|a|tch"
+    },
+    {
+      "word": "match",
+      "gloss": "/tʃ/ · m|a|tch"
+    },
+    {
+      "word": "a_e",
+      "gloss": "/eɪ/ · a 长音（魔法E）"
+    },
+    {
+      "word": "cake",
+      "gloss": "/eɪ/ · c|a|k|e"
+    },
+    {
+      "word": "name",
+      "gloss": "/eɪ/ · n|a|m|e"
+    },
+    {
+      "word": "e_e",
+      "gloss": "/iː/ · e 长音（魔法E）"
+    },
+    {
+      "word": "gene",
+      "gloss": "/iː/ · g|e|n|e"
+    },
+    {
+      "word": "scene",
+      "gloss": "/iː/ · sc|e|n|e"
+    },
+    {
+      "word": "i_e",
+      "gloss": "/aɪ/ · i 长音（魔法E）"
+    },
+    {
+      "word": "bike",
+      "gloss": "/aɪ/ · b|i|k|e"
+    },
+    {
+      "word": "time",
+      "gloss": "/aɪ/ · t|i|m|e"
+    },
+    {
+      "word": "o_e",
+      "gloss": "/oʊ/ · o 长音（魔法E）"
+    },
+    {
+      "word": "home",
+      "gloss": "/oʊ/ · h|o|m|e"
+    },
+    {
+      "word": "nose",
+      "gloss": "/oʊ/ · n|o|s|e"
+    },
+    {
+      "word": "u_e",
+      "gloss": "/juː/ or /uː/ · u 长音（魔法E）"
+    },
+    {
+      "word": "cube",
+      "gloss": "/juː/ or /uː/ · c|u|b|e"
+    },
+    {
+      "word": "tune",
+      "gloss": "/juː/ or /uː/ · t|u|n|e"
+    },
+    {
+      "word": "ai",
+      "gloss": "/eɪ/ · 长 a"
+    },
+    {
+      "word": "rain",
+      "gloss": "/eɪ/ · r|ai|n"
+    },
+    {
+      "word": "tail",
+      "gloss": "/eɪ/ · t|ai|l"
+    },
+    {
+      "word": "ay",
+      "gloss": "/eɪ/ · 长 a"
+    },
+    {
+      "word": "day",
+      "gloss": "/eɪ/ · d|ay"
+    },
+    {
+      "word": "play",
+      "gloss": "/eɪ/ · p|l|ay"
+    },
+    {
+      "word": "ea",
+      "gloss": "/iː/ · 长 e"
+    },
+    {
+      "word": "meat",
+      "gloss": "/iː/ · m|ea|t"
+    },
+    {
+      "word": "team",
+      "gloss": "/iː/ · t|ea|m"
+    },
+    {
+      "word": "ee",
+      "gloss": "/iː/ · 长 e"
+    },
+    {
+      "word": "see",
+      "gloss": "/iː/ · s|ee"
+    },
+    {
+      "word": "seed",
+      "gloss": "/iː/ · s|ee|d"
+    },
+    {
+      "word": "ie",
+      "gloss": "/aɪ/ · 长 i"
+    },
+    {
+      "word": "pie",
+      "gloss": "/aɪ/ · p|ie"
+    },
+    {
+      "word": "tie",
+      "gloss": "/aɪ/ · t|ie"
+    },
+    {
+      "word": "igh",
+      "gloss": "/aɪ/ · 长 i"
+    },
+    {
+      "word": "light",
+      "gloss": "/aɪ/ · l|igh|t"
+    },
+    {
+      "word": "night",
+      "gloss": "/aɪ/ · n|igh|t"
+    },
+    {
+      "word": "oa",
+      "gloss": "/oʊ/ · 长 o"
+    },
+    {
+      "word": "boat",
+      "gloss": "/oʊ/ · b|oa|t"
+    },
+    {
+      "word": "coat",
+      "gloss": "/oʊ/ · c|oa|t"
+    },
+    {
+      "word": "ow",
+      "gloss": "/oʊ/ · 长 o"
+    },
+    {
+      "word": "snow",
+      "gloss": "/oʊ/ · s|n|ow"
+    },
+    {
+      "word": "grow",
+      "gloss": "/oʊ/ · g|r|ow"
+    },
+    {
+      "word": "ar",
+      "gloss": "/ɑr/ · ar 发 /ɑr/"
+    },
+    {
+      "word": "car",
+      "gloss": "/ɑr/ · c|ar"
+    },
+    {
+      "word": "far",
+      "gloss": "/ɑr/ · f|ar"
+    },
+    {
+      "word": "er",
+      "gloss": "/ɝ/ · er 发 /ɝ/（美式卷舌元音）"
+    },
+    {
+      "word": "her",
+      "gloss": "/ɝ/ · h|er"
+    },
+    {
+      "word": "fern",
+      "gloss": "/ɝ/ · f|er|n"
+    },
+    {
+      "word": "ir",
+      "gloss": "/ɝ/ · ir 也常读 /ɝ/"
+    },
+    {
+      "word": "bird",
+      "gloss": "/ɝ/ · b|ir|d"
+    },
+    {
+      "word": "girl",
+      "gloss": "/ɝ/ · g|ir|l"
+    },
+    {
+      "word": "or",
+      "gloss": "/ɔr/ · or 发 /ɔr/"
+    },
+    {
+      "word": "corn",
+      "gloss": "/ɔr/ · c|or|n"
+    },
+    {
+      "word": "fork",
+      "gloss": "/ɔr/ · f|or|k"
+    },
+    {
+      "word": "ur",
+      "gloss": "/ɝ/ · ur 也常读 /ɝ/"
+    },
+    {
+      "word": "fur",
+      "gloss": "/ɝ/ · f|ur"
+    },
+    {
+      "word": "turn",
+      "gloss": "/ɝ/ · t|ur|n"
+    },
+    {
+      "word": "wor",
+      "gloss": "/wɝ/ · wor 常读 /wɝ/"
+    },
+    {
+      "word": "word",
+      "gloss": "/wɝ/ · w|or|d"
+    },
+    {
+      "word": "work",
+      "gloss": "/wɝ/ · w|or|k"
+    },
+    {
+      "word": "au",
+      "gloss": "/ɔː/ · au 常读 /ɔː/"
+    },
+    {
+      "word": "haul",
+      "gloss": "/ɔː/ · h|au|l"
+    },
+    {
+      "word": "autumn",
+      "gloss": "/ɔː/ · au|t|u|m|n"
+    },
+    {
+      "word": "aw",
+      "gloss": "/ɔː/ · aw 常读 /ɔː/"
+    },
+    {
+      "word": "saw",
+      "gloss": "/ɔː/ · s|aw"
+    },
+    {
+      "word": "paw",
+      "gloss": "/ɔː/ · p|aw"
+    },
+    {
+      "word": "bread",
+      "gloss": "/ɛ/ · b|r|ea|d"
+    },
+    {
+      "word": "head",
+      "gloss": "/ɛ/ · h|ea|d"
+    },
+    {
+      "word": "oi",
+      "gloss": "/ɔɪ/ · oi 常读 /ɔɪ/"
+    },
+    {
+      "word": "coin",
+      "gloss": "/ɔɪ/ · c|oi|n"
+    },
+    {
+      "word": "boil",
+      "gloss": "/ɔɪ/ · b|oi|l"
+    },
+    {
+      "word": "oo",
+      "gloss": "/uː/ · oo 长音 /uː/"
+    },
+    {
+      "word": "moon",
+      "gloss": "/uː/ · m|oo|n"
+    },
+    {
+      "word": "food",
+      "gloss": "/uː/ · f|oo|d"
+    },
+    {
+      "word": "book",
+      "gloss": "/ʊ/ · b|oo|k"
+    },
+    {
+      "word": "cook",
+      "gloss": "/ʊ/ · c|oo|k"
+    },
+    {
+      "word": "ou",
+      "gloss": "/aʊ/ · ou 常读 /aʊ/（双元音）"
+    },
+    {
+      "word": "out",
+      "gloss": "/aʊ/ · ou|t"
+    },
+    {
+      "word": "loud",
+      "gloss": "/aʊ/ · l|ou|d"
+    },
+    {
+      "word": "cow",
+      "gloss": "/aʊ/ · c|ow"
+    },
+    {
+      "word": "now",
+      "gloss": "/aʊ/ · n|ow"
+    },
+    {
+      "word": "oy",
+      "gloss": "/ɔɪ/ · oy 常读 /ɔɪ/"
+    },
+    {
+      "word": "boy",
+      "gloss": "/ɔɪ/ · b|oy"
+    },
+    {
+      "word": "toy",
+      "gloss": "/ɔɪ/ · t|oy"
+    },
+    {
+      "word": "cent",
+      "gloss": "/s/ · c|e|n|t"
+    },
+    {
+      "word": "city",
+      "gloss": "/s/ · c|i|t|y"
+    },
+    {
+      "word": "gem",
+      "gloss": "/dʒ/ · g|e|m"
+    },
+    {
+      "word": "giraffe",
+      "gloss": "/dʒ/ · g|i|r|a|ffe"
+    },
+    {
+      "word": "happy",
+      "gloss": "/iː/ · h|a|p|p|y"
+    },
+    {
+      "word": "funny",
+      "gloss": "/iː/ · f|u|n|n|y"
+    },
+    {
+      "word": "my",
+      "gloss": "/aɪ/ · m|y"
+    },
+    {
+      "word": "fly",
+      "gloss": "/aɪ/ · f|l|y"
+    },
+    {
+      "word": "gym",
+      "gloss": "/ɪ/ · g|y|m"
+    },
+    {
+      "word": "myth",
+      "gloss": "/ɪ/ · m|y|th"
+    },
+    {
+      "word": "ed",
+      "gloss": "/d/ · 后缀/词尾"
+    },
+    {
+      "word": "played",
+      "gloss": "/d/ · p|l|ay|ed"
+    },
+    {
+      "word": "cleaned",
+      "gloss": "/d/ · c|l|ea|n|ed"
+    },
+    {
+      "word": "wanted",
+      "gloss": "/ɪd/ · w|a|n|t|ed"
+    },
+    {
+      "word": "needed",
+      "gloss": "/ɪd/ · n|ee|d|ed"
+    },
+    {
+      "word": "jumped",
+      "gloss": "/t/ · j|u|m|p|ed"
+    },
+    {
+      "word": "kissed",
+      "gloss": "/t/ · k|i|ss|ed"
+    },
+    {
+      "word": "ing",
+      "gloss": "/ɪŋ/ · 后缀/词尾"
+    },
+    {
+      "word": "jumping",
+      "gloss": "/ɪŋ/ · j|u|m|p|i|ng"
+    },
+    {
+      "word": "running",
+      "gloss": "/ɪŋ/ · r|u|n|n|i|ng"
+    },
+    {
+      "word": "es",
+      "gloss": "/ɪz/ · 后缀/词尾"
+    },
+    {
+      "word": "boxes",
+      "gloss": "/ɪz/ · b|o|x|es"
+    },
+    {
+      "word": "buses",
+      "gloss": "/ɪz/ · b|u|s|es"
+    },
+    {
+      "word": "cats",
+      "gloss": "None · c|a|t|s"
+    },
+    {
+      "word": "dogs",
+      "gloss": "None · d|o|g|s"
+    },
+    {
+      "word": "suffix_change.double_final_consonant",
+      "gloss": "None · 双写词尾辅音"
+    },
+    {
+      "word": "swimming",
+      "gloss": "None · s|w|i|m|m|i|ng"
+    },
+    {
+      "word": "clapping",
+      "gloss": "None · c|l|a|p|p|i|ng"
+    },
+    {
+      "word": "hopping",
+      "gloss": ""
+    },
+    {
+      "word": "suffix_change.drop_silent_e",
+      "gloss": "None · 去掉魔法 e"
+    },
+    {
+      "word": "baking",
+      "gloss": "None · b|a|k|ing"
+    },
+    {
+      "word": "liking",
+      "gloss": "None · l|i|k|ing"
+    },
+    {
+      "word": "making",
+      "gloss": ""
+    },
+    {
+      "word": "riding",
+      "gloss": ""
+    },
+    {
+      "word": "suffix_change.y_to_i",
+      "gloss": "None · y 变 i"
+    },
+    {
+      "word": "dries",
+      "gloss": "None · d|r|ie|s"
+    },
+    {
+      "word": "funnier",
+      "gloss": "None · f|u|n|n|i|er"
+    },
+    {
+      "word": "cried",
+      "gloss": ""
+    },
+    {
+      "word": "tries",
+      "gloss": ""
+    },
+    {
+      "word": "syllable.closed",
+      "gloss": "None · 闭音节"
+    },
+    {
+      "word": "basket",
+      "gloss": "None · b|a|s|k|e|t"
+    },
+    {
+      "word": "syllable.consonant_le",
+      "gloss": "None · 辅音+le音节"
+    },
+    {
+      "word": "table",
+      "gloss": "None · t|a|b|le"
+    },
+    {
+      "word": "syllable.open",
+      "gloss": "None · 开音节"
+    },
+    {
+      "word": "me",
+      "gloss": "None · m|e"
+    },
+    {
+      "word": "go",
+      "gloss": "None · g|o"
+    },
+    {
+      "word": "syllable.r_controlled",
+      "gloss": "None · R 控制音节"
+    },
+    {
+      "word": "syllable.vce",
+      "gloss": "None · 魔法E音节"
+    },
+    {
+      "word": "syllable.vowel_team",
+      "gloss": "None · 元音组合音节"
+    },
+    {
+      "word": "gn",
+      "gloss": "/n/ · gn：g 常不发音，gn 读 /n/"
+    },
+    {
+      "word": "gnat",
+      "gloss": "/n/ · gn|a|t"
+    },
+    {
+      "word": "gnaw",
+      "gloss": "/n/ · gn|aw"
+    },
+    {
+      "word": "gh",
+      "gloss": "/g/ · 词首 gh：读 /g/"
+    },
+    {
+      "word": "ghost",
+      "gloss": "/g/ · gh|o|s|t"
+    },
+    {
+      "word": "ghoul",
+      "gloss": "/g/ · gh|ou|l"
+    },
+    {
+      "word": "laugh",
+      "gloss": "/f/ · l|au|gh"
+    },
+    {
+      "word": "rough",
+      "gloss": "/f/ · r|ou|gh"
+    },
+    {
+      "word": "gu",
+      "gloss": "/g/ · gu：u 不发音，gu 读 /g/"
+    },
+    {
+      "word": "guess",
+      "gloss": "/g/ · gu|e|ss"
+    },
+    {
+      "word": "guest",
+      "gloss": "/g/ · gu|e|st"
+    },
+    {
+      "word": "a|e|i|o|u|y",
+      "gloss": "/ə/ · 非重读音节的 Schwa /ə/（弱读）"
+    },
+    {
+      "word": "about",
+      "gloss": "/ə/ · a|b|ou|t"
+    },
+    {
+      "word": "pencil",
+      "gloss": "/ə/ · p|e|n|c|i|l"
+    },
+    {
+      "word": "syllable.divide.vcccv",
+      "gloss": "None · VCCCV：三个辅音夹在两个元音之间，优先保持常见复合辅音不被拆开"
+    },
+    {
+      "word": "monster",
+      "gloss": "None · m|o|n|s|t|er"
+    },
+    {
+      "word": "hundred",
+      "gloss": "None · h|u|n|d|r|e|d"
+    },
+    {
+      "word": "syllable.divide.vccv",
+      "gloss": "None · VCCV：两个辅音夹在两个元音之间，通常从中间切分"
+    },
+    {
+      "word": "rabbit",
+      "gloss": "None · r|a|b|b|i|t"
+    },
+    {
+      "word": "napkin",
+      "gloss": "None · n|a|p|k|i|n"
+    },
+    {
+      "word": "syllable.divide.vcv_two_ways",
+      "gloss": "None · VCV：先试 V/CV（开音节），不通再试 VC/V（闭音节）"
+    },
+    {
+      "word": "open",
+      "gloss": "None · o|p|e|n"
+    },
+    {
+      "word": "human",
+      "gloss": "None · h|u|m|a|n"
+    },
+    {
+      "word": "syllable.divide.compound",
+      "gloss": "None · 复合词：在两个词之间切分"
+    },
+    {
+      "word": "sunset",
+      "gloss": "None · s|u|n|s|e|t"
+    },
+    {
+      "word": "rainbow",
+      "gloss": "None · r|ai|n|b|ow"
+    },
+    {
+      "word": "syllable.divide.prefix_suffix",
+      "gloss": "None · 前缀/后缀：按词根边界切分"
+    },
+    {
+      "word": "replay",
+      "gloss": "None · r|e|p|l|ay"
+    },
+    {
+      "word": "unhappy",
+      "gloss": "None · u|n|h|a|p|p|y"
+    },
+    {
+      "word": "syllable.divide.vv_split",
+      "gloss": "None · 双元音字母：少数词会在两个元音字母之间分开读（hiatus）"
+    },
+    {
+      "word": "diet",
+      "gloss": "None · d|i|e|t"
+    },
+    {
+      "word": "poem",
+      "gloss": "None · p|o|e|m"
+    },
+    {
+      "word": "music",
+      "gloss": "/z/ · m|u|s|i|c"
+    },
+    {
+      "word": "prison",
+      "gloss": "/z/ · p|r|i|s|o|n"
+    }
+  ]
+}

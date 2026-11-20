@@ -1,0 +1,117 @@
+{
+  "id": "foundation_phonics_helper_course",
+  "title": "自然拼读 · 拼音迁移课纲",
+  "examTag": "PINYIN",
+  "kind": "foundation",
+  "disclaimer": "课纲整理自 RichardoZhao/Phonics-Helper（MIT）。互动课：https://richardozhao.github.io/Phonics-Helper/",
+  "words": [
+    {
+      "word": "pinyin helper",
+      "gloss": "21 辅音字母中英德对比 + 拼音↔IPA"
+    },
+    {
+      "word": "ea mini game",
+      "gloss": "ea 四音听辨与跟读"
+    },
+    {
+      "word": "u01 拼音近亲",
+      "gloss": "letter name vs sound; an/en/in"
+    },
+    {
+      "word": "u02a magic e a_e",
+      "gloss": "a…e"
+    },
+    {
+      "word": "u02e magic e e_e",
+      "gloss": "e…e"
+    },
+    {
+      "word": "u02i magic e i_e",
+      "gloss": "i…e"
+    },
+    {
+      "word": "u02o magic e o_e",
+      "gloss": "o…e"
+    },
+    {
+      "word": "u02u magic e u_e",
+      "gloss": "u…e"
+    },
+    {
+      "word": "u03a 闭音节 a",
+      "gloss": "closed a"
+    },
+    {
+      "word": "u03e 闭音节 e",
+      "gloss": "closed e"
+    },
+    {
+      "word": "u03i 闭音节 i",
+      "gloss": "closed i"
+    },
+    {
+      "word": "u03o 闭音节 o",
+      "gloss": "closed o"
+    },
+    {
+      "word": "u03u 闭音节 u",
+      "gloss": "closed u"
+    },
+    {
+      "word": "u03z 开闭对比",
+      "gloss": "open vs closed"
+    },
+    {
+      "word": "u04 远亲组合",
+      "gloss": "igh / ind / old / all / al / as"
+    },
+    {
+      "word": "u05 ae ie oe ue",
+      "gloss": "ae / ie / oe / ue"
+    },
+    {
+      "word": "u06 ee 与 oo",
+      "gloss": "ee [i:] / oo"
+    },
+    {
+      "word": "u07 ea 四音",
+      "gloss": "four sounds of ea"
+    },
+    {
+      "word": "u08 ai ay 等",
+      "gloss": "ai/ay ei/ey oi/oy ui/uy"
+    },
+    {
+      "word": "u09 au aw eu ew",
+      "gloss": "au/aw eu/ew"
+    },
+    {
+      "word": "u10 ou ow",
+      "gloss": "ou/ow"
+    },
+    {
+      "word": "u11 r 控",
+      "gloss": "ar or er ir ur"
+    },
+    {
+      "word": "u12 r 控加 e",
+      "gloss": "are ere ire ore ure"
+    },
+    {
+      "word": "u13 ear eer oar",
+      "gloss": "ear/eer/oar/oor"
+    },
+    {
+      "word": "u14 air eir our",
+      "gloss": "air/eir/our"
+    },
+    {
+      "word": "u15 双写 rr",
+      "gloss": "doubled rr"
+    },
+    {
+      "word": "u16 辅音团队",
+      "gloss": "c/g soft + sh ch th wh ph kn wr"
+    }
+  ]
+}

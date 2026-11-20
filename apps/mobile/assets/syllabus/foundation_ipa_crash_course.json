@@ -1,0 +1,61 @@
+{
+  "id": "foundation_ipa_crash_course",
+  "title": "IPA Crash Course 课纲",
+  "examTag": "IPACourse",
+  "kind": "foundation",
+  "disclaimer": "课纲摘自 https://jhnwnstd.github.io/courses/ipa-crash-course.html",
+  "words": [
+    {
+      "word": "unit 1 segment and descriptors",
+      "gloss": "音段与描述特征"
+    },
+    {
+      "word": "unit 2 place of articulation",
+      "gloss": "发音部位"
+    },
+    {
+      "word": "unit 3 manner and voicing",
+      "gloss": "发音方式与清浊"
+    },
+    {
+      "word": "unit 4 reading the pulmonic chart",
+      "gloss": "读肺气流辅音表"
+    },
+    {
+      "word": "unit 5 rest of the consonants",
+      "gloss": "其余辅音"
+    },
+    {
+      "word": "unit 6 the vowel space",
+      "gloss": "元音空间"
+    },
+    {
+      "word": "unit 7 diacritics and suprasegmentals",
+      "gloss": "变音符号与超音段"
+    },
+    {
+      "word": "unit 8 transcribing english i",
+      "gloss": "英语转写 I"
+    },
+    {
+      "word": "unit 9 transcribing english ii",
+      "gloss": "英语转写 II"
+    },
+    {
+      "word": "unit 10 reading inventories",
+      "gloss": "读音位清单"
+    },
+    {
+      "word": "unit 11 building the chart",
+      "gloss": "重建音标表"
+    },
+    {
+      "word": "unit 12 final",
+      "gloss": "总复习"
+    },
+    {
+      "word": "unit 13 listening",
+      "gloss": "听辨练习"
+    }
+  ]
+}

@@ -1,0 +1,165 @@
+{
+  "id": "foundation_ipa_cmudict_phones",
+  "title": "CMUdict 音素 ↔ IPA",
+  "examTag": "CMU",
+  "kind": "foundation",
+  "disclaimer": "ARPAbet 来自 CMUdict（需致谢 CMU）；映射为常用 ARPAbet→IPA 对照。",
+  "words": [
+    {
+      "word": "arpabet aa",
+      "gloss": "/ɑ/ · CMUdict phone"
+    },
+    {
+      "word": "arpabet ae",
+      "gloss": "/æ/ · CMUdict phone"
+    },
+    {
+      "word": "arpabet ah",
+      "gloss": "/ʌ/ · CMUdict phone"
+    },
+    {
+      "word": "arpabet ao",
+      "gloss": "/ɔ/ · CMUdict phone"
+    },
+    {
+      "word": "arpabet aw",
+      "gloss": "/aʊ/ · CMUdict phone"
+    },
+    {
+      "word": "arpabet ay",
+      "gloss": "/aɪ/ · CMUdict phone"
+    },
+    {
+      "word": "arpabet b",
+      "gloss": "/b/ · CMUdict phone"
+    },
+    {
+      "word": "arpabet ch",
+      "gloss": "/tʃ/ · CMUdict phone"
+    },
+    {
+      "word": "arpabet d",
+      "gloss": "/d/ · CMUdict phone"
+    },
+    {
+      "word": "arpabet dh",
+      "gloss": "/ð/ · CMUdict phone"
+    },
+    {
+      "word": "arpabet eh",
+      "gloss": "/ɛ/ · CMUdict phone"
+    },
+    {
+      "word": "arpabet er",
+      "gloss": "/ɝ/ · CMUdict phone"
+    },
+    {
+      "word": "arpabet ey",
+      "gloss": "/eɪ/ · CMUdict phone"
+    },
+    {
+      "word": "arpabet f",
+      "gloss": "/f/ · CMUdict phone"
+    },
+    {
+      "word": "arpabet g",
+      "gloss": "/ɡ/ · CMUdict phone"
+    },
+    {
+      "word": "arpabet hh",
+      "gloss": "/h/ · CMUdict phone"
+    },
+    {
+      "word": "arpabet ih",
+      "gloss": "/ɪ/ · CMUdict phone"
+    },
+    {
+      "word": "arpabet iy",
+      "gloss": "/i/ · CMUdict phone"
+    },
+    {
+      "word": "arpabet jh",
+      "gloss": "/dʒ/ · CMUdict phone"
+    },
+    {
+      "word": "arpabet k",
+      "gloss": "/k/ · CMUdict phone"
+    },
+    {
+      "word": "arpabet l",
+      "gloss": "/l/ · CMUdict phone"
+    },
+    {
+      "word": "arpabet m",
+      "gloss": "/m/ · CMUdict phone"
+    },
+    {
+      "word": "arpabet n",
+      "gloss": "/n/ · CMUdict phone"
+    },
+    {
+      "word": "arpabet ng",
+      "gloss": "/ŋ/ · CMUdict phone"
+    },
+    {
+      "word": "arpabet ow",
+      "gloss": "/oʊ/ · CMUdict phone"
+    },
+    {
+      "word": "arpabet oy",
+      "gloss": "/ɔɪ/ · CMUdict phone"
+    },
+    {
+      "word": "arpabet p",
+      "gloss": "/p/ · CMUdict phone"
+    },
+    {
+      "word": "arpabet r",
+      "gloss": "/ɹ/ · CMUdict phone"
+    },
+    {
+      "word": "arpabet s",
+      "gloss": "/s/ · CMUdict phone"
+    },
+    {
+      "word": "arpabet sh",
+      "gloss": "/ʃ/ · CMUdict phone"
+    },
+    {
+      "word": "arpabet t",
+      "gloss": "/t/ · CMUdict phone"
+    },
+    {
+      "word": "arpabet th",
+      "gloss": "/θ/ · CMUdict phone"
+    },
+    {
+      "word": "arpabet uh",
+      "gloss": "/ʊ/ · CMUdict phone"
+    },
+    {
+      "word": "arpabet uw",
+      "gloss": "/u/ · CMUdict phone"
+    },
+    {
+      "word": "arpabet v",
+      "gloss": "/v/ · CMUdict phone"
+    },
+    {
+      "word": "arpabet w",
+      "gloss": "/w/ · CMUdict phone"
+    },
+    {
+      "word": "arpabet y",
+      "gloss": "/j/ · CMUdict phone"
+    },
+    {
+      "word": "arpabet z",
+      "gloss": "/z/ · CMUdict phone"
+    },
+    {
+      "word": "arpabet zh",
+      "gloss": "/ʒ/ · CMUdict phone"
+    }
+  ]
+}

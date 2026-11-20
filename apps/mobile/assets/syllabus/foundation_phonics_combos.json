@@ -1,0 +1,1065 @@
+{
+  "id": "foundation_phonics_combos",
+  "title": "自然拼读 · 字母组合",
+  "examTag": "COMBO",
+  "kind": "foundation",
+  "disclaimer": "整理自 scott-lei/phonics-app 字母组合库。",
+  "words": [
+    {
+      "word": "ai",
+      "gloss": "/eɪ/ · vowel-digraph"
+    },
+    {
+      "word": "rain",
+      "gloss": "/reɪn/ 雨"
+    },
+    {
+      "word": "wait",
+      "gloss": "/weɪt/ 等待"
+    },
+    {
+      "word": "train",
+      "gloss": "/treɪn/ 火车"
+    },
+    {
+      "word": "ay",
+      "gloss": "/eɪ/ · vowel-digraph"
+    },
+    {
+      "word": "day",
+      "gloss": "/deɪ/ 天；日"
+    },
+    {
+      "word": "play",
+      "gloss": "/pleɪ/ 玩"
+    },
+    {
+      "word": "say",
+      "gloss": "/seɪ/ 说"
+    },
+    {
+      "word": "ea",
+      "gloss": "/iː/ /e/ · vowel-digraph · 多数发 /iː/，但在 bread、head 等词中发 /e/"
+    },
+    {
+      "word": "eat",
+      "gloss": "/iːt/ 吃"
+    },
+    {
+      "word": "sea",
+      "gloss": "/siː/ 海"
+    },
+    {
+      "word": "read",
+      "gloss": "/riːd/ 读（现在时）"
+    },
+    {
+      "word": "ee",
+      "gloss": "/iː/ · vowel-digraph"
+    },
+    {
+      "word": "see",
+      "gloss": "/siː/ 看见"
+    },
+    {
+      "word": "tree",
+      "gloss": "/triː/ 树"
+    },
+    {
+      "word": "green",
+      "gloss": "/ɡriːn/ 绿色的"
+    },
+    {
+      "word": "ey",
+      "gloss": "/iː/ /eɪ/ · vowel-digraph · key、money 中发 /iː/；they、hey 中发 /eɪ/"
+    },
+    {
+      "word": "key",
+      "gloss": "/kiː/ 钥匙"
+    },
+    {
+      "word": "money",
+      "gloss": "/ˈmʌni/ 钱"
+    },
+    {
+      "word": "they",
+      "gloss": "/ðeɪ/ 他们"
+    },
+    {
+      "word": "ie",
+      "gloss": "/aɪ/ /iː/ · vowel-digraph · pie、tie 中发 /aɪ/；field、piece 中发 /iː/"
+    },
+    {
+      "word": "pie",
+      "gloss": "/paɪ/ 馅饼"
+    },
+    {
+      "word": "tie",
+      "gloss": "/taɪ/ 领带"
+    },
+    {
+      "word": "field",
+      "gloss": "/fiːld/ 田野"
+    },
+    {
+      "word": "igh",
+      "gloss": "/aɪ/ · vowel-digraph"
+    },
+    {
+      "word": "high",
+      "gloss": "/haɪ/ 高的"
+    },
+    {
+      "word": "night",
+      "gloss": "/naɪt/ 夜晚"
+    },
+    {
+      "word": "light",
+      "gloss": "/laɪt/ 光"
+    },
+    {
+      "word": "oa",
+      "gloss": "/əʊ/ · vowel-digraph"
+    },
+    {
+      "word": "boat",
+      "gloss": "/bəʊt/ 船"
+    },
+    {
+      "word": "road",
+      "gloss": "/rəʊd/ 路"
+    },
+    {
+      "word": "coat",
+      "gloss": "/kəʊt/ 外套"
+    },
+    {
+      "word": "ow",
+      "gloss": "/əʊ/ /aʊ/ · vowel-digraph · snow、grow 中发 /əʊ/；cow、now 中发 /aʊ/"
+    },
+    {
+      "word": "snow",
+      "gloss": "/snəʊ/ 雪"
+    },
+    {
+      "word": "grow",
+      "gloss": "/ɡrəʊ/ 生长"
+    },
+    {
+      "word": "cow",
+      "gloss": "/kaʊ/ 奶牛"
+    },
+    {
+      "word": "oe",
+      "gloss": "/əʊ/ · vowel-digraph"
+    },
+    {
+      "word": "toe",
+      "gloss": "/təʊ/ 脚趾"
+    },
+    {
+      "word": "hoe",
+      "gloss": "/həʊ/ 锄头"
+    },
+    {
+      "word": "goes",
+      "gloss": "/ɡəʊz/ 去（第三人称）"
+    },
+    {
+      "word": "oo",
+      "gloss": "/uː/ /ʊ/ · vowel-digraph · moon、food 中发长音 /uː/；book、look 中发短音 /ʊ/"
+    },
+    {
+      "word": "moon",
+      "gloss": "/muːn/ 月亮"
+    },
+    {
+      "word": "food",
+      "gloss": "/fuːd/ 食物"
+    },
+    {
+      "word": "book",
+      "gloss": "/bʊk/ 书"
+    },
+    {
+      "word": "ou",
+      "gloss": "/aʊ/ /uː/ · vowel-digraph · house、out 中发 /aʊ/；soup、group 中发 /uː/"
+    },
+    {
+      "word": "house",
+      "gloss": "/haʊs/ 房子"
+    },
+    {
+      "word": "out",
+      "gloss": "/aʊt/ 外面"
+    },
+    {
+      "word": "soup",
+      "gloss": "/suːp/ 汤"
+    },
+    {
+      "word": "oi",
+      "gloss": "/ɔɪ/ · vowel-digraph"
+    },
+    {
+      "word": "coin",
+      "gloss": "/kɔɪn/ 硬币"
+    },
+    {
+      "word": "join",
+      "gloss": "/dʒɔɪn/ 加入"
+    },
+    {
+      "word": "point",
+      "gloss": "/pɔɪnt/ 要点"
+    },
+    {
+      "word": "oy",
+      "gloss": "/ɔɪ/ · vowel-digraph"
+    },
+    {
+      "word": "boy",
+      "gloss": "/bɔɪ/ 男孩"
+    },
+    {
+      "word": "toy",
+      "gloss": "/tɔɪ/ 玩具"
+    },
+    {
+      "word": "enjoy",
+      "gloss": "/ɪnˈdʒɔɪ/ 享受"
+    },
+    {
+      "word": "au",
+      "gloss": "/ɔː/ · vowel-digraph"
+    },
+    {
+      "word": "autumn",
+      "gloss": "/ˈɔːtəm/ 秋天"
+    },
+    {
+      "word": "because",
+      "gloss": "/bɪˈkɒz/ 因为"
+    },
+    {
+      "word": "august",
+      "gloss": "/ˈɔːɡəst/ 八月"
+    },
+    {
+      "word": "aw",
+      "gloss": "/ɔː/ · vowel-digraph"
+    },
+    {
+      "word": "saw",
+      "gloss": "/sɔː/ 看见（过去式）"
+    },
+    {
+      "word": "draw",
+      "gloss": "/drɔː/ 画"
+    },
+    {
+      "word": "straw",
+      "gloss": "/strɔː/ 吸管；稻草"
+    },
+    {
+      "word": "ew",
+      "gloss": "/juː/ /uː/ · vowel-digraph · new、few 中发 /juː/；grew、flew 中发 /uː/"
+    },
+    {
+      "word": "new",
+      "gloss": "/njuː/ 新的"
+    },
+    {
+      "word": "few",
+      "gloss": "/fjuː/ 少数"
+    },
+    {
+      "word": "grew",
+      "gloss": "/ɡruː/ 生长（过去式）"
+    },
+    {
+      "word": "ui",
+      "gloss": "/uː/ · vowel-digraph"
+    },
+    {
+      "word": "fruit",
+      "gloss": "/fruːt/ 水果"
+    },
+    {
+      "word": "juice",
+      "gloss": "/dʒuːs/ 果汁"
+    },
+    {
+      "word": "build",
+      "gloss": "/bɪld/ 建造"
+    },
+    {
+      "word": "sh",
+      "gloss": "/ʃ/ · consonant-digraph"
+    },
+    {
+      "word": "ship",
+      "gloss": "/ʃɪp/ 船"
+    },
+    {
+      "word": "fish",
+      "gloss": "/fɪʃ/ 鱼"
+    },
+    {
+      "word": "shop",
+      "gloss": "/ʃɒp/ 商店"
+    },
+    {
+      "word": "ch",
+      "gloss": "/tʃ/ · consonant-digraph"
+    },
+    {
+      "word": "chair",
+      "gloss": "/tʃeə/ 椅子"
+    },
+    {
+      "word": "much",
+      "gloss": "/mʌtʃ/ 许多"
+    },
+    {
+      "word": "lunch",
+      "gloss": "/lʌntʃ/ 午餐"
+    },
+    {
+      "word": "tch",
+      "gloss": "/tʃ/ · consonant-digraph"
+    },
+    {
+      "word": "watch",
+      "gloss": "/wɒtʃ/ 手表"
+    },
+    {
+      "word": "catch",
+      "gloss": "/kætʃ/ 抓住"
+    },
+    {
+      "word": "match",
+      "gloss": "/mætʃ/ 比赛"
+    },
+    {
+      "word": "th",
+      "gloss": "/θ/ /ð/ · consonant-digraph · think、three 中发清音 /θ/；this、mother 中发浊音 /ð/"
+    },
+    {
+      "word": "think",
+      "gloss": "/θɪŋk/ 想"
+    },
+    {
+      "word": "three",
+      "gloss": "/θriː/ 三"
+    },
+    {
+      "word": "this",
+      "gloss": "/ðɪs/ 这个"
+    },
+    {
+      "word": "ph",
+      "gloss": "/f/ · consonant-digraph"
+    },
+    {
+      "word": "phone",
+      "gloss": "/fəʊn/ 电话"
+    },
+    {
+      "word": "graph",
+      "gloss": "/ɡrɑːf/ 图表"
+    },
+    {
+      "word": "photo",
+      "gloss": "/ˈfəʊtəʊ/ 照片"
+    },
+    {
+      "word": "wh",
+      "gloss": "/w/ /h/ · consonant-digraph · 多数发 /w/；who、whose 中发 /h/"
+    },
+    {
+      "word": "when",
+      "gloss": "/wen/ 什么时候"
+    },
+    {
+      "word": "wheel",
+      "gloss": "/wiːl/ 轮子"
+    },
+    {
+      "word": "who",
+      "gloss": "/huː/ 谁"
+    },
+    {
+      "word": "ck",
+      "gloss": "/k/ · consonant-digraph"
+    },
+    {
+      "word": "duck",
+      "gloss": "/dʌk/ 鸭子"
+    },
+    {
+      "word": "back",
+      "gloss": "/bæk/ 背部"
+    },
+    {
+      "word": "clock",
+      "gloss": "/klɒk/ 钟"
+    },
+    {
+      "word": "ng",
+      "gloss": "/ŋ/ · consonant-digraph"
+    },
+    {
+      "word": "sing",
+      "gloss": "/sɪŋ/ 唱歌"
+    },
+    {
+      "word": "long",
+      "gloss": "/lɒŋ/ 长的"
+    },
+    {
+      "word": "ring",
+      "gloss": "/rɪŋ/ 铃"
+    },
+    {
+      "word": "nk",
+      "gloss": "/ŋk/ · consonant-digraph"
+    },
+    {
+      "word": "bank",
+      "gloss": "/bæŋk/ 银行"
+    },
+    {
+      "word": "pink",
+      "gloss": "/pɪŋk/ 粉色的"
+    },
+    {
+      "word": "qu",
+      "gloss": "/kw/ · consonant-digraph"
+    },
+    {
+      "word": "queen",
+      "gloss": "/kwiːn/ 女王"
+    },
+    {
+      "word": "quick",
+      "gloss": "/kwɪk/ 快的"
+    },
+    {
+      "word": "question",
+      "gloss": "/ˈkwestʃən/ 问题"
+    },
+    {
+      "word": "gh",
+      "gloss": "/f/ 不发音 · consonant-digraph · laugh、enough 中发 /f/；night、high 中不发音"
+    },
+    {
+      "word": "laugh",
+      "gloss": "/lɑːf/ 笑"
+    },
+    {
+      "word": "enough",
+      "gloss": "/ɪˈnʌf/ 足够的"
+    },
+    {
+      "word": "kn",
+      "gloss": "/n/ · consonant-digraph · 词首 k 不发音"
+    },
+    {
+      "word": "know",
+      "gloss": "/nəʊ/ 知道"
+    },
+    {
+      "word": "knee",
+      "gloss": "/niː/ 膝盖"
+    },
+    {
+      "word": "knife",
+      "gloss": "/naɪf/ 刀"
+    },
+    {
+      "word": "wr",
+      "gloss": "/r/ · consonant-digraph · 词首 w 不发音"
+    },
+    {
+      "word": "write",
+      "gloss": "/raɪt/ 写"
+    },
+    {
+      "word": "wrong",
+      "gloss": "/rɒŋ/ 错误的"
+    },
+    {
+      "word": "wrist",
+      "gloss": "/rɪst/ 手腕"
+    },
+    {
+      "word": "mb",
+      "gloss": "/m/ · consonant-digraph · 词尾 b 不发音"
+    },
+    {
+      "word": "lamb",
+      "gloss": "/læm/ 羔羊"
+    },
+    {
+      "word": "climb",
+      "gloss": "/klaɪm/ 爬"
+    },
+    {
+      "word": "comb",
+      "gloss": "/kəʊm/ 梳子"
+    },
+    {
+      "word": "dge",
+      "gloss": "/dʒ/ · consonant-digraph"
+    },
+    {
+      "word": "bridge",
+      "gloss": "/brɪdʒ/ 桥"
+    },
+    {
+      "word": "judge",
+      "gloss": "/dʒʌdʒ/ 法官"
+    },
+    {
+      "word": "edge",
+      "gloss": "/edʒ/ 边缘"
+    },
+    {
+      "word": "bl",
+      "gloss": "/bl/ · consonant-blend"
+    },
+    {
+      "word": "blue",
+      "gloss": "/bluː/ 蓝色的"
+    },
+    {
+      "word": "black",
+      "gloss": "/blæk/ 黑色的"
+    },
+    {
+      "word": "blow",
+      "gloss": "/bləʊ/ 吹"
+    },
+    {
+      "word": "cl",
+      "gloss": "/kl/ · consonant-blend"
+    },
+    {
+      "word": "clean",
+      "gloss": "/kliːn/ 干净的"
+    },
+    {
+      "word": "class",
+      "gloss": "/klɑːs/ 班级"
+    },
+    {
+      "word": "fl",
+      "gloss": "/fl/ · consonant-blend"
+    },
+    {
+      "word": "flag",
+      "gloss": "/flæɡ/ 旗子"
+    },
+    {
+      "word": "fly",
+      "gloss": "/flaɪ/ 飞"
+    },
+    {
+      "word": "flower",
+      "gloss": "/ˈflaʊə/ 花"
+    },
+    {
+      "word": "gl",
+      "gloss": "/ɡl/ · consonant-blend"
+    },
+    {
+      "word": "glass",
+      "gloss": "/ɡlɑːs/ 玻璃杯"
+    },
+    {
+      "word": "glue",
+      "gloss": "/ɡluː/ 胶水"
+    },
+    {
+      "word": "glad",
+      "gloss": "/ɡlæd/ 高兴的"
+    },
+    {
+      "word": "pl",
+      "gloss": "/pl/ · consonant-blend"
+    },
+    {
+      "word": "plane",
+      "gloss": "/pleɪn/ 飞机"
+    },
+    {
+      "word": "please",
+      "gloss": "/pliːz/ 请"
+    },
+    {
+      "word": "sl",
+      "gloss": "/sl/ · consonant-blend"
+    },
+    {
+      "word": "sleep",
+      "gloss": "/sliːp/ 睡觉"
+    },
+    {
+      "word": "slow",
+      "gloss": "/sləʊ/ 慢的"
+    },
+    {
+      "word": "slide",
+      "gloss": "/slaɪd/ 滑行"
+    },
+    {
+      "word": "br",
+      "gloss": "/br/ · consonant-blend"
+    },
+    {
+      "word": "bread",
+      "gloss": "/bred/ 面包"
+    },
+    {
+      "word": "bring",
+      "gloss": "/brɪŋ/ 带来"
+    },
+    {
+      "word": "brown",
+      "gloss": "/braʊn/ 棕色的"
+    },
+    {
+      "word": "cr",
+      "gloss": "/kr/ · consonant-blend"
+    },
+    {
+      "word": "cry",
+      "gloss": "/kraɪ/ 哭"
+    },
+    {
+      "word": "cross",
+      "gloss": "/krɒs/ 穿过"
+    },
+    {
+      "word": "cream",
+      "gloss": "/kriːm/ 奶油"
+    },
+    {
+      "word": "dr",
+      "gloss": "/dr/ · consonant-blend"
+    },
+    {
+      "word": "dress",
+      "gloss": "/dres/ 连衣裙"
+    },
+    {
+      "word": "dream",
+      "gloss": "/driːm/ 梦"
+    },
+    {
+      "word": "drive",
+      "gloss": "/draɪv/ 驾驶"
+    },
+    {
+      "word": "fr",
+      "gloss": "/fr/ · consonant-blend"
+    },
+    {
+      "word": "frog",
+      "gloss": "/frɒɡ/ 青蛙"
+    },
+    {
+      "word": "friend",
+      "gloss": "/frend/ 朋友"
+    },
+    {
+      "word": "gr",
+      "gloss": "/ɡr/ · consonant-blend"
+    },
+    {
+      "word": "grape",
+      "gloss": "/ɡreɪp/ 葡萄"
+    },
+    {
+      "word": "pr",
+      "gloss": "/pr/ · consonant-blend"
+    },
+    {
+      "word": "price",
+      "gloss": "/praɪs/ 价格"
+    },
+    {
+      "word": "print",
+      "gloss": "/prɪnt/ 打印"
+    },
+    {
+      "word": "pretty",
+      "gloss": "/ˈprɪti/ 漂亮的"
+    },
+    {
+      "word": "tr",
+      "gloss": "/tr/ · consonant-blend"
+    },
+    {
+      "word": "try",
+      "gloss": "/traɪ/ 尝试"
+    },
+    {
+      "word": "sc",
+      "gloss": "/sk/ · consonant-blend"
+    },
+    {
+      "word": "school",
+      "gloss": "/skuːl/ 学校"
+    },
+    {
+      "word": "scan",
+      "gloss": "/skæn/ 扫描"
+    },
+    {
+      "word": "score",
+      "gloss": "/skɔː/ 得分"
+    },
+    {
+      "word": "sk",
+      "gloss": "/sk/ · consonant-blend"
+    },
+    {
+      "word": "skip",
+      "gloss": "/skɪp/ 跳跃"
+    },
+    {
+      "word": "desk",
+      "gloss": "/desk/ 书桌"
+    },
+    {
+      "word": "sky",
+      "gloss": "/skaɪ/ 天空"
+    },
+    {
+      "word": "sm",
+      "gloss": "/sm/ · consonant-blend"
+    },
+    {
+      "word": "smile",
+      "gloss": "/smaɪl/ 微笑"
+    },
+    {
+      "word": "small",
+      "gloss": "/smɔːl/ 小的"
+    },
+    {
+      "word": "smoke",
+      "gloss": "/sməʊk/ 烟"
+    },
+    {
+      "word": "sn",
+      "gloss": "/sn/ · consonant-blend"
+    },
+    {
+      "word": "snake",
+      "gloss": "/sneɪk/ 蛇"
+    },
+    {
+      "word": "snack",
+      "gloss": "/snæk/ 零食"
+    },
+    {
+      "word": "sp",
+      "gloss": "/sp/ · consonant-blend"
+    },
+    {
+      "word": "spin",
+      "gloss": "/spɪn/ 旋转"
+    },
+    {
+      "word": "spoon",
+      "gloss": "/spuːn/ 勺子"
+    },
+    {
+      "word": "sport",
+      "gloss": "/spɔːt/ 运动"
+    },
+    {
+      "word": "st",
+      "gloss": "/st/ · consonant-blend"
+    },
+    {
+      "word": "stop",
+      "gloss": "/stɒp/ 停止"
+    },
+    {
+      "word": "star",
+      "gloss": "/stɑː/ 星星"
+    },
+    {
+      "word": "street",
+      "gloss": "/striːt/ 街道"
+    },
+    {
+      "word": "sw",
+      "gloss": "/sw/ · consonant-blend"
+    },
+    {
+      "word": "swim",
+      "gloss": "/swɪm/ 游泳"
+    },
+    {
+      "word": "sweet",
+      "gloss": "/swiːt/ 甜的"
+    },
+    {
+      "word": "swing",
+      "gloss": "/swɪŋ/ 摆动"
+    },
+    {
+      "word": "tw",
+      "gloss": "/tw/ · consonant-blend"
+    },
+    {
+      "word": "twin",
+      "gloss": "/twɪn/ 双胞胎之一"
+    },
+    {
+      "word": "twelve",
+      "gloss": "/twelv/ 十二"
+    },
+    {
+      "word": "twenty",
+      "gloss": "/ˈtwenti/ 二十"
+    },
+    {
+      "word": "ar",
+      "gloss": "/ɑː/ · r-controlled"
+    },
+    {
+      "word": "car",
+      "gloss": "/kɑː/ 汽车"
+    },
+    {
+      "word": "park",
+      "gloss": "/pɑːk/ 公园"
+    },
+    {
+      "word": "er",
+      "gloss": "/ɜː/ · r-controlled"
+    },
+    {
+      "word": "her",
+      "gloss": "/hɜː/ 她的"
+    },
+    {
+      "word": "term",
+      "gloss": "/tɜːm/ 学期"
+    },
+    {
+      "word": "teacher",
+      "gloss": "/ˈtiːtʃə/ 老师"
+    },
+    {
+      "word": "ir",
+      "gloss": "/ɜː/ · r-controlled"
+    },
+    {
+      "word": "bird",
+      "gloss": "/bɜːd/ 鸟"
+    },
+    {
+      "word": "girl",
+      "gloss": "/ɡɜːl/ 女孩"
+    },
+    {
+      "word": "first",
+      "gloss": "/fɜːst/ 第一"
+    },
+    {
+      "word": "or",
+      "gloss": "/ɔː/ · r-controlled"
+    },
+    {
+      "word": "fork",
+      "gloss": "/fɔːk/ 叉子"
+    },
+    {
+      "word": "horse",
+      "gloss": "/hɔːs/ 马"
+    },
+    {
+      "word": "short",
+      "gloss": "/ʃɔːt/ 短的"
+    },
+    {
+      "word": "ur",
+      "gloss": "/ɜː/ · r-controlled"
+    },
+    {
+      "word": "turn",
+      "gloss": "/tɜːn/ 转弯"
+    },
+    {
+      "word": "nurse",
+      "gloss": "/nɜːs/ 护士"
+    },
+    {
+      "word": "purple",
+      "gloss": "/ˈpɜːpl/ 紫色的"
+    },
+    {
+      "word": "air",
+      "gloss": "/eə/ · r-controlled"
+    },
+    {
+      "word": "hair",
+      "gloss": "/heə/ 头发"
+    },
+    {
+      "word": "pair",
+      "gloss": "/peə/ 一对"
+    },
+    {
+      "word": "ear",
+      "gloss": "/ɪə/ /ɜː/ · r-controlled · hear、near 中发 /ɪə/；learn、earth 中发 /ɜː/"
+    },
+    {
+      "word": "hear",
+      "gloss": "/hɪə/ 听见"
+    },
+    {
+      "word": "near",
+      "gloss": "/nɪə/ 近的"
+    },
+    {
+      "word": "learn",
+      "gloss": "/lɜːn/ 学习"
+    },
+    {
+      "word": "eer",
+      "gloss": "/ɪə/ · r-controlled"
+    },
+    {
+      "word": "deer",
+      "gloss": "/dɪə/ 鹿"
+    },
+    {
+      "word": "cheer",
+      "gloss": "/tʃɪə/ 欢呼"
+    },
+    {
+      "word": "beer",
+      "gloss": "/bɪə/ 啤酒"
+    },
+    {
+      "word": "oor",
+      "gloss": "/ɔː/ /ʊə/ · r-controlled · door、floor 中发 /ɔː/；poor 中发 /ʊə/"
+    },
+    {
+      "word": "door",
+      "gloss": "/dɔː/ 门"
+    },
+    {
+      "word": "floor",
+      "gloss": "/flɔː/ 地板"
+    },
+    {
+      "word": "poor",
+      "gloss": "/pʊə/ 贫穷的"
+    },
+    {
+      "word": "our",
+      "gloss": "/ɔː/ /aʊə/ · r-controlled · four、pour 中发 /ɔː/；hour 中发 /aʊə/"
+    },
+    {
+      "word": "four",
+      "gloss": "/fɔː/ 四"
+    },
+    {
+      "word": "pour",
+      "gloss": "/pɔː/ 倒"
+    },
+    {
+      "word": "hour",
+      "gloss": "/ˈaʊə/ 小时"
+    },
+    {
+      "word": "a e",
+      "gloss": "/eɪ/ · magic-e · 词尾 e 不发音，前面的 a 发字母本音 /eɪ/"
+    },
+    {
+      "word": "cake",
+      "gloss": "/keɪk/ 蛋糕"
+    },
+    {
+      "word": "name",
+      "gloss": "/neɪm/ 名字"
+    },
+    {
+      "word": "game",
+      "gloss": "/ɡeɪm/ 游戏"
+    },
+    {
+      "word": "e e",
+      "gloss": "/iː/ · magic-e · 词尾 e 不发音，前面的 e 发字母本音 /iː/"
+    },
+    {
+      "word": "these",
+      "gloss": "/ðiːz/ 这些"
+    },
+    {
+      "word": "chinese",
+      "gloss": "/ˌtʃaɪˈniːz/ 中国的"
+    },
+    {
+      "word": "complete",
+      "gloss": "/kəmˈpliːt/ 完整的"
+    },
+    {
+      "word": "i e",
+      "gloss": "/aɪ/ · magic-e · 词尾 e 不发音，前面的 i 发字母本音 /aɪ/"
+    },
+    {
+      "word": "bike",
+      "gloss": "/baɪk/ 自行车"
+    },
+    {
+      "word": "time",
+      "gloss": "/taɪm/ 时间"
+    },
+    {
+      "word": "kite",
+      "gloss": "/kaɪt/ 风筝"
+    },
+    {
+      "word": "o e",
+      "gloss": "/əʊ/ · magic-e · 词尾 e 不发音，前面的 o 发字母本音 /əʊ/"
+    },
+    {
+      "word": "nose",
+      "gloss": "/nəʊz/ 鼻子"
+    },
+    {
+      "word": "home",
+      "gloss": "/həʊm/ 家"
+    },
+    {
+      "word": "rose",
+      "gloss": "/rəʊz/ 玫瑰"
+    },
+    {
+      "word": "u e",
+      "gloss": "/juː/ /uː/ · magic-e · cute、tube 中发 /juː/；rule、June 中发 /uː/"
+    },
+    {
+      "word": "cute",
+      "gloss": "/kjuːt/ 可爱的"
+    },
+    {
+      "word": "tube",
+      "gloss": "/tjuːb/ 管子"
+    },
+    {
+      "word": "rule",
+      "gloss": "/ruːl/ 规则"
+    }
+  ]
+}

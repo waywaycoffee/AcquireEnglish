@@ -1,0 +1,121 @@
+{
+  "id": "foundation_ipa_vowel_drill",
+  "title": "IPA 元音听辨卡",
+  "examTag": "VOWEL",
+  "kind": "foundation",
+  "disclaimer": "对齐 nk2028/ipa-practise（CC0）。在线：https://nk2028.shn.hk/ipa-practise/",
+  "words": [
+    {
+      "word": "vowel i",
+      "gloss": "IPA [i] · nk2028/ipa-practise（CC0）"
+    },
+    {
+      "word": "vowel y",
+      "gloss": "IPA [y] · nk2028/ipa-practise（CC0）"
+    },
+    {
+      "word": "vowel ɨ",
+      "gloss": "IPA [ɨ] · nk2028/ipa-practise（CC0）"
+    },
+    {
+      "word": "vowel ʉ",
+      "gloss": "IPA [ʉ] · nk2028/ipa-practise（CC0）"
+    },
+    {
+      "word": "vowel ɯ",
+      "gloss": "IPA [ɯ] · nk2028/ipa-practise（CC0）"
+    },
+    {
+      "word": "vowel u",
+      "gloss": "IPA [u] · nk2028/ipa-practise（CC0）"
+    },
+    {
+      "word": "vowel ɪ",
+      "gloss": "IPA [ɪ] · nk2028/ipa-practise（CC0）"
+    },
+    {
+      "word": "vowel ʏ",
+      "gloss": "IPA [ʏ] · nk2028/ipa-practise（CC0）"
+    },
+    {
+      "word": "vowel ʊ",
+      "gloss": "IPA [ʊ] · nk2028/ipa-practise（CC0）"
+    },
+    {
+      "word": "vowel e",
+      "gloss": "IPA [e] · nk2028/ipa-practise（CC0）"
+    },
+    {
+      "word": "vowel ø",
+      "gloss": "IPA [ø] · nk2028/ipa-practise（CC0）"
+    },
+    {
+      "word": "vowel ɘ",
+      "gloss": "IPA [ɘ] · nk2028/ipa-practise（CC0）"
+    },
+    {
+      "word": "vowel ɵ",
+      "gloss": "IPA [ɵ] · nk2028/ipa-practise（CC0）"
+    },
+    {
+      "word": "vowel ɤ",
+      "gloss": "IPA [ɤ] · nk2028/ipa-practise（CC0）"
+    },
+    {
+      "word": "vowel o",
+      "gloss": "IPA [o] · nk2028/ipa-practise（CC0）"
+    },
+    {
+      "word": "vowel ə",
+      "gloss": "IPA [ə] · nk2028/ipa-practise（CC0）"
+    },
+    {
+      "word": "vowel ɛ",
+      "gloss": "IPA [ɛ] · nk2028/ipa-practise（CC0）"
+    },
+    {
+      "word": "vowel œ",
+      "gloss": "IPA [œ] · nk2028/ipa-practise（CC0）"
+    },
+    {
+      "word": "vowel ɜ",
+      "gloss": "IPA [ɜ] · nk2028/ipa-practise（CC0）"
+    },
+    {
+      "word": "vowel ɞ",
+      "gloss": "IPA [ɞ] · nk2028/ipa-practise（CC0）"
+    },
+    {
+      "word": "vowel ʌ",
+      "gloss": "IPA [ʌ] · nk2028/ipa-practise（CC0）"
+    },
+    {
+      "word": "vowel ɔ",
+      "gloss": "IPA [ɔ] · nk2028/ipa-practise（CC0）"
+    },
+    {
+      "word": "vowel æ",
+      "gloss": "IPA [æ] · nk2028/ipa-practise（CC0）"
+    },
+    {
+      "word": "vowel ɐ",
+      "gloss": "IPA [ɐ] · nk2028/ipa-practise（CC0）"
+    },
+    {
+      "word": "vowel a",
+      "gloss": "IPA [a] · nk2028/ipa-practise（CC0）"
+    },
+    {
+      "word": "vowel ɶ",
+      "gloss": "IPA [ɶ] · nk2028/ipa-practise（CC0）"
+    },
+    {
+      "word": "vowel ɑ",
+      "gloss": "IPA [ɑ] · nk2028/ipa-practise（CC0）"
+    },
+    {
+      "word": "vowel ɒ",
+      "gloss": "IPA [ɒ] · nk2028/ipa-practise（CC0）"
+    }
+  ]
+}

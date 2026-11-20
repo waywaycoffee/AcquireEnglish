@@ -133,8 +133,12 @@ reviewSourcesProvider = Provider<List<ReviewSource>>((Ref ref) {
           kind: book.isPatternBook ? ReviewKind.sentence : ReviewKind.word,
           question: entry.word,
           answer: entry.gloss,
-          english: book.isPatternBook ? entry.word : '',
-          chinese: book.isPatternBook ? entry.gloss : '',
+          english: book.isPatternBook || book.isFoundationBook
+              ? entry.word
+              : '',
+          chinese: book.isPatternBook || book.isFoundationBook
+              ? entry.gloss
+              : '',
           sourceLabel: '${book.title} · ${book.examTag}',
         ),
   ];

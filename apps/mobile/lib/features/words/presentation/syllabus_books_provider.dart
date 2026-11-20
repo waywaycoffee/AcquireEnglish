@@ -17,7 +17,19 @@ const List<String> kBuiltinSyllabusAssetPaths = <String>[
   'assets/syllabus/chunks_programmer_speak.json',
   'assets/syllabus/chunks_programmer_weekly.json',
   'assets/syllabus/chunks_superword_safe.json',
-  // Phonics chunk word lists.
+  // Zero-foundation IPA / phonics (see assets/syllabus/PHONICS_IPA_SOURCES.md).
+  'assets/syllabus/foundation_ipa_48.json',
+  'assets/syllabus/foundation_ipa_cmudict_phones.json',
+  'assets/syllabus/foundation_ipa_vowel_drill.json',
+  'assets/syllabus/foundation_ipa_crash_course.json',
+  'assets/syllabus/foundation_ipa_sheffield_listening.json',
+  'assets/syllabus/foundation_phonics_combos.json',
+  'assets/syllabus/foundation_phonics_irregulars.json',
+  'assets/syllabus/foundation_phonics_sentences.json',
+  'assets/syllabus/foundation_phonics_word_groups.json',
+  'assets/syllabus/foundation_phonics_rules_100.json',
+  'assets/syllabus/foundation_phonics_categories.json',
+  'assets/syllabus/foundation_phonics_helper_course.json',
   'assets/syllabus/chunks_phonics_cvc.json',
   'assets/syllabus/chunks_phonics_cvce.json',
 ];
@@ -215,20 +227,33 @@ class SyllabusBooksNotifier extends Notifier<SyllabusBooksState> {
   }) async {
     final List<SyllabusWord> words = parseSyllabusImport(
       rawText,
-      allowPhrases: kind == SyllabusBookKind.pattern,
+      allowPhrases: kind == SyllabusBookKind.pattern ||
+          kind == SyllabusBookKind.foundation,
     );
     if (words.isEmpty) return null;
     final String id =
         'import_${DateTime.now().millisecondsSinceEpoch}_${words.length}';
-    final bool isPattern = kind == SyllabusBookKind.pattern;
+    final String fallbackTitle = switch (kind) {
+      SyllabusBookKind.pattern => '导入句型书',
+      SyllabusBookKind.foundation => '导入零基础书',
+      SyllabusBookKind.word => '导入词书',
+    };
+    final String examTag = switch (kind) {
+      SyllabusBookKind.pattern => 'PATTERN',
+      SyllabusBookKind.foundation => 'FOUNDATION',
+      SyllabusBookKind.word => 'IMPORT',
+    };
+    final String disclaimer = switch (kind) {
+      SyllabusBookKind.pattern => '用户导入句型表。',
+      SyllabusBookKind.foundation => '用户导入零基础音标/拼读表。',
+      SyllabusBookKind.word => '用户导入词表。',
+    };
     return saveImportedBook(
       SyllabusBook(
         id: id,
-        title: title.trim().isEmpty
-            ? (isPattern ? '导入句型书' : '导入词书')
-            : title.trim(),
-        examTag: isPattern ? 'PATTERN' : 'IMPORT',
-        disclaimer: isPattern ? '用户导入句型表。' : '用户导入词表。',
+        title: title.trim().isEmpty ? fallbackTitle : title.trim(),
+        examTag: examTag,
+        disclaimer: disclaimer,
         words: words,
         builtin: false,
         kind: kind,

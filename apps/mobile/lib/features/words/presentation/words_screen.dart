@@ -240,10 +240,21 @@ class _WordsScreenState extends ConsumerState<WordsScreen> {
                                 Expanded(
                                   child: _BookTypeCard(
                                     title: '句型书',
-                                    subtitle: '日常口语句型练习',
+                                    subtitle: '语块与口语句型',
                                     icon: Icons.format_quote_rounded,
                                     onTap: () => context.push(
                                       '/words/syllabus?tab=pattern',
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(width: 10),
+                                Expanded(
+                                  child: _BookTypeCard(
+                                    title: '零基础',
+                                    subtitle: '音标与自然拼读',
+                                    icon: Icons.record_voice_over_rounded,
+                                    onTap: () => context.push(
+                                      '/words/syllabus?tab=foundation',
                                     ),
                                   ),
                                 ),

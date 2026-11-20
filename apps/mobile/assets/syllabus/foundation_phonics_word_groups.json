@@ -1,0 +1,2185 @@
+{
+  "id": "foundation_phonics_word_groups",
+  "title": "自然拼读 · 拼写练习词",
+  "examTag": "SPELL",
+  "kind": "foundation",
+  "disclaimer": "整理自 scott-lei/phonics-app word-groups。",
+  "words": [
+    {
+      "word": "cat",
+      "gloss": "猫 · a → short-a"
+    },
+    {
+      "word": "map",
+      "gloss": "地图 · a → short-a"
+    },
+    {
+      "word": "bag",
+      "gloss": "包 · a → short-a"
+    },
+    {
+      "word": "hand",
+      "gloss": "手 · a → short-a"
+    },
+    {
+      "word": "black",
+      "gloss": "黑色的 · a → short-a"
+    },
+    {
+      "word": "apple",
+      "gloss": "苹果 · a → short-a"
+    },
+    {
+      "word": "bed",
+      "gloss": "床 · e → short-e"
+    },
+    {
+      "word": "pen",
+      "gloss": "钢笔 · e → short-e"
+    },
+    {
+      "word": "red",
+      "gloss": "红色的 · e → short-e"
+    },
+    {
+      "word": "ten",
+      "gloss": "十 · e → short-e"
+    },
+    {
+      "word": "egg",
+      "gloss": "蛋 · e → short-e"
+    },
+    {
+      "word": "head",
+      "gloss": "头 · ea → short-e"
+    },
+    {
+      "word": "bread",
+      "gloss": "面包 · ea → short-e"
+    },
+    {
+      "word": "ready",
+      "gloss": "准备好的 · ea → short-e"
+    },
+    {
+      "word": "weather",
+      "gloss": "天气 · ea → short-e"
+    },
+    {
+      "word": "heavy",
+      "gloss": "重的 · ea → short-e"
+    },
+    {
+      "word": "sit",
+      "gloss": "坐 · i → short-i"
+    },
+    {
+      "word": "pig",
+      "gloss": "猪 · i → short-i"
+    },
+    {
+      "word": "big",
+      "gloss": "大的 · i → short-i"
+    },
+    {
+      "word": "fish",
+      "gloss": "鱼 · i → short-i"
+    },
+    {
+      "word": "milk",
+      "gloss": "牛奶 · i → short-i"
+    },
+    {
+      "word": "six",
+      "gloss": "六 · i → short-i"
+    },
+    {
+      "word": "gym",
+      "gloss": "健身房 · y → short-i"
+    },
+    {
+      "word": "myth",
+      "gloss": "神话 · y → short-i"
+    },
+    {
+      "word": "system",
+      "gloss": "系统 · y → short-i"
+    },
+    {
+      "word": "symbol",
+      "gloss": "符号 · y → short-i"
+    },
+    {
+      "word": "build",
+      "gloss": "建造 · ui → short-i"
+    },
+    {
+      "word": "guitar",
+      "gloss": "吉他 · ui → short-i"
+    },
+    {
+      "word": "biscuit",
+      "gloss": "饼干 · ui → short-i"
+    },
+    {
+      "word": "guilt",
+      "gloss": "内疚 · ui → short-i"
+    },
+    {
+      "word": "hot",
+      "gloss": "热的 · o → short-o"
+    },
+    {
+      "word": "dog",
+      "gloss": "狗 · o → short-o"
+    },
+    {
+      "word": "box",
+      "gloss": "盒子 · o → short-o"
+    },
+    {
+      "word": "clock",
+      "gloss": "钟 · o → short-o"
+    },
+    {
+      "word": "stop",
+      "gloss": "停止 · o → short-o"
+    },
+    {
+      "word": "orange",
+      "gloss": "橙子 · o → short-o"
+    },
+    {
+      "word": "want",
+      "gloss": "想要 · a → short-o"
+    },
+    {
+      "word": "wash",
+      "gloss": "洗 · a → short-o"
+    },
+    {
+      "word": "watch",
+      "gloss": "手表 · a → short-o"
+    },
+    {
+      "word": "what",
+      "gloss": "什么 · a → short-o"
+    },
+    {
+      "word": "was",
+      "gloss": "是（过去式） · a → short-o"
+    },
+    {
+      "word": "wallet",
+      "gloss": "钱包 · a → short-o"
+    },
+    {
+      "word": "cup",
+      "gloss": "杯子 · u → short-u"
+    },
+    {
+      "word": "bus",
+      "gloss": "公共汽车 · u → short-u"
+    },
+    {
+      "word": "sun",
+      "gloss": "太阳 · u → short-u"
+    },
+    {
+      "word": "mum",
+      "gloss": "妈妈 · u → short-u"
+    },
+    {
+      "word": "lunch",
+      "gloss": "午餐 · u → short-u"
+    },
+    {
+      "word": "number",
+      "gloss": "数字 · u → short-u"
+    },
+    {
+      "word": "love",
+      "gloss": "爱 · o → short-u"
+    },
+    {
+      "word": "come",
+      "gloss": "来 · o → short-u"
+    },
+    {
+      "word": "son",
+      "gloss": "儿子 · o → short-u"
+    },
+    {
+      "word": "money",
+      "gloss": "钱 · o → short-u"
+    },
+    {
+      "word": "month",
+      "gloss": "月份 · o → short-u"
+    },
+    {
+      "word": "young",
+      "gloss": "年轻的 · ou → short-u"
+    },
+    {
+      "word": "touch",
+      "gloss": "触摸 · ou → short-u"
+    },
+    {
+      "word": "country",
+      "gloss": "国家 · ou → short-u"
+    },
+    {
+      "word": "enough",
+      "gloss": "足够的 · ou → short-u"
+    },
+    {
+      "word": "double",
+      "gloss": "双倍的 · ou → short-u"
+    },
+    {
+      "word": "book",
+      "gloss": "书 · oo → short-oo"
+    },
+    {
+      "word": "look",
+      "gloss": "看 · oo → short-oo"
+    },
+    {
+      "word": "good",
+      "gloss": "好的 · oo → short-oo"
+    },
+    {
+      "word": "foot",
+      "gloss": "脚 · oo → short-oo"
+    },
+    {
+      "word": "wood",
+      "gloss": "木头 · oo → short-oo"
+    },
+    {
+      "word": "cook",
+      "gloss": "厨师 · oo → short-oo"
+    },
+    {
+      "word": "put",
+      "gloss": "放 · u → short-oo"
+    },
+    {
+      "word": "full",
+      "gloss": "满的 · u → short-oo"
+    },
+    {
+      "word": "pull",
+      "gloss": "拉 · u → short-oo"
+    },
+    {
+      "word": "push",
+      "gloss": "推 · u → short-oo"
+    },
+    {
+      "word": "wolf",
+      "gloss": "狼 · o → short-oo"
+    },
+    {
+      "word": "woman",
+      "gloss": "女人 · o → short-oo"
+    },
+    {
+      "word": "about",
+      "gloss": "关于 · a → short-schwa"
+    },
+    {
+      "word": "banana",
+      "gloss": "香蕉 · a → short-schwa"
+    },
+    {
+      "word": "sofa",
+      "gloss": "沙发 · a → short-schwa"
+    },
+    {
+      "word": "ago",
+      "gloss": "以前 · a → short-schwa"
+    },
+    {
+      "word": "china",
+      "gloss": "中国 · a → short-schwa"
+    },
+    {
+      "word": "open",
+      "gloss": "打开 · e → short-schwa"
+    },
+    {
+      "word": "seven",
+      "gloss": "七 · e → short-schwa"
+    },
+    {
+      "word": "chicken",
+      "gloss": "鸡 · e → short-schwa"
+    },
+    {
+      "word": "taken",
+      "gloss": "拿走的 · e → short-schwa"
+    },
+    {
+      "word": "lesson",
+      "gloss": "课 · o → short-schwa"
+    },
+    {
+      "word": "carrot",
+      "gloss": "胡萝卜 · o → short-schwa"
+    },
+    {
+      "word": "lemon",
+      "gloss": "柠檬 · o → short-schwa"
+    },
+    {
+      "word": "button",
+      "gloss": "纽扣 · o → short-schwa"
+    },
+    {
+      "word": "teacher",
+      "gloss": "老师 · er → short-schwa"
+    },
+    {
+      "word": "sister",
+      "gloss": "姐妹 · er → short-schwa"
+    },
+    {
+      "word": "water",
+      "gloss": "水 · er → short-schwa"
+    },
+    {
+      "word": "letter",
+      "gloss": "信 · er → short-schwa"
+    },
+    {
+      "word": "brother",
+      "gloss": "兄弟 · er → short-schwa"
+    },
+    {
+      "word": "doctor",
+      "gloss": "医生 · or → short-schwa"
+    },
+    {
+      "word": "actor",
+      "gloss": "演员 · or → short-schwa"
+    },
+    {
+      "word": "visitor",
+      "gloss": "访客 · or → short-schwa"
+    },
+    {
+      "word": "mirror",
+      "gloss": "镜子 · or → short-schwa"
+    },
+    {
+      "word": "see",
+      "gloss": "看见 · ee → long-ee"
+    },
+    {
+      "word": "tree",
+      "gloss": "树 · ee → long-ee"
+    },
+    {
+      "word": "green",
+      "gloss": "绿色的 · ee → long-ee"
+    },
+    {
+      "word": "sleep",
+      "gloss": "睡觉 · ee → long-ee"
+    },
+    {
+      "word": "feet",
+      "gloss": "脚（复数） · ee → long-ee"
+    },
+    {
+      "word": "eat",
+      "gloss": "吃 · ea → long-ee"
+    },
+    {
+      "word": "sea",
+      "gloss": "海 · ea → long-ee"
+    },
+    {
+      "word": "read",
+      "gloss": "读 · ea → long-ee"
+    },
+    {
+      "word": "tea",
+      "gloss": "茶 · ea → long-ee"
+    },
+    {
+      "word": "season",
+      "gloss": "季节 · ea → long-ee"
+    },
+    {
+      "word": "he",
+      "gloss": "他 · e → long-ee"
+    },
+    {
+      "word": "me",
+      "gloss": "我（宾格） · e → long-ee"
+    },
+    {
+      "word": "we",
+      "gloss": "我们 · e → long-ee"
+    },
+    {
+      "word": "she",
+      "gloss": "她 · e → long-ee"
+    },
+    {
+      "word": "these",
+      "gloss": "这些 · e → long-ee"
+    },
+    {
+      "word": "field",
+      "gloss": "田野 · ie → long-ee"
+    },
+    {
+      "word": "piece",
+      "gloss": "一块 · ie → long-ee"
+    },
+    {
+      "word": "chief",
+      "gloss": "首领 · ie → long-ee"
+    },
+    {
+      "word": "believe",
+      "gloss": "相信 · ie → long-ee"
+    },
+    {
+      "word": "key",
+      "gloss": "钥匙 · ey → long-ee"
+    },
+    {
+      "word": "keyboard",
+      "gloss": "键盘 · ey → long-ee"
+    },
+    {
+      "word": "monkey",
+      "gloss": "猴子 · ey → long-ee"
+    },
+    {
+      "word": "donkey",
+      "gloss": "驴 · ey → long-ee"
+    },
+    {
+      "word": "car",
+      "gloss": "汽车 · ar → long-ar"
+    },
+    {
+      "word": "park",
+      "gloss": "公园 · ar → long-ar"
+    },
+    {
+      "word": "star",
+      "gloss": "星星 · ar → long-ar"
+    },
+    {
+      "word": "farm",
+      "gloss": "农场 · ar → long-ar"
+    },
+    {
+      "word": "garden",
+      "gloss": "花园 · ar → long-ar"
+    },
+    {
+      "word": "father",
+      "gloss": "父亲 · a → long-ar"
+    },
+    {
+      "word": "class",
+      "gloss": "班级 · a → long-ar"
+    },
+    {
+      "word": "bath",
+      "gloss": "洗澡 · a → long-ar"
+    },
+    {
+      "word": "glass",
+      "gloss": "玻璃杯 · a → long-ar"
+    },
+    {
+      "word": "ask",
+      "gloss": "问 · a → long-ar"
+    },
+    {
+      "word": "calm",
+      "gloss": "平静的 · al → long-ar"
+    },
+    {
+      "word": "half",
+      "gloss": "一半 · al → long-ar"
+    },
+    {
+      "word": "palm",
+      "gloss": "手掌 · al → long-ar"
+    },
+    {
+      "word": "calf",
+      "gloss": "小牛 · al → long-ar"
+    },
+    {
+      "word": "fork",
+      "gloss": "叉子 · or → long-or"
+    },
+    {
+      "word": "horse",
+      "gloss": "马 · or → long-or"
+    },
+    {
+      "word": "short",
+      "gloss": "短的 · or → long-or"
+    },
+    {
+      "word": "born",
+      "gloss": "出生的 · or → long-or"
+    },
+    {
+      "word": "morning",
+      "gloss": "早上 · or → long-or"
+    },
+    {
+      "word": "door",
+      "gloss": "门 · oor → long-or"
+    },
+    {
+      "word": "floor",
+      "gloss": "地板 · oor → long-or"
+    },
+    {
+      "word": "saw",
+      "gloss": "锯子 · aw → long-or"
+    },
+    {
+      "word": "draw",
+      "gloss": "画 · aw → long-or"
+    },
+    {
+      "word": "straw",
+      "gloss": "稻草 · aw → long-or"
+    },
+    {
+      "word": "law",
+      "gloss": "法律 · aw → long-or"
+    },
+    {
+      "word": "dawn",
+      "gloss": "黎明 · aw → long-or"
+    },
+    {
+      "word": "autumn",
+      "gloss": "秋天 · au → long-or"
+    },
+    {
+      "word": "august",
+      "gloss": "八月 · au → long-or"
+    },
+    {
+      "word": "because",
+      "gloss": "因为 · au → long-or"
+    },
+    {
+      "word": "sauce",
+      "gloss": "酱汁 · au → long-or"
+    },
+    {
+      "word": "talk",
+      "gloss": "说话 · al → long-or"
+    },
+    {
+      "word": "walk",
+      "gloss": "走路 · al → long-or"
+    },
+    {
+      "word": "ball",
+      "gloss": "球 · al → long-or"
+    },
+    {
+      "word": "small",
+      "gloss": "小的 · al → long-or"
+    },
+    {
+      "word": "tall",
+      "gloss": "高的 · al → long-or"
+    },
+    {
+      "word": "moon",
+      "gloss": "月亮 · oo → long-oo"
+    },
+    {
+      "word": "food",
+      "gloss": "食物 · oo → long-oo"
+    },
+    {
+      "word": "school",
+      "gloss": "学校 · oo → long-oo"
+    },
+    {
+      "word": "room",
+      "gloss": "房间 · oo → long-oo"
+    },
+    {
+      "word": "zoo",
+      "gloss": "动物园 · oo → long-oo"
+    },
+    {
+      "word": "rule",
+      "gloss": "规则 · u → long-oo"
+    },
+    {
+      "word": "ruler",
+      "gloss": "尺子 · u → long-oo"
+    },
+    {
+      "word": "june",
+      "gloss": "六月 · u → long-oo"
+    },
+    {
+      "word": "rude",
+      "gloss": "粗鲁的 · u → long-oo"
+    },
+    {
+      "word": "blue",
+      "gloss": "蓝色的 · ue → long-oo"
+    },
+    {
+      "word": "true",
+      "gloss": "真的 · ue → long-oo"
+    },
+    {
+      "word": "glue",
+      "gloss": "胶水 · ue → long-oo"
+    },
+    {
+      "word": "clue",
+      "gloss": "线索 · ue → long-oo"
+    },
+    {
+      "word": "do",
+      "gloss": "做 · o → long-oo"
+    },
+    {
+      "word": "who",
+      "gloss": "谁 · o → long-oo"
+    },
+    {
+      "word": "whose",
+      "gloss": "谁的 · o → long-oo"
+    },
+    {
+      "word": "move",
+      "gloss": "移动 · o → long-oo"
+    },
+    {
+      "word": "lose",
+      "gloss": "丢失 · o → long-oo"
+    },
+    {
+      "word": "fruit",
+      "gloss": "水果 · ui → long-oo"
+    },
+    {
+      "word": "juice",
+      "gloss": "果汁 · ui → long-oo"
+    },
+    {
+      "word": "suit",
+      "gloss": "西装 · ui → long-oo"
+    },
+    {
+      "word": "cruise",
+      "gloss": "乘船游览 · ui → long-oo"
+    },
+    {
+      "word": "her",
+      "gloss": "她（宾格） · er → long-er"
+    },
+    {
+      "word": "term",
+      "gloss": "学期 · er → long-er"
+    },
+    {
+      "word": "serve",
+      "gloss": "服务 · er → long-er"
+    },
+    {
+      "word": "verb",
+      "gloss": "动词 · er → long-er"
+    },
+    {
+      "word": "person",
+      "gloss": "人 · er → long-er"
+    },
+    {
+      "word": "bird",
+      "gloss": "鸟 · ir → long-er"
+    },
+    {
+      "word": "girl",
+      "gloss": "女孩 · ir → long-er"
+    },
+    {
+      "word": "first",
+      "gloss": "第一 · ir → long-er"
+    },
+    {
+      "word": "shirt",
+      "gloss": "衬衫 · ir → long-er"
+    },
+    {
+      "word": "thirty",
+      "gloss": "三十 · ir → long-er"
+    },
+    {
+      "word": "turn",
+      "gloss": "转弯 · ur → long-er"
+    },
+    {
+      "word": "nurse",
+      "gloss": "护士 · ur → long-er"
+    },
+    {
+      "word": "purple",
+      "gloss": "紫色的 · ur → long-er"
+    },
+    {
+      "word": "hurt",
+      "gloss": "受伤 · ur → long-er"
+    },
+    {
+      "word": "thursday",
+      "gloss": "星期四 · ur → long-er"
+    },
+    {
+      "word": "word",
+      "gloss": "单词 · or → long-er"
+    },
+    {
+      "word": "work",
+      "gloss": "工作 · or → long-er"
+    },
+    {
+      "word": "world",
+      "gloss": "世界 · or → long-er"
+    },
+    {
+      "word": "worse",
+      "gloss": "更差的 · or → long-er"
+    },
+    {
+      "word": "learn",
+      "gloss": "学习 · ear → long-er"
+    },
+    {
+      "word": "earth",
+      "gloss": "地球 · ear → long-er"
+    },
+    {
+      "word": "early",
+      "gloss": "早的 · ear → long-er"
+    },
+    {
+      "word": "heard",
+      "gloss": "听说（过去式） · ear → long-er"
+    },
+    {
+      "word": "cake",
+      "gloss": "蛋糕 · a_e → diph-ei"
+    },
+    {
+      "word": "name",
+      "gloss": "名字 · a_e → diph-ei"
+    },
+    {
+      "word": "game",
+      "gloss": "游戏 · a_e → diph-ei"
+    },
+    {
+      "word": "plane",
+      "gloss": "飞机 · a_e → diph-ei"
+    },
+    {
+      "word": "late",
+      "gloss": "迟的 · a_e → diph-ei"
+    },
+    {
+      "word": "rain",
+      "gloss": "雨 · ai → diph-ei"
+    },
+    {
+      "word": "wait",
+      "gloss": "等待 · ai → diph-ei"
+    },
+    {
+      "word": "train",
+      "gloss": "火车 · ai → diph-ei"
+    },
+    {
+      "word": "paint",
+      "gloss": "油漆 · ai → diph-ei"
+    },
+    {
+      "word": "tail",
+      "gloss": "尾巴 · ai → diph-ei"
+    },
+    {
+      "word": "day",
+      "gloss": "天；日 · ay → diph-ei"
+    },
+    {
+      "word": "play",
+      "gloss": "玩 · ay → diph-ei"
+    },
+    {
+      "word": "say",
+      "gloss": "说 · ay → diph-ei"
+    },
+    {
+      "word": "stay",
+      "gloss": "停留 · ay → diph-ei"
+    },
+    {
+      "word": "may",
+      "gloss": "五月 · ay → diph-ei"
+    },
+    {
+      "word": "they",
+      "gloss": "他们 · ey → diph-ei"
+    },
+    {
+      "word": "hey",
+      "gloss": "嘿 · ey → diph-ei"
+    },
+    {
+      "word": "grey",
+      "gloss": "灰色的 · ey → diph-ei"
+    },
+    {
+      "word": "obey",
+      "gloss": "服从 · ey → diph-ei"
+    },
+    {
+      "word": "great",
+      "gloss": "很棒的 · ea → diph-ei"
+    },
+    {
+      "word": "break",
+      "gloss": "打破 · ea → diph-ei"
+    },
+    {
+      "word": "steak",
+      "gloss": "牛排 · ea → diph-ei"
+    },
+    {
+      "word": "bike",
+      "gloss": "自行车 · i_e → diph-ai"
+    },
+    {
+      "word": "time",
+      "gloss": "时间 · i_e → diph-ai"
+    },
+    {
+      "word": "kite",
+      "gloss": "风筝 · i_e → diph-ai"
+    },
+    {
+      "word": "write",
+      "gloss": "写 · i_e → diph-ai"
+    },
+    {
+      "word": "drive",
+      "gloss": "驾驶 · i_e → diph-ai"
+    },
+    {
+      "word": "high",
+      "gloss": "高的 · igh → diph-ai"
+    },
+    {
+      "word": "night",
+      "gloss": "夜晚 · igh → diph-ai"
+    },
+    {
+      "word": "light",
+      "gloss": "光 · igh → diph-ai"
+    },
+    {
+      "word": "right",
+      "gloss": "右边 · igh → diph-ai"
+    },
+    {
+      "word": "fight",
+      "gloss": "打架 · igh → diph-ai"
+    },
+    {
+      "word": "my",
+      "gloss": "我的 · y → diph-ai"
+    },
+    {
+      "word": "fly",
+      "gloss": "飞 · y → diph-ai"
+    },
+    {
+      "word": "sky",
+      "gloss": "天空 · y → diph-ai"
+    },
+    {
+      "word": "try",
+      "gloss": "尝试 · y → diph-ai"
+    },
+    {
+      "word": "why",
+      "gloss": "为什么 · y → diph-ai"
+    },
+    {
+      "word": "pie",
+      "gloss": "派 · ie → diph-ai"
+    },
+    {
+      "word": "tie",
+      "gloss": "领带 · ie → diph-ai"
+    },
+    {
+      "word": "lie",
+      "gloss": "说谎 · ie → diph-ai"
+    },
+    {
+      "word": "die",
+      "gloss": "死 · ie → diph-ai"
+    },
+    {
+      "word": "coin",
+      "gloss": "硬币 · oi → diph-oi"
+    },
+    {
+      "word": "join",
+      "gloss": "加入 · oi → diph-oi"
+    },
+    {
+      "word": "point",
+      "gloss": "要点 · oi → diph-oi"
+    },
+    {
+      "word": "voice",
+      "gloss": "声音 · oi → diph-oi"
+    },
+    {
+      "word": "soil",
+      "gloss": "土壤 · oi → diph-oi"
+    },
+    {
+      "word": "boy",
+      "gloss": "男孩 · oy → diph-oi"
+    },
+    {
+      "word": "toy",
+      "gloss": "玩具 · oy → diph-oi"
+    },
+    {
+      "word": "enjoy",
+      "gloss": "享受 · oy → diph-oi"
+    },
+    {
+      "word": "royal",
+      "gloss": "皇家的 · oy → diph-oi"
+    },
+    {
+      "word": "oyster",
+      "gloss": "牡蛎 · oy → diph-oi"
+    },
+    {
+      "word": "nose",
+      "gloss": "鼻子 · o_e → diph-ou"
+    },
+    {
+      "word": "home",
+      "gloss": "家 · o_e → diph-ou"
+    },
+    {
+      "word": "rose",
+      "gloss": "玫瑰 · o_e → diph-ou"
+    },
+    {
+      "word": "hope",
+      "gloss": "希望 · o_e → diph-ou"
+    },
+    {
+      "word": "note",
+      "gloss": "笔记 · o_e → diph-ou"
+    },
+    {
+      "word": "boat",
+      "gloss": "船 · oa → diph-ou"
+    },
+    {
+      "word": "road",
+      "gloss": "路 · oa → diph-ou"
+    },
+    {
+      "word": "coat",
+      "gloss": "外套 · oa → diph-ou"
+    },
+    {
+      "word": "soap",
+      "gloss": "肥皂 · oa → diph-ou"
+    },
+    {
+      "word": "goat",
+      "gloss": "山羊 · oa → diph-ou"
+    },
+    {
+      "word": "snow",
+      "gloss": "雪 · ow → diph-ou"
+    },
+    {
+      "word": "grow",
+      "gloss": "生长 · ow → diph-ou"
+    },
+    {
+      "word": "show",
+      "gloss": "展示 · ow → diph-ou"
+    },
+    {
+      "word": "slow",
+      "gloss": "慢的 · ow → diph-ou"
+    },
+    {
+      "word": "window",
+      "gloss": "窗户 · ow → diph-ou"
+    },
+    {
+      "word": "go",
+      "gloss": "去 · o → diph-ou"
+    },
+    {
+      "word": "no",
+      "gloss": "不 · o → diph-ou"
+    },
+    {
+      "word": "so",
+      "gloss": "所以 · o → diph-ou"
+    },
+    {
+      "word": "hello",
+      "gloss": "你好 · o → diph-ou"
+    },
+    {
+      "word": "toe",
+      "gloss": "脚趾 · oe → diph-ou"
+    },
+    {
+      "word": "hoe",
+      "gloss": "锄头 · oe → diph-ou"
+    },
+    {
+      "word": "goes",
+      "gloss": "去（三单） · oe → diph-ou"
+    },
+    {
+      "word": "house",
+      "gloss": "房子 · ou → diph-au"
+    },
+    {
+      "word": "out",
+      "gloss": "外面 · ou → diph-au"
+    },
+    {
+      "word": "mouth",
+      "gloss": "嘴 · ou → diph-au"
+    },
+    {
+      "word": "cloud",
+      "gloss": "云 · ou → diph-au"
+    },
+    {
+      "word": "sound",
+      "gloss": "声音 · ou → diph-au"
+    },
+    {
+      "word": "cow",
+      "gloss": "奶牛 · ow → diph-au"
+    },
+    {
+      "word": "now",
+      "gloss": "现在 · ow → diph-au"
+    },
+    {
+      "word": "how",
+      "gloss": "怎样 · ow → diph-au"
+    },
+    {
+      "word": "brown",
+      "gloss": "棕色的 · ow → diph-au"
+    },
+    {
+      "word": "flower",
+      "gloss": "花 · ow → diph-au"
+    },
+    {
+      "word": "hear",
+      "gloss": "听见 · ear → diph-ia"
+    },
+    {
+      "word": "near",
+      "gloss": "近的 · ear → diph-ia"
+    },
+    {
+      "word": "dear",
+      "gloss": "亲爱的 · ear → diph-ia"
+    },
+    {
+      "word": "fear",
+      "gloss": "害怕 · ear → diph-ia"
+    },
+    {
+      "word": "year",
+      "gloss": "年 · ear → diph-ia"
+    },
+    {
+      "word": "deer",
+      "gloss": "鹿 · eer → diph-ia"
+    },
+    {
+      "word": "cheer",
+      "gloss": "欢呼 · eer → diph-ia"
+    },
+    {
+      "word": "beer",
+      "gloss": "啤酒 · eer → diph-ia"
+    },
+    {
+      "word": "engineer",
+      "gloss": "工程师 · eer → diph-ia"
+    },
+    {
+      "word": "here",
+      "gloss": "这里 · ere → diph-ia"
+    },
+    {
+      "word": "mere",
+      "gloss": "仅仅的 · ere → diph-ia"
+    },
+    {
+      "word": "severe",
+      "gloss": "严重的 · ere → diph-ia"
+    },
+    {
+      "word": "hair",
+      "gloss": "头发 · air → diph-ea"
+    },
+    {
+      "word": "chair",
+      "gloss": "椅子 · air → diph-ea"
+    },
+    {
+      "word": "pair",
+      "gloss": "一对 · air → diph-ea"
+    },
+    {
+      "word": "fair",
+      "gloss": "公平的 · air → diph-ea"
+    },
+    {
+      "word": "stair",
+      "gloss": "楼梯 · air → diph-ea"
+    },
+    {
+      "word": "care",
+      "gloss": "关心 · are → diph-ea"
+    },
+    {
+      "word": "share",
+      "gloss": "分享 · are → diph-ea"
+    },
+    {
+      "word": "dare",
+      "gloss": "敢 · are → diph-ea"
+    },
+    {
+      "word": "square",
+      "gloss": "正方形 · are → diph-ea"
+    },
+    {
+      "word": "bare",
+      "gloss": "赤裸的 · are → diph-ea"
+    },
+    {
+      "word": "bear",
+      "gloss": "熊 · ear → diph-ea"
+    },
+    {
+      "word": "wear",
+      "gloss": "穿 · ear → diph-ea"
+    },
+    {
+      "word": "pear",
+      "gloss": "梨 · ear → diph-ea"
+    },
+    {
+      "word": "swear",
+      "gloss": "发誓 · ear → diph-ea"
+    },
+    {
+      "word": "where",
+      "gloss": "哪里 · ere → diph-ea"
+    },
+    {
+      "word": "there",
+      "gloss": "那里 · ere → diph-ea"
+    },
+    {
+      "word": "nowhere",
+      "gloss": "无处 · ere → diph-ea"
+    },
+    {
+      "word": "somewhere",
+      "gloss": "某处 · ere → diph-ea"
+    },
+    {
+      "word": "poor",
+      "gloss": "贫穷的 · oor → diph-ua"
+    },
+    {
+      "word": "moor",
+      "gloss": "荒野 · oor → diph-ua"
+    },
+    {
+      "word": "tour",
+      "gloss": "旅行 · our → diph-ua"
+    },
+    {
+      "word": "tourist",
+      "gloss": "游客 · our → diph-ua"
+    },
+    {
+      "word": "sure",
+      "gloss": "确定的 · ure → diph-ua"
+    },
+    {
+      "word": "cure",
+      "gloss": "治愈 · ure → diph-ua"
+    },
+    {
+      "word": "pure",
+      "gloss": "纯净的 · ure → diph-ua"
+    },
+    {
+      "word": "ensure",
+      "gloss": "确保 · ure → diph-ua"
+    },
+    {
+      "word": "happy",
+      "gloss": "快乐的 · p → cons-p"
+    },
+    {
+      "word": "supper",
+      "gloss": "晚餐 · pp → cons-p"
+    },
+    {
+      "word": "puppy",
+      "gloss": "小狗 · pp → cons-p"
+    },
+    {
+      "word": "zipper",
+      "gloss": "拉链 · pp → cons-p"
+    },
+    {
+      "word": "top",
+      "gloss": "顶部 · t → cons-t"
+    },
+    {
+      "word": "better",
+      "gloss": "更好的 · tt → cons-t"
+    },
+    {
+      "word": "little",
+      "gloss": "小的 · tt → cons-t"
+    },
+    {
+      "word": "butter",
+      "gloss": "黄油 · tt → cons-t"
+    },
+    {
+      "word": "washed",
+      "gloss": "洗（过去式） · ed → cons-t"
+    },
+    {
+      "word": "looked",
+      "gloss": "看（过去式） · ed → cons-t"
+    },
+    {
+      "word": "stopped",
+      "gloss": "停止（过去式） · ed → cons-t"
+    },
+    {
+      "word": "helped",
+      "gloss": "帮助（过去式） · ed → cons-t"
+    },
+    {
+      "word": "jumped",
+      "gloss": "跳（过去式） · ed → cons-t"
+    },
+    {
+      "word": "king",
+      "gloss": "国王 · k → cons-k"
+    },
+    {
+      "word": "cold",
+      "gloss": "冷的 · c → cons-k"
+    },
+    {
+      "word": "duck",
+      "gloss": "鸭子 · ck → cons-k"
+    },
+    {
+      "word": "back",
+      "gloss": "后面 · ck → cons-k"
+    },
+    {
+      "word": "sick",
+      "gloss": "生病的 · ck → cons-k"
+    },
+    {
+      "word": "christmas",
+      "gloss": "圣诞节 · ch → cons-k"
+    },
+    {
+      "word": "chemist",
+      "gloss": "药剂师 · ch → cons-k"
+    },
+    {
+      "word": "ache",
+      "gloss": "疼痛 · ch → cons-k"
+    },
+    {
+      "word": "fan",
+      "gloss": "扇子 · f → cons-f"
+    },
+    {
+      "word": "five",
+      "gloss": "五 · f → cons-f"
+    },
+    {
+      "word": "off",
+      "gloss": "关掉 · ff → cons-f"
+    },
+    {
+      "word": "coffee",
+      "gloss": "咖啡 · ff → cons-f"
+    },
+    {
+      "word": "cliff",
+      "gloss": "悬崖 · ff → cons-f"
+    },
+    {
+      "word": "stuff",
+      "gloss": "东西 · ff → cons-f"
+    },
+    {
+      "word": "phone",
+      "gloss": "电话 · ph → cons-f"
+    },
+    {
+      "word": "photo",
+      "gloss": "照片 · ph → cons-f"
+    },
+    {
+      "word": "graph",
+      "gloss": "图表 · ph → cons-f"
+    },
+    {
+      "word": "elephant",
+      "gloss": "大象 · ph → cons-f"
+    },
+    {
+      "word": "laugh",
+      "gloss": "笑 · gh → cons-f"
+    },
+    {
+      "word": "tough",
+      "gloss": "艰难的 · gh → cons-f"
+    },
+    {
+      "word": "cough",
+      "gloss": "咳嗽 · gh → cons-f"
+    },
+    {
+      "word": "grass",
+      "gloss": "草 · ss → cons-s"
+    },
+    {
+      "word": "miss",
+      "gloss": "想念 · ss → cons-s"
+    },
+    {
+      "word": "kiss",
+      "gloss": "亲吻 · ss → cons-s"
+    },
+    {
+      "word": "city",
+      "gloss": "城市 · c → cons-s"
+    },
+    {
+      "word": "cent",
+      "gloss": "分 · c → cons-s"
+    },
+    {
+      "word": "ice",
+      "gloss": "冰 · c → cons-s"
+    },
+    {
+      "word": "cinema",
+      "gloss": "电影院 · c → cons-s"
+    },
+    {
+      "word": "pencil",
+      "gloss": "铅笔 · c → cons-s"
+    },
+    {
+      "word": "face",
+      "gloss": "脸 · ce → cons-s"
+    },
+    {
+      "word": "nice",
+      "gloss": "好的 · ce → cons-s"
+    },
+    {
+      "word": "dance",
+      "gloss": "跳舞 · ce → cons-s"
+    },
+    {
+      "word": "rice",
+      "gloss": "米饭 · ce → cons-s"
+    },
+    {
+      "word": "place",
+      "gloss": "地方 · ce → cons-s"
+    },
+    {
+      "word": "ship",
+      "gloss": "船 · sh → cons-sh"
+    },
+    {
+      "word": "shop",
+      "gloss": "商店 · sh → cons-sh"
+    },
+    {
+      "word": "nation",
+      "gloss": "国家 · ti → cons-sh"
+    },
+    {
+      "word": "station",
+      "gloss": "车站 · ti → cons-sh"
+    },
+    {
+      "word": "action",
+      "gloss": "行动 · ti → cons-sh"
+    },
+    {
+      "word": "patient",
+      "gloss": "病人 · ti → cons-sh"
+    },
+    {
+      "word": "special",
+      "gloss": "特别的 · ci → cons-sh"
+    },
+    {
+      "word": "official",
+      "gloss": "官方的 · ci → cons-sh"
+    },
+    {
+      "word": "delicious",
+      "gloss": "美味的 · ci → cons-sh"
+    },
+    {
+      "word": "musician",
+      "gloss": "音乐家 · ci → cons-sh"
+    },
+    {
+      "word": "sugar",
+      "gloss": "糖 · s → cons-sh"
+    },
+    {
+      "word": "church",
+      "gloss": "教堂 · ch → cons-ch"
+    },
+    {
+      "word": "rich",
+      "gloss": "富有的 · ch → cons-ch"
+    },
+    {
+      "word": "catch",
+      "gloss": "抓住 · tch → cons-ch"
+    },
+    {
+      "word": "match",
+      "gloss": "比赛 · tch → cons-ch"
+    },
+    {
+      "word": "kitchen",
+      "gloss": "厨房 · tch → cons-ch"
+    },
+    {
+      "word": "fetch",
+      "gloss": "去取来 · tch → cons-ch"
+    },
+    {
+      "word": "nature",
+      "gloss": "自然 · t → cons-ch"
+    },
+    {
+      "word": "picture",
+      "gloss": "图片 · t → cons-ch"
+    },
+    {
+      "word": "future",
+      "gloss": "未来 · t → cons-ch"
+    },
+    {
+      "word": "adventure",
+      "gloss": "冒险 · t → cons-ch"
+    },
+    {
+      "word": "think",
+      "gloss": "想 · th → cons-th"
+    },
+    {
+      "word": "three",
+      "gloss": "三 · th → cons-th"
+    },
+    {
+      "word": "thank",
+      "gloss": "感谢 · th → cons-th"
+    },
+    {
+      "word": "hat",
+      "gloss": "帽子 · h → cons-h"
+    },
+    {
+      "word": "help",
+      "gloss": "帮助 · h → cons-h"
+    },
+    {
+      "word": "whole",
+      "gloss": "整个的 · wh → cons-h"
+    },
+    {
+      "word": "whom",
+      "gloss": "谁（宾格） · wh → cons-h"
+    },
+    {
+      "word": "street",
+      "gloss": "街道 · tr → cons-tr"
+    },
+    {
+      "word": "truck",
+      "gloss": "卡车 · tr → cons-tr"
+    },
+    {
+      "word": "cats",
+      "gloss": "猫（复数） · ts → cons-ts"
+    },
+    {
+      "word": "seats",
+      "gloss": "座位（复数） · ts → cons-ts"
+    },
+    {
+      "word": "gets",
+      "gloss": "得到（三单） · ts → cons-ts"
+    },
+    {
+      "word": "sports",
+      "gloss": "运动 · ts → cons-ts"
+    },
+    {
+      "word": "gifts",
+      "gloss": "礼物（复数） · ts → cons-ts"
+    },
+    {
+      "word": "gates",
+      "gloss": "大门（复数） · tes → cons-ts"
+    },
+    {
+      "word": "notes",
+      "gloss": "笔记（复数） · tes → cons-ts"
+    },
+    {
+      "word": "dates",
+      "gloss": "日期（复数） · tes → cons-ts"
+    },
+    {
+      "word": "plates",
+      "gloss": "盘子（复数） · tes → cons-ts"
+    },
+    {
+      "word": "baby",
+      "gloss": "婴儿 · b → cons-b"
+    },
+    {
+      "word": "rabbit",
+      "gloss": "兔子 · bb → cons-b"
+    },
+    {
+      "word": "hobby",
+      "gloss": "爱好 · bb → cons-b"
+    },
+    {
+      "word": "cabbage",
+      "gloss": "卷心菜 · bb → cons-b"
+    },
+    {
+      "word": "rubber",
+      "gloss": "橡皮 · bb → cons-b"
+    },
+    {
+      "word": "dad",
+      "gloss": "爸爸 · d → cons-d"
+    },
+    {
+      "word": "ladder",
+      "gloss": "梯子 · dd → cons-d"
+    },
+    {
+      "word": "middle",
+      "gloss": "中间 · dd → cons-d"
+    },
+    {
+      "word": "sudden",
+      "gloss": "突然的 · dd → cons-d"
+    },
+    {
+      "word": "address",
+      "gloss": "地址 · dd → cons-d"
+    },
+    {
+      "word": "played",
+      "gloss": "玩（过去式） · ed → cons-d"
+    },
+    {
+      "word": "opened",
+      "gloss": "打开（过去式） · ed → cons-d"
+    },
+    {
+      "word": "listened",
+      "gloss": "听（过去式） · ed → cons-d"
+    },
+    {
+      "word": "cleaned",
+      "gloss": "打扫（过去式） · ed → cons-d"
+    },
+    {
+      "word": "moved",
+      "gloss": "移动（过去式） · ed → cons-d"
+    },
+    {
+      "word": "bigger",
+      "gloss": "更大的 · gg → cons-g"
+    },
+    {
+      "word": "luggage",
+      "gloss": "行李 · gg → cons-g"
+    },
+    {
+      "word": "beggar",
+      "gloss": "乞丐 · gg → cons-g"
+    },
+    {
+      "word": "ghost",
+      "gloss": "鬼 · gh → cons-g"
+    },
+    {
+      "word": "spaghetti",
+      "gloss": "意大利面 · gh → cons-g"
+    },
+    {
+      "word": "van",
+      "gloss": "货车 · v → cons-v"
+    },
+    {
+      "word": "very",
+      "gloss": "非常 · v → cons-v"
+    },
+    {
+      "word": "river",
+      "gloss": "河 · v → cons-v"
+    },
+    {
+      "word": "give",
+      "gloss": "给 · ve → cons-v"
+    },
+    {
+      "word": "live",
+      "gloss": "居住 · ve → cons-v"
+    },
+    {
+      "word": "have",
+      "gloss": "有 · ve → cons-v"
+    },
+    {
+      "word": "save",
+      "gloss": "拯救 · ve → cons-v"
+    },
+    {
+      "word": "zip",
+      "gloss": "拉链 · z → cons-z"
+    },
+    {
+      "word": "zero",
+      "gloss": "零 · z → cons-z"
+    },
+    {
+      "word": "zebra",
+      "gloss": "斑马 · z → cons-z"
+    },
+    {
+      "word": "lazy",
+      "gloss": "懒的 · z → cons-z"
+    },
+    {
+      "word": "is",
+      "gloss": "是 · s → cons-z"
+    },
+    {
+      "word": "has",
+      "gloss": "有（三单） · s → cons-z"
+    },
+    {
+      "word": "easy",
+      "gloss": "容易的 · s → cons-z"
+    },
+    {
+      "word": "music",
+      "gloss": "音乐 · s → cons-z"
+    },
+    {
+      "word": "buzz",
+      "gloss": "嗡嗡叫 · zz → cons-z"
+    },
+    {
+      "word": "jazz",
+      "gloss": "爵士乐 · zz → cons-z"
+    },
+    {
+      "word": "dizzy",
+      "gloss": "头晕的 · zz → cons-z"
+    },
+    {
+      "word": "puzzle",
+      "gloss": "拼图 · zz → cons-z"
+    },
+    {
+      "word": "cheese",
+      "gloss": "奶酪 · se → cons-z"
+    },
+    {
+      "word": "please",
+      "gloss": "请 · se → cons-z"
+    },
+    {
+      "word": "vision",
+      "gloss": "视觉 · si → cons-zh"
+    },
+    {
+      "word": "decision",
+      "gloss": "决定 · si → cons-zh"
+    },
+    {
+      "word": "television",
+      "gloss": "电视 · si → cons-zh"
+    },
+    {
+      "word": "division",
+      "gloss": "分开 · si → cons-zh"
+    },
+    {
+      "word": "measure",
+      "gloss": "测量 · su → cons-zh"
+    },
+    {
+      "word": "pleasure",
+      "gloss": "愉快 · su → cons-zh"
+    },
+    {
+      "word": "treasure",
+      "gloss": "宝藏 · su → cons-zh"
+    },
+    {
+      "word": "usual",
+      "gloss": "通常的 · su → cons-zh"
+    },
+    {
+      "word": "beige",
+      "gloss": "米色 · ge → cons-zh"
+    },
+    {
+      "word": "garage",
+      "gloss": "车库 · ge → cons-zh"
+    },
+    {
+      "word": "massage",
+      "gloss": "按摩 · ge → cons-zh"
+    },
+    {
+      "word": "jam",
+      "gloss": "果酱 · j → cons-j"
+    },
+    {
+      "word": "jump",
+      "gloss": "跳 · j → cons-j"
+    },
+    {
+      "word": "jacket",
+      "gloss": "夹克 · j → cons-j"
+    },
+    {
+      "word": "joke",
+      "gloss": "玩笑 · j → cons-j"
+    },
+    {
+      "word": "giant",
+      "gloss": "巨人 · g → cons-j"
+    },
+    {
+      "word": "magic",
+      "gloss": "魔法 · g → cons-j"
+    },
+    {
+      "word": "gentle",
+      "gloss": "温柔的 · g → cons-j"
+    },
+    {
+      "word": "danger",
+      "gloss": "危险 · g → cons-j"
+    },
+    {
+      "word": "bridge",
+      "gloss": "桥 · dge → cons-j"
+    },
+    {
+      "word": "judge",
+      "gloss": "法官 · dge → cons-j"
+    },
+    {
+      "word": "edge",
+      "gloss": "边缘 · dge → cons-j"
+    },
+    {
+      "word": "fridge",
+      "gloss": "冰箱 · dge → cons-j"
+    },
+    {
+      "word": "badge",
+      "gloss": "徽章 · dge → cons-j"
+    },
+    {
+      "word": "age",
+      "gloss": "年龄 · ge → cons-j"
+    },
+    {
+      "word": "page",
+      "gloss": "页 · ge → cons-j"
+    },
+    {
+      "word": "large",
+      "gloss": "大的 · ge → cons-j"
+    },
+    {
+      "word": "huge",
+      "gloss": "巨大的 · ge → cons-j"
+    },
+    {
+      "word": "change",
+      "gloss": "改变 · ge → cons-j"
+    },
+    {
+      "word": "this",
+      "gloss": "这个 · th → cons-dh"
+    },
+    {
+      "word": "mother",
+      "gloss": "母亲 · th → cons-dh"
+    },
+    {
+      "word": "breathe",
+      "gloss": "呼吸 · th → cons-dh"
+    },
+    {
+      "word": "man",
+      "gloss": "男人 · m → cons-m"
+    },
+    {
+      "word": "summer",
+      "gloss": "夏天 · mm → cons-m"
+    },
+    {
+      "word": "hammer",
+      "gloss": "锤子 · mm → cons-m"
+    },
+    {
+      "word": "comment",
+      "gloss": "评论 · mm → cons-m"
+    },
+    {
+      "word": "swimming",
+      "gloss": "游泳 · mm → cons-m"
+    },
+    {
+      "word": "lamb",
+      "gloss": "小羊 · mb → cons-m"
+    },
+    {
+      "word": "climb",
+      "gloss": "爬 · mb → cons-m"
+    },
+    {
+      "word": "comb",
+      "gloss": "梳子 · mb → cons-m"
+    },
+    {
+      "word": "thumb",
+      "gloss": "拇指 · mb → cons-m"
+    },
+    {
+      "word": "net",
+      "gloss": "网 · n → cons-n"
+    },
+    {
+      "word": "nine",
+      "gloss": "九 · n → cons-n"
+    },
+    {
+      "word": "dinner",
+      "gloss": "晚餐 · nn → cons-n"
+    },
+    {
+      "word": "funny",
+      "gloss": "有趣的 · nn → cons-n"
+    },
+    {
+      "word": "sunny",
+      "gloss": "晴朗的 · nn → cons-n"
+    },
+    {
+      "word": "running",
+      "gloss": "跑步 · nn → cons-n"
+    },
+    {
+      "word": "know",
+      "gloss": "知道 · kn → cons-n"
+    },
+    {
+      "word": "knee",
+      "gloss": "膝盖 · kn → cons-n"
+    },
+    {
+      "word": "knife",
+      "gloss": "刀 · kn → cons-n"
+    },
+    {
+      "word": "knock",
+      "gloss": "敲 · kn → cons-n"
+    },
+    {
+      "word": "sign",
+      "gloss": "标志 · gn → cons-n"
+    },
+    {
+      "word": "design",
+      "gloss": "设计 · gn → cons-n"
+    },
+    {
+      "word": "foreign",
+      "gloss": "外国的 · gn → cons-n"
+    },
+    {
+      "word": "campaign",
+      "gloss": "运动；活动 · gn → cons-n"
+    },
+    {
+      "word": "sing",
+      "gloss": "唱歌 · ng → cons-ng"
+    },
+    {
+      "word": "long",
+      "gloss": "长的 · ng → cons-ng"
+    },
+    {
+      "word": "ring",
+      "gloss": "戒指 · ng → cons-ng"
+    },
+    {
+      "word": "going",
+      "gloss": "去 · ng → cons-ng"
+    },
+    {
+      "word": "bank",
+      "gloss": "银行 · n → cons-ng"
+    },
+    {
+      "word": "pink",
+      "gloss": "粉色的 · n → cons-ng"
+    },
+    {
+      "word": "uncle",
+      "gloss": "叔叔 · n → cons-ng"
+    },
+    {
+      "word": "leg",
+      "gloss": "腿 · l → cons-l"
+    },
+    {
+      "word": "bell",
+      "gloss": "铃 · ll → cons-l"
+    },
+    {
+      "word": "yellow",
+      "gloss": "黄色的 · ll → cons-l"
+    },
+    {
+      "word": "run",
+      "gloss": "跑 · r → cons-r"
+    },
+    {
+      "word": "carry",
+      "gloss": "携带 · rr → cons-r"
+    },
+    {
+      "word": "sorry",
+      "gloss": "抱歉的 · rr → cons-r"
+    },
+    {
+      "word": "hurry",
+      "gloss": "匆忙 · rr → cons-r"
+    },
+    {
+      "word": "marry",
+      "gloss": "结婚 · rr → cons-r"
+    },
+    {
+      "word": "wrong",
+      "gloss": "错误的 · wr → cons-r"
+    },
+    {
+      "word": "wrist",
+      "gloss": "手腕 · wr → cons-r"
+    },
+    {
+      "word": "wrap",
+      "gloss": "包裹 · wr → cons-r"
+    },
+    {
+      "word": "wet",
+      "gloss": "湿的 · w → cons-w"
+    },
+    {
+      "word": "win",
+      "gloss": "赢 · w → cons-w"
+    },
+    {
+      "word": "week",
+      "gloss": "星期 · w → cons-w"
+    },
+    {
+      "word": "when",
+      "gloss": "什么时候 · wh → cons-w"
+    },
+    {
+      "word": "wheel",
+      "gloss": "轮子 · wh → cons-w"
+    },
+    {
+      "word": "white",
+      "gloss": "白色的 · wh → cons-w"
+    },
+    {
+      "word": "which",
+      "gloss": "哪一个 · wh → cons-w"
+    },
+    {
+      "word": "yes",
+      "gloss": "是的 · y → cons-y"
+    },
+    {
+      "word": "you",
+      "gloss": "你 · y → cons-y"
+    },
+    {
+      "word": "use",
+      "gloss": "使用 · u → cons-y"
+    },
+    {
+      "word": "cute",
+      "gloss": "可爱的 · u → cons-y"
+    },
+    {
+      "word": "human",
+      "gloss": "人类 · u → cons-y"
+    },
+    {
+      "word": "onion",
+      "gloss": "洋葱 · i → cons-y"
+    },
+    {
+      "word": "million",
+      "gloss": "百万 · i → cons-y"
+    },
+    {
+      "word": "senior",
+      "gloss": "年长的 · i → cons-y"
+    },
+    {
+      "word": "companion",
+      "gloss": "同伴 · i → cons-y"
+    },
+    {
+      "word": "dream",
+      "gloss": "梦 · dr → cons-dr"
+    },
+    {
+      "word": "dress",
+      "gloss": "连衣裙 · dr → cons-dr"
+    },
+    {
+      "word": "drum",
+      "gloss": "鼓 · dr → cons-dr"
+    },
+    {
+      "word": "children",
+      "gloss": "孩子们 · dr → cons-dr"
+    },
+    {
+      "word": "beds",
+      "gloss": "床（复数） · ds → cons-dz"
+    },
+    {
+      "word": "hands",
+      "gloss": "手（复数） · ds → cons-dz"
+    },
+    {
+      "word": "needs",
+      "gloss": "需要（三单） · ds → cons-dz"
+    },
+    {
+      "word": "friends",
+      "gloss": "朋友（复数） · ds → cons-dz"
+    },
+    {
+      "word": "words",
+      "gloss": "单词（复数） · ds → cons-dz"
+    },
+    {
+      "word": "rides",
+      "gloss": "骑（三单） · des → cons-dz"
+    },
+    {
+      "word": "grades",
+      "gloss": "年级（复数） · des → cons-dz"
+    },
+    {
+      "word": "decides",
+      "gloss": "决定（三单） · des → cons-dz"
+    }
+  ]
+}
