@@ -34,6 +34,7 @@ class EpisodeWordCard {
     this.startMs,
     this.endMs,
     this.tags = const <String>[],
+    this.audioUrl,
   });
 
   final String id;
@@ -52,6 +53,41 @@ class EpisodeWordCard {
   final int? startMs;
   final int? endMs;
   final List<String> tags;
+
+  /// Public lexicon pronunciation URL when available.
+  final String? audioUrl;
+
+  bool get hasLexiconAudio =>
+      audioUrl != null && audioUrl!.trim().isNotEmpty;
+
+  EpisodeWordCard copyWith({
+    bool? favorited,
+    String? source,
+    String? meaningCn,
+    String? phonetic,
+    String? partOfSpeech,
+    String? exampleEn,
+    String? exampleCn,
+    String? audioUrl,
+  }) {
+    return EpisodeWordCard(
+      id: id,
+      text: text,
+      kind: kind,
+      favorited: favorited ?? this.favorited,
+      source: source ?? this.source,
+      meaningCn: meaningCn ?? this.meaningCn,
+      phonetic: phonetic ?? this.phonetic,
+      partOfSpeech: partOfSpeech ?? this.partOfSpeech,
+      exampleEn: exampleEn ?? this.exampleEn,
+      exampleCn: exampleCn ?? this.exampleCn,
+      time: time,
+      startMs: startMs,
+      endMs: endMs,
+      tags: tags,
+      audioUrl: audioUrl ?? this.audioUrl,
+    );
+  }
 }
 
 /// Builds a Shadow Talk–like episode vocabulary deck.
@@ -189,31 +225,6 @@ List<EpisodeWordCard> buildEpisodeWordCards({
     return a.text.toLowerCase().compareTo(b.text.toLowerCase());
   });
   return result;
-}
-
-extension on EpisodeWordCard {
-  EpisodeWordCard copyWith({
-    bool? favorited,
-    String? source,
-    String? meaningCn,
-  }) {
-    return EpisodeWordCard(
-      id: id,
-      text: text,
-      kind: kind,
-      favorited: favorited ?? this.favorited,
-      source: source ?? this.source,
-      meaningCn: meaningCn ?? this.meaningCn,
-      phonetic: phonetic,
-      partOfSpeech: partOfSpeech,
-      exampleEn: exampleEn,
-      exampleCn: exampleCn,
-      time: time,
-      startMs: startMs,
-      endMs: endMs,
-      tags: tags,
-    );
-  }
 }
 
 EpisodeCardKind _kindForText(String raw) {

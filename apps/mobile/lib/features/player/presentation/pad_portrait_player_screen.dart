@@ -3448,7 +3448,7 @@ Future<void> _settleChineseFillIfAlreadyPresent() async {
             _handleFavoriteWord(card.text);
           },
           onSpeak: (EpisodeWordCard card) {
-            unawaited(_speakWordCard(card.text));
+            unawaited(_speakWordCard(card));
           },
         );
     }
@@ -3499,9 +3499,25 @@ Future<void> _settleChineseFillIfAlreadyPresent() async {
     }
   }
 
-  Future<void> _speakWordCard(String text) async {
+  Future<void> _speakWordCard(EpisodeWordCard card) async {
     try {
-      await ref.read(wordPronunciationServiceProvider).speak(text);
+      final String text = card.text.trim();
+      if (text.isEmpty) return;
+      String? recorded = card.audioUrl?.trim();
+      if (recorded == null || recorded.isEmpty) {
+        final LearningSettingsState settings =
+            ref.read(learningSettingsProvider);
+        final entry = await ref
+            .read(wordLookupServiceProvider)
+            .publicLookup
+            ?.call(text, settings);
+        recorded = entry?.audioUrl;
+      }
+      await ref.read(wordPronunciationServiceProvider).speak(
+            text,
+            recordedUrl: recorded,
+            allowSynthesisFallback: true,
+          );
     } on WordPronunciationException catch (error) {
       if (mounted) _showMessage(error.message);
     }

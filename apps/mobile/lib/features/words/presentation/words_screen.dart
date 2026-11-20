@@ -14,6 +14,7 @@ import '../../daily_review/domain/review_week_stats.dart';
 import '../../daily_review/presentation/daily_review_provider.dart';
 import '../../daily_review/presentation/fsrs_word_status.dart';
 import '../../navigation/presentation/navigation_destination.dart';
+import '../../shared/presentation/lexicon_pronounce_button.dart';
 import '../../shared/presentation/pad/app_design_tokens.dart';
 import '../../shared/presentation/pad/pad_scaffold.dart';
 import '../../shared/presentation/pad/pad_top_bar.dart';
@@ -963,6 +964,20 @@ class _WordCard extends ConsumerWidget {
                         ],
                       ],
                     ),
+                    if ((entry.phonetic ?? '').trim().isNotEmpty) ...<Widget>[
+                      const SizedBox(height: 2),
+                      Text(
+                        entry.phonetic!.trim(),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontSize: 12,
+                          height: 1.2,
+                          color: AppDesignTokens.textSecondary,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
                     const SizedBox(height: 2),
                     Text(
                       translation,
@@ -1025,6 +1040,10 @@ class _WordCard extends ConsumerWidget {
                     ),
                   ],
                 ),
+              ),
+              LexiconPronounceButton(
+                word: entry.word,
+                color: AppDesignTokens.textPrimary,
               ),
               IconButton(
                 tooltip: entry.favorite ? '取消收藏' : '收藏单词',

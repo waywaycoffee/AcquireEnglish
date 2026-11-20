@@ -3,6 +3,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../../router/app_router.dart';
+import '../../../settings/presentation/settings_provider.dart';
+import '../../../shared/data/word_lookup_service.dart';
+import '../../../shared/domain/word_lookup_entry.dart';
 import '../../../words/data/offline_word_dictionary.dart';
 import '../../domain/episode_word_cards.dart';
 import 'study_shell_tokens.dart';
@@ -66,38 +69,46 @@ class _StudyWordCardsTabState extends ConsumerState<StudyWordCardsTab> {
       final OfflineWordDictionary dictionary = ref.read(
         offlineWordDictionaryProvider,
       );
+      final LearningSettingsState settings = ref.read(learningSettingsProvider);
+      final WordLookupService lookup = ref.read(wordLookupServiceProvider);
       final List<EpisodeWordCard> next = <EpisodeWordCard>[];
       for (final EpisodeWordCard card in source) {
-        if (card.kind != EpisodeCardKind.word ||
-            (card.meaningCn != null && card.meaningCn!.trim().isNotEmpty)) {
-          next.add(card);
-          continue;
+        EpisodeWordCard enriched = card;
+        if (card.kind == EpisodeCardKind.word &&
+            (card.meaningCn == null || card.meaningCn!.trim().isEmpty)) {
+          final OfflineWordDefinition? def = await dictionary.lookup(card.text);
+          if (def != null) {
+            enriched = enriched.copyWith(
+              meaningCn: def.translation,
+              phonetic: def.phonetic.isEmpty ? null : def.phonetic,
+              partOfSpeech: def.partOfSpeech.isEmpty ? null : def.partOfSpeech,
+            );
+          }
         }
-        final OfflineWordDefinition? def = await dictionary.lookup(card.text);
-        if (def == null) {
-          next.add(card);
-          continue;
+        if (card.kind == EpisodeCardKind.word && !enriched.hasLexiconAudio) {
+          try {
+            final WordLookupEntry? public = await lookup.publicLookup?.call(
+              card.text,
+              settings,
+            );
+            if (public != null) {
+              enriched = enriched.copyWith(
+                audioUrl: public.audioUrl,
+                phonetic: (enriched.phonetic == null ||
+                        enriched.phonetic!.trim().isEmpty)
+                    ? (public.phonetic.isEmpty ? null : public.phonetic)
+                    : null,
+                meaningCn: (enriched.meaningCn == null ||
+                        enriched.meaningCn!.trim().isEmpty)
+                    ? (public.definitionCn.isEmpty
+                          ? null
+                          : public.definitionCn)
+                    : null,
+              );
+            }
+          } catch (_) {}
         }
-        next.add(
-          EpisodeWordCard(
-            id: card.id,
-            text: card.text,
-            kind: card.kind,
-            favorited: card.favorited,
-            source: card.source,
-            meaningCn: def.translation,
-            phonetic: def.phonetic.isEmpty ? card.phonetic : def.phonetic,
-            partOfSpeech: def.partOfSpeech.isEmpty
-                ? card.partOfSpeech
-                : def.partOfSpeech,
-            exampleEn: card.exampleEn,
-            exampleCn: card.exampleCn,
-            time: card.time,
-            startMs: card.startMs,
-            endMs: card.endMs,
-            tags: card.tags,
-          ),
-        );
+        next.add(enriched);
       }
       if (!mounted || _enrichKey != captureKey) return;
       setState(() => _enriched = next);
@@ -336,17 +347,28 @@ class _WordCardTile extends StatelessWidget {
                         ],
                       ],
                     ),
-                    if (card.phonetic != null && card.phonetic!.isNotEmpty) ...<
-                      Widget
-                    >[
+                    if ((card.phonetic != null && card.phonetic!.isNotEmpty) ||
+                        card.hasLexiconAudio) ...<Widget>[
                       const SizedBox(height: 4),
-                      Text(
-                        card.phonetic!,
-                        style: TextStyle(
-                          color: colors.textMuted,
-                          fontSize: 12,
-                          fontWeight: FontWeight.w600,
-                        ),
+                      Row(
+                        children: <Widget>[
+                          if (card.phonetic != null &&
+                              card.phonetic!.isNotEmpty)
+                            Flexible(
+                              child: Text(
+                                card.phonetic!,
+                                style: TextStyle(
+                                  color: colors.textMuted,
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ),
+                          if (card.hasLexiconAudio) ...<Widget>[
+                            const SizedBox(width: 6),
+                            _Tag(label: '词库发音', colors: colors, accent: true),
+                          ],
+                        ],
                       ),
                     ],
                     if (card.meaningCn != null &&

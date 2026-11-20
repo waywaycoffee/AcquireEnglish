@@ -320,7 +320,11 @@ class _WordLookupPopupCardState extends ConsumerState<WordLookupPopupCard> {
                 ),
               ),
             IconButton(
-              tooltip: _isPronouncing ? '播放中...' : '播放发音',
+              tooltip: _isPronouncing
+                  ? '播放中...'
+                  : ((_entry?.audioUrl ?? '').trim().isNotEmpty
+                        ? '词库发音'
+                        : '播放发音'),
               onPressed: _isPronouncing
                   ? null
                   : () => _handlePronounce(_entry?.word ?? widget.rawWord),
@@ -332,12 +336,17 @@ class _WordLookupPopupCardState extends ConsumerState<WordLookupPopupCard> {
               style: IconButton.styleFrom(
                 backgroundColor: _isPronouncing
                     ? const Color(0xFFEAF5E5)
-                    : null,
+                    : ((_entry?.audioUrl ?? '').trim().isNotEmpty
+                          ? const Color(0xFFEAF5E5)
+                          : null),
               ),
               icon: Icon(
                 _isPronouncing
                     ? Icons.graphic_eq_rounded
-                    : Icons.volume_up_outlined,
+                    : Icons.volume_up_rounded,
+                color: (_entry?.audioUrl ?? '').trim().isNotEmpty
+                    ? AppDesignTokens.brandGreenDark
+                    : null,
               ),
             ),
             IconButton(
