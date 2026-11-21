@@ -25,6 +25,7 @@ import '../../words/presentation/learned_vocabulary_provider.dart';
 import '../../words/presentation/word_book_provider.dart';
 import '../data/reading_continuous_tts.dart';
 import '../data/reading_gloss.dart';
+import '../data/reading_tts.dart';
 import '../data/reading_vocab_lists.dart';
 import '../domain/reading_doc.dart';
 import '../domain/reading_study_mode.dart';
@@ -62,6 +63,7 @@ class _ReadingReaderScreenState extends ConsumerState<ReadingReaderScreen> {
   bool _continuousPlaying = false;
   bool _slowMode = false;
   bool _soeEnabled = false;
+  ReadingTtsGender _ttsGender = ReadingTtsGender.female;
   int? _highlightWordIndex;
   int _continuousGeneration = 0;
   Timer? _highlightTimer;
@@ -94,6 +96,7 @@ class _ReadingReaderScreenState extends ConsumerState<ReadingReaderScreen> {
     _sentenceTranslate = prefs.get(kReadingSentenceTranslateKey) == '1';
     _slowMode = prefs.get(kReadingSlowModeKey) == '1';
     _soeEnabled = prefs.get(kReadingSoeEnabledKey) == '1';
+    _ttsGender = ReadingTtsGenderX.fromStorage(prefs.get(kReadingTtsGenderKey));
     final int? thr = int.tryParse(prefs.get(kReadingFreqThresholdKey) ?? '');
     if (thr != null && kReadingFreqThresholdBands.contains(thr)) {
       _freqThreshold = thr;
@@ -120,6 +123,32 @@ class _ReadingReaderScreenState extends ConsumerState<ReadingReaderScreen> {
     await prefs.put(kReadingFreqThresholdKey, '$_freqThreshold');
     await prefs.put(kReadingSlowModeKey, _slowMode ? '1' : '0');
     await prefs.put(kReadingSoeEnabledKey, _soeEnabled ? '1' : '0');
+    await prefs.put(kReadingTtsGenderKey, _ttsGender.storageValue);
+  }
+
+  Future<void> _speakReading(
+    String text, {
+    double? rate,
+  }) {
+    return speakReadingText(
+      ref,
+      text,
+      rate: rate ?? _effectiveRate,
+      gender: _ttsGender,
+    );
+  }
+
+  Future<void> _toggleTtsGender() async {
+    setState(() {
+      _ttsGender = _ttsGender == ReadingTtsGender.female
+          ? ReadingTtsGender.male
+          : ReadingTtsGender.female;
+    });
+    await saveReadingTtsGender(_ttsGender);
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('朗读音色：${_ttsGender.labelCn}（阿里云）')),
+    );
   }
 
   double get _effectiveRate {
@@ -171,10 +200,7 @@ class _ReadingReaderScreenState extends ConsumerState<ReadingReaderScreen> {
             () => _highlightWordIndex = unit.firstWordIndex + local,
           );
         });
-        await ref.read(wordPronunciationServiceProvider).speak(
-              unit.text,
-              rate: rate,
-            );
+        await _speakReading(unit.text, rate: rate);
         _highlightTimer?.cancel();
         if (!mounted || generation != _continuousGeneration) return;
       }
@@ -376,10 +402,10 @@ class _ReadingReaderScreenState extends ConsumerState<ReadingReaderScreen> {
                     TextButton.icon(
                       onPressed: () {
                         unawaited(
-                          ref.read(wordPronunciationServiceProvider).speak(
-                                lexeme,
-                                rate: (_effectiveRate * 0.7).clamp(0.5, 1.0),
-                              ),
+                          _speakReading(
+                            lexeme,
+                            rate: (_effectiveRate * 0.7).clamp(0.5, 1.0),
+                          ),
                         );
                       },
                       icon: const Icon(Icons.slow_motion_video_rounded),
@@ -432,12 +458,7 @@ class _ReadingReaderScreenState extends ConsumerState<ReadingReaderScreen> {
                   maxHeight: maxH,
                   onClose: () => Navigator.pop(ctx),
                   onPronounce: () {
-                    unawaited(
-                      ref.read(wordPronunciationServiceProvider).speak(
-                            lexeme,
-                            rate: _effectiveRate,
-                          ),
-                    );
+                    unawaited(_speakReading(lexeme));
                   },
                   onFavorite: (String? definitionCn) {
                     final bool ok =
@@ -501,10 +522,7 @@ class _ReadingReaderScreenState extends ConsumerState<ReadingReaderScreen> {
       if (!mounted) return;
       setState(() => _speakingSentence = true);
       try {
-        await ref.read(wordPronunciationServiceProvider).speak(
-              sentence,
-              rate: _effectiveRate,
-            );
+        await _speakReading(sentence);
       } finally {
         if (mounted) setState(() => _speakingSentence = false);
       }
@@ -549,9 +567,7 @@ class _ReadingReaderScreenState extends ConsumerState<ReadingReaderScreen> {
                     : () async {
                         setState(() => _speakingSentence = true);
                         try {
-                          await ref
-                              .read(wordPronunciationServiceProvider)
-                              .speak(sentence, rate: _effectiveRate);
+                          await _speakReading(sentence);
                         } finally {
                           if (mounted) {
                             setState(() => _speakingSentence = false);
@@ -766,10 +782,20 @@ class _ReadingReaderScreenState extends ConsumerState<ReadingReaderScreen> {
       topBar: PadTopBar(
         title: doc.title,
         description: _mode == ReadingStudyMode.immersion
-            ? '沉浸 · 连续朗读 · 长按整句${_slowMode ? ' · 慢读' : ''}$rateLabel'
-            : '精读 · 难词中文(>$_freqThreshold)${_slowMode ? ' · 慢读' : ''}$rateLabel',
+            ? '沉浸 · ${_ttsGender.labelCn} · 连续朗读${_slowMode ? ' · 慢读' : ''}$rateLabel'
+            : '精读 · ${_ttsGender.labelCn} · 难词(>$_freqThreshold)${_slowMode ? ' · 慢读' : ''}$rateLabel',
         leading: PadBackButton(onPressed: () => context.pop()),
         actions: <Widget>[
+          IconButton(
+            tooltip: '切换为${_ttsGender == ReadingTtsGender.female ? '男声' : '女声'}',
+            onPressed: () => unawaited(_toggleTtsGender()),
+            icon: Icon(
+              _ttsGender == ReadingTtsGender.female
+                  ? Icons.woman_rounded
+                  : Icons.man_rounded,
+              color: AppDesignTokens.brandGreenDark,
+            ),
+          ),
           IconButton(
             tooltip: _continuousPlaying ? '停止朗读' : '连续朗读',
             onPressed: () => unawaited(_playContinuous(doc)),
@@ -805,6 +831,12 @@ class _ReadingReaderScreenState extends ConsumerState<ReadingReaderScreen> {
             tooltip: '更多',
             onSelected: (String value) {
               switch (value) {
+                case 'voice_female':
+                  setState(() => _ttsGender = ReadingTtsGender.female);
+                  unawaited(saveReadingTtsGender(_ttsGender));
+                case 'voice_male':
+                  setState(() => _ttsGender = ReadingTtsGender.male);
+                  unawaited(saveReadingTtsGender(_ttsGender));
                 case 'slow':
                   setState(() => _slowMode = !_slowMode);
                   unawaited(_persistPrefs());
@@ -833,6 +865,23 @@ class _ReadingReaderScreenState extends ConsumerState<ReadingReaderScreen> {
               }
             },
             itemBuilder: (BuildContext context) => <PopupMenuEntry<String>>[
+              PopupMenuItem<String>(
+                value: 'voice_female',
+                child: Text(
+                  _ttsGender == ReadingTtsGender.female
+                      ? '女声（当前 · 阿里云）'
+                      : '女声（阿里云）',
+                ),
+              ),
+              PopupMenuItem<String>(
+                value: 'voice_male',
+                child: Text(
+                  _ttsGender == ReadingTtsGender.male
+                      ? '男声（当前 · 阿里云）'
+                      : '男声（阿里云）',
+                ),
+              ),
+              const PopupMenuDivider(),
               PopupMenuItem<String>(
                 value: 'slow',
                 child: Text(_slowMode ? '关闭慢读' : '慢读模式'),
