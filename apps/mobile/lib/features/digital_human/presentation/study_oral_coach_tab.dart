@@ -21,7 +21,6 @@ import '../../settings/presentation/settings_provider.dart';
 import '../../sync/data/acquire_api_client.dart';
 import '../../sync/data/user_assets_service.dart';
 import '../../words/presentation/word_book_provider.dart';
-import '../../words/presentation/word_book_provider.dart';
 import '../data/digital_human_catalog.dart';
 import '../data/livetalking_client.dart';
 import '../data/oral_coach_pipeline_client.dart';
