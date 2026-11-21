@@ -2399,11 +2399,61 @@ class AcquireApiClient {
     required int postId,
     required String event,
   }) async {
-    await _dio.post(
-      '${Endpoints.communityPosts}/$postId/challenge-event',
-      data: <String, dynamic>{'event': event},
+    // Cafe challenge counters retired (API returns 410).
+    try {
+      await _dio.post(
+        '${Endpoints.communityPosts}/$postId/challenge-event',
+        data: <String, dynamic>{'event': event},
+        options: _noCache,
+      );
+    } on DioException catch (e) {
+      if (e.response?.statusCode == 410) return;
+      rethrow;
+    }
+  }
+
+  Future<List<Map<String, dynamic>>> listCommunityPacks({
+    String? cefr,
+    String? topic,
+    bool mine = false,
+  }) async {
+    final Response<dynamic> response = await _dio.get(
+      Endpoints.communityPacks,
+      queryParameters: <String, dynamic>{
+        if (cefr != null && cefr.isNotEmpty) 'cefr': cefr,
+        if (topic != null && topic.isNotEmpty) 'topic': topic,
+        if (mine) 'mine': true,
+      },
       options: _noCache,
     );
+    return (response.data as List<dynamic>).cast<Map<String, dynamic>>();
+  }
+
+  Future<Map<String, dynamic>> createCommunityPack(
+    Map<String, dynamic> body,
+  ) async {
+    final Response<dynamic> response = await _dio.post(
+      Endpoints.communityPacks,
+      data: body,
+      options: _noCache,
+    );
+    return response.data as Map<String, dynamic>;
+  }
+
+  Future<Map<String, dynamic>> forkCommunityPack(
+    int packId, {
+    bool syncUpstream = false,
+    String? title,
+  }) async {
+    final Response<dynamic> response = await _dio.post(
+      '${Endpoints.communityPacks}/$packId/fork',
+      data: <String, dynamic>{
+        'sync_upstream': syncUpstream,
+        if (title != null && title.isNotEmpty) 'title': title,
+      },
+      options: _noCache,
+    );
+    return response.data as Map<String, dynamic>;
   }
 
   Future<Map<String, dynamic>> studyDeskRequest(String method, String path, {Map<String, dynamic>? data, Map<String, dynamic>? query}) async {

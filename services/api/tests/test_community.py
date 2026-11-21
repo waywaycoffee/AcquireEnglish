@@ -279,3 +279,87 @@ async def test_learning_result_challenge_is_visible_to_another_user():
         )
         assert method.status_code == 201, method.text
         assert method.json()["link_url"] == path
+
+        http_ok = await client.post(
+            "/api/community/posts",
+            headers=author,
+            json={
+                "kind": "imitation",
+                "body": "仿写一句 Could I get a latte?",
+                "link_url": "https://www.bilibili.com/video/BV1xx411c7mD",
+            },
+        )
+        assert http_ok.status_code == 201, http_ok.text
+        assert http_ok.json()["kind"] == "imitation"
+
+        gone = await client.post(
+            f"/api/community/posts/{result.json()['id']}/challenge-event",
+            headers=author,
+            json={"event": "open"},
+        )
+        assert gone.status_code == 410
+
+
+@pytest.mark.asyncio
+async def test_guest_feed_hot_and_material_pack_fork():
+    transport = ASGITransport(app=fastapi_app)
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
+        author = await _login(client, "13900003391")
+        created = await client.post(
+            "/api/community/posts",
+            headers=author,
+            json={
+                "kind": "shadowing",
+                "title": "跟读一段新闻",
+                "body": "注意弱读",
+            },
+        )
+        assert created.status_code == 201, created.text
+
+        guest_feed = await client.get("/api/community/feed")
+        assert guest_feed.status_code == 200, guest_feed.text
+        assert any(row["id"] == created.json()["id"] for row in guest_feed.json())
+
+        guest_hot = await client.get("/api/community/hot-shares")
+        assert guest_hot.status_code == 200, guest_hot.text
+
+        pack = await client.post(
+            "/api/community/packs",
+            headers=author,
+            json={
+                "title": "咖啡店精听包",
+                "description": "含词表元信息",
+                "source_url": "https://www.bilibili.com/video/BV1xx411c7mD",
+                "cefr": "A2",
+                "topic": "daily",
+                "has_subtitles": True,
+                "has_vocab": True,
+                "visibility": "public",
+            },
+        )
+        assert pack.status_code == 201, pack.text
+        pack_id = pack.json()["id"]
+
+        guest_packs = await client.get("/api/community/packs")
+        assert guest_packs.status_code == 200
+        assert any(row["id"] == pack_id for row in guest_packs.json())
+
+        forker = await _login(client, "13900003392")
+        fork = await client.post(
+            f"/api/community/packs/{pack_id}/fork",
+            headers=forker,
+            json={"sync_upstream": True},
+        )
+        assert fork.status_code == 201, fork.text
+        assert fork.json()["forked_from_id"] == pack_id
+        assert fork.json()["sync_upstream"] is True
+
+        synced = await client.post(
+            f"/api/community/packs/{fork.json()['id']}/sync-upstream",
+            headers=forker,
+        )
+        assert synced.status_code == 200, synced.text
+
+        me = await client.get("/api/community/me", headers=author)
+        assert me.status_code == 200
+        assert me.json()["credit_score"] >= 5

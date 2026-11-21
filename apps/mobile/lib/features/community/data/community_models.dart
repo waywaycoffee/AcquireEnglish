@@ -5,6 +5,7 @@ class CommunityProfileDto {
     required this.showOnLeaderboard,
     required this.vocabCount,
     this.englishLevel,
+    this.creditScore = 0,
   });
 
   factory CommunityProfileDto.fromJson(Map<String, dynamic> json) =>
@@ -14,6 +15,7 @@ class CommunityProfileDto {
         showOnLeaderboard: json['show_on_leaderboard'] != false,
         englishLevel: json['english_level'] as String?,
         vocabCount: (json['vocab_count'] as num?)?.toInt() ?? 0,
+        creditScore: (json['credit_score'] as num?)?.toInt() ?? 0,
       );
 
   final String bio;
@@ -21,6 +23,7 @@ class CommunityProfileDto {
   final bool showOnLeaderboard;
   final String? englishLevel;
   final int vocabCount;
+  final int creditScore;
 }
 
 class CommunityPostDto {

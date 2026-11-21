@@ -7,7 +7,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy import select, delete, update, func, or_
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.database import get_db
-from app.deps import get_current_user
+from app.deps import get_current_user, get_current_user_optional
 from app.config import settings
 from app.models import (CommunityFollow, CommunityBookmark, CommunityNotice, CommunityReport,
                         CommunityPost, DeskBlock, DeskMember, User, CommunityNoticePreference)
@@ -28,14 +28,25 @@ async def visible_post(db, uid, post_id):
     return post
 
 
-async def post_guard(request: Request, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+async def post_guard(
+    request: Request,
+    user: User | None = Depends(get_current_user_optional),
+    db: AsyncSession = Depends(get_db),
+):
+    """Allow anonymous browse of public routes; enforce post visibility when post_id present."""
     pid = request.path_params.get('post_id')
-    if pid is not None:
-        try:
-            post_id = int(pid)
-        except ValueError:
-            raise HTTPException(404, '帖子不存在')
-        await visible_post(db, user.id, post_id)
+    if pid is None:
+        return
+    try:
+        post_id = int(pid)
+    except ValueError:
+        raise HTTPException(404, '帖子不存在')
+    if user is None:
+        post = await db.get(CommunityPost, post_id)
+        if post is None or post.status != 'visible':
+            raise HTTPException(404, '帖子不存在或不可访问')
+        return
+    await visible_post(db, user.id, post_id)
 
 
 async def notice(db, recipient, actor, event, text, post_id=None):

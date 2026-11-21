@@ -16,11 +16,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import settings
 from app.database import get_db
-from app.deps import get_current_user
+from app.deps import get_current_user, get_current_user_optional
 from app.followed_creators import parse_followed_creators
 from app.models import (
     ChallengePostStat,
     CommunityComment,
+    CommunityMaterialPack,
     CommunityPost,
     CommunityPostLike,
     CommunityProfile,
@@ -38,7 +39,17 @@ from app.services.community_classify import classify_share_text, extract_bvid
 
 router = APIRouter(prefix="/community", tags=["community"], dependencies=[Depends(post_guard)])
 
-PostKind = Literal["team_invite", "share_bilibili", "feedback", "learning_result", "method", "question"]
+PostKind = Literal[
+    "team_invite",
+    "share_bilibili",
+    "feedback",
+    "learning_result",
+    "method",
+    "question",
+    "imitation",
+    "shadowing",
+    "sentence_make",
+]
 LeaderboardMetric = Literal["study_today", "study_week", "vocab"]
 PkStatus = Literal["pending", "completed", "declined"]
 
@@ -47,6 +58,23 @@ _LEGACY_KIND = {
     "share_link": "share_bilibili",
     "podcast_placeholder": "feedback",
 }
+_OUTPUT_KINDS = {
+    "learning_result",
+    "method",
+    "question",
+    "imitation",
+    "shadowing",
+    "sentence_make",
+}
+_OUTPUT_DEFAULT_TITLE = {
+    "learning_result": "学习成果",
+    "method": "学习方法",
+    "question": "学习问答",
+    "imitation": "句子仿写",
+    "shadowing": "跟读投稿",
+    "sentence_make": "选词造句",
+}
+_CAFE_LEGACY_PATHS = {f"/community/explore/cafe/{stage}" for stage in range(1, 5)}
 
 
 def _normalize_kind(kind: str) -> str:
@@ -104,12 +132,75 @@ async def _vocab_count(db: AsyncSession, user_id: int) -> int:
     )
 
 
+async def _credit_score(db: AsyncSession, user_id: int) -> int:
+    """Public credit shell: likes on posts + forks of owned material packs."""
+    likes = int(
+        (
+            await db.execute(
+                select(func.coalesce(func.sum(CommunityPost.like_count), 0)).where(
+                    CommunityPost.user_id == user_id,
+                    CommunityPost.status == "visible",
+                )
+            )
+        ).scalar()
+        or 0
+    )
+    forks = int(
+        (
+            await db.execute(
+                select(func.coalesce(func.sum(CommunityMaterialPack.fork_count), 0)).where(
+                    CommunityMaterialPack.owner_id == user_id,
+                    CommunityMaterialPack.status == "visible",
+                )
+            )
+        ).scalar()
+        or 0
+    )
+    return likes + forks * 5
+
+
+def _profile_out(profile: CommunityProfile, *, vocab_count: int, credit_score: int) -> CommunityProfileOut:
+    return CommunityProfileOut(
+        bio=profile.bio or "",
+        looking_for_partner=bool(profile.looking_for_partner),
+        show_on_leaderboard=bool(profile.show_on_leaderboard),
+        english_level=profile.english_level,
+        vocab_count=vocab_count,
+        credit_score=credit_score,
+    )
+
+
+def _attach_output_link(raw: str | None) -> str | None:
+    """Accept legacy cafe paths or http(s) learning links; reject garbage."""
+    if not raw:
+        return None
+    text = raw.strip()
+    if not text:
+        return None
+    if text in _CAFE_LEGACY_PATHS:
+        return text
+    parsed = urlparse(text)
+    if parsed.scheme not in {"http", "https"}:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="link_url 须为 http(s) 链接或合法素材引用",
+        )
+    host = parsed.netloc.split("@")[-1].split(":")[0]
+    if _host_is_youtube(host):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="因政策原因，暂时不支持分享 YouTube 视频，请改用 B 站链接",
+        )
+    return text
+
+
 class CommunityProfileOut(BaseModel):
     bio: str = ""
     looking_for_partner: bool = False
     show_on_leaderboard: bool = True
     english_level: str | None = None
     vocab_count: int = 0
+    credit_score: int = 0
 
 
 class CommunityProfileUpdate(BaseModel):
@@ -352,12 +443,10 @@ async def get_my_profile(
 ) -> CommunityProfileOut:
     profile = await _ensure_profile(db, user)
     await db.commit()
-    return CommunityProfileOut(
-        bio=profile.bio or "",
-        looking_for_partner=bool(profile.looking_for_partner),
-        show_on_leaderboard=bool(profile.show_on_leaderboard),
-        english_level=profile.english_level,
+    return _profile_out(
+        profile,
         vocab_count=await _vocab_count(db, user.id),
+        credit_score=await _credit_score(db, user.id),
     )
 
 
@@ -385,12 +474,10 @@ async def update_my_profile(
             pref.level = profile.english_level
     await db.commit()
     await db.refresh(profile)
-    return CommunityProfileOut(
-        bio=profile.bio or "",
-        looking_for_partner=bool(profile.looking_for_partner),
-        show_on_leaderboard=bool(profile.show_on_leaderboard),
-        english_level=profile.english_level,
+    return _profile_out(
+        profile,
         vocab_count=await _vocab_count(db, user.id),
+        credit_score=await _credit_score(db, user.id),
     )
 
 
@@ -402,11 +489,17 @@ async def community_feed(
     bookmarked: bool = False,
     limit: int = Query(default=40, ge=1, le=100),
     db: AsyncSession = Depends(get_db),
-    user: User = Depends(get_current_user),
+    user: User | None = Depends(get_current_user_optional),
 ) -> list[CommunityPostOut]:
+    if (following or bookmarked) and user is None:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Not authenticated")
+
+    filters = [CommunityPost.status == "visible"]
+    if user is not None:
+        filters.append(CommunityPost.user_id.not_in(blocked_ids(user.id)))
     stmt: Select[tuple[CommunityPost]] = (
         select(CommunityPost)
-        .where(CommunityPost.status == "visible", CommunityPost.user_id.not_in(blocked_ids(user.id)))
+        .where(*filters)
         .order_by(CommunityPost.id.desc())
         .limit(limit)
     )
@@ -414,9 +507,11 @@ async def community_feed(
         stmt = stmt.where(CommunityPost.id < before)
     if following:
         from app.models import CommunityFollow
+        assert user is not None
         stmt = stmt.where(CommunityPost.user_id.in_(select(CommunityFollow.target_id).where(CommunityFollow.user_id == user.id)))
     if bookmarked:
         from app.models import CommunityBookmark
+        assert user is not None
         stmt = stmt.where(CommunityPost.id.in_(select(CommunityBookmark.post_id).where(CommunityBookmark.user_id == user.id)))
     if kind is not None:
         stmt = stmt.where(CommunityPost.kind == kind)
@@ -439,17 +534,19 @@ async def community_feed(
             )
         ).scalars().all()
     }
-    liked_ids = {
-        row.post_id
-        for row in (
-            await db.execute(
-                select(CommunityPostLike).where(
-                    CommunityPostLike.user_id == user.id,
-                    CommunityPostLike.post_id.in_([p.id for p in posts]),
+    liked_ids: set[int] = set()
+    if user is not None:
+        liked_ids = {
+            row.post_id
+            for row in (
+                await db.execute(
+                    select(CommunityPostLike).where(
+                        CommunityPostLike.user_id == user.id,
+                        CommunityPostLike.post_id.in_([p.id for p in posts]),
+                    )
                 )
-            )
-        ).scalars().all()
-    }
+            ).scalars().all()
+        }
     avatar_rows = (await db.execute(select(UserAvatarLoadout).where(UserAvatarLoadout.user_id.in_(author_ids)))).scalars().all()
     post_ids = [p.id for p in posts]
     stats = {
@@ -500,22 +597,12 @@ async def challenge_event(
     db: AsyncSession = Depends(get_db),
     user: User = Depends(get_current_user),
 ) -> dict:
-    post = await db.get(CommunityPost, post_id)
-    if post is None or post.status != "visible":
-        raise HTTPException(404, "帖子不存在")
-    if not _is_challenge_post(post):
-        raise HTTPException(400, "该帖未关联可开练关卡")
-    row = await db.get(ChallengePostStat, post_id)
-    if row is None:
-        row = ChallengePostStat(post_id=post_id, opens=0, completes=0)
-        db.add(row)
-        await db.flush()
-    if payload.event == "open":
-        row.opens = int(row.opens or 0) + 1
-    else:
-        row.completes = int(row.completes or 0) + 1
-    await db.commit()
-    return {"post_id": post_id, "opens": row.opens, "completes": row.completes}
+    """Deprecated: cafe adventure / challenge counters are retired."""
+    _ = (post_id, payload, db, user)
+    raise HTTPException(
+        status_code=status.HTTP_410_GONE,
+        detail="探索关卡已下线，请改用练习成果帖或素材包",
+    )
 
 
 @router.post("/posts", response_model=CommunityPostOut, status_code=201)
@@ -582,21 +669,11 @@ async def create_post(
             )
         if not title:
             title = "功能吐槽"
-    elif kind in {"learning_result", "method", "question"}:
+    elif kind in _OUTPUT_KINDS:
         if not title and not body:
             raise HTTPException(status_code=400, detail="请填写标题或内容")
-        title = title or {
-            "learning_result": "学习成果",
-            "method": "学习方法",
-            "question": "学习问答",
-        }[kind]
-        if payload.link_url:
-            challenge_paths = {
-                f"/community/explore/cafe/{stage}" for stage in range(1, 5)
-            }
-            if payload.link_url not in challenge_paths:
-                raise HTTPException(status_code=400, detail="无法识别探索地图关卡")
-            link_url = payload.link_url
+        title = title or _OUTPUT_DEFAULT_TITLE[kind]
+        link_url = _attach_output_link(payload.link_url)
     else:
         raise HTTPException(status_code=400, detail="unsupported post kind")
 
@@ -926,7 +1003,7 @@ async def similar_users(
 async def hot_shares(
     limit: int = Query(default=20, ge=1, le=50),
     db: AsyncSession = Depends(get_db),
-    user: User = Depends(get_current_user),
+    user: User | None = Depends(get_current_user_optional),
 ) -> list[HotShareOut]:
     _ = user
     posts = (
@@ -973,7 +1050,7 @@ async def hot_shares(
 async def hot_creators(
     limit: int = Query(default=20, ge=1, le=50),
     db: AsyncSession = Depends(get_db),
-    user: User = Depends(get_current_user),
+    user: User | None = Depends(get_current_user_optional),
 ) -> list[HotCreatorOut]:
     _ = user
     prefs = (await db.execute(select(UserPreference))).scalars().all()

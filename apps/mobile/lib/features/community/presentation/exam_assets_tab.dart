@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../../authentication/presentation/auth_session.dart';
 import '../../exam/domain/exam_profile.dart';
 import '../../exam/domain/exam_registry.dart';
 import '../../exam/presentation/exam_profile_provider.dart';
@@ -38,6 +39,15 @@ class _ExamAssetsTabState extends ConsumerState<ExamAssetsTab> {
   }
 
   Future<void> _refresh() async {
+    if (!ref.read(authSessionProvider).isLoggedIn) {
+      if (!mounted) return;
+      setState(() {
+        _items = const <ExamAssetDto>[];
+        _loading = false;
+        _error = null;
+      });
+      return;
+    }
     setState(() {
       _loading = true;
       _error = null;

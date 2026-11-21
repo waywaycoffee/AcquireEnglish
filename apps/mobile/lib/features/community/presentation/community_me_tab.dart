@@ -5,8 +5,10 @@ import '../../avatar/presentation/avatar_preview.dart';
 import '../../avatar/presentation/avatar_provider.dart';
 import '../../avatar/presentation/avatar_shop_screen.dart';
 import '../../shared/presentation/pad/app_design_tokens.dart';
+import '../data/community_models.dart';
 import 'adventure_ui.dart';
 import 'community_leaderboard_tab.dart';
+import 'community_provider.dart';
 import 'community_social_screen.dart';
 import 'study_play_screen.dart';
 
@@ -19,6 +21,9 @@ class CommunityMeTab extends ConsumerWidget {
     final Map<String, String> loadout =
         ref.watch(avatarMeProvider).asData?.value.loadout ??
             const <String, String>{'body': 'body.cartoon1'};
+    final CommunityProfileDto? profile =
+        ref.watch(communityPeopleProvider).asData?.value.profile;
+    final int credit = profile?.creditScore ?? 0;
 
     return ListView(
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 32),
@@ -55,6 +60,24 @@ class CommunityMeTab extends ConsumerWidget {
                         color: AppDesignTokens.textSecondary,
                       ),
                     ),
+                    const SizedBox(height: 10),
+                    Text(
+                      '信用分 $credit',
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w800,
+                        color: AppDesignTokens.brandGreen,
+                      ),
+                    ),
+                    Text(
+                      '来自被赞成果与素材 fork，不是打卡段位',
+                      style: TextStyle(
+                        fontSize: 11,
+                        height: 1.4,
+                        fontWeight: FontWeight.w600,
+                        color: AppDesignTokens.textSecondary,
+                      ),
+                    ),
                     const SizedBox(height: 12),
                     FilledButton.tonal(
                       onPressed: () => Navigator.of(context).push<void>(
@@ -86,8 +109,8 @@ class CommunityMeTab extends ConsumerWidget {
         ),
         const SizedBox(height: 12),
         QuestFeedCard(
-          title: '一起练 · 积分与装扮',
-          meta: '温和信用：用贡献换装扮，不做打卡段位',
+          title: '积分与装扮',
+          meta: '用贡献换装扮；信用分公开可见',
           badge: '资产',
           accent: AppDesignTokens.brandGreen,
           showPlayChevron: false,
@@ -100,14 +123,14 @@ class CommunityMeTab extends ConsumerWidget {
         ),
         const SizedBox(height: 12),
         QuestFeedCard(
-          title: '作品集（预告）',
-          meta: '短文、跟读录音、优质点评将汇总到这里',
-          badge: '即将开放',
+          title: '作品集',
+          meta: '仿写、跟读、造句投稿汇总（持续完善）',
+          badge: '练习',
           accent: AdventurePalette.pathAmber,
           showPlayChevron: false,
           onPlay: () {
             ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('作品集将在仿写 / 跟读投稿上线后开放')),
+              const SnackBar(content: Text('可在「练习」发仿写 / 跟读 / 造句，汇总页稍后完善')),
             );
           },
         ),

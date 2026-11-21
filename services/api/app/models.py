@@ -864,6 +864,48 @@ class ChallengePostStat(Base):
     completes: Mapped[int] = mapped_column(Integer, default=0)
 
 
+class CommunityMaterialPack(Base):
+    """Shareable learning material pack (metadata + fork; no video bytes)."""
+
+    __tablename__ = "community_material_packs"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    owner_id: Mapped[int] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), index=True
+    )
+    title: Mapped[str] = mapped_column(String(200), default="")
+    description: Mapped[str] = mapped_column(Text, default="")
+    source_url: Mapped[str | None] = mapped_column(String(1024), nullable=True)
+    source_title: Mapped[str | None] = mapped_column(String(512), nullable=True)
+    bvid: Mapped[str | None] = mapped_column(String(32), nullable=True, index=True)
+    cefr: Mapped[str | None] = mapped_column(String(8), nullable=True, index=True)
+    accent: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    topic: Mapped[str | None] = mapped_column(String(64), nullable=True, index=True)
+    duration_sec: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    has_subtitles: Mapped[int] = mapped_column(Integer, default=0)
+    has_vocab: Mapped[int] = mapped_column(Integer, default=0)
+    # public | friends | private
+    visibility: Mapped[str] = mapped_column(String(16), default="public", index=True)
+    forked_from_id: Mapped[int | None] = mapped_column(
+        ForeignKey("community_material_packs.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
+    # User opted in to pull upstream updates (default off).
+    sync_upstream: Mapped[int] = mapped_column(Integer, default=0)
+    fork_count: Mapped[int] = mapped_column(Integer, default=0)
+    bookmark_count: Mapped[int] = mapped_column(Integer, default=0)
+    meta_json: Mapped[str] = mapped_column(Text, default="{}")
+    # visible | hidden | deleted
+    status: Mapped[str] = mapped_column(String(16), default="visible", index=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
+
+
 class DeskBattle(Base):
     __tablename__ = "desk_battles"
     id: Mapped[int] = mapped_column(Integer, primary_key=True)

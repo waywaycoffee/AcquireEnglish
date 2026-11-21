@@ -56,21 +56,16 @@ class CommunityFeedNotifier extends AsyncNotifier<List<CommunityPostDto>> {
 
   @override
   Future<List<CommunityPostDto>> build() async {
-    if (!ref.watch(authSessionProvider).isLoggedIn) {
-      return const <CommunityPostDto>[];
-    }
+    ref.watch(authSessionProvider.select((AuthSessionState s) => s.isLoggedIn));
     return ref.read(acquireApiClientProvider).communityFeed();
   }
 
   Future<void> refresh() async {
     hasMore = true;
     state = const AsyncLoading<List<CommunityPostDto>>();
-    state = await AsyncValue.guard(() async {
-      if (!ref.read(authSessionProvider).isLoggedIn) {
-        return const <CommunityPostDto>[];
-      }
-      return ref.read(acquireApiClientProvider).communityFeed();
-    });
+    state = await AsyncValue.guard(
+      () => ref.read(acquireApiClientProvider).communityFeed(),
+    );
   }
 
   Future<CommunityPostDto?> createPost({
@@ -259,12 +254,7 @@ class CommunityHotBundle {
 class CommunityHotNotifier extends AsyncNotifier<CommunityHotBundle> {
   @override
   Future<CommunityHotBundle> build() async {
-    if (!ref.watch(authSessionProvider).isLoggedIn) {
-      return const CommunityHotBundle(
-        shares: <HotShareDto>[],
-        creators: <HotCreatorDto>[],
-      );
-    }
+    ref.watch(authSessionProvider.select((AuthSessionState s) => s.isLoggedIn));
     final AcquireApiClient api = ref.read(acquireApiClientProvider);
     return CommunityHotBundle(
       shares: await api.communityHotShares(),

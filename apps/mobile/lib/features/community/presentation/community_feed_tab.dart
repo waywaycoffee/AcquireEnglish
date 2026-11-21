@@ -164,9 +164,27 @@ class CommunityFeedTab extends ConsumerWidget {
               for (final (String id, String title, String meta, Color accent)
                   in <(String, String, String, Color)>[
                 (
+                  'imitation',
+                  '句子仿写',
+                  '基于素材原句仿写，求用词点评',
+                  AdventurePalette.pathAmber,
+                ),
+                (
+                  'shadowing',
+                  '跟读投稿',
+                  '一句 / 一段，求重音与连读反馈',
+                  const Color(0xFF5B8DEF),
+                ),
+                (
+                  'sentence_make',
+                  '选词造句',
+                  '用复习词造句，可绑 FSRS',
+                  const Color(0xFF8E44AD),
+                ),
+                (
                   'learning_result',
                   '分享学习成果',
-                  '跟读 / 仿写 / 精听收获',
+                  '精听 / 模考等通用成果卡',
                   AdventurePalette.pathAmber,
                 ),
                 (
@@ -239,6 +257,12 @@ class CommunityPostCard extends ConsumerWidget {
         return '反馈';
       case 'learning_result':
         return '学习成果';
+      case 'imitation':
+        return '仿写';
+      case 'shadowing':
+        return '跟读';
+      case 'sentence_make':
+        return '造句';
       case 'method':
         return '学习方法';
       case 'question':
@@ -517,14 +541,20 @@ class _ComposeSheetState extends ConsumerState<_ComposeSheet> {
         return '组队邀请';
       case 'share_bilibili':
         return '分享你喜欢的 B 站视频';
+      case 'imitation':
+        return '句子仿写';
+      case 'shadowing':
+        return '跟读投稿';
+      case 'sentence_make':
+        return '选词造句';
+      case 'learning_result':
+        return '分享学习成果';
+      case 'method':
+        return '分享学习方法';
+      case 'question':
+        return '提出学习问题';
       default:
-        return widget.kind == 'learning_result'
-            ? '分享学习成果'
-            : widget.kind == 'method'
-            ? '分享学习方法'
-            : widget.kind == 'question'
-            ? '提出学习问题'
-            : '反馈软件功能';
+        return '反馈软件功能';
     }
   }
 
@@ -570,6 +600,31 @@ class _ComposeSheetState extends ConsumerState<_ComposeSheet> {
         return;
       }
     }
+    final bool outputKind = const <String>{
+      'learning_result',
+      'imitation',
+      'shadowing',
+      'sentence_make',
+      'method',
+      'question',
+    }.contains(widget.kind);
+    final String optionalLink = _link.text.trim();
+    if (outputKind && optionalLink.isNotEmpty) {
+      if (_isYoutubeUrl(optionalLink)) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('因政策原因，暂时不支持分享 YouTube 视频，请改用 B 站链接')),
+        );
+        return;
+      }
+      final Uri? uri = Uri.tryParse(optionalLink);
+      if (uri == null ||
+          (uri.scheme != 'http' && uri.scheme != 'https')) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('素材链接须为 http(s)')),
+        );
+        return;
+      }
+    }
     setState(() => _busy = true);
     try {
       await ref
@@ -580,7 +635,7 @@ class _ComposeSheetState extends ConsumerState<_ComposeSheet> {
             body: _body.text.trim(),
             linkUrl: widget.kind == 'share_bilibili'
                 ? _link.text.trim()
-                : null,
+                : (outputKind && optionalLink.isNotEmpty ? optionalLink : null),
             linkTitle: widget.kind == 'share_bilibili'
                 ? _title.text.trim()
                 : null,
@@ -641,6 +696,23 @@ class _ComposeSheetState extends ConsumerState<_ComposeSheet> {
                 decoration: const InputDecoration(
                   labelText: 'B 站视频链接',
                   hintText: 'https://www.bilibili.com/video/… 或 b23.tv/…',
+                  border: OutlineInputBorder(),
+                ),
+              ),
+            ] else if (const <String>{
+              'learning_result',
+              'imitation',
+              'shadowing',
+              'sentence_make',
+              'method',
+              'question',
+            }.contains(widget.kind)) ...<Widget>[
+              const SizedBox(height: 10),
+              TextField(
+                controller: _link,
+                decoration: const InputDecoration(
+                  labelText: '素材链接（可选）',
+                  hintText: 'https://…',
                   border: OutlineInputBorder(),
                 ),
               ),

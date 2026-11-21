@@ -62,13 +62,16 @@ class _CommunityScreenState extends ConsumerState<CommunityScreen> {
       const CommunityFeedTab(
         kinds: <String>{
           'learning_result',
+          'imitation',
+          'shadowing',
+          'sentence_make',
           'method',
           'team_invite',
           'share_bilibili',
           'feedback',
         },
         emptyTitle: '发一条练习成果',
-        emptyMeta: '仿写、跟读、模考成果都会出现在这里',
+        emptyMeta: '仿写、跟读、造句成果都会出现在这里',
         emptyHint: '练习区承接输出与反馈；真题资料请看「考试」。',
       ),
       const CommunityFeedTab(
@@ -85,7 +88,7 @@ class _CommunityScreenState extends ConsumerState<CommunityScreen> {
       showContinueLearning: false,
       topBar: PadTopBar(
         title: '学习社区',
-        description: '真题共享 · 素材协作 · 输出互评',
+        description: '素材可 fork · 输出可互评 · 拒绝打卡灌水',
         actions: <Widget>[
           IconButton(
             tooltip: '同桌学习桌',
@@ -105,7 +108,7 @@ class _CommunityScreenState extends ConsumerState<CommunityScreen> {
           ),
           IconButton(
             tooltip: '刷新',
-            onPressed: loggedIn ? () => unawaited(_refreshAll()) : null,
+            onPressed: () => unawaited(_refreshAll()),
             icon: const Icon(Icons.refresh_rounded),
           ),
         ],
@@ -142,15 +145,16 @@ class _CommunityScreenState extends ConsumerState<CommunityScreen> {
           ),
           const SizedBox(height: 8),
           Expanded(
-            child: loggedIn
-                ? IndexedStack(index: _tab, children: pages)
-                : ListView(
+            child: (!loggedIn && (_tab == 0 || _tab == 4))
+                ? ListView(
                     padding: const EdgeInsets.all(24),
                     children: <Widget>[
                       HubSurface(
                         child: Text(
-                          '登录后可浏览与上传考试真题资料（音频、脚本、词表），'
-                          '以及同桌学习、练习互评与问答。',
+                          _tab == 0
+                              ? '登录后可浏览与上传考试真题资料（音频、脚本、词表）。'
+                              : '登录后可管理形象、信用分、收藏与同桌学习。'
+                              '公开素材与练习流无需登录即可浏览。',
                           style: TextStyle(
                             fontSize: 14,
                             height: 1.5,
@@ -160,7 +164,8 @@ class _CommunityScreenState extends ConsumerState<CommunityScreen> {
                         ),
                       ),
                     ],
-                  ),
+                  )
+                : IndexedStack(index: _tab, children: pages),
           ),
         ],
       ),

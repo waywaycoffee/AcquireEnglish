@@ -75,7 +75,7 @@ class CommunityHotTab extends ConsumerWidget {
                 ],
               const SizedBox(height: 12),
               const Text(
-                '热门 · 博主关卡源',
+                '热门 · 关注的 UP',
                 style: TextStyle(fontWeight: FontWeight.w900, fontSize: 18),
               ),
               const SizedBox(height: 4),
