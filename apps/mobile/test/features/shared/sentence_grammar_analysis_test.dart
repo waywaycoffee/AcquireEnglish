@@ -1,5 +1,7 @@
 import 'dart:convert';
 
+import 'package:common_learn_english/features/player/presentation/widgets/ai_grammar_analysis_sheet.dart';
+import 'package:common_learn_english/features/settings/data/api_usage_ledger.dart';
 import 'package:common_learn_english/features/settings/presentation/settings_provider.dart';
 import 'package:common_learn_english/features/shared/data/word_lookup_service.dart';
 import 'package:common_learn_english/features/shared/domain/sentence_grammar_analysis.dart';
@@ -7,9 +9,14 @@ import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:common_learn_english/features/player/presentation/widgets/ai_grammar_analysis_sheet.dart';
 
 void main() {
+  test('acquireUsageHeaders tolerates null clientId', () {
+    final Map<String, String> headers = acquireUsageHeaders(module: 'grammar');
+    expect(headers['X-Acquire-Module'], 'grammar');
+    expect(headers['X-Acquire-Client-Id'], 'mobile-app');
+  });
+
   group('analyzeSentenceGrammar', () {
     test('parses JSON grammar analysis from chat completions', () async {
       final LearningSettingsState settings = LearningSettingsState.defaults()
@@ -31,6 +38,9 @@ void main() {
               expect(method, 'POST');
               expect(path, '/chat/completions');
               final Map<String, dynamic> body = data! as Map<String, dynamic>;
+              expect(body['response_format'], <String, String>{
+                'type': 'json_object',
+              });
               final List<Map<String, String>> messages =
                   body['messages'] as List<Map<String, String>>;
               expect(messages.first['role'], 'system');
@@ -104,6 +114,83 @@ void main() {
       expect(analysis.isAvailable, isFalse);
       expect(analysis.errorMessage, contains('设置'));
     });
+
+    test('repairs loose local-model JSON and coerces structureCn arrays', () async {
+      final WordLookupService service = WordLookupService(
+        httpRequestOverride:
+            ({
+              required BaseOptions options,
+              required String method,
+              required String path,
+              Map<String, dynamic>? queryParameters,
+              Object? data,
+            }) async {
+              return Response<dynamic>(
+                requestOptions: RequestOptions(path: path),
+                data: <String, dynamic>{
+                  'choices': <Map<String, dynamic>>[
+                    <String, dynamic>{
+                      'message': <String, dynamic>{
+                        // qwen2.5:3b often emits unquoted keys + array structureCn.
+                        'content': '''
+{
+  "sentence": "The house is quiet.",
+  "translationCn": "房子很安静。",
+  chord: "xiū zuò shì ǎn quán。",
+  "structureCn": [
+    {"title": "主谓结构", "explanation": "主语是 house，谓语是 is quiet"}
+  ],
+  "grammarPoints": [
+    {"title": "be动词", "explanation": "is 用来描述主语状态。"}
+  ],
+  "keyPhrases": [
+    {"phrase": "is quiet", "explanation": "处于安静状态"}
+  ],
+  "paraphraseEn": "The dwelling is silent.",
+  "learningTipCn": "用 be 动词描述状态。"
+}
+''',
+                      },
+                    },
+                  ],
+                },
+              );
+            },
+      );
+
+      final SentenceGrammarAnalysis analysis = await service
+          .analyzeSentenceGrammar(
+            sentence: 'The house is quiet.',
+            settings: LearningSettingsState.defaults(),
+          );
+
+      expect(analysis.isAvailable, isTrue);
+      expect(analysis.translationCn, '房子很安静。');
+      expect(analysis.structureCn, contains('主谓结构'));
+      expect(analysis.grammarPoints, hasLength(1));
+      expect(analysis.keyPhrases.first.phrase, 'is quiet');
+    });
+  });
+
+  test('fromJson coerces structureCn list into readable Chinese text', () {
+    final SentenceGrammarAnalysis analysis = SentenceGrammarAnalysis.fromJson(
+      <String, dynamic>{
+        'sentence': 'The house is quiet.',
+        'translationCn': '房子很安静。',
+        'structureCn': <Map<String, String>>[
+          <String, String>{'title': '主系表', 'explanation': 'house + is + quiet'},
+        ],
+        'grammarPoints': <Object?>['系动词 is'],
+        'keyPhrases': <String>['is quiet'],
+        'paraphraseEn': 'It is quiet in the house.',
+        'learningTipCn': '注意系动词。',
+      },
+      fallbackSentence: 'The house is quiet.',
+      sourceLabel: '本地 Ollama',
+    );
+    expect(analysis.structureCn, contains('主系表'));
+    expect(analysis.grammarPoints.single.title, '系动词 is');
+    expect(analysis.keyPhrases.single.phrase, 'is quiet');
   });
 
   testWidgets('grammar sheet shows loading then analysis sections', (

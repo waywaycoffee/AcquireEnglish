@@ -57,11 +57,11 @@ Map<String, String> acquireUsageHeaders({
   required String module,
   String? clientId,
 }) {
+  final String resolvedClientId = (clientId ?? '').trim();
   return <String, String>{
     'X-Acquire-Module': module,
-    'X-Acquire-Client-Id': (clientId ?? 'mobile-app').trim().isEmpty
-        ? 'mobile-app'
-        : clientId!.trim(),
+    'X-Acquire-Client-Id':
+        resolvedClientId.isEmpty ? 'mobile-app' : resolvedClientId,
   };
 }
 

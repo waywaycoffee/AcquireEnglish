@@ -6,8 +6,10 @@ class SentenceGrammarPoint {
 
   factory SentenceGrammarPoint.fromJson(Map<dynamic, dynamic> json) {
     return SentenceGrammarPoint(
-      title: (json['title'] as String? ?? '').trim(),
-      explanation: (json['explanation'] as String? ?? '').trim(),
+      title: _asPlainText(json['title'] ?? json['name'] ?? json['point']),
+      explanation: _asPlainText(
+        json['explanation'] ?? json['detail'] ?? json['desc'],
+      ),
     );
   }
 
@@ -28,8 +30,10 @@ class SentenceGrammarPhrase {
 
   factory SentenceGrammarPhrase.fromJson(Map<dynamic, dynamic> json) {
     return SentenceGrammarPhrase(
-      phrase: (json['phrase'] as String? ?? '').trim(),
-      explanation: (json['explanation'] as String? ?? '').trim(),
+      phrase: _asPlainText(json['phrase'] ?? json['text'] ?? json['title']),
+      explanation: _asPlainText(
+        json['explanation'] ?? json['detail'] ?? json['desc'],
+      ),
     );
   }
 
@@ -60,32 +64,32 @@ class SentenceGrammarAnalysis {
     required String fallbackSentence,
     String sourceLabel = 'API',
   }) {
-    final List<dynamic> pointsRaw =
-        json['grammarPoints'] as List<dynamic>? ?? const <dynamic>[];
-    final List<dynamic> phrasesRaw =
-        json['keyPhrases'] as List<dynamic>? ?? const <dynamic>[];
+    final Object? pointsRaw =
+        json['grammarPoints'] ??
+        json['grammar_points'] ??
+        json['points'] ??
+        json['grammarPoints/keyPhrases'];
+    final Object? phrasesRaw =
+        json['keyPhrases'] ?? json['key_phrases'] ?? json['phrases'];
     return SentenceGrammarAnalysis(
-      sentence: (json['sentence'] as String? ?? fallbackSentence).trim(),
-      translationCn: (json['translationCn'] as String? ?? '').trim(),
-      structureCn: (json['structureCn'] as String? ?? '').trim(),
-      grammarPoints: pointsRaw
-          .whereType<Map<dynamic, dynamic>>()
-          .map(SentenceGrammarPoint.fromJson)
-          .where(
-            (SentenceGrammarPoint point) =>
-                point.title.isNotEmpty || point.explanation.isNotEmpty,
-          )
-          .toList(growable: false),
-      keyPhrases: phrasesRaw
-          .whereType<Map<dynamic, dynamic>>()
-          .map(SentenceGrammarPhrase.fromJson)
-          .where(
-            (SentenceGrammarPhrase phrase) =>
-                phrase.phrase.isNotEmpty || phrase.explanation.isNotEmpty,
-          )
-          .toList(growable: false),
-      paraphraseEn: (json['paraphraseEn'] as String? ?? '').trim(),
-      learningTipCn: (json['learningTipCn'] as String? ?? '').trim(),
+      sentence: _asPlainText(
+        json['sentence'] ?? json['text'] ?? fallbackSentence,
+        fallback: fallbackSentence,
+      ),
+      translationCn: _asPlainText(
+        json['translationCn'] ?? json['translation'] ?? json['zh'],
+      ),
+      structureCn: _asStructureText(
+        json['structureCn'] ?? json['structure'] ?? json['structure_cn'],
+      ),
+      grammarPoints: _parseGrammarPoints(pointsRaw),
+      keyPhrases: _parseKeyPhrases(phrasesRaw),
+      paraphraseEn: _asPlainText(
+        json['paraphraseEn'] ?? json['paraphrase'] ?? json['rewriteEn'],
+      ),
+      learningTipCn: _asPlainText(
+        json['learningTipCn'] ?? json['tip'] ?? json['learningTip'],
+      ),
       sourceLabel: sourceLabel,
     );
   }
@@ -134,4 +138,133 @@ class SentenceGrammarAnalysis {
         'sourceLabel': sourceLabel,
         'errorMessage': errorMessage,
       };
+}
+
+String _asPlainText(Object? value, {String fallback = ''}) {
+  if (value == null) {
+    return fallback;
+  }
+  if (value is String) {
+    final String trimmed = value.trim();
+    return trimmed.isEmpty ? fallback : trimmed;
+  }
+  if (value is num || value is bool) {
+    return '$value';
+  }
+  if (value is List) {
+    final String joined = value
+        .map((Object? item) => _asPlainText(item))
+        .where((String item) => item.isNotEmpty)
+        .join('；');
+    return joined.isEmpty ? fallback : joined;
+  }
+  if (value is Map) {
+    return _asStructureText(value);
+  }
+  final String text = '$value'.trim();
+  return text.isEmpty ? fallback : text;
+}
+
+String _asStructureText(Object? value) {
+  if (value == null) {
+    return '';
+  }
+  if (value is String) {
+    return value.trim();
+  }
+  if (value is List) {
+    return value
+        .map((Object? item) {
+          if (item is Map) {
+            final String title = _asPlainText(
+              item['title'] ?? item['name'] ?? item['part'],
+            );
+            final String explanation = _asPlainText(
+              item['explanation'] ?? item['detail'] ?? item['desc'],
+            );
+            if (title.isEmpty) {
+              return explanation;
+            }
+            if (explanation.isEmpty) {
+              return title;
+            }
+            return '$title：$explanation';
+          }
+          return _asPlainText(item);
+        })
+        .where((String item) => item.isNotEmpty)
+        .join('；');
+  }
+  if (value is Map) {
+    final String title = _asPlainText(
+      value['title'] ?? value['name'] ?? value['pattern'],
+    );
+    final String explanation = _asPlainText(
+      value['explanation'] ?? value['detail'] ?? value['desc'],
+    );
+    if (title.isEmpty) {
+      return explanation;
+    }
+    if (explanation.isEmpty) {
+      return title;
+    }
+    return '$title：$explanation';
+  }
+  return '$value'.trim();
+}
+
+List<SentenceGrammarPoint> _parseGrammarPoints(Object? raw) {
+  if (raw is! List) {
+    if (raw is String && raw.trim().isNotEmpty) {
+      return <SentenceGrammarPoint>[
+        SentenceGrammarPoint(title: raw.trim(), explanation: ''),
+      ];
+    }
+    return const <SentenceGrammarPoint>[];
+  }
+  return raw
+      .map((Object? item) {
+        if (item is Map) {
+          return SentenceGrammarPoint.fromJson(item);
+        }
+        final String text = _asPlainText(item);
+        if (text.isEmpty) {
+          return null;
+        }
+        return SentenceGrammarPoint(title: text, explanation: '');
+      })
+      .whereType<SentenceGrammarPoint>()
+      .where(
+        (SentenceGrammarPoint point) =>
+            point.title.isNotEmpty || point.explanation.isNotEmpty,
+      )
+      .toList(growable: false);
+}
+
+List<SentenceGrammarPhrase> _parseKeyPhrases(Object? raw) {
+  if (raw is! List) {
+    if (raw is String && raw.trim().isNotEmpty) {
+      return <SentenceGrammarPhrase>[
+        SentenceGrammarPhrase(phrase: raw.trim(), explanation: ''),
+      ];
+    }
+    return const <SentenceGrammarPhrase>[];
+  }
+  return raw
+      .map((Object? item) {
+        if (item is Map) {
+          return SentenceGrammarPhrase.fromJson(item);
+        }
+        final String text = _asPlainText(item);
+        if (text.isEmpty) {
+          return null;
+        }
+        return SentenceGrammarPhrase(phrase: text, explanation: '');
+      })
+      .whereType<SentenceGrammarPhrase>()
+      .where(
+        (SentenceGrammarPhrase phrase) =>
+            phrase.phrase.isNotEmpty || phrase.explanation.isNotEmpty,
+      )
+      .toList(growable: false);
 }
