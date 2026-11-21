@@ -1,9 +1,9 @@
 ﻿$ErrorActionPreference = 'Continue'
-$env:OLLAMA_MODEL = 'qwen2.5:3b'
+$env:OLLAMA_MODEL = 'qwen2.5:7b'
 $env:OLLAMA_HOST = '0.0.0.0'
 $env:OLLAMA_PORT = '11434'
 $env:OLLAMA_MODEL_DIR = 'D:\AcquireEnglish\deploy\gpu-box-ollama\models'
-$env:MODELSCOPE_MODEL = 'Qwen/Qwen2.5-3B-Instruct'
+$env:MODELSCOPE_MODEL = 'Qwen/Qwen2.5-7B-Instruct'
 Set-Location 'D:\AcquireEnglish\deploy\gpu-box-ollama'
 while ($true) {
   try {

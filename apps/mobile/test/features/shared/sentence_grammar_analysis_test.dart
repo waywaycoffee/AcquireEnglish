@@ -131,7 +131,7 @@ void main() {
                   'choices': <Map<String, dynamic>>[
                     <String, dynamic>{
                       'message': <String, dynamic>{
-                        // qwen2.5:3b often emits unquoted keys + array structureCn.
+                        // qwen2.5:7b often emits unquoted keys + array structureCn.
                         'content': '''
 {
   "sentence": "The house is quiet.",

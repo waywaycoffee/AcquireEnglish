@@ -167,9 +167,8 @@ const Set<String> legacyTailscaleOllamaBaseUrls = <String>{
   'http://192.168.31.121:11434/v1/',
 };
 
-/// Ollama tag currently installed on 5060 Ti (EN↔ZH). Prefer 3b while sharing
-/// VRAM with LiveTalking; pull `qwen2.5:7b` later if quality needs a bump.
-const String defaultOllamaTranslationModel = 'qwen2.5:3b';
+/// Ollama tag currently installed on 5060 Ti (EN↔ZH).
+const String defaultOllamaTranslationModel = 'qwen2.5:7b';
 
 const String _learningSettingsStorageKey = 'learning_settings_v1';
 
@@ -882,13 +881,13 @@ class LearningSettingsNotifier extends Notifier<LearningSettingsState> {
       return settings;
     }
     final String model = settings.translationModel.trim();
-    final bool staleSevenB = model == 'qwen2.5:7b' || model.isEmpty;
+    final bool staleThreeB = model == 'qwen2.5:3b' || model.isEmpty;
     return settings.copyWith(
       translationProvider: ollama.name,
       translationBaseUrl: settings.useCustomTranslationEndpoint
           ? settings.translationBaseUrl
           : ollama.baseUrl,
-      translationModel: alreadyOllama && !staleSevenB
+      translationModel: alreadyOllama && !staleThreeB
           ? settings.translationModel
           : ollama.model,
       translationApiKey: key.isEmpty ? 'ollama' : settings.translationApiKey,
@@ -961,7 +960,6 @@ class LearningSettingsNotifier extends Notifier<LearningSettingsState> {
       availableTranslationModels: isOllama
           ? <String>[
               defaultOllamaTranslationModel,
-              'qwen2.5:7b',
               'qwen3:8b',
               'qwen3:4b',
             ]

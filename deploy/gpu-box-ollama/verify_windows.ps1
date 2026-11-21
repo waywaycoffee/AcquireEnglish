@@ -1,7 +1,7 @@
 ﻿# Verify local OpenAI-compatible qwen2.5:7b on the GPU box / Tailscale.
 param(
   [string]$Base = "http://127.0.0.1:11434",
-  [string]$Model = "qwen2.5:3b"
+  [string]$Model = "qwen2.5:7b"
 )
 
 $ErrorActionPreference = "Stop"

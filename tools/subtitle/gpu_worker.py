@@ -21,7 +21,7 @@ from concurrent.futures import Future, ThreadPoolExecutor
 from pathlib import Path
 
 LLM_BASE = os.environ.get('SUBTITLE_LLM_BASE', 'http://127.0.0.1:11434/v1').rstrip('/')
-LLM_MODEL = os.environ.get('SUBTITLE_LLM_MODEL', 'qwen2.5:3b')
+LLM_MODEL = os.environ.get('SUBTITLE_LLM_MODEL', 'qwen2.5:7b')
 TRANSLATE_BATCH = 12
 _HAN = re.compile(r'[\u4e00-\u9fff]')
 

@@ -684,7 +684,7 @@ class SettingsScreen extends ConsumerWidget {
                     title: '公网本地模型',
                     description:
                         '默认：https://acquireenglish.curlhairai.com/ollama/v1'
-                        '（ECS→GPU 本地 qwen2.5:3b，手机免 Tailscale）。'
+                        '（ECS→GPU 本地 qwen2.5:7b，手机免 Tailscale）。'
                         '部署见 deploy/gpu-box-ollama 与 nginx ollama 片段。',
                   ),
                 _SwitchRow(

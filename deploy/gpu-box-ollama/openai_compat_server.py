@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
-"""OpenAI-compatible /v1 server for local qwen2.5:3b (App「本地 Ollama」).
+"""OpenAI-compatible /v1 server for local qwen2.5:7b (App「本地 Ollama」).
 
 Default: http://0.0.0.0:11434  → Tailscale http://100.115.252.55:11434/v1
 
-Loads Qwen2.5-3B-Instruct via ModelScope + transformers 4-bit (bitsandbytes)
+Loads Qwen2.5-7B-Instruct via ModelScope + transformers 4-bit (bitsandbytes)
 so it shares the 5060 Ti with LiveTalking without needing the Ollama installer.
 """
 
@@ -21,10 +21,10 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
-MODEL_ID = os.environ.get("OLLAMA_MODEL", "qwen2.5:3b")
+MODEL_ID = os.environ.get("OLLAMA_MODEL", "qwen2.5:7b")
 HOST = os.environ.get("OLLAMA_HOST", "0.0.0.0")
 PORT = int(os.environ.get("OLLAMA_PORT", "11434"))
-MS_MODEL = os.environ.get("MODELSCOPE_MODEL", "Qwen/Qwen2.5-3B-Instruct")
+MS_MODEL = os.environ.get("MODELSCOPE_MODEL", "Qwen/Qwen2.5-7B-Instruct")
 CACHE_DIR = Path(
     os.environ.get(
         "OLLAMA_MODEL_DIR",
