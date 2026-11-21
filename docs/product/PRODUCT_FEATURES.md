@@ -1,7 +1,7 @@
 # AcquireEnglish 产品功能说明
 
 > 版本对应仓库主线能力（以代码落地为准）。面向产品、运营与协作说明「用户能做什么」。  
-> 相关专项文档：`MEDIA_ECS.md`、`PREGEN_CACHE.md`、`community-adventure-ui.md`、`home-learning-modules-release.md`。
+> 相关专项文档：`MEDIA_ECS.md`、`PREGEN_CACHE.md`、`community-prd-v2.md`、`home-learning-modules-release.md`。（`community-adventure-ui.md` 已作废）
 
 ---
 

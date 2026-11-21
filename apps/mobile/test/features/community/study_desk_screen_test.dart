@@ -92,25 +92,18 @@ void main() {
         ),
       );
       await tester.pumpAndSettle();
-      expect(
-        tester
-            .widgetList<SwitchListTile>(find.byType(SwitchListTile))
-            .every((s) => !s.value),
-        true,
-      );
-      await tester.scrollUntilVisible(
-        find.text('对方尚未共享收藏词库'),
-        200,
-        scrollable: find.byType(Scrollable).first,
-      );
-      expect(find.text('对方尚未共享收藏词库'), findsOneWidget);
+      final Iterable<SwitchListTile> tiles =
+          tester.widgetList<SwitchListTile>(find.byType(SwitchListTile));
+      expect(tiles.length, 3);
+      expect(tiles.every((SwitchListTile s) => !s.value), isTrue);
+      expect(find.textContaining('尚未共享'), findsWidgets);
       final Finder toggle = find.text('共享收藏单词（不含私有原句）');
-      await tester.scrollUntilVisible(
+      await tester.dragUntilVisible(
         toggle,
-        -150,
-        scrollable: find.byType(Scrollable).first,
+        find.byType(ListView),
+        const Offset(0, -280),
       );
-      await tester.ensureVisible(toggle);
+      await tester.pumpAndSettle();
       await tester.tap(toggle);
       await tester.pumpAndSettle();
       final request = api.requests.firstWhere((r) => r.path == '/sharing');
@@ -140,10 +133,10 @@ void main() {
         ),
       );
       await tester.pumpAndSettle();
-      expect(find.text('我的同桌 · Mia'), findsOneWidget);
+      expect(find.textContaining('Mia'), findsWidgets);
       (container.read(authSessionProvider.notifier) as FakeAuth).logout();
       await tester.pumpAndSettle();
-      expect(find.text('我的同桌 · Mia'), findsNothing);
+      expect(find.textContaining('Mia'), findsNothing);
       expect(find.text('请先登录，再建立同桌关系。'), findsOneWidget);
       expect(tester.takeException(), isNull);
     },

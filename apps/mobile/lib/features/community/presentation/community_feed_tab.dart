@@ -156,7 +156,7 @@ class CommunityFeedTab extends ConsumerWidget {
               const Align(
                 alignment: Alignment.centerLeft,
                 child: Text(
-                  '分享今天的闯关收获',
+                  '分享今天的练习成果',
                   style: TextStyle(fontWeight: FontWeight.w900, fontSize: 17),
                 ),
               ),
@@ -166,7 +166,7 @@ class CommunityFeedTab extends ConsumerWidget {
                 (
                   'learning_result',
                   '分享学习成果',
-                  '通关后邀人练同一关',
+                  '跟读 / 仿写 / 精听收获',
                   AdventurePalette.pathAmber,
                 ),
                 (

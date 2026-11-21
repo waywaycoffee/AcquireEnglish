@@ -30,7 +30,7 @@ class _CommunityPreviewScreenState extends State<CommunityPreviewScreen> {
       author: '林间听风',
       level: 'B1',
       kind: '视频精听',
-      title: '把咖啡店这 3 句话练熟，点单不再卡壳',
+      title: '把点单这 3 句话练熟，开口不再卡壳',
       body: '今天精听了 8 分钟日常对话。Could I get… 比 I want… 更自然。我的方法：盲听 → 看字幕 → 影子跟读三遍。',
       likes: 128,
     ),

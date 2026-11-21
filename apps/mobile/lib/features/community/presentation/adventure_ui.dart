@@ -32,6 +32,7 @@ class AdventureHeroBanner extends StatelessWidget {
     this.nodeLabels,
     this.chapterIndex = 1,
     this.edgeToEdge = false,
+    this.ctaLabel = '继续学习',
   });
 
   final String chapterTitle;
@@ -45,6 +46,7 @@ class AdventureHeroBanner extends StatelessWidget {
   final List<String>? nodeLabels;
   final int chapterIndex;
   final bool edgeToEdge;
+  final String ctaLabel;
 
   @override
   Widget build(BuildContext context) {
@@ -136,7 +138,7 @@ class AdventureHeroBanner extends StatelessWidget {
                   ),
                   SizedBox(height: compact ? 8 : 14),
                   HubChunkyButton(
-                    label: '继续冒险',
+                    label: ctaLabel,
                     icon: Icons.play_arrow_rounded,
                     onPressed: onContinue,
                   ),
@@ -892,7 +894,7 @@ class QuestComposerBar extends StatelessWidget {
                   const SizedBox(width: 8),
                   const Expanded(
                     child: Text(
-                      '分享今天的闯关收获',
+                      '分享今天的练习成果',
                       style: TextStyle(
                         fontWeight: FontWeight.w800,
                         fontSize: 15,
@@ -916,7 +918,7 @@ class QuestFeedCard extends StatelessWidget {
     required this.meta,
     required this.onPlay,
     super.key,
-    this.badge = '可开练',
+    this.badge = '练习',
     this.accent,
     this.authorAvatar = const <String, String>{},
     this.showPlayChevron = true,

@@ -291,6 +291,7 @@ class _StudyDeskScreenState extends ConsumerState<StudyDeskScreen>
                     progressLabel: peer == null ? '尚未配对' : '同桌学习中',
                     nodeCount: 1,
                     clearedCount: peer == null ? 0 : 1,
+                    ctaLabel: '打开考试备考',
                     onContinue: () => context.push('/exam'),
                     partnerLabel: peer == null
                         ? '暂无同桌'
@@ -326,11 +327,6 @@ class _StudyDeskScreenState extends ConsumerState<StudyDeskScreen>
                                       );
                                     }
                                   })),
-                        ),
-                        const SizedBox(height: 12),
-                        HubChunkyButton(
-                          label: '打开考试备考',
-                          onPressed: () => context.push('/exam'),
                         ),
                         const SizedBox(height: 14),
                         Row(
@@ -397,7 +393,7 @@ class _StudyDeskScreenState extends ConsumerState<StudyDeskScreen>
                         if (peer != null) ...<Widget>[
                           const SizedBox(height: 10),
                           Text(
-                            '同桌在线一起练 · 换人不丢你的关卡',
+                            '同桌在线一起练 · 换人不丢个人进度',
                             textAlign: TextAlign.center,
                             style: TextStyle(
                               fontSize: 12,
@@ -412,7 +408,7 @@ class _StudyDeskScreenState extends ConsumerState<StudyDeskScreen>
                             key: ValueKey<String>(
                               'invite-${_inviteExpanded || peer == null}',
                             ),
-                            initiallyExpanded: peer == null || _inviteExpanded,
+                            initiallyExpanded: true,
                             onExpansionChanged: (bool open) {
                               setState(() => _inviteExpanded = open);
                             },
@@ -430,7 +426,7 @@ class _StudyDeskScreenState extends ConsumerState<StudyDeskScreen>
                               ),
                               _card(
                                 peer == null
-                                    ? '同桌加分 · 换人不丢个人关卡'
+                                    ? '邀请同桌 · 双方确认后建立'
                                     : '本周搭子 · ${peer['name']}',
                                 <Widget>[
                                   Row(

@@ -54,7 +54,7 @@ class CommunityPeopleTab extends ConsumerWidget {
                         ),
                         const SizedBox(height: 4),
                         Text(
-                          '一起练咖啡店，互相进步',
+                          '找语伴一起练，互相进步',
                           style: TextStyle(
                             fontSize: 13,
                             fontWeight: FontWeight.w600,
@@ -177,7 +177,7 @@ class CommunityPeopleTab extends ConsumerWidget {
                             '词汇 ${user.vocabCount}',
                             if (user.sharedTags.isNotEmpty)
                               '共同 ${user.sharedTags.take(2).join('、')}',
-                            if (user.lookingForPartner) '想一起练咖啡店',
+                            if (user.lookingForPartner) '想找语伴',
                           ].join(' · '),
                           actionLabel: '邀请同桌',
                           onAction: () =>
