@@ -12,7 +12,7 @@ class ReadingBookCover extends StatelessWidget {
   final String title;
   final String level;
 
-  /// When true, sit on a shelf ledge with a soft ground shadow.
+  /// When true, sit on a shelf ledge as a flat cover tile (board 01).
   final bool standing;
 
   static const List<Color> palette = <Color>[
@@ -35,6 +35,41 @@ class ReadingBookCover extends StatelessWidget {
     final Color color = palette[seed % palette.length];
     final bool lightInk = color.computeLuminance() > 0.55;
     final Color ink = lightInk ? const Color(0xFF3A2A18) : Colors.white;
+
+    if (standing) {
+      return DecoratedBox(
+        decoration: BoxDecoration(
+          color: color,
+          borderRadius: BorderRadius.circular(3),
+          boxShadow: const <BoxShadow>[
+            BoxShadow(
+              color: Color(0x40000000),
+              blurRadius: 8,
+              offset: Offset(2, 3),
+            ),
+          ],
+        ),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(8, 16, 8, 12),
+          child: Center(
+            child: Text(
+              title,
+              maxLines: 4,
+              textAlign: TextAlign.left,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                color: ink,
+                fontFamily: 'Georgia',
+                fontSize: 12,
+                height: 1.2,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+        ),
+      );
+    }
+
     final Color muted = lightInk
         ? const Color(0xFF3A2A18).withValues(alpha: 0.7)
         : Colors.white70;
@@ -45,11 +80,11 @@ class ReadingBookCover extends StatelessWidget {
         decoration: BoxDecoration(
           color: color,
           borderRadius: BorderRadius.circular(3),
-          boxShadow: <BoxShadow>[
+          boxShadow: const <BoxShadow>[
             BoxShadow(
-              color: const Color(0x40000000),
-              blurRadius: standing ? 10 : 8,
-              offset: standing ? const Offset(2, 3) : const Offset(3, 4),
+              color: Color(0x40000000),
+              blurRadius: 8,
+              offset: Offset(3, 4),
             ),
           ],
           gradient: LinearGradient(
@@ -86,7 +121,7 @@ class ReadingBookCover extends StatelessWidget {
                     style: TextStyle(
                       color: ink,
                       fontFamily: 'Georgia',
-                      fontSize: standing ? 13 : 15,
+                      fontSize: 15,
                       height: 1.15,
                       fontWeight: FontWeight.w600,
                     ),

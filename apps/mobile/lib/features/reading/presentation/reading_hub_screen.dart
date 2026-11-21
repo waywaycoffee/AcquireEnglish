@@ -20,8 +20,8 @@ import '../data/reading_ingest.dart';
 import '../data/reading_pdf_import.dart';
 import '../data/reading_vocab_lists.dart';
 import '../domain/reading_doc.dart';
-import 'reading_bookshelf.dart';
 import 'reading_bookshelf_theme.dart';
+import 'reading_bookshelf_view.dart';
 import 'reading_cold_start.dart';
 import 'reading_library_provider.dart';
 import 'reading_vocab_lists_sheet.dart';
@@ -523,153 +523,119 @@ class _ReadingHubScreenState extends ConsumerState<ReadingHubScreen> {
                     ? '封面朝外 · 点书继续读'
                     : '继续读「${cont.title}」')));
 
+    final List<ReadingDoc> books = _filteredBooks(state);
+    final int totalWords = state.all.fold<int>(
+      0,
+      (int sum, ReadingDoc doc) => sum + doc.wordCount,
+    );
+
     return PadScaffold(
       currentDestination: AppNavDestination.reading,
       showContinueLearning: false,
-      body: ColoredBox(
-        color: shelfTheme.canvas,
-        child: !state.ready
-            ? Center(
+      body: !state.ready
+          ? ColoredBox(
+              color: shelfTheme.canvas,
+              child: Center(
                 child: CircularProgressIndicator(color: shelfTheme.action),
-              )
-            : Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: <Widget>[
-                  ReadingBookshelfHeader(
-                    searching: _searching,
-                    searchController: _searchController,
-                    onSearchChanged: (_) => setState(() {}),
-                    onCloseSearch: () {
-                      setState(() {
-                        _searching = false;
-                        _searchController.clear();
-                      });
-                    },
-                    onSearch: () => setState(() => _searching = true),
-                    onImport: () => unawaited(_importFile(context, ref)),
-                    onBack: () => context.pop(),
-                    subtitle: subtitle,
-                    actions: <Widget>[
-                      PopupMenuButton<String>(
-                        tooltip: '更多',
-                        icon: Icon(
-                          Icons.more_horiz_rounded,
-                          color: shelfTheme.action,
-                        ),
-                        onSelected: (String value) {
-                          switch (value) {
-                            case 'catalog':
-                              context.push('/reading/catalog');
-                            case 'materials':
-                              context.push('/material-courses');
-                            case 'video':
-                              unawaited(_generateFromVideo(context, ref));
-                            case 'vocab':
-                              unawaited(
-                                showReadingVocabListsSheet(context, ref),
-                              );
-                            case 'filter0':
-                              setState(() => _filter = 0);
-                            case 'filter1':
-                              setState(() => _filter = 1);
-                            case 'filter2':
-                              setState(() => _filter = 2);
-                          }
-                        },
-                        itemBuilder: (BuildContext context) =>
-                            <PopupMenuEntry<String>>[
-                          const PopupMenuItem<String>(
-                            value: 'catalog',
-                            child: Text('在线书库'),
-                          ),
-                          const PopupMenuItem<String>(
-                            value: 'materials',
-                            child: Text('我的教材课'),
-                          ),
-                          const PopupMenuItem<String>(
-                            value: 'video',
-                            child: Text('从视频生成短文'),
-                          ),
-                          PopupMenuItem<String>(
-                            value: 'vocab',
-                            child: Text(
-                              lists.knownCount + lists.focusCount > 0
-                                  ? '黑白名单（${lists.knownCount + lists.focusCount}）'
-                                  : '黑白名单',
-                            ),
-                          ),
-                          const PopupMenuDivider(),
-                          CheckedPopupMenuItem<String>(
-                            value: 'filter0',
-                            checked: _filter == 0,
-                            child: const Text('全部'),
-                          ),
-                          CheckedPopupMenuItem<String>(
-                            value: 'filter1',
-                            checked: _filter == 1,
-                            child: const Text('在读'),
-                          ),
-                          CheckedPopupMenuItem<String>(
-                            value: 'filter2',
-                            checked: _filter == 2,
-                            child: const Text('已读'),
-                          ),
-                        ],
-                      ),
-                    ],
+              ),
+            )
+          : ReadingBookshelfView(
+              books: books,
+              bookCount: state.all.length,
+              totalWords: totalWords,
+              searching: _searching,
+              searchController: _searchController,
+              searchQuery: _searchController.text.trim(),
+              onSearchChanged: (_) => setState(() {}),
+              onCloseSearch: () {
+                setState(() {
+                  _searching = false;
+                  _searchController.clear();
+                });
+              },
+              onSearch: () => setState(() => _searching = true),
+              onImport: () => unawaited(_importFile(context, ref)),
+              onBack: () => context.pop(),
+              subtitle: subtitle,
+              footerHint: AppDesignTokens.isDark
+                  ? '深胡桃木 · 暖色封面'
+                  : '书架上的书 · 非卡片网格',
+              onOpenBook: (ReadingDoc doc) {
+                unawaited(
+                  context.push('/reading/${Uri.encodeComponent(doc.id)}'),
+                );
+              },
+              onLongPressBook: (ReadingDoc doc) {
+                if (doc.builtin) return;
+                unawaited(_confirmRemove(context, doc));
+              },
+              actions: <Widget>[
+                PopupMenuButton<String>(
+                  tooltip: '更多',
+                  icon: Icon(
+                    Icons.more_horiz_rounded,
+                    color: shelfTheme.action,
                   ),
-                  Expanded(
-                    child: Padding(
-                      padding: const EdgeInsets.fromLTRB(14, 0, 14, 0),
-                      child: Builder(
-                        builder: (BuildContext context) {
-                          final List<ReadingDoc> books = _filteredBooks(state);
-                          final int totalWords = state.all.fold<int>(
-                            0,
-                            (int sum, ReadingDoc doc) => sum + doc.wordCount,
-                          );
-                          return ReadingBookshelf(
-                            books: books,
-                            bookCount: state.all.length,
-                            totalWords: totalWords,
-                            searchQuery: _searchController.text.trim(),
-                            onImport: () =>
-                                unawaited(_importFile(context, ref)),
-                            onOpenBook: (ReadingDoc doc) {
-                              unawaited(
-                                context.push(
-                                  '/reading/${Uri.encodeComponent(doc.id)}',
-                                ),
-                              );
-                            },
-                            onLongPressBook: (ReadingDoc doc) {
-                              if (doc.builtin) return;
-                              unawaited(_confirmRemove(context, doc));
-                            },
-                          );
-                        },
+                  onSelected: (String value) {
+                    switch (value) {
+                      case 'catalog':
+                        context.push('/reading/catalog');
+                      case 'materials':
+                        context.push('/material-courses');
+                      case 'video':
+                        unawaited(_generateFromVideo(context, ref));
+                      case 'vocab':
+                        unawaited(showReadingVocabListsSheet(context, ref));
+                      case 'filter0':
+                        setState(() => _filter = 0);
+                      case 'filter1':
+                        setState(() => _filter = 1);
+                      case 'filter2':
+                        setState(() => _filter = 2);
+                    }
+                  },
+                  itemBuilder: (BuildContext context) =>
+                      <PopupMenuEntry<String>>[
+                    const PopupMenuItem<String>(
+                      value: 'catalog',
+                      child: Text('在线书库'),
+                    ),
+                    const PopupMenuItem<String>(
+                      value: 'materials',
+                      child: Text('我的教材课'),
+                    ),
+                    const PopupMenuItem<String>(
+                      value: 'video',
+                      child: Text('从视频生成短文'),
+                    ),
+                    PopupMenuItem<String>(
+                      value: 'vocab',
+                      child: Text(
+                        lists.knownCount + lists.focusCount > 0
+                            ? '黑白名单（${lists.knownCount + lists.focusCount}）'
+                            : '黑白名单',
                       ),
                     ),
-                  ),
-                  Builder(
-                    builder: (BuildContext context) {
-                      final int totalWords = state.all.fold<int>(
-                        0,
-                        (int sum, ReadingDoc doc) => sum + doc.wordCount,
-                      );
-                      return ReadingBookshelfFooter(
-                        bookCount: state.all.length,
-                        totalWords: totalWords,
-                        hint: AppDesignTokens.isDark
-                            ? '深胡桃木 · 暖色封面'
-                            : '书架上的书 · 非卡片网格',
-                      );
-                    },
-                  ),
-                  SizedBox(height: MediaQuery.paddingOf(context).bottom + 4),
-                ],
-              ),
-      ),
+                    const PopupMenuDivider(),
+                    CheckedPopupMenuItem<String>(
+                      value: 'filter0',
+                      checked: _filter == 0,
+                      child: const Text('全部'),
+                    ),
+                    CheckedPopupMenuItem<String>(
+                      value: 'filter1',
+                      checked: _filter == 1,
+                      child: const Text('在读'),
+                    ),
+                    CheckedPopupMenuItem<String>(
+                      value: 'filter2',
+                      checked: _filter == 2,
+                      child: const Text('已读'),
+                    ),
+                  ],
+                ),
+              ],
+            ),
     );
   }
 }

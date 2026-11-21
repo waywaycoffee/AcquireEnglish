@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:common_learn_english/features/reading/domain/reading_doc.dart';
 import 'package:common_learn_english/features/reading/presentation/reading_bookshelf.dart';
+import 'package:common_learn_english/features/reading/presentation/reading_bookshelf_view.dart';
 
 void main() {
   testWidgets('bookshelf shows cover-facing books on ledges with import slot', (
@@ -47,6 +48,7 @@ void main() {
     expect(find.text('A Morning Walk'), findsOneWidget);
     expect(find.text('The Lost Key'), findsOneWidget);
     expect(find.text('导入'), findsOneWidget);
+    expect(find.text('＋'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 
@@ -65,5 +67,29 @@ void main() {
     expect(find.textContaining('10 本'), findsOneWidget);
     expect(find.textContaining('1,860 词'), findsOneWidget);
     expect(find.text('书架上的书 · 非卡片网格'), findsOneWidget);
+  });
+
+  testWidgets('bookshelf view shows title search add and stats', (
+    WidgetTester tester,
+  ) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: ReadingBookshelfView(
+            books: const <ReadingDoc>[],
+            bookCount: 0,
+            totalWords: 0,
+            onOpenBook: (_) {},
+            onImport: () {},
+            onSearch: () {},
+            footerHint: '书架上的书 · 非卡片网格',
+          ),
+        ),
+      ),
+    );
+    expect(find.text('我的书架'), findsOneWidget);
+    expect(find.text('封面朝外 · 点书继续读'), findsOneWidget);
+    expect(find.textContaining('0 本'), findsOneWidget);
+    expect(find.text('导入'), findsOneWidget);
   });
 }

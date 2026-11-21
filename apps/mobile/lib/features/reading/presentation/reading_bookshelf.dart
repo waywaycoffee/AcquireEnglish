@@ -1,5 +1,3 @@
-import 'dart:ui';
-
 import 'package:flutter/material.dart';
 
 import '../domain/reading_doc.dart';
@@ -7,7 +5,7 @@ import 'reading_book_cover.dart';
 import 'reading_bookshelf_theme.dart';
 import 'reading_stats_row.dart';
 
-/// Cover-facing books on oak shelf ledges (Pencil「我的书架」).
+/// Cover-facing books on oak shelf ledges (Pencil「01 我的书架 · 浅色」).
 class ReadingBookshelf extends StatelessWidget {
   const ReadingBookshelf({
     required this.books,
@@ -70,7 +68,7 @@ class ReadingBookshelf extends StatelessWidget {
                   end: Alignment.bottomCenter,
                   colors: <Color>[
                     theme.woodInner,
-                    Color.lerp(theme.woodInner, theme.woodOuter, 0.35)!,
+                    Color.lerp(theme.woodInner, theme.woodOuter, 0.28)!,
                   ],
                 ),
               ),
@@ -80,13 +78,14 @@ class ReadingBookshelf extends StatelessWidget {
                   children: <Widget>[
                     Expanded(
                       child: ListView.builder(
-                        padding: const EdgeInsets.fromLTRB(10, 18, 10, 8),
+                        padding: const EdgeInsets.fromLTRB(12, 20, 12, 8),
                         itemCount: rows.length,
                         itemBuilder: (BuildContext context, int index) {
                           return _ShelfRow(
                             theme: theme,
                             slots: rows[index],
                             columns: columns,
+                            rowIndex: index,
                             onOpenBook: onOpenBook,
                             onImport: onImport,
                             onLongPressBook: onLongPressBook,
@@ -118,9 +117,10 @@ class ReadingBookshelf extends StatelessWidget {
     );
   }
 
+  /// Board 01 uses 4 covers across a ~362pt inner panel.
   static int _columnsFor(double width) {
-    if (width >= 520) return 5;
-    if (width >= 420) return 4;
+    if (width >= 560) return 5;
+    if (width >= 300) return 4;
     return 3;
   }
 
@@ -134,6 +134,7 @@ class ReadingBookshelf extends StatelessWidget {
   }
 }
 
+/// Title left · search / add right (Pencil board 01).
 class ReadingBookshelfHeader extends StatelessWidget {
   const ReadingBookshelfHeader({
     required this.onSearch,
@@ -163,12 +164,12 @@ class ReadingBookshelfHeader extends StatelessWidget {
     final ReadingBookshelfTheme theme = ReadingBookshelfTheme.of(context);
     final double top = MediaQuery.paddingOf(context).top;
     return Padding(
-      padding: EdgeInsets.fromLTRB(8, top + 8, 8, 0),
+      padding: EdgeInsets.fromLTRB(16, top + 10, 8, 0),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
           SizedBox(
-            height: 44,
+            height: 40,
             child: searching
                 ? Row(
                     children: <Widget>[
@@ -192,7 +193,10 @@ class ReadingBookshelfHeader extends StatelessWidget {
                       ),
                       TextButton(
                         onPressed: onCloseSearch,
-                        child: Text('取消', style: TextStyle(color: theme.action)),
+                        child: Text(
+                          '取消',
+                          style: TextStyle(color: theme.action),
+                        ),
                       ),
                     ],
                   )
@@ -201,6 +205,11 @@ class ReadingBookshelfHeader extends StatelessWidget {
                       if (onBack != null)
                         IconButton(
                           tooltip: '返回',
+                          padding: EdgeInsets.zero,
+                          constraints: const BoxConstraints(
+                            minWidth: 36,
+                            minHeight: 36,
+                          ),
                           onPressed: onBack,
                           icon: Icon(
                             Icons.arrow_back_ios_new_rounded,
@@ -208,38 +217,34 @@ class ReadingBookshelfHeader extends StatelessWidget {
                             color: theme.action,
                           ),
                         ),
-                      IconButton(
-                        tooltip: '搜索',
-                        onPressed: onSearch,
-                        icon: Icon(Icons.search_rounded, color: theme.action),
-                      ),
                       Expanded(
                         child: Text(
                           '我的书架',
-                          textAlign: TextAlign.center,
                           style: TextStyle(
                             fontFamily: 'Georgia',
-                            fontSize: 24,
+                            fontSize: 26,
                             fontWeight: FontWeight.w700,
                             color: theme.title,
                             height: 1.1,
                           ),
                         ),
                       ),
-                      ...actions,
+                      IconButton(
+                        tooltip: '搜索',
+                        onPressed: onSearch,
+                        icon: Icon(Icons.search_rounded, color: theme.action),
+                      ),
                       IconButton(
                         tooltip: '导入',
                         onPressed: onImport,
-                        icon: Icon(
-                          Icons.file_download_outlined,
-                          color: theme.action,
-                        ),
+                        icon: Icon(Icons.add, color: theme.action, size: 26),
                       ),
+                      ...actions,
                     ],
                   ),
           ),
           Padding(
-            padding: const EdgeInsets.fromLTRB(16, 0, 16, 10),
+            padding: EdgeInsets.fromLTRB(onBack == null ? 0 : 36, 2, 12, 12),
             child: Text(
               subtitle,
               style: TextStyle(
@@ -255,6 +260,7 @@ class ReadingBookshelfHeader extends StatelessWidget {
   }
 }
 
+/// Bottom 本数 · 词数 (Pencil board 01).
 class ReadingBookshelfFooter extends StatelessWidget {
   const ReadingBookshelfFooter({
     required this.bookCount,
@@ -274,28 +280,20 @@ class ReadingBookshelfFooter extends StatelessWidget {
         ? '${ReadingStatsRow.compact(totalWords)}词'
         : '${_withCommas(totalWords)} 词';
     return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 10, 20, 12),
+      padding: const EdgeInsets.fromLTRB(24, 12, 24, 8),
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
-          Row(
-            children: <Widget>[
-              Expanded(child: _statRule(theme.statsHint)),
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 12),
-                child: Text(
-                  '$bookCount 本  ·  $wordsLabel',
-                  style: TextStyle(
-                    fontFamily: 'Georgia',
-                    fontSize: 13,
-                    color: theme.stats,
-                  ),
-                ),
-              ),
-              Expanded(child: _statRule(theme.statsHint)),
-            ],
+          Text(
+            '$bookCount 本          ·          $wordsLabel',
+            style: TextStyle(
+              fontFamily: 'Georgia',
+              fontSize: 14,
+              color: theme.stats,
+            ),
           ),
           if ((hint ?? '').isNotEmpty) ...<Widget>[
-            const SizedBox(height: 4),
+            const SizedBox(height: 6),
             Text(
               hint!,
               style: TextStyle(
@@ -307,28 +305,6 @@ class ReadingBookshelfFooter extends StatelessWidget {
           ],
         ],
       ),
-    );
-  }
-
-  static Widget _statRule(Color color) {
-    return Row(
-      children: <Widget>[
-        Container(
-          width: 5,
-          height: 5,
-          decoration: BoxDecoration(
-            color: color,
-            shape: BoxShape.circle,
-          ),
-        ),
-        Expanded(
-          child: Container(
-            height: 1,
-            margin: const EdgeInsets.symmetric(horizontal: 6),
-            color: color.withValues(alpha: 0.55),
-          ),
-        ),
-      ],
     );
   }
 
@@ -359,6 +335,7 @@ class _ShelfRow extends StatelessWidget {
     required this.theme,
     required this.slots,
     required this.columns,
+    required this.rowIndex,
     required this.onOpenBook,
     required this.onImport,
     this.onLongPressBook,
@@ -368,6 +345,7 @@ class _ShelfRow extends StatelessWidget {
   final ReadingBookshelfTheme theme;
   final List<_ShelfSlot> slots;
   final int columns;
+  final int rowIndex;
   final ValueChanged<ReadingDoc> onOpenBook;
   final VoidCallback onImport;
   final void Function(ReadingDoc doc)? onLongPressBook;
@@ -376,11 +354,11 @@ class _ShelfRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.only(bottom: 6),
+      padding: const EdgeInsets.only(bottom: 4),
       child: Column(
         children: <Widget>[
           SizedBox(
-            height: 158,
+            height: 156,
             child: slots.isEmpty
                 ? Center(
                     child: Text(
@@ -396,10 +374,10 @@ class _ShelfRow extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.end,
                     children: <Widget>[
                       for (int i = 0; i < columns; i++) ...<Widget>[
-                        if (i > 0) const SizedBox(width: 10),
+                        if (i > 0) const SizedBox(width: 12),
                         Expanded(
                           child: i < slots.length
-                              ? _slotWidget(slots[i])
+                              ? _slotWidget(slots[i], i)
                               : const SizedBox.shrink(),
                         ),
                       ],
@@ -412,25 +390,31 @@ class _ShelfRow extends StatelessWidget {
     );
   }
 
-  Widget _slotWidget(_ShelfSlot slot) {
+  Widget _slotWidget(_ShelfSlot slot, int column) {
     if (slot.isImport) {
       return _ImportSlot(theme: theme, onTap: onImport);
     }
     final ReadingDoc doc = slot.doc!;
+    // Slight height jitter so covers feel hand-placed, matching board 01.
+    final double heightFactor = 0.88 + (((rowIndex * 3 + column) % 5) * 0.025);
     return Align(
       alignment: Alignment.bottomCenter,
-      child: InkWell(
-        onTap: () => onOpenBook(doc),
-        onLongPress: onLongPressBook == null
-            ? null
-            : () => onLongPressBook!(doc),
-        borderRadius: BorderRadius.circular(4),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 2),
-          child: ReadingBookCover(
-            title: doc.title,
-            level: doc.level,
-            standing: true,
+      child: FractionallySizedBox(
+        heightFactor: heightFactor.clamp(0.86, 1.0),
+        widthFactor: 0.96,
+        child: Material(
+          color: Colors.transparent,
+          child: InkWell(
+            onTap: () => onOpenBook(doc),
+            onLongPress: onLongPressBook == null
+                ? null
+                : () => onLongPressBook!(doc),
+            borderRadius: BorderRadius.circular(3),
+            child: ReadingBookCover(
+              title: doc.title,
+              level: doc.level,
+              standing: true,
+            ),
           ),
         ),
       ),
@@ -466,7 +450,7 @@ class _ShelfLedge extends StatelessWidget {
           right: 0,
           top: 0,
           child: Container(
-            height: 4,
+            height: 5,
             decoration: BoxDecoration(
               color: theme.ledgeHighlight,
               borderRadius: const BorderRadius.vertical(
@@ -490,43 +474,49 @@ class _ImportSlot extends StatelessWidget {
   Widget build(BuildContext context) {
     return Align(
       alignment: Alignment.bottomCenter,
-      child: AspectRatio(
-        aspectRatio: 0.68,
+      child: FractionallySizedBox(
+        heightFactor: 0.86,
+        widthFactor: 0.96,
         child: Material(
           color: Colors.transparent,
           child: InkWell(
             onTap: onTap,
             borderRadius: BorderRadius.circular(4),
-            child: CustomPaint(
-              painter: _DashedRoundRectPainter(
-                color: theme.importInk.withValues(alpha: 0.55),
-                radius: 4,
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                color: theme.importFill,
+                borderRadius: BorderRadius.circular(4),
+                boxShadow: const <BoxShadow>[
+                  BoxShadow(
+                    color: Color(0x33000000),
+                    blurRadius: 6,
+                    offset: Offset(1, 2),
+                  ),
+                ],
               ),
-              child: DecoratedBox(
-                decoration: BoxDecoration(
-                  color: theme.importFill.withValues(alpha: 0.55),
-                  borderRadius: BorderRadius.circular(4),
-                ),
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: <Widget>[
-                    Icon(
-                      Icons.file_download_outlined,
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: <Widget>[
+                  Text(
+                    '＋',
+                    style: TextStyle(
+                      fontFamily: 'Georgia',
+                      fontSize: 28,
+                      height: 1,
                       color: theme.importInk,
-                      size: 28,
                     ),
-                    const SizedBox(height: 8),
-                    Text(
-                      '导入',
-                      style: TextStyle(
-                        fontFamily: 'Georgia',
-                        fontSize: 14,
-                        fontWeight: FontWeight.w600,
-                        color: theme.importInk,
-                      ),
+                  ),
+                  const SizedBox(height: 10),
+                  Text(
+                    '导入',
+                    style: TextStyle(
+                      fontFamily: 'Georgia',
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                      color: theme.importInk,
                     ),
-                  ],
-                ),
+                  ),
+                ],
               ),
             ),
           ),
@@ -534,36 +524,4 @@ class _ImportSlot extends StatelessWidget {
       ),
     );
   }
-}
-
-class _DashedRoundRectPainter extends CustomPainter {
-  _DashedRoundRectPainter({required this.color, required this.radius});
-
-  final Color color;
-  final double radius;
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final RRect rrect = RRect.fromRectAndRadius(
-      Rect.fromLTWH(1, 1, size.width - 2, size.height - 2),
-      Radius.circular(radius),
-    );
-    final Paint paint = Paint()
-      ..color = color
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 1.4;
-    final Path path = Path()..addRRect(rrect);
-    for (final PathMetric metric in path.computeMetrics()) {
-      double distance = 0;
-      while (distance < metric.length) {
-        final double next = (distance + 5).clamp(0, metric.length).toDouble();
-        canvas.drawPath(metric.extractPath(distance, next), paint);
-        distance += 9;
-      }
-    }
-  }
-
-  @override
-  bool shouldRepaint(covariant _DashedRoundRectPainter oldDelegate) =>
-      oldDelegate.color != color || oldDelegate.radius != radius;
 }
