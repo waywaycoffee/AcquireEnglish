@@ -102,6 +102,22 @@ class OralCoachPipeline:
         )
         return url
 
+    @staticmethod
+    def _tts_cache_key(
+        text: str,
+        *,
+        digital_human_id: str | None,
+        tts_voice: str | None,
+        language: str | None,
+    ) -> str:
+        import hashlib
+
+        persona = (digital_human_id or 'mia').strip().lower() or 'mia'
+        voice = (tts_voice or '').strip().lower()
+        lang = (language or 'en').strip().lower() or 'en'
+        payload = f'{persona}|{voice}|{lang}|{text.strip()}'
+        return hashlib.sha256(payload.encode('utf-8')).hexdigest()[:40]
+
     async def synthesize_speech_with_provider(
         self,
         text: str,
@@ -110,22 +126,37 @@ class OralCoachPipeline:
         tts_voice: str | None = None,
         language: str | None = None,
     ) -> tuple[str | None, str | None]:
-        """Return the audio URL and the provider that actually produced it."""
+        """Return the audio URL and the provider that actually produced it.
+
+        Same text+voice+language reuses a content-addressed file under
+        ``data_dir/tts/cache/`` so reading continuous TTS and greetings do not
+        re-bill DashScope CosyVoice on every tap.
+        """
         spoken = (text or '').strip()
         if not spoken:
             return None, None
-        tts_name = f'speak-{uuid.uuid4().hex[:10]}.mp3'
-        tts_path = str(self.settings.data_dir / 'tts' / tts_name)
+        cache_key = self._tts_cache_key(
+            spoken,
+            digital_human_id=digital_human_id,
+            tts_voice=tts_voice,
+            language=language,
+        )
+        cache_dir = self.settings.data_dir / 'tts' / 'cache'
+        cache_dir.mkdir(parents=True, exist_ok=True)
+        tts_name = f'{cache_key}.mp3'
+        tts_path = cache_dir / tts_name
+        if tts_path.is_file() and tts_path.stat().st_size > 64:
+            return f'/api/tts/cache/{tts_name}', 'cache'
         result = await self.tts.synthesize(
             spoken,
-            tts_path,
+            str(tts_path),
             voice=tts_voice,
             digital_human_id=digital_human_id,
             language=language,
         )
         if not result.audio_path:
             return None, None
-        return f'/api/tts/{tts_name}', result.provider
+        return f'/api/tts/cache/{tts_name}', result.provider
 
     def get(self, sid: str) -> CoachSession | None:
         return self.sessions.get(sid)

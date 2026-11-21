@@ -60,6 +60,55 @@ def curated_bvids() -> list[str]:
     return out
 
 
+def seed_pages_for_bvid(bvid: str) -> list[int] | None:
+    """Return explicit page numbers from catalog ``seed_pages``, or None for all.
+
+    Catalog values:
+    - ``\"all\"`` / missing / empty → ``None`` (seed every page)
+    - ``[1, 2, 5]`` → those pages only
+    - ``\"1-3\"`` / ``\"1,2,5\"`` → parsed range / list
+    """
+    want = normalize_bvid(bvid)
+    if not want:
+        return None
+    for item in load_catalog():
+        for video in item.get("videos") or []:
+            if not isinstance(video, dict):
+                continue
+            if normalize_bvid(str(video.get("bvid") or "")) != want:
+                continue
+            raw = video.get("seed_pages")
+            if raw is None or raw == "" or raw == "all":
+                return None
+            if isinstance(raw, list):
+                pages = sorted(
+                    {
+                        int(x)
+                        for x in raw
+                        if str(x).strip().isdigit() and int(x) >= 1
+                    }
+                )
+                return pages or None
+            text = str(raw).strip().lower()
+            if text in {"all", "*"}:
+                return None
+            pages: set[int] = set()
+            for part in text.replace(" ", "").split(","):
+                if not part:
+                    continue
+                if "-" in part:
+                    ends = part.split("-", 1)
+                    if len(ends) == 2 and ends[0].isdigit() and ends[1].isdigit():
+                        lo, hi = int(ends[0]), int(ends[1])
+                        if lo <= hi:
+                            pages.update(range(lo, hi + 1))
+                    continue
+                if part.isdigit():
+                    pages.add(int(part))
+            return sorted(pages) or None
+    return None
+
+
 async def _shared_pages(db: AsyncSession, bvid: str) -> set[int]:
     key = normalize_bvid(bvid)
     result = await db.execute(

@@ -351,12 +351,29 @@ async def turn(
         await file.close()
 
 
+@app.get('/api/tts/cache/{name}')
+def get_tts_cache(name: str):
+    """Content-addressed TTS (sha of text+voice+lang)."""
+    safe = Path(name).name
+    path = settings.data_dir / 'tts' / 'cache' / safe
+    if not path.is_file():
+        raise HTTPException(404, 'TTS audio not found.')
+    suffix = path.suffix.lower()
+    media = 'audio/mpeg' if suffix in {'.mp3', '.mpeg'} else 'audio/wav'
+    return FileResponse(path, media_type=media)
+
+
 @app.get('/api/tts/{name}')
 def get_tts(name: str):
     safe = Path(name).name
     path = settings.data_dir / 'tts' / safe
     if not path.is_file():
-        raise HTTPException(404, 'TTS audio not found.')
+        # Fall back to content-addressed cache (older clients may strip "cache/").
+        cached = settings.data_dir / 'tts' / 'cache' / safe
+        if cached.is_file():
+            path = cached
+        else:
+            raise HTTPException(404, 'TTS audio not found.')
     suffix = path.suffix.lower()
     media = 'audio/mpeg' if suffix in {'.mp3', '.mpeg'} else 'audio/wav'
     return FileResponse(path, media_type=media)

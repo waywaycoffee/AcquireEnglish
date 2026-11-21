@@ -1567,6 +1567,44 @@ class AcquireApiClient {
     );
   }
 
+  /// ECS content-addressed reading TTS. Null when not pre-generated.
+  Future<String?> lookupReadingSpeechUrl({
+    required String text,
+    String voice = '',
+    String language = 'en',
+  }) async {
+    final String spoken = text.trim();
+    if (spoken.isEmpty) return null;
+    try {
+      final Response<dynamic> response = await _dio.get(
+        Endpoints.readingSpeechLookup,
+        queryParameters: <String, dynamic>{
+          'text': spoken,
+          if (voice.trim().isNotEmpty) 'voice': voice.trim(),
+          'language': language,
+        },
+        options: Options(
+          validateStatus: (int? status) =>
+              status != null &&
+              ((status >= 200 && status < 300) || status == 404),
+          receiveTimeout: const Duration(seconds: 8),
+          sendTimeout: const Duration(seconds: 8),
+        ),
+      );
+      if (response.statusCode == 404 || response.data is! Map) {
+        return null;
+      }
+      final Object? url = (response.data as Map)['audio_url'];
+      final String value = '$url'.trim();
+      return value.isEmpty ? null : value;
+    } on DioException catch (error) {
+      if (error.response?.statusCode == 404) return null;
+      return null;
+    } catch (_) {
+      return null;
+    }
+  }
+
   /// Returns null on 404 / network miss (shared cache optional).
   Future<SharedBilibiliSubtitlePack?> getSharedBilibiliSubtitle({
     required String bvid,

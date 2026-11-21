@@ -65,6 +65,7 @@ async def seed_one(
     bvid: str,
     max_pages: int | None,
     dry_run: bool,
+    page_filter: list[int] | None = None,
 ) -> dict:
     from app.link_import import fetch_bilibili_official_subs
     from app.shared_subtitle_store import upsert_shared_bilibili_pack
@@ -72,6 +73,9 @@ async def seed_one(
     pages = await _view_pages(client, bvid)
     if not pages:
         pages = [{"page": 1, "cid": None, "duration": None, "part": ""}]
+    if page_filter:
+        allowed = set(page_filter)
+        pages = [row for row in pages if int(row.get("page") or 1) in allowed]
     if max_pages is not None:
         pages = pages[: max(1, max_pages)]
 
@@ -145,7 +149,11 @@ async def amain(args: argparse.Namespace) -> int:
     from app.config import settings
     from app.database import SessionLocal
     from app.link_import import _bilibili_headers
-    from app.services.recommended_bilibili import curated_bvids, load_catalog
+    from app.services.recommended_bilibili import (
+        curated_bvids,
+        load_catalog,
+        seed_pages_for_bvid,
+    )
 
     cookie = (settings.bilibili_cookie or "").strip() or None
     print("api_root", api_root)
@@ -163,7 +171,8 @@ async def amain(args: argparse.Namespace) -> int:
     ) as client:
         async with SessionLocal() as db:
             for bvid in bvids:
-                print("==>", bvid)
+                page_filter = seed_pages_for_bvid(bvid)
+                print("==>", bvid, "seed_pages", page_filter or "all")
                 try:
                     summary.append(
                         await seed_one(
@@ -172,6 +181,7 @@ async def amain(args: argparse.Namespace) -> int:
                             bvid=bvid,
                             max_pages=args.max_pages,
                             dry_run=args.dry_run,
+                            page_filter=page_filter,
                         )
                     )
                 except Exception as exc:  # noqa: BLE001

@@ -34,6 +34,7 @@ from app.routers import (
     progress,
     pronunciation_assessment,
     public_lexicon,
+    pregen_cache,
     reading_speech,
     review_sync,
     rewards,
@@ -105,6 +106,7 @@ app.include_router(foundation_media.router, prefix="/api")
 app.include_router(content_media.router, prefix="/api")
 app.include_router(syllabus_books.router, prefix="/api")
 app.include_router(reading_speech.router, prefix="/api")
+app.include_router(pregen_cache.router, prefix="/api")
 
 # Audio/video served from ECS disk only — never bundled into the mobile APK.
 # Namespaces: foundation | reading | oral | course | misc

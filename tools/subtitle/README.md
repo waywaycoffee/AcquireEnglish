@@ -38,3 +38,16 @@ cd tools/subtitle
 2. 仓库内 `tools/subtitle/fill_missing.py`（从当前工作目录向上搜）
 
 找到且 `.venv` 可用时，导入补全 Worker **优先**走本 CLI；否则回退 on-device / 云端 ASR。
+
+## 推荐课共享字幕（ECS）
+
+在 API 机用官方 CC 播种到 Postgres `shared_bilibili_subtitles`（App 优先拉取，减少人人 ASR）：
+
+```bash
+cd /opt/acquireenglish/services/api
+.venv/bin/python /opt/acquireenglish/tools/subtitle/seed_recommended_bilibili_subs.py --dry-run
+.venv/bin/python /opt/acquireenglish/tools/subtitle/seed_recommended_bilibili_subs.py
+.venv/bin/python /opt/acquireenglish/tools/subtitle/_ecs_shared_health_check.py
+```
+
+目录 `recommended_bilibili.json` 的 `seed_pages`（`all` / `1-3` / 列表）会被遵守。详见 `docs/PREGEN_CACHE.md`。

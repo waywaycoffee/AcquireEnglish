@@ -4,6 +4,7 @@ import 'package:hive_ce/hive.dart';
 import '../../digital_human/data/oral_coach_pipeline_client.dart';
 import '../../settings/presentation/settings_provider.dart';
 import '../../shared/data/word_pronunciation_service.dart';
+import '../../sync/data/acquire_api_client.dart';
 
 const String kReadingTtsGenderKey = 'reading_tts_gender_v1';
 
@@ -74,6 +75,21 @@ Future<void> speakReadingText(
   final WordPronunciationService pronunciation =
       ref.read(wordPronunciationServiceProvider);
 
+  // 1) ECS pre-generated reading TTS (content-addressed).
+  try {
+    final String? cached = await ref
+        .read(acquireApiClientProvider)
+        .lookupReadingSpeechUrl(
+          text: spoken,
+          voice: voice.aliyunVoiceId,
+        );
+    if (cached != null && cached.isNotEmpty) {
+      await pronunciation.speak(spoken, recordedUrl: cached, rate: rate);
+      return;
+    }
+  } catch (_) {}
+
+  // 2) Oral-coach CosyVoice (server-side content-addressed cache).
   if (base.isNotEmpty) {
     try {
       final String? url = await _readingTtsClient.synthesizeSpeech(

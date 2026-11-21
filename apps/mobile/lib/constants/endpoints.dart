@@ -103,6 +103,12 @@ class Endpoints {
   /// Aliyun DashScope (Qwen Audio) TTS — voices list + speech synthesis.
   static const String readingVoices = 'api/reading/voices';
   static const String readingSpeech = 'api/reading/speech';
+  static const String readingSpeechLookup = 'api/reading/speech/lookup';
+  static const String pregenSentences = 'api/pregen/sentences';
+  static String pregenVocab(String word) =>
+      'api/pregen/vocab/${Uri.encodeComponent(word)}';
+  static String pregenOralTopics(String key) =>
+      'api/pregen/oral-topics/${Uri.encodeComponent(key)}';
 
   /// Kept for Dio header compatibility; AcquireEnglish API ignores it.
   static const String apiKey = '';
