@@ -6,7 +6,7 @@ import '../../domain/word_morphology.dart';
 /// Vowels are always red; consonants/syllable groups use distinct text colors.
 const Color _kVowelRed = Color(0xFFE11D48);
 
-/// Light-theme text colors for non-vowel segments (cycled by syllable).
+/// Light-surface text colors for non-vowel segments (cycled by syllable).
 const List<Color> _kPhonicsTextLight = <Color>[
   Color(0xFF111827),
   Color(0xFF1D4ED8),
@@ -16,9 +16,9 @@ const List<Color> _kPhonicsTextLight = <Color>[
   Color(0xFFBE185D),
 ];
 
-/// Dark-theme text colors for non-vowel segments (cycled by syllable).
+/// Dark-surface text colors for non-vowel segments (cycled by syllable).
 const List<Color> _kPhonicsTextDark = <Color>[
-  Color(0xFFE5E7EB),
+  Color(0xFFF3F4F6),
   Color(0xFF93C5FD),
   Color(0xFF86EFAC),
   Color(0xFFFCD34D),
@@ -26,12 +26,38 @@ const List<Color> _kPhonicsTextDark = <Color>[
   Color(0xFFF9A8D4),
 ];
 
-Color _segmentTextColor(PhonicsSegment seg) {
+Brightness _surfaceBrightness(BuildContext context, {Brightness? surface}) {
+  return surface ?? Theme.of(context).brightness;
+}
+
+Color _onSurfaceInk(BuildContext context, {Brightness? surface}) {
+  final Brightness brightness = _surfaceBrightness(context, surface: surface);
+  if (surface == null) {
+    return Theme.of(context).colorScheme.onSurface;
+  }
+  return brightness == Brightness.dark
+      ? const Color(0xFFF3F4F6)
+      : const Color(0xFF111827);
+}
+
+Color _mutedInk(BuildContext context, {Brightness? surface}) {
+  final Brightness brightness = _surfaceBrightness(context, surface: surface);
+  return brightness == Brightness.dark
+      ? const Color(0xFFB0B6C3)
+      : const Color(0xFF4B5563);
+}
+
+Color _segmentTextColor(
+  BuildContext context,
+  PhonicsSegment seg, {
+  Brightness? surface,
+}) {
   if (seg.kind == 'vowel') {
     return _kVowelRed;
   }
+  final Brightness brightness = _surfaceBrightness(context, surface: surface);
   final List<Color> palette =
-      AppDesignTokens.isDark ? _kPhonicsTextDark : _kPhonicsTextLight;
+      brightness == Brightness.dark ? _kPhonicsTextDark : _kPhonicsTextLight;
   return palette[seg.colorIndex % palette.length];
 }
 
@@ -56,7 +82,8 @@ class ColoredVowelHeadword extends StatelessWidget {
   Widget build(BuildContext context) {
     final String raw = word.trim();
     if (raw.isEmpty) return const SizedBox.shrink();
-    final Color consonant = AppDesignTokens.textPrimary;
+    // Prefer Theme onSurface so dark scaffolds never get black consonants.
+    final Color consonant = _onSurfaceInk(context);
     final List<InlineSpan> spans = <InlineSpan>[];
     for (int i = 0; i < raw.length; i++) {
       final String ch = raw[i];
@@ -95,7 +122,7 @@ class ColoredVowelHeadword extends StatelessWidget {
             style: TextStyle(
               fontSize: 12,
               fontWeight: FontWeight.w700,
-              color: AppDesignTokens.textSecondary,
+              color: _mutedInk(context),
             ),
           ),
         ],
@@ -119,12 +146,16 @@ class PhonicsSyllableBlocks extends StatelessWidget {
     required this.word,
     this.compact = false,
     this.onSegmentTap,
+    this.surfaceBrightness,
     super.key,
   });
 
   final String word;
   final bool compact;
   final ValueChanged<PhonicsSegment>? onSegmentTap;
+
+  /// When set, letter colors follow this surface (e.g. a light panel in dark app).
+  final Brightness? surfaceBrightness;
 
   @override
   Widget build(BuildContext context) {
@@ -134,6 +165,7 @@ class PhonicsSyllableBlocks extends StatelessWidget {
     }
     final List<String> syllables = splitEnglishSyllables(word);
     final double fontSize = compact ? 18 : 22;
+    final Color muted = _mutedInk(context, surface: surfaceBrightness);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -143,7 +175,7 @@ class PhonicsSyllableBlocks extends StatelessWidget {
           style: TextStyle(
             fontSize: compact ? 12 : 13,
             fontWeight: FontWeight.w800,
-            color: AppDesignTokens.textSecondary,
+            color: muted,
           ),
         ),
         const SizedBox(height: 6),
@@ -160,12 +192,13 @@ class PhonicsSyllableBlocks extends StatelessWidget {
                   style: TextStyle(
                     fontSize: fontSize * 0.85,
                     fontWeight: FontWeight.w700,
-                    color: AppDesignTokens.textSecondary,
+                    color: muted,
                   ),
                 ),
               _PhonicsLetterSpan(
                 segment: segments[i],
                 fontSize: fontSize,
+                surfaceBrightness: surfaceBrightness,
                 onTap: onSegmentTap == null
                     ? null
                     : () => onSegmentTap!(segments[i]),
@@ -179,7 +212,7 @@ class PhonicsSyllableBlocks extends StatelessWidget {
             '音节：${syllables.join(' · ')}',
             style: TextStyle(
               fontSize: 12,
-              color: AppDesignTokens.textSecondary,
+              color: muted,
               fontWeight: FontWeight.w600,
             ),
           ),
@@ -193,11 +226,13 @@ class _PhonicsLetterSpan extends StatelessWidget {
   const _PhonicsLetterSpan({
     required this.segment,
     required this.fontSize,
+    this.surfaceBrightness,
     this.onTap,
   });
 
   final PhonicsSegment segment;
   final double fontSize;
+  final Brightness? surfaceBrightness;
   final VoidCallback? onTap;
 
   @override
@@ -209,7 +244,11 @@ class _PhonicsLetterSpan extends StatelessWidget {
         fontWeight: segment.kind == 'vowel' ? FontWeight.w900 : FontWeight.w700,
         letterSpacing: 0.4,
         height: 1.2,
-        color: _segmentTextColor(segment),
+        color: _segmentTextColor(
+          context,
+          segment,
+          surface: surfaceBrightness,
+        ),
       ),
     );
     if (onTap == null) return text;
@@ -281,16 +320,22 @@ class _PhonicsCoachPanelState extends State<PhonicsCoachPanel> {
     final List<PhonicsGuideStep> steps = _steps;
     if (steps.isEmpty) return const SizedBox.shrink();
     final PhonicsGuideStep current = steps[_step.clamp(0, steps.length - 1)];
-    final bool dark = AppDesignTokens.isDark;
+    // Match panel ink to the panel surface, not a possibly stale global token.
+    final Brightness panelBrightness = Theme.of(context).brightness;
+    final bool panelDark = panelBrightness == Brightness.dark;
+    final Color panelBg =
+        panelDark ? const Color(0xFF1C2430) : const Color(0xFFEFF6FF);
+    final Color panelInk = _onSurfaceInk(context, surface: panelBrightness);
+    final Color panelMuted = _mutedInk(context, surface: panelBrightness);
 
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(14),
+      padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: dark ? const Color(0xFF1C2430) : const Color(0xFFEFF6FF),
+        color: panelBg,
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
-          color: dark ? const Color(0xFF2A3444) : const Color(0xFFBFDBFE),
+          color: panelDark ? const Color(0xFF2A3444) : const Color(0xFFBFDBFE),
         ),
       ),
       child: Column(
@@ -301,7 +346,7 @@ class _PhonicsCoachPanelState extends State<PhonicsCoachPanel> {
             style: TextStyle(
               fontWeight: FontWeight.w900,
               fontSize: 15,
-              color: AppDesignTokens.textPrimary,
+              color: panelInk,
             ),
           ),
           const SizedBox(height: 4),
@@ -309,41 +354,40 @@ class _PhonicsCoachPanelState extends State<PhonicsCoachPanel> {
             '按音节拼出来，再连成整词；点字母或步骤可听真人/云端发音。',
             style: TextStyle(
               fontSize: 12,
-              height: 1.4,
-              color: AppDesignTokens.textSecondary,
+              height: 1.35,
+              color: panelMuted,
               fontWeight: FontWeight.w600,
             ),
           ),
-          const SizedBox(height: 10),
+          const SizedBox(height: 8),
           PhonicsSyllableBlocks(
             word: widget.word,
+            surfaceBrightness: panelBrightness,
             onSegmentTap: (PhonicsSegment seg) {
               if (_busy || widget.speaking) return;
               widget.onSpeak(seg.text);
             },
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 10),
           Text(
             '步骤 ${_step + 1}/${steps.length} · ${current.labelCn}',
             style: TextStyle(
               fontWeight: FontWeight.w800,
               fontSize: 13,
-              color: AppDesignTokens.textPrimary,
+              color: panelInk,
             ),
           ),
-          const SizedBox(height: 6),
+          const SizedBox(height: 4),
           Text(
             current.text,
             textAlign: TextAlign.center,
             style: TextStyle(
-              fontSize: current.isWholeWord ? 28 : 24,
+              fontSize: current.isWholeWord ? 26 : 22,
               fontWeight: FontWeight.w900,
-              color: current.isWholeWord
-                  ? _kVowelRed
-                  : AppDesignTokens.textPrimary,
+              color: current.isWholeWord ? _kVowelRed : panelInk,
             ),
           ),
-          const SizedBox(height: 10),
+          const SizedBox(height: 8),
           Row(
             children: <Widget>[
               IconButton(
@@ -369,7 +413,7 @@ class _PhonicsCoachPanelState extends State<PhonicsCoachPanel> {
               ),
             ],
           ),
-          const SizedBox(height: 6),
+          const SizedBox(height: 4),
           OutlinedButton.icon(
             onPressed: _busy || widget.speaking ? null : _playAll,
             icon: const Icon(Icons.play_circle_outline_rounded),
