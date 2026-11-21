@@ -32,6 +32,6 @@
 - 词汇 PK 入口仍在学习桌；发现页不再并行旧 PK。
 - 微信/浏览器落地：`GET /api/public/challenges/cafe/{1-4}`；App 深链 `acquireenglish://app/explore/cafe/{n}` 与路由 `/explore/cafe/:stage`。
 - 方法/提问帖也可挂同一关卡 `link_url`，任务流同样置顶可开练。
-- PK 可选 `source=cafe`（街角咖啡店约定词表），不要求共同学过词交集。
+- PK 可选 `source=cafe`（街角咖啡店约定词表）或 `source=syllabus`（服务端词书按 50 词切单元），都不要求共同学过词交集。
 - 延迟复测：首次通关记 `challenge_first_clears`；满 24 小时后重练上报 `/api/study-desk/retest`，地图展示通过率。
 - 任务流按关卡帖 `challenge_completes` / `opens` 排序；`POST /api/community/posts/{id}/challenge-event`。

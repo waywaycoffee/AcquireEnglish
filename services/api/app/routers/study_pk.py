@@ -29,8 +29,45 @@ class ConsentIn(BaseModel):
 class CreateIn(BaseModel):
     days: Literal[7, 30] = 7
     count: Literal[5, 10] = 10
-    # intersection = shared recent words; cafe = chapter public bank (agreed vocab)
-    source: Literal["intersection", "cafe"] = "intersection"
+    # intersection = shared recent words; cafe = chapter bank; syllabus = agreed book unit
+    source: Literal["intersection", "cafe", "syllabus"] = "intersection"
+    book_id: str | None = Field(default=None, max_length=64)
+    unit_index: int = Field(default=0, ge=0, le=200)
+
+
+def _pack_questions(
+    questions: list[dict],
+    *,
+    source: str,
+    meta: dict | None = None,
+) -> str:
+    if source == "intersection":
+        return json.dumps(questions, ensure_ascii=False)
+    return json.dumps(
+        {
+            "source": source,
+            "meta": meta or {},
+            "questions": questions,
+        },
+        ensure_ascii=False,
+    )
+
+
+def _unpack_questions(raw: str, *, days: int) -> tuple[list[dict], str, dict]:
+    data = json.loads(raw)
+    if isinstance(data, list):
+        source = "cafe" if days == 0 else "intersection"
+        return data, source, {}
+    questions = data.get("questions") or []
+    if not isinstance(questions, list):
+        questions = []
+    source = str(data.get("source") or ("cafe" if days == 0 else "intersection"))
+    meta = data.get("meta") if isinstance(data.get("meta"), dict) else {}
+    return questions, source, meta
+
+
+def _match_source(row) -> tuple[list[dict], str, dict]:
+    return _unpack_questions(row.questions_json, days=row.days)
 
 
 class AnswerIn(BaseModel):
@@ -131,16 +168,29 @@ async def lobby(user: User = Depends(get_current_user), db: AsyncSession = Depen
     for row in rows:
         if row.status in {'pending', 'active'} and aware(row.expires_at) <= now():
             row.status, row.active_desk_id = 'expired', None
+        questions, source, meta = _match_source(row)
         matches.append({
             'id': row.id,
             'status': row.status,
             'incoming': row.target_id == user.id,
-            'count': len(json.loads(row.questions_json)),
-            'days': row.days,
-            'source': 'cafe' if row.days == 0 else 'intersection',
+            'count': len(questions),
+            'days': row.days if source == 'intersection' else 0,
+            'source': source,
+            'book_id': meta.get('book_id'),
+            'unit_index': meta.get('unit_index'),
+            'unit_label': meta.get('unit_label'),
+            'book_title': meta.get('book_title'),
         })
     await db.commit()
     return {'my_consent': a, 'peer_consent': b, 'matches': matches if a and b else []}
+
+
+@router.get('/syllabus-units')
+async def syllabus_units(user: User = Depends(get_current_user)):
+    from app.services.syllabus_pk import list_syllabus_pk_units
+
+    _ = user
+    return {'units': list_syllabus_pk_units()}
 
 
 @router.post('', status_code=201)
@@ -152,24 +202,74 @@ async def create(payload: CreateIn, user: User = Depends(get_current_user), db: 
             raise HTTPException(409, '已有待处理或进行中的对局，请先继续或取消')
         current.status, current.active_desk_id = 'expired', None
         await db.flush()
+    meta: dict | None = None
     if payload.source == 'cafe':
         from app.services.cafe_challenge import cafe_pk_questions
 
         try:
             questions = cafe_pk_questions(payload.count, seed=me.desk_id * 1000 + payload.count)
         except ValueError as exc:
-            raise HTTPException(400, '咖啡店章节词表不足，请改用共同词或减少题量') from exc
+            raise HTTPException(400, '咖啡店章节词表不足，请改用共同词、词书单元或减少题量') from exc
         # days column reused as marker: 0 = cafe chapter bank
         days_marker = 0
+    elif payload.source == 'syllabus':
+        from app.services.syllabus_pk import list_syllabus_pk_units, syllabus_pk_questions
+
+        book_id = (payload.book_id or '').strip()
+        if not book_id:
+            raise HTTPException(400, '请选择词书单元')
+        try:
+            questions = syllabus_pk_questions(
+                book_id,
+                payload.unit_index,
+                payload.count,
+                seed=me.desk_id * 1000 + payload.unit_index * 17 + payload.count,
+            )
+        except (FileNotFoundError, ValueError) as exc:
+            raise HTTPException(400, '词书单元不足或不可用，请换一本词书或减少题量') from exc
+        unit_meta = next(
+            (
+                u
+                for u in list_syllabus_pk_units()
+                if u['book_id'] == book_id and u['unit_index'] == payload.unit_index
+            ),
+            None,
+        )
+        meta = {
+            'book_id': book_id,
+            'unit_index': payload.unit_index,
+            'book_title': (unit_meta or {}).get('book_title') or book_id,
+            'unit_label': (unit_meta or {}).get('unit_label')
+            or f'第{payload.unit_index + 1}单元',
+        }
+        # days < 0 marks syllabus-backed matches for legacy readers
+        days_marker = -1
     else:
         recent = await recent_words(db, user.id, payload.days) & await recent_words(db, peer.user_id, payload.days)
         if len(recent) < payload.count:
-            raise HTTPException(400, f'双方近{payload.days}天共同学过的词不足{payload.count}个，请同步复习记录、扩大至30天、选5题，或改用「咖啡店章节词表」')
+            raise HTTPException(
+                400,
+                f'双方近{payload.days}天共同学过的词不足{payload.count}个，请同步复习记录、扩大至30天、选5题，或改用「咖啡店章节词表 / 词书单元」',
+            )
         questions = question_pool(recent)
         if len(questions) < payload.count:
-            raise HTTPException(400, '可用释义题不足，请先学习更多共同单词或改用章节词表')
+            raise HTTPException(400, '可用释义题不足，请先学习更多共同单词或改用约定词表')
         days_marker = payload.days
-    row = DeskWordPk(desk_id=me.desk_id, active_desk_id=me.desk_id, sender_id=user.id, target_id=peer.user_id, status='pending', days=days_marker, questions_json=json.dumps(questions[:payload.count], ensure_ascii=False), expires_at=now() + timedelta(hours=24))
+    packed = _pack_questions(
+        questions[: payload.count],
+        source=payload.source,
+        meta=meta,
+    )
+    row = DeskWordPk(
+        desk_id=me.desk_id,
+        active_desk_id=me.desk_id,
+        sender_id=user.id,
+        target_id=peer.user_id,
+        status='pending',
+        days=days_marker,
+        questions_json=packed,
+        expires_at=now() + timedelta(hours=24),
+    )
     db.add(row)
     try:
         await db.flush()
@@ -214,14 +314,23 @@ async def completed_notices(db, row):
 @router.get('/{match_id}')
 async def view(match_id: int, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
     row = await match_for(db, user.id, match_id)
-    questions = json.loads(row.questions_json)
+    questions, source, meta = _match_source(row)
     if row.status == 'active':
         finished = await db.scalar(select(func.count()).select_from(DeskPkRun).where(DeskPkRun.match_id == match_id, DeskPkRun.next_index == len(questions)))
         if finished == 2:
             row.status, row.active_desk_id = 'completed', None
             await completed_notices(db, row)
             await db.commit()
-    result = {'id': row.id, 'status': row.status, 'count': len(questions), 'question': None, 'result': None}
+    result = {
+        'id': row.id,
+        'status': row.status,
+        'count': len(questions),
+        'source': source,
+        'book_title': meta.get('book_title'),
+        'unit_label': meta.get('unit_label'),
+        'question': None,
+        'result': None,
+    }
     if row.status == 'completed':
         answers = (await db.execute(select(DeskPkAnswer).where(DeskPkAnswer.match_id == match_id))).scalars().all()
         own = {a.question_index: a for a in answers if a.user_id == user.id}
@@ -247,7 +356,7 @@ async def view(match_id: int, user: User = Depends(get_current_user), db: AsyncS
 async def answer(match_id: int, payload: AnswerIn, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
     row = await match_for(db, user.id, match_id)
     run = await db.get(DeskPkRun, (match_id, user.id))
-    questions = json.loads(row.questions_json)
+    questions, _, _ = _match_source(row)
     if row.status != 'active' or run is None or run.next_index != payload.index or run.question_started_at is None or payload.index >= len(questions):
         raise HTTPException(409, '题目状态已更新，请刷新对局')
     selected = payload.choice if (now() - aware(run.question_started_at)).total_seconds() < SECONDS_PER_QUESTION else None

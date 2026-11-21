@@ -21,7 +21,10 @@ class _StudyPkScreenState extends ConsumerState<StudyPkScreen>
   bool _busy = false;
   int _days = 7;
   int _count = 10;
-  String _source = 'intersection'; // intersection | cafe
+  String _source = 'intersection'; // intersection | cafe | syllabus
+  List<Map<String, dynamic>> _syllabusUnits = <Map<String, dynamic>>[];
+  String? _bookId;
+  int _unitIndex = 0;
   int? _selected;
   int _seconds = 0;
   int _generation = 0;
@@ -79,6 +82,39 @@ class _StudyPkScreenState extends ConsumerState<StudyPkScreen>
     return '暂时无法连接PK服务，请重试。';
   }
 
+  Future<void> _loadSyllabusUnits() async {
+    try {
+      final Map<String, dynamic> payload = await _request(
+        'GET',
+        '/syllabus-units',
+      );
+      final List<Map<String, dynamic>> units =
+          (payload['units'] as List<dynamic>? ?? const <dynamic>[])
+              .whereType<Map>()
+              .map((Map row) => Map<String, dynamic>.from(row))
+              .toList(growable: false);
+      if (!mounted) return;
+      setState(() {
+        _syllabusUnits = units;
+        if (units.isEmpty) {
+          _bookId = null;
+          _unitIndex = 0;
+          return;
+        }
+        final bool keep = units.any(
+          (Map<String, dynamic> u) =>
+              u['book_id'] == _bookId && u['unit_index'] == _unitIndex,
+        );
+        if (!keep) {
+          _bookId = '${units.first['book_id']}';
+          _unitIndex = (units.first['unit_index'] as num?)?.toInt() ?? 0;
+        }
+      });
+    } catch (_) {
+      if (mounted) setState(() => _syllabusUnits = <Map<String, dynamic>>[]);
+    }
+  }
+
   Future<void> _load() async {
     final int generation = ++_generation;
     setState(() {
@@ -87,7 +123,10 @@ class _StudyPkScreenState extends ConsumerState<StudyPkScreen>
     });
     try {
       final Map<String, dynamic> lobby = await _request('GET', '');
-      if (mounted && generation == _generation) setState(() => _lobby = lobby);
+      if (mounted && generation == _generation) {
+        setState(() => _lobby = lobby);
+        unawaited(_loadSyllabusUnits());
+      }
     } catch (error) {
       if (mounted && generation == _generation)
         setState(() {
@@ -97,6 +136,17 @@ class _StudyPkScreenState extends ConsumerState<StudyPkScreen>
     } finally {
       if (mounted && generation == _generation) setState(() => _busy = false);
     }
+  }
+
+  String _sourceLabel(Map<String, dynamic> match) {
+    final String source = '${match['source'] ?? ''}';
+    if (source == 'cafe') return '咖啡店词表';
+    if (source == 'syllabus') {
+      final String book = '${match['book_title'] ?? match['book_id'] ?? '词书'}';
+      final String unit = '${match['unit_label'] ?? ''}';
+      return unit.isEmpty ? book : '$book · $unit';
+    }
+    return '近${match['days']}天';
   }
 
   Future<void> _open(int id) async {
@@ -261,6 +311,7 @@ class _StudyPkScreenState extends ConsumerState<StudyPkScreen>
             ),
             Wrap(
               spacing: 8,
+              runSpacing: 8,
               children: <Widget>[
                 ChoiceChip(
                   label: const Text('共同学过词'),
@@ -275,6 +326,16 @@ class _StudyPkScreenState extends ConsumerState<StudyPkScreen>
                   onSelected: _busy
                       ? null
                       : (_) => setState(() => _source = 'cafe'),
+                ),
+                ChoiceChip(
+                  label: const Text('词书单元'),
+                  selected: _source == 'syllabus',
+                  onSelected: _busy
+                      ? null
+                      : (_) {
+                          setState(() => _source = 'syllabus');
+                          unawaited(_loadSyllabusUnits());
+                        },
                 ),
                 if (_source == 'intersection')
                   for (final int days in <int>[7, 30])
@@ -295,16 +356,56 @@ class _StudyPkScreenState extends ConsumerState<StudyPkScreen>
                   ),
               ],
             ),
+            if (_source == 'syllabus') ...<Widget>[
+              const SizedBox(height: 8),
+              if (_syllabusUnits.isEmpty)
+                const Text('暂无可用词书单元，请稍后再试或改用其他题库。')
+              else
+                DropdownButtonFormField<String>(
+                  value: _bookId == null
+                      ? null
+                      : '$_bookId:$_unitIndex',
+                  decoration: const InputDecoration(
+                    labelText: '约定词书单元',
+                    border: OutlineInputBorder(),
+                  ),
+                  items: <DropdownMenuItem<String>>[
+                    for (final Map<String, dynamic> unit in _syllabusUnits)
+                      DropdownMenuItem<String>(
+                        value: '${unit['book_id']}:${unit['unit_index']}',
+                        child: Text(
+                          '${unit['book_title']} · ${unit['unit_label']}'
+                          '（${unit['word_count']}词）',
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                  ],
+                  onChanged: _busy
+                      ? null
+                      : (String? value) {
+                          if (value == null) return;
+                          final List<String> parts = value.split(':');
+                          setState(() {
+                            _bookId = parts.first;
+                            _unitIndex = int.tryParse(parts.last) ?? 0;
+                          });
+                        },
+                ),
+            ],
             Text(
               _source == 'cafe'
                   ? '约定章节词表：双方用街角咖啡店公共表达对战，不要求词库交集。'
-                  : '只取双方共同学过的单词；不足时请扩大范围、选5题，或改用章节词表。',
+                  : _source == 'syllabus'
+                  ? '约定词书单元：双方用同一本服务端词书的同一单元对战，不要求共同学过。'
+                  : '只取双方共同学过的单词；不足时请扩大范围、选5题，或改用约定词表。',
             ),
             FilledButton(
               onPressed:
                   _busy ||
                       _lobby!['my_consent'] != true ||
-                      _lobby!['peer_consent'] != true
+                      _lobby!['peer_consent'] != true ||
+                      (_source == 'syllabus' &&
+                          (_bookId == null || _syllabusUnits.isEmpty))
                   ? null
                   : () => _action(() async {
                       await _request(
@@ -314,11 +415,19 @@ class _StudyPkScreenState extends ConsumerState<StudyPkScreen>
                           'days': _days,
                           'count': _count,
                           'source': _source,
+                          if (_source == 'syllabus') ...<String, dynamic>{
+                            'book_id': _bookId,
+                            'unit_index': _unitIndex,
+                          },
                         },
                       );
                     }),
               child: Text(
-                _source == 'cafe' ? '发起咖啡店词表 PK' : '向同桌发起比赛',
+                _source == 'cafe'
+                    ? '发起咖啡店词表 PK'
+                    : _source == 'syllabus'
+                    ? '发起词书单元 PK'
+                    : '向同桌发起比赛',
               ),
             ),
             const SizedBox(height: 20),
@@ -337,7 +446,7 @@ class _StudyPkScreenState extends ConsumerState<StudyPkScreen>
                     children: <Widget>[
                       Text(
                         '第 ${match['id']} 局 · ${match['count']} 题 · '
-                        '${match['source'] == 'cafe' ? '咖啡店词表' : '近${match['days']}天'}',
+                        '${_sourceLabel(Map<String, dynamic>.from(match as Map))}',
                       ),
                       Text(_status('${match['status']}')),
                       if (match['status'] == 'pending')
