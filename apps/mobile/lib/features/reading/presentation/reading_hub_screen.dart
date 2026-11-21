@@ -24,6 +24,7 @@ import '../data/reading_vocab_lists.dart';
 import '../domain/reading_doc.dart';
 import 'reading_iplus1_provider.dart';
 import 'reading_library_provider.dart';
+import 'reading_stats_row.dart';
 import 'reading_cold_start.dart';
 import 'reading_book_cover.dart';
 import 'reading_vocab_lists_sheet.dart';
@@ -275,29 +276,15 @@ class _ReadingHubScreenState extends ConsumerState<ReadingHubScreen> {
                     final ReadingHubStats stats = computeReadingHubStats(state);
                     return Padding(
                       padding: const EdgeInsets.only(bottom: 16),
-                      child: Wrap(
-                        spacing: 10,
-                        runSpacing: 8,
-                        children: <Widget>[
-                          _StatChip(label: '书架', value: '${stats.docCount}'),
-                          _StatChip(
-                            label: '已打开',
-                            value: '${stats.openedCount}',
-                          ),
-                          _StatChip(
-                            label: '读完',
-                            value: '${stats.completedCount}',
-                          ),
-                          _StatChip(
-                            label: '约读词数',
-                            value: '${stats.wordsReadEstimate}',
-                          ),
-                          _StatChip(label: '已会词', value: '${lists.knownCount}'),
-                          _StatChip(
-                            label: '强制生词',
-                            value: '${lists.focusCount}',
-                          ),
-                        ],
+                      child: ReadingStatsRow(
+                        values: {
+                          '藏书': stats.docCount,
+                          '已打开': stats.openedCount,
+                          '读完': stats.completedCount,
+                          '约读词': stats.wordsReadEstimate,
+                          '已会词': lists.knownCount,
+                          '重点词': lists.focusCount,
+                        },
                       ),
                     );
                   },
@@ -505,38 +492,6 @@ class _ReadingHubScreenState extends ConsumerState<ReadingHubScreen> {
   }
 }
 
-class _StatChip extends StatelessWidget {
-  const _StatChip({required this.label, required this.value});
-
-  final String label;
-  final String value;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-      decoration: BoxDecoration(
-        color: const Color(0xFFF3F6F2),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: AppDesignTokens.borderGray),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: <Widget>[
-          Text(
-            value,
-            style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 16),
-          ),
-          Text(
-            label,
-            style: const TextStyle(fontSize: 12, color: Color(0xFF626262)),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
 class _SectionTitle extends StatelessWidget {
   const _SectionTitle(this.text);
   final String text;
@@ -609,17 +564,50 @@ class _DocTile extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: <Widget>[
                   SizedBox(
-                    width: 92,
+                    width: 76,
                     child: ReadingBookCover(title: doc.title, level: doc.level),
                   ),
-                  const SizedBox(width: 18),
+                  const SizedBox(width: 14),
                   Expanded(
-                    child: Text(
-                      doc.title,
-                      style: TextStyle(
-                        fontWeight: FontWeight.w800,
-                        color: AppDesignTokens.textPrimary,
-                      ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: <Widget>[
+                        Text(
+                          doc.title,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w800,
+                            color: AppDesignTokens.textPrimary,
+                          ),
+                        ),
+                        const SizedBox(height: 6),
+                        Text(
+                          '$_sourceLabel · 约 ${doc.wordCount} 词'
+                          '${pct > 0 ? ' · 进度 ${(pct * 100).round()}%' : ''}'
+                          '${(badge ?? '').isNotEmpty ? ' · $badge' : ''}',
+                          maxLines: 3,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            color: Color(0xFF626262),
+                            fontSize: 12,
+                            height: 1.35,
+                          ),
+                        ),
+                        if (pct > 0) ...<Widget>[
+                          const SizedBox(height: 10),
+                          ClipRRect(
+                            borderRadius: BorderRadius.circular(99),
+                            child: LinearProgressIndicator(
+                              value: pct.clamp(0.0, 1.0),
+                              minHeight: 5,
+                              backgroundColor: const Color(0xFFE8E8E8),
+                              color: AppDesignTokens.brandGreenDark,
+                            ),
+                          ),
+                        ],
+                      ],
                     ),
                   ),
                   if (onDelete != null)
@@ -630,24 +618,6 @@ class _DocTile extends StatelessWidget {
                     ),
                 ],
               ),
-              Text(
-                '$_sourceLabel · 约 ${doc.wordCount} 词'
-                '${pct > 0 ? ' · 进度 ${(pct * 100).round()}%' : ''}'
-                '${(badge ?? '').isNotEmpty ? ' · $badge' : ''}',
-                style: const TextStyle(color: Color(0xFF626262), fontSize: 13),
-              ),
-              if (pct > 0) ...<Widget>[
-                const SizedBox(height: 8),
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(99),
-                  child: LinearProgressIndicator(
-                    value: pct.clamp(0.0, 1.0),
-                    minHeight: 6,
-                    backgroundColor: const Color(0xFFE8E8E8),
-                    color: AppDesignTokens.brandGreenDark,
-                  ),
-                ),
-              ],
             ],
           ),
         ),

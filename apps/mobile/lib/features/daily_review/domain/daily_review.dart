@@ -382,6 +382,7 @@ class DailyReviewState {
     final List<ReviewRecord> active = records.values
         .where((ReviewRecord record) => activeKeys.contains(record.key))
         .toList();
+    bool favoriteFirst(String key) => key.startsWith('entry:');
     final List<ReviewRecord> due =
         active
             .where(
@@ -390,12 +391,20 @@ class DailyReviewState {
             )
             .toList()
           ..sort((ReviewRecord a, ReviewRecord b) {
+            final bool aFav = favoriteFirst(a.key);
+            final bool bFav = favoriteFirst(b.key);
+            if (aFav != bFav) return aFav ? -1 : 1;
             final int byDue = a.card.due.compareTo(b.card.due);
             return byDue == 0 ? a.order.compareTo(b.order) : byDue;
           });
     final List<ReviewRecord> waiting =
         active.where((ReviewRecord record) => record.isNew).toList()..sort(
-          (ReviewRecord a, ReviewRecord b) => a.order.compareTo(b.order),
+          (ReviewRecord a, ReviewRecord b) {
+            final bool aFav = favoriteFirst(a.key);
+            final bool bFav = favoriteFirst(b.key);
+            if (aFav != bFav) return aFav ? -1 : 1;
+            return a.order.compareTo(b.order);
+          },
         );
     final ReviewDay today = days[reviewDayKey(now)] ?? const ReviewDay();
     final int available = math.min(

@@ -3,6 +3,13 @@ import 'package:flutter/material.dart';
 import '../../player/presentation/widgets/subtitle_chunk_highlight.dart';
 import '../../words/presentation/word_book_provider.dart' show normalizeWord;
 
+/// Reader colors follow the reading surface, independently of the app theme.
+Color readingForegroundColor(bool dark) =>
+    dark ? const Color(0xFFF2F2F7) : const Color(0xFF242428);
+
+Color readingBackgroundColor(bool dark) =>
+    dark ? const Color(0xFF1C1C1E) : const Color(0xFFF7F3E9);
+
 typedef ReadingRangeCallback = void Function(String lexeme, int start, int end);
 
 class ReadingToken {

@@ -35,7 +35,6 @@ import 'content_media_provider.dart';
 import 'reading_chunk_provider.dart';
 import 'reading_digital_human_ball.dart';
 import 'reading_library_provider.dart';
-import 'reading_book_cover.dart';
 import 'reading_text_spans.dart';
 import 'reading_vocab_lists_sheet.dart';
 
@@ -814,10 +813,8 @@ class _ReadingReaderScreenState extends ConsumerState<ReadingReaderScreen> {
     unawaited(_ensureGlosses(doc));
 
     final bool showChinese = _mode.showInlineChinese;
-    final Color bg = _dark ? const Color(0xFF1C1C1E) : const Color(0xFFF7F3E9);
-    final Color fg = _dark
-        ? const Color(0xFFF2F2F7)
-        : AppDesignTokens.textPrimary;
+    final Color bg = readingBackgroundColor(_dark);
+    final Color fg = readingForegroundColor(_dark);
     final AsyncValue<FoundationMediaManifest> mediaAsync = ref.watch(
       readingContentMediaProvider,
     );
@@ -997,16 +994,6 @@ class _ReadingReaderScreenState extends ConsumerState<ReadingReaderScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: <Widget>[
-                  Center(
-                    child: SizedBox(
-                      width: 100,
-                      child: ReadingBookCover(
-                        title: doc.title,
-                        level: doc.level,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 24),
                   Text(
                     doc.title,
                     textAlign: TextAlign.center,

@@ -29,10 +29,12 @@ import '../../shared/presentation/pad/pad_top_bar.dart';
 import '../../sync/data/study_activity_service.dart';
 import '../../phrases/presentation/phrase_book_provider.dart';
 import '../../words/domain/foundation_media.dart';
+import '../../words/domain/syllabus_book.dart';
 import '../../words/domain/vocab_entry.dart';
 import '../../words/domain/word_morphology.dart';
 import '../../words/domain/word_review_settings.dart';
 import '../../words/presentation/foundation_media_provider.dart';
+import '../../words/presentation/syllabus_books_provider.dart';
 import '../../words/presentation/vocabulary_placement_provider.dart';
 import '../../words/presentation/widgets/phonics_syllable_blocks.dart';
 import '../../words/presentation/word_book_provider.dart';
@@ -182,16 +184,34 @@ class _DailyReviewScreenState extends ConsumerState<DailyReviewScreen>
     Iterable<ReviewSource> sources = ref.watch(reviewSourcesProvider);
     if (widget.syllabusOnly) {
       final String? bookId = widget.syllabusBookId?.trim();
+      final Set<String> bookLemmas = <String>{};
+      if (bookId != null && bookId.isNotEmpty) {
+        final SyllabusBook? book =
+            ref.read(syllabusBooksProvider).bookById(bookId);
+        if (book != null) {
+          for (final SyllabusWord word in book.words) {
+            final String lemma = word.word.trim().toLowerCase();
+            if (lemma.isNotEmpty) bookLemmas.add(lemma);
+          }
+        }
+      }
       sources = sources.where((ReviewSource source) {
-        if (!source.key.startsWith('syllabus:')) return false;
-        if (bookId == null || bookId.isEmpty) return true;
-        return source.key.startsWith('syllabus:$bookId:');
+        // Book-scoped: that book's cards + favorites that also appear in it.
+        if (source.key.startsWith('syllabus:')) {
+          if (bookId == null || bookId.isEmpty) return true;
+          return source.key.startsWith('syllabus:$bookId:');
+        }
+        if (source.key.startsWith('entry:')) {
+          if (bookLemmas.isEmpty) return bookId == null || bookId.isEmpty;
+          final String? lemma = lemmaFromReviewKey(source.key);
+          return lemma != null && bookLemmas.contains(lemma);
+        }
+        return false;
       });
     } else {
       sources = sources.where(
         (ReviewSource source) =>
-            source.key.startsWith('recommended:') == widget.recommended &&
-            !source.key.startsWith('syllabus:'),
+            source.key.startsWith('recommended:') == widget.recommended,
       );
     }
     if (widget.expressions) {

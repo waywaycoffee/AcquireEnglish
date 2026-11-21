@@ -4,6 +4,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../router/app_router.dart';
+import '../../daily_review/presentation/syllabus_overlap_dialog.dart';
 import '../../navigation/presentation/navigation_destination.dart';
 import '../../shared/presentation/pad/app_design_tokens.dart';
 import '../../shared/presentation/pad/pad_scaffold.dart';
@@ -132,6 +134,11 @@ class _LilinjiCatalogScreenState extends ConsumerState<LilinjiCatalogScreen> {
           .downloadBook(entry: entry, examTag: _examTag);
       final SyllabusBook book = result.book;
       await ref.read(syllabusBooksProvider.notifier).saveImportedBook(book);
+      final overlap = await activateBookWithOverlap(ref, book, setActive: false);
+      if (!mounted) return;
+      if (overlap != null) {
+        await showSyllabusOverlapDialog(context, book, overlap);
+      }
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -139,9 +146,7 @@ class _LilinjiCatalogScreenState extends ConsumerState<LilinjiCatalogScreen> {
           action: SnackBarAction(
             label: '开始背',
             onPressed: () {
-              context.push(
-                '/review/session?deck=syllabus&book=${Uri.encodeComponent(book.id)}',
-              );
+              context.push(SGRoute.reviewSession.route);
             },
           ),
         ),

@@ -1,4 +1,3 @@
-import 'package:url_launcher/url_launcher.dart';
 import 'assessment_panel.dart';
 import '../digital_human/presentation/digital_human_coach_screen.dart';
 import 'dart:convert';
@@ -616,53 +615,6 @@ class _ModuleScreenState extends ConsumerState<ModuleScreen>
               child: const Text('10分钟定时停止'),
             ),
           ],
-          if (widget.kind == 'ipa' || widget.kind == 'phonics')
-            Card(
-              child: Padding(
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text(
-                      'Seeing Speech · 发音器官示范',
-                      style: TextStyle(
-                        fontSize: 17,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                    const Text('打开原站，点击音标查看发音动画、MRI或超声示范。注意：这些视图与正面真人口型并不相同。'),
-                    OutlinedButton.icon(
-                      onPressed: () async {
-                        stop();
-                        try {
-                          final opened = await launchUrl(
-                            Uri.parse(
-                              'https://www.seeingspeech.ac.uk/ipa-charts/',
-                            ),
-                            mode: LaunchMode.externalApplication,
-                          );
-                          if (!opened) throw StateError('launch');
-                        } catch (_) {
-                          if (mounted)
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                content: Text(
-                                  '无法打开浏览器，请访问 www.seeingspeech.ac.uk',
-                                ),
-                              ),
-                            );
-                        }
-                      },
-                      icon: const Icon(Icons.open_in_new),
-                      label: const Text('查看 Seeing Speech 原站示范'),
-                    ),
-                    const Text(
-                      '来源：Lawson、Stuart-Smith、Scobbie、Nakai（2018），University of Glasgow。原站许可：CC BY-NC-ND 4.0。',
-                    ),
-                  ],
-                ),
-              ),
-            ),
           AssessmentPanel(
             key: ValueKey('${widget.kind}-$lesson-$line'),
             reference: item.lines[line],
