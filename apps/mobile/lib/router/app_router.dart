@@ -39,6 +39,8 @@ import '../features/words/presentation/words_screen.dart';
 import '../features/words/presentation/vocabulary_placement_screen.dart';
 import 'fade_extension.dart';
 import '../features/membership/presentation/membership_screen.dart';
+import '../features/onboarding/presentation/first_open_onboarding_screen.dart';
+import '../features/onboarding/presentation/onboarding_provider.dart';
 
 part 'app_router.g.dart';
 
@@ -89,10 +91,34 @@ enum SGRoute {
   String get name => toString().replaceAll('SGRoute.', '');
 }
 
+bool _isAuthOrLegalPath(String location) {
+  return location == SGRoute.login.route ||
+      location == SGRoute.loginPhone.route ||
+      location == SGRoute.loginWechat.route ||
+      location == SGRoute.register.route ||
+      location == SGRoute.userAgreement.route;
+}
+
 @riverpod
 GoRouter goRouter(Ref ref) => GoRouter(
-  initialLocation: SGRoute.home.route,
+  initialLocation: readOnboardingCompletedSync()
+      ? SGRoute.home.route
+      : '/onboarding',
+  redirect: (BuildContext context, GoRouterState state) {
+    final bool done = readOnboardingCompletedSync();
+    final String loc = state.matchedLocation;
+    final bool onOnboarding = loc == '/onboarding';
+    if (!done && !onOnboarding && !_isAuthOrLegalPath(loc)) {
+      return '/onboarding';
+    }
+    return null;
+  },
   routes: <GoRoute>[
+    GoRoute(
+      path: '/onboarding',
+      builder: (BuildContext context, GoRouterState state) =>
+          const FirstOpenOnboardingScreen(),
+    ).fade(),
     GoRoute(
       path: '/learn/:kind',
       builder: (context, state) => ModuleScreen(
