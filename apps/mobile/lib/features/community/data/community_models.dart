@@ -47,6 +47,8 @@ class CommunityPostDto {
     this.authorLevel,
     this.authorAvatar = const <String, String>{},
     this.bilibiliOpenUrl,
+    this.embedWord,
+    this.embedTimestampSec,
     this.challengeOpens = 0,
     this.challengeCompletes = 0,
   });
@@ -66,6 +68,8 @@ class CommunityPostDto {
       bvid: json['bvid'] as String?,
       interestTag: json['interest_tag'] as String?,
       englishLevel: json['english_level'] as String?,
+      embedWord: (json['embed_word'] as String?)?.trim(),
+      embedTimestampSec: (json['embed_timestamp_sec'] as num?)?.toDouble(),
       likeCount: (json['like_count'] as num?)?.toInt() ?? 0,
       commentCount: (json['comment_count'] as num?)?.toInt() ?? 0,
       likedByMe: json['liked_by_me'] == true,
@@ -91,6 +95,8 @@ class CommunityPostDto {
   final String? bvid;
   final String? interestTag;
   final String? englishLevel;
+  final String? embedWord;
+  final double? embedTimestampSec;
   final int likeCount;
   final int commentCount;
   final bool likedByMe;

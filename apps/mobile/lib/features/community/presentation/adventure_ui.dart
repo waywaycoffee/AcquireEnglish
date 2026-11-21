@@ -922,6 +922,8 @@ class QuestFeedCard extends StatelessWidget {
     this.accent,
     this.authorAvatar = const <String, String>{},
     this.showPlayChevron = true,
+    this.onLongPress,
+    this.trailing,
   });
 
   final String title;
@@ -932,6 +934,8 @@ class QuestFeedCard extends StatelessWidget {
   /// Cosmetics paper-doll loadout from API `author_avatar`.
   final Map<String, String> authorAvatar;
   final bool showPlayChevron;
+  final VoidCallback? onLongPress;
+  final Widget? trailing;
 
   @override
   Widget build(BuildContext context) {
@@ -941,6 +945,7 @@ class QuestFeedCard extends StatelessWidget {
       color: Colors.transparent,
       child: InkWell(
         onTap: onPlay,
+        onLongPress: onLongPress,
         borderRadius: BorderRadius.circular(18),
         child: Ink(
           decoration: BoxDecoration(
@@ -1012,6 +1017,11 @@ class QuestFeedCard extends StatelessWidget {
                     ),
                   ),
                 ),
+                if (trailing != null)
+                  Padding(
+                    padding: const EdgeInsets.only(right: 4),
+                    child: trailing,
+                  ),
                 if (showPlayChevron)
                   Padding(
                     padding: const EdgeInsets.only(right: 12),

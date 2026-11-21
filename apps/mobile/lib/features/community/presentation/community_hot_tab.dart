@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../router/app_router.dart';
+import '../../authentication/presentation/auth_session.dart';
 import '../../import_course/presentation/bilibili_import_sheet.dart';
 import '../../shared/presentation/pad/app_design_tokens.dart';
 import '../../sync/data/acquire_api_client.dart';
@@ -12,17 +13,66 @@ import '../../sync/presentation/daily_feed_provider.dart';
 import '../data/community_models.dart';
 import 'adventure_ui.dart';
 import 'community_provider.dart';
+import 'community_social_screen.dart';
 
-class CommunityHotTab extends ConsumerWidget {
+class CommunityHotTab extends ConsumerStatefulWidget {
   const CommunityHotTab({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<CommunityHotTab> createState() => _CommunityHotTabState();
+}
+
+class _CommunityHotTabState extends ConsumerState<CommunityHotTab> {
+  List<Map<String, dynamic>> _packs = const <Map<String, dynamic>>[];
+  List<CommunityPostDto> _followingPosts = const <CommunityPostDto>[];
+  bool _packsLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      unawaited(_loadExtras());
+    });
+  }
+
+  Future<void> _loadExtras() async {
+    setState(() => _packsLoading = true);
+    try {
+      final AcquireApiClient api = ref.read(acquireApiClientProvider);
+      final List<Map<String, dynamic>> packs = await api.listCommunityPacks();
+      List<CommunityPostDto> following = const <CommunityPostDto>[];
+      if (ref.read(authSessionProvider).isLoggedIn) {
+        try {
+          following = await api.communityFeed(following: true, limit: 8);
+        } catch (_) {}
+      }
+      if (!mounted) return;
+      setState(() {
+        _packs = packs;
+        _followingPosts = following;
+        _packsLoading = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _packsLoading = false);
+    }
+  }
+
+  Future<void> _refreshAll() async {
+    await Future.wait(<Future<void>>[
+      ref.read(communityHotProvider.notifier).refresh(),
+      _loadExtras(),
+    ]);
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final AsyncValue<CommunityHotBundle> async =
         ref.watch(communityHotProvider);
+    final bool loggedIn = ref.watch(authSessionProvider).isLoggedIn;
 
     return RefreshIndicator(
-      onRefresh: () => ref.read(communityHotProvider.notifier).refresh(),
+      onRefresh: _refreshAll,
       child: async.when(
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (Object e, StackTrace st) => ListView(
@@ -36,12 +86,122 @@ class CommunityHotTab extends ConsumerWidget {
             padding: const EdgeInsets.fromLTRB(16, 12, 16, 32),
             children: <Widget>[
               const Text(
-                '素材 · 可练习视频',
+                '素材包',
                 style: TextStyle(fontWeight: FontWeight.w900, fontSize: 18),
               ),
               const SizedBox(height: 4),
               Text(
-                '社区只存链接与学习笔记，视频请自行准备；后续支持 CEFR / 词表 fork',
+                '社区不存视频本体，只存链接 / 字幕元信息 / 词表说明；可 fork 到自己的库',
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                  color: AppDesignTokens.textSecondary,
+                ),
+              ),
+              const SizedBox(height: 10),
+              if (loggedIn)
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: FilledButton.tonal(
+                    onPressed: () => unawaited(_createPack(context)),
+                    child: const Text('发布素材包'),
+                  ),
+                ),
+              const SizedBox(height: 10),
+              if (_packsLoading)
+                const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 16),
+                  child: Center(child: CircularProgressIndicator()),
+                )
+              else if (_packs.isEmpty)
+                QuestFeedCard(
+                  title: '还没有公开素材包',
+                  meta: '发布含 CEFR / 题材的包，或先分享 B 站链接',
+                  badge: '等你来发',
+                  accent: AdventurePalette.pathAmber,
+                  onPlay: loggedIn
+                      ? () => unawaited(_createPack(context))
+                      : () {},
+                )
+              else
+                for (final Map<String, dynamic> pack in _packs) ...<Widget>[
+                  QuestFeedCard(
+                    title: (pack['title'] as String?)?.trim().isNotEmpty == true
+                        ? pack['title'] as String
+                        : '未命名素材包',
+                    meta: <String>[
+                      if ((pack['cefr'] as String?)?.isNotEmpty == true)
+                        pack['cefr'] as String,
+                      if ((pack['topic'] as String?)?.isNotEmpty == true)
+                        pack['topic'] as String,
+                      'fork ${pack['fork_count'] ?? 0}',
+                      if (pack['has_subtitles'] == true) '字幕',
+                      if (pack['has_vocab'] == true) '词表',
+                    ].join(' · '),
+                    badge: '可 fork',
+                    accent: const Color(0xFF5B8DEF),
+                    onPlay: () => unawaited(_openPack(context, pack)),
+                  ),
+                  const SizedBox(height: 12),
+                ],
+              const SizedBox(height: 16),
+              Row(
+                children: <Widget>[
+                  const Expanded(
+                    child: Text(
+                      '关注的人',
+                      style: TextStyle(
+                        fontWeight: FontWeight.w900,
+                        fontSize: 18,
+                      ),
+                    ),
+                  ),
+                  TextButton(
+                    onPressed: () => Navigator.of(context).push<void>(
+                      MaterialPageRoute<void>(
+                        builder: (_) => const CommunitySocialScreen(),
+                      ),
+                    ),
+                    child: const Text('消息与管理'),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 4),
+              Text(
+                loggedIn
+                    ? '关注流只看你关心的人的练习与素材'
+                    : '登录后可看关注流',
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                  color: AppDesignTokens.textSecondary,
+                ),
+              ),
+              const SizedBox(height: 10),
+              if (!loggedIn)
+                const Text('登录后显示关注流')
+              else if (_followingPosts.isEmpty)
+                const Text('还没有关注动态；可在帖子操作里关注作者')
+              else
+                for (final CommunityPostDto post in _followingPosts) ...<Widget>[
+                  QuestFeedCard(
+                    title: '${post.authorName} · ${post.title.isEmpty ? post.kind : post.title}',
+                    meta: post.body.replaceAll('\n', ' '),
+                    badge: '关注',
+                    accent: AppDesignTokens.brandGreen,
+                    authorAvatar: post.authorAvatar,
+                    onPlay: () {},
+                  ),
+                  const SizedBox(height: 10),
+                ],
+              const SizedBox(height: 16),
+              const Text(
+                '热门分享链接',
+                style: TextStyle(fontWeight: FontWeight.w900, fontSize: 18),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                '社区只存链接与学习笔记，视频请自行准备',
                 style: TextStyle(
                   fontSize: 13,
                   fontWeight: FontWeight.w600,
@@ -52,7 +212,7 @@ class CommunityHotTab extends ConsumerWidget {
               if (data.shares.isEmpty)
                 QuestFeedCard(
                   title: '还没有人分享学习素材',
-                  meta: '去「练习」发一条 B 站链接或成果卡',
+                  meta: '去「练习」发一条 B 站链接，或上方发布素材包',
                   badge: '等你来发',
                   accent: AdventurePalette.pathAmber,
                   onPlay: () {},
@@ -65,7 +225,7 @@ class CommunityHotTab extends ConsumerWidget {
                         : 'B 站视频任务',
                     meta: share.latestBody?.isNotEmpty == true
                         ? '分享 ${share.shareCount} 次 · ${share.latestBody}'
-                        : '分享 ${share.shareCount} 次 · ${share.shareCount} 人正在做',
+                        : '分享 ${share.shareCount} 次',
                     badge: '热门',
                     accent: const Color(0xFFE67E22),
                     onPlay: () =>
@@ -113,6 +273,188 @@ class CommunityHotTab extends ConsumerWidget {
             ],
           );
         },
+      ),
+    );
+  }
+
+  Future<void> _createPack(BuildContext context) async {
+    final TextEditingController title = TextEditingController();
+    final TextEditingController url = TextEditingController();
+    final TextEditingController cefr = TextEditingController(text: 'B1');
+    final TextEditingController topic = TextEditingController(text: 'daily');
+    final bool? ok = await showDialog<bool>(
+      context: context,
+      builder: (BuildContext ctx) => AlertDialog(
+        title: const Text('发布素材包'),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: <Widget>[
+              const Text(
+                '不上传视频文件；只保存来源链接与学习元信息。',
+                style: TextStyle(fontSize: 12),
+              ),
+              TextField(
+                controller: title,
+                decoration: const InputDecoration(labelText: '标题'),
+              ),
+              TextField(
+                controller: url,
+                decoration: const InputDecoration(labelText: 'B 站链接（可选）'),
+              ),
+              TextField(
+                controller: cefr,
+                decoration: const InputDecoration(labelText: 'CEFR'),
+              ),
+              TextField(
+                controller: topic,
+                decoration: const InputDecoration(labelText: '题材'),
+              ),
+            ],
+          ),
+        ),
+        actions: <Widget>[
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('取消'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('发布'),
+          ),
+        ],
+      ),
+    );
+    if (ok != true || !mounted) return;
+    if (title.text.trim().isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('请填写标题')),
+      );
+      return;
+    }
+    try {
+      await ref.read(acquireApiClientProvider).createCommunityPack(
+        <String, dynamic>{
+          'title': title.text.trim(),
+          if (url.text.trim().isNotEmpty) 'source_url': url.text.trim(),
+          if (cefr.text.trim().isNotEmpty) 'cefr': cefr.text.trim(),
+          if (topic.text.trim().isNotEmpty) 'topic': topic.text.trim(),
+          'has_subtitles': false,
+          'has_vocab': false,
+          'visibility': 'public',
+        },
+      );
+      await _loadExtras();
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('素材包已发布')),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('发布失败：$e')),
+      );
+    }
+  }
+
+  Future<void> _openPack(
+    BuildContext context,
+    Map<String, dynamic> pack,
+  ) async {
+    final int packId = (pack['id'] as num?)?.toInt() ?? 0;
+    final String? sourceUrl = pack['source_url'] as String?;
+    final bool isFork = pack['forked_from_id'] != null;
+    await showModalBottomSheet<void>(
+      context: context,
+      builder: (BuildContext ctx) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: <Widget>[
+              Text(
+                (pack['title'] as String?) ?? '素材包',
+                style: Theme.of(ctx).textTheme.titleMedium,
+              ),
+              const SizedBox(height: 6),
+              Text(
+                (pack['description'] as String?)?.trim().isNotEmpty == true
+                    ? pack['description'] as String
+                    : '社区不存视频本体；导入播放器时请自备合法片源。',
+              ),
+              const SizedBox(height: 12),
+              if (sourceUrl != null && sourceUrl.isNotEmpty)
+                FilledButton(
+                  onPressed: () {
+                    Navigator.pop(ctx);
+                    unawaited(_openShare(context, ref, sourceUrl));
+                  },
+                  child: const Text('导入播放器'),
+                ),
+              const SizedBox(height: 8),
+              if (ref.read(authSessionProvider).isLoggedIn && packId > 0) ...<
+                  Widget>[
+                FilledButton.tonal(
+                  onPressed: () async {
+                    try {
+                      await ref.read(acquireApiClientProvider).forkCommunityPack(
+                            packId,
+                            syncUpstream: false,
+                          );
+                      if (ctx.mounted) Navigator.pop(ctx);
+                      await _loadExtras();
+                      if (!mounted) return;
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('已 fork 到我的库（默认不同步上游）'),
+                        ),
+                      );
+                    } catch (e) {
+                      if (!context.mounted) return;
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text('fork 失败：$e')),
+                      );
+                    }
+                  },
+                  child: const Text('Fork 到我的库'),
+                ),
+                if (isFork)
+                  TextButton(
+                    onPressed: () async {
+                      try {
+                        await ref
+                            .read(acquireApiClientProvider)
+                            .syncCommunityPackUpstream(packId);
+                        if (ctx.mounted) Navigator.pop(ctx);
+                        if (!mounted) return;
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('已同步上游元信息')),
+                        );
+                      } catch (e) {
+                        if (!context.mounted) return;
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(content: Text('同步失败：$e')),
+                        );
+                      }
+                    },
+                    child: const Text('同步上游'),
+                  ),
+              ],
+              TextButton(
+                onPressed: () {
+                  Navigator.pop(ctx);
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('词表导入 FSRS：请先在播放器中收藏生词'),
+                    ),
+                  );
+                },
+                child: const Text('导入词表到 FSRS（占位）'),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }

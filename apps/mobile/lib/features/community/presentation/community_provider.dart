@@ -74,6 +74,8 @@ class CommunityFeedNotifier extends AsyncNotifier<List<CommunityPostDto>> {
     String body = '',
     String? linkUrl,
     String? linkTitle,
+    String? embedWord,
+    double? embedTimestampSec,
   }) async {
     final CommunityPostDto post = await ref
         .read(acquireApiClientProvider)
@@ -83,6 +85,8 @@ class CommunityFeedNotifier extends AsyncNotifier<List<CommunityPostDto>> {
           body: body,
           linkUrl: linkUrl,
           linkTitle: linkTitle,
+          embedWord: embedWord,
+          embedTimestampSec: embedTimestampSec,
         );
     final List<CommunityPostDto> current =
         state.asData?.value ?? const <CommunityPostDto>[];

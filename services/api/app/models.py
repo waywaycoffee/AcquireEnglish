@@ -477,6 +477,8 @@ class CommunityPost(Base):
     bvid: Mapped[str | None] = mapped_column(String(32), nullable=True, index=True)
     interest_tag: Mapped[str | None] = mapped_column(String(32), nullable=True, index=True)
     english_level: Mapped[str | None] = mapped_column(String(16), nullable=True, index=True)
+    # Optional embeds: {"embed_word":"apple","embed_timestamp_sec":12.5,"quote":"..."}
+    meta_json: Mapped[str] = mapped_column(Text, default="{}")
     like_count: Mapped[int] = mapped_column(Integer, default=0)
     comment_count: Mapped[int] = mapped_column(Integer, default=0)
     # visible | hidden

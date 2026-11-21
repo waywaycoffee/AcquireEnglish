@@ -2229,14 +2229,23 @@ class AcquireApiClient {
         },
       );
 
-  Future<List<CommunityPostDto>> communityFeed({String? kind, int? before, bool following = false, bool bookmarked = false}) async {
+  Future<List<CommunityPostDto>> communityFeed({
+    String? kind,
+    int? before,
+    int? authorId,
+    bool following = false,
+    bool bookmarked = false,
+    int limit = 40,
+  }) async {
     final Response<dynamic> response = await _dio.get(
       Endpoints.communityFeed,
       queryParameters: <String, dynamic>{
         if (kind != null && kind.isNotEmpty) 'kind': kind,
         if (before != null) 'before': before,
+        if (authorId != null) 'author_id': authorId,
         if (following) 'following': true,
         if (bookmarked) 'bookmarked': true,
+        'limit': limit,
       },
       options: _noCache,
     );
@@ -2253,6 +2262,8 @@ class AcquireApiClient {
     String? linkUrl,
     String? linkTitle,
     String? linkCover,
+    String? embedWord,
+    double? embedTimestampSec,
   }) async {
     final Response<dynamic> response = await _dio.post(
       Endpoints.communityPosts,
@@ -2263,6 +2274,10 @@ class AcquireApiClient {
         if (linkUrl != null) 'link_url': linkUrl,
         if (linkTitle != null) 'link_title': linkTitle,
         if (linkCover != null) 'link_cover': linkCover,
+        if (embedWord != null && embedWord.trim().isNotEmpty)
+          'embed_word': embedWord.trim(),
+        if (embedTimestampSec != null)
+          'embed_timestamp_sec': embedTimestampSec,
       },
       options: _noCache,
     );
@@ -2499,6 +2514,14 @@ class AcquireApiClient {
         'sync_upstream': syncUpstream,
         if (title != null && title.isNotEmpty) 'title': title,
       },
+      options: _noCache,
+    );
+    return response.data as Map<String, dynamic>;
+  }
+
+  Future<Map<String, dynamic>> syncCommunityPackUpstream(int packId) async {
+    final Response<dynamic> response = await _dio.post(
+      '${Endpoints.communityPacks}/$packId/sync-upstream',
       options: _noCache,
     );
     return response.data as Map<String, dynamic>;

@@ -11,6 +11,7 @@ import '../../sync/data/acquire_api_client.dart';
 import '../../sync/presentation/daily_feed_provider.dart';
 import '../data/community_models.dart';
 import 'adventure_ui.dart';
+import 'community_post_actions.dart';
 import 'community_provider.dart';
 
 class CommunityFeedTab extends ConsumerWidget {
@@ -294,24 +295,60 @@ class CommunityPostCard extends ConsumerWidget {
 
     final String bodyPreview = post.body.trim().isEmpty ? post.title : post.body;
     final String compact = bodyPreview.replaceAll('\n', ' ');
+    final String embedBits = <String>[
+      if ((post.embedWord ?? '').isNotEmpty) '词条 ${post.embedWord}',
+      if (post.embedTimestampSec != null)
+        '⏱ ${post.embedTimestampSec!.toStringAsFixed(1)}s',
+    ].join(' · ');
+    final String metaCore =
+        '$_metaLine · ♥${post.likeCount} · 💬${post.commentCount}'
+        '${embedBits.isEmpty ? '' : ' · $embedBits'}'
+        '${compact.isEmpty ? '' : ' · $compact'}';
+    void openActions() {
+      showModalBottomSheet<void>(
+        context: context,
+        builder: (BuildContext ctx) => SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: <Widget>[
+                Text(
+                  '帖子操作',
+                  style: Theme.of(ctx).textTheme.titleMedium,
+                ),
+                const SizedBox(height: 8),
+                CommunityPostActions(post: post),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
+
     if (post.isShareBilibili) {
       final String title = post.linkTitle?.trim().isNotEmpty == true
           ? post.linkTitle!.trim()
           : (post.title.isNotEmpty ? post.title : 'B 站视频任务');
       return QuestFeedCard(
         title: '${post.authorName} · $title',
-        meta:
-            '$_metaLine · ♥${post.likeCount} · 💬${post.commentCount}'
-            '${compact.isEmpty ? '' : ' · $compact'}',
+        meta: metaCore,
         badge: '视频素材',
         accent: const Color(0xFFE67E22),
         authorAvatar: post.authorAvatar,
         onPlay: () => unawaited(_openLink(context, ref)),
+        onLongPress: openActions,
+        trailing: IconButton(
+          tooltip: '更多',
+          onPressed: openActions,
+          icon: const Icon(Icons.more_horiz_rounded),
+        ),
       );
     }
     return QuestFeedCard(
       title: '${post.authorName} · ${_kindLabel}',
-      meta: '$_metaLine · ♥${post.likeCount} · 💬${post.commentCount} · $compact',
+      meta: metaCore,
       badge: _kindLabel,
       accent: post.kind == 'method'
           ? const Color(0xFF5B8DEF)
@@ -323,6 +360,12 @@ class CommunityPostCard extends ConsumerWidget {
       authorAvatar: post.authorAvatar,
       showPlayChevron: post.kind != 'question' && post.kind != 'method',
       onPlay: () => unawaited(_openComments(context, ref)),
+      onLongPress: openActions,
+      trailing: IconButton(
+        tooltip: '更多',
+        onPressed: openActions,
+        icon: const Icon(Icons.more_horiz_rounded),
+      ),
     );
   }
 
@@ -457,12 +500,31 @@ class _CommentsSheetState extends ConsumerState<_CommentsSheet> {
               widget.post.title.isEmpty ? '评论' : widget.post.title,
               style: Theme.of(context).textTheme.titleMedium,
             ),
+            if ((widget.post.embedWord ?? '').isNotEmpty ||
+                widget.post.embedTimestampSec != null) ...<Widget>[
+              const SizedBox(height: 6),
+              Text(
+                <String>[
+                  if ((widget.post.embedWord ?? '').isNotEmpty)
+                    '词条：${widget.post.embedWord}',
+                  if (widget.post.embedTimestampSec != null)
+                    '时间戳：${widget.post.embedTimestampSec!.toStringAsFixed(1)}s',
+                ].join(' · '),
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                  color: AppDesignTokens.textSecondary,
+                ),
+              ),
+            ],
+            const SizedBox(height: 8),
+            CommunityPostActions(post: widget.post),
             const SizedBox(height: 8),
             Expanded(
               child: _loading
                   ? const Center(child: CircularProgressIndicator())
                   : _comments.isEmpty
-                  ? const Center(child: Text('还没有评论，来说两句吧'))
+                  ? const Center(child: Text('还没有评论；点评请实名，可用下方模板'))
                   : ListView.separated(
                       itemCount: _comments.length,
                       separatorBuilder: (_, __) => const Divider(height: 1),
@@ -479,6 +541,34 @@ class _CommentsSheetState extends ConsumerState<_CommentsSheet> {
                       },
                     ),
             ),
+            SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Row(
+                children: <Widget>[
+                  for (final String chip in const <String>[
+                    '【语法】',
+                    '【用词】',
+                    '【句式】',
+                    '【自然度】',
+                  ])
+                    Padding(
+                      padding: const EdgeInsets.only(right: 8),
+                      child: ActionChip(
+                        label: Text(chip),
+                        onPressed: () {
+                          final String current = _body.text;
+                          if (current.contains(chip)) return;
+                          _body.text = current.isEmpty ? '$chip ' : '$current$chip ';
+                          _body.selection = TextSelection.collapsed(
+                            offset: _body.text.length,
+                          );
+                        },
+                      ),
+                    ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 8),
             if (canMirror)
               SwitchListTile(
                 contentPadding: EdgeInsets.zero,
@@ -493,7 +583,7 @@ class _CommentsSheetState extends ConsumerState<_CommentsSheet> {
                   child: TextField(
                     controller: _body,
                     decoration: const InputDecoration(
-                      hintText: '写评论…',
+                      hintText: '写点评（不覆盖原文）…',
                       border: OutlineInputBorder(),
                     ),
                   ),
@@ -525,6 +615,8 @@ class _ComposeSheetState extends ConsumerState<_ComposeSheet> {
   final TextEditingController _title = TextEditingController();
   final TextEditingController _body = TextEditingController();
   final TextEditingController _link = TextEditingController();
+  final TextEditingController _embedWord = TextEditingController();
+  final TextEditingController _embedTs = TextEditingController();
   bool _busy = false;
 
   @override
@@ -532,8 +624,19 @@ class _ComposeSheetState extends ConsumerState<_ComposeSheet> {
     _title.dispose();
     _body.dispose();
     _link.dispose();
+    _embedWord.dispose();
+    _embedTs.dispose();
     super.dispose();
   }
+
+  bool get _supportsEmbed => const <String>{
+        'question',
+        'imitation',
+        'shadowing',
+        'sentence_make',
+        'learning_result',
+        'method',
+      }.contains(widget.kind);
 
   String get _heading {
     switch (widget.kind) {
@@ -625,6 +728,7 @@ class _ComposeSheetState extends ConsumerState<_ComposeSheet> {
         return;
       }
     }
+    final double? embedTs = double.tryParse(_embedTs.text.trim());
     setState(() => _busy = true);
     try {
       await ref
@@ -639,6 +743,8 @@ class _ComposeSheetState extends ConsumerState<_ComposeSheet> {
             linkTitle: widget.kind == 'share_bilibili'
                 ? _title.text.trim()
                 : null,
+            embedWord: _supportsEmbed ? _embedWord.text.trim() : null,
+            embedTimestampSec: _supportsEmbed ? embedTs : null,
           );
       if (!mounted) return;
       Navigator.of(context).pop();
@@ -713,6 +819,29 @@ class _ComposeSheetState extends ConsumerState<_ComposeSheet> {
                 decoration: const InputDecoration(
                   labelText: '素材链接（可选）',
                   hintText: 'https://…',
+                  border: OutlineInputBorder(),
+                ),
+              ),
+            ],
+            if (_supportsEmbed) ...<Widget>[
+              const SizedBox(height: 10),
+              TextField(
+                controller: _embedWord,
+                decoration: const InputDecoration(
+                  labelText: '关联词条（可选）',
+                  hintText: 'apple / Could I get…',
+                  border: OutlineInputBorder(),
+                ),
+              ),
+              const SizedBox(height: 10),
+              TextField(
+                controller: _embedTs,
+                keyboardType: const TextInputType.numberWithOptions(
+                  decimal: true,
+                ),
+                decoration: const InputDecoration(
+                  labelText: '台词时间戳秒（可选）',
+                  hintText: '12.5',
                   border: OutlineInputBorder(),
                 ),
               ),

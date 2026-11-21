@@ -10,6 +10,7 @@ import 'adventure_ui.dart';
 import 'community_leaderboard_tab.dart';
 import 'community_provider.dart';
 import 'community_social_screen.dart';
+import 'community_works_screen.dart';
 import 'study_play_screen.dart';
 
 /// Personal asset homepage shell: 2D avatar + works / social / shop.
@@ -124,15 +125,15 @@ class CommunityMeTab extends ConsumerWidget {
         const SizedBox(height: 12),
         QuestFeedCard(
           title: '作品集',
-          meta: '仿写、跟读、造句投稿汇总（持续完善）',
+          meta: '仿写、跟读、造句与分享按类型汇总',
           badge: '练习',
           accent: AdventurePalette.pathAmber,
           showPlayChevron: false,
-          onPlay: () {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('可在「练习」发仿写 / 跟读 / 造句，汇总页稍后完善')),
-            );
-          },
+          onPlay: () => Navigator.of(context).push<void>(
+            MaterialPageRoute<void>(
+              builder: (_) => const CommunityWorksScreen(),
+            ),
+          ),
         ),
         const SizedBox(height: 12),
         QuestFeedCard(

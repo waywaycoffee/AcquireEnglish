@@ -221,6 +221,8 @@ class CommunityPostOut(BaseModel):
     bvid: str | None = None
     interest_tag: str | None = None
     english_level: str | None = None
+    embed_word: str | None = None
+    embed_timestamp_sec: float | None = None
     like_count: int
     comment_count: int = 0
     liked_by_me: bool = False
@@ -241,6 +243,8 @@ class CommunityPostCreate(BaseModel):
     link_url: str | None = Field(default=None, max_length=1024)
     link_title: str | None = Field(default=None, max_length=512)
     link_cover: str | None = Field(default=None, max_length=1024)
+    embed_word: str | None = Field(default=None, max_length=64)
+    embed_timestamp_sec: float | None = Field(default=None, ge=0, le=86400)
 
 
 class CommunityCommentOut(BaseModel):
@@ -296,6 +300,28 @@ def _is_challenge_post(post: CommunityPost) -> bool:
     }
 
 
+def _post_meta(post: CommunityPost) -> dict[str, Any]:
+    try:
+        data = json.loads(getattr(post, "meta_json", None) or "{}")
+    except Exception:
+        return {}
+    return data if isinstance(data, dict) else {}
+
+
+def _build_meta_json(
+    *,
+    embed_word: str | None,
+    embed_timestamp_sec: float | None,
+) -> str:
+    meta: dict[str, Any] = {}
+    word = (embed_word or "").strip().lower()
+    if word:
+        meta["embed_word"] = word[:64]
+    if embed_timestamp_sec is not None:
+        meta["embed_timestamp_sec"] = float(embed_timestamp_sec)
+    return json.dumps(meta, ensure_ascii=False)
+
+
 def _serialize_post(
     post: CommunityPost,
     *,
@@ -308,6 +334,13 @@ def _serialize_post(
 ) -> CommunityPostOut:
     kind = _normalize_kind(post.kind)
     bvid = post.bvid or extract_bvid(post.link_url or "")
+    meta = _post_meta(post)
+    embed_word = str(meta.get("embed_word") or "").strip() or None
+    embed_ts = meta.get("embed_timestamp_sec")
+    try:
+        embed_timestamp = float(embed_ts) if embed_ts is not None else None
+    except (TypeError, ValueError):
+        embed_timestamp = None
     return CommunityPostOut(
         id=post.id,
         kind=kind,
@@ -319,6 +352,8 @@ def _serialize_post(
         bvid=bvid,
         interest_tag=post.interest_tag,
         english_level=post.english_level,
+        embed_word=embed_word,
+        embed_timestamp_sec=embed_timestamp,
         like_count=int(post.like_count or 0),
         comment_count=int(post.comment_count or 0),
         liked_by_me=liked_by_me,
@@ -487,6 +522,7 @@ async def community_feed(
     before: int | None = None,
     following: bool = False,
     bookmarked: bool = False,
+    author_id: int | None = Query(default=None, ge=1),
     limit: int = Query(default=40, ge=1, le=100),
     db: AsyncSession = Depends(get_db),
     user: User | None = Depends(get_current_user_optional),
@@ -505,6 +541,8 @@ async def community_feed(
     )
     if before:
         stmt = stmt.where(CommunityPost.id < before)
+    if author_id is not None:
+        stmt = stmt.where(CommunityPost.user_id == author_id)
     if following:
         from app.models import CommunityFollow
         assert user is not None
@@ -688,6 +726,10 @@ async def create_post(
         bvid=bvid,
         interest_tag=interest_tag,
         english_level=english_level,
+        meta_json=_build_meta_json(
+            embed_word=payload.embed_word,
+            embed_timestamp_sec=payload.embed_timestamp_sec,
+        ),
     )
     db.add(post)
     await db.commit()

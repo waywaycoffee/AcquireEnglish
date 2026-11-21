@@ -301,6 +301,37 @@ async def test_learning_result_challenge_is_visible_to_another_user():
 
 
 @pytest.mark.asyncio
+async def test_author_feed_and_embed_fields():
+    transport = ASGITransport(app=fastapi_app)
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
+        headers = await _login(client, "13900003401")
+        me = await client.get("/api/auth/me", headers=headers)
+        author_id = me.json()["id"]
+        created = await client.post(
+            "/api/community/posts",
+            headers=headers,
+            json={
+                "kind": "question",
+                "title": "这句怎么连读",
+                "body": "around the corner",
+                "embed_word": "corner",
+                "embed_timestamp_sec": 12.5,
+            },
+        )
+        assert created.status_code == 201, created.text
+        assert created.json()["embed_word"] == "corner"
+        assert created.json()["embed_timestamp_sec"] == 12.5
+
+        mine = await client.get(
+            "/api/community/feed",
+            headers=headers,
+            params={"author_id": author_id},
+        )
+        assert mine.status_code == 200
+        assert any(row["id"] == created.json()["id"] for row in mine.json())
+
+
+@pytest.mark.asyncio
 async def test_guest_feed_hot_and_material_pack_fork():
     transport = ASGITransport(app=fastapi_app)
     async with AsyncClient(transport=transport, base_url="http://test") as client:

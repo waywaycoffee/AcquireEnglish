@@ -170,6 +170,10 @@ async def _ensure_community_post_columns(conn: AsyncConnection) -> None:
             "comment_count",
             "ALTER TABLE community_posts ADD COLUMN comment_count INTEGER DEFAULT 0",
         ),
+        (
+            "meta_json",
+            "ALTER TABLE community_posts ADD COLUMN meta_json TEXT DEFAULT '{}'",
+        ),
     ]
     for col, sql in alters:
         if col not in existing:
