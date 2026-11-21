@@ -516,13 +516,16 @@ def convert_scques(root: Path, *, max_items: int = 2000) -> dict[str, list]:
     if not root.exists():
         return out
     for tar_path in list(root.glob("*.tar.gz")) + list(root.rglob("*.tar.gz")):
+        # Skip incomplete downloads (<1MB) and already-extracted trees.
+        if tar_path.stat().st_size < 1_000_000:
+            continue
         extract_dir = tar_path.parent / "_extracted"
         if extract_dir.exists():
             continue
         try:
             with tarfile.open(tar_path, "r:gz") as tf:
                 tf.extractall(extract_dir)
-        except (OSError, tarfile.TarError) as e:
+        except (OSError, tarfile.TarError, PermissionError) as e:
             print("SC-Ques tar fail", e)
     candidates: list[Path] = []
     for pat in ("**/*.json", "**/*.jsonl", "**/*.jsons", "**/*.csv"):

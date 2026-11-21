@@ -2,7 +2,7 @@
   "family_id": "gaokao",
   "title": "高考英语备考包",
   "cefr": "B1",
-  "version": 12,
+  "version": 15,
   "sources": [
     "ExpressAI/Exams",
     "daligao/gaokao-2026-english-exam",
