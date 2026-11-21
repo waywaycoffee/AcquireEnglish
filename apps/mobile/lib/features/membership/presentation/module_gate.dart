@@ -2,21 +2,28 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../authentication/presentation/auth_session.dart';
-import '../../sync/data/acquire_api_client.dart';
 import '../domain/module_access.dart';
 
 /// Wraps a learning entry; shows a graceful paywall when the module is locked.
+///
+/// - [softBrowse]: always show [child] so catalogs stay browsable; gate items
+///   with [resolveModuleContentAccess] / free-preview helpers.
+/// - [freePreviewAllowed]: unlock this specific content without a purchase.
 class ModuleGate extends ConsumerStatefulWidget {
   const ModuleGate({
     super.key,
     required this.moduleCode,
     required this.child,
     this.title,
+    this.softBrowse = false,
+    this.freePreviewAllowed = false,
   });
 
   final String moduleCode;
   final Widget child;
   final String? title;
+  final bool softBrowse;
+  final bool freePreviewAllowed;
 
   @override
   ConsumerState<ModuleGate> createState() => _ModuleGateState();
@@ -33,9 +40,37 @@ class _ModuleGateState extends ConsumerState<ModuleGate> {
     Future.microtask(_check);
   }
 
+  @override
+  void didUpdateWidget(covariant ModuleGate oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.moduleCode != widget.moduleCode ||
+        oldWidget.softBrowse != widget.softBrowse ||
+        oldWidget.freePreviewAllowed != widget.freePreviewAllowed) {
+      Future.microtask(_check);
+    }
+  }
+
   Future<void> _check() async {
-    if (!ref.read(authSessionProvider).isLoggedIn) {
+    if (widget.softBrowse || widget.freePreviewAllowed) {
       if (!mounted) return;
+      setState(() {
+        _loading = false;
+        _allowed = true;
+        _error = null;
+      });
+      return;
+    }
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
+    final bool allowed = await resolveModuleContentAccess(
+      ref,
+      moduleCode: widget.moduleCode,
+      freePreviewAllowed: widget.freePreviewAllowed,
+    );
+    if (!mounted) return;
+    if (!ref.read(authSessionProvider).isLoggedIn && !allowed) {
       setState(() {
         _loading = false;
         _allowed = false;
@@ -44,38 +79,12 @@ class _ModuleGateState extends ConsumerState<ModuleGate> {
       return;
     }
     setState(() {
-      _loading = true;
-      _error = null;
+      _allowed = allowed;
+      _loading = false;
+      _error = allowed ? null : 'paywall';
     });
-    try {
-      final Map<String, dynamic> assets =
-          await ref.read(acquireApiClientProvider).getAssets();
-      bool allowed = assetsUnlockModule(assets, widget.moduleCode);
-      if (!allowed) {
-        try {
-          final Map<String, dynamic> access = await ref
-              .read(acquireApiClientProvider)
-              .commerceModuleAccess(widget.moduleCode);
-          allowed = access['allowed'] == true;
-        } catch (_) {
-          // Assets snapshot is enough when access endpoint is older.
-        }
-      }
-      if (!mounted) return;
-      setState(() {
-        _allowed = allowed;
-        _loading = false;
-      });
-      if (!allowed) {
-        await showModulePaywall(context, moduleCode: widget.moduleCode);
-      }
-    } catch (_) {
-      if (!mounted) return;
-      setState(() {
-        _loading = false;
-        _allowed = false;
-        _error = 'network';
-      });
+    if (!allowed) {
+      await showModulePaywall(context, moduleCode: widget.moduleCode);
     }
   }
 
@@ -100,20 +109,23 @@ class _ModuleGateState extends ConsumerState<ModuleGate> {
               Text(
                 _error == 'login'
                     ? '登录后可查看模块权益'
-                    : '尚未开通「$title」',
+                    : '免费体验已用完',
                 textAlign: TextAlign.center,
                 style: Theme.of(context).textTheme.titleMedium,
               ),
               const SizedBox(height: 8),
-              const Text(
-                '体验期 / Pro 或单独购买本板块后即可进入。',
+              Text(
+                _error == 'login'
+                    ? '登录后可免费体验约 $kModuleFreePreviewCount 个内容，或开通月卡 / 年卡。'
+                    : '「$title」约有 $kModuleFreePreviewCount 个免费体验内容；'
+                        '继续学习请开通月卡或年卡。',
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: 16),
               FilledButton(
                 onPressed: () =>
                     showModulePaywall(context, moduleCode: widget.moduleCode),
-                child: const Text('查看开通方式'),
+                child: const Text('开通月卡 / 年卡'),
               ),
               TextButton(onPressed: _check, child: const Text('刷新权益')),
             ],
