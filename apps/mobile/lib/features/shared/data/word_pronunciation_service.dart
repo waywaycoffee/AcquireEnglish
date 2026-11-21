@@ -98,7 +98,12 @@ class WordPronunciationService {
       return;
     }
 
-    if (recordedUrl != null && await _playRecording(recordedUrl)) return;
+    final double effectiveRate = (rate ?? selectedRate).clamp(0.5, 1.8);
+
+    if (recordedUrl != null &&
+        await _playRecording(recordedUrl, rate: effectiveRate)) {
+      return;
+    }
 
     final bool tryCloud =
         cloudAudioResolver != null && (preferAliyunCloud || forceCloud);
@@ -106,7 +111,7 @@ class WordPronunciationService {
       final String? cloudUrl = await cloudAudioResolver!(normalizedText);
       if (cloudUrl != null &&
           cloudUrl.isNotEmpty &&
-          await _playRecording(cloudUrl)) {
+          await _playRecording(cloudUrl, rate: effectiveRate)) {
         return;
       }
       // Prefer Aliyun, but keep learning moving if CDN/media path is briefly
@@ -131,11 +136,11 @@ class WordPronunciationService {
       language: language,
       engine: selectedEngine,
       voice: selectedVoice,
-      rate: (rate ?? selectedRate).clamp(0.5, 1.8),
+      rate: effectiveRate,
     );
   }
 
-  Future<bool> _playRecording(String url) async {
+  Future<bool> _playRecording(String url, {double rate = 1.0}) async {
     Player? player;
     StreamSubscription<bool>? completed;
     StreamSubscription<String>? errors;
@@ -150,8 +155,12 @@ class WordPronunciationService {
       errors = player.stream.error.listen((String _) {
         if (!result.isCompleted) result.complete(false);
       });
-      await player.open(Media(url)).timeout(const Duration(seconds: 4));
-      return await result.future.timeout(const Duration(seconds: 8));
+      await player.open(Media(url)).timeout(const Duration(seconds: 8));
+      final double clamped = rate.clamp(0.5, 1.8);
+      if ((clamped - 1.0).abs() > 0.01) {
+        await player.setRate(clamped);
+      }
+      return await result.future.timeout(const Duration(seconds: 30));
     } catch (_) {
       return false;
     } finally {

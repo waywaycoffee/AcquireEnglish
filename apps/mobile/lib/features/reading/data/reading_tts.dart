@@ -6,7 +6,7 @@ import '../../sync/data/acquire_api_client.dart';
 
 const String kReadingTtsGenderKey = 'reading_tts_gender_v1';
 
-/// Reading uses Alibaba CosyVoice via the oral-coach `/api/tts/speak` proxy.
+/// Reading uses Aliyun Qwen voices via ECS `/api/reading/speech` (media on ECS).
 enum ReadingTtsGender { female, male, luna, nora, ivy, alexander, james, ryan }
 
 extension ReadingTtsGenderX on ReadingTtsGender {
@@ -23,7 +23,7 @@ extension ReadingTtsGenderX on ReadingTtsGender {
     ReadingTtsGender.ryan => 'Ryan Ma',
   };
 
-  /// DashScope CosyVoice id (English).
+  /// DashScope CosyVoice id (English-native Qwen voices; not Edge).
   String get aliyunVoiceId => switch (this) {
     ReadingTtsGender.female => 'qwen-audio-3.0-tts-flash-loongolivialin',
     ReadingTtsGender.male => 'qwen-audio-3.0-tts-flash-loongadriangao',
@@ -53,19 +53,42 @@ Future<void> saveReadingTtsGender(ReadingTtsGender gender) async {
   ).put(kReadingTtsGenderKey, gender.storageValue);
 }
 
+/// Kick off ECS TTS without awaiting playback (continuous / prefetch).
+Future<String> prefetchReadingSpeechUrl(
+  WidgetRef ref,
+  String text, {
+  ReadingTtsGender? gender,
+}) {
+  final String spoken = text.trim();
+  if (spoken.isEmpty) {
+    return Future<String>.error(StateError('empty speech text'));
+  }
+  final ReadingTtsGender voice = gender ?? loadReadingTtsGender();
+  return ref
+      .read(acquireApiClientProvider)
+      .readingSpeech(spoken, voice.aliyunVoiceId);
+}
+
 /// Synthesize only through the authenticated ECS Aliyun endpoint.
+/// Never falls back to device/Edge TTS (keeps reading voice consistent).
 Future<void> speakReadingText(
   WidgetRef ref,
   String text, {
   double? rate,
   ReadingTtsGender? gender,
 }) async {
-  if (text.trim().isEmpty) return;
-  final voice = gender ?? loadReadingTtsGender();
-  final url = await ref
+  final String spoken = text.trim();
+  if (spoken.isEmpty) return;
+  final ReadingTtsGender voice = gender ?? loadReadingTtsGender();
+  final String url = await ref
       .read(acquireApiClientProvider)
-      .readingSpeech(text.trim(), voice.aliyunVoiceId);
+      .readingSpeech(spoken, voice.aliyunVoiceId);
   await ref
       .read(wordPronunciationServiceProvider)
-      .speak(text, recordedUrl: url, rate: rate, allowSynthesisFallback: false);
+      .speak(
+        spoken,
+        recordedUrl: url,
+        rate: rate,
+        allowSynthesisFallback: false,
+      );
 }

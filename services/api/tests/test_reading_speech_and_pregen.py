@@ -25,6 +25,29 @@ def test_speech_hash_stable(tmp_path: Path, monkeypatch) -> None:
     assert hit is not None
     assert hit["hash"] == saved["hash"]
     assert Path(tmp_path, "reading", hit["relative"]).is_file()
+    # TTS must not pollute / force-rebuild the book media manifest.
+    assert not (tmp_path / "reading" / "manifest.json").is_file()
+
+
+def test_tts_files_excluded_from_reading_manifest(tmp_path: Path, monkeypatch) -> None:
+    monkeypatch.setenv("MEDIA_CACHE_DIR", str(tmp_path))
+    from app.config import settings
+    from app.services import content_media as cm
+
+    settings.media_cache_dir = str(tmp_path)
+    book_audio = tmp_path / "reading" / "demo_book" / "hello.mp3"
+    book_audio.parent.mkdir(parents=True, exist_ok=True)
+    book_audio.write_bytes(b"1234567890" * 10)
+    rsc.save_bytes(
+        b"1234567890" * 10,
+        text="Hello world",
+        voice="qwen-audio-3.0-tts-flash-loongolivialin",
+        language="en",
+    )
+    manifest = cm.rebuild_manifest("reading")
+    keys = {(item["book_id"], item["key"]) for item in manifest["items"]}
+    assert ("demo_book", "hello") in keys
+    assert not any(book == "tts" for book, _ in keys)
 
 
 def test_pregen_sentence_and_topics(tmp_path: Path, monkeypatch) -> None:

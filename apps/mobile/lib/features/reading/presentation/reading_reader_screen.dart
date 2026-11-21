@@ -134,13 +134,20 @@ class _ReadingReaderScreenState extends ConsumerState<ReadingReaderScreen> {
     await prefs.put(kReadingTtsGenderKey, _ttsGender.storageValue);
   }
 
-  Future<void> _speakReading(String text, {double? rate}) {
-    return speakReadingText(
-      ref,
-      text,
-      rate: rate ?? _effectiveRate,
-      gender: _ttsGender,
-    );
+  Future<void> _speakReading(String text, {double? rate}) async {
+    try {
+      await speakReadingText(
+        ref,
+        text,
+        rate: rate ?? _effectiveRate,
+        gender: _ttsGender,
+      );
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('阿里云朗读暂不可用，请检查登录与网络后重试')),
+      );
+    }
   }
 
   Future<void> _toggleTtsGender() async {
@@ -197,15 +204,35 @@ class _ReadingReaderScreenState extends ConsumerState<ReadingReaderScreen> {
     final List<ReadingSpeakUnit> units = splitReadingSpeakUnits(doc.plainText);
     if (units.isEmpty) return;
     setState(() => _continuousPlaying = true);
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('正在生成朗读音频…首句稍候，后续句会预取'),
+          duration: Duration(seconds: 2),
+        ),
+      );
+    }
     final double rate = _effectiveRate;
+    final String voiceId = _ttsGender.aliyunVoiceId;
     final player = Player();
     _readingAudio = player;
+    Future<String>? prefetch;
     try {
-      for (final unit in units) {
+      for (int i = 0; i < units.length; i++) {
         if (!mounted || generation != _continuousGeneration) return;
-        final url = await ref
-            .read(acquireApiClientProvider)
-            .readingSpeech(unit.text, _ttsGender.aliyunVoiceId);
+        final ReadingSpeakUnit unit = units[i];
+        final Future<String> urlFuture =
+            prefetch ??
+            ref
+                .read(acquireApiClientProvider)
+                .readingSpeech(unit.text, voiceId);
+        // Prefetch next sentence while this one plays (same-text requests coalesce).
+        prefetch = i + 1 < units.length
+            ? ref
+                  .read(acquireApiClientProvider)
+                  .readingSpeech(units[i + 1].text, voiceId)
+            : null;
+        final String url = await urlFuture;
         if (!mounted || generation != _continuousGeneration) return;
         final done = Completer<void>();
         _readingDone = done;

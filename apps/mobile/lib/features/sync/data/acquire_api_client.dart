@@ -1034,6 +1034,13 @@ class AcquireApiClient {
 
   final Dio _dio;
 
+  /// In-memory reading TTS URL cache (text+voice → absolute media URL).
+  /// Avoids repeat lookup/synth RTT when replaying the same sentence.
+  static const int _readingSpeechCacheCap = 160;
+  final Map<String, String> _readingSpeechUrlCache = <String, String>{};
+  final Map<String, Future<String>> _readingSpeechInflight =
+      <String, Future<String>>{};
+
   Future<({int revision, Map<String, dynamic>? state})> reviewBackup(
     String token, {
     int? revision,
@@ -2335,38 +2342,82 @@ class AcquireApiClient {
     };
   }
 
-  /// Synthesize [text] with an Aliyun English voice; returns absolute audio URL
-  /// cached on ECS under `/media/reading/speech/…`.
-  Future<String> readingSpeech(String text, String voice) async {
-    final Response<dynamic> response = await _dio.post(
-      Endpoints.readingSpeech,
-      data: <String, dynamic>{
-        'text': text,
-        'voice': voice,
-        'language': 'en',
-      },
-      options: Options(
-        receiveTimeout: const Duration(seconds: 45),
-        extra: const <String, Object>{
-          'dio_cache_interceptor_force_refresh': true,
-        },
-      ),
-    );
-    final Object? data = response.data;
-    final Map<String, dynamic> json = data is Map<String, dynamic>
-        ? data
-        : Map<String, dynamic>.from(data as Map);
-    final String rawUrl = (json['audio_url'] as String? ?? '').trim();
-    if (rawUrl.isEmpty) {
-      throw StateError('阿里云配音未返回音频地址');
-    }
-    // ECS may return `/media/...`; media_kit needs an absolute URL.
-    if (rawUrl.startsWith('http://') || rawUrl.startsWith('https://')) {
-      return rawUrl;
+  String _readingSpeechCacheKey(String text, String voice) =>
+      '${voice.trim()}|${text.trim()}';
+
+  String _absoluteMediaUrl(String rawUrl) {
+    final String trimmed = rawUrl.trim();
+    if (trimmed.isEmpty) return trimmed;
+    if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
+      return trimmed;
     }
     return Uri.parse(
       Endpoints.normalizeBaseUrl(_dio.options.baseUrl),
-    ).resolve(rawUrl).toString();
+    ).resolve(trimmed).toString();
+  }
+
+  void _rememberReadingSpeechUrl(String key, String url) {
+    if (url.isEmpty) return;
+    _readingSpeechUrlCache.remove(key);
+    _readingSpeechUrlCache[key] = url;
+    while (_readingSpeechUrlCache.length > _readingSpeechCacheCap) {
+      _readingSpeechUrlCache.remove(_readingSpeechUrlCache.keys.first);
+    }
+  }
+
+  /// Synthesize [text] with an Aliyun English voice; returns absolute audio URL
+  /// cached on ECS under `/media/reading/tts/…`.
+  ///
+  /// Hot path: memory cache → POST (server disk cache / synth).
+  /// Concurrent identical requests share one in-flight Future (prefetch-friendly).
+  /// Skip client lookup-first: a 404 RTT would slow cold first taps.
+  Future<String> readingSpeech(String text, String voice) {
+    final String spoken = text.trim();
+    if (spoken.isEmpty) {
+      return Future<String>.error(StateError('empty speech text'));
+    }
+    final String key = _readingSpeechCacheKey(spoken, voice);
+    final String? cached = _readingSpeechUrlCache[key];
+    if (cached != null && cached.isNotEmpty) {
+      return Future<String>.value(cached);
+    }
+    final Future<String>? pending = _readingSpeechInflight[key];
+    if (pending != null) return pending;
+
+    final Future<String> work = () async {
+      try {
+        final Response<dynamic> response = await _dio.post(
+          Endpoints.readingSpeech,
+          data: <String, dynamic>{
+            'text': spoken,
+            'voice': voice,
+            'language': 'en',
+          },
+          options: Options(
+            receiveTimeout: const Duration(seconds: 45),
+            sendTimeout: const Duration(seconds: 20),
+            extra: const <String, Object>{
+              'dio_cache_interceptor_force_refresh': true,
+            },
+          ),
+        );
+        final Object? data = response.data;
+        final Map<String, dynamic> json = data is Map<String, dynamic>
+            ? data
+            : Map<String, dynamic>.from(data as Map);
+        final String rawUrl = (json['audio_url'] as String? ?? '').trim();
+        if (rawUrl.isEmpty) {
+          throw StateError('阿里云配音未返回音频地址');
+        }
+        final String absolute = _absoluteMediaUrl(rawUrl);
+        _rememberReadingSpeechUrl(key, absolute);
+        return absolute;
+      } finally {
+        _readingSpeechInflight.remove(key);
+      }
+    }();
+    _readingSpeechInflight[key] = work;
+    return work;
   }
 
   Future<FoundationMediaItem?> contentMediaLookup({

@@ -98,6 +98,11 @@ def _scan_items(namespace: str) -> list[dict[str, Any]]:
         parts = rel.parts
         if len(parts) < 2:
             continue
+        # Content-addressed reading TTS lives under tts/{voice}/{hash}.mp3 and
+        # is resolved via /api/reading/speech/lookup — keep it out of the
+        # book/key media manifest so scans stay fast as the TTS cache grows.
+        if parts[0] == "tts":
+            continue
         book_id = parts[0]
         key = path.stem
         entry = by_key.setdefault(

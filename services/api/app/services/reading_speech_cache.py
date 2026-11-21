@@ -79,7 +79,8 @@ def save_bytes(
     path = cache_file_path(voice=voice, digest=digest)
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_bytes(data)
-    cm.rebuild_manifest("reading")
+    # TTS is content-addressed under reading/tts/ and looked up by hash —
+    # do not rebuild the book media manifest (expensive rglob) on every synth.
     rel = cache_relative_path(voice=voice, digest=digest)
     return {
         "hash": digest,
