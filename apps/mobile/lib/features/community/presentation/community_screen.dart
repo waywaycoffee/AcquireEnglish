@@ -201,7 +201,7 @@ class _SegTab extends StatelessWidget {
               fontWeight: FontWeight.w800,
               fontSize: 13,
               color: selected
-                  ? AppDesignTokens.textPrimary
+                  ? const Color(0xFF17212F)
                   : AppDesignTokens.textSecondary,
             ),
           ),
