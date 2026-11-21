@@ -31,6 +31,7 @@ import '../data/scene_word_recognizer.dart';
 import '../domain/learning_scenario.dart';
 import '../domain/oral_expression_diagnosis.dart';
 import '../domain/scene_word_label.dart';
+import 'digital_human_picker.dart';
 import 'widgets/cartoon_coach_sprite.dart';
 import 'widgets/coach_avatar_stage.dart';
 import 'widgets/oral_diagnosis_card.dart';
@@ -325,20 +326,9 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
       }
     } catch (_) {}
     if (!mounted) return;
-    try {
-      final DigitalHumanPersona persona = ref.read(learningSettingsProvider).selectedDigitalHuman;
-      final SharedPreferencesAsync preferences = SharedPreferencesAsync();
-      final String? saved = await preferences.getString(
-        '$coachEnglishVoicePreference:${persona.id}',
-      ) ?? (persona.recommendedVoiceId == null
-          ? await preferences.getString(coachEnglishVoicePreference)
-          : null);
-      if (mounted && coachVoices.any((CoachEnglishVoice voice) => voice.id == saved)) {
-        setState(() => _englishVoiceId = saved);
-      }
-    } catch (_) {
-      // Use the coach's default voice when preferences are unavailable.
-    }
+    final DigitalHumanPersona persona =
+        ref.read(learningSettingsProvider).selectedDigitalHuman;
+    await _loadVoiceFor(persona);
     if (mounted) await _restoreHistoryAndStart();
   }
 
@@ -671,9 +661,74 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
       ? persona.edgeVoice(chinese: true)
       : _englishVoiceId ?? persona.recommendedVoiceId ?? persona.edgeVoice(chinese: false);
 
+  Future<void> _loadVoiceFor(DigitalHumanPersona persona) async {
+    String? selected;
+    try {
+      final SharedPreferencesAsync prefs = SharedPreferencesAsync();
+      final String? saved = await prefs.getString(
+        '$coachEnglishVoicePreference:${persona.id}',
+      ) ?? (persona.recommendedVoiceId == null
+          ? await prefs.getString(coachEnglishVoicePreference)
+          : null);
+      if (coachVoices.any((CoachEnglishVoice voice) => voice.id == saved)) {
+        selected = saved;
+      }
+    } catch (_) {
+      // Use the default voice when preferences are unavailable.
+    }
+    if (mounted &&
+        ref.read(learningSettingsProvider).selectedDigitalHuman.id == persona.id) {
+      setState(() => _englishVoiceId = selected);
+    }
+  }
+
+  Future<void> _chooseCoach() async {
+    if (_busy || _recordingActive || _coachSpeaking) return;
+    final DigitalHumanPersona? chosen =
+        await showModalBottomSheet<DigitalHumanPersona>(
+          context: context,
+          isScrollControlled: true,
+          showDragHandle: true,
+          builder: (BuildContext sheetContext) => SafeArea(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 20),
+              child: DigitalHumanPicker(
+                onSelect: (DigitalHumanPersona persona) =>
+                    Navigator.pop(sheetContext, persona),
+              ),
+            ),
+          ),
+        );
+    if (!mounted || chosen == null || _busy || _recordingActive || _coachSpeaking) {
+      return;
+    }
+    if (ref.read(learningSettingsProvider).selectedDigitalHuman.id == chosen.id) {
+      return;
+    }
+    setState(() {
+      _busy = true;
+      _englishVoiceId = null;
+    });
+    try {
+      ref.read(learningSettingsProvider.notifier).setDigitalHumanId(chosen.id);
+      await _loadVoiceFor(chosen);
+      final OralCoachSession? session = _session;
+      if (mounted && session != null) {
+        await _pipelineClient.updateContext(
+          session: session,
+          context: _videoContext(),
+        );
+      }
+    } catch (_) {
+      // Each submitted turn also passes the selected persona and voice.
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
   Future<void> _chooseEnglishVoice() async {
     final DigitalHumanPersona persona = ref.read(learningSettingsProvider).selectedDigitalHuman;
-    final CoachEnglishVoice? chosen = await showModalBottomSheet<CoachEnglishVoice>(
+    final String? chosen = await showModalBottomSheet<String>(
       context: context,
       isScrollControlled: true,
       showDragHandle: true,
@@ -686,12 +741,18 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
               Expanded(
                 child: ListView(
                   children: <Widget>[
+                    ListTile(
+                      leading: const Icon(Icons.restore_rounded),
+                      title: const Text('使用教练推荐音色'),
+                      selected: _englishVoiceId == null,
+                      onTap: () => Navigator.pop(sheetContext, ''),
+                    ),
                     for (final CoachEnglishVoice voice in coachVoices)
                       ListTile(
                         selected: voice.id == (_englishVoiceId ?? persona.recommendedVoiceId),
                         title: Text(voice.name),
                         subtitle: Text(voice.description),
-                        onTap: () => Navigator.pop(sheetContext, voice),
+                        onTap: () => Navigator.pop(sheetContext, voice.id),
                         trailing: IconButton(
                           tooltip: '试听 ${voice.name}',
                           icon: const Icon(Icons.play_circle_outline),
@@ -707,9 +768,9 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
       ),
     );
     if (!mounted || chosen == null) return;
-    setState(() => _englishVoiceId = chosen.id);
+    setState(() => _englishVoiceId = chosen.isEmpty ? null : chosen);
     try {
-      await SharedPreferencesAsync().setString('$coachEnglishVoicePreference:${persona.id}', chosen.id);
+      await SharedPreferencesAsync().setString('$coachEnglishVoicePreference:${persona.id}', chosen);
     } catch (_) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -2100,6 +2161,17 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
                         fontSize: 11,
                         fontWeight: FontWeight.w600,
                       ),
+                    ),
+                  ),
+                  Positioned(
+                    left: 12,
+                    top: 12,
+                    child: ActionChip(
+                      avatar: const Icon(Icons.swap_horiz_rounded, size: 18),
+                      label: const Text('换教练'),
+                      onPressed: _busy || _recordingActive || _coachSpeaking
+                          ? null
+                          : () => unawaited(_chooseCoach()),
                     ),
                   ),
                   if (_liveSceneOn ||

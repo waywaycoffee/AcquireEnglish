@@ -9,7 +9,9 @@ import 'widgets/cartoon_coach_sprite.dart';
 
 /// Home-page row: pick a near-real digital-human coach persona.
 class DigitalHumanPicker extends ConsumerStatefulWidget {
-  const DigitalHumanPicker({super.key});
+  const DigitalHumanPicker({super.key, this.onSelect});
+
+  final ValueChanged<DigitalHumanPersona>? onSelect;
 
   @override
   ConsumerState<DigitalHumanPicker> createState() => _DigitalHumanPickerState();
@@ -133,6 +135,12 @@ class _DigitalHumanPickerState extends ConsumerState<DigitalHumanPicker> {
                   selected: active,
                   cartoon: settings.cartoonDigitalHuman,
                   onTap: () {
+                    final ValueChanged<DigitalHumanPersona>? onSelect =
+                        widget.onSelect;
+                    if (onSelect != null) {
+                      onSelect(persona);
+                      return;
+                    }
                     ref
                         .read(learningSettingsProvider.notifier)
                         .setDigitalHumanId(persona.id);
@@ -142,29 +150,30 @@ class _DigitalHumanPickerState extends ConsumerState<DigitalHumanPicker> {
             ),
           ),
         ),
-        Row(
-          children: <Widget>[
-            Expanded(
-              child: FilledButton.tonalIcon(
-                onPressed: () => context.push('/digital-human'),
-                icon: const Icon(Icons.record_voice_over_rounded),
-                label: const Text('开始情景口语'),
+        if (widget.onSelect == null)
+          Row(
+            children: <Widget>[
+              Expanded(
+                child: FilledButton.tonalIcon(
+                  onPressed: () => context.push('/digital-human'),
+                  icon: const Icon(Icons.record_voice_over_rounded),
+                  label: const Text('开始情景口语'),
+                ),
               ),
-            ),
-            TextButton(
-              onPressed: () {
-                if (_personas.hasClients) {
-                  _personas.animateTo(
-                    _personas.position.maxScrollExtent,
-                    duration: const Duration(milliseconds: 280),
-                    curve: Curves.easeOut,
-                  );
-                }
-              },
-              child: const Text('更多 ›'),
-            ),
-          ],
-        ),
+              TextButton(
+                onPressed: () {
+                  if (_personas.hasClients) {
+                    _personas.animateTo(
+                      _personas.position.maxScrollExtent,
+                      duration: const Duration(milliseconds: 280),
+                      curve: Curves.easeOut,
+                    );
+                  }
+                },
+                child: const Text('更多 ›'),
+              ),
+            ],
+          ),
       ],
     );
   }
