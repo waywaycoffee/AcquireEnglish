@@ -34,6 +34,11 @@ _FAMILY_TRACK = {
     "k12_s2": "k12",
     "k12_s3": "k12",
     "gaokao": "k12",
+    "cn_english_taxonomy": "k12",
+    "race_middle": "k12",
+    "race_high": "k12",
+    "cloth_cloze": "k12",
+    "scques_grammar": "k12",
     "ket": "cambridge",
     "pet": "cambridge",
     "cet4": "cet",
@@ -74,6 +79,10 @@ def resolve_pack_stem(family_id: str) -> str:
         "gaokao": "pack_gaokao",
         "zhongkao": "pack_zhongkao",
         "pet": "pack_ket",
+        "race": "pack_race_middle",
+        "cloth": "pack_cloth_cloze",
+        "scques": "pack_scques_grammar",
+        "cn_english": "pack_cn_english_taxonomy",
     }
     if fam in aliases and (_packs_dir() / f"{aliases[fam]}.json").is_file():
         return aliases[fam]
