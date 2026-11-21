@@ -1,3 +1,7 @@
+import 'package:shared_preferences/shared_preferences.dart';
+
+import 'digital_human_catalog.dart';
+
 const String coachEnglishVoicePreference = 'coach_english_voice_v1';
 
 typedef CoachEnglishVoice = ({String id, String name, String description});
@@ -59,3 +63,17 @@ const List<CoachEnglishVoice> coachVoices = <CoachEnglishVoice>[
 
 bool isBilingualCoachVoice(String? id) =>
     coachBilingualVoices.any((CoachEnglishVoice voice) => voice.id == id);
+
+Future<String?> readCoachVoicePreference(
+  SharedPreferencesAsync prefs,
+  DigitalHumanPersona persona,
+) async {
+  final String? saved =
+      await prefs.getString('$coachEnglishVoicePreference:${persona.id}') ??
+      (persona.recommendedVoiceId == null
+          ? await prefs.getString(coachEnglishVoicePreference)
+          : null);
+  return coachVoices.any((CoachEnglishVoice voice) => voice.id == saved)
+      ? saved
+      : null;
+}

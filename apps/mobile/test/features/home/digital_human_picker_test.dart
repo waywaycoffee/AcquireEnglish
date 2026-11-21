@@ -8,25 +8,22 @@ import 'package:flutter_test/flutter_test.dart';
 class _PickerSettings extends LearningSettingsNotifier {
   @override
   LearningSettingsState build() => LearningSettingsState.defaults();
-
-  @override
-  void setCartoonDigitalHuman(bool value) {
-    state = state.copyWith(cartoonDigitalHuman: value);
-  }
 }
 
 void main() {
-  testWidgets('persona cards switch between photo and cartoon', (tester) async {
+  testWidgets('shows portraits, voice previews and Chinese support', (
+    tester,
+  ) async {
     await tester.pumpWidget(
       ProviderScope(
         overrides: [learningSettingsProvider.overrideWith(_PickerSettings.new)],
         child: const MaterialApp(home: Scaffold(body: DigitalHumanPicker())),
       ),
     );
-    expect(find.byType(CartoonCoachSprite), findsWidgets);
-    await tester.tap(find.text('真人版'));
-    await tester.pumpAndSettle();
     expect(find.byType(CartoonCoachSprite), findsNothing);
+    expect(find.text('卡通版'), findsNothing);
+    expect(find.byTooltip('试听 Mia'), findsOneWidget);
+    expect(find.text('中文另用音色'), findsWidgets);
     final Iterable<Image> photos = tester.widgetList<Image>(find.byType(Image));
     expect(
       photos.any(
@@ -36,16 +33,9 @@ void main() {
       ),
       isTrue,
     );
-    await tester.tap(find.text('卡通版'));
+    await tester.tap(find.text('儿童伙伴'));
     await tester.pumpAndSettle();
-    final Iterable<CartoonCoachSprite> sprites = tester
-        .widgetList<CartoonCoachSprite>(find.byType(CartoonCoachSprite));
-    expect(
-      sprites.any(
-        (CartoonCoachSprite sprite) =>
-            sprite.asset.endsWith('/mia-cartoon.webp') && sprite.frame == 0,
-      ),
-      isTrue,
-    );
+    expect(find.byTooltip('试听 Ruby'), findsOneWidget);
+    expect(find.text('中英同音色'), findsNWidgets(2));
   });
 }

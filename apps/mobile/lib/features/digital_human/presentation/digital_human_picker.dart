@@ -1,11 +1,16 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:media_kit/media_kit.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../settings/presentation/settings_provider.dart';
 import '../../shared/presentation/pad/app_design_tokens.dart';
+import '../data/coach_english_voices.dart';
 import '../data/digital_human_catalog.dart';
-import 'widgets/cartoon_coach_sprite.dart';
+import '../data/oral_coach_pipeline_client.dart';
 
 /// Home-page row: pick a near-real digital-human coach persona.
 class DigitalHumanPicker extends ConsumerStatefulWidget {
@@ -38,8 +43,117 @@ class _DigitalHumanPickerState extends ConsumerState<DigitalHumanPicker> {
   final ScrollController _personas = ScrollController();
   _PersonaFilter _filter = _PersonaFilter.all;
 
+  final OralCoachPipelineClient _pipeline = OralCoachPipelineClient();
+  final Map<String, String?> _savedVoices = <String, String?>{};
+  Player? _previewPlayer;
+  String? _previewing;
+  bool _loadingPreview = false;
+  int _previewRequest = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    unawaited(_refreshVoices());
+  }
+
+  Future<void> _refreshVoices() async {
+    try {
+      final SharedPreferencesAsync preferences = SharedPreferencesAsync();
+      final Map<String, String?> voices = Map<String, String?>.fromEntries(
+        await Future.wait(
+          digitalHumanCatalog.map(
+            (DigitalHumanPersona persona) async => MapEntry<String, String?>(
+              persona.id,
+              await readCoachVoicePreference(preferences, persona),
+            ),
+          ),
+        ),
+      );
+      if (mounted) setState(() => _savedVoices.addAll(voices));
+    } catch (_) {
+      // Show each coach's recommended voice if saved preferences are unavailable.
+    }
+  }
+
+  Future<void> _stopPreview() async {
+    _previewRequest++;
+    final Player? player = _previewPlayer;
+    _previewPlayer = null;
+    if (mounted) {
+      setState(() {
+        _previewing = null;
+        _loadingPreview = false;
+      });
+    }
+    await player?.dispose();
+  }
+
+  Future<void> _preview(DigitalHumanPersona persona) async {
+    final bool stop = _previewing == persona.id;
+    final Future<void> stopping = _stopPreview();
+    final int request = _previewRequest;
+    if (stop) {
+      await stopping;
+      return;
+    }
+    final String baseUrl = ref
+        .read(learningSettingsProvider)
+        .oralCoachPipelineUrl;
+    setState(() {
+      _previewing = persona.id;
+      _loadingPreview = true;
+    });
+    try {
+      await stopping;
+      String? saved = _savedVoices[persona.id];
+      try {
+        saved = await readCoachVoicePreference(
+          SharedPreferencesAsync(),
+          persona,
+        );
+      } catch (_) {
+        // Use the cached selection or recommended voice.
+      }
+      if (!mounted || request != _previewRequest) return;
+      setState(() => _savedVoices[persona.id] = saved);
+      final String voice =
+          saved ?? persona.recommendedVoiceId ?? persona.edgeVoiceEn;
+      final bool bilingual = isBilingualCoachVoice(voice);
+      final String? url = await _pipeline.synthesizeSpeech(
+        rawBaseUrl: baseUrl,
+        text: bilingual
+            ? '你好，很高兴见到你。 Hi! Let’s practise English together.'
+            : 'Hi! It’s nice to meet you. Let’s practise English together.',
+        digitalHumanId: persona.id,
+        ttsVoice: voice,
+        language: bilingual ? 'zh' : 'en',
+      );
+      if (!mounted || request != _previewRequest) return;
+      if (url == null) throw StateError('Missing preview audio');
+      final Player player = Player();
+      _previewPlayer = player;
+      await player.open(Media(url), play: true);
+      if (!mounted || request != _previewRequest) return;
+      setState(() => _loadingPreview = false);
+      await player.stream.completed
+          .firstWhere((bool value) => value)
+          .timeout(const Duration(seconds: 30));
+    } catch (_) {
+      if (mounted && request == _previewRequest) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('暂时无法试听，请稍后重试。')));
+      }
+    } finally {
+      if (mounted && request == _previewRequest) await _stopPreview();
+    }
+  }
+
   @override
   void dispose() {
+    _previewRequest++;
+    final Player? player = _previewPlayer;
+    if (player != null) unawaited(player.dispose());
     _personas.dispose();
     super.dispose();
   }
@@ -73,25 +187,6 @@ class _DigitalHumanPickerState extends ConsumerState<DigitalHumanPicker> {
           ),
         ),
         const SizedBox(height: 12),
-        SegmentedButton<bool>(
-          segments: const <ButtonSegment<bool>>[
-            ButtonSegment<bool>(
-              value: true,
-              label: Text('卡通版'),
-              icon: Icon(Icons.face),
-            ),
-            ButtonSegment<bool>(
-              value: false,
-              label: Text('真人版'),
-              icon: Icon(Icons.portrait),
-            ),
-          ],
-          selected: <bool>{settings.cartoonDigitalHuman},
-          onSelectionChanged: (Set<bool> values) => ref
-              .read(learningSettingsProvider.notifier)
-              .setCartoonDigitalHuman(values.first),
-        ),
-        const SizedBox(height: 12),
         Wrap(
           spacing: 8,
           children: <Widget>[
@@ -119,7 +214,7 @@ class _DigitalHumanPickerState extends ConsumerState<DigitalHumanPicker> {
           thumbColor: AppDesignTokens.brandGreenDark,
           trackColor: AppDesignTokens.borderGray,
           child: SizedBox(
-            height: 184,
+            height: 215,
             child: ListView.separated(
               controller: _personas,
               primary: false,
@@ -133,7 +228,12 @@ class _DigitalHumanPickerState extends ConsumerState<DigitalHumanPicker> {
                 return _PersonaCard(
                   persona: persona,
                   selected: active,
-                  cartoon: settings.cartoonDigitalHuman,
+                  bilingual: isBilingualCoachVoice(
+                    _savedVoices[persona.id] ?? persona.recommendedVoiceId,
+                  ),
+                  playing: _previewing == persona.id,
+                  loading: _previewing == persona.id && _loadingPreview,
+                  onPreview: () => unawaited(_preview(persona)),
                   onTap: () {
                     final ValueChanged<DigitalHumanPersona>? onSelect =
                         widget.onSelect;
@@ -155,7 +255,12 @@ class _DigitalHumanPickerState extends ConsumerState<DigitalHumanPicker> {
             children: <Widget>[
               Expanded(
                 child: FilledButton.tonalIcon(
-                  onPressed: () => context.push('/digital-human'),
+                  onPressed: () async {
+                    await _stopPreview();
+                    if (!context.mounted) return;
+                    await context.push('/digital-human');
+                    if (mounted) await _refreshVoices();
+                  },
                   icon: const Icon(Icons.record_voice_over_rounded),
                   label: const Text('开始情景口语'),
                 ),
@@ -183,13 +288,19 @@ class _PersonaCard extends StatelessWidget {
   const _PersonaCard({
     required this.persona,
     required this.selected,
-    required this.cartoon,
+    required this.bilingual,
+    required this.playing,
+    required this.loading,
+    required this.onPreview,
     required this.onTap,
   });
 
   final DigitalHumanPersona persona;
   final bool selected;
-  final bool cartoon;
+  final bool bilingual;
+  final bool playing;
+  final bool loading;
+  final VoidCallback onPreview;
   final VoidCallback onTap;
 
   @override
@@ -217,23 +328,19 @@ class _PersonaCard extends StatelessWidget {
             Expanded(
               child: ClipRRect(
                 borderRadius: BorderRadius.circular(14),
-                child: cartoon && persona.hasCartoonAtlas
-                    ? CartoonCoachSprite.portrait(
-                        asset: persona.cartoonAssetPath,
-                      )
-                    : Image.asset(
-                        persona.assetPath,
-                        fit: BoxFit.cover,
-                        width: double.infinity,
-                        errorBuilder: (_, __, ___) => ColoredBox(
-                          color: AppDesignTokens.skyLight,
-                          child: Icon(
-                            Icons.face_retouching_natural_rounded,
-                            color: AppDesignTokens.brandGreenDark,
-                            size: 36,
-                          ),
-                        ),
-                      ),
+                child: Image.asset(
+                  persona.assetPath,
+                  fit: BoxFit.cover,
+                  width: double.infinity,
+                  errorBuilder: (_, __, ___) => ColoredBox(
+                    color: AppDesignTokens.skyLight,
+                    child: Icon(
+                      Icons.face_retouching_natural_rounded,
+                      color: AppDesignTokens.brandGreenDark,
+                      size: 36,
+                    ),
+                  ),
+                ),
               ),
             ),
             const SizedBox(height: 8),
@@ -249,14 +356,29 @@ class _PersonaCard extends StatelessWidget {
               ),
             ),
             Text(
-              persona.voiceLabel,
+              bilingual ? '中英同音色' : '中文另用音色',
               maxLines: 1,
-              overflow: TextOverflow.ellipsis,
               style: TextStyle(
                 fontSize: 11,
-                fontWeight: FontWeight.w600,
                 color: AppDesignTokens.textSecondary,
               ),
+            ),
+            IconButton(
+              tooltip: playing
+                  ? '停止试听 ${persona.displayName}'
+                  : '试听 ${persona.displayName}',
+              onPressed: onPreview,
+              visualDensity: VisualDensity.compact,
+              icon: loading
+                  ? const SizedBox.square(
+                      dimension: 16,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : Icon(
+                      playing
+                          ? Icons.stop_circle_outlined
+                          : Icons.play_circle_outline,
+                    ),
             ),
           ],
         ),

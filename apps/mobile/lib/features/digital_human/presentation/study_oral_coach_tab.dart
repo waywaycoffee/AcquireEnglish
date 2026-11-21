@@ -32,7 +32,6 @@ import '../domain/learning_scenario.dart';
 import '../domain/oral_expression_diagnosis.dart';
 import '../domain/scene_word_label.dart';
 import 'digital_human_picker.dart';
-import 'widgets/cartoon_coach_sprite.dart';
 import 'widgets/coach_avatar_stage.dart';
 import 'widgets/oral_diagnosis_card.dart';
 import 'widgets/scene_photo_sheet.dart';
@@ -664,15 +663,7 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
   Future<void> _loadVoiceFor(DigitalHumanPersona persona) async {
     String? selected;
     try {
-      final SharedPreferencesAsync prefs = SharedPreferencesAsync();
-      final String? saved = await prefs.getString(
-        '$coachEnglishVoicePreference:${persona.id}',
-      ) ?? (persona.recommendedVoiceId == null
-          ? await prefs.getString(coachEnglishVoicePreference)
-          : null);
-      if (coachVoices.any((CoachEnglishVoice voice) => voice.id == saved)) {
-        selected = saved;
-      }
+      selected = await readCoachVoicePreference(SharedPreferencesAsync(), persona);
     } catch (_) {
       // Use the default voice when preferences are unavailable.
     }
@@ -2085,11 +2076,11 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
         ? '外教在说…'
         : (_recordingActive
               ? '外教在听…'
-              : (_liveConnected && !settings.cartoonDigitalHuman
+              : (_liveConnected
                     ? '${persona.displayName} · 唇形'
                     : persona.displayName));
     final Widget? liveVideo =
-        !settings.cartoonDigitalHuman && _liveConnected && _liveRenderer != null
+        _liveConnected && _liveRenderer != null
         ? RTCVideoView(
             _liveRenderer!,
             objectFit: RTCVideoViewObjectFit.RTCVideoViewObjectFitCover,
@@ -2120,9 +2111,6 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
                 fit: StackFit.expand,
                 children: <Widget>[
                   CoachAvatarStage(
-                    spriteAsset: settings.cartoonDigitalHuman && persona.hasCartoonAtlas
-                        ? persona.cartoonAssetPath
-                        : null,
                     pulse: _orbPulse,
                     speaking: _coachSpeaking,
                     listening: _recordingActive,
@@ -2379,9 +2367,6 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
                           bubble: bubble,
                           showZh: _showZhIndexes.contains(index),
                           coachAvatarAsset: persona.assetPath,
-                          cartoonAvatarAsset: settings.cartoonDigitalHuman && persona.hasCartoonAtlas
-                              ? persona.cartoonAssetPath
-                              : null,
                           onToggleZh: () => _toggleZh(index, bubble.zh),
                           onCopy: () => unawaited(_copyBubble(bubble.text)),
                           onSpeak: () => unawaited(_replayBubble(bubble.text)),
@@ -2663,7 +2648,6 @@ class _ConversationBubble extends StatelessWidget {
     required this.onCopy,
     required this.onSpeak,
     this.coachAvatarAsset,
-    this.cartoonAvatarAsset,
   });
 
   final _ChatBubble bubble;
@@ -2672,7 +2656,6 @@ class _ConversationBubble extends StatelessWidget {
   final VoidCallback onCopy;
   final VoidCallback onSpeak;
   final String? coachAvatarAsset;
-  final String? cartoonAvatarAsset;
 
   @override
   Widget build(BuildContext context) {
@@ -2691,15 +2674,7 @@ class _ConversationBubble extends StatelessWidget {
             : MainAxisAlignment.start,
         children: <Widget>[
           if (!mine) ...<Widget>[
-            if (cartoonAvatarAsset case final String asset)
-              ClipOval(
-                child: SizedBox.square(
-                  dimension: 32,
-                  child: CartoonCoachSprite.portrait(asset: asset),
-                ),
-              )
-            else
-              CircleAvatar(
+            CircleAvatar(
                 radius: 16,
                 backgroundColor: const Color(0xFF5B3FD4),
                 backgroundImage: avatar.isEmpty ? null : AssetImage(avatar),
