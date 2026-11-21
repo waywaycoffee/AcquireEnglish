@@ -39,6 +39,7 @@ class PlayerSubtitleList extends StatefulWidget {
     this.subtitleWordHighlightStyle = '绿色填充',
     this.subtitleWordHighlightBorderWidth = 2.5,
     this.savedVocabularyWords = const <String>{},
+    this.learnedVocabularyWords = const <String>{},
     this.keyVocabularyWords = const <String>{},
     this.chunkHighlighter,
     required this.onTapLine,
@@ -106,6 +107,7 @@ class PlayerSubtitleList extends StatefulWidget {
   final String subtitleWordHighlightStyle;
   final double subtitleWordHighlightBorderWidth;
   final Set<String> savedVocabularyWords;
+  final Set<String> learnedVocabularyWords;
   final Set<String> keyVocabularyWords;
   final SubtitleChunkHighlighter? chunkHighlighter;
   final ValueChanged<int> onTapLine;
@@ -668,19 +670,17 @@ class _PlayerSubtitleListState extends State<PlayerSubtitleList> {
     });
   }
 
-  void _recordEncounterIfSaved(String rawWord) {
+  void _recordLearnedContext(String rawWord, String sentence) {
     final String word = normalizeWord(rawWord);
-    if (word.isEmpty || !widget.savedVocabularyWords.contains(word)) {
+    if (word.isEmpty || !widget.learnedVocabularyWords.contains(word)) {
       return;
     }
     unawaited(() async {
-      final int count = await WordEncounterStore().record(word);
+      final int count = await WordEncounterStore().recordContext(word, sentence);
       if (!mounted) return;
       _showMessage(
         context,
-        count >= 3
-            ? '片中再遇「$word」· 今日第 $count 次（轻量巩固已记）'
-            : '片中再遇「$word」· 今日第 $count 次',
+        '语境再遇「$word」· $count/${WordEncounterStore.contextGoal}',
       );
     }());
   }
@@ -697,7 +697,7 @@ class _PlayerSubtitleListState extends State<PlayerSubtitleList> {
       return;
     }
 
-    _recordEncounterIfSaved(rawWord);
+    _recordLearnedContext(rawWord, contextSentence);
     _removeDictionaryOverlay(notify: false, emitClosed: false);
     widget.onDictionaryOpened?.call();
 
@@ -2379,6 +2379,7 @@ class _PlayerSubtitleListState extends State<PlayerSubtitleList> {
                 SubtitleVocabularyHighlight.resolve(
                   rawToken: token.value,
                   savedWords: widget.savedVocabularyWords,
+                  learnedWords: widget.learnedVocabularyWords,
                   keyWords: widget.keyVocabularyWords,
                 );
             final Color baseWordColor =

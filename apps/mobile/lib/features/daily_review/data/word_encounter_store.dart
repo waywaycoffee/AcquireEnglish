@@ -1,5 +1,7 @@
+import 'dart:async';
 import 'dart:convert';
 
+import 'package:crypto/crypto.dart';
 import 'package:hive_ce/hive.dart';
 
 import '../../authentication/presentation/account_storage.dart';
@@ -12,6 +14,59 @@ class WordEncounterStore {
   WordEncounterStore({String? account}) : account = account ?? lastStudyAccount;
 
   final String account;
+
+  static const int contextGoal = 7;
+
+  String _contextKey(String word) =>
+      'word_contexts_v1:${Uri.encodeComponent(word.trim().toLowerCase())}';
+
+  int contextCount(String word) => _contexts(word).length;
+
+  Stream<int> watchContextCount(String word) {
+    if (!Hive.isBoxOpen('prefs')) return Stream<int>.value(0);
+    final Box<String> box = Hive.box<String>('prefs');
+    final String key = studyStorageKey(_contextKey(word), account);
+    return Stream<int>.multi((MultiStreamController<int> controller) {
+      final StreamSubscription<BoxEvent> subscription = box
+          .watch(key: key)
+          .listen(
+            (BoxEvent _) => controller.add(contextCount(word)),
+            onError: controller.addError,
+            onDone: controller.close,
+          );
+      controller.onCancel = subscription.cancel;
+      controller.add(contextCount(word));
+    }).distinct();
+  }
+
+  Set<String> _contexts(String word) {
+    final String? stored = readStudyStorage(_contextKey(word), account);
+    return stored == null || stored.isEmpty
+        ? <String>{}
+        : stored.split(',').toSet();
+  }
+
+  /// Count distinct sentences across learning surfaces, up to the visible goal.
+  Future<int> recordContext(String word, String sentence) async {
+    final Set<String> contexts = _contexts(word);
+    final String normalized = sentence
+        .toLowerCase()
+        .replaceAll(RegExp(r"[^a-z0-9]+"), ' ')
+        .trim();
+    if (word.trim().isEmpty ||
+        !normalized.contains(' ') ||
+        contexts.length >= contextGoal ||
+        !Hive.isBoxOpen('prefs')) {
+      return contexts.length;
+    }
+    final String digest = sha256.convert(utf8.encode(normalized)).toString();
+    if (contexts.add(digest)) {
+      await Hive.box<String>(
+        'prefs',
+      ).put(studyStorageKey(_contextKey(word), account), contexts.join(','));
+    }
+    return contexts.length;
+  }
 
   Map<String, dynamic> _load() {
     if (!Hive.isBoxOpen('prefs')) return <String, dynamic>{};

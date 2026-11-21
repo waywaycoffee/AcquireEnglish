@@ -122,6 +122,8 @@ GoRouter goRouter(Ref ref) => GoRouter(
     GoRoute(
       path: '/learn/:kind',
       builder: (context, state) => ModuleScreen(
+        key: ValueKey<String>(state.uri.toString()),
+        initialLesson: int.tryParse(state.uri.queryParameters['lesson'] ?? ''),
         kind: moduleLessons.containsKey(state.pathParameters['kind'])
             ? state.pathParameters['kind']!
             : 'ipa',
@@ -131,6 +133,11 @@ GoRouter goRouter(Ref ref) => GoRouter(
       path: '/shared/:token',
       builder: (BuildContext context, GoRouterState state) =>
           PublicLearningCardScreen(token: state.pathParameters['token']!),
+    ),
+    GoRoute(
+      path: '/explore',
+      builder: (BuildContext context, GoRouterState state) =>
+          const ExplorationMapScreen(),
     ),
     GoRoute(
       path: '/explore/cafe/:stage',

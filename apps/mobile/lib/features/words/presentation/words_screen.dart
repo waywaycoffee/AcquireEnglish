@@ -22,6 +22,7 @@ import '../../shared/presentation/pill_segmented_control.dart';
 import '../domain/word_review_settings.dart';
 import 'vocabulary_placement_provider.dart';
 import 'word_book_provider.dart';
+import 'word_context_progress.dart';
 import 'word_detail_screen.dart';
 import 'word_review_settings_provider.dart';
 import 'word_review_settings_sheet.dart';
@@ -1001,6 +1002,7 @@ class _WordCard extends ConsumerWidget {
                           color: AppDesignTokens.textSecondary,
                         ),
                       ),
+                    WordContextProgress(word: entry.word),
                     if (entry.sourceSentence.isNotEmpty) ...<Widget>[
                       const SizedBox(height: 6),
                       Text(

@@ -20,6 +20,7 @@ class PlayerCurrentLineCard extends StatefulWidget {
     required this.fontScale,
     required this.highlightWords,
     this.savedVocabularyWords = const <String>{},
+    this.learnedVocabularyWords = const <String>{},
     this.keyVocabularyWords = const <String>{},
     this.chunkHighlighter,
     required this.onBookmark,
@@ -38,6 +39,7 @@ class PlayerCurrentLineCard extends StatefulWidget {
   final double fontScale;
   final bool highlightWords;
   final Set<String> savedVocabularyWords;
+  final Set<String> learnedVocabularyWords;
   final Set<String> keyVocabularyWords;
   final SubtitleChunkHighlighter? chunkHighlighter;
   final VoidCallback onBookmark;
@@ -245,6 +247,7 @@ class _PlayerCurrentLineCardState extends State<PlayerCurrentLineCard> {
                             SubtitleVocabularyHighlight.resolve(
                               rawToken: token,
                               savedWords: widget.savedVocabularyWords,
+                              learnedWords: widget.learnedVocabularyWords,
                               keyWords: widget.keyVocabularyWords,
                             );
                         final Color vocabFill =

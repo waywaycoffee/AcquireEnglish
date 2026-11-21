@@ -38,6 +38,7 @@ class PlayerVideoPanel extends StatefulWidget {
     this.subtitleWordHighlightStyle = '绿色填充',
     this.subtitleWordHighlightBorderWidth = 2.5,
     this.savedVocabularyWords = const <String>{},
+    this.learnedVocabularyWords = const <String>{},
     this.keyVocabularyWords = const <String>{},
     this.chunkHighlighter,
     required this.speed,
@@ -115,6 +116,7 @@ class PlayerVideoPanel extends StatefulWidget {
   final String subtitleWordHighlightStyle;
   final double subtitleWordHighlightBorderWidth;
   final Set<String> savedVocabularyWords;
+  final Set<String> learnedVocabularyWords;
   final Set<String> keyVocabularyWords;
   final SubtitleChunkHighlighter? chunkHighlighter;
   final String speed;
@@ -300,16 +302,14 @@ class _PlayerVideoPanelState extends State<PlayerVideoPanel> {
   void _openSubtitleLookup(BuildContext anchorContext, String word) {
     final String normalized = normalizeWord(word);
     if (normalized.isNotEmpty &&
-        widget.savedVocabularyWords.contains(normalized)) {
+        widget.learnedVocabularyWords.contains(normalized)) {
       unawaited(() async {
-        final int count = await WordEncounterStore().record(normalized);
+        final int count = await WordEncounterStore().recordContext(normalized, widget.line.english);
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
-              count >= 3
-                  ? '片中再遇「$normalized」· 今日第 $count 次（轻量巩固已记）'
-                  : '片中再遇「$normalized」· 今日第 $count 次',
+              '语境再遇「$normalized」· $count/${WordEncounterStore.contextGoal}',
             ),
           ),
         );
@@ -1480,6 +1480,7 @@ class _PlayerVideoPanelState extends State<PlayerVideoPanel> {
                 SubtitleVocabularyHighlight.resolve(
                   rawToken: entry.value,
                   savedWords: widget.savedVocabularyWords,
+                  learnedWords: widget.learnedVocabularyWords,
                   keyWords: widget.keyVocabularyWords,
                 );
             final Color vocabWordColor = SubtitleVocabularyHighlight.textColor(

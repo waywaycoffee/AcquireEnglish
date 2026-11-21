@@ -1,0 +1,8 @@
+{
+  "id": "builtin_a2_tech_robot",
+  "title": "A Robot in the School Library",
+  "sourceType": "builtin",
+  "level": "A2",
+  "builtin": true,
+  "plainText": "The school library has a robot that carries books. Students put returned books on a tray. The robot follows a line on the floor and takes the tray to the librarian. If a schoolbag blocks the line, the robot stops and turns on a light. A student moves the bag, and the robot continues."
+}

@@ -18,6 +18,7 @@ class PlayerTranscriptPanel extends StatefulWidget {
     required this.subtitleWordHighlightStyle,
     this.subtitleWordHighlightBorderWidth = 2.5,
     this.savedVocabularyWords = const <String>{},
+    this.learnedVocabularyWords = const <String>{},
     this.keyVocabularyWords = const <String>{},
     this.chunkHighlighter,
     required this.onTapLine,
@@ -79,6 +80,7 @@ class PlayerTranscriptPanel extends StatefulWidget {
   final String subtitleWordHighlightStyle;
   final double subtitleWordHighlightBorderWidth;
   final Set<String> savedVocabularyWords;
+  final Set<String> learnedVocabularyWords;
   final Set<String> keyVocabularyWords;
   final SubtitleChunkHighlighter? chunkHighlighter;
   final ValueChanged<int> onTapLine;
@@ -149,6 +151,7 @@ class _PlayerTranscriptPanelState extends State<PlayerTranscriptPanel> {
       subtitleWordHighlightStyle: widget.subtitleWordHighlightStyle,
       subtitleWordHighlightBorderWidth: widget.subtitleWordHighlightBorderWidth,
       savedVocabularyWords: widget.savedVocabularyWords,
+      learnedVocabularyWords: widget.learnedVocabularyWords,
       keyVocabularyWords: widget.keyVocabularyWords,
       chunkHighlighter: widget.chunkHighlighter,
       onCollectWord: widget.onCollectWord,

@@ -1,3 +1,4 @@
+import 'package:common_learn_english/features/library/presentation/library_mock_data.dart';
 import 'package:common_learn_english/features/onboarding/domain/onboarding_profile.dart';
 import 'package:common_learn_english/features/onboarding/presentation/focus_recommendation.dart';
 import 'package:common_learn_english/features/reading/domain/reading_doc.dart';
@@ -13,10 +14,7 @@ void main() {
   });
 
   test('resolvedLevel maps ability ids', () {
-    expect(
-      const OnboardingProfile(abilityId: 'beginner').resolvedLevel,
-      '零基础',
-    );
+    expect(const OnboardingProfile(abilityId: 'beginner').resolvedLevel, '零基础');
     expect(const OnboardingProfile(abilityId: 'words').resolvedLevel, 'A2');
     expect(const OnboardingProfile(abilityId: 'daily').resolvedLevel, 'B1');
     expect(const OnboardingProfile().resolvedLevel, 'A2');
@@ -60,7 +58,7 @@ void main() {
         abilityId: 'words',
       ),
       prefs: const AcquirePreferencesDto(level: 'A2'),
-      feed: const <AcquireDailyFeedItemDto>[],
+      courses: const <LibraryCourseData>[],
       readingDocs: const <ReadingDoc>[
         ReadingDoc(
           id: 'builtin_a2_lost_key',
@@ -70,13 +68,40 @@ void main() {
           level: 'A2',
           builtin: true,
         ),
+        ReadingDoc(
+          id: 'builtin_a2_tech_robot',
+          title: 'A Robot in the School Library',
+          sourceType: ReadingSourceType.builtin,
+          plainText: 'A robot carries books.',
+          level: 'A2',
+          builtin: true,
+        ),
       ],
-      activeBookTitle: null,
+      activeBook: null,
     );
     expect(rec.focus.id, 'reading');
-    expect(rec.route, '/reading/builtin_a2_lost_key');
-    expect(rec.subtitle, contains('科技'));
+    expect(rec.route, '/reading/builtin_a2_tech_robot');
+    expect(rec.title, contains('Robot'));
   });
+
+  test(
+    'oral opens the travel lesson and vocabulary opens the unified word book',
+    () {
+      FocusRecommendation recommend(String focus) => buildFocusRecommendation(
+        profile: OnboardingProfile(
+          focusId: focus,
+          interestIds: const <String>['travel'],
+        ),
+        prefs: const AcquirePreferencesDto(),
+        courses: const <LibraryCourseData>[],
+        readingDocs: const <ReadingDoc>[],
+        activeBook: null,
+      );
+      expect(recommend('oral').route, '/learn/dialogue?lesson=1');
+      expect(recommend('vocab').route, '/words');
+      expect(recommend('video').title, '选择一段视频');
+    },
+  );
 
   test('prefs tags encode focus without gating community', () {
     final List<String> tags = prefsTagsForProfile(

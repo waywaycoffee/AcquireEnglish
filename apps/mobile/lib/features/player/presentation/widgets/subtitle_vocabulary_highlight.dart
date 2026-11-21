@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import '../../../words/presentation/word_book_provider.dart';
 
 /// Vocabulary mark layered under karaoke current-word highlight.
-enum SubtitleVocabMark { none, key, saved }
+enum SubtitleVocabMark { none, key, saved, learned }
 
 /// Favorites take precedence over personalized recommendations.
 class SubtitleVocabularyHighlight {
@@ -28,12 +28,14 @@ class SubtitleVocabularyHighlight {
   static SubtitleVocabMark resolve({
     required String rawToken,
     required Set<String> savedWords,
+    Set<String> learnedWords = const <String>{},
     required Set<String> keyWords,
   }) {
     final String word = normalizeToken(rawToken);
     if (word.isEmpty) {
       return SubtitleVocabMark.none;
     }
+    if (learnedWords.contains(word)) return SubtitleVocabMark.learned;
     if (savedWords.contains(word)) {
       return SubtitleVocabMark.saved;
     }
@@ -49,6 +51,9 @@ class SubtitleVocabularyHighlight {
     required bool onDarkVideo,
   }) {
     return switch (mark) {
+      SubtitleVocabMark.learned => onDarkVideo
+          ? const Color(0xFF123E2C)
+          : const Color(0xFFD5F4E0),
       SubtitleVocabMark.saved => onDarkVideo
           ? const Color(0xFF624A10)
           : const Color(0xFFFFEDAB),
@@ -73,6 +78,8 @@ class SubtitleVocabularyHighlight {
     required bool onDarkVideo,
   }) {
     switch (mark) {
+      case SubtitleVocabMark.learned:
+        return onDarkVideo ? const Color(0xFF9AE6B4) : const Color(0xFF146638);
       case SubtitleVocabMark.saved:
         return onDarkVideo
             ? const Color(0xFFFFDB72)
@@ -91,7 +98,7 @@ class SubtitleVocabularyHighlight {
     required bool karaoke,
     required bool activeLine,
   }) {
-    if (karaoke || mark == SubtitleVocabMark.saved) {
+    if (karaoke || mark == SubtitleVocabMark.saved || mark == SubtitleVocabMark.learned) {
       return FontWeight.w800;
     }
     if (mark == SubtitleVocabMark.key) {

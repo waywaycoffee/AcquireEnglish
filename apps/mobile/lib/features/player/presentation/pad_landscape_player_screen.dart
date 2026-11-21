@@ -39,6 +39,7 @@ import '../../sync/data/acquire_api_client.dart';
 import '../../sync/data/personal_import_sync.dart';
 import '../../words/data/offline_word_dictionary.dart';
 import '../../words/data/vocab_card_enrichment_service.dart';
+import '../../words/presentation/learned_vocabulary_provider.dart';
 import '../../words/presentation/word_book_provider.dart';
 import '../domain/pronunciation_assessment.dart';
 import 'asr_subtitle_cache.dart';
@@ -2606,6 +2607,7 @@ Future<void> _settleChineseFillIfAlreadyPresent() async {
         SubtitleVocabularyHighlight.savedWordsFromBook(
           ref.watch(wordBookProvider),
         );
+    final Set<String> learnedVocabularyWords = ref.watch(learnedVocabularyProvider);
     final Set<String> keyVocabularyWords =
         ref.watch(recommendedWordsProvider);
     final SubtitleChunkHighlighter? chunkHighlighter = ref
@@ -2715,6 +2717,7 @@ Future<void> _settleChineseFillIfAlreadyPresent() async {
                               subtitleWordHighlightBorderWidth:
                                   settings.subtitleWordHighlightBorderWidth,
                               savedVocabularyWords: savedVocabularyWords,
+                              learnedVocabularyWords: learnedVocabularyWords,
                               keyVocabularyWords: keyVocabularyWords,
                               chunkHighlighter: chunkHighlighter,
                               isShadowing: state.isShadowing,
@@ -2842,6 +2845,7 @@ Future<void> _settleChineseFillIfAlreadyPresent() async {
                                             >{},
                                       savedVocabularyWords:
                                           savedVocabularyWords,
+                                      learnedVocabularyWords: learnedVocabularyWords,
                                       keyVocabularyWords: keyVocabularyWords,
                                       chunkHighlighter: chunkHighlighter,
                                       onTapLine: _goToLine,
@@ -2933,6 +2937,7 @@ Future<void> _settleChineseFillIfAlreadyPresent() async {
                                           settings.subtitleLetterCase,
                                       savedVocabularyWords:
                                           savedVocabularyWords,
+                                      learnedVocabularyWords: learnedVocabularyWords,
                                       keyVocabularyWords: keyVocabularyWords,
                                       chunkHighlighter: chunkHighlighter,
                                       onTapLine: (_) {},
@@ -4104,6 +4109,7 @@ Future<void> _settleChineseFillIfAlreadyPresent() async {
         SubtitleVocabularyHighlight.savedWordsFromBook(
           ref.read(wordBookProvider),
         );
+    final Set<String> learnedVocabularyWords = ref.watch(learnedVocabularyProvider);
     final Set<String> keyVocabularyWords =
         ref.read(recommendedWordsProvider);
     final SubtitleChunkHighlighter? chunkHighlighter = ref
@@ -4131,6 +4137,7 @@ Future<void> _settleChineseFillIfAlreadyPresent() async {
             subtitleWordHighlightStyle: subtitleWordHighlightStyle,
             subtitleWordHighlightBorderWidth: subtitleWordHighlightBorderWidth,
             savedVocabularyWords: savedVocabularyWords,
+            learnedVocabularyWords: learnedVocabularyWords,
             keyVocabularyWords: keyVocabularyWords,
             chunkHighlighter: chunkHighlighter,
             isMuted: _isMuted,

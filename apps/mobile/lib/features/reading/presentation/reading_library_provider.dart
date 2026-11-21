@@ -11,6 +11,8 @@ const String kReadingLibraryKey = 'reading_library_v1';
 const String kReadingProgressKey = 'reading_progress_v1';
 const List<String> kBuiltinReadingAssetPaths = <String>[
   'assets/reading/a1_morning_walk.json',
+  'assets/reading/a1_tech_robot.json',
+  'assets/reading/a2_tech_robot.json',
   'assets/reading/a2_lost_key.json',
   'assets/reading/b1_new_city.json',
   'assets/reading/b1_library_afternoon.json',

@@ -5,6 +5,18 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
+  test('reviewed vocabulary takes precedence over saved and recommended marks', () {
+    expect(
+      SubtitleVocabularyHighlight.resolve(
+        rawToken: 'Room!',
+        savedWords: const <String>{'room'},
+        keyWords: const <String>{'room'},
+        learnedWords: const <String>{'room'},
+      ),
+      SubtitleVocabMark.learned,
+    );
+  });
+
   test('inline marks only favorited words, not all learning entries', () {
     final Set<String> saved = SubtitleVocabularyHighlight.savedWordsFromBook(
       <WordEntry>[

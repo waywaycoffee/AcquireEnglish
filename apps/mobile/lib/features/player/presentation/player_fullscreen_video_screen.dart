@@ -24,6 +24,7 @@ class PlayerFullscreenVideoScreen extends StatefulWidget {
     this.subtitleWordHighlightStyle = '绿色填充',
     this.subtitleWordHighlightBorderWidth = 2.5,
     this.savedVocabularyWords = const <String>{},
+    this.learnedVocabularyWords = const <String>{},
     this.keyVocabularyWords = const <String>{},
     this.chunkHighlighter,
     required this.isMuted,
@@ -84,6 +85,7 @@ class PlayerFullscreenVideoScreen extends StatefulWidget {
   final String subtitleWordHighlightStyle;
   final double subtitleWordHighlightBorderWidth;
   final Set<String> savedVocabularyWords;
+  final Set<String> learnedVocabularyWords;
   final Set<String> keyVocabularyWords;
   final SubtitleChunkHighlighter? chunkHighlighter;
   final bool isMuted;
@@ -285,6 +287,7 @@ class _PlayerFullscreenVideoScreenState
               subtitleWordHighlightBorderWidth:
                   widget.subtitleWordHighlightBorderWidth,
               savedVocabularyWords: widget.savedVocabularyWords,
+              learnedVocabularyWords: widget.learnedVocabularyWords,
               keyVocabularyWords: widget.keyVocabularyWords,
               chunkHighlighter: widget.chunkHighlighter,
               isShadowing: player.isShadowing,
@@ -438,6 +441,7 @@ class _PlayerFullscreenVideoScreenState
               subtitleWordHighlightBorderWidth:
                   widget.subtitleWordHighlightBorderWidth,
               savedVocabularyWords: widget.savedVocabularyWords,
+              learnedVocabularyWords: widget.learnedVocabularyWords,
               keyVocabularyWords: widget.keyVocabularyWords,
               chunkHighlighter: widget.chunkHighlighter,
               onTapLine: (int index) =>
@@ -500,6 +504,7 @@ class _FullscreenSubtitlePanel extends StatelessWidget {
     required this.subtitleWordHighlightStyle,
     required this.subtitleWordHighlightBorderWidth,
     this.savedVocabularyWords = const <String>{},
+    this.learnedVocabularyWords = const <String>{},
     this.keyVocabularyWords = const <String>{},
     this.chunkHighlighter,
     required this.onTapLine,
@@ -531,6 +536,7 @@ class _FullscreenSubtitlePanel extends StatelessWidget {
   final String subtitleWordHighlightStyle;
   final double subtitleWordHighlightBorderWidth;
   final Set<String> savedVocabularyWords;
+  final Set<String> learnedVocabularyWords;
   final Set<String> keyVocabularyWords;
   final SubtitleChunkHighlighter? chunkHighlighter;
   final ValueChanged<int> onTapLine;
@@ -578,6 +584,7 @@ class _FullscreenSubtitlePanel extends StatelessWidget {
           subtitleWordHighlightStyle: subtitleWordHighlightStyle,
           subtitleWordHighlightBorderWidth: subtitleWordHighlightBorderWidth,
           savedVocabularyWords: savedVocabularyWords,
+          learnedVocabularyWords: learnedVocabularyWords,
           keyVocabularyWords: keyVocabularyWords,
           chunkHighlighter: chunkHighlighter,
           onTapLine: onTapLine,

@@ -5,6 +5,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../authentication/presentation/account_storage.dart';
+import '../../daily_review/data/word_encounter_store.dart';
 import '../../navigation/presentation/navigation_destination.dart';
 import '../../settings/presentation/settings_provider.dart';
 import '../../shared/data/word_lookup_service.dart';
@@ -14,6 +16,7 @@ import '../../shared/presentation/pad/pad_scaffold.dart';
 import '../../shared/presentation/pad/pad_top_bar.dart';
 import '../../shared/data/word_pronunciation_service.dart';
 import '../../words/domain/foundation_media.dart';
+import '../../words/presentation/learned_vocabulary_provider.dart';
 import '../../words/presentation/word_book_provider.dart';
 import '../domain/reading_doc.dart';
 import 'content_media_provider.dart';
@@ -90,6 +93,18 @@ class _ReadingReaderScreenState extends ConsumerState<ReadingReaderScreen> {
     );
     if (word.length < 2) return;
     final LearningSettingsState settings = ref.read(learningSettingsProvider);
+    final bool learned = ref.read(learnedVocabularyProvider).contains(word);
+    int? contexts;
+    if (learned) {
+      try {
+        contexts = await WordEncounterStore(
+          account: ref.read(studyAccountProvider),
+        ).recordContext(word, sentence);
+      } catch (_) {
+        // Keep dictionary lookup available if the progress write fails.
+      }
+    }
+    if (!mounted) return;
     WordLookupEntry? entry;
     try {
       entry = await ref
@@ -123,6 +138,8 @@ class _ReadingReaderScreenState extends ConsumerState<ReadingReaderScreen> {
                 word,
                 style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w900),
               ),
+              if (contexts != null)
+                Text('语境再遇 $contexts/${WordEncounterStore.contextGoal}'),
               if (entry?.phonetic.isNotEmpty ?? false)
                 Text(
                   entry!.phonetic,
@@ -171,7 +188,7 @@ class _ReadingReaderScreenState extends ConsumerState<ReadingReaderScreen> {
     );
   }
 
-  List<InlineSpan> _buildSpans(ReadingDoc doc, Color textColor) {
+  List<InlineSpan> _buildSpans(ReadingDoc doc, Color textColor, Set<String> learnedWords) {
     final String text = doc.plainText;
     final List<InlineSpan> spans = <InlineSpan>[];
     final RegExp token = RegExp(r"[A-Za-z]+(?:['-][A-Za-z]+)*|[^A-Za-z]+");
@@ -198,7 +215,9 @@ class _ReadingReaderScreenState extends ConsumerState<ReadingReaderScreen> {
           TextSpan(
             text: part,
             style: TextStyle(
-              color: textColor,
+              color: learnedWords.contains(normalizeWord(part))
+                  ? (_dark ? const Color(0xFF9AE6B4) : const Color(0xFF146638))
+                  : textColor,
               fontSize: _fontSize,
               height: _lineHeight,
               fontWeight: FontWeight.w500,
@@ -325,7 +344,7 @@ class _ReadingReaderScreenState extends ConsumerState<ReadingReaderScreen> {
             controller: _scroll,
             padding: const EdgeInsets.fromLTRB(22, 12, 22, 40),
             child: Text.rich(
-              TextSpan(children: _buildSpans(doc, fg)),
+              TextSpan(children: _buildSpans(doc, fg, ref.watch(learnedVocabularyProvider))),
             ),
           ),
         ),

@@ -90,7 +90,7 @@ class OnboardingNotifier extends Notifier<OnboardingProfile> {
   }
 
   Future<void> skipForNow() async {
-    await _persist(state.copyWith(completed: true));
+    await _persist(state.copyWith(completed: true, focusId: null));
     if (Hive.isBoxOpen('prefs')) {
       await Hive.box<String>('prefs').put(kOnboardingCompleteKey, '1');
     }

@@ -154,8 +154,9 @@ const moduleTitles = {
 };
 
 class ModuleScreen extends ConsumerStatefulWidget {
-  const ModuleScreen({super.key, required this.kind});
+  const ModuleScreen({super.key, required this.kind, this.initialLesson});
   final String kind;
+  final int? initialLesson;
   @override
   ConsumerState<ModuleScreen> createState() => _ModuleScreenState();
 }
@@ -250,6 +251,11 @@ class _ModuleScreenState extends ConsumerState<ModuleScreen>
         if (raw != null) applyState(jsonDecode(raw) as Map<String, dynamic>);
       } catch (_) {
         lesson = (int.tryParse(raw ?? '') ?? 0).clamp(0, lessons.length - 1);
+      }
+      final int? initial = widget.initialLesson;
+      if (initial != null && lessons.isNotEmpty) {
+        lesson = initial.clamp(0, lessons.length - 1);
+        line = 0;
       }
     });
     if (ref.read(authSessionProvider).isLoggedIn) unawaited(sync());

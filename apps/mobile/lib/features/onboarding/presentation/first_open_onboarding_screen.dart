@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../../community/presentation/adventure_ui.dart';
 import '../../shared/presentation/pad/app_design_tokens.dart';
 import '../domain/onboarding_profile.dart';
+import 'focus_recommendation.dart';
 import 'onboarding_provider.dart';
 
 class FirstOpenOnboardingScreen extends ConsumerStatefulWidget {
@@ -163,9 +164,17 @@ class _FirstOpenOnboardingScreenState
                   ),
                   _ResultPage(
                     profile: profile,
-                    onStart: (String route) => context.go(route),
+                    onStart: (String route) {
+                      final String target = ref.read(focusRecommendationProvider)?.route ?? route;
+                      context.go('/home');
+                      context.push(target);
+                    },
                     onHome: () => context.go('/home'),
-                    onMap: () => context.go('/discover'),
+                    recommendation: ref.watch(focusRecommendationProvider),
+                    onMap: () {
+                      context.go('/discover');
+                      context.push('/explore');
+                    },
                   ),
                 ],
               ),
@@ -559,12 +568,14 @@ class _ResultPage extends StatelessWidget {
     required this.onStart,
     required this.onHome,
     required this.onMap,
+    required this.recommendation,
   });
 
   final OnboardingProfile profile;
   final ValueChanged<String> onStart;
   final VoidCallback onHome;
   final VoidCallback onMap;
+  final FocusRecommendation? recommendation;
 
   @override
   Widget build(BuildContext context) {
@@ -601,7 +612,7 @@ class _ResultPage extends StatelessWidget {
           ),
           const SizedBox(height: 6),
           Text(
-            focus.homeBlurb,
+            recommendation?.title ?? focus.homeBlurb,
             style: TextStyle(
               fontWeight: FontWeight.w600,
               color: AppDesignTokens.textSecondary,
@@ -610,7 +621,7 @@ class _ResultPage extends StatelessWidget {
           const SizedBox(height: 14),
           HubChunkyButton(
             label: focus.startLabel,
-            onPressed: () => onStart(focus.route),
+            onPressed: () => onStart(recommendation?.route ?? focus.route),
           ),
         ],
         const SizedBox(height: 16),

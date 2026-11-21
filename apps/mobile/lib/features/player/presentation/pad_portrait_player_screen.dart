@@ -40,6 +40,7 @@ import '../../sync/data/personal_import_sync.dart';
 import '../../sync/data/progress_sync_service.dart';
 import '../../words/data/offline_word_dictionary.dart';
 import '../../words/data/vocab_card_enrichment_service.dart';
+import '../../words/presentation/learned_vocabulary_provider.dart';
 import '../../words/presentation/word_book_provider.dart';
 import '../data/dictation_queue_provider.dart';
 import '../data/dub_accompaniment_service.dart';
@@ -2854,6 +2855,7 @@ Future<void> _settleChineseFillIfAlreadyPresent() async {
         SubtitleVocabularyHighlight.savedWordsFromBook(
           ref.watch(wordBookProvider),
         );
+    final Set<String> learnedVocabularyWords = ref.watch(learnedVocabularyProvider);
     final Set<String> keyVocabularyWords =
         ref.watch(recommendedWordsProvider);
     final SubtitleChunkHighlighter? chunkHighlighter = ref
@@ -2951,6 +2953,7 @@ Future<void> _settleChineseFillIfAlreadyPresent() async {
                         subtitleWordHighlightBorderWidth:
                             settings.subtitleWordHighlightBorderWidth,
                           savedVocabularyWords: savedVocabularyWords,
+                          learnedVocabularyWords: learnedVocabularyWords,
                           keyVocabularyWords: keyVocabularyWords,
                           chunkHighlighter: chunkHighlighter,
                         isShadowing: state.isShadowing,
@@ -3058,6 +3061,7 @@ Future<void> _settleChineseFillIfAlreadyPresent() async {
                           visibleAssessment: visibleAssessment,
                           activeLine: activeLine,
                             savedVocabularyWords: savedVocabularyWords,
+                            learnedVocabularyWords: learnedVocabularyWords,
                             keyVocabularyWords: keyVocabularyWords,
                             chunkHighlighter: chunkHighlighter,
                         ),
@@ -3151,6 +3155,7 @@ Future<void> _settleChineseFillIfAlreadyPresent() async {
     required PronunciationTargetSelection visibleAssessment,
     required PlayerSubtitleLine activeLine,
     required Set<String> savedVocabularyWords,
+    required Set<String> learnedVocabularyWords,
     required Set<String> keyVocabularyWords,
     SubtitleChunkHighlighter? chunkHighlighter,
   }) {
@@ -3174,6 +3179,7 @@ Future<void> _settleChineseFillIfAlreadyPresent() async {
                 ? _asrFragmentsBySentenceStartMs
                 : const <int, List<PlayerSubtitleLine>>{},
             savedVocabularyWords: savedVocabularyWords,
+            learnedVocabularyWords: learnedVocabularyWords,
             keyVocabularyWords: keyVocabularyWords,
             chunkHighlighter: chunkHighlighter,
             onTapLine: _goToLine,
@@ -3252,6 +3258,7 @@ Future<void> _settleChineseFillIfAlreadyPresent() async {
             highlightWords: settings.highlightWords,
             subtitleLetterCase: settings.subtitleLetterCase,
             savedVocabularyWords: savedVocabularyWords,
+            learnedVocabularyWords: learnedVocabularyWords,
             keyVocabularyWords: keyVocabularyWords,
             chunkHighlighter: chunkHighlighter,
             onTapLine: (_) {},
@@ -4950,6 +4957,7 @@ Future<void> _settleChineseFillIfAlreadyPresent() async {
         SubtitleVocabularyHighlight.savedWordsFromBook(
           ref.read(wordBookProvider),
         );
+    final Set<String> learnedVocabularyWords = ref.watch(learnedVocabularyProvider);
     final Set<String> keyVocabularyWords =
         ref.read(recommendedWordsProvider);
     final SubtitleChunkHighlighter? chunkHighlighter = ref
@@ -4977,6 +4985,7 @@ Future<void> _settleChineseFillIfAlreadyPresent() async {
             subtitleWordHighlightStyle: subtitleWordHighlightStyle,
             subtitleWordHighlightBorderWidth: subtitleWordHighlightBorderWidth,
             savedVocabularyWords: savedVocabularyWords,
+            learnedVocabularyWords: learnedVocabularyWords,
             keyVocabularyWords: keyVocabularyWords,
             chunkHighlighter: chunkHighlighter,
             isMuted: _isMuted,

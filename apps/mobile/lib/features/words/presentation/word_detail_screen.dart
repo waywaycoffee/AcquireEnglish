@@ -17,6 +17,7 @@ import '../data/offline_word_dictionary.dart';
 import '../data/vocab_card_enrichment_service.dart';
 import '../domain/word_morphology.dart';
 import 'word_book_provider.dart';
+import 'word_context_progress.dart';
 import 'word_video_relink.dart';
 import 'widgets/phonics_syllable_blocks.dart';
 
@@ -331,6 +332,7 @@ class _WordDetailDialogState extends ConsumerState<WordDetailDialog> {
                         .read(wordBookProvider.notifier)
                         .toggleFavorite(entry.word),
                   ),
+                  WordContextProgress(word: entry.word, showDetails: true),
                   if (entry.favorite) ...<Widget>[
                     const SizedBox(height: 12),
                     SizedBox(
