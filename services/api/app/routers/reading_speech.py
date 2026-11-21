@@ -21,8 +21,20 @@ router = APIRouter(prefix="/reading/speech", tags=["reading-speech"])
 voices_router = APIRouter(prefix="/reading", tags=["reading-speech"])
 
 # Published voice catalog for settings + vocab pronunciation.
+# CosyVoice bilingual narrators first — richer prosody for reading aloud.
 VOICE_LABELS: dict[str, str] = {
-    "qwen-audio-3.0-tts-flash-loongolivialin": "Olivia Lin · 英音女声（推荐）",
+    "longanfengyue": "龙安风悦 · 温暖有感染力（推荐）",
+    "longshu_v3.1": "龙书 · 朗读书卷感",
+    "longanxiaoxin": "龙安小昕 · 亲切活泼",
+    "longanlingxi": "龙安灵希 · 甜美轻快",
+    "longanhuan_v3.6": "龙安欢 · 元气感染力",
+    "longxiaocheng_v3.1": "龙小诚 · 沉稳男声",
+    "libai_v3.1": "李白 · 文气旁白",
+    "longze_v3.1": "龙泽 · 磁性男声",
+    "longanyang_v3.1": "龙安洋 · 中英双语",
+    "longsanshu_v3.1": "龙三叔 · 中英双语",
+    "longanlufeng": "龙安鲁风 · 中英双语",
+    "qwen-audio-3.0-tts-flash-loongolivialin": "Olivia Lin · 英音女声",
     "qwen-audio-3.0-tts-flash-loonglunawang": "Luna Wang · 英音女声",
     "qwen-audio-3.0-tts-flash-loongnorahu": "Nora Hu · 英音女声",
     "qwen-audio-3.0-tts-flash-loongivyhu": "Ivy Hu · 英音女声",
@@ -30,21 +42,10 @@ VOICE_LABELS: dict[str, str] = {
     "qwen-audio-3.0-tts-flash-loongalexanderhu": "Alexander Hu · 英音男声",
     "qwen-audio-3.0-tts-flash-loongjameszhao": "James Zhao · 英音男声",
     "qwen-audio-3.0-tts-flash-loongryanma": "Ryan Ma · 英音男声",
-    "longanfengyue": "龙安风悦 · 中英双语",
-    "longanxiaoxin": "龙安小昕 · 中英双语",
-    "longanlingxi": "龙安灵希 · 中英双语",
-    "longshu_v3.1": "龙书 · 中英双语",
-    "longxiaocheng_v3.1": "龙小诚 · 中英双语",
-    "longsanshu_v3.1": "龙三叔 · 中英双语",
-    "longze_v3.1": "龙泽 · 中英双语",
-    "libai_v3.1": "李白 · 中英双语",
-    "longanyang_v3.1": "龙安洋 · 中英双语",
-    "longanlufeng": "龙安鲁风 · 中英双语",
-    "longanhuan_v3.6": "龙安欢 · 中英双语",
 }
 NAMES = frozenset(VOICE_LABELS)
-# English-first default for vocab / reading cards; bilingual voices stay selectable.
-DEFAULT_VOICE = "qwen-audio-3.0-tts-flash-loongolivialin"
+# Expressive CosyVoice default for reading / vocab cards.
+DEFAULT_VOICE = "longanfengyue"
 
 
 class SpeechLookupOut(BaseModel):

@@ -950,11 +950,13 @@ class _ReadingReaderScreenState extends ConsumerState<ReadingReaderScreen> {
         leading: PadBackButton(onPressed: () => context.pop()),
         actions: <Widget>[
           IconButton(
-            tooltip:
-                '切换为${_ttsGender == ReadingTtsGender.female ? '男声' : '女声'}',
+            tooltip: '选择朗读音色（当前：${_ttsGender.labelCn}）',
             onPressed: () => unawaited(_toggleTtsGender()),
             icon: Icon(
-              _ttsGender == ReadingTtsGender.female
+              _ttsGender == ReadingTtsGender.female ||
+                      _ttsGender == ReadingTtsGender.luna ||
+                      _ttsGender == ReadingTtsGender.nora ||
+                      _ttsGender == ReadingTtsGender.ivy
                   ? Icons.woman_rounded
                   : Icons.man_rounded,
               color: AppDesignTokens.brandGreenDark,
@@ -1031,16 +1033,16 @@ class _ReadingReaderScreenState extends ConsumerState<ReadingReaderScreen> {
                 value: 'voice_female',
                 child: Text(
                   _ttsGender == ReadingTtsGender.female
-                      ? '女声（当前 · 阿里云）'
-                      : '女声（阿里云）',
+                      ? '女声 · 龙安风悦（当前）'
+                      : '女声 · 龙安风悦',
                 ),
               ),
               PopupMenuItem<String>(
                 value: 'voice_male',
                 child: Text(
                   _ttsGender == ReadingTtsGender.male
-                      ? '男声（当前 · 阿里云）'
-                      : '男声（阿里云）',
+                      ? '男声 · 龙书（当前）'
+                      : '男声 · 龙书',
                 ),
               ),
               const PopupMenuDivider(),

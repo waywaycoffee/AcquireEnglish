@@ -6,33 +6,33 @@ import '../../sync/data/acquire_api_client.dart';
 
 const String kReadingTtsGenderKey = 'reading_tts_gender_v1';
 
-/// Reading uses Aliyun Qwen voices via ECS `/api/reading/speech` (media on ECS).
+/// Reading uses expressive Aliyun CosyVoice narrators via ECS `/api/reading/speech`.
 enum ReadingTtsGender { female, male, luna, nora, ivy, alexander, james, ryan }
 
 extension ReadingTtsGenderX on ReadingTtsGender {
   String get storageValue => name;
 
   String get labelCn => switch (this) {
-    ReadingTtsGender.female => 'Olivia Lin',
-    ReadingTtsGender.male => 'Adrian Gao',
-    ReadingTtsGender.luna => 'Luna Wang',
-    ReadingTtsGender.nora => 'Nora Hu',
-    ReadingTtsGender.ivy => 'Ivy Hu',
-    ReadingTtsGender.alexander => 'Alexander Hu',
-    ReadingTtsGender.james => 'James Zhao',
-    ReadingTtsGender.ryan => 'Ryan Ma',
+    ReadingTtsGender.female => '龙安风悦 · 温暖有感染力（推荐）',
+    ReadingTtsGender.male => '龙书 · 朗读书卷感',
+    ReadingTtsGender.luna => '龙安小昕 · 亲切活泼',
+    ReadingTtsGender.nora => '龙安灵希 · 甜美轻快',
+    ReadingTtsGender.ivy => '龙安欢 · 元气感染力',
+    ReadingTtsGender.alexander => '龙小诚 · 沉稳男声',
+    ReadingTtsGender.james => '李白 · 文气旁白',
+    ReadingTtsGender.ryan => '龙泽 · 磁性男声',
   };
 
-  /// DashScope CosyVoice id (English-native Qwen voices; not Edge).
+  /// CosyVoice bilingual ids — richer prosody than flat English-native loong voices.
   String get aliyunVoiceId => switch (this) {
-    ReadingTtsGender.female => 'qwen-audio-3.0-tts-flash-loongolivialin',
-    ReadingTtsGender.male => 'qwen-audio-3.0-tts-flash-loongadriangao',
-    ReadingTtsGender.luna => 'qwen-audio-3.0-tts-flash-loonglunawang',
-    ReadingTtsGender.nora => 'qwen-audio-3.0-tts-flash-loongnorahu',
-    ReadingTtsGender.ivy => 'qwen-audio-3.0-tts-flash-loongivyhu',
-    ReadingTtsGender.alexander => 'qwen-audio-3.0-tts-flash-loongalexanderhu',
-    ReadingTtsGender.james => 'qwen-audio-3.0-tts-flash-loongjameszhao',
-    ReadingTtsGender.ryan => 'qwen-audio-3.0-tts-flash-loongryanma',
+    ReadingTtsGender.female => 'longanfengyue',
+    ReadingTtsGender.male => 'longshu_v3.1',
+    ReadingTtsGender.luna => 'longanxiaoxin',
+    ReadingTtsGender.nora => 'longanlingxi',
+    ReadingTtsGender.ivy => 'longanhuan_v3.6',
+    ReadingTtsGender.alexander => 'longxiaocheng_v3.1',
+    ReadingTtsGender.james => 'libai_v3.1',
+    ReadingTtsGender.ryan => 'longze_v3.1',
   };
 
   static ReadingTtsGender fromStorage(String? raw) => ReadingTtsGender.values

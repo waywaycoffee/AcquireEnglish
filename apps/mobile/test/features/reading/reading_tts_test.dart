@@ -5,11 +5,11 @@ void main() {
   test('reading TTS gender maps to Alibaba CosyVoice ids', () {
     expect(
       ReadingTtsGender.female.aliyunVoiceId,
-      'qwen-audio-3.0-tts-flash-loongolivialin',
+      'longanfengyue',
     );
     expect(
       ReadingTtsGender.male.aliyunVoiceId,
-      'qwen-audio-3.0-tts-flash-loongadriangao',
+      'longshu_v3.1',
     );
     expect(
       ReadingTtsGender.values.map((v) => v.aliyunVoiceId).toSet(),
