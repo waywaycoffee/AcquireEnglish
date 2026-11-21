@@ -275,6 +275,10 @@ class _WordsScreenState extends ConsumerState<WordsScreen> {
                                   ),
                                 ),
                                 ActionChip(
+                                  label: const Text('爱快阅读'),
+                                  onPressed: () => context.push('/reading'),
+                                ),
+                                ActionChip(
                                   label: const Text('背收藏单词'),
                                   onPressed: () => context.push(
                                     '${SGRoute.reviewSession.route}?practice=1&kind=word',

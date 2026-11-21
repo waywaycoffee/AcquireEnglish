@@ -20,6 +20,8 @@ import '../features/import_course/presentation/import_course_screen.dart';
 import '../features/library/presentation/library_screen.dart';
 import '../features/phrases/presentation/phrases_screen.dart';
 import '../features/player/presentation/player_screen.dart';
+import '../features/reading/presentation/reading_hub_screen.dart';
+import '../features/reading/presentation/reading_reader_screen.dart';
 import '../features/review_hub/presentation/review_hub_screen.dart';
 import '../features/settings/presentation/settings_screen.dart';
 import '../features/learning/presentation/learning_review_screen.dart';
@@ -235,6 +237,20 @@ GoRouter goRouter(Ref ref) => GoRouter(
       path: '/words/syllabus/catalog',
       builder: (BuildContext context, GoRouterState state) =>
           const LilinjiCatalogScreen(),
+    ).fade(),
+    GoRoute(
+      path: '/reading',
+      builder: (BuildContext context, GoRouterState state) =>
+          const ReadingHubScreen(),
+    ).fade(),
+    GoRoute(
+      path: '/reading/:docId',
+      builder: (BuildContext context, GoRouterState state) {
+        final String docId = Uri.decodeComponent(
+          state.pathParameters['docId'] ?? '',
+        );
+        return ReadingReaderScreen(docId: docId);
+      },
     ).fade(),
     GoRoute(
       path: '/digital-human',
