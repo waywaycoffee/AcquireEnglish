@@ -104,6 +104,8 @@ dependencies:
   flutter_foreground_task: ^11.0.3
   flutter_overlay_window: ^1.0.2
   wakelock_plus: ^1.5.2
+  dart_mobi: ^1.0.2
+  syncfusion_flutter_pdf: ^33.2.13
 
 
 dev_dependencies:

@@ -6,6 +6,7 @@ import 'package:common_learn_english/features/player/presentation/player_mock_st
 import 'package:common_learn_english/features/reading/data/reading_ingest.dart';
 import 'package:common_learn_english/features/reading/domain/reading_doc.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:syncfusion_flutter_pdf/pdf.dart';
 
 void main() {
   group('cleanSubtitleEnglish', () {
@@ -110,10 +111,43 @@ void main() {
     });
   });
 
+  group('parsePdfImport', () {
+    test('extracts text-layer PDF content', () {
+      final PdfDocument document = PdfDocument();
+      document.pages.add().graphics.drawString(
+            'The cafe opens early for reading practice.',
+            PdfStandardFont(PdfFontFamily.helvetica, 12),
+          );
+      final List<int> saved = document.saveSync();
+      document.dispose();
+      final String text = parsePdfImport(Uint8List.fromList(saved));
+      expect(text, contains('cafe opens early'));
+    });
+
+    test('rejects non-pdf payloads', () {
+      expect(
+        () => parsePdfImport(Uint8List.fromList(utf8.encode('not a pdf'))),
+        throwsA(isA<StateError>()),
+      );
+    });
+  });
+
+  group('parseReadingImport', () {
+    test('routes by extension', () async {
+      final String text = await parseReadingImport(
+        Uint8List.fromList(utf8.encode('Hello from markdown')),
+        filename: 'notes.md',
+      );
+      expect(text, contains('Hello from markdown'));
+    });
+  });
+
   group('titleFromFilename', () {
     test('strips extension', () {
       expect(titleFromFilename('My Book.epub'), 'My Book');
       expect(titleFromFilename(r'C:\tmp\sample_cafe.txt'), 'sample_cafe');
+      expect(titleFromFilename('Kindle Sample.azw3'), 'Kindle Sample');
+      expect(titleFromFilename('paper.pdf'), 'paper');
     });
   });
 

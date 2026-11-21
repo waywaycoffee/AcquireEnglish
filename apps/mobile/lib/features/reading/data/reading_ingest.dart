@@ -2,10 +2,44 @@ import 'dart:convert';
 import 'dart:typed_data';
 
 import 'package:archive/archive.dart';
+import 'package:dart_mobi/dart_mobi.dart';
 import 'package:html/parser.dart' as html_parser;
+import 'package:syncfusion_flutter_pdf/pdf.dart';
 
 import '../../player/presentation/player_mock_state.dart';
 import '../domain/reading_doc.dart';
+
+/// File extensions accepted by the reading import picker.
+const List<String> kReadingImportExtensions = <String>[
+  'txt',
+  'epub',
+  'md',
+  'markdown',
+  'pdf',
+  'mobi',
+  'azw',
+  'azw3',
+];
+
+/// Route bytes to the matching reader parser by filename extension.
+Future<String> parseReadingImport(
+  Uint8List bytes, {
+  required String filename,
+}) async {
+  final String lower = filename.toLowerCase();
+  if (lower.endsWith('.epub')) {
+    return parseEpubImport(bytes);
+  }
+  if (lower.endsWith('.pdf')) {
+    return parsePdfImport(bytes);
+  }
+  if (lower.endsWith('.mobi') ||
+      lower.endsWith('.azw') ||
+      lower.endsWith('.azw3')) {
+    return parseMobiImport(bytes);
+  }
+  return parseTxtImport(bytes, filename: filename);
+}
 
 /// Target words per generated article from video subtitles.
 const int kReadingChunkMinWords = 200;
@@ -194,6 +228,89 @@ String parseEpubImport(Uint8List bytes) {
   return buf.toString().trim();
 }
 
+/// Extract plain text from a text-layer PDF (scanned image PDFs return empty).
+String parsePdfImport(Uint8List bytes) {
+  if (bytes.length < 5) {
+    throw StateError('不是有效的 PDF 文件');
+  }
+  final String head = utf8.decode(bytes.sublist(0, 5), allowMalformed: true);
+  if (!head.startsWith('%PDF')) {
+    throw StateError('不是有效的 PDF 文件');
+  }
+  final PdfDocument document = PdfDocument(inputBytes: bytes);
+  try {
+    final String text = PdfTextExtractor(document).extractText().trim();
+    if (text.isEmpty) {
+      throw StateError('未能提取正文（可能是扫描版 PDF，需先 OCR）');
+    }
+    return text.replaceAll(RegExp(r'[ \t]+\n'), '\n').replaceAll(RegExp(r'\n{3,}'), '\n\n');
+  } finally {
+    document.dispose();
+  }
+}
+
+/// Extract plain text from DRM-free MOBI / AZW / AZW3 (Kindle).
+Future<String> parseMobiImport(Uint8List bytes) async {
+  if (bytes.length < 16) {
+    throw StateError('不是有效的 MOBI/AZW 文件');
+  }
+
+  final MobiData mobiData;
+  try {
+    mobiData = await DartMobiReader.read(bytes);
+  } catch (error) {
+    final String message = '$error'.toLowerCase();
+    if (message.contains('drm')) {
+      throw StateError('该 Kindle 文件有 DRM 加密，无法导入。请使用无 DRM 的 MOBI/AZW3。');
+    }
+    throw StateError('MOBI/AZW 解析失败：$error');
+  }
+
+  final int? encryption = mobiData.record0header?.encryptionType;
+  if (encryption != null && encryption > 0) {
+    throw StateError('该 Kindle 文件有 DRM 加密，无法导入。请使用无 DRM 的 MOBI/AZW3。');
+  }
+
+  final MobiRawml rawml;
+  try {
+    rawml = mobiData.parseOpt(true, false, false);
+  } catch (error) {
+    final String message = '$error'.toLowerCase();
+    if (message.contains('drm')) {
+      throw StateError('该 Kindle 文件有 DRM 加密，无法导入。请使用无 DRM 的 MOBI/AZW3。');
+    }
+    throw StateError('MOBI/AZW 解析失败：$error');
+  }
+
+  final StringBuffer buf = StringBuffer();
+  void appendParts(MobiPart? head) {
+    MobiPart? curr = head;
+    while (curr != null) {
+      final Uint8List? data = curr.data;
+      if (data != null && data.isNotEmpty) {
+        final String xml = utf8.decode(data, allowMalformed: true);
+        final String plain = html_parser.parse(xml).body?.text ?? '';
+        final String cleaned = plain.replaceAll(RegExp(r'\s+'), ' ').trim();
+        if (cleaned.isNotEmpty) {
+          if (buf.isNotEmpty) buf.writeln();
+          buf.writeln(cleaned);
+        }
+      }
+      curr = curr.next;
+    }
+  }
+
+  appendParts(rawml.markup);
+  if (buf.isEmpty) {
+    appendParts(rawml.flow);
+  }
+  final String text = buf.toString().trim();
+  if (text.isEmpty) {
+    throw StateError('未能从 MOBI/AZW 中提取正文');
+  }
+  return text;
+}
+
 int _naturalEpubPathCompare(String a, String b) {
   final List<String> pa = a.toLowerCase().replaceAll('\\', '/').split('/');
   final List<String> pb = b.toLowerCase().replaceAll('\\', '/').split('/');
@@ -217,7 +334,10 @@ String titleFromFilename(String name) {
   final int cut = slash > backslash ? slash : backslash;
   if (cut >= 0) base = base.substring(cut + 1);
   base = base.replaceAll(
-    RegExp(r'\.(txt|epub|md|markdown|html?)$', caseSensitive: false),
+    RegExp(
+      r'\.(txt|epub|md|markdown|html?|pdf|mobi|azw3?)$',
+      caseSensitive: false,
+    ),
     '',
   );
   return base.isEmpty ? '导入读物' : base;

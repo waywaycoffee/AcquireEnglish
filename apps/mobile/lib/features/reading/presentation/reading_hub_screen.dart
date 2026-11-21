@@ -27,11 +27,11 @@ class ReadingHubScreen extends ConsumerWidget {
   const ReadingHubScreen({super.key});
 
   Future<void> _importFile(BuildContext context, WidgetRef ref) async {
-    final XFile? file = await openFile(
+      final XFile? file = await openFile(
       acceptedTypeGroups: const <XTypeGroup>[
         XTypeGroup(
           label: 'reading',
-          extensions: <String>['txt', 'epub', 'md', 'markdown'],
+          extensions: kReadingImportExtensions,
         ),
       ],
       confirmButtonText: '导入读物',
@@ -39,10 +39,10 @@ class ReadingHubScreen extends ConsumerWidget {
     if (file == null) return;
     try {
       final Uint8List bytes = await file.readAsBytes();
-      final String lower = file.name.toLowerCase();
-      final String text = lower.endsWith('.epub')
-          ? parseEpubImport(bytes)
-          : parseTxtImport(bytes, filename: file.name);
+      final String text = await parseReadingImport(
+        bytes,
+        filename: file.name,
+      );
       if (text.trim().isEmpty) {
         if (context.mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -297,7 +297,7 @@ class ReadingHubScreen extends ConsumerWidget {
                     FilledButton.tonalIcon(
                       onPressed: () => unawaited(_importFile(context, ref)),
                       icon: const Icon(Icons.upload_file_rounded),
-                      label: const Text('导入 TXT / EPUB / MD'),
+                      label: const Text('导入 TXT / EPUB / PDF / MOBI'),
                     ),
                     FilledButton.tonalIcon(
                       onPressed: () =>
