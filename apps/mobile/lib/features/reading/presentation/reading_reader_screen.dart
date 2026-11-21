@@ -31,6 +31,7 @@ import '../domain/reading_doc.dart';
 import '../domain/reading_study_mode.dart';
 import 'content_media_provider.dart';
 import 'reading_chunk_provider.dart';
+import 'reading_digital_human_ball.dart';
 import 'reading_library_provider.dart';
 import 'reading_text_spans.dart';
 import 'reading_vocab_lists_sheet.dart';
@@ -73,6 +74,7 @@ class _ReadingReaderScreenState extends ConsumerState<ReadingReaderScreen> {
   Map<String, String> _hardGlosses = const <String, String>{};
   bool _glossLoading = false;
   double? _unknownRate;
+  String _focusedSentence = '';
 
   @override
   void initState() {
@@ -375,6 +377,9 @@ class _ReadingReaderScreenState extends ConsumerState<ReadingReaderScreen> {
   }) async {
     final String lexeme = rawLexeme.trim();
     if (lexeme.length < 2) return;
+    if (sentence.trim().isNotEmpty) {
+      setState(() => _focusedSentence = sentence.trim());
+    }
     unawaited(_recordLearnedContext(lexeme, sentence));
     if (!mounted) return;
     final String fallback =
@@ -503,6 +508,7 @@ class _ReadingReaderScreenState extends ConsumerState<ReadingReaderScreen> {
         sentenceBounds(doc.plainText, start, end);
     final String sentence = bounds.text;
     if (sentence.isEmpty) return;
+    setState(() => _focusedSentence = sentence);
 
     String? zh;
     if (_sentenceTranslate) {
@@ -923,19 +929,22 @@ class _ReadingReaderScreenState extends ConsumerState<ReadingReaderScreen> {
           ),
         ],
       ),
-      body: ColoredBox(
-        color: bg,
-        child: NotificationListener<ScrollNotification>(
-          onNotification: (ScrollNotification n) {
-            if (n is ScrollUpdateNotification || n is ScrollEndNotification) {
-              _scheduleProgressSave(doc);
-            }
-            return false;
-          },
-          child: SingleChildScrollView(
-            controller: _scroll,
-            padding: const EdgeInsets.fromLTRB(22, 12, 22, 40),
-            child: Column(
+      body: ReadingDigitalHumanBallHost(
+        doc: doc,
+        focusedSentence: _focusedSentence,
+        child: ColoredBox(
+          color: bg,
+          child: NotificationListener<ScrollNotification>(
+            onNotification: (ScrollNotification n) {
+              if (n is ScrollUpdateNotification || n is ScrollEndNotification) {
+                _scheduleProgressSave(doc);
+              }
+              return false;
+            },
+            child: SingleChildScrollView(
+              controller: _scroll,
+              padding: const EdgeInsets.fromLTRB(22, 12, 22, 40),
+              child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: <Widget>[
                 if (_mode.showChunkLegend || showChinese)
@@ -1046,6 +1055,7 @@ class _ReadingReaderScreenState extends ConsumerState<ReadingReaderScreen> {
             ),
           ),
         ),
+      ),
       ),
     );
   }
