@@ -1,0 +1,30 @@
+---
+description: GPU (5060 Ti) workloads must be developed and tested on this local machine
+alwaysApply: true
+---
+
+# GPU work stays on this PC (5060 Ti)
+
+This developer machine has an **NVIDIA RTX 5060 Ti**. Any feature that needs GPU inference or heavy local ML must be developed, run, and validated **on this machine**, not assumed to run only on ECS/cloud.
+
+## Typical GPU-bound work
+
+- Whisper / WhisperX / faster-whisper ASR
+- Local TTS / voice cloning / stem separation (Demucs/UVR)
+- LiveTalking / digital-human avatar GPU services
+- Local LLM inference used by oral coach / writing grade when not using cloud API keys
+- Other CUDA / TensorRT / ONNX-GPU pipelines
+
+## Rules of engagement
+
+1. **Develop locally first**: install deps, download models, and prove the pipeline on this PC before documenting ECS deploy steps.
+2. **Do not** require the Guangzhou ECS API box to have a 5060 Ti for day-to-day coding of these features.
+3. ECS may still **call** a GPU service over Tailscale/LAN if one is exposed from this PC (or a dedicated GPU host); keep that as an optional remote endpoint (`WHISPER_*` / oral_coach provider URLs), not as “must train/run models on ECS”.
+4. Mobile APK must never ship large GPU models; App continues to use cloud/API or on-device `whisper.cpp` where already designed.
+5. When choosing providers, prefer: local GPU mock→real on this PC → optional cloud API fallback → ECS only for orchestration/storage.
+
+## When the agent starts GPU-related tasks
+
+- Check local CUDA / Python venv / model paths on this Windows host.
+- Run smoke tests here (CLI or `tools/*/app`) before changing production ECS only.
+- Say clearly if a step needs the user to start a local GPU service (port, env vars).
