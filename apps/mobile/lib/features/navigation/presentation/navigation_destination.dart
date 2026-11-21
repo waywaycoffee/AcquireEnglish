@@ -52,7 +52,7 @@ enum AppNavDestination {
   ),
   review(
     route: '/review',
-    label: '背单词',
+    label: '单词',
     title: '背单词',
     subtitle: 'FSRS 背单词、短语、词书与错词本，统一记忆计划。',
     icon: Icons.style_outlined,
