@@ -539,7 +539,7 @@ class _ReadingHubScreenState extends ConsumerState<ReadingHubScreen> {
                 child: CircularProgressIndicator(color: shelfTheme.action),
               ),
             )
-          : ReadingBookshelfView(
+          : ReadingBookshelfHubLayout(
               books: books,
               bookCount: state.all.length,
               totalWords: totalWords,
@@ -560,12 +560,12 @@ class _ReadingHubScreenState extends ConsumerState<ReadingHubScreen> {
               footerHint: AppDesignTokens.isDark
                   ? '深胡桃木 · 暖色封面'
                   : '书架上的书 · 非卡片网格',
-              onOpenBook: (ReadingDoc doc) {
+              onOpen: (ReadingDoc doc) {
                 unawaited(
                   context.push('/reading/${Uri.encodeComponent(doc.id)}'),
                 );
               },
-              onLongPressBook: (ReadingDoc doc) {
+              onLongPress: (ReadingDoc doc) {
                 if (doc.builtin) return;
                 unawaited(_confirmRemove(context, doc));
               },

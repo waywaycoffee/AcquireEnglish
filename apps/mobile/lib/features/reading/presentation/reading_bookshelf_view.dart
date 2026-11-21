@@ -4,19 +4,56 @@ import '../domain/reading_doc.dart';
 import 'reading_bookshelf.dart';
 import 'reading_bookshelf_theme.dart';
 
-/// Full「我的书架」presentation: header + wood shelf + footer stats.
-///
-/// Keeps layout/chrome out of the reading hub screen while still consuming
-/// [ReadingDoc] lists from `reading_library_provider`.
+/// Light oak bookshelf panel: brown wood, 3 shelf ledges, ~4 cover tiles per row,
+/// last slot = Import (＋). Colors follow [ReadingBookshelfTheme.light] (#5C3D2E /
+/// #8B5E3C).
 class ReadingBookshelfView extends StatelessWidget {
   const ReadingBookshelfView({
+    required this.docs,
+    required this.onOpen,
+    required this.onImport,
+    this.onLongPress,
+    this.searchQuery = '',
+    this.showImportSlot = true,
+    super.key,
+  });
+
+  final List<ReadingDoc> docs;
+  final ValueChanged<ReadingDoc> onOpen;
+  final VoidCallback onImport;
+  final void Function(ReadingDoc doc)? onLongPress;
+  final String searchQuery;
+  final bool showImportSlot;
+
+  @override
+  Widget build(BuildContext context) {
+    final int totalWords = docs.fold<int>(
+      0,
+      (int sum, ReadingDoc doc) => sum + doc.wordCount,
+    );
+    return ReadingBookshelf(
+      books: docs,
+      bookCount: docs.length,
+      totalWords: totalWords,
+      searchQuery: searchQuery,
+      showImportSlot: showImportSlot,
+      onImport: onImport,
+      onOpenBook: onOpen,
+      onLongPressBook: onLongPress,
+    );
+  }
+}
+
+/// Full「我的书架」chrome: header + [ReadingBookshelfView] + footer stats.
+class ReadingBookshelfHubLayout extends StatelessWidget {
+  const ReadingBookshelfHubLayout({
     required this.books,
     required this.bookCount,
     required this.totalWords,
-    required this.onOpenBook,
+    required this.onOpen,
     required this.onImport,
     required this.onSearch,
-    this.onLongPressBook,
+    this.onLongPress,
     this.onBack,
     this.actions = const <Widget>[],
     this.searching = false,
@@ -33,10 +70,10 @@ class ReadingBookshelfView extends StatelessWidget {
   final List<ReadingDoc> books;
   final int bookCount;
   final int totalWords;
-  final ValueChanged<ReadingDoc> onOpenBook;
+  final ValueChanged<ReadingDoc> onOpen;
   final VoidCallback onImport;
   final VoidCallback onSearch;
-  final void Function(ReadingDoc doc)? onLongPressBook;
+  final void Function(ReadingDoc doc)? onLongPress;
   final VoidCallback? onBack;
   final List<Widget> actions;
   final bool searching;
@@ -70,15 +107,13 @@ class ReadingBookshelfView extends StatelessWidget {
           Expanded(
             child: Padding(
               padding: const EdgeInsets.fromLTRB(14, 0, 14, 0),
-              child: ReadingBookshelf(
-                books: books,
-                bookCount: bookCount,
-                totalWords: totalWords,
+              child: ReadingBookshelfView(
+                docs: books,
                 searchQuery: searchQuery,
                 showImportSlot: showImportSlot,
                 onImport: onImport,
-                onOpenBook: onOpenBook,
-                onLongPressBook: onLongPressBook,
+                onOpen: onOpen,
+                onLongPress: onLongPress,
               ),
             ),
           ),

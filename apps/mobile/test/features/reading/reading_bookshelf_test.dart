@@ -75,11 +75,11 @@ void main() {
     await tester.pumpWidget(
       MaterialApp(
         home: Scaffold(
-          body: ReadingBookshelfView(
+          body: ReadingBookshelfHubLayout(
             books: const <ReadingDoc>[],
             bookCount: 0,
             totalWords: 0,
-            onOpenBook: (_) {},
+            onOpen: (_) {},
             onImport: () {},
             onSearch: () {},
             footerHint: '书架上的书 · 非卡片网格',
