@@ -261,17 +261,9 @@ class _WordLookupPopupCardState extends ConsumerState<WordLookupPopupCard> {
         Row(
           children: <Widget>[
             Expanded(
-              child: Text(
-                _entry?.word ?? widget.rawWord,
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  fontSize: 28,
-                  fontWeight: FontWeight.w900,
-                  height: 1.15,
-                  letterSpacing: 0.2,
-                  color: AppDesignTokens.textPrimary,
-                ),
+              child: ColoredVowelHeadword(
+                word: _entry?.word ?? widget.rawWord,
+                textAlign: TextAlign.start,
               ),
             ),
             if (widget.onFavorite != null)
