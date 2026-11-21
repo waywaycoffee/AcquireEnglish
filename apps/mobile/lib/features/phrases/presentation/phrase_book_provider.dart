@@ -200,6 +200,7 @@ class PhraseBookNotifier extends Notifier<List<PhraseEntry>> {
     required String english,
     required String chinese,
     required String title,
+    String source = '公开学习卡',
   }) async {
     if (state.any(
       (PhraseEntry p) =>
@@ -211,7 +212,7 @@ class PhraseBookNotifier extends Notifier<List<PhraseEntry>> {
       id: 'shared-$token',
       english: english.trim(),
       chinese: chinese.trim(),
-      course: '公开学习卡',
+      course: source,
       episode: title,
       time: '',
       rating: 1,

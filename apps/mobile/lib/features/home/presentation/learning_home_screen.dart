@@ -60,20 +60,10 @@ class LearningHomeScreen extends ConsumerWidget {
           ),
         );
     final modules = <(String, String, IconData, String)>[
-      ('国际音标', '听清 · 说准', Icons.graphic_eq, '/words/syllabus/cloud?tab=ipa'),
-      (
-        '自然拼读',
-        '从字母音到单词',
-        Icons.spellcheck,
-        '/words/syllabus/cloud?tab=phonics',
-      ),
-      (
-        '应用语块',
-        '整句学，直接用',
-        Icons.chat_bubble_outline,
-        '/words/syllabus/cloud?tab=pattern',
-      ),
-      ('场景对话', '在情境里开口', Icons.forum_outlined, '/digital-human'),
+      ('国际音标', '听清 · 说准', Icons.graphic_eq, '/learn/ipa'),
+      ('自然拼读', '从字母音到单词', Icons.spellcheck, '/learn/phonics'),
+      ('应用语块', '整句学，直接用', Icons.chat_bubble_outline, '/learn/chunks'),
+      ('场景对话', '在情境里开口', Icons.forum_outlined, '/learn/dialogue'),
       ('真人口语', '匹配对练 · AI改写', Icons.record_voice_over_outlined, '/peer-oral'),
     ];
     return PadScaffold(
@@ -302,7 +292,7 @@ class LearningHomeScreen extends ConsumerWidget {
                   ),
                   const SizedBox(height: 14),
                   InkWell(
-                    onTap: () => context.go('/library'),
+                    onTap: () => context.push('/learn/listening'),
                     child: section(
                       Row(
                         children: [
@@ -313,7 +303,7 @@ class LearningHomeScreen extends ConsumerWidget {
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 text('磨耳朵', 16, bold: true),
-                                text('进入课程库，选择听力内容', 11, color: muted),
+                                text('分句听力 · 循环播放 · 理解练习', 11, color: muted),
                               ],
                             ),
                           ),

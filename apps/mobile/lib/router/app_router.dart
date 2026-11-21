@@ -1,3 +1,4 @@
+import '../features/learning_modules/module_screen.dart';
 import '../features/community/presentation/public_learning_card_screen.dart';
 import '../features/community/presentation/community_screen.dart';
 import '../features/daily_review/domain/daily_review.dart';
@@ -91,6 +92,14 @@ enum SGRoute {
 GoRouter goRouter(Ref ref) => GoRouter(
   initialLocation: SGRoute.home.route,
   routes: <GoRoute>[
+    GoRoute(
+      path: '/learn/:kind',
+      builder: (context, state) => ModuleScreen(
+        kind: moduleLessons.containsKey(state.pathParameters['kind'])
+            ? state.pathParameters['kind']!
+            : 'ipa',
+      ),
+    ),
     GoRoute(
       path: '/shared/:token',
       builder: (BuildContext context, GoRouterState state) =>
