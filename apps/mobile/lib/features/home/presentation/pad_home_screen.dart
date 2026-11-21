@@ -968,7 +968,7 @@ class _RecentCourseCard extends StatelessWidget {
           children: <Widget>[
             LibraryCoursePoster(
               title: course.title,
-              path: course.coverImage,
+              path: displayCoverForCourse(course: course),
               borderRadius: BorderRadius.circular(24),
             ),
             const DecoratedBox(

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../../import_course/data/bilibili_cover_refresh.dart';
 import '../../../shared/presentation/media/cover_image.dart';
 import '../../../shared/presentation/pad/app_design_tokens.dart';
 
@@ -19,7 +20,8 @@ class LibraryCoursePoster extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    if (path.trim().isEmpty) {
+    // App icon / asset placeholders are not real covers — show title tile.
+    if (!isDisplayableCover(path)) {
       return _PosterPlaceholder(
         title: title,
         borderRadius: borderRadius,

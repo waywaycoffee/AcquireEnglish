@@ -11,19 +11,22 @@ import '../../reading/domain/reading_doc.dart';
 import '../../reading/presentation/reading_library_provider.dart';
 import '../../sync/presentation/daily_feed_provider.dart';
 import '../../words/presentation/syllabus_books_provider.dart';
+import '../../import_course/data/bilibili_cover_refresh.dart';
 import '../../player/presentation/learning_resume_provider.dart';
-import '../../library/presentation/widgets/library_course_poster.dart';
 import '../../navigation/presentation/navigation_destination.dart';
 import '../../shared/presentation/pad/pad_scaffold.dart';
 import '../../sync/presentation/cloud_catalog_sync.dart';
 import 'learning_dashboard_provider.dart';
 import 'pad_home_screen.dart' show DailyRecommendSection, RecentCourses;
+import 'widgets/continue_learning_poster.dart';
 
 class LearningHomeScreen extends ConsumerWidget {
   const LearningHomeScreen({super.key});
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     ref.watch(cloudCatalogSyncProvider);
+    // Backfill missing Bilibili posters so Home never sticks on app_icon.
+    ref.watch(bilibiliCoverRefreshProvider);
     final books = ref.watch(syllabusBooksProvider);
     final video = ref.watch(continueLearningTargetProvider);
     final lastVideo = ref.watch(lastLearningEpisodeProvider);
@@ -190,9 +193,8 @@ class LearningHomeScreen extends ConsumerWidget {
                                         color: accent,
                                       ),
                                     )
-                                  : LibraryCoursePoster(
-                                      title: title,
-                                      path: video.course.coverImage,
+                                  : ContinueLearningPoster(
+                                      target: video,
                                       borderRadius: BorderRadius.circular(13),
                                     ),
                             ),

@@ -142,6 +142,8 @@ class BilibiliImportResult {
 
   bool get isSeasonCollection => seasonEpisodes.length > 1;
 
+  /// Empty when unresolved — never fall back to the app icon (that looks like
+  /// a missing poster on Home / Library).
   String get bestCoverImage =>
       (coverImagePath != null && coverImagePath!.isNotEmpty)
       ? coverImagePath!
@@ -149,7 +151,7 @@ class BilibiliImportResult {
       ? coverImageUrl!
       : (seasonCoverUrl != null && seasonCoverUrl!.isNotEmpty)
       ? seasonCoverUrl!
-      : 'assets/img/app_icon.png';
+      : '';
 
   /// Prefer the on-disk video; fall back to the watch page URL.
   String get bestVideoAsset =>
@@ -825,6 +827,26 @@ class BilibiliImportService {
 
   /// Resolve and download cover for an already-imported Bilibili course.
   Future<String?> resolveCoverImage(String rawInput) async {
+    // Season course ids (bilibili-season-6058486-01) → pick archive BV then cover.
+    final ({String seasonId, int? episodeIndex})? seasonHint =
+        parseBilibiliSeasonHint(rawInput);
+    if (seasonHint != null) {
+      try {
+        final BilibiliSeasonArchiveMatch? match = await matchSeasonArchive(
+          seasonId: seasonHint.seasonId,
+          episodeIndex: seasonHint.episodeIndex,
+        );
+        if (match != null) {
+          final String key = match.bvid.isNotEmpty
+              ? match.bvid
+              : (match.aid.isNotEmpty ? 'av${match.aid}' : '');
+          if (key.isNotEmpty) {
+            return resolveCoverImage(key);
+          }
+        }
+      } catch (_) {}
+    }
+
     Map<String, String>? ids = BilibiliImport.extractIds(rawInput);
     ids ??= await resolveIds(rawInput);
     if (ids == null) {

@@ -10,7 +10,8 @@ import '../domain/bilibili_import.dart';
 import 'bilibili_import_service.dart';
 import 'bilibili_multipage.dart';
 
-bool _isPlaceholderCover(String cover) {
+/// App icon / bundled assets are not real course posters.
+bool isPlaceholderCover(String cover) {
   final String value = cover.trim();
   if (value.isEmpty) {
     return true;
@@ -28,7 +29,7 @@ bool _isPlaceholderCover(String cover) {
   return !File(value).existsSync();
 }
 
-bool _isDisplayableCover(String cover) {
+bool isDisplayableCover(String cover) {
   final String value = cover.trim();
   if (value.isEmpty || value.startsWith('assets/')) {
     return false;
@@ -38,6 +39,26 @@ bool _isDisplayableCover(String cover) {
   }
   return File(value).existsSync();
 }
+
+/// Prefer episode poster, then course; skip app-icon placeholders.
+String displayCoverForCourse({
+  required LibraryCourseData course,
+  LibraryEpisodeItem? episode,
+}) {
+  final String episodeCover = episode?.coverImage.trim() ?? '';
+  if (isDisplayableCover(episodeCover)) {
+    return episodeCover;
+  }
+  final String courseCover = course.coverImage.trim();
+  if (isDisplayableCover(courseCover)) {
+    return courseCover;
+  }
+  return '';
+}
+
+bool _isPlaceholderCover(String cover) => isPlaceholderCover(cover);
+
+bool _isDisplayableCover(String cover) => isDisplayableCover(cover);
 
 bool _isLocalVideoPath(String? path) {
   final String value = path?.trim() ?? '';
@@ -63,8 +84,12 @@ String? _sourceForCourse(LibraryCourseData course) {
   if (description.contains('bilibili.com') ||
       description.contains('b23.tv') ||
       description.contains('bili2233.cn') ||
-      description.contains('BV')) {
+      description.contains('BV') ||
+      description.contains('bilibili-season-')) {
     return description;
+  }
+  if (course.id.startsWith('bilibili-season-')) {
+    return course.id;
   }
   if (course.id.startsWith('bilibili-')) {
     final String idKey = course.id.substring('bilibili-'.length);
@@ -73,6 +98,13 @@ String? _sourceForCourse(LibraryCourseData course) {
     }
   }
   for (final LibraryEpisodeItem episode in course.episodes) {
+    final String? sourceUrl = episode.sourceUrl?.trim();
+    if (sourceUrl != null &&
+        sourceUrl.isNotEmpty &&
+        (BilibiliImport.isWatchPageUrl(sourceUrl) ||
+            BilibiliImport.looksLikeBilibiliInput(sourceUrl))) {
+      return sourceUrl;
+    }
     final String? video = episode.videoAsset?.trim();
     if (video == null || video.isEmpty) {
       continue;
