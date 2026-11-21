@@ -32,6 +32,7 @@ from app.routers import (
     phrases,
     preferences,
     progress,
+    pronunciation_assessment,
     public_lexicon,
     review_sync,
     rewards,
@@ -92,6 +93,7 @@ app.include_router(imports.router, prefix="/api")
 app.include_router(learning.router, prefix="/api")
 app.include_router(livekit.router, prefix="/api")
 app.include_router(oral_match.router, prefix="/api")
+app.include_router(pronunciation_assessment.router, prefix="/api")
 app.include_router(assets.router, prefix="/api")
 app.include_router(netdisk.router, prefix="/api")
 app.include_router(shared_subtitles.router, prefix="/api")

@@ -82,6 +82,10 @@ class Settings(BaseSettings):
     # Optional token for approving community reclassify requests (header X-Community-Admin-Token).
     community_admin_token: str = ""
 
+    # Tencent Cloud SOE (server-side pronunciation). Never ship these in the APK.
+    tencent_soe_secret_id: str = ""
+    tencent_soe_secret_key: str = ""
+
     def validate_auth_configuration(self) -> None:
         if self.production_mode and (
             not self.secret_key.strip()
