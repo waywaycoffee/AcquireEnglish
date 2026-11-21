@@ -92,6 +92,14 @@ class Settings(BaseSettings):
     admin_api_token: str = ""
     admin_credentials_dir: str = ""
 
+    # Aliyun ECS / cloud-disk monitor (admin infra tab). Falls back to
+    # ALIYUN_ACCESS_KEY_* env, then SMS keys if those have ECS read scope.
+    aliyun_ecs_access_key_id: str = ""
+    aliyun_ecs_access_key_secret: str = ""
+    aliyun_ecs_region_id: str = "cn-guangzhou"
+    aliyun_ecs_instance_id: str = ""
+    aliyun_ecs_public_ip: str = "8.163.45.100"
+
     # Tencent Cloud SOE (server-side pronunciation). Never ship these in the APK.
     tencent_soe_app_id: str = ""
     tencent_soe_secret_id: str = ""

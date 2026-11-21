@@ -25,6 +25,7 @@ from app.models import (
     VocabItem,
 )
 from app.services import api_usage as usage_svc
+from app.services.infra_monitor import collect_infra_snapshot
 
 router = APIRouter(prefix="/admin", tags=["admin-analytics"])
 
@@ -314,3 +315,11 @@ async def analytics_resources(
         ],
         "official_exam_packs": catalog,
     }
+
+
+@router.get("/analytics/infra")
+async def analytics_infra(
+    _: str = Depends(require_admin_token),
+) -> dict[str, Any]:
+    """ECS host vitals + Aliyun cloud-disk inventory for the ops monitor tab."""
+    return collect_infra_snapshot()

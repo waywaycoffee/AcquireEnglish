@@ -20,6 +20,7 @@
   const loginError = $("loginError");
   const titles = {
     dashboard: "可视化看板",
+    infra: "ECS / 云盘监控",
     usage: "Token 消耗与损益",
     resources: "公共资源库",
     users: "用户与资产",
@@ -109,9 +110,18 @@
     document.querySelectorAll(".tab").forEach((btn) => {
       btn.classList.toggle("active", btn.dataset.tab === tab);
     });
-    ["dashboard", "usage", "resources", "users"].forEach((id) => {
+    ["dashboard", "infra", "usage", "resources", "users"].forEach((id) => {
       $(`panel-${id}`).classList.toggle("hidden", id !== tab);
     });
+  }
+
+  function pctBar(pct, label) {
+    const v = Math.max(0, Math.min(100, Number(pct || 0)));
+    const tone = v >= 85 ? "hot" : v >= 70 ? "warm" : "ok";
+    return `<div class="meter ${tone}"><div class="meter-head"><span>${escapeHtml(
+      label
+    )}</span><strong>${v.toFixed(1)}%</strong></div>
+      <div class="bar-track"><div class="bar-fill" style="width:${v}%"></div></div></div>`;
   }
 
   function downloadTokenFile(token) {
@@ -217,6 +227,7 @@
     setTab(state.tab);
     await Promise.all([
       loadDashboard().catch((e) => console.warn(e)),
+      loadInfra().catch((e) => console.warn(e)),
       loadUsage().catch((e) => console.warn(e)),
       loadResources().catch((e) => console.warn(e)),
       loadStats(),
@@ -226,12 +237,178 @@
     if (state.selectedId) await loadDetail(state.selectedId);
   }
 
+  async function loadInfra() {
+    const data = await api("/analytics/infra");
+    const host = data.host || {};
+    const mem = host.memory || {};
+    const root = host.root_disk || {};
+    const aliyun = data.aliyun || {};
+    const inst = aliyun.instance || {};
+    const el = $("panel-infra");
+    const alertHtml = (data.alerts || [])
+      .map(
+        (a) =>
+          `<div class="alert ${escapeAttr(a.level || "info")}">${escapeHtml(
+            a.message || ""
+          )}</div>`
+      )
+      .join("");
+    el.innerHTML = `
+      <div class="kpi-row kpi-5">
+        <div class="stat"><span class="muted">主机</span><strong>${escapeHtml(
+          host.hostname || "—"
+        )}</strong></div>
+        <div class="stat"><span class="muted">运行时长</span><strong>${escapeHtml(
+          host.uptime_human || "—"
+        )}</strong></div>
+        <div class="stat"><span class="muted">CPU</span><strong>${
+          host.cpu_percent == null ? "—" : host.cpu_percent + "%"
+        }</strong><span class="muted">${num(host.cpu_cores)} 核 · load ${escapeHtml(
+          String((host.loadavg && host.loadavg["1m"]) ?? "—")
+        )}</span></div>
+        <div class="stat"><span class="muted">内存</span><strong>${
+          mem.used_pct == null ? "—" : mem.used_pct + "%"
+        }</strong><span class="muted">${escapeHtml(mem.used_human || "")} / ${escapeHtml(
+          mem.total_human || ""
+        )}</span></div>
+        <div class="stat"><span class="muted">系统盘</span><strong>${
+          root.used_pct == null ? "—" : root.used_pct + "%"
+        }</strong><span class="muted">${escapeHtml(root.used_human || "")} / ${escapeHtml(
+          root.total_human || ""
+        )}</span></div>
+      </div>
+      ${alertHtml ? `<div class="alert-row">${alertHtml}</div>` : ""}
+      <div class="dash-grid">
+        <div class="dash-card">
+          <h3>资源占用</h3>
+          ${pctBar(host.cpu_percent, "CPU")}
+          ${pctBar(mem.used_pct, "内存")}
+          ${pctBar(root.used_pct, "根分区 /")}
+          <div class="note-box">采集时间 ${escapeHtml(data.collected_at || "")}</div>
+        </div>
+        <div class="dash-card">
+          <h3>关键服务</h3>
+          <div class="table-wrap"><table>
+            <thead><tr><th>服务</th><th>状态</th></tr></thead>
+            <tbody>
+              ${Object.entries(data.services || {})
+                .map(
+                  ([name, st]) =>
+                    `<tr><td>${escapeHtml(name)}</td><td><span class="chip ${
+                      st === "active" ? "ok" : "bad"
+                    }">${escapeHtml(st)}</span></td></tr>`
+                )
+                .join("")}
+            </tbody>
+          </table></div>
+        </div>
+        <div class="dash-card full">
+          <h3>挂载点 / 本机磁盘用量</h3>
+          <div class="table-wrap"><table>
+            <thead><tr><th>设备</th><th>挂载</th><th>类型</th><th>已用</th><th>总量</th><th>使用率</th></tr></thead>
+            <tbody>
+              ${(data.mounts || [])
+                .map(
+                  (m) => `<tr>
+                  <td>${escapeHtml(m.device)}</td>
+                  <td>${escapeHtml(m.mount)}</td>
+                  <td>${escapeHtml(m.fstype)}</td>
+                  <td>${escapeHtml(m.used_human)}</td>
+                  <td>${escapeHtml(m.total_human)}</td>
+                  <td>${num(m.used_pct)}%</td>
+                </tr>`
+                )
+                .join("") || `<tr><td colspan="6" class="muted">无挂载数据</td></tr>`}
+            </tbody>
+          </table></div>
+        </div>
+        <div class="dash-card full">
+          <h3>块设备（含云盘虚拟盘）</h3>
+          <div class="table-wrap"><table>
+            <thead><tr><th>名称</th><th>类型</th><th>容量</th><th>挂载</th><th>序列号</th><th>云盘?</th></tr></thead>
+            <tbody>
+              ${(data.block_devices || [])
+                .map(
+                  (d) => `<tr>
+                  <td>${escapeHtml(d.name)}</td>
+                  <td>${escapeHtml(d.type)}</td>
+                  <td>${escapeHtml(d.size_human)}</td>
+                  <td>${escapeHtml(d.mountpoint || "—")}</td>
+                  <td>${escapeHtml(d.serial || "—")}</td>
+                  <td>${d.likely_cloud_disk ? "是" : "—"}</td>
+                </tr>`
+                )
+                .join("") || `<tr><td colspan="6" class="muted">无块设备数据</td></tr>`}
+            </tbody>
+          </table></div>
+        </div>
+        <div class="dash-card full">
+          <h3>阿里云 ECS / 云盘（控制台）</h3>
+          <div class="note-box">
+            ${
+              aliyun.ok
+                ? `区域 ${escapeHtml(aliyun.region_id || "")} · 实例 ${escapeHtml(
+                    inst.instance_id || aliyun.instance_id || ""
+                  )} · 状态 ${escapeHtml(inst.status || "")} · 规格 ${escapeHtml(
+                    String(inst.instance_type || "")
+                  )}`
+                : escapeHtml(aliyun.note || aliyun.error || "云盘 API 未就绪，仍显示本机磁盘。")
+            }
+          </div>
+          <div class="table-wrap"><table>
+            <thead><tr><th>DiskId</th><th>名称</th><th>类别</th><th>类型</th><th>容量</th><th>设备</th><th>状态</th><th>性能</th></tr></thead>
+            <tbody>
+              ${(aliyun.disks || [])
+                .map(
+                  (d) => `<tr>
+                  <td>${escapeHtml(d.disk_id)}</td>
+                  <td>${escapeHtml(d.disk_name || "—")}</td>
+                  <td>${escapeHtml(d.category || "—")}</td>
+                  <td>${escapeHtml(d.type || "—")}</td>
+                  <td>${escapeHtml(d.size_human || "")}</td>
+                  <td>${escapeHtml(d.device || "—")}</td>
+                  <td>${escapeHtml(d.status || "—")}</td>
+                  <td>${escapeHtml(
+                    [d.performance_level, d.iops ? d.iops + " IOPS" : ""]
+                      .filter(Boolean)
+                      .join(" · ") || "—"
+                  )}</td>
+                </tr>`
+                )
+                .join("") ||
+              `<tr><td colspan="8" class="muted">暂无阿里云盘列表。配置具有 ECS 只读权限的 AccessKey 后可显示系统盘/数据盘详情。</td></tr>`}
+            </tbody>
+          </table></div>
+        </div>
+        <div class="dash-card full">
+          <h3>应用目录占用</h3>
+          <div class="table-wrap"><table>
+            <thead><tr><th>目录</th><th>路径</th><th>大小</th></tr></thead>
+            <tbody>
+              ${(data.app_dirs || [])
+                .map(
+                  (d) =>
+                    `<tr><td>${escapeHtml(d.name)}</td><td>${escapeHtml(
+                      d.path
+                    )}</td><td>${escapeHtml(d.human)}</td></tr>`
+                )
+                .join("")}
+            </tbody>
+          </table></div>
+        </div>
+      </div>`;
+  }
+
   async function loadDashboard() {
-    const [users, learning, pnl] = await Promise.all([
+    const [users, learning, pnl, infra] = await Promise.all([
       api("/analytics/users?days=90"),
       api("/analytics/learning"),
       api("/usage/pnl?days=30"),
+      api("/analytics/infra").catch(() => null),
     ]);
+    const host = (infra && infra.host) || {};
+    const mem = host.memory || {};
+    const root = host.root_disk || {};
     const el = $("panel-dashboard");
     el.innerHTML = `
       <div class="kpi-row">
@@ -240,6 +417,24 @@
         <div class="stat"><span class="muted">30 日收入</span><strong>${money(pnl.revenue_cny)}</strong></div>
         <div class="stat"><span class="muted">30 日毛利</span><strong>${money(pnl.gross_cny)}</strong></div>
       </div>
+      ${
+        infra
+          ? `<div class="kpi-row">
+        <div class="stat"><span class="muted">ECS CPU</span><strong>${
+          host.cpu_percent == null ? "—" : host.cpu_percent + "%"
+        }</strong></div>
+        <div class="stat"><span class="muted">内存</span><strong>${
+          mem.used_pct == null ? "—" : mem.used_pct + "%"
+        }</strong></div>
+        <div class="stat"><span class="muted">系统盘</span><strong>${
+          root.used_pct == null ? "—" : root.used_pct + "%"
+        }</strong></div>
+        <div class="stat"><span class="muted">API 服务</span><strong>${escapeHtml(
+          (infra.services && infra.services["acquireenglish-api"]) || "—"
+        )}</strong></div>
+      </div>`
+          : ""
+      }
       <div class="dash-grid">
         <div class="dash-card full">
           <h3>注册趋势（90 日）</h3>
@@ -741,6 +936,7 @@
     btn.addEventListener("click", () => {
       setTab(btn.dataset.tab);
       if (btn.dataset.tab === "dashboard") loadDashboard().catch((e) => alert(e.message));
+      if (btn.dataset.tab === "infra") loadInfra().catch((e) => alert(e.message));
       if (btn.dataset.tab === "usage") loadUsage().catch((e) => alert(e.message));
       if (btn.dataset.tab === "resources") loadResources().catch((e) => alert(e.message));
     });
