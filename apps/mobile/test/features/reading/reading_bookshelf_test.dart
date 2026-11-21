@@ -45,13 +45,34 @@ void main() {
       ),
     );
 
-    expect(find.text('A Morning Walk'), findsOneWidget);
-    expect(find.text('The Lost Key'), findsOneWidget);
+    // Front cover + vertical spine title per book.
+    expect(find.text('A Morning Walk'), findsNWidgets(2));
+    expect(find.text('The Lost Key'), findsNWidgets(2));
+    expect(find.text('Level A1'), findsOneWidget);
     expect(find.text('导入'), findsOneWidget);
-    expect(find.text('＋'), findsNothing);
-    expect(find.byIcon(Icons.file_download_outlined), findsWidgets);
     expect(find.text('ACQUIRE ENGLISH'), findsNWidgets(2));
     expect(tester.takeException(), isNull);
+
+    bool opened = false;
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: SizedBox(
+            width: 390,
+            height: 640,
+            child: ReadingBookshelf(
+              books: books,
+              bookCount: 2,
+              totalWords: 160,
+              onOpenBook: (_) => opened = true,
+              onImport: () {},
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.tap(find.text('ACQUIRE ENGLISH').first);
+    expect(opened, isTrue);
   });
 
   testWidgets('footer formats book and word counts', (WidgetTester tester) async {
@@ -68,7 +89,6 @@ void main() {
     expect(find.textContaining('10 本'), findsOneWidget);
     expect(find.textContaining('1,860 词'), findsOneWidget);
     expect(find.text('10 本 · 1,860 词'), findsOneWidget);
-    expect(find.text('◇'), findsNWidgets(2));
   });
 
   testWidgets('bookshelf view shows centered title, search, import and stats', (
@@ -92,7 +112,8 @@ void main() {
     expect(find.text('封面朝外 · 点书继续读'), findsNothing);
     final Offset titleCenter = tester.getCenter(find.text('我的书架'));
     expect(titleCenter.dx, closeTo(tester.view.physicalSize.width / tester.view.devicePixelRatio / 2, 1));
-    expect(find.byIcon(Icons.search_rounded), findsOneWidget);
+    expect(find.byTooltip('搜索'), findsOneWidget);
+    expect(find.byTooltip('导入'), findsOneWidget);
     expect(find.textContaining('0 本'), findsOneWidget);
     expect(find.text('导入'), findsOneWidget);
   });

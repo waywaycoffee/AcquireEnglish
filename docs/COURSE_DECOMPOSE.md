@@ -143,7 +143,25 @@ Content-Type: application/json
 
 ### 本机 / GPU 盒运行
 
-**A. 推荐生产过渡：`tools/openmaic_mock`（5060 Ti 盒，端口 8093）**
+**A. 官方 OpenMAIC（推荐生产，5060 Ti 盒，端口 3000）**
+
+安装路径在仓库外：`D:\OpenMAIC`（MIT，不进 git）。详见 `tools/openmaic/README.md`。
+
+```powershell
+cd D:\AcquireEnglish\tools\openmaic
+.\start.ps1   # 需保持运行；自动开 ECS Postgres SSH 隧道 :5433
+```
+
+- UI / API: `http://127.0.0.1:3000`
+- Tailscale: `http://100.115.252.55:3000`
+- Capabilities: `GET /api/generate-classroom/capabilities`
+- ECS `.env`: `OPENMAIC_URL=http://100.115.252.55:3000`
+
+`start.ps1` 用 DeepSeek（复用 `tools/oral_coach/.env`）+ ECS Postgres 隧道。OpenMAIC 本体走云端 LLM HTTP，不强制 CUDA；本机 Ollama/FunASR 可选。
+
+**B. Mock 回退（可选，端口 8093）**
+
+官方进程宕机时临时切 mock：
 
 ```powershell
 cd D:\AcquireEnglish\tools\openmaic_mock
@@ -152,21 +170,9 @@ cd D:\AcquireEnglish\tools\openmaic_mock
 ```
 
 - Health: `http://127.0.0.1:8093/api/health`
-- Tailscale: `http://100.115.252.55:8093/api/health`
-- ECS `.env`: `OPENMAIC_URL=http://100.115.252.55:8093`
+- 临时：`OPENMAIC_URL=http://100.115.252.55:8093`
 
-无 LLM key 时 mock 用启发式切课并生成 oral/shadow 提纲；有 key 时走 DeepSeek/Qwen 兼容接口。
-
-**B. 真 OpenMAIC（需 Node 22 + pnpm + Postgres + LLM）**
-
-```bash
-git clone https://github.com/THU-MAIC/OpenMAIC.git
-cd OpenMAIC && pnpm install && pnpm db:up
-# .env.local + openmaic.yml 配好 LLM
-pnpm dev   # http://localhost:3000
-```
-
-ECS / 本机 API：`OPENMAIC_URL=http://100.115.252.55:3000`（或对应 Tailscale）。
+无 LLM key 时 mock 用启发式切课；adapter 自动探测 mock vs 原生。
 
 ### 测试
 

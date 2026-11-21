@@ -12,7 +12,7 @@ Prerequisites:
 
 - Node.js >= 22.19, pnpm >= 10 (`npm i -g pnpm@10.28.0`)
 - PostgreSQL reachable as `DATABASE_URL` (this box **or** ECS via SSH tunnel)
-- LLM key (DeepSeek recommended; reused from `tools/oral_coach/.env`)
+- LLM: DeepSeek key (from `tools/oral_coach/.env`) **or** local Ollama (`qwen2.5:7b` on `:11434`)
 
 OpenMAIC itself is cloud/local LLM HTTP — it does **not** require CUDA. Optional local Ollama/FunASR stay on this 5060 Ti.
 

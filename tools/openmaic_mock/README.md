@@ -25,9 +25,12 @@ $env:DEEPSEEK_API_KEY = "sk-..."
 - Tailscale: `http://100.115.252.55:8093/api/health`
 - Decompose: `POST /api/v1/decompose`
 
-## API → ECS
+## API → ECS (fallback only)
+
+Prefer official OpenMAIC on `:3000` — see `tools/openmaic/README.md`.
 
 ```
+# temporary fallback when official Next.js is down:
 OPENMAIC_URL=http://100.115.252.55:8093
 PREFER_OPENMAIC=true
 ```
@@ -36,11 +39,9 @@ If the URL is empty or unreachable, the API falls back to `HeuristicSplitter` (p
 
 ## True OpenMAIC
 
-```bash
-git clone https://github.com/THU-MAIC/OpenMAIC.git
-cd OpenMAIC && pnpm install && pnpm db:up
-# configure .env.local + openmaic.yml with an LLM key
-pnpm dev   # http://localhost:3000
+```powershell
+cd D:\AcquireEnglish\tools\openmaic
+.\start.ps1   # D:\OpenMAIC, bind 0.0.0.0:3000
 ```
 
-Then set `OPENMAIC_URL=http://127.0.0.1:3000` (or Tailscale). The adapter uses materials + generate-classroom and maps scenes back to lessons.
+Then set `OPENMAIC_URL=http://100.115.252.55:3000`. The adapter uses materials + generate-classroom and maps scenes back to lessons.

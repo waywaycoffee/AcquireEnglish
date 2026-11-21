@@ -1,4 +1,5 @@
 import 'dart:math' as math;
+import 'dart:ui' show PathMetric;
 
 import 'package:flutter/material.dart';
 
@@ -7,7 +8,18 @@ import 'reading_book_cover.dart';
 import 'reading_bookshelf_theme.dart';
 import 'reading_stats_row.dart';
 
-/// Cover-facing books on a light oak shelf with three ledges.
+const String _oakVertical = 'assets/img/bookshelf/oak_vertical.jpg';
+const String _oakHorizontal = 'assets/img/bookshelf/oak_horizontal.jpg';
+const String _serif = 'serif';
+const List<String> _serifFallback = <String>[
+  'Noto Serif CJK SC',
+  'Source Han Serif SC',
+  'Noto Serif',
+  'Georgia',
+];
+
+/// Oak cabinet with cloth hardcovers standing on thick planks
+/// (design/exports/reading_bookshelf/shelf-3d-target.jpg).
 class ReadingBookshelf extends StatelessWidget {
   const ReadingBookshelf({
     required this.books,
@@ -35,78 +47,74 @@ class ReadingBookshelf extends StatelessWidget {
     final ReadingBookshelfTheme theme = ReadingBookshelfTheme.of(context);
     return LayoutBuilder(
       builder: (BuildContext context, BoxConstraints constraints) {
-        final double panelWidth = constraints.maxWidth;
-        final int columns = _columnsFor(panelWidth);
+        final double width = constraints.maxWidth;
+        final double post = (width * 0.04).clamp(12.0, 24.0);
+        final double rail = (width * 0.04).clamp(13.0, 22.0);
+        final double plank = (width * 0.045).clamp(15.0, 24.0);
+        final double bayWidth = width - post * 2;
+        final int columns = _columnsFor(width);
+
         final List<_ShelfSlot> slots = <_ShelfSlot>[
           for (final ReadingDoc doc in books) _ShelfSlot.book(doc),
           if (showImportSlot) const _ShelfSlot.import(),
         ];
         final List<List<_ShelfSlot>> rows = _chunk(slots, columns);
-        // Always show at least 3 shelf ledges for atmosphere.
         while (rows.length < 3) {
           rows.add(const <_ShelfSlot>[]);
         }
 
-        return DecoratedBox(
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(10),
-            boxShadow: const <BoxShadow>[
-              BoxShadow(
-                color: Color(0x3D3A2410),
-                blurRadius: 22,
-                offset: Offset(0, 12),
-              ),
-              BoxShadow(
-                color: Color(0x223A2410),
-                blurRadius: 6,
-                offset: Offset(0, 2),
-              ),
-            ],
-          ),
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(10),
-            child: CustomPaint(
-              painter: _OakCabinetPainter(
-                outer: theme.woodOuter,
-                inner: theme.woodInner,
-                ledge: theme.ledge,
-              ),
-              child: Padding(
-                // Side walls + top rail leave a recessed bay for the books.
-                padding: const EdgeInsets.fromLTRB(18, 16, 18, 10),
-                child: ListView.builder(
-                  padding: EdgeInsets.zero,
-                  itemCount: rows.length,
-                  itemBuilder: (BuildContext context, int index) {
-                    return _ShelfRow(
-                      theme: theme,
-                      slots: rows[index],
-                      columns: columns,
-                      rowIndex: index,
-                      onOpenBook: onOpenBook,
-                      onImport: onImport,
-                      onLongPressBook: onLongPressBook,
-                      emptyHint: index == 1 &&
-                              books.isEmpty &&
-                              searchQuery.isEmpty
-                          ? '空层留给新书'
-                          : (index == 0 &&
+        final double available = constraints.maxHeight.isFinite
+            ? constraints.maxHeight - rail
+            : 3 * 220;
+        final double pitch = math.max(available / 3, 200);
+
+        return Row(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: <Widget>[
+            _Post(theme: theme, width: post, left: true),
+            Expanded(
+              child: Column(
+                children: <Widget>[
+                  _Plank(theme: theme, height: rail, topRail: true),
+                  Expanded(
+                    child: ListView.builder(
+                      padding: EdgeInsets.zero,
+                      itemCount: rows.length,
+                      itemBuilder: (BuildContext context, int index) {
+                        return _ShelfRow(
+                          theme: theme,
+                          slots: rows[index],
+                          columns: columns,
+                          rowIndex: index,
+                          width: bayWidth,
+                          cubbyHeight: pitch - plank,
+                          plankHeight: plank,
+                          onOpenBook: onOpenBook,
+                          onImport: onImport,
+                          onLongPressBook: onLongPressBook,
+                          emptyHint: index == 1 &&
                                   books.isEmpty &&
-                                  searchQuery.isNotEmpty
-                              ? '没有匹配的书'
-                              : null),
-                    );
-                  },
-                ),
+                                  searchQuery.isEmpty
+                              ? '空层留给新书'
+                              : (index == 0 &&
+                                      books.isEmpty &&
+                                      searchQuery.isNotEmpty
+                                  ? '没有匹配的书'
+                                  : null),
+                        );
+                      },
+                    ),
+                  ),
+                ],
               ),
             ),
-          ),
+            _Post(theme: theme, width: post, left: false),
+          ],
         );
       },
     );
   }
 
-  /// Reference design shows 3 covers per ledge on phones.
   static int _columnsFor(double width) {
     if (width >= 900) return 5;
     if (width >= 600) return 4;
@@ -123,7 +131,8 @@ class ReadingBookshelf extends StatelessWidget {
   }
 }
 
-/// Search left · centered serif title · import right.
+/// Search left · centered serif title · document-download right, on a cream
+/// gradient above the cabinet.
 class ReadingBookshelfHeader extends StatelessWidget {
   const ReadingBookshelfHeader({
     required this.onSearch,
@@ -141,6 +150,8 @@ class ReadingBookshelfHeader extends StatelessWidget {
   final VoidCallback onSearch;
   final VoidCallback onImport;
   final VoidCallback? onBack;
+
+  /// Replaces the default import button on the right when non-empty.
   final List<Widget> actions;
   final bool searching;
   final TextEditingController? searchController;
@@ -154,143 +165,136 @@ class ReadingBookshelfHeader extends StatelessWidget {
   Widget build(BuildContext context) {
     final ReadingBookshelfTheme theme = ReadingBookshelfTheme.of(context);
     final double top = MediaQuery.paddingOf(context).top;
-    return Padding(
-      padding: EdgeInsets.fromLTRB(8, top + 8, 8, 8),
-      child: Column(
-        children: <Widget>[
-          SizedBox(
-            height: 48,
-            child: searching
-                ? Row(
-                    children: <Widget>[
-                      Expanded(
-                        child: TextField(
-                          controller: searchController,
-                          autofocus: true,
-                          onChanged: onSearchChanged,
-                          style: TextStyle(color: theme.title, fontSize: 16),
-                          decoration: InputDecoration(
-                            hintText: '搜索书架…',
-                            hintStyle: TextStyle(color: theme.subtitle),
-                            isDense: true,
-                            border: InputBorder.none,
-                            prefixIcon: Icon(
-                              Icons.search_rounded,
-                              color: theme.action,
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: <Color>[theme.headerTop, theme.headerBottom],
+        ),
+      ),
+      child: Padding(
+        padding: EdgeInsets.fromLTRB(10, top + 8, 10, 10),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: <Widget>[
+            SizedBox(
+              height: 52,
+              child: searching
+                  ? Row(
+                      children: <Widget>[
+                        Expanded(
+                          child: TextField(
+                            controller: searchController,
+                            autofocus: true,
+                            onChanged: onSearchChanged,
+                            style: TextStyle(color: theme.title, fontSize: 16),
+                            decoration: InputDecoration(
+                              hintText: '搜索书架…',
+                              hintStyle: TextStyle(color: theme.subtitle),
+                              isDense: true,
+                              border: InputBorder.none,
+                              prefixIcon: Padding(
+                                padding: const EdgeInsets.all(12),
+                                child: BookshelfGlyph.search(
+                                  color: theme.action,
+                                  size: 20,
+                                ),
+                              ),
                             ),
                           ),
                         ),
-                      ),
-                      TextButton(
-                        onPressed: onCloseSearch,
-                        child: Text(
-                          '取消',
-                          style: TextStyle(color: theme.action),
+                        TextButton(
+                          onPressed: onCloseSearch,
+                          child: Text(
+                            '取消',
+                            style: TextStyle(color: theme.action),
+                          ),
                         ),
-                      ),
-                    ],
-                  )
-                : Stack(
-                    alignment: Alignment.center,
-                    children: <Widget>[
-                      Align(
-                        alignment: Alignment.centerLeft,
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: <Widget>[
-                            if (onBack != null)
-                              _HeaderIcon(
-                                tooltip: '返回',
-                                icon: Icons.arrow_back_ios_new_rounded,
-                                size: 20,
-                                color: theme.action,
-                                onPressed: onBack!,
+                      ],
+                    )
+                  : Stack(
+                      alignment: Alignment.center,
+                      children: <Widget>[
+                        Align(
+                          alignment: Alignment.centerLeft,
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: <Widget>[
+                              if (onBack != null)
+                                IconButton(
+                                  tooltip: '返回',
+                                  onPressed: onBack,
+                                  icon: Icon(
+                                    Icons.arrow_back_ios_new_rounded,
+                                    size: 20,
+                                    color: theme.action,
+                                  ),
+                                ),
+                              IconButton(
+                                tooltip: '搜索',
+                                onPressed: onSearch,
+                                icon: BookshelfGlyph.search(
+                                  color: theme.action,
+                                ),
                               ),
-                            _HeaderIcon(
-                              tooltip: '搜索',
-                              icon: Icons.search_rounded,
-                              color: theme.action,
-                              onPressed: onSearch,
-                            ),
-                          ],
+                            ],
+                          ),
                         ),
-                      ),
-                      Text(
-                        '我的书架',
-                        textAlign: TextAlign.center,
-                        style: TextStyle(
-                          fontFamily: 'Georgia',
-                          fontSize: 26,
-                          fontWeight: FontWeight.w700,
-                          color: theme.title,
-                          height: 1.1,
+                        Text(
+                          '我的书架',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            fontFamily: _serif,
+                            fontFamilyFallback: _serifFallback,
+                            fontSize: 28,
+                            fontWeight: FontWeight.w800,
+                            letterSpacing: 3,
+                            color: theme.title,
+                            height: 1.1,
+                          ),
                         ),
-                      ),
-                      Align(
-                        alignment: Alignment.centerRight,
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: <Widget>[
-                            _HeaderIcon(
-                              tooltip: '导入',
-                              icon: Icons.file_download_outlined,
-                              color: theme.action,
-                              onPressed: onImport,
-                            ),
-                            ...actions,
-                          ],
+                        Align(
+                          alignment: Alignment.centerRight,
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: actions.isNotEmpty
+                                ? actions
+                                : <Widget>[
+                                    IconButton(
+                                      tooltip: '导入',
+                                      onPressed: onImport,
+                                      icon: BookshelfGlyph.docDownload(
+                                        color: theme.action,
+                                      ),
+                                    ),
+                                  ],
+                          ),
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
+            ),
+            if (subtitle.isNotEmpty)
+              Padding(
+                padding: const EdgeInsets.only(top: 2),
+                child: Text(
+                  subtitle,
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontFamily: _serif,
+                    fontSize: 12,
+                    color: theme.subtitle,
                   ),
-          ),
-          if (subtitle.isNotEmpty)
-            Padding(
-              padding: const EdgeInsets.only(top: 2),
-              child: Text(
-                subtitle,
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  fontFamily: 'Georgia',
-                  fontSize: 12,
-                  color: theme.subtitle,
                 ),
               ),
-            ),
-        ],
+          ],
+        ),
       ),
     );
   }
 }
 
-class _HeaderIcon extends StatelessWidget {
-  const _HeaderIcon({
-    required this.tooltip,
-    required this.icon,
-    required this.color,
-    required this.onPressed,
-    this.size = 28,
-  });
-
-  final String tooltip;
-  final IconData icon;
-  final Color color;
-  final VoidCallback onPressed;
-  final double size;
-
-  @override
-  Widget build(BuildContext context) {
-    return IconButton(
-      tooltip: tooltip,
-      padding: EdgeInsets.zero,
-      constraints: const BoxConstraints(minWidth: 40, minHeight: 40),
-      onPressed: onPressed,
-      icon: Icon(icon, color: color, size: size),
-    );
-  }
-}
-
-/// Bottom 本数 · 词数, centered between thin rules and diamond ornaments.
+/// Oak base board with「N 本 · X万词」carved between ruled diamonds.
 class ReadingBookshelfFooter extends StatelessWidget {
   const ReadingBookshelfFooter({
     required this.bookCount,
@@ -307,57 +311,88 @@ class ReadingBookshelfFooter extends StatelessWidget {
   Widget build(BuildContext context) {
     final ReadingBookshelfTheme theme = ReadingBookshelfTheme.of(context);
     final String wordsLabel = totalWords >= 10000
-        ? '${ReadingStatsRow.compact(totalWords)}词'
+        ? '${ReadingStatsRow.compact(totalWords).replaceFirst('.0万', '万')}词'
         : '${_withCommas(totalWords)} 词';
-    final Color ornament = theme.stats.withValues(alpha: 0.55);
-    Widget rule() => Expanded(
-          child: Container(height: 1, color: ornament),
-        );
-    Widget diamond() => Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 6),
-          child: Text(
-            '◇',
-            style: TextStyle(fontSize: 11, height: 1, color: ornament),
-          ),
-        );
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(24, 14, 24, 8),
-      child: Column(
-        children: <Widget>[
-          Row(
+    final Color ink = theme.engrave;
+    Widget rule({required bool diamondAtEnd}) => Expanded(
+          child: Row(
             children: <Widget>[
-              rule(),
-              diamond(),
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 8),
-                child: Text(
-                  '$bookCount 本 · $wordsLabel',
-                  style: TextStyle(
-                    fontFamily: 'Georgia',
-                    fontSize: 18,
-                    fontWeight: FontWeight.w600,
-                    color: theme.stats,
-                  ),
-                ),
-              ),
-              diamond(),
-              rule(),
+              if (!diamondAtEnd) _Diamond(color: ink),
+              Expanded(child: Container(height: 1.2, color: ink.withValues(alpha: 0.85))),
+              if (diamondAtEnd) _Diamond(color: ink),
             ],
           ),
-          if ((hint ?? '').isNotEmpty) ...<Widget>[
-            const SizedBox(height: 6),
-            Text(
-              hint!,
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                fontFamily: 'Georgia',
-                fontSize: 11,
-                color: theme.statsHint,
+        );
+    return Stack(
+      children: <Widget>[
+        Positioned.fill(child: _Oak(asset: _oakHorizontal, tint: theme.woodTint)),
+        // Seam under the last plank and a soft lower falloff.
+        const Positioned.fill(
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: <Color>[
+                  Color(0x59000000),
+                  Color(0x00000000),
+                  Color(0x00000000),
+                  Color(0x26000000),
+                ],
+                stops: <double>[0, 0.12, 0.7, 1],
               ),
             ),
-          ],
-        ],
-      ),
+          ),
+        ),
+        Padding(
+          padding: EdgeInsets.fromLTRB(
+            22,
+            18,
+            22,
+            16 + MediaQuery.paddingOf(context).bottom,
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: <Widget>[
+              Row(
+                children: <Widget>[
+                  rule(diamondAtEnd: true),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 14),
+                    child: Text(
+                      '$bookCount 本 · $wordsLabel',
+                      style: TextStyle(
+                        fontFamily: _serif,
+                        fontFamilyFallback: _serifFallback,
+                        fontSize: 24,
+                        fontWeight: FontWeight.w800,
+                        color: ink,
+                        shadows: const <Shadow>[
+                          Shadow(color: Color(0x59FFFFFF), offset: Offset(0, 1)),
+                          Shadow(color: Color(0x33000000), offset: Offset(0, -0.6)),
+                        ],
+                      ),
+                    ),
+                  ),
+                  rule(diamondAtEnd: false),
+                ],
+              ),
+              if ((hint ?? '').isNotEmpty) ...<Widget>[
+                const SizedBox(height: 6),
+                Text(
+                  hint!,
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontFamily: _serif,
+                    fontSize: 11,
+                    color: ink.withValues(alpha: 0.75),
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ),
+      ],
     );
   }
 
@@ -373,6 +408,155 @@ class ReadingBookshelfFooter extends StatelessWidget {
   }
 }
 
+class _Diamond extends StatelessWidget {
+  const _Diamond({required this.color});
+
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return Transform.rotate(
+      angle: math.pi / 4,
+      child: Container(width: 6, height: 6, color: color),
+    );
+  }
+}
+
+/// Oak texture multiplied by [tint]; falls back to the tint when the asset is
+/// unavailable (e.g. widget tests without a bundle).
+class _Oak extends StatelessWidget {
+  const _Oak({
+    required this.asset,
+    required this.tint,
+    this.alignment = Alignment.center,
+  });
+
+  final String asset;
+  final Color tint;
+  final Alignment alignment;
+
+  @override
+  Widget build(BuildContext context) {
+    return ColorFiltered(
+      // modulate keeps transparent pixels transparent; multiply would flood
+      // the whole filter layer with the tint.
+      colorFilter: ColorFilter.mode(tint, BlendMode.modulate),
+      child: Image.asset(
+        asset,
+        fit: BoxFit.cover,
+        alignment: alignment,
+        errorBuilder: (BuildContext context, Object error, StackTrace? st) =>
+            const ColoredBox(color: Color(0xFFB98D60)),
+      ),
+    );
+  }
+}
+
+/// Cabinet side post: lit front face with a rounded edge highlight.
+class _Post extends StatelessWidget {
+  const _Post({required this.theme, required this.width, required this.left});
+
+  final ReadingBookshelfTheme theme;
+  final double width;
+  final bool left;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: width,
+      child: Stack(
+        fit: StackFit.expand,
+        children: <Widget>[
+          _Oak(
+            asset: _oakVertical,
+            tint: theme.woodTint,
+            alignment: left ? Alignment.centerLeft : Alignment.centerRight,
+          ),
+          DecoratedBox(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: left ? Alignment.centerLeft : Alignment.centerRight,
+                end: left ? Alignment.centerRight : Alignment.centerLeft,
+                colors: const <Color>[
+                  Color(0x14000000),
+                  Color(0x1FFFFFFF),
+                  Color(0x00FFFFFF),
+                  Color(0x40000000),
+                ],
+                stops: const <double>[0, 0.2, 0.7, 1],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Thick oak plank seen from the front: lit nose, grain, darker underside.
+class _Plank extends StatelessWidget {
+  const _Plank({
+    required this.theme,
+    required this.height,
+    this.topRail = false,
+  });
+
+  final ReadingBookshelfTheme theme;
+  final double height;
+  final bool topRail;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      height: height,
+      width: double.infinity,
+      child: Stack(
+        fit: StackFit.expand,
+        children: <Widget>[
+          _Oak(asset: _oakHorizontal, tint: theme.woodTint),
+          DecoratedBox(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: topRail
+                    ? const <Color>[
+                        Color(0x26FFFFFF),
+                        Color(0x00FFFFFF),
+                        Color(0x40000000),
+                      ]
+                    : const <Color>[
+                        Color(0x38FFFFFF),
+                        Color(0x0AFFFFFF),
+                        Color(0x00000000),
+                        Color(0x33000000),
+                      ],
+                stops: topRail
+                    ? const <double>[0, 0.5, 1]
+                    : const <double>[0, 0.18, 0.6, 1],
+              ),
+            ),
+          ),
+          const Positioned(
+            left: 0,
+            right: 0,
+            top: 0,
+            height: 1,
+            child: ColoredBox(color: Color(0x4DFFFFFF)),
+          ),
+          const Positioned(
+            left: 0,
+            right: 0,
+            bottom: 0,
+            height: 1,
+            child: ColoredBox(color: Color(0x59000000)),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class _ShelfSlot {
   const _ShelfSlot.book(this.doc) : isImport = false;
   const _ShelfSlot.import()
@@ -383,12 +567,16 @@ class _ShelfSlot {
   final bool isImport;
 }
 
+/// One cubby: shaded back panel, books in fixed columns, plank below.
 class _ShelfRow extends StatelessWidget {
   const _ShelfRow({
     required this.theme,
     required this.slots,
     required this.columns,
     required this.rowIndex,
+    required this.width,
+    required this.cubbyHeight,
+    required this.plankHeight,
     required this.onOpenBook,
     required this.onImport,
     this.onLongPressBook,
@@ -399,213 +587,138 @@ class _ShelfRow extends StatelessWidget {
   final List<_ShelfSlot> slots;
   final int columns;
   final int rowIndex;
+  final double width;
+  final double cubbyHeight;
+  final double plankHeight;
   final ValueChanged<ReadingDoc> onOpenBook;
   final VoidCallback onImport;
   final void Function(ReadingDoc doc)? onLongPressBook;
   final String? emptyHint;
 
+  static const List<double> _heightJitter = <double>[1, 0.985, 0.995, 0.975, 1];
+
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 2),
-      child: Column(
-        children: <Widget>[
-          SizedBox(
-            height: 188,
-            child: Stack(
-              children: <Widget>[
-                // Soft recession shadow along the backboard under the books.
-                Positioned(
-                  left: 0,
-                  right: 0,
-                  bottom: 0,
-                  height: 28,
-                  child: DecoratedBox(
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        begin: Alignment.topCenter,
-                        end: Alignment.bottomCenter,
-                        colors: <Color>[
-                          Colors.transparent,
-                          theme.woodOuter.withValues(alpha: 0.22),
-                          const Color(0x33201008),
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
-                slots.isEmpty
-                    ? Center(
-                        child: Text(
-                          emptyHint ?? '',
-                          style: TextStyle(
-                            fontFamily: 'Georgia',
-                            fontSize: 13,
-                            color: theme.emptyHint,
-                          ),
-                        ),
-                      )
-                    : Row(
-                        crossAxisAlignment: CrossAxisAlignment.end,
-                        children: <Widget>[
-                          for (int i = 0; i < columns; i++) ...<Widget>[
-                            if (i > 0) const SizedBox(width: 12),
-                            Expanded(
-                              child: i < slots.length
-                                  ? _slotWidget(slots[i], i)
-                                  : const SizedBox.shrink(),
-                            ),
-                          ],
-                        ],
-                      ),
-              ],
-            ),
-          ),
-          _ShelfLedge3D(theme: theme),
-        ],
-      ),
-    );
-  }
+    final double side = width * 0.035;
+    final double gap = width * 0.055;
+    final double colW = (width - side * 2 - gap * (columns - 1)) / columns;
+    final double bookH = math.min(cubbyHeight * 0.84, colW / 0.66);
+    final Color shade = theme.cubbyShade;
 
-  Widget _slotWidget(_ShelfSlot slot, int column) {
-    if (slot.isImport) {
-      return _ImportSlot(theme: theme, onTap: onImport);
-    }
-    final ReadingDoc doc = slot.doc!;
-    // Slight height jitter so covers feel hand-placed.
-    final double heightFactor = 0.90 + (((rowIndex * 3 + column) % 5) * 0.02);
-    return Align(
-      alignment: Alignment.bottomCenter,
-      child: FractionallySizedBox(
-        heightFactor: heightFactor.clamp(0.88, 1.0),
-        widthFactor: 0.98,
-        child: Material(
-          color: Colors.transparent,
-          child: InkWell(
+    final List<Widget> placed = <Widget>[];
+    for (int i = 0; i < slots.length; i++) {
+      final _ShelfSlot slot = slots[i];
+      final double x = side + i * (colW + gap);
+      if (slot.isImport) {
+        final double remaining = width - side - x;
+        final double w = math.min(remaining, colW * 1.5);
+        placed.add(
+          Positioned(
+            left: x + (remaining - w) / 2,
+            bottom: 0,
+            width: w,
+            height: bookH,
+            child: _ImportSlot(theme: theme, onTap: onImport),
+          ),
+        );
+        continue;
+      }
+      final ReadingDoc doc = slot.doc!;
+      final double h = bookH * _heightJitter[(rowIndex * 3 + i) % _heightJitter.length];
+      placed.add(
+        Positioned(
+          left: x,
+          bottom: 0,
+          width: colW,
+          height: h,
+          child: GestureDetector(
+            behavior: HitTestBehavior.opaque,
             onTap: () => onOpenBook(doc),
-            onLongPress: onLongPressBook == null
-                ? null
-                : () => onLongPressBook!(doc),
-            borderRadius: BorderRadius.circular(3),
+            onLongPress:
+                onLongPressBook == null ? null : () => onLongPressBook!(doc),
             child: ReadingBookCover(
               title: doc.title,
               level: doc.level,
+              subtitle: _subtitleFor(doc),
               standing: true,
+              paletteIndex: rowIndex * columns + i,
             ),
           ),
         ),
-      ),
-    );
-  }
-}
-
-/// Thick oak plank: top plane, front face, underside cast shadow.
-class _ShelfLedge3D extends StatelessWidget {
-  const _ShelfLedge3D({required this.theme});
-
-  final ReadingBookshelfTheme theme;
-
-  @override
-  Widget build(BuildContext context) {
-    return SizedBox(
-      height: 28,
-      width: double.infinity,
-      child: CustomPaint(
-        painter: _Ledge3DPainter(
-          top: theme.ledgeHighlight,
-          front: theme.ledge,
-          shade: Color.lerp(theme.ledge, const Color(0xFF5A3A1E), 0.45)!,
-        ),
-      ),
-    );
-  }
-}
-
-class _Ledge3DPainter extends CustomPainter {
-  const _Ledge3DPainter({
-    required this.top,
-    required this.front,
-    required this.shade,
-  });
-
-  final Color top;
-  final Color front;
-  final Color shade;
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    const double topH = 9;
-    final double frontH = size.height - topH - 4;
-
-    // Underside soft cast onto the bay below.
-    canvas.drawRect(
-      Rect.fromLTWH(0, size.height - 6, size.width, 6),
-      Paint()
-        ..shader = const LinearGradient(
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-          colors: <Color>[Color(0x55301808), Color(0x00000000)],
-        ).createShader(Rect.fromLTWH(0, size.height - 6, size.width, 6)),
-    );
-
-    // Top walking surface (lighter).
-    final Path topPath = Path()
-      ..moveTo(0, 2)
-      ..lineTo(size.width, 2)
-      ..lineTo(size.width, topH)
-      ..lineTo(0, topH)
-      ..close();
-    canvas.drawPath(
-      topPath,
-      Paint()
-        ..shader = LinearGradient(
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-          colors: <Color>[Color.lerp(top, Colors.white, 0.18)!, top, front],
-        ).createShader(Rect.fromLTWH(0, 0, size.width, topH)),
-    );
-
-    // Front thickness.
-    canvas.drawRect(
-      Rect.fromLTWH(0, topH, size.width, frontH),
-      Paint()
-        ..shader = LinearGradient(
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-          colors: <Color>[front, shade],
-        ).createShader(Rect.fromLTWH(0, topH, size.width, frontH)),
-    );
-
-    // Nose highlight along the front edge.
-    canvas.drawLine(
-      Offset(0, topH + 0.8),
-      Offset(size.width, topH + 0.8),
-      Paint()
-        ..color = Colors.white.withValues(alpha: 0.28)
-        ..strokeWidth = 1.1,
-    );
-
-    // Grain ticks on the front face.
-    final math.Random rng = math.Random(11);
-    final Paint grain = Paint()..strokeWidth = 0.7;
-    for (double x = 4; x < size.width; x += 7 + rng.nextDouble() * 9) {
-      grain.color = shade.withValues(alpha: 0.18 + rng.nextDouble() * 0.12);
-      canvas.drawLine(
-        Offset(x, topH + 3),
-        Offset(x + rng.nextDouble() * 2, topH + frontH - 2),
-        grain,
       );
     }
+
+    return Column(
+      children: <Widget>[
+        SizedBox(
+          height: cubbyHeight,
+          child: Stack(
+            fit: StackFit.expand,
+            children: <Widget>[
+              _Oak(
+                asset: _oakVertical,
+                tint: theme.backTint,
+                alignment: Alignment(0, -1 + (rowIndex % 3) * 0.8),
+              ),
+              // Shadow from the plank / rail above.
+              DecoratedBox(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: <Color>[
+                      shade.withValues(alpha: rowIndex == 0 ? 0.9 : 0.82),
+                      shade.withValues(alpha: rowIndex == 0 ? 0.5 : 0.4),
+                      shade.withValues(alpha: 0.06),
+                      shade.withValues(alpha: 0),
+                    ],
+                    stops: const <double>[0, 0.14, 0.5, 1],
+                  ),
+                ),
+              ),
+              // Inner side walls falling into shadow.
+              DecoratedBox(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: <Color>[
+                      shade.withValues(alpha: 0.75),
+                      shade.withValues(alpha: 0),
+                      shade.withValues(alpha: 0),
+                      shade.withValues(alpha: 0.75),
+                    ],
+                    stops: const <double>[0, 0.05, 0.95, 1],
+                  ),
+                ),
+              ),
+              if (slots.isEmpty && (emptyHint ?? '').isNotEmpty)
+                Center(
+                  child: Text(
+                    emptyHint!,
+                    style: TextStyle(
+                      fontFamily: _serif,
+                      fontSize: 13,
+                      color: theme.emptyHint,
+                    ),
+                  ),
+                ),
+              ...placed,
+            ],
+          ),
+        ),
+        _Plank(theme: theme, height: plankHeight),
+      ],
+    );
   }
 
-  @override
-  bool shouldRepaint(_Ledge3DPainter oldDelegate) =>
-      oldDelegate.top != top ||
-      oldDelegate.front != front ||
-      oldDelegate.shade != shade;
+  static String _subtitleFor(ReadingDoc doc) {
+    final String course = doc.courseTitle.trim();
+    if (course.isNotEmpty && course != doc.title.trim()) return course;
+    final String level = doc.level.trim();
+    return level.isEmpty ? '' : 'Level $level';
+  }
 }
 
-/// Dashed rounded import tile with a large download arrow.
+/// Lit cubby back with a dashed outline, tray-download glyph and「导入」.
 class _ImportSlot extends StatelessWidget {
   const _ImportSlot({required this.theme, required this.onTap});
 
@@ -614,69 +727,53 @@ class _ImportSlot extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Align(
-      alignment: Alignment.bottomCenter,
-      child: FractionallySizedBox(
-        heightFactor: 0.9,
-        widthFactor: 1,
-        child: Material(
-          color: Colors.transparent,
-          child: InkWell(
-            onTap: onTap,
-            borderRadius: BorderRadius.circular(8),
-            child: CustomPaint(
-              foregroundPainter: _DashedRRectPainter(
-                color: theme.importInk.withValues(alpha: 0.6),
+    return Semantics(
+      button: true,
+      label: '导入',
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: onTap,
+        child: CustomPaint(
+          foregroundPainter: _DashedRectPainter(
+            color: theme.importInk.withValues(alpha: 0.8),
+          ),
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: <Color>[
+                  theme.importGlow,
+                  theme.importGlow.withValues(alpha: theme.importGlow.a * 0.8),
+                  const Color(0x14000000),
+                ],
+                stops: const <double>[0, 0.82, 1],
               ),
-              child: DecoratedBox(
-                decoration: BoxDecoration(
-                  color: theme.importFill,
-                  borderRadius: BorderRadius.circular(8),
-                  boxShadow: const <BoxShadow>[
-                    BoxShadow(
-                      color: Color(0x33180800),
-                      blurRadius: 6,
-                      offset: Offset(0, 2),
-                    ),
-                  ],
-                  gradient: LinearGradient(
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                    colors: <Color>[
-                      Color.lerp(theme.importFill, Colors.white, 0.35)!,
-                      theme.importFill,
-                      Color.lerp(theme.importFill, theme.woodOuter, 0.35)!,
-                    ],
-                  ),
-                ),
-                child: Column(
+            ),
+            child: LayoutBuilder(
+              builder: (BuildContext context, BoxConstraints c) {
+                final double glyph = math.min(c.maxWidth, c.maxHeight) * 0.3;
+                return Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: <Widget>[
-                    Icon(
-                      Icons.file_download_outlined,
-                      size: 44,
+                    BookshelfGlyph.trayDownload(
                       color: theme.importInk,
-                      shadows: const <Shadow>[
-                        Shadow(
-                          color: Color(0x33000000),
-                          blurRadius: 2,
-                          offset: Offset(0, 1),
-                        ),
-                      ],
+                      size: glyph,
                     ),
-                    const SizedBox(height: 6),
+                    SizedBox(height: glyph * 0.22),
                     Text(
                       '导入',
                       style: TextStyle(
-                        fontFamily: 'Georgia',
-                        fontSize: 16,
-                        fontWeight: FontWeight.w600,
+                        fontFamily: _serif,
+                        fontFamilyFallback: _serifFallback,
+                        fontSize: math.max(14, glyph * 0.42),
+                        fontWeight: FontWeight.w700,
                         color: theme.importInk,
                       ),
                     ),
                   ],
-                ),
-              ),
+                );
+              },
             ),
           ),
         ),
@@ -685,169 +782,123 @@ class _ImportSlot extends StatelessWidget {
   }
 }
 
-class _DashedRRectPainter extends CustomPainter {
-  const _DashedRRectPainter({required this.color});
+class _DashedRectPainter extends CustomPainter {
+  const _DashedRectPainter({required this.color});
 
   final Color color;
 
   @override
   void paint(Canvas canvas, Size size) {
-    final Path path = Path()
-      ..addRRect(
-        RRect.fromRectAndRadius(
-          Offset.zero & size,
-          const Radius.circular(8),
-        ),
-      );
+    final Path path = Path()..addRect((Offset.zero & size).deflate(0.7));
     final Paint paint = Paint()
       ..color = color
       ..style = PaintingStyle.stroke
       ..strokeWidth = 1.4;
-    for (final metric in path.computeMetrics()) {
-      double distance = 0;
-      while (distance < metric.length) {
-        canvas.drawPath(metric.extractPath(distance, distance + 5), paint);
-        distance += 9;
+    for (final PathMetric metric in path.computeMetrics()) {
+      double d = 0;
+      while (d < metric.length) {
+        canvas.drawPath(metric.extractPath(d, d + 6), paint);
+        d += 10;
       }
     }
   }
 
   @override
-  bool shouldRepaint(_DashedRRectPainter oldDelegate) =>
+  bool shouldRepaint(_DashedRectPainter oldDelegate) =>
       oldDelegate.color != color;
 }
 
-/// Full oak cabinet: outer frame, recessed bay, left/right side walls with
-/// thickness, top rail, and wood grain on the backboard.
-class _OakCabinetPainter extends CustomPainter {
-  const _OakCabinetPainter({
-    required this.outer,
-    required this.inner,
-    required this.ledge,
-  });
+enum _GlyphKind { search, docDownload, trayDownload }
 
-  final Color outer;
-  final Color inner;
-  final Color ledge;
+/// Thin-stroke line icons matching the reference header and import slot.
+class BookshelfGlyph extends StatelessWidget {
+  const BookshelfGlyph._(this._kind, {required this.color, this.size = 28});
+
+  const BookshelfGlyph.search({required Color color, double size = 28})
+      : this._(_GlyphKind.search, color: color, size: size);
+
+  const BookshelfGlyph.docDownload({required Color color, double size = 28})
+      : this._(_GlyphKind.docDownload, color: color, size: size);
+
+  const BookshelfGlyph.trayDownload({required Color color, double size = 40})
+      : this._(_GlyphKind.trayDownload, color: color, size: size);
+
+  final _GlyphKind _kind;
+  final Color color;
+  final double size;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox.square(
+      dimension: size,
+      child: CustomPaint(painter: _GlyphPainter(_kind, color)),
+    );
+  }
+}
+
+class _GlyphPainter extends CustomPainter {
+  const _GlyphPainter(this.kind, this.color);
+
+  final _GlyphKind kind;
+  final Color color;
 
   @override
   void paint(Canvas canvas, Size size) {
-    final Rect rect = Offset.zero & size;
-
-    // Outer carcass.
-    canvas.drawRect(
-      rect,
-      Paint()
-        ..shader = LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: <Color>[
-            Color.lerp(outer, Colors.white, 0.12)!,
-            outer,
-            Color.lerp(outer, Colors.black, 0.12)!,
-          ],
-        ).createShader(rect),
-    );
-
-    // Recessed bay (backboard).
-    const double wall = 16;
-    const double topRail = 12;
-    final Rect bay = Rect.fromLTRB(
-      wall,
-      topRail,
-      size.width - wall,
-      size.height - 6,
-    );
-    canvas.drawRRect(
-      RRect.fromRectAndRadius(bay, const Radius.circular(2)),
-      Paint()
-        ..shader = LinearGradient(
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-          colors: <Color>[
-            Color.lerp(inner, Colors.black, 0.08)!,
-            inner,
-            Color.lerp(inner, Colors.white, 0.06)!,
-          ],
-        ).createShader(bay),
-    );
-
-    // Horizontal grain on backboard.
-    final math.Random rng = math.Random(7);
-    final Paint line = Paint()..strokeWidth = 0.75;
-    for (double y = bay.top + 2; y < bay.bottom; y += 3 + rng.nextDouble() * 5) {
-      line.color = outer.withValues(alpha: 0.05 + rng.nextDouble() * 0.08);
-      final double x0 = bay.left + rng.nextDouble() * bay.width * 0.25;
-      final double x1 = bay.right - rng.nextDouble() * bay.width * 0.25;
-      canvas.drawLine(Offset(x0, y), Offset(x1, y), line);
+    final double s = size.width;
+    final Paint p = Paint()
+      ..color = color
+      ..style = PaintingStyle.stroke
+      ..strokeCap = StrokeCap.round
+      ..strokeJoin = StrokeJoin.round
+      ..strokeWidth = s * (kind == _GlyphKind.trayDownload ? 0.055 : 0.07);
+    Offset o(double x, double y) => Offset(x * s, y * s);
+    switch (kind) {
+      case _GlyphKind.search:
+        canvas.drawCircle(o(0.42, 0.42), s * 0.3, p);
+        canvas.drawLine(o(0.64, 0.64), o(0.9, 0.9), p);
+      case _GlyphKind.docDownload:
+        final Path doc = Path()
+          ..moveTo(0.2 * s, 0.06 * s)
+          ..lineTo(0.6 * s, 0.06 * s)
+          ..lineTo(0.8 * s, 0.26 * s)
+          ..lineTo(0.8 * s, 0.94 * s)
+          ..lineTo(0.2 * s, 0.94 * s)
+          ..close()
+          ..moveTo(0.6 * s, 0.06 * s)
+          ..lineTo(0.6 * s, 0.26 * s)
+          ..lineTo(0.8 * s, 0.26 * s);
+        canvas.drawPath(doc, p);
+        canvas.drawLine(o(0.5, 0.4), o(0.5, 0.8), p);
+        canvas.drawPath(
+          Path()
+            ..moveTo(0.36 * s, 0.66 * s)
+            ..lineTo(0.5 * s, 0.8 * s)
+            ..lineTo(0.64 * s, 0.66 * s),
+          p,
+        );
+      case _GlyphKind.trayDownload:
+        canvas.drawLine(o(0.5, 0.06), o(0.5, 0.62), p);
+        canvas.drawPath(
+          Path()
+            ..moveTo(0.28 * s, 0.42 * s)
+            ..lineTo(0.5 * s, 0.64 * s)
+            ..lineTo(0.72 * s, 0.42 * s),
+          p,
+        );
+        canvas.drawPath(
+          Path()
+            ..moveTo(0.06 * s, 0.62 * s)
+            ..lineTo(0.06 * s, 0.86 * s)
+            ..quadraticBezierTo(0.06 * s, 0.94 * s, 0.14 * s, 0.94 * s)
+            ..lineTo(0.86 * s, 0.94 * s)
+            ..quadraticBezierTo(0.94 * s, 0.94 * s, 0.94 * s, 0.86 * s)
+            ..lineTo(0.94 * s, 0.62 * s),
+          p,
+        );
     }
-
-    // Left / right side walls — darker inner face, lighter outer edge.
-    for (final bool left in <bool>[true, false]) {
-      final double x0 = left ? 0 : size.width - wall;
-      final Rect wallRect = Rect.fromLTWH(x0, 0, wall, size.height);
-      canvas.drawRect(
-        wallRect,
-        Paint()
-          ..shader = LinearGradient(
-            begin: left ? Alignment.centerLeft : Alignment.centerRight,
-            end: left ? Alignment.centerRight : Alignment.centerLeft,
-            colors: <Color>[
-              Color.lerp(outer, Colors.white, 0.1)!,
-              Color.lerp(outer, Colors.black, 0.18)!,
-              Color.lerp(inner, Colors.black, 0.28)!,
-            ],
-            stops: const <double>[0, 0.55, 1],
-          ).createShader(wallRect),
-      );
-      // Inner corner shadow into the bay.
-      final Rect crease = Rect.fromLTWH(
-        left ? wall : size.width - wall - 10,
-        topRail,
-        10,
-        size.height - topRail,
-      );
-      canvas.drawRect(
-        crease,
-        Paint()
-          ..shader = LinearGradient(
-            begin: left ? Alignment.centerLeft : Alignment.centerRight,
-            end: left ? Alignment.centerRight : Alignment.centerLeft,
-            colors: const <Color>[Color(0x44301808), Color(0x00000000)],
-          ).createShader(crease),
-      );
-    }
-
-    // Top rail thickness.
-    canvas.drawRect(
-      Rect.fromLTWH(0, 0, size.width, topRail),
-      Paint()
-        ..shader = LinearGradient(
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-          colors: <Color>[
-            Color.lerp(ledge, Colors.white, 0.2)!,
-            ledge,
-            Color.lerp(outer, Colors.black, 0.15)!,
-          ],
-        ).createShader(Rect.fromLTWH(0, 0, size.width, topRail)),
-    );
-
-    // Soft top lip shadow into the first bay.
-    canvas.drawRect(
-      Rect.fromLTWH(wall, topRail, size.width - wall * 2, 22),
-      Paint()
-        ..shader = const LinearGradient(
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-          colors: <Color>[Color(0x44301808), Color(0x00000000)],
-        ).createShader(Rect.fromLTWH(wall, topRail, size.width - wall * 2, 22)),
-    );
   }
 
   @override
-  bool shouldRepaint(_OakCabinetPainter oldDelegate) =>
-      oldDelegate.outer != outer ||
-      oldDelegate.inner != inner ||
-      oldDelegate.ledge != ledge;
+  bool shouldRepaint(_GlyphPainter oldDelegate) =>
+      oldDelegate.kind != kind || oldDelegate.color != color;
 }

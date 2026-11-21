@@ -1,5 +1,9 @@
 ﻿# Start official THU-MAIC/OpenMAIC on this GPU box (Next.js :3000, bind 0.0.0.0).
-# Clone lives outside the AcquireEnglish repo: D:\OpenMAIC (MIT, not vendored).
+# Source tree: D:\OpenMAIC (ECS /tmp/openmaic-src.tgz extract, or git clone — MIT, not vendored).
+# Local LLM default: Ollama qwen2.5:7b @ http://127.0.0.1:11434/v1 (gpu-box shim OK).
+#
+# One-time: cd D:\OpenMAIC; pnpm install; ollama pull qwen2.5:7b
+# Run: cd D:\AcquireEnglish\tools\openmaic; .\start.ps1
 # Keep this process running — generation jobs die when Node exits.
 $ErrorActionPreference = "Stop"
 
@@ -8,11 +12,34 @@ $HostBind = if ($env:OPENMAIC_HOST) { $env:OPENMAIC_HOST } else { "0.0.0.0" }
 $Port = if ($env:OPENMAIC_PORT) { [int]$env:OPENMAIC_PORT } else { 3000 }
 $PgLocalPort = if ($env:OPENMAIC_PG_LOCAL_PORT) { [int]$env:OPENMAIC_PG_LOCAL_PORT } else { 5433 }
 $EcsSshHost = if ($env:OPENMAIC_ECS_SSH) { $env:OPENMAIC_ECS_SSH } else { "acquireenglish" }
+$LocalLlmModel = if ($env:OPENMAIC_OLLAMA_MODEL) { $env:OPENMAIC_OLLAMA_MODEL } else { "qwen2.5:7b" }
+$OllamaBase = if ($env:OLLAMA_BASE_URL) { $env:OLLAMA_BASE_URL } else { "http://127.0.0.1:11434/v1" }
+
+function Resolve-OllamaExe {
+  $cmd = Get-Command ollama -ErrorAction SilentlyContinue
+  if ($cmd) { return $cmd.Source }
+  foreach ($p in @("$env:LOCALAPPDATA\Programs\Ollama\ollama.exe", "C:\Program Files\Ollama\ollama.exe")) {
+    if (Test-Path $p) { return $p }
+  }
+  return $null
+}
+
+$ollamaExe = Resolve-OllamaExe
+if ($ollamaExe) {
+  $ollamaList = & $ollamaExe list 2>&1 | Out-String
+  if ($ollamaList -notmatch [regex]::Escape($LocalLlmModel)) {
+    Write-Host "Pulling Ollama $LocalLlmModel in background..."
+    Start-Process -FilePath $ollamaExe -ArgumentList "pull", $LocalLlmModel -WindowStyle Hidden
+  }
+} else {
+  Write-Warning "ollama not found — start deploy/gpu-box-ollama shim on :11434 or install Ollama, then: ollama pull $LocalLlmModel"
+}
 
 if (-not (Test-Path (Join-Path $OpenMaicRoot "package.json"))) {
   Write-Error @"
 OpenMAIC not found at $OpenMaicRoot
-See tools/openmaic/README.md for clone / slim-transfer steps.
+From ECS: scp acquireenglish:/tmp/openmaic-src.tgz D:\OpenMAIC-src.tgz; mkdir D:\OpenMAIC; tar -xzf D:\OpenMAIC-src.tgz -C D:\OpenMAIC
+Or see tools/openmaic/README.md
 "@
 }
 
@@ -29,11 +56,21 @@ if (-not (Test-Path ".\node_modules\next")) {
 
 if (-not (Test-Path ".\.env.local")) {
   Copy-Item .env.example .env.local
-  Write-Host "Created .env.local — set DATABASE_URL and an LLM API key."
+  Write-Host "Created .env.local — DATABASE_URL via SSH tunnel; LLM via Ollama $LocalLlmModel."
 }
 
 if (-not (Test-Path ".\openmaic.yml")) {
   Copy-Item openmaic.example.yml openmaic.yml
+}
+
+$envLines = @(Get-Content .\.env.local -ErrorAction SilentlyContinue)
+$envPatch = @()
+if (($envLines | Out-String) -notmatch '(?m)^\s*ALLOW_LOCAL_NETWORKS\s*=') { $envPatch += "ALLOW_LOCAL_NETWORKS=true" }
+if (($envLines | Out-String) -notmatch '(?m)^\s*OLLAMA_BASE_URL\s*=') { $envPatch += "OLLAMA_BASE_URL=$OllamaBase" }
+if (($envLines | Out-String) -notmatch '(?m)^\s*OLLAMA_MODELS\s*=') { $envPatch += "OLLAMA_MODELS=$LocalLlmModel" }
+if ($envPatch.Count -gt 0) {
+  Add-Content .\.env.local ("`n" + ($envPatch -join "`n"))
+  Write-Host "Appended Ollama env for $LocalLlmModel"
 }
 
 # Prefer DeepSeek from oral_coach .env when not already set.
@@ -60,11 +97,10 @@ if ($envLocal -notmatch '(?m)^\s*DATABASE_URL\s*=') {
   Write-Host "Appended DATABASE_URL → local tunnel :$PgLocalPort"
 }
 
-# Ensure openmaic.yml uses DeepSeek when key present and still on openai default.
-if ($env:DEEPSEEK_API_KEY) {
-  $yml = Get-Content .\openmaic.yml -Raw
-  if ($yml -match 'llm:\s*openai:' -or $yml -notmatch '(?m)^\s*deepseek:') {
-    @"
+# openmaic.yml: DeepSeek when key present; otherwise local Ollama qwen2.5:7b.
+$yml = Get-Content .\openmaic.yml -Raw
+if ($env:DEEPSEEK_API_KEY -and ($yml -match 'llm:\s*openai:' -or $yml -notmatch '(?m)^\s*deepseek:')) {
+  @"
 providers:
   deepseek:
     preset: deepseek
@@ -75,8 +111,19 @@ slots:
   llm: deepseek:deepseek-chat
   video: null
 "@ | Set-Content .\openmaic.yml -Encoding utf8
-    Write-Host "Wrote openmaic.yml for DeepSeek."
-  }
+  Write-Host "Wrote openmaic.yml for DeepSeek."
+} elseif (-not $env:DEEPSEEK_API_KEY -and $yml -match 'llm:\s*openai:' -and $yml -notmatch '(?m)^\s*ollama:') {
+  @"
+providers:
+  ollama:
+    preset: ollama
+    models: [$LocalLlmModel]
+
+slots:
+  llm: ollama:$LocalLlmModel
+  video: null
+"@ | Set-Content .\openmaic.yml -Encoding utf8
+  Write-Host "Wrote openmaic.yml for Ollama ($LocalLlmModel)."
 }
 
 # SSH tunnel for ECS Postgres (skip if already listening).
@@ -94,8 +141,8 @@ if (-not $tunnelUp) {
     "-N",
     "-o", "ServerAliveInterval=30",
     "-o", "ExitOnForwardFailure=yes",
-    # ECS openmaic-pg listens on 127.0.0.1:5433 (host Postgres keeps :5432).
-    "-L", "${PgLocalPort}:127.0.0.1:5433",
+    # Host Postgres on ECS (openmaic DB) listens on 127.0.0.1:5432.
+    "-L", "${PgLocalPort}:127.0.0.1:5432",
     $EcsSshHost
   ) -WindowStyle Hidden | Out-Null
   Start-Sleep -Seconds 2
@@ -104,7 +151,7 @@ if (-not $tunnelUp) {
     $c2.Connect("127.0.0.1", $PgLocalPort)
     $c2.Close()
   } catch {
-    Write-Error "Postgres tunnel failed. Run tools/openmaic/setup_ecs_pg.sh on ECS first, then: ssh -N -L ${PgLocalPort}:127.0.0.1:5433 $EcsSshHost"
+    Write-Error "Postgres tunnel failed. Run tools/openmaic/setup_ecs_pg.sh on ECS first, then: ssh -N -L ${PgLocalPort}:127.0.0.1:5432 $EcsSshHost"
   }
 }
 

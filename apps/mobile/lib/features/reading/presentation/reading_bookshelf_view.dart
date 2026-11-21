@@ -4,8 +4,8 @@ import '../domain/reading_doc.dart';
 import 'reading_bookshelf.dart';
 import 'reading_bookshelf_theme.dart';
 
-/// Light oak bookshelf panel: 3 ledges, ~3 gold hardcovers per row, dashed
-/// import slot last. Colors follow [ReadingBookshelfTheme.light].
+/// Textured oak cabinet: 3 cubbies, 3 cloth hardcovers per row on phones,
+/// dashed import cubby last. Colors follow [ReadingBookshelfTheme].
 class ReadingBookshelfView extends StatelessWidget {
   const ReadingBookshelfView({
     required this.docs,
@@ -104,16 +104,13 @@ class ReadingBookshelfHubLayout extends StatelessWidget {
             actions: actions,
           ),
           Expanded(
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(14, 0, 14, 0),
-              child: ReadingBookshelfView(
-                docs: books,
-                searchQuery: searchQuery,
-                showImportSlot: showImportSlot,
-                onImport: onImport,
-                onOpen: onOpen,
-                onLongPress: onLongPress,
-              ),
+            child: ReadingBookshelfView(
+              docs: books,
+              searchQuery: searchQuery,
+              showImportSlot: showImportSlot,
+              onImport: onImport,
+              onOpen: onOpen,
+              onLongPress: onLongPress,
             ),
           ),
           ReadingBookshelfFooter(
@@ -121,7 +118,6 @@ class ReadingBookshelfHubLayout extends StatelessWidget {
             totalWords: totalWords,
             hint: footerHint,
           ),
-          SizedBox(height: MediaQuery.paddingOf(context).bottom + 4),
         ],
       ),
     );

@@ -157,6 +157,7 @@ flutter:
     - assets/reading/
     - assets/translations/
     - assets/img/
+    - assets/img/bookshelf/
     - assets/img/digital_human/
 
   fonts:

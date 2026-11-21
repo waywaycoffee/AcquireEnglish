@@ -1,5 +1,3 @@
-import 'dart:math' as math;
-
 import 'package:flutter/material.dart';
 
 /// Stable title-based cover for built-in and imported books.
@@ -7,41 +5,59 @@ class ReadingBookCover extends StatelessWidget {
   const ReadingBookCover({
     required this.title,
     this.level = '',
+    this.subtitle = '',
     this.standing = false,
+    this.paletteIndex,
     super.key,
   });
 
   final String title;
   final String level;
 
-  /// When true, render a thick 3D hardcover (spine + face + page edges).
+  /// Shelf position; cycles [palette] so neighbours differ. Falls back to a
+  /// title hash.
+  final int? paletteIndex;
+
+  /// Small line under the title on shelf hardcovers.
+  final String subtitle;
+
+  /// When true, render the cloth hardcover standing on a shelf.
   final bool standing;
 
+  /// Cloth colors from the reference shelf (green, rust, navy, mustard,
+  /// burgundy, plum, then extras).
   static const List<Color> palette = <Color>[
-    Color(0xFF25472F),
-    Color(0xFFB4533A),
-    Color(0xFF1F3A66),
-    Color(0xFFD1A23A),
-    Color(0xFF5A1F2B),
-    Color(0xFF1F5058),
-    Color(0xFF4A2340),
-    Color(0xFF3D5A4C),
-    Color(0xFF8B3A2E),
-    Color(0xFF33496B),
+    Color(0xFF2E4634),
+    Color(0xFFA4553A),
+    Color(0xFF1F3557),
+    Color(0xFFCFA03C),
+    Color(0xFF5E2430),
+    Color(0xFF4E2228),
+    Color(0xFF1F4F55),
+    Color(0xFF55602E),
+    Color(0xFF3A4A63),
+    Color(0xFF8A3B2C),
   ];
+
+  static int seedOf(String title) =>
+      title.runes.fold<int>(0, (int value, int rune) => value + rune);
 
   @override
   Widget build(BuildContext context) {
-    final int seed =
-        title.runes.fold<int>(0, (int value, int rune) => value + rune);
-    final Color color = palette[seed % palette.length];
-    final bool lightInk = color.computeLuminance() > 0.55;
-    final Color ink = lightInk ? const Color(0xFF3A2A18) : Colors.white;
+    final int seed = seedOf(title);
+    final Color color = palette[(paletteIndex ?? seed) % palette.length];
 
     if (standing) {
-      return _ClassicHardcover3D(title: title, color: color, seed: seed);
+      return _ClothHardcover(
+        title: title,
+        subtitle: subtitle,
+        color: color,
+        glyph: _glyphFor(title, seed),
+      );
     }
 
+    final bool lightInk = color.computeLuminance() > 0.55;
+    final Color ink = lightInk ? const Color(0xFF3A2A18) : Colors.white;
     final Color muted = lightInk
         ? const Color(0xFF3A2A18).withValues(alpha: 0.7)
         : Colors.white70;
@@ -92,7 +108,7 @@ class ReadingBookCover extends StatelessWidget {
                     overflow: TextOverflow.ellipsis,
                     style: TextStyle(
                       color: ink,
-                      fontFamily: 'Georgia',
+                      fontFamily: 'serif',
                       fontSize: 15,
                       height: 1.15,
                       fontWeight: FontWeight.w600,
@@ -111,12 +127,41 @@ class ReadingBookCover extends StatelessWidget {
       ),
     );
   }
-}
 
-const Color _goldLight = Color(0xFFE8C97A);
-const Color _goldMid = Color(0xFFC9A24A);
-const Color _goldDark = Color(0xFF4A3410);
-const Color _pageCream = Color(0xFFF4EBD8);
+  static IconData _glyphFor(String title, int seed) {
+    final String t = title.toLowerCase();
+    if (t.contains('key') || t.contains('detective') || t.contains('mystery')) {
+      return Icons.vpn_key_outlined;
+    }
+    if (t.contains('garden') || t.contains('flower') || t.contains('rose')) {
+      return Icons.local_florist_outlined;
+    }
+    if (t.contains('wizard') || t.contains('castle') || t.contains('city') ||
+        t.contains('oz')) {
+      return Icons.castle_outlined;
+    }
+    if (t.contains('fable') || t.contains('animal') || t.contains('cat') ||
+        t.contains('dog') || t.contains('fox')) {
+      return Icons.pets_outlined;
+    }
+    if (t.contains('stor') || t.contains('letter') || t.contains('poem') ||
+        t.contains('essay')) {
+      return Icons.history_edu_outlined;
+    }
+    if (t.contains('walk') || t.contains('morning') || t.contains('tree') ||
+        t.contains('leaf') || t.contains('nature')) {
+      return Icons.eco_outlined;
+    }
+    if (t.contains('night') || t.contains('moon') || t.contains('star')) {
+      return Icons.nightlight_outlined;
+    }
+    if (t.contains('sea') || t.contains('lake') || t.contains('island') ||
+        t.contains('ship')) {
+      return Icons.sailing_outlined;
+    }
+    return _glyphs[seed % _glyphs.length];
+  }
+}
 
 const List<IconData> _glyphs = <IconData>[
   Icons.eco_outlined,
@@ -127,320 +172,307 @@ const List<IconData> _glyphs = <IconData>[
   Icons.pets_outlined,
 ];
 
-/// Thick hardcover: left spine, front cover, right page block, soft contact shadow.
-class _ClassicHardcover3D extends StatelessWidget {
-  const _ClassicHardcover3D({
+/// Foil gradient for gold stamping on dark cloth.
+const List<Color> _foil = <Color>[
+  Color(0xFFF4DE98),
+  Color(0xFFC99A45),
+  Color(0xFFEDCF82),
+  Color(0xFFB28636),
+];
+
+const Color _darkStamp = Color(0xFF3A2410);
+const String _serif = 'serif';
+const List<String> _serifFallback = <String>[
+  'Noto Serif',
+  'Georgia',
+  'Noto Serif CJK SC',
+  'Source Han Serif SC',
+];
+
+/// Front-facing cloth hardcover: hinge strip with vertical spine title on the
+/// left, foil-stamped title / subtitle / emblem / imprint, and a deep cast
+/// shadow onto the back panel.
+class _ClothHardcover extends StatelessWidget {
+  const _ClothHardcover({
     required this.title,
+    required this.subtitle,
     required this.color,
-    required this.seed,
+    required this.glyph,
   });
 
   final String title;
+  final String subtitle;
   final Color color;
-  final int seed;
+  final IconData glyph;
+
+  static const BorderRadius _radius = BorderRadius.only(
+    topLeft: Radius.circular(2),
+    bottomLeft: Radius.circular(2),
+    topRight: Radius.circular(4),
+    bottomRight: Radius.circular(4),
+  );
 
   @override
   Widget build(BuildContext context) {
-    final Color gold =
-        color.computeLuminance() > 0.38 ? _goldDark : _goldLight;
-    final IconData glyph = _glyphs[seed % _glyphs.length];
+    final bool lightCloth = color.computeLuminance() > 0.3;
     return LayoutBuilder(
       builder: (BuildContext context, BoxConstraints constraints) {
         final double w =
             constraints.maxWidth.isFinite ? constraints.maxWidth : 100;
         final double h =
-            constraints.maxHeight.isFinite ? constraints.maxHeight : 160;
-        final double spine = (w * 0.11).clamp(8.0, 14.0);
-        final double pages = (w * 0.08).clamp(6.0, 11.0);
-        final double depth = (w * 0.055).clamp(4.0, 8.0);
-        final double faceLeft = spine;
-        final double faceRight = w - pages;
-        final double faceWidth = math.max(24.0, faceRight - faceLeft);
-        final double unit = (faceWidth / 78).clamp(0.72, 1.35);
+            constraints.maxHeight.isFinite ? constraints.maxHeight : 142;
+        final double hinge = (w * 0.115).clamp(8.0, 18.0);
 
-        return Stack(
-          clipBehavior: Clip.none,
-          children: <Widget>[
-            // Soft oval contact shadow on the ledge.
-            Positioned(
-              left: spine * 0.4,
-              right: pages * 0.2,
-              bottom: -3,
-              height: 14,
-              child: DecoratedBox(
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(40),
-                  boxShadow: const <BoxShadow>[
-                    BoxShadow(
-                      color: Color(0x55301808),
-                      blurRadius: 10,
-                      spreadRadius: -2,
-                      offset: Offset(2, 2),
+        Widget stamp(Widget child) => lightCloth
+            ? child
+            : ShaderMask(
+                blendMode: BlendMode.srcIn,
+                shaderCallback: (Rect r) => const LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: _foil,
+                  stops: <double>[0, 0.38, 0.62, 1],
+                ).createShader(r),
+                child: child,
+              );
+        final Color ink = lightCloth ? _darkStamp : Colors.white;
+
+        return DecoratedBox(
+          decoration: const BoxDecoration(
+            borderRadius: _radius,
+            boxShadow: <BoxShadow>[
+              // Cast onto the back panel, falling to the right.
+              BoxShadow(
+                color: Color(0x99000000),
+                blurRadius: 14,
+                spreadRadius: -1,
+                offset: Offset(9, -2),
+              ),
+              // Contact with the plank.
+              BoxShadow(
+                color: Color(0x66000000),
+                blurRadius: 3,
+                offset: Offset(1.5, 1.5),
+              ),
+            ],
+          ),
+          child: ClipRRect(
+            borderRadius: _radius,
+            child: Stack(
+              fit: StackFit.expand,
+              children: <Widget>[
+                const _ClothWeave(),
+                // Cloth color modulated by the weave texture.
+                DecoratedBox(
+                  decoration: BoxDecoration(
+                    backgroundBlendMode: BlendMode.overlay,
+                    gradient: LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: <Color>[
+                        Color.lerp(color, Colors.white, 0.07)!,
+                        color,
+                        Color.lerp(color, Colors.black, 0.12)!,
+                      ],
                     ),
-                  ],
-                ),
-              ),
-            ),
-            CustomPaint(
-              size: Size(w, h),
-              painter: _HardcoverShellPainter(
-                cover: color,
-                spineWidth: spine,
-                pageWidth: pages,
-                depth: depth,
-              ),
-            ),
-            // Face content sits on the front plane.
-            Positioned(
-              left: faceLeft + 5 * unit,
-              right: pages + 4 * unit,
-              top: depth + 8 * unit,
-              bottom: 7 * unit,
-              child: DecoratedBox(
-                decoration: BoxDecoration(
-                  border: Border.all(
-                    color: gold.withValues(alpha: 0.9),
-                    width: 0.9,
                   ),
                 ),
-                child: Padding(
-                  padding: EdgeInsets.all(2.2 * unit),
+                // Hinge strip (spine wrap) — slightly raised and lighter.
+                Positioned(
+                  left: 0,
+                  top: 0,
+                  bottom: 0,
+                  width: hinge,
                   child: DecoratedBox(
                     decoration: BoxDecoration(
-                      border: Border.all(
-                        color: gold.withValues(alpha: 0.55),
-                        width: 0.55,
+                      gradient: LinearGradient(
+                        colors: <Color>[
+                          Color.lerp(color, Colors.black, 0.22)!,
+                          Color.lerp(color, Colors.white, 0.08)!,
+                          Color.lerp(color, Colors.white, 0.03)!,
+                        ],
+                        stops: const <double>[0, 0.35, 1],
                       ),
                     ),
-                    child: Padding(
-                      padding: EdgeInsets.fromLTRB(
-                        3 * unit,
-                        6 * unit,
-                        3 * unit,
-                        4 * unit,
+                  ),
+                ),
+                // Hinge groove: dark crease + soft lit lip.
+                Positioned(
+                  left: hinge,
+                  top: 0,
+                  bottom: 0,
+                  width: 1.2,
+                  child: const ColoredBox(color: Color(0x73000000)),
+                ),
+                Positioned(
+                  left: hinge + 1.2,
+                  top: 0,
+                  bottom: 0,
+                  width: 1.6,
+                  child: const ColoredBox(color: Color(0x1FFFFFFF)),
+                ),
+                // Spine bands.
+                for (final double y in <double>[h * 0.055, h * 0.075, h * 0.925, h * 0.945])
+                  Positioned(
+                    left: hinge * 0.18,
+                    width: hinge * 0.64,
+                    top: y,
+                    height: 0.9,
+                    child: stamp(ColoredBox(color: ink.withValues(alpha: 0.85))),
+                  ),
+                // Spine title, reading top to bottom.
+                Positioned(
+                  left: 0,
+                  width: hinge,
+                  top: h * 0.11,
+                  bottom: h * 0.11,
+                  child: RotatedBox(
+                    quarterTurns: 1,
+                    child: Center(
+                      child: stamp(
+                        Text(
+                          title,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            color: ink.withValues(alpha: 0.9),
+                            fontFamily: _serif,
+                            fontFamilyFallback: _serifFallback,
+                            fontSize: hinge * 0.52,
+                            height: 1,
+                          ),
+                        ),
                       ),
-                      child: Column(
-                        children: <Widget>[
+                    ),
+                  ),
+                ),
+                // Lighting: top-left sheen, bottom-right falloff, board edges.
+                const DecoratedBox(
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: <Color>[
+                        Color(0x14FFFFFF),
+                        Color(0x00FFFFFF),
+                        Color(0x00000000),
+                        Color(0x2E000000),
+                      ],
+                      stops: <double>[0, 0.35, 0.6, 1],
+                    ),
+                  ),
+                ),
+                const Positioned(
+                  left: 0,
+                  right: 0,
+                  top: 0,
+                  height: 1,
+                  child: ColoredBox(color: Color(0x24FFFFFF)),
+                ),
+                const Positioned(
+                  right: 0,
+                  top: 0,
+                  bottom: 0,
+                  width: 2,
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: <Color>[Color(0x00000000), Color(0x40000000)],
+                      ),
+                    ),
+                  ),
+                ),
+                // Front board stamping.
+                Positioned(
+                  left: hinge + 4,
+                  right: w * 0.05,
+                  top: h * 0.09,
+                  bottom: h * 0.06,
+                  child: Column(
+                    children: <Widget>[
+                      stamp(
+                        Text(
+                          title,
+                          maxLines: 3,
+                          textAlign: TextAlign.center,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            color: ink,
+                            fontFamily: _serif,
+                            fontFamilyFallback: _serifFallback,
+                            fontSize: w * 0.118,
+                            height: 1.12,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ),
+                      if (subtitle.isNotEmpty) ...<Widget>[
+                        SizedBox(height: h * 0.025),
+                        stamp(
                           Text(
-                            title,
-                            maxLines: 3,
+                            subtitle,
+                            maxLines: 2,
                             textAlign: TextAlign.center,
                             overflow: TextOverflow.ellipsis,
                             style: TextStyle(
-                              color: gold,
-                              fontFamily: 'Georgia',
-                              fontSize: 11.2 * unit,
-                              height: 1.12,
-                              fontWeight: FontWeight.w700,
-                              shadows: <Shadow>[
-                                Shadow(
-                                  color: gold.withValues(alpha: 0.35),
-                                  blurRadius: 0.6,
-                                  offset: const Offset(0, 0.4),
-                                ),
-                              ],
+                              color: ink.withValues(alpha: 0.92),
+                              fontFamily: _serif,
+                              fontFamilyFallback: _serifFallback,
+                              fontSize: w * 0.068,
+                              height: 1.15,
                             ),
                           ),
-                          Expanded(
-                            child: Center(
-                              child: Icon(
-                                glyph,
-                                size: 28 * unit,
-                                color: gold.withValues(alpha: 0.92),
-                                shadows: <Shadow>[
-                                  Shadow(
-                                    color: _goldMid.withValues(alpha: 0.45),
-                                    blurRadius: 1.2,
-                                  ),
-                                ],
-                              ),
+                        ),
+                      ],
+                      Expanded(
+                        child: Center(
+                          child: stamp(
+                            Icon(
+                              glyph,
+                              size: w * 0.34,
+                              color: ink,
                             ),
                           ),
-                          Text(
-                            'ACQUIRE ENGLISH',
-                            maxLines: 1,
-                            overflow: TextOverflow.clip,
-                            style: TextStyle(
-                              color: gold.withValues(alpha: 0.88),
-                              fontFamily: 'Georgia',
-                              fontSize: 5.4 * unit,
-                              letterSpacing: 0.45,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                        ],
+                        ),
                       ),
-                    ),
+                      stamp(
+                        Text(
+                          'ACQUIRE ENGLISH',
+                          maxLines: 1,
+                          overflow: TextOverflow.clip,
+                          style: TextStyle(
+                            color: ink.withValues(alpha: 0.95),
+                            fontSize: w * 0.056,
+                            letterSpacing: w * 0.004,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
-              ),
+              ],
             ),
-          ],
+          ),
         );
       },
     );
   }
 }
 
-/// Draws spine (left), cover face, top bevel, and stacked page edges (right).
-class _HardcoverShellPainter extends CustomPainter {
-  const _HardcoverShellPainter({
-    required this.cover,
-    required this.spineWidth,
-    required this.pageWidth,
-    required this.depth,
-  });
-
-  final Color cover;
-  final double spineWidth;
-  final double pageWidth;
-  final double depth;
+class _ClothWeave extends StatelessWidget {
+  const _ClothWeave();
 
   @override
-  void paint(Canvas canvas, Size size) {
-    final double w = size.width;
-    final double h = size.height;
-    final Color spineColor = Color.lerp(cover, Colors.black, 0.38)!;
-    final Color faceLit = Color.lerp(cover, Colors.white, 0.07)!;
-    final Color faceShade = Color.lerp(cover, Colors.black, 0.14)!;
-    final Color topColor = Color.lerp(cover, Colors.white, 0.18)!;
-
-    // Drop shadow behind the block (right/bottom).
-    final Path shadow = Path()
-      ..addRRect(
-        RRect.fromRectAndRadius(
-          Rect.fromLTWH(spineWidth * 0.35, depth + 4, w - spineWidth * 0.2, h - depth - 2),
-          const Radius.circular(2),
-        ),
-      );
-    canvas.drawShadow(shadow, const Color(0xFF000000), 8, true);
-
-    // --- Top bevel (thickness plane) ---
-    final Path top = Path()
-      ..moveTo(spineWidth * 0.35, depth)
-      ..lineTo(spineWidth, 0)
-      ..lineTo(w - pageWidth * 0.35, 0)
-      ..lineTo(w - pageWidth * 0.1, depth)
-      ..close();
-    canvas.drawPath(
-      top,
-      Paint()
-        ..shader = LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: <Color>[topColor, Color.lerp(cover, Colors.black, 0.08)!],
-        ).createShader(Rect.fromLTWH(0, 0, w, depth)),
-    );
-
-    // --- Spine (left thickness, slight taper) ---
-    final Path spine = Path()
-      ..moveTo(0, depth + 2)
-      ..lineTo(spineWidth, 0)
-      ..lineTo(spineWidth, h)
-      ..lineTo(spineWidth * 0.25, h - 2)
-      ..close();
-    canvas.drawPath(
-      spine,
-      Paint()
-        ..shader = LinearGradient(
-          begin: Alignment.centerLeft,
-          end: Alignment.centerRight,
-          colors: <Color>[
-            Color.lerp(spineColor, Colors.black, 0.25)!,
-            spineColor,
-            Color.lerp(spineColor, cover, 0.35)!,
-          ],
-        ).createShader(Rect.fromLTWH(0, 0, spineWidth, h)),
-    );
-    // Spine ridge highlight.
-    canvas.drawLine(
-      Offset(spineWidth * 0.55, depth + 6),
-      Offset(spineWidth * 0.55, h - 6),
-      Paint()
-        ..color = Colors.white.withValues(alpha: 0.12)
-        ..strokeWidth = 1.2,
-    );
-
-    // --- Front cover face ---
-    final Path face = Path()
-      ..moveTo(spineWidth, 0)
-      ..lineTo(w - pageWidth, 0)
-      ..lineTo(w - pageWidth, h)
-      ..lineTo(spineWidth, h)
-      ..close();
-    canvas.drawPath(
-      face,
-      Paint()
-        ..shader = LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: <Color>[faceLit, cover, faceShade],
-          stops: const <double>[0, 0.45, 1],
-        ).createShader(Rect.fromLTWH(spineWidth, 0, w - pageWidth - spineWidth, h)),
-    );
-    // Cloth-ish vignette on the right edge of the face.
-    canvas.drawRect(
-      Rect.fromLTWH(w - pageWidth - 10, 0, 10, h),
-      Paint()
-        ..shader = LinearGradient(
-          begin: Alignment.centerLeft,
-          end: Alignment.centerRight,
-          colors: <Color>[
-            const Color(0x00000000),
-            Colors.black.withValues(alpha: 0.18),
-          ],
-        ).createShader(Rect.fromLTWH(w - pageWidth - 10, 0, 10, h)),
-    );
-
-    // --- Page block (right) ---
-    final Path pages = Path()
-      ..moveTo(w - pageWidth, 0)
-      ..lineTo(w - pageWidth * 0.15, depth * 0.6)
-      ..lineTo(w, depth + 3)
-      ..lineTo(w, h - 2)
-      ..lineTo(w - pageWidth, h)
-      ..close();
-    canvas.drawPath(
-      pages,
-      Paint()
-        ..shader = const LinearGradient(
-          begin: Alignment.centerLeft,
-          end: Alignment.centerRight,
-          colors: <Color>[
-            Color(0xFFE8DCC4),
-            _pageCream,
-            Color(0xFFD9CBB0),
-          ],
-        ).createShader(Rect.fromLTWH(w - pageWidth, 0, pageWidth, h)),
-    );
-    final Paint pageLine = Paint()
-      ..color = const Color(0xFFC9B89A)
-      ..strokeWidth = 0.7;
-    for (double y = depth + 8; y < h - 6; y += 2.4) {
-      canvas.drawLine(
-        Offset(w - pageWidth + 1.2, y),
-        Offset(w - 1.5, y + depth * 0.15),
-        pageLine,
-      );
-    }
-
-    // Subtle round corners silhouette.
-    canvas.drawRRect(
-      RRect.fromRectAndRadius(
-        Rect.fromLTWH(spineWidth * 0.2, depth * 0.2, w - spineWidth * 0.25, h - depth * 0.2),
-        const Radius.circular(2),
-      ),
-      Paint()
-        ..color = Colors.black.withValues(alpha: 0.08)
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = 0.8,
+  Widget build(BuildContext context) {
+    return Image.asset(
+      'assets/img/bookshelf/bookcloth.png',
+      repeat: ImageRepeat.repeat,
+      scale: 2,
+      fit: BoxFit.none,
+      alignment: Alignment.topLeft,
+      errorBuilder: (BuildContext context, Object error, StackTrace? st) =>
+          const ColoredBox(color: Color(0xFF808080)),
     );
   }
-
-  @override
-  bool shouldRepaint(_HardcoverShellPainter oldDelegate) =>
-      oldDelegate.cover != cover ||
-      oldDelegate.spineWidth != spineWidth ||
-      oldDelegate.pageWidth != pageWidth ||
-      oldDelegate.depth != depth;
 }

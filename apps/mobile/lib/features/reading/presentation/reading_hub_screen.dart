@@ -19,6 +19,7 @@ import '../data/reading_ingest.dart';
 import '../data/reading_pdf_import.dart';
 import '../data/reading_vocab_lists.dart';
 import '../domain/reading_doc.dart';
+import 'reading_bookshelf.dart';
 import 'reading_bookshelf_theme.dart';
 import 'reading_bookshelf_view.dart';
 import 'reading_cold_start.dart';
@@ -544,7 +545,6 @@ class _ReadingHubScreenState extends ConsumerState<ReadingHubScreen> {
               },
               onSearch: () => setState(() => _searching = true),
               onImport: () => unawaited(_importFile(context, ref)),
-              onBack: () => context.pop(),
               onOpen: (ReadingDoc doc) {
                 unawaited(
                   context.push('/reading/${Uri.encodeComponent(doc.id)}'),
@@ -556,13 +556,12 @@ class _ReadingHubScreenState extends ConsumerState<ReadingHubScreen> {
               },
               actions: <Widget>[
                 PopupMenuButton<String>(
-                  tooltip: '更多',
-                  icon: Icon(
-                    Icons.more_horiz_rounded,
-                    color: shelfTheme.action,
-                  ),
+                  tooltip: '导入与更多',
+                  icon: BookshelfGlyph.docDownload(color: shelfTheme.action),
                   onSelected: (String value) {
                     switch (value) {
+                      case 'import':
+                        unawaited(_importFile(context, ref));
                       case 'catalog':
                         context.push('/reading/catalog');
                       case 'materials':
@@ -581,6 +580,10 @@ class _ReadingHubScreenState extends ConsumerState<ReadingHubScreen> {
                   },
                   itemBuilder: (BuildContext context) =>
                       <PopupMenuEntry<String>>[
+                    const PopupMenuItem<String>(
+                      value: 'import',
+                      child: Text('导入本地文件'),
+                    ),
                     const PopupMenuItem<String>(
                       value: 'catalog',
                       child: Text('在线书库'),
