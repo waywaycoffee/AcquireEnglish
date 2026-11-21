@@ -1,4 +1,4 @@
-"""Generic English writing grade endpoint (exam rubrics come later)."""
+"""English writing grade: generic + exam rubrics (IELTS / K12 / CET)."""
 
 from __future__ import annotations
 
@@ -16,22 +16,73 @@ from app.models import User
 
 router = APIRouter(prefix="/writing", tags=["writing"])
 
+_RUBRIC_PROMPTS = {
+    "generic": (
+        "You are an English writing coach. Return ONLY JSON with keys: "
+        "summary, issues (array of {type, excerpt, suggestion, rewrite}), "
+        "rewrite_full, scores (object). Types: grammar|vocab|clarity|structure. "
+        "Do not invent official exam bands unless rubric requests them."
+    ),
+    "ielts_task2": (
+        "You are an IELTS Academic Task 2 examiner. Return ONLY JSON with keys: "
+        "summary, issues (array of {type, excerpt, suggestion, rewrite}), "
+        "rewrite_full, scores: {TR, CC, LR, GRA, overall} as numbers 0-9 "
+        "(0.5 steps ok). Comment briefly on Task Response, Coherence & Cohesion, "
+        "Lexical Resource, Grammatical Range & Accuracy."
+    ),
+    "ielts_task1": (
+        "You are an IELTS Academic Task 1 examiner. Return ONLY JSON with keys: "
+        "summary, issues, rewrite_full, scores: {TR, CC, LR, GRA, overall}. "
+        "Focus on overview, key features, comparisons, and accurate data language."
+    ),
+    "k12": (
+        "You are a Chinese secondary-school English writing teacher. Return ONLY JSON "
+        "with keys: summary, issues, rewrite_full, scores: "
+        "{content, language, structure, overall} as 0-15 integers (overall 0-15). "
+        "Comment on 立意/内容、语言、结构、卷面清晰度；用中文写 summary 与 suggestion。"
+    ),
+    "cet": (
+        "You are a CET writing rater. Return ONLY JSON with keys: summary, issues, "
+        "rewrite_full, scores: {content, language, structure, overall} 0-15. "
+        "Be practical for CET4/6 examinees."
+    ),
+}
+
 
 class GradeIn(BaseModel):
     text: str = Field(..., min_length=1, max_length=20000)
     prompt: str = ""
     title: str = ""
+    rubric: str = "generic"
+    family_id: str = ""
 
 
-def _local_grade(text: str, prompt: str = "") -> dict[str, Any]:
+def _normalize_rubric(raw: str, family_id: str = "") -> str:
+    r = (raw or "generic").strip().lower()
+    if r in _RUBRIC_PROMPTS:
+        return r
+    fam = (family_id or "").lower()
+    if fam.startswith("ielts"):
+        return "ielts_task2"
+    if fam.startswith("k12") or fam in {"gaokao", "zhongkao", "ket", "pet"}:
+        return "k12"
+    if fam in {"cet4", "cet6", "kaoyan", "toefl"}:
+        return "cet"
+    return "generic"
+
+
+def _local_grade(text: str, prompt: str = "", rubric: str = "generic") -> dict[str, Any]:
     issues: list[dict[str, str]] = []
     body = text.strip()
-    if len(body) < 40:
+    words = len(re.findall(r"[A-Za-z']+", body)) + len(
+        re.findall(r"[\u4e00-\u9fff]", body)
+    )
+    if words < 40:
         issues.append(
             {
                 "type": "structure",
                 "excerpt": "",
-                "suggestion": "Essay is short; add examples and a clearer ending.",
+                "suggestion": "篇幅偏短，请补充论据、例子与结尾。",
                 "rewrite": "",
             }
         )
@@ -40,7 +91,7 @@ def _local_grade(text: str, prompt: str = "") -> dict[str, Any]:
             {
                 "type": "grammar",
                 "excerpt": "i",
-                "suggestion": "Capitalize the pronoun I.",
+                "suggestion": "代词 I 需大写。",
                 "rewrite": "I",
             }
         )
@@ -49,7 +100,7 @@ def _local_grade(text: str, prompt: str = "") -> dict[str, Any]:
             {
                 "type": "structure",
                 "excerpt": "",
-                "suggestion": "Add sentence-final punctuation.",
+                "suggestion": "请补全句号等标点。",
                 "rewrite": "",
             }
         )
@@ -58,23 +109,47 @@ def _local_grade(text: str, prompt: str = "") -> dict[str, Any]:
             {
                 "type": "clarity",
                 "excerpt": "",
-                "suggestion": "Readable overall. Check topic sentences and connectors.",
+                "suggestion": "整体可读。请检查主题句与连接词。",
                 "rewrite": "",
             }
         )
+
+    if rubric.startswith("ielts"):
+        base = 5.0 if words < 150 else 6.0 if words < 250 else 6.5
+        scores = {
+            "TR": base,
+            "CC": base,
+            "LR": max(5.0, base - 0.5),
+            "GRA": base,
+            "overall": base,
+        }
+        summary = f"IELTS 启发式估分（非官方）：约 Band {base}。联网 LLM 可给出细项评语。"
+    elif rubric in {"k12", "cet"}:
+        overall = 9 if words < 80 else 11 if words < 120 else 12
+        scores = {
+            "content": overall,
+            "language": max(8, overall - 1),
+            "structure": overall,
+            "overall": overall,
+        }
+        summary = f"考试启发式估分：约 {overall}/15。正式细评需 LLM。"
+    else:
+        scores = {"overall": 3 if words < 80 else 4}
+        summary = "通用英语写作检查（本地规则）。"
+
     return {
-        "summary": (
-            "Generic English writing check (server heuristic)."
-            if not prompt.strip()
-            else "Generic check against the given prompt (server heuristic)."
-        ),
+        "summary": summary if not prompt.strip() else f"{summary} 已对照题目检查。",
         "issues": issues,
         "rewrite_full": "",
+        "scores": scores,
+        "rubric": rubric,
         "source": "local",
     }
 
 
-async def _llm_grade(text: str, prompt: str, title: str) -> dict[str, Any] | None:
+async def _llm_grade(
+    text: str, prompt: str, title: str, rubric: str
+) -> dict[str, Any] | None:
     api_key = (
         os.getenv("DEEPSEEK_API_KEY", "").strip()
         or os.getenv("OPENAI_API_KEY", "").strip()
@@ -83,19 +158,13 @@ async def _llm_grade(text: str, prompt: str, title: str) -> dict[str, Any] | Non
         return None
     base = os.getenv("OPENAI_BASE_URL", "https://api.deepseek.com/v1").rstrip("/")
     model = os.getenv("OPENAI_MODEL", os.getenv("DEEPSEEK_MODEL", "deepseek-chat"))
-    system = (
-        "You are an English writing coach. Return ONLY JSON with keys: "
-        "summary (string), issues (array of {type, excerpt, suggestion, rewrite}), "
-        "rewrite_full (string). Types: grammar|vocab|clarity|structure. "
-        "Do NOT output IELTS bands or K12 grade bands. Keep feedback practical."
-    )
+    system = _RUBRIC_PROMPTS.get(rubric, _RUBRIC_PROMPTS["generic"])
     user = (
-        f"Title: {title or '(none)'}\n"
-        f"Prompt: {prompt or '(free writing)'}\n\n"
-        f"Essay:\n{text}"
+        f"Rubric: {rubric}\nTitle: {title or '(none)'}\n"
+        f"Prompt: {prompt or '(free writing)'}\n\nEssay:\n{text}"
     )
     try:
-        async with httpx.AsyncClient(timeout=60.0) as client:
+        async with httpx.AsyncClient(timeout=90.0) as client:
             resp = await client.post(
                 f"{base}/chat/completions",
                 headers={"Authorization": f"Bearer {api_key}"},
@@ -115,9 +184,11 @@ async def _llm_grade(text: str, prompt: str, title: str) -> dict[str, Any] | Non
             if not isinstance(data, dict):
                 return None
             data["source"] = "llm"
+            data["rubric"] = rubric
             data.setdefault("issues", [])
             data.setdefault("summary", "")
             data.setdefault("rewrite_full", "")
+            data.setdefault("scores", {})
             return data
     except Exception:
         return None
@@ -129,7 +200,8 @@ async def grade_writing(
     user: User = Depends(get_current_user),
 ) -> dict[str, Any]:
     del user
-    llm = await _llm_grade(body.text, body.prompt, body.title)
+    rubric = _normalize_rubric(body.rubric, body.family_id)
+    llm = await _llm_grade(body.text, body.prompt, body.title, rubric)
     if llm is not None:
         return llm
-    return _local_grade(body.text, body.prompt)
+    return _local_grade(body.text, body.prompt, rubric)

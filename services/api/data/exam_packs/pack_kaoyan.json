@@ -1,0 +1,134 @@
+{
+  "family_id": "kaoyan",
+  "title": "考研英语备考包",
+  "cefr": "B2",
+  "version": 1,
+  "sections": {
+    "vocab": [
+      {
+        "id": "kyv1",
+        "type": "mcq",
+        "prompt": "The theory needs further ____.",
+        "options": [
+          "verification",
+          "verify",
+          "vertical",
+          "version only"
+        ],
+        "answer": "verification",
+        "explain": ""
+      },
+      {
+        "id": "kyv2",
+        "type": "mcq",
+        "prompt": "His views are rather ____.",
+        "options": [
+          "controversial",
+          "control",
+          "contribute",
+          "convenient"
+        ],
+        "answer": "controversial",
+        "explain": ""
+      },
+      {
+        "id": "kyv3",
+        "type": "mcq",
+        "prompt": "Economic growth remains ____.",
+        "options": [
+          "sluggish",
+          "slug",
+          "slum",
+          "slim only"
+        ],
+        "answer": "sluggish",
+        "explain": ""
+      },
+      {
+        "id": "kyv4",
+        "type": "mcq",
+        "prompt": "The author ____ a new framework.",
+        "options": [
+          "proposes",
+          "purposes",
+          "poses",
+          "postures"
+        ],
+        "answer": "proposes",
+        "explain": ""
+      }
+    ],
+    "listening": [
+      {
+        "id": "kyl1",
+        "type": "listening",
+        "title": "Supervision",
+        "script": "Professor: Your literature review is solid, but strengthen the methodology section with more recent studies from 2022 onward.",
+        "audio_url": "",
+        "questions": [
+          {
+            "id": "kyl1q1",
+            "type": "mcq",
+            "prompt": "What should be strengthened?",
+            "options": [
+              "Methodology section",
+              "Title page",
+              "Font size",
+              "Parking"
+            ],
+            "answer": "Methodology section",
+            "explain": ""
+          }
+        ]
+      }
+    ],
+    "reading": [
+      {
+        "id": "kyr1",
+        "type": "reading",
+        "title": "University Rankings",
+        "passage": "Globalization has intensified competition among universities. Institutions compete for talent, funding, and international rankings. Critics argue that ranking culture may distort educational priorities, pushing schools to chase metrics instead of student learning.",
+        "questions": [
+          {
+            "id": "kyr1q1",
+            "type": "mcq",
+            "prompt": "What may ranking culture distort?",
+            "options": [
+              "Educational priorities",
+              "Campus trees",
+              "Bus routes",
+              "Lunch menus"
+            ],
+            "answer": "Educational priorities",
+            "explain": ""
+          }
+        ]
+      }
+    ],
+    "writing": [
+      {
+        "id": "kyw1",
+        "type": "writing",
+        "prompt": "Write an essay: Is cultural globalization a threat to local traditions? Discuss.",
+        "rubric": "cet",
+        "min_words": 160
+      }
+    ],
+    "speaking": [
+      {
+        "id": "kys1",
+        "type": "speaking",
+        "prompt": "Explain your research interest in two minutes.",
+        "tips": "Background, question, method."
+      }
+    ]
+  },
+  "mock": {
+    "duration_minutes": 80,
+    "sections": [
+      "vocab",
+      "reading",
+      "writing"
+    ]
+  }
+}

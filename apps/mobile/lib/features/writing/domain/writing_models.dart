@@ -79,6 +79,8 @@ class WritingGradeResult {
     required this.issues,
     this.rewriteFull = '',
     this.source = 'local',
+    this.rubric = 'generic',
+    this.scores = const <String, dynamic>{},
   });
 
   factory WritingGradeResult.fromJson(Map<String, dynamic> json) =>
@@ -86,6 +88,10 @@ class WritingGradeResult {
         summary: '${json['summary'] ?? ''}',
         rewriteFull: '${json['rewrite_full'] ?? json['rewriteFull'] ?? ''}',
         source: '${json['source'] ?? 'api'}',
+        rubric: '${json['rubric'] ?? 'generic'}',
+        scores: json['scores'] is Map
+            ? Map<String, dynamic>.from(json['scores'] as Map)
+            : const <String, dynamic>{},
         issues: ((json['issues'] as List<dynamic>?) ?? const <dynamic>[])
             .whereType<Map>()
             .map(
@@ -98,4 +104,6 @@ class WritingGradeResult {
   final List<WritingIssue> issues;
   final String rewriteFull;
   final String source;
+  final String rubric;
+  final Map<String, dynamic> scores;
 }

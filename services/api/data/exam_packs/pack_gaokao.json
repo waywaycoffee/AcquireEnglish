@@ -1,0 +1,148 @@
+{
+  "family_id": "gaokao",
+  "title": "高考英语备考包",
+  "cefr": "B2",
+  "version": 1,
+  "sections": {
+    "vocab": [
+      {
+        "id": "gkv1",
+        "type": "mcq",
+        "prompt": "We ____ the importance of honesty.",
+        "options": [
+          "emphasize",
+          "emperor",
+          "employ",
+          "empty"
+        ],
+        "answer": "emphasize",
+        "explain": ""
+      },
+      {
+        "id": "gkv2",
+        "type": "mcq",
+        "prompt": "Hard work leads to ____.",
+        "options": [
+          "success",
+          "succeed",
+          "successful",
+          "successive"
+        ],
+        "answer": "success",
+        "explain": ""
+      },
+      {
+        "id": "gkv3",
+        "type": "mcq",
+        "prompt": "She ____ her hand to greet me.",
+        "options": [
+          "raised",
+          "rose",
+          "risen",
+          "arose"
+        ],
+        "answer": "raised",
+        "explain": ""
+      },
+      {
+        "id": "gkv4",
+        "type": "mcq",
+        "prompt": "The story is based ____ a true event.",
+        "options": [
+          "on",
+          "in",
+          "at",
+          "with"
+        ],
+        "answer": "on",
+        "explain": ""
+      },
+      {
+        "id": "gkv5",
+        "type": "mcq",
+        "prompt": "He is the ____ person for the job.",
+        "options": [
+          "suitable",
+          "suite",
+          "suit",
+          "suitor"
+        ],
+        "answer": "suitable",
+        "explain": ""
+      }
+    ],
+    "listening": [
+      {
+        "id": "gkl1",
+        "type": "listening",
+        "title": "Weekend Plan",
+        "script": "Boy: Shall we visit the science museum this Saturday?\nGirl: I would love to, but I have a piano lesson in the morning. How about Sunday afternoon?\nBoy: Sunday works for me.",
+        "audio_url": "",
+        "questions": [
+          {
+            "id": "gkl1q1",
+            "type": "mcq",
+            "prompt": "When will they go?",
+            "options": [
+              "Sunday afternoon",
+              "Saturday morning",
+              "Tonight",
+              "Friday"
+            ],
+            "answer": "Sunday afternoon",
+            "explain": ""
+          }
+        ]
+      }
+    ],
+    "reading": [
+      {
+        "id": "gkr1",
+        "type": "reading",
+        "title": "Garbage Classification",
+        "passage": "China has been promoting garbage classification in many cities. Citizens are asked to separate wet waste, recyclables, and hazardous waste. Although the new rules take time to learn, they help recycling and protect the environment.",
+        "questions": [
+          {
+            "id": "gkr1q1",
+            "type": "mcq",
+            "prompt": "What is being promoted?",
+            "options": [
+              "Garbage classification",
+              "Longer holidays",
+              "Free phones",
+              "New airports"
+            ],
+            "answer": "Garbage classification",
+            "explain": ""
+          }
+        ]
+      }
+    ],
+    "writing": [
+      {
+        "id": "gkw1",
+        "type": "writing",
+        "prompt": "假定你是李华，你的英国朋友 Eric 想了解中国的高中生活。请写一封邮件介绍课程、课外活动与考试压力，并给出一条建议。",
+        "rubric": "k12",
+        "min_words": 100
+      }
+    ],
+    "speaking": [
+      {
+        "id": "gks1",
+        "type": "speaking",
+        "prompt": "用英语介绍一次难忘的校园活动。",
+        "tips": "包含时间、地点、经过与感受。"
+      }
+    ]
+  },
+  "mock": {
+    "duration_minutes": 75,
+    "sections": [
+      "vocab",
+      "listening",
+      "reading",
+      "writing"
+    ]
+  }
+}

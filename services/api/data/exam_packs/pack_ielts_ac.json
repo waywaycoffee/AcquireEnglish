@@ -1,0 +1,186 @@
+{
+  "family_id": "ielts_ac",
+  "title": "IELTS Academic Prep Pack",
+  "cefr": "B2",
+  "version": 1,
+  "sections": {
+    "vocab": [
+      {
+        "id": "ilv1",
+        "type": "mcq",
+        "prompt": "\"Substantial\" most nearly means ____.",
+        "options": [
+          "considerable",
+          "tiny",
+          "sudden",
+          "musical"
+        ],
+        "answer": "considerable",
+        "explain": ""
+      },
+      {
+        "id": "ilv2",
+        "type": "mcq",
+        "prompt": "A ____ increase was observed.",
+        "options": [
+          "significant",
+          "signify",
+          "signature",
+          "signal"
+        ],
+        "answer": "significant",
+        "explain": ""
+      },
+      {
+        "id": "ilv3",
+        "type": "mcq",
+        "prompt": "The data ____ the hypothesis.",
+        "options": [
+          "support",
+          "suppose",
+          "supply",
+          "suppress"
+        ],
+        "answer": "support",
+        "explain": ""
+      },
+      {
+        "id": "ilv4",
+        "type": "mcq",
+        "prompt": "Researchers should avoid ____ conclusions.",
+        "options": [
+          "hasty",
+          "haste",
+          "hastily only as noun",
+          "host"
+        ],
+        "answer": "hasty",
+        "explain": ""
+      },
+      {
+        "id": "ilv5",
+        "type": "mcq",
+        "prompt": "The chart shows a steady ____.",
+        "options": [
+          "decline",
+          "declare",
+          "decorate",
+          "decide"
+        ],
+        "answer": "decline",
+        "explain": ""
+      }
+    ],
+    "listening": [
+      {
+        "id": "ill1",
+        "type": "listening",
+        "title": "Tutorial",
+        "script": "Tutor: For your presentation, keep it under ten minutes and leave two minutes for questions.\nStudent: Should I include the survey results?\nTutor: Yes, but summarize them. Use one clear graph rather than three tables.",
+        "audio_url": "",
+        "questions": [
+          {
+            "id": "ill1q1",
+            "type": "mcq",
+            "prompt": "How long should the talk be?",
+            "options": [
+              "Under 10 minutes",
+              "30 minutes",
+              "Two hours",
+              "Five seconds"
+            ],
+            "answer": "Under 10 minutes",
+            "explain": ""
+          },
+          {
+            "id": "ill1q2",
+            "type": "mcq",
+            "prompt": "What does the tutor prefer?",
+            "options": [
+              "One clear graph",
+              "Three tables",
+              "No data",
+              "A video only"
+            ],
+            "answer": "One clear graph",
+            "explain": ""
+          }
+        ]
+      }
+    ],
+    "reading": [
+      {
+        "id": "ilr1",
+        "type": "reading",
+        "title": "Urban Parks",
+        "passage": "Urban green spaces improve mental health and reduce heat in cities. Studies in several countries show that people living near parks report lower stress. Planners now treat parks as essential infrastructure, similar to roads and schools, rather than optional decoration.",
+        "questions": [
+          {
+            "id": "ilr1q1",
+            "type": "mcq",
+            "prompt": "Parks are compared to ____.",
+            "options": [
+              "essential infrastructure",
+              "optional toys",
+              "private gardens only",
+              "airports"
+            ],
+            "answer": "essential infrastructure",
+            "explain": ""
+          },
+          {
+            "id": "ilr1q2",
+            "type": "mcq",
+            "prompt": "What benefit is mentioned?",
+            "options": [
+              "Lower stress",
+              "Higher taxes",
+              "More traffic",
+              "Less sunlight"
+            ],
+            "answer": "Lower stress",
+            "explain": ""
+          }
+        ]
+      }
+    ],
+    "writing": [
+      {
+        "id": "ilw1",
+        "type": "writing",
+        "prompt": "Task 2: Some people think universities should focus on practical skills; others believe theoretical knowledge is more important. Discuss both views and give your opinion.",
+        "rubric": "ielts_task2",
+        "min_words": 250
+      },
+      {
+        "id": "ilw2",
+        "type": "writing",
+        "prompt": "Task 1: The chart below shows the percentage of households with internet access from 2000 to 2020 in three countries. Summarise the information by selecting and reporting the main features.",
+        "rubric": "ielts_task1",
+        "min_words": 150
+      }
+    ],
+    "speaking": [
+      {
+        "id": "ils1",
+        "type": "speaking",
+        "prompt": "Part 2: Describe a time you learned something new. You should say what it was, how you learned it, and how you felt.",
+        "tips": "Speak for 1–2 minutes; use past forms."
+      },
+      {
+        "id": "ils2",
+        "type": "speaking",
+        "prompt": "Part 3: Do you think schools should teach more digital skills? Why?",
+        "tips": "Give reasons and an example."
+      }
+    ]
+  },
+  "mock": {
+    "duration_minutes": 90,
+    "sections": [
+      "listening",
+      "reading",
+      "writing"
+    ]
+  }
+}

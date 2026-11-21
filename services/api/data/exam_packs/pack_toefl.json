@@ -1,0 +1,108 @@
+{
+  "family_id": "toefl",
+  "title": "TOEFL Prep Pack",
+  "cefr": "B2",
+  "version": 1,
+  "sections": {
+    "vocab": [
+      {
+        "id": "tfv1",
+        "type": "mcq",
+        "prompt": "\"Mitigate\" means ____.",
+        "options": [
+          "make less severe",
+          "make larger",
+          "ignore",
+          "celebrate"
+        ],
+        "answer": "make less severe",
+        "explain": ""
+      },
+      {
+        "id": "tfv2",
+        "type": "mcq",
+        "prompt": "The results were ____.",
+        "options": [
+          "inconclusive",
+          "including",
+          "indoor",
+          "induce"
+        ],
+        "answer": "inconclusive",
+        "explain": ""
+      }
+    ],
+    "listening": [
+      {
+        "id": "tfl1",
+        "type": "listening",
+        "title": "Lecture",
+        "script": "Professor: Photosynthesis converts light energy into chemical energy. Remember, chlorophyll absorbs mainly blue and red wavelengths.",
+        "audio_url": "",
+        "questions": [
+          {
+            "id": "tfl1q1",
+            "type": "mcq",
+            "prompt": "What does chlorophyll mainly absorb?",
+            "options": [
+              "Blue and red light",
+              "Only green light",
+              "Ultraviolet only",
+              "Sound waves"
+            ],
+            "answer": "Blue and red light",
+            "explain": ""
+          }
+        ]
+      }
+    ],
+    "reading": [
+      {
+        "id": "tfr1",
+        "type": "reading",
+        "title": "Coral Reefs",
+        "passage": "Coral reefs support marine biodiversity but are sensitive to temperature rise. Even slight warming can cause bleaching, which weakens coral and affects fish populations that depend on reef habitats.",
+        "questions": [
+          {
+            "id": "tfr1q1",
+            "type": "mcq",
+            "prompt": "What can cause bleaching?",
+            "options": [
+              "Temperature rise",
+              "More tourists only",
+              "Less salt",
+              "Moonlight"
+            ],
+            "answer": "Temperature rise",
+            "explain": ""
+          }
+        ]
+      }
+    ],
+    "writing": [
+      {
+        "id": "tfw1",
+        "type": "writing",
+        "prompt": "Integrated style: Summarize a lecture claim that disagrees with a reading about city bikes, then state which side is stronger.",
+        "rubric": "cet",
+        "min_words": 180
+      }
+    ],
+    "speaking": [
+      {
+        "id": "tfs1",
+        "type": "speaking",
+        "prompt": "Do you prefer studying in a library or at home? Explain.",
+        "tips": "Give two reasons."
+      }
+    ]
+  },
+  "mock": {
+    "duration_minutes": 80,
+    "sections": [
+      "listening",
+      "reading",
+      "writing"
+    ]
+  }
+}

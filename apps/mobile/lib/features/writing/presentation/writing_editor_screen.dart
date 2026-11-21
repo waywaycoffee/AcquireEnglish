@@ -15,9 +15,18 @@ import '../data/writing_draft_store.dart';
 import '../domain/writing_models.dart';
 
 class WritingEditorScreen extends ConsumerStatefulWidget {
-  const WritingEditorScreen({super.key, required this.essayId});
+  const WritingEditorScreen({
+    super.key,
+    required this.essayId,
+    this.initialPrompt,
+    this.initialRubric,
+    this.initialTitle,
+  });
 
   final String essayId;
+  final String? initialPrompt;
+  final String? initialRubric;
+  final String? initialTitle;
 
   @override
   ConsumerState<WritingEditorScreen> createState() =>
@@ -28,6 +37,7 @@ class _WritingEditorScreenState extends ConsumerState<WritingEditorScreen> {
   late final TextEditingController _title;
   late final TextEditingController _prompt;
   late final TextEditingController _body;
+  late String _rubric;
   WritingGradeResult? _grade;
   bool _busy = false;
   Timer? _autosave;
@@ -37,9 +47,18 @@ class _WritingEditorScreenState extends ConsumerState<WritingEditorScreen> {
     super.initState();
     final WritingDraft? existing =
         ref.read(writingDraftsProvider.notifier).byId(widget.essayId);
-    _title = TextEditingController(text: existing?.title ?? '我的作文');
-    _prompt = TextEditingController(text: existing?.prompt ?? '');
+    _title = TextEditingController(
+      text: existing?.title.isNotEmpty == true
+          ? existing!.title
+          : (widget.initialTitle ?? '我的作文'),
+    );
+    _prompt = TextEditingController(
+      text: existing?.prompt.isNotEmpty == true
+          ? existing!.prompt
+          : (widget.initialPrompt ?? ''),
+    );
     _body = TextEditingController(text: existing?.body ?? '');
+    _rubric = widget.initialRubric ?? 'generic';
     _title.addListener(_scheduleSave);
     _prompt.addListener(_scheduleSave);
     _body.addListener(_scheduleSave);
@@ -77,12 +96,32 @@ class _WritingEditorScreenState extends ConsumerState<WritingEditorScreen> {
     if (_busy || _body.text.trim().isEmpty) return;
     setState(() => _busy = true);
     await _save();
+    final String familyId = ref.read(examProfileProvider).familyId ?? '';
+    String rubric = _rubric;
+    if (rubric == 'generic' && familyId.isNotEmpty) {
+      if (familyId.startsWith('ielts')) {
+        rubric = 'ielts_task2';
+      } else if (familyId.startsWith('k12') ||
+          familyId == 'gaokao' ||
+          familyId == 'zhongkao' ||
+          familyId == 'ket' ||
+          familyId == 'pet') {
+        rubric = 'k12';
+      } else if (familyId == 'cet4' ||
+          familyId == 'cet6' ||
+          familyId == 'kaoyan' ||
+          familyId == 'toefl') {
+        rubric = 'cet';
+      }
+    }
     WritingGradeResult result;
     try {
       result = await ref.read(acquireApiClientProvider).gradeWriting(
             text: _body.text.trim(),
             prompt: _prompt.text.trim(),
             title: _title.text.trim(),
+            rubric: rubric,
+            familyId: familyId,
           );
     } catch (_) {
       result = gradeWritingLocally(
@@ -206,7 +245,7 @@ class _WritingEditorScreenState extends ConsumerState<WritingEditorScreen> {
           if (_grade != null) ...<Widget>[
             const SizedBox(height: 20),
             Text(
-              '批改结果（${_grade!.source}）',
+              '批改结果（${_grade!.source} · ${_grade!.rubric}）',
               style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w900),
             ),
             const SizedBox(height: 8),
@@ -214,6 +253,15 @@ class _WritingEditorScreenState extends ConsumerState<WritingEditorScreen> {
               _grade!.summary,
               style: const TextStyle(height: 1.45, fontWeight: FontWeight.w600),
             ),
+            if (_grade!.scores.isNotEmpty) ...<Widget>[
+              const SizedBox(height: 8),
+              Text(
+                _grade!.scores.entries
+                    .map((MapEntry<String, dynamic> e) => '${e.key}: ${e.value}')
+                    .join(' · '),
+                style: const TextStyle(fontWeight: FontWeight.w800),
+              ),
+            ],
             const SizedBox(height: 12),
             for (final WritingIssue issue in _grade!.issues) ...<Widget>[
               Card(

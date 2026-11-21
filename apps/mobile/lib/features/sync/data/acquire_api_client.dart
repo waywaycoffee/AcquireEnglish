@@ -9,6 +9,7 @@ import '../../digital_human/domain/learning_scenario.dart';
 import '../../words/domain/foundation_media.dart';
 import '../../words/domain/server_syllabus_catalog.dart';
 import '../../words/domain/syllabus_book.dart';
+import '../../exam/domain/exam_pack.dart';
 import '../../writing/domain/writing_models.dart';
 
 final Provider<AcquireApiClient> acquireApiClientProvider =
@@ -2273,6 +2274,8 @@ class AcquireApiClient {
     required String text,
     String prompt = '',
     String title = '',
+    String rubric = 'generic',
+    String familyId = '',
   }) async {
     final Response<dynamic> response = await _dio.post(
       Endpoints.writingGrade,
@@ -2280,6 +2283,8 @@ class AcquireApiClient {
         'text': text,
         'prompt': prompt,
         'title': title,
+        'rubric': rubric,
+        'family_id': familyId,
       },
       options: Options(
         extra: _noCache.extra,
@@ -2289,6 +2294,14 @@ class AcquireApiClient {
     return WritingGradeResult.fromJson(
       response.data as Map<String, dynamic>,
     );
+  }
+
+  Future<ExamPack> examPack(String familyId) async {
+    final Response<dynamic> response = await _dio.get(
+      '${Endpoints.examPacks}/$familyId',
+      options: _noCache,
+    );
+    return ExamPack.fromJson(response.data as Map<String, dynamic>);
   }
 
   Future<void> upsertCommunityStudyStats({

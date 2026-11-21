@@ -1,0 +1,187 @@
+{
+  "family_id": "cet6",
+  "title": "大学英语六级备考包",
+  "cefr": "B2",
+  "version": 1,
+  "sections": {
+    "vocab": [
+      {
+        "id": "c6v1",
+        "type": "mcq",
+        "prompt": "The findings ____ previous assumptions.",
+        "options": [
+          "challenge",
+          "change into",
+          "charge",
+          "chase"
+        ],
+        "answer": "challenge",
+        "explain": ""
+      },
+      {
+        "id": "c6v2",
+        "type": "mcq",
+        "prompt": "She spoke with remarkable ____.",
+        "options": [
+          "eloquence",
+          "elegance only",
+          "element",
+          "election"
+        ],
+        "answer": "eloquence",
+        "explain": ""
+      },
+      {
+        "id": "c6v3",
+        "type": "mcq",
+        "prompt": "The policy aims to ____ inequality.",
+        "options": [
+          "alleviate",
+          "allocate",
+          "altercate",
+          "alienate only"
+        ],
+        "answer": "alleviate",
+        "explain": ""
+      },
+      {
+        "id": "c6v4",
+        "type": "mcq",
+        "prompt": "His argument is not ____ enough.",
+        "options": [
+          "convincing",
+          "convenient",
+          "conventional",
+          "conversing"
+        ],
+        "answer": "convincing",
+        "explain": ""
+      },
+      {
+        "id": "c6v5",
+        "type": "mcq",
+        "prompt": "They reached a ____ after long talks.",
+        "options": [
+          "consensus",
+          "consent form",
+          "console",
+          "contest"
+        ],
+        "answer": "consensus",
+        "explain": ""
+      },
+      {
+        "id": "c6v6",
+        "type": "mcq",
+        "prompt": "The lecture was too ____ for beginners.",
+        "options": [
+          "abstract",
+          "absorb",
+          "abrupt only",
+          "absent"
+        ],
+        "answer": "abstract",
+        "explain": ""
+      }
+    ],
+    "listening": [
+      {
+        "id": "c6l1",
+        "type": "listening",
+        "title": "Study Abroad",
+        "script": "Man: I am considering a semester abroad, but the cost worries me.\nWoman: Have you checked the scholarship board? Several programs cover airfare and tuition partially.\nMan: That would make a huge difference. I will apply this week.",
+        "audio_url": "",
+        "questions": [
+          {
+            "id": "c6l1q1",
+            "type": "mcq",
+            "prompt": "What worries the man?",
+            "options": [
+              "Cost",
+              "Grades",
+              "Language",
+              "Weather"
+            ],
+            "answer": "Cost",
+            "explain": ""
+          },
+          {
+            "id": "c6l1q2",
+            "type": "mcq",
+            "prompt": "What will he do?",
+            "options": [
+              "Apply for scholarship",
+              "Cancel the trip",
+              "Borrow a book",
+              "Change major"
+            ],
+            "answer": "Apply for scholarship",
+            "explain": ""
+          }
+        ]
+      }
+    ],
+    "reading": [
+      {
+        "id": "c6r1",
+        "type": "reading",
+        "title": "AI in Medicine",
+        "passage": "Artificial intelligence can speed up medical diagnosis, yet doctors remain responsible for final decisions. Over-reliance on algorithms may hide rare cases that models have never seen. Therefore, hospitals train staff to treat AI as an assistant, not a replacement.",
+        "questions": [
+          {
+            "id": "c6r1q1",
+            "type": "mcq",
+            "prompt": "What is AI compared to?",
+            "options": [
+              "An assistant",
+              "A replacement doctor",
+              "A patient",
+              "A hospital"
+            ],
+            "answer": "An assistant",
+            "explain": ""
+          },
+          {
+            "id": "c6r1q2",
+            "type": "mcq",
+            "prompt": "What risk is mentioned?",
+            "options": [
+              "Missing rare cases",
+              "Higher salaries",
+              "Slower diagnosis",
+              "No training"
+            ],
+            "answer": "Missing rare cases",
+            "explain": ""
+          }
+        ]
+      }
+    ],
+    "writing": [
+      {
+        "id": "c6w1",
+        "type": "writing",
+        "prompt": "Write about whether technology makes people more or less creative. Support your view.",
+        "rubric": "cet",
+        "min_words": 150
+      }
+    ],
+    "speaking": [
+      {
+        "id": "c6s1",
+        "type": "speaking",
+        "prompt": "Discuss the advantages and disadvantages of remote work.",
+        "tips": "Balance both sides; end with your stance."
+      }
+    ]
+  },
+  "mock": {
+    "duration_minutes": 70,
+    "sections": [
+      "vocab",
+      "listening",
+      "reading",
+      "writing"
+    ]
+  }
+}

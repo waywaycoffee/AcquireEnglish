@@ -6,8 +6,11 @@ import '../../navigation/presentation/navigation_destination.dart';
 import '../../shared/presentation/pad/app_design_tokens.dart';
 import '../../shared/presentation/pad/pad_scaffold.dart';
 import '../../shared/presentation/pad/pad_top_bar.dart';
+import '../data/exam_progress_store.dart';
+import '../domain/exam_pack.dart';
 import '../domain/exam_profile.dart';
 import '../domain/exam_registry.dart';
+import 'exam_pack_provider.dart';
 import 'exam_profile_provider.dart';
 
 class ExamHomeScreen extends ConsumerWidget {
@@ -17,6 +20,10 @@ class ExamHomeScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final ExamProfile profile = ref.watch(examProfileProvider);
     final ExamFamily? family = profile.family;
+    final ExamPack? pack = ref.watch(examPackProvider).asData?.value;
+    final Map<String, int> progress = family == null
+        ? const <String, int>{}
+        : ref.watch(examProgressProvider).forFamily(family.id);
 
     return PadScaffold(
       currentDestination: AppNavDestination.home,
@@ -54,17 +61,29 @@ class ExamHomeScreen extends ConsumerWidget {
                 child: const Text('更换'),
               ),
             ),
+            const SizedBox(height: 8),
+            Text(
+              pack == null
+                  ? '登录后加载官方备考题包'
+                  : '${pack.title} · 练习 ${progress['practiced'] ?? 0} 题 · 模考 ${progress['mocks'] ?? 0} 次',
+              style: TextStyle(
+                fontWeight: FontWeight.w700,
+                color: AppDesignTokens.textSecondary,
+              ),
+            ),
             const SizedBox(height: 12),
             _NavTile(
               icon: Icons.fitness_center_rounded,
               title: '专项训练',
-              subtitle: '按科 / 题型练习',
+              subtitle: '词汇 / 听力 / 阅读 / 写作 / 口语',
               onTap: () => context.push('/exam/practice'),
             ),
             _NavTile(
               icon: Icons.timer_outlined,
               title: '全真模考',
-              subtitle: '计时模拟与报告',
+              subtitle: pack == null
+                  ? '计时组卷'
+                  : '${pack.mockMinutes} 分钟 · ${pack.mockSections.join(" / ")}',
               onTap: () => context.push('/exam/mock'),
             ),
             _NavTile(

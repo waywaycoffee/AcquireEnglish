@@ -1,0 +1,122 @@
+{
+  "family_id": "ket",
+  "title": "KET / A2 Key Prep",
+  "cefr": "A2",
+  "version": 1,
+  "sections": {
+    "vocab": [
+      {
+        "id": "ketv1",
+        "type": "mcq",
+        "prompt": "I ____ from China.",
+        "options": [
+          "am",
+          "is",
+          "are",
+          "be"
+        ],
+        "answer": "am",
+        "explain": ""
+      },
+      {
+        "id": "ketv2",
+        "type": "mcq",
+        "prompt": "Can you ____ English?",
+        "options": [
+          "speak",
+          "speaking",
+          "spoke",
+          "speech"
+        ],
+        "answer": "speak",
+        "explain": ""
+      },
+      {
+        "id": "ketv3",
+        "type": "mcq",
+        "prompt": "This shop ____ at 9 a.m.",
+        "options": [
+          "opens",
+          "open",
+          "opening",
+          "opened always"
+        ],
+        "answer": "opens",
+        "explain": ""
+      }
+    ],
+    "listening": [
+      {
+        "id": "ketl1",
+        "type": "listening",
+        "title": "Directions",
+        "script": "Man: Where is the post office?\nWoman: Go straight and turn left. It is next to the bank.",
+        "audio_url": "",
+        "questions": [
+          {
+            "id": "ketl1q1",
+            "type": "mcq",
+            "prompt": "Where is the post office?",
+            "options": [
+              "Next to the bank",
+              "Inside the bank",
+              "Far from town",
+              "At school"
+            ],
+            "answer": "Next to the bank",
+            "explain": ""
+          }
+        ]
+      }
+    ],
+    "reading": [
+      {
+        "id": "ketr1",
+        "type": "reading",
+        "title": "Invitation",
+        "passage": "Hi Sam, Would you like to come to my birthday party on Friday at 6 p.m.? Please tell me if you can come. Love, Mia",
+        "questions": [
+          {
+            "id": "ketr1q1",
+            "type": "mcq",
+            "prompt": "When is the party?",
+            "options": [
+              "Friday 6 p.m.",
+              "Saturday",
+              "Sunday morning",
+              "Monday"
+            ],
+            "answer": "Friday 6 p.m.",
+            "explain": ""
+          }
+        ]
+      }
+    ],
+    "writing": [
+      {
+        "id": "ketw1",
+        "type": "writing",
+        "prompt": "Write an email to a friend about your favourite sport (40–50 words).",
+        "rubric": "k12",
+        "min_words": 40
+      }
+    ],
+    "speaking": [
+      {
+        "id": "kets1",
+        "type": "speaking",
+        "prompt": "Talk about your daily routine.",
+        "tips": "Morning, afternoon, evening."
+      }
+    ]
+  },
+  "mock": {
+    "duration_minutes": 45,
+    "sections": [
+      "vocab",
+      "listening",
+      "reading",
+      "writing"
+    ]
+  }
+}

@@ -8,6 +8,7 @@ import '../features/exam/presentation/exam_mock_screen.dart';
 import '../features/exam/presentation/exam_practice_screen.dart';
 import '../features/exam/presentation/exam_reading_screen.dart';
 import '../features/exam/presentation/exam_select_screen.dart';
+import '../features/exam/presentation/exam_session_screen.dart';
 import '../features/writing/presentation/writing_editor_screen.dart';
 import '../features/writing/presentation/writing_home_screen.dart';
 import '../features/daily_review/domain/daily_review.dart';
@@ -180,14 +181,43 @@ GoRouter goRouter(Ref ref) => GoRouter(
           const ExamReadingScreen(),
     ),
     GoRoute(
+      path: '/exam/session',
+      builder: (BuildContext context, GoRouterState state) {
+        final String skill = state.uri.queryParameters['skill'] ?? 'vocab';
+        final bool mock =
+            state.uri.queryParameters['mock'] == '1' || skill == 'mock';
+        return ExamSessionScreen(
+          skill: mock ? 'mock' : skill,
+          mock: mock,
+        );
+      },
+    ),
+    GoRoute(
       path: '/writing',
-      builder: (BuildContext context, GoRouterState state) =>
-          const WritingHomeScreen(),
+      builder: (BuildContext context, GoRouterState state) {
+        final String? prompt = state.uri.queryParameters['prompt'];
+        final String? rubric = state.uri.queryParameters['rubric'];
+        final String? title = state.uri.queryParameters['title'];
+        if (prompt != null && prompt.isNotEmpty) {
+          final String id = 'w_${DateTime.now().millisecondsSinceEpoch}';
+          return WritingEditorScreen(
+            essayId: id,
+            initialPrompt: prompt,
+            initialRubric: rubric ?? 'generic',
+            initialTitle: title ?? '考试写作',
+          );
+        }
+        return const WritingHomeScreen();
+      },
     ),
     GoRoute(
       path: '/writing/:essayId',
-      builder: (BuildContext context, GoRouterState state) =>
-          WritingEditorScreen(essayId: state.pathParameters['essayId']!),
+      builder: (BuildContext context, GoRouterState state) => WritingEditorScreen(
+        essayId: state.pathParameters['essayId']!,
+        initialPrompt: state.uri.queryParameters['prompt'],
+        initialRubric: state.uri.queryParameters['rubric'],
+        initialTitle: state.uri.queryParameters['title'],
+      ),
     ),
     // Legacy cafe adventure URLs → exam hub (cafe removed).
     GoRoute(
