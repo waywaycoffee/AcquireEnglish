@@ -206,6 +206,21 @@ DailyReviewState seedKnownSyllabusRetests({
   );
 }
 
+/// Syllabus cards in today's actionable queue: due reviews + new slots.
+///
+/// Fresh downloads land in [ReviewPlan.waiting], so counting only due cards
+/// incorrectly shows「词书 0」right after import.
+int syllabusQueuedForToday(ReviewPlan plan) {
+  final int due = plan.due
+      .where((ReviewRecord record) => isSyllabusReviewKey(record.key))
+      .length;
+  final int fresh = plan.waiting
+      .take(plan.newAvailable)
+      .where((ReviewRecord record) => isSyllabusReviewKey(record.key))
+      .length;
+  return due + fresh;
+}
+
 /// Sort due/waiting so favorite cards come before book-only cards.
 int compareFavoriteFirst(ReviewRecord a, ReviewRecord b) {
   final bool aFav = isFavoriteReviewKey(a.key);

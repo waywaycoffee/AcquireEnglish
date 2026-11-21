@@ -4,7 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../../router/app_router.dart';
+import '../../daily_review/domain/vocab_unified_queue.dart';
 import '../../daily_review/presentation/syllabus_overlap_dialog.dart';
 import '../../navigation/presentation/navigation_destination.dart';
 import '../../shared/presentation/pad/app_design_tokens.dart';
@@ -81,8 +81,8 @@ class _ServerSyllabusCatalogScreenState
       final SyllabusBook saved = await ref
           .read(syllabusBooksProvider.notifier)
           .saveImportedBook(book.copyWith(builtin: false));
-      final overlap =
-          await activateBookWithOverlap(ref, saved, setActive: false);
+      final SyllabusImportOverlap? overlap =
+          await activateBookWithOverlap(ref, saved);
       if (!mounted) return;
       if (overlap != null) {
         await showSyllabusOverlapDialog(context, saved, overlap);
@@ -95,7 +95,7 @@ class _ServerSyllabusCatalogScreenState
           ),
           action: SnackBarAction(
             label: '开始背',
-            onPressed: () => context.push(SGRoute.reviewSession.route),
+            onPressed: () => context.push(syllabusBookSessionRoute(saved.id)),
           ),
         ),
       );
@@ -265,9 +265,21 @@ class _ServerSyllabusCatalogScreenState
                                 )
                               : FilledButton(
                                   onPressed: downloaded
-                                      ? () => context.push(
-                                          SGRoute.reviewSession.route,
-                                        )
+                                      ? () {
+                                          final SyllabusBook? localBook =
+                                              local.bookById(item.id);
+                                          if (localBook == null) {
+                                            unawaited(_download(item));
+                                            return;
+                                          }
+                                          unawaited(
+                                            startSyllabusBookSession(
+                                              ref,
+                                              context,
+                                              localBook,
+                                            ),
+                                          );
+                                        }
                                       : () => unawaited(_download(item)),
                                   child: Text(downloaded ? '开始学习' : '下载'),
                                 ),

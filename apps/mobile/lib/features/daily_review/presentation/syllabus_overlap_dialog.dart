@@ -1,11 +1,24 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
+import '../../../router/app_router.dart';
 import '../../words/domain/syllabus_book.dart';
 import '../../words/presentation/syllabus_books_provider.dart';
+import '../../words/presentation/word_review_settings_provider.dart';
 import '../domain/vocab_unified_queue.dart';
 import 'daily_review_provider.dart';
 
+/// Session route that studies [bookId] (book cards + overlapping favorites).
+String syllabusBookSessionRoute(String bookId) {
+  return '${SGRoute.reviewSession.route}?deck=syllabus&book=${Uri.encodeComponent(bookId)}';
+}
+
+/// Activate [book] for the unified 背单词 queue and ingest FSRS cards.
+///
+/// Aligns the FSRS new-learn quota with word settings, then runs overlap
+/// seeding so new lemmas enter today's waiting pool. Pass [setActive] false
+/// only when the caller already persisted this book as the active source.
 Future<SyllabusImportOverlap?> activateBookWithOverlap(
   WidgetRef ref,
   SyllabusBook book, {
@@ -14,7 +27,29 @@ Future<SyllabusImportOverlap?> activateBookWithOverlap(
   if (setActive) {
     await ref.read(syllabusBooksProvider.notifier).setActiveBook(book.id);
   }
+  final int quota =
+      ref.read(wordReviewSettingsProvider).dailyNewLimit.clamp(0, 100);
+  await ref
+      .read(dailyReviewProvider.notifier)
+      .syncNewLimitFromWordSettings(quota);
   return ref.read(dailyReviewProvider.notifier).applySyllabusImportOverlap(book);
+}
+
+/// Activate [book], then open a book-scoped review session.
+Future<SyllabusImportOverlap?> startSyllabusBookSession(
+  WidgetRef ref,
+  BuildContext context,
+  SyllabusBook book, {
+  bool setActive = true,
+}) async {
+  final SyllabusImportOverlap? overlap = await activateBookWithOverlap(
+    ref,
+    book,
+    setActive: setActive,
+  );
+  if (!context.mounted) return overlap;
+  await context.push(syllabusBookSessionRoute(book.id));
+  return overlap;
 }
 
 Future<void> showSyllabusOverlapDialog(

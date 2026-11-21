@@ -44,7 +44,16 @@ class ReviewHubScreen extends ConsumerWidget {
     final DailyReviewState review = ref.watch(dailyReviewProvider);
     final List<ReviewSource> sources = ref.watch(reviewSourcesProvider);
     final DateTime now = DateTime.now();
-    final ReviewPlan plan = review.plan(sources, now);
+    final int newQuota = ref.watch(
+      wordReviewSettingsProvider.select(
+        (WordReviewSettings s) => s.dailyNewLimit,
+      ),
+    );
+    // Keep hub CTA / empty-vs-done aligned with the背单词新学额度 setting.
+    final ReviewPlan plan = review.withLimit(newQuota.clamp(0, 100)).plan(
+      sources,
+      now,
+    );
     final List<WordEntry> wordBook = ref.watch(wordBookProvider);
     final int phraseCount = ref.watch(phraseBookProvider).length;
     final int wordFavorites =
@@ -206,11 +215,7 @@ class ReviewHubScreen extends ConsumerWidget {
           _MoreLinks(
             activeBookTitle: activeBookTitle,
             phraseCount: phraseCount,
-            newQuota: ref.watch(
-              wordReviewSettingsProvider.select(
-                (WordReviewSettings s) => s.dailyNewLimit,
-              ),
-            ),
+            newQuota: newQuota,
           ),
         ],
       ),

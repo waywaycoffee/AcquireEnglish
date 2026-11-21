@@ -790,6 +790,12 @@ class DailyReviewNotifier extends Notifier<DailyReviewState> {
   Future<SyllabusImportOverlap> applySyllabusImportOverlap(
     SyllabusBook book,
   ) async {
+    // New lemmas are only sourced from the *active* book in
+    // [reviewSourcesProvider]. Force-activate so download/shelf paths that
+    // skipped setActive still enqueue this book's words.
+    if (ref.read(syllabusBooksProvider).activeBookId != book.id) {
+      await ref.read(syllabusBooksProvider.notifier).setActiveBook(book.id);
+    }
     final DateTime now = ref.read(reviewClockProvider)();
     final List<WordEntry> words = ref.read(wordBookProvider);
     final PlacementRow profile = ref.read(vocabularyPlacementProvider);
@@ -799,8 +805,11 @@ class DailyReviewNotifier extends Notifier<DailyReviewState> {
         normalizeWord('$item'),
     }..remove('');
     // Ensure book cards exist in FSRS before seeding known retests.
+    // Prefer an explicit book-aware source list so a briefly stale provider
+    // cannot drop 1849 newly downloaded lemmas from today's waiting pool.
+    final List<ReviewSource> sources = _sourcesWithSyllabusBook(book);
     await _transaction((DailyReviewState current) {
-      return current.synchronize(ref.read(reviewSourcesProvider), now);
+      return current.synchronize(sources, now);
     });
     final SyllabusImportOverlap overlap = computeSyllabusImportOverlap(
       book: book,
@@ -834,9 +843,47 @@ class DailyReviewNotifier extends Notifier<DailyReviewState> {
 
   /// Keep FSRS new-learn quota aligned with the words-plan setting.
   Future<void> syncNewLimitFromWordSettings(int wordPlanLimit) async {
-    final int next = wordPlanLimit.clamp(0, 200);
+    // Persist layer caps at 100 (see [DailyReviewState.withLimit]).
+    final int next = wordPlanLimit.clamp(0, 100);
     if (state.dailyNewLimit == next) return;
     await setDailyNewLimit(next);
+  }
+
+  /// [reviewSourcesProvider] plus every lemma from [book] (deduped vs favorites).
+  List<ReviewSource> _sourcesWithSyllabusBook(SyllabusBook book) {
+    final List<ReviewSource> base = ref.read(reviewSourcesProvider);
+    final Set<String> keys = <String>{
+      for (final ReviewSource source in base) source.key,
+    };
+    final Set<String> favoriteLemmas = <String>{
+      for (final WordEntry word in ref.read(wordBookProvider))
+        if (word.isSchedulable) normalizeWord(word.word),
+    }..remove('');
+    final List<ReviewSource> extra = <ReviewSource>[];
+    for (final SyllabusWord entry in book.words) {
+      final String lemma = normalizeWord(entry.word);
+      if (lemma.isEmpty || favoriteLemmas.contains(lemma)) continue;
+      final String key = syllabusReviewKey(book.id, lemma);
+      if (!keys.add(key)) continue;
+      extra.add(
+        ReviewSource(
+          key: key,
+          kind: book.isPatternBook ? ReviewKind.sentence : ReviewKind.word,
+          question: entry.word,
+          answer: entry.gloss,
+          english: book.isPatternBook || book.isFoundationBook
+              ? entry.word
+              : '',
+          chinese: book.isPatternBook || book.isFoundationBook
+              ? entry.gloss
+              : '',
+          sourceLabel: '词书 · ${book.title} · ${book.examTag}',
+          origin: 'syllabus',
+        ),
+      );
+    }
+    if (extra.isEmpty) return base;
+    return List<ReviewSource>.unmodifiable(<ReviewSource>[...base, ...extra]);
   }
 
   Future<void> grade(

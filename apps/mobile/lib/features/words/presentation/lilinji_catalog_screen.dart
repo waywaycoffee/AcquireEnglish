@@ -4,7 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../../router/app_router.dart';
+import '../../daily_review/domain/vocab_unified_queue.dart';
 import '../../daily_review/presentation/syllabus_overlap_dialog.dart';
 import '../../navigation/presentation/navigation_destination.dart';
 import '../../settings/presentation/settings_provider.dart';
@@ -160,7 +160,9 @@ class _LilinjiCatalogScreenState extends ConsumerState<LilinjiCatalogScreen> {
           .downloadBook(entry: entry, examTag: _examTag);
       final SyllabusBook book = result.book;
       await ref.read(syllabusBooksProvider.notifier).saveImportedBook(book);
-      final overlap = await activateBookWithOverlap(ref, book, setActive: false);
+      // Activate + ingest into today's FSRS waiting pool (new-learn quota).
+      final SyllabusImportOverlap? overlap =
+          await activateBookWithOverlap(ref, book);
       if (!mounted) return;
       if (overlap != null) {
         await showSyllabusOverlapDialog(context, book, overlap);
@@ -172,7 +174,7 @@ class _LilinjiCatalogScreenState extends ConsumerState<LilinjiCatalogScreen> {
           action: SnackBarAction(
             label: '开始背',
             onPressed: () {
-              context.push(SGRoute.reviewSession.route);
+              context.push(syllabusBookSessionRoute(book.id));
             },
           ),
         ),

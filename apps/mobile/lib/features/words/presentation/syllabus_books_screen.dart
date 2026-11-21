@@ -5,7 +5,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../../router/app_router.dart';
 import '../../daily_review/domain/vocab_unified_queue.dart';
 import '../../daily_review/presentation/syllabus_overlap_dialog.dart';
 import '../../exam/domain/exam_fsrs.dart';
@@ -117,7 +116,7 @@ class _SyllabusBooksScreenState extends ConsumerState<SyllabusBooksScreen> {
       return;
     }
     final SyllabusImportOverlap? overlap =
-        await activateBookWithOverlap(ref, book, setActive: false);
+        await activateBookWithOverlap(ref, book);
     if (!context.mounted) return;
     if (overlap != null) {
       await showSyllabusOverlapDialog(context, book, overlap);
@@ -135,7 +134,9 @@ class _SyllabusBooksScreenState extends ConsumerState<SyllabusBooksScreen> {
 
   void _startBook(BuildContext context, SyllabusBook book) {
     unawaited(_selectBook(book).then((_) {
-      if (context.mounted) context.push(SGRoute.reviewSession.route);
+      if (context.mounted) {
+        context.push(syllabusBookSessionRoute(book.id));
+      }
     }));
   }
 

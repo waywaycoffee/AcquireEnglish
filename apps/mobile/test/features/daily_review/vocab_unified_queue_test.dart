@@ -82,6 +82,74 @@ void main() {
     expect(record.card.due.isAfter(now.toUtc()), isFalse);
   });
 
+  test('syllabusQueuedForToday counts waiting book cards under new quota', () {
+    final ReviewRecord favWaiting = ReviewRecord(
+      key: vocabFsrsKey('hello', WordPracticeMode.recognize),
+      order: 1,
+      addedAt: now,
+      card: fsrs.Card(cardId: 1, due: now.toUtc()),
+    );
+    final ReviewRecord bookWaiting = ReviewRecord(
+      key: syllabusReviewKey('b', 'apple'),
+      order: 2,
+      addedAt: now,
+      card: fsrs.Card(cardId: 2, due: now.toUtc()),
+    );
+    final ReviewRecord bookDue = ReviewRecord(
+      key: syllabusReviewKey('b', 'banana'),
+      order: 3,
+      addedAt: now.subtract(const Duration(days: 2)),
+      card: fsrs.Card(cardId: 3, due: now.toUtc()),
+      firstLearnedAt: now.subtract(const Duration(days: 2)),
+      reviews: 1,
+    );
+    final DailyReviewState state = DailyReviewState(
+      records: <String, ReviewRecord>{
+        favWaiting.key: favWaiting,
+        bookWaiting.key: bookWaiting,
+        bookDue.key: bookDue,
+      },
+      dailyNewLimit: 20,
+      nextOrder: 4,
+    );
+    final ReviewPlan plan = state.plan(
+      <ReviewSource>[
+        ReviewSource(
+          key: favWaiting.key,
+          kind: ReviewKind.word,
+          question: 'hello',
+          answer: '',
+          english: '',
+          chinese: '',
+          sourceLabel: '收藏',
+        ),
+        ReviewSource(
+          key: bookWaiting.key,
+          kind: ReviewKind.word,
+          question: 'apple',
+          answer: '',
+          english: '',
+          chinese: '',
+          sourceLabel: '词书',
+        ),
+        ReviewSource(
+          key: bookDue.key,
+          kind: ReviewKind.word,
+          question: 'banana',
+          answer: '',
+          english: '',
+          chinese: '',
+          sourceLabel: '词书',
+        ),
+      ],
+      now,
+    );
+    // Favorites fill new slots first; with quota 20 both waiting cards fit,
+    // so today includes 1 due book card + 1 new book card.
+    expect(syllabusQueuedForToday(plan), 2);
+    expect(plan.due.where((ReviewRecord r) => isSyllabusReviewKey(r.key)).length, 1);
+  });
+
   test('plan prefers favorite cards before syllabus cards', () {
     final ReviewRecord fav = ReviewRecord(
       key: vocabFsrsKey('hello', WordPracticeMode.recognize),
