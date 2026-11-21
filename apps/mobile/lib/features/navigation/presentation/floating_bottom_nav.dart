@@ -1,51 +1,58 @@
-import 'dart:async';
 import 'dart:ui';
 
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../shared/presentation/pad/app_design_tokens.dart';
+import '../data/bottom_nav_scroll_hint.dart';
 import 'navigation_destination.dart';
 
-const String kBottomNavScrollHintKey = 'bottom_nav_scroll_hint_v1';
-
-/// Horizontally scrollable bottom tabs: 5 visible, swipe for the rest + 更多.
+/// Horizontally swipeable bottom navigation.
+///
+/// Fixed viewport shows [AppNavDestination.bottomBarVisibleCount] tabs;
+/// swipe left/right for the rest. Lives in [Scaffold.bottomNavigationBar],
+/// so horizontal drags are hit-tested on this bar only and do not enter the
+/// page body's gesture arena (PageView / TabBarView stay independent).
 class FloatingBottomNav extends StatefulWidget {
-  const FloatingBottomNav({required this.current, super.key});
+  const FloatingBottomNav({
+    required this.current,
+    super.key,
+    this.forceShowScrollHint,
+    this.onScrollHintDismissed,
+  });
 
   final AppNavDestination current;
 
-  static const int visibleCount = 5;
+  /// When non-null, overrides Hive-backed first-run hint visibility (tests).
+  final bool? forceShowScrollHint;
+
+  /// Optional hook after the one-time tip is dismissed (tests / analytics).
+  final VoidCallback? onScrollHintDismissed;
 
   @override
-  State<FloatingBottomNav> createState() => _FloatingBottomNavState();
+  State<FloatingBottomNav> createState() => FloatingBottomNavState();
 }
 
-class _FloatingBottomNavState extends State<FloatingBottomNav> {
-  final ScrollController _controller = ScrollController();
-  double _scrollProgress = 0;
+@visibleForTesting
+class FloatingBottomNavState extends State<FloatingBottomNav> {
+  final ScrollController _scrollController = ScrollController();
   bool _showHint = false;
-  bool _hintLoaded = false;
+  double _scrollProgress = 0;
 
-  List<AppNavDestination> get _strip => AppNavDestination.bottomStrip;
+  /// Destinations + trailing 「更多」 action index.
+  static List<AppNavDestination> get barDestinations =>
+      AppNavDestination.bottomBarDestinations;
 
-  List<AppNavDestination> get _moreDestinations => AppNavDestination.values
-      .where(
-        (AppNavDestination d) =>
-            d.showInNav && !_strip.contains(d) && d != AppNavDestination.importCourse,
-      )
-      .toList(growable: false);
+  static int get _moreIndex => barDestinations.length;
 
-  bool get _moreSelected => _moreDestinations.contains(widget.current);
-
-  int get _slotCount => _strip.length + 1; // + 更多
+  static int get itemCount => barDestinations.length + 1;
 
   @override
   void initState() {
     super.initState();
-    _controller.addListener(_onScroll);
-    unawaited(_loadHint());
+    _showHint =
+        widget.forceShowScrollHint ?? !readBottomNavScrollHintSeen();
+    _scrollController.addListener(_onScroll);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _centerCurrent(animated: false);
     });
@@ -59,98 +66,107 @@ class _FloatingBottomNavState extends State<FloatingBottomNav> {
         _centerCurrent(animated: true);
       });
     }
+    if (oldWidget.forceShowScrollHint != widget.forceShowScrollHint &&
+        widget.forceShowScrollHint != null) {
+      _showHint = widget.forceShowScrollHint!;
+    }
   }
 
   @override
   void dispose() {
-    _controller.removeListener(_onScroll);
-    _controller.dispose();
+    _scrollController.removeListener(_onScroll);
+    _scrollController.dispose();
     super.dispose();
   }
 
-  Future<void> _loadHint() async {
-    final SharedPreferences prefs = await SharedPreferences.getInstance();
-    final bool seen = prefs.getBool(kBottomNavScrollHintKey) ?? false;
-    if (!mounted) {
-      return;
-    }
-    setState(() {
-      _showHint = !seen;
-      _hintLoaded = true;
-    });
-  }
-
-  Future<void> _dismissHint() async {
-    if (!_showHint) {
-      return;
-    }
-    setState(() => _showHint = false);
-    final SharedPreferences prefs = await SharedPreferences.getInstance();
-    await prefs.setBool(kBottomNavScrollHintKey, true);
-  }
-
   void _onScroll() {
-    if (!_controller.hasClients) {
-      return;
-    }
-    final double max = _controller.position.maxScrollExtent;
-    final double next = max <= 0 ? 0 : (_controller.offset / max).clamp(0.0, 1.0);
+    if (!_scrollController.hasClients) return;
+    final double max = _scrollController.position.maxScrollExtent;
+    final double next = max <= 0
+        ? 0
+        : (_scrollController.offset / max).clamp(0.0, 1.0);
     if ((next - _scrollProgress).abs() > 0.002) {
       setState(() => _scrollProgress = next);
     }
-    if (_showHint && _controller.offset > 8) {
-      unawaited(_dismissHint());
+    // First intentional pan teaches discoverability — clear the tip.
+    if (_showHint && _scrollController.offset > 8) {
+      _dismissHint();
     }
   }
 
+  int _selectedIndex() {
+    final int index = barDestinations.indexOf(widget.current);
+    if (index >= 0) return index;
+    // Secondary pages (成长 / 设置 / …) highlight 「更多」.
+    return _moreIndex;
+  }
+
+  double _itemWidth(double viewportWidth) =>
+      viewportWidth / AppNavDestination.bottomBarVisibleCount;
+
   void _centerCurrent({required bool animated}) {
-    if (!_controller.hasClients) {
-      return;
-    }
-    final double viewport = _controller.position.viewportDimension;
-    if (viewport <= 0) {
-      return;
-    }
-    final double itemWidth = viewport / FloatingBottomNav.visibleCount;
-    final int index = _moreSelected
-        ? _strip.length
-        : _strip.indexOf(widget.current).clamp(0, _strip.length - 1);
+    if (!_scrollController.hasClients) return;
+    final double viewport = _scrollController.position.viewportDimension;
+    if (viewport <= 0) return;
+    final double itemWidth = _itemWidth(viewport);
+    final int index = _selectedIndex();
     final double target =
-        (index * itemWidth) - (viewport - itemWidth) / 2;
+        (index * itemWidth) -
+        (viewport - itemWidth) / 2;
     final double clamped = target.clamp(
       0.0,
-      _controller.position.maxScrollExtent,
+      _scrollController.position.maxScrollExtent,
     );
     if (animated) {
-      _controller.animateTo(
+      _scrollController.animateTo(
         clamped,
         duration: const Duration(milliseconds: 280),
         curve: Curves.easeOutCubic,
       );
     } else {
-      _controller.jumpTo(clamped);
+      _scrollController.jumpTo(clamped);
     }
   }
+
+  Future<void> _dismissHint() async {
+    if (!_showHint) return;
+    setState(() => _showHint = false);
+    await markBottomNavScrollHintSeen();
+    widget.onScrollHintDismissed?.call();
+  }
+
+  @visibleForTesting
+  Future<void> centerCurrentForTest({bool animated = false}) async {
+    _centerCurrent(animated: animated);
+    if (animated) {
+      await Future<void>.delayed(const Duration(milliseconds: 300));
+    }
+  }
+
+  @visibleForTesting
+  double get scrollOffsetForTest =>
+      _scrollController.hasClients ? _scrollController.offset : 0;
 
   @override
   Widget build(BuildContext context) {
     final Size size = MediaQuery.sizeOf(context);
-    final bool compact = size.width < 768;
+    final double width = size.width;
+    final bool compact = width < 768;
+    final List<AppNavDestination> moreDestinations =
+        AppNavDestination.moreMenuDestinations;
+    final bool moreSelected = !barDestinations.contains(widget.current);
 
     return Padding(
       padding: EdgeInsets.fromLTRB(
         compact ? 10 : 16,
-        compact ? 6 : 10,
+        compact ? 4 : 8,
         compact ? 10 : 16,
-        compact ? 8 : 12,
+        compact ? 6 : 10,
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: <Widget>[
-          if (_hintLoaded && _showHint) ...<Widget>[
-            _ScrollHintBanner(onDismiss: _dismissHint),
-            const SizedBox(height: 6),
-          ],
+          if (_showHint) _ScrollHintBanner(onDismiss: _dismissHint),
           ClipRRect(
             borderRadius: BorderRadius.circular(compact ? 22 : 28),
             child: BackdropFilter(
@@ -161,55 +177,58 @@ class _FloatingBottomNavState extends State<FloatingBottomNav> {
                   borderRadius: BorderRadius.circular(compact ? 22 : 28),
                   boxShadow: AppDesignTokens.toyCardShadow,
                 ),
-                child: Padding(
-                  padding: EdgeInsets.fromLTRB(
-                    compact ? 2 : 6,
-                    compact ? 4 : 6,
-                    compact ? 2 : 6,
-                    compact ? 2 : 4,
-                  ),
-                  child: LayoutBuilder(
-                    builder: (BuildContext context, BoxConstraints constraints) {
-                      final double itemWidth =
-                          constraints.maxWidth / FloatingBottomNav.visibleCount;
-                      return Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: <Widget>[
-                          SizedBox(
-                            height: compact ? 58 : 64,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: <Widget>[
+                    Padding(
+                      padding: EdgeInsets.symmetric(
+                        horizontal: compact ? 2 : 6,
+                        vertical: compact ? 4 : 6,
+                      ),
+                      child: LayoutBuilder(
+                        builder:
+                            (BuildContext context, BoxConstraints constraints) {
+                          final double viewportWidth = constraints.maxWidth;
+                          final double itemWidth = _itemWidth(viewportWidth);
+                          return SizedBox(
+                            height: compact ? 56 : 62,
                             child: NotificationListener<ScrollNotification>(
-                              // Keep horizontal drags on the strip; don't bubble
-                              // into page-level PageViews / horizontal lists.
+                              // Absorb horizontal scroll metrics so ancestors
+                              // (nested scrollables) do not react to bar pans.
                               onNotification: (ScrollNotification notification) {
-                                return notification.depth == 0;
+                                return notification.metrics.axis ==
+                                    Axis.horizontal;
                               },
                               child: ListView.builder(
                                 key: const Key('bottom-nav-scroll'),
-                                controller: _controller,
+                                controller: _scrollController,
                                 scrollDirection: Axis.horizontal,
+                                primary: false,
                                 physics: const BouncingScrollPhysics(
                                   parent: AlwaysScrollableScrollPhysics(),
                                 ),
-                                itemCount: _slotCount,
+                                itemCount: itemCount,
                                 itemBuilder: (BuildContext context, int index) {
-                                  if (index == _strip.length) {
+                                  if (index == _moreIndex) {
                                     return SizedBox(
                                       width: itemWidth,
                                       child: _MoreNavItem(
-                                        selected: _moreSelected,
-                                        destinations: _moreDestinations,
+                                        selected: moreSelected,
+                                        destinations: moreDestinations,
+                                        onOpened: _dismissHint,
                                       ),
                                     );
                                   }
                                   final AppNavDestination destination =
-                                      _strip[index];
+                                      barDestinations[index];
                                   return SizedBox(
                                     width: itemWidth,
                                     child: _NavItem(
                                       destination: destination,
-                                      selected: destination == widget.current,
-                                      onSelected: () {
-                                        unawaited(_dismissHint());
+                                      selected:
+                                          destination == widget.current,
+                                      onTap: () {
+                                        _dismissHint();
                                         context.go(destination.route);
                                       },
                                     ),
@@ -217,15 +236,15 @@ class _FloatingBottomNavState extends State<FloatingBottomNav> {
                                 },
                               ),
                             ),
-                          ),
-                          _ScrollProgressIndicator(
-                            progress: _scrollProgress,
-                            compact: compact,
-                          ),
-                        ],
-                      );
-                    },
-                  ),
+                          );
+                        },
+                      ),
+                    ),
+                    _ScrollTrack(
+                      progress: _scrollProgress,
+                      compact: compact,
+                    ),
+                  ],
                 ),
               ),
             ),
@@ -243,44 +262,39 @@ class _ScrollHintBanner extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        key: const Key('bottom-nav-hint'),
-        onTap: onDismiss,
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 6),
+      child: Material(
+        key: const Key('bottom-nav-scroll-hint'),
+        color: AppDesignTokens.skyLight.withValues(alpha: 0.92),
         borderRadius: BorderRadius.circular(14),
-        child: Ink(
-          decoration: BoxDecoration(
-            color: AppDesignTokens.brandGreen.withValues(alpha: 0.14),
-            borderRadius: BorderRadius.circular(14),
-            border: Border.all(
-              color: AppDesignTokens.brandGreen.withValues(alpha: 0.35),
-            ),
-          ),
-          child: const Padding(
-            padding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(14),
+          onTap: onDismiss,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
             child: Row(
               children: <Widget>[
                 Icon(
                   Icons.swipe_rounded,
-                  size: 18,
-                  color: AppDesignTokens.brandGreenDark,
+                  size: 16,
+                  color: AppDesignTokens.primaryBlueDark,
                 ),
-                SizedBox(width: 8),
+                const SizedBox(width: 8),
                 Expanded(
                   child: Text(
-                    '左右滑动底栏，可看社区、对战、备考等',
+                    '左右滑动，查看更多功能',
                     style: TextStyle(
                       fontSize: 12,
                       fontWeight: FontWeight.w700,
-                      color: AppDesignTokens.brandGreenDark,
+                      color: AppDesignTokens.textPrimary,
                     ),
                   ),
                 ),
                 Icon(
                   Icons.close_rounded,
                   size: 16,
-                  color: AppDesignTokens.brandGreenDark,
+                  color: AppDesignTokens.textSecondary,
                 ),
               ],
             ),
@@ -291,11 +305,8 @@ class _ScrollHintBanner extends StatelessWidget {
   }
 }
 
-class _ScrollProgressIndicator extends StatelessWidget {
-  const _ScrollProgressIndicator({
-    required this.progress,
-    required this.compact,
-  });
+class _ScrollTrack extends StatelessWidget {
+  const _ScrollTrack({required this.progress, required this.compact});
 
   final double progress;
   final bool compact;
@@ -303,34 +314,38 @@ class _ScrollProgressIndicator extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: EdgeInsets.only(
-        left: compact ? 18 : 28,
-        right: compact ? 18 : 28,
-        top: compact ? 2 : 4,
-        bottom: compact ? 2 : 4,
+      padding: EdgeInsets.fromLTRB(
+        compact ? 18 : 24,
+        0,
+        compact ? 18 : 24,
+        compact ? 6 : 8,
       ),
-      child: LayoutBuilder(
-        builder: (BuildContext context, BoxConstraints constraints) {
-          final double track = constraints.maxWidth;
-          final double thumb = (track / FloatingBottomNav.visibleCount)
-              .clamp(18.0, track * 0.45);
-          final double maxLeft = (track - thumb).clamp(0.0, track);
-          final double left = maxLeft * progress;
-          return SizedBox(
-            key: const Key('bottom-nav-indicator'),
-            height: 3,
-            child: Stack(
+      child: SizedBox(
+        key: const Key('bottom-nav-scroll-indicator'),
+        height: 3,
+        child: LayoutBuilder(
+          builder: (BuildContext context, BoxConstraints constraints) {
+            final double trackWidth = constraints.maxWidth;
+            final double thumbWidth = (trackWidth /
+                    (itemCount /
+                        AppNavDestination.bottomBarVisibleCount))
+                .clamp(18.0, trackWidth * 0.55);
+            final double maxOffset = (trackWidth - thumbWidth).clamp(
+              0.0,
+              trackWidth,
+            );
+            return Stack(
               children: <Widget>[
                 DecoratedBox(
                   decoration: BoxDecoration(
-                    color: AppDesignTokens.borderGray.withValues(alpha: 0.7),
+                    color: AppDesignTokens.borderGray.withValues(alpha: 0.55),
                     borderRadius: BorderRadius.circular(99),
                   ),
                   child: const SizedBox.expand(),
                 ),
                 Positioned(
-                  left: left,
-                  width: thumb,
+                  left: maxOffset * progress,
+                  width: thumbWidth,
                   top: 0,
                   bottom: 0,
                   child: DecoratedBox(
@@ -341,19 +356,26 @@ class _ScrollProgressIndicator extends StatelessWidget {
                   ),
                 ),
               ],
-            ),
-          );
-        },
+            );
+          },
+        ),
       ),
     );
   }
+
+  int get itemCount => FloatingBottomNavState.itemCount;
 }
 
 class _MoreNavItem extends StatelessWidget {
-  const _MoreNavItem({required this.selected, required this.destinations});
+  const _MoreNavItem({
+    required this.selected,
+    required this.destinations,
+    required this.onOpened,
+  });
 
   final bool selected;
   final List<AppNavDestination> destinations;
+  final VoidCallback onOpened;
 
   @override
   Widget build(BuildContext context) {
@@ -361,7 +383,10 @@ class _MoreNavItem extends StatelessWidget {
     return InkWell(
       key: const Key('bottom-nav-more'),
       borderRadius: BorderRadius.circular(compact ? 16 : 20),
-      onTap: () => _showMoreMenu(context),
+      onTap: () {
+        onOpened();
+        _showMoreMenu(context);
+      },
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 220),
         curve: Curves.easeOut,
@@ -458,12 +483,12 @@ class _NavItem extends StatelessWidget {
   const _NavItem({
     required this.destination,
     required this.selected,
-    required this.onSelected,
+    required this.onTap,
   });
 
   final AppNavDestination destination;
   final bool selected;
-  final VoidCallback onSelected;
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
@@ -471,9 +496,9 @@ class _NavItem extends StatelessWidget {
     final bool compact = width < 768;
 
     return InkWell(
-      key: Key('bottom-nav-${destination.name}'),
+      key: Key('bottom-nav-item-${destination.name}'),
       borderRadius: BorderRadius.circular(compact ? 16 : 20),
-      onTap: onSelected,
+      onTap: onTap,
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 220),
         curve: Curves.easeOut,

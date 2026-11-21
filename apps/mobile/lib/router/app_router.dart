@@ -58,6 +58,7 @@ import '../features/membership/presentation/module_gate.dart';
 import '../features/membership/domain/module_access.dart';
 import '../features/onboarding/presentation/first_open_onboarding_screen.dart';
 import '../features/onboarding/presentation/onboarding_provider.dart';
+import '../features/navigation/presentation/battle_hub_screen.dart';
 import '../features/navigation/presentation/navigation_destination.dart';
 import '../features/shared/presentation/pad/pad_scaffold.dart';
 import '../features/shared/presentation/pad/pad_top_bar.dart';
@@ -324,15 +325,8 @@ GoRouter goRouter(Ref ref) => GoRouter(
     ).fade(),
     GoRoute(
       path: AppNavDestination.battle.route,
-      builder: (BuildContext context, GoRouterState state) => PadScaffold(
-        currentDestination: AppNavDestination.battle,
-        showContinueLearning: false,
-        topBar: const PadTopBar(
-          title: '词汇对战',
-          description: '比拼近期单词，看看谁记得更牢',
-        ),
-        body: const StudyPkScreen(embedded: true),
-      ),
+      builder: (BuildContext context, GoRouterState state) =>
+          const BattleHubScreen(),
     ).fade(),
     GoRoute(
       path: SGRoute.review.route,

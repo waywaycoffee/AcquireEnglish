@@ -160,7 +160,7 @@ class _SyllabusBooksScreenState extends ConsumerState<SyllabusBooksScreen> {
         : '';
 
     return PadScaffold(
-      currentDestination: AppNavDestination.review,
+      currentDestination: AppNavDestination.words,
       showContinueLearning: false,
       topBar: PadTopBar(
         title: '学习书库',
