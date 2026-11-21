@@ -219,13 +219,11 @@ class _DigitalHumanPickerState extends ConsumerState<DigitalHumanPicker> {
           thumbColor: AppDesignTokens.brandGreenDark,
           trackColor: AppDesignTokens.borderGray,
           child: SizedBox(
-            // Keep cards shorter than this; overflow here paints over bottom nav
-            // and eats taps (首页以外“打不开”).
-            height: 248,
+            height: _PersonaCard.cardHeight + 8,
             child: ListView.separated(
               controller: _personas,
               primary: false,
-              padding: const EdgeInsets.only(bottom: 10),
+              padding: EdgeInsets.zero,
               scrollDirection: Axis.horizontal,
               itemCount: visible.length,
               separatorBuilder: (_, __) => const SizedBox(width: 12),
@@ -310,93 +308,105 @@ class _PersonaCard extends StatelessWidget {
   final VoidCallback onPreview;
   final VoidCallback onTap;
 
+  static const double cardHeight = 196;
+  static const double cardWidth = 112;
+
   @override
   Widget build(BuildContext context) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(20),
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 220),
-        width: 112,
-        padding: const EdgeInsets.all(8),
-        decoration: BoxDecoration(
-          color: AppDesignTokens.appWhite.withValues(alpha: 0.96),
+    return SizedBox(
+      width: cardWidth,
+      height: cardHeight,
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: onTap,
           borderRadius: BorderRadius.circular(20),
-          border: Border.all(
-            color: selected
-                ? AppDesignTokens.brandGreenDark
-                : AppDesignTokens.borderGray,
-            width: selected ? 2.5 : 1,
-          ),
-          boxShadow: selected ? AppDesignTokens.toyCardShadow : null,
-        ),
-        child: Column(
-          children: <Widget>[
-            Expanded(
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(14),
-                child: Image.asset(
-                  persona.assetPath,
-                  fit: BoxFit.cover,
-                  width: double.infinity,
-                  errorBuilder: (_, __, ___) => ColoredBox(
-                    color: AppDesignTokens.skyLight,
-                    child: Icon(
-                      Icons.face_retouching_natural_rounded,
-                      color: AppDesignTokens.brandGreenDark,
-                      size: 36,
-                    ),
-                  ),
-                ),
-              ),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              persona.displayName,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(
-                fontSize: 13,
-                fontWeight: FontWeight.w900,
-                height: 1.1,
+          child: Ink(
+            decoration: BoxDecoration(
+              color: AppDesignTokens.appWhite.withValues(alpha: 0.96),
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(
                 color: selected
                     ? AppDesignTokens.brandGreenDark
-                    : AppDesignTokens.textPrimary,
+                    : AppDesignTokens.borderGray,
+                width: selected ? 2.5 : 1,
               ),
+              boxShadow: selected ? AppDesignTokens.toyCardShadow : null,
             ),
-            Text(
-              bilingual ? '中英同音色' : '中文另用音色',
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(
-                fontSize: 10,
-                height: 1.1,
-                color: AppDesignTokens.textSecondary,
-              ),
-            ),
-            SizedBox(
-              height: 28,
-              child: IconButton(
-                tooltip: playing
-                    ? '停止试听 ${persona.displayName}'
-                    : '试听 ${persona.displayName}',
-                onPressed: onPreview,
-                padding: EdgeInsets.zero,
-                visualDensity: VisualDensity.compact,
-                iconSize: 22,
-                icon: loading
-                    ? const SizedBox.square(
-                        dimension: 16,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                    : Icon(
-                        playing
-                            ? Icons.stop_circle_outlined
-                            : Icons.play_circle_outline,
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(8, 8, 8, 4),
+              child: Column(
+                children: <Widget>[
+                  Expanded(
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(14),
+                      child: Image.asset(
+                        persona.assetPath,
+                        fit: BoxFit.cover,
+                        width: double.infinity,
+                        errorBuilder: (_, __, ___) => ColoredBox(
+                          color: AppDesignTokens.skyLight,
+                          child: Icon(
+                            Icons.face_retouching_natural_rounded,
+                            color: AppDesignTokens.brandGreenDark,
+                            size: 36,
+                          ),
+                        ),
                       ),
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    persona.displayName,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w900,
+                      height: 1.1,
+                      color: selected
+                          ? AppDesignTokens.brandGreenDark
+                          : AppDesignTokens.textPrimary,
+                    ),
+                  ),
+                  Text(
+                    bilingual ? '中英同音色' : '中文另用音色',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 10,
+                      height: 1.1,
+                      color: AppDesignTokens.textSecondary,
+                    ),
+                  ),
+                  SizedBox(
+                    height: 28,
+                    child: IconButton(
+                      tooltip: playing
+                          ? '停止试听 ${persona.displayName}'
+                          : '试听 ${persona.displayName}',
+                      onPressed: onPreview,
+                      padding: EdgeInsets.zero,
+                      visualDensity: VisualDensity.compact,
+                      constraints:
+                          const BoxConstraints.tightFor(width: 28, height: 28),
+                      iconSize: 22,
+                      icon: loading
+                          ? const SizedBox.square(
+                              dimension: 16,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : Icon(
+                              playing
+                                  ? Icons.stop_circle_outlined
+                                  : Icons.play_circle_outline,
+                            ),
+                    ),
+                  ),
+                ],
               ),
             ),
-          ],
+          ),
         ),
       ),
     );

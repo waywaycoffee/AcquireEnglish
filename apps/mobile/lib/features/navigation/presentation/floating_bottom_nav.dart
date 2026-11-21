@@ -43,16 +43,15 @@ class FloatingBottomNav extends StatelessWidget {
         ? _primaryDestinations
         : destinations;
 
-    // SafeArea owns the system gesture/nav inset. Do not also add
-    // systemBottomInsetOf here — double padding was blowing past Scaffold's
-    // bottom bar budget (~74px overflow on gesture phones).
-    return SafeArea(
-      top: false,
-      minimum: EdgeInsets.fromLTRB(
+    // Use MediaQuery.padding.bottom only. viewPadding/SafeArea here double-
+    // counts with Scaffold and overflows the bottom bar by ~74px on this phone.
+    final double bottomInset = MediaQuery.paddingOf(context).bottom;
+    return Padding(
+      padding: EdgeInsets.fromLTRB(
         compact ? 10 : 16,
         compact ? 6 : 10,
         compact ? 10 : 16,
-        compact ? 8 : 12,
+        (compact ? 8 : 12) + bottomInset,
       ),
       child: ClipRRect(
         borderRadius: BorderRadius.circular(compact ? 22 : 28),
