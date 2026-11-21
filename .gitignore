@@ -77,3 +77,7 @@ deploy/gpu-box-ollama/aria2c.exe
 
 deploy/_probe_shared_subs.py
 services/api/media/
+
+tools/reading_samples/*.epub
+tools/reading_samples/*.zip
+
