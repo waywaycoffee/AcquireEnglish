@@ -119,7 +119,7 @@ class _DigitalHumanPickerState extends ConsumerState<DigitalHumanPicker> {
       final String voice =
           saved ?? persona.recommendedVoiceId ?? persona.edgeVoiceEn;
       final bool bilingual = isBilingualCoachVoice(voice);
-      final String? url = await _pipeline.synthesizeSpeech(
+      final result = await _pipeline.synthesizeSpeechWithProvider(
         rawBaseUrl: baseUrl,
         text: bilingual
             ? '你好，很高兴见到你。 Hi! Let’s practise English together.'
@@ -129,10 +129,15 @@ class _DigitalHumanPickerState extends ConsumerState<DigitalHumanPicker> {
         language: bilingual ? 'zh' : 'en',
       );
       if (!mounted || request != _previewRequest) return;
-      if (url == null) throw StateError('Missing preview audio');
+      if (result == null) throw StateError('Missing preview audio');
+      if (result.provider == 'edge') {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('本次试听使用备用音色（Edge）')));
+      }
       final Player player = Player();
       _previewPlayer = player;
-      await player.open(Media(url), play: true);
+      await player.open(Media(result.url), play: true);
       if (!mounted || request != _previewRequest) return;
       setState(() => _loadingPreview = false);
       await player.stream.completed

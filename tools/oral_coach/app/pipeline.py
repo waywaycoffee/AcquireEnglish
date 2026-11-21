@@ -97,10 +97,23 @@ class OralCoachPipeline:
         tts_voice: str | None = None,
         language: str | None = None,
     ) -> str | None:
-        """Synthesize coach speech and return a relative /api/tts/... URL."""
+        url, _ = await self.synthesize_speech_with_provider(
+            text, digital_human_id=digital_human_id, tts_voice=tts_voice, language=language,
+        )
+        return url
+
+    async def synthesize_speech_with_provider(
+        self,
+        text: str,
+        *,
+        digital_human_id: str | None = None,
+        tts_voice: str | None = None,
+        language: str | None = None,
+    ) -> tuple[str | None, str | None]:
+        """Return the audio URL and the provider that actually produced it."""
         spoken = (text or '').strip()
         if not spoken:
-            return None
+            return None, None
         tts_name = f'speak-{uuid.uuid4().hex[:10]}.mp3'
         tts_path = str(self.settings.data_dir / 'tts' / tts_name)
         result = await self.tts.synthesize(
@@ -111,8 +124,8 @@ class OralCoachPipeline:
             language=language,
         )
         if not result.audio_path:
-            return None
-        return f'/api/tts/{tts_name}'
+            return None, None
+        return f'/api/tts/{tts_name}', result.provider
 
     def get(self, sid: str) -> CoachSession | None:
         return self.sessions.get(sid)

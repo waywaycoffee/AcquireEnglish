@@ -286,7 +286,7 @@ async def create_draft(
 async def speak_tts(body: SpeakBody) -> dict[str, Any]:
     """One-shot coach TTS with persona voice (greeting / local fallback)."""
     try:
-        relative = await pipeline.synthesize_speech(
+        relative, provider = await pipeline.synthesize_speech_with_provider(
             body.text,
             digital_human_id=body.digital_human_id,
             tts_voice=body.tts_voice or None,
@@ -298,6 +298,7 @@ async def speak_tts(body: SpeakBody) -> dict[str, Any]:
         raise HTTPException(422, 'Empty speech text.')
     return {
         'tts_url': relative,
+        'provider': provider,
         'digital_human_id': (body.digital_human_id or 'mia').strip().lower(),
         'language': (body.language or 'en').strip().lower(),
     }

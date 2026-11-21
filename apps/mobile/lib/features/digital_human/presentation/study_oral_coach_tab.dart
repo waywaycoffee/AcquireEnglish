@@ -218,7 +218,25 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
   bool _liveConnected = false;
   bool _quotaConsumed = false;
   int? _coachMinutesLeft;
-  String? _historyKey;
+  late final String _historyAccount;
+  String? _voicePlaybackLabel;
+  int _roundStartBubble = 0;
+  int _lastRoundTurns = 0;
+  List<String> _lastRoundExpressions = const <String>[];
+
+  String? get _historyKey {
+    final String? episodeId = widget.episodeId;
+    if (episodeId != null && episodeId.isNotEmpty) {
+      return 'oralCoachHistory:${jsonEncode(<String>[_historyAccount, episodeId])}';
+    }
+    if (!widget.standalone) return null;
+    return 'oralCoachStandaloneHistory:${jsonEncode(<String>[
+      _historyAccount,
+      _activeScenario?.id ?? 'freechat',
+      widget.courseTitle,
+      widget.topicSummary,
+    ])}';
+  }
   bool _historyLoading = true;
   Player? _speechPlayer;
   String? _learningSessionId;
@@ -271,16 +289,7 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
       LearningScenario.seeds,
       preferVideo: !widget.standalone && widget.hasTranscript,
     );
-    final String? episodeId = widget.episodeId;
-    if (episodeId != null && episodeId.isNotEmpty) {
-      final String account = ref
-          .read(authSessionProvider)
-          .email
-          .trim()
-          .toLowerCase();
-      _historyKey =
-          'oralCoachHistory:${jsonEncode(<String>[account, episodeId])}';
-    }
+    _historyAccount = ref.read(authSessionProvider).email.trim().toLowerCase();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) unawaited(_bootstrapScenariosAndStart());
     });
@@ -349,6 +358,7 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
     final String? key = _historyKey;
     if (key != null) {
       try {
+        await _historyWrite;
         final String? raw = await SharedPreferencesAsync().getString(key);
         if (!mounted) return;
         if (raw != null) {
@@ -388,6 +398,7 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
     if (key == null) return;
     final String snapshot = jsonEncode(
       _bubbles
+          .skip(_bubbles.length > 80 ? _bubbles.length - 80 : 0)
           .map(
             (_ChatBubble bubble) => <String, Object?>{
               'role': bubble.role,
@@ -825,24 +836,31 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
     setState(() => _coachSpeaking = true);
     try {
       final bool usesCloudVoice = _usesCloudVoice(settings.selectedDigitalHuman);
-      if (usesCloudVoice) {
-        String? remote = ttsUrl;
-        if (remote == null || remote.isEmpty) {
-          try {
-            remote = await _pipelineClient.synthesizeSpeech(
-              rawBaseUrl: settings.oralCoachPipelineUrl,
-              text: speak,
-              digitalHumanId: settings.selectedDigitalHuman.id,
-              ttsVoice: _coachVoice(settings.selectedDigitalHuman),
-              language: _preferChineseReply ? 'zh' : 'en',
-            );
-          } catch (_) {
-            // The local voice remains available when cloud synthesis fails.
-          }
+      String? remote = ttsUrl;
+      String provider = '';
+      if (remote == null || remote.isEmpty) {
+        try {
+          final result = await _pipelineClient.synthesizeSpeechWithProvider(
+            rawBaseUrl: settings.oralCoachPipelineUrl,
+            text: speak,
+            digitalHumanId: settings.selectedDigitalHuman.id,
+            ttsVoice: _coachVoice(settings.selectedDigitalHuman),
+            language: _preferChineseReply ? 'zh' : 'en',
+          );
+          remote = result?.url;
+          provider = result?.provider ?? '';
+        } catch (_) {
+          // Use device TTS if the voice service is unavailable.
         }
-        if (remote != null && remote.isNotEmpty && await _playRemoteTts(remote)) {
-          return;
-        }
+      }
+      if (!mounted || !_started) return;
+      if (remote != null && remote.isNotEmpty) {
+        setState(() => _voicePlaybackLabel = switch (provider) {
+          'qwen-audio' => '阿里云陪练音色',
+          'edge' => usesCloudVoice ? '备用音色 · Edge' : '中文音色 · Edge',
+          _ => '在线音色',
+        });
+        if (await _playRemoteTts(remote)) return;
       }
       if (_wantsLiveTalking(settings)) {
         await _ensureLiveTalking(settings);
@@ -858,9 +876,8 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
           }
         }
       }
-      if (!usesCloudVoice && ttsUrl != null && ttsUrl.isNotEmpty && await _playRemoteTts(ttsUrl))
-        return;
       if (!mounted || !_started) return;
+      setState(() => _voicePlaybackLabel = '备用音色 · 本机');
       await _configureLocalPersonaVoice(settings.selectedDigitalHuman);
       await _cartoonTts.awaitSpeakCompletion(true);
       if (!mounted || !_started) return;
@@ -978,6 +995,9 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
         : null;
     setState(() {
       _started = true;
+      _roundStartBubble = _bubbles.length;
+      _lastRoundTurns = 0;
+      _lastRoundExpressions = const <String>[];
       _error = null;
       _status = '你可以开始说';
       if (opening != null)
@@ -1000,6 +1020,7 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
   Future<void> _applyScenario(LearningScenario scenario) async {
     if (_busy || _coachSpeaking) return;
     final LearningSettingsState settings = ref.read(learningSettingsProvider);
+    if (widget.standalone) _saveHistory();
     setState(() {
       _activeScenario = scenario;
       _difficulty = scenario.difficulty;
@@ -1020,13 +1041,18 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
                   ]);
       _topicCursor = 0;
       _bubbles.clear();
+      _lastRoundTurns = 0;
+      _lastRoundExpressions = const <String>[];
+      _pendingResay = null;
+      _showZhIndexes.clear();
+      _historyLoading = widget.standalone;
       _started = false;
       _sessionTicker?.cancel();
       _sessionStartedAt = null;
       _error = null;
       _status = '已切换场景：${scenario.title}';
     });
-    _saveHistory();
+    if (!widget.standalone) _saveHistory();
     if (_session != null && _usesVoicePipeline(settings)) {
       try {
         await _pipelineClient.updateContext(
@@ -1038,7 +1064,12 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
         _sessionPreparation = null;
       }
     }
-    _startTopicConversation();
+    if (!mounted) return;
+    if (widget.standalone) {
+      await _restoreHistoryAndStart();
+    } else {
+      _startTopicConversation();
+    }
   }
 
   void _armSessionClock() {
@@ -1245,6 +1276,37 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
     await _speakCoach(reply, settings);
   }
 
+  Future<String?> _reviewTranscript(String transcript) {
+    String edited = transcript.trim();
+    return showDialog<String>(
+      context: context,
+      builder: (BuildContext dialogContext) => StatefulBuilder(
+        builder: (BuildContext context, StateSetter update) => AlertDialog(
+          title: const Text('确认语音转写'),
+          content: TextFormField(
+            initialValue: edited,
+            minLines: 2,
+            maxLines: 5,
+            decoration: const InputDecoration(hintText: '输入或修改刚才说的话'),
+            onChanged: (String value) => update(() => edited = value),
+          ),
+          actions: <Widget>[
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext, ''),
+              child: const Text('重新录音'),
+            ),
+            FilledButton(
+              onPressed: edited.trim().isEmpty
+                  ? null
+                  : () => Navigator.pop(dialogContext, edited.trim()),
+              child: const Text('发送给教练'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   void _updateReplyLanguageFromLearner(String transcript) {
     if (learnerRequestsChineseReply(transcript)) {
       _preferChineseReply = true;
@@ -1268,8 +1330,16 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
       audioPath: audioPath,
     );
     if (!mounted || !identical(_session, session)) return;
-    final String confirmed = draft.transcript.trim();
-    if (confirmed.isEmpty) throw StateError('语音转写为空');
+    final String? confirmed = await _reviewTranscript(draft.transcript);
+    if (!mounted || !_started || !identical(_session, session)) return;
+    if (confirmed == null || confirmed.isEmpty) {
+      setState(() {
+        _busy = false;
+        _status = '点麦克风重新录音';
+      });
+      if (confirmed == '') await _onHoldStart();
+      return;
+    }
 
     final OralExpressionDiagnosis? pending = _pendingResay;
     if (pending != null) {
@@ -1890,8 +1960,16 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
     _sessionStartedAt = null;
     _liveTalkingPreparation = null;
     await _liveTalking.disconnect();
+    final List<_ChatBubble> round = _bubbles.skip(_roundStartBubble).toList();
+    final Set<String> expressions = <String>{
+      for (final _ChatBubble bubble in round)
+        if (bubble.diagnosis case final OralExpressionDiagnosis diagnosis)
+          if (diagnosis.idiomaticEn.trim().isNotEmpty) diagnosis.idiomaticEn.trim(),
+    };
     setState(() {
       _started = false;
+      _lastRoundTurns = round.where((_ChatBubble bubble) => bubble.role == 'user').length;
+      _lastRoundExpressions = expressions.take(3).toList(growable: false);
       _session = null;
       _sessionPreparation = null;
       _liveRenderer = null;
@@ -1902,8 +1980,42 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
       _error = null;
       _status = '已结束 · 点麦克风重新开始';
     });
+    _saveHistory();
     await _cartoonTts.stop();
     await _speechPlayer?.stop();
+  }
+
+  void _showRoundSummary() {
+    unawaited(showDialog<void>(
+      context: context,
+      builder: (BuildContext context) => AlertDialog(
+        title: const Text('本轮练习小结'),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: <Widget>[
+              Text('$_topicLabel · 开口 $_lastRoundTurns 次'),
+              if (_lastRoundExpressions.isNotEmpty) ...<Widget>[
+                const SizedBox(height: 12),
+                const Text('可以再练的表达'),
+                for (final String expression in _lastRoundExpressions)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 6),
+                    child: Text(expression),
+                  ),
+              ],
+            ],
+          ),
+        ),
+        actions: <Widget>[
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('完成'),
+          ),
+        ],
+      ),
+    ));
   }
 
   void _scrollChatToEnd() {
@@ -2263,13 +2375,22 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
                   _GlassChip(
                     onTap: _showSceneSheet,
                     child: Text(
-                      _started ? _sessionClockLabel : '准备中',
+                      _started ? _sessionClockLabel : '已结束',
                       style: const TextStyle(color: Colors.white, fontSize: 12),
                     ),
                   ),
                 ],
               ),
             ),
+            if (!_started && _lastRoundTurns > 0)
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+                child: OutlinedButton.icon(
+                  icon: const Icon(Icons.summarize_outlined),
+                  label: Text('本轮小结 · $_lastRoundTurns 次开口'),
+                  onPressed: _showRoundSummary,
+                ),
+              ),
             if (_error != null)
               Padding(
                 padding: const EdgeInsets.fromLTRB(16, 4, 16, 0),
@@ -2518,6 +2639,8 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
                 ),
               ),
             const SizedBox(height: 6),
+            if (_voicePlaybackLabel case final String label)
+              Text(label, style: const TextStyle(color: Colors.white70, fontSize: 11)),
             Text(
               orbHint,
               style: TextStyle(
@@ -2532,37 +2655,31 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: <Widget>[
                   _DockRoundButton(
-                    icon: _liveSceneOn
-                        ? Icons.videocam_rounded
-                        : Icons.photo_camera_outlined,
+                    label: '相机',
+                    icon: _liveSceneOn ? Icons.videocam_rounded : Icons.photo_camera_outlined,
                     active: _liveSceneOn || _sceneDescription.isNotEmpty,
                     onTap: _busy ? null : () => unawaited(_openSceneCapture()),
                   ),
                   _DockRoundButton(
+                    label: '场景',
                     icon: Icons.grid_view_rounded,
                     onTap: _showSceneSheet,
                   ),
-                  Tooltip(
-                    message: '陪练音色',
-                    child: _DockRoundButton(
-                      icon: Icons.record_voice_over_outlined,
-                      onTap: _busy ? null : _chooseEnglishVoice,
+                  _DockRoundButton(
+                    label: '音色',
+                    icon: Icons.record_voice_over_outlined,
+                    onTap: _busy ? null : _chooseEnglishVoice,
+                  ),
+                  _DockRoundButton(
+                    label: _recordingActive ? '停止' : '说话',
+                    icon: _recordingActive ? Icons.stop_rounded : Icons.mic_rounded,
+                    active: _recordingActive,
+                    onTap: _busy ? null : () => unawaited(
+                      _recordingActive ? _stopRecordingAndSend() : _onHoldStart(),
                     ),
                   ),
                   _DockRoundButton(
-                    icon: _recordingActive
-                        ? Icons.stop_rounded
-                        : Icons.mic_rounded,
-                    active: _recordingActive,
-                    onTap: _busy
-                        ? null
-                        : () => unawaited(
-                            _recordingActive
-                                ? _stopRecordingAndSend()
-                                : _onHoldStart(),
-                          ),
-                  ),
-                  _DockRoundButton(
+                    label: '结束',
                     icon: Icons.call_end_rounded,
                     danger: true,
                     onTap: () => unawaited(_hangUp()),
@@ -2603,12 +2720,14 @@ class _GlassChip extends StatelessWidget {
 class _DockRoundButton extends StatelessWidget {
   const _DockRoundButton({
     required this.icon,
+    required this.label,
     this.onTap,
     this.active = false,
     this.danger = false,
   });
 
   final IconData icon;
+  final String label;
   final VoidCallback? onTap;
   final bool active;
   final bool danger;
@@ -2620,7 +2739,10 @@ class _DockRoundButton extends StatelessWidget {
         : active
         ? const Color(0xFF7C5CFF)
         : Colors.white.withValues(alpha: 0.12);
-    return Material(
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: <Widget>[
+        Material(
       color: fill,
       shape: const CircleBorder(),
       child: InkWell(
@@ -2636,6 +2758,10 @@ class _DockRoundButton extends StatelessWidget {
           ),
         ),
       ),
+        ),
+        const SizedBox(height: 3),
+        Text(label, style: const TextStyle(color: Colors.white70, fontSize: 11)),
+      ],
     );
   }
 }

@@ -193,6 +193,20 @@ class OralCoachPipelineClient {
     required String digitalHumanId,
     String? ttsVoice,
     String language = 'en',
+  }) async => (await synthesizeSpeechWithProvider(
+    rawBaseUrl: rawBaseUrl,
+    text: text,
+    digitalHumanId: digitalHumanId,
+    ttsVoice: ttsVoice,
+    language: language,
+  ))?.url;
+
+  Future<({String url, String provider})?> synthesizeSpeechWithProvider({
+    required String rawBaseUrl,
+    required String text,
+    required String digitalHumanId,
+    String? ttsVoice,
+    String language = 'en',
   }) async {
     final String spoken = text.trim();
     if (spoken.isEmpty) {
@@ -220,16 +234,15 @@ class OralCoachPipelineClient {
     if (relative.isEmpty) {
       return null;
     }
+    final String url;
     if (relative.startsWith('http://') || relative.startsWith('https://')) {
-      return relative;
+      url = relative;
+    } else if (relative.startsWith('//')) {
+      url = 'https:$relative';
+    } else {
+      url = relative.startsWith('/') ? '$base$relative' : '$base/$relative';
     }
-    if (relative.startsWith('//')) {
-      return 'https:$relative';
-    }
-    if (relative.startsWith('/')) {
-      return '$base$relative';
-    }
-    return '$base/$relative';
+    return (url: url, provider: '${body['provider'] ?? ''}');
   }
 
   Future<OralCoachTurnResult> turn({
@@ -336,10 +349,12 @@ class OralCoachVideoContext {
     'digital_human_id': digitalHumanId,
     if (ttsVoice.trim().isNotEmpty) 'tts_voice': ttsVoice.trim(),
     'reply_language': replyLanguage,
-    if (scenarioTaskId.trim().isNotEmpty) 'scenario_task_id': scenarioTaskId.trim(),
+    if (scenarioTaskId.trim().isNotEmpty)
+      'scenario_task_id': scenarioTaskId.trim(),
     if (scenarioTitle.trim().isNotEmpty) 'scenario_title': scenarioTitle.trim(),
     if (scenarioGoal.trim().isNotEmpty) 'scenario_goal': scenarioGoal.trim(),
-    if (scenarioPrompt.trim().isNotEmpty) 'scenario_prompt': scenarioPrompt.trim(),
+    if (scenarioPrompt.trim().isNotEmpty)
+      'scenario_prompt': scenarioPrompt.trim(),
     if (sceneDescription.trim().isNotEmpty)
       'scene_description': sceneDescription.trim(),
   };
