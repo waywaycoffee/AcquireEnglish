@@ -10,8 +10,8 @@ class ExamListeningScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return ModuleGate(
-      moduleCode: 'exam_listening',
-      title: '听力专项',
+      moduleCode: 'exam',
+      title: '考试模块',
       child: Scaffold(
         appBar: AppBar(title: const Text('听力专项')),
         body: ListView(

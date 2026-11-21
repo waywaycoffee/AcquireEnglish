@@ -1,4 +1,4 @@
-"""Four-module catalog + combo SKUs (PRD P0 pricing)."""
+"""Four product-module catalog + combo SKUs (PRD P0 pricing)."""
 
 from __future__ import annotations
 
@@ -9,57 +9,68 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models import ProductSku
 
-# Content axis × capability axis → four sellable modules.
+# Product-area sellable modules (paywall buckets).
 MODULE_DEFS: list[dict] = [
     {
-        "code": "exam_reading",
-        "title": "考试阅读",
-        "axis": "exam",
-        "capability": "reading",
-        "monthly_cents": 990,
-        "list_cents": 2990,
-        "yearly_cents": 9900,
-        "yearly_list_cents": 29900,
-        "quota": {"articles": 40, "ai_explain": 12},
-        "blurb": "题型对齐 · 精读额度 · AI 精讲",
-    },
-    {
-        "code": "exam_listening",
-        "title": "考试听说",
-        "axis": "exam",
-        "capability": "listening",
-        "monthly_cents": 1290,
-        "list_cents": 3990,
-        "yearly_cents": 12900,
-        "yearly_list_cents": 39900,
-        "quota": {"coach_minutes": 60, "dialogs": 6},
-        "blurb": "听说训练 · 陪练分钟 · 对话练习",
-    },
-    {
-        "code": "acquire_reading",
-        "title": "习得阅读",
-        "axis": "acquire",
-        "capability": "reading",
-        "monthly_cents": 990,
-        "list_cents": 2990,
-        "yearly_cents": 9900,
-        "yearly_list_cents": 29900,
-        "quota": {"books": 2, "articles": 6},
-        "blurb": "自建教材 · 解构复用 · 精读积累",
-    },
-    {
-        "code": "acquire_listening",
-        "title": "习得听说",
-        "axis": "acquire",
+        "code": "video",
+        "title": "视频模块",
+        "axis": "video",
         "capability": "listening",
         "monthly_cents": 1290,
         "list_cents": 3990,
         "yearly_cents": 12900,
         "yearly_list_cents": 39900,
         "quota": {"coach_minutes": 60, "video_lessons": 4},
-        "blurb": "视频跟读 · 陪练 · 碎片精听",
+        "blurb": "视频跟读 · 精听 · 听说训练",
+    },
+    {
+        "code": "reading",
+        "title": "阅读模块",
+        "axis": "reading",
+        "capability": "reading",
+        "monthly_cents": 990,
+        "list_cents": 2990,
+        "yearly_cents": 9900,
+        "yearly_list_cents": 29900,
+        "quota": {"books": 2, "articles": 6, "ai_explain": 12},
+        "blurb": "精读泛读 · AI 精讲 · 词句积累",
+    },
+    {
+        "code": "exam",
+        "title": "考试模块",
+        "axis": "exam",
+        "capability": "exam",
+        "monthly_cents": 1290,
+        "list_cents": 3990,
+        "yearly_cents": 12900,
+        "yearly_list_cents": 39900,
+        "quota": {"articles": 40, "coach_minutes": 60, "dialogs": 6},
+        "blurb": "备考阅读 · 听说专项 · 模考练习",
+    },
+    {
+        "code": "course",
+        "title": "课程板块",
+        "axis": "course",
+        "capability": "course",
+        "monthly_cents": 990,
+        "list_cents": 2990,
+        "yearly_cents": 9900,
+        "yearly_list_cents": 29900,
+        "quota": {"courses": 4, "lessons": 20},
+        "blurb": "教材课 · 课程解构 · 自建课表",
     },
 ]
+
+# Old content×capability codes → new product buckets (existing purchasers).
+LEGACY_MODULE_ALIASES: dict[str, list[str]] = {
+    "exam_reading": ["exam"],
+    "exam_listening": ["exam"],
+    "acquire_reading": ["reading", "course"],
+    "acquire_listening": ["video"],
+}
+
+MODULE_CODES: set[str] = {str(m["code"]) for m in MODULE_DEFS}
+LEGACY_MODULE_CODES: set[str] = set(LEGACY_MODULE_ALIASES.keys())
 
 COMBO_SKUS: list[dict] = [
     {
@@ -124,6 +135,48 @@ EFFICIENCY_SKUS: list[dict] = [
 ]
 
 
+def entitlement_refs_for_module(module_code: str) -> set[str]:
+    """Entitlement asset_ref values that unlock ``module_code`` (new or legacy)."""
+    code = (module_code or "").strip()
+    if not code:
+        return set()
+    refs: set[str] = {code}
+    if code in LEGACY_MODULE_ALIASES:
+        refs.update(LEGACY_MODULE_ALIASES[code])
+    for legacy, news in LEGACY_MODULE_ALIASES.items():
+        if code in news:
+            refs.add(legacy)
+            refs.update(news)
+    return refs
+
+
+def expand_unlocked_module_codes(raw_refs: list[str] | set[str]) -> list[str]:
+    """Map stored entitlement refs (incl. legacy) onto current MODULE_DEFS codes."""
+    unlocked: set[str] = set()
+    for ref in raw_refs:
+        code = (ref or "").strip()
+        if not code:
+            continue
+        if code in MODULE_CODES:
+            unlocked.add(code)
+        elif code in LEGACY_MODULE_ALIASES:
+            unlocked.update(LEGACY_MODULE_ALIASES[code])
+    return [str(m["code"]) for m in MODULE_DEFS if m["code"] in unlocked]
+
+
+def normalize_module_code(module_code: str) -> str | None:
+    """Resolve request code to a current catalog code (legacy → primary new)."""
+    code = (module_code or "").strip()
+    if not code:
+        return None
+    if code in MODULE_CODES:
+        return code
+    mapped = LEGACY_MODULE_ALIASES.get(code)
+    if mapped:
+        return mapped[0]
+    return None
+
+
 def _module_skus() -> list[dict]:
     rows: list[dict] = []
     for mod in MODULE_DEFS:
@@ -179,6 +232,15 @@ def _module_skus() -> list[dict]:
     return rows
 
 
+def _legacy_module_sku_codes() -> list[str]:
+    suffixes = ("monthly", "yearly", "permanent")
+    return [
+        f"module.{code}.{suffix}"
+        for code in LEGACY_MODULE_CODES
+        for suffix in suffixes
+    ]
+
+
 async def ensure_commerce_skus(db: AsyncSession) -> int:
     """Upsert commerce SKUs (idempotent). Returns number inserted."""
     inserted = 0
@@ -213,6 +275,14 @@ async def ensure_commerce_skus(db: AsyncSession) -> int:
             row.duration_days = spec.get("duration_days")
             row.meta_json = meta
             row.active = 1
+    # Hide retired content×capability SKUs from storefront; keep rows for history.
+    for sku_code in _legacy_module_sku_codes():
+        existing = await db.execute(
+            select(ProductSku).where(ProductSku.sku_code == sku_code)
+        )
+        row = existing.scalar_one_or_none()
+        if row is not None:
+            row.active = 0
     await db.commit()
     return inserted
 
@@ -269,4 +339,7 @@ def public_commerce_catalog() -> dict:
             }
             for e in EFFICIENCY_SKUS
         ],
+        "legacy_aliases": {
+            legacy: list(news) for legacy, news in LEGACY_MODULE_ALIASES.items()
+        },
     }

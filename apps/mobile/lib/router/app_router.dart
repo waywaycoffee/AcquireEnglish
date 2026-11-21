@@ -147,8 +147,8 @@ GoRouter goRouter(Ref ref) => GoRouter(
         );
         if (kind == 'listening' || kind == 'dialogue') {
           return ModuleGate(
-            moduleCode: 'acquire_listening',
-            title: '习得听说',
+            moduleCode: 'video',
+            title: '视频模块',
             child: screen,
           );
         }
@@ -205,17 +205,10 @@ GoRouter goRouter(Ref ref) => GoRouter(
           skill: mock ? 'mock' : skill,
           mock: mock,
         );
-        if (!mock && skill == 'reading') {
+        if (!mock && (skill == 'reading' || skill == 'listening')) {
           return ModuleGate(
-            moduleCode: 'exam_reading',
-            title: '考试阅读',
-            child: session,
-          );
-        }
-        if (!mock && skill == 'listening') {
-          return ModuleGate(
-            moduleCode: 'exam_listening',
-            title: '考试听说',
+            moduleCode: 'exam',
+            title: '考试模块',
             child: session,
           );
         }
@@ -415,24 +408,24 @@ GoRouter goRouter(Ref ref) => GoRouter(
     GoRoute(
       path: '/reading',
       builder: (BuildContext context, GoRouterState state) => const ModuleGate(
-        moduleCode: 'acquire_reading',
-        title: '习得阅读',
+        moduleCode: 'reading',
+        title: '阅读模块',
         child: ReadingHubScreen(),
       ),
     ).fade(),
     GoRoute(
       path: '/reading/catalog',
       builder: (BuildContext context, GoRouterState state) => const ModuleGate(
-        moduleCode: 'acquire_reading',
-        title: '习得阅读',
+        moduleCode: 'reading',
+        title: '阅读模块',
         child: ReadingCatalogScreen(),
       ),
     ).fade(),
     GoRoute(
       path: '/material-courses',
       builder: (BuildContext context, GoRouterState state) => const ModuleGate(
-        moduleCode: 'acquire_reading',
-        title: '我的教材课',
+        moduleCode: 'course',
+        title: '课程板块',
         child: MyMaterialCoursesScreen(),
       ),
     ).fade(),
@@ -443,8 +436,8 @@ GoRouter goRouter(Ref ref) => GoRouter(
           state.pathParameters['courseId'] ?? '',
         );
         return ModuleGate(
-          moduleCode: 'acquire_reading',
-          title: '我的教材课',
+          moduleCode: 'course',
+          title: '课程板块',
           child: MaterialCourseEditScreen(courseId: courseId),
         );
       },
@@ -456,8 +449,8 @@ GoRouter goRouter(Ref ref) => GoRouter(
           state.pathParameters['docId'] ?? '',
         );
         return ModuleGate(
-          moduleCode: 'acquire_reading',
-          title: '习得阅读',
+          moduleCode: 'reading',
+          title: '阅读模块',
           child: ReadingReaderScreen(docId: docId),
         );
       },

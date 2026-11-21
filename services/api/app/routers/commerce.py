@@ -9,7 +9,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.database import get_db
 from app.deps import get_current_user
 from app.models import User
-from app.services.commerce.catalog import MODULE_DEFS, public_commerce_catalog
+from app.services.commerce.catalog import (
+    LEGACY_MODULE_CODES,
+    MODULE_CODES,
+    MODULE_DEFS,
+    normalize_module_code,
+    public_commerce_catalog,
+)
 from app.services.commerce.points import earn_points, points_summary, spend_points
 from app.services.commerce.trial import (
     claim_trial_extend_coupon,
@@ -19,7 +25,7 @@ from app.services.user_assets import list_active_entitlements, user_has_module_a
 
 router = APIRouter(prefix="/commerce", tags=["commerce"])
 
-_MODULE_CODES = {str(m["code"]) for m in MODULE_DEFS}
+_MODULE_CODES = MODULE_CODES | LEGACY_MODULE_CODES
 
 
 class PointsEarnIn(BaseModel):
@@ -57,10 +63,15 @@ async def commerce_module_access(
     code = module_code.strip()
     if code not in _MODULE_CODES:
         raise HTTPException(status_code=404, detail="unknown_module")
+    canonical = normalize_module_code(code) or code
     allowed = await user_has_module_access(db, user.id, code)
-    title = next((m["title"] for m in MODULE_DEFS if m["code"] == code), code)
+    title = next(
+        (m["title"] for m in MODULE_DEFS if m["code"] == canonical),
+        code,
+    )
     return {
-        "module": code,
+        "module": canonical,
+        "requested": code,
         "title": title,
         "allowed": allowed,
         "paywall": not allowed,

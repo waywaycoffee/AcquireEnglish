@@ -106,7 +106,7 @@ class _ModuleGateState extends ConsumerState<ModuleGate> {
               ),
               const SizedBox(height: 8),
               const Text(
-                '体验期 / Pro 或单独购买模块后即可进入。',
+                '体验期 / Pro 或单独购买本板块后即可进入。',
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: 16),

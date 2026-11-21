@@ -55,11 +55,12 @@ async def test_commerce_catalog_public():
         body = res.json()
         codes = {m["code"] for m in body["modules"]}
         assert codes == {
-            "exam_reading",
-            "exam_listening",
-            "acquire_reading",
-            "acquire_listening",
+            "video",
+            "reading",
+            "exam",
+            "course",
         }
+        assert body.get("legacy_aliases", {}).get("acquire_listening") == ["video"]
         assert any(c["sku_code"] == "module.combo.any2.monthly" for c in body["combos"])
 
 
@@ -80,11 +81,13 @@ async def test_new_user_full_trial_and_module_access():
             if e["asset_kind"] == "module" and e["status"] == "active"
         }
         assert module_refs >= {
-            "exam_reading",
-            "exam_listening",
-            "acquire_reading",
-            "acquire_listening",
+            "video",
+            "reading",
+            "exam",
+            "course",
         }
+        unlocked = set(body.get("unlocked_modules") or [])
+        assert unlocked >= {"video", "reading", "exam", "course"}
 
         trial = await client.get("/api/commerce/trial/status", headers=headers)
         assert trial.status_code == 200, trial.text
@@ -95,10 +98,17 @@ async def test_new_user_full_trial_and_module_access():
         assert t["extend_claimed"] is False
 
         access = await client.get(
-            "/api/commerce/modules/exam_listening/access", headers=headers
+            "/api/commerce/modules/exam/access", headers=headers
         )
         assert access.status_code == 200
         assert access.json()["allowed"] is True
+        # Legacy code still accepted and maps to exam.
+        legacy = await client.get(
+            "/api/commerce/modules/exam_listening/access", headers=headers
+        )
+        assert legacy.status_code == 200
+        assert legacy.json()["allowed"] is True
+        assert legacy.json()["module"] == "exam"
 
 
 @pytest.mark.asyncio
@@ -167,6 +177,59 @@ async def test_claim_trial_extend_after_login_days():
             assert coupon.used == 0
             assert coupon.kind == "days"
             assert coupon.value == TRIAL_DAYS
+
+
+@pytest.mark.asyncio
+async def test_legacy_entitlement_aliases_unlock_new_modules():
+    transport = ASGITransport(app=fastapi_app)
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
+        token = await _sms_token(client, phone="13900008888")
+        headers = {"Authorization": f"Bearer {token}"}
+        me = await client.get("/api/auth/me", headers=headers)
+        user_id = int(me.json()["id"])
+
+        async with SessionLocal() as session:
+            from app.models import UserEntitlement
+
+            # Strip trial modules; leave only a legacy exam_reading entitlement.
+            ents = (
+                await session.execute(
+                    select(UserEntitlement).where(UserEntitlement.user_id == user_id)
+                )
+            ).scalars().all()
+            for ent in ents:
+                if ent.asset_kind == "module":
+                    ent.status = "expired"
+            session.add(
+                UserEntitlement(
+                    user_id=user_id,
+                    asset_kind="module",
+                    asset_ref="exam_reading",
+                    status="active",
+                    source="purchase",
+                    quantity=None,
+                    starts_at=datetime.now(timezone.utc),
+                    ends_at=datetime.now(timezone.utc) + timedelta(days=30),
+                    meta_json="{}",
+                )
+            )
+            # Also expire Pro so module check is not short-circuited.
+            for ent in ents:
+                if ent.asset_kind == "membership":
+                    ent.status = "expired"
+            await session.commit()
+
+        access = await client.get(
+            "/api/commerce/modules/exam/access", headers=headers
+        )
+        assert access.status_code == 200, access.text
+        assert access.json()["allowed"] is True
+
+        assets = await client.get("/api/assets", headers=headers)
+        assert assets.status_code == 200
+        unlocked = set(assets.json().get("unlocked_modules") or [])
+        assert "exam" in unlocked
+        assert "video" not in unlocked
 
 
 @pytest.mark.asyncio

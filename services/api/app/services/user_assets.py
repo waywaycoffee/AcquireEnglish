@@ -237,13 +237,37 @@ def _sku_meta(sku: ProductSku) -> dict:
 
 def _combo_module_codes(sku: ProductSku, *, selected_modules: list[str] | None) -> list[str]:
     """Resolve module codes for module_combo SKUs (all4 / any2 pick)."""
+    from app.services.commerce.catalog import LEGACY_MODULE_ALIASES, MODULE_CODES
+
     meta = _sku_meta(sku)
     catalog = [str(c) for c in (meta.get("modules") or []) if str(c).strip()]
+    # Prefer live catalog codes when SKU meta still lists retired modules.
+    if not catalog or any(c not in MODULE_CODES for c in catalog):
+        catalog = [c for c in catalog if c in MODULE_CODES] or sorted(MODULE_CODES)
+
+    def _normalize_pick(raw: str) -> str | None:
+        code = raw.strip()
+        if code in MODULE_CODES:
+            return code
+        mapped = LEGACY_MODULE_ALIASES.get(code)
+        return mapped[0] if mapped else None
+
     pick = meta.get("pick")
     if pick is not None:
         need = int(pick)
-        chosen = [str(c) for c in (selected_modules or meta.get("selected_modules") or []) if str(c).strip()]
-        if len(chosen) == need and all(c in catalog for c in chosen):
+        chosen_raw = [
+            str(c)
+            for c in (selected_modules or meta.get("selected_modules") or [])
+            if str(c).strip()
+        ]
+        chosen = []
+        seen: set[str] = set()
+        for raw in chosen_raw:
+            norm = _normalize_pick(raw)
+            if norm and norm in catalog and norm not in seen:
+                seen.add(norm)
+                chosen.append(norm)
+        if len(chosen) == need:
             return chosen
         # P0 fallback when checkout did not send a pick: first N catalog modules.
         if len(catalog) >= need:
@@ -283,12 +307,11 @@ async def grant_from_sku(
             raise ValueError(f"combo_modules_empty:{sku.sku_code}")
         granted: list[UserEntitlement] = []
         for code in codes:
-            granted.append(
-                await grant_entitlement(
+            granted.extend(
+                await _grant_module_refs(
                     db,
                     user_id,
-                    asset_kind="module",
-                    asset_ref=code,
+                    code,
                     source=source,
                     quantity=units,
                     duration_days=sku.duration_days,
@@ -299,11 +322,22 @@ async def grant_from_sku(
         return granted
     # module / module_permanent map to asset_kind=module (permanent → no ends_at).
     duration = None if sku.kind == "module_permanent" else sku.duration_days
-    asset_kind = "module" if sku.kind in ("module", "module_permanent") else kind
+    if sku.kind in ("module", "module_permanent") or kind == "module":
+        granted = await _grant_module_refs(
+            db,
+            user_id,
+            ref,
+            source=source,
+            quantity=units,
+            duration_days=duration,
+            order_id=order_id,
+            meta=grant_meta,
+        )
+        return granted[0] if len(granted) == 1 else granted
     return await grant_entitlement(
         db,
         user_id,
-        asset_kind=asset_kind,
+        asset_kind=kind,
         asset_ref=ref,
         source=source,
         quantity=units,
@@ -311,6 +345,42 @@ async def grant_from_sku(
         order_id=order_id,
         meta=grant_meta,
     )
+
+
+async def _grant_module_refs(
+    db: AsyncSession,
+    user_id: int,
+    ref: str,
+    *,
+    source: str,
+    quantity: int | None,
+    duration_days: int | None,
+    order_id: int | None,
+    meta: dict,
+) -> list[UserEntitlement]:
+    """Grant current module code(s); remaps legacy refs onto new buckets."""
+    from app.services.commerce.catalog import LEGACY_MODULE_ALIASES, MODULE_CODES
+
+    code = (ref or "").strip()
+    targets = LEGACY_MODULE_ALIASES.get(code) or (
+        [code] if code in MODULE_CODES else [code]
+    )
+    granted: list[UserEntitlement] = []
+    for target in targets:
+        granted.append(
+            await grant_entitlement(
+                db,
+                user_id,
+                asset_kind="module",
+                asset_ref=target,
+                source=source,
+                quantity=quantity,
+                duration_days=duration_days,
+                order_id=order_id,
+                meta={**meta, "granted_from": code} if target != code else meta,
+            )
+        )
+    return granted
 
 
 async def consume_entitlement(
@@ -401,22 +471,31 @@ async def user_has_module_access(
     user_id: int,
     module_code: str,
 ) -> bool:
-    """True if Pro membership / full trial, or an active module entitlement."""
+    """True if Pro membership / full trial, or an active module entitlement.
+
+    Accepts current product codes (video/reading/exam/course) and legacy
+    content×capability codes; legacy entitlements unlock their mapped buckets.
+    """
+    from app.services.commerce.catalog import entitlement_refs_for_module
+
     code = (module_code or "").strip()
     if not code:
+        return False
+    accepted = entitlement_refs_for_module(code)
+    if not accepted:
         return False
     rows = await list_active_entitlements(db, user_id)
     for row in rows:
         if row.asset_kind == "membership" and row.asset_ref == "pro":
             return True
-        if row.asset_kind == "module" and row.asset_ref == code:
+        if row.asset_kind == "module" and (row.asset_ref or "").strip() in accepted:
             return True
     return False
 
 
 def unlocked_module_codes(entitlements: list[UserEntitlement]) -> list[str]:
     """Module codes unlocked via module rows or Pro membership (all modules)."""
-    from app.services.commerce.catalog import MODULE_DEFS
+    from app.services.commerce.catalog import MODULE_DEFS, expand_unlocked_module_codes
 
     has_pro = any(
         row.asset_kind == "membership" and row.asset_ref == "pro"
@@ -424,7 +503,7 @@ def unlocked_module_codes(entitlements: list[UserEntitlement]) -> list[str]:
     )
     if has_pro:
         return [str(m["code"]) for m in MODULE_DEFS]
-    codes: list[str] = []
+    raw: list[str] = []
     seen: set[str] = set()
     for row in entitlements:
         if row.asset_kind != "module":
@@ -433,8 +512,8 @@ def unlocked_module_codes(entitlements: list[UserEntitlement]) -> list[str]:
         if not ref or ref in seen:
             continue
         seen.add(ref)
-        codes.append(ref)
-    return codes
+        raw.append(ref)
+    return expand_unlocked_module_codes(raw)
 
 
 async def create_order(

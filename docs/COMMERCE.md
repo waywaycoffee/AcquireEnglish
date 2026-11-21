@@ -4,16 +4,24 @@ P0 commercialization for Acquire English: modular SKUs, 7-day full-feature trial
 
 ## Modules
 
-Four sellable modules (content × capability):
+Four sellable product buckets:
 
-| Code | Title |
-|------|--------|
-| `exam_reading` | 考试阅读 |
-| `exam_listening` | 考试听说 |
-| `acquire_reading` | 习得阅读 |
-| `acquire_listening` | 习得听说 |
+| Code | Title | Gates (examples) |
+|------|--------|------------------|
+| `video` | 视频模块 | 听说课 / 对话课（原习得听说） |
+| `reading` | 阅读模块 | 阅读中心 / 书目 / 读者 |
+| `exam` | 考试模块 | 考试阅读与听说专项 |
+| `course` | 课程板块 | 教材课 / 课程解构 |
 
-Combos: `module.combo.any2.monthly` (pick 2), `module.combo.all4.monthly` / `.yearly`. Permanent unlocks: `module.{code}.permanent`.
+Legacy aliases (existing entitlements still unlock):
+
+| Old code | → New |
+|----------|-------|
+| `exam_reading` / `exam_listening` | `exam` |
+| `acquire_reading` | `reading` + `course` |
+| `acquire_listening` | `video` |
+
+Combos: `module.combo.any2.monthly` (pick 2), `module.combo.all4.monthly` / `.yearly`. Permanent unlocks: `module.{code}.permanent`. Retired legacy SKUs are deactivated on `ensure_commerce_skus`.
 
 SKUs are upserted on API startup via `ensure_commerce_skus` (after `ensure_default_skus`). Entitlements use `asset_kind=module` and `asset_ref=<code>`. Combo orders may pass `selected_modules` on create-order for any2.
 
@@ -51,7 +59,7 @@ Related: `/api/assets/membership-coupons/{id}/redeem` honors `trial_extend_7` fu
 
 Membership screen shows trial banner (days left / login streak / claim), module/combo purchase (any2 uses `selected_modules`), points balance + spend catalog, and module catalog cards; client methods live on `AcquireApiClient` (`commerce*`).
 
-Module entry gates (`ModuleGate`): `exam_reading` / `exam_listening` / `acquire_reading` / `acquire_listening`. Access = active Pro (incl. full trial) **or** matching `asset_kind=module` entitlement. API: `GET /api/commerce/modules/{code}/access`.
+Module entry gates (`ModuleGate`): `video` / `reading` / `exam` / `course`. Access = active Pro (incl. full trial) **or** matching module entitlement (incl. legacy aliases). API: `GET /api/commerce/modules/{code}/access` (accepts legacy codes).
 
 Points earn hooks (client → `POST /api/commerce/points/earn`):
 

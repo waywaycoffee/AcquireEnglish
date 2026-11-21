@@ -208,8 +208,8 @@ class _MembershipScreenState extends ConsumerState<MembershipScreen> {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         const SizedBox(height: 16),
-        Text('学习模块', style: Theme.of(context).textTheme.titleLarge),
-        const Text('点选月卡/年卡/永久解锁后，用下方微信支付开通；任选两模块需勾选两个。'),
+        Text('付费板块', style: Theme.of(context).textTheme.titleLarge),
+        const Text('视频 / 阅读 / 考试 / 课程：点选月卡、年卡或永久解锁后微信支付；任选两板块需勾选两个。'),
         for (final mod in _modules) ...[
           Card(
             child: Column(
@@ -279,7 +279,7 @@ class _MembershipScreenState extends ConsumerState<MembershipScreen> {
                 title: Text('${combo['title']}'),
                 subtitle: Text(
                   '${combo['duration_days'] ?? ''} 天'
-                  '${combo['pick'] != null ? ' · 任选 ${combo['pick']} 模块（勾选上方模块）' : ''}',
+                  '${combo['pick'] != null ? ' · 任选 ${combo['pick']} 板块（勾选上方板块）' : ''}',
                 ),
                 trailing: Text(
                   _money(combo['price_cents']),
@@ -387,7 +387,7 @@ class _MembershipScreenState extends ConsumerState<MembershipScreen> {
     }
     if (_selectedNeedsAny2() && _any2Picks.length != 2) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('任选两模块请先勾选恰好 2 个学习模块。')),
+        const SnackBar(content: Text('任选两板块请先勾选恰好 2 个付费板块。')),
       );
       return;
     }
