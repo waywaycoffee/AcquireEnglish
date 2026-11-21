@@ -4,6 +4,8 @@ import 'package:go_router/go_router.dart';
 
 import '../../library/presentation/library_catalog_provider.dart';
 import '../../library/presentation/library_mock_data.dart';
+import '../../membership/domain/free_trial_seeds.dart';
+import '../../membership/domain/module_access.dart';
 import '../../../router/app_router.dart';
 import '../domain/bilibili_import.dart';
 import '../presentation/bilibili_import_sheet.dart';
@@ -113,6 +115,19 @@ Future<String?> openBilibiliLearningOrImport(
   final String url = watchUrl.trim();
   if (url.isEmpty) {
     return null;
+  }
+  final Map<String, String>? ids = BilibiliImport.extractIds(url);
+  final String bvid = (ids?['bvid'] ?? '').trim();
+  final bool seedFree =
+      bvid.isNotEmpty && isFreeTrialBilibiliBvid(bvid);
+  if (!seedFree) {
+    final bool unlocked = await resolveModuleUnlocked(ref, 'video');
+    if (!unlocked) {
+      if (context.mounted) {
+        await showModulePaywall(context, moduleCode: 'video');
+      }
+      return null;
+    }
   }
   final hit = findLibraryEpisodeForBilibiliInput(
     ref.read(libraryCatalogProvider),
