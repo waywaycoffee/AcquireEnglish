@@ -3,6 +3,9 @@ enum WordPracticeMode {
   /// Flip card + self grade (认记).
   recognize,
 
+  /// Audio only → recall meaning (听音).
+  listen,
+
   /// Type the English spelling from Chinese/definition (拼写).
   spell,
 
@@ -13,12 +16,14 @@ enum WordPracticeMode {
 extension WordPracticeModeX on WordPracticeMode {
   String get label => switch (this) {
     WordPracticeMode.recognize => '认记',
+    WordPracticeMode.listen => '听音',
     WordPracticeMode.spell => '拼写',
     WordPracticeMode.speak => '发音跟读',
   };
 
   String get hint => switch (this) {
     WordPracticeMode.recognize => '看词回想释义，自评难度',
+    WordPracticeMode.listen => '只听发音，识别单词与释义',
     WordPracticeMode.spell => '根据中文释义默写英文单词',
     WordPracticeMode.speak => '听示范后跟读，再自评',
   };
@@ -27,6 +32,8 @@ extension WordPracticeModeX on WordPracticeMode {
     switch (raw) {
       case 'recognize':
         return WordPracticeMode.recognize;
+      case 'listen':
+        return WordPracticeMode.listen;
       case 'spell':
         return WordPracticeMode.spell;
       case 'speak':
@@ -47,8 +54,7 @@ class WordReviewSettings {
     this.dailyReviewLimit = 50,
     this.enabledModes = const <WordPracticeMode>[
       WordPracticeMode.recognize,
-      WordPracticeMode.spell,
-      WordPracticeMode.speak,
+      WordPracticeMode.listen,
     ],
   });
 

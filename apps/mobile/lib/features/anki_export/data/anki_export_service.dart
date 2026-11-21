@@ -5,6 +5,8 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:share_plus/share_plus.dart';
 
+import '../../daily_review/domain/daily_review.dart';
+import '../../daily_review/presentation/daily_review_provider.dart';
 import '../../phrases/presentation/phrase_book_provider.dart';
 import '../../words/data/offline_word_dictionary.dart';
 import '../../words/presentation/word_book_provider.dart';
@@ -17,6 +19,7 @@ final Provider<AnkiExportService> ankiExportServiceProvider =
     Provider<AnkiExportService>(
       (Ref ref) => AnkiExportService(
         AnkiExportBuilder(ref.watch(offlineWordDictionaryProvider)),
+        reviewRecords: () => ref.read(dailyReviewProvider).records,
       ),
     );
 final Provider<AnkiExportSaver> ankiExportSaverProvider =
@@ -36,8 +39,13 @@ class AnkiExportFile {
 }
 
 class AnkiExportService {
-  AnkiExportService(this.builder);
+  AnkiExportService(
+    this.builder, {
+    Map<String, ReviewRecord> Function()? reviewRecords,
+  }) : _reviewRecords = reviewRecords ?? (() => const <String, ReviewRecord>{});
+
   final AnkiExportBuilder builder;
+  final Map<String, ReviewRecord> Function() _reviewRecords;
 
   Future<AnkiExportFile> generate({
     required List<WordEntry> words,
@@ -50,6 +58,7 @@ class AnkiExportService {
       words: words,
       phrases: phrases,
       subtitleLetterCase: subtitleLetterCase,
+      reviewRecords: _reviewRecords(),
     );
     if (notes.isEmpty) throw StateError('没有可导出的收藏内容。');
     final DateTime now = DateTime.now();

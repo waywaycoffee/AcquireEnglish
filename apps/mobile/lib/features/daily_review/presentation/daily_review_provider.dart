@@ -13,9 +13,12 @@ import '../../avatar/presentation/avatar_provider.dart';
 import '../../phrases/presentation/phrase_book_provider.dart';
 import '../../sync/data/acquire_api_client.dart';
 import '../../words/domain/syllabus_book.dart';
+import '../../words/domain/vocab_entry.dart';
+import '../../words/domain/word_review_settings.dart';
 import '../../words/presentation/syllabus_books_provider.dart';
 import '../../words/presentation/vocabulary_placement_provider.dart';
 import '../../words/presentation/word_book_provider.dart';
+import '../../words/presentation/word_review_settings_provider.dart';
 import '../data/memory_item_store.dart';
 import '../data/missed_review_book.dart';
 import '../data/word_encounter_store.dart';
@@ -59,52 +62,26 @@ class ReviewRepository {
 
 final Provider<List<ReviewSource>>
 reviewSourcesProvider = Provider<List<ReviewSource>>((Ref ref) {
+  final List<WordPracticeMode> modes =
+      ref.watch(wordReviewSettingsProvider).orderedModes;
   final List<WordEntry> words = ref
       .watch(wordBookProvider)
-      .where((WordEntry word) => word.favorite)
+      .where((WordEntry word) => word.isSchedulable)
       .toList();
   final List<PhraseEntry> phrases =
-      <PhraseEntry>[...ref.watch(phraseBookProvider)]..sort(
+      <PhraseEntry>[
+        ...ref.watch(phraseBookProvider).where(
+              (PhraseEntry p) => !p.archived,
+            ),
+      ]..sort(
         (PhraseEntry a, PhraseEntry b) =>
             (a.collectedAt ?? '').compareTo(b.collectedAt ?? ''),
       );
-  final List<ReviewSource> wordSources = words.map((WordEntry word) {
-    final WordOccurrence? occurrence = word.occurrences.firstOrNull;
-    final WordContext? context = occurrence?.contexts.firstOrNull;
-    return ReviewSource(
-      key: 'word:${word.word}',
-      kind: switch (word.kind) {
-        VocabCardKind.word => ReviewKind.word,
-        VocabCardKind.phrase => ReviewKind.phrase,
-        VocabCardKind.pattern => ReviewKind.sentence,
-      },
-      question: word.word,
-      answer: (word.definitionCn?.trim().isNotEmpty ?? false)
-          ? word.definitionCn!
-          : word.offlineDefinitionCn ?? '',
-      english: context?.sentence ?? occurrence?.sentence ?? '',
-      chinese:
-          context?.apiTranslationCn ??
-          context?.chinese ??
-          occurrence?.chinese ??
-          '',
-      sourceLabel: occurrence == null
-          ? '单词本'
-          : '${occurrence.course} · ${occurrence.episode}',
-      relatedSources: <ReviewSourceLink>[
-        for (final WordOccurrence item in word.occurrences)
-          ReviewSourceLink(
-            label: '${item.course} · ${item.episode}',
-            episodeId: item.episodeId,
-            time: item.contexts.firstOrNull?.time ?? item.time,
-            english: item.contexts.firstOrNull?.sentence ?? item.sentence,
-            chinese: item.contexts.firstOrNull?.chinese ?? item.chinese,
-          ),
-      ],
-      episodeId: occurrence?.episodeId,
-      time: context?.time ?? occurrence?.time,
-    );
-  }).toList();
+  final List<ReviewSource> wordSources = <ReviewSource>[
+    for (final WordEntry word in words)
+      for (final WordPracticeMode mode in modes)
+        _wordReviewSource(word, mode),
+  ];
   final List<ReviewSource> phraseSources = phrases
       .map(
         (PhraseEntry phrase) => ReviewSource(
@@ -184,6 +161,53 @@ reviewSourcesProvider = Provider<List<ReviewSource>>((Ref ref) {
     ...memorySources,
   ]);
 });
+
+ReviewSource _wordReviewSource(WordEntry word, WordPracticeMode mode) {
+  final WordOccurrence? occurrence = word.occurrences.firstOrNull;
+  final WordContext? context = occurrence?.contexts.firstOrNull;
+  final String lineKey = context?.lineKey ?? '';
+  final List<String> ms = lineKey.split('-');
+  final int? startMs = ms.isNotEmpty ? int.tryParse(ms.first) : null;
+  final int? endMs = ms.length > 1 ? int.tryParse(ms[1]) : null;
+  return ReviewSource(
+    key: vocabFsrsKey(word.word, mode),
+    kind: switch (word.kind) {
+      VocabCardKind.word => ReviewKind.word,
+      VocabCardKind.phrase => ReviewKind.phrase,
+      VocabCardKind.pattern => ReviewKind.sentence,
+    },
+    question: word.word,
+    answer: word.primaryGloss.isNotEmpty
+        ? word.primaryGloss
+        : ((word.definitionCn?.trim().isNotEmpty ?? false)
+              ? word.definitionCn!
+              : word.offlineDefinitionCn ?? ''),
+    english: context?.sentence ?? occurrence?.sentence ?? '',
+    chinese:
+        context?.apiTranslationCn ??
+        context?.chinese ??
+        occurrence?.chinese ??
+        '',
+    sourceLabel: occurrence == null
+        ? '单词本'
+        : '${occurrence.course} · ${occurrence.episode}',
+    cardType: mode.name,
+    relatedSources: <ReviewSourceLink>[
+      for (final WordOccurrence item in word.occurrences)
+        ReviewSourceLink(
+          label: '${item.course} · ${item.episode}',
+          episodeId: item.episodeId,
+          time: item.contexts.firstOrNull?.time ?? item.time,
+          english: item.contexts.firstOrNull?.sentence ?? item.sentence,
+          chinese: item.contexts.firstOrNull?.chinese ?? item.chinese,
+        ),
+    ],
+    episodeId: occurrence?.episodeId,
+    time: context?.time ?? occurrence?.time,
+    startMs: startMs,
+    endMs: endMs,
+  );
+}
 
 // An explicit old review flag may bring a future date forward, but must never
 // discard an already overdue timestamp and its place in the queue.

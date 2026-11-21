@@ -44,6 +44,7 @@ class ReviewSource {
     this.skillChapter,
     this.skillLevel,
     this.origin,
+    this.cardType,
     this.relatedSources = const <ReviewSourceLink>[],
     this.legacyLastReview,
     this.legacyDue,
@@ -64,6 +65,8 @@ class ReviewSource {
   final String? skillChapter;
   final int? skillLevel;
   final String? origin;
+  /// Word practice mode name when this source is a per-mode FSRS card.
+  final String? cardType;
   final List<ReviewSourceLink> relatedSources;
 
   ReviewSource forContext({String? label, String? episode}) {
@@ -90,6 +93,7 @@ class ReviewSource {
       skillChapter: skillChapter,
       skillLevel: skillLevel,
       origin: origin,
+      cardType: cardType,
       relatedSources: relatedSources,
       legacyLastReview: legacyLastReview,
       legacyDue: legacyDue,
@@ -258,7 +262,9 @@ class DailyReviewState {
   }
 
   DailyReviewState synchronize(List<ReviewSource> sources, DateTime now) {
-    final Map<String, ReviewRecord> next = <String, ReviewRecord>{...records};
+    final Map<String, ReviewRecord> next = <String, ReviewRecord>{
+      ..._migrateLegacyWordKeys(records),
+    };
     int order = nextOrder;
     for (final ReviewSource source in sources) {
       if (next.containsKey(source.key)) continue;
@@ -286,6 +292,39 @@ class DailyReviewState {
       dueReviewsSinceNew: dueReviewsSinceNew,
       storageError: storageError,
     );
+  }
+
+  /// Copy `word:lemma` records onto `entry:lemma:recognize`, then drop legacy keys.
+  static Map<String, ReviewRecord> _migrateLegacyWordKeys(
+    Map<String, ReviewRecord> records,
+  ) {
+    final Map<String, ReviewRecord> next = Map<String, ReviewRecord>.from(
+      records,
+    );
+    final List<String> legacyKeys = <String>[];
+    for (final MapEntry<String, ReviewRecord> e in records.entries) {
+      final String key = e.key;
+      if (!key.startsWith('word:')) continue;
+      legacyKeys.add(key);
+      final String lemma = key.substring('word:'.length);
+      final String target = 'entry:$lemma:recognize';
+      if (next.containsKey(target)) continue;
+      final ReviewRecord old = e.value;
+      next[target] = ReviewRecord(
+        key: target,
+        order: old.order,
+        addedAt: old.addedAt,
+        card: old.card,
+        firstLearnedAt: old.firstLearnedAt,
+        reviews: old.reviews,
+        lapses: old.lapses,
+        lastRating: old.lastRating,
+      );
+    }
+    for (final String key in legacyKeys) {
+      next.remove(key);
+    }
+    return next;
   }
 
   DailyReviewState reviewToday(String key, DateTime now) {

@@ -17,13 +17,14 @@ import 'package:go_router/go_router.dart';
 
 const List<ReviewSource> sources = <ReviewSource>[
   ReviewSource(
-    key: 'word:hello',
+    key: 'entry:hello:recognize',
     kind: ReviewKind.word,
     question: 'hello',
     answer: '你好',
     english: 'Hello there.',
     chinese: '你好。',
     sourceLabel: '课程 · 01',
+    cardType: 'recognize',
   ),
   ReviewSource(
     key: 'phrase:1',
@@ -39,6 +40,15 @@ const List<ReviewSource> sources = <ReviewSource>[
 class _RecognizeOnlySettings extends WordReviewSettingsNotifier {
   @override
   WordReviewSettings build() => const WordReviewSettings(
+    enabledModes: <WordPracticeMode>[WordPracticeMode.recognize],
+  );
+}
+
+class _SpellGateSettings extends WordReviewSettingsNotifier {
+  @override
+  WordReviewSettings build() => const WordReviewSettings(
+    recallStyle: WordRecallStyle.multipleChoice,
+    requireSpelling: true,
     enabledModes: <WordPracticeMode>[WordPracticeMode.recognize],
   );
 }
@@ -111,7 +121,7 @@ void main() {
       await tester.pumpAndSettle();
       final DailyReviewState state = container.read(dailyReviewProvider);
       expect(state.records['phrase:1']!.reviews, 1);
-      expect(state.records['word:hello']!.reviews, 0);
+      expect(state.records['entry:hello:recognize']!.reviews, 0);
       expect(find.byKey(const Key('review-saved-summary')), findsOneWidget);
       expect(find.text('记得 1'), findsOneWidget);
       expect(tester.takeException(), isNull);
@@ -122,7 +132,7 @@ void main() {
     'secondary video source uses its own sentence without duplicating the word',
     (WidgetTester tester) async {
       const ReviewSource linked = ReviewSource(
-        key: 'word:hello',
+        key: 'entry:hello:recognize',
         kind: ReviewKind.word,
         question: 'hello',
         answer: '你好',
@@ -171,7 +181,7 @@ void main() {
         findsWidgets,
       );
       expect(
-        container.read(dailyReviewProvider).records['word:hello']!.reviews,
+        container.read(dailyReviewProvider).records['entry:hello:recognize']!.reviews,
         0,
       );
       expect(tester.takeException(), isNull);
@@ -184,19 +194,15 @@ void main() {
     tester.view.physicalSize = const Size(390, 900);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.reset);
-    final ProviderContainer container = makeContainer(<ReviewSource>[
-      sources.first,
-    ]);
+    final ProviderContainer container = ProviderContainer(
+      // ignore: always_specify_types
+      overrides: [
+        reviewSourcesProvider.overrideWithValue(<ReviewSource>[sources.first]),
+        reviewClockProvider.overrideWithValue(() => DateTime(2026, 10, 23, 9)),
+        wordReviewSettingsProvider.overrideWith(_SpellGateSettings.new),
+      ],
+    );
     addTearDown(container.dispose);
-    await container
-        .read(wordReviewSettingsProvider.notifier)
-        .update(
-          const WordReviewSettings(
-            recallStyle: WordRecallStyle.multipleChoice,
-            requireSpelling: true,
-            enabledModes: <WordPracticeMode>[WordPracticeMode.recognize],
-          ),
-        );
     await tester.pumpWidget(app(container, session: true));
     await tester.pumpAndSettle();
 
@@ -221,14 +227,14 @@ void main() {
         expect(find.text('拼写有误，请重试。'), findsOneWidget);
       }
       expect(
-        container.read(dailyReviewProvider).records['word:hello']!.reviews,
+        container.read(dailyReviewProvider).records['entry:hello:recognize']!.reviews,
         0,
       );
       await tester.enterText(find.byType(TextField), 'hello');
       await tapText('检查拼写');
     }
     expect(
-      container.read(dailyReviewProvider).records['word:hello']!.reviews,
+      container.read(dailyReviewProvider).records['entry:hello:recognize']!.reviews,
       1,
     );
     await tester.pumpWidget(const SizedBox.shrink());
@@ -395,7 +401,7 @@ void main() {
         expect(find.text('想对了，但吃力'), findsOneWidget);
         expect(find.textContaining('预计 '), findsNWidgets(4));
         expect(
-          container.read(dailyReviewProvider).records['word:hello']!.reviews,
+          container.read(dailyReviewProvider).records['entry:hello:recognize']!.reviews,
           0,
         );
         await tester.ensureVisible(
@@ -404,7 +410,7 @@ void main() {
         await tester.tap(find.byKey(const Key('daily-review-rate-good')));
         await tester.pumpAndSettle();
         expect(
-          container.read(dailyReviewProvider).records['word:hello']!.reviews,
+          container.read(dailyReviewProvider).records['entry:hello:recognize']!.reviews,
           1,
         );
         expect(find.text('很高兴见到你。'), findsOneWidget);
@@ -482,7 +488,7 @@ void main() {
       expect(find.text('已完成，这张卡片的进度已保存'), findsOneWidget);
       expect(find.byKey(const Key('daily-review-rate-good')), findsNothing);
       expect(
-        container.read(dailyReviewProvider).records['word:hello']!.reviews,
+        container.read(dailyReviewProvider).records['entry:hello:recognize']!.reviews,
         1,
       );
       await tester.tap(find.byKey(const Key('daily-review-next')));
@@ -643,7 +649,7 @@ void main() {
       addTearDown(container.dispose);
       await container
           .read(dailyReviewProvider.notifier)
-          .grade('word:hello', fsrs.Rating.good, expectedReviews: 0);
+          .grade('entry:hello:recognize', fsrs.Rating.good, expectedReviews: 0);
       time = time.add(const Duration(minutes: 11));
       await tester.pumpWidget(app(container));
       await tester.pumpAndSettle();
@@ -662,7 +668,7 @@ void main() {
       await tester.tap(find.byKey(const Key('daily-review-rate-good')));
       await tester.pumpAndSettle();
       final DailyReviewState state = container.read(dailyReviewProvider);
-      expect(state.records['word:hello']!.reviews, 2);
+      expect(state.records['entry:hello:recognize']!.reviews, 2);
       expect(
         state.plan(<ReviewSource>[sources.first], time).today.newLearned,
         1,

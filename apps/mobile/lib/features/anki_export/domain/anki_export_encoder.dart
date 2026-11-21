@@ -27,6 +27,10 @@ class AnkiExportEncoder {
     '来源',
     '时间点',
     '类型',
+    'FsrsStability',
+    'FsrsDifficulty',
+    'FsrsDue',
+    'FsrsReviews',
   ];
 
   /// Encodes plain-text spreadsheet CSV and TSV with the same Chinese headers.

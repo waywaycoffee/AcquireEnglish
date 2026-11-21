@@ -27,10 +27,13 @@ import '../../shared/presentation/pad/app_design_tokens.dart';
 import '../../shared/presentation/pad/pad_scaffold.dart';
 import '../../shared/presentation/pad/pad_top_bar.dart';
 import '../../sync/data/study_activity_service.dart';
+import '../../phrases/presentation/phrase_book_provider.dart';
 import '../../words/domain/foundation_media.dart';
+import '../../words/domain/vocab_entry.dart';
 import '../../words/domain/word_review_settings.dart';
 import '../../words/presentation/foundation_media_provider.dart';
 import '../../words/presentation/vocabulary_placement_provider.dart';
+import '../../words/presentation/word_book_provider.dart';
 import '../../words/presentation/word_review_settings_provider.dart';
 import '../../words/presentation/word_review_settings_sheet.dart';
 import '../data/missed_review_book.dart';
@@ -1398,6 +1401,13 @@ class _DailyReviewScreenState extends ConsumerState<DailyReviewScreen>
   }
 
   List<WordPracticeMode> _modesFor(ReviewSource source) {
+    // Per-mode FSRS cards carry their own key; do not chain modes on one card.
+    final WordPracticeMode? fromKey = WordPracticeModeX.tryParse(
+      source.cardType,
+    );
+    if (fromKey != null) {
+      return <WordPracticeMode>[fromKey];
+    }
     if (source.kind != ReviewKind.word) {
       return const <WordPracticeMode>[WordPracticeMode.recognize];
     }
@@ -1415,6 +1425,7 @@ class _DailyReviewScreenState extends ConsumerState<DailyReviewScreen>
     final bool word = source.kind == ReviewKind.word;
     final WordPracticeMode mode = _currentMode(source);
     final bool speakStage = word && mode == WordPracticeMode.speak;
+    final bool listenStage = word && mode == WordPracticeMode.listen;
     final bool skill = source.kind == ReviewKind.skill;
     final List<String> skillChoices = skill &&
             source.skillLevel != null &&
@@ -1441,9 +1452,12 @@ class _DailyReviewScreenState extends ConsumerState<DailyReviewScreen>
     final bool useCloze =
         word &&
         !speakStage &&
+        !listenStage &&
         source.english.trim().isNotEmpty &&
         sentenceContainsWord(source.english, source.question);
-    final String frontText = speakStage
+    final String frontText = listenStage && !_revealed
+        ? '♪ 听音识词'
+        : speakStage
         ? source.question
         : useCloze && !_revealed
         ? clozeSentence(source.english, source.question)
@@ -1454,8 +1468,10 @@ class _DailyReviewScreenState extends ConsumerState<DailyReviewScreen>
           ).todayCount(source.question, now)
         : 0;
     final List<WordPracticeMode> modes = _modesFor(source);
-    final String stageLabel = word && modes.length > 1
-        ? ' · ${mode.label} ${_modeStep + 1}/${modes.length}'
+    final String stageLabel = word
+        ? (modes.length > 1
+              ? ' · ${mode.label} ${_modeStep + 1}/${modes.length}'
+              : ' · ${mode.label}')
         : '';
     return _ReviewSurface(
       child: ConstrainedBox(
@@ -1571,6 +1587,40 @@ class _DailyReviewScreenState extends ConsumerState<DailyReviewScreen>
                     ),
                     icon: const Icon(Icons.ondemand_video_outlined),
                   ),
+                PopupMenuButton<String>(
+                  tooltip: '更多操作',
+                  onSelected: (String action) {
+                    switch (action) {
+                      case 'skip':
+                        _skipCard(source);
+                      case 'hard':
+                        _markDifficult(source);
+                      case 'note':
+                        unawaited(_editNote(source));
+                      case 'archive':
+                        _archiveFromSession(source);
+                    }
+                  },
+                  itemBuilder: (BuildContext context) =>
+                      const <PopupMenuEntry<String>>[
+                        PopupMenuItem<String>(
+                          value: 'skip',
+                          child: Text('跳过本次'),
+                        ),
+                        PopupMenuItem<String>(
+                          value: 'hard',
+                          child: Text('标记疑难'),
+                        ),
+                        PopupMenuItem<String>(
+                          value: 'note',
+                          child: Text('补充笔记'),
+                        ),
+                        PopupMenuItem<String>(
+                          value: 'archive',
+                          child: Text('归档'),
+                        ),
+                      ],
+                ),
               ],
             ),
             const SizedBox(height: 22),
@@ -1600,7 +1650,7 @@ class _DailyReviewScreenState extends ConsumerState<DailyReviewScreen>
               ),
               const SizedBox(height: 8),
               Text(
-                '优先用腾讯云跟读评分；未配置密钥时可下方自评。分数会与前面关卡取最弱一环写入 FSRS。',
+                '跟读分仅作参考；最终以你的自评档写入本卡独立 FSRS 曲线。',
                 textAlign: TextAlign.center,
                 style: TextStyle(
                   fontSize: 12,
@@ -1622,7 +1672,21 @@ class _DailyReviewScreenState extends ConsumerState<DailyReviewScreen>
                   child: LinearProgressIndicator(),
                 ),
             ] else if (!_revealed && !completed) ...<Widget>[
-              if (choiceMode)
+              if (listenStage) ...<Widget>[
+                FilledButton.tonalIcon(
+                  onPressed: _speaking ? null : () => _playWord(source),
+                  icon: const Icon(Icons.hearing_rounded),
+                  label: const Text('播放发音'),
+                ),
+                const SizedBox(height: 10),
+                FilledButton.icon(
+                  key: const Key('daily-review-reveal'),
+                  onPressed: () => setState(() => _revealed = true),
+                  style: _primaryButtonStyle,
+                  icon: const Icon(Icons.visibility_outlined),
+                  label: const Text('显示单词与释义'),
+                ),
+              ] else if (choiceMode)
                 for (final String choice in choices)
                   OutlinedButton(
                     onPressed: () {
@@ -2205,9 +2269,29 @@ class _DailyReviewScreenState extends ConsumerState<DailyReviewScreen>
         : List<fsrs.Rating>.of(_stageRatings[source.key]!);
     setState(() => _saving = true);
     try {
-      if (source.kind == ReviewKind.word) {
+      // Independent FSRS per card type — no weakest-merge across modes.
+      final WordReviewSettings options = ref.read(wordReviewSettingsProvider);
+      final bool multiModeLegacy =
+          source.kind == ReviewKind.word &&
+          source.cardType == null &&
+          options.orderedModes.length > 1;
+      if (multiModeLegacy) {
         await _gradeWordPipeline(source, record, rating);
         return;
+      }
+      final bool spellGate =
+          source.kind == ReviewKind.word &&
+          options.requireSpelling &&
+          !options.orderedModes.contains(WordPracticeMode.spell) &&
+          (source.cardType == null || source.cardType == 'recognize');
+      if (spellGate) {
+        final SpellStageResult? spelled = await _runSpellStage(source);
+        if (!mounted || spelled == null) return;
+        if (spelled.rating == fsrs.Rating.again) {
+          _setWordPasses(source.key, 0);
+          _nextCard(source.key, complete: false);
+          return;
+        }
       }
       await _finishGrade(source, record, rating);
     } catch (_) {
@@ -2329,6 +2413,69 @@ class _DailyReviewScreenState extends ConsumerState<DailyReviewScreen>
     await _finishGrade(source, record, finalRating);
   }
 
+  void _skipCard(ReviewSource source) {
+    _advanceCard(source.key);
+  }
+
+  void _markDifficult(ReviewSource source) {
+    final String? lemma = lemmaFromReviewKey(source.key) ??
+        (source.kind == ReviewKind.word ? source.question : null);
+    if (lemma != null) {
+      ref.read(wordBookProvider.notifier).addWordTag(lemma, '疑难');
+    }
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('已标记为疑难')),
+    );
+  }
+
+  Future<void> _editNote(ReviewSource source) async {
+    final String? lemma = lemmaFromReviewKey(source.key) ??
+        (source.kind == ReviewKind.word ? source.question : null);
+    if (lemma == null) return;
+    final WordEntry? entry = ref
+        .read(wordBookProvider)
+        .where((WordEntry e) => e.word == lemma)
+        .firstOrNull;
+    final TextEditingController controller = TextEditingController(
+      text: entry?.note ?? '',
+    );
+    final String? note = await showDialog<String>(
+      context: context,
+      builder: (BuildContext context) => AlertDialog(
+        title: const Text('补充笔记'),
+        content: TextField(
+          controller: controller,
+          maxLines: 4,
+          decoration: const InputDecoration(hintText: '写下联想或易混点…'),
+        ),
+        actions: <Widget>[
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('取消'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, controller.text),
+            child: const Text('保存'),
+          ),
+        ],
+      ),
+    );
+    controller.dispose();
+    if (note == null) return;
+    ref.read(wordBookProvider.notifier).setWordNote(lemma, note);
+  }
+
+  void _archiveFromSession(ReviewSource source) {
+    final String? lemma = lemmaFromReviewKey(source.key);
+    if (lemma != null) {
+      ref.read(wordBookProvider.notifier).archiveWord(lemma);
+    } else if (source.key.startsWith('phrase:')) {
+      final String id = source.key.substring('phrase:'.length);
+      ref.read(phraseBookProvider.notifier).archivePhrase(id);
+    }
+    _advanceCard(source.key);
+  }
+
   Future<void> _finishGrade(
     ReviewSource source,
     ReviewRecord record,
@@ -2341,14 +2488,29 @@ class _DailyReviewScreenState extends ConsumerState<DailyReviewScreen>
       _advanceCard(source.key);
       return;
     }
+    final bool passing =
+        rating == fsrs.Rating.good || rating == fsrs.Rating.easy;
+    if (passes != null && !passing) {
+      _setWordPasses(source.key, 0);
+      _stageRatings.remove(source.key);
+      _nextCard(source.key, complete: false);
+      return;
+    }
+    if (passes != null && passes < 2) {
+      _setWordPasses(source.key, passes + 1);
+      _stageRatings.remove(source.key);
+      _nextCard(source.key, complete: false);
+      return;
+    }
     await ref
         .read(dailyReviewProvider.notifier)
         .grade(source.key, rating, expectedReviews: record.reviews);
     if (!mounted) return;
     unawaited(ref.read(studyActivityServiceProvider).touchReview());
     _sessionRatings[source.key] = rating;
-    if (rating == fsrs.Rating.again || rating == fsrs.Rating.hard)
+    if (rating == fsrs.Rating.again || rating == fsrs.Rating.hard) {
       _missedKeys.add(source.key);
+    }
     if (passes != null) _setWordPasses(source.key, null);
     _stageRatings.remove(source.key);
     _advanceCard(source.key);

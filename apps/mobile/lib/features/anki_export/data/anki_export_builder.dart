@@ -1,12 +1,15 @@
 import 'dart:convert';
 
+import '../../daily_review/domain/daily_review.dart';
 import '../../phrases/presentation/phrase_book_provider.dart';
 import '../../shared/domain/subtitle_letter_case.dart';
 import '../../words/data/offline_word_dictionary.dart';
+import '../../words/domain/vocab_entry.dart';
+import '../../words/domain/word_review_settings.dart';
 import '../../words/presentation/word_book_provider.dart';
 import '../domain/anki_export_note.dart';
 
-/// A read-only snapshot of saved learning content. No review state is exported.
+/// Snapshot of saved learning content, optionally with FSRS scheduling fields.
 class AnkiExportBuilder {
   AnkiExportBuilder(this.dictionary);
 
@@ -16,6 +19,8 @@ class AnkiExportBuilder {
     required List<WordEntry> words,
     required List<PhraseEntry> phrases,
     String subtitleLetterCase = '保留原样',
+    Map<String, ReviewRecord> reviewRecords =
+        const <String, ReviewRecord>{},
   }) async {
     final List<AnkiExportNote> notes = <AnkiExportNote>[];
     final List<WordEntry> savedWords =
@@ -55,12 +60,16 @@ class AnkiExportBuilder {
           }
         }
       }
+      final ReviewRecord? record =
+          reviewRecords[vocabFsrsKey(expression, WordPracticeMode.recognize)] ??
+          reviewRecords[legacyWordFsrsKey(expression)];
       notes.add(
         _note(
           id: 'word:$expression',
           expression: expression,
-          phonetic: definition?.phonetic ?? '',
+          phonetic: definition?.phonetic ?? word.phonetic ?? '',
           meaning: _first(<String?>[
+            word.primaryGloss,
             word.definitionCn,
             word.offlineDefinitionCn,
             definition?.translation,
@@ -68,6 +77,7 @@ class AnkiExportBuilder {
           isPhrase: false,
           contexts: contexts,
           subtitleLetterCase: subtitleLetterCase,
+          fsrs: record,
         ),
       );
     }
@@ -125,6 +135,7 @@ AnkiExportNote _note({
   required bool isPhrase,
   required List<_Context> contexts,
   required String subtitleLetterCase,
+  ReviewRecord? fsrs,
 }) {
   final Map<String, _Context> unique = <String, _Context>{};
   for (final _Context context in contexts) {
@@ -172,8 +183,18 @@ AnkiExportNote _note({
       values((_Context item) => item.source),
       values((_Context item) => item.time),
       if (isPhrase) '短语' else '单词',
+      _html(_fsrsField(fsrs, 'stability')),
+      _html(_fsrsField(fsrs, 'difficulty')),
+      _html(fsrs == null ? '' : fsrs.card.due.toIso8601String()),
+      _html(fsrs == null ? '' : '${fsrs.reviews}'),
     ],
   );
+}
+
+String _fsrsField(ReviewRecord? record, String key) {
+  if (record == null) return '';
+  final Object? value = record.card.toMap()[key];
+  return value == null ? '' : '$value';
 }
 
 String _html(String value) => const HtmlEscape()

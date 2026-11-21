@@ -31,7 +31,7 @@ void main() {
     expect(await player.record('hello'), 2);
     expect(await player.record('hello'), 3);
     expect(review.todayCount('hello'), 3);
-    expect(review.peekSoftCredits(), <String>['word:hello']);
+    expect(review.peekSoftCredits(), <String>['entry:hello:recognize']);
   });
 
   test(

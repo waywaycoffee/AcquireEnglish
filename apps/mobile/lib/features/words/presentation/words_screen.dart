@@ -2,11 +2,13 @@ import 'dart:async';
 
 import 'package:alphabet_list_view/alphabet_list_view.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../router/app_router.dart';
 import '../../anki_export/presentation/anki_export_sheet.dart';
+import '../data/vocab_markdown_export.dart';
 import '../../authentication/presentation/account_storage.dart';
 import '../../daily_review/data/missed_review_book.dart';
 import '../../daily_review/domain/daily_review.dart';
@@ -19,7 +21,9 @@ import '../../shared/presentation/pad/app_design_tokens.dart';
 import '../../shared/presentation/pad/pad_scaffold.dart';
 import '../../shared/presentation/pad/pad_top_bar.dart';
 import '../../shared/presentation/pill_segmented_control.dart';
+import '../domain/vocab_entry.dart';
 import '../domain/word_review_settings.dart';
+import 'vocab_preview_sheet.dart';
 import 'vocabulary_placement_provider.dart';
 import 'word_book_provider.dart';
 import 'word_context_progress.dart';
@@ -47,6 +51,9 @@ class _WordsScreenState extends ConsumerState<WordsScreen> {
 
   String _query = '';
   bool _favoritesOnly = true;
+  VocabScheduleStatus? _statusFilter;
+  String? _cefrFilter;
+  bool _videoContextOnly = false;
 
   @override
   void initState() {
@@ -144,7 +151,10 @@ class _WordsScreenState extends ConsumerState<WordsScreen> {
     final DailyReviewState reviewState = ref.watch(dailyReviewProvider);
     final List<ReviewSource> wordSources = ref
         .watch(reviewSourcesProvider)
-        .where((ReviewSource s) => s.key.startsWith('word:'))
+        .where(
+          (ReviewSource s) =>
+              s.key.startsWith('entry:') || s.key.startsWith('word:'),
+        )
         .toList(growable: false);
     final DateTime now = DateTime.now();
     final int newLimit = reviewSettings.dailyNewLimit.clamp(0, 100);
@@ -158,11 +168,28 @@ class _WordsScreenState extends ConsumerState<WordsScreen> {
     final int streak = ref.read(wordBookProvider.notifier).reviewStreak();
     final int missedCount = MissedReviewBook(
       account: ref.watch(studyAccountProvider),
-    ).keys().where((String key) => key.startsWith('word:')).length;
+    ).keys().where(
+      (String key) => key.startsWith('entry:') || key.startsWith('word:'),
+    ).length;
+    final int pendingCount = entries
+        .where(
+          (WordEntry e) =>
+              e.favorite && e.scheduleStatus == VocabScheduleStatus.pending,
+        )
+        .length;
     final List<WordEntry> filtered = entries
         .where((WordEntry entry) {
-          return (!_favoritesOnly || entry.favorite) &&
-              entry.word.contains(_query.trim().toLowerCase());
+          if (_favoritesOnly && !entry.favorite) return false;
+          if (_statusFilter != null &&
+              entry.scheduleStatus != _statusFilter) {
+            return false;
+          }
+          if (_cefrFilter != null &&
+              (entry.cefr ?? '').toUpperCase() != _cefrFilter) {
+            return false;
+          }
+          if (_videoContextOnly && !entry.hasVideoContext) return false;
+          return entry.word.contains(_query.trim().toLowerCase());
         })
         .toList(growable: false);
     final int coveredVideos = entries
@@ -185,6 +212,18 @@ class _WordsScreenState extends ConsumerState<WordsScreen> {
             onPressed: () => unawaited(_startTodayReview(newLimit)),
             icon: const Icon(Icons.style_rounded),
             label: const Text('今日背词'),
+          ),
+          IconButton(
+            tooltip: '导出 Markdown',
+            onPressed: () async {
+              final String md = exportVocabMarkdown(ref.read(wordBookProvider));
+              await Clipboard.setData(ClipboardData(text: md));
+              if (!context.mounted) return;
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('词库 Markdown 已复制到剪贴板')),
+              );
+            },
+            icon: const Icon(Icons.notes_rounded),
           ),
           const AnkiExportButton(),
         ],
@@ -280,11 +319,24 @@ class _WordsScreenState extends ConsumerState<WordsScreen> {
                                   onPressed: () => context.push('/reading'),
                                 ),
                                 ActionChip(
-                                  label: const Text('背收藏单词'),
+                                  label: const Text('自测模式'),
                                   onPressed: () => context.push(
                                     '${SGRoute.reviewSession.route}?practice=1&kind=word',
                                   ),
                                 ),
+                                if (pendingCount > 0)
+                                  ActionChip(
+                                    avatar: const Icon(
+                                      Icons.preview_rounded,
+                                      size: 18,
+                                    ),
+                                    label: Text('待学习 $pendingCount'),
+                                    onPressed: () => setState(() {
+                                      _favoritesOnly = true;
+                                      _statusFilter =
+                                          VocabScheduleStatus.pending;
+                                    }),
+                                  ),
                                 if (missedCount > 0)
                                   ActionChip(
                                     avatar: const Icon(
@@ -297,6 +349,22 @@ class _WordsScreenState extends ConsumerState<WordsScreen> {
                                     ),
                                   ),
                               ],
+                            ),
+                            const SizedBox(height: 10),
+                            _VocabDashboard(
+                              total: entries.where((WordEntry e) => e.favorite).length,
+                              pending: pendingCount,
+                              active: entries
+                                  .where(
+                                    (WordEntry e) =>
+                                        e.favorite &&
+                                        e.scheduleStatus ==
+                                            VocabScheduleStatus.active,
+                                  )
+                                  .length,
+                              due: planReview,
+                              newToday: planNew,
+                              ratingShare: _ratingShare(reviewState),
                             ),
                             const SizedBox(height: 12),
                             _TodayPlanCard(
@@ -333,7 +401,59 @@ class _WordsScreenState extends ConsumerState<WordsScreen> {
                             setState(() => _favoritesOnly = value),
                       ),
                     ),
-                    const SizedBox(height: 16),
+                    const SizedBox(height: 12),
+                    SingleChildScrollView(
+                      scrollDirection: Axis.horizontal,
+                      child: Row(
+                        children: <Widget>[
+                          FilterChip(
+                            label: const Text('全部状态'),
+                            selected: _statusFilter == null,
+                            onSelected: (_) =>
+                                setState(() => _statusFilter = null),
+                          ),
+                          const SizedBox(width: 6),
+                          for (final VocabScheduleStatus status
+                              in VocabScheduleStatus.values) ...<Widget>[
+                            FilterChip(
+                              label: Text(status.label),
+                              selected: _statusFilter == status,
+                              onSelected: (_) => setState(
+                                () => _statusFilter =
+                                    _statusFilter == status ? null : status,
+                              ),
+                            ),
+                            const SizedBox(width: 6),
+                          ],
+                          FilterChip(
+                            label: const Text('有原句'),
+                            selected: _videoContextOnly,
+                            onSelected: (bool v) =>
+                                setState(() => _videoContextOnly = v),
+                          ),
+                          const SizedBox(width: 6),
+                          for (final String level in const <String>[
+                            'A1',
+                            'A2',
+                            'B1',
+                            'B2',
+                            'C1',
+                            'C2',
+                          ]) ...<Widget>[
+                            FilterChip(
+                              label: Text(level),
+                              selected: _cefrFilter == level,
+                              onSelected: (_) => setState(
+                                () => _cefrFilter =
+                                    _cefrFilter == level ? null : level,
+                              ),
+                            ),
+                            const SizedBox(width: 6),
+                          ],
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 12),
                     TextField(
                       onChanged: (String value) => setState(() => _query = value),
                       style: TextStyle(color: AppDesignTokens.textPrimary),
@@ -444,11 +564,41 @@ class _WordsScreenState extends ConsumerState<WordsScreen> {
       for (final FsrsWordPhase phase in FsrsWordPhase.values) phase: 0,
     };
     for (final WordEntry entry in favorites) {
-      final ReviewRecord? record = reviewState.records['word:${entry.word}'];
+      final ReviewRecord? record = _recognizeRecord(reviewState, entry.word);
       final FsrsWordPhase phase = fsrsWordPhase(record, now);
       counts[phase] = (counts[phase] ?? 0) + 1;
     }
     return counts;
+  }
+
+  ReviewRecord? _recognizeRecord(DailyReviewState state, String word) {
+    return state.records[vocabFsrsKey(word, WordPracticeMode.recognize)] ??
+        state.records[legacyWordFsrsKey(word)];
+  }
+
+  Map<String, int> _ratingShare(DailyReviewState state) {
+    final Map<String, int> share = <String, int>{
+      'again': 0,
+      'hard': 0,
+      'good': 0,
+      'easy': 0,
+    };
+    for (final ReviewRecord record in state.records.values) {
+      if (!record.key.startsWith('entry:') && !record.key.startsWith('word:')) {
+        continue;
+      }
+      final String? name = switch (record.lastRating) {
+        1 => 'again',
+        2 => 'hard',
+        3 => 'good',
+        4 => 'easy',
+        _ => null,
+      };
+      if (name != null) {
+        share[name] = (share[name] ?? 0) + 1;
+      }
+    }
+    return share;
   }
 
   List<AlphabetListViewItemGroup> _buildGroups(List<WordEntry> entries) {
@@ -886,6 +1036,94 @@ class _Metric extends StatelessWidget {
   );
 }
 
+class _VocabDashboard extends StatelessWidget {
+  const _VocabDashboard({
+    required this.total,
+    required this.pending,
+    required this.active,
+    required this.due,
+    required this.newToday,
+    required this.ratingShare,
+  });
+
+  final int total;
+  final int pending;
+  final int active;
+  final int due;
+  final int newToday;
+  final Map<String, int> ratingShare;
+
+  @override
+  Widget build(BuildContext context) {
+    final int rated = ratingShare.values.fold<int>(0, (int a, int b) => a + b);
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: AppDesignTokens.appWhite,
+        borderRadius: BorderRadius.circular(18),
+        boxShadow: AppDesignTokens.toyCardShadow,
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          const Text(
+            '词库看板',
+            style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800),
+          ),
+          const SizedBox(height: 10),
+          Wrap(
+            spacing: 10,
+            runSpacing: 8,
+            children: <Widget>[
+              _DashPill(label: '收藏 $total'),
+              _DashPill(label: '待学习 $pending'),
+              _DashPill(label: '复习中 $active'),
+              _DashPill(label: '今日到期 $due'),
+              _DashPill(label: '可新学 $newToday'),
+            ],
+          ),
+          if (rated > 0) ...<Widget>[
+            const SizedBox(height: 10),
+            Text(
+              '近期自评 Again ${ratingShare['again'] ?? 0} · Hard ${ratingShare['hard'] ?? 0} · Good ${ratingShare['good'] ?? 0} · Easy ${ratingShare['easy'] ?? 0}',
+              style: TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w600,
+                color: AppDesignTokens.textSecondary,
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _DashPill extends StatelessWidget {
+  const _DashPill({required this.label});
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: AppDesignTokens.skyLight,
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Text(
+        label,
+        style: const TextStyle(
+          fontSize: 12,
+          fontWeight: FontWeight.w800,
+          color: AppDesignTokens.primaryBlueDark,
+        ),
+      ),
+    );
+  }
+}
+
 class _WordCard extends ConsumerWidget {
   const _WordCard({
     required this.entry,
@@ -908,7 +1146,12 @@ class _WordCard extends ConsumerWidget {
     final ReviewRecord? record = entry.favorite
         ? ref.watch(
             dailyReviewProvider.select(
-              (DailyReviewState value) => value.records['word:${entry.word}'],
+              (DailyReviewState value) =>
+                  value.records[vocabFsrsKey(
+                        entry.word,
+                        WordPracticeMode.recognize,
+                      )] ??
+                  value.records[legacyWordFsrsKey(entry.word)],
             ),
           )
         : null;
@@ -958,7 +1201,9 @@ class _WordCard extends ConsumerWidget {
                               borderRadius: BorderRadius.circular(999),
                             ),
                             child: Text(
-                              fsrsWordPhaseLabel(phase),
+                              entry.scheduleStatus == VocabScheduleStatus.active
+                                  ? fsrsWordPhaseLabel(phase)
+                                  : entry.scheduleStatus.label,
                               style: TextStyle(
                                 fontSize: 11,
                                 fontWeight: FontWeight.w800,
@@ -966,6 +1211,17 @@ class _WordCard extends ConsumerWidget {
                               ),
                             ),
                           ),
+                          if ((entry.cefr ?? '').isNotEmpty) ...<Widget>[
+                            const SizedBox(width: 6),
+                            Text(
+                              entry.cefr!,
+                              style: TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w800,
+                                color: AppDesignTokens.primaryBlueDark,
+                              ),
+                            ),
+                          ],
                         ],
                       ],
                     ),
@@ -1047,6 +1303,17 @@ class _WordCard extends ConsumerWidget {
                   ],
                 ),
               ),
+              if (entry.favorite &&
+                  entry.scheduleStatus == VocabScheduleStatus.pending)
+                IconButton(
+                  tooltip: '预览并加入复习',
+                  onPressed: () => unawaited(
+                    showVocabPreviewSheet(context, word: entry.word),
+                  ),
+                  visualDensity: VisualDensity.compact,
+                  color: AppDesignTokens.brandGreenDark,
+                  icon: const Icon(Icons.playlist_add_check_rounded),
+                ),
               LexiconPronounceButton(
                 word: entry.word,
                 color: AppDesignTokens.textPrimary,

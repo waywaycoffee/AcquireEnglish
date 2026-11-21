@@ -38,6 +38,7 @@ import '../../subtitle_completion/subtitle_completion_scheduler.dart';
 import '../../subtitle_completion/subtitle_completion_status_provider.dart';
 import '../../sync/data/acquire_api_client.dart';
 import '../../words/data/offline_word_dictionary.dart';
+import '../../words/presentation/vocab_iplus_provider.dart';
 import '../domain/video_difficulty.dart';
 import 'library_browse.dart';
 import 'library_catalog_provider.dart';
@@ -110,6 +111,10 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
     showImport = widget.initialView == LibraryScreenView.import;
     showDetail = widget.initialView == LibraryScreenView.detail;
     _restoreBrowsePrefs();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      _applyIplusCefrDefault();
+    });
     queryController = TextEditingController()
       ..addListener(() {
         setState(() {});
@@ -142,6 +147,15 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
         kCefrLevels.contains(storedCefr.toUpperCase())) {
       cefrFilter = storedCefr.toUpperCase();
     }
+  }
+
+  void _applyIplusCefrDefault() {
+    if (cefrFilter != null && cefrFilter!.isNotEmpty) return;
+    final String? suggested = ref.read(suggestedLibraryCefrProvider);
+    if (suggested == null || !kCefrLevels.contains(suggested)) return;
+    setState(() {
+      cefrFilter = suggested;
+    });
   }
 
   void _persistBrowsePrefs() {

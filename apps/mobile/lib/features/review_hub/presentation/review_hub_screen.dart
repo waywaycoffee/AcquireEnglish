@@ -50,9 +50,12 @@ class ReviewHubScreen extends ConsumerStatefulWidget {
   ConsumerState<ReviewHubScreen> createState() => _ReviewHubScreenState();
 }
 
+enum _ReciteHubMode { memory, browse, quiz }
+
 class _ReviewHubScreenState extends ConsumerState<ReviewHubScreen> {
   int _oralWrong = 0;
   int _oralDue = 0;
+  _ReciteHubMode _mode = _ReciteHubMode.memory;
 
   @override
   void initState() {
@@ -141,6 +144,61 @@ class _ReviewHubScreenState extends ConsumerState<ReviewHubScreen> {
           physics: const AlwaysScrollableScrollPhysics(),
           padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
           children: <Widget>[
+            HubSurface(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: <Widget>[
+                  const Text(
+                    '模式',
+                    style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800),
+                  ),
+                  const SizedBox(height: 10),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: <Widget>[
+                      HubPill(
+                        label: '记忆 (FSRS)',
+                        selected: _mode == _ReciteHubMode.memory,
+                        onTap: () => setState(() => _mode = _ReciteHubMode.memory),
+                      ),
+                      HubPill(
+                        label: '浏览词库',
+                        selected: _mode == _ReciteHubMode.browse,
+                        onTap: () {
+                          setState(() => _mode = _ReciteHubMode.browse);
+                          context.go(AppNavDestination.words.route);
+                        },
+                      ),
+                      HubPill(
+                        label: '自测',
+                        selected: _mode == _ReciteHubMode.quiz,
+                        onTap: () {
+                          setState(() => _mode = _ReciteHubMode.quiz);
+                          context.push(
+                            '${SGRoute.reviewSession.route}?practice=1&kind=word',
+                          );
+                        },
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    _mode == _ReciteHubMode.memory
+                        ? '按 FSRS 调度复习；自评难度写入间隔。'
+                        : _mode == _ReciteHubMode.browse
+                        ? '翻看词本，不改动复习计划。'
+                        : '主动抽测，错题会提高优先级，不直接冒充 Good/Easy。',
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: AppDesignTokens.textSecondary,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 14),
             HubSurface(
               child: Row(
                 children: <Widget>[
@@ -322,8 +380,11 @@ class _ReviewHubScreenState extends ConsumerState<ReviewHubScreen> {
                   const SizedBox(height: 14),
                   HubPrimaryButton(
                     label: plan.due.isEmpty ? '自由练习 / 再背一遍' : '开始今日背诵',
-                    onPressed: () =>
-                        context.push(SGRoute.reviewSession.route),
+                    onPressed: () => context.push(
+                      _mode == _ReciteHubMode.quiz
+                          ? '${SGRoute.reviewSession.route}?practice=1'
+                          : SGRoute.reviewSession.route,
+                    ),
                   ),
                 ],
               ),

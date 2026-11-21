@@ -105,7 +105,7 @@ class _WordReviewSettingsSheetState
             ),
             const SizedBox(height: 6),
             const Text(
-              '认记可叠加拼写、跟读；多关卡时 FSRS 按最弱一环记分。',
+              '每种卡片类型独立计入 FSRS（认记 / 听音 / 拼写 / 跟读互不影响）。',
               style: TextStyle(color: Color(0xFF94A3B8), height: 1.4),
             ),
             const SizedBox(height: 18),

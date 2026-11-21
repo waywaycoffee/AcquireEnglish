@@ -18,6 +18,10 @@ class AnkiExportNote {
     'Source',
     'Time',
     'Kind',
+    'FsrsStability',
+    'FsrsDifficulty',
+    'FsrsDue',
+    'FsrsReviews',
   ];
   final String id;
   final bool isPhrase;

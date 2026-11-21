@@ -11,10 +11,12 @@ import '../../sync/data/vocab_sync_service.dart';
 import '../data/offline_word_dictionary.dart';
 import '../domain/sm2_scheduler.dart';
 import '../domain/vocab_card_kind.dart';
+import '../domain/vocab_entry.dart';
 
 import 'vocabulary_placement_provider.dart';
 
 export '../domain/vocab_card_kind.dart';
+export '../domain/vocab_entry.dart';
 
 const String _wordBookStorageKey = 'word_book_v1';
 const String _reviewStreakKey = 'word_review_streak_v1';
@@ -176,6 +178,13 @@ class WordEntry {
     this.aiExampleEn,
     this.aiExampleCn,
     this.enrichmentStatus = VocabEnrichmentStatus.none,
+    this.scheduleStatus = VocabScheduleStatus.pending,
+    this.tags = const <String>[],
+    this.groupIds = const <String>[],
+    this.note = '',
+    this.senses = const <VocabSense>[],
+    this.freqRank,
+    this.cefr,
     this.ease = 2.5,
     this.intervalDays = 0,
     this.repetitions = 0,
@@ -192,9 +201,11 @@ class WordEntry {
             (VocabCardKind k) => k.name == kindRaw,
             orElse: () => vocabCardKindForLexeme(word),
           );
+    final bool favorite = json['favorite'] as bool? ?? false;
+    final int? freqRank = (json['freqRank'] as num?)?.toInt();
     return WordEntry(
       word: word,
-      favorite: json['favorite'] as bool? ?? false,
+      favorite: favorite,
       kind: kind,
       definitionCn: json['definitionCn'] as String?,
       offlineDefinitionCn: json['offlineDefinitionCn'] as String?,
@@ -210,6 +221,25 @@ class WordEntry {
       enrichmentStatus: vocabEnrichmentStatusFromName(
         json['enrichmentStatus'] as String?,
       ),
+      scheduleStatus: VocabScheduleStatusX.parse(
+        json['scheduleStatus'] as String?,
+        favorite: favorite,
+      ),
+      tags: (json['tags'] as List<Object?>? ?? const <Object?>[])
+          .map((Object? e) => '$e')
+          .where((String t) => t.isNotEmpty)
+          .toList(growable: false),
+      groupIds: (json['groupIds'] as List<Object?>? ?? const <Object?>[])
+          .map((Object? e) => '$e')
+          .where((String t) => t.isNotEmpty)
+          .toList(growable: false),
+      note: json['note'] as String? ?? '',
+      senses: (json['senses'] as List<Object?>? ?? const <Object?>[])
+          .cast<Map<String, Object?>>()
+          .map(VocabSense.fromJson)
+          .toList(growable: false),
+      freqRank: freqRank,
+      cefr: json['cefr'] as String? ?? cefrFromFreqRank(freqRank),
       occurrences: (json['occurrences'] as List<Object?>? ?? const <Object?>[])
           .cast<Map<String, Object?>>()
           .map(WordOccurrence.fromJson)
@@ -237,12 +267,41 @@ class WordEntry {
   final String? aiExampleEn;
   final String? aiExampleCn;
   final VocabEnrichmentStatus enrichmentStatus;
+  final VocabScheduleStatus scheduleStatus;
+  final List<String> tags;
+  final List<String> groupIds;
+  final String note;
+  final List<VocabSense> senses;
+  final int? freqRank;
+  final String? cefr;
   final List<WordOccurrence> occurrences;
   final double ease;
   final int intervalDays;
   final int repetitions;
   final int? dueAtMs;
   final WordMastery mastery;
+
+  String get entryId => vocabEntryIdForLemma(word);
+
+  bool get isSchedulable =>
+      favorite && scheduleStatus == VocabScheduleStatus.active;
+
+  bool get hasVideoContext => occurrences.any(
+    (WordOccurrence o) => o.episodeId.trim().isNotEmpty,
+  );
+
+  String get primaryGloss {
+    for (final VocabSense sense in senses) {
+      if (sense.isPrimary && sense.gloss.trim().isNotEmpty) {
+        return sense.gloss.trim();
+      }
+    }
+    if (senses.isNotEmpty && senses.first.gloss.trim().isNotEmpty) {
+      return senses.first.gloss.trim();
+    }
+    final String def = (definitionCn ?? offlineDefinitionCn ?? '').trim();
+    return def;
+  }
 
   int get videoCount => occurrences.length;
   int get occurrenceCount => occurrences.fold<int>(
@@ -305,6 +364,13 @@ class WordEntry {
     String? aiExampleEn,
     String? aiExampleCn,
     VocabEnrichmentStatus? enrichmentStatus,
+    VocabScheduleStatus? scheduleStatus,
+    List<String>? tags,
+    List<String>? groupIds,
+    String? note,
+    List<VocabSense>? senses,
+    int? freqRank,
+    String? cefr,
     double? ease,
     int? intervalDays,
     int? repetitions,
@@ -327,6 +393,13 @@ class WordEntry {
     aiExampleEn: aiExampleEn ?? this.aiExampleEn,
     aiExampleCn: aiExampleCn ?? this.aiExampleCn,
     enrichmentStatus: enrichmentStatus ?? this.enrichmentStatus,
+    scheduleStatus: scheduleStatus ?? this.scheduleStatus,
+    tags: tags ?? this.tags,
+    groupIds: groupIds ?? this.groupIds,
+    note: note ?? this.note,
+    senses: senses ?? this.senses,
+    freqRank: freqRank ?? this.freqRank,
+    cefr: cefr ?? this.cefr,
     ease: ease ?? this.ease,
     intervalDays: intervalDays ?? this.intervalDays,
     repetitions: repetitions ?? this.repetitions,
@@ -350,6 +423,13 @@ class WordEntry {
     'aiExampleEn': aiExampleEn,
     'aiExampleCn': aiExampleCn,
     'enrichmentStatus': enrichmentStatus.name,
+    'scheduleStatus': scheduleStatus.name,
+    'tags': tags,
+    'groupIds': groupIds,
+    'note': note,
+    'senses': senses.map((VocabSense s) => s.toJson()).toList(),
+    'freqRank': freqRank,
+    'cefr': cefr,
     'occurrences': occurrences
         .map((WordOccurrence item) => item.toJson())
         .toList(),
@@ -510,7 +590,14 @@ class WordBookNotifier extends Notifier<List<WordEntry>> {
     final int index = state.indexWhere((WordEntry item) => item.word == word);
     if (index < 0) return null;
     final List<WordEntry> next = <WordEntry>[...state];
-    next[index] = next[index].copyWith(favorite: !next[index].favorite);
+    final WordEntry current = next[index];
+    final bool becomingFavorite = !current.favorite;
+    next[index] = current.copyWith(
+      favorite: becomingFavorite,
+      scheduleStatus: becomingFavorite
+          ? VocabScheduleStatus.pending
+          : VocabScheduleStatus.archived,
+    );
     state = next;
     unawaited(_persist());
     final WordEntry updated = state[index];
@@ -518,6 +605,76 @@ class WordBookNotifier extends Notifier<List<WordEntry>> {
       unawaited(ref.read(vocabSyncServiceProvider).pushEntry(updated));
     }
     return updated.favorite;
+  }
+
+  /// Move a pending/archived favorite onto the FSRS schedule.
+  bool enrollForReview(String rawWord) {
+    final String word = normalizeLexeme(rawWord);
+    final int index = state.indexWhere((WordEntry item) => item.word == word);
+    if (index < 0) return false;
+    final List<WordEntry> next = <WordEntry>[...state];
+    next[index] = next[index].copyWith(
+      favorite: true,
+      scheduleStatus: VocabScheduleStatus.active,
+    );
+    state = next;
+    unawaited(_persist());
+    unawaited(ref.read(vocabSyncServiceProvider).pushEntry(next[index]));
+    return true;
+  }
+
+  /// Keep the word in the book but drop it from the daily queue.
+  bool archiveWord(String rawWord) {
+    final String word = normalizeLexeme(rawWord);
+    final int index = state.indexWhere((WordEntry item) => item.word == word);
+    if (index < 0) return false;
+    final List<WordEntry> next = <WordEntry>[...state];
+    next[index] = next[index].copyWith(
+      scheduleStatus: VocabScheduleStatus.archived,
+    );
+    state = next;
+    unawaited(_persist());
+    return true;
+  }
+
+  bool setWordNote(String rawWord, String note) {
+    final String word = normalizeLexeme(rawWord);
+    final int index = state.indexWhere((WordEntry item) => item.word == word);
+    if (index < 0) return false;
+    final List<WordEntry> next = <WordEntry>[...state];
+    next[index] = next[index].copyWith(note: note.trim());
+    state = next;
+    unawaited(_persist());
+    return true;
+  }
+
+  bool addWordTag(String rawWord, String tag) {
+    final String word = normalizeLexeme(rawWord);
+    final String clean = tag.trim();
+    if (clean.isEmpty) return false;
+    final int index = state.indexWhere((WordEntry item) => item.word == word);
+    if (index < 0) return false;
+    final WordEntry entry = state[index];
+    if (entry.tags.contains(clean)) return true;
+    final List<WordEntry> next = <WordEntry>[...state];
+    next[index] = entry.copyWith(tags: <String>[...entry.tags, clean]);
+    state = next;
+    unawaited(_persist());
+    return true;
+  }
+
+  bool setScheduleStatus(String rawWord, VocabScheduleStatus status) {
+    final String word = normalizeLexeme(rawWord);
+    final int index = state.indexWhere((WordEntry item) => item.word == word);
+    if (index < 0) return false;
+    final List<WordEntry> next = <WordEntry>[...state];
+    next[index] = next[index].copyWith(
+      favorite: true,
+      scheduleStatus: status,
+    );
+    state = next;
+    unawaited(_persist());
+    return true;
   }
 
   bool addFavoriteWord({
@@ -555,6 +712,18 @@ class WordBookNotifier extends Notifier<List<WordEntry>> {
       count: count == 0 ? 1 : count,
     );
     final VocabCardKind kind = cardKind ?? vocabCardKindForLexeme(word);
+    final String sourceTag = course.trim().isEmpty
+        ? ''
+        : course.trim();
+    final List<VocabSense> defaultSenses = validDefinition == null
+        ? const <VocabSense>[]
+        : <VocabSense>[
+            VocabSense(
+              gloss: validDefinition,
+              isPrimary: true,
+              register: '语境',
+            ),
+          ];
     if (entryIndex < 0) {
       state = <WordEntry>[
         WordEntry(
@@ -563,6 +732,12 @@ class WordBookNotifier extends Notifier<List<WordEntry>> {
           kind: kind,
           definitionCn: validDefinition,
           enrichmentStatus: VocabEnrichmentStatus.pending,
+          // New collects stay pending until preview enroll.
+          scheduleStatus: VocabScheduleStatus.pending,
+          tags: sourceTag.isEmpty
+              ? const <String>[]
+              : <String>[sourceTag],
+          senses: defaultSenses,
           occurrences: <WordOccurrence>[
             WordOccurrence(
               episodeId: episodeId,
@@ -613,11 +788,24 @@ class WordBookNotifier extends Notifier<List<WordEntry>> {
           ),
         );
       }
+      final List<String> tags = <String>[...entry.tags];
+      if (sourceTag.isNotEmpty && !tags.contains(sourceTag)) {
+        tags.add(sourceTag);
+      }
+      final List<VocabSense> senses = entry.senses.isNotEmpty
+          ? entry.senses
+          : defaultSenses;
       final List<WordEntry> next = <WordEntry>[...state];
       next[entryIndex] = entry.copyWith(
         favorite: true,
+        // Keep existing schedule status; only brand-new words start pending.
+        scheduleStatus: entry.favorite
+            ? entry.scheduleStatus
+            : VocabScheduleStatus.pending,
         kind: entry.kind == VocabCardKind.word ? kind : entry.kind,
         occurrences: occurrences,
+        tags: tags,
+        senses: senses,
         definitionCn: entry.definitionCn ?? validDefinition,
         enrichmentStatus:
             entry.enrichmentStatus == VocabEnrichmentStatus.ready

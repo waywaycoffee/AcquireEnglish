@@ -7,6 +7,7 @@ import 'package:dio/dio.dart';
 import 'package:common_learn_english/features/daily_review/domain/daily_review.dart';
 import 'package:common_learn_english/features/daily_review/presentation/daily_review_provider.dart';
 import 'package:common_learn_english/features/phrases/presentation/phrase_book_provider.dart';
+import 'package:common_learn_english/features/words/domain/vocab_entry.dart';
 import 'package:common_learn_english/features/words/presentation/word_book_provider.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -16,7 +17,7 @@ import 'package:hive_ce/hive.dart';
 final DateTime now = DateTime(2026, 10, 23, 9);
 const List<ReviewSource> sources = <ReviewSource>[
   ReviewSource(
-    key: 'word:hello',
+    key: 'entry:hello:recognize',
     kind: ReviewKind.word,
     question: 'hello',
     answer: '你好',
@@ -65,7 +66,7 @@ void main() {
       await first.read(dailyReviewProvider.notifier).setDailyNewLimit(1);
       await first
           .read(dailyReviewProvider.notifier)
-          .grade('word:hello', fsrs.Rating.easy, expectedReviews: 0);
+          .grade('entry:hello:recognize', fsrs.Rating.easy, expectedReviews: 0);
       first.dispose();
       await Hive.box<String>('prefs').close();
       await Hive.openBox<String>('prefs');
@@ -132,19 +133,19 @@ void main() {
         dailyReviewProvider.notifier,
       );
       await firstReview.grade(
-        'word:hello',
+        'entry:hello:recognize',
         fsrs.Rating.good,
         expectedReviews: 0,
       );
       online = false;
       expect(await firstReview.syncCloudBackup(), contains('本机记录已保留'));
-      expect(first.read(dailyReviewProvider).records['word:hello']!.reviews, 1);
+      expect(first.read(dailyReviewProvider).records['entry:hello:recognize']!.reviews, 1);
       online = true;
       expect(await firstReview.syncCloudBackup(), contains('已备份'));
       expect(revision, 1);
       final DateTime due = first
           .read(dailyReviewProvider)
-          .records['word:hello']!
+          .records['entry:hello:recognize']!
           .card
           .due;
       first.dispose();
@@ -161,11 +162,11 @@ void main() {
       );
       expect(await secondReview.syncCloudBackup(), contains('已恢复'));
       expect(
-        second.read(dailyReviewProvider).records['word:hello']!.card.due,
+        second.read(dailyReviewProvider).records['entry:hello:recognize']!.card.due,
         due,
       );
       expect(
-        second.read(dailyReviewProvider).records['word:hello']!.reviews,
+        second.read(dailyReviewProvider).records['entry:hello:recognize']!.reviews,
         1,
       );
       await secondReview.setDailyNewLimit(7);
@@ -188,11 +189,11 @@ void main() {
       await expectLater(
         container
             .read(dailyReviewProvider.notifier)
-            .grade('word:hello', fsrs.Rating.good, expectedReviews: 0),
+            .grade('entry:hello:recognize', fsrs.Rating.good, expectedReviews: 0),
         throwsStateError,
       );
       expect(
-        container.read(dailyReviewProvider).records['word:hello']!.isNew,
+        container.read(dailyReviewProvider).records['entry:hello:recognize']!.isNew,
         isTrue,
       );
       expect(
@@ -202,9 +203,9 @@ void main() {
       repository.fail = false;
       await container
           .read(dailyReviewProvider.notifier)
-          .grade('word:hello', fsrs.Rating.good, expectedReviews: 0);
+          .grade('entry:hello:recognize', fsrs.Rating.good, expectedReviews: 0);
       expect(
-        container.read(dailyReviewProvider).records['word:hello']!.reviews,
+        container.read(dailyReviewProvider).records['entry:hello:recognize']!.reviews,
         1,
       );
     },
@@ -237,18 +238,18 @@ void main() {
       dailyReviewProvider.notifier,
     );
     final Future<void> first = notifier.grade(
-      'word:hello',
+      'entry:hello:recognize',
       fsrs.Rating.good,
       expectedReviews: 0,
     );
     final Future<void> duplicate = expectLater(
-      notifier.grade('word:hello', fsrs.Rating.good, expectedReviews: 0),
+      notifier.grade('entry:hello:recognize', fsrs.Rating.good, expectedReviews: 0),
       throwsStateError,
     );
     await first;
     await duplicate;
     expect(
-      container.read(dailyReviewProvider).records['word:hello']!.reviews,
+      container.read(dailyReviewProvider).records['entry:hello:recognize']!.reviews,
       1,
     );
   });
@@ -365,8 +366,19 @@ void main() {
     expect(
       container
           .read(reviewSourcesProvider)
-          .map((ReviewSource source) => source.key),
-      <String>['word:saved', 'phrase:1'],
+          .map((ReviewSource source) => source.key)
+          .toList(),
+      containsAll(<String>[
+        'entry:saved:recognize',
+        'entry:saved:listen',
+        'phrase:1',
+      ]),
+    );
+    expect(
+      container
+          .read(reviewSourcesProvider)
+          .any((ReviewSource s) => s.question == 'seen'),
+      isFalse,
     );
   });
 }
@@ -383,7 +395,12 @@ class FailingRepository extends ReviewRepository {
 class TestWords extends WordBookNotifier {
   @override
   List<WordEntry> build() => const <WordEntry>[
-    WordEntry(word: 'saved', favorite: true, occurrences: <WordOccurrence>[]),
+    WordEntry(
+      word: 'saved',
+      favorite: true,
+      scheduleStatus: VocabScheduleStatus.active,
+      occurrences: <WordOccurrence>[],
+    ),
     WordEntry(word: 'seen', favorite: false, occurrences: <WordOccurrence>[]),
   ];
 }

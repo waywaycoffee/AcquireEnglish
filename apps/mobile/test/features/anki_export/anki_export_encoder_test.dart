@@ -65,6 +65,10 @@ void main() {
         '来源',
         '时间点',
         '类型',
+        'FsrsStability',
+        'FsrsDifficulty',
+        'FsrsDue',
+        'FsrsReviews',
       ]);
       expect(text, isNot(contains('guid')));
 
@@ -74,7 +78,7 @@ void main() {
         separator,
       );
       expect(rows, hasLength(1));
-      expect(rows.single, hasLength(8));
+      expect(rows.single, hasLength(12));
       expect(rows.single, <String>[
         'café & 茶 🐳',
         note.fields[1],
@@ -106,6 +110,10 @@ void main() {
         '剧集 A<br>剧集 B',
         '00:01<br>00:02',
         '单词',
+        '',
+        '',
+        '',
+        '',
       ],
     );
     for (final AnkiExportFormat format in <AnkiExportFormat>[
@@ -159,7 +167,7 @@ void main() {
         .select('SELECT id, guid, mid, mod, tags, flds, sfld FROM notes')
         .single;
     final List<String> storedFields = (noteRow['flds'] as String).split('\x1f');
-    expect(storedFields, hasLength(8));
+    expect(storedFields, hasLength(12));
     expect(
       storedFields,
       note.fields
@@ -271,7 +279,9 @@ void main() {
     expect(rows, hasLength(2));
     expect(rows[0]['guid'], isNot(rows[1]['guid']));
     expect(
-      rows.map((Row row) => (row['flds'] as String).split('\x1f').last).toSet(),
+      rows
+          .map((Row row) => (row['flds'] as String).split('\x1f')[7])
+          .toSet(),
       <String>{'Word', 'Phrase'},
     );
     expect(
@@ -326,6 +336,10 @@ AnkiExportNote _sampleNote({
     'Source:引用，逗号\t制表符',
     '2026-10-23\n09:30',
     kind,
+    '12.5',
+    '5.0',
+    '2026-11-01T00:00:00.000Z',
+    '3',
   ],
 );
 

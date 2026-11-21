@@ -182,10 +182,10 @@ void main() {
           }
           expect(fields, hasLength(2));
           final List<String> word = fields.singleWhere(
-            (List<String> row) => row.last == '单词',
+            (List<String> row) => row.length > 7 && row[7] == '单词',
           );
           final List<String> phrase = fields.singleWhere(
-            (List<String> row) => row.last == '短语',
+            (List<String> row) => row.length > 7 && row[7] == '短语',
           );
           expect(word[0], 'antacid');
           expect(word[2], '抗酸药 API');

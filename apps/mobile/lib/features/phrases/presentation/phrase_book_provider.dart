@@ -42,6 +42,7 @@ class PhraseEntry {
     this.nextReviewAt,
     this.reviewCount = 0,
     this.lapseCount = 0,
+    this.archived = false,
   });
 
   factory PhraseEntry.fromJson(Map<String, Object?> json) {
@@ -65,6 +66,7 @@ class PhraseEntry {
       nextReviewAt: json['nextReviewAt'] as String?,
       reviewCount: json['reviewCount'] as int? ?? 0,
       lapseCount: json['lapseCount'] as int? ?? 0,
+      archived: json['archived'] as bool? ?? false,
     );
   }
 
@@ -87,6 +89,7 @@ class PhraseEntry {
   final String? nextReviewAt;
   final int reviewCount;
   final int lapseCount;
+  final bool archived;
 
   bool isDue([DateTime? now]) {
     if (needsReview) return true;
@@ -116,6 +119,7 @@ class PhraseEntry {
     String? nextReviewAt,
     int? reviewCount,
     int? lapseCount,
+    bool? archived,
   }) {
     return PhraseEntry(
       id: id ?? this.id,
@@ -137,6 +141,7 @@ class PhraseEntry {
       nextReviewAt: nextReviewAt ?? this.nextReviewAt,
       reviewCount: reviewCount ?? this.reviewCount,
       lapseCount: lapseCount ?? this.lapseCount,
+      archived: archived ?? this.archived,
     );
   }
 
@@ -160,6 +165,7 @@ class PhraseEntry {
     'nextReviewAt': nextReviewAt,
     'reviewCount': reviewCount,
     'lapseCount': lapseCount,
+    'archived': archived,
   };
 }
 
@@ -348,6 +354,16 @@ class PhraseBookNotifier extends Notifier<List<PhraseEntry>> {
     if (row != null) {
       unawaited(ref.read(phraseSyncServiceProvider).pushEntry(row));
     }
+  }
+
+  bool archivePhrase(String id, {bool archived = true}) {
+    final int index = state.indexWhere((PhraseEntry p) => p.id == id);
+    if (index < 0) return false;
+    final List<PhraseEntry> next = <PhraseEntry>[...state];
+    next[index] = next[index].copyWith(archived: archived);
+    state = next;
+    unawaited(_persist());
+    return true;
   }
 
   void deletePhrase(String id) {
