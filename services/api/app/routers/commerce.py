@@ -9,15 +9,17 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.database import get_db
 from app.deps import get_current_user
 from app.models import User
-from app.services.commerce.catalog import public_commerce_catalog
+from app.services.commerce.catalog import MODULE_DEFS, public_commerce_catalog
 from app.services.commerce.points import earn_points, points_summary, spend_points
 from app.services.commerce.trial import (
     claim_trial_extend_coupon,
     trial_status,
 )
-from app.services.user_assets import list_active_entitlements
+from app.services.user_assets import list_active_entitlements, user_has_module_access
 
 router = APIRouter(prefix="/commerce", tags=["commerce"])
+
+_MODULE_CODES = {str(m["code"]) for m in MODULE_DEFS}
 
 
 class PointsEarnIn(BaseModel):
@@ -43,6 +45,26 @@ async def _is_paid_user(db: AsyncSession, user_id: int) -> bool:
 async def commerce_catalog() -> dict:
     """Public module / combo / efficiency SKU catalog (PRD pricing)."""
     return public_commerce_catalog()
+
+
+@router.get("/modules/{module_code}/access")
+async def commerce_module_access(
+    module_code: str,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    """Whether the user may enter a learning module (Pro/trial or module SKU)."""
+    code = module_code.strip()
+    if code not in _MODULE_CODES:
+        raise HTTPException(status_code=404, detail="unknown_module")
+    allowed = await user_has_module_access(db, user.id, code)
+    title = next((m["title"] for m in MODULE_DEFS if m["code"] == code), code)
+    return {
+        "module": code,
+        "title": title,
+        "allowed": allowed,
+        "paywall": not allowed,
+    }
 
 
 @router.get("/trial/status")

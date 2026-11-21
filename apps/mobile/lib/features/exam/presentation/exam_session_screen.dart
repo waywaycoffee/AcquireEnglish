@@ -4,10 +4,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../authentication/presentation/auth_session.dart';
 import '../../daily_review/domain/daily_review.dart';
 import '../../daily_review/domain/memory_item.dart';
 import '../../daily_review/presentation/daily_review_provider.dart';
 import '../../shared/presentation/pad/app_design_tokens.dart';
+import '../../sync/data/acquire_api_client.dart';
 import '../data/exam_error_book_store.dart';
 import '../data/exam_progress_store.dart';
 import '../domain/exam_fsrs.dart';
@@ -234,6 +236,17 @@ class _ExamSessionScreenState extends ConsumerState<ExamSessionScreen> {
           wrong: _wrong,
           mock: widget.mock,
         );
+    final int total = _correct + _wrong;
+    final bool readingPass = widget.skill == 'reading' &&
+        total > 0 &&
+        _correct * 100 >= total * 60;
+    if (readingPass && ref.read(authSessionProvider).isLoggedIn) {
+      try {
+        await ref
+            .read(acquireApiClientProvider)
+            .commerceEarnPoints(reason: 'reading_quiz_pass');
+      } catch (_) {}
+    }
     if (!mounted) return;
     await showDialog<void>(
       context: context,

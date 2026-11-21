@@ -95,6 +95,7 @@ async def get_my_assets(
         link_course_count=summary["link_course_count"],
         vocab_count=summary["vocab_count"],
         active_membership=summary["active_membership"],
+        unlocked_modules=list(summary.get("unlocked_modules") or []),
     )
 
 

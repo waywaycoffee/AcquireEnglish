@@ -3,6 +3,19 @@
 Vendor caches live under data/exam_bank_vendor/ (gitignored).
 RACE / CLOTH / SC-Ques / cn-math English are research or CC BY-NC — packs carry
 license metadata; commercial redistribution needs separate rights.
+
+Optional downloads (do not commit archives)::
+
+  CLOTH:
+    mkdir -p data/exam_bank_vendor/CLOTH
+    # Research dump: https://www.qizhexie.com/data/CLOTH  (CLOTH.tar.gz)
+    # Place CLOTH.tar.gz under CLOTH/ — converter auto-extracts to _extracted/
+
+  SC-Ques:
+    # https://github.com/ai4ed/SC-Ques — put dataset json/jsonl under
+    # data/exam_bank_vendor/SC-Ques/datasets/  (repo code alone is not enough)
+
+  Then:  python tools/import_k12_open_banks.py
 """
 
 from __future__ import annotations

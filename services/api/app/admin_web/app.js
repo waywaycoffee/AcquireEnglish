@@ -2,6 +2,30 @@
   const TOKEN_KEY = "ae_admin_token";
   const USER_KEY = "ae_admin_username";
   const TOKEN_FILENAME = "acquireenglish-admin-login.token";
+  // Keep in sync with services/api/app/services/commerce/catalog.py MODULE_DEFS.
+  const MODULE_DEFS = [
+    { code: "exam_reading", title: "考试阅读" },
+    { code: "exam_listening", title: "考试听说" },
+    { code: "acquire_reading", title: "习得阅读" },
+    { code: "acquire_listening", title: "习得听说" },
+  ];
+  const MODULE_TITLE = Object.fromEntries(
+    MODULE_DEFS.map((m) => [m.code, m.title])
+  );
+
+  function moduleLabel(code) {
+    const key = String(code || "").trim();
+    return MODULE_TITLE[key] || key;
+  }
+
+  function normalizeGrantKind(kind) {
+    const k = String(kind || "").trim();
+    if (k === "module" || k === "module_permanent" || k === "module_combo") {
+      return "module";
+    }
+    return k;
+  }
+
   const state = {
     token: localStorage.getItem(TOKEN_KEY) || "",
     username: localStorage.getItem(USER_KEY) || "admin",
@@ -1085,15 +1109,27 @@
           )})</option>`
       )
       .join("");
+    const moduleOptions = MODULE_DEFS.map(
+      (m) =>
+        `<option value="${escapeHtml(m.code)}">${escapeHtml(m.title)} (${escapeHtml(
+          m.code
+        )})</option>`
+    ).join("");
     const ents = (data.entitlements || [])
       .map((e) => {
         const revoke =
           e.status === "active"
             ? `<button class="btn danger" data-revoke="${e.id}" type="button">吊销</button>`
             : "";
+        const refLabel =
+          e.asset_kind === "module"
+            ? `${moduleLabel(e.asset_ref)} <span class="muted">(${escapeHtml(
+                e.asset_ref
+              )})</span>`
+            : escapeHtml(e.asset_ref);
         return `<tr>
           <td>${e.id}</td>
-          <td>${escapeHtml(e.asset_kind)}<br/><span class="muted">${escapeHtml(e.asset_ref)}</span></td>
+          <td>${escapeHtml(e.asset_kind)}<br/>${refLabel}</td>
           <td>${escapeHtml(e.status)}</td>
           <td>${e.quantity ?? "∞"}</td>
           <td>${escapeHtml(e.ends_at || "—")}</td>
@@ -1153,6 +1189,12 @@
           <label class="full">快捷 SKU
             <select id="skuPick"><option value="">自定义填写</option>${skuOptions}</select>
           </label>
+          <label class="full">学习模块（asset_kind=module）
+            <select id="modulePick">
+              <option value="">不套用模块标题</option>
+              ${moduleOptions}
+            </select>
+          </label>
           <label>asset_kind<input name="asset_kind" required placeholder="membership" /></label>
           <label>asset_ref<input name="asset_ref" required placeholder="pro" /></label>
           <label>quantity<input name="quantity" type="number" placeholder="可空=不限" /></label>
@@ -1204,10 +1246,22 @@
       const opt = $("skuPick").selectedOptions[0];
       if (!opt || !opt.value) return;
       const form = $("grantForm");
-      form.asset_kind.value = opt.dataset.kind || "";
+      const rawKind = opt.dataset.kind || "";
+      form.asset_kind.value = normalizeGrantKind(rawKind);
       form.asset_ref.value = opt.dataset.ref || opt.value;
       form.quantity.value = opt.dataset.qty || "";
       form.duration_days.value = opt.dataset.days || "";
+      if (form.asset_kind.value === "module" && MODULE_TITLE[form.asset_ref.value]) {
+        const mp = $("modulePick");
+        if (mp) mp.value = form.asset_ref.value;
+      }
+    });
+    $("modulePick")?.addEventListener("change", () => {
+      const code = $("modulePick").value;
+      if (!code) return;
+      const form = $("grantForm");
+      form.asset_kind.value = "module";
+      form.asset_ref.value = code;
     });
     $("renameForm")?.addEventListener("submit", async (ev) => {
       ev.preventDefault();

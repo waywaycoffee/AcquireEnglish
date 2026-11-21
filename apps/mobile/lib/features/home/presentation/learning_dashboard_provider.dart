@@ -231,11 +231,13 @@ class LearningActivityNotifier extends Notifier<LearningActivityState> {
     final String dayKey = _dayKey(occurredAt);
     final LearningDailyRecord previous =
         state.records[dayKey] ?? LearningDailyRecord.empty(dayKey);
+    final int streakBefore = state.streakDays;
     LearningDailyRecord next = update(previous);
     next = next.copyWith(checkedIn: _meetsCheckInRequirements(next));
     if (next == previous) {
       return;
     }
+    final bool justCheckedIn = !previous.checkedIn && next.checkedIn;
     final Map<String, LearningDailyRecord> records =
         <String, LearningDailyRecord>{...state.records, dayKey: next};
     final DateTime oldestDay = DateTime.now().subtract(
@@ -247,6 +249,47 @@ class LearningActivityNotifier extends Notifier<LearningActivityState> {
     state = LearningActivityState(records: records);
     _schedulePersist();
     _scheduleStudyStatsSync();
+    if (justCheckedIn) {
+      unawaited(
+        _earnCommercePoints(
+          reason: 'daily_tasks_clear',
+          // Server monthly cap dedupes volume; day key avoids same-day spam storms.
+          clientEventId: 'daily_tasks_clear:$dayKey',
+        ),
+      );
+      final int streakAfter = state.streakDays;
+      for (final int milestone in const <int>[3, 7, 14, 30]) {
+        if (streakBefore < milestone && streakAfter >= milestone) {
+          unawaited(
+            _earnCommercePoints(
+              reason: 'checkin_$milestone',
+              clientEventId: 'checkin_$milestone:$dayKey',
+            ),
+          );
+        }
+      }
+    }
+  }
+
+  Future<void> _earnCommercePoints({
+    required String reason,
+    required String clientEventId,
+  }) async {
+    if (!ref.read(authSessionProvider).isLoggedIn) return;
+    // Prefer prefs-local once-per-event guard so we do not hammer the API.
+    if (Hive.isBoxOpen('prefs')) {
+      final Box<String> prefs = Hive.box<String>('prefs');
+      final String key = 'commerce_pts:$clientEventId';
+      if (prefs.get(key) == '1') return;
+      await prefs.put(key, '1');
+    }
+    try {
+      await ref.read(acquireApiClientProvider).commerceEarnPoints(reason: reason);
+    } catch (_) {
+      if (Hive.isBoxOpen('prefs')) {
+        await Hive.box<String>('prefs').delete('commerce_pts:$clientEventId');
+      }
+    }
   }
 
   bool _meetsCheckInRequirements(LearningDailyRecord record) {

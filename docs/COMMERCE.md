@@ -43,4 +43,35 @@ Related: `/api/assets/membership-coupons/{id}/redeem` honors `trial_extend_7` fu
 
 ## App
 
-Membership screen shows trial banner (days left / login streak / claim) and module catalog cards; client methods live on `AcquireApiClient` (`commerce*`).
+Membership screen shows trial banner (days left / login streak / claim), module/combo purchase (any2 uses `selected_modules`), points balance + spend catalog, and module catalog cards; client methods live on `AcquireApiClient` (`commerce*`).
+
+Module entry gates (`ModuleGate`): `exam_reading` / `exam_listening` / `acquire_reading` / `acquire_listening`. Access = active Pro (incl. full trial) **or** matching `asset_kind=module` entitlement. API: `GET /api/commerce/modules/{code}/access`.
+
+Points earn hooks (client → `POST /api/commerce/points/earn`):
+
+| Reason | Trigger |
+|--------|---------|
+| `reading_quiz_pass` | Exam reading session ≥60% correct |
+| `daily_tasks_clear` | Daily learning check-in requirements met |
+| `checkin_3` / `_7` / `_14` / `_30` | Streak first reaches milestone |
+
+## Shared subtitle EN→ZH cron
+
+On ECS (after LLM keys in `tools/oral_coach/.env` or `services/api/.env`):
+
+```cron
+20 4 * * * cd /opt/acquireenglish/services/api && .venv/bin/python tools/backfill_shared_zh_translations.py --mismatch --limit 80 >> /var/log/acquireenglish-shared-zh.log 2>&1
+```
+
+Manual: `python tools/backfill_shared_zh_translations.py --mismatch --limit 100`.
+
+## CLOTH / SC-Ques exam banks
+
+Importer: `services/api/tools/import_k12_open_banks.py` (writes `data/exam_packs/`). Vendor trees are gitignored under `data/exam_bank_vendor/`.
+
+| Dataset | Place archive / files at | Upstream |
+|---------|--------------------------|----------|
+| CLOTH | `exam_bank_vendor/CLOTH/CLOTH.tar.gz` (auto-extract) or JSON under that folder | https://www.qizhexie.com/data/CLOTH (research) / paper “CLOTH” (Xie et al.) |
+| SC-Ques | `exam_bank_vendor/SC-Ques/datasets/` (json/jsonl from release) | https://github.com/ai4ed/SC-Ques |
+
+Do **not** invent packs: if archives are missing, the importer prints a skip message and leaves converters ready. After import, redeploy pack JSON to ECS with the usual exam-pack ship path.

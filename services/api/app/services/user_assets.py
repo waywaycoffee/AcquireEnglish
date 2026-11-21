@@ -396,6 +396,47 @@ async def list_active_entitlements(
     return rows
 
 
+async def user_has_module_access(
+    db: AsyncSession,
+    user_id: int,
+    module_code: str,
+) -> bool:
+    """True if Pro membership / full trial, or an active module entitlement."""
+    code = (module_code or "").strip()
+    if not code:
+        return False
+    rows = await list_active_entitlements(db, user_id)
+    for row in rows:
+        if row.asset_kind == "membership" and row.asset_ref == "pro":
+            return True
+        if row.asset_kind == "module" and row.asset_ref == code:
+            return True
+    return False
+
+
+def unlocked_module_codes(entitlements: list[UserEntitlement]) -> list[str]:
+    """Module codes unlocked via module rows or Pro membership (all modules)."""
+    from app.services.commerce.catalog import MODULE_DEFS
+
+    has_pro = any(
+        row.asset_kind == "membership" and row.asset_ref == "pro"
+        for row in entitlements
+    )
+    if has_pro:
+        return [str(m["code"]) for m in MODULE_DEFS]
+    codes: list[str] = []
+    seen: set[str] = set()
+    for row in entitlements:
+        if row.asset_kind != "module":
+            continue
+        ref = (row.asset_ref or "").strip()
+        if not ref or ref in seen:
+            continue
+        seen.add(ref)
+        codes.append(ref)
+    return codes
+
+
 async def create_order(
     db: AsyncSession,
     user: User,
@@ -529,4 +570,5 @@ async def build_assets_summary(db: AsyncSession, user: User) -> dict:
         "link_course_count": int(link_count or 0),
         "vocab_count": int(vocab_count or 0),
         "active_membership": membership,
+        "unlocked_modules": unlocked_module_codes(entitlements),
     }

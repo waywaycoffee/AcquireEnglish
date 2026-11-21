@@ -86,6 +86,7 @@ class UserAssetsService {
     required String skuCode,
     int quantity = 1,
     int? couponId,
+    List<String>? selectedModules,
   }) async {
     final AcquireApiClient api = _ref.read(acquireApiClientProvider);
     final Map<String, dynamic> order = await api.createAssetOrder(
@@ -94,6 +95,7 @@ class UserAssetsService {
       ],
       provider: 'wechat',
       couponId: couponId,
+      selectedModules: selectedModules,
     );
     final int orderId = (order['id'] as num).toInt();
     final Map<String, dynamic> prepay = await api.createWechatPrepay(

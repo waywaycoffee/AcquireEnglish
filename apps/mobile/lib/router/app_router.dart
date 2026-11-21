@@ -48,6 +48,7 @@ import '../features/words/presentation/words_screen.dart';
 import '../features/words/presentation/vocabulary_placement_screen.dart';
 import 'fade_extension.dart';
 import '../features/membership/presentation/membership_screen.dart';
+import '../features/membership/presentation/module_gate.dart';
 import '../features/onboarding/presentation/first_open_onboarding_screen.dart';
 import '../features/onboarding/presentation/onboarding_provider.dart';
 import '../features/navigation/presentation/navigation_destination.dart';
@@ -132,13 +133,24 @@ GoRouter goRouter(Ref ref) => GoRouter(
     ).fade(),
     GoRoute(
       path: '/learn/:kind',
-      builder: (context, state) => ModuleScreen(
-        key: ValueKey<String>(state.uri.toString()),
-        initialLesson: int.tryParse(state.uri.queryParameters['lesson'] ?? ''),
-        kind: moduleLessons.containsKey(state.pathParameters['kind'])
+      builder: (context, state) {
+        final String kind = moduleLessons.containsKey(state.pathParameters['kind'])
             ? state.pathParameters['kind']!
-            : 'ipa',
-      ),
+            : 'ipa';
+        final Widget screen = ModuleScreen(
+          key: ValueKey<String>(state.uri.toString()),
+          initialLesson: int.tryParse(state.uri.queryParameters['lesson'] ?? ''),
+          kind: kind,
+        );
+        if (kind == 'listening' || kind == 'dialogue') {
+          return ModuleGate(
+            moduleCode: 'acquire_listening',
+            title: '习得听说',
+            child: screen,
+          );
+        }
+        return screen;
+      },
     ),
     GoRoute(
       path: '/shared/:token',
@@ -186,10 +198,25 @@ GoRouter goRouter(Ref ref) => GoRouter(
         final String skill = state.uri.queryParameters['skill'] ?? 'vocab';
         final bool mock =
             state.uri.queryParameters['mock'] == '1' || skill == 'mock';
-        return ExamSessionScreen(
+        final Widget session = ExamSessionScreen(
           skill: mock ? 'mock' : skill,
           mock: mock,
         );
+        if (!mock && skill == 'reading') {
+          return ModuleGate(
+            moduleCode: 'exam_reading',
+            title: '考试阅读',
+            child: session,
+          );
+        }
+        if (!mock && skill == 'listening') {
+          return ModuleGate(
+            moduleCode: 'exam_listening',
+            title: '考试听说',
+            child: session,
+          );
+        }
+        return session;
       },
     ),
     GoRoute(
@@ -381,13 +408,19 @@ GoRouter goRouter(Ref ref) => GoRouter(
     ).fade(),
     GoRoute(
       path: '/reading',
-      builder: (BuildContext context, GoRouterState state) =>
-          const ReadingHubScreen(),
+      builder: (BuildContext context, GoRouterState state) => const ModuleGate(
+        moduleCode: 'acquire_reading',
+        title: '习得阅读',
+        child: ReadingHubScreen(),
+      ),
     ).fade(),
     GoRoute(
       path: '/reading/catalog',
-      builder: (BuildContext context, GoRouterState state) =>
-          const ReadingCatalogScreen(),
+      builder: (BuildContext context, GoRouterState state) => const ModuleGate(
+        moduleCode: 'acquire_reading',
+        title: '习得阅读',
+        child: ReadingCatalogScreen(),
+      ),
     ).fade(),
     GoRoute(
       path: '/reading/:docId',
@@ -395,7 +428,11 @@ GoRouter goRouter(Ref ref) => GoRouter(
         final String docId = Uri.decodeComponent(
           state.pathParameters['docId'] ?? '',
         );
-        return ReadingReaderScreen(docId: docId);
+        return ModuleGate(
+          moduleCode: 'acquire_reading',
+          title: '习得阅读',
+          child: ReadingReaderScreen(docId: docId),
+        );
       },
     ).fade(),
     GoRoute(

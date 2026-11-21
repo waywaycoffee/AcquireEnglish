@@ -393,3 +393,4 @@ class UserAssetsOut(BaseModel):
     link_course_count: int
     vocab_count: int
     active_membership: str | None = None
+    unlocked_modules: list[str] = []

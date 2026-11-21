@@ -21,6 +21,7 @@ class _MembershipScreenState extends ConsumerState<MembershipScreen> {
   List<Map<String, dynamic>> _combos = [];
   Map<String, dynamic>? _assets;
   Map<String, dynamic>? _trial;
+  Map<String, dynamic>? _points;
   String? _selected;
   String? _error;
   String? _paymentMessage;
@@ -30,6 +31,8 @@ class _MembershipScreenState extends ConsumerState<MembershipScreen> {
   int? _couponId;
   bool _rewardBusy = false;
   bool _trialBusy = false;
+  bool _pointsBusy = false;
+  final Set<String> _any2Picks = <String>{};
 
   @override
   void initState() {
@@ -63,11 +66,18 @@ class _MembershipScreenState extends ConsumerState<MembershipScreen> {
       } catch (_) {
         catalog = null;
       }
+      Map<String, dynamic>? points;
+      try {
+        points = await api.commercePoints();
+      } catch (_) {
+        points = null;
+      }
       if (!mounted) return;
       setState(() {
         _rewards = results[3] as Map<String, dynamic>;
         _assets = results[0] as Map<String, dynamic>;
         _trial = trial;
+        _points = points;
         _modules = ((catalog?['modules'] as List<dynamic>?) ?? const [])
             .whereType<Map>()
             .map((e) => Map<String, dynamic>.from(e))
@@ -76,8 +86,17 @@ class _MembershipScreenState extends ConsumerState<MembershipScreen> {
             .whereType<Map>()
             .map((e) => Map<String, dynamic>.from(e))
             .toList();
-        _skus = (results[1] as List<Map<String, dynamic>>)
-            .where((s) => s['currency'] == 'CNY' && s['kind'] == 'membership')
+        final List<Map<String, dynamic>> allSkus =
+            results[1] as List<Map<String, dynamic>>;
+        _skus = allSkus
+            .where(
+              (s) =>
+                  s['currency'] == 'CNY' &&
+                  (s['kind'] == 'membership' ||
+                      s['kind'] == 'module' ||
+                      s['kind'] == 'module_permanent' ||
+                      s['kind'] == 'module_combo'),
+            )
             .toList();
         _orders = results[2] as List<Map<String, dynamic>>;
         _selected ??= _skus.isEmpty ? null : _skus.first['sku_code'] as String;
@@ -164,6 +183,25 @@ class _MembershipScreenState extends ConsumerState<MembershipScreen> {
     );
   }
 
+  void _toggleAny2(String code) {
+    setState(() {
+      if (_any2Picks.contains(code)) {
+        _any2Picks.remove(code);
+      } else {
+        if (_any2Picks.length >= 2) {
+          _any2Picks.remove(_any2Picks.first);
+        }
+        _any2Picks.add(code);
+      }
+    });
+  }
+
+  bool _selectedNeedsAny2() {
+    final String? code = _selected;
+    if (code == null) return false;
+    return code.contains('any2');
+  }
+
   Widget _moduleCatalog() {
     if (_modules.isEmpty && _combos.isEmpty) return const SizedBox.shrink();
     return Column(
@@ -171,37 +209,154 @@ class _MembershipScreenState extends ConsumerState<MembershipScreen> {
       children: [
         const SizedBox(height: 16),
         Text('学习模块', style: Theme.of(context).textTheme.titleLarge),
-        const Text('按考试/习得 × 阅读/听说拆分；可单模块或组合开通。'),
-        for (final mod in _modules)
+        const Text('点选月卡/年卡/永久解锁后，用下方微信支付开通；任选两模块需勾选两个。'),
+        for (final mod in _modules) ...[
           Card(
-            child: ListTile(
-              title: Text('${mod['title']}'),
-              subtitle: Text(
-                '${mod['blurb'] ?? ''}\n月付 ${_money(mod['monthly_cents'])}（标价 ${_money(mod['list_cents'])}）',
-              ),
-              isThreeLine: true,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                ListTile(
+                  title: Text('${mod['title']}'),
+                  subtitle: Text('${mod['blurb'] ?? ''}'),
+                  trailing: _selectedNeedsAny2()
+                      ? Checkbox(
+                          value: _any2Picks.contains('${mod['code']}'),
+                          onChanged: _paying
+                              ? null
+                              : (_) => _toggleAny2('${mod['code']}'),
+                        )
+                      : null,
+                ),
+                Wrap(
+                  spacing: 8,
+                  children: [
+                    TextButton(
+                      onPressed: _paying
+                          ? null
+                          : () => setState(
+                                () => _selected = '${mod['sku_monthly']}',
+                              ),
+                      child: Text(
+                        '月卡 ${_money(mod['monthly_cents'])}'
+                        '${_selected == mod['sku_monthly'] ? ' ✓' : ''}',
+                      ),
+                    ),
+                    TextButton(
+                      onPressed: _paying
+                          ? null
+                          : () => setState(
+                                () => _selected = '${mod['sku_yearly']}',
+                              ),
+                      child: Text(
+                        '年卡 ${_money(mod['yearly_cents'])}'
+                        '${_selected == mod['sku_yearly'] ? ' ✓' : ''}',
+                      ),
+                    ),
+                    TextButton(
+                      onPressed: _paying
+                          ? null
+                          : () => setState(
+                                () => _selected = '${mod['sku_permanent']}',
+                              ),
+                      child: Text(
+                        '永久 ${_money(1990)}'
+                        '${_selected == mod['sku_permanent'] ? ' ✓' : ''}',
+                      ),
+                    ),
+                  ],
+                ),
+              ],
             ),
           ),
+        ],
         if (_combos.isNotEmpty) ...[
           const SizedBox(height: 8),
           Text('组合优惠', style: Theme.of(context).textTheme.titleMedium),
           for (final combo in _combos)
             Card(
               child: ListTile(
+                selected: _selected == combo['sku_code'],
                 title: Text('${combo['title']}'),
                 subtitle: Text(
                   '${combo['duration_days'] ?? ''} 天'
-                  '${combo['pick'] != null ? ' · 任选 ${combo['pick']} 模块' : ''}',
+                  '${combo['pick'] != null ? ' · 任选 ${combo['pick']} 模块（勾选上方模块）' : ''}',
                 ),
                 trailing: Text(
                   _money(combo['price_cents']),
                   style: Theme.of(context).textTheme.titleMedium,
                 ),
+                onTap: _paying
+                    ? null
+                    : () => setState(
+                          () => _selected = combo['sku_code'] as String,
+                        ),
               ),
             ),
         ],
       ],
     );
+  }
+
+  Widget _pointsCard() {
+    final balance =
+        (_points?['balance'] as num?)?.toInt() ??
+        (_assets?['wallet'] as Map<String, dynamic>?)?['balance_credits'] ??
+        0;
+    final monthEarned = (_points?['month_earned'] as num?)?.toInt() ?? 0;
+    final monthCap = (_points?['month_cap'] as num?)?.toInt() ?? 200;
+    final spend =
+        (_points?['spend_catalog'] as Map<String, dynamic>?) ??
+        const <String, dynamic>{};
+    return _card(
+      Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text('学习积分', style: Theme.of(context).textTheme.titleLarge),
+          Text('余额 $balance · 本月已得 $monthEarned / $monthCap'),
+          const SizedBox(height: 8),
+          const Text('积分可兑换消耗型服务（不可兑换永久解锁）。'),
+          for (final entry in spend.entries)
+            ListTile(
+              contentPadding: EdgeInsets.zero,
+              title: Text('${(entry.value as Map)['title'] ?? entry.key}'),
+              subtitle: Text('${(entry.value as Map)['points'] ?? '?'} 积分'),
+              trailing: TextButton(
+                onPressed: _pointsBusy || _paying
+                    ? null
+                    : () => _spendPoints(entry.key),
+                child: const Text('兑换'),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _spendPoints(String item) async {
+    if (_pointsBusy) return;
+    setState(() => _pointsBusy = true);
+    try {
+      final result = await ref
+          .read(acquireApiClientProvider)
+          .commerceSpendPoints(item: item);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            '已兑换 ${result['title'] ?? item}，剩余 ${result['balance'] ?? ''} 积分',
+          ),
+        ),
+      );
+      await _load();
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('兑换失败：积分不足或条目不可用')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _pointsBusy = false);
+    }
   }
 
   String _money(Object? cents) =>
@@ -215,7 +370,21 @@ class _MembershipScreenState extends ConsumerState<MembershipScreen> {
       ).showSnackBar(const SnackBar(content: Text('套餐尚未加载，请刷新后选择套餐。')));
       return;
     }
-    final sku = _skus.firstWhere((s) => s['sku_code'] == _selected);
+    if (_selectedNeedsAny2() && _any2Picks.length != 2) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('任选两模块请先勾选恰好 2 个学习模块。')),
+      );
+      return;
+    }
+    final Map<String, dynamic> sku = _skus.firstWhere(
+      (s) => s['sku_code'] == _selected,
+      orElse: () => <String, dynamic>{
+        'sku_code': _selected,
+        'title': _selected,
+        'price_cents': 0,
+      },
+    );
+    final bool isMembership = sku['kind'] == 'membership';
     final confirmed = await showModalBottomSheet<bool>(
       context: context,
       showDragHandle: true,
@@ -229,7 +398,13 @@ class _MembershipScreenState extends ConsumerState<MembershipScreen> {
               Text('确认订单', style: Theme.of(context).textTheme.titleLarge),
               const SizedBox(height: 20),
               Text('${sku['title']} · ${_money(sku['price_cents'])}'),
-              Text(_couponId == null ? '未使用抵扣券' : '已选择抵扣券，以服务端结算金额为准'),
+              if (_selectedNeedsAny2())
+                Text('已选模块：${_any2Picks.join(' · ')}'),
+              Text(
+                !isMembership || _couponId == null
+                    ? '未使用抵扣券'
+                    : '已选择抵扣券，以服务端结算金额为准',
+              ),
               const Text('确认即表示同意当前价格和有效期；一次性付款，不自动续费。'),
               const ListTile(
                 contentPadding: EdgeInsets.zero,
@@ -255,9 +430,12 @@ class _MembershipScreenState extends ConsumerState<MembershipScreen> {
       _paymentMessage = '正在创建订单并打开微信…';
     });
     try {
-      final order = await ref
-          .read(userAssetsServiceProvider)
-          .purchaseWithWechat(skuCode: _selected!, couponId: _couponId);
+      final order = await ref.read(userAssetsServiceProvider).purchaseWithWechat(
+            skuCode: _selected!,
+            couponId: isMembership ? _couponId : null,
+            selectedModules:
+                _selectedNeedsAny2() ? _any2Picks.toList(growable: false) : null,
+          );
       bool paid = false;
       for (var attempt = 0; attempt < 5; attempt++) {
         final orders = await ref
@@ -490,7 +668,7 @@ class _MembershipScreenState extends ConsumerState<MembershipScreen> {
                                 ),
                                 const SizedBox(height: 12),
                                 Text(
-                                  '学习积分：${(_assets?['wallet'] as Map<String, dynamic>?)?['balance_credits'] ?? 0}',
+                                  '学习积分：${(_points?['balance'] as num?)?.toInt() ?? (_assets?['wallet'] as Map<String, dynamic>?)?['balance_credits'] ?? 0}',
                                 ),
                                 for (final e
                                     in entitlements
@@ -500,10 +678,18 @@ class _MembershipScreenState extends ConsumerState<MembershipScreen> {
                                               e['asset_kind'] == 'coach_quota',
                                         ))
                                   Text('口语陪练剩余：${e['quantity'] ?? 0} 分钟'),
+                                for (final e
+                                    in entitlements
+                                        .whereType<Map<String, dynamic>>()
+                                        .where(
+                                          (e) => e['asset_kind'] == 'module',
+                                        ))
+                                  Text('模块：${e['asset_ref']}'),
                               ],
                             ),
                           ),
                           _trialBanner(),
+                          _pointsCard(),
                           _moduleCatalog(),
                           _rewardCard(),
                           const SizedBox(height: 16),
@@ -511,7 +697,7 @@ class _MembershipScreenState extends ConsumerState<MembershipScreen> {
                             '选择权益套餐',
                             style: Theme.of(context).textTheme.titleLarge,
                           ),
-                          const Text('价格与权益以当前套餐为准；陪练分钟包单独购买。'),
+                          const Text('含 Pro 会员与模块/组合 SKU；价格以当前列表为准。'),
                           if (_loading) const LinearProgressIndicator(),
                           if (_error != null)
                             _card(

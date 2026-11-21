@@ -6,6 +6,15 @@ Run on ECS::
   cd /opt/acquireenglish/services/api
   .venv/bin/python tools/backfill_shared_zh_translations.py --limit 50
   .venv/bin/python tools/backfill_shared_zh_translations.py --mismatch --limit 100
+
+Cron (ECS, daily 04:20 Asia/Shanghai — mismatch pass, capped)::
+
+  20 4 * * * cd /opt/acquireenglish/services/api && \\
+    .venv/bin/python tools/backfill_shared_zh_translations.py --mismatch --limit 80 \\
+    >> /var/log/acquireenglish-shared-zh.log 2>&1
+
+Install once: ``sudo crontab -e`` as the deploy user (or root) after confirming
+LLM keys exist in oral_coach/.env or services/api/.env.
 """
 
 from __future__ import annotations
