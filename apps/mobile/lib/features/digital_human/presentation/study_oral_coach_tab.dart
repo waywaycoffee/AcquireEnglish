@@ -2003,7 +2003,16 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
                 for (final String expression in _lastRoundExpressions)
                   Padding(
                     padding: const EdgeInsets.only(top: 6),
-                    child: Text(expression),
+                    child: Row(
+                      children: <Widget>[
+                        Expanded(child: SelectableText(expression)),
+                        IconButton(
+                          tooltip: '复制表达',
+                          icon: const Icon(Icons.copy_outlined),
+                          onPressed: () => unawaited(_copyBubble(expression)),
+                        ),
+                      ],
+                    ),
                   ),
               ],
             ],
@@ -2013,6 +2022,13 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
           TextButton(
             onPressed: () => Navigator.pop(context),
             child: const Text('完成'),
+          ),
+          FilledButton(
+            onPressed: () {
+              Navigator.pop(context);
+              _startTopicConversation();
+            },
+            child: const Text('继续练习'),
           ),
         ],
       ),
