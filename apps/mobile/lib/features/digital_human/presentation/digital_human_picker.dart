@@ -46,6 +46,7 @@ class _DigitalHumanPickerState extends ConsumerState<DigitalHumanPicker> {
   final OralCoachPipelineClient _pipeline = OralCoachPipelineClient();
   final Map<String, String?> _savedVoices = <String, String?>{};
   Player? _previewPlayer;
+  Completer<bool>? _previewDone;
   String? _previewing;
   bool _loadingPreview = false;
   int _previewRequest = 0;
@@ -77,6 +78,11 @@ class _DigitalHumanPickerState extends ConsumerState<DigitalHumanPicker> {
 
   Future<void> _stopPreview() async {
     _previewRequest++;
+    final Completer<bool>? done = _previewDone;
+    _previewDone = null;
+    if (done != null && !done.isCompleted) {
+      done.complete(false);
+    }
     final Player? player = _previewPlayer;
     _previewPlayer = null;
     if (mounted) {
@@ -85,7 +91,58 @@ class _DigitalHumanPickerState extends ConsumerState<DigitalHumanPicker> {
         _loadingPreview = false;
       });
     }
-    await player?.dispose();
+    if (player == null) return;
+    try {
+      await player.stop();
+    } catch (_) {
+      // Player may already be torn down.
+    }
+    try {
+      await player.dispose();
+    } catch (_) {
+      // Ignore dispose races when switching previews quickly.
+    }
+  }
+
+  Future<bool> _playPreviewUrl(String url, int request) async {
+    if (!mounted || request != _previewRequest) return false;
+    final Player player = Player();
+    final Completer<bool> done = Completer<bool>();
+    _previewPlayer = player;
+    _previewDone = done;
+    StreamSubscription<bool>? completedSub;
+    StreamSubscription<String>? errorSub;
+    try {
+      completedSub = player.stream.completed.listen((bool value) {
+        if (value && !done.isCompleted) done.complete(true);
+      });
+      errorSub = player.stream.error.listen((String _) {
+        if (!done.isCompleted) done.complete(false);
+      });
+      // Subscribe before open so short/cached clips cannot miss completion.
+      await player.open(Media(url), play: true);
+      if (!mounted || request != _previewRequest) return false;
+      if (mounted) setState(() => _loadingPreview = false);
+      return await done.future.timeout(
+        const Duration(seconds: 45),
+        onTimeout: () => false,
+      );
+    } finally {
+      await completedSub?.cancel();
+      await errorSub?.cancel();
+      if (identical(_previewDone, done)) {
+        _previewDone = null;
+      }
+      if (identical(_previewPlayer, player)) {
+        _previewPlayer = null;
+        try {
+          await player.stop();
+        } catch (_) {}
+        try {
+          await player.dispose();
+        } catch (_) {}
+      }
+    }
   }
 
   Future<void> _preview(DigitalHumanPersona persona) async {
@@ -103,6 +160,7 @@ class _DigitalHumanPickerState extends ConsumerState<DigitalHumanPicker> {
       _previewing = persona.id;
       _loadingPreview = true;
     });
+    var failed = false;
     try {
       await stopping;
       String? saved = _savedVoices[persona.id];
@@ -135,22 +193,20 @@ class _DigitalHumanPickerState extends ConsumerState<DigitalHumanPicker> {
           context,
         ).showSnackBar(const SnackBar(content: Text('本次试听使用备用音色（Edge）')));
       }
-      final Player player = Player();
-      _previewPlayer = player;
-      await player.open(Media(result.url), play: true);
+      final bool played = await _playPreviewUrl(result.url, request);
       if (!mounted || request != _previewRequest) return;
-      setState(() => _loadingPreview = false);
-      await player.stream.completed
-          .firstWhere((bool value) => value)
-          .timeout(const Duration(seconds: 30));
+      if (!played) failed = true;
     } catch (_) {
-      if (mounted && request == _previewRequest) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(const SnackBar(content: Text('暂时无法试听，请稍后重试。')));
-      }
+      if (mounted && request == _previewRequest) failed = true;
     } finally {
-      if (mounted && request == _previewRequest) await _stopPreview();
+      if (mounted && request == _previewRequest) {
+        if (failed) {
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(const SnackBar(content: Text('暂时无法试听，请稍后重试。')));
+        }
+        await _stopPreview();
+      }
     }
   }
 
@@ -158,7 +214,17 @@ class _DigitalHumanPickerState extends ConsumerState<DigitalHumanPicker> {
   void dispose() {
     _previewRequest++;
     final Player? player = _previewPlayer;
-    if (player != null) unawaited(player.dispose());
+    _previewPlayer = null;
+    if (player != null) {
+      unawaited(() async {
+        try {
+          await player.stop();
+        } catch (_) {}
+        try {
+          await player.dispose();
+        } catch (_) {}
+      }());
+    }
     _personas.dispose();
     super.dispose();
   }

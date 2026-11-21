@@ -10,6 +10,8 @@ from uuid import uuid4
 
 
 MODEL = 'qwen-audio-3.0-tts-flash'
+MODEL_PLUS = 'qwen-audio-3.0-tts-plus'
+MODEL_V31 = 'qwen-audio-3.1-tts-flash'
 ENDPOINT = 'wss://dashscope.aliyuncs.com/api-ws/v1/inference'
 VOICE_PREFIX = MODEL + '-loong'
 VOICES = frozenset(VOICE_PREFIX + name for name in (
@@ -22,10 +24,15 @@ VOICES = frozenset(VOICE_PREFIX + name for name in (
     'ryanma',
     'ivyhu',
 ))
+# CosyVoice bilingual ids. v3.1 voices need MODEL_V31; longanlufeng needs MODEL_PLUS.
 BILINGUAL_VOICES = frozenset({
     'longanfengyue',
     'longanxiaoxin',
     'longanlingxi',
+    'longanlufeng',
+    'longanyang_v3.1',
+    'longshu_v3.1',
+    'longze_v3.1',
     'longanhuan_v3.6',
     'longpaopao_v3.6',
     'longjielidou_v3.6',
@@ -34,9 +41,9 @@ BILINGUAL_VOICES = frozenset({
 })
 PERSONA_VOICES = {
     'mia': 'longanfengyue',
-    'leo': 'longchuanshu_v3.6',
+    'leo': 'longshu_v3.1',
     'emma': VOICE_PREFIX + 'norahu',
-    'arun': 'longchuanshu_v3.6',
+    'arun': VOICE_PREFIX + 'adriangao',
     'olivia': 'longanfengyue',
     'luna': 'longanxiaoxin',
     'nora': 'longanlingxi',
@@ -50,6 +57,16 @@ PERSONA_VOICES = {
     'ruby': 'longanxiaoxin',
     'sophie': 'longanlingxi',
 }
+
+
+def model_for_voice(voice: str) -> str:
+    """DashScope rejects cross-model voice ids; route each speaker to its model."""
+    name = (voice or '').strip()
+    if name.endswith('_v3.1') or name.endswith('v3.1'):
+        return MODEL_V31
+    if name == 'longanlufeng':
+        return MODEL_PLUS
+    return MODEL
 
 
 class QwenAudioTts:
@@ -67,6 +84,7 @@ class QwenAudioTts:
         speaker = voice if voice in VOICES or voice in BILINGUAL_VOICES else PERSONA_VOICES.get(
             (digital_human_id or '').strip().lower(), PERSONA_VOICES['mia']
         )
+        model = model_for_voice(speaker)
 
         def event(action: str, **payload: object) -> str:
             return json.dumps({
@@ -83,7 +101,7 @@ class QwenAudioTts:
                     task_group='audio',
                     task='tts',
                     function='SpeechSynthesizer',
-                    model=MODEL,
+                    model=model,
                     parameters={'text_type': 'PlainText', 'voice': speaker, 'format': 'mp3', 'sample_rate': 24000},
                 ))
                 if json.loads(await socket.recv())['header'].get('event') != 'task-started':

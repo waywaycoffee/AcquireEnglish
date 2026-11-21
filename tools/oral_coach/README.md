@@ -73,7 +73,7 @@ curl -fsS http://127.0.0.1:8770/api/tts/speak \
 
 响应里的 `tts_url` 是相对地址。将其拼到同一个陪练服务地址之后，用 GET 获取 MP3。线上使用陪练服务的 `/coach` 基地址。
 
-亚裔数字人默认对接中英双语音色（如 `longanfengyue` / `longchuanshu_v3.6`）。双语试听可传 `tts_voice: longanxiaoxin`、`language: zh` 和中英混合文本。非双语音色的中文回复走角色的独立中文音色。百炼调用失败时会回退到 Edge，所以健康检查和拿到 MP3 只确认陪练服务工作正常。要确认实际使用了百炼音色，还需查看陪练日志中是否出现 `Coach TTS fell back to Edge`。
+亚裔数字人默认对接中英双语音色（如 `longanfengyue` / `longshu_v3.1`）。双语试听可传 `tts_voice: longanxiaoxin`、`language: zh` 和中英混合文本。Leo 默认 `longshu_v3.1`（中英同音色，走 qwen-audio-3.1）；Arun 默认英音 `qwen-audio-3.0-tts-flash-loongadriangao`，中文回复走独立 Edge 音色。非双语音色的中文回复走角色的独立中文音色。百炼调用失败时会回退到 Edge，所以健康检查和拿到 MP3 只确认陪练服务工作正常。要确认实际使用了百炼音色，还需查看陪练日志中是否出现 `Coach TTS fell back to Edge`。
 
 - `app/providers/qwen_audio_tts.py` 中的 `VOICES`、`BILINGUAL_VOICES` 和 `PERSONA_VOICES` 定义可调用音色及默认映射。
 - `app/providers/tts.py` 根据语言和音色选择合成服务。

@@ -63,6 +63,37 @@ class FishSpeechTts:
         )
 
 
+_MALE_PERSONAS = frozenset({
+    'leo', 'arun', 'alexander', 'adrian', 'james', 'ryan', 'finley', 'miles',
+})
+
+
+def _is_cloud_voice(voice: str | None) -> bool:
+    name = (voice or '').strip().lower()
+    if not name:
+        return False
+    if name in VOICES or name in BILINGUAL_VOICES:
+        return True
+    # CosyVoice / Qwen ids must never be forwarded to edge-tts unchanged.
+    return name.startswith('long') or name.startswith('qwen-') or '-loong' in name
+
+
+def _edge_voice_for(*, voice: str | None, digital_human_id: str | None, language: str | None) -> str:
+    chinese = (language or '').lower().startswith('zh')
+    male = (digital_human_id or '').strip().lower() in _MALE_PERSONAS
+    if chinese:
+        return 'zh-CN-YunxiNeural' if male else 'zh-CN-XiaoxiaoNeural'
+    return 'en-US-GuyNeural' if male else 'en-US-AriaNeural'
+
+
+def _is_edge_voice(voice: str | None) -> bool:
+    name = (voice or '').strip()
+    if not name:
+        return False
+    lower = name.lower()
+    return lower.endswith('neural') or lower.startswith('zh-') or lower.startswith('en-')
+
+
 class CoachTts:
     def __init__(self, english: QwenAudioTts, edge: EdgeTts) -> None:
         self.english = english
@@ -70,20 +101,30 @@ class CoachTts:
 
     async def synthesize(self, text: str, out_path: str, *, voice: str | None = None, digital_human_id: str | None = None, language: str | None = None) -> TtsResult:
         options = dict(voice=voice, digital_human_id=digital_human_id, language=language)
-        if (language or 'en').lower().startswith('en') or voice in BILINGUAL_VOICES:
-            try:
-                return await self.english.synthesize(text, out_path, **options)
-            except Exception as exc:
-                logger.warning('Coach TTS fell back to Edge (%s)', type(exc).__name__)
-        if voice in VOICES or voice in BILINGUAL_VOICES:
-            male = (digital_human_id or '').lower() in {
-                'leo', 'arun', 'alexander', 'adrian', 'james', 'ryan',
-            }
-            chinese = (language or '').lower().startswith('zh')
-            if male:
-                options['voice'] = 'zh-CN-YunxiNeural' if chinese else 'en-US-GuyNeural'
-            else:
-                options['voice'] = 'zh-CN-XiaoxiaoNeural' if chinese else 'en-US-AriaNeural'
+        chinese = (language or '').lower().startswith('zh')
+        voice_name = (voice or '').strip()
+        # English-only Qwen voices / explicit Edge ids: Chinese replies use Edge.
+        if chinese and (voice_name in VOICES or _is_edge_voice(voice_name)):
+            if voice_name in VOICES or _is_cloud_voice(voice_name):
+                options['voice'] = _edge_voice_for(
+                    voice=voice,
+                    digital_human_id=digital_human_id,
+                    language=language,
+                )
+            return await self.edge.synthesize(text, out_path, **options)
+        if _is_edge_voice(voice_name) and not _is_cloud_voice(voice_name):
+            return await self.edge.synthesize(text, out_path, **options)
+        # Prefer Qwen: unknown ids are remapped to the persona default.
+        try:
+            return await self.english.synthesize(text, out_path, **options)
+        except Exception as exc:
+            logger.warning('Coach TTS fell back to Edge (%s)', type(exc).__name__)
+        if _is_cloud_voice(voice):
+            options['voice'] = _edge_voice_for(
+                voice=voice,
+                digital_human_id=digital_human_id,
+                language=language,
+            )
         return await self.edge.synthesize(text, out_path, **options)
 
 

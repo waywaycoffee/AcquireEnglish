@@ -33,6 +33,9 @@ VOICE_LABELS: dict[str, str] = {
     "longanfengyue": "龙安风悦 · 中英双语",
     "longanxiaoxin": "龙安小昕 · 中英双语",
     "longanlingxi": "龙安灵希 · 中英双语",
+    "longshu_v3.1": "龙书 · 中英双语",
+    "longanyang_v3.1": "龙安洋 · 中英双语",
+    "longanlufeng": "龙安鲁风 · 中英双语",
     "longanhuan_v3.6": "龙安欢 · 中英双语",
 }
 NAMES = frozenset(VOICE_LABELS)

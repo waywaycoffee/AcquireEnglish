@@ -54,11 +54,14 @@ const List<CoachEnglishVoice> coachBilingualVoices = <CoachEnglishVoice>[
   (id: 'longanfengyue', name: '龙安风悦', description: '自然亲切 · 女声 · 中英双语'),
   (id: 'longanxiaoxin', name: '龙安小昕', description: '亲切活泼 · 女声 · 中英双语'),
   (id: 'longanlingxi', name: '龙安灵希', description: '甜美轻快 · 女声 · 中英双语'),
+  (id: 'longshu_v3.1', name: '龙书', description: '沉稳磁性 · 男声 · 中英双语'),
+  (id: 'longanyang_v3.1', name: '龙安洋', description: '阳光大男孩 · 男声 · 中英双语'),
+  (id: 'longanlufeng', name: '龙安鲁风', description: '明亮开朗 · 男声 · 中英双语'),
   (id: 'longanhuan_v3.6', name: '龙安欢', description: '元气陪伴 · 女声 · 中英双语'),
   (id: 'longpaopao_v3.6', name: '龙泡泡', description: '飞天泡泡 · 女童 · 中英双语'),
   (id: 'longjielidou_v3.6', name: '龙杰力豆', description: '天真男童 · 中英双语'),
   (id: 'longhuohuo_v3.6', name: '龙火火', description: '顽皮少年 · 中英双语'),
-  (id: 'longchuanshu_v3.6', name: '龙川叔', description: '沉稳大叔 · 男声 · 中英双语'),
+  (id: 'longchuanshu_v3.6', name: '龙川叔', description: '川普大叔 · 男声 · 中英双语'),
 ];
 
 const List<CoachEnglishVoice> coachVoices = <CoachEnglishVoice>[
@@ -74,7 +77,7 @@ String bilingualVoiceIdForPersona(DigitalHumanPersona persona) {
   if (persona.isChild) {
     return persona.isFemaleVoice ? 'longpaopao_v3.6' : 'longjielidou_v3.6';
   }
-  return persona.isFemaleVoice ? 'longanfengyue' : 'longchuanshu_v3.6';
+  return persona.isFemaleVoice ? 'longanfengyue' : 'longshu_v3.1';
 }
 
 /// Voices offered in the picker: Asian personas stay on bilingual-only.
