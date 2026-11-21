@@ -26,8 +26,11 @@ from app.services.fingerprint import embedding as emb
 from app.services.fingerprint import simhash as sh
 from app.services.fingerprint.asset_store import (
     delete_asset_blobs,
+    delete_upload_payload,
     read_json_blob,
+    read_upload_payload,
     write_json_blob,
+    write_upload_payload,
 )
 
 # Short-lived compute / negative caches (process-local).
@@ -669,6 +672,243 @@ async def load_asset_lessons(asset_id: str) -> list[dict[str, Any]]:
         lessons = data.get("lessons")
         return lessons if isinstance(lessons, list) else []
     return []
+
+
+_LESSON_HEADING_RE = None
+
+
+def _lesson_heading_re():
+    global _LESSON_HEADING_RE
+    if _LESSON_HEADING_RE is None:
+        import re
+
+        _LESSON_HEADING_RE = re.compile(
+            r"(?im)^(?:\s*)(?:lesson|unit|chapter|第)\s*"
+            r"(?:\d+|[ivxlcdm]+|[一二三四五六七八九十百]+)\s*"
+            r"[.:：、\-]?\s*(.*)$"
+        )
+    return _LESSON_HEADING_RE
+
+
+def decompose_text_to_lessons(
+    cleaned_text: str,
+    *,
+    asset_name: str = "",
+    max_lesson_chars: int = 2800,
+    min_lesson_chars: int = 160,
+) -> list[dict[str, Any]]:
+    """Light CPU decompose: split by lesson/chapter headings or sized paragraphs.
+
+    Heavy LLM/GPU 解构 can replace this later; workers still call register the same way.
+    """
+    text = (cleaned_text or "").strip()
+    if not text:
+        return []
+
+    import re
+
+    heading_re = _lesson_heading_re()
+    lines = text.splitlines()
+    chunks: list[tuple[str, list[str]]] = []
+    current_title = ""
+    buf: list[str] = []
+
+    def flush(title: str, body_lines: list[str]) -> None:
+        body = "\n".join(body_lines).strip()
+        if len(body) < min_lesson_chars and chunks:
+            # Merge tiny leftover into previous.
+            prev_title, prev_body = chunks[-1]
+            chunks[-1] = (prev_title, (prev_body + "\n\n" + body).strip().splitlines())
+            return
+        if body:
+            chunks.append((title or "", body.splitlines()))
+
+    for line in lines:
+        m = heading_re.match(line.strip())
+        if m and buf:
+            flush(current_title, buf)
+            buf = []
+            current_title = (m.group(1) or line.strip())[:120]
+            continue
+        if m and not buf:
+            current_title = (m.group(1) or line.strip())[:120]
+            continue
+        buf.append(line)
+    flush(current_title, buf)
+
+    # No headings → pack by blank-line paragraphs into size windows.
+    if len(chunks) <= 1 and len(text) > max_lesson_chars:
+        paras = [p.strip() for p in re.split(r"\n\s*\n", text) if p.strip()]
+        chunks = []
+        acc: list[str] = []
+        acc_len = 0
+        part = 1
+        for p in paras:
+            if acc and acc_len + len(p) > max_lesson_chars:
+                chunks.append((f"Part {part}", acc))
+                part += 1
+                acc = [p]
+                acc_len = len(p)
+            else:
+                acc.append(p)
+                acc_len += len(p) + 2
+        if acc:
+            chunks.append((f"Part {part}", acc))
+
+    # Still oversized single lesson → hard split.
+    normalized: list[tuple[str, str]] = []
+    for title, body_lines in chunks:
+        body = "\n".join(body_lines).strip()
+        if len(body) <= max_lesson_chars * 2:
+            normalized.append((title, body))
+            continue
+        start = 0
+        sub = 1
+        while start < len(body):
+            end = min(len(body), start + max_lesson_chars)
+            if end < len(body):
+                cut = body.rfind("\n", start + min_lesson_chars, end)
+                if cut > start:
+                    end = cut
+            piece = body[start:end].strip()
+            if piece:
+                label = title or asset_name or "Lesson"
+                normalized.append(
+                    (f"{label} · {sub}" if sub > 1 or title else label, piece)
+                )
+                sub += 1
+            start = end
+
+    if not normalized:
+        normalized = [(asset_name or "Lesson 1", text)]
+
+    lessons: list[dict[str, Any]] = []
+    for i, (title, body) in enumerate(normalized, start=1):
+        lessons.append(
+            {
+                "lesson_no": i,
+                "title": (title or f"Lesson {i}")[:256],
+                "text_content": body,
+            }
+        )
+    return lessons
+
+
+def store_upload_task_payload(
+    task_id: str,
+    *,
+    cleaned_text: str,
+    source_type: str,
+    file_name: str | None,
+    file_type: str,
+    user_id: int,
+    asset_name: str | None = None,
+    candidates: list[str] | None = None,
+    degraded: bool = False,
+) -> str:
+    return write_upload_payload(
+        task_id,
+        {
+            "cleaned_text": cleaned_text,
+            "source_type": source_type,
+            "file_name": file_name,
+            "file_type": file_type,
+            "user_id": user_id,
+            "asset_name": (asset_name or file_name or "导入教材")[:256],
+            "candidates": candidates or [],
+            "degraded": bool(degraded),
+        },
+    )
+
+
+async def drain_queue_gpu(
+    db: AsyncSession,
+    *,
+    limit: int = 3,
+) -> list[dict[str, Any]]:
+    """Claim ``queue_gpu`` upload tasks, decompose, register public assets."""
+    q = (
+        select(UploadTask)
+        .where(UploadTask.status == "queue_gpu")
+        .order_by(UploadTask.create_at.asc())
+        .limit(max(1, limit))
+    )
+    try:
+        rows = (await db.execute(q.with_for_update(skip_locked=True))).scalars().all()
+    except Exception:  # noqa: BLE001 — SQLite / dialects without skip_locked
+        await db.rollback()
+        rows = (await db.execute(q)).scalars().all()
+
+    results: list[dict[str, Any]] = []
+    for task in rows:
+        task.status = "processing"
+        task.update_at = _now()
+    if rows:
+        await db.commit()
+
+    for task in rows:
+        out = await _process_queue_gpu_task(db, task)
+        results.append(out)
+    return results
+
+
+async def _process_queue_gpu_task(
+    db: AsyncSession,
+    task: UploadTask,
+) -> dict[str, Any]:
+    payload = read_upload_payload(task.id)
+    if not isinstance(payload, dict):
+        task.status = "failed"
+        task.fail_reason = "缺少解构文本载荷（payload.json）"
+        task.update_at = _now()
+        await db.commit()
+        return {"task_id": task.id, "ok": False, "error": task.fail_reason}
+
+    cleaned = str(payload.get("cleaned_text") or "").strip()
+    if len(cleaned) < 80:
+        task.status = "failed"
+        task.fail_reason = "解构文本过短"
+        task.update_at = _now()
+        await db.commit()
+        return {"task_id": task.id, "ok": False, "error": task.fail_reason}
+
+    source_type = str(payload.get("source_type") or "pdf_text")
+    asset_name = str(
+        payload.get("asset_name") or task.file_name or "导入教材"
+    )[:256]
+    user_id = payload.get("user_id")
+    try:
+        created_by = int(user_id) if user_id is not None else int(task.user_id)
+    except (TypeError, ValueError):
+        created_by = int(task.user_id)
+
+    try:
+        lessons = decompose_text_to_lessons(cleaned, asset_name=asset_name)
+        summary = cleaned[:280].replace("\n", " ").strip()
+        reg = await register_decomposed_asset(
+            db,
+            cleaned_text=cleaned,
+            source_type=source_type,
+            asset_name=asset_name,
+            lessons=lessons,
+            summary_text=summary,
+            tags=["auto_decompose"],
+            created_by=created_by,
+            upload_task_id=task.id,
+        )
+        delete_upload_payload(task.id)
+        return {"task_id": task.id, "ok": True, **reg}
+    except Exception as exc:  # noqa: BLE001
+        # Re-load task in case register partially committed.
+        fresh = (
+            await db.execute(select(UploadTask).where(UploadTask.id == task.id))
+        ).scalar_one_or_none()
+        if fresh and fresh.status not in ("success", "fingerprint_match"):
+            fresh.status = "failed"
+            fresh.fail_reason = f"解构失败: {exc}"[:500]
+            fresh.update_at = _now()
+            await db.commit()
+        return {"task_id": task.id, "ok": False, "error": str(exc)}
 
 
 async def admin_stats(db: AsyncSession, *, days: int = 30) -> dict[str, Any]:

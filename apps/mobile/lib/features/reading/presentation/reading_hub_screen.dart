@@ -16,6 +16,7 @@ import '../../shared/presentation/pad/app_design_tokens.dart';
 import '../../shared/presentation/pad/pad_scaffold.dart';
 import '../../shared/presentation/pad/pad_top_bar.dart';
 import '../../sync/data/acquire_api_client.dart';
+import '../data/reading_fingerprint.dart';
 import '../data/reading_iplus1.dart';
 import '../data/reading_ingest.dart';
 import '../data/reading_pdf_import.dart';
@@ -109,7 +110,7 @@ class _ReadingHubScreenState extends ConsumerState<ReadingHubScreen> {
         throw StateError('未能从文件中提取正文');
       }
 
-      String fingerprintNote = '';
+      FingerprintCacheSearchResult? fp;
       if (ref.read(authSessionProvider).isLoggedIn && text.trim().length >= 80) {
         progress.value = '正在检索同源解析资产…';
         final String sourceType = lower.endsWith('.epub')
@@ -117,9 +118,7 @@ class _ReadingHubScreenState extends ConsumerState<ReadingHubScreen> {
             : lower.endsWith('.srt')
             ? 'srt'
             : 'pdf_text';
-        final FingerprintCacheSearchResult? fp = await ref
-            .read(acquireApiClientProvider)
-            .searchFingerprintCache(
+        fp = await ref.read(acquireApiClientProvider).searchFingerprintCache(
               cleanedText: text,
               sourceType: sourceType,
               fileName: file.name,
@@ -127,10 +126,104 @@ class _ReadingHubScreenState extends ConsumerState<ReadingHubScreen> {
                   ? lower.split('.').last
                   : 'pdf',
             );
-        if (fp != null) {
-          fingerprintNote = fp.message.trim().isNotEmpty
-              ? ' · ${fp.message}'
-              : (fp.hit ? ' · 已复用云端课程结构' : ' · 未命中缓存，可排队 GPU 解析');
+      }
+
+      // Hit (or user confirms degraded candidate): open cached course package.
+      if (fp != null && fp.hit && fp.assetId.isNotEmpty) {
+        final List<ReadingDoc> reused = readingDocsFromFingerprintAsset(
+          result: fp,
+          fallbackText: text,
+          fileName: file.name,
+        );
+        if (reused.isNotEmpty) {
+          final List<ReadingDoc> saved = await ref
+              .read(readingLibraryProvider.notifier)
+              .addDocs(reused);
+          if (!context.mounted) return;
+          Navigator.of(context, rootNavigator: true).pop();
+          final ReadingDoc open = saved.isNotEmpty ? saved.first : reused.first;
+          final String note = fp.message.trim().isNotEmpty
+              ? fp.message.trim()
+              : '已复用云端课程结构';
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                '已复用「${open.courseTitle.isNotEmpty ? open.courseTitle : open.title}」'
+                '· ${saved.length} 课$sourceNote · $note',
+              ),
+            ),
+          );
+          unawaited(context.push('/reading/${Uri.encodeComponent(open.id)}'));
+          return;
+        }
+      }
+
+      // Degraded: offer first candidate confirm-bind before falling back.
+      if (fp != null &&
+          fp.degraded &&
+          fp.candidates.isNotEmpty &&
+          context.mounted) {
+        final FingerprintCacheSearchResult degraded = fp;
+        progress.value = '发现疑似同源教材，等待确认…';
+        final bool? bind = await showDialog<bool>(
+          context: context,
+          builder: (BuildContext ctx) {
+            return AlertDialog(
+              title: const Text('疑似命中缓存'),
+              content: Text(
+                degraded.message.trim().isNotEmpty
+                    ? degraded.message
+                    : '向量库暂不可用，仅有 SimHash 疑似结果。是否确认复用候选课程？',
+              ),
+              actions: <Widget>[
+                TextButton(
+                  onPressed: () => Navigator.of(ctx).pop(false),
+                  child: const Text('仍导入原文'),
+                ),
+                FilledButton(
+                  onPressed: () => Navigator.of(ctx).pop(true),
+                  child: const Text('确认复用'),
+                ),
+              ],
+            );
+          },
+        );
+        if (bind == true) {
+          progress.value = '正在绑定缓存课程…';
+          final FingerprintCacheSearchResult? bound = await ref
+              .read(acquireApiClientProvider)
+              .confirmFingerprintBind(
+                assetId: degraded.candidates.first,
+                uploadTaskId: degraded.uploadTaskId,
+                assetTitle: titleFromFilename(file.name),
+              );
+          if (bound != null && bound.hit) {
+            final List<ReadingDoc> reused = readingDocsFromFingerprintAsset(
+              result: bound,
+              fallbackText: text,
+              fileName: file.name,
+            );
+            if (reused.isNotEmpty) {
+              final List<ReadingDoc> saved = await ref
+                  .read(readingLibraryProvider.notifier)
+                  .addDocs(reused);
+              if (!context.mounted) return;
+              Navigator.of(context, rootNavigator: true).pop();
+              final ReadingDoc open =
+                  saved.isNotEmpty ? saved.first : reused.first;
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text(
+                    '已确认复用「${open.title}」· ${saved.length} 课$sourceNote',
+                  ),
+                ),
+              );
+              unawaited(
+                context.push('/reading/${Uri.encodeComponent(open.id)}'),
+              );
+              return;
+            }
+          }
         }
       }
 
@@ -140,10 +233,32 @@ class _ReadingHubScreenState extends ConsumerState<ReadingHubScreen> {
         sourceType: ReadingSourceType.import,
         plainText: text,
         createdAt: DateTime.now(),
+        sourceLabel: fp != null && !fp.hit ? '解析排队中' : '',
       );
       await ref.read(readingLibraryProvider.notifier).addDoc(doc);
       if (!context.mounted) return;
       Navigator.of(context, rootNavigator: true).pop();
+
+      String fingerprintNote = '';
+      if (fp != null) {
+        if (fp.hit) {
+          fingerprintNote = ' · ${fp.message.isNotEmpty ? fp.message : '已复用'}';
+        } else if (fp.uploadTaskId.isNotEmpty) {
+          fingerprintNote = ' · 已加入 GPU 解析队列';
+          unawaited(
+            _pollFingerprintTaskAndNotify(
+              context,
+              ref,
+              taskId: fp.uploadTaskId,
+              fileName: file.name,
+              fallbackText: text,
+            ),
+          );
+        } else if (fp.message.trim().isNotEmpty) {
+          fingerprintNote = ' · ${fp.message}';
+        }
+      }
+
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
@@ -162,6 +277,100 @@ class _ReadingHubScreenState extends ConsumerState<ReadingHubScreen> {
     } finally {
       progress.dispose();
     }
+  }
+
+  Future<void> _pollFingerprintTaskAndNotify(
+    BuildContext context,
+    WidgetRef ref, {
+    required String taskId,
+    required String fileName,
+    required String fallbackText,
+  }) async {
+    final AcquireApiClient api = ref.read(acquireApiClientProvider);
+    final FingerprintUploadTaskStatus? status = await api.pollFingerprintUploadTask(
+      taskId,
+      timeout: const Duration(seconds: 120),
+      interval: const Duration(seconds: 3),
+    );
+    if (!context.mounted || status == null) return;
+
+    if (status.status == 'failed') {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            status.failReason.trim().isNotEmpty
+                ? '云端解析失败：${status.failReason}'
+                : '云端解析失败，可稍后重试导入',
+          ),
+        ),
+      );
+      return;
+    }
+    if (!status.isReady) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('云端解析仍在进行（${status.status}），可稍后在阅读库查看'),
+        ),
+      );
+      return;
+    }
+
+    Map<String, dynamic>? asset;
+    // Prefer asset via user course list when register finished.
+    final List<Map<String, dynamic>> courses = await api.listMyFingerprintCourses();
+    String assetId = '';
+    for (final Map<String, dynamic> c in courses) {
+      if ('${c['id']}' == status.userCourseAssetId ||
+          '${c['source_upload_id']}' == taskId) {
+        assetId = '${c['asset_cache_id'] ?? ''}';
+        break;
+      }
+    }
+    if (assetId.isNotEmpty) {
+      asset = await api.getFingerprintAsset(assetId);
+    }
+    if (asset == null) return;
+
+    final FingerprintCacheSearchResult synthesized =
+        FingerprintCacheSearchResult.fromJson(<String, dynamic>{
+      'hit': true,
+      'message': '云端解析完成，已写入课程包',
+      'asset_id': assetId,
+      'upload_task_id': taskId,
+      'asset': asset,
+      'user_course_asset': <String, dynamic>{
+        'id': status.userCourseAssetId,
+      },
+    });
+    final List<ReadingDoc> docs = readingDocsFromFingerprintAsset(
+      result: synthesized,
+      fallbackText: fallbackText,
+      fileName: fileName,
+    );
+    if (docs.isEmpty || !context.mounted) return;
+    final List<ReadingDoc> saved =
+        await ref.read(readingLibraryProvider.notifier).addDocs(docs);
+    if (!context.mounted) return;
+    if (!context.mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          '云端解析完成：已加入 ${saved.length} 课（原导入仍保留）',
+        ),
+        action: saved.isEmpty
+            ? null
+            : SnackBarAction(
+                label: '打开',
+                onPressed: () {
+                  unawaited(
+                    context.push(
+                      '/reading/${Uri.encodeComponent(saved.first.id)}',
+                    ),
+                  );
+                },
+              ),
+      ),
+    );
   }
 
   Future<void> _generateFromVideo(BuildContext context, WidgetRef ref) async {

@@ -65,6 +65,10 @@ async def lifespan(_: FastAPI):
     from app.database import SessionLocal
     from app.db_migrate import ensure_schema_columns
     from app.services.commerce.catalog import ensure_commerce_skus
+    from app.services.fingerprint.queue_worker import (
+        start_background_worker,
+        stop_background_worker,
+    )
     from app.services.user_assets import ensure_default_skus
 
     settings.validate_auth_configuration()
@@ -79,7 +83,11 @@ async def lifespan(_: FastAPI):
 
         await ensure_community_seed(session)
         await ensure_cosmetics_catalog(session)
-    yield
+    start_background_worker()
+    try:
+        yield
+    finally:
+        await stop_background_worker()
 
 
 app = FastAPI(title=settings.app_name, lifespan=lifespan)

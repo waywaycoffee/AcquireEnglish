@@ -1398,7 +1398,8 @@ class UploadTask(Base):
     file_name: Mapped[str | None] = mapped_column(String(256), nullable=True)
     file_type: Mapped[str] = mapped_column(String(32), default="pdf")
     raw_file_key: Mapped[str | None] = mapped_column(String(256), nullable=True)
-    # pending / fingerprint_match / queue_gpu / success / failed
+    # pending / pending_confirm / fingerprint_match / queue_gpu /
+    # processing / success / failed
     status: Mapped[str] = mapped_column(String(32), default="pending", index=True)
     fingerprint_id: Mapped[str | None] = mapped_column(String(36), nullable=True)
     user_course_asset_id: Mapped[str | None] = mapped_column(String(36), nullable=True)

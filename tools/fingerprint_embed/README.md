@@ -29,3 +29,15 @@ FINGERPRINT_EMBED_DIM=512
 ```
 
 After switching from hashing vectors, clear `media/misc/asset_embedding/*.json` (or re-register packs) so dims match.
+
+## Related: miss → queue_gpu → register
+
+Embedding is only for search similarity. Miss-path lesson decompose runs **inside the API**
+(`app.services.fingerprint.queue_worker`, started with the FastAPI lifespan) or via:
+
+```powershell
+cd D:\AcquireEnglish\services\api
+.\.venv\Scripts\python.exe -m app.services.fingerprint.cli_drain --limit 5
+```
+
+See `docs/FINGERPRINT_CACHE.md` for hit/miss/App poll flows.

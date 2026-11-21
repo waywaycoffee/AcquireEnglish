@@ -81,6 +81,8 @@ class Endpoints {
   static const String commercePoints = 'api/commerce/points';
   static const String commercePointsEarn = 'api/commerce/points/earn';
   static const String commercePointsSpend = 'api/commerce/points/spend';
+  static String commerceModuleAccess(String code) =>
+      'api/commerce/modules/$code/access';
   static const String learningTasks = 'api/learning/tasks';
   static const String learningSessions = 'api/learning/sessions';
   static const String learningSceneRecognize = 'api/learning/scene-recognize';
@@ -137,8 +139,16 @@ class Endpoints {
   static const String fingerprintCacheSearch = 'api/fingerprint-cache/search';
   static const String fingerprintCacheRegister = 'api/fingerprint-cache/register';
   static const String fingerprintCacheMyCourses = 'api/fingerprint-cache/my-courses';
+  static const String fingerprintCacheConfirmBind =
+      'api/fingerprint-cache/confirm-bind';
   static String fingerprintCacheAsset(String assetId) =>
       'api/fingerprint-cache/assets/${Uri.encodeComponent(assetId)}';
+  static String fingerprintCacheUploadTask(String taskId) =>
+      'api/fingerprint-cache/upload-tasks/${Uri.encodeComponent(taskId)}';
+  static String fingerprintCacheCourseDiff(String courseId) =>
+      'api/fingerprint-cache/my-courses/${Uri.encodeComponent(courseId)}/diff';
+  static String fingerprintCacheCourseShare(String courseId) =>
+      'api/fingerprint-cache/my-courses/${Uri.encodeComponent(courseId)}/share';
 
   /// Kept for Dio header compatibility; AcquireEnglish API ignores it.
   static const String apiKey = '';

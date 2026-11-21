@@ -132,6 +132,21 @@ class ConfigUpdateBody(BaseModel):
     max_blocks: int | None = Field(default=None, ge=4, le=256)
 
 
+class ConfirmBindBody(BaseModel):
+    asset_id: str = Field(..., min_length=8, max_length=36)
+    upload_task_id: str | None = Field(default=None, max_length=36)
+    asset_title: str | None = Field(default=None, max_length=256)
+
+
+class ShareRequestBody(BaseModel):
+    note: str | None = Field(default=None, max_length=500)
+
+
+class ShareAuditBody(BaseModel):
+    approve: bool = True
+    reason: str | None = Field(default=None, max_length=500)
+
+
 # ----- user APIs -----
 
 
@@ -197,8 +212,24 @@ async def search_and_reuse(
             await db.execute(select(UploadTask).where(UploadTask.id == upload_id))
         ).scalar_one_or_none()
         if task:
-            task.status = "queue_gpu"
-            task.fail_reason = None
+            # Degraded SimHash candidates: keep pending confirm; else queue decompose.
+            if result.degraded and result.candidates:
+                task.status = "pending_confirm"
+                task.fail_reason = None
+            else:
+                task.status = "queue_gpu"
+                task.fail_reason = None
+                fp_svc.store_upload_task_payload(
+                    upload_id,
+                    cleaned_text=body.cleaned_text,
+                    source_type=body.source_type,
+                    file_name=body.file_name,
+                    file_type=body.file_type,
+                    user_id=user.id,
+                    asset_name=body.file_name,
+                    candidates=result.candidates,
+                    degraded=result.degraded,
+                )
             await db.commit()
     else:
         await db.commit()
@@ -308,6 +339,79 @@ async def patch_my_course_diff(
         )
     except ValueError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
+    return _user_course_out(row)
+
+
+@router.post("/confirm-bind")
+async def confirm_bind_candidate(
+    body: ConfirmBindBody,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> dict[str, Any]:
+    """Manual reuse when search returns degraded SimHash candidates."""
+    try:
+        user_course = await fp_svc.create_user_course_from_cache(
+            db,
+            user_id=user.id,
+            asset_cache_id=body.asset_id,
+            asset_title=body.asset_title,
+            upload_task_id=body.upload_task_id,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+    if body.upload_task_id:
+        task = (
+            await db.execute(
+                select(UploadTask).where(
+                    UploadTask.id == body.upload_task_id,
+                    UploadTask.user_id == user.id,
+                )
+            )
+        ).scalar_one_or_none()
+        if task:
+            task.status = "fingerprint_match"
+            task.user_course_asset_id = user_course.id
+            await db.commit()
+
+    asset = (
+        await db.execute(
+            select(AssetCache).where(
+                AssetCache.id == body.asset_id,
+                AssetCache.is_ban.is_(False),
+            )
+        )
+    ).scalar_one_or_none()
+    return {
+        "ok": True,
+        "user_course_asset": _user_course_out(user_course),
+        "asset": _asset_out(asset, include_lessons=True) if asset else None,
+    }
+
+
+@router.post("/my-courses/{course_id}/share")
+async def request_share_course(
+    course_id: str,
+    body: ShareRequestBody,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> dict[str, Any]:
+    """Minimal share stub — marks private course for admin audit."""
+    _ = body.note
+    row = (
+        await db.execute(
+            select(UserCourseAsset).where(
+                UserCourseAsset.id == course_id,
+                UserCourseAsset.user_id == user.id,
+            )
+        )
+    ).scalar_one_or_none()
+    if row is None:
+        raise HTTPException(status_code=404, detail="课程不存在")
+    row.is_shared = True
+    row.share_audit_status = "pending"
+    await db.commit()
+    await db.refresh(row)
     return _user_course_out(row)
 
 
@@ -427,6 +531,43 @@ async def admin_lru_evict(
 ) -> dict[str, Any]:
     removed = await fp_svc.lru_evict_cold_assets(db, limit=limit)
     return {"removed": removed, "count": len(removed)}
+
+
+@admin_router.post("/drain-queue")
+async def admin_drain_queue(
+    limit: int = Query(5, ge=1, le=50),
+    _: str = Depends(require_admin_token),
+    db: AsyncSession = Depends(get_db),
+) -> dict[str, Any]:
+    """Manually process queue_gpu tasks (also runs in API lifespan worker)."""
+    results = await fp_svc.drain_queue_gpu(db, limit=limit)
+    return {"processed": len(results), "results": results}
+
+
+@admin_router.post("/share-audit/{course_id}")
+async def admin_share_audit(
+    course_id: str,
+    body: ShareAuditBody,
+    _: str = Depends(require_admin_token),
+    db: AsyncSession = Depends(get_db),
+) -> dict[str, Any]:
+    """Minimal share audit stub."""
+    row = (
+        await db.execute(select(UserCourseAsset).where(UserCourseAsset.id == course_id))
+    ).scalar_one_or_none()
+    if row is None:
+        raise HTTPException(status_code=404, detail="课程不存在")
+    row.share_audit_status = "approved" if body.approve else "rejected"
+    if not body.approve:
+        row.is_shared = False
+    await db.commit()
+    await db.refresh(row)
+    return {
+        "id": row.id,
+        "share_audit_status": row.share_audit_status,
+        "is_shared": row.is_shared,
+        "reason": body.reason,
+    }
 
 
 @admin_router.get("/config")

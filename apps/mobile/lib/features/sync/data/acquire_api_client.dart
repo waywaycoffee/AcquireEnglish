@@ -444,6 +444,10 @@ class FingerprintCacheSearchResult {
     this.assetName = '',
     this.lessonCount = 0,
     this.userCourseAssetId = '',
+    this.asset = const <String, dynamic>{},
+    this.userCourseAsset = const <String, dynamic>{},
+    this.candidates = const <String>[],
+    this.lessons = const <Map<String, dynamic>>[],
   });
 
   factory FingerprintCacheSearchResult.fromJson(Map<String, dynamic> json) {
@@ -455,18 +459,32 @@ class FingerprintCacheSearchResult {
     final Map<String, dynamic> course = courseRaw is Map
         ? Map<String, dynamic>.from(courseRaw)
         : <String, dynamic>{};
+    final List<Map<String, dynamic>> lessons = _fingerprintLessonsFromAsset(asset);
+    final List<String> candidates = <String>[];
+    final Object? candRaw = json['candidates'];
+    if (candRaw is List) {
+      for (final Object? c in candRaw) {
+        final String id = '$c'.trim();
+        if (id.isNotEmpty) candidates.add(id);
+      }
+    }
     return FingerprintCacheSearchResult(
       hit: json['hit'] == true,
       degraded: json['degraded'] == true,
       message: '${json['message'] ?? ''}',
-      assetId: '${json['asset_id'] ?? ''}',
+      assetId: '${json['asset_id'] ?? asset['id'] ?? ''}',
       fingerprintId: '${json['fingerprint_id'] ?? ''}',
       similarBlocks: (json['similar_blocks'] as num?)?.toInt() ?? 0,
       costMs: (json['cost_ms'] as num?)?.toInt() ?? 0,
       uploadTaskId: '${json['upload_task_id'] ?? ''}',
       assetName: '${asset['asset_name'] ?? ''}',
-      lessonCount: (asset['total_lesson_count'] as num?)?.toInt() ?? 0,
+      lessonCount:
+          (asset['total_lesson_count'] as num?)?.toInt() ?? lessons.length,
       userCourseAssetId: '${course['id'] ?? ''}',
+      asset: asset,
+      userCourseAsset: course,
+      candidates: candidates,
+      lessons: lessons,
     );
   }
 
@@ -481,6 +499,71 @@ class FingerprintCacheSearchResult {
   final String assetName;
   final int lessonCount;
   final String userCourseAssetId;
+  final Map<String, dynamic> asset;
+  final Map<String, dynamic> userCourseAsset;
+  final List<String> candidates;
+  final List<Map<String, dynamic>> lessons;
+}
+
+class FingerprintUploadTaskStatus {
+  const FingerprintUploadTaskStatus({
+    required this.id,
+    required this.status,
+    this.fileName = '',
+    this.fileType = '',
+    this.fingerprintId = '',
+    this.userCourseAssetId = '',
+    this.failReason = '',
+  });
+
+  factory FingerprintUploadTaskStatus.fromJson(Map<String, dynamic> json) =>
+      FingerprintUploadTaskStatus(
+        id: '${json['id'] ?? ''}',
+        status: '${json['status'] ?? ''}',
+        fileName: '${json['file_name'] ?? ''}',
+        fileType: '${json['file_type'] ?? ''}',
+        fingerprintId: '${json['fingerprint_id'] ?? ''}',
+        userCourseAssetId: '${json['user_course_asset_id'] ?? ''}',
+        failReason: '${json['fail_reason'] ?? ''}',
+      );
+
+  final String id;
+  final String status;
+  final String fileName;
+  final String fileType;
+  final String fingerprintId;
+  final String userCourseAssetId;
+  final String failReason;
+
+  bool get isTerminal =>
+      status == 'success' ||
+      status == 'fingerprint_match' ||
+      status == 'failed';
+
+  bool get isReady =>
+      status == 'success' || status == 'fingerprint_match';
+}
+
+List<Map<String, dynamic>> _fingerprintLessonsFromAsset(
+  Map<String, dynamic> asset,
+) {
+  final Object? lessonsRaw = asset['lessons'];
+  if (lessonsRaw is Map) {
+    final Object? inner = lessonsRaw['lessons'];
+    if (inner is List) {
+      return <Map<String, dynamic>>[
+        for (final Object? item in inner)
+          if (item is Map) Map<String, dynamic>.from(item),
+      ];
+    }
+  }
+  if (lessonsRaw is List) {
+    return <Map<String, dynamic>>[
+      for (final Object? item in lessonsRaw)
+        if (item is Map) Map<String, dynamic>.from(item),
+    ];
+  }
+  return const <Map<String, dynamic>>[];
 }
 
 class SharedOcrBookUpsertResult {
@@ -1504,6 +1587,12 @@ class AcquireApiClient {
     await _dio.post('${Endpoints.assets}/membership-coupons/$id/redeem');
   }
 
+  Future<Map<String, dynamic>> commerceModuleAccess(String moduleCode) async {
+    final Response<dynamic> response =
+        await _dio.get(Endpoints.commerceModuleAccess(moduleCode));
+    return response.data as Map<String, dynamic>;
+  }
+
   Future<Map<String, dynamic>> commerceCatalog() async {
     final Response<dynamic> response = await _dio.get(Endpoints.commerceCatalog);
     return response.data as Map<String, dynamic>;
@@ -1552,12 +1641,15 @@ class AcquireApiClient {
     required List<({String skuCode, int quantity})> items,
     String provider = 'wechat',
     int? couponId,
+    List<String>? selectedModules,
   }) async {
     final Response<dynamic> response = await _dio.post(
       Endpoints.assetsOrders,
       data: <String, dynamic>{
         'provider': provider,
         if (couponId != null) 'coupon_id': couponId,
+        if (selectedModules != null && selectedModules.isNotEmpty)
+          'selected_modules': selectedModules,
         'items': <Map<String, dynamic>>[
           for (final ({String skuCode, int quantity}) item in items)
             <String, dynamic>{
@@ -1983,6 +2075,164 @@ class AcquireApiClient {
       return FingerprintCacheSearchResult.fromJson(
         Map<String, dynamic>.from(response.data as Map),
       );
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Future<Map<String, dynamic>?> registerFingerprintCache({
+    required String cleanedText,
+    required String assetName,
+    required List<Map<String, dynamic>> lessons,
+    String sourceType = 'pdf_text',
+    String? uploadTaskId,
+    String? cefrLevel,
+    String? summaryText,
+    List<String> tags = const <String>[],
+  }) async {
+    final String text = cleanedText.trim();
+    if (text.length < 80 || assetName.trim().isEmpty) return null;
+    try {
+      final Response<dynamic> response = await _dio.post(
+        Endpoints.fingerprintCacheRegister,
+        data: <String, dynamic>{
+          'cleaned_text': text,
+          'source_type': sourceType,
+          'asset_name': assetName.trim(),
+          'lessons': lessons,
+          if (cefrLevel != null && cefrLevel.trim().isNotEmpty)
+            'cefr_level': cefrLevel.trim(),
+          if (summaryText != null && summaryText.trim().isNotEmpty)
+            'summary_text': summaryText.trim(),
+          'tags': tags,
+          if (uploadTaskId != null && uploadTaskId.trim().isNotEmpty)
+            'upload_task_id': uploadTaskId.trim(),
+        },
+        options: Options(
+          receiveTimeout: const Duration(seconds: 60),
+          sendTimeout: const Duration(seconds: 60),
+        ),
+      );
+      if (response.data is! Map) return null;
+      return Map<String, dynamic>.from(response.data as Map);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Future<Map<String, dynamic>?> getFingerprintAsset(String assetId) async {
+    final String id = assetId.trim();
+    if (id.isEmpty) return null;
+    try {
+      final Response<dynamic> response = await _dio.get(
+        Endpoints.fingerprintCacheAsset(id),
+        options: Options(
+          receiveTimeout: const Duration(seconds: 20),
+          sendTimeout: const Duration(seconds: 20),
+        ),
+      );
+      if (response.data is! Map) return null;
+      return Map<String, dynamic>.from(response.data as Map);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Future<List<Map<String, dynamic>>> listMyFingerprintCourses() async {
+    try {
+      final Response<dynamic> response = await _dio.get(
+        Endpoints.fingerprintCacheMyCourses,
+        options: Options(
+          receiveTimeout: const Duration(seconds: 20),
+          sendTimeout: const Duration(seconds: 20),
+        ),
+      );
+      if (response.data is! Map) return const <Map<String, dynamic>>[];
+      final Object? items = (response.data as Map)['items'];
+      if (items is! List) return const <Map<String, dynamic>>[];
+      return <Map<String, dynamic>>[
+        for (final Object? item in items)
+          if (item is Map) Map<String, dynamic>.from(item),
+      ];
+    } catch (_) {
+      return const <Map<String, dynamic>>[];
+    }
+  }
+
+  Future<FingerprintUploadTaskStatus?> getFingerprintUploadTask(
+    String taskId,
+  ) async {
+    final String id = taskId.trim();
+    if (id.isEmpty) return null;
+    try {
+      final Response<dynamic> response = await _dio.get(
+        Endpoints.fingerprintCacheUploadTask(id),
+        options: Options(
+          receiveTimeout: const Duration(seconds: 15),
+          sendTimeout: const Duration(seconds: 15),
+        ),
+      );
+      if (response.data is! Map) return null;
+      return FingerprintUploadTaskStatus.fromJson(
+        Map<String, dynamic>.from(response.data as Map),
+      );
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// Poll until success / fingerprint_match / failed, or [timeout] elapses.
+  Future<FingerprintUploadTaskStatus?> pollFingerprintUploadTask(
+    String taskId, {
+    Duration timeout = const Duration(seconds: 90),
+    Duration interval = const Duration(seconds: 2),
+  }) async {
+    final DateTime deadline = DateTime.now().add(timeout);
+    FingerprintUploadTaskStatus? last;
+    while (DateTime.now().isBefore(deadline)) {
+      last = await getFingerprintUploadTask(taskId);
+      if (last != null && last.isTerminal) return last;
+      await Future<void>.delayed(interval);
+    }
+    return last;
+  }
+
+  Future<FingerprintCacheSearchResult?> confirmFingerprintBind({
+    required String assetId,
+    String? uploadTaskId,
+    String? assetTitle,
+  }) async {
+    final String id = assetId.trim();
+    if (id.isEmpty) return null;
+    try {
+      final Response<dynamic> response = await _dio.post(
+        Endpoints.fingerprintCacheConfirmBind,
+        data: <String, dynamic>{
+          'asset_id': id,
+          if (uploadTaskId != null && uploadTaskId.trim().isNotEmpty)
+            'upload_task_id': uploadTaskId.trim(),
+          if (assetTitle != null && assetTitle.trim().isNotEmpty)
+            'asset_title': assetTitle.trim(),
+        },
+        options: Options(
+          receiveTimeout: const Duration(seconds: 30),
+          sendTimeout: const Duration(seconds: 30),
+        ),
+      );
+      if (response.data is! Map) return null;
+      final Map<String, dynamic> data =
+          Map<String, dynamic>.from(response.data as Map);
+      final Object? assetRaw = data['asset'];
+      final Object? courseRaw = data['user_course_asset'];
+      return FingerprintCacheSearchResult.fromJson(<String, dynamic>{
+        'hit': true,
+        'message': '已确认复用疑似匹配课程',
+        'asset_id': id,
+        'asset': assetRaw is Map ? assetRaw : <String, dynamic>{},
+        'user_course_asset':
+            courseRaw is Map ? courseRaw : <String, dynamic>{},
+        'upload_task_id': uploadTaskId ?? '',
+      });
     } catch (_) {
       return null;
     }

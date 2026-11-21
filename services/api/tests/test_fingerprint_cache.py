@@ -70,6 +70,20 @@ def test_local_embed_cosine() -> None:
     assert emb.cosine_similarity(a, c) < emb.cosine_similarity(a, b)
 
 
+def test_decompose_text_to_lessons() -> None:
+    text = (
+        "Lesson 1 A private conversation\n"
+        + SAMPLE_A
+        + "\n\nLesson 2 Breakfast or lunch?\n"
+        + SAMPLE_B
+    )
+    lessons = fp_svc.decompose_text_to_lessons(text, asset_name="NCE")
+    assert len(lessons) >= 2
+    assert lessons[0]["lesson_no"] == 1
+    assert "text_content" in lessons[0]
+    assert len(lessons[0]["text_content"]) >= 80
+
+
 @pytest_asyncio.fixture
 async def db_session(tmp_path, monkeypatch):
     db_path = tmp_path / "fp.db"
@@ -226,6 +240,48 @@ async def test_http_search_flow(tmp_path, monkeypatch):
             cfg = await client.get("/api/fingerprint-cache/config")
             assert cfg.status_code == 200
             assert cfg.json()["enabled"] is True
+
+            # Miss → queue_gpu payload stored; drain registers for reuse.
+            miss_resp = await client.post(
+                "/api/fingerprint-cache/search",
+                headers={"Authorization": f"Bearer {token}"},
+                json={
+                    "cleaned_text": SAMPLE_B,
+                    "source_type": "pdf_text",
+                    "file_name": "sahara.pdf",
+                    "file_type": "pdf",
+                },
+            )
+            assert miss_resp.status_code == 200, miss_resp.text
+            miss_data = miss_resp.json()
+            assert miss_data["hit"] is False
+            task_id = miss_data["upload_task_id"]
+            assert task_id
+
+            async with session_factory() as session:
+                drained = await fp_svc.drain_queue_gpu(session, limit=5)
+            assert any(r.get("ok") for r in drained), drained
+
+            task_get = await client.get(
+                f"/api/fingerprint-cache/upload-tasks/{task_id}",
+                headers={"Authorization": f"Bearer {token}"},
+            )
+            assert task_get.status_code == 200
+            assert task_get.json()["status"] == "success"
+
+            hit2 = await client.post(
+                "/api/fingerprint-cache/search",
+                headers={"Authorization": f"Bearer {token}"},
+                json={
+                    "cleaned_text": SAMPLE_B,
+                    "source_type": "pdf_text",
+                    "file_name": "sahara2.pdf",
+                    "file_type": "pdf",
+                },
+            )
+            assert hit2.status_code == 200
+            assert hit2.json()["hit"] is True
+            assert hit2.json()["asset"] is not None
     finally:
         app.dependency_overrides.pop(get_db, None)
         await engine.dispose()

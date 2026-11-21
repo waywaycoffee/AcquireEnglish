@@ -55,3 +55,48 @@ def delete_asset_blobs(asset_id: str) -> None:
         root.rmdir()
     except OSError:
         pass
+
+
+_UPLOAD_SUB = "upload_task"
+
+
+def upload_payload_dir(task_id: str) -> Path:
+    root = media_cache_root() / _NS / _UPLOAD_SUB / task_id
+    root.mkdir(parents=True, exist_ok=True)
+    return root
+
+
+def write_upload_payload(task_id: str, payload: Any) -> str:
+    """Persist miss-path text for queue_gpu workers (not original PDF/EPUB bytes)."""
+    path = upload_payload_dir(task_id) / "payload.json"
+    path.write_text(
+        json.dumps(payload, ensure_ascii=False, indent=2),
+        encoding="utf-8",
+    )
+    rel = f"{_UPLOAD_SUB}/{task_id}/payload.json"
+    return public_url(_NS, rel)
+
+
+def read_upload_payload(task_id: str) -> Any | None:
+    path = media_cache_root() / _NS / _UPLOAD_SUB / task_id / "payload.json"
+    if not path.is_file():
+        return None
+    try:
+        return json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return None
+
+
+def delete_upload_payload(task_id: str) -> None:
+    root = media_cache_root() / _NS / _UPLOAD_SUB / task_id
+    if not root.is_dir():
+        return
+    for child in root.iterdir():
+        try:
+            child.unlink()
+        except OSError:
+            pass
+    try:
+        root.rmdir()
+    except OSError:
+        pass
