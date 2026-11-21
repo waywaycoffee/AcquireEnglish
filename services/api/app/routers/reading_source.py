@@ -1,5 +1,6 @@
 """Bounded ECS cache for public licensed reading catalog sources."""
 import hashlib
+import re
 from pathlib import Path
 from urllib.parse import urlparse,unquote
 import httpx
@@ -14,6 +15,8 @@ def allowed(url):
     except ValueError:return False
     if any(p in ('.','..') for p in unquote(u.path).split('/')):return False
     if u.scheme!='https' or u.username or u.password or port not in (None,443):return False
+    if u.hostname=='github.com':return bool(re.fullmatch(r'/standardebooks/[a-z0-9_-]+/archive/refs/heads/(master|main)\.zip',u.path))
+    if u.hostname=='codeload.github.com':return bool(re.fullmatch(r'/standardebooks/[a-z0-9_-]+/zip/refs/heads/(master|main)',u.path))
     if u.hostname=='raw.githubusercontent.com':return any(u.path.startswith('/'+r+'/') for r in ['nishkalavallabhi/OneStopEnglishCorpus','xckevin/magic-english-buddy'])
     if u.hostname=='api.github.com':return any(u.path.startswith('/repos/'+r+'/contents') for r in ['nishkalavallabhi/OneStopEnglishCorpus','xckevin/magic-english-buddy'])
     return u.hostname=='standardebooks.org' and u.path.startswith(('/ebooks/','/feeds/'))

@@ -59,3 +59,11 @@ def test_reading_source_limits_hosts_and_starters_have_text():
     data = asyncio.run(starter())
     assert len(data['documents']) == 3
     assert all(d['plainText'] for d in data['documents'])
+
+
+def test_standard_ebooks_proxy_allows_only_book_archives():
+    from app.routers.reading_source import allowed
+    assert allowed('https://github.com/standardebooks/jane-austen_pride-and-prejudice/archive/refs/heads/master.zip')
+    assert allowed('https://codeload.github.com/standardebooks/jane-austen_pride-and-prejudice/zip/refs/heads/master')
+    assert not allowed('https://github.com/other/private/archive/refs/heads/master.zip')
+    assert not allowed('https://codeload.github.com/standardebooks/repo/anything')

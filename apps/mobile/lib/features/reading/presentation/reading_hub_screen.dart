@@ -24,6 +24,7 @@ import '../data/reading_vocab_lists.dart';
 import '../domain/reading_doc.dart';
 import 'reading_iplus1_provider.dart';
 import 'reading_library_provider.dart';
+import 'reading_stats_row.dart';
 import 'reading_cold_start.dart';
 import 'reading_book_cover.dart';
 import 'reading_vocab_lists_sheet.dart';
@@ -275,29 +276,15 @@ class _ReadingHubScreenState extends ConsumerState<ReadingHubScreen> {
                     final ReadingHubStats stats = computeReadingHubStats(state);
                     return Padding(
                       padding: const EdgeInsets.only(bottom: 16),
-                      child: Wrap(
-                        spacing: 10,
-                        runSpacing: 8,
-                        children: <Widget>[
-                          _StatChip(label: '书架', value: '${stats.docCount}'),
-                          _StatChip(
-                            label: '已打开',
-                            value: '${stats.openedCount}',
-                          ),
-                          _StatChip(
-                            label: '读完',
-                            value: '${stats.completedCount}',
-                          ),
-                          _StatChip(
-                            label: '约读词数',
-                            value: '${stats.wordsReadEstimate}',
-                          ),
-                          _StatChip(label: '已会词', value: '${lists.knownCount}'),
-                          _StatChip(
-                            label: '强制生词',
-                            value: '${lists.focusCount}',
-                          ),
-                        ],
+                      child: ReadingStatsRow(
+                        values: {
+                          '藏书': stats.docCount,
+                          '已打开': stats.openedCount,
+                          '读完': stats.completedCount,
+                          '约读词': stats.wordsReadEstimate,
+                          '已会词': lists.knownCount,
+                          '重点词': lists.focusCount,
+                        },
                       ),
                     );
                   },
@@ -501,38 +488,6 @@ class _ReadingHubScreenState extends ConsumerState<ReadingHubScreen> {
                 ),
               ],
             ),
-    );
-  }
-}
-
-class _StatChip extends StatelessWidget {
-  const _StatChip({required this.label, required this.value});
-
-  final String label;
-  final String value;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-      decoration: BoxDecoration(
-        color: const Color(0xFFF3F6F2),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: AppDesignTokens.borderGray),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: <Widget>[
-          Text(
-            value,
-            style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 16),
-          ),
-          Text(
-            label,
-            style: const TextStyle(fontSize: 12, color: Color(0xFF626262)),
-          ),
-        ],
-      ),
     );
   }
 }

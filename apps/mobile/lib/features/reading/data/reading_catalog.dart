@@ -188,7 +188,8 @@ class ReadingCatalogClient {
             final source = options.uri;
             if (source.host == 'api.github.com' ||
                 source.host == 'raw.githubusercontent.com' ||
-                source.host == 'standardebooks.org') {
+                source.host == 'standardebooks.org' ||
+                source.host == 'github.com') {
               options.path = Uri.parse(Endpoints.normalizeBaseUrl(apiBaseUrl))
                   .resolve('api/reading/source')
                   .replace(queryParameters: {'url': source.toString()})
