@@ -183,6 +183,7 @@ async def test_put_and_get_roundtrip_and_upsert():
                 "bvid": "BV1TESTUPSERT01",
                 "page": 1,
                 "duration_sec": 18,
+                "title": "Upsert demo · P1",
                 "subtitle_en_srt": en,
                 "subtitle_zh_srt": zh,
                 "source_origin": "asr",
@@ -191,6 +192,13 @@ async def test_put_and_get_roundtrip_and_upsert():
         assert with_zh.status_code == 200, with_zh.text
         assert with_zh.json()["stored"] is True
         assert with_zh.json()["replaced"] is True
+        got_zh = await client.get(
+            "/api/shared-subtitles/bilibili",
+            params={"bvid": "BV1TESTUPSERT01", "page": 1},
+        )
+        assert got_zh.status_code == 200
+        assert got_zh.json().get("title") == "Upsert demo · P1"
+        assert "你好" in (got_zh.json().get("preview_zh") or "")
 
         # Same score EN-only → keep bilingual existing.
         keep = await client.put(
@@ -276,3 +284,18 @@ async def test_personal_import_promotes_to_shared():
         assert got.status_code == 200, got.text
         assert "Hello world" in got.json()["subtitle_en_srt"]
         assert got.json().get("subtitle_zh_srt")
+        assert got.json().get("title") == "Promote test"
+        assert "你好" in (got.json().get("preview_zh") or "")
+
+        listed = await client.get("/api/shared-subtitles/bilibili/list")
+        assert listed.status_code == 200, listed.text
+        body = listed.json()
+        assert body["total"] >= 1
+        match = next(
+            (i for i in body["items"] if i["bvid"] == "BV1TESTPROMOTE01"),
+            None,
+        )
+        assert match is not None
+        assert match["title"] == "Promote test"
+        assert match["has_zh"] is True
+        assert "你好" in (match.get("preview_zh") or "")

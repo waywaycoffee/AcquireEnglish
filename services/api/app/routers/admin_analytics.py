@@ -28,8 +28,13 @@ from app.models import (
 from app.services import api_usage as usage_svc
 from app.services.infra_monitor import collect_infra_snapshot
 from app.services.platform_billing import collect_platform_usage
+from app.shared_subtitle_store import preview_zh_from_srt
 
 router = APIRouter(prefix="/admin", tags=["admin-analytics"])
+
+
+def _preview_zh_fallback(zh_srt: str | None) -> str:
+    return preview_zh_from_srt(zh_srt)
 
 
 def _day_key(dt: datetime | None) -> str:
@@ -270,6 +275,9 @@ async def analytics_resources(
                 SharedBilibiliSubtitle.en_hits,
                 SharedBilibiliSubtitle.zh_hits,
                 SharedBilibiliSubtitle.cue_count,
+                SharedBilibiliSubtitle.title,
+                SharedBilibiliSubtitle.preview_zh,
+                SharedBilibiliSubtitle.subtitle_zh_srt,
             )
             .order_by(
                 (SharedBilibiliSubtitle.en_hits + SharedBilibiliSubtitle.zh_hits).desc()
@@ -307,6 +315,10 @@ async def analytics_resources(
                     "en_hits": r[2],
                     "zh_hits": r[3],
                     "cues": r[4],
+                    "title": (r[5] or "").strip()
+                    or f"{r[0]} · 第{r[1]}P",
+                    "preview_zh": (r[6] or "").strip()
+                    or _preview_zh_fallback(r[7]),
                 }
                 for r in top_bili
             ],

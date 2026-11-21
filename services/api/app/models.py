@@ -247,6 +247,10 @@ class SharedBilibiliSubtitle(Base):
     # Bilibili cid can exceed int32 on newer uploads.
     cid: Mapped[int | None] = mapped_column(BigInteger, nullable=True, index=True)
     duration_sec: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    # Human-readable identity (video title · 分P part). Filled on upsert/backfill.
+    title: Mapped[str] = mapped_column(String(512), default="")
+    # Short Chinese cue preview so learners recognize content without opening SRT.
+    preview_zh: Mapped[str] = mapped_column(String(512), default="")
     subtitle_en_srt: Mapped[str] = mapped_column(Text)
     subtitle_zh_srt: Mapped[str | None] = mapped_column(Text, nullable=True)
     quality_score: Mapped[float] = mapped_column(Float, default=0.0)

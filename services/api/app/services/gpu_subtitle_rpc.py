@@ -16,11 +16,16 @@ async def run(command):
         if job is None: return None
         async with httpx.AsyncClient(headers=_bilibili_headers(settings.bilibili_cookie),timeout=40) as client:
             view=(await client.get('https://api.bilibili.com/x/web-interface/view',params={'bvid':job['bvid']})).json()
-            pages=(view.get('data') or {}).get('pages') or []
+            data=(view.get('data') or {})
+            pages=data.get('pages') or []
             page=next((p for p in pages if p['page']==job['page']),None)
             if page is None:
                 queue.update(job,'failed','Video page unavailable')
                 return {'error':'Video page unavailable'}
+            title=(data.get('title') or '').strip() or job['bvid']
+            part=str(page.get('part') or '').strip()
+            if part and part not in title:
+                title=f'{title} · {part}'
             play=(await client.get('https://api.bilibili.com/x/player/playurl',
               params={'bvid':job['bvid'],'cid':page['cid'],'fnval':16,'qn':16})).json()
             tracks=(((play.get('data') or {}).get('dash') or {}).get('audio') or [])
@@ -29,7 +34,7 @@ async def run(command):
                 return {'error':'Audio unavailable'}
             track=min(tracks,key=lambda x:x.get('bandwidth',0))
             return {**job,'url':track.get('baseUrl') or track.get('base_url'),
-              'cid':page['cid'],'duration':page['duration']}
+              'cid':page['cid'],'duration':page['duration'],'title':title}
     job=command['job']
     if action=='heartbeat':
         queue.update(job,command.get('state','transcribing'))
@@ -71,7 +76,7 @@ async def run(command):
         async with SessionLocal() as db:
             result=await upsert_shared_bilibili_pack(db,bvid=job['bvid'],page=job['page'],
               cid=job['cid'],duration_sec=job['duration'],subtitle_en_srt=srt([c['text'] for c in cues]),
-              subtitle_zh_srt=srt(translated),source_origin='asr')
+              subtitle_zh_srt=srt(translated),title=job.get('title'),source_origin='asr')
             if not result.stored and result.reason!='existing pack has equal or better quality':
                 raise ValueError('Subtitle quality gate rejected')
         queue.update(job,'completed')

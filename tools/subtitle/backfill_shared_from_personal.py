@@ -68,6 +68,11 @@ async def main() -> None:
             duration = (
                 raw_dur if 30 <= raw_dur <= 3 * 3600 else (last_sec if last_sec >= 30 else None)
             )
+            best_title = ""
+            for row in items:
+                t = (row.title or "").strip()
+                if t and (not best_title or len(t) > len(best_title)):
+                    best_title = t
             result = await upsert_shared_bilibili_pack(
                 db,
                 bvid=bvid,
@@ -75,6 +80,7 @@ async def main() -> None:
                 duration_sec=duration,
                 subtitle_en_srt=best_en,
                 subtitle_zh_srt=best_zh or None,
+                title=best_title or None,
                 uploader_user_id=uploader,
                 source_origin="asr",
                 commit=False,

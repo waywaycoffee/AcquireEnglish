@@ -1095,8 +1095,8 @@ class SettingsScreen extends ConsumerWidget {
               _ActionRow(
                 title: '云端字幕库',
                 description: authSession.isLoggedIn
-                    ? '查看私人字幕资产，一键恢复到本机；共享字幕自动命中。'
-                    : '登录后可查看私人字幕库并恢复到本机。',
+                    ? '浏览公共字幕标题与中文预览；私人资产可一键恢复到本机。'
+                    : '可浏览公共字幕库；登录后还可查看并恢复私人字幕。',
                 icon: Icons.cloud_queue_rounded,
                 onTap: () => Navigator.of(context).push(
                   MaterialPageRoute<void>(

@@ -18,6 +18,7 @@ async def ensure_schema_columns(conn: AsyncConnection) -> None:
     await _ensure_community_post_columns(conn)
     await _ensure_oral_match_queue_columns(conn)
     await _ensure_shared_bilibili_cid_bigint(conn)
+    await _ensure_shared_bilibili_identity_columns(conn)
 
 
 async def ensure_user_auth_columns(conn: AsyncConnection) -> None:
@@ -235,3 +236,24 @@ async def _ensure_shared_bilibili_cid_bigint(conn: AsyncConnection) -> None:
             pass
     except Exception:  # noqa: BLE001
         pass
+
+
+async def _ensure_shared_bilibili_identity_columns(conn: AsyncConnection) -> None:
+    """Title + Chinese preview so shared packs are recognizable in lists."""
+    existing = await _existing_columns(conn, "shared_bilibili_subtitles")
+    if existing is None:
+        return
+    if "title" not in existing:
+        await conn.execute(
+            text(
+                "ALTER TABLE shared_bilibili_subtitles "
+                "ADD COLUMN title VARCHAR(512) DEFAULT ''"
+            )
+        )
+    if "preview_zh" not in existing:
+        await conn.execute(
+            text(
+                "ALTER TABLE shared_bilibili_subtitles "
+                "ADD COLUMN preview_zh VARCHAR(512) DEFAULT ''"
+            )
+        )

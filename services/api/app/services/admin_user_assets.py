@@ -312,14 +312,20 @@ async def detailed_asset_report(db: AsyncSession, user_id: int) -> dict[str, Any
             .limit(40)
         )
     ).scalars().all()
+    from app.shared_subtitle_store import preview_zh_from_srt
+
     sub_items = [
         {
             "id": r.id,
             "bvid": r.bvid,
             "page": r.page,
+            "title": (r.title or "").strip() or f"{r.bvid} · 第{r.page}P",
+            "preview_zh": (r.preview_zh or "").strip()
+            or preview_zh_from_srt(r.subtitle_zh_srt),
             "cue_count": r.cue_count,
             "en_hits": r.en_hits,
             "zh_hits": r.zh_hits,
+            "has_zh": bool((r.subtitle_zh_srt or "").strip()),
             "approx_bytes": len(r.subtitle_en_srt or "") + len(r.subtitle_zh_srt or ""),
         }
         for r in sub_rows

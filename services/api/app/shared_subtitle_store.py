@@ -9,7 +9,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models import SharedBilibiliSubtitle
-from app.shared_subtitle_quality import evaluate_shared_pack
+from app.shared_subtitle_quality import evaluate_shared_pack, parse_srt_cues
 
 
 @dataclass(frozen=True)
@@ -34,6 +34,24 @@ def parse_bvid_page(external_id: str) -> tuple[str, int]:
     return match.group(1).upper(), int(match.group(2) or 1)
 
 
+def preview_zh_from_srt(zh_srt: str | None, *, max_cues: int = 2, max_chars: int = 160) -> str:
+    """First 1–2 Chinese cue bodies for list identity."""
+    cues = parse_srt_cues(zh_srt or "")
+    if not cues:
+        return ""
+    bodies: list[str] = []
+    for _, _, body in cues[: max(1, max_cues)]:
+        text = re.sub(r"\s+", " ", (body or "").strip())
+        if text:
+            bodies.append(text)
+    if not bodies:
+        return ""
+    joined = " · ".join(bodies)
+    if len(joined) <= max_chars:
+        return joined
+    return joined[: max_chars - 1].rstrip() + "…"
+
+
 def should_replace_shared(
     existing: SharedBilibiliSubtitle,
     *,
@@ -50,6 +68,25 @@ def should_replace_shared(
     return False
 
 
+def _apply_identity(
+    row: SharedBilibiliSubtitle,
+    *,
+    title: str | None,
+    zh_srt: str | None,
+) -> None:
+    cleaned = (title or "").strip()
+    if cleaned:
+        row.title = cleaned[:512]
+    preview = preview_zh_from_srt(zh_srt)
+    if preview:
+        row.preview_zh = preview[:512]
+    elif not (row.preview_zh or "").strip():
+        # Fall back to English first cue so EN-only packs still show something.
+        en_cues = parse_srt_cues(row.subtitle_en_srt or "")
+        if en_cues:
+            row.preview_zh = re.sub(r"\s+", " ", en_cues[0][2]).strip()[:512]
+
+
 async def upsert_shared_bilibili_pack(
     db: AsyncSession,
     *,
@@ -59,6 +96,7 @@ async def upsert_shared_bilibili_pack(
     duration_sec: int | None = None,
     subtitle_en_srt: str,
     subtitle_zh_srt: str | None = None,
+    title: str | None = None,
     uploader_user_id: int | None = None,
     source_origin: str = "asr",
     commit: bool = True,
@@ -103,22 +141,22 @@ async def upsert_shared_bilibili_pack(
     new_has_zh = bool(zh)
 
     if existing is None:
-        db.add(
-            SharedBilibiliSubtitle(
-                bvid=key,
-                page=page,
-                cid=cid,
-                duration_sec=duration_sec,
-                subtitle_en_srt=en,
-                subtitle_zh_srt=zh,
-                quality_score=quality.score,
-                cue_count=quality.cue_count,
-                en_hits=quality.en_hits,
-                zh_hits=quality.zh_hits,
-                uploader_user_id=uploader_user_id,
-                source_origin=origin,
-            )
+        row = SharedBilibiliSubtitle(
+            bvid=key,
+            page=page,
+            cid=cid,
+            duration_sec=duration_sec,
+            subtitle_en_srt=en,
+            subtitle_zh_srt=zh,
+            quality_score=quality.score,
+            cue_count=quality.cue_count,
+            en_hits=quality.en_hits,
+            zh_hits=quality.zh_hits,
+            uploader_user_id=uploader_user_id,
+            source_origin=origin,
         )
+        _apply_identity(row, title=title, zh_srt=zh)
+        db.add(row)
         if commit:
             await db.commit()
         return SharedUpsertResult(
@@ -131,6 +169,19 @@ async def upsert_shared_bilibili_pack(
     if not should_replace_shared(
         existing, new_score=quality.score, new_has_zh=new_has_zh
     ):
+        # Still enrich identity when a better pack already exists.
+        dirty = False
+        cleaned = (title or "").strip()
+        if cleaned and not (existing.title or "").strip():
+            existing.title = cleaned[:512]
+            dirty = True
+        if zh and not (existing.preview_zh or "").strip():
+            preview = preview_zh_from_srt(zh)
+            if preview:
+                existing.preview_zh = preview[:512]
+                dirty = True
+        if dirty and commit:
+            await db.commit()
         return SharedUpsertResult(
             stored=False,
             replaced=False,
@@ -150,6 +201,11 @@ async def upsert_shared_bilibili_pack(
     if uploader_user_id is not None:
         existing.uploader_user_id = uploader_user_id
     existing.source_origin = origin
+    _apply_identity(
+        existing,
+        title=title or existing.title,
+        zh_srt=existing.subtitle_zh_srt,
+    )
     if commit:
         await db.commit()
     return SharedUpsertResult(
@@ -168,6 +224,7 @@ async def promote_personal_bilibili_to_shared(
     subtitle_zh_srt: str | None,
     duration_sec: int | None,
     uploader_user_id: int | None,
+    title: str | None = None,
     source_origin: str = "asr",
 ) -> SharedUpsertResult:
     en = (subtitle_en_srt or "").strip()
@@ -183,6 +240,7 @@ async def promote_personal_bilibili_to_shared(
         duration_sec=duration_sec,
         subtitle_en_srt=en,
         subtitle_zh_srt=subtitle_zh_srt,
+        title=title,
         uploader_user_id=uploader_user_id,
         source_origin=source_origin,
         commit=True,

@@ -696,16 +696,20 @@
       data.shared_bilibili?.zh_hits
     )} · 句数 ${num(data.shared_bilibili?.cues)}</div>
           <div class="table-wrap"><table>
-            <thead><tr><th>BVID</th><th>分P</th><th>英文</th><th>中文</th></tr></thead>
+            <thead><tr><th>标题</th><th>分P</th><th>中文预览</th><th>英文</th><th>中文</th></tr></thead>
             <tbody>
               ${(data.shared_bilibili?.top || [])
                 .map(
                   (t) =>
-                    `<tr><td>${escapeHtml(t.bvid)}</td><td>${t.page}</td><td>${num(
-                      t.en_hits
-                    )}</td><td>${num(t.zh_hits)}</td></tr>`
+                    `<tr><td title="${escapeHtml(t.bvid || "")}">${escapeHtml(
+                      (t.title || t.bvid || "").slice(0, 28)
+                    )}</td><td>${t.page}</td><td class="muted">${escapeHtml(
+                      (t.preview_zh || "").slice(0, 36)
+                    )}</td><td>${num(t.en_hits)}</td><td>${num(
+                      t.zh_hits
+                    )}</td></tr>`
                 )
-                .join("") || `<tr><td colspan="4" class="muted">暂无</td></tr>`}
+                .join("") || `<tr><td colspan="5" class="muted">暂无</td></tr>`}
             </tbody>
           </table></div>
         </div>
@@ -879,7 +883,10 @@
       .map(
         (r) => `<tr>
           <td>${r.id}</td>
-          <td>${escapeHtml(r.bvid)} P${r.page}</td>
+          <td title="${escapeHtml(r.bvid || "")}">${escapeHtml(
+            (r.title || `${r.bvid} P${r.page}` || "").slice(0, 32)
+          )}</td>
+          <td class="muted">${escapeHtml((r.preview_zh || "").slice(0, 40))}</td>
           <td>${num(r.cue_count)} 句</td>
           <td>${num(r.en_hits)} / ${num(r.zh_hits)}</td>
           <td>${formatBytes(r.approx_bytes)}</td>
@@ -935,8 +942,8 @@
       <section class="section">
         <h3>共享字幕贡献（${(assets.shared_subtitles || []).length}）</h3>
         <div class="table-wrap"><table>
-          <thead><tr><th>ID</th><th>BVID</th><th>句数</th><th>EN/ZH 命中</th><th>约占用</th></tr></thead>
-          <tbody>${subs || `<tr><td colspan="5" class="muted">暂无</td></tr>`}</tbody>
+          <thead><tr><th>ID</th><th>标题</th><th>中文预览</th><th>句数</th><th>EN/ZH 命中</th><th>约占用</th></tr></thead>
+          <tbody>${subs || `<tr><td colspan="6" class="muted">暂无</td></tr>`}</tbody>
         </table></div>
       </section>
       <section class="section">

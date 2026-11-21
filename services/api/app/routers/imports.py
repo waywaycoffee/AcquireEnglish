@@ -153,6 +153,7 @@ async def upsert_personal_asset(
                 subtitle_zh_srt=row.subtitle_zh_srt,
                 duration_sec=int(row.duration_sec or 0) or None,
                 uploader_user_id=user.id,
+                title=row.title,
                 source_origin="asr",
             )
         except Exception:
@@ -270,6 +271,7 @@ async def put_import_srt(
                 subtitle_zh_srt=row.subtitle_zh_srt,
                 duration_sec=int(row.duration_sec or 0) or None,
                 uploader_user_id=user.id,
+                title=row.title,
                 source_origin="asr",
             )
         except Exception:

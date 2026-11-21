@@ -93,6 +93,8 @@ class Endpoints {
       'api/oral-match/rooms/$roomId/report';
   static const String sharedSubtitlesBilibili =
       'api/shared-subtitles/bilibili';
+  static const String sharedSubtitlesBilibiliList =
+      'api/shared-subtitles/bilibili/list';
   static const String imports = 'api/imports';
   static const String importsAsset = 'api/imports/asset';
   static const String netdiskStatus = 'api/netdisk/status';

@@ -267,12 +267,16 @@ class SharedBilibiliSubtitlePack {
     required this.subtitleEnSrt,
     this.cid,
     this.durationSec,
+    this.title = '',
+    this.previewZh = '',
     this.subtitleZhSrt,
     this.qualityScore = 0,
     this.cueCount = 0,
     this.enHits = 0,
     this.zhHits = 0,
     this.sourceOrigin = 'asr',
+    this.hasEn = true,
+    this.hasZh = false,
   });
 
   factory SharedBilibiliSubtitlePack.fromJson(Map<String, dynamic> json) =>
@@ -281,6 +285,8 @@ class SharedBilibiliSubtitlePack {
         page: (json['page'] as num?)?.toInt() ?? 1,
         cid: (json['cid'] as num?)?.toInt(),
         durationSec: (json['duration_sec'] as num?)?.toInt(),
+        title: '${json['title'] ?? ''}',
+        previewZh: '${json['preview_zh'] ?? ''}',
         subtitleEnSrt: '${json['subtitle_en_srt'] ?? ''}',
         subtitleZhSrt: json['subtitle_zh_srt'] as String?,
         qualityScore: (json['quality_score'] as num?)?.toDouble() ?? 0,
@@ -288,12 +294,17 @@ class SharedBilibiliSubtitlePack {
         enHits: (json['en_hits'] as num?)?.toInt() ?? 0,
         zhHits: (json['zh_hits'] as num?)?.toInt() ?? 0,
         sourceOrigin: '${json['source_origin'] ?? 'asr'}',
+        hasEn: json['has_en'] != false,
+        hasZh: json['has_zh'] == true ||
+            ((json['subtitle_zh_srt'] as String?)?.trim().isNotEmpty ?? false),
       );
 
   final String bvid;
   final int page;
   final int? cid;
   final int? durationSec;
+  final String title;
+  final String previewZh;
   final String subtitleEnSrt;
   final String? subtitleZhSrt;
   final double qualityScore;
@@ -301,6 +312,57 @@ class SharedBilibiliSubtitlePack {
   final int enHits;
   final int zhHits;
   final String sourceOrigin;
+  final bool hasEn;
+  final bool hasZh;
+}
+
+class SharedBilibiliSubtitleListItem {
+  const SharedBilibiliSubtitleListItem({
+    required this.id,
+    required this.bvid,
+    required this.page,
+    required this.title,
+    required this.previewZh,
+    this.durationSec,
+    this.cueCount = 0,
+    this.qualityScore = 0,
+    this.hasEn = true,
+    this.hasZh = false,
+    this.sourceOrigin = 'asr',
+  });
+
+  factory SharedBilibiliSubtitleListItem.fromJson(Map<String, dynamic> json) =>
+      SharedBilibiliSubtitleListItem(
+        id: (json['id'] as num?)?.toInt() ?? 0,
+        bvid: '${json['bvid'] ?? ''}',
+        page: (json['page'] as num?)?.toInt() ?? 1,
+        title: '${json['title'] ?? ''}',
+        previewZh: '${json['preview_zh'] ?? ''}',
+        durationSec: (json['duration_sec'] as num?)?.toInt(),
+        cueCount: (json['cue_count'] as num?)?.toInt() ?? 0,
+        qualityScore: (json['quality_score'] as num?)?.toDouble() ?? 0,
+        hasEn: json['has_en'] != false,
+        hasZh: json['has_zh'] == true,
+        sourceOrigin: '${json['source_origin'] ?? 'asr'}',
+      );
+
+  final int id;
+  final String bvid;
+  final int page;
+  final String title;
+  final String previewZh;
+  final int? durationSec;
+  final int cueCount;
+  final double qualityScore;
+  final bool hasEn;
+  final bool hasZh;
+  final String sourceOrigin;
+
+  String get displayTitle {
+    final String t = title.trim();
+    if (t.isNotEmpty) return t;
+    return '$bvid · 第${page}P';
+  }
 }
 
 class SharedBilibiliSubtitleUpsertResult {
@@ -1973,6 +2035,39 @@ class AcquireApiClient {
         .toList(growable: false);
   }
 
+  /// Community shared Bilibili packs (title + Chinese preview, no full SRT).
+  Future<({int total, List<SharedBilibiliSubtitleListItem> items})>
+      listSharedBilibiliSubtitles({
+    String? query,
+    int limit = 50,
+    int offset = 0,
+  }) async {
+    final Response<dynamic> response = await _dio.get(
+      Endpoints.sharedSubtitlesBilibiliList,
+      queryParameters: <String, dynamic>{
+        'limit': limit,
+        'offset': offset,
+        if (query != null && query.trim().isNotEmpty) 'q': query.trim(),
+      },
+      options: Options(
+        extra: const <String, Object>{
+          'dio_cache_interceptor_force_refresh': true,
+        },
+      ),
+    );
+    final Map<String, dynamic> data =
+        (response.data as Map<String, dynamic>?) ?? <String, dynamic>{};
+    final List<SharedBilibiliSubtitleListItem> items =
+        ((data['items'] as List<dynamic>?) ?? const <dynamic>[])
+            .cast<Map<String, dynamic>>()
+            .map(SharedBilibiliSubtitleListItem.fromJson)
+            .toList(growable: false);
+    return (
+      total: (data['total'] as num?)?.toInt() ?? items.length,
+      items: items,
+    );
+  }
+
   Future<PersonalImportAsset> upsertPersonalImport({
     required String source,
     required String externalId,
@@ -2080,6 +2175,7 @@ class AcquireApiClient {
     int page = 1,
     int? cid,
     int? durationSec,
+    String? title,
     required String subtitleEnSrt,
     String? subtitleZhSrt,
     String sourceOrigin = 'asr',
@@ -2091,6 +2187,7 @@ class AcquireApiClient {
         'page': page,
         if (cid != null) 'cid': cid,
         if (durationSec != null) 'duration_sec': durationSec,
+        if (title != null && title.trim().isNotEmpty) 'title': title.trim(),
         'subtitle_en_srt': subtitleEnSrt,
         if (subtitleZhSrt != null) 'subtitle_zh_srt': subtitleZhSrt,
         'source_origin': sourceOrigin,

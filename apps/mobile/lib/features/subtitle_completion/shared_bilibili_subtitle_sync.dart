@@ -195,6 +195,7 @@ Future<void> tryUploadSharedBilibiliSubtitles({
   LibraryCourseData? course,
   LibraryEpisodeItem? episode,
   int? durationSec,
+  String? title,
   String sourceOrigin = 'asr',
 }) async {
   if (!isLoggedIn) {
@@ -237,11 +238,15 @@ Future<void> tryUploadSharedBilibiliSubtitles({
     if (!quality.passed) {
       return;
     }
+    final String resolvedTitle = (title ?? '').trim().isNotEmpty
+        ? title!.trim()
+        : _sharedUploadTitle(course: course, episode: episode);
     await api.putSharedBilibiliSubtitle(
       bvid: ids.bvid,
       page: ids.page,
       cid: ids.cid,
       durationSec: uploadDuration,
+      title: resolvedTitle.isEmpty ? null : resolvedTitle,
       subtitleEnSrt: enSrt,
       subtitleZhSrt: zhSrt,
       sourceOrigin: sourceOrigin,
@@ -249,4 +254,19 @@ Future<void> tryUploadSharedBilibiliSubtitles({
   } catch (_) {
     // Never block local completion UX.
   }
+}
+
+String _sharedUploadTitle({
+  LibraryCourseData? course,
+  LibraryEpisodeItem? episode,
+}) {
+  final String episodeTitle = (episode?.title ?? '').trim();
+  final String courseTitle = (course?.title ?? '').trim();
+  if (episodeTitle.isNotEmpty &&
+      courseTitle.isNotEmpty &&
+      episodeTitle != courseTitle) {
+    return '$courseTitle · $episodeTitle';
+  }
+  if (episodeTitle.isNotEmpty) return episodeTitle;
+  return courseTitle;
 }
