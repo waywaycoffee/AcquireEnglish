@@ -381,6 +381,119 @@ void main() {
       isFalse,
     );
   });
+
+  test(
+    'word cards use earliest same-video hit and list distinct media sources',
+    () async {
+      final ProviderContainer container = ProviderContainer(
+        // ignore: always_specify_types
+        overrides: [
+          wordBookProvider.overrideWith(MultiSourceWords.new),
+          phraseBookProvider.overrideWith(TestPhrases.new),
+        ],
+      );
+      addTearDown(container.dispose);
+      final ReviewSource card = container
+          .read(reviewSourcesProvider)
+          .firstWhere(
+            (ReviewSource source) =>
+                source.key == 'entry:them:recognize',
+          );
+      expect(card.english, 'Both of them enjoy the meal.');
+      expect(card.startMs, 5000);
+      expect(card.sourceLabel, contains('视频'));
+      expect(card.relatedSources.map((ReviewSourceLink l) => l.mediaKind),
+          <String>['视频', '文章', '书籍']);
+      expect(
+        card.relatedSources.map((ReviewSourceLink l) => l.displayLabel),
+        containsAll(<String>[
+          '视频 · Show · Ep1',
+          '文章 · 阅读 · NYT · 精读',
+          '书籍 · 词书 · CET4 · Unit1',
+        ]),
+      );
+      final ReviewSource switched = card.forContext(episode: 'reading:nyt');
+      expect(switched.english, 'Look at them carefully.');
+      expect(switched.sourceLabel, startsWith('文章'));
+    },
+  );
+}
+
+class MultiSourceWords extends WordBookNotifier {
+  @override
+  List<WordEntry> build() => const <WordEntry>[
+    WordEntry(
+      word: 'them',
+      favorite: true,
+      scheduleStatus: VocabScheduleStatus.active,
+      occurrences: <WordOccurrence>[
+        WordOccurrence(
+          episodeId: 'show-ep1',
+          course: 'Show',
+          episode: 'Ep1',
+          time: '00:20',
+          sentence: 'I see them later.',
+          chinese: '后来',
+          count: 2,
+          lineKeys: <String>['20000-21000', '5000-6500'],
+          contexts: <WordContext>[
+            WordContext(
+              lineKey: '20000-21000',
+              time: '00:20',
+              sentence: 'I see them later.',
+              chinese: '后来',
+              count: 1,
+            ),
+            WordContext(
+              lineKey: '5000-6500',
+              time: '00:05',
+              sentence: 'Both of them enjoy the meal.',
+              chinese: '两人都喜欢这顿饭。',
+              count: 1,
+            ),
+          ],
+        ),
+        WordOccurrence(
+          episodeId: 'reading:nyt',
+          course: '阅读 · NYT',
+          episode: '精读',
+          time: '',
+          sentence: 'Look at them carefully.',
+          chinese: '仔细看他们。',
+          count: 1,
+          lineKeys: <String>['reading:nyt:them'],
+          contexts: <WordContext>[
+            WordContext(
+              lineKey: 'reading:nyt:them',
+              time: '',
+              sentence: 'Look at them carefully.',
+              chinese: '仔细看他们。',
+              count: 1,
+            ),
+          ],
+        ),
+        WordOccurrence(
+          episodeId: 'book:cet4',
+          course: '词书 · CET4',
+          episode: 'Unit1',
+          time: '',
+          sentence: 'Help them learn.',
+          chinese: '帮助他们学习。',
+          count: 1,
+          lineKeys: <String>['book:1'],
+          contexts: <WordContext>[
+            WordContext(
+              lineKey: 'book:1',
+              time: '',
+              sentence: 'Help them learn.',
+              chinese: '帮助他们学习。',
+              count: 1,
+            ),
+          ],
+        ),
+      ],
+    ),
+  ];
 }
 
 class FailingRepository extends ReviewRepository {

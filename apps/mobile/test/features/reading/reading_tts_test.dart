@@ -11,8 +11,13 @@ void main() {
       ReadingTtsGender.male.aliyunVoiceId,
       'qwen-audio-3.0-tts-flash-loongadriangao',
     );
-    expect(ReadingTtsGender.female.digitalHumanId, 'mia');
-    expect(ReadingTtsGender.male.digitalHumanId, 'leo');
+    expect(
+      ReadingTtsGender.values.map((v) => v.aliyunVoiceId).toSet(),
+      hasLength(8),
+    );
+    for (final voice in ReadingTtsGender.values) {
+      expect(ReadingTtsGenderX.fromStorage(voice.storageValue), voice);
+    }
     expect(ReadingTtsGenderX.fromStorage('male'), ReadingTtsGender.male);
     expect(ReadingTtsGenderX.fromStorage(null), ReadingTtsGender.female);
   });

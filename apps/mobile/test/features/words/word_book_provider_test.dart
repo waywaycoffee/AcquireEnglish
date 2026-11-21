@@ -12,6 +12,69 @@ void main() {
     expect(normalizeWord('  IT’S  '), "it's");
   });
 
+  test('same-video earliestContext prefers the first timeline hit', () {
+    const WordOccurrence occurrence = WordOccurrence(
+      episodeId: 'ep-1',
+      course: 'Friends',
+      episode: 'S01E01',
+      time: '00:20',
+      sentence: 'later hit',
+      chinese: '后',
+      count: 2,
+      lineKeys: <String>['20000-21000', '5000-6000'],
+      contexts: <WordContext>[
+        WordContext(
+          lineKey: '20000-21000',
+          time: '00:20',
+          sentence: 'later hit',
+          chinese: '后',
+          count: 1,
+        ),
+        WordContext(
+          lineKey: '5000-6000',
+          time: '00:05',
+          sentence: 'first hit',
+          chinese: '先',
+          count: 1,
+        ),
+      ],
+    );
+    expect(occurrence.earliestContext?.sentence, 'first hit');
+    expect(occurrence.earliestContext?.time, '00:05');
+    expect(occurrence.mediaKind, '视频');
+  });
+
+  test('mediaKind distinguishes article and book sources', () {
+    expect(
+      const WordOccurrence(
+        episodeId: 'reading:doc-1',
+        course: '阅读 · 纽约时报',
+        episode: '文章',
+        time: '',
+        sentence: 'hello',
+        chinese: '',
+        count: 1,
+        lineKeys: <String>['reading:doc-1:hello'],
+        contexts: <WordContext>[],
+      ).mediaKind,
+      '文章',
+    );
+    expect(
+      const WordOccurrence(
+        episodeId: 'book:cet4',
+        course: '词书 · CET4',
+        episode: 'Unit 1',
+        time: '',
+        sentence: 'hello',
+        chinese: '',
+        count: 1,
+        lineKeys: <String>['1'],
+        contexts: <WordContext>[],
+      ).mediaKind,
+      '书籍',
+    );
+  });
+
   test('normalizes surrounding subtitle punctuation without merging words', () {
     expect(normalizeWord(' “Sanctuary,” '), 'sanctuary');
     expect(normalizeWord('Puddles.'), 'puddles');

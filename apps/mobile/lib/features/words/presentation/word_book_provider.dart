@@ -81,6 +81,65 @@ class WordOccurrence {
   final List<String> lineKeys;
   final List<WordContext> contexts;
 
+  /// Video / article / book badge for multi-source labels.
+  String get mediaKind {
+    final String id = episodeId.trim();
+    final String c = course.trim();
+    if (id.startsWith('reading:') || c.startsWith('阅读')) {
+      return '文章';
+    }
+    if (id.startsWith('book:') ||
+        c.contains('词书') ||
+        c.contains('书籍') ||
+        c.contains('Syllabus') ||
+        c.startsWith('公共词库')) {
+      return '书籍';
+    }
+    if (id.isEmpty) return '其他';
+    return '视频';
+  }
+
+  /// Earliest timeline hit in this episode (same video → first clip).
+  WordContext? get earliestContext {
+    if (contexts.isEmpty) return null;
+    WordContext best = contexts.first;
+    int? bestMs = contextStartMs(best);
+    for (final WordContext ctx in contexts.skip(1)) {
+      final int? ms = contextStartMs(ctx);
+      if (ms == null) continue;
+      if (bestMs == null || ms < bestMs) {
+        best = ctx;
+        bestMs = ms;
+      }
+    }
+    return best;
+  }
+
+  static int? contextStartMs(WordContext ctx) {
+    final Match? match = RegExp(r'^(\d+)').firstMatch(ctx.lineKey.trim());
+    if (match != null) {
+      return int.tryParse(match.group(1)!);
+    }
+    return _parseClockToMs(ctx.time);
+  }
+
+  static int? _parseClockToMs(String raw) {
+    final String time = raw.trim();
+    if (time.isEmpty) return null;
+    final List<int?> parts = time
+        .split(':')
+        .map((String part) => int.tryParse(part.trim()))
+        .toList(growable: false);
+    if (parts.isEmpty || parts.any((int? part) => part == null)) return null;
+    if (parts.length == 3) {
+      return ((parts[0]! * 60 + parts[1]!) * 60 + parts[2]!) * 1000;
+    }
+    if (parts.length == 2) {
+      return (parts[0]! * 60 + parts[1]!) * 1000;
+    }
+    return null;
+  }
+
   WordOccurrence copyWith({
     String? episodeId,
     String? course,
@@ -320,8 +379,9 @@ class WordEntry {
       return '';
     }
     final WordOccurrence first = occurrences.first;
-    if (first.contexts.isNotEmpty) {
-      return first.contexts.first.sentence.trim();
+    final WordContext? ctx = first.earliestContext;
+    if (ctx != null) {
+      return ctx.sentence.trim();
     }
     return first.sentence.trim();
   }
@@ -331,8 +391,9 @@ class WordEntry {
       return '';
     }
     final WordOccurrence first = occurrences.first;
-    if (first.contexts.isNotEmpty) {
-      return first.contexts.first.chinese.trim();
+    final WordContext? ctx = first.earliestContext;
+    if (ctx != null) {
+      return ctx.chinese.trim();
     }
     return first.chinese.trim();
   }

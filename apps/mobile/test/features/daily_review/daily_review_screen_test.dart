@@ -100,6 +100,18 @@ Widget app(
   );
 }
 
+Future<void> tapVisibleKey(WidgetTester tester, Key key) async {
+  final Finder target = find.byKey(key);
+  await tester.scrollUntilVisible(
+    target,
+    240,
+    scrollable: find.byType(Scrollable).first,
+  );
+  await tester.pumpAndSettle();
+  await tester.tap(target);
+  await tester.pumpAndSettle();
+}
+
 void main() {
   testWidgets(
     'source-scoped plan only grades selected source and summarizes saved ratings',
@@ -118,14 +130,8 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.text('很高兴见到你。'), findsOneWidget);
       expect(find.text('hello'), findsNothing);
-      final Finder reveal = find.byKey(const Key('daily-review-reveal'));
-      await tester.ensureVisible(reveal);
-      await tester.tap(reveal);
-      await tester.pumpAndSettle();
-      final Finder good = find.byKey(const Key('daily-review-rate-good'));
-      await tester.ensureVisible(good);
-      await tester.tap(good);
-      await tester.pumpAndSettle();
+      await tapVisibleKey(tester, const Key('daily-review-reveal'));
+      await tapVisibleKey(tester, const Key('daily-review-rate-good'));
       final DailyReviewState state = container.read(dailyReviewProvider);
       expect(state.records['phrase:1']!.reviews, 1);
       expect(state.records['entry:hello:recognize']!.reviews, 0);
@@ -179,10 +185,7 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.textContaining('视频 B'), findsWidgets);
       expect(container.read(dailyReviewProvider).records.length, 1);
-      final Finder reveal = find.byKey(const Key('daily-review-reveal'));
-      await tester.ensureVisible(reveal);
-      await tester.tap(reveal);
-      await tester.pumpAndSettle();
+      await tapVisibleKey(tester, const Key('daily-review-reveal'));
       expect(
         find.textContaining(RegExp('hello again', caseSensitive: false)),
         findsWidgets,
@@ -308,7 +311,7 @@ void main() {
   testWidgets('speech remains locked until completion and stops when grading', (
     WidgetTester tester,
   ) async {
-    final Completer<void> spoken = Completer<void>();
+    final List<Completer<void>> gates = <Completer<void>>[];
     final List<String> texts = <String>[];
     int stops = 0;
     final ProviderContainer container = ProviderContainer(
@@ -321,11 +324,15 @@ void main() {
           WordPronunciationService(
             speakOverride: (String text) {
               texts.add(text);
-              return spoken.future;
+              final Completer<void> gate = Completer<void>();
+              gates.add(gate);
+              return gate.future;
             },
             stopOverride: () async {
               stops++;
-              spoken.complete();
+              for (final Completer<void> gate in gates) {
+                if (!gate.isCompleted) gate.complete();
+              }
             },
           ),
         ),
@@ -333,6 +340,10 @@ void main() {
     );
     addTearDown(container.dispose);
     await tester.pumpWidget(app(container, session: true));
+    await tester.pump(); // auto-play word starts
+    expect(texts, isNotEmpty);
+    // Finish auto-play of the headword so sentence listen can start.
+    gates.first.complete();
     await tester.pumpAndSettle();
     await tester.tap(find.byTooltip('听原句'));
     await tester.pump();
@@ -347,29 +358,22 @@ void main() {
           .onPressed,
       isNull,
     );
-    expect(texts, <String>[sources.first.english]);
-    await tester.ensureVisible(find.byKey(const Key('daily-review-reveal')));
-    await tester.tap(find.byKey(const Key('daily-review-reveal')));
-    await tester.pumpAndSettle();
-    await tester.ensureVisible(find.byKey(const Key('daily-review-rate-good')));
-    await tester.tap(find.byKey(const Key('daily-review-rate-good')));
-    await tester.pumpAndSettle();
-    expect(stops, 1);
+    expect(texts.last, sources.first.english);
+    await tapVisibleKey(tester, const Key('daily-review-reveal'));
+    await tapVisibleKey(tester, const Key('daily-review-rate-good'));
+    expect(stops, greaterThanOrEqualTo(1));
     expect(find.byTooltip('听原句'), findsOneWidget);
     expect(find.text('很高兴见到你。'), findsOneWidget);
     await tester.pumpWidget(const SizedBox.shrink());
   });
 
-  test('navigation places review between discovery and phrases', () {
+  test('navigation keeps review after discovery in primary IA', () {
     const List<AppNavDestination> nav = AppNavDestination.values;
     expect(
       nav.indexOf(AppNavDestination.review),
-      nav.indexOf(AppNavDestination.discover) + 1,
+      greaterThan(nav.indexOf(AppNavDestination.discover)),
     );
-    expect(
-      nav.indexOf(AppNavDestination.phrases),
-      nav.indexOf(AppNavDestination.review) + 1,
-    );
+    expect(AppNavDestination.phrases.showInBottomNav, isFalse);
   });
 
   for (final Size size in <Size>[const Size(390, 844), const Size(1366, 900)]) {
@@ -398,11 +402,7 @@ void main() {
         expect(find.text('hello'), findsNothing);
         expect(find.text('你好'), findsNothing);
         expect(find.byKey(const Key('daily-review-rate-good')), findsNothing);
-        await tester.ensureVisible(
-          find.byKey(const Key('daily-review-reveal')),
-        );
-        await tester.tap(find.byKey(const Key('daily-review-reveal')));
-        await tester.pumpAndSettle();
+        await tapVisibleKey(tester, const Key('daily-review-reveal'));
         expect(find.text('你好'), findsOneWidget);
         expect(find.text('没想起 · 重学'), findsOneWidget);
         expect(find.text('想对了，但吃力'), findsOneWidget);
@@ -411,11 +411,7 @@ void main() {
           container.read(dailyReviewProvider).records['entry:hello:recognize']!.reviews,
           0,
         );
-        await tester.ensureVisible(
-          find.byKey(const Key('daily-review-rate-good')),
-        );
-        await tester.tap(find.byKey(const Key('daily-review-rate-good')));
-        await tester.pumpAndSettle();
+        await tapVisibleKey(tester, const Key('daily-review-rate-good'));
         expect(
           container.read(dailyReviewProvider).records['entry:hello:recognize']!.reviews,
           1,
@@ -480,14 +476,8 @@ void main() {
       );
       await tester.tap(find.byKey(const Key('daily-review-previous')));
       await tester.pumpAndSettle();
-      await tester.ensureVisible(find.byKey(const Key('daily-review-reveal')));
-      await tester.tap(find.byKey(const Key('daily-review-reveal')));
-      await tester.pumpAndSettle();
-      await tester.ensureVisible(
-        find.byKey(const Key('daily-review-rate-good')),
-      );
-      await tester.tap(find.byKey(const Key('daily-review-rate-good')));
-      await tester.pumpAndSettle();
+      await tapVisibleKey(tester, const Key('daily-review-reveal'));
+      await tapVisibleKey(tester, const Key('daily-review-rate-good'));
       expect(find.text('已完成 1 / 2'), findsOneWidget);
       await tester.tap(find.byKey(const Key('daily-review-previous')));
       await tester.pumpAndSettle();
@@ -665,15 +655,8 @@ void main() {
       await tester.tap(find.byKey(const Key('daily-review-start')));
       await tester.pumpAndSettle();
       expect(find.text('正在复习'), findsOneWidget);
-      await tester.ensureVisible(find.byKey(const Key('daily-review-reveal')));
-      await tester.tap(find.byKey(const Key('daily-review-reveal')));
-      await tester.pumpAndSettle();
-      await tester.ensureVisible(
-        find.byKey(const Key('daily-review-rate-good')),
-      );
-      await tester.pumpAndSettle();
-      await tester.tap(find.byKey(const Key('daily-review-rate-good')));
-      await tester.pumpAndSettle();
+      await tapVisibleKey(tester, const Key('daily-review-reveal'));
+      await tapVisibleKey(tester, const Key('daily-review-rate-good'));
       final DailyReviewState state = container.read(dailyReviewProvider);
       expect(state.records['entry:hello:recognize']!.reviews, 2);
       expect(

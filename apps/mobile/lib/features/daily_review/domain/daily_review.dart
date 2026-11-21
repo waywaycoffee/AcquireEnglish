@@ -18,14 +18,30 @@ class ReviewSourceLink {
     required this.label,
     this.episodeId,
     this.time,
+    this.startMs,
+    this.endMs,
     this.english = '',
     this.chinese = '',
+    this.mediaKind = '',
   });
   final String label;
   final String? episodeId;
   final String? time;
+  final int? startMs;
+  final int? endMs;
   final String english;
   final String chinese;
+  /// 视频 / 文章 / 书籍 — used when a word hits multiple places.
+  final String mediaKind;
+
+  String get displayLabel {
+    final String kind = mediaKind.trim();
+    if (kind.isEmpty) return label;
+    if (label.startsWith('$kind · ') || label.startsWith('$kind ')) {
+      return label;
+    }
+    return '$kind · $label';
+  }
 }
 
 class ReviewSource {
@@ -73,8 +89,12 @@ class ReviewSource {
     final ReviewSourceLink? link = relatedSources
         .where(
           (ReviewSourceLink link) =>
-              (episode != null && link.episodeId == episode) ||
-              (label != null && link.label == label),
+              (episode != null &&
+                  episode.isNotEmpty &&
+                  link.episodeId == episode) ||
+              (label != null &&
+                  label.isNotEmpty &&
+                  (link.label == label || link.displayLabel == label)),
         )
         .firstOrNull;
     if (link == null) return this;
@@ -85,11 +105,11 @@ class ReviewSource {
       answer: answer,
       english: link.english.isEmpty ? english : link.english,
       chinese: link.chinese.isEmpty ? chinese : link.chinese,
-      sourceLabel: link.label,
+      sourceLabel: link.displayLabel,
       episodeId: link.episodeId,
       time: link.time,
-      startMs: startMs,
-      endMs: endMs,
+      startMs: link.startMs ?? startMs,
+      endMs: link.endMs ?? endMs,
       skillChapter: skillChapter,
       skillLevel: skillLevel,
       origin: origin,

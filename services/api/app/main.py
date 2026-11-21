@@ -200,3 +200,7 @@ async def health() -> dict[str, str]:
         "openlist": "configured" if settings.openlist_configured else "unset",
         "netdisk": "/api/netdisk",
     }
+
+# Public reading catalogs are cached by ECS for reliable domestic downloads.
+from app.routers import reading_source
+app.include_router(reading_source.router, prefix="/api")

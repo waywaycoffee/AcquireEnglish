@@ -5,6 +5,7 @@ import 'package:crypto/crypto.dart';
 import 'package:dio/dio.dart';
 import 'package:hive_ce/hive.dart';
 
+import '../../../constants/endpoints.dart';
 import '../domain/reading_doc.dart';
 import 'reading_ingest.dart';
 
@@ -35,54 +36,54 @@ class ReadingCatalogSource {
   final bool downloadable;
 }
 
-const List<ReadingCatalogSource> kReadingCatalogSources =
-    <ReadingCatalogSource>[
-      ReadingCatalogSource(
-        kind: ReadingCatalogKind.onestop,
-        title: 'OneStopEnglish',
-        subtitle: '新闻分级短文 · 初/中/高三档对齐',
-        licenseNote: 'CC BY-SA 4.0 · github.com/nishkalavallabhi/OneStopEnglishCorpus',
-      ),
-      ReadingCatalogSource(
-        kind: ReadingCatalogKind.cefr,
-        title: 'CEFR Levelled Texts',
-        subtitle: '约 1500 篇 A1–C2 短文（导入 Kaggle CSV 或加载缓存）',
-        licenseNote:
-            '数据集标 CC0；请从 Kaggle 下载 cefr_leveled_texts.csv 后导入。仅供个人学习。',
-        externalUrl:
-            'https://www.kaggle.com/datasets/amontgomerie/cefr-levelled-english-texts',
-      ),
-      ReadingCatalogSource(
-        kind: ReadingCatalogKind.magic,
-        title: 'Magic English Buddy',
-        subtitle: '儿童分级故事 L1–L7（按需下载）',
-        licenseNote: 'CC BY-NC-SA 4.0 · 非商用；署名分享一致。仅个人学习。',
-        externalUrl: 'https://github.com/xckevin/magic-english-buddy',
-      ),
-      ReadingCatalogSource(
-        kind: ReadingCatalogKind.standardebooks,
-        title: 'Standard Ebooks',
-        subtitle: '公版精排 EPUB · 新书 + 经典精选',
-        licenseNote: '文本公版；排版 CC0 · standardebooks.org',
-        externalUrl: 'https://standardebooks.org/ebooks',
-      ),
-      ReadingCatalogSource(
-        kind: ReadingCatalogKind.readseasy,
-        title: 'Readseasy',
-        subtitle: 'A2/B1/B2 简易分级读物站（外链打开）',
-        licenseNote: '第三方网站；请在站内按其条款下载 EPUB，再用「导入」加入书架。',
-        externalUrl: 'https://readseasy.com/library/english',
-        downloadable: false,
-      ),
-      ReadingCatalogSource(
-        kind: ReadingCatalogKind.clickbook,
-        title: 'ClickBook',
-        subtitle: '按 CEFR 词覆盖度整理的公版书目录（外链）',
-        licenseNote: '第三方目录（多为 Standard Ebooks）；外链浏览后可回 App 导入 EPUB。',
-        externalUrl: 'https://clickbook-ai.com/library/english.html',
-        downloadable: false,
-      ),
-    ];
+const List<ReadingCatalogSource>
+kReadingCatalogSources = <ReadingCatalogSource>[
+  ReadingCatalogSource(
+    kind: ReadingCatalogKind.onestop,
+    title: 'OneStopEnglish',
+    subtitle: '新闻分级短文 · 初/中/高三档对齐',
+    licenseNote:
+        'CC BY-SA 4.0 · github.com/nishkalavallabhi/OneStopEnglishCorpus',
+  ),
+  ReadingCatalogSource(
+    kind: ReadingCatalogKind.cefr,
+    title: 'CEFR Levelled Texts',
+    subtitle: '约 1500 篇 A1–C2 短文（导入 Kaggle CSV 或加载缓存）',
+    licenseNote: '数据集标 CC0；请从 Kaggle 下载 cefr_leveled_texts.csv 后导入。仅供个人学习。',
+    externalUrl:
+        'https://www.kaggle.com/datasets/amontgomerie/cefr-levelled-english-texts',
+  ),
+  ReadingCatalogSource(
+    kind: ReadingCatalogKind.magic,
+    title: 'Magic English Buddy',
+    subtitle: '儿童分级故事 L1–L7（按需下载）',
+    licenseNote: 'CC BY-NC-SA 4.0 · 非商用；署名分享一致。仅个人学习。',
+    externalUrl: 'https://github.com/xckevin/magic-english-buddy',
+  ),
+  ReadingCatalogSource(
+    kind: ReadingCatalogKind.standardebooks,
+    title: 'Standard Ebooks',
+    subtitle: '公版精排 EPUB · 新书 + 经典精选',
+    licenseNote: '文本公版；排版 CC0 · standardebooks.org',
+    externalUrl: 'https://standardebooks.org/ebooks',
+  ),
+  ReadingCatalogSource(
+    kind: ReadingCatalogKind.readseasy,
+    title: 'Readseasy',
+    subtitle: 'A2/B1/B2 简易分级读物站（外链打开）',
+    licenseNote: '第三方网站；请在站内按其条款下载 EPUB，再用「导入」加入书架。',
+    externalUrl: 'https://readseasy.com/library/english',
+    downloadable: false,
+  ),
+  ReadingCatalogSource(
+    kind: ReadingCatalogKind.clickbook,
+    title: 'ClickBook',
+    subtitle: '按 CEFR 词覆盖度整理的公版书目录（外链）',
+    licenseNote: '第三方目录（多为 Standard Ebooks）；外链浏览后可回 App 导入 EPUB。',
+    externalUrl: 'https://clickbook-ai.com/library/english.html',
+    downloadable: false,
+  ),
+];
 
 enum ReadingCatalogEntryKind { folder, article, ebook, external }
 
@@ -128,11 +129,7 @@ kStandardEbooksFeatured = <({String path, String title, String author})>[
     title: 'Frankenstein',
     author: 'Mary Shelley',
   ),
-  (
-    path: 'bram-stoker/dracula',
-    title: 'Dracula',
-    author: 'Bram Stoker',
-  ),
+  (path: 'bram-stoker/dracula', title: 'Dracula', author: 'Bram Stoker'),
   (
     path: 'lewis-carroll/alices-adventures-in-wonderland',
     title: 'Alice’s Adventures in Wonderland',
@@ -171,8 +168,9 @@ kStandardEbooksFeatured = <({String path, String title, String author})>[
 ];
 
 class ReadingCatalogClient {
-  ReadingCatalogClient({Dio? dio})
-    : _dio = dio ??
+  ReadingCatalogClient({Dio? dio, String apiBaseUrl = Endpoints.baseUrl})
+    : _dio =
+          dio ??
           Dio(
             BaseOptions(
               connectTimeout: const Duration(seconds: 20),
@@ -182,7 +180,27 @@ class ReadingCatalogClient {
                 'Accept': '*/*',
               },
             ),
-          );
+          ) {
+    if (dio == null) {
+      _dio.interceptors.add(
+        InterceptorsWrapper(
+          onRequest: (options, handler) {
+            final source = options.uri;
+            if (source.host == 'api.github.com' ||
+                source.host == 'raw.githubusercontent.com' ||
+                source.host == 'standardebooks.org') {
+              options.path = Uri.parse(Endpoints.normalizeBaseUrl(apiBaseUrl))
+                  .resolve('api/reading/source')
+                  .replace(queryParameters: {'url': source.toString()})
+                  .toString();
+              options.queryParameters = {};
+            }
+            handler.next(options);
+          },
+        ),
+      );
+    }
+  }
 
   static const String _cefrCacheKey = 'reading_cefr_catalog_v1';
   static const String _onestopApi =
@@ -258,8 +276,7 @@ class ReadingCatalogClient {
         return _downloadPlainText(
           entry: entry,
           sourceLabel: 'OneStopEnglish',
-          disclaimer:
-              '来自 OneStopEnglishCorpus（CC BY-SA 4.0），仅供个人学习。',
+          disclaimer: '来自 OneStopEnglishCorpus（CC BY-SA 4.0），仅供个人学习。',
         );
       case ReadingCatalogKind.magic:
         return _downloadMagicStory(entry);
@@ -420,7 +437,10 @@ class ReadingCatalogClient {
       final String itemPath = '${map['path'] ?? ''}';
       final String type = '${map['type'] ?? ''}';
       if (type != 'file' || !name.toLowerCase().endsWith('.txt')) continue;
-      final String title = name.replaceAll(RegExp(r'\.txt$', caseSensitive: false), '');
+      final String title = name.replaceAll(
+        RegExp(r'\.txt$', caseSensitive: false),
+        '',
+      );
       out.add(
         ReadingCatalogEntry(
           id: '$idPrefix:$itemPath',
@@ -435,8 +455,10 @@ class ReadingCatalogClient {
         ),
       );
     }
-    out.sort((ReadingCatalogEntry a, ReadingCatalogEntry b) =>
-        a.title.compareTo(b.title));
+    out.sort(
+      (ReadingCatalogEntry a, ReadingCatalogEntry b) =>
+          a.title.compareTo(b.title),
+    );
     return out;
   }
 
@@ -551,7 +573,8 @@ class ReadingCatalogClient {
     required String sourceLabel,
     required String disclaimer,
   }) async {
-    final String url = entry.downloadUrl ??
+    final String url =
+        entry.downloadUrl ??
         'https://raw.githubusercontent.com/nishkalavallabhi/OneStopEnglishCorpus/master/${entry.path.split('/').map(Uri.encodeComponent).join('/')}';
     final String text = (await _getString(url)).trim();
     if (text.isEmpty) throw StateError('正文为空');
@@ -600,10 +623,12 @@ class ReadingCatalogClient {
 
   Future<ReadingDoc> _downloadCefrCached(ReadingCatalogEntry entry) async {
     final List<Map<String, String>> items = _loadCefrCache();
-    final Map<String, String>? hit = items.cast<Map<String, String>?>().firstWhere(
-      (Map<String, String>? m) => m?['id'] == entry.id,
-      orElse: () => null,
-    );
+    final Map<String, String>? hit = items
+        .cast<Map<String, String>?>()
+        .firstWhere(
+          (Map<String, String>? m) => m?['id'] == entry.id,
+          orElse: () => null,
+        );
     if (hit == null || (hit['text'] ?? '').trim().isEmpty) {
       throw StateError('请先导入 cefr_leveled_texts.csv');
     }
@@ -664,7 +689,8 @@ class ReadingCatalogClient {
           options: Options(
             responseType: ResponseType.bytes,
             followRedirects: true,
-            validateStatus: (int? code) => code != null && code >= 200 && code < 400,
+            validateStatus: (int? code) =>
+                code != null && code >= 200 && code < 400,
           ),
         );
         final List<int>? data = response.data;
@@ -767,9 +793,7 @@ class ReadingCatalogClient {
   }
 
   static String _cefrTitle(String text, String label, int index) {
-    final String preview = text
-        .replaceAll(RegExp(r'\s+'), ' ')
-        .trim();
+    final String preview = text.replaceAll(RegExp(r'\s+'), ' ').trim();
     final String head = preview.length <= 42
         ? preview
         : '${preview.substring(0, 42)}…';
@@ -871,11 +895,8 @@ List<ReadingCatalogEntry> parseMagicStoriesIndex(
   String raw, {
   required String path,
 }) {
-  final String level = RegExp(
-        r'/l(\d+)',
-        caseSensitive: false,
-      ).firstMatch(path)?.group(1) ??
-      '';
+  final String level =
+      RegExp(r'/l(\d+)', caseSensitive: false).firstMatch(path)?.group(1) ?? '';
   final List<ReadingCatalogEntry> out = <ReadingCatalogEntry>[];
   // Stories have `level: N` right after id; quiz items use `type:` instead.
   // Without that anchor, `id: '…_q1' … title:` would skip into the next story.
@@ -916,7 +937,7 @@ List<ReadingCatalogEntry> parseMagicStoriesIndex(
 String _extractBalancedBracketBlock(String source, int openIndex) {
   if (openIndex < 0 ||
       openIndex >= source.length ||
-      source.codeUnitAt(openIndex) != 0x5B /* [ */) {
+      source.codeUnitAt(openIndex) != 0x5B /* [ */ ) {
     return '';
   }
   int depth = 0;

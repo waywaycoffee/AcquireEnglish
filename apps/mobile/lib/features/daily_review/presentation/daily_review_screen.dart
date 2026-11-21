@@ -47,6 +47,7 @@ import '../domain/weakest_rating.dart';
 import 'daily_review_provider.dart';
 import 'foundation_media_video_sheet.dart';
 import 'fsrs_sd_meter.dart';
+import 'review_source_context_panel.dart';
 import 'review_spelling_screen.dart';
 
 class DailyReviewScreen extends ConsumerStatefulWidget {
@@ -114,6 +115,8 @@ class _DailyReviewScreenState extends ConsumerState<DailyReviewScreen>
   bool _saving = false;
   ReviewKind? _overviewKind;
   final Map<String, fsrs.Rating> _sessionRatings = <String, fsrs.Rating>{};
+  /// Per-card override: episodeId (preferred) or related source label.
+  final Map<String, String> _contextPick = <String, String>{};
 
   bool _speaking = false;
   int _speechSequence = 0;
@@ -234,7 +237,8 @@ class _DailyReviewScreenState extends ConsumerState<DailyReviewScreen>
                 (source.sourceLabel == widget.sourceLabel ||
                     source.relatedSources.any(
                       (ReviewSourceLink link) =>
-                          link.label == widget.sourceLabel,
+                          link.label == widget.sourceLabel ||
+                          link.displayLabel == widget.sourceLabel,
                     ))),
       );
     }
@@ -1429,7 +1433,20 @@ class _DailyReviewScreenState extends ConsumerState<DailyReviewScreen>
     return modes[_modeStep.clamp(0, modes.length - 1)];
   }
 
-  Widget _buildStudy(ReviewSource source, ReviewRecord record) {
+  ReviewSource _displaySource(ReviewSource source) {
+    final String? pick = _contextPick[source.key]?.trim();
+    if (pick == null || pick.isEmpty) return source;
+    final bool asEpisode = source.relatedSources.any(
+      (ReviewSourceLink link) => link.episodeId == pick,
+    );
+    return source.forContext(
+      episode: asEpisode ? pick : null,
+      label: asEpisode ? null : pick,
+    );
+  }
+
+  Widget _buildStudy(ReviewSource rawSource, ReviewRecord record) {
+    final ReviewSource source = _displaySource(rawSource);
     final WordReviewSettings options = ref.watch(wordReviewSettingsProvider);
     final bool word = source.kind == ReviewKind.word;
     final WordPracticeMode mode = _currentMode(source);
@@ -1546,13 +1563,9 @@ class _DailyReviewScreenState extends ConsumerState<DailyReviewScreen>
             ),
             const SizedBox(height: 18),
             if (word &&
-                !_revealed &&
-                !listenStage &&
-                !useCloze &&
-                !contrastStage)
+                (_revealed ||
+                    (!listenStage && !useCloze && !contrastStage)))
               _wordPhonicsSurface(source.question, expandByDefault: false)
-            else if (word && _revealed)
-              _wordPhonicsSurface(source.question, expandByDefault: true)
             else
               SelectableText(
                 frontText,
@@ -1566,19 +1579,35 @@ class _DailyReviewScreenState extends ConsumerState<DailyReviewScreen>
                   color: AppDesignTokens.textPrimary,
                 ),
               ),
-            const SizedBox(height: 20),
+            if (word &&
+                (source.english.trim().isNotEmpty ||
+                    (source.episodeId?.trim().isNotEmpty ?? false) ||
+                    source.sourceLabel.trim().isNotEmpty)) ...<Widget>[
+              const SizedBox(height: 14),
+              ReviewSourceContextPanel(
+                source: source,
+                word: source.question,
+                speaking: _speaking,
+                compact: !_revealed,
+                // Cloze / listen / contrast: keep source + clip, hide sentence.
+                hideSentence: !_revealed &&
+                    (useCloze || listenStage || contrastStage),
+                onSpeakSentence: () => _speakSource(source),
+                onSelectRelatedSource: (ReviewSourceLink link) {
+                  setState(() {
+                    final String? episode = link.episodeId?.trim();
+                    _contextPick[rawSource.key] =
+                        (episode != null && episode.isNotEmpty)
+                            ? episode
+                            : link.label;
+                  });
+                },
+              ),
+            ],
+            const SizedBox(height: 16),
             Row(
               children: <Widget>[
-                Expanded(
-                  child: Text(
-                    '${source.sourceLabel}${source.time == null ? '' : ' · ${source.time}'}',
-                    style: TextStyle(
-                      fontSize: 12,
-                      height: 1.5,
-                      color: AppDesignTokens.textSecondary,
-                    ),
-                  ),
-                ),
+                const Spacer(),
                 if (word)
                   IconButton(
                     tooltip: '播放单词发音',
@@ -1607,22 +1636,6 @@ class _DailyReviewScreenState extends ConsumerState<DailyReviewScreen>
                     tooltip: '看真人示范视频',
                     onPressed: () => unawaited(_openFoundationVideo(source)),
                     icon: const Icon(Icons.face_retouching_natural_rounded),
-                  ),
-                if (source.episodeId != null)
-                  IconButton(
-                    tooltip: '回到原视频',
-                    onPressed: () => context.pushNamed(
-                      SGRoute.player.name,
-                      pathParameters: <String, String>{
-                        'episodeId': source.episodeId!,
-                      },
-                      queryParameters: <String, String>{
-                        if (source.time != null) 'startTime': source.time!,
-                        'autoplay': '1',
-                        'loop': 'sentence',
-                      },
-                    ),
-                    icon: const Icon(Icons.ondemand_video_outlined),
                   ),
                 PopupMenuButton<String>(
                   tooltip: '更多操作',
@@ -1819,7 +1832,9 @@ class _DailyReviewScreenState extends ConsumerState<DailyReviewScreen>
                     ),
                   ),
               ],
-              if (source.answer != source.english &&
+              // Word cards already show subtitle example in ReviewSourceContextPanel.
+              if (!word &&
+                  source.answer != source.english &&
                   source.english.isNotEmpty) ...<Widget>[
                 const SizedBox(height: 16),
                 Text(

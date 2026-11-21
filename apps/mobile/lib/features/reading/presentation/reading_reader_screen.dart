@@ -4,6 +4,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:hive_ce/hive.dart';
+import 'package:media_kit/media_kit.dart';
+import '../../sync/data/acquire_api_client.dart';
 
 import '../../authentication/presentation/account_storage.dart';
 import '../../daily_review/data/word_encounter_store.dart';
@@ -68,7 +70,8 @@ class _ReadingReaderScreenState extends ConsumerState<ReadingReaderScreen> {
   ReadingTtsGender _ttsGender = ReadingTtsGender.female;
   int? _highlightWordIndex;
   int _continuousGeneration = 0;
-  Timer? _highlightTimer;
+  Player? _readingAudio;
+  Completer<void>? _readingDone;
   String? _glossDocId;
   int _glossThreshold = -1;
   int _glossListsSig = -1;
@@ -109,7 +112,8 @@ class _ReadingReaderScreenState extends ConsumerState<ReadingReaderScreen> {
   @override
   void dispose() {
     _continuousGeneration += 1;
-    _highlightTimer?.cancel();
+    if (_readingDone?.isCompleted == false) _readingDone!.complete();
+    unawaited(_readingAudio?.stop());
     _saveDebounce?.cancel();
     _scroll.dispose();
     super.dispose();
@@ -129,10 +133,7 @@ class _ReadingReaderScreenState extends ConsumerState<ReadingReaderScreen> {
     await prefs.put(kReadingTtsGenderKey, _ttsGender.storageValue);
   }
 
-  Future<void> _speakReading(
-    String text, {
-    double? rate,
-  }) {
+  Future<void> _speakReading(String text, {double? rate}) {
     return speakReadingText(
       ref,
       text,
@@ -142,16 +143,31 @@ class _ReadingReaderScreenState extends ConsumerState<ReadingReaderScreen> {
   }
 
   Future<void> _toggleTtsGender() async {
-    setState(() {
-      _ttsGender = _ttsGender == ReadingTtsGender.female
-          ? ReadingTtsGender.male
-          : ReadingTtsGender.female;
-    });
-    await saveReadingTtsGender(_ttsGender);
-    if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('朗读音色：${_ttsGender.labelCn}（阿里云）')),
+    final selected = await showModalBottomSheet<ReadingTtsGender>(
+      context: context,
+      builder: (context) => SafeArea(
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              for (final voice in ReadingTtsGender.values)
+                ListTile(
+                  title: Text(voice.labelCn),
+                  trailing: voice == _ttsGender
+                      ? const Icon(Icons.check)
+                      : null,
+                  onTap: () => Navigator.pop(context, voice),
+                ),
+            ],
+          ),
+        ),
+      ),
     );
+    if (selected == null || !mounted) return;
+    await _stopContinuous();
+    if (!mounted) return;
+    setState(() => _ttsGender = selected);
+    await saveReadingTtsGender(selected);
   }
 
   double get _effectiveRate {
@@ -161,7 +177,8 @@ class _ReadingReaderScreenState extends ConsumerState<ReadingReaderScreen> {
 
   Future<void> _stopContinuous() async {
     _continuousGeneration += 1;
-    _highlightTimer?.cancel();
+    if (_readingDone?.isCompleted == false) _readingDone!.complete();
+    unawaited(_readingAudio?.stop());
     await ref.read(wordPronunciationServiceProvider).stop();
     if (!mounted) return;
     setState(() {
@@ -180,35 +197,56 @@ class _ReadingReaderScreenState extends ConsumerState<ReadingReaderScreen> {
     if (units.isEmpty) return;
     setState(() => _continuousPlaying = true);
     final double rate = _effectiveRate;
-    final int msPerWord = estimatedMsPerWord(rate);
+    final player = Player();
+    _readingAudio = player;
     try {
-      for (final ReadingSpeakUnit unit in units) {
+      for (final unit in units) {
         if (!mounted || generation != _continuousGeneration) return;
-        int local = 0;
-        setState(() => _highlightWordIndex = unit.firstWordIndex);
-        _highlightTimer?.cancel();
-        _highlightTimer = Timer.periodic(Duration(milliseconds: msPerWord), (
-          Timer t,
-        ) {
-          if (!mounted || generation != _continuousGeneration) {
-            t.cancel();
-            return;
-          }
-          local += 1;
-          if (local >= unit.wordCount) {
-            t.cancel();
-            return;
-          }
-          setState(
-            () => _highlightWordIndex = unit.firstWordIndex + local,
-          );
+        final url = await ref
+            .read(acquireApiClientProvider)
+            .readingSpeech(unit.text, _ttsGender.aliyunVoiceId);
+        if (!mounted || generation != _continuousGeneration) return;
+        final done = Completer<void>();
+        _readingDone = done;
+        final completed = player.stream.completed.listen((value) {
+          if (value && !done.isCompleted) done.complete();
         });
-        await _speakReading(unit.text, rate: rate);
-        _highlightTimer?.cancel();
-        if (!mounted || generation != _continuousGeneration) return;
+        final errors = player.stream.error.listen((error) {
+          if (!done.isCompleted) done.completeError(StateError(error));
+        });
+        final position = player.stream.position.listen((position) {
+          if (!mounted || generation != _continuousGeneration) {
+            if (!done.isCompleted) done.complete();
+            return;
+          }
+          final duration = player.state.duration.inMilliseconds;
+          if (duration <= 0) return;
+          // Relative word positions are estimated within the real audio duration.
+          final local = (position.inMilliseconds / duration * unit.wordCount)
+              .floor()
+              .clamp(0, unit.wordCount - 1);
+          setState(() => _highlightWordIndex = unit.firstWordIndex + local);
+        });
+        try {
+          await player.open(Media(url));
+          await player.setRate(rate);
+          await done.future.timeout(const Duration(minutes: 3));
+        } finally {
+          if (identical(_readingDone, done)) _readingDone = null;
+          await completed.cancel();
+          await errors.cancel();
+          await position.cancel();
+        }
+      }
+    } catch (_) {
+      if (mounted && generation == _continuousGeneration) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('阿里云朗读暂不可用，请检查网络后重试')));
       }
     } finally {
-      _highlightTimer?.cancel();
+      if (identical(_readingAudio, player)) _readingAudio = null;
+      await player.dispose();
       if (mounted && generation == _continuousGeneration) {
         setState(() {
           _continuousPlaying = false;
@@ -219,8 +257,9 @@ class _ReadingReaderScreenState extends ConsumerState<ReadingReaderScreen> {
   }
 
   Future<void> _openMouthVideo(String lexeme) async {
-    final FoundationMediaManifest manifest =
-        await ref.read(foundationMediaManifestProvider.future);
+    final FoundationMediaManifest manifest = await ref.read(
+      foundationMediaManifestProvider.future,
+    );
     final String key = normalizeWord(lexeme);
     FoundationMediaItem? hit;
     for (final String book in const <String>[
@@ -246,9 +285,9 @@ class _ReadingReaderScreenState extends ConsumerState<ReadingReaderScreen> {
     }
     if (!mounted) return;
     if (hit == null || !(hit.hasVideo)) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('暂无该词/音素的口型视频（需已上传到服务器）')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('暂无该词/音素的口型视频（需已上传到服务器）')));
       return;
     }
     await showFoundationMediaVideoSheet(
@@ -282,10 +321,12 @@ class _ReadingReaderScreenState extends ConsumerState<ReadingReaderScreen> {
     _glossListsSig = listsSig;
     if (mounted) setState(() => _glossLoading = true);
     try {
-      final ReadingFrequencyLexicon lexicon =
-          await ref.read(readingFrequencyLexiconProvider.future);
-      final OfflineWordDictionary dictionary =
-          ref.read(offlineWordDictionaryProvider);
+      final ReadingFrequencyLexicon lexicon = await ref.read(
+        readingFrequencyLexiconProvider.future,
+      );
+      final OfflineWordDictionary dictionary = ref.read(
+        offlineWordDictionaryProvider,
+      );
       final Set<String> known = effectiveKnownWords(
         lists: lists,
         learned: learned,
@@ -327,16 +368,14 @@ class _ReadingReaderScreenState extends ConsumerState<ReadingReaderScreen> {
     if (url == null || url.isEmpty || _playingRemote) return;
     setState(() => _playingRemote = true);
     try {
-      await ref.read(wordPronunciationServiceProvider).speak(
-            item.key,
-            recordedUrl: url,
-            allowSynthesisFallback: false,
-          );
+      await ref
+          .read(wordPronunciationServiceProvider)
+          .speak(item.key, recordedUrl: url, allowSynthesisFallback: false);
     } catch (_) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('朗读音频暂不可用（需已上传到服务器）')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('朗读音频暂不可用（需已上传到服务器）')));
       }
     } finally {
       if (mounted) setState(() => _playingRemote = false);
@@ -351,11 +390,13 @@ class _ReadingReaderScreenState extends ConsumerState<ReadingReaderScreen> {
       final double offset = _scroll.offset;
       final double percent = max <= 0 ? 1.0 : (offset / max).clamp(0.0, 1.0);
       unawaited(
-        ref.read(readingLibraryProvider.notifier).updateProgress(
-          docId: doc.id,
-          offsetChars: (percent * doc.plainText.length).round(),
-          percent: percent,
-        ),
+        ref
+            .read(readingLibraryProvider.notifier)
+            .updateProgress(
+              docId: doc.id,
+              offsetChars: (percent * doc.plainText.length).round(),
+              percent: percent,
+            ),
       );
     });
   }
@@ -384,7 +425,9 @@ class _ReadingReaderScreenState extends ConsumerState<ReadingReaderScreen> {
     unawaited(_recordLearnedContext(lexeme, sentence));
     if (!mounted) return;
     final String fallback =
-        _hardGlosses[normalizeWord(lexeme)] ?? _hardGlosses[lexeme.toLowerCase()] ?? '';
+        _hardGlosses[normalizeWord(lexeme)] ??
+        _hardGlosses[lexeme.toLowerCase()] ??
+        '';
     await showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
@@ -467,23 +510,24 @@ class _ReadingReaderScreenState extends ConsumerState<ReadingReaderScreen> {
                     unawaited(_speakReading(lexeme));
                   },
                   onFavorite: (String? definitionCn) {
-                    final bool ok =
-                        ref.read(wordBookProvider.notifier).addFavoriteWord(
-                              rawWord: lexeme,
-                              episodeId: doc.episodeId ?? 'reading:${doc.id}',
-                              course: '阅读 · ${doc.title}',
-                              episode: doc.episodeTitle.isEmpty
-                                  ? doc.title
-                                  : doc.episodeTitle,
-                              time: '',
-                              lineKey: 'reading:${doc.id}:$lexeme',
-                              sentence: sentence,
-                              chinese: '',
-                              generatedDefinition:
-                                  (definitionCn ?? '').trim().isEmpty
-                                      ? null
-                                      : definitionCn!.trim(),
-                            );
+                    final bool ok = ref
+                        .read(wordBookProvider.notifier)
+                        .addFavoriteWord(
+                          rawWord: lexeme,
+                          episodeId: doc.episodeId ?? 'reading:${doc.id}',
+                          course: '阅读 · ${doc.title}',
+                          episode: doc.episodeTitle.isEmpty
+                              ? doc.title
+                              : doc.episodeTitle,
+                          time: '',
+                          lineKey: 'reading:${doc.id}:$lexeme',
+                          sentence: sentence,
+                          chinese: '',
+                          generatedDefinition:
+                              (definitionCn ?? '').trim().isEmpty
+                              ? null
+                              : definitionCn!.trim(),
+                        );
                     Navigator.pop(ctx);
                     ScaffoldMessenger.of(context).showSnackBar(
                       SnackBar(
@@ -505,8 +549,11 @@ class _ReadingReaderScreenState extends ConsumerState<ReadingReaderScreen> {
     required int start,
     required int end,
   }) async {
-    final ({int start, int end, String text}) bounds =
-        sentenceBounds(doc.plainText, start, end);
+    final ({int start, int end, String text}) bounds = sentenceBounds(
+      doc.plainText,
+      start,
+      end,
+    );
     final String sentence = bounds.text;
     if (sentence.isEmpty) return;
     setState(() => _focusedSentence = sentence);
@@ -514,7 +561,9 @@ class _ReadingReaderScreenState extends ConsumerState<ReadingReaderScreen> {
     String? zh;
     if (_sentenceTranslate) {
       try {
-        zh = await ref.read(wordLookupServiceProvider).translateSentence(
+        zh = await ref
+            .read(wordLookupServiceProvider)
+            .translateSentence(
               sentence: sentence,
               settings: ref.read(learningSettingsProvider),
             );
@@ -555,7 +604,10 @@ class _ReadingReaderScreenState extends ConsumerState<ReadingReaderScreen> {
                 style: TextStyle(fontWeight: FontWeight.w800, fontSize: 16),
               ),
               const SizedBox(height: 8),
-              Text(sentence, style: const TextStyle(height: 1.45, fontSize: 16)),
+              Text(
+                sentence,
+                style: const TextStyle(height: 1.45, fontSize: 16),
+              ),
               if ((zh ?? '').trim().isNotEmpty) ...<Widget>[
                 const SizedBox(height: 10),
                 Text(
@@ -604,9 +656,7 @@ class _ReadingReaderScreenState extends ConsumerState<ReadingReaderScreen> {
                     );
                   }
                 },
-                child: Text(
-                  _sentenceTranslate ? '句译：开（点此关闭）' : '句译：关（点此开启）',
-                ),
+                child: Text(_sentenceTranslate ? '句译：开（点此关闭）' : '句译：关（点此开启）'),
               ),
               if (_soeEnabled) ...<Widget>[
                 const SizedBox(height: 12),
@@ -633,7 +683,9 @@ class _ReadingReaderScreenState extends ConsumerState<ReadingReaderScreen> {
   void _addHardWordsToBook(ReadingDoc doc) {
     int added = 0;
     for (final MapEntry<String, String> e in _hardGlosses.entries.take(25)) {
-      final bool ok = ref.read(wordBookProvider.notifier).addFavoriteWord(
+      final bool ok = ref
+          .read(wordBookProvider.notifier)
+          .addFavoriteWord(
             rawWord: e.key,
             episodeId: doc.episodeId ?? 'reading:${doc.id}',
             course: '阅读难词 · ${doc.title}',
@@ -688,8 +740,7 @@ class _ReadingReaderScreenState extends ConsumerState<ReadingReaderScreen> {
                     divisions: kReadingFreqThresholdBands.length - 1,
                     label: '$_freqThreshold',
                     onChanged: (double v) {
-                      final int next =
-                          kReadingFreqThresholdBands[v.round()];
+                      final int next = kReadingFreqThresholdBands[v.round()];
                       setModal(() => _freqThreshold = next);
                       setState(() {
                         _freqThreshold = next;
@@ -764,10 +815,12 @@ class _ReadingReaderScreenState extends ConsumerState<ReadingReaderScreen> {
 
     final bool showChinese = _mode.showInlineChinese;
     final Color bg = _dark ? const Color(0xFF1C1C1E) : const Color(0xFFF7F3E9);
-    final Color fg =
-        _dark ? const Color(0xFFF2F2F7) : AppDesignTokens.textPrimary;
-    final AsyncValue<FoundationMediaManifest> mediaAsync =
-        ref.watch(readingContentMediaProvider);
+    final Color fg = _dark
+        ? const Color(0xFFF2F2F7)
+        : AppDesignTokens.textPrimary;
+    final AsyncValue<FoundationMediaManifest> mediaAsync = ref.watch(
+      readingContentMediaProvider,
+    );
     final FoundationMediaItem? remoteMedia = mediaAsync.maybeWhen(
       data: (FoundationMediaManifest m) =>
           readingMediaForDoc(m, doc.id) ??
@@ -775,8 +828,10 @@ class _ReadingReaderScreenState extends ConsumerState<ReadingReaderScreen> {
           readingMediaForDoc(m, doc.sourceLabel),
       orElse: () => null,
     );
-    final SubtitleChunkHighlighter? chunks =
-        ref.watch(readingChunkHighlighterProvider).asData?.value;
+    final SubtitleChunkHighlighter? chunks = ref
+        .watch(readingChunkHighlighterProvider)
+        .asData
+        ?.value;
     final Set<String> learned = ref.watch(learnedVocabularyProvider);
     final String rateLabel = _unknownRate == null
         ? ''
@@ -795,7 +850,8 @@ class _ReadingReaderScreenState extends ConsumerState<ReadingReaderScreen> {
         leading: PadBackButton(onPressed: () => context.pop()),
         actions: <Widget>[
           IconButton(
-            tooltip: '切换为${_ttsGender == ReadingTtsGender.female ? '男声' : '女声'}',
+            tooltip:
+                '切换为${_ttsGender == ReadingTtsGender.female ? '男声' : '女声'}',
             onPressed: () => unawaited(_toggleTtsGender()),
             icon: Icon(
               _ttsGender == ReadingTtsGender.female
@@ -811,9 +867,7 @@ class _ReadingReaderScreenState extends ConsumerState<ReadingReaderScreen> {
               _continuousPlaying
                   ? Icons.stop_circle_outlined
                   : Icons.play_circle_outline_rounded,
-              color: _continuousPlaying
-                  ? AppDesignTokens.brandGreenDark
-                  : null,
+              color: _continuousPlaying ? AppDesignTokens.brandGreenDark : null,
             ),
           ),
           IconButton(
@@ -898,10 +952,7 @@ class _ReadingReaderScreenState extends ConsumerState<ReadingReaderScreen> {
                 value: 'freq',
                 child: Text('词频阈值 / 名单'),
               ),
-              const PopupMenuItem<String>(
-                value: 'lists',
-                child: Text('黑白名单'),
-              ),
+              const PopupMenuItem<String>(value: 'lists', child: Text('黑白名单')),
               if (_hardGlosses.isNotEmpty)
                 const PopupMenuItem<String>(
                   value: 'hard',
@@ -913,10 +964,7 @@ class _ReadingReaderScreenState extends ConsumerState<ReadingReaderScreen> {
                   enabled: !_playingRemote,
                   child: Text(_playingRemote ? '朗读中…' : '服务器朗读'),
                 ),
-              const PopupMenuItem<String>(
-                value: 'font',
-                child: Text('字号'),
-              ),
+              const PopupMenuItem<String>(value: 'font', child: Text('字号')),
               PopupMenuItem<String>(
                 value: 'theme',
                 child: Text(_dark ? '浅色' : '深色'),
@@ -947,131 +995,154 @@ class _ReadingReaderScreenState extends ConsumerState<ReadingReaderScreen> {
               controller: _scroll,
               padding: const EdgeInsets.fromLTRB(22, 12, 22, 40),
               child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: <Widget>[
-                Center(
-                  child: SizedBox(
-                    width: 100,
-                    child: ReadingBookCover(title: doc.title, level: doc.level),
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: <Widget>[
+                  Center(
+                    child: SizedBox(
+                      width: 100,
+                      child: ReadingBookCover(
+                        title: doc.title,
+                        level: doc.level,
+                      ),
+                    ),
                   ),
-                ),
-                const SizedBox(height: 24),
-                Text(doc.title, textAlign: TextAlign.center,
-                  style: TextStyle(fontSize: 26, height: 1.25,
-                    fontFamily: 'Georgia', color: fg, fontWeight: FontWeight.w600)),
-                const SizedBox(height: 8),
-                Text('${doc.level} · ${doc.wordCount} words', textAlign: TextAlign.center,
-                  style: TextStyle(color: fg.withValues(alpha: 0.6), fontSize: 12)),
-                const SizedBox(height: 28),
-                if (_mode.showChunkLegend || showChinese)
-                  Padding(
-                    padding: const EdgeInsets.only(bottom: 10),
-                    child: Wrap(
-                      spacing: 8,
-                      runSpacing: 6,
-                      crossAxisAlignment: WrapCrossAlignment.center,
-                      children: <Widget>[
-                        if (_mode.showChunkLegend) ...<Widget>[
-                          _LegendChip(
-                            color: SubtitleChunkHighlighter.legendColor(
-                              SubtitleChunkKind.phrase,
+                  const SizedBox(height: 24),
+                  Text(
+                    doc.title,
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontSize: 26,
+                      height: 1.25,
+                      fontFamily: 'Georgia',
+                      color: fg,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    '${doc.level} · ${doc.wordCount} words',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      color: fg.withValues(alpha: 0.6),
+                      fontSize: 12,
+                    ),
+                  ),
+                  const SizedBox(height: 28),
+                  if (_mode.showChunkLegend || showChinese)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 10),
+                      child: Wrap(
+                        spacing: 8,
+                        runSpacing: 6,
+                        crossAxisAlignment: WrapCrossAlignment.center,
+                        children: <Widget>[
+                          if (_mode.showChunkLegend) ...<Widget>[
+                            _LegendChip(
+                              color: SubtitleChunkHighlighter.legendColor(
+                                SubtitleChunkKind.phrase,
+                              ),
+                              label: '词组',
+                              dark: _dark,
                             ),
-                            label: '词组',
-                            dark: _dark,
-                          ),
-                          _LegendChip(
-                            color: SubtitleChunkHighlighter.legendColor(
-                              SubtitleChunkKind.chunk,
+                            _LegendChip(
+                              color: SubtitleChunkHighlighter.legendColor(
+                                SubtitleChunkKind.chunk,
+                              ),
+                              label: '语块',
+                              dark: _dark,
                             ),
-                            label: '语块',
-                            dark: _dark,
-                          ),
-                          _LegendChip(
-                            color: SubtitleChunkHighlighter.legendColor(
-                              SubtitleChunkKind.usage,
+                            _LegendChip(
+                              color: SubtitleChunkHighlighter.legendColor(
+                                SubtitleChunkKind.usage,
+                              ),
+                              label: '用法',
+                              dark: _dark,
                             ),
-                            label: '用法',
-                            dark: _dark,
+                          ],
+                          Text(
+                            showChinese
+                                ? (_glossLoading
+                                      ? '难词释义加载中…'
+                                      : '词下灰字 = 词频>$_freqThreshold · 双击语块 · 长按整句')
+                                : '沉浸模式 · 点词/双击语块/长按整句',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: _dark
+                                  ? const Color(0xFF9A9AA2)
+                                  : const Color(0xFF6B6B76),
+                            ),
                           ),
                         ],
-                        Text(
-                          showChinese
-                              ? (_glossLoading
-                                  ? '难词释义加载中…'
-                                  : '词下灰字 = 词频>$_freqThreshold · 双击语块 · 长按整句')
-                              : '沉浸模式 · 点词/双击语块/长按整句',
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: _dark
-                                ? const Color(0xFF9A9AA2)
-                                : const Color(0xFF6B6B76),
-                          ),
-                        ),
-                      ],
+                      ),
+                    ),
+                  Text.rich(
+                    TextSpan(
+                      children: buildReadingTextSpans(
+                        text: doc.plainText,
+                        textColor: fg,
+                        fontSize: _fontSize,
+                        lineHeight: _lineHeight,
+                        dark: _dark,
+                        showChinese: showChinese,
+                        showChunks: true,
+                        learnedWords: learned,
+                        hardGlosses: _hardGlosses,
+                        chunkHighlighter: chunks,
+                        onWordTap: (String word, int start, int end) {
+                          final String sentence = sentenceBounds(
+                            doc.plainText,
+                            start,
+                            end,
+                          ).text;
+                          unawaited(
+                            _showLookupCard(
+                              doc: doc,
+                              rawLexeme: word,
+                              sentence: sentence,
+                            ),
+                          );
+                        },
+                        onWordLongPress: (String word, int start, int end) {
+                          unawaited(
+                            _onSentenceLongPress(
+                              doc: doc,
+                              start: start,
+                              end: end,
+                            ),
+                          );
+                        },
+                        onChunkDoubleTap: (String phrase, int start, int end) {
+                          final String sentence = sentenceBounds(
+                            doc.plainText,
+                            start,
+                            end,
+                          ).text;
+                          unawaited(
+                            _showLookupCard(
+                              doc: doc,
+                              rawLexeme: phrase,
+                              sentence: sentence,
+                            ),
+                          );
+                        },
+                        onChunkLongPress: (String phrase, int start, int end) {
+                          unawaited(
+                            _onSentenceLongPress(
+                              doc: doc,
+                              start: start,
+                              end: end,
+                            ),
+                          );
+                        },
+                        highlightWordIndex: _highlightWordIndex,
+                      ),
                     ),
                   ),
-                Text.rich(
-                  TextSpan(
-                    children: buildReadingTextSpans(
-                      text: doc.plainText,
-                      textColor: fg,
-                      fontSize: _fontSize,
-                      lineHeight: _lineHeight,
-                      dark: _dark,
-                      showChinese: showChinese,
-                      showChunks: true,
-                      learnedWords: learned,
-                      hardGlosses: _hardGlosses,
-                      chunkHighlighter: chunks,
-                      onWordTap: (String word, int start, int end) {
-                        final String sentence =
-                            sentenceBounds(doc.plainText, start, end).text;
-                        unawaited(
-                          _showLookupCard(
-                            doc: doc,
-                            rawLexeme: word,
-                            sentence: sentence,
-                          ),
-                        );
-                      },
-                      onWordLongPress: (String word, int start, int end) {
-                        unawaited(
-                          _onSentenceLongPress(
-                            doc: doc,
-                            start: start,
-                            end: end,
-                          ),
-                        );
-                      },
-                      onChunkDoubleTap: (String phrase, int start, int end) {
-                        final String sentence =
-                            sentenceBounds(doc.plainText, start, end).text;
-                        unawaited(
-                          _showLookupCard(
-                            doc: doc,
-                            rawLexeme: phrase,
-                            sentence: sentence,
-                          ),
-                        );
-                      },
-                      onChunkLongPress: (String phrase, int start, int end) {
-                        unawaited(
-                          _onSentenceLongPress(
-                            doc: doc,
-                            start: start,
-                            end: end,
-                          ),
-                        );
-                      },
-                      highlightWordIndex: _highlightWordIndex,
-                    ),
-                  ),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
         ),
-      ),
       ),
     );
   }
