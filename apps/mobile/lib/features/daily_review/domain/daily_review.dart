@@ -18,12 +18,16 @@ class ReviewSourceLink {
     required this.label,
     this.episodeId,
     this.time,
+    this.startMs,
+    this.endMs,
     this.english = '',
     this.chinese = '',
   });
   final String label;
   final String? episodeId;
   final String? time;
+  final int? startMs;
+  final int? endMs;
   final String english;
   final String chinese;
 }
@@ -88,8 +92,8 @@ class ReviewSource {
       sourceLabel: link.label,
       episodeId: link.episodeId,
       time: link.time,
-      startMs: startMs,
-      endMs: endMs,
+      startMs: link.startMs ?? startMs,
+      endMs: link.endMs ?? endMs,
       skillChapter: skillChapter,
       skillLevel: skillLevel,
       origin: origin,

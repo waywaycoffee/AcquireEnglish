@@ -170,6 +170,20 @@ reviewSourcesProvider = Provider<List<ReviewSource>>((Ref ref) {
   ]);
 });
 
+ReviewSourceLink _linkFromOccurrence(WordOccurrence item) {
+  final WordContext? ctx = item.contexts.firstOrNull;
+  final List<String> parts = (ctx?.lineKey ?? '').split('-');
+  return ReviewSourceLink(
+    label: '${item.course} · ${item.episode}',
+    episodeId: item.episodeId,
+    time: ctx?.time ?? item.time,
+    startMs: parts.isNotEmpty ? int.tryParse(parts.first) : null,
+    endMs: parts.length > 1 ? int.tryParse(parts[1]) : null,
+    english: ctx?.sentence ?? item.sentence,
+    chinese: ctx?.chinese ?? item.chinese,
+  );
+}
+
 ReviewSource _wordReviewSource(WordEntry word, WordPracticeMode mode) {
   final WordOccurrence? occurrence = word.occurrences.firstOrNull;
   final WordContext? context = occurrence?.contexts.firstOrNull;
@@ -202,13 +216,7 @@ ReviewSource _wordReviewSource(WordEntry word, WordPracticeMode mode) {
     cardType: mode.name,
     relatedSources: <ReviewSourceLink>[
       for (final WordOccurrence item in word.occurrences)
-        ReviewSourceLink(
-          label: '${item.course} · ${item.episode}',
-          episodeId: item.episodeId,
-          time: item.contexts.firstOrNull?.time ?? item.time,
-          english: item.contexts.firstOrNull?.sentence ?? item.sentence,
-          chinese: item.contexts.firstOrNull?.chinese ?? item.chinese,
-        ),
+        _linkFromOccurrence(item),
     ],
     episodeId: occurrence?.episodeId,
     time: context?.time ?? occurrence?.time,
