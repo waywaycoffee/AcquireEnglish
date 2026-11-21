@@ -100,6 +100,10 @@ class Endpoints {
   static String syllabusBook(String bookId) =>
       'api/syllabus/books/${Uri.encodeComponent(bookId)}';
 
+  /// Aliyun DashScope (Qwen Audio) TTS — voices list + speech synthesis.
+  static const String readingVoices = 'api/reading/voices';
+  static const String readingSpeech = 'api/reading/speech';
+
   /// Kept for Dio header compatibility; AcquireEnglish API ignores it.
   static const String apiKey = '';
 }

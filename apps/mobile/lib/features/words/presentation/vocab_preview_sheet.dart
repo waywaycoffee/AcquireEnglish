@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../shared/data/word_pronunciation_service.dart';
 import '../../shared/presentation/pad/app_design_tokens.dart';
+import 'widgets/phonics_syllable_blocks.dart';
 import 'word_book_provider.dart';
 
 /// Preview a newly collected word before enrolling it into FSRS.
@@ -89,12 +90,10 @@ class _VocabPreviewSheetState extends ConsumerState<VocabPreviewSheet> {
             Row(
               children: <Widget>[
                 Expanded(
-                  child: Text(
-                    entry.word,
-                    style: const TextStyle(
-                      fontSize: 28,
-                      fontWeight: FontWeight.w900,
-                    ),
+                  child: ColoredVowelHeadword(
+                    word: entry.word,
+                    fontSize: 28,
+                    textAlign: TextAlign.start,
                   ),
                 ),
                 IconButton(
@@ -119,6 +118,23 @@ class _VocabPreviewSheetState extends ConsumerState<VocabPreviewSheet> {
               gloss.isEmpty ? '暂无释义，可稍后再补。' : gloss,
               style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
             ),
+            const SizedBox(height: 12),
+            PhonicsCoachPanel(
+              word: entry.word,
+              speaking: _speaking,
+              onSpeak: _speak,
+            ),
+            if (sentence.isNotEmpty) ...<Widget>[
+              const SizedBox(height: 10),
+              Align(
+                alignment: Alignment.centerLeft,
+                child: TextButton.icon(
+                  onPressed: _speaking ? null : () => _speak(sentence),
+                  icon: const Icon(Icons.record_voice_over_outlined, size: 18),
+                  label: const Text('听主例句（云端音色）'),
+                ),
+              ),
+            ],
             if (entry.senses.length > 1) ...<Widget>[
               const SizedBox(height: 8),
               Text(

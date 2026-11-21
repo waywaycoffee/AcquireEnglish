@@ -30,9 +30,11 @@ import '../../sync/data/study_activity_service.dart';
 import '../../phrases/presentation/phrase_book_provider.dart';
 import '../../words/domain/foundation_media.dart';
 import '../../words/domain/vocab_entry.dart';
+import '../../words/domain/word_morphology.dart';
 import '../../words/domain/word_review_settings.dart';
 import '../../words/presentation/foundation_media_provider.dart';
 import '../../words/presentation/vocabulary_placement_provider.dart';
+import '../../words/presentation/widgets/phonics_syllable_blocks.dart';
 import '../../words/presentation/word_book_provider.dart';
 import '../../words/presentation/word_review_settings_provider.dart';
 import '../../words/presentation/word_review_settings_sheet.dart';
@@ -44,6 +46,7 @@ import '../domain/daily_review.dart';
 import '../domain/weakest_rating.dart';
 import 'daily_review_provider.dart';
 import 'foundation_media_video_sheet.dart';
+import 'fsrs_sd_meter.dart';
 import 'review_spelling_screen.dart';
 
 class DailyReviewScreen extends ConsumerStatefulWidget {
@@ -687,7 +690,9 @@ class _DailyReviewScreenState extends ConsumerState<DailyReviewScreen>
               compact ? 12 : 32,
               16,
               compact ? 12 : 32,
-              28,
+              // Leave room for the sticky prev/next bar so grade buttons
+              // remain hittable after ensureVisible scrolls.
+              96,
             ),
             children: <Widget>[
               Center(
@@ -1426,6 +1431,10 @@ class _DailyReviewScreenState extends ConsumerState<DailyReviewScreen>
     final WordPracticeMode mode = _currentMode(source);
     final bool speakStage = word && mode == WordPracticeMode.speak;
     final bool listenStage = word && mode == WordPracticeMode.listen;
+    final bool contrastStage = word && mode == WordPracticeMode.contrast;
+    final List<ConfusablePair> contrastPairs = contrastStage
+        ? confusablePairsFor(source.question)
+        : const <ConfusablePair>[];
     final bool skill = source.kind == ReviewKind.skill;
     final List<String> skillChoices = skill &&
             source.skillLevel != null &&
@@ -1453,10 +1462,13 @@ class _DailyReviewScreenState extends ConsumerState<DailyReviewScreen>
         word &&
         !speakStage &&
         !listenStage &&
+        !contrastStage &&
         source.english.trim().isNotEmpty &&
         sentenceContainsWord(source.english, source.question);
     final String frontText = listenStage && !_revealed
         ? '♪ 听音识词'
+        : contrastStage && !_revealed
+        ? '辨异：选出正确用法对应的词'
         : speakStage
         ? source.question
         : useCloze && !_revealed
@@ -1518,6 +1530,8 @@ class _DailyReviewScreenState extends ConsumerState<DailyReviewScreen>
             Text(
               speakStage
                   ? '听示范后跟读，再自评发音把握'
+                  : contrastStage
+                  ? '对比易混词，分清形近 / 义近差异'
                   : useCloze && !_revealed
                   ? '根据原句回忆被挖空的单词'
                   : source.answer != source.english
@@ -1527,18 +1541,25 @@ class _DailyReviewScreenState extends ConsumerState<DailyReviewScreen>
               style: TextStyle(fontSize: 14, color: Color(0xFF626262)),
             ),
             const SizedBox(height: 18),
-            SelectableText(
-              frontText,
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                fontSize: source.kind == ReviewKind.word
-                    ? (useCloze && !_revealed ? 22 : 34)
-                    : 25,
-                height: 1.45,
-                fontWeight: FontWeight.w800,
-                color: AppDesignTokens.textPrimary,
+            if (word &&
+                !_revealed &&
+                !listenStage &&
+                !useCloze &&
+                !contrastStage)
+              ColoredVowelHeadword(word: source.question)
+            else
+              SelectableText(
+                frontText,
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: source.kind == ReviewKind.word
+                      ? (useCloze && !_revealed ? 22 : 34)
+                      : 25,
+                  height: 1.45,
+                  fontWeight: FontWeight.w800,
+                  color: AppDesignTokens.textPrimary,
+                ),
               ),
-            ),
             const SizedBox(height: 20),
             Row(
               children: <Widget>[
@@ -1557,6 +1578,14 @@ class _DailyReviewScreenState extends ConsumerState<DailyReviewScreen>
                     tooltip: '播放单词发音',
                     onPressed: _speaking ? null : () => _playWord(source),
                     icon: const Icon(Icons.volume_up_rounded),
+                  ),
+                if (word)
+                  IconButton(
+                    tooltip: '分音节与自然拼读',
+                    onPressed: () => unawaited(
+                      _showPhonicsSheet(source.question, record),
+                    ),
+                    icon: const Icon(Icons.spa_outlined),
                   ),
                 IconButton(
                   tooltip: _speaking ? '正在朗读' : '听原句',
@@ -1672,7 +1701,41 @@ class _DailyReviewScreenState extends ConsumerState<DailyReviewScreen>
                   child: LinearProgressIndicator(),
                 ),
             ] else if (!_revealed && !completed) ...<Widget>[
-              if (listenStage) ...<Widget>[
+              if (contrastStage) ...<Widget>[
+                Text(
+                  '目标词与易混项',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                    color: AppDesignTokens.textSecondary,
+                  ),
+                ),
+                const SizedBox(height: 10),
+                for (final String option in _contrastOptions(
+                  source.question,
+                  contrastPairs,
+                ))
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 8),
+                    child: OutlinedButton(
+                      onPressed: () {
+                        if (option.toLowerCase() ==
+                            source.question.trim().toLowerCase()) {
+                          setState(() => _revealed = true);
+                        } else {
+                          _markUnknown(source);
+                        }
+                      },
+                      child: Text(option),
+                    ),
+                  ),
+                if (contrastPairs.isEmpty)
+                  TextButton(
+                    onPressed: () => setState(() => _revealed = true),
+                    child: const Text('暂无易混对，直接看解析'),
+                  ),
+              ] else if (listenStage) ...<Widget>[
                 FilledButton.tonalIcon(
                   onPressed: _speaking ? null : () => _playWord(source),
                   icon: const Icon(Icons.hearing_rounded),
@@ -1717,6 +1780,9 @@ class _DailyReviewScreenState extends ConsumerState<DailyReviewScreen>
                 ),
             ] else ...<Widget>[
               const Divider(height: 24),
+              if (word)
+                ColoredVowelHeadword(word: source.question, fontSize: 28),
+              if (word) const SizedBox(height: 8),
               Text(
                 source.answer.trim().isEmpty
                     ? '暂无单词释义，可以结合下方原句回忆，或在单词本补充。'
@@ -1731,6 +1797,22 @@ class _DailyReviewScreenState extends ConsumerState<DailyReviewScreen>
                   color: AppDesignTokens.textPrimary,
                 ),
               ),
+              if (contrastStage && contrastPairs.isNotEmpty) ...<Widget>[
+                const SizedBox(height: 12),
+                for (final ConfusablePair pair in contrastPairs)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 8),
+                    child: Text(
+                      '${source.question} ↔ ${pair.foil}\n${pair.hintCn}',
+                      style: TextStyle(
+                        fontSize: 14,
+                        height: 1.45,
+                        fontWeight: FontWeight.w600,
+                        color: AppDesignTokens.textSecondary,
+                      ),
+                    ),
+                  ),
+              ],
               if (source.answer != source.english &&
                   source.english.isNotEmpty) ...<Widget>[
                 const SizedBox(height: 16),
@@ -2671,13 +2753,10 @@ class _DailyReviewScreenState extends ConsumerState<DailyReviewScreen>
         _speaking)
       return;
     final String? url = entry?.audioUrl;
-    if (url == null) {
-      // Fall back to TTS for foundation / pattern cards without lexicon audio.
-      if (source.key.startsWith('syllabus:')) {
-        await _speak(source.question);
-        return;
-      }
-      if (!silent) _message('词库发音暂不可用。');
+    if (url == null || url.isEmpty) {
+      // Auto-prefetch stays quiet without lexicon audio; manual play uses TTS.
+      if (silent) return;
+      await _speak(source.question);
       return;
     }
     setState(() => _speaking = true);
@@ -2686,16 +2765,64 @@ class _DailyReviewScreenState extends ConsumerState<DailyReviewScreen>
       await _speech!.speak(
         source.question,
         recordedUrl: url,
-        allowSynthesisFallback: false,
+        allowSynthesisFallback: !silent,
+        forceCloud: !silent,
       );
     } catch (_) {
       if (mounted && sequence == _speechSequence && !silent) {
-        _message('词库发音暂不可用。');
+        _message('发音暂不可用，请检查网络或本地 TTS。');
       }
     } finally {
       if (mounted && sequence == _speechSequence)
         setState(() => _speaking = false);
     }
+  }
+
+  List<String> _contrastOptions(String target, List<ConfusablePair> pairs) {
+    final List<String> options = <String>[target.trim()];
+    for (final ConfusablePair pair in pairs) {
+      if (!options.any(
+        (String o) => o.toLowerCase() == pair.foil.toLowerCase(),
+      )) {
+        options.add(pair.foil);
+      }
+    }
+    if (options.length < 2) {
+      options.add('${target.trim()}e');
+    }
+    options.shuffle();
+    return options;
+  }
+
+  Future<void> _showPhonicsSheet(String word, ReviewRecord record) async {
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      showDragHandle: true,
+      builder: (BuildContext context) {
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 20),
+            child: SingleChildScrollView(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: <Widget>[
+                  ColoredVowelHeadword(word: word, fontSize: 28),
+                  const SizedBox(height: 12),
+                  PhonicsCoachPanel(
+                    word: word,
+                    speaking: _speaking,
+                    onSpeak: (String text) => _speak(text),
+                  ),
+                  const SizedBox(height: 12),
+                  FsrsSdMeter(record: record),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+    );
   }
 
   Future<void> _speakSource(ReviewSource source) async {

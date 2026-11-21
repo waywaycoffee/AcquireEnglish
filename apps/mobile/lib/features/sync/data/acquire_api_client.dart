@@ -1871,6 +1871,46 @@ class AcquireApiClient {
     return FoundationMediaManifest.empty;
   }
 
+  /// Aliyun DashScope voice catalog (`configured` false when server key missing).
+  Future<Map<String, dynamic>> readingVoices() async {
+    final Response<dynamic> response = await _dio.get(Endpoints.readingVoices);
+    final Object? data = response.data;
+    if (data is Map<String, dynamic>) return data;
+    if (data is Map) return Map<String, dynamic>.from(data);
+    return <String, dynamic>{
+      'voices': <String>[],
+      'labels': <String, String>{},
+      'configured': false,
+    };
+  }
+
+  /// Synthesize [text] with an Aliyun English voice; returns absolute audio URL
+  /// cached on ECS under `/media/reading/speech/…`.
+  Future<String> readingSpeech(String text, String voice) async {
+    final Response<dynamic> response = await _dio.post(
+      Endpoints.readingSpeech,
+      data: <String, dynamic>{
+        'text': text,
+        'voice': voice,
+      },
+      options: Options(
+        receiveTimeout: const Duration(seconds: 45),
+        extra: const <String, Object>{
+          'dio_cache_interceptor_force_refresh': true,
+        },
+      ),
+    );
+    final Object? data = response.data;
+    final Map<String, dynamic> json = data is Map<String, dynamic>
+        ? data
+        : Map<String, dynamic>.from(data as Map);
+    final String url = (json['audio_url'] as String? ?? '').trim();
+    if (url.isEmpty) {
+      throw StateError('阿里云配音未返回音频地址');
+    }
+    return url;
+  }
+
   Future<FoundationMediaItem?> contentMediaLookup({
     required String bookId,
     required String key,

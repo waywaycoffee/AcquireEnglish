@@ -6,16 +6,22 @@ import 'package:flutter_tts/flutter_tts.dart';
 import 'package:media_kit/media_kit.dart';
 
 import '../../settings/presentation/settings_provider.dart';
+import 'aliyun_speech_service.dart';
 
 final Provider<WordPronunciationService> wordPronunciationServiceProvider =
     Provider<WordPronunciationService>((Ref ref) {
       final LearningSettingsState settings = ref.watch(
         learningSettingsProvider,
       );
+      final AliyunSpeechService aliyun = ref.watch(aliyunSpeechServiceProvider);
       return WordPronunciationService(
         selectedEngine: settings.ttsEngine,
         selectedVoice: settings.ttsVoice,
         selectedRate: settings.ttsRate,
+        preferAliyunCloud: settings.preferAliyunTts,
+        cloudAudioResolver: aliyun.isAvailable
+            ? aliyun.resolveAudioUrl
+            : null,
       );
     });
 
@@ -56,6 +62,8 @@ class WordPronunciationService {
     this.selectedEngine = '',
     this.selectedVoice = '',
     this.selectedRate = _defaultPronunciationSpeechRate,
+    this.preferAliyunCloud = true,
+    this.cloudAudioResolver,
     WordPronunciationTtsClient? ttsClient,
   }) : _ttsClient = ttsClient ?? WordPronunciationTtsClient();
 
@@ -64,6 +72,9 @@ class WordPronunciationService {
   final String selectedEngine;
   final String selectedVoice;
   final double selectedRate;
+  /// Prefer Aliyun (DashScope) human voices via ECS-cached MP3 when available.
+  final bool preferAliyunCloud;
+  final Future<String?> Function(String text)? cloudAudioResolver;
   final WordPronunciationTtsClient _ttsClient;
 
   Player? _recordedPlayer;
@@ -75,6 +86,7 @@ class WordPronunciationService {
     String? recordedUrl,
     bool allowSynthesisFallback = true,
     double? rate,
+    bool forceCloud = false,
   }) async {
     if (speakOverride != null) {
       await speakOverride!(text);
@@ -87,6 +99,17 @@ class WordPronunciationService {
     }
 
     if (recordedUrl != null && await _playRecording(recordedUrl)) return;
+
+    final bool tryCloud =
+        cloudAudioResolver != null && (preferAliyunCloud || forceCloud);
+    if (tryCloud) {
+      final String? cloudUrl = await cloudAudioResolver!(normalizedText);
+      if (cloudUrl != null &&
+          cloudUrl.isNotEmpty &&
+          await _playRecording(cloudUrl)) {
+        return;
+      }
+    }
 
     if (!allowSynthesisFallback) {
       throw const WordPronunciationException('词库发音暂不可用。');

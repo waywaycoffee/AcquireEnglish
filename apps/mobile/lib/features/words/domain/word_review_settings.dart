@@ -11,6 +11,9 @@ enum WordPracticeMode {
 
   /// Listen + shadow the pronunciation (发音跟读).
   speak,
+
+  /// Confusable / near-miss discrimination (辨异).
+  contrast,
 }
 
 extension WordPracticeModeX on WordPracticeMode {
@@ -19,6 +22,7 @@ extension WordPracticeModeX on WordPracticeMode {
     WordPracticeMode.listen => '听音',
     WordPracticeMode.spell => '拼写',
     WordPracticeMode.speak => '发音跟读',
+    WordPracticeMode.contrast => '辨异',
   };
 
   String get hint => switch (this) {
@@ -26,6 +30,7 @@ extension WordPracticeModeX on WordPracticeMode {
     WordPracticeMode.listen => '只听发音，识别单词与释义',
     WordPracticeMode.spell => '根据中文释义默写英文单词',
     WordPracticeMode.speak => '听示范后跟读，再自评',
+    WordPracticeMode.contrast => '对比易混词，分清形义差异',
   };
 
   static WordPracticeMode? tryParse(String? raw) {
@@ -38,6 +43,8 @@ extension WordPracticeModeX on WordPracticeMode {
         return WordPracticeMode.spell;
       case 'speak':
         return WordPracticeMode.speak;
+      case 'contrast':
+        return WordPracticeMode.contrast;
       default:
         return null;
     }

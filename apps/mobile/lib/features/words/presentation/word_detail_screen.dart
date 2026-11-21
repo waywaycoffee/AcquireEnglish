@@ -327,7 +327,7 @@ class _WordDetailDialogState extends ConsumerState<WordDetailDialog> {
                     publicEntry: _publicEntry,
                     loading: _loadingOfflineDefinition,
                     speaking: _speakingText == entry.word,
-                    onSpeak: () => _speak(entry.word),
+                    onSpeak: _speak,
                     onFavorite: () => ref
                         .read(wordBookProvider.notifier)
                         .toggleFavorite(entry.word),
@@ -358,6 +358,12 @@ class _WordDetailDialogState extends ConsumerState<WordDetailDialog> {
                       return Column(
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: <Widget>[
+                          PhonicsCoachPanel(
+                            word: entry.word,
+                            speaking: _speakingText != null,
+                            onSpeak: _speak,
+                          ),
+                          const SizedBox(height: 16),
                           RootsAffixesCard(
                             affixes: morph.affixes,
                             aiText: entry.rootsAffixesCn ?? '',
@@ -457,7 +463,7 @@ class _WordHeader extends StatelessWidget {
   final WordLookupEntry? publicEntry;
   final bool loading;
   final bool speaking;
-  final VoidCallback onSpeak;
+  final Future<void> Function(String text) onSpeak;
   final VoidCallback onFavorite;
 
   @override
@@ -473,16 +479,19 @@ class _WordHeader extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: <Widget>[
-              Text(
-                entry.word,
-                style: TextStyle(
-                  fontSize: 30,
-                  fontWeight: FontWeight.w900,
-                  color: AppDesignTokens.textPrimary,
-                ),
+              ColoredVowelHeadword(
+                word: entry.word,
+                fontSize: 30,
+                textAlign: TextAlign.start,
               ),
               const SizedBox(height: 10),
-              PhonicsSyllableBlocks(word: entry.word, compact: true),
+              PhonicsSyllableBlocks(
+                word: entry.word,
+                compact: true,
+                onSegmentTap: (PhonicsSegment seg) {
+                  onSpeak(seg.text);
+                },
+              ),
               Padding(
                 padding: const EdgeInsets.only(top: 8),
                 child: Text(
@@ -527,7 +536,7 @@ class _WordHeader extends StatelessWidget {
         ),
         IconButton(
           tooltip: '播放单词发音',
-          onPressed: speaking ? null : onSpeak,
+          onPressed: speaking ? null : () => onSpeak(entry.word),
           icon: Icon(
             speaking ? Icons.volume_up_rounded : Icons.volume_up_outlined,
           ),

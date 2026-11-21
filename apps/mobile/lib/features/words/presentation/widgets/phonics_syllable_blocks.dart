@@ -2,16 +2,62 @@ import 'package:flutter/material.dart';
 
 import '../../domain/word_morphology.dart';
 
+/// Headword with vowel letters tinted for natural-phonics awareness.
+class ColoredVowelHeadword extends StatelessWidget {
+  const ColoredVowelHeadword({
+    required this.word,
+    this.fontSize = 34,
+    this.textAlign = TextAlign.center,
+    super.key,
+  });
+
+  final String word;
+  final double fontSize;
+  final TextAlign textAlign;
+
+  @override
+  Widget build(BuildContext context) {
+    final String raw = word.trim();
+    if (raw.isEmpty) return const SizedBox.shrink();
+    final List<InlineSpan> spans = <InlineSpan>[];
+    for (int i = 0; i < raw.length; i++) {
+      final String ch = raw[i];
+      final bool vowel = isVowelLetter(
+        ch,
+        prev: i > 0 ? raw[i - 1] : null,
+      );
+      spans.add(
+        TextSpan(
+          text: ch,
+          style: TextStyle(
+            fontSize: fontSize,
+            height: 1.2,
+            fontWeight: FontWeight.w900,
+            letterSpacing: 0.4,
+            color: vowel ? const Color(0xFF1D4ED8) : const Color(0xFF111827),
+          ),
+        ),
+      );
+    }
+    return Text.rich(
+      TextSpan(children: spans),
+      textAlign: textAlign,
+    );
+  }
+}
+
 /// Colored syllable / phonics blocks under a headword.
 class PhonicsSyllableBlocks extends StatelessWidget {
   const PhonicsSyllableBlocks({
     required this.word,
     this.compact = false,
+    this.onSegmentTap,
     super.key,
   });
 
   final String word;
   final bool compact;
+  final ValueChanged<PhonicsSegment>? onSegmentTap;
 
   @override
   Widget build(BuildContext context) {
@@ -24,7 +70,7 @@ class PhonicsSyllableBlocks extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: <Widget>[
         Text(
-          compact ? '自然拼读' : '自然拼读 · 音节色块',
+          compact ? '自然拼读' : '自然拼读 · 音节色块（元音加亮）',
           style: TextStyle(
             fontSize: compact ? 12 : 13,
             fontWeight: FontWeight.w800,
@@ -37,29 +83,38 @@ class PhonicsSyllableBlocks extends StatelessWidget {
           runSpacing: 6,
           children: <Widget>[
             for (final PhonicsSegment seg in segments)
-              Container(
-                padding: EdgeInsets.symmetric(
-                  horizontal: compact ? 8 : 10,
-                  vertical: compact ? 4 : 6,
-                ),
-                decoration: BoxDecoration(
-                  color: Color(kPhonicsPalette[seg.colorIndex]),
+              Material(
+                color: Color(kPhonicsPalette[seg.colorIndex]),
+                borderRadius: BorderRadius.circular(10),
+                child: InkWell(
                   borderRadius: BorderRadius.circular(10),
-                  border: Border.all(
-                    color: Colors.black.withValues(alpha: 0.06),
-                  ),
-                ),
-                child: Text(
-                  seg.text,
-                  style: TextStyle(
-                    fontSize: compact ? 16 : 20,
-                    fontWeight: seg.kind == 'vowel'
-                        ? FontWeight.w900
-                        : FontWeight.w700,
-                    letterSpacing: 0.3,
-                    color: seg.kind == 'vowel'
-                        ? const Color(0xFF1D4ED8)
-                        : const Color(0xFF111827),
+                  onTap: onSegmentTap == null
+                      ? null
+                      : () => onSegmentTap!(seg),
+                  child: Container(
+                    padding: EdgeInsets.symmetric(
+                      horizontal: compact ? 8 : 10,
+                      vertical: compact ? 4 : 6,
+                    ),
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(
+                        color: Colors.black.withValues(alpha: 0.06),
+                      ),
+                    ),
+                    child: Text(
+                      seg.text,
+                      style: TextStyle(
+                        fontSize: compact ? 16 : 20,
+                        fontWeight: seg.kind == 'vowel'
+                            ? FontWeight.w900
+                            : FontWeight.w700,
+                        letterSpacing: 0.3,
+                        color: seg.kind == 'vowel'
+                            ? const Color(0xFF1D4ED8)
+                            : const Color(0xFF111827),
+                      ),
+                    ),
                   ),
                 ),
               ),
@@ -77,6 +132,152 @@ class PhonicsSyllableBlocks extends StatelessWidget {
           ),
         ],
       ],
+    );
+  }
+}
+
+/// Step-by-step natural phonics coach with optional cloud/human audio.
+class PhonicsCoachPanel extends StatefulWidget {
+  const PhonicsCoachPanel({
+    required this.word,
+    required this.onSpeak,
+    this.speaking = false,
+    super.key,
+  });
+
+  final String word;
+  final Future<void> Function(String text) onSpeak;
+  final bool speaking;
+
+  @override
+  State<PhonicsCoachPanel> createState() => _PhonicsCoachPanelState();
+}
+
+class _PhonicsCoachPanelState extends State<PhonicsCoachPanel> {
+  int _step = 0;
+  bool _busy = false;
+
+  List<PhonicsGuideStep> get _steps => buildPhonicsGuideSteps(widget.word);
+
+  Future<void> _playCurrent() async {
+    if (_busy || widget.speaking) return;
+    final List<PhonicsGuideStep> steps = _steps;
+    if (steps.isEmpty) return;
+    setState(() => _busy = true);
+    try {
+      await widget.onSpeak(steps[_step.clamp(0, steps.length - 1)].text);
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  Future<void> _playAll() async {
+    if (_busy || widget.speaking) return;
+    final List<PhonicsGuideStep> steps = _steps;
+    if (steps.isEmpty) return;
+    setState(() => _busy = true);
+    try {
+      for (int i = 0; i < steps.length; i++) {
+        if (!mounted) return;
+        setState(() => _step = i);
+        await widget.onSpeak(steps[i].text);
+        await Future<void>.delayed(const Duration(milliseconds: 280));
+      }
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final List<PhonicsGuideStep> steps = _steps;
+    if (steps.isEmpty) return const SizedBox.shrink();
+    final PhonicsGuideStep current = steps[_step.clamp(0, steps.length - 1)];
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: const Color(0xFFEFF6FF),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFFBFDBFE)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: <Widget>[
+          const Text(
+            '自然拼读引导',
+            style: TextStyle(fontWeight: FontWeight.w900, fontSize: 15),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            '按音节拼出来，再连成整词；点色块或步骤可听真人/云端发音。',
+            style: TextStyle(
+              fontSize: 12,
+              height: 1.4,
+              color: Colors.grey.shade700,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          const SizedBox(height: 10),
+          PhonicsSyllableBlocks(
+            word: widget.word,
+            onSegmentTap: (PhonicsSegment seg) {
+              if (_busy || widget.speaking) return;
+              widget.onSpeak(seg.text);
+            },
+          ),
+          const SizedBox(height: 12),
+          Text(
+            '步骤 ${_step + 1}/${steps.length} · ${current.labelCn}',
+            style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 13),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            current.text,
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              fontSize: current.isWholeWord ? 28 : 24,
+              fontWeight: FontWeight.w900,
+              color: current.isWholeWord
+                  ? const Color(0xFF1D4ED8)
+                  : const Color(0xFF111827),
+            ),
+          ),
+          const SizedBox(height: 10),
+          Row(
+            children: <Widget>[
+              IconButton(
+                tooltip: '上一步',
+                onPressed: _step <= 0 || _busy
+                    ? null
+                    : () => setState(() => _step -= 1),
+                icon: const Icon(Icons.skip_previous_rounded),
+              ),
+              Expanded(
+                child: FilledButton.tonalIcon(
+                  onPressed: _busy || widget.speaking ? null : _playCurrent,
+                  icon: const Icon(Icons.volume_up_rounded),
+                  label: const Text('听这一拍'),
+                ),
+              ),
+              IconButton(
+                tooltip: '下一步',
+                onPressed: _step >= steps.length - 1 || _busy
+                    ? null
+                    : () => setState(() => _step += 1),
+                icon: const Icon(Icons.skip_next_rounded),
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          OutlinedButton.icon(
+            onPressed: _busy || widget.speaking ? null : _playAll,
+            icon: const Icon(Icons.play_circle_outline_rounded),
+            label: const Text('完整拼读一遍'),
+          ),
+        ],
+      ),
     );
   }
 }

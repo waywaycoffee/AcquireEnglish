@@ -278,6 +278,8 @@ class LearningSettingsState {
     required this.ttsEngine,
     required this.ttsVoice,
     required this.ttsRate,
+    this.preferAliyunTts = true,
+    this.cloudTtsVoice = '',
     this.cloudApiBaseUrl = '',
     this.oralCoachBackend = '视频陪练管线',
     this.oralCoachServerUrl = defaultLiveTalkingUrlPublic,
@@ -329,6 +331,8 @@ class LearningSettingsState {
       ttsEngine: '',
       ttsVoice: '',
       ttsRate: 0.75,
+      preferAliyunTts: true,
+      cloudTtsVoice: '',
     );
   }
 
@@ -365,6 +369,10 @@ class LearningSettingsState {
   final String ttsEngine;
   final String ttsVoice;
   final double ttsRate;
+  /// Prefer Aliyun DashScope human voices (ECS-cached) over device TTS.
+  final bool preferAliyunTts;
+  /// Aliyun voice id; empty → Olivia Lin default on the client.
+  final String cloudTtsVoice;
   /// Empty → use compile-time [Endpoints.baseUrl] (`API_BASE`).
   final String cloudApiBaseUrl;
   final String oralCoachBackend;
@@ -498,6 +506,8 @@ class LearningSettingsState {
     String? ttsEngine,
     String? ttsVoice,
     double? ttsRate,
+    bool? preferAliyunTts,
+    String? cloudTtsVoice,
     String? cloudApiBaseUrl,
     String? oralCoachBackend,
     String? oralCoachServerUrl,
@@ -547,6 +557,8 @@ class LearningSettingsState {
       ttsEngine: ttsEngine ?? this.ttsEngine,
       ttsVoice: ttsVoice ?? this.ttsVoice,
       ttsRate: ttsRate ?? this.ttsRate,
+      preferAliyunTts: preferAliyunTts ?? this.preferAliyunTts,
+      cloudTtsVoice: cloudTtsVoice ?? this.cloudTtsVoice,
       cloudApiBaseUrl: cloudApiBaseUrl ?? this.cloudApiBaseUrl,
       oralCoachBackend: oralCoachBackend ?? this.oralCoachBackend,
       oralCoachServerUrl: oralCoachServerUrl ?? this.oralCoachServerUrl,
@@ -725,6 +737,10 @@ class LearningSettingsNotifier extends Notifier<LearningSettingsState> {
         ttsEngine: _stringOrNull(json['ttsEngine']),
         ttsVoice: _stringOrNull(json['ttsVoice']),
         ttsRate: _doubleOrNull(json['ttsRate']),
+        preferAliyunTts: json['preferAliyunTts'] is bool
+            ? json['preferAliyunTts'] as bool
+            : null,
+        cloudTtsVoice: _stringOrNull(json['cloudTtsVoice']),
         cloudApiBaseUrl: _stringOrNull(json['cloudApiBaseUrl']),
         oralCoachBackend: oralCoachBackendOptions.contains(
               json['oralCoachBackend'],
@@ -1126,6 +1142,16 @@ class LearningSettingsNotifier extends Notifier<LearningSettingsState> {
     _persist();
   }
 
+  void setPreferAliyunTts({required bool value}) {
+    state = state.copyWith(preferAliyunTts: value);
+    _persist();
+  }
+
+  void setCloudTtsVoice(String value) {
+    state = state.copyWith(cloudTtsVoice: value.trim());
+    _persist();
+  }
+
   void setCloudApiBaseUrl(String value) {
     state = state.copyWith(
       cloudApiBaseUrl: fixCurlhairaiTypoHost(value.trim()),
@@ -1305,6 +1331,8 @@ class LearningSettingsNotifier extends Notifier<LearningSettingsState> {
           'ttsEngine': state.ttsEngine,
           'ttsVoice': state.ttsVoice,
           'ttsRate': state.ttsRate,
+          'preferAliyunTts': state.preferAliyunTts,
+          'cloudTtsVoice': state.cloudTtsVoice,
           'cloudApiBaseUrl': state.cloudApiBaseUrl,
           'oralCoachBackend': state.oralCoachBackend,
           'oralCoachServerUrl': state.oralCoachServerUrl,

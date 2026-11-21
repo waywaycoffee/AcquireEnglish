@@ -222,6 +222,70 @@ MorphologyInsight analyzeWordMorphology(String raw) {
   );
 }
 
+/// Confusable / near-miss pairs for contrast cards (lemma → foil lemmas).
+class ConfusablePair {
+  const ConfusablePair({
+    required this.foil,
+    required this.hintCn,
+  });
+
+  final String foil;
+  final String hintCn;
+}
+
+List<ConfusablePair> confusablePairsFor(String raw) {
+  final String word = raw.trim().toLowerCase().replaceAll(RegExp(r"[^a-z']"), '');
+  if (word.isEmpty) return const <ConfusablePair>[];
+  final List<ConfusablePair>? direct = _kConfusables[word];
+  if (direct != null && direct.isNotEmpty) {
+    return direct;
+  }
+  return const <ConfusablePair>[];
+}
+
+/// Natural-phonics coach steps: each syllable then the whole word.
+class PhonicsGuideStep {
+  const PhonicsGuideStep({
+    required this.text,
+    required this.labelCn,
+    required this.isWholeWord,
+  });
+
+  final String text;
+  final String labelCn;
+  final bool isWholeWord;
+}
+
+List<PhonicsGuideStep> buildPhonicsGuideSteps(String raw) {
+  final String word = raw.trim();
+  if (word.isEmpty) return const <PhonicsGuideStep>[];
+  final List<String> syllables = splitEnglishSyllables(word);
+  final List<PhonicsGuideStep> steps = <PhonicsGuideStep>[];
+  for (int i = 0; i < syllables.length; i++) {
+    steps.add(
+      PhonicsGuideStep(
+        text: syllables[i],
+        labelCn: syllables.length == 1
+            ? '整词拼读'
+            : '第 ${i + 1} 拍 · 按自然拼读读出',
+        isWholeWord: false,
+      ),
+    );
+  }
+  if (syllables.length > 1) {
+    steps.add(
+      PhonicsGuideStep(
+        text: word,
+        labelCn: '连起来 · 读完整单词',
+        isWholeWord: true,
+      ),
+    );
+  }
+  return steps;
+}
+
+bool isVowelLetter(String ch, {String? prev}) => _isVowel(ch, prev: prev);
+
 bool _isVowel(String ch, {String? prev}) {
   final String c = ch.toLowerCase();
   if ('aeiou'.contains(c)) {
@@ -365,4 +429,80 @@ const Map<String, String> _kEtymologyHints = <String, String>{
   'dictionary': '拉丁 dictio「词语 / 说话」相关，后指词典。',
   'structure': '拉丁 struere「建造」派生。',
   'wonderful': 'wonder「惊奇」+ -ful「充满…的」。',
+};
+
+const Map<String, List<ConfusablePair>> _kConfusables =
+    <String, List<ConfusablePair>>{
+  'affect': <ConfusablePair>[
+    ConfusablePair(foil: 'effect', hintCn: 'affect 多为动词「影响」；effect 多为名词「效果」'),
+  ],
+  'effect': <ConfusablePair>[
+    ConfusablePair(foil: 'affect', hintCn: 'effect 多为名词；affect 多为动词'),
+  ],
+  'accept': <ConfusablePair>[
+    ConfusablePair(foil: 'except', hintCn: 'accept「接受」；except「除了」'),
+  ],
+  'except': <ConfusablePair>[
+    ConfusablePair(foil: 'accept', hintCn: 'except「除了」；accept「接受」'),
+  ],
+  'advice': <ConfusablePair>[
+    ConfusablePair(foil: 'advise', hintCn: 'advice 名词；advise 动词'),
+  ],
+  'advise': <ConfusablePair>[
+    ConfusablePair(foil: 'advice', hintCn: 'advise 动词；advice 名词'),
+  ],
+  'principal': <ConfusablePair>[
+    ConfusablePair(foil: 'principle', hintCn: 'principal「校长/主要的」；principle「原则」'),
+  ],
+  'principle': <ConfusablePair>[
+    ConfusablePair(foil: 'principal', hintCn: 'principle「原则」；principal「校长/主要的」'),
+  ],
+  'stationary': <ConfusablePair>[
+    ConfusablePair(foil: 'stationery', hintCn: 'stationary「静止的」；stationery「文具」'),
+  ],
+  'stationery': <ConfusablePair>[
+    ConfusablePair(foil: 'stationary', hintCn: 'stationery「文具」；stationary「静止的」'),
+  ],
+  'complement': <ConfusablePair>[
+    ConfusablePair(foil: 'compliment', hintCn: 'complement「补足」；compliment「称赞」'),
+  ],
+  'compliment': <ConfusablePair>[
+    ConfusablePair(foil: 'complement', hintCn: 'compliment「称赞」；complement「补足」'),
+  ],
+  'desert': <ConfusablePair>[
+    ConfusablePair(foil: 'dessert', hintCn: 'desert「沙漠/抛弃」；dessert「甜点」'),
+  ],
+  'dessert': <ConfusablePair>[
+    ConfusablePair(foil: 'desert', hintCn: 'dessert「甜点」；desert「沙漠」'),
+  ],
+  'lose': <ConfusablePair>[
+    ConfusablePair(foil: 'loose', hintCn: 'lose「丢失」；loose「松的」'),
+  ],
+  'loose': <ConfusablePair>[
+    ConfusablePair(foil: 'lose', hintCn: 'loose「松的」；lose「丢失」'),
+  ],
+  'quite': <ConfusablePair>[
+    ConfusablePair(foil: 'quiet', hintCn: 'quite「相当」；quiet「安静」'),
+  ],
+  'quiet': <ConfusablePair>[
+    ConfusablePair(foil: 'quite', hintCn: 'quiet「安静」；quite「相当」'),
+  ],
+  'then': <ConfusablePair>[
+    ConfusablePair(foil: 'than', hintCn: 'then「然后」；than「比」'),
+  ],
+  'than': <ConfusablePair>[
+    ConfusablePair(foil: 'then', hintCn: 'than「比」；then「然后」'),
+  ],
+  'weather': <ConfusablePair>[
+    ConfusablePair(foil: 'whether', hintCn: 'weather「天气」；whether「是否」'),
+  ],
+  'whether': <ConfusablePair>[
+    ConfusablePair(foil: 'weather', hintCn: 'whether「是否」；weather「天气」'),
+  ],
+  'ensure': <ConfusablePair>[
+    ConfusablePair(foil: 'insure', hintCn: 'ensure「确保」；insure「投保」'),
+  ],
+  'insure': <ConfusablePair>[
+    ConfusablePair(foil: 'ensure', hintCn: 'insure「投保」；ensure「确保」'),
+  ],
 };

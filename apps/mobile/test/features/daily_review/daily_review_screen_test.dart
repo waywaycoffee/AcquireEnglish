@@ -62,6 +62,13 @@ ProviderContainer makeContainer([List<ReviewSource> items = sources]) =>
         // Keep classic single-stage cards in widget tests; multi-stage is
         // covered by domain helpers + manual QA with settings toggles.
         wordReviewSettingsProvider.overrideWith(_RecognizeOnlySettings.new),
+        // Avoid real TTS / Aliyun HTTP during widget tests.
+        wordPronunciationServiceProvider.overrideWithValue(
+          WordPronunciationService(
+            speakOverride: (_) async {},
+            stopOverride: () async {},
+          ),
+        ),
       ],
     );
 Widget app(

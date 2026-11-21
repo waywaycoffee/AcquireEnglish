@@ -12,6 +12,7 @@ import '../../authentication/presentation/account_hub_sheet.dart';
 import '../../authentication/presentation/auth_session.dart';
 import '../../navigation/presentation/navigation_destination.dart';
 import '../../player/presentation/local_whisper_asr.dart';
+import '../../shared/data/aliyun_speech_service.dart';
 import '../../shared/data/word_pronunciation_service.dart';
 import '../../sync/data/acquire_api_client.dart';
 import '../../daily_review/presentation/daily_review_provider.dart';
@@ -441,6 +442,22 @@ class SettingsScreen extends ConsumerWidget {
                 onChanged: (double value) => ref
                     .read(learningSettingsProvider.notifier)
                     .setTtsRate(value),
+              ),
+              _SwitchRow(
+                title: '优先阿里云真人音色',
+                description:
+                    '单词/句级朗读优先走云端阿里云（DashScope）音色，音频缓存在 ECS；'
+                    '未登录或服务不可用时回退到本地 TTS。',
+                value: settings.preferAliyunTts,
+                onChanged: (bool value) {
+                  ref
+                      .read(learningSettingsProvider.notifier)
+                      .setPreferAliyunTts(value: value);
+                },
+              ),
+              _AliyunCloudVoiceRow(
+                selectedVoice: settings.cloudTtsVoice,
+                enabled: settings.preferAliyunTts,
               ),
             ],
           ),
@@ -1517,6 +1534,130 @@ class _ModelFetchRow extends StatelessWidget {
           FilledButton(
             onPressed: isLoading ? null : onTap,
             child: Text(isLoading ? '获取中...' : '获取模型'),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _AliyunCloudVoiceRow extends ConsumerStatefulWidget {
+  const _AliyunCloudVoiceRow({
+    required this.selectedVoice,
+    required this.enabled,
+  });
+
+  final String selectedVoice;
+  final bool enabled;
+
+  @override
+  ConsumerState<_AliyunCloudVoiceRow> createState() =>
+      _AliyunCloudVoiceRowState();
+}
+
+class _AliyunCloudVoiceRowState extends ConsumerState<_AliyunCloudVoiceRow> {
+  bool _loading = true;
+  bool _configured = false;
+  List<String> _voices = <String>[];
+  Map<String, String> _labels = <String, String>{};
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    unawaited(_load());
+  }
+
+  Future<void> _load() async {
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
+    try {
+      final Map<String, dynamic> data =
+          await ref.read(aliyunSpeechServiceProvider).fetchVoices();
+      if (!mounted) return;
+      final List<String> voices =
+          (data['voices'] as List<dynamic>? ?? <dynamic>[])
+              .map((dynamic e) => '$e')
+              .where((String e) => e.isNotEmpty)
+              .toList(growable: false);
+      final Map<String, String> labels =
+          (data['labels'] as Map<String, dynamic>? ?? <String, dynamic>{}).map(
+            (String k, dynamic v) => MapEntry<String, String>(k, '$v'),
+          );
+      setState(() {
+        _voices = voices;
+        _labels = labels;
+        _configured = data['configured'] == true;
+        _loading = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _loading = false;
+        _error = '音色列表暂不可用（需网络与登录）';
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final String effective = widget.selectedVoice.trim().isEmpty
+        ? kDefaultAliyunTtsVoice
+        : widget.selectedVoice.trim();
+    final bool hasSelected = _voices.contains(effective);
+    final String value = hasSelected
+        ? effective
+        : (_voices.isEmpty ? '' : _voices.first);
+
+    return _SettingsRowFrame(
+      child: Row(
+        children: <Widget>[
+          Expanded(
+            child: _TitleBlock(
+              title: '阿里云英文音色',
+              description: _loading
+                  ? '正在读取云端音色…'
+                  : _error ??
+                        (!_configured
+                            ? '服务器尚未配置 DASHSCOPE_API_KEY'
+                            : '真人配音，缓存到 ECS /media/reading/speech'),
+            ),
+          ),
+          const SizedBox(width: 16),
+          _SettingsSelectShell(
+            child: DropdownButtonHideUnderline(
+              child: DropdownButton<String>(
+                value: value.isEmpty ? null : value,
+                hint: const Text('加载中'),
+                borderRadius: BorderRadius.circular(16),
+                dropdownColor: AppDesignTokens.appWhite,
+                style: TextStyle(
+                  color: AppDesignTokens.textPrimary,
+                  fontWeight: FontWeight.w600,
+                ),
+                icon: Icon(
+                  Icons.keyboard_arrow_down_rounded,
+                  color: AppDesignTokens.textSecondary,
+                ),
+                items: <DropdownMenuItem<String>>[
+                  for (final String id in _voices)
+                    DropdownMenuItem<String>(
+                      value: id,
+                      child: Text(_labels[id] ?? id),
+                    ),
+                ],
+                onChanged: !widget.enabled || _loading || _voices.isEmpty
+                    ? null
+                    : (String? next) {
+                        if (next == null) return;
+                        ref
+                            .read(learningSettingsProvider.notifier)
+                            .setCloudTtsVoice(next);
+                      },
+              ),
+            ),
           ),
         ],
       ),
