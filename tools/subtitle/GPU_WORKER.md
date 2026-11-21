@@ -1,6 +1,6 @@
 # 本机 GPU 公共字幕 worker
 
-架构：App 公共字幕查询未命中后提交 ECS 持久队列；本机经 SSH 领取任务，RTX 5060 Ti 用 faster-whisper small.en 转写；英文文本交给 ECS 已配置的 DeepSeek 翻译；中英时间轴对齐并通过公共字幕质量门槛后入库。手机视频仍须用户手工下载。
+架构：App 在开始下载视频时并行查询公共字幕，未命中后提交 ECS 持久队列；本机经 SSH 领取任务，RTX 5060 Ti 用 faster-whisper small.en 转写；英文文本交给 ECS 已配置的 DeepSeek 翻译；中英时间轴对齐并通过公共字幕质量门槛后入库。手机视频仍须用户手工点击下载。下载后的字幕补全再次查询公共库并应用已生成字幕；当前不提供云端进度实时推送。
 
 Windows 安装（Python 3.11+，NVIDIA 驱动已安装）：
 

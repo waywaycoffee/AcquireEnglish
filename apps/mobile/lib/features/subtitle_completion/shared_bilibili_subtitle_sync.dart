@@ -9,17 +9,7 @@ import '../library/presentation/library_mock_data.dart';
 import '../sync/data/acquire_api_client.dart';
 import 'shared_subtitle_quality.dart';
 
-AcquireApiClient? _configuredSharedSubtitleApi;
-
-/// Wire the cloud API client once from app bootstrap (silent no-op when null).
-void configureSharedBilibiliSubtitleApi(AcquireApiClient? api) {
-  _configuredSharedSubtitleApi = api;
-}
-
-AcquireApiClient? resolveSharedBilibiliSubtitleApi([
-  AcquireApiClient? override,
-]) =>
-    override ?? _configuredSharedSubtitleApi;
+export 'shared_subtitle_api.dart';
 
 /// Stable Bilibili identity for the shared-subtitle cache.
 class BilibiliSharedSubtitleIds {
@@ -64,8 +54,8 @@ BilibiliSharedSubtitleIds? resolveBilibiliSharedSubtitleIds({
     caseSensitive: false,
   ).firstMatch(rawKey);
   if (keyMatch != null) {
-    // Canonicalize BV case for cache keys; URL extract keeps source casing.
-    bvid = keyMatch.group(1)!.toUpperCase();
+    // Preserve the case-sensitive Bilibili API identity.
+    bvid = keyMatch.group(1)!;
     page = int.tryParse(keyMatch.group(2) ?? '') ?? 1;
   }
 
@@ -78,6 +68,11 @@ BilibiliSharedSubtitleIds? resolveBilibiliSharedSubtitleIds({
       return null;
     }
     bvid = extracted;
+  }
+
+  final String? sourceBvid = BilibiliImport.extractIds(rawUrl)?['bvid'];
+  if (sourceBvid != null && sourceBvid.toUpperCase() == bvid.toUpperCase()) {
+    bvid = sourceBvid;
   }
 
   // UGC 合集: numberStr is episode index, NOT multi-P ?p=. Inventing page from

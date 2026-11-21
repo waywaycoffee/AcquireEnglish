@@ -9,6 +9,7 @@ import 'package:dio/io.dart';
 import 'package:path_provider/path_provider.dart';
 
 import '../../../constants/env_config.dart';
+import '../../subtitle_completion/shared_subtitle_api.dart';
 import '../domain/bilibili_import.dart';
 import 'bilibili_media_proxy.dart';
 import 'subtitle_source_policy.dart';
@@ -1125,6 +1126,11 @@ class BilibiliImportService {
     }
     onProgress?.call(null, '正在准备本地视频…');
     final _BilibiliVideoRef ref = await _resolveVideoRef(rawInput);
+    unawaited(requestSharedSubtitlesForDownload(
+      bvid: ref.bvid,
+      page: ref.page,
+      cid: ref.cid,
+    ));
     final File? cached = await _existingCacheFile(ref.idKey);
     if (cached != null) {
       onProgress?.call(1, '使用已缓存视频');

@@ -86,8 +86,28 @@ void main() {
       sourceUrl: 'https://www.bilibili.com/video/BV1xx411c7mD?p=2',
     );
     expect(ids, isNotNull);
-    expect(ids!.bvid, 'BV1XX411C7MD');
+    expect(ids!.bvid, 'BV1xx411c7mD');
     expect(ids.page, 2);
+  });
+
+  test('download requests cloud subtitles without a local media file', () async {
+    final _FakeSharedApi api = _FakeSharedApi(null);
+    configureSharedBilibiliSubtitleApi(api);
+    await requestSharedSubtitlesForDownload(bvid: 'BV1CS4y1v7sQ', page: 151);
+    expect(api.getCalls, 1);
+  });
+
+  test('download continues when the cloud API is not configured', () async {
+    await requestSharedSubtitlesForDownload(bvid: 'BV1CS4y1v7sQ', page: 1);
+  });
+
+  test('source URL restores case lost in a disk cache key', () {
+    final BilibiliSharedSubtitleIds? ids = resolveBilibiliSharedSubtitleIds(
+      sourceKey: 'BV1CS4Y1V7SQ-p03',
+      sourceUrl: 'https://www.bilibili.com/video/BV1CS4y1v7sQ?p=3',
+    );
+    expect(ids!.bvid, 'BV1CS4y1v7sQ');
+    expect(ids.page, 3);
   });
 
   test('season course does not invent page from episode numberStr', () {
