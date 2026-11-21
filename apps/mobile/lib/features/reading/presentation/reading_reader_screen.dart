@@ -814,10 +814,8 @@ class _ReadingReaderScreenState extends ConsumerState<ReadingReaderScreen> {
     unawaited(_ensureGlosses(doc));
 
     final bool showChinese = _mode.showInlineChinese;
-    final Color bg = _dark ? const Color(0xFF1C1C1E) : const Color(0xFFF7F3E9);
-    final Color fg = _dark
-        ? const Color(0xFFF2F2F7)
-        : AppDesignTokens.textPrimary;
+    final Color bg = readingBackgroundColor(_dark);
+    final Color fg = readingForegroundColor(_dark);
     final AsyncValue<FoundationMediaManifest> mediaAsync = ref.watch(
       readingContentMediaProvider,
     );
