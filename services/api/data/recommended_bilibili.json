@@ -76,6 +76,44 @@
           "seed_pages": "all"
         }
       ]
+    },
+    {
+      "id": "daily-speaking-1637588963",
+      "source": "bilibili",
+      "creator_id": "1637588963",
+      "display_name": "净信背单词App",
+      "avatar_url": "https://i2.hdslb.com/bfs/face/b1970b7d767f703335fe3a32d0d80e7015524fbd.jpg",
+      "profile_url": "https://space.bilibili.com/1637588963",
+      "blurb": "每日英语跟读 · 常用口语与生活例句",
+      "videos": [
+        {
+          "bvid": "BV1CS4y1v7sQ",
+          "title": "英语核心口语句型9000句（合集  共151课）",
+          "watch_url": "https://www.bilibili.com/video/BV1CS4y1v7sQ",
+          "cover_url": "http://i1.hdslb.com/bfs/archive/e1b5bfd132fceb0dc4b0e7b78c2f976e2f883ba0.png",
+          "duration_sec": 115047,
+          "seed_pages": "all"
+        }
+      ]
+    },
+    {
+      "id": "daily-speaking-3493130475145687",
+      "source": "bilibili",
+      "creator_id": "3493130475145687",
+      "display_name": "原声原味学英语",
+      "avatar_url": "https://i1.hdslb.com/bfs/face/cf320e62607f8830f3fee2d0f13c9fa31a54a71e.jpg",
+      "profile_url": "https://space.bilibili.com/3493130475145687",
+      "blurb": "每日英语跟读 · 常用口语与生活例句",
+      "videos": [
+        {
+          "bvid": "BV1Aw4m1k7qU",
+          "title": "美国人从小就说的英文100句｜每天1小时听英文One Hour English｜快速提升英语水平｜跟美国人学英语｜【从零开始学英语】出国后才发现人生必学英语口语",
+          "watch_url": "https://www.bilibili.com/video/BV1Aw4m1k7qU",
+          "cover_url": "http://i0.hdslb.com/bfs/archive/ffbbb1e47adbc6f95922efd6d20ecdd9ae0dd183.jpg",
+          "duration_sec": 3020,
+          "seed_pages": "all"
+        }
+      ]
     }
   ]
 }
