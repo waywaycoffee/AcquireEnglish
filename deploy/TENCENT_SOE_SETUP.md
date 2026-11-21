@@ -58,9 +58,10 @@ flutter build apk --debug --flavor prod --no-pub \
 ```bash
 TENCENT_SOE_SECRET_ID=你的SecretId
 TENCENT_SOE_SECRET_KEY=你的SecretKey
+TENCENT_SOE_APP_ID=你的腾讯云账号APPID
 ```
 
-本地模板见 `services/api/.env.example`。服务端评测签名不需要把 AppId 写进 `.env`（用 SecretId/Key 调 `soe.tencentcloudapi.com`）。
+本地模板见 `services/api/.env.example`。配置 AppId 后，服务端使用新版 WebSocket 录音评测。留空时沿用已开通基础版的旧接口。
 
 ### 部署并重启
 

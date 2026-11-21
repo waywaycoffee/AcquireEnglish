@@ -9,6 +9,7 @@ from app.config import settings
 from app.deps import get_current_user
 from app.models import User
 from app.services.tencent_soe import evaluate
+from app.services.tencent_soe_v2 import evaluate as evaluate_v2
 router=APIRouter(prefix='/pronunciation',tags=['pronunciation'])
 _limits=defaultdict(deque)
 _slots=asyncio.Semaphore(4)
@@ -34,6 +35,15 @@ async def assess(body: Recording,user:User=Depends(get_current_user)):
     if len(recent)>=6:raise HTTPException(429,'每分钟最多评测6次，请稍后重试')
     recent.append(now)
     try:
-        async with _slots:return await evaluate(settings.tencent_soe_secret_id,settings.tencent_soe_secret_key,pcm,reference)
+        async with _slots:
+            if settings.tencent_soe_app_id:
+                return await evaluate_v2(
+                    settings.tencent_soe_app_id,
+                    settings.tencent_soe_secret_id,
+                    settings.tencent_soe_secret_key,
+                    pcm,
+                    reference,
+                )
+            return await evaluate(settings.tencent_soe_secret_id, settings.tencent_soe_secret_key, pcm, reference)
     except ValueError as e:raise HTTPException(502,'腾讯云评测未成功（'+str(e)[:80]+'），请管理员检查服务开通与权限')
     except Exception:raise HTTPException(502,'腾讯云评测暂时不可用，请稍后重试')

@@ -83,6 +83,7 @@ class Settings(BaseSettings):
     community_admin_token: str = ""
 
     # Tencent Cloud SOE (server-side pronunciation). Never ship these in the APK.
+    tencent_soe_app_id: str = ""
     tencent_soe_secret_id: str = ""
     tencent_soe_secret_key: str = ""
 
