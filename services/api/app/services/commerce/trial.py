@@ -81,6 +81,21 @@ def _consecutive_from_start(days: list[str], start: date, *, need: int) -> int:
     return streak
 
 
+def _campaign_meta(row: UserEntitlement) -> dict:
+    try:
+        import json
+
+        meta = json.loads(row.meta_json or "{}")
+    except Exception:  # noqa: BLE001
+        return {}
+    return meta if isinstance(meta, dict) else {}
+
+
+def _is_welcome_campaign(meta: dict) -> bool:
+    campaign = str(meta.get("campaign") or "")
+    return campaign == TRIAL_CAMPAIGN or campaign.startswith("new_user_trial")
+
+
 async def _find_trial_membership(
     db: AsyncSession, user_id: int
 ) -> UserEntitlement | None:
@@ -88,20 +103,31 @@ async def _find_trial_membership(
     for row in rows:
         if row.asset_kind != "membership" or row.asset_ref != "pro":
             continue
-        try:
-            import json
-
-            meta = json.loads(row.meta_json or "{}")
-        except Exception:  # noqa: BLE001
-            meta = {}
-        if isinstance(meta, dict) and meta.get("campaign") == TRIAL_CAMPAIGN:
-            return row
-        # Legacy new_user_trial also counts as trial for extension.
-        if isinstance(meta, dict) and str(meta.get("campaign") or "").startswith(
-            "new_user_trial"
-        ):
+        if _is_welcome_campaign(_campaign_meta(row)):
             return row
     return None
+
+
+async def has_claimed_welcome_pro(db: AsyncSession, user_id: int) -> bool:
+    """True if this account ever claimed the welcome Pro month (even if expired)."""
+    result = await db.execute(
+        select(UserEntitlement).where(
+            UserEntitlement.user_id == user_id,
+            UserEntitlement.asset_kind == "membership",
+            UserEntitlement.asset_ref == "pro",
+        )
+    )
+    for row in result.scalars().all():
+        if _is_welcome_campaign(_campaign_meta(row)):
+            return True
+    return False
+
+
+async def claim_welcome_pro(db: AsyncSession, user_id: int) -> dict[str, object]:
+    """Popup claim: each user may receive the welcome Pro month at most once."""
+    if await has_claimed_welcome_pro(db, user_id):
+        raise ValueError("已领取过 Pro 体验，不能重复领取")
+    return await grant_full_feature_trial(db, user_id)
 
 
 async def grant_full_feature_trial(db: AsyncSession, user_id: int) -> dict[str, object]:
@@ -155,6 +181,8 @@ async def grant_full_feature_trial(db: AsyncSession, user_id: int) -> dict[str, 
 
 
 async def trial_status(db: AsyncSession, user_id: int) -> dict[str, object]:
+    welcome_claimed = await has_claimed_welcome_pro(db, user_id)
+    welcome_claimable = not welcome_claimed
     trial = await _find_trial_membership(db, user_id)
     coupon = (
         await db.execute(
@@ -170,13 +198,19 @@ async def trial_status(db: AsyncSession, user_id: int) -> dict[str, object]:
             "in_trial": False,
             "trial_ends_at": None,
             "trial_days": TRIAL_DAYS,
+            "welcome_claimed": welcome_claimed,
+            "welcome_claimable": welcome_claimable,
             "login_days": 0,
             "required_login_days": TRIAL_EXTEND_LOGIN_DAYS,
             "extend_eligible": False,
             "extend_claimed": coupon is not None,
             "extend_coupon_id": coupon.id if coupon else None,
             "extend_coupon_used": bool(coupon.used) if coupon else False,
-            "message": "当前不在 Pro 体验期内",
+            "message": (
+                "可领取 1 个月 Pro 体验"
+                if welcome_claimable
+                else "当前不在 Pro 体验期内"
+            ),
         }
 
     starts = _as_utc(trial.starts_at) or _utcnow()
@@ -202,6 +236,8 @@ async def trial_status(db: AsyncSession, user_id: int) -> dict[str, object]:
         "in_trial": True,
         "trial_ends_at": ends.isoformat() if ends else None,
         "trial_days": TRIAL_DAYS,
+        "welcome_claimed": welcome_claimed,
+        "welcome_claimable": False,
         "login_days": len(login_days),
         "login_streak_from_start": streak,
         "required_login_days": TRIAL_EXTEND_LOGIN_DAYS,

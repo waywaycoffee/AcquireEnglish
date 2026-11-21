@@ -78,6 +78,8 @@ class Endpoints {
   static const String commerceCatalog = 'api/commerce/catalog';
   static const String commercePayStatus = 'api/commerce/pay-status';
   static const String commerceTrialStatus = 'api/commerce/trial/status';
+  static const String commerceTrialClaimWelcome =
+      'api/commerce/trial/claim-welcome';
   static const String commerceTrialClaimExtend = 'api/commerce/trial/claim-extend';
   static const String commercePoints = 'api/commerce/points';
   static const String commercePointsEarn = 'api/commerce/points/earn';

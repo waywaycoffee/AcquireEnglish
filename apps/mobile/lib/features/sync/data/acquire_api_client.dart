@@ -1641,6 +1641,12 @@ class AcquireApiClient {
     return response.data as Map<String, dynamic>;
   }
 
+  Future<Map<String, dynamic>> commerceClaimWelcomePro() async {
+    final Response<dynamic> response =
+        await _dio.post(Endpoints.commerceTrialClaimWelcome);
+    return response.data as Map<String, dynamic>;
+  }
+
   Future<Map<String, dynamic>> commerceClaimTrialExtend() async {
     final Response<dynamic> response =
         await _dio.post(Endpoints.commerceTrialClaimExtend);

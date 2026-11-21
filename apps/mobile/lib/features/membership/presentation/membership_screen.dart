@@ -142,10 +142,33 @@ class _MembershipScreenState extends ConsumerState<MembershipScreen> {
     }
   }
 
+  Future<void> _claimWelcomePro() async {
+    if (_trialBusy) return;
+    setState(() => _trialBusy = true);
+    try {
+      await ref.read(acquireApiClientProvider).commerceClaimWelcomePro();
+      if (!mounted) return;
+      playSuccessSfx(SuccessSfxKind.fanfare);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('已领取 1 个月 Pro，全功能可用')),
+      );
+      await _load();
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('领取失败：可能已领取过')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _trialBusy = false);
+    }
+  }
+
   Widget _trialBanner() {
+    if (_trial == null) return const SizedBox.shrink();
+    final bool welcomeClaimable = _trial?['welcome_claimable'] == true;
     final inTrial = _trial?['in_trial'] == true;
-    if (!inTrial && _trial == null) return const SizedBox.shrink();
-    if (!inTrial) return const SizedBox.shrink();
+    if (!inTrial && !welcomeClaimable) return const SizedBox.shrink();
     final daysLeft = _trialDaysLeft();
     final loginDays = (_trial?['login_days'] as num?)?.toInt() ?? 0;
     final required = (_trial?['required_login_days'] as num?)?.toInt() ?? 7;
@@ -153,11 +176,31 @@ class _MembershipScreenState extends ConsumerState<MembershipScreen> {
     final claimed = _trial?['extend_claimed'] == true;
     final used = _trial?['extend_coupon_used'] == true;
     final message = '${_trial?['message'] ?? ''}';
+    if (welcomeClaimable) {
+      return _card(
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text(
+              '免费领取 1 个月 Pro',
+              style: Theme.of(context).textTheme.titleLarge,
+            ),
+            const SizedBox(height: 8),
+            const Text('每位用户限领一次，开通后全功能可用。'),
+            const SizedBox(height: 12),
+            FilledButton(
+              onPressed: (_trialBusy || _paying) ? null : _claimWelcomePro,
+              child: Text(_trialBusy ? '领取中…' : '立即领取'),
+            ),
+          ],
+        ),
+      );
+    }
     return _card(
       Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Text('Pro 体验（注册赠送 1 个月）', style: Theme.of(context).textTheme.titleLarge),
+          Text('Pro 体验（1 个月）', style: Theme.of(context).textTheme.titleLarge),
           const SizedBox(height: 8),
           Text(
             daysLeft == null

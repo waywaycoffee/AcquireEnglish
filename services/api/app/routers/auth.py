@@ -36,7 +36,6 @@ from app.services.phone_auth import (
     sms_mock_enabled,
     verify_sms_code,
 )
-from app.services.user_assets import grant_new_user_trial
 from app.services.wechat_auth import (
     exchange_wechat_code,
     random_password_hash as wechat_password_hash,
@@ -52,15 +51,6 @@ def _token_for(user: User, *, is_new_user: bool = False) -> TokenOut:
         user=UserOut.from_user(user),
         is_new_user=is_new_user,
     )
-
-
-async def _seed_trial_if_new(db: AsyncSession, user: User, *, is_new: bool) -> None:
-    if not is_new:
-        return
-    try:
-        await grant_new_user_trial(db, user.id)
-    except Exception:  # noqa: BLE001 — registration must not fail on promo grant
-        pass
 
 
 async def _record_login_day(db: AsyncSession, user: User) -> None:
@@ -86,7 +76,7 @@ async def _ensure_default_pro(db: AsyncSession, user: User) -> None:
 async def _after_auth_success(
     db: AsyncSession, user: User, *, is_new: bool = False
 ) -> None:
-    await _seed_trial_if_new(db, user, is_new=is_new)
+    # Pro welcome month is claim-once via popup (POST /commerce/trial/claim-welcome).
     await _ensure_default_pro(db, user)
     await _record_login_day(db, user)
 

@@ -37,6 +37,7 @@ from app.services.commerce.quotas import (
 from app.services.free_trial_seeds import public_free_trial_seeds
 from app.services.commerce.trial import (
     claim_trial_extend_coupon,
+    claim_welcome_pro,
     trial_status,
 )
 from app.services.user_assets import (
@@ -179,6 +180,30 @@ async def commerce_trial_status(
     db: AsyncSession = Depends(get_db),
 ) -> dict:
     return await trial_status(db, user.id)
+
+
+@router.post("/trial/claim-welcome")
+async def commerce_claim_welcome_pro(
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    """Claim the one-time 30-day Pro welcome gift (popup)."""
+    try:
+        granted = await claim_welcome_pro(db, user.id)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    try:
+        await record_commerce_event(
+            db, event="trial_welcome_claim", user_id=user.id, page="home"
+        )
+    except Exception:  # noqa: BLE001
+        pass
+    return {
+        "ok": True,
+        "trial_days": granted.get("trial_days"),
+        "message": "已领取 1 个月 Pro，全功能可用",
+        **granted,
+    }
 
 
 @router.post("/trial/claim-extend")

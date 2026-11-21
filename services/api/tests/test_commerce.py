@@ -76,6 +76,25 @@ async def test_new_user_full_trial_and_module_access():
         token = await _sms_token(client)
         headers = {"Authorization": f"Bearer {token}"}
 
+        # Welcome Pro is claim-once via popup — not auto-granted on register.
+        before = await client.get("/api/commerce/trial/status", headers=headers)
+        assert before.status_code == 200, before.text
+        assert before.json()["welcome_claimable"] is True
+        assert before.json()["welcome_claimed"] is False
+        assert before.json()["in_trial"] is False
+
+        assets0 = await client.get("/api/assets", headers=headers)
+        assert assets0.status_code == 200
+        assert assets0.json().get("active_membership") != "pro"
+
+        claim = await client.post("/api/commerce/trial/claim-welcome", headers=headers)
+        assert claim.status_code == 200, claim.text
+        assert claim.json().get("ok") is True
+        assert claim.json().get("trial_days") == TRIAL_DAYS
+
+        again = await client.post("/api/commerce/trial/claim-welcome", headers=headers)
+        assert again.status_code == 400
+
         assets = await client.get("/api/assets", headers=headers)
         assert assets.status_code == 200
         body = assets.json()
@@ -98,6 +117,8 @@ async def test_new_user_full_trial_and_module_access():
         assert trial.status_code == 200, trial.text
         t = trial.json()
         assert t["in_trial"] is True
+        assert t["welcome_claimed"] is True
+        assert t["welcome_claimable"] is False
         assert t["required_login_days"] == TRIAL_EXTEND_LOGIN_DAYS
         assert t.get("trial_days") == TRIAL_DAYS
         assert t["login_days"] >= 1
@@ -123,6 +144,11 @@ async def test_claim_trial_extend_after_login_days():
     async with AsyncClient(transport=transport, base_url="http://test") as client:
         token = await _sms_token(client, phone="13900006666")
         headers = {"Authorization": f"Bearer {token}"}
+
+        welcome = await client.post(
+            "/api/commerce/trial/claim-welcome", headers=headers
+        )
+        assert welcome.status_code == 200, welcome.text
 
         # Backdate trial start and seed TRIAL_EXTEND_LOGIN_DAYS consecutive logins.
         me = await client.get("/api/auth/me", headers=headers)

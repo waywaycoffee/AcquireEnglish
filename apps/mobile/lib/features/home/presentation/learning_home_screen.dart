@@ -15,6 +15,7 @@ import '../../sync/presentation/daily_feed_provider.dart';
 import '../../words/presentation/syllabus_books_provider.dart';
 import '../../import_course/data/bilibili_cover_refresh.dart';
 import '../../player/presentation/learning_resume_provider.dart';
+import '../../membership/presentation/welcome_pro_claim_host.dart';
 import '../../navigation/presentation/navigation_destination.dart';
 import '../../shared/presentation/pad/pad_scaffold.dart';
 import '../../sync/presentation/cloud_catalog_sync.dart';
@@ -103,7 +104,8 @@ class LearningHomeScreen extends ConsumerWidget {
       ('场景对话', '在情境里开口', Icons.forum_outlined, '/learn/dialogue'),
       ('真人口语', '匹配对练 · AI改写', Icons.record_voice_over_outlined, '/peer-oral'),
     ];
-    return PadScaffold(
+    return WelcomeProClaimHost(
+      child: PadScaffold(
       currentDestination: AppNavDestination.home,
       showContinueLearning: false,
       body: ColoredBox(
@@ -545,6 +547,7 @@ class LearningHomeScreen extends ConsumerWidget {
             ),
           ),
         ),
+      ),
       ),
     );
   }

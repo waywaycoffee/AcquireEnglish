@@ -5,7 +5,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../../router/app_router.dart';
-import '../../../shared/audio/success_sfx.dart';
 import '../../../shared/presentation/pad/app_design_tokens.dart';
 import '../../../sync/data/acquire_api_client.dart';
 import '../../../sync/presentation/cloud_catalog_sync.dart';
@@ -143,11 +142,10 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
         if (!mounted) {
           return;
         }
-        playSuccessSfx(SuccessSfxKind.fanfare);
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('注册成功！已赠送 1 个月 Pro，全功能免费畅用'),
-            duration: Duration(seconds: 5),
+            content: Text('注册成功！进入首页可领取 1 个月 Pro'),
+            duration: Duration(seconds: 4),
           ),
         );
         ref.invalidate(cloudCatalogSyncProvider);
