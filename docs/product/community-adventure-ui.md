@@ -5,7 +5,7 @@
 - **单人冒险为主**：章节地图与通关进度永远属于个人。
 - **同桌为辅**：只显示为可选加分条，换人不回滚个人关卡。
 - **视觉**：品牌绿 `#58CC02` + 琥珀关卡 `#FFC800` + 咖啡暖色夜景；厚按钮阴影；避免紫色玻璃风。
-- **效果图**：`apps/mobile/design/exports/community-design/community-*-v1.jpg`（hub / map / desk）。
+- **效果图**：`apps/mobile/design/exports/community-design/community-*-v1.jpg`（hub / map / desk / feed-quest / tabs / level-clear）。
 
 ## 信息架构
 
@@ -14,7 +14,9 @@
 | 冒险广场（原社区） | 全幅咖啡馆夜景英雄区 + 四站路径标签 | 继续冒险 | 同桌加分文字链 / 任务|热门|找人|榜 |
 | 街角咖啡店地图 | 蜿蜒四站夜景路径 + 底部开战条 | 开始这一关 | 跟练成果卡、去学习桌 |
 | 学习桌 | 暖色英雄区 + 本周一起通关进度 | 打开地图继续冒险 | 词汇PK / 每日打卡 / 邀请同桌三格；管理收进折叠区 |
-| 通关结算 | 练过的能力（不夸大） | 发布成果卡 | 回地图 |
+| 任务流 | 可开练 / 视频任务卡 + 底栏发帖 | 开练或去做任务 | 分享闯关收获 |
+| 热门 / 找人 / 榜 | 视频任务卡、搭子卡、勋章排行行 | 去做任务 / 邀请同桌 | 关注博主、应战 PK |
+| 通关结算 | 夜景「通关」金章 + 已掌握能力 | 发布成果卡邀人练同一关 | 回地图；展示本周进度 |
 
 ## Tab 文案
 
@@ -22,9 +24,9 @@
 
 ## 组件
 
-`adventure_ui.dart`：`AdventureHeroBanner`、`AdventurePathStrip`、`CafeWindingPath`（夜景蜿蜒关卡）、`HubChunkyButton`、`QuestFeedCard`。
+`adventure_ui.dart`：`AdventureHeroBanner`、`AdventurePathStrip`、`CafeWindingPath`、`CafeNightBackdrop`、`HubChunkyButton`、`QuestFeedCard`、`QuestComposerBar`、`AdventureBuddyCard`、`AdventureRankRow`。
 
-地图页（`exploration_map_screen.dart`）使用咖啡夜景底 + 蜿蜒节点；底部固定「开战 / 约同桌」厚按钮区。
+地图页（`exploration_map_screen.dart`）使用咖啡夜景底 + 蜿蜒节点；底部固定「开战 / 约同桌」厚按钮区；通关后切夜景结算页。
 
 ## 已落地行为
 

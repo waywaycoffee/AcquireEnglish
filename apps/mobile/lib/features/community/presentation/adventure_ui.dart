@@ -156,8 +156,23 @@ class AdventureHeroBanner extends StatelessWidget {
   }
 }
 
+/// Full-bleed night cafe wash for settlement / map overlays (drawn, not media).
+class CafeNightBackdrop extends StatelessWidget {
+  const CafeNightBackdrop({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return const CustomPaint(
+      painter: _CafeNightPainter(),
+      child: SizedBox.expand(),
+    );
+  }
+}
+
 /// Soft cafe silhouette for the adventure hero (no bundled media).
 class _CafeNightPainter extends CustomPainter {
+  const _CafeNightPainter();
+
   @override
   void paint(Canvas canvas, Size size) {
     final Paint sky = Paint()
@@ -639,6 +654,239 @@ class DeskActionTile extends StatelessWidget {
                 ),
               ),
             ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class AdventureBuddyCard extends StatelessWidget {
+  const AdventureBuddyCard({
+    required this.name,
+    required this.meta,
+    required this.actionLabel,
+    required this.onAction,
+    super.key,
+  });
+
+  final String name;
+  final String meta;
+  final String actionLabel;
+  final VoidCallback onAction;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(
+          color: AdventurePalette.pathAmber.withValues(alpha: 0.45),
+          width: 2,
+        ),
+        boxShadow: const <BoxShadow>[
+          BoxShadow(color: Color(0x22000000), offset: Offset(0, 4)),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          CircleAvatar(
+            radius: 22,
+            backgroundColor: AdventurePalette.pathAmber,
+            child: Text(
+              name.isEmpty ? '?' : name.substring(0, 1),
+              style: const TextStyle(
+                fontWeight: FontWeight.w900,
+                color: Color(0xFF3A2A00),
+              ),
+            ),
+          ),
+          const SizedBox(height: 10),
+          Text(
+            name,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 15),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            meta,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+              color: AppDesignTokens.textSecondary,
+            ),
+          ),
+          const SizedBox(height: 10),
+          SizedBox(
+            width: double.infinity,
+            child: FilledButton(
+              onPressed: onAction,
+              style: FilledButton.styleFrom(
+                backgroundColor: AppDesignTokens.brandGreen,
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+              child: Text(
+                actionLabel,
+                style: const TextStyle(fontWeight: FontWeight.w800),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class AdventureRankRow extends StatelessWidget {
+  const AdventureRankRow({
+    required this.rank,
+    required this.name,
+    required this.valueLabel,
+    super.key,
+    this.isMe = false,
+    this.subtitle,
+  });
+
+  final int rank;
+  final String name;
+  final String valueLabel;
+  final bool isMe;
+  final String? subtitle;
+
+  @override
+  Widget build(BuildContext context) {
+    final Color fill = rank == 1
+        ? AdventurePalette.pathAmber
+        : rank == 2
+            ? const Color(0xFFC0C7D1)
+            : rank == 3
+                ? const Color(0xFFD4A574)
+                : const Color(0xFFE8E4DC);
+    return Container(
+      margin: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: isMe
+              ? AppDesignTokens.brandGreen
+              : fill.withValues(alpha: 0.7),
+          width: isMe ? 2 : 1.5,
+        ),
+        boxShadow: const <BoxShadow>[
+          BoxShadow(color: Color(0x14000000), offset: Offset(0, 3)),
+        ],
+      ),
+      child: Row(
+        children: <Widget>[
+          CircleAvatar(
+            radius: 18,
+            backgroundColor: fill,
+            child: Text(
+              '$rank',
+              style: TextStyle(
+                fontWeight: FontWeight.w900,
+                color: rank <= 3 ? const Color(0xFF3A2A00) : AppDesignTokens.textPrimary,
+              ),
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: <Widget>[
+                Text(
+                  isMe ? '$name（我）' : name,
+                  style: const TextStyle(fontWeight: FontWeight.w800),
+                ),
+                if ((subtitle ?? '').isNotEmpty)
+                  Text(
+                    subtitle!,
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: AppDesignTokens.textSecondary,
+                    ),
+                  ),
+              ],
+            ),
+          ),
+          Text(
+            valueLabel,
+            style: const TextStyle(
+              fontWeight: FontWeight.w900,
+              color: AppDesignTokens.brandGreenDark,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class QuestComposerBar extends StatelessWidget {
+  const QuestComposerBar({required this.onTap, super.key});
+
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return SafeArea(
+      top: false,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+        child: Material(
+          color: Colors.transparent,
+          child: InkWell(
+            onTap: onTap,
+            borderRadius: BorderRadius.circular(18),
+            child: Ink(
+              height: 52,
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(18),
+                border: Border.all(
+                  color: AppDesignTokens.brandGreen,
+                  width: 2,
+                ),
+                boxShadow: const <BoxShadow>[
+                  BoxShadow(
+                    color: AppDesignTokens.brandGreenDark,
+                    offset: Offset(0, 4),
+                  ),
+                ],
+              ),
+              child: Row(
+                children: <Widget>[
+                  const SizedBox(width: 14),
+                  Icon(
+                    Icons.add_rounded,
+                    color: AppDesignTokens.brandGreenDark,
+                  ),
+                  const SizedBox(width: 8),
+                  const Expanded(
+                    child: Text(
+                      '分享今天的闯关收获',
+                      style: TextStyle(
+                        fontWeight: FontWeight.w800,
+                        fontSize: 15,
+                        color: Color(0xFF1A1520),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
           ),
         ),
       ),

@@ -221,17 +221,17 @@ class _CafeMapBody extends ConsumerWidget {
   }
 }
 
-class _CafeLevel extends StatefulWidget {
+class _CafeLevel extends ConsumerStatefulWidget {
   const _CafeLevel({required this.index, required this.onComplete});
 
   final int index;
   final Future<void> Function() onComplete;
 
   @override
-  State<_CafeLevel> createState() => _CafeLevelState();
+  ConsumerState<_CafeLevel> createState() => _CafeLevelState();
 }
 
-class _CafeLevelState extends State<_CafeLevel> {
+class _CafeLevelState extends ConsumerState<_CafeLevel> {
   bool _saving = false;
   bool _complete = false;
   String? _feedback;
@@ -259,6 +259,18 @@ class _CafeLevelState extends State<_CafeLevel> {
   @override
   Widget build(BuildContext context) {
     final CafeLevel level = kCafeLevels[widget.index];
+    if (_complete) {
+      final CafeProgress? progress =
+          ref.watch(cafeProgressProvider).asData?.value;
+      final int weekCount = progress?.weekCount ?? 0;
+      final int weekTarget = progress?.weekTarget ?? kCafeWeeklyTarget;
+      return _CafeLevelClearSettlement(
+        level: level,
+        levelIndex: widget.index,
+        weekCount: weekCount,
+        weekTarget: weekTarget,
+      );
+    }
     return Scaffold(
       backgroundColor: AppDesignTokens.softWhite,
       appBar: AppBar(title: Text('第 ${widget.index + 1} 关 · ${level.title}')),
@@ -281,7 +293,8 @@ class _CafeLevelState extends State<_CafeLevel> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: <Widget>[
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                   decoration: BoxDecoration(
                     color: AdventurePalette.pathAmber,
                     borderRadius: BorderRadius.circular(999),
@@ -309,99 +322,294 @@ class _CafeLevelState extends State<_CafeLevel> {
             ),
           ),
           const SizedBox(height: 18),
-          if (_complete) ...<Widget>[
-            Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: AppDesignTokens.brandGreen.withValues(alpha: 0.15),
-                borderRadius: BorderRadius.circular(18),
-                border: Border.all(color: AppDesignTokens.brandGreen, width: 2),
-              ),
-              child: Text(
-                '通关！本关练过：${level.ability}\n${level.explanation}',
-                style: TextStyle(
-                  fontSize: 15,
-                  fontWeight: FontWeight.w700,
-                  height: 1.45,
-                  color: AppDesignTokens.textPrimary,
-                ),
-              ),
-            ),
-            const SizedBox(height: 16),
-            HubChunkyButton(
-              label: '发布成果卡，邀人练同一关',
-              icon: Icons.ios_share_rounded,
-              onPressed: () => Navigator.of(context).push<void>(
-                MaterialPageRoute<void>(
-                  builder: (_) => PublishLearningResultScreen(
-                    initialText:
-                        '我完成了街角咖啡店的「${level.title}」关卡（${level.ability}）。一起来练吧！',
-                    challengePath: cafeChallengePath(widget.index),
+          for (int index = 0; index < level.answers.length; index++)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 10),
+              child: Material(
+                color: AppDesignTokens.appWhite,
+                borderRadius: BorderRadius.circular(16),
+                child: InkWell(
+                  borderRadius: BorderRadius.circular(16),
+                  onTap: _saving ? null : () => _answer(index),
+                  child: Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 14,
+                      vertical: 16,
+                    ),
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(color: AppDesignTokens.borderGray),
+                      boxShadow: const <BoxShadow>[
+                        BoxShadow(
+                          color: Color(0x14000000),
+                          offset: Offset(0, 3),
+                        ),
+                      ],
+                    ),
+                    child: Text(
+                      level.answers[index],
+                      style: TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w700,
+                        color: AppDesignTokens.textPrimary,
+                      ),
+                    ),
                   ),
                 ),
               ),
             ),
-            const SizedBox(height: 10),
-            HubChunkyButton(
-              label: '返回地图',
-              icon: Icons.map_rounded,
-              color: AdventurePalette.pathAmber,
-              onPressed: () => Navigator.pop(context),
+          if (_saving) const LinearProgressIndicator(),
+          if (_feedback != null)
+            Padding(
+              padding: const EdgeInsets.only(top: 8),
+              child: Semantics(
+                liveRegion: true,
+                child: Text(
+                  _feedback!,
+                  style: TextStyle(
+                    fontWeight: FontWeight.w700,
+                    color: AppDesignTokens.orange,
+                  ),
+                ),
+              ),
             ),
-          ] else ...<Widget>[
-            for (int index = 0; index < level.answers.length; index++)
-              Padding(
-                padding: const EdgeInsets.only(bottom: 10),
-                child: Material(
-                  color: AppDesignTokens.appWhite,
-                  borderRadius: BorderRadius.circular(16),
-                  child: InkWell(
-                    borderRadius: BorderRadius.circular(16),
-                    onTap: _saving ? null : () => _answer(index),
-                    child: Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 14,
-                        vertical: 16,
+        ],
+      ),
+    );
+  }
+}
+
+class _CafeLevelClearSettlement extends StatelessWidget {
+  const _CafeLevelClearSettlement({
+    required this.level,
+    required this.levelIndex,
+    required this.weekCount,
+    required this.weekTarget,
+  });
+
+  final CafeLevel level;
+  final int levelIndex;
+  final int weekCount;
+  final int weekTarget;
+
+  @override
+  Widget build(BuildContext context) {
+    final double weekRatio =
+        weekTarget <= 0 ? 0 : (weekCount / weekTarget).clamp(0.0, 1.0);
+    return Scaffold(
+      backgroundColor: AdventurePalette.nightInk,
+      body: Stack(
+        fit: StackFit.expand,
+        children: <Widget>[
+          const CafeNightBackdrop(),
+          SafeArea(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(20, 8, 20, 20),
+              child: Column(
+                children: <Widget>[
+                  Row(
+                    children: <Widget>[
+                      IconButton(
+                        onPressed: () => Navigator.pop(context),
+                        style: IconButton.styleFrom(
+                          backgroundColor: AdventurePalette.cafeWarm,
+                          foregroundColor: AdventurePalette.pathAmber,
+                        ),
+                        icon: const Icon(Icons.arrow_back_rounded),
                       ),
-                      decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(16),
-                        border: Border.all(color: AppDesignTokens.borderGray),
-                        boxShadow: const <BoxShadow>[
-                          BoxShadow(
-                            color: Color(0x14000000),
-                            offset: Offset(0, 3),
+                      const Spacer(),
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.end,
+                        children: <Widget>[
+                          Text(
+                            '本周 $weekCount/$weekTarget 关',
+                            style: const TextStyle(
+                              color: AdventurePalette.cafeGlow,
+                              fontWeight: FontWeight.w800,
+                              fontSize: 13,
+                            ),
+                          ),
+                          const SizedBox(height: 6),
+                          SizedBox(
+                            width: 88,
+                            height: 6,
+                            child: ClipRRect(
+                              borderRadius: BorderRadius.circular(99),
+                              child: LinearProgressIndicator(
+                                value: weekRatio,
+                                backgroundColor: Colors.white24,
+                                color: AppDesignTokens.brandGreen,
+                              ),
+                            ),
                           ),
                         ],
                       ),
-                      child: Text(
-                        level.answers[index],
-                        style: TextStyle(
-                          fontSize: 15,
-                          fontWeight: FontWeight.w700,
-                          color: AppDesignTokens.textPrimary,
+                    ],
+                  ),
+                  const Spacer(flex: 2),
+                  Container(
+                    width: 132,
+                    height: 132,
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      gradient: const RadialGradient(
+                        colors: <Color>[
+                          Color(0xFFFFE08A),
+                          Color(0xFFE6A800),
+                          Color(0xFF8A5A10),
+                        ],
+                      ),
+                      border: Border.all(
+                        color: AdventurePalette.pathAmber,
+                        width: 4,
+                      ),
+                      boxShadow: const <BoxShadow>[
+                        BoxShadow(
+                          color: Color(0x66FFC800),
+                          blurRadius: 28,
+                          spreadRadius: 2,
+                        ),
+                      ],
+                    ),
+                    child: const Text(
+                      '通关',
+                      style: TextStyle(
+                        fontSize: 36,
+                        fontWeight: FontWeight.w900,
+                        color: Color(0xFF3A2A00),
+                        letterSpacing: 4,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 28),
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 18,
+                      vertical: 16,
+                    ),
+                    decoration: BoxDecoration(
+                      color: AdventurePalette.cafeWarm,
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(
+                        color: AdventurePalette.pathAmber,
+                        width: 2,
+                      ),
+                    ),
+                    child: Text(
+                      '${level.title} · 已掌握',
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(
+                        color: AdventurePalette.cafeGlow,
+                        fontWeight: FontWeight.w900,
+                        fontSize: 22,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 12,
+                    ),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF231C16),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: AdventurePalette.pathAmber.withValues(alpha: 0.35),
+                      ),
+                    ),
+                    child: Text(
+                      level.explanation.isNotEmpty
+                          ? level.explanation
+                          : '本关练过：${level.ability}',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        color: AdventurePalette.cafeGlow.withValues(alpha: 0.9),
+                        fontWeight: FontWeight.w700,
+                        height: 1.4,
+                      ),
+                    ),
+                  ),
+                  const Spacer(flex: 2),
+                  HubChunkyButton(
+                    label: '发布成果卡邀人练同一关',
+                    icon: Icons.auto_awesome_rounded,
+                    onPressed: () => Navigator.of(context).push<void>(
+                      MaterialPageRoute<void>(
+                        builder: (_) => PublishLearningResultScreen(
+                          initialText:
+                              '我完成了街角咖啡店的「${level.title}」关卡（${level.ability}）。一起来练吧！',
+                          challengePath: cafeChallengePath(levelIndex),
                         ),
                       ),
                     ),
                   ),
-                ),
-              ),
-            if (_saving) const LinearProgressIndicator(),
-            if (_feedback != null)
-              Padding(
-                padding: const EdgeInsets.only(top: 8),
-                child: Semantics(
-                  liveRegion: true,
-                  child: Text(
-                    _feedback!,
-                    style: TextStyle(
-                      fontWeight: FontWeight.w700,
-                      color: AppDesignTokens.orange,
+                  const SizedBox(height: 12),
+                  SizedBox(
+                    width: double.infinity,
+                    height: 52,
+                    child: OutlinedButton(
+                      onPressed: () => Navigator.pop(context),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: AdventurePalette.pathAmber,
+                        side: const BorderSide(
+                          color: AdventurePalette.pathAmber,
+                          width: 2,
+                        ),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(16),
+                        ),
+                      ),
+                      child: const Text(
+                        '返回地图',
+                        style: TextStyle(
+                          fontWeight: FontWeight.w900,
+                          fontSize: 16,
+                        ),
+                      ),
                     ),
                   ),
-                ),
+                  const SizedBox(height: 18),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: <Widget>[
+                      const Icon(
+                        Icons.map_rounded,
+                        size: 18,
+                        color: AdventurePalette.cafeGlow,
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        '本周 ',
+                        style: TextStyle(
+                          color: AdventurePalette.cafeGlow.withValues(alpha: 0.85),
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      Text(
+                        '$weekCount/$weekTarget',
+                        style: const TextStyle(
+                          color: AppDesignTokens.brandGreen,
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                      Text(
+                        ' 关',
+                        style: TextStyle(
+                          color: AdventurePalette.cafeGlow.withValues(alpha: 0.85),
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
               ),
-          ],
+            ),
+          ),
         ],
       ),
     );

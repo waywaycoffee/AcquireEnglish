@@ -6,9 +6,11 @@ import 'package:go_router/go_router.dart';
 
 import '../../../router/app_router.dart';
 import '../../import_course/presentation/bilibili_import_sheet.dart';
+import '../../shared/presentation/pad/app_design_tokens.dart';
 import '../../sync/data/acquire_api_client.dart';
 import '../../sync/presentation/daily_feed_provider.dart';
 import '../data/community_models.dart';
+import 'adventure_ui.dart';
 import 'community_provider.dart';
 
 class CommunityHotTab extends ConsumerWidget {
@@ -33,76 +35,81 @@ class CommunityHotTab extends ConsumerWidget {
             physics: const AlwaysScrollableScrollPhysics(),
             padding: const EdgeInsets.fromLTRB(16, 12, 16, 32),
             children: <Widget>[
-              Text(
-                '大家喜欢的 B 站视频',
-                style: Theme.of(context).textTheme.titleMedium,
+              const Text(
+                '热门 · 视频任务',
+                style: TextStyle(fontWeight: FontWeight.w900, fontSize: 18),
               ),
               const SizedBox(height: 4),
               Text(
-                '欢迎发「分享 B 站视频」帖；点进帖子可评论，授权后还能同步到 B 站。',
-                style: Theme.of(context).textTheme.bodySmall,
+                '大家正在练的 B 站片子，点进去就是一关任务',
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                  color: AppDesignTokens.textSecondary,
+                ),
               ),
-              const SizedBox(height: 8),
+              const SizedBox(height: 14),
               if (data.shares.isEmpty)
-                const Text('还没有人分享。去「动态」贴一条你喜欢的 B 站链接吧。')
+                QuestFeedCard(
+                  title: '还没有人分享视频任务',
+                  meta: '去「任务」贴一条你喜欢的 B 站链接吧',
+                  badge: '等你来发',
+                  accent: AdventurePalette.pathAmber,
+                  onPlay: () {},
+                )
               else
-                for (final HotShareDto share in data.shares)
-                  ListTile(
-                    contentPadding: EdgeInsets.zero,
-                    title: Text(
-                      share.linkTitle?.isNotEmpty == true
-                          ? share.linkTitle!
-                          : share.linkUrl,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    subtitle: Text(
-                      [
-                        '分享 ${share.shareCount} 次',
-                        if (share.latestBody?.isNotEmpty == true)
-                          share.latestBody!,
-                      ].join(' · '),
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    trailing: TextButton(
-                      onPressed: () =>
-                          unawaited(_openShare(context, ref, share.linkUrl)),
-                      child: const Text('我也想学'),
-                    ),
+                for (final HotShareDto share in data.shares) ...<Widget>[
+                  QuestFeedCard(
+                    title: share.linkTitle?.isNotEmpty == true
+                        ? share.linkTitle!
+                        : 'B 站视频任务',
+                    meta: share.latestBody?.isNotEmpty == true
+                        ? '分享 ${share.shareCount} 次 · ${share.latestBody}'
+                        : '分享 ${share.shareCount} 次 · ${share.shareCount} 人正在做',
+                    badge: '热门',
+                    accent: const Color(0xFFE67E22),
+                    onPlay: () =>
+                        unawaited(_openShare(context, ref, share.linkUrl)),
                   ),
-              const SizedBox(height: 24),
-              Text(
-                '大家喜欢的 B 站博主',
-                style: Theme.of(context).textTheme.titleMedium,
+                  const SizedBox(height: 12),
+                ],
+              const SizedBox(height: 12),
+              const Text(
+                '热门 · 博主关卡源',
+                style: TextStyle(fontWeight: FontWeight.w900, fontSize: 18),
               ),
               const SizedBox(height: 4),
               Text(
-                '关注后新视频会出现在首页推荐；导入仍需你确认。YouTube 博主因政策原因暂时不可关注。',
-                style: Theme.of(context).textTheme.bodySmall,
+                '关注后新视频会出现在首页推荐；导入仍需你确认',
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                  color: AppDesignTokens.textSecondary,
+                ),
               ),
-              const SizedBox(height: 8),
+              const SizedBox(height: 14),
               if (data.creators.isEmpty)
-                const Text('暂无聚合数据。去「关注博主」添加你喜欢的 B 站 UP 主吧。')
-              else
-                for (final HotCreatorDto creator in data.creators)
-                  ListTile(
-                    contentPadding: EdgeInsets.zero,
-                    leading: const Icon(Icons.person_outline),
-                    title: Text(
-                      creator.displayName.isEmpty
-                          ? creator.creatorId
-                          : creator.displayName,
-                    ),
-                    subtitle: Text(
-                      'B站 · ${creator.followerCount} 人关注',
-                    ),
-                    trailing: TextButton(
-                      onPressed: () =>
-                          unawaited(_followCreator(context, ref, creator)),
-                      child: const Text('关注'),
-                    ),
+                Text(
+                  '暂无聚合数据。去「关注博主」添加你喜欢的 B 站 UP 主吧。',
+                  style: TextStyle(
+                    fontWeight: FontWeight.w600,
+                    color: AppDesignTokens.textSecondary,
                   ),
+                )
+              else
+                for (final HotCreatorDto creator in data.creators) ...<Widget>[
+                  QuestFeedCard(
+                    title: creator.displayName.isEmpty
+                        ? creator.creatorId
+                        : creator.displayName,
+                    meta: 'B站 · ${creator.followerCount} 人关注',
+                    badge: '关注',
+                    accent: AppDesignTokens.brandGreen,
+                    onPlay: () =>
+                        unawaited(_followCreator(context, ref, creator)),
+                  ),
+                  const SizedBox(height: 12),
+                ],
             ],
           );
         },
