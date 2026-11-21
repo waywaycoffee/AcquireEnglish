@@ -210,6 +210,13 @@ async def health() -> dict[str, str]:
         "admin": "/admin/",
         "openlist": "configured" if settings.openlist_configured else "unset",
         "netdisk": "/api/netdisk",
+        "scene_vl_model": (settings.scene_vl_model or "qwen-vl-plus").strip()
+        or "qwen-vl-plus",
+        "scene_vl": (
+            "configured"
+            if (settings.dashscope_api_key or "").strip()
+            else "unset"
+        ),
     }
 
 # Ops console (also deployed to /opt/acquireenglish/www/admin for nginx).

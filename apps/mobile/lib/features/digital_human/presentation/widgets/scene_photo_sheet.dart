@@ -59,11 +59,11 @@ class _ScenePhotoSheetState extends State<ScenePhotoSheet> {
 
   String get _footerHint {
     if (widget.statusHint.trim().isNotEmpty) return widget.statusHint;
-    if (widget.refining) return '云端精修中（Qwen-VL）…';
+    if (widget.refining) return '云端精修中（qwen-vl-plus）…';
     if (widget.refined) {
       return widget.labels.isEmpty
           ? '没有需要学的新词（高频已会词已隐藏），可重拍或仍交给数字人描述。'
-          : '点标注收藏进生词本；已会的高频词不会显示。';
+          : '点标注收藏进生词本；qwen-vl-plus 精修后更准。已会的高频词不会显示。';
     }
     return widget.labels.isEmpty
         ? '暂无待学新词，可点「再识别一次」或重拍。'

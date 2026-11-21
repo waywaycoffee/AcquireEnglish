@@ -10,6 +10,7 @@ import 'package:google_mlkit_text_recognition/google_mlkit_text_recognition.dart
 import 'package:image/image.dart' as img;
 
 import '../../../constants/endpoints.dart';
+import '../../../constants/env_config.dart';
 import '../../reading/data/reading_gloss.dart';
 import '../../reading/data/reading_vocab_lists.dart';
 import '../../settings/presentation/settings_provider.dart';
@@ -18,6 +19,11 @@ import '../../shared/domain/word_lookup_entry.dart';
 import '../../sync/data/acquire_api_client.dart';
 import '../../words/data/offline_word_dictionary.dart';
 import '../domain/scene_word_label.dart';
+
+/// Default cloud vision model for scene photo refine (DashScope compatible-mode).
+const String kSceneVlModel = 'qwen-vl-plus';
+const String kDashscopeCompatibleBase =
+    'https://dashscope.aliyuncs.com/compatible-mode/v1';
 
 final Provider<SceneWordRecognizer> sceneWordRecognizerProvider =
     Provider<SceneWordRecognizer>((Ref ref) {
@@ -140,8 +146,7 @@ class SceneWordRecognizer {
     }
   }
 
-  /// Cloud VL refine (Acquire API / DashScope Qwen-VL). Falls back to the
-  /// user's OpenAI-compatible vision model when the server is unavailable.
+  /// Cloud VL refine: Acquire API → direct DashScope `qwen-vl-plus` → user vision.
   Future<List<SceneWordLabel>> refineWithCloud(
     String imagePath, {
     required LearningSettingsState settings,
@@ -159,13 +164,22 @@ class SceneWordRecognizer {
         limit: limit,
       );
     } catch (_) {
-      cloud = await _refineWithUserVision(
+      cloud = await _refineWithDashscopeQwenVl(
         imageBase64: encoded.base64,
         mime: encoded.mime,
         settings: settings,
         seed: seed,
         limit: limit,
       );
+      if (cloud.isEmpty) {
+        cloud = await _refineWithUserVision(
+          imageBase64: encoded.base64,
+          mime: encoded.mime,
+          settings: settings,
+          seed: seed,
+          limit: limit,
+        );
+      }
     }
     if (cloud.isEmpty) {
       return seed;
@@ -189,6 +203,45 @@ class SceneWordRecognizer {
     return out;
   }
 
+  String _dashscopeVlApiKey(LearningSettingsState settings) {
+    final String asr = settings.resolvedAsrApiKey.trim();
+    if (asr.isNotEmpty) return asr;
+    if (EnvConfig.hasBailianAsrApiKey) return EnvConfig.bailianAsrApiKey;
+    final String translation = settings.translationApiKey.trim();
+    final String provider = settings.translationProvider.trim();
+    if (translation.isNotEmpty &&
+        (provider.contains('百炼') ||
+            provider.toLowerCase().contains('dashscope') ||
+            settings.translationBaseUrl.contains('dashscope'))) {
+      return translation;
+    }
+    return '';
+  }
+
+  Future<List<SceneWordLabel>> _refineWithDashscopeQwenVl({
+    required String imageBase64,
+    required String mime,
+    required LearningSettingsState settings,
+    required List<SceneWordLabel> seed,
+    required int limit,
+  }) async {
+    final String apiKey = _dashscopeVlApiKey(settings);
+    if (apiKey.isEmpty) return const <SceneWordLabel>[];
+    try {
+      return await _postVisionChat(
+        baseUrl: kDashscopeCompatibleBase,
+        apiKey: apiKey,
+        model: kSceneVlModel,
+        imageBase64: imageBase64,
+        mime: mime,
+        seed: seed,
+        limit: limit,
+      );
+    } catch (_) {
+      return const <SceneWordLabel>[];
+    }
+  }
+
   Future<List<SceneWordLabel>> _refineWithUserVision({
     required String imageBase64,
     required String mime,
@@ -200,6 +253,41 @@ class SceneWordRecognizer {
       return const <SceneWordLabel>[];
     }
     final String model = settings.translationModel.trim();
+    final String base = settings.translationBaseUrl.trim().replaceAll(
+      RegExp(r'/+$'),
+      '',
+    );
+    // Bailian users often set ASR base without compatible-mode; normalize.
+    final String chatBase = base.contains('dashscope.aliyuncs.com') &&
+            !base.contains('compatible-mode')
+        ? kDashscopeCompatibleBase
+        : base;
+    try {
+      return await _postVisionChat(
+        baseUrl: chatBase,
+        apiKey: settings.translationApiKey.trim().isEmpty
+            ? 'ollama'
+            : settings.translationApiKey.trim(),
+        model: model.toLowerCase().contains('qwen-vl') ? model : kSceneVlModel,
+        imageBase64: imageBase64,
+        mime: mime,
+        seed: seed,
+        limit: limit,
+      );
+    } catch (_) {
+      return const <SceneWordLabel>[];
+    }
+  }
+
+  Future<List<SceneWordLabel>> _postVisionChat({
+    required String baseUrl,
+    required String apiKey,
+    required String model,
+    required String imageBase64,
+    required String mime,
+    required List<SceneWordLabel> seed,
+    required int limit,
+  }) async {
     final String seedBrief = seed
         .take(8)
         .map((SceneWordLabel s) => '${s.word}:${s.chinese}')
@@ -235,10 +323,9 @@ class SceneWordRecognizer {
     };
     final Response<dynamic> response = await Dio(
       BaseOptions(
-        baseUrl: settings.translationBaseUrl.trim(),
+        baseUrl: baseUrl,
         headers: <String, String>{
-          'Authorization':
-              'Bearer ${settings.translationApiKey.trim().isEmpty ? 'ollama' : settings.translationApiKey.trim()}',
+          'Authorization': 'Bearer $apiKey',
           'Content-Type': 'application/json',
         },
         connectTimeout: const Duration(seconds: 20),
