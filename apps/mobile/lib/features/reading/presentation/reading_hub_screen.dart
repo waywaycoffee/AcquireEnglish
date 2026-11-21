@@ -14,10 +14,14 @@ import '../../player/presentation/player_subtitle_loader.dart';
 import '../../shared/presentation/pad/app_design_tokens.dart';
 import '../../shared/presentation/pad/pad_scaffold.dart';
 import '../../shared/presentation/pad/pad_top_bar.dart';
+import '../data/reading_iplus1.dart';
 import '../data/reading_ingest.dart';
 import '../data/reading_stats.dart';
+import '../data/reading_vocab_lists.dart';
 import '../domain/reading_doc.dart';
+import 'reading_iplus1_provider.dart';
 import 'reading_library_provider.dart';
+import 'reading_vocab_lists_sheet.dart';
 
 class ReadingHubScreen extends ConsumerWidget {
   const ReadingHubScreen({super.key});
@@ -159,14 +163,22 @@ class ReadingHubScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final ReadingLibraryState state = ref.watch(readingLibraryProvider);
     final ReadingDoc? cont = state.continueDoc;
+    final ReadingVocabLists lists = ref.watch(readingVocabListsProvider);
+    final AsyncValue<List<ReadingIPlus1Match>> iPlus1 =
+        ref.watch(readingIPlus1MatchesProvider);
     return PadScaffold(
       currentDestination: AppNavDestination.reading,
       showContinueLearning: false,
       topBar: PadTopBar(
         title: '爱快阅读',
-        description: '泛读短文 · 点词进词书 · 连续朗读 / 跟读评测',
+        description: '泛读短文 · i+1 推荐 · 黑白名单',
         leading: PadBackButton(onPressed: () => context.pop()),
         actions: <Widget>[
+          TextButton.icon(
+            onPressed: () => unawaited(showReadingVocabListsSheet(context, ref)),
+            icon: const Icon(Icons.playlist_add_check_rounded),
+            label: Text('词表 ${lists.knownCount + lists.focusCount}'),
+          ),
           TextButton.icon(
             onPressed: () => context.push('/reading/catalog'),
             icon: const Icon(Icons.cloud_download_outlined),
@@ -211,6 +223,14 @@ class ReadingHubScreen extends ConsumerWidget {
                             label: '约读词数',
                             value: '${stats.wordsReadEstimate}',
                           ),
+                          _StatChip(
+                            label: '已会词',
+                            value: '${lists.knownCount}',
+                          ),
+                          _StatChip(
+                            label: '强制生词',
+                            value: '${lists.focusCount}',
+                          ),
                         ],
                       ),
                     );
@@ -227,6 +247,44 @@ class ReadingHubScreen extends ConsumerWidget {
                   ),
                   const SizedBox(height: 16),
                 ],
+                iPlus1.when(
+                  data: (List<ReadingIPlus1Match> matches) {
+                    if (matches.isEmpty) return const SizedBox.shrink();
+                    return Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: <Widget>[
+                        const _SectionTitle('适合你（i+1）'),
+                        Text(
+                          '按生词率约 2%–8% 排序；白名单与已复习词视为已会',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: AppDesignTokens.textPrimary.withValues(
+                              alpha: 0.55,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        for (final ReadingIPlus1Match m in matches) ...<Widget>[
+                          _DocTile(
+                            doc: m.doc,
+                            progress: state.progressFor(m.doc.id),
+                            badge: '${m.band.labelCn} · ${m.rateLabel}',
+                            onOpen: () => context.push(
+                              '/reading/${Uri.encodeComponent(m.doc.id)}',
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                        ],
+                        const SizedBox(height: 8),
+                      ],
+                    );
+                  },
+                  loading: () => const Padding(
+                    padding: EdgeInsets.only(bottom: 16),
+                    child: LinearProgressIndicator(minHeight: 2),
+                  ),
+                  error: (_, __) => const SizedBox.shrink(),
+                ),
                 Wrap(
                   spacing: 8,
                   runSpacing: 8,
@@ -246,6 +304,12 @@ class ReadingHubScreen extends ConsumerWidget {
                           unawaited(_generateFromVideo(context, ref)),
                       icon: const Icon(Icons.movie_filter_outlined),
                       label: const Text('从视频生成短文'),
+                    ),
+                    FilledButton.tonalIcon(
+                      onPressed: () =>
+                          unawaited(showReadingVocabListsSheet(context, ref)),
+                      icon: const Icon(Icons.rule_folder_outlined),
+                      label: const Text('黑白名单'),
                     ),
                   ],
                 ),
@@ -349,12 +413,14 @@ class _DocTile extends StatelessWidget {
     required this.onOpen,
     this.progress,
     this.onDelete,
+    this.badge,
   });
 
   final ReadingDoc doc;
   final ReadingProgress? progress;
   final VoidCallback onOpen;
   final VoidCallback? onDelete;
+  final String? badge;
 
   String get _sourceLabel {
     switch (doc.sourceType) {
@@ -410,7 +476,8 @@ class _DocTile extends StatelessWidget {
               ),
               Text(
                 '$_sourceLabel · 约 ${doc.wordCount} 词'
-                '${pct > 0 ? ' · 进度 ${(pct * 100).round()}%' : ''}',
+                '${pct > 0 ? ' · 进度 ${(pct * 100).round()}%' : ''}'
+                '${(badge ?? '').isNotEmpty ? ' · $badge' : ''}',
                 style: const TextStyle(color: Color(0xFF626262), fontSize: 13),
               ),
               if (pct > 0) ...<Widget>[

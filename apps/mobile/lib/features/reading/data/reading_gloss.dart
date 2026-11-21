@@ -87,13 +87,23 @@ Future<Map<String, String>> buildHardWordGlosses({
   required ReadingFrequencyLexicon lexicon,
   required OfflineWordDictionary dictionary,
   int threshold = kReadingDefaultFreqThreshold,
+  Set<String> known = const <String>{},
+  Set<String> focus = const <String>{},
 }) async {
   final Map<String, String> out = <String, String>{};
   final Set<String> seen = <String>{};
   for (final String raw in words) {
     final String word = raw.trim().toLowerCase().replaceAll('’', "'");
     if (word.length < 2 || !seen.add(word)) continue;
-    if (!lexicon.isHard(word, threshold: threshold)) continue;
+    if (!_isHardWithLists(
+      word: word,
+      lexicon: lexicon,
+      threshold: threshold,
+      known: known,
+      focus: focus,
+    )) {
+      continue;
+    }
     final OfflineWordDefinition? def = await dictionary.lookup(word);
     final String gloss = shortReadingGloss(def?.translation ?? '');
     if (gloss.isEmpty) continue;
@@ -102,11 +112,26 @@ Future<Map<String, String>> buildHardWordGlosses({
   return out;
 }
 
+bool _isHardWithLists({
+  required String word,
+  required ReadingFrequencyLexicon lexicon,
+  required int threshold,
+  required Set<String> known,
+  required Set<String> focus,
+}) {
+  if (known.contains(word)) return false;
+  if (focus.contains(word)) return true;
+  return lexicon.isHard(word, threshold: threshold);
+}
+
 /// Share of tokens whose frequency rank is above [threshold] (or unknown).
+/// Optional [known]/[focus] lists override frequency (whitelist / blacklist).
 double unknownWordRate({
   required Iterable<String> words,
   required ReadingFrequencyLexicon lexicon,
   required int threshold,
+  Set<String> known = const <String>{},
+  Set<String> focus = const <String>{},
 }) {
   int total = 0;
   int hard = 0;
@@ -114,7 +139,15 @@ double unknownWordRate({
     final String word = raw.trim().toLowerCase().replaceAll('’', "'");
     if (word.length < 2) continue;
     total += 1;
-    if (lexicon.isHard(word, threshold: threshold)) hard += 1;
+    if (_isHardWithLists(
+      word: word,
+      lexicon: lexicon,
+      threshold: threshold,
+      known: known,
+      focus: focus,
+    )) {
+      hard += 1;
+    }
   }
   if (total == 0) return 0;
   return hard / total;

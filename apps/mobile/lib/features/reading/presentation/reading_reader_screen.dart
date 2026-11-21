@@ -25,12 +25,14 @@ import '../../words/presentation/learned_vocabulary_provider.dart';
 import '../../words/presentation/word_book_provider.dart';
 import '../data/reading_continuous_tts.dart';
 import '../data/reading_gloss.dart';
+import '../data/reading_vocab_lists.dart';
 import '../domain/reading_doc.dart';
 import '../domain/reading_study_mode.dart';
 import 'content_media_provider.dart';
 import 'reading_chunk_provider.dart';
 import 'reading_library_provider.dart';
 import 'reading_text_spans.dart';
+import 'reading_vocab_lists_sheet.dart';
 
 const String kReadingSlowModeKey = 'reading_slow_mode_v1';
 const String kReadingSoeEnabledKey = 'reading_soe_enabled_v1';
@@ -65,6 +67,7 @@ class _ReadingReaderScreenState extends ConsumerState<ReadingReaderScreen> {
   Timer? _highlightTimer;
   String? _glossDocId;
   int _glossThreshold = -1;
+  int _glossListsSig = -1;
   Map<String, String> _hardGlosses = const <String, String>{};
   bool _glossLoading = false;
   double? _unknownRate;
@@ -226,27 +229,53 @@ class _ReadingReaderScreenState extends ConsumerState<ReadingReaderScreen> {
     );
   }
 
+  int _listsSignature(ReadingVocabLists lists, Set<String> learned) {
+    final List<String> knownSorted = lists.known.toList()..sort();
+    final List<String> focusSorted = lists.focus.toList()..sort();
+    return Object.hash(
+      Object.hashAll(knownSorted),
+      Object.hashAll(focusSorted),
+      learned.length,
+    );
+  }
+
   Future<void> _ensureGlosses(ReadingDoc doc) async {
-    if (_glossDocId == doc.id && _glossThreshold == _freqThreshold) return;
+    final ReadingVocabLists lists = ref.read(readingVocabListsProvider);
+    final Set<String> learned = ref.read(learnedVocabularyProvider);
+    final int listsSig = _listsSignature(lists, learned);
+    if (_glossDocId == doc.id &&
+        _glossThreshold == _freqThreshold &&
+        _glossListsSig == listsSig) {
+      return;
+    }
     _glossDocId = doc.id;
     _glossThreshold = _freqThreshold;
+    _glossListsSig = listsSig;
     if (mounted) setState(() => _glossLoading = true);
     try {
       final ReadingFrequencyLexicon lexicon =
           await ref.read(readingFrequencyLexiconProvider.future);
       final OfflineWordDictionary dictionary =
           ref.read(offlineWordDictionaryProvider);
+      final Set<String> known = effectiveKnownWords(
+        lists: lists,
+        learned: learned,
+      );
       final List<String> tokens = extractReadingWordTokens(doc.plainText);
       final Map<String, String> glosses = await buildHardWordGlosses(
         words: tokens.toSet(),
         lexicon: lexicon,
         dictionary: dictionary,
         threshold: _freqThreshold,
+        known: known,
+        focus: lists.focus,
       );
       final double rate = unknownWordRate(
         words: tokens,
         lexicon: lexicon,
         threshold: _freqThreshold,
+        known: known,
+        focus: lists.focus,
       );
       if (!mounted || _glossDocId != doc.id) return;
       setState(() {
@@ -360,6 +389,38 @@ class _ReadingReaderScreenState extends ConsumerState<ReadingReaderScreen> {
                       onPressed: () => unawaited(_openMouthVideo(lexeme)),
                       icon: const Icon(Icons.face_retouching_natural_outlined),
                       label: const Text('口型'),
+                    ),
+                    TextButton.icon(
+                      onPressed: () {
+                        unawaited(
+                          ref
+                              .read(readingVocabListsProvider.notifier)
+                              .markKnown(lexeme),
+                        );
+                        setState(() => _glossDocId = null);
+                        Navigator.pop(ctx);
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(content: Text('已加入白名单：$lexeme')),
+                        );
+                      },
+                      icon: const Icon(Icons.check_circle_outline),
+                      label: const Text('已会'),
+                    ),
+                    TextButton.icon(
+                      onPressed: () {
+                        unawaited(
+                          ref
+                              .read(readingVocabListsProvider.notifier)
+                              .markFocus(lexeme),
+                        );
+                        setState(() => _glossDocId = null);
+                        Navigator.pop(ctx);
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(content: Text('已加入黑名单：$lexeme')),
+                        );
+                      },
+                      icon: const Icon(Icons.flag_outlined),
+                      label: const Text('生词'),
                     ),
                   ],
                 ),
@@ -631,6 +692,15 @@ class _ReadingReaderScreenState extends ConsumerState<ReadingReaderScreen> {
                           },
                         ),
                     ],
+                  ),
+                  const SizedBox(height: 8),
+                  OutlinedButton.icon(
+                    onPressed: () {
+                      Navigator.pop(ctx);
+                      unawaited(showReadingVocabListsSheet(context, ref));
+                    },
+                    icon: const Icon(Icons.rule_folder_outlined),
+                    label: const Text('管理黑白名单'),
                   ),
                 ],
               ),

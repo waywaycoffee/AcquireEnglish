@@ -1,6 +1,9 @@
 import 'package:common_learn_english/features/reading/data/reading_continuous_tts.dart';
 import 'package:common_learn_english/features/reading/data/reading_gloss.dart';
+import 'package:common_learn_english/features/reading/data/reading_iplus1.dart';
 import 'package:common_learn_english/features/reading/data/reading_ingest.dart';
+import 'package:common_learn_english/features/reading/data/reading_vocab_lists.dart';
+import 'package:common_learn_english/features/reading/domain/reading_doc.dart';
 import 'package:common_learn_english/features/reading/domain/reading_study_mode.dart';
 import 'package:common_learn_english/features/reading/presentation/reading_text_spans.dart';
 import 'package:common_learn_english/features/player/presentation/widgets/subtitle_chunk_highlight.dart';
@@ -121,6 +124,92 @@ void main() {
   group('estimatedMsPerWord', () {
     test('slows down when rate decreases', () {
       expect(estimatedMsPerWord(0.5), greaterThan(estimatedMsPerWord(1.0)));
+    });
+  });
+
+  group('vocab lists + i+1', () {
+    final ReadingFrequencyLexicon lexicon = ReadingFrequencyLexicon(
+      const <String, int>{
+        'the': 1,
+        'cat': 100,
+        'sat': 200,
+        'mat': 300,
+        'serendipity': 9000,
+      },
+    );
+
+    test('whitelist suppresses hard; blacklist forces hard', () {
+      expect(
+        isReadingHardWord(
+          word: 'serendipity',
+          lexicon: lexicon,
+          threshold: 3000,
+          known: const <String>{'serendipity'},
+        ),
+        isFalse,
+      );
+      expect(
+        isReadingHardWord(
+          word: 'the',
+          lexicon: lexicon,
+          threshold: 3000,
+          focus: const <String>{'the'},
+        ),
+        isTrue,
+      );
+    });
+
+    test('unknownWordRate respects lists', () {
+      final double rate = unknownWordRate(
+        words: const <String>['the', 'cat', 'serendipity'],
+        lexicon: lexicon,
+        threshold: 3000,
+        known: const <String>{'serendipity'},
+      );
+      expect(rate, 0);
+    });
+
+    test('i+1 fitness peaks inside ideal band', () {
+      expect(iPlus1Fitness(0.04), 1.0);
+      expect(iPlus1Fitness(0.0), lessThan(1.0));
+      expect(iPlus1Fitness(0.25), lessThan(iPlus1Fitness(0.10)));
+      expect(bandForUnknownRate(0.04), ReadingIPlus1Band.ideal);
+      expect(bandForUnknownRate(0.01), ReadingIPlus1Band.tooEasy);
+    });
+
+    test('rankDocsForIPlus1 prefers ideal unknown rate', () {
+      // 1/20 = 5% unknown → ideal.
+      final String idealText = List<String>.filled(19, 'the').join(' ') +
+          ' serendipity';
+      const ReadingDoc hard = ReadingDoc(
+        id: 'hard',
+        title: 'Hard',
+        sourceType: ReadingSourceType.builtin,
+        plainText: 'serendipity serendipity serendipity serendipity',
+      );
+      final ReadingDoc ideal = ReadingDoc(
+        id: 'ideal',
+        title: 'Ideal',
+        sourceType: ReadingSourceType.builtin,
+        plainText: idealText,
+      );
+      final List<ReadingIPlus1Match> ranked = rankDocsForIPlus1(
+        docs: <ReadingDoc>[hard, ideal],
+        lexicon: lexicon,
+        threshold: 3000,
+        limit: 2,
+      );
+      expect(ranked.first.doc.id, 'ideal');
+      expect(ranked.first.band, ReadingIPlus1Band.ideal);
+      expect(ranked.last.doc.id, 'hard');
+    });
+
+    test('ReadingVocabLists markKnown removes from focus', () {
+      final ReadingVocabLists lists = const ReadingVocabLists(
+        focus: <String>{'apple'},
+      ).markKnown('Apple');
+      expect(lists.isKnown('apple'), isTrue);
+      expect(lists.isFocus('apple'), isFalse);
     });
   });
 }
