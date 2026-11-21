@@ -43,9 +43,12 @@ class FloatingBottomNav extends StatelessWidget {
         ? _primaryDestinations
         : destinations;
 
-    // Use MediaQuery.padding.bottom only. viewPadding/SafeArea here double-
-    // counts with Scaffold and overflows the bottom bar by ~74px on this phone.
-    final double bottomInset = MediaQuery.paddingOf(context).bottom;
+    // Edge-to-edge: padding.bottom==0 and we must clear the gesture/nav bar.
+    // Non-edge-to-edge: Scaffold already inset us — adding padding again
+    // overflows the bottom bar by ~74px and blocks tab taps.
+    final MediaQueryData media = MediaQuery.of(context);
+    final double bottomInset =
+        media.padding.bottom == 0 ? media.viewPadding.bottom : 0;
     return Padding(
       padding: EdgeInsets.fromLTRB(
         compact ? 10 : 16,
