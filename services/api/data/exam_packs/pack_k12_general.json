@@ -1,8 +1,19 @@
 {
-  "family_id": "k12_j2",
-  "title": "K12 通用备考包",
+  "family_id": "k12_general",
+  "title": "K12 英语通用备考包",
   "cefr": "A2",
-  "version": 1,
+  "version": 2,
+  "sources": [
+    "guorentao/SmartGaokaoPastPapers",
+    "mirrored-zhongkao/gaokao-slice"
+  ],
+  "counts": {
+    "vocab": 39,
+    "listening": 1,
+    "reading": 20,
+    "writing": 1,
+    "speaking": 1
+  },
   "sections": {
     "vocab": [
       {
@@ -69,6 +80,447 @@
         ],
         "answer": "an",
         "explain": ""
+      },
+      {
+        "id": "zk_j_chemistry_0",
+        "type": "mcq",
+        "prompt": "下列变化中，属于化学变化的是",
+        "options": [
+          "冰雪融化",
+          "铁锅生锈",
+          "酒精挥发",
+          "玻璃破碎"
+        ],
+        "answer": "铁锅生锈",
+        "explain": "化学变化的本质特征是有新物质生成。铁生锈生成了铁的氧化物，属于化学变化；其余三项只是形状或状态改变，属于物理变化。故选 B。"
+      },
+      {
+        "id": "zk_j_chemistry_1",
+        "type": "mcq",
+        "prompt": "空气中体积分数约为21%的气体是",
+        "options": [
+          "氮气",
+          "氧气",
+          "二氧化碳",
+          "稀有气体"
+        ],
+        "answer": "氧气",
+        "explain": "空气的成分按体积计：氮气约78%、氧气约21%、稀有气体约0.94%、二氧化碳约0.03%。故选 B。"
+      },
+      {
+        "id": "zk_j_chemistry_2",
+        "type": "mcq",
+        "prompt": "下列物质中，属于氧化物的是",
+        "options": [
+          "O₂",
+          "KClO₃",
+          "CO₂",
+          "NaOH"
+        ],
+        "answer": "CO₂",
+        "explain": "氧化物是由两种元素组成且其中一种是氧元素的化合物。CO₂ 由碳、氧两种元素组成，符合定义；O₂ 是单质，KClO₃ 含三种元素，NaOH 不含氧元素（含 O 但由三种元素组成）。故选 C。"
+      },
+      {
+        "id": "zk_j_chemistry_3",
+        "type": "mcq",
+        "prompt": "下列实验操作中，正确的是",
+        "options": [
+          "用嘴吹灭燃着的酒精灯",
+          "用托盘天平称量时，砝码放在左盘",
+          "给试管中的液体加热时，液体体积不超过试管容积的1/3",
+          "用量筒量取液体时，俯视凹液面最低处读数"
+        ],
+        "answer": "给试管中的液体加热时，液体体积不超过试管容积的1/3",
+        "explain": "酒精灯应用灯帽盖灭；天平使用“左物右码”；加热时液体不超过容积的1/3，防止沸腾冲出，C 正确；量筒读数应视线与凹液面最低处保持水平，俯视会读数偏大。故选 C。"
+      },
+      {
+        "id": "zk_j_chemistry_8",
+        "type": "mcq",
+        "prompt": "下列物质中，属于纯净物的是",
+        "options": [
+          "洁净的空气",
+          "生铁",
+          "蒸馏水",
+          "加碘食盐"
+        ],
+        "answer": "蒸馏水",
+        "explain": "纯净物只由一种物质组成。蒸馏水只含水，是纯净物；空气是混合物，生铁是铁与碳等的混合物，加碘食盐含氯化钠和碘酸钾。故选 C。"
+      },
+      {
+        "id": "zk_j_chemistry_9",
+        "type": "mcq",
+        "prompt": "下列化肥中，属于氮肥的是",
+        "options": [
+          "K₂SO₄",
+          "CO(NH₂)₂",
+          "Ca₃(PO₄)₂",
+          "KCl"
+        ],
+        "answer": "CO(NH₂)₂",
+        "explain": "含氮元素、能提供氮营养的肥料为氮肥。CO(NH₂)₂（尿素）是常用氮肥；K₂SO₄、KCl 是钾肥，Ca₃(PO₄)₂ 是磷肥。故选 B。"
+      },
+      {
+        "id": "zk_j_chemistry_10",
+        "type": "mcq",
+        "prompt": "下列金属中，金属活动性最强的是",
+        "options": [
+          "铜",
+          "铁",
+          "锌",
+          "镁"
+        ],
+        "answer": "镁",
+        "explain": "金属活动性顺序：K Ca Na Mg Al Zn Fe Sn Pb (H) Cu Hg Ag Pt Au。四种金属中镁最靠前，活动性最强。故选 D。"
+      },
+      {
+        "id": "zk_j_chinese_0",
+        "type": "mcq",
+        "prompt": "下列词语中，书写完全正确的一项是",
+        "options": [
+          "各得其所　恍然大悟　花团锦簇",
+          "惊慌失错　混为一谈　人声鼎沸",
+          "美不甚收　大相径庭　沉默寡言",
+          "截然不同　浑为一谈　小心翼翼"
+        ],
+        "answer": "各得其所　恍然大悟　花团锦簇",
+        "explain": "B 项“惊慌失错”应为“惊慌失措”；C 项“美不甚收”应为“美不胜收”；D 项“浑为一谈”应为“混为一谈”。故选 A。"
+      },
+      {
+        "id": "zk_j_chinese_2",
+        "type": "mcq",
+        "prompt": "下列句子中，没有语病的一项是",
+        "options": [
+          "通过这次活动，使我明白了坚持的意义。",
+          "我们要及时改正并发现学习中的问题。",
+          "这本书内容丰富，深受同学们的喜爱。",
+          "能否取得好成绩，关键在于努力。"
+        ],
+        "answer": "这本书内容丰富，深受同学们的喜爱。",
+        "explain": "A 项“通过……使……”造成主语残缺，删去“通过”或“使”；B 项语序不当，应先“发现”再“改正”；D 项两面对一面，“能否”与“努力”不对应。故选 C。"
+      },
+      {
+        "id": "zk_j_chinese_8",
+        "type": "mcq",
+        "prompt": "下列句子中加点成语使用恰当的一项是",
+        "options": [
+          "他的演讲抑扬顿挫，赢得了阵阵掌声。",
+          "运动会上，他一鸣惊人，跑了个倒数第一。",
+          "这道题他想了半天，终于恍然大悟，还是不会做。",
+          "面对困难，我们要不以为然，勇敢面对。"
+        ],
+        "answer": "他的演讲抑扬顿挫，赢得了阵阵掌声。",
+        "explain": "B 项“一鸣惊人”指平时无声无息、突然做出惊人的成绩，与“倒数第一”矛盾；C 项“恍然大悟”指一下子明白过来，与“还是不会做”矛盾；D 项“不以为然”指不认为是对的，表示不赞同，此处应用“不以为意”或“毫不畏惧”。故选 A。"
+      },
+      {
+        "id": "zk_j_chinese_10",
+        "type": "mcq",
+        "prompt": "将下列句子填入语段横线处，使语意连贯，正确的一项是\n①它需要长期的积累　②读书是一场慢功夫　③也离不开反复的思考\n横线处应填入的顺序是",
+        "options": [
+          "②①③",
+          "①②③",
+          "③①②",
+          "②③①"
+        ],
+        "answer": "②①③",
+        "explain": "②提出观点“读书是慢功夫”，①“它需要长期的积累”承接“慢功夫”，③“也离不开反复的思考”用“也”并列补充，故顺序为②①③。"
+      },
+      {
+        "id": "zk_j_english_0",
+        "type": "mcq",
+        "prompt": "— Where is Tom?\n— He ______ basketball on the playground now.",
+        "options": [
+          "plays",
+          "is playing",
+          "played",
+          "has played"
+        ],
+        "answer": "is playing",
+        "explain": "时间状语 now 提示现在进行时，结构为 be + doing，主语 He 用 is，故选 B。"
+      },
+      {
+        "id": "zk_j_english_1",
+        "type": "mcq",
+        "prompt": "This is ______ useful book. I read it every day.",
+        "options": [
+          "a",
+          "an",
+          "the",
+          "/"
+        ],
+        "answer": "a",
+        "explain": "useful 虽以元音字母 u 开头，但读音为 /ˈjuːsfl/，以辅音音素开头，故用 a。选 A。"
+      },
+      {
+        "id": "zk_j_english_2",
+        "type": "mcq",
+        "prompt": "My sister is much ______ than me.",
+        "options": [
+          "tall",
+          "taller",
+          "tallest",
+          "the tallest"
+        ],
+        "answer": "taller",
+        "explain": "有 than 说明是比较级，much 修饰比较级，tall 的比较级为 taller，故选 B。"
+      },
+      {
+        "id": "zk_j_english_3",
+        "type": "mcq",
+        "prompt": "The new library ______ in 2019, and it is very popular now.",
+        "options": [
+          "built",
+          "was built",
+          "is built",
+          "builds"
+        ],
+        "answer": "was built",
+        "explain": "图书馆是被建造的，用被动语态；in 2019 表示过去，故用一般过去时的被动 was built。选 B。"
+      },
+      {
+        "id": "zk_j_english_4",
+        "type": "mcq",
+        "prompt": "阅读短文，从每题所给选项中选出最佳答案。\nLi Hua is a middle school student. Every morning he gets up at six and (1)______ to school by bike. He says riding a bike is good for his (2)______. Last week he (3)______ a bike race in his school and won first prize.",
+        "options": [
+          "(1) A. go　B. goes　C. went　D. going",
+          "(2) A. health　B. money　C. homework　D. weather",
+          "(3) A. joins　B. joined　C. will join　D. is joining"
+        ],
+        "answer": "(1) B　(2) A　(3) B",
+        "explain": "(1) 主语 he 为第三人称单数，一般现在时用 goes；(2) 骑车有益于健康，选 health；(3) Last week 表过去，用 joined。"
+      },
+      {
+        "id": "zk_j_english_5",
+        "type": "mcq",
+        "prompt": "阅读短文，选择最佳答案。\nIn our school, students go to school in different ways. About half of them take the school bus because it is safe and fast. Some students live near the school, so they walk there every day. A few students ride bikes, but they must wear helmets. Our teacher says walking and riding are good exercise.\nHow do about half of the students go to school?",
+        "options": [
+          "On foot.",
+          "By bus.",
+          "By bike.",
+          "By car."
+        ],
+        "answer": "By bus.",
+        "explain": "文中“About half of them take the school bus”直接说明约一半学生乘校车，故选 B。"
+      },
+      {
+        "id": "zk_j_english_8",
+        "type": "mcq",
+        "prompt": "I ______ in this city since 2015.",
+        "options": [
+          "live",
+          "lived",
+          "have lived",
+          "will live"
+        ],
+        "answer": "have lived",
+        "explain": "since + 时间点与现在完成时连用，表示从过去持续到现在，结构为 have/has + 过去分词。选 C。"
+      },
+      {
+        "id": "zk_j_english_9",
+        "type": "mcq",
+        "prompt": "— Must I finish the work today?\n— No, you ______. You can do it tomorrow.",
+        "options": [
+          "mustn't",
+          "needn't",
+          "can't",
+          "shouldn't"
+        ],
+        "answer": "needn't",
+        "explain": "Must 引导的一般疑问句，否定回答用 needn't（不必），而 mustn't 表示“禁止”，语气不符。选 B。"
+      },
+      {
+        "id": "zk_j_english_10",
+        "type": "mcq",
+        "prompt": "Could you tell me ______?",
+        "options": [
+          "where is the museum",
+          "where the museum is",
+          "where was the museum",
+          "where the museum was"
+        ],
+        "answer": "where the museum is",
+        "explain": "宾语从句要用陈述语序，即“连接词 + 主语 + 谓语”，且主句为现在时，从句可用现在时。故选 B。"
+      },
+      {
+        "id": "zk_j_english_11",
+        "type": "mcq",
+        "prompt": "My grandfather is good at ______ chess, and he often teaches me.",
+        "options": [
+          "play",
+          "plays",
+          "playing",
+          "to play"
+        ],
+        "answer": "playing",
+        "explain": "be good at 中的 at 是介词，后接动词 -ing 形式，故用 playing。选 C。"
+      },
+      {
+        "id": "zk_j_english_12",
+        "type": "mcq",
+        "prompt": "阅读短文，从每题所给选项中选出最佳答案。\nLast summer, Amy went to a small village to help the children there. She found that many of them had never (1)______ a computer. So she decided to teach them how to use one. At first the children were shy, but soon they became (2)______ in it. On the last day, a girl said to her, “Thank you. You opened a (3)______ for us.” Amy (4)______ that helping others made her happier than anything else.",
+        "options": [
+          "(1) A. seen　B. see　C. saw　D. seeing",
+          "(2) A. boring　B. interested　C. angry　D. tired",
+          "(3) A. door　B. window　C. box　D. bag",
+          "(4) A. forgot　B. realized　C. refused　D. doubted"
+        ],
+        "answer": "(1) A　(2) B　(3) B　(4) B",
+        "explain": "(1) had never + 过去分词构成过去完成时，用 seen；(2) become interested in 表示“对……感兴趣”；(3) open a window for us 是比喻“为我们打开一扇窗”；(4) realized 表示“意识到”。"
+      },
+      {
+        "id": "zk_j_english_13",
+        "type": "mcq",
+        "prompt": "阅读短文，选择最佳答案。\nMany people believe that the best way to learn a language is to use it. Maria, a student from Spain, agrees. She came to China last year knowing only a few Chinese words. Instead of taking too many classes, she made friends with her neighbours and practised speaking with them every day. Six months later, she could talk with shopkeepers and order food by herself. “Textbooks are useful,” she says, “but real conversations taught me more.”\nWhat does Maria think is the best way to learn a language?",
+        "options": [
+          "Taking as many classes as possible.",
+          "Using the language in real life.",
+          "Reading textbooks carefully.",
+          "Living with other foreign students."
+        ],
+        "answer": "Using the language in real life.",
+        "explain": "首句“the best way to learn a language is to use it”与末句“real conversations taught me more”共同说明她的观点是在真实生活中使用语言，故选 B。"
+      },
+      {
+        "id": "zk_j_math_0",
+        "type": "mcq",
+        "prompt": "截至2024年3月，我国累计建成5G基站约3 640 000个。将3 640 000用科学记数法表示为",
+        "options": [
+          "3.64×10⁵",
+          "36.4×10⁵",
+          "3.64×10⁶",
+          "0.364×10⁷"
+        ],
+        "answer": "3.64×10⁶",
+        "explain": "科学记数法要求 1≤|a|<10。3 640 000 = 3.64×10⁶，故选 C。"
+      },
+      {
+        "id": "zk_j_math_1",
+        "type": "mcq",
+        "prompt": "下列实数中，最小的数是",
+        "options": [
+          "-√5",
+          "-2",
+          "0",
+          "1/2"
+        ],
+        "answer": "-√5",
+        "explain": "√5≈2.236，故 -√5≈-2.236 < -2 < 0 < 1/2，最小的数是 -√5，选 A。"
+      },
+      {
+        "id": "zk_j_math_2",
+        "type": "mcq",
+        "prompt": "若一个正多边形的每一个外角都是40°，则这个正多边形的边数是",
+        "options": [
+          "7",
+          "8",
+          "9",
+          "10"
+        ],
+        "answer": "9",
+        "explain": "多边形外角和恒为360°，边数 = 360°÷40° = 9，选 C。"
+      },
+      {
+        "id": "zk_j_math_3",
+        "type": "mcq",
+        "prompt": "一元二次方程 x²-4x+3=0 的两个根是",
+        "options": [
+          "x₁=1，x₂=3",
+          "x₁=-1，x₂=-3",
+          "x₁=1，x₂=-3",
+          "x₁=-1，x₂=3"
+        ],
+        "answer": "x₁=1，x₂=3",
+        "explain": "因式分解得 (x-1)(x-3)=0，所以 x₁=1，x₂=3，选 A。"
+      },
+      {
+        "id": "zk_j_math_8",
+        "type": "mcq",
+        "prompt": "-3 的相反数是",
+        "options": [
+          "3",
+          "-3",
+          "1/3",
+          "-1/3"
+        ],
+        "answer": "3",
+        "explain": "只有符号不同的两个数互为相反数，-3 的相反数是 3，选 A。"
+      },
+      {
+        "id": "zk_j_math_9",
+        "type": "mcq",
+        "prompt": "下列计算正确的是",
+        "options": [
+          "a²·a³=a⁶",
+          "(a²)³=a⁶",
+          "a²+a³=a⁵",
+          "a⁶÷a²=a³"
+        ],
+        "answer": "(a²)³=a⁶",
+        "explain": "同底数幂相乘指数相加，a²·a³=a⁵（A 错）；幂的乘方指数相乘，(a²)³=a⁶（B 对）；不同类项不能合并（C 错）；同底数幂相除指数相减，a⁶÷a²=a⁴（D 错）。"
+      },
+      {
+        "id": "zk_j_math_10",
+        "type": "mcq",
+        "prompt": "一个不透明的袋子中装有3个红球和2个白球，除颜色外都相同。从袋中随机摸出一个球，摸到红球的概率是",
+        "options": [
+          "2/5",
+          "3/5",
+          "1/2",
+          "3/2"
+        ],
+        "answer": "3/5",
+        "explain": "共有 3+2=5 个球，其中红球 3 个，概率 = 3/5，选 B。"
+      },
+      {
+        "id": "zk_j_physics_0",
+        "type": "mcq",
+        "prompt": "下列估测中，最接近实际的是",
+        "options": [
+          "一名中学生的质量约为500 g",
+          "教室门的高度约为2 m",
+          "人的正常体温约为42 ℃",
+          "手机电池的电压约为220 V"
+        ],
+        "answer": "教室门的高度约为2 m",
+        "explain": "中学生质量约50 kg（500 g 太小）；教室门高约2 m，符合实际；人体正常体温约37 ℃；手机电池电压约3.7 V。故选 B。"
+      },
+      {
+        "id": "zk_j_physics_1",
+        "type": "mcq",
+        "prompt": "下列现象中，由光的折射形成的是",
+        "options": [
+          "立竿见影",
+          "水中倒影",
+          "用放大镜把字放大",
+          "小孔成像"
+        ],
+        "answer": "用放大镜把字放大",
+        "explain": "立竿见影和小孔成像由光的直线传播形成；水中倒影是光的反射；放大镜把字放大是凸透镜成像，属于光的折射。故选 C。"
+      },
+      {
+        "id": "zk_j_physics_8",
+        "type": "mcq",
+        "prompt": "关于声现象，下列说法正确的是",
+        "options": [
+          "声音在真空中的传播速度最大",
+          "声音的响度由振动频率决定",
+          "“闻其声知其人”是根据音色来判断的",
+          "超声波不能在空气中传播"
+        ],
+        "answer": "“闻其声知其人”是根据音色来判断的",
+        "explain": "声音不能在真空中传播；响度由振幅决定，音调由频率决定；不同人音色不同，故能“闻其声知其人”；超声波也是声波，能在空气中传播。故选 C。"
+      },
+      {
+        "id": "zk_j_physics_9",
+        "type": "mcq",
+        "prompt": "用撬棒撬石头时，撬棒属于",
+        "options": [
+          "省力杠杆",
+          "费力杠杆",
+          "等臂杠杆",
+          "无法判断"
+        ],
+        "answer": "省力杠杆",
+        "explain": "使用撬棒时动力臂大于阻力臂，根据杠杆平衡条件可知动力小于阻力，属于省力杠杆（费距离）。故选 A。"
       }
     ],
     "listening": [
@@ -116,6 +568,404 @@
             "explain": ""
           }
         ]
+      },
+      {
+        "id": "zk_j_chemistry_r_0",
+        "type": "reading",
+        "title": "zk_j_chemistry",
+        "passage": "下列变化中，属于化学变化的是",
+        "questions": [
+          {
+            "id": "zk_j_chemistry_0",
+            "type": "mcq",
+            "prompt": "下列变化中，属于化学变化的是",
+            "options": [
+              "冰雪融化",
+              "铁锅生锈",
+              "酒精挥发",
+              "玻璃破碎"
+            ],
+            "answer": "铁锅生锈",
+            "explain": "化学变化的本质特征是有新物质生成。铁生锈生成了铁的氧化物，属于化学变化；其余三项只是形状或状态改变，属于物理变化。故选 B。"
+          }
+        ]
+      },
+      {
+        "id": "zk_j_chemistry_r_1",
+        "type": "reading",
+        "title": "zk_j_chemistry",
+        "passage": "空气中体积分数约为21%的气体是",
+        "questions": [
+          {
+            "id": "zk_j_chemistry_1",
+            "type": "mcq",
+            "prompt": "空气中体积分数约为21%的气体是",
+            "options": [
+              "氮气",
+              "氧气",
+              "二氧化碳",
+              "稀有气体"
+            ],
+            "answer": "氧气",
+            "explain": "空气的成分按体积计：氮气约78%、氧气约21%、稀有气体约0.94%、二氧化碳约0.03%。故选 B。"
+          }
+        ]
+      },
+      {
+        "id": "zk_j_chemistry_r_2",
+        "type": "reading",
+        "title": "zk_j_chemistry",
+        "passage": "下列物质中，属于氧化物的是",
+        "questions": [
+          {
+            "id": "zk_j_chemistry_2",
+            "type": "mcq",
+            "prompt": "下列物质中，属于氧化物的是",
+            "options": [
+              "O₂",
+              "KClO₃",
+              "CO₂",
+              "NaOH"
+            ],
+            "answer": "CO₂",
+            "explain": "氧化物是由两种元素组成且其中一种是氧元素的化合物。CO₂ 由碳、氧两种元素组成，符合定义；O₂ 是单质，KClO₃ 含三种元素，NaOH 不含氧元素（含 O 但由三种元素组成）。故选 C。"
+          }
+        ]
+      },
+      {
+        "id": "zk_j_chemistry_r_3",
+        "type": "reading",
+        "title": "zk_j_chemistry",
+        "passage": "下列实验操作中，正确的是",
+        "questions": [
+          {
+            "id": "zk_j_chemistry_3",
+            "type": "mcq",
+            "prompt": "下列实验操作中，正确的是",
+            "options": [
+              "用嘴吹灭燃着的酒精灯",
+              "用托盘天平称量时，砝码放在左盘",
+              "给试管中的液体加热时，液体体积不超过试管容积的1/3",
+              "用量筒量取液体时，俯视凹液面最低处读数"
+            ],
+            "answer": "给试管中的液体加热时，液体体积不超过试管容积的1/3",
+            "explain": "酒精灯应用灯帽盖灭；天平使用“左物右码”；加热时液体不超过容积的1/3，防止沸腾冲出，C 正确；量筒读数应视线与凹液面最低处保持水平，俯视会读数偏大。故选 C。"
+          }
+        ]
+      },
+      {
+        "id": "zk_j_chemistry_r_8",
+        "type": "reading",
+        "title": "zk_j_chemistry",
+        "passage": "下列物质中，属于纯净物的是",
+        "questions": [
+          {
+            "id": "zk_j_chemistry_8",
+            "type": "mcq",
+            "prompt": "下列物质中，属于纯净物的是",
+            "options": [
+              "洁净的空气",
+              "生铁",
+              "蒸馏水",
+              "加碘食盐"
+            ],
+            "answer": "蒸馏水",
+            "explain": "纯净物只由一种物质组成。蒸馏水只含水，是纯净物；空气是混合物，生铁是铁与碳等的混合物，加碘食盐含氯化钠和碘酸钾。故选 C。"
+          }
+        ]
+      },
+      {
+        "id": "zk_j_chemistry_r_9",
+        "type": "reading",
+        "title": "zk_j_chemistry",
+        "passage": "下列化肥中，属于氮肥的是",
+        "questions": [
+          {
+            "id": "zk_j_chemistry_9",
+            "type": "mcq",
+            "prompt": "下列化肥中，属于氮肥的是",
+            "options": [
+              "K₂SO₄",
+              "CO(NH₂)₂",
+              "Ca₃(PO₄)₂",
+              "KCl"
+            ],
+            "answer": "CO(NH₂)₂",
+            "explain": "含氮元素、能提供氮营养的肥料为氮肥。CO(NH₂)₂（尿素）是常用氮肥；K₂SO₄、KCl 是钾肥，Ca₃(PO₄)₂ 是磷肥。故选 B。"
+          }
+        ]
+      },
+      {
+        "id": "zk_j_chemistry_r_10",
+        "type": "reading",
+        "title": "zk_j_chemistry",
+        "passage": "下列金属中，金属活动性最强的是",
+        "questions": [
+          {
+            "id": "zk_j_chemistry_10",
+            "type": "mcq",
+            "prompt": "下列金属中，金属活动性最强的是",
+            "options": [
+              "铜",
+              "铁",
+              "锌",
+              "镁"
+            ],
+            "answer": "镁",
+            "explain": "金属活动性顺序：K Ca Na Mg Al Zn Fe Sn Pb (H) Cu Hg Ag Pt Au。四种金属中镁最靠前，活动性最强。故选 D。"
+          }
+        ]
+      },
+      {
+        "id": "zk_j_chinese_r_0",
+        "type": "reading",
+        "title": "zk_j_chinese",
+        "passage": "下列词语中，书写完全正确的一项是",
+        "questions": [
+          {
+            "id": "zk_j_chinese_0",
+            "type": "mcq",
+            "prompt": "下列词语中，书写完全正确的一项是",
+            "options": [
+              "各得其所　恍然大悟　花团锦簇",
+              "惊慌失错　混为一谈　人声鼎沸",
+              "美不甚收　大相径庭　沉默寡言",
+              "截然不同　浑为一谈　小心翼翼"
+            ],
+            "answer": "各得其所　恍然大悟　花团锦簇",
+            "explain": "B 项“惊慌失错”应为“惊慌失措”；C 项“美不甚收”应为“美不胜收”；D 项“浑为一谈”应为“混为一谈”。故选 A。"
+          }
+        ]
+      },
+      {
+        "id": "zk_j_chinese_r_2",
+        "type": "reading",
+        "title": "zk_j_chinese",
+        "passage": "下列句子中，没有语病的一项是",
+        "questions": [
+          {
+            "id": "zk_j_chinese_2",
+            "type": "mcq",
+            "prompt": "下列句子中，没有语病的一项是",
+            "options": [
+              "通过这次活动，使我明白了坚持的意义。",
+              "我们要及时改正并发现学习中的问题。",
+              "这本书内容丰富，深受同学们的喜爱。",
+              "能否取得好成绩，关键在于努力。"
+            ],
+            "answer": "这本书内容丰富，深受同学们的喜爱。",
+            "explain": "A 项“通过……使……”造成主语残缺，删去“通过”或“使”；B 项语序不当，应先“发现”再“改正”；D 项两面对一面，“能否”与“努力”不对应。故选 C。"
+          }
+        ]
+      },
+      {
+        "id": "zk_j_chinese_r_8",
+        "type": "reading",
+        "title": "zk_j_chinese",
+        "passage": "下列句子中加点成语使用恰当的一项是",
+        "questions": [
+          {
+            "id": "zk_j_chinese_8",
+            "type": "mcq",
+            "prompt": "下列句子中加点成语使用恰当的一项是",
+            "options": [
+              "他的演讲抑扬顿挫，赢得了阵阵掌声。",
+              "运动会上，他一鸣惊人，跑了个倒数第一。",
+              "这道题他想了半天，终于恍然大悟，还是不会做。",
+              "面对困难，我们要不以为然，勇敢面对。"
+            ],
+            "answer": "他的演讲抑扬顿挫，赢得了阵阵掌声。",
+            "explain": "B 项“一鸣惊人”指平时无声无息、突然做出惊人的成绩，与“倒数第一”矛盾；C 项“恍然大悟”指一下子明白过来，与“还是不会做”矛盾；D 项“不以为然”指不认为是对的，表示不赞同，此处应用“不以为意”或“毫不畏惧”。故选 A。"
+          }
+        ]
+      },
+      {
+        "id": "zk_j_chinese_r_10",
+        "type": "reading",
+        "title": "zk_j_chinese",
+        "passage": "将下列句子填入语段横线处，使语意连贯，正确的一项是\n①它需要长期的积累　②读书是一场慢功夫　③也离不开反复的思考\n横线处应填入的顺序是",
+        "questions": [
+          {
+            "id": "zk_j_chinese_10",
+            "type": "mcq",
+            "prompt": "将下列句子填入语段横线处，使语意连贯，正确的一项是\n①它需要长期的积累　②读书是一场慢功夫　③也离不开反复的思考\n横线处应填入的顺序是",
+            "options": [
+              "②①③",
+              "①②③",
+              "③①②",
+              "②③①"
+            ],
+            "answer": "②①③",
+            "explain": "②提出观点“读书是慢功夫”，①“它需要长期的积累”承接“慢功夫”，③“也离不开反复的思考”用“也”并列补充，故顺序为②①③。"
+          }
+        ]
+      },
+      {
+        "id": "zk_j_english_r_0",
+        "type": "reading",
+        "title": "zk_j_english",
+        "passage": "— Where is Tom?\n— He ______ basketball on the playground now.",
+        "questions": [
+          {
+            "id": "zk_j_english_0",
+            "type": "mcq",
+            "prompt": "— Where is Tom?\n— He ______ basketball on the playground now.",
+            "options": [
+              "plays",
+              "is playing",
+              "played",
+              "has played"
+            ],
+            "answer": "is playing",
+            "explain": "时间状语 now 提示现在进行时，结构为 be + doing，主语 He 用 is，故选 B。"
+          }
+        ]
+      },
+      {
+        "id": "zk_j_english_r_1",
+        "type": "reading",
+        "title": "zk_j_english",
+        "passage": "This is ______ useful book. I read it every day.",
+        "questions": [
+          {
+            "id": "zk_j_english_1",
+            "type": "mcq",
+            "prompt": "This is ______ useful book. I read it every day.",
+            "options": [
+              "a",
+              "an",
+              "the",
+              "/"
+            ],
+            "answer": "a",
+            "explain": "useful 虽以元音字母 u 开头，但读音为 /ˈjuːsfl/，以辅音音素开头，故用 a。选 A。"
+          }
+        ]
+      },
+      {
+        "id": "zk_j_english_r_2",
+        "type": "reading",
+        "title": "zk_j_english",
+        "passage": "My sister is much ______ than me.",
+        "questions": [
+          {
+            "id": "zk_j_english_2",
+            "type": "mcq",
+            "prompt": "My sister is much ______ than me.",
+            "options": [
+              "tall",
+              "taller",
+              "tallest",
+              "the tallest"
+            ],
+            "answer": "taller",
+            "explain": "有 than 说明是比较级，much 修饰比较级，tall 的比较级为 taller，故选 B。"
+          }
+        ]
+      },
+      {
+        "id": "zk_j_english_r_3",
+        "type": "reading",
+        "title": "zk_j_english",
+        "passage": "The new library ______ in 2019, and it is very popular now.",
+        "questions": [
+          {
+            "id": "zk_j_english_3",
+            "type": "mcq",
+            "prompt": "The new library ______ in 2019, and it is very popular now.",
+            "options": [
+              "built",
+              "was built",
+              "is built",
+              "builds"
+            ],
+            "answer": "was built",
+            "explain": "图书馆是被建造的，用被动语态；in 2019 表示过去，故用一般过去时的被动 was built。选 B。"
+          }
+        ]
+      },
+      {
+        "id": "zk_j_english_r_4",
+        "type": "reading",
+        "title": "zk_j_english",
+        "passage": "阅读短文，从每题所给选项中选出最佳答案。\nLi Hua is a middle school student. Every morning he gets up at six and (1)______ to school by bike. He says riding a bike is good for his (2)______. Last week he (3)______ a bike race in his school and won first prize.",
+        "questions": [
+          {
+            "id": "zk_j_english_4",
+            "type": "mcq",
+            "prompt": "阅读短文，从每题所给选项中选出最佳答案。\nLi Hua is a middle school student. Every morning he gets up at six and (1)______ to school by bike. He says riding a bike is good for his (2)______. Last week he (3)______ a bike race in his school and won first prize.",
+            "options": [
+              "(1) A. go　B. goes　C. went　D. going",
+              "(2) A. health　B. money　C. homework　D. weather",
+              "(3) A. joins　B. joined　C. will join　D. is joining"
+            ],
+            "answer": "(1) B　(2) A　(3) B",
+            "explain": "(1) 主语 he 为第三人称单数，一般现在时用 goes；(2) 骑车有益于健康，选 health；(3) Last week 表过去，用 joined。"
+          }
+        ]
+      },
+      {
+        "id": "zk_j_english_r_5",
+        "type": "reading",
+        "title": "zk_j_english",
+        "passage": "阅读短文，选择最佳答案。\nIn our school, students go to school in different ways. About half of them take the school bus because it is safe and fast. Some students live near the school, so they walk there every day. A few students ride bikes, but they must wear helmets. Our teacher says walking and riding are good exercise.\nHow do about half of the students go to school?",
+        "questions": [
+          {
+            "id": "zk_j_english_5",
+            "type": "mcq",
+            "prompt": "阅读短文，选择最佳答案。\nIn our school, students go to school in different ways. About half of them take the school bus because it is safe and fast. Some students live near the school, so they walk there every day. A few students ride bikes, but they must wear helmets. Our teacher says walking and riding are good exercise.\nHow do about half of the students go to school?",
+            "options": [
+              "On foot.",
+              "By bus.",
+              "By bike.",
+              "By car."
+            ],
+            "answer": "By bus.",
+            "explain": "文中“About half of them take the school bus”直接说明约一半学生乘校车，故选 B。"
+          }
+        ]
+      },
+      {
+        "id": "zk_j_english_r_8",
+        "type": "reading",
+        "title": "zk_j_english",
+        "passage": "I ______ in this city since 2015.",
+        "questions": [
+          {
+            "id": "zk_j_english_8",
+            "type": "mcq",
+            "prompt": "I ______ in this city since 2015.",
+            "options": [
+              "live",
+              "lived",
+              "have lived",
+              "will live"
+            ],
+            "answer": "have lived",
+            "explain": "since + 时间点与现在完成时连用，表示从过去持续到现在，结构为 have/has + 过去分词。选 C。"
+          }
+        ]
+      },
+      {
+        "id": "zk_j_english_r_9",
+        "type": "reading",
+        "title": "zk_j_english",
+        "passage": "— Must I finish the work today?\n— No, you ______. You can do it tomorrow.",
+        "questions": [
+          {
+            "id": "zk_j_english_9",
+            "type": "mcq",
+            "prompt": "— Must I finish the work today?\n— No, you ______. You can do it tomorrow.",
+            "options": [
+              "mustn't",
+              "needn't",
+              "can't",
+              "shouldn't"
+            ],
+            "answer": "needn't",
+            "explain": "Must 引导的一般疑问句，否定回答用 needn't（不必），而 mustn't 表示“禁止”，语气不符。选 B。"
+          }
+        ]
       }
     ],
     "writing": [
@@ -137,10 +987,9 @@
     ]
   },
   "mock": {
-    "duration_minutes": 50,
+    "duration_minutes": 60,
     "sections": [
       "vocab",
-      "listening",
       "reading",
       "writing"
     ]

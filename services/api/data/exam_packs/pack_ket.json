@@ -1,8 +1,18 @@
 {
   "family_id": "ket",
-  "title": "KET / A2 Key Prep",
+  "title": "Cambridge KET/PET Prep Pack",
   "cefr": "A2",
-  "version": 1,
+  "version": 2,
+  "sources": [
+    "derived-from-k12 + base thin pack"
+  ],
+  "counts": {
+    "vocab": 8,
+    "listening": 2,
+    "reading": 2,
+    "writing": 2,
+    "speaking": 2
+  },
   "sections": {
     "vocab": [
       {
@@ -43,6 +53,71 @@
         ],
         "answer": "opens",
         "explain": ""
+      },
+      {
+        "id": "zkv1",
+        "type": "mcq",
+        "prompt": "I ____ a student.",
+        "options": [
+          "am",
+          "is",
+          "are",
+          "be"
+        ],
+        "answer": "am",
+        "explain": ""
+      },
+      {
+        "id": "zkv2",
+        "type": "mcq",
+        "prompt": "There ____ a book on the desk.",
+        "options": [
+          "is",
+          "are",
+          "am",
+          "be"
+        ],
+        "answer": "is",
+        "explain": ""
+      },
+      {
+        "id": "zkv3",
+        "type": "mcq",
+        "prompt": "She ____ to school by bus.",
+        "options": [
+          "goes",
+          "go",
+          "going",
+          "gone"
+        ],
+        "answer": "goes",
+        "explain": ""
+      },
+      {
+        "id": "zkv4",
+        "type": "mcq",
+        "prompt": "____ you like apples?",
+        "options": [
+          "Do",
+          "Does",
+          "Are",
+          "Is"
+        ],
+        "answer": "Do",
+        "explain": ""
+      },
+      {
+        "id": "zkv5",
+        "type": "mcq",
+        "prompt": "This is ____ interesting story.",
+        "options": [
+          "an",
+          "a",
+          "the",
+          "/"
+        ],
+        "answer": "an",
+        "explain": ""
       }
     ],
     "listening": [
@@ -64,6 +139,28 @@
               "At school"
             ],
             "answer": "Next to the bank",
+            "explain": ""
+          }
+        ]
+      },
+      {
+        "id": "zkl1",
+        "type": "listening",
+        "title": "Time",
+        "script": "Tom: What time is it?\nLucy: It is half past seven. Hurry, or we will be late for school.",
+        "audio_url": "",
+        "questions": [
+          {
+            "id": "zkl1q1",
+            "type": "mcq",
+            "prompt": "What time is it?",
+            "options": [
+              "7:30",
+              "7:00",
+              "8:30",
+              "6:30"
+            ],
+            "answer": "7:30",
             "explain": ""
           }
         ]
@@ -90,6 +187,27 @@
             "explain": ""
           }
         ]
+      },
+      {
+        "id": "zkr1",
+        "type": "reading",
+        "title": "My Dog",
+        "passage": "My name is Anna. I have a dog called Bobby. Every morning I walk Bobby in the park before school. Bobby likes running and playing with a ball.",
+        "questions": [
+          {
+            "id": "zkr1q1",
+            "type": "mcq",
+            "prompt": "What is the dog's name?",
+            "options": [
+              "Bobby",
+              "Anna",
+              "Tom",
+              "Park"
+            ],
+            "answer": "Bobby",
+            "explain": ""
+          }
+        ]
       }
     ],
     "writing": [
@@ -99,6 +217,13 @@
         "prompt": "Write an email to a friend about your favourite sport (40–50 words).",
         "rubric": "k12",
         "min_words": 40
+      },
+      {
+        "id": "zkw1",
+        "type": "writing",
+        "prompt": "以 \"My Best Friend\" 为题写一篇短文，介绍朋友外貌、性格与一件小事。",
+        "rubric": "k12",
+        "min_words": 80
       }
     ],
     "speaking": [
@@ -107,15 +232,20 @@
         "type": "speaking",
         "prompt": "Talk about your daily routine.",
         "tips": "Morning, afternoon, evening."
+      },
+      {
+        "id": "zks1",
+        "type": "speaking",
+        "prompt": "Introduce your family in English.",
+        "tips": "Name, people, and one hobby."
       }
     ]
   },
   "mock": {
-    "duration_minutes": 45,
+    "duration_minutes": 70,
     "sections": [
-      "vocab",
-      "listening",
       "reading",
+      "listening",
       "writing"
     ]
   }

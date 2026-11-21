@@ -2,7 +2,19 @@
   "family_id": "ielts_ac",
   "title": "IELTS Academic Prep Pack",
   "cefr": "B2",
-  "version": 1,
+  "version": 2,
+  "sources": [
+    "fthrvi/pteracai",
+    "Looffeeuu/toefl-ielts-prep",
+    "LuchoBazz/ielts-ai-dataset"
+  ],
+  "counts": {
+    "vocab": 31,
+    "listening": 37,
+    "reading": 49,
+    "writing": 22,
+    "speaking": 22
+  },
   "sections": {
     "vocab": [
       {
@@ -69,6 +81,359 @@
         ],
         "answer": "decline",
         "explain": ""
+      },
+      {
+        "id": "i-mcq-001",
+        "type": "mcq",
+        "prompt": "What is the writer's main point about biophilia?",
+        "options": [
+          "It has been conclusively proven by environmental psychologists.",
+          "Evidence supports it, but methodological limitations remain.",
+          "It applies more to urban dwellers than to rural populations.",
+          "Cultural factors completely undermine the biophilia hypothesis."
+        ],
+        "answer": "Evidence supports it, but methodological limitations remain.",
+        "explain": "The passage presents both supporting evidence (hospital recovery, parks, blood pressure) AND limitations (correlational not causal, cultural variation). Option B captures this balanced framing. A overstates ('conclusively proven'), C is a fabricated comparison, D overstates the critic position ('completely undermine')."
+      },
+      {
+        "id": "i-mcq-002",
+        "type": "mcq",
+        "prompt": "According to the passage, secondary microplastics are formed when:",
+        "options": [
+          "They are manufactured intentionally for cosmetics.",
+          "Marine animals ingest larger plastic items.",
+          "Larger plastic items break down through environmental processes.",
+          "They escape from coastal landfills into the ocean."
+        ],
+        "answer": "Larger plastic items break down through environmental processes.",
+        "explain": "The passage explicitly defines secondary microplastics as 'formed when larger plastic items degrade through UV exposure, wave action, and biological processes' — option C paraphrases this directly. A describes PRIMARY microplastics. B and D are plausible-sounding but not stated in the passage."
+      },
+      {
+        "id": "i-mcq-003",
+        "type": "mcq",
+        "prompt": "What does the writer suggest about the open-access publishing model?",
+        "options": [
+          "It has successfully replaced the traditional paywall system.",
+          "It offers significant benefits with no substantial drawbacks.",
+          "It addresses some problems but introduces new ones.",
+          "It should be abandoned in favor of the traditional model."
+        ],
+        "answer": "It addresses some problems but introduces new ones.",
+        "explain": "The writer presents open-access as PARTIAL progress: 'grown' (some success) but with criticisms (processing charges, predatory journals). Option C captures this balanced view. A overstates ('successfully replaced'), B contradicts the criticism noted, D is the opposite of the writer's stance."
+      },
+      {
+        "id": "i-mcq-004",
+        "type": "mcq",
+        "prompt": "What can be inferred from the passage about scholarly opinion on Neanderthal cognition?",
+        "options": [
+          "All researchers now agree Neanderthals had symbolic cognition.",
+          "The new findings are considered insufficient to change views.",
+          "There is ongoing debate, though many find the evidence compelling.",
+          "Symbolic cognition was originally thought to be a Neanderthal trait."
+        ],
+        "answer": "There is ongoing debate, though many find the evidence compelling.",
+        "explain": "The passage notes BOTH cautious researchers AND those wanting fundamental revision — this is ongoing debate. C captures this. A overstates ('all'), B contradicts 'compel a fundamental revision', D reverses the original assumption (it was thought to be Homo sapiens-only)."
+      },
+      {
+        "id": "i-mcq-005",
+        "type": "mcq",
+        "prompt": "What is the main argument of the passage?",
+        "options": [
+          "Zoning was a complete failure as an urban planning approach.",
+          "Mixed-use development is a return to historical urban design after a zoning era.",
+          "Car dependence is the most serious problem facing modern cities.",
+          "The 21st century requires entirely new urban planning principles never seen before."
+        ],
+        "answer": "Mixed-use development is a return to historical urban design after a zoning era.",
+        "explain": "The passage frames mixed-use as a 'return' to integration after zoning split things apart — option B captures this historical pivot. A overstates (zoning had benefits too — 'reduced certain conflicts'). C and D are details/extensions not the main idea."
+      },
+      {
+        "id": "i-mcq-006",
+        "type": "mcq",
+        "prompt": "According to the passage, why are single-threat conservation strategies insufficient?",
+        "options": [
+          "Because pesticides are the most serious problem and dominate other concerns.",
+          "Because the causes of bee decline are multiple and interacting.",
+          "Because farmers refuse to cooperate with conservation programs.",
+          "Because the Varroa mite cannot be controlled by any current method."
+        ],
+        "answer": "Because the causes of bee decline are multiple and interacting.",
+        "explain": "The passage explicitly says causes are 'multiple and interacting' and 'effective response requires coordinated action across agriculture, land management, and climate policy' — option B paraphrases this. A picks out one cause; C and D are not mentioned in the passage."
+      },
+      {
+        "id": "i-mcq-007",
+        "type": "mcq",
+        "prompt": "What is the writer's primary purpose in this passage?",
+        "options": [
+          "To argue that congestion pricing should be implemented worldwide.",
+          "To present evidence and the main debate around congestion pricing.",
+          "To criticize cities that have implemented congestion pricing schemes.",
+          "To explain the technical mechanisms of congestion pricing."
+        ],
+        "answer": "To present evidence and the main debate around congestion pricing.",
+        "explain": "The writer cites specific data (London 15%, Stockholm 20-25%), then presents both critic and proponent views, then concludes with a hedged assessment ('depends heavily'). This is balanced analysis, not advocacy. B captures it. A and C are too one-sided; D ignores the debate content."
+      },
+      {
+        "id": "i-mcq-008",
+        "type": "mcq",
+        "prompt": "According to the passage, which aspect of language is most susceptible to attrition?",
+        "options": [
+          "Grammar and sentence structure.",
+          "Vocabulary.",
+          "Pronunciation and accent.",
+          "Reading and writing ability."
+        ],
+        "answer": "Vocabulary.",
+        "explain": "The passage states directly: 'attrition is most pronounced in vocabulary, with grammar tending to remain more stable.' Option B paraphrases this. A contradicts the passage, C and D are not mentioned."
+      },
+      {
+        "id": "i-mcq-200",
+        "type": "mcq",
+        "prompt": "What is the main argument of the passage?",
+        "options": [
+          "All plant-based diets are equally beneficial for health and the environment.",
+          "Plant-based diets are healthier than any meat-based diet under all conditions.",
+          "Whole-food plant-based diets offer benefits, but processed alternatives are problematic.",
+          "Industrial meat alternatives are the most important component of a plant-based diet."
+        ],
+        "answer": "Whole-food plant-based diets offer benefits, but processed alternatives are problematic.",
+        "explain": "The passage acknowledges benefits AND warns about processed substitutes, concluding that 'genuinely beneficial' diets rely on 'minimally processed whole foods'. Option C captures this distinction. A and B overstate; D contradicts the warning."
+      },
+      {
+        "id": "i-mcq-201",
+        "type": "mcq",
+        "prompt": "According to the passage, why is cutting sleep short particularly damaging?",
+        "options": [
+          "It eliminates deep slow-wave sleep, which is concentrated in the morning.",
+          "It disproportionately reduces REM sleep, which is more abundant later in the night.",
+          "It prevents the glymphatic system from clearing metabolic waste entirely.",
+          "It reduces total sleep hours but does not affect any specific sleep phase."
+        ],
+        "answer": "It disproportionately reduces REM sleep, which is more abundant later in the night.",
+        "explain": "The passage states cutting sleep short 'disproportionately strips away the REM phases that occur in the morning'. Option B paraphrases this. A reverses (slow-wave is FIRST half), C overstates ('entirely'), D contradicts."
+      },
+      {
+        "id": "i-mcq-202",
+        "type": "mcq",
+        "prompt": "What is the writer's stance on AI's impact on creative work?",
+        "options": [
+          "AI will conclusively democratize creativity for all individuals.",
+          "AI will destroy the livelihoods of all working artists.",
+          "AI's impact will be shaped by regulation, business models, and audience preferences.",
+          "AI will have no meaningful impact on creative industries."
+        ],
+        "answer": "AI's impact will be shaped by regulation, business models, and audience preferences.",
+        "explain": "The writer explicitly says 'its effects will depend on how it is regulated, on what compensation models emerge, and on how human audiences value the distinction'. C captures this. A and B mirror the extreme positions the writer EXPLICITLY rejects ('between these positions'). D contradicts."
+      },
+      {
+        "id": "i-mcq-203",
+        "type": "mcq",
+        "prompt": "What can be inferred from the passage about the acceptance of new scientific theories?",
+        "options": [
+          "Scientific communities universally welcome new theories that overturn old ones.",
+          "Established practitioners are sometimes slow to adopt theories that contradict prevailing views.",
+          "Miasma theory is still considered scientifically valid by some doctors today.",
+          "Germ theory was never resisted by anyone in the medical community."
+        ],
+        "answer": "Established practitioners are sometimes slow to adopt theories that contradict prevailing views.",
+        "explain": "The passage explicitly says 'many established physicians resisted the new theory' and 'it took decades' for new practices to standardize. Option B paraphrases this. A and D contradict the passage; C is not mentioned."
+      },
+      {
+        "id": "i-mcq-204",
+        "type": "mcq",
+        "prompt": "Why is sustainability a concern in sponge-based drug development?",
+        "options": [
+          "Sponges cannot regenerate quickly enough to meet pharmaceutical demand.",
+          "Harvesting sponges in sufficient quantities threatens reef ecosystems.",
+          "The chemical compounds in sponges lose potency when extracted.",
+          "Sponges have only been discovered in very small numbers worldwide."
+        ],
+        "answer": "Harvesting sponges in sufficient quantities threatens reef ecosystems.",
+        "explain": "The passage states directly: 'harvesting sponges in quantities sufficient for drug production threatens fragile reef ecosystems.' Option B paraphrases. Others are not stated."
+      },
+      {
+        "id": "i-mcq-300",
+        "type": "mcq",
+        "prompt": "What is the main argument of the passage?",
+        "options": [
+          "Microfinance has completely failed to reduce poverty anywhere.",
+          "Microfinance has clear benefits but more limited impact on poverty than originally hoped.",
+          "Microfinance is the most effective poverty reduction tool ever invented.",
+          "Microfinance should be abandoned in favor of traditional banking systems."
+        ],
+        "answer": "Microfinance has clear benefits but more limited impact on poverty than originally hoped.",
+        "explain": "The passage describes real benefits (financial inclusion, income smoothing) but also notes 'mixed' evidence and 'modest effects on poverty rates' — option B captures this nuanced position. A and D overstate negatives; C contradicts the modest-effects finding."
+      },
+      {
+        "id": "i-mcq-301",
+        "type": "mcq",
+        "prompt": "According to the passage, what was Gutenberg's key innovation?",
+        "options": [
+          "He invented printing for the first time in history.",
+          "He developed a movable metal type system that could be rearranged and reused.",
+          "He created the first oil-based ink in human history.",
+          "He designed the first press, adapting it from wine production."
+        ],
+        "answer": "He developed a movable metal type system that could be rearranged and reused.",
+        "explain": "The passage states explicitly: 'Gutenberg's key innovation was not printing itself...but rather a system of movable metal type that could be rearranged and reused for different texts.' Option B paraphrases this. A directly contradicts the passage; C and D overstate ('first in history')."
+      },
+      {
+        "id": "i-mcq-302",
+        "type": "mcq",
+        "prompt": "What is the writer's view on the debate about zoos?",
+        "options": [
+          "Zoos should be closed because they harm animals.",
+          "Zoos serve only an entertainment purpose and should be expanded.",
+          "Zoos involve genuine trade-offs between conservation value and animal welfare.",
+          "The debate about zoos has already been resolved in favor of conservation."
+        ],
+        "answer": "Zoos involve genuine trade-offs between conservation value and animal welfare.",
+        "explain": "The writer explicitly says zoos do 'meaningful conservation work' AND 'compromise wellbeing' — a genuine trade-off. Option C captures this. A and B are extreme positions the writer doesn't take; D contradicts 'contested'."
+      },
+      {
+        "id": "i-mcq-303",
+        "type": "mcq",
+        "prompt": "What can be inferred from the passage about the relationship between writing technology and political organization?",
+        "options": [
+          "Writing technology is unrelated to political organization in ancient societies.",
+          "Political centralization always precedes the development of writing.",
+          "Earlier use of writing technology may have implications for our understanding of when political centralization occurred.",
+          "Carbon dating is an unreliable method for assessing ancient artifacts."
+        ],
+        "answer": "Earlier use of writing technology may have implications for our understanding of when political centralization occurred.",
+        "explain": "The passage explicitly connects the earlier dating to potential revision of 'the relationship between writing technology and the centralization of political power'. Option C captures this. A contradicts the passage; B is not stated; D contradicts the use of carbon dating as evidence."
+      },
+      {
+        "id": "i-mcq-304",
+        "type": "mcq",
+        "prompt": "What is the main point of the passage?",
+        "options": [
+          "People should drink as much water as possible every day.",
+          "The eight-glasses-a-day rule is based on a misunderstanding of older research.",
+          "Hydration is not important for health.",
+          "Coffee and tea are better hydration sources than water."
+        ],
+        "answer": "The eight-glasses-a-day rule is based on a misunderstanding of older research.",
+        "explain": "The passage traces how the 1945 guideline was stripped of context, creating a misleading impression. Option B captures this. A contradicts the passage; C reverses the message; D is not discussed."
+      },
+      {
+        "id": "r-salt_0",
+        "type": "mcq",
+        "prompt": "Question",
+        "options": [
+          "An unreliable explanation of a word's origin",
+          "Different ways of obtaining salt",
+          "A source of income for rulers",
+          "The health risks of eating too little salt",
+          "Salt as a symbol of resistance",
+          "How salt created wealth along trade routes",
+          "The decline of salt mining",
+          "Why salt was once so important"
+        ],
+        "answer": "None",
+        "explain": ""
+      },
+      {
+        "id": "r-salt_1",
+        "type": "mcq",
+        "prompt": "Question",
+        "options": [
+          "p",
+          "a",
+          "r",
+          "a",
+          "s"
+        ],
+        "answer": "None",
+        "explain": ""
+      },
+      {
+        "id": "r-sleep_0",
+        "type": "mcq",
+        "prompt": "Question",
+        "options": [
+          "Dr Lena Ortiz",
+          "Professor Daniel Reeve",
+          "Dr Marcus Bell"
+        ],
+        "answer": "None",
+        "explain": ""
+      },
+      {
+        "id": "r-sleep_1",
+        "type": "mcq",
+        "prompt": "Question",
+        "options": [
+          "earlier",
+          "later",
+          "unchanged",
+          "lower",
+          "worse",
+          "attendance",
+          "grades",
+          "appetite"
+        ],
+        "answer": "None",
+        "explain": ""
+      },
+      {
+        "id": "r-coral_0",
+        "type": "mcq",
+        "prompt": "Question",
+        "options": [
+          "p",
+          "a",
+          "r",
+          "a",
+          "s"
+        ],
+        "answer": "None",
+        "explain": ""
+      },
+      {
+        "id": "r-choice_0",
+        "type": "mcq",
+        "prompt": "Question",
+        "options": [
+          "Reasons why many options may cause difficulty",
+          "Mixed results when experiments were repeated",
+          "The conditions in which the problem appears",
+          "A finding that challenged an established view",
+          "Ways of making choices easier",
+          "The rapid spread of an idea",
+          "What the case shows about research in general",
+          "Why shoppers prefer smaller stores",
+          "Evidence that choice always reduces satisfaction"
+        ],
+        "answer": "None",
+        "explain": ""
+      },
+      {
+        "id": "r-choice_1",
+        "type": "mcq",
+        "prompt": "Question",
+        "options": [
+          "are more likely to put off making a decision.",
+          "makes a large range less of a problem.",
+          "lose nothing when extra choices are added.",
+          "has often received less attention than the original study.",
+          "should be removed from most shops.",
+          "tend to praise themselves for good results."
+        ],
+        "answer": "None",
+        "explain": ""
+      },
+      {
+        "id": "r-wind_0",
+        "type": "mcq",
+        "prompt": "Question",
+        "options": [
+          "Samira Haddad",
+          "Tom Garrick",
+          "Mei Lin"
+        ],
+        "answer": "None",
+        "explain": ""
       }
     ],
     "listening": [
@@ -106,6 +471,294 @@
             "explain": ""
           }
         ]
+      },
+      {
+        "id": "i-wfd-001",
+        "type": "listening",
+        "title": "academic dictation",
+        "script": "",
+        "audio_url": "",
+        "questions": []
+      },
+      {
+        "id": "i-wfd-002",
+        "type": "listening",
+        "title": "academic dictation",
+        "script": "",
+        "audio_url": "",
+        "questions": []
+      },
+      {
+        "id": "i-wfd-003",
+        "type": "listening",
+        "title": "academic dictation",
+        "script": "",
+        "audio_url": "",
+        "questions": []
+      },
+      {
+        "id": "i-wfd-004",
+        "type": "listening",
+        "title": "academic dictation",
+        "script": "",
+        "audio_url": "",
+        "questions": []
+      },
+      {
+        "id": "i-wfd-005",
+        "type": "listening",
+        "title": "academic dictation",
+        "script": "",
+        "audio_url": "",
+        "questions": []
+      },
+      {
+        "id": "i-wfd-006",
+        "type": "listening",
+        "title": "academic dictation",
+        "script": "",
+        "audio_url": "",
+        "questions": []
+      },
+      {
+        "id": "i-wfd-007",
+        "type": "listening",
+        "title": "academic dictation",
+        "script": "",
+        "audio_url": "",
+        "questions": []
+      },
+      {
+        "id": "i-wfd-008",
+        "type": "listening",
+        "title": "academic dictation",
+        "script": "",
+        "audio_url": "",
+        "questions": []
+      },
+      {
+        "id": "i-wfd-200",
+        "type": "listening",
+        "title": "academic dictation",
+        "script": "",
+        "audio_url": "",
+        "questions": []
+      },
+      {
+        "id": "i-wfd-201",
+        "type": "listening",
+        "title": "academic dictation",
+        "script": "",
+        "audio_url": "",
+        "questions": []
+      },
+      {
+        "id": "i-wfd-202",
+        "type": "listening",
+        "title": "academic dictation",
+        "script": "",
+        "audio_url": "",
+        "questions": []
+      },
+      {
+        "id": "i-wfd-203",
+        "type": "listening",
+        "title": "academic dictation",
+        "script": "",
+        "audio_url": "",
+        "questions": []
+      },
+      {
+        "id": "i-wfd-204",
+        "type": "listening",
+        "title": "academic dictation",
+        "script": "",
+        "audio_url": "",
+        "questions": []
+      },
+      {
+        "id": "i-wfd-205",
+        "type": "listening",
+        "title": "academic dictation",
+        "script": "",
+        "audio_url": "",
+        "questions": []
+      },
+      {
+        "id": "i-wfd-206",
+        "type": "listening",
+        "title": "academic dictation",
+        "script": "",
+        "audio_url": "",
+        "questions": []
+      },
+      {
+        "id": "i-wfd-207",
+        "type": "listening",
+        "title": "academic dictation",
+        "script": "",
+        "audio_url": "",
+        "questions": []
+      },
+      {
+        "id": "i-wfd-208",
+        "type": "listening",
+        "title": "academic dictation",
+        "script": "",
+        "audio_url": "",
+        "questions": []
+      },
+      {
+        "id": "i-wfd-209",
+        "type": "listening",
+        "title": "academic dictation",
+        "script": "",
+        "audio_url": "",
+        "questions": []
+      },
+      {
+        "id": "i-wfd-210",
+        "type": "listening",
+        "title": "academic dictation",
+        "script": "",
+        "audio_url": "",
+        "questions": []
+      },
+      {
+        "id": "i-wfd-211",
+        "type": "listening",
+        "title": "academic dictation",
+        "script": "",
+        "audio_url": "",
+        "questions": []
+      },
+      {
+        "id": "i-wfd-212",
+        "type": "listening",
+        "title": "academic dictation",
+        "script": "",
+        "audio_url": "",
+        "questions": []
+      },
+      {
+        "id": "i-wfd-213",
+        "type": "listening",
+        "title": "academic dictation",
+        "script": "",
+        "audio_url": "",
+        "questions": []
+      },
+      {
+        "id": "i-wfd-214",
+        "type": "listening",
+        "title": "academic dictation",
+        "script": "",
+        "audio_url": "",
+        "questions": []
+      },
+      {
+        "id": "i-wfd-215",
+        "type": "listening",
+        "title": "academic dictation",
+        "script": "",
+        "audio_url": "",
+        "questions": []
+      },
+      {
+        "id": "i-wfd-216",
+        "type": "listening",
+        "title": "academic dictation",
+        "script": "",
+        "audio_url": "",
+        "questions": []
+      },
+      {
+        "id": "i-wfd-217",
+        "type": "listening",
+        "title": "academic dictation",
+        "script": "",
+        "audio_url": "",
+        "questions": []
+      },
+      {
+        "id": "i-wfd-218",
+        "type": "listening",
+        "title": "academic dictation",
+        "script": "",
+        "audio_url": "",
+        "questions": []
+      },
+      {
+        "id": "i-wfd-219",
+        "type": "listening",
+        "title": "academic dictation",
+        "script": "",
+        "audio_url": "",
+        "questions": []
+      },
+      {
+        "id": "i-lst-sc-100",
+        "type": "listening",
+        "title": "course registration",
+        "script": "",
+        "audio_url": "",
+        "questions": []
+      },
+      {
+        "id": "i-lst-sc-101",
+        "type": "listening",
+        "title": "library tour",
+        "script": "",
+        "audio_url": "",
+        "questions": []
+      },
+      {
+        "id": "i-lst-sc-102",
+        "type": "listening",
+        "title": "field trip details",
+        "script": "",
+        "audio_url": "",
+        "questions": []
+      },
+      {
+        "id": "i-lst-sc-103",
+        "type": "listening",
+        "title": "assignment instructions",
+        "script": "",
+        "audio_url": "",
+        "questions": []
+      },
+      {
+        "id": "i-lst-sc-104",
+        "type": "listening",
+        "title": "accommodation options",
+        "script": "",
+        "audio_url": "",
+        "questions": []
+      },
+      {
+        "id": "i-lst-sc-105",
+        "type": "listening",
+        "title": "career service",
+        "script": "",
+        "audio_url": "",
+        "questions": []
+      },
+      {
+        "id": "l-t1",
+        "type": "listening",
+        "title": "l-t1",
+        "script": "",
+        "audio_url": "",
+        "questions": []
+      },
+      {
+        "id": "l-t2",
+        "type": "listening",
+        "title": "l-t2",
+        "script": "",
+        "audio_url": "",
+        "questions": []
       }
     ],
     "reading": [
@@ -142,6 +795,718 @@
             "explain": ""
           }
         ]
+      },
+      {
+        "id": "i-mcq-001_r",
+        "type": "reading",
+        "title": "main idea identification",
+        "passage": "The concept of biophilia, introduced by biologist E.O. Wilson in 1984, suggests that humans possess an innate tendency to seek connections with nature and other forms of life. Recent studies in environmental psychology have lent considerable support to this hypothesis, demonstrating measurable improvements in mood, cognition, and even physical health among individuals regularly exposed to natural environments. Hospital patients with views of trees recover faster, urban dwellers who walk in parks report reduced anxiety, and even brief exposure to indoor plants can lower blood pressure. However, critics argue that biophilia's predictive power is limited: most evidence is correlational rather than causal, and cultural variation in nature preferences suggests biological hardwiring may be overstated.",
+        "questions": [
+          {
+            "id": "i-mcq-001",
+            "type": "mcq",
+            "prompt": "What is the writer's main point about biophilia?",
+            "options": [
+              "It has been conclusively proven by environmental psychologists.",
+              "Evidence supports it, but methodological limitations remain.",
+              "It applies more to urban dwellers than to rural populations.",
+              "Cultural factors completely undermine the biophilia hypothesis."
+            ],
+            "answer": "Evidence supports it, but methodological limitations remain.",
+            "explain": "The passage presents both supporting evidence (hospital recovery, parks, blood pressure) AND limitations (correlational not causal, cultural variation). Option B captures this balanced framing. A overstates ('conclusively proven'), C is a fabricated comparison, D overstates the critic position ('completely undermine')."
+          }
+        ]
+      },
+      {
+        "id": "i-mcq-002_r",
+        "type": "reading",
+        "title": "detail identification",
+        "passage": "The rise of microplastics in marine ecosystems represents one of the most pervasive yet poorly understood environmental challenges of the 21st century. Defined as plastic particles under 5mm in diameter, microplastics originate from two main sources: primary microplastics, manufactured at small sizes for use in cosmetics or industrial abrasives, and secondary microplastics, formed when larger plastic items degrade through UV exposure, wave action, and biological processes. While the visible accumulation of plastic waste on coastlines draws public attention, microplastics infiltrate marine food webs invisibly, having been documented in zooplankton, fish, and even the deepest ocean trenches. The implications for human health, given that fish are a primary protein source for over three billion people, remain a subject of active investigation.",
+        "questions": [
+          {
+            "id": "i-mcq-002",
+            "type": "mcq",
+            "prompt": "According to the passage, secondary microplastics are formed when:",
+            "options": [
+              "They are manufactured intentionally for cosmetics.",
+              "Marine animals ingest larger plastic items.",
+              "Larger plastic items break down through environmental processes.",
+              "They escape from coastal landfills into the ocean."
+            ],
+            "answer": "Larger plastic items break down through environmental processes.",
+            "explain": "The passage explicitly defines secondary microplastics as 'formed when larger plastic items degrade through UV exposure, wave action, and biological processes' — option C paraphrases this directly. A describes PRIMARY microplastics. B and D are plausible-sounding but not stated in the passage."
+          }
+        ]
+      },
+      {
+        "id": "i-mcq-003_r",
+        "type": "reading",
+        "title": "writer's view",
+        "passage": "The traditional model of academic publishing — in which researchers submit papers to journals, peer reviewers volunteer their time, and final articles are placed behind paywalls — has come under increasing scrutiny in recent decades. Critics argue that the system effectively transfers publicly funded research into the hands of private publishers, who then charge universities and libraries substantial sums for access. Open-access alternatives have grown, but they too face criticisms: 'article processing charges' can shift the financial burden to authors, disadvantaging researchers from less wealthy institutions, and predatory journals undermine the credibility of the open-access model. A truly equitable system would require coordinated international policy, sustained funding for non-commercial publication infrastructure, and a cultural shift in how academic prestige is measured.",
+        "questions": [
+          {
+            "id": "i-mcq-003",
+            "type": "mcq",
+            "prompt": "What does the writer suggest about the open-access publishing model?",
+            "options": [
+              "It has successfully replaced the traditional paywall system.",
+              "It offers significant benefits with no substantial drawbacks.",
+              "It addresses some problems but introduces new ones.",
+              "It should be abandoned in favor of the traditional model."
+            ],
+            "answer": "It addresses some problems but introduces new ones.",
+            "explain": "The writer presents open-access as PARTIAL progress: 'grown' (some success) but with criticisms (processing charges, predatory journals). Option C captures this balanced view. A overstates ('successfully replaced'), B contradicts the criticism noted, D is the opposite of the writer's stance."
+          }
+        ]
+      },
+      {
+        "id": "i-mcq-004_r",
+        "type": "reading",
+        "title": "inference",
+        "passage": "Recent archaeological discoveries in northern Spain have challenged longstanding assumptions about Neanderthal cognition. Cave paintings dated to over 64,000 years ago — predating the arrival of modern humans in Europe by at least 20,000 years — strongly suggest that Neanderthals were capable of symbolic representation, a cognitive ability previously thought to be unique to Homo sapiens. The findings, made possible by improved uranium-thorium dating techniques, have prompted re-examination of other ambiguous artifacts and have reignited debates about what distinguishes 'modern' cognitive abilities from those of our extinct relatives. Some researchers remain cautious, noting that dating methods can carry uncertainties; others argue that the evidence is sufficient to compel a fundamental revision of how we conceptualize Neanderthal capabilities.",
+        "questions": [
+          {
+            "id": "i-mcq-004",
+            "type": "mcq",
+            "prompt": "What can be inferred from the passage about scholarly opinion on Neanderthal cognition?",
+            "options": [
+              "All researchers now agree Neanderthals had symbolic cognition.",
+              "The new findings are considered insufficient to change views.",
+              "There is ongoing debate, though many find the evidence compelling.",
+              "Symbolic cognition was originally thought to be a Neanderthal trait."
+            ],
+            "answer": "There is ongoing debate, though many find the evidence compelling.",
+            "explain": "The passage notes BOTH cautious researchers AND those wanting fundamental revision — this is ongoing debate. C captures this. A overstates ('all'), B contradicts 'compel a fundamental revision', D reverses the original assumption (it was thought to be Homo sapiens-only)."
+          }
+        ]
+      },
+      {
+        "id": "i-mcq-005_r",
+        "type": "reading",
+        "title": "main idea identification",
+        "passage": "For much of the 20th century, urban planning was dominated by the principle of zoning: separating residential, commercial, and industrial activities into distinct districts. While this approach reduced certain conflicts — factories no longer abutted family homes — it also created cities heavily dependent on cars, with long commutes between zones and stagnant streetscapes outside business hours. The 21st century has seen a return to mixed-use development, where apartments sit above shops, workplaces share blocks with cafés, and public spaces remain active across the day. Advocates point to research showing that mixed-use neighborhoods experience lower rates of crime, higher property values, and stronger community bonds. The challenge now lies in retrofitting cities built for the zoning era to accommodate this denser, more integrated vision.",
+        "questions": [
+          {
+            "id": "i-mcq-005",
+            "type": "mcq",
+            "prompt": "What is the main argument of the passage?",
+            "options": [
+              "Zoning was a complete failure as an urban planning approach.",
+              "Mixed-use development is a return to historical urban design after a zoning era.",
+              "Car dependence is the most serious problem facing modern cities.",
+              "The 21st century requires entirely new urban planning principles never seen before."
+            ],
+            "answer": "Mixed-use development is a return to historical urban design after a zoning era.",
+            "explain": "The passage frames mixed-use as a 'return' to integration after zoning split things apart — option B captures this historical pivot. A overstates (zoning had benefits too — 'reduced certain conflicts'). C and D are details/extensions not the main idea."
+          }
+        ]
+      },
+      {
+        "id": "i-mcq-006_r",
+        "type": "reading",
+        "title": "detail identification",
+        "passage": "The decline of pollinating insects globally has prompted urgent calls for action from ecologists and farmers alike. Bees, in particular, are responsible for pollinating approximately one-third of the food crops consumed by humans, including most fruits, nuts, and many vegetables. The causes of decline are multiple and interacting: widespread pesticide use, especially neonicotinoids, weakens bee immune systems; habitat loss reduces foraging opportunities; and the spread of parasites like the Varroa mite devastates managed honeybee colonies. Wild bees face additional pressures from climate change, which disrupts the synchronization between flowering plants and pollinator activity. Conservation strategies that focus on a single threat are unlikely to succeed; effective response requires coordinated action across agriculture, land management, and climate policy.",
+        "questions": [
+          {
+            "id": "i-mcq-006",
+            "type": "mcq",
+            "prompt": "According to the passage, why are single-threat conservation strategies insufficient?",
+            "options": [
+              "Because pesticides are the most serious problem and dominate other concerns.",
+              "Because the causes of bee decline are multiple and interacting.",
+              "Because farmers refuse to cooperate with conservation programs.",
+              "Because the Varroa mite cannot be controlled by any current method."
+            ],
+            "answer": "Because the causes of bee decline are multiple and interacting.",
+            "explain": "The passage explicitly says causes are 'multiple and interacting' and 'effective response requires coordinated action across agriculture, land management, and climate policy' — option B paraphrases this. A picks out one cause; C and D are not mentioned in the passage."
+          }
+        ]
+      },
+      {
+        "id": "i-mcq-007_r",
+        "type": "reading",
+        "title": "writer's purpose",
+        "passage": "In recent years, several major cities have introduced 'congestion pricing' — charging drivers a fee to enter central districts during peak hours — as a tool to reduce traffic and improve air quality. London's scheme, launched in 2003, reduced traffic volume in the charging zone by 15% in its first year, and Stockholm's 2007 implementation saw a similar 20-25% drop. Critics argue that such fees disproportionately burden lower-income drivers who lack alternatives. Proponents respond that revenue is typically reinvested in public transit, which over time creates better options for everyone. The empirical record suggests that congestion pricing works as advertised in terms of reducing traffic, but its equity implications depend heavily on how revenues are spent.",
+        "questions": [
+          {
+            "id": "i-mcq-007",
+            "type": "mcq",
+            "prompt": "What is the writer's primary purpose in this passage?",
+            "options": [
+              "To argue that congestion pricing should be implemented worldwide.",
+              "To present evidence and the main debate around congestion pricing.",
+              "To criticize cities that have implemented congestion pricing schemes.",
+              "To explain the technical mechanisms of congestion pricing."
+            ],
+            "answer": "To present evidence and the main debate around congestion pricing.",
+            "explain": "The writer cites specific data (London 15%, Stockholm 20-25%), then presents both critic and proponent views, then concludes with a hedged assessment ('depends heavily'). This is balanced analysis, not advocacy. B captures it. A and C are too one-sided; D ignores the debate content."
+          }
+        ]
+      },
+      {
+        "id": "i-mcq-008_r",
+        "type": "reading",
+        "title": "detail identification",
+        "passage": "The phenomenon of 'language attrition' — the gradual loss of a first language by speakers who have moved to a region where it is not used — has attracted growing interest from linguists. Studies of immigrants in particular have shown that attrition is most pronounced in vocabulary, with grammar tending to remain more stable. However, age at immigration plays a crucial role: children who migrate before adolescence are far more likely to experience significant attrition, sometimes losing their first language entirely if not actively maintained. Adult immigrants typically retain their first language even after decades in a new linguistic environment, though they may experience subtle changes such as slower word retrieval or interference from the dominant language. These findings have implications for heritage language preservation in immigrant communities.",
+        "questions": [
+          {
+            "id": "i-mcq-008",
+            "type": "mcq",
+            "prompt": "According to the passage, which aspect of language is most susceptible to attrition?",
+            "options": [
+              "Grammar and sentence structure.",
+              "Vocabulary.",
+              "Pronunciation and accent.",
+              "Reading and writing ability."
+            ],
+            "answer": "Vocabulary.",
+            "explain": "The passage states directly: 'attrition is most pronounced in vocabulary, with grammar tending to remain more stable.' Option B paraphrases this. A contradicts the passage, C and D are not mentioned."
+          }
+        ]
+      },
+      {
+        "id": "i-tfng-001_r",
+        "type": "reading",
+        "title": "true false not given",
+        "passage": "The domestication of the horse, occurring approximately 5,500 years ago on the steppes of Central Asia, fundamentally transformed human societies. Archaeological evidence from the Botai culture in modern-day Kazakhstan provides the earliest direct indications of horse husbandry, including milk residues on pottery and bit-wear on horse teeth. The mobility revolution that followed allowed peoples to traverse vast distances, accelerated the diffusion of languages, and reshaped warfare. However, the horse's introduction to the Americas occurred far later — Spanish explorers in the 16th century brought horses to a continent where the species had been extinct for over 10,000 years. Indigenous peoples of the Great Plains rapidly adopted horse-based culture, transforming their societies in less than two centuries.",
+        "questions": []
+      },
+      {
+        "id": "i-tfng-002_r",
+        "type": "reading",
+        "title": "true false not given",
+        "passage": "The domestication of the horse, occurring approximately 5,500 years ago on the steppes of Central Asia, fundamentally transformed human societies. Archaeological evidence from the Botai culture in modern-day Kazakhstan provides the earliest direct indications of horse husbandry, including milk residues on pottery and bit-wear on horse teeth. The mobility revolution that followed allowed peoples to traverse vast distances, accelerated the diffusion of languages, and reshaped warfare. However, the horse's introduction to the Americas occurred far later — Spanish explorers in the 16th century brought horses to a continent where the species had been extinct for over 10,000 years. Indigenous peoples of the Great Plains rapidly adopted horse-based culture, transforming their societies in less than two centuries.",
+        "questions": []
+      },
+      {
+        "id": "i-tfng-003_r",
+        "type": "reading",
+        "title": "true false not given",
+        "passage": "The domestication of the horse, occurring approximately 5,500 years ago on the steppes of Central Asia, fundamentally transformed human societies. Archaeological evidence from the Botai culture in modern-day Kazakhstan provides the earliest direct indications of horse husbandry, including milk residues on pottery and bit-wear on horse teeth. The mobility revolution that followed allowed peoples to traverse vast distances, accelerated the diffusion of languages, and reshaped warfare. However, the horse's introduction to the Americas occurred far later — Spanish explorers in the 16th century brought horses to a continent where the species had been extinct for over 10,000 years. Indigenous peoples of the Great Plains rapidly adopted horse-based culture, transforming their societies in less than two centuries.",
+        "questions": []
+      },
+      {
+        "id": "i-tfng-004_r",
+        "type": "reading",
+        "title": "true false not given",
+        "passage": "Coral reefs, often called the rainforests of the sea, support roughly a quarter of all marine species despite covering less than 1% of the ocean floor. Their decline has accelerated alarmingly in recent decades, driven primarily by rising sea temperatures, which cause the symbiotic algae living within coral tissues to be expelled — a process known as bleaching. Without these algae, corals cannot photosynthesize their primary food source and may starve within weeks. Ocean acidification, caused by absorbed atmospheric CO2, compounds the threat by weakening coral skeletons. Some reef systems show remarkable resilience: the Red Sea's corals tolerate temperatures 5°C higher than their Indo-Pacific cousins, suggesting genetic adaptation may offer routes to conservation.",
+        "questions": []
+      },
+      {
+        "id": "i-tfng-005_r",
+        "type": "reading",
+        "title": "true false not given",
+        "passage": "Coral reefs, often called the rainforests of the sea, support roughly a quarter of all marine species despite covering less than 1% of the ocean floor. Their decline has accelerated alarmingly in recent decades, driven primarily by rising sea temperatures, which cause the symbiotic algae living within coral tissues to be expelled — a process known as bleaching. Without these algae, corals cannot photosynthesize their primary food source and may starve within weeks. Ocean acidification, caused by absorbed atmospheric CO2, compounds the threat by weakening coral skeletons. Some reef systems show remarkable resilience: the Red Sea's corals tolerate temperatures 5°C higher than their Indo-Pacific cousins, suggesting genetic adaptation may offer routes to conservation.",
+        "questions": []
+      },
+      {
+        "id": "i-tfng-006_r",
+        "type": "reading",
+        "title": "true false not given",
+        "passage": "Coral reefs, often called the rainforests of the sea, support roughly a quarter of all marine species despite covering less than 1% of the ocean floor. Their decline has accelerated alarmingly in recent decades, driven primarily by rising sea temperatures, which cause the symbiotic algae living within coral tissues to be expelled — a process known as bleaching. Without these algae, corals cannot photosynthesize their primary food source and may starve within weeks. Ocean acidification, caused by absorbed atmospheric CO2, compounds the threat by weakening coral skeletons. Some reef systems show remarkable resilience: the Red Sea's corals tolerate temperatures 5°C higher than their Indo-Pacific cousins, suggesting genetic adaptation may offer routes to conservation.",
+        "questions": []
+      },
+      {
+        "id": "i-tfng-200_r",
+        "type": "reading",
+        "title": "true false not given",
+        "passage": "The phenomenon of urban heat islands — areas in cities that experience significantly higher temperatures than surrounding rural regions — has been studied extensively since the 1960s. Concrete and asphalt absorb solar radiation during the day and release it slowly at night, leading to nighttime temperature differences of up to 7°C between city centers and their outskirts. The effect is intensified by the heat generated by vehicles, air conditioning units, and industrial activity. Recent research has shown that planting urban trees, painting roofs white, and installing reflective pavements can mitigate the effect, with some cities reporting temperature reductions of 2-3°C after implementing such measures. However, the relative effectiveness of these interventions varies considerably based on climate, building density, and the species of trees planted.",
+        "questions": []
+      },
+      {
+        "id": "i-tfng-201_r",
+        "type": "reading",
+        "title": "true false not given",
+        "passage": "The phenomenon of urban heat islands — areas in cities that experience significantly higher temperatures than surrounding rural regions — has been studied extensively since the 1960s. Concrete and asphalt absorb solar radiation during the day and release it slowly at night, leading to nighttime temperature differences of up to 7°C between city centers and their outskirts. The effect is intensified by the heat generated by vehicles, air conditioning units, and industrial activity. Recent research has shown that planting urban trees, painting roofs white, and installing reflective pavements can mitigate the effect, with some cities reporting temperature reductions of 2-3°C after implementing such measures. However, the relative effectiveness of these interventions varies considerably based on climate, building density, and the species of trees planted.",
+        "questions": []
+      },
+      {
+        "id": "i-tfng-202_r",
+        "type": "reading",
+        "title": "true false not given",
+        "passage": "The history of vaccination dates back to 1796, when English physician Edward Jenner observed that milkmaids who had contracted cowpox seemed immune to the more deadly smallpox. Building on this observation, Jenner inoculated a young boy with cowpox material and then exposed him to smallpox, demonstrating that the cowpox infection conferred immunity. Although his approach was crude by modern standards and would not be permitted under contemporary ethical guidelines, it laid the foundation for the science of immunology. Within a century, vaccination had become standard practice in much of Europe and North America. Modern vaccines work through diverse mechanisms — some use weakened pathogens, others use only fragments of the pathogen's protein, and the most recent generation uses messenger RNA to instruct cells to produce a target protein.",
+        "questions": []
+      },
+      {
+        "id": "i-tfng-203_r",
+        "type": "reading",
+        "title": "true false not given",
+        "passage": "The history of vaccination dates back to 1796, when English physician Edward Jenner observed that milkmaids who had contracted cowpox seemed immune to the more deadly smallpox. Building on this observation, Jenner inoculated a young boy with cowpox material and then exposed him to smallpox, demonstrating that the cowpox infection conferred immunity. Although his approach was crude by modern standards and would not be permitted under contemporary ethical guidelines, it laid the foundation for the science of immunology. Within a century, vaccination had become standard practice in much of Europe and North America. Modern vaccines work through diverse mechanisms — some use weakened pathogens, others use only fragments of the pathogen's protein, and the most recent generation uses messenger RNA to instruct cells to produce a target protein.",
+        "questions": []
+      },
+      {
+        "id": "i-tfng-204_r",
+        "type": "reading",
+        "title": "true false not given",
+        "passage": "The Maillard reaction, discovered by French chemist Louis-Camille Maillard in 1912, is the chemical process responsible for the browning of food when heated. It occurs between amino acids and reducing sugars, typically at temperatures above 140°C, and produces hundreds of distinct flavor compounds — the reason a seared steak smells and tastes fundamentally different from a boiled one. Despite its central role in cooking, the reaction was studied seriously by food scientists only from the 1950s onward, when industrial food production demanded better understanding of flavor development. The reaction is also linked to less desirable outcomes: it produces acrylamide, a compound considered a probable human carcinogen, when starchy foods are cooked at high temperatures.",
+        "questions": []
+      },
+      {
+        "id": "i-tfng-205_r",
+        "type": "reading",
+        "title": "true false not given",
+        "passage": "The Maillard reaction, discovered by French chemist Louis-Camille Maillard in 1912, is the chemical process responsible for the browning of food when heated. It occurs between amino acids and reducing sugars, typically at temperatures above 140°C, and produces hundreds of distinct flavor compounds — the reason a seared steak smells and tastes fundamentally different from a boiled one. Despite its central role in cooking, the reaction was studied seriously by food scientists only from the 1950s onward, when industrial food production demanded better understanding of flavor development. The reaction is also linked to less desirable outcomes: it produces acrylamide, a compound considered a probable human carcinogen, when starchy foods are cooked at high temperatures.",
+        "questions": []
+      },
+      {
+        "id": "i-mcq-200_r",
+        "type": "reading",
+        "title": "main idea identification",
+        "passage": "The recent shift towards plant-based diets has been driven by a combination of environmental, health, and ethical considerations. Studies have shown that diets centered on plants, particularly whole grains, legumes, vegetables, and nuts, are associated with lower rates of cardiovascular disease, type 2 diabetes, and certain cancers. From an environmental perspective, plant-based foods generally require less land, water, and energy to produce than animal products, contributing fewer greenhouse gas emissions per calorie. However, nutritionists caution that simply removing meat from one's diet does not guarantee improved health — heavily processed plant-based substitutes often contain high levels of sodium, saturated fat from coconut and palm oils, and various additives. A genuinely beneficial plant-based diet relies primarily on minimally processed whole foods, not on industrial meat alternatives.",
+        "questions": [
+          {
+            "id": "i-mcq-200",
+            "type": "mcq",
+            "prompt": "What is the main argument of the passage?",
+            "options": [
+              "All plant-based diets are equally beneficial for health and the environment.",
+              "Plant-based diets are healthier than any meat-based diet under all conditions.",
+              "Whole-food plant-based diets offer benefits, but processed alternatives are problematic.",
+              "Industrial meat alternatives are the most important component of a plant-based diet."
+            ],
+            "answer": "Whole-food plant-based diets offer benefits, but processed alternatives are problematic.",
+            "explain": "The passage acknowledges benefits AND warns about processed substitutes, concluding that 'genuinely beneficial' diets rely on 'minimally processed whole foods'. Option C captures this distinction. A and B overstate; D contradicts the warning."
+          }
+        ]
+      },
+      {
+        "id": "i-mcq-201_r",
+        "type": "reading",
+        "title": "detail identification",
+        "passage": "Sleep research conducted over the past two decades has overturned several long-held assumptions about the function and structure of sleep. Once thought to be a passive state of inactivity, sleep is now understood as an active process during which the brain consolidates memories, clears metabolic waste through the recently discovered glymphatic system, and modulates immune responses. Crucially, these functions are not evenly distributed across the night: deep slow-wave sleep, concentrated in the first half of the night, appears most important for waste clearance and physical recovery, while REM sleep, more abundant in the later hours, plays a central role in emotional processing and creative problem-solving. Cutting sleep short therefore does not merely reduce total hours — it disproportionately strips away the REM phases that occur in the morning, with consequences for emotional regulation and cognition.",
+        "questions": [
+          {
+            "id": "i-mcq-201",
+            "type": "mcq",
+            "prompt": "According to the passage, why is cutting sleep short particularly damaging?",
+            "options": [
+              "It eliminates deep slow-wave sleep, which is concentrated in the morning.",
+              "It disproportionately reduces REM sleep, which is more abundant later in the night.",
+              "It prevents the glymphatic system from clearing metabolic waste entirely.",
+              "It reduces total sleep hours but does not affect any specific sleep phase."
+            ],
+            "answer": "It disproportionately reduces REM sleep, which is more abundant later in the night.",
+            "explain": "The passage states cutting sleep short 'disproportionately strips away the REM phases that occur in the morning'. Option B paraphrases this. A reverses (slow-wave is FIRST half), C overstates ('entirely'), D contradicts."
+          }
+        ]
+      },
+      {
+        "id": "i-mcq-202_r",
+        "type": "reading",
+        "title": "writer's view",
+        "passage": "The rise of artificial intelligence has prompted intense debate about its impact on creative work. Some commentators argue that AI tools will democratize creativity, allowing individuals without formal training to produce sophisticated music, images, and text. Others warn that the same tools threaten the livelihoods of working artists by flooding markets with cheap synthetic output and by training on copyrighted material without permission. The truth likely lies between these positions: AI may indeed lower the barrier to certain forms of creative production while simultaneously concentrating economic value in the hands of platform owners rather than human creators. What the current debate often overlooks is that the technology is unlikely to evolve neatly into either utopia or dystopia — its effects will depend on how it is regulated, on what compensation models emerge, and on how human audiences value the distinction between AI-generated and human-made work.",
+        "questions": [
+          {
+            "id": "i-mcq-202",
+            "type": "mcq",
+            "prompt": "What is the writer's stance on AI's impact on creative work?",
+            "options": [
+              "AI will conclusively democratize creativity for all individuals.",
+              "AI will destroy the livelihoods of all working artists.",
+              "AI's impact will be shaped by regulation, business models, and audience preferences.",
+              "AI will have no meaningful impact on creative industries."
+            ],
+            "answer": "AI's impact will be shaped by regulation, business models, and audience preferences.",
+            "explain": "The writer explicitly says 'its effects will depend on how it is regulated, on what compensation models emerge, and on how human audiences value the distinction'. C captures this. A and B mirror the extreme positions the writer EXPLICITLY rejects ('between these positions'). D contradicts."
+          }
+        ]
+      },
+      {
+        "id": "i-mcq-203_r",
+        "type": "reading",
+        "title": "inference",
+        "passage": "Until the mid-19th century, the dominant view in Western medicine held that disease was caused by 'miasmas' — noxious air emanating from rotting matter. This theory provided a logical framework for some sound public health interventions, such as removing waste from streets and improving ventilation, but it offered no explanation for why the same air affected some individuals and not others. The germ theory of disease, developed primarily through the work of Louis Pasteur and Robert Koch in the 1860s and 1870s, eventually displaced miasma theory by identifying specific microorganisms responsible for specific illnesses. The transition was not immediate: many established physicians resisted the new theory, and it took decades for germ-based hygiene practices, such as surgeons washing their hands between patients, to become standard.",
+        "questions": [
+          {
+            "id": "i-mcq-203",
+            "type": "mcq",
+            "prompt": "What can be inferred from the passage about the acceptance of new scientific theories?",
+            "options": [
+              "Scientific communities universally welcome new theories that overturn old ones.",
+              "Established practitioners are sometimes slow to adopt theories that contradict prevailing views.",
+              "Miasma theory is still considered scientifically valid by some doctors today.",
+              "Germ theory was never resisted by anyone in the medical community."
+            ],
+            "answer": "Established practitioners are sometimes slow to adopt theories that contradict prevailing views.",
+            "explain": "The passage explicitly says 'many established physicians resisted the new theory' and 'it took decades' for new practices to standardize. Option B paraphrases this. A and D contradict the passage; C is not mentioned."
+          }
+        ]
+      },
+      {
+        "id": "i-mcq-204_r",
+        "type": "reading",
+        "title": "detail identification",
+        "passage": "Sponges are among the simplest of multicellular animals, yet they exhibit remarkable biological capabilities that have caught the attention of medical researchers. Unlike most animals, sponges lack true tissues, organs, or a nervous system, instead functioning as collections of specialized cells that can be separated, mixed, and then reassembled — sometimes from cells of different individuals — into functioning sponges. This regenerative capacity, combined with the chemical compounds sponges produce to defend against predators and pathogens, has made them a focus of pharmaceutical research. Several anticancer drugs in current use, including cytarabine and trabectedin, were derived from compounds originally identified in marine sponges. The challenge is sustainability: harvesting sponges in quantities sufficient for drug production threatens fragile reef ecosystems.",
+        "questions": [
+          {
+            "id": "i-mcq-204",
+            "type": "mcq",
+            "prompt": "Why is sustainability a concern in sponge-based drug development?",
+            "options": [
+              "Sponges cannot regenerate quickly enough to meet pharmaceutical demand.",
+              "Harvesting sponges in sufficient quantities threatens reef ecosystems.",
+              "The chemical compounds in sponges lose potency when extracted.",
+              "Sponges have only been discovered in very small numbers worldwide."
+            ],
+            "answer": "Harvesting sponges in sufficient quantities threatens reef ecosystems.",
+            "explain": "The passage states directly: 'harvesting sponges in quantities sufficient for drug production threatens fragile reef ecosystems.' Option B paraphrases. Others are not stated."
+          }
+        ]
+      },
+      {
+        "id": "i-mh-001_r",
+        "type": "reading",
+        "title": "scientific overview",
+        "passage": "Question",
+        "questions": []
+      },
+      {
+        "id": "i-mh-002_r",
+        "type": "reading",
+        "title": "social trends",
+        "passage": "Question",
+        "questions": []
+      },
+      {
+        "id": "i-mh-003_r",
+        "type": "reading",
+        "title": "technology adoption",
+        "passage": "Question",
+        "questions": []
+      },
+      {
+        "id": "i-mh-004_r",
+        "type": "reading",
+        "title": "environmental science",
+        "passage": "Question",
+        "questions": []
+      },
+      {
+        "id": "i-mh-005_r",
+        "type": "reading",
+        "title": "psychology",
+        "passage": "Question",
+        "questions": []
+      },
+      {
+        "id": "i-mcq-300_r",
+        "type": "reading",
+        "title": "main idea identification",
+        "passage": "The growth of microfinance institutions over the past three decades has transformed access to credit for hundreds of millions of people in developing economies. By offering small loans to individuals without collateral or formal credit histories, microfinance has enabled entrepreneurs to launch businesses, smallholder farmers to invest in productivity-enhancing equipment, and households to weather unexpected expenses without resorting to predatory lenders. However, empirical evidence on poverty reduction has been more mixed than early enthusiasts predicted. While microfinance reliably improves financial inclusion and helps households manage volatile incomes, randomized trials in multiple countries have found only modest effects on overall poverty rates. Researchers now suggest that microfinance should be understood as one financial tool among many, rather than a singular solution to poverty.",
+        "questions": [
+          {
+            "id": "i-mcq-300",
+            "type": "mcq",
+            "prompt": "What is the main argument of the passage?",
+            "options": [
+              "Microfinance has completely failed to reduce poverty anywhere.",
+              "Microfinance has clear benefits but more limited impact on poverty than originally hoped.",
+              "Microfinance is the most effective poverty reduction tool ever invented.",
+              "Microfinance should be abandoned in favor of traditional banking systems."
+            ],
+            "answer": "Microfinance has clear benefits but more limited impact on poverty than originally hoped.",
+            "explain": "The passage describes real benefits (financial inclusion, income smoothing) but also notes 'mixed' evidence and 'modest effects on poverty rates' — option B captures this nuanced position. A and D overstate negatives; C contradicts the modest-effects finding."
+          }
+        ]
+      },
+      {
+        "id": "i-mcq-301_r",
+        "type": "reading",
+        "title": "detail identification",
+        "passage": "The development of the printing press by Johannes Gutenberg in the mid-15th century is often credited with launching the modern era of mass communication. Gutenberg's key innovation was not printing itself — woodblock printing had existed in East Asia for centuries — but rather a system of movable metal type that could be rearranged and reused for different texts. Combined with an oil-based ink suited to metal type and a press design adapted from wine and olive presses, the technology enabled rapid, economical reproduction of books. Within fifty years of Gutenberg's first major publication, an estimated 20 million books had been printed across Europe, fundamentally transforming literacy, religion, and scientific exchange.",
+        "questions": [
+          {
+            "id": "i-mcq-301",
+            "type": "mcq",
+            "prompt": "According to the passage, what was Gutenberg's key innovation?",
+            "options": [
+              "He invented printing for the first time in history.",
+              "He developed a movable metal type system that could be rearranged and reused.",
+              "He created the first oil-based ink in human history.",
+              "He designed the first press, adapting it from wine production."
+            ],
+            "answer": "He developed a movable metal type system that could be rearranged and reused.",
+            "explain": "The passage states explicitly: 'Gutenberg's key innovation was not printing itself...but rather a system of movable metal type that could be rearranged and reused for different texts.' Option B paraphrases this. A directly contradicts the passage; C and D overstate ('first in history')."
+          }
+        ]
+      },
+      {
+        "id": "i-mcq-302_r",
+        "type": "reading",
+        "title": "writer's view",
+        "passage": "The role of zoos in modern society is increasingly contested. Critics argue that even the best-designed enclosures cannot replicate the spatial freedom and behavioral complexity of wild habitats, and that the educational value of zoo visits is overstated by surveys that simply ask whether visitors learned something. Defenders counter that modern accredited zoos invest substantially in conservation breeding programs, fund field research, and serve as critical safety nets for species facing extinction in the wild. The honest answer is that contemporary zoos are doing meaningful conservation work while simultaneously asking visiting animals to live lives constrained in ways that, in many cases, do compromise their wellbeing. Whether the trade-off is justified depends partly on factual questions about animal welfare and partly on ethical values that vary across observers.",
+        "questions": [
+          {
+            "id": "i-mcq-302",
+            "type": "mcq",
+            "prompt": "What is the writer's view on the debate about zoos?",
+            "options": [
+              "Zoos should be closed because they harm animals.",
+              "Zoos serve only an entertainment purpose and should be expanded.",
+              "Zoos involve genuine trade-offs between conservation value and animal welfare.",
+              "The debate about zoos has already been resolved in favor of conservation."
+            ],
+            "answer": "Zoos involve genuine trade-offs between conservation value and animal welfare.",
+            "explain": "The writer explicitly says zoos do 'meaningful conservation work' AND 'compromise wellbeing' — a genuine trade-off. Option C captures this. A and B are extreme positions the writer doesn't take; D contradicts 'contested'."
+          }
+        ]
+      },
+      {
+        "id": "i-mcq-303_r",
+        "type": "reading",
+        "title": "inference",
+        "passage": "Archaeologists working in the Nile Delta have recently uncovered evidence suggesting that the use of papyrus for writing began significantly earlier than previously documented. Carbon dating of papyrus fragments found at a Bronze Age administrative site indicates that the material was in use at least three centuries before the earliest examples in the established archaeological record. The implications, while still being assessed, suggest that the development of literate administration in ancient Egypt may need to be revised backward, potentially altering historians' understanding of the relationship between writing technology and the centralization of political power.",
+        "questions": [
+          {
+            "id": "i-mcq-303",
+            "type": "mcq",
+            "prompt": "What can be inferred from the passage about the relationship between writing technology and political organization?",
+            "options": [
+              "Writing technology is unrelated to political organization in ancient societies.",
+              "Political centralization always precedes the development of writing.",
+              "Earlier use of writing technology may have implications for our understanding of when political centralization occurred.",
+              "Carbon dating is an unreliable method for assessing ancient artifacts."
+            ],
+            "answer": "Earlier use of writing technology may have implications for our understanding of when political centralization occurred.",
+            "explain": "The passage explicitly connects the earlier dating to potential revision of 'the relationship between writing technology and the centralization of political power'. Option C captures this. A contradicts the passage; B is not stated; D contradicts the use of carbon dating as evidence."
+          }
+        ]
+      },
+      {
+        "id": "i-mcq-304_r",
+        "type": "reading",
+        "title": "main idea identification",
+        "passage": "The standard advice to drink eight glasses of water per day has become so widely accepted that it is rarely questioned, yet there is little scientific basis for this specific recommendation. The figure appears to have originated from a 1945 U.S. Food and Nutrition Board guideline that suggested 2.5 liters of total water intake per day — explicitly including water contained in food. Subsequent popularization stripped away that qualification, leaving the misleading impression that eight glasses of pure water are required on top of normal dietary intake. In reality, individual hydration needs vary widely based on body size, activity level, climate, and the water content of foods consumed, and the most reliable signal of adequate hydration is simply the absence of thirst and the color of urine.",
+        "questions": [
+          {
+            "id": "i-mcq-304",
+            "type": "mcq",
+            "prompt": "What is the main point of the passage?",
+            "options": [
+              "People should drink as much water as possible every day.",
+              "The eight-glasses-a-day rule is based on a misunderstanding of older research.",
+              "Hydration is not important for health.",
+              "Coffee and tea are better hydration sources than water."
+            ],
+            "answer": "The eight-glasses-a-day rule is based on a misunderstanding of older research.",
+            "explain": "The passage traces how the 1945 guideline was stripped of context, creating a misleading impression. Option B captures this. A contradicts the passage; C reverses the message; D is not discussed."
+          }
+        ]
+      },
+      {
+        "id": "i-tfng-300_r",
+        "type": "reading",
+        "title": "true false not given",
+        "passage": "The platypus, native to eastern Australia, is one of the most evolutionarily distinctive mammals on Earth. It is one of only five species of monotreme — mammals that lay eggs instead of giving birth to live young. The platypus possesses a duck-like bill equipped with electroreceptors that detect the electrical signals produced by the muscle movements of prey, allowing it to hunt with its eyes and ears closed underwater. Males have venomous spurs on their hind legs, making the platypus one of the few venomous mammals known to science. Despite these unusual traits, recent research has shown that the platypus shares many genetic features with other mammals, indicating a common ancestor rather than a wholly separate evolutionary line.",
+        "questions": []
+      },
+      {
+        "id": "i-tfng-301_r",
+        "type": "reading",
+        "title": "true false not given",
+        "passage": "The platypus, native to eastern Australia, is one of the most evolutionarily distinctive mammals on Earth. It is one of only five species of monotreme — mammals that lay eggs instead of giving birth to live young. The platypus possesses a duck-like bill equipped with electroreceptors that detect the electrical signals produced by the muscle movements of prey, allowing it to hunt with its eyes and ears closed underwater. Males have venomous spurs on their hind legs, making the platypus one of the few venomous mammals known to science. Despite these unusual traits, recent research has shown that the platypus shares many genetic features with other mammals, indicating a common ancestor rather than a wholly separate evolutionary line.",
+        "questions": []
+      },
+      {
+        "id": "i-tfng-302_r",
+        "type": "reading",
+        "title": "true false not given",
+        "passage": "The platypus, native to eastern Australia, is one of the most evolutionarily distinctive mammals on Earth. It is one of only five species of monotreme — mammals that lay eggs instead of giving birth to live young. The platypus possesses a duck-like bill equipped with electroreceptors that detect the electrical signals produced by the muscle movements of prey, allowing it to hunt with its eyes and ears closed underwater. Males have venomous spurs on their hind legs, making the platypus one of the few venomous mammals known to science. Despite these unusual traits, recent research has shown that the platypus shares many genetic features with other mammals, indicating a common ancestor rather than a wholly separate evolutionary line.",
+        "questions": []
+      },
+      {
+        "id": "i-tfng-303_r",
+        "type": "reading",
+        "title": "true false not given",
+        "passage": "The development of antibiotics in the 20th century transformed medicine by enabling effective treatment of bacterial infections that had previously been fatal. However, the widespread use — and frequent overuse — of these drugs has created selective pressure for the evolution of resistant bacterial strains. The World Health Organization has identified antimicrobial resistance as one of the top ten global public health threats facing humanity. Researchers are pursuing several strategies to address this threat, including the development of new classes of antibiotics, the use of bacteriophages (viruses that attack bacteria), and improved stewardship programs in hospitals to limit unnecessary antibiotic use. Despite these efforts, the rate at which new antibiotics are being developed continues to lag behind the rate at which resistance is emerging.",
+        "questions": []
+      },
+      {
+        "id": "i-mh-006_r",
+        "type": "reading",
+        "title": "science of nutrition",
+        "passage": "Question",
+        "questions": []
+      },
+      {
+        "id": "i-mh-007_r",
+        "type": "reading",
+        "title": "urban transportation",
+        "passage": "Question",
+        "questions": []
+      },
+      {
+        "id": "i-mh-008_r",
+        "type": "reading",
+        "title": "linguistic evolution",
+        "passage": "Question",
+        "questions": []
+      },
+      {
+        "id": "r-bees",
+        "type": "reading",
+        "title": "City Bees",
+        "passage": "A. In the past two decades, beehives have appeared in some unexpected places: on the roofs of hotels, office towers and even opera houses. Urban beekeeping, once regarded as an eccentric hobby, has become fashionable in cities such as London, Paris, New York and Tokyo. Some companies keep hives as part of their environmental programmes, and a number of restaurants now serve honey produced only a few floors above the dining room.\nB. Supporters of the trend point out that cities can be surprisingly good places for bees. Parks, private gardens, street trees and balconies offer a wide variety of flowers, and because these plants bloom at different times, food is often available for a longer period than in the countryside. Farmland, by contrast, is frequently planted with a single crop that flowers for only a few weeks. Urban gardens are also less likely to be sprayed with the chemicals used in large-scale agriculture, although they are not entirely free of them.\nC. Honey from city hives has its own character. Because bees collect nectar from many different plants, the flavour can change from month to month and from one neighbourhood to the next. Some beekeepers sell honey labelled by district, and laboratory analyses of city honey have generally found levels of pollutants low enough to be considered safe. Bees appear to filter out many contaminants before they reach the honey, although scientists continue to monitor the question.\nD. However, not everyone welcomes the rapid growth in hive numbers. The honeybee is only one of many bee species, and most of the others live alone rather than in colonies. These wild bees are often more effective pollinators of certain plants, yet they receive far less public attention. Ecologists warn that when too many honeybee colonies are placed in a small area, they may compete with wild bees for the same limited supply of pollen and nectar. In some European cities, researchers have suggested that the number of hives has already grown faster than the supply of flowers.\nE. Disease is another concern. Honeybees kept close together can pass parasites and infections from colony to colony, and inexperienced keepers may not recognise the early signs of a problem. For this reason, many beekeeping associations now ask new members to complete a training course and to spend a season working alongside an experienced keeper before they set up hives of their own.\nF. For those who want to help pollinators, experts increasingly recommend a different approach: planting rather than keeping. Choosing flowering plants that bloom from early spring to late autumn, leaving some areas of grass uncut, and providing nesting sites such as patches of bare soil or bundles of hollow stems can benefit a wide range of insects. As one city ecologist put it, a rooftop hive may be a pleasant symbol, but a street full of flowers does more for bees as a whole.",
+        "questions": []
+      },
+      {
+        "id": "r-salt",
+        "type": "reading",
+        "title": "Salt and Civilisation",
+        "passage": "A. Today salt is so cheap that it is easy to forget how valuable it once was. For most of human history, however, salt was essential not only for flavour but for survival. Before refrigeration, it was one of the few reliable ways of preserving meat and fish, allowing communities to store food through the winter and to carry it on long journeys.\nB. The earliest methods of producing salt were simple. In coastal regions, people let seawater evaporate in shallow pools under the sun, leaving crystals behind. Inland, where this was impossible, they boiled water from salt springs over fires, a process that required large amounts of fuel. In some places, salt was dug directly from underground deposits left behind by ancient seas, and a few of these mines have been worked for many centuries.\nC. Because salt was both necessary and unevenly distributed, it became a valuable trade good. Caravans crossed the Sahara carrying blocks of salt southwards, where it was exchanged for gold and other goods. In Europe, cities that controlled salt routes grew rich; Venice, for example, gained much of its early wealth from the salt trade in the Adriatic.\nD. Governments quickly recognised that a product everyone needed was easy to tax. In China, the state took control of salt production more than two thousand years ago, and income from salt remained an important part of government revenue for centuries. In France, a salt tax known as the gabelle became one of the most hated taxes of the old regime, partly because the rate varied greatly from one region to another, which encouraged widespread smuggling.\nE. Salt has also played a part in political protest. In 1930, Mahatma Gandhi led a march of nearly 400 kilometres to the sea, where he and his followers made salt in defiance of a British law that taxed it. The march attracted international attention and became one of the defining moments of the Indian independence movement.\nF. A popular story claims that Roman soldiers were paid in salt and that the English word 'salary' comes from this practice. While the word does come from the Latin for salt, historians have found little evidence that soldiers actually received their wages in salt, and the true origin of the term remains uncertain.\nG. In the modern world, the problem is no longer scarcity but excess. Health authorities in many countries advise people to reduce the amount of salt they eat, because high intake is linked to raised blood pressure. Much of the salt in modern diets comes not from the salt shaker but from processed foods such as bread, sauces and ready meals, which makes it harder for consumers to control how much they consume.",
+        "questions": [
+          {
+            "id": "r-salt_0",
+            "type": "mcq",
+            "prompt": "Question",
+            "options": [
+              "An unreliable explanation of a word's origin",
+              "Different ways of obtaining salt",
+              "A source of income for rulers",
+              "The health risks of eating too little salt",
+              "Salt as a symbol of resistance",
+              "How salt created wealth along trade routes",
+              "The decline of salt mining",
+              "Why salt was once so important"
+            ],
+            "answer": "None",
+            "explain": ""
+          },
+          {
+            "id": "r-salt_1",
+            "type": "mcq",
+            "prompt": "Question",
+            "options": [
+              "p",
+              "a",
+              "r",
+              "a",
+              "s"
+            ],
+            "answer": "None",
+            "explain": ""
+          }
+        ]
+      },
+      {
+        "id": "r-sleep",
+        "type": "reading",
+        "title": "Why Teenagers Can't Get Up",
+        "passage": "A. Parents of teenagers have long complained that their children stay up late and are almost impossible to wake in the morning. For many years this behaviour was put down to laziness or to the distractions of television and, more recently, smartphones. Research over the past three decades, however, suggests that biology plays a central role.\nB. Human sleep is regulated partly by the circadian rhythm, an internal clock that runs on a cycle of roughly 24 hours. One of the signals this clock sends is the release of melatonin, a hormone that helps to prepare the body for sleep. During adolescence, the timing of melatonin release shifts later in the evening, often by one to two hours. As a result, a typical teenager simply does not feel sleepy at the time that was natural a few years earlier.\nC. At the same time, the amount of sleep that adolescents need does not decrease. Most sleep scientists estimate that teenagers require between eight and ten hours a night. When school begins early in the morning, a student who cannot fall asleep before midnight has little chance of getting enough rest. Surveys in several countries suggest that a large proportion of secondary school students regularly sleep less than eight hours on school nights.\nD. Dr Lena Ortiz, a sleep researcher, argues that the consequences go beyond tiredness. In her studies, students who slept less performed worse on tests of memory and attention, and they were more likely to report low mood. Professor Daniel Reeve, an education specialist, takes a more cautious view. He accepts that teenagers are short of sleep but points out that many factors affect school performance, and he warns against expecting a single change to solve complex problems.\nE. One proposed solution is to start the school day later. Some schools that have moved their start time by 30 to 60 minutes have reported improvements in attendance and fewer students falling asleep in class. Dr Marcus Bell, who has studied such schools, found that students did not simply go to bed later in response; on average, they gained extra sleep. Critics note, however, that later start times can create difficulties for families, bus services and after-school activities, and that the benefits may vary between communities.\nF. Technology adds a further complication. Light from screens, particularly in the blue part of the spectrum, can delay the release of melatonin even further. Dr Ortiz recommends that teenagers stop using phones and computers at least an hour before bed, although she admits that this advice is often ignored. Professor Reeve believes that schools should teach students about sleep in the same way that they teach about diet and exercise, so that young people understand why rest matters.\nG. In my view, the evidence is now strong enough that schools should take adolescent sleep seriously. Changing timetables is not easy, and it will not suit every community. But continuing to treat sleepy teenagers as lazy ignores what we know about how their bodies work. At the very least, parents and teachers should recognise that a teenager who cannot sleep at ten o'clock is not necessarily being difficult.",
+        "questions": [
+          {
+            "id": "r-sleep_0",
+            "type": "mcq",
+            "prompt": "Question",
+            "options": [
+              "Dr Lena Ortiz",
+              "Professor Daniel Reeve",
+              "Dr Marcus Bell"
+            ],
+            "answer": "None",
+            "explain": ""
+          },
+          {
+            "id": "r-sleep_1",
+            "type": "mcq",
+            "prompt": "Question",
+            "options": [
+              "earlier",
+              "later",
+              "unchanged",
+              "lower",
+              "worse",
+              "attendance",
+              "grades",
+              "appetite"
+            ],
+            "answer": "None",
+            "explain": ""
+          }
+        ]
+      },
+      {
+        "id": "r-coral",
+        "type": "reading",
+        "title": "Gardening the Reef",
+        "passage": "A. Coral reefs cover less than one per cent of the ocean floor, yet they support around a quarter of all known marine species. They also protect coastlines from waves and storms and provide food and income for hundreds of millions of people. Over recent decades, however, reefs around the world have declined sharply, damaged by rising sea temperatures, pollution, overfishing and coastal development.\nB. The most dramatic threat is coral bleaching. Corals depend on tiny algae that live inside their tissues and provide them with most of their food through photosynthesis. When the water becomes too warm for an extended period, this partnership breaks down and the corals expel the algae, losing their colour. Bleached corals are not immediately dead, and they can recover if temperatures return to normal quickly enough. If the heat persists, however, many of them starve.\nC. Faced with these losses, scientists and conservation groups have begun to actively restore damaged reefs. One of the most widely used methods is known as coral gardening. Small fragments are cut from healthy corals and grown in underwater nurseries, often hanging from frames that look like trees made of plastic pipe. After several months, when the fragments have grown large enough, divers attach them to the damaged reef.\nD. A more recent technique takes advantage of a surprising discovery. When certain slow-growing corals are cut into very small pieces, only a centimetre or two across, each piece grows much faster than it would as part of a larger colony. If these micro-fragments are placed close together on a dead surface, they eventually grow into one another and fuse, covering the area far more quickly than a single colony could. This approach, called micro-fragmentation, has allowed restoration teams to produce in a few years coral cover that would naturally take decades.\nE. Other researchers are trying to make corals more resistant to heat. In laboratory experiments, corals have been exposed to gradually rising temperatures to see whether they can adapt, and some teams are selecting and breeding individual corals that survived previous bleaching events. The aim is to produce populations better able to cope with the warmer oceans of the future. This work is still at an early stage, and some scientists are concerned about unintended effects on reef ecosystems.\nF. Restoration is expensive and labour-intensive, and even its supporters admit that it can only be carried out over relatively small areas. A single project may restore a few hectares, while the world's reefs cover hundreds of thousands of square kilometres. Most experts therefore agree that restoration cannot replace efforts to reduce the causes of reef decline, above all the rise in ocean temperatures linked to climate change.\nG. Nevertheless, restoration projects have value beyond the corals they replant. They train local divers, attract visitors, and give communities a direct role in protecting the reefs on which they depend. In some places, former fishermen now earn a living by tending coral nurseries. Restoration, in other words, may be most useful not as a solution in itself but as a way of buying time while the larger problem is addressed.",
+        "questions": [
+          {
+            "id": "r-coral_0",
+            "type": "mcq",
+            "prompt": "Question",
+            "options": [
+              "p",
+              "a",
+              "r",
+              "a",
+              "s"
+            ],
+            "answer": "None",
+            "explain": ""
+          }
+        ]
+      },
+      {
+        "id": "r-choice",
+        "type": "reading",
+        "title": "Too Much of a Good Thing? The Choice Overload Debate",
+        "passage": "A. It seems obvious that having more options is better than having fewer. If a shop offers ten varieties of a product rather than three, customers are more likely to find something that suits them exactly. Economists have traditionally assumed that rational consumers benefit from additional choices, since they can always ignore the options they do not want.\nB. Around the turn of the century, however, a series of studies challenged this assumption. In one widely reported experiment, shoppers in a supermarket encountered a tasting table offering either six or twenty-four varieties of jam. The larger display attracted more visitors, but those who saw the smaller selection were far more likely to go on to buy a jar. The researchers concluded that too much choice could discourage people from choosing at all, an effect that became known as choice overload.\nC. Psychologists proposed several explanations. Comparing many options requires time and mental effort, and people may postpone a decision that feels too demanding. A larger range also raises expectations: if there are dozens of alternatives, it seems that one of them must be perfect, so whatever is chosen may feel disappointing by comparison. Finally, when people have many alternatives, they are more likely to blame themselves if the outcome is poor, since they could have chosen differently.\nD. The idea proved enormously popular. It was discussed in business books, applied to retirement savings plans and dating websites, and used to argue that modern life offers more freedom than people can comfortably manage. Some companies reduced the number of products they sold, citing choice overload as their reason.\nE. Yet as more researchers attempted to repeat the original findings, the picture became less clear. A major review that combined the results of dozens of experiments found that, on average, the effect of the number of options on people's satisfaction and willingness to choose was close to zero. Some studies found that more choice discouraged decisions; others found that it encouraged them; many found no difference at all.\nF. This does not mean that choice overload is imaginary. Instead, later research suggests that it appears only under certain conditions. People are more likely to struggle when the options are hard to compare, when they do not have clear preferences, or when they are under time pressure. When people know exactly what they want, or when the options are organised into clear categories, a large range causes few problems and may even be welcomed.\nG. These findings have practical consequences. Rather than simply cutting the number of options, organisations can help people to choose by grouping products, providing clear comparisons, or offering a sensible default option. Several governments have used this approach in pension schemes, automatically enrolling workers in a standard plan while allowing them to select another if they prefer.\nH. The story of choice overload also illustrates a wider lesson about how science works. A striking result that matches popular intuition can spread far beyond the evidence that supports it. It is only through repeated testing, often less widely reported than the original study, that researchers can discover when an effect is real, how large it is, and for whom it matters.",
+        "questions": [
+          {
+            "id": "r-choice_0",
+            "type": "mcq",
+            "prompt": "Question",
+            "options": [
+              "Reasons why many options may cause difficulty",
+              "Mixed results when experiments were repeated",
+              "The conditions in which the problem appears",
+              "A finding that challenged an established view",
+              "Ways of making choices easier",
+              "The rapid spread of an idea",
+              "What the case shows about research in general",
+              "Why shoppers prefer smaller stores",
+              "Evidence that choice always reduces satisfaction"
+            ],
+            "answer": "None",
+            "explain": ""
+          },
+          {
+            "id": "r-choice_1",
+            "type": "mcq",
+            "prompt": "Question",
+            "options": [
+              "are more likely to put off making a decision.",
+              "makes a large range less of a problem.",
+              "lose nothing when extra choices are added.",
+              "has often received less attention than the original study.",
+              "should be removed from most shops.",
+              "tend to praise themselves for good results."
+            ],
+            "answer": "None",
+            "explain": ""
+          }
+        ]
+      },
+      {
+        "id": "r-wind",
+        "type": "reading",
+        "title": "Catching the Wind",
+        "passage": "A. Long before electric air conditioning, people living in hot climates found ways to keep buildings cool without using any energy at all. Some of the most ingenious of these solutions can be found in the Middle East, where tall towers known as wind catchers have been used for centuries to ventilate homes, markets and water storage buildings. In the Iranian city of Yazd, dozens of these towers still rise above the rooftops, and the city's historic centre is a UNESCO World Heritage Site.\nB. A wind catcher works in two main ways. When the wind blows, an opening at the top of the tower faces the breeze and directs air down into the building, while warm air leaves through openings on the other side. Even when the air is still, the tower can act like a chimney: warm air inside the building rises and escapes through the top, drawing cooler air in from shaded courtyards or underground spaces. Some designs added a further element by passing incoming air over water, which cools the air as some of the water evaporates.\nC. The effectiveness of these systems depends heavily on their surroundings. Wind catchers were usually built as part of a wider design that included thick walls of mud brick, which absorb heat during the day and release it slowly at night; narrow streets that remain shaded for much of the day; and courtyards with trees and pools. Taken out of this context, a wind catcher on its own provides only limited cooling.\nD. For much of the twentieth century, such traditional techniques were largely abandoned. Mechanical air conditioning was cheaper to build into new buildings and gave occupants precise control over indoor temperature. As a result, many modern buildings in hot regions were designed with large glass surfaces and lightweight walls, relying entirely on electricity to remain comfortable.\nE. Rising energy costs and concern about climate change have revived interest in what architects now call passive cooling. Buildings that use natural ventilation, shading and thermal mass, the ability of heavy materials to store heat, can need far less energy for cooling. Engineers have adapted the principle of the wind catcher for modern use, for example in roof-mounted ventilation towers on schools and offices in Europe, which bring in fresh air without fans for much of the year.\nF. Architect Samira Haddad, who has designed several passively cooled buildings, stresses that the aim is not to copy historic forms but to understand the principles behind them. She notes that the climate of a city, including its typical wind directions and humidity, must be studied carefully before a design is chosen. Engineer Tom Garrick, by contrast, believes that the greatest gains will come from combining passive techniques with efficient mechanical systems that operate only when natural methods are insufficient. Urban planner Mei Lin emphasises the role of the city as a whole, arguing that shaded streets and green spaces can lower air temperatures for entire neighbourhoods.\nG. Passive cooling has its limits. In very humid climates, cooling by evaporation is far less effective, and natural ventilation may bring in noise and pollution in busy cities. Rising global temperatures may also push some regions beyond the conditions in which passive methods alone can keep people comfortable. Nevertheless, the traditional builders of the desert offer a valuable reminder that comfort can be achieved by working with the climate rather than against it.",
+        "questions": [
+          {
+            "id": "r-wind_0",
+            "type": "mcq",
+            "prompt": "Question",
+            "options": [
+              "Samira Haddad",
+              "Tom Garrick",
+              "Mei Lin"
+            ],
+            "answer": "None",
+            "explain": ""
+          }
+        ]
       }
     ],
     "writing": [
@@ -158,6 +1523,146 @@
         "prompt": "Task 1: The chart below shows the percentage of households with internet access from 2000 to 2020 in three countries. Summarise the information by selecting and reporting the main features.",
         "rubric": "ielts_task1",
         "min_words": 150
+      },
+      {
+        "id": "i-essay-100",
+        "type": "writing",
+        "prompt": "Some people believe that universities should focus on developing students' professional skills, while others argue that the main purpose of a university education is to develop knowledge for its own sake. Discuss both views and give your own opinion. Write at least 250 words.",
+        "rubric": "ielts",
+        "min_words": 150
+      },
+      {
+        "id": "i-essay-101",
+        "type": "writing",
+        "prompt": "In many countries, the number of animal and plant species is decreasing rapidly. What do you think are the causes of this? What measures can be taken to address the problem? Write at least 250 words.",
+        "rubric": "ielts",
+        "min_words": 150
+      },
+      {
+        "id": "i-essay-102",
+        "type": "writing",
+        "prompt": "Some people think that international tourism is a positive development for all countries involved. Others believe its negative impacts outweigh its benefits. Discuss both views and give your own opinion. Write at least 250 words.",
+        "rubric": "ielts",
+        "min_words": 150
+      },
+      {
+        "id": "i-essay-103",
+        "type": "writing",
+        "prompt": "In many cities, traffic congestion has become a serious problem. What are the main causes of traffic congestion in cities, and what solutions would you propose? Write at least 250 words.",
+        "rubric": "ielts",
+        "min_words": 150
+      },
+      {
+        "id": "i-essay-104",
+        "type": "writing",
+        "prompt": "Some people believe that governments should ban dangerous sports, while others think people should be allowed to take part in any sport of their choice. Discuss both views and give your opinion. Write at least 250 words.",
+        "rubric": "ielts",
+        "min_words": 150
+      },
+      {
+        "id": "i-essay-105",
+        "type": "writing",
+        "prompt": "Online learning has become increasingly popular in recent years. Do the advantages of online learning outweigh the disadvantages? Write at least 250 words.",
+        "rubric": "ielts",
+        "min_words": 150
+      },
+      {
+        "id": "i-essay-106",
+        "type": "writing",
+        "prompt": "Some people think the best way to reduce crime is to give longer prison sentences. Others, however, believe there are better alternative methods. Discuss both views and give your opinion. Write at least 250 words.",
+        "rubric": "ielts",
+        "min_words": 150
+      },
+      {
+        "id": "i-essay-107",
+        "type": "writing",
+        "prompt": "In many countries, fast food is becoming cheaper and more widely available. Do the disadvantages of this outweigh the advantages? Write at least 250 words.",
+        "rubric": "ielts",
+        "min_words": 150
+      },
+      {
+        "id": "i-essay-108",
+        "type": "writing",
+        "prompt": "Many young people today struggle with mental health issues such as anxiety and depression. What are the main causes of this trend, and what can governments and societies do to help? Write at least 250 words.",
+        "rubric": "ielts",
+        "min_words": 150
+      },
+      {
+        "id": "i-essay-109",
+        "type": "writing",
+        "prompt": "Many museums charge for admission while others are free. Do you think the advantages of charging people for admission to museums outweigh the disadvantages? Write at least 250 words.",
+        "rubric": "ielts",
+        "min_words": 150
+      },
+      {
+        "id": "i-task1-100",
+        "type": "writing",
+        "prompt": "The line graph below shows the percentage of households owning four different consumer goods (television, washing machine, refrigerator, and mobile phone) in a developing country between 1990 and 2020. Summarise the information by selecting and reporting the main features, and make comparisons where relevant. Write at least 150 words.",
+        "rubric": "ielts",
+        "min_words": 150
+      },
+      {
+        "id": "i-task1-101",
+        "type": "writing",
+        "prompt": "The bar chart shows the average hours per week that adults in five different countries (UK, USA, Germany, Japan, and Australia) spent on three leisure activities (reading, watching TV, and using social media) in 2020. Summarise the information by selecting and reporting the main features, and make comparisons where relevant. Write at least 150 words.",
+        "rubric": "ielts",
+        "min_words": 150
+      },
+      {
+        "id": "i-task1-102",
+        "type": "writing",
+        "prompt": "The pie charts compare the sources of energy used to generate electricity in a country in 1990 and 2020. The four sources are coal, natural gas, nuclear, and renewables. Summarise the information by selecting and reporting the main features, and make comparisons where relevant. Write at least 150 words.",
+        "rubric": "ielts",
+        "min_words": 150
+      },
+      {
+        "id": "i-task1-103",
+        "type": "writing",
+        "prompt": "The diagram below shows the process by which recycled paper is produced from used newspapers, magazines, and office paper. Summarise the information by selecting and reporting the main features. Write at least 150 words.",
+        "rubric": "ielts",
+        "min_words": 150
+      },
+      {
+        "id": "i-task1-104",
+        "type": "writing",
+        "prompt": "The maps below show the village of Stokeford in 1930 and in 2020. Summarise the information by selecting and reporting the main features, and make comparisons where relevant. Write at least 150 words.",
+        "rubric": "ielts",
+        "min_words": 150
+      },
+      {
+        "id": "i-essay-200",
+        "type": "writing",
+        "prompt": "Many people believe that social media has fundamentally changed political discourse for the worse. Others argue that it has democratized political participation. Discuss both views and give your own opinion. Write at least 250 words.",
+        "rubric": "ielts",
+        "min_words": 150
+      },
+      {
+        "id": "i-essay-201",
+        "type": "writing",
+        "prompt": "Some people believe that governments should invest heavily in public transportation rather than building new roads. To what extent do you agree or disagree? Write at least 250 words.",
+        "rubric": "ielts",
+        "min_words": 150
+      },
+      {
+        "id": "i-essay-202",
+        "type": "writing",
+        "prompt": "In many countries today, people are working longer hours than in the past. What are the reasons for this trend? What problems can it cause? Write at least 250 words.",
+        "rubric": "ielts",
+        "min_words": 150
+      },
+      {
+        "id": "i-essay-203",
+        "type": "writing",
+        "prompt": "Obesity rates are rising in many developed countries, particularly among children. What do you think are the main causes of this problem, and what measures can be taken to address it? Write at least 250 words.",
+        "rubric": "ielts",
+        "min_words": 150
+      },
+      {
+        "id": "i-essay-204",
+        "type": "writing",
+        "prompt": "Some argue that history is the most important school subject because it teaches us about the past. Others believe subjects like mathematics and science are more useful. Discuss both views and give your opinion. Write at least 250 words.",
+        "rubric": "ielts",
+        "min_words": 150
       }
     ],
     "speaking": [
@@ -172,11 +1677,131 @@
         "type": "speaking",
         "prompt": "Part 3: Do you think schools should teach more digital skills? Why?",
         "tips": "Give reasons and an example."
+      },
+      {
+        "id": "i-sp1-100",
+        "type": "speaking",
+        "prompt": "Tell me about your hometown. What is it like to live there?",
+        "tips": ""
+      },
+      {
+        "id": "i-sp1-101",
+        "type": "speaking",
+        "prompt": "What do you do for work or study? Tell me about your daily routine.",
+        "tips": ""
+      },
+      {
+        "id": "i-sp1-102",
+        "type": "speaking",
+        "prompt": "What do you usually do in your free time? Why do you enjoy it?",
+        "tips": ""
+      },
+      {
+        "id": "i-sp1-103",
+        "type": "speaking",
+        "prompt": "Can you describe your family? Are you close to them?",
+        "tips": ""
+      },
+      {
+        "id": "i-sp1-104",
+        "type": "speaking",
+        "prompt": "What kind of weather do you prefer? Why?",
+        "tips": ""
+      },
+      {
+        "id": "i-sp1-105",
+        "type": "speaking",
+        "prompt": "Do you enjoy traveling? Where have you been recently?",
+        "tips": ""
+      },
+      {
+        "id": "i-sp1-106",
+        "type": "speaking",
+        "prompt": "What kind of food do you like to eat? Have your tastes changed over time?",
+        "tips": ""
+      },
+      {
+        "id": "i-sp1-107",
+        "type": "speaking",
+        "prompt": "How often do you use a smartphone in a typical day? What for?",
+        "tips": ""
+      },
+      {
+        "id": "i-sp2-100",
+        "type": "speaking",
+        "prompt": "Describe a person who has had an important influence on your life. You should say:\n• who this person is\n• how you know them\n• what they did or do that has influenced you\n• and explain why this person has been so important to you.\n\nYou have 1 minute to prepare. Speak for 1-2 minutes.",
+        "tips": ""
+      },
+      {
+        "id": "i-sp2-101",
+        "type": "speaking",
+        "prompt": "Describe a time when you learned something new that was difficult. You should say:\n• what it was\n• why you wanted to learn it\n• how you learned it\n• and explain how you felt when you eventually mastered it.\n\nYou have 1 minute to prepare. Speak for 1-2 minutes.",
+        "tips": ""
+      },
+      {
+        "id": "i-sp2-102",
+        "type": "speaking",
+        "prompt": "Describe a place you have visited that is particularly memorable. You should say:\n• where it is\n• when you went there\n• who you went with\n• and explain why it was so memorable for you.\n\nYou have 1 minute to prepare. Speak for 1-2 minutes.",
+        "tips": ""
+      },
+      {
+        "id": "i-sp2-103",
+        "type": "speaking",
+        "prompt": "Describe an item that is important to you. You should say:\n• what it is\n• how long you have had it\n• where you got it\n• and explain why this item is important to you.\n\nYou have 1 minute to prepare. Speak for 1-2 minutes.",
+        "tips": ""
+      },
+      {
+        "id": "i-sp2-104",
+        "type": "speaking",
+        "prompt": "Describe a hobby or activity that you started recently. You should say:\n• what the hobby or activity is\n• when you started doing it\n• how you got into it\n• and explain why you enjoy doing it.\n\nYou have 1 minute to prepare. Speak for 1-2 minutes.",
+        "tips": ""
+      },
+      {
+        "id": "i-sp2-105",
+        "type": "speaking",
+        "prompt": "Describe a goal or plan you have for the next few years. You should say:\n• what the goal is\n• when you decided on it\n• what steps you are taking to achieve it\n• and explain why this goal is important to you.\n\nYou have 1 minute to prepare. Speak for 1-2 minutes.",
+        "tips": ""
+      },
+      {
+        "id": "i-sp3-100",
+        "type": "speaking",
+        "prompt": "How has education changed in your country over the past few decades? What do you think drives those changes?",
+        "tips": ""
+      },
+      {
+        "id": "i-sp3-101",
+        "type": "speaking",
+        "prompt": "What impact has smartphone technology had on the way younger and older generations communicate? Is this a good thing?",
+        "tips": ""
+      },
+      {
+        "id": "i-sp3-102",
+        "type": "speaking",
+        "prompt": "Some people work the same job their entire careers, while others change frequently. What are the advantages and disadvantages of each approach?",
+        "tips": ""
+      },
+      {
+        "id": "i-sp3-103",
+        "type": "speaking",
+        "prompt": "Whose responsibility is it to protect the environment — individuals, businesses, or governments? Why?",
+        "tips": ""
+      },
+      {
+        "id": "i-sp3-104",
+        "type": "speaking",
+        "prompt": "How important is it to preserve traditional cultural practices in a rapidly changing world? Can you give an example?",
+        "tips": ""
+      },
+      {
+        "id": "i-sp3-105",
+        "type": "speaking",
+        "prompt": "Do you think globalization has been more positive or negative for ordinary people in your country? Why?",
+        "tips": ""
       }
     ]
   },
   "mock": {
-    "duration_minutes": 90,
+    "duration_minutes": 150,
     "sections": [
       "listening",
       "reading",

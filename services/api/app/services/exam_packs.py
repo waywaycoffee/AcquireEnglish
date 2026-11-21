@@ -85,13 +85,22 @@ def list_catalog() -> list[dict[str, Any]]:
     items: list[dict[str, Any]] = []
     for path in sorted(_packs_dir().glob("pack_*.json")):
         data = _read_pack_file(path.stem) or {}
+        sections = data.get("sections") or {}
+        counts: dict[str, int] = {}
+        if isinstance(sections, dict):
+            for skill, raw in sections.items():
+                counts[str(skill)] = len(raw) if isinstance(raw, list) else 0
+        if isinstance(data.get("counts"), dict):
+            counts = {str(k): int(v) for k, v in data["counts"].items()}
         items.append(
             {
                 "id": path.stem,
                 "family_id": data.get("family_id") or path.stem.replace("pack_", "", 1),
                 "title": data.get("title") or path.stem,
                 "cefr": data.get("cefr") or "",
-                "skills": list((data.get("sections") or {}).keys()),
+                "skills": list(counts.keys()) or list(sections.keys()),
+                "counts": counts,
+                "version": data.get("version"),
             }
         )
     return items
@@ -119,7 +128,7 @@ def get_pack(family_id: str) -> dict[str, Any]:
     return out
 
 
-def section_items(family_id: str, skill: str, *, limit: int = 40) -> list[dict[str, Any]]:
+def section_items(family_id: str, skill: str, *, limit: int = 200) -> list[dict[str, Any]]:
     pack = get_pack(family_id)
     sections = pack.get("sections") or {}
     raw = sections.get(skill) or []

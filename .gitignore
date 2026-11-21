@@ -81,3 +81,7 @@ services/api/media/
 tools/reading_samples/*.epub
 tools/reading_samples/*.zip
 
+# Exam bank vendor clones / releases (large; generated packs committed separately)
+services/api/data/exam_bank_vendor/**
+!services/api/data/exam_bank_vendor/.gitkeep
+

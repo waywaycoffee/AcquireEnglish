@@ -32,7 +32,7 @@ async def pack_for_family(
 async def pack_section(
     family_id: str,
     skill: str,
-    limit: int = Query(40, ge=1, le=100),
+    limit: int = Query(200, ge=1, le=500),
     user: User = Depends(get_current_user),
 ) -> dict[str, Any]:
     del user
