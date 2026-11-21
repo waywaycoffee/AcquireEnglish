@@ -159,19 +159,22 @@ class _WordLookupPopupCardState extends ConsumerState<WordLookupPopupCard> {
     setState(() {
       _isPronouncing = true;
     });
+    // Notify host (e.g. stop video / in-flight reading audio). Must not speak.
     widget.onPronounce?.call();
 
     try {
-      await ref
-          .read(wordPronunciationServiceProvider)
-          .speak(
-            text,
-            language: language,
-            recordedUrl:
-                language == 'en-US' && text.trim().toLowerCase() == entry?.word
-                ? entry?.audioUrl
-                : null,
-          );
+      final WordPronunciationService pronunciation = ref.read(
+        wordPronunciationServiceProvider,
+      );
+      await pronunciation.stop();
+      await pronunciation.speak(
+        text,
+        language: language,
+        recordedUrl:
+            language == 'en-US' && text.trim().toLowerCase() == entry?.word
+            ? entry?.audioUrl
+            : null,
+      );
     } on WordPronunciationException catch (error) {
       if (mounted) {
         _showMessage(error.message);

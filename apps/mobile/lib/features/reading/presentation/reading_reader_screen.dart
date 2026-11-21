@@ -594,8 +594,12 @@ class _ReadingReaderScreenState extends ConsumerState<ReadingReaderScreen> {
                   fallbackDefinitionCn: fallback.isEmpty ? null : fallback,
                   maxHeight: maxH,
                   onClose: () => Navigator.pop(ctx),
+                  // Side-effect only: card already speaks via WordPronunciationService.
+                  // Calling _speakReading here doubled audio (CosyVoice + dictionary TTS).
                   onPronounce: () {
-                    unawaited(_speakReading(lexeme));
+                    unawaited(
+                      ref.read(wordPronunciationServiceProvider).stop(),
+                    );
                   },
                   onFavorite: (String? definitionCn) {
                     Navigator.pop(ctx);

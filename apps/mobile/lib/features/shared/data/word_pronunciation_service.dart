@@ -98,6 +98,9 @@ class WordPronunciationService {
       return;
     }
 
+    // One tap must never layer a new utterance on top of an in-flight one.
+    await stop();
+
     final double effectiveRate = (rate ?? selectedRate).clamp(0.5, 1.8);
 
     if (recordedUrl != null &&
