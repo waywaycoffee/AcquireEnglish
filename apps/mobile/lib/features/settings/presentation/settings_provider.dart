@@ -415,10 +415,11 @@ class LearningSettingsState {
       usesOralCoachPipeline ||
       oralCoachBackend == '本地 TTS';
 
-  /// Real-time wav2lip WebRTC on the GPU box. Expensive; default pipeline
-  /// conversation uses a local avatar + TTS instead.
-  bool get usesRealtimeLipSync => !cartoonDigitalHuman &&
-      (usesLiveTalkingCoach || usesOralCoachPipeline);
+  /// Real-time wav2lip WebRTC on the GPU box.
+  ///
+  /// Disabled for now: connecting LiveTalking during digital-human chat jumps
+  /// into an unrelated lip-sync loading experience. Keep local avatar + TTS.
+  bool get usesRealtimeLipSync => false;
 
   bool get isBilibiliLoggedIn => hasBilibiliCookie;
 

@@ -523,8 +523,8 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
       settings.oralCoachBackend != '本地 TTS' &&
       settings.oralCoachPipelineUrl.trim().isNotEmpty;
 
-  bool _wantsLiveTalking(LearningSettingsState settings) =>
-      settings.usesRealtimeLipSync;
+  /// LiveTalking lip-sync is intentionally off — stay on local avatar + TTS.
+  bool _wantsLiveTalking(LearningSettingsState settings) => false;
 
   Future<void> _ensurePipelineSession(LearningSettingsState settings) async {
     if (_session != null) return;
