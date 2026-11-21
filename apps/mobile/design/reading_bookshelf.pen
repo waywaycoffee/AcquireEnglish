@@ -1,0 +1,1093 @@
+{
+  "version": "2.22",
+  "children": [
+    {
+      "type": "frame",
+      "id": "bs-light",
+      "name": "01 我的书架 · 浅色",
+      "x": 0,
+      "y": 0,
+      "width": 390,
+      "height": 844,
+      "layout": "none",
+      "fill": "#F3EBD9",
+      "children": [
+        {
+          "type": "text",
+          "id": "lt-title",
+          "x": 24,
+          "y": 34,
+          "content": "我的书架",
+          "fontFamily": "Georgia",
+          "fontSize": 26,
+          "fill": "#243F36"
+        },
+        {
+          "type": "text",
+          "id": "lt-actions",
+          "x": 268,
+          "y": 38,
+          "content": "⌕     ＋",
+          "fontFamily": "Georgia",
+          "fontSize": 20,
+          "fill": "#5C3D2E"
+        },
+        {
+          "type": "text",
+          "id": "lt-sub",
+          "x": 24,
+          "y": 72,
+          "content": "封面朝外 · 点书继续读",
+          "fontFamily": "Georgia",
+          "fontSize": 12,
+          "fill": "#7A6348"
+        },
+        {
+          "type": "frame",
+          "id": "lt-wood",
+          "x": 14,
+          "y": 98,
+          "width": 362,
+          "height": 668,
+          "layout": "none",
+          "fill": "#5C3D2E",
+          "cornerRadius": 14,
+          "children": [
+            {
+              "type": "frame",
+              "id": "lt-wood-inner",
+              "x": 8,
+              "y": 8,
+              "width": 346,
+              "height": 652,
+              "layout": "none",
+              "fill": "#6B4633",
+              "cornerRadius": 10,
+              "children": [
+                {
+                  "type": "frame",
+                  "id": "lt-b1",
+                  "x": 18,
+                  "y": 36,
+                  "width": 70,
+                  "height": 148,
+                  "fill": "#315B50",
+                  "cornerRadius": 3,
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "lt-b1t",
+                      "x": 8,
+                      "y": 52,
+                      "content": "A Morning\nWalk",
+                      "fontFamily": "Georgia",
+                      "fontSize": 12,
+                      "fill": "#FFFFFF"
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "lt-b2",
+                  "x": 100,
+                  "y": 44,
+                  "width": 68,
+                  "height": 140,
+                  "fill": "#AD6842",
+                  "cornerRadius": 3,
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "lt-b2t",
+                      "x": 8,
+                      "y": 50,
+                      "content": "The Lost\nKey",
+                      "fontFamily": "Georgia",
+                      "fontSize": 12,
+                      "fill": "#FFFFFF"
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "lt-b3",
+                  "x": 180,
+                  "y": 32,
+                  "width": 72,
+                  "height": 152,
+                  "fill": "#384F74",
+                  "cornerRadius": 3,
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "lt-b3t",
+                      "x": 8,
+                      "y": 52,
+                      "content": "A Robot\nat Home",
+                      "fontFamily": "Georgia",
+                      "fontSize": 12,
+                      "fill": "#FFFFFF"
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "lt-b4",
+                  "x": 264,
+                  "y": 40,
+                  "width": 66,
+                  "height": 144,
+                  "fill": "#8B4A3A",
+                  "cornerRadius": 3,
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "lt-b4t",
+                      "x": 8,
+                      "y": 52,
+                      "content": "Rainy\nDay",
+                      "fontFamily": "Georgia",
+                      "fontSize": 12,
+                      "fill": "#FFFFFF"
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "lt-shelf1",
+                  "x": 6,
+                  "y": 184,
+                  "width": 334,
+                  "height": 16,
+                  "fill": "#8B5E3C",
+                  "cornerRadius": 2,
+                  "children": []
+                },
+                {
+                  "type": "frame",
+                  "id": "lt-shelf1-lip",
+                  "x": 6,
+                  "y": 184,
+                  "width": 334,
+                  "height": 5,
+                  "fill": "#A67C52",
+                  "cornerRadius": 1,
+                  "children": []
+                },
+                {
+                  "type": "frame",
+                  "id": "lt-b5",
+                  "x": 18,
+                  "y": 218,
+                  "width": 70,
+                  "height": 146,
+                  "fill": "#5C6B3A",
+                  "cornerRadius": 3,
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "lt-b5t",
+                      "x": 8,
+                      "y": 52,
+                      "content": "Cafe\nTalk",
+                      "fontFamily": "Georgia",
+                      "fontSize": 12,
+                      "fill": "#FFFFFF"
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "lt-b6",
+                  "x": 100,
+                  "y": 214,
+                  "width": 68,
+                  "height": 150,
+                  "fill": "#2F4A5C",
+                  "cornerRadius": 3,
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "lt-b6t",
+                      "x": 8,
+                      "y": 52,
+                      "content": "Night\nTrain",
+                      "fontFamily": "Georgia",
+                      "fontSize": 12,
+                      "fill": "#FFFFFF"
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "lt-b7",
+                  "x": 180,
+                  "y": 226,
+                  "width": 66,
+                  "height": 138,
+                  "fill": "#C4A35A",
+                  "cornerRadius": 3,
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "lt-b7t",
+                      "x": 8,
+                      "y": 48,
+                      "content": "Old\nMap",
+                      "fontFamily": "Georgia",
+                      "fontSize": 12,
+                      "fill": "#3A2A18"
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "lt-b8",
+                  "x": 258,
+                  "y": 216,
+                  "width": 70,
+                  "height": 148,
+                  "fill": "#3D5A4C",
+                  "cornerRadius": 3,
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "lt-b8t",
+                      "x": 8,
+                      "y": 52,
+                      "content": "Blue\nLake",
+                      "fontFamily": "Georgia",
+                      "fontSize": 12,
+                      "fill": "#FFFFFF"
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "lt-shelf2",
+                  "x": 6,
+                  "y": 364,
+                  "width": 334,
+                  "height": 16,
+                  "fill": "#8B5E3C",
+                  "cornerRadius": 2,
+                  "children": []
+                },
+                {
+                  "type": "frame",
+                  "id": "lt-shelf2-lip",
+                  "x": 6,
+                  "y": 364,
+                  "width": 334,
+                  "height": 5,
+                  "fill": "#A67C52",
+                  "cornerRadius": 1,
+                  "children": []
+                },
+                {
+                  "type": "frame",
+                  "id": "lt-b9",
+                  "x": 18,
+                  "y": 400,
+                  "width": 68,
+                  "height": 142,
+                  "fill": "#9C5A3C",
+                  "cornerRadius": 3,
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "lt-b9t",
+                      "x": 8,
+                      "y": 50,
+                      "content": "Soft\nWind",
+                      "fontFamily": "Georgia",
+                      "fontSize": 12,
+                      "fill": "#FFFFFF"
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "lt-b10",
+                  "x": 100,
+                  "y": 396,
+                  "width": 70,
+                  "height": 146,
+                  "fill": "#4A5E6B",
+                  "cornerRadius": 3,
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "lt-b10t",
+                      "x": 8,
+                      "y": 50,
+                      "content": "Quiet\nRoom",
+                      "fontFamily": "Georgia",
+                      "fontSize": 12,
+                      "fill": "#FFFFFF"
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "lt-import",
+                  "x": 186,
+                  "y": 408,
+                  "width": 72,
+                  "height": 134,
+                  "fill": "#D4B896",
+                  "cornerRadius": 4,
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "lt-import-plus",
+                      "x": 26,
+                      "y": 42,
+                      "content": "＋",
+                      "fontFamily": "Georgia",
+                      "fontSize": 28,
+                      "fill": "#5C3D2E"
+                    },
+                    {
+                      "type": "text",
+                      "id": "lt-import-label",
+                      "x": 16,
+                      "y": 86,
+                      "content": "导入",
+                      "fontFamily": "Georgia",
+                      "fontSize": 14,
+                      "fill": "#5C3D2E"
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "lt-shelf3",
+                  "x": 6,
+                  "y": 542,
+                  "width": 334,
+                  "height": 16,
+                  "fill": "#8B5E3C",
+                  "cornerRadius": 2,
+                  "children": []
+                },
+                {
+                  "type": "frame",
+                  "id": "lt-shelf3-lip",
+                  "x": 6,
+                  "y": 542,
+                  "width": 334,
+                  "height": 5,
+                  "fill": "#A67C52",
+                  "cornerRadius": 1,
+                  "children": []
+                },
+                {
+                  "type": "frame",
+                  "id": "lt-base",
+                  "x": 0,
+                  "y": 620,
+                  "width": 346,
+                  "height": 32,
+                  "fill": "#4A2F22",
+                  "cornerRadius": 0,
+                  "children": []
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "type": "text",
+          "id": "lt-stats",
+          "x": 24,
+          "y": 786,
+          "content": "10 本          ·          1,860 词",
+          "fontFamily": "Georgia",
+          "fontSize": 14,
+          "fill": "#6B5340"
+        },
+        {
+          "type": "text",
+          "id": "lt-stats-hint",
+          "x": 24,
+          "y": 812,
+          "content": "书架上的书 · 非卡片网格",
+          "fontFamily": "Georgia",
+          "fontSize": 11,
+          "fill": "#9A8168"
+        }
+      ]
+    },
+    {
+      "type": "frame",
+      "id": "bs-dark",
+      "name": "02 我的书架 · 深色",
+      "x": 430,
+      "y": 0,
+      "width": 390,
+      "height": 844,
+      "layout": "none",
+      "fill": "#1A1410",
+      "children": [
+        {
+          "type": "text",
+          "id": "dk-title",
+          "x": 24,
+          "y": 34,
+          "content": "我的书架",
+          "fontFamily": "Georgia",
+          "fontSize": 26,
+          "fill": "#F0E4D0"
+        },
+        {
+          "type": "text",
+          "id": "dk-actions",
+          "x": 268,
+          "y": 38,
+          "content": "⌕     ＋",
+          "fontFamily": "Georgia",
+          "fontSize": 20,
+          "fill": "#D4B896"
+        },
+        {
+          "type": "text",
+          "id": "dk-sub",
+          "x": 24,
+          "y": 72,
+          "content": "封面朝外 · 点书继续读",
+          "fontFamily": "Georgia",
+          "fontSize": 12,
+          "fill": "#A89078"
+        },
+        {
+          "type": "frame",
+          "id": "dk-wood",
+          "x": 14,
+          "y": 98,
+          "width": 362,
+          "height": 668,
+          "layout": "none",
+          "fill": "#2C1B14",
+          "cornerRadius": 14,
+          "children": [
+            {
+              "type": "frame",
+              "id": "dk-wood-inner",
+              "x": 8,
+              "y": 8,
+              "width": 346,
+              "height": 652,
+              "layout": "none",
+              "fill": "#3D2A1F",
+              "cornerRadius": 10,
+              "children": [
+                {
+                  "type": "frame",
+                  "id": "dk-b1",
+                  "x": 18,
+                  "y": 36,
+                  "width": 70,
+                  "height": 148,
+                  "fill": "#3A6B5C",
+                  "cornerRadius": 3,
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "dk-b1t",
+                      "x": 8,
+                      "y": 52,
+                      "content": "A Morning\nWalk",
+                      "fontFamily": "Georgia",
+                      "fontSize": 12,
+                      "fill": "#FFFFFF"
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "dk-b2",
+                  "x": 100,
+                  "y": 44,
+                  "width": 68,
+                  "height": 140,
+                  "fill": "#B8734A",
+                  "cornerRadius": 3,
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "dk-b2t",
+                      "x": 8,
+                      "y": 50,
+                      "content": "The Lost\nKey",
+                      "fontFamily": "Georgia",
+                      "fontSize": 12,
+                      "fill": "#FFFFFF"
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "dk-b3",
+                  "x": 180,
+                  "y": 32,
+                  "width": 72,
+                  "height": 152,
+                  "fill": "#4A6288",
+                  "cornerRadius": 3,
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "dk-b3t",
+                      "x": 8,
+                      "y": 52,
+                      "content": "A Robot\nat Home",
+                      "fontFamily": "Georgia",
+                      "fontSize": 12,
+                      "fill": "#FFFFFF"
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "dk-b4",
+                  "x": 264,
+                  "y": 40,
+                  "width": 66,
+                  "height": 144,
+                  "fill": "#9A4E3E",
+                  "cornerRadius": 3,
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "dk-b4t",
+                      "x": 8,
+                      "y": 52,
+                      "content": "Rainy\nDay",
+                      "fontFamily": "Georgia",
+                      "fontSize": 12,
+                      "fill": "#FFFFFF"
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "dk-shelf1",
+                  "x": 6,
+                  "y": 184,
+                  "width": 334,
+                  "height": 16,
+                  "fill": "#5C3D2E",
+                  "cornerRadius": 2,
+                  "children": []
+                },
+                {
+                  "type": "frame",
+                  "id": "dk-shelf1-lip",
+                  "x": 6,
+                  "y": 184,
+                  "width": 334,
+                  "height": 5,
+                  "fill": "#7A5238",
+                  "cornerRadius": 1,
+                  "children": []
+                },
+                {
+                  "type": "frame",
+                  "id": "dk-b5",
+                  "x": 18,
+                  "y": 218,
+                  "width": 70,
+                  "height": 146,
+                  "fill": "#6A7A42",
+                  "cornerRadius": 3,
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "dk-b5t",
+                      "x": 8,
+                      "y": 52,
+                      "content": "Cafe\nTalk",
+                      "fontFamily": "Georgia",
+                      "fontSize": 12,
+                      "fill": "#FFFFFF"
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "dk-b6",
+                  "x": 100,
+                  "y": 214,
+                  "width": 68,
+                  "height": 150,
+                  "fill": "#3A5A6C",
+                  "cornerRadius": 3,
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "dk-b6t",
+                      "x": 8,
+                      "y": 52,
+                      "content": "Night\nTrain",
+                      "fontFamily": "Georgia",
+                      "fontSize": 12,
+                      "fill": "#FFFFFF"
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "dk-b7",
+                  "x": 180,
+                  "y": 226,
+                  "width": 66,
+                  "height": 138,
+                  "fill": "#D0AE62",
+                  "cornerRadius": 3,
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "dk-b7t",
+                      "x": 8,
+                      "y": 48,
+                      "content": "Old\nMap",
+                      "fontFamily": "Georgia",
+                      "fontSize": 12,
+                      "fill": "#2C1B14"
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "dk-b8",
+                  "x": 258,
+                  "y": 216,
+                  "width": 70,
+                  "height": 148,
+                  "fill": "#4A6A58",
+                  "cornerRadius": 3,
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "dk-b8t",
+                      "x": 8,
+                      "y": 52,
+                      "content": "Blue\nLake",
+                      "fontFamily": "Georgia",
+                      "fontSize": 12,
+                      "fill": "#FFFFFF"
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "dk-shelf2",
+                  "x": 6,
+                  "y": 364,
+                  "width": 334,
+                  "height": 16,
+                  "fill": "#5C3D2E",
+                  "cornerRadius": 2,
+                  "children": []
+                },
+                {
+                  "type": "frame",
+                  "id": "dk-shelf2-lip",
+                  "x": 6,
+                  "y": 364,
+                  "width": 334,
+                  "height": 5,
+                  "fill": "#7A5238",
+                  "cornerRadius": 1,
+                  "children": []
+                },
+                {
+                  "type": "frame",
+                  "id": "dk-b9",
+                  "x": 18,
+                  "y": 400,
+                  "width": 68,
+                  "height": 142,
+                  "fill": "#A85E42",
+                  "cornerRadius": 3,
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "dk-b9t",
+                      "x": 8,
+                      "y": 50,
+                      "content": "Soft\nWind",
+                      "fontFamily": "Georgia",
+                      "fontSize": 12,
+                      "fill": "#FFFFFF"
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "dk-b10",
+                  "x": 100,
+                  "y": 396,
+                  "width": 70,
+                  "height": 146,
+                  "fill": "#5A6E7A",
+                  "cornerRadius": 3,
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "dk-b10t",
+                      "x": 8,
+                      "y": 50,
+                      "content": "Quiet\nRoom",
+                      "fontFamily": "Georgia",
+                      "fontSize": 12,
+                      "fill": "#FFFFFF"
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "dk-import",
+                  "x": 186,
+                  "y": 408,
+                  "width": 72,
+                  "height": 134,
+                  "fill": "#4A3428",
+                  "cornerRadius": 4,
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "dk-import-plus",
+                      "x": 26,
+                      "y": 42,
+                      "content": "＋",
+                      "fontFamily": "Georgia",
+                      "fontSize": 28,
+                      "fill": "#D4B896"
+                    },
+                    {
+                      "type": "text",
+                      "id": "dk-import-label",
+                      "x": 16,
+                      "y": 86,
+                      "content": "导入",
+                      "fontFamily": "Georgia",
+                      "fontSize": 14,
+                      "fill": "#D4B896"
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "dk-shelf3",
+                  "x": 6,
+                  "y": 542,
+                  "width": 334,
+                  "height": 16,
+                  "fill": "#5C3D2E",
+                  "cornerRadius": 2,
+                  "children": []
+                },
+                {
+                  "type": "frame",
+                  "id": "dk-shelf3-lip",
+                  "x": 6,
+                  "y": 542,
+                  "width": 334,
+                  "height": 5,
+                  "fill": "#7A5238",
+                  "cornerRadius": 1,
+                  "children": []
+                },
+                {
+                  "type": "frame",
+                  "id": "dk-base",
+                  "x": 0,
+                  "y": 620,
+                  "width": 346,
+                  "height": 32,
+                  "fill": "#1F130E",
+                  "cornerRadius": 0,
+                  "children": []
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "type": "text",
+          "id": "dk-stats",
+          "x": 24,
+          "y": 786,
+          "content": "10 本          ·          1,860 词",
+          "fontFamily": "Georgia",
+          "fontSize": 14,
+          "fill": "#C4A88A"
+        },
+        {
+          "type": "text",
+          "id": "dk-stats-hint",
+          "x": 24,
+          "y": 812,
+          "content": "深胡桃木 · 暖色书脊",
+          "fontFamily": "Georgia",
+          "fontSize": 11,
+          "fill": "#8A7260"
+        }
+      ]
+    },
+    {
+      "type": "frame",
+      "id": "bs-empty",
+      "name": "03 空书架 · 冷启动",
+      "x": 860,
+      "y": 0,
+      "width": 390,
+      "height": 844,
+      "layout": "none",
+      "fill": "#F3EBD9",
+      "children": [
+        {
+          "type": "text",
+          "id": "em-title",
+          "x": 24,
+          "y": 34,
+          "content": "我的书架",
+          "fontFamily": "Georgia",
+          "fontSize": 26,
+          "fill": "#243F36"
+        },
+        {
+          "type": "text",
+          "id": "em-actions",
+          "x": 268,
+          "y": 38,
+          "content": "⌕     ＋",
+          "fontFamily": "Georgia",
+          "fontSize": 20,
+          "fill": "#5C3D2E"
+        },
+        {
+          "type": "text",
+          "id": "em-sub",
+          "x": 24,
+          "y": 72,
+          "content": "开始你的书架 · 导入第一本书",
+          "fontFamily": "Georgia",
+          "fontSize": 12,
+          "fill": "#7A6348"
+        },
+        {
+          "type": "frame",
+          "id": "em-wood",
+          "x": 14,
+          "y": 98,
+          "width": 362,
+          "height": 668,
+          "layout": "none",
+          "fill": "#5C3D2E",
+          "cornerRadius": 14,
+          "children": [
+            {
+              "type": "frame",
+              "id": "em-wood-inner",
+              "x": 8,
+              "y": 8,
+              "width": 346,
+              "height": 652,
+              "layout": "none",
+              "fill": "#6B4633",
+              "cornerRadius": 10,
+              "children": [
+                {
+                  "type": "frame",
+                  "id": "em-b1",
+                  "x": 18,
+                  "y": 40,
+                  "width": 70,
+                  "height": 144,
+                  "fill": "#315B50",
+                  "cornerRadius": 3,
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "em-b1t",
+                      "x": 8,
+                      "y": 50,
+                      "content": "Starter\nStory",
+                      "fontFamily": "Georgia",
+                      "fontSize": 12,
+                      "fill": "#FFFFFF"
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "em-b2",
+                  "x": 100,
+                  "y": 48,
+                  "width": 68,
+                  "height": 136,
+                  "fill": "#AD6842",
+                  "cornerRadius": 3,
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "em-b2t",
+                      "x": 8,
+                      "y": 48,
+                      "content": "First\nWords",
+                      "fontFamily": "Georgia",
+                      "fontSize": 12,
+                      "fill": "#FFFFFF"
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "em-shelf1",
+                  "x": 6,
+                  "y": 184,
+                  "width": 334,
+                  "height": 16,
+                  "fill": "#8B5E3C",
+                  "cornerRadius": 2,
+                  "children": []
+                },
+                {
+                  "type": "frame",
+                  "id": "em-shelf1-lip",
+                  "x": 6,
+                  "y": 184,
+                  "width": 334,
+                  "height": 5,
+                  "fill": "#A67C52",
+                  "cornerRadius": 1,
+                  "children": []
+                },
+                {
+                  "type": "frame",
+                  "id": "em-cta",
+                  "x": 58,
+                  "y": 240,
+                  "width": 230,
+                  "height": 100,
+                  "fill": "#D4B896",
+                  "cornerRadius": 10,
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "em-cta-plus",
+                      "x": 98,
+                      "y": 18,
+                      "content": "＋",
+                      "fontFamily": "Georgia",
+                      "fontSize": 28,
+                      "fill": "#5C3D2E"
+                    },
+                    {
+                      "type": "text",
+                      "id": "em-cta-label",
+                      "x": 72,
+                      "y": 58,
+                      "content": "导入电子书",
+                      "fontFamily": "Georgia",
+                      "fontSize": 16,
+                      "fill": "#5C3D2E"
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "em-shelf2",
+                  "x": 6,
+                  "y": 364,
+                  "width": 334,
+                  "height": 16,
+                  "fill": "#8B5E3C",
+                  "cornerRadius": 2,
+                  "children": []
+                },
+                {
+                  "type": "frame",
+                  "id": "em-shelf2-lip",
+                  "x": 6,
+                  "y": 364,
+                  "width": 334,
+                  "height": 5,
+                  "fill": "#A67C52",
+                  "cornerRadius": 1,
+                  "children": []
+                },
+                {
+                  "type": "text",
+                  "id": "em-hint",
+                  "x": 70,
+                  "y": 420,
+                  "content": "空层留给新书",
+                  "fontFamily": "Georgia",
+                  "fontSize": 14,
+                  "fill": "#C4A88A"
+                },
+                {
+                  "type": "frame",
+                  "id": "em-shelf3",
+                  "x": 6,
+                  "y": 542,
+                  "width": 334,
+                  "height": 16,
+                  "fill": "#8B5E3C",
+                  "cornerRadius": 2,
+                  "children": []
+                },
+                {
+                  "type": "frame",
+                  "id": "em-shelf3-lip",
+                  "x": 6,
+                  "y": 542,
+                  "width": 334,
+                  "height": 5,
+                  "fill": "#A67C52",
+                  "cornerRadius": 1,
+                  "children": []
+                },
+                {
+                  "type": "frame",
+                  "id": "em-base",
+                  "x": 0,
+                  "y": 620,
+                  "width": 346,
+                  "height": 32,
+                  "fill": "#4A2F22",
+                  "cornerRadius": 0,
+                  "children": []
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "type": "text",
+          "id": "em-stats",
+          "x": 24,
+          "y": 786,
+          "content": "2 本起步          ·          导入继续填满",
+          "fontFamily": "Georgia",
+          "fontSize": 14,
+          "fill": "#6B5340"
+        },
+        {
+          "type": "text",
+          "id": "em-stats-hint",
+          "x": 24,
+          "y": 812,
+          "content": "冷启动：示例书 + 导入 CTA",
+          "fontFamily": "Georgia",
+          "fontSize": 11,
+          "fill": "#9A8168"
+        }
+      ]
+    }
+  ]
+}
