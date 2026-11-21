@@ -277,7 +277,10 @@ class _VocabHero extends StatelessWidget {
               child: TextButton(
                 onPressed: onBook,
                 style: TextButton.styleFrom(
-                  foregroundColor: AppDesignTokens.brandGreenDark,
+                  // Dark surfaces need the brighter green for link contrast.
+                  foregroundColor: dark
+                      ? AppDesignTokens.brandGreen
+                      : AppDesignTokens.brandGreenDark,
                   padding: const EdgeInsets.symmetric(horizontal: 4),
                 ),
                 child: Text(
