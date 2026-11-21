@@ -675,6 +675,14 @@ packages:
     description: flutter
     source: sdk
     version: "0.0.0"
+  flutter_ocr_native:
+    dependency: "direct main"
+    description:
+      name: flutter_ocr_native
+      sha256: f2f7c0196463ea6deed0bea3e7a74ea605b5bdb44e6243448f092480a6a4975a
+      url: "https://pub.dev"
+    source: hosted
+    version: "0.3.8"
   flutter_overlay_window:
     dependency: "direct main"
     description:

@@ -31,7 +31,13 @@ Future<String> parseReadingImport(
     return parseEpubImport(bytes);
   }
   if (lower.endsWith('.pdf')) {
-    return parsePdfImport(bytes);
+    final String embedded = parsePdfImport(bytes);
+    if (!pdfNeedsOcr(embedded)) {
+      return embedded;
+    }
+    // Scanned PDF: callers that need OCR + cloud share should use
+    // [importPdfForReading] instead of this sync-ish helper.
+    throw StateError('扫描版 PDF 需 OCR，请从阅读页导入以启用识别与云端共享');
   }
   if (lower.endsWith('.mobi') ||
       lower.endsWith('.azw') ||
@@ -228,7 +234,7 @@ String parseEpubImport(Uint8List bytes) {
   return buf.toString().trim();
 }
 
-/// Extract plain text from a text-layer PDF (scanned image PDFs return empty).
+/// Extract embedded text-layer PDF text. Returns empty string for scanned PDFs.
 String parsePdfImport(Uint8List bytes) {
   if (bytes.length < 5) {
     throw StateError('不是有效的 PDF 文件');
@@ -241,12 +247,27 @@ String parsePdfImport(Uint8List bytes) {
   try {
     final String text = PdfTextExtractor(document).extractText().trim();
     if (text.isEmpty) {
-      throw StateError('未能提取正文（可能是扫描版 PDF，需先 OCR）');
+      return '';
     }
-    return text.replaceAll(RegExp(r'[ \t]+\n'), '\n').replaceAll(RegExp(r'\n{3,}'), '\n\n');
+    return text
+        .replaceAll(RegExp(r'[ \t]+\n'), '\n')
+        .replaceAll(RegExp(r'\n{3,}'), '\n\n');
   } finally {
     document.dispose();
   }
+}
+
+/// True when embedded text is missing or too sparse (likely a scan).
+bool pdfNeedsOcr(String extractedText) {
+  final String text = extractedText.trim();
+  if (text.isEmpty) return true;
+  final int words = text
+      .split(RegExp(r'\s+'))
+      .where((String w) => w.trim().isNotEmpty)
+      .length;
+  // Near-empty extracts (common for image-only PDFs); keep short text-layer
+  // samples usable without forcing OCR.
+  return words < 5 && text.length < 40;
 }
 
 /// Extract plain text from DRM-free MOBI / AZW / AZW3 (Kindle).

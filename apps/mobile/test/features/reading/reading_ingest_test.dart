@@ -122,6 +122,16 @@ void main() {
       document.dispose();
       final String text = parsePdfImport(Uint8List.fromList(saved));
       expect(text, contains('cafe opens early'));
+      expect(pdfNeedsOcr(text), isFalse);
+    });
+
+    test('empty extract needs OCR', () {
+      expect(pdfNeedsOcr(''), isTrue);
+      expect(pdfNeedsOcr('hi'), isTrue);
+      expect(
+        pdfNeedsOcr('The cafe opens early for reading practice.'),
+        isFalse,
+      );
     });
 
     test('rejects non-pdf payloads', () {

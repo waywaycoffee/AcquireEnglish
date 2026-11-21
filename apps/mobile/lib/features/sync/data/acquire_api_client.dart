@@ -326,6 +326,74 @@ class SharedBilibiliSubtitleUpsertResult {
   final String reason;
 }
 
+class SharedOcrBookPack {
+  const SharedOcrBookPack({
+    required this.contentSha256,
+    required this.plainText,
+    this.title = '',
+    this.sourceFilename = '',
+    this.pageCount = 0,
+    this.charCount = 0,
+    this.wordCount = 0,
+    this.qualityScore = 0,
+    this.sourceOrigin = 'ocr',
+    this.hitCount = 0,
+  });
+
+  factory SharedOcrBookPack.fromJson(Map<String, dynamic> json) =>
+      SharedOcrBookPack(
+        contentSha256: '${json['content_sha256'] ?? ''}',
+        plainText: '${json['plain_text'] ?? ''}',
+        title: '${json['title'] ?? ''}',
+        sourceFilename: '${json['source_filename'] ?? ''}',
+        pageCount: (json['page_count'] as num?)?.toInt() ?? 0,
+        charCount: (json['char_count'] as num?)?.toInt() ?? 0,
+        wordCount: (json['word_count'] as num?)?.toInt() ?? 0,
+        qualityScore: (json['quality_score'] as num?)?.toDouble() ?? 0,
+        sourceOrigin: '${json['source_origin'] ?? 'ocr'}',
+        hitCount: (json['hit_count'] as num?)?.toInt() ?? 0,
+      );
+
+  final String contentSha256;
+  final String plainText;
+  final String title;
+  final String sourceFilename;
+  final int pageCount;
+  final int charCount;
+  final int wordCount;
+  final double qualityScore;
+  final String sourceOrigin;
+  final int hitCount;
+}
+
+class SharedOcrBookUpsertResult {
+  const SharedOcrBookUpsertResult({
+    required this.stored,
+    this.replaced = false,
+    this.qualityScore = 0,
+    this.charCount = 0,
+    this.wordCount = 0,
+    this.reason = '',
+  });
+
+  factory SharedOcrBookUpsertResult.fromJson(Map<String, dynamic> json) =>
+      SharedOcrBookUpsertResult(
+        stored: json['stored'] == true,
+        replaced: json['replaced'] == true,
+        qualityScore: (json['quality_score'] as num?)?.toDouble() ?? 0,
+        charCount: (json['char_count'] as num?)?.toInt() ?? 0,
+        wordCount: (json['word_count'] as num?)?.toInt() ?? 0,
+        reason: '${json['reason'] ?? ''}',
+      );
+
+  final bool stored;
+  final bool replaced;
+  final double qualityScore;
+  final int charCount;
+  final int wordCount;
+  final String reason;
+}
+
 class AcquireSmsSendResult {
   const AcquireSmsSendResult({
     required this.expiresIn,
@@ -1565,6 +1633,66 @@ class AcquireApiClient {
       roomClosed: data['room_closed'] == true,
       peerOnline: data['peer_online'] == true,
     );
+  }
+
+  /// Shared OCR book library keyed by PDF/file sha256. Null on miss.
+  Future<SharedOcrBookPack?> getSharedOcrBook({
+    required String contentSha256,
+  }) async {
+    final String key = contentSha256.trim().toLowerCase();
+    if (key.length != 64) return null;
+    try {
+      final Response<dynamic> response = await _dio.get(
+        Endpoints.sharedOcrBooks,
+        queryParameters: <String, dynamic>{'content_sha256': key},
+        options: Options(
+          validateStatus: (int? status) =>
+              status != null &&
+              ((status >= 200 && status < 300) || status == 404),
+          receiveTimeout: const Duration(seconds: 20),
+        ),
+      );
+      if (response.statusCode == 404 || response.data is! Map) {
+        return null;
+      }
+      return SharedOcrBookPack.fromJson(
+        Map<String, dynamic>.from(response.data as Map),
+      );
+    } on DioException catch (error) {
+      if (error.response?.statusCode == 404) return null;
+      return null;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Future<SharedOcrBookUpsertResult?> putSharedOcrBook({
+    required String contentSha256,
+    required String plainText,
+    String title = '',
+    String sourceFilename = '',
+    int pageCount = 0,
+    String sourceOrigin = 'ocr',
+  }) async {
+    try {
+      final Response<dynamic> response = await _dio.put(
+        Endpoints.sharedOcrBooks,
+        data: <String, dynamic>{
+          'content_sha256': contentSha256.trim().toLowerCase(),
+          'plain_text': plainText,
+          'title': title,
+          'source_filename': sourceFilename,
+          'page_count': pageCount,
+          'source_origin': sourceOrigin,
+        },
+      );
+      if (response.data is! Map) return null;
+      return SharedOcrBookUpsertResult.fromJson(
+        Map<String, dynamic>.from(response.data as Map),
+      );
+    } catch (_) {
+      return null;
+    }
   }
 
   /// ECS content-addressed reading TTS. Null when not pre-generated.

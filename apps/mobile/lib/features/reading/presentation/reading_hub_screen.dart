@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../authentication/presentation/auth_session.dart';
 import '../../library/presentation/library_catalog_provider.dart';
 import '../../library/presentation/library_mock_data.dart';
 import '../../navigation/presentation/navigation_destination.dart';
@@ -14,8 +15,10 @@ import '../../player/presentation/player_subtitle_loader.dart';
 import '../../shared/presentation/pad/app_design_tokens.dart';
 import '../../shared/presentation/pad/pad_scaffold.dart';
 import '../../shared/presentation/pad/pad_top_bar.dart';
+import '../../sync/data/acquire_api_client.dart';
 import '../data/reading_iplus1.dart';
 import '../data/reading_ingest.dart';
+import '../data/reading_pdf_import.dart';
 import '../data/reading_stats.dart';
 import '../data/reading_vocab_lists.dart';
 import '../domain/reading_doc.dart';
@@ -27,7 +30,7 @@ class ReadingHubScreen extends ConsumerWidget {
   const ReadingHubScreen({super.key});
 
   Future<void> _importFile(BuildContext context, WidgetRef ref) async {
-      final XFile? file = await openFile(
+    final XFile? file = await openFile(
       acceptedTypeGroups: const <XTypeGroup>[
         XTypeGroup(
           label: 'reading',
@@ -37,19 +40,66 @@ class ReadingHubScreen extends ConsumerWidget {
       confirmButtonText: '导入读物',
     );
     if (file == null) return;
+
+    final ValueNotifier<String> progress = ValueNotifier<String>('正在解析…');
+    if (context.mounted) {
+      unawaited(
+        showDialog<void>(
+          context: context,
+          barrierDismissible: false,
+          builder: (BuildContext ctx) {
+            return PopScope(
+              canPop: false,
+              child: AlertDialog(
+                content: ValueListenableBuilder<String>(
+                  valueListenable: progress,
+                  builder: (_, String message, __) {
+                    return Row(
+                      children: <Widget>[
+                        const SizedBox(
+                          width: 28,
+                          height: 28,
+                          child: CircularProgressIndicator(strokeWidth: 2.5),
+                        ),
+                        const SizedBox(width: 16),
+                        Expanded(child: Text(message)),
+                      ],
+                    );
+                  },
+                ),
+              ),
+            );
+          },
+        ),
+      );
+    }
+
     try {
       final Uint8List bytes = await file.readAsBytes();
-      final String text = await parseReadingImport(
-        bytes,
-        filename: file.name,
-      );
+      final String lower = file.name.toLowerCase();
+      final String text;
+      String sourceNote = '';
+      if (lower.endsWith('.pdf')) {
+        final ReadingPdfImportResult pdf = await importPdfForReading(
+          bytes: bytes,
+          filename: file.name,
+          api: ref.read(acquireApiClientProvider),
+          isLoggedIn: ref.read(authSessionProvider).isLoggedIn,
+          onProgress: (int page, int total, String message) {
+            progress.value = message;
+          },
+        );
+        text = pdf.text;
+        sourceNote = switch (pdf.source) {
+          'shared_ocr' => '（云端 OCR）',
+          'local_ocr' => '（本机 OCR）',
+          _ => '',
+        };
+      } else {
+        text = await parseReadingImport(bytes, filename: file.name);
+      }
       if (text.trim().isEmpty) {
-        if (context.mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('未能从文件中提取正文')),
-          );
-        }
-        return;
+        throw StateError('未能从文件中提取正文');
       }
       final ReadingDoc doc = ReadingDoc(
         id: 'import_${DateTime.now().millisecondsSinceEpoch}',
@@ -60,15 +110,24 @@ class ReadingHubScreen extends ConsumerWidget {
       );
       await ref.read(readingLibraryProvider.notifier).addDoc(doc);
       if (!context.mounted) return;
+      Navigator.of(context, rootNavigator: true).pop();
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('已导入「${doc.title}」· 约 ${doc.wordCount} 词')),
+        SnackBar(
+          content: Text(
+            '已导入「${doc.title}」· 约 ${doc.wordCount} 词$sourceNote',
+          ),
+        ),
       );
       unawaited(context.push('/reading/${Uri.encodeComponent(doc.id)}'));
     } catch (e) {
-      if (!context.mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('导入失败：$e')),
-      );
+      if (context.mounted) {
+        unawaited(Navigator.of(context, rootNavigator: true).maybePop());
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('导入失败：$e')),
+        );
+      }
+    } finally {
+      progress.dispose();
     }
   }
 

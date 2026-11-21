@@ -204,6 +204,33 @@ class UserPreference(Base):
     user: Mapped[User] = relationship(back_populates="preference")
 
 
+class SharedOcrBook(Base):
+    """Community cache of OCR'd scanned PDF / ebook text keyed by file sha256."""
+
+    __tablename__ = "shared_ocr_books"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    content_sha256: Mapped[str] = mapped_column(String(64), unique=True, index=True)
+    title: Mapped[str] = mapped_column(String(255), default="")
+    source_filename: Mapped[str] = mapped_column(String(255), default="")
+    plain_text: Mapped[str] = mapped_column(Text)
+    page_count: Mapped[int] = mapped_column(Integer, default=0)
+    char_count: Mapped[int] = mapped_column(Integer, default=0)
+    word_count: Mapped[int] = mapped_column(Integer, default=0)
+    quality_score: Mapped[float] = mapped_column(Float, default=0.0)
+    source_origin: Mapped[str] = mapped_column(String(32), default="ocr")
+    uploader_user_id: Mapped[int | None] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True
+    )
+    hit_count: Mapped[int] = mapped_column(Integer, default=0)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
+
+
 class SharedBilibiliSubtitle(Base):
     """Community cache of filled EN/ZH softsubs keyed by Bilibili episode."""
 

@@ -109,6 +109,7 @@ class Endpoints {
       'api/pregen/vocab/${Uri.encodeComponent(word)}';
   static String pregenOralTopics(String key) =>
       'api/pregen/oral-topics/${Uri.encodeComponent(key)}';
+  static const String sharedOcrBooks = 'api/shared-ocr-books';
 
   /// Kept for Dio header compatibility; AcquireEnglish API ignores it.
   static const String apiKey = '';

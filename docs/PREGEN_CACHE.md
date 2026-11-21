@@ -43,3 +43,9 @@ python tools/syllabus/fill_chunks_gloss.py
 ```
 
 从 ECDICT 填充 `services/api/data/syllabus/chunks_conversational_1000.json` 的空 `gloss`。
+
+## 5. 扫描版 PDF OCR + 云端图书库
+
+- 本地：`flutter_ocr_native` 渲染页面 + OCR（最多 120 页）
+- 流程：文字层 → `GET /api/shared-ocr-books?content_sha256=` → 本机 OCR → 登录后 `PUT` 共享
+- 表：`shared_ocr_books`（按文件 sha256 去重，更长/更高质量可覆盖）

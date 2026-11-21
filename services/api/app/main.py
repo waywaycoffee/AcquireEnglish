@@ -38,6 +38,7 @@ from app.routers import (
     reading_speech,
     review_sync,
     rewards,
+    shared_ocr_books,
     shared_subtitles,
     vocab,
 )
@@ -99,6 +100,7 @@ app.include_router(pronunciation_assessment.router, prefix="/api")
 app.include_router(assets.router, prefix="/api")
 app.include_router(netdisk.router, prefix="/api")
 app.include_router(shared_subtitles.router, prefix="/api")
+app.include_router(shared_ocr_books.router, prefix="/api")
 app.include_router(rewards.router, prefix="/api")
 app.include_router(cosmetics.router, prefix="/api")
 app.include_router(review_sync.router, prefix="/api")

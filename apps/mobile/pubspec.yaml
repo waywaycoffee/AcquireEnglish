@@ -106,6 +106,7 @@ dependencies:
   wakelock_plus: ^1.5.2
   dart_mobi: ^1.0.2
   syncfusion_flutter_pdf: ^33.2.13
+  flutter_ocr_native: ^0.3.8
 
 
 dev_dependencies:
