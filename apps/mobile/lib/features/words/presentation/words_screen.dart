@@ -13,6 +13,7 @@ import '../../authentication/presentation/account_storage.dart';
 import '../../daily_review/data/missed_review_book.dart';
 import '../../daily_review/domain/daily_review.dart';
 import '../../daily_review/domain/review_week_stats.dart';
+import '../../daily_review/domain/vocab_unified_queue.dart';
 import '../../daily_review/presentation/daily_review_provider.dart';
 import '../../daily_review/presentation/fsrs_word_status.dart';
 import '../../navigation/presentation/navigation_destination.dart';
@@ -23,6 +24,7 @@ import '../../shared/presentation/pad/pad_top_bar.dart';
 import '../../shared/presentation/pill_segmented_control.dart';
 import '../domain/vocab_entry.dart';
 import '../domain/word_review_settings.dart';
+import 'syllabus_books_provider.dart';
 import 'vocab_preview_sheet.dart';
 import 'vocabulary_placement_provider.dart';
 import 'word_book_provider.dart';
@@ -52,7 +54,15 @@ class _WordsScreenState extends ConsumerState<WordsScreen> {
       await ref.read(dailyReviewProvider.notifier).setDailyNewLimit(newLimit);
     }
     if (!mounted) return;
-    // Word-home plan must not interleave phrases/sentences.
+    // Unified queue: favorites + active 词书 (word cards only, no phrases).
+    final String? bookId =
+        ref.read(syllabusBooksProvider).activeBookId.trim();
+    if (bookId != null && bookId.isNotEmpty) {
+      context.push(
+        '${SGRoute.reviewSession.route}?deck=syllabus&book=${Uri.encodeComponent(bookId)}',
+      );
+      return;
+    }
     context.push('${SGRoute.reviewSession.route}?kind=word');
   }
 
@@ -157,11 +167,14 @@ class _WordsScreenState extends ConsumerState<WordsScreen> {
     final WordReviewSettings reviewSettings =
         ref.watch(wordReviewSettingsProvider);
     final DailyReviewState reviewState = ref.watch(dailyReviewProvider);
+    // Favorites + active 词书 share one FSRS queue (exclude phrases/sentences).
     final List<ReviewSource> wordSources = ref
         .watch(reviewSourcesProvider)
         .where(
           (ReviewSource s) =>
-              s.key.startsWith('entry:') || s.key.startsWith('word:'),
+              s.key.startsWith('entry:') ||
+              s.key.startsWith('word:') ||
+              s.key.startsWith('syllabus:'),
         )
         .toList(growable: false);
     final DateTime now = DateTime.now();
@@ -173,6 +186,9 @@ class _WordsScreenState extends ConsumerState<WordsScreen> {
     final int planReview = wordPlan.due.length
         .clamp(0, reviewSettings.dailyReviewLimit)
         .toInt();
+    final int syllabusToday = syllabusQueuedForToday(wordPlan);
+    final String activeBookTitle =
+        ref.watch(syllabusBooksProvider).activeBook?.title ?? '';
     final int streak = ref.read(wordBookProvider.notifier).reviewStreak();
     final int missedCount = MissedReviewBook(
       account: ref.watch(studyAccountProvider),
@@ -396,6 +412,8 @@ class _WordsScreenState extends ConsumerState<WordsScreen> {
                                 reviewLimit: reviewSettings.dailyReviewLimit,
                                 modes: reviewSettings.orderedModes,
                                 streak: streak,
+                                activeBookTitle: activeBookTitle,
+                                syllabusToday: syllabusToday,
                                 onStart: () =>
                                     unawaited(_startTodayReview(newLimit)),
                                 onSettings: () =>
@@ -752,6 +770,8 @@ class _TodayPlanCard extends StatelessWidget {
     required this.streak,
     required this.onStart,
     required this.onSettings,
+    this.activeBookTitle = '',
+    this.syllabusToday = 0,
   });
 
   final int planNew;
@@ -762,6 +782,8 @@ class _TodayPlanCard extends StatelessWidget {
   final int streak;
   final VoidCallback onStart;
   final VoidCallback onSettings;
+  final String activeBookTitle;
+  final int syllabusToday;
 
   @override
   Widget build(BuildContext context) {
@@ -821,9 +843,22 @@ class _TodayPlanCard extends StatelessWidget {
               fontWeight: FontWeight.w700,
             ),
           ),
+          if (activeBookTitle.isNotEmpty) ...<Widget>[
+            const SizedBox(height: 4),
+            Text(
+              syllabusToday > 0
+                  ? '当前词书「$activeBookTitle」· 今日队列含 $syllabusToday 词'
+                  : '当前词书「$activeBookTitle」· 与收藏同一套复习计划',
+              style: TextStyle(
+                color: AppDesignTokens.brandGreenDark,
+                fontWeight: FontWeight.w700,
+                fontSize: 13,
+              ),
+            ),
+          ],
           const SizedBox(height: 4),
           Text(
-            'FSRS 间隔复习 · $modeText',
+            '收藏优先，词书补新学 · $modeText',
             style: TextStyle(color: AppDesignTokens.textSecondary),
           ),
           const SizedBox(height: 12),

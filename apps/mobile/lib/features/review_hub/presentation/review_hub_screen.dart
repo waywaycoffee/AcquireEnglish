@@ -81,12 +81,14 @@ class ReviewHubScreen extends ConsumerWidget {
             ? '今天暂时没有到期内容'
             : '把学过的，真正记住';
     final String subtitle = empty
-        ? '还没有可复习内容。在播放器收藏一个单词，或把表达加入短语库。'
+        ? '还没有可复习内容。去导入一本词书，或在播放器收藏单词。'
         : done
             ? (plan.nextDue == null
                 ? '可以自由练习已学内容，也可以继续学新内容。'
                 : '下次到期：${_formatNextDue(plan.nextDue!, now)}。可以自由练习，也可以继续学新内容。')
-            : '今天优先巩固到期内容，再认识一点新表达。';
+            : activeBookTitle.isEmpty
+                ? '今天优先巩固到期内容，再认识一点新表达。'
+                : '收藏与词书「$activeBookTitle」同一队列：先复习到期，再按额度学新词。';
 
     final String ctaLabel = empty
         ? '去发现一段好内容'
@@ -157,7 +159,7 @@ class ReviewHubScreen extends ConsumerWidget {
             ctaLabel: ctaLabel,
             onCta: onCta,
             footer: empty
-                ? '收藏后会进入统一 FSRS 计划。'
+                ? '词书下载后会进入统一复习计划，也可先收藏再背。'
                 : done
                     ? '自由练习不改动到期时间，也不消耗新学额度。'
                     : '先回忆，再核对答案。每条评分后立即保存。',
