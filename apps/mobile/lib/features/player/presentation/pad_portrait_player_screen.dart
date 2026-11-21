@@ -3113,17 +3113,21 @@ Future<void> _settleChineseFillIfAlreadyPresent() async {
         if (episodeTitle.trim().isNotEmpty) episodeTitle.trim(),
       ].join(' · ');
       final String excerpt = _oralCoachSubtitleExcerpt(state.lines);
+      final String currentLine = activeLine.english.trim();
       final Widget coach = StudyOralCoachTab(
-        topicSummary: topicSummary.isNotEmpty
-            ? topicSummary
-            : (activeLine.english.trim().isNotEmpty
-                  ? activeLine.english.trim()
-                  : '本集视频'),
-        articleExcerpt: excerpt,
+        topicSummary: currentLine.isNotEmpty
+            ? '当前句 · $currentLine'
+            : (topicSummary.isNotEmpty ? topicSummary : '本集视频'),
+        articleExcerpt: <String>[
+          if (currentLine.isNotEmpty) currentLine,
+          if (excerpt.trim().isNotEmpty) excerpt.trim(),
+        ].join('\n'),
         courseTitle: courseTitle,
         episodeTitle: episodeTitle,
-        hasTranscript: excerpt.isNotEmpty,
+        hasTranscript: excerpt.isNotEmpty || currentLine.isNotEmpty,
         episodeId: courseContext.episode?.id ?? widget.episodeId,
+        // Close the loop: video line → scenario speak → later review weak items.
+        initialScenarioId: 'video_line',
       );
       await Navigator.of(context).push<void>(
         MaterialPageRoute<void>(
@@ -3454,6 +3458,7 @@ Future<void> _settleChineseFillIfAlreadyPresent() async {
         );
         return StudyWordCardsTab(
           cards: cards,
+          episodeId: widget.episodeId,
           onJumpToCard: _handleJumpToWordCard,
           onFavorite: (EpisodeWordCard card) {
             _handleFavoriteWord(card.text);

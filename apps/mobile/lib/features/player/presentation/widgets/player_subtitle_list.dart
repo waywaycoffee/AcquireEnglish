@@ -2286,6 +2286,7 @@ class _PlayerSubtitleListState extends State<PlayerSubtitleList> {
   }) {
     final int? anchor = _phraseAnchorIndex;
     final String? anchorLine = _phraseAnchorLine;
+    // Manual long-press range always wins.
     if (anchorLine == lineText && anchor != null && anchor != index) {
       final int start = math.min(anchor, index);
       final int end = math.max(anchor, index);
@@ -2304,6 +2305,26 @@ class _PlayerSubtitleListState extends State<PlayerSubtitleList> {
       return;
     }
     _clearPhraseSelection(notify: false);
+    // Auto-detected chunk/phrase/usage → open whole span so favorite enters review.
+    final SubtitleChunkSpan? chunkSpan =
+        widget.chunkHighlighter?.matchLine(lineText)[index];
+    if (chunkSpan != null &&
+        chunkSpan.start >= 0 &&
+        chunkSpan.endExclusive <= tokens.length &&
+        chunkSpan.endExclusive > chunkSpan.start) {
+      final String phrase = tokens
+          .sublist(chunkSpan.start, chunkSpan.endExclusive)
+          .map((_WordToken t) => t.value)
+          .join(' ');
+      _toggleDictionaryOverlay(
+        wordContext,
+        phrase,
+        lineText,
+        '$lineText-chunk-${chunkSpan.start}-${chunkSpan.endExclusive}',
+        contextTime,
+      );
+      return;
+    }
     _toggleDictionaryOverlay(
       wordContext,
       tokens[index].value,

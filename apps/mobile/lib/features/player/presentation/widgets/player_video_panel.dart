@@ -1516,7 +1516,15 @@ class _PlayerVideoPanelState extends State<PlayerVideoPanel> {
                 return GestureDetector(
                   key: ValueKey<String>('video-subtitle-word-${entry.key}'),
                   behavior: HitTestBehavior.opaque,
-                  onTap: () => _openSubtitleLookup(tokenContext, entry.value),
+                  onTap: () {
+                    final SubtitleChunkSpan? span = chunkHits[entry.key];
+                    final String lookup = span == null
+                        ? entry.value
+                        : tokens
+                              .sublist(span.start, span.endExclusive)
+                              .join(' ');
+                    _openSubtitleLookup(tokenContext, lookup);
+                  },
                   child: Container(
                     padding: const EdgeInsets.symmetric(
                       horizontal: 3,

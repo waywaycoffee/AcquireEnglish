@@ -17,6 +17,7 @@ class StudyWordCardsTab extends ConsumerStatefulWidget {
     required this.onJumpToCard,
     this.onFavorite,
     this.onSpeak,
+    this.episodeId,
     super.key,
   });
 
@@ -24,6 +25,9 @@ class StudyWordCardsTab extends ConsumerStatefulWidget {
   final ValueChanged<EpisodeWordCard> onJumpToCard;
   final ValueChanged<EpisodeWordCard>? onFavorite;
   final ValueChanged<EpisodeWordCard>? onSpeak;
+
+  /// When set, "今日背单词" opens an episode-scoped review session.
+  final String? episodeId;
 
   @override
   ConsumerState<StudyWordCardsTab> createState() => _StudyWordCardsTabState();
@@ -141,10 +145,22 @@ class _StudyWordCardsTabState extends ConsumerState<StudyWordCardsTab> {
         Padding(
           padding: const EdgeInsets.fromLTRB(2, 0, 2, 10),
           child: FilledButton.icon(
-            onPressed: () =>
-                context.push('${SGRoute.reviewSession.route}?kind=word'),
+            onPressed: () {
+              final String episode = (widget.episodeId ?? '').trim();
+              if (episode.isNotEmpty) {
+                context.push(
+                  '${SGRoute.reviewSession.route}?sourceEpisode=${Uri.encodeComponent(episode)}',
+                );
+                return;
+              }
+              context.push('${SGRoute.reviewSession.route}?kind=word');
+            },
             icon: const Icon(Icons.style_rounded, size: 18),
-            label: const Text('开始今日背单词'),
+            label: Text(
+              (widget.episodeId ?? '').trim().isEmpty
+                  ? '开始今日背单词'
+                  : '复习本集生词',
+            ),
             style: FilledButton.styleFrom(
               backgroundColor: colors.accent,
               foregroundColor: Colors.white,
