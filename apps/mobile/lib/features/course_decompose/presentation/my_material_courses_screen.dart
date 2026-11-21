@@ -13,6 +13,7 @@ import '../../reading/data/reading_ingest.dart';
 import '../../reading/data/reading_pdf_import.dart';
 import '../../reading/domain/reading_doc.dart';
 import '../../reading/presentation/reading_library_provider.dart';
+import '../../navigation/presentation/navigation_destination.dart';
 import '../../shared/presentation/pad/pad_scaffold.dart';
 import '../../shared/presentation/pad/pad_top_bar.dart';
 import '../../sync/data/acquire_api_client.dart';
@@ -292,7 +293,7 @@ class _MyMaterialCoursesScreenState
                     children: <Widget>[
                       FilledButton.tonalIcon(
                         onPressed: () => unawaited(_uploadPrivate()),
-                        icon: const Icon(Icons.auto_stories_outlined),
+                        icon: const Icon(Icons.menu_book_outlined),
                         label: const Text('上传 EPUB / PDF 并智能切课'),
                       ),
                       const SizedBox(height: 8),
