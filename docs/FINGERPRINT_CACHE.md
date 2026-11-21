@@ -64,4 +64,4 @@ cd services/api
 ## 约束
 
 - 音视频只存 ECS，不进 APK
-- 解构默认是 CPU 启发式切课；可后续换成 GPU/LLM，注册接口不变
+- 解构优先走 `OPENMAIC_URL`（OpenMAIC / `tools/openmaic_mock`）；不可达时回退 CPU 启发式。详见 `docs/COURSE_DECOMPOSE.md`

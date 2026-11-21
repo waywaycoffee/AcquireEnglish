@@ -122,6 +122,16 @@ class Settings(BaseSettings):
     fingerprint_lru_idle_days: int = 180
     fingerprint_gpu_save_minutes: int = 8
 
+    # OpenMAIC textbook decompose (P1). Empty URL → HeuristicSplitter only.
+    # Prefer Tailscale GPU-box mock/real: http://100.115.252.55:8093
+    openmaic_url: str = ""
+    prefer_openmaic: bool = True
+    openmaic_timeout_seconds: float = 45.0
+    openmaic_poll_timeout_seconds: float = 180.0
+    # Self-hosted OpenMAIC ACCESS_CODE (cookie flow) or live-demo Bearer token.
+    openmaic_access_code: str = ""
+    openmaic_bearer_token: str = ""
+
     def validate_auth_configuration(self) -> None:
         if self.production_mode and (
             not self.secret_key.strip()

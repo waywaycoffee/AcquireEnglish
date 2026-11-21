@@ -216,16 +216,79 @@ def lesson_goal(title: str, target_words: list[dict[str, Any]], cefr: str) -> st
     return f"读懂「{label}」（{cefr}），掌握 {n} 个目标词"
 
 
-def build_lesson_tasks(target_words: list[dict[str, Any]]) -> list[dict[str, Any]]:
+def build_lesson_tasks(
+    target_words: list[dict[str, Any]],
+    *,
+    oral_outline: list[str] | None = None,
+    shadow_lines: list[str] | None = None,
+) -> list[dict[str, Any]]:
     n = max(3, min(8, len(target_words) or 5))
-    return [
+    tasks: list[dict[str, Any]] = [
         {"type": "reading", "title": "精读本课"},
         {"type": "vocab_warmup", "title": "词汇热身", "word_count": n},
     ]
+    if shadow_lines:
+        tasks.append(
+            {
+                "type": "shadow",
+                "title": "跟读影子读",
+                "line_count": len(shadow_lines),
+            }
+        )
+    if oral_outline:
+        tasks.append(
+            {
+                "type": "oral_outline",
+                "title": "口语提纲练习",
+                "prompt_count": len(oral_outline),
+            }
+        )
+    return tasks
+
+
+def _coerce_target_words(
+    existing: Any, text: str
+) -> list[dict[str, Any]]:
+    """Keep OpenMAIC-provided words when present; fill ranks via lexicon."""
+    if not isinstance(existing, list) or not existing:
+        return pick_target_words(text)
+    out: list[dict[str, Any]] = []
+    for item in existing:
+        if isinstance(item, str) and item.strip():
+            w = item.strip().lower()
+            rank = word_freq_rank(w) or 8000
+            out.append({"word": w, "rank": rank, "cefr": cefr_from_freq_rank(rank) or "B1"})
+            continue
+        if not isinstance(item, dict):
+            continue
+        w = str(item.get("word") or "").strip().lower()
+        if not w:
+            continue
+        try:
+            rank = int(item["rank"]) if item.get("rank") is not None else None
+        except (TypeError, ValueError):
+            rank = None
+        if rank is None:
+            rank = word_freq_rank(w) or 8000
+        cefr = str(item.get("cefr") or "").strip() or (cefr_from_freq_rank(rank) or "B1")
+        out.append({"word": w, "rank": rank, "cefr": cefr})
+    if len(out) < 3:
+        # Pad with heuristic picks.
+        seen = {x["word"] for x in out}
+        for tw in pick_target_words(text):
+            if tw["word"] in seen:
+                continue
+            out.append(tw)
+            if len(out) >= 3:
+                break
+    return out[:8]
 
 
 def annotate_lesson(lesson: dict[str, Any]) -> dict[str, Any]:
-    """Mutate-copy a lesson dict with CEFR, target_words, goal, tasks."""
+    """Mutate-copy a lesson dict with CEFR, target_words, goal, tasks.
+
+    Preserves OpenMAIC-provided goal / oral_outline / shadow_lines when present.
+    """
     out = dict(lesson)
     text = str(
         out.get("text_content")
@@ -233,12 +296,28 @@ def annotate_lesson(lesson: dict[str, Any]) -> dict[str, Any]:
         or out.get("text")
         or ""
     )
-    targets = pick_target_words(text)
-    cefr = estimate_text_cefr(text, targets)
+    targets = _coerce_target_words(out.get("target_words"), text)
+    cefr = str(out.get("cefr") or "").strip() or estimate_text_cefr(text, targets)
     out["target_words"] = targets
     out["cefr"] = cefr
-    out["goal"] = lesson_goal(str(out.get("title") or ""), targets, cefr)
-    out["tasks"] = build_lesson_tasks(targets)
+    if not str(out.get("goal") or "").strip():
+        out["goal"] = lesson_goal(str(out.get("title") or ""), targets, cefr)
+    oral = out.get("oral_outline")
+    oral_list: list[str] | None = None
+    if isinstance(oral, list) and oral:
+        oral_list = [str(x)[:240] for x in oral[:12] if str(x).strip()]
+        out["oral_outline"] = oral_list
+    elif isinstance(oral, str) and oral.strip():
+        oral_list = [oral.strip()[:240]]
+        out["oral_outline"] = oral_list
+    shadow = out.get("shadow_lines")
+    shadow_list: list[str] | None = None
+    if isinstance(shadow, list) and shadow:
+        shadow_list = [str(x)[:240] for x in shadow[:16] if str(x).strip()]
+        out["shadow_lines"] = shadow_list
+    out["tasks"] = build_lesson_tasks(
+        targets, oral_outline=oral_list, shadow_lines=shadow_list
+    )
     return out
 
 
