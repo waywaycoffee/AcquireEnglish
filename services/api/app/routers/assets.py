@@ -194,6 +194,7 @@ async def create_order(
             sku_codes=[(item.sku_code, item.quantity) for item in payload.items],
             provider=payload.provider,
             coupon_id=payload.coupon_id,
+            selected_modules=payload.selected_modules,
         )
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
@@ -434,11 +435,40 @@ async def claim_membership_reward(code: str, user: User = Depends(get_current_us
 async def redeem_membership_coupon(coupon_id: int, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
     from sqlalchemy import update
     from app.models import MembershipCoupon
+    from app.services.commerce.catalog import MODULE_DEFS
+    from app.services.commerce.trial import TRIAL_EXTEND_CODE
+
     row = await db.get(MembershipCoupon, coupon_id)
     if row is None or row.user_id != user.id or row.kind != "days":
         raise HTTPException(400, "时长券不可用")
     result = await db.execute(update(MembershipCoupon).where(MembershipCoupon.id == coupon_id, MembershipCoupon.used == 0).values(used=1))
     if result.rowcount != 1:
         raise HTTPException(409, "优惠券已使用")
-    await assets_svc.grant_entitlement(db, user.id, asset_kind="membership", asset_ref="pro", source="coupon", duration_days=row.value)
-    return {"status": "redeemed"}
+    days = int(row.value)
+    campaign = (
+        "trial_extend"
+        if row.reward_code == TRIAL_EXTEND_CODE or str(row.reward_code).startswith("trial_extend")
+        else "membership_coupon"
+    )
+    await assets_svc.grant_entitlement(
+        db,
+        user.id,
+        asset_kind="membership",
+        asset_ref="pro",
+        source="coupon",
+        duration_days=days,
+        meta={"campaign": campaign, "reward_code": row.reward_code},
+    )
+    # trial_extend_7: also extend all four commerce modules (full-feature).
+    if row.reward_code == TRIAL_EXTEND_CODE or str(row.reward_code).startswith("trial_extend"):
+        for mod in MODULE_DEFS:
+            await assets_svc.grant_entitlement(
+                db,
+                user.id,
+                asset_kind="module",
+                asset_ref=mod["code"],
+                source="coupon",
+                duration_days=days,
+                meta={"campaign": campaign, "reward_code": row.reward_code},
+            )
+    return {"status": "redeemed", "days": days, "campaign": campaign}

@@ -346,6 +346,8 @@ class OrderCreateIn(BaseModel):
     coupon_id: int | None = None
     items: list[OrderItemIn] = Field(min_length=1)
     provider: str = Field(default="mock", max_length=24)
+    # For module.combo.any2.* — client picks N module codes.
+    selected_modules: list[str] | None = None
 
 
 class OrderItemOut(BaseModel):

@@ -17,7 +17,10 @@ class MembershipScreen extends ConsumerStatefulWidget {
 class _MembershipScreenState extends ConsumerState<MembershipScreen> {
   List<Map<String, dynamic>> _skus = [];
   List<Map<String, dynamic>> _orders = [];
+  List<Map<String, dynamic>> _modules = [];
+  List<Map<String, dynamic>> _combos = [];
   Map<String, dynamic>? _assets;
+  Map<String, dynamic>? _trial;
   String? _selected;
   String? _error;
   String? _paymentMessage;
@@ -26,6 +29,7 @@ class _MembershipScreenState extends ConsumerState<MembershipScreen> {
   Map<String, dynamic>? _rewards;
   int? _couponId;
   bool _rewardBusy = false;
+  bool _trialBusy = false;
 
   @override
   void initState() {
@@ -47,10 +51,31 @@ class _MembershipScreenState extends ConsumerState<MembershipScreen> {
         api.listAssetOrders(),
         api.membershipRewards(),
       ]);
+      Map<String, dynamic>? trial;
+      Map<String, dynamic>? catalog;
+      try {
+        trial = await api.commerceTrialStatus();
+      } catch (_) {
+        trial = null;
+      }
+      try {
+        catalog = await api.commerceCatalog();
+      } catch (_) {
+        catalog = null;
+      }
       if (!mounted) return;
       setState(() {
         _rewards = results[3] as Map<String, dynamic>;
         _assets = results[0] as Map<String, dynamic>;
+        _trial = trial;
+        _modules = ((catalog?['modules'] as List<dynamic>?) ?? const [])
+            .whereType<Map>()
+            .map((e) => Map<String, dynamic>.from(e))
+            .toList();
+        _combos = ((catalog?['combos'] as List<dynamic>?) ?? const [])
+            .whereType<Map>()
+            .map((e) => Map<String, dynamic>.from(e))
+            .toList();
         _skus = (results[1] as List<Map<String, dynamic>>)
             .where((s) => s['currency'] == 'CNY' && s['kind'] == 'membership')
             .toList();
@@ -62,6 +87,121 @@ class _MembershipScreenState extends ConsumerState<MembershipScreen> {
     } finally {
       if (mounted) setState(() => _loading = false);
     }
+  }
+
+  int? _trialDaysLeft() {
+    final ends = DateTime.tryParse('${_trial?['trial_ends_at'] ?? ''}');
+    if (ends == null) return null;
+    final diff = ends.toUtc().difference(DateTime.now().toUtc());
+    if (diff.isNegative) return 0;
+    return diff.inDays + 1;
+  }
+
+  Future<void> _claimTrialExtend() async {
+    if (_trialBusy) return;
+    setState(() => _trialBusy = true);
+    try {
+      await ref.read(acquireApiClientProvider).commerceClaimTrialExtend();
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('已领取 7 天全功能延长券，可在下方优惠券兑换')),
+      );
+      await _load();
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('领取失败：需体验期内每天登录满 7 天，且未领取过')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _trialBusy = false);
+    }
+  }
+
+  Widget _trialBanner() {
+    final inTrial = _trial?['in_trial'] == true;
+    if (!inTrial && _trial == null) return const SizedBox.shrink();
+    if (!inTrial) return const SizedBox.shrink();
+    final daysLeft = _trialDaysLeft();
+    final loginDays = (_trial?['login_days'] as num?)?.toInt() ?? 0;
+    final required = (_trial?['required_login_days'] as num?)?.toInt() ?? 7;
+    final eligible = _trial?['extend_eligible'] == true;
+    final claimed = _trial?['extend_claimed'] == true;
+    final used = _trial?['extend_coupon_used'] == true;
+    final message = '${_trial?['message'] ?? ''}';
+    return _card(
+      Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text('全功能体验', style: Theme.of(context).textTheme.titleLarge),
+          const SizedBox(height: 8),
+          Text(
+            daysLeft == null
+                ? '体验进行中'
+                : '剩余约 $daysLeft 天 · 登录 $loginDays / $required 天',
+          ),
+          if (message.isNotEmpty) ...[
+            const SizedBox(height: 4),
+            Text(message, style: Theme.of(context).textTheme.bodySmall),
+          ],
+          const SizedBox(height: 12),
+          FilledButton.tonal(
+            onPressed: (!eligible || claimed || used || _trialBusy || _paying)
+                ? null
+                : _claimTrialExtend,
+            child: Text(
+              used
+                  ? '延长券已兑换'
+                  : claimed
+                  ? '延长券已领取'
+                  : eligible
+                  ? '领取 +7 天延长券'
+                  : '连续登录可领延长券',
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _moduleCatalog() {
+    if (_modules.isEmpty && _combos.isEmpty) return const SizedBox.shrink();
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        const SizedBox(height: 16),
+        Text('学习模块', style: Theme.of(context).textTheme.titleLarge),
+        const Text('按考试/习得 × 阅读/听说拆分；可单模块或组合开通。'),
+        for (final mod in _modules)
+          Card(
+            child: ListTile(
+              title: Text('${mod['title']}'),
+              subtitle: Text(
+                '${mod['blurb'] ?? ''}\n月付 ${_money(mod['monthly_cents'])}（标价 ${_money(mod['list_cents'])}）',
+              ),
+              isThreeLine: true,
+            ),
+          ),
+        if (_combos.isNotEmpty) ...[
+          const SizedBox(height: 8),
+          Text('组合优惠', style: Theme.of(context).textTheme.titleMedium),
+          for (final combo in _combos)
+            Card(
+              child: ListTile(
+                title: Text('${combo['title']}'),
+                subtitle: Text(
+                  '${combo['duration_days'] ?? ''} 天'
+                  '${combo['pick'] != null ? ' · 任选 ${combo['pick']} 模块' : ''}',
+                ),
+                trailing: Text(
+                  _money(combo['price_cents']),
+                  style: Theme.of(context).textTheme.titleMedium,
+                ),
+              ),
+            ),
+        ],
+      ],
+    );
   }
 
   String _money(Object? cents) =>
@@ -363,6 +503,8 @@ class _MembershipScreenState extends ConsumerState<MembershipScreen> {
                               ],
                             ),
                           ),
+                          _trialBanner(),
+                          _moduleCatalog(),
                           _rewardCard(),
                           const SizedBox(height: 16),
                           Text(

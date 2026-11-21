@@ -1504,6 +1504,50 @@ class AcquireApiClient {
     await _dio.post('${Endpoints.assets}/membership-coupons/$id/redeem');
   }
 
+  Future<Map<String, dynamic>> commerceCatalog() async {
+    final Response<dynamic> response = await _dio.get(Endpoints.commerceCatalog);
+    return response.data as Map<String, dynamic>;
+  }
+
+  Future<Map<String, dynamic>> commerceTrialStatus() async {
+    final Response<dynamic> response =
+        await _dio.get(Endpoints.commerceTrialStatus);
+    return response.data as Map<String, dynamic>;
+  }
+
+  Future<Map<String, dynamic>> commerceClaimTrialExtend() async {
+    final Response<dynamic> response =
+        await _dio.post(Endpoints.commerceTrialClaimExtend);
+    return response.data as Map<String, dynamic>;
+  }
+
+  Future<Map<String, dynamic>> commercePoints() async {
+    final Response<dynamic> response = await _dio.get(Endpoints.commercePoints);
+    return response.data as Map<String, dynamic>;
+  }
+
+  Future<Map<String, dynamic>> commerceEarnPoints({
+    required String reason,
+    int? amount,
+  }) async {
+    final Response<dynamic> response = await _dio.post(
+      Endpoints.commercePointsEarn,
+      data: <String, dynamic>{
+        'reason': reason,
+        if (amount != null) 'amount': amount,
+      },
+    );
+    return response.data as Map<String, dynamic>;
+  }
+
+  Future<Map<String, dynamic>> commerceSpendPoints({required String item}) async {
+    final Response<dynamic> response = await _dio.post(
+      Endpoints.commercePointsSpend,
+      data: <String, dynamic>{'item': item},
+    );
+    return response.data as Map<String, dynamic>;
+  }
+
   Future<Map<String, dynamic>> createAssetOrder({
     required List<({String skuCode, int quantity})> items,
     String provider = 'wechat',

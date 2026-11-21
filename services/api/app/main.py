@@ -13,6 +13,7 @@ from app.routers import (
     app_settings_backup,
     assets,
     auth,
+    commerce,
     community,
     community_groups,
     community_packs,
@@ -63,6 +64,7 @@ from app.routers import (
 async def lifespan(_: FastAPI):
     from app.database import SessionLocal
     from app.db_migrate import ensure_schema_columns
+    from app.services.commerce.catalog import ensure_commerce_skus
     from app.services.user_assets import ensure_default_skus
 
     settings.validate_auth_configuration()
@@ -71,6 +73,7 @@ async def lifespan(_: FastAPI):
         await ensure_schema_columns(conn)
     async with SessionLocal() as session:
         await ensure_default_skus(session)
+        await ensure_commerce_skus(session)
         from app.services.community_seed import ensure_community_seed
         from app.services.cosmetics_seed import ensure_cosmetics_catalog
 
@@ -122,6 +125,7 @@ app.include_router(livekit.router, prefix="/api")
 app.include_router(oral_match.router, prefix="/api")
 app.include_router(pronunciation_assessment.router, prefix="/api")
 app.include_router(assets.router, prefix="/api")
+app.include_router(commerce.router, prefix="/api")
 app.include_router(netdisk.router, prefix="/api")
 app.include_router(shared_subtitles.router, prefix="/api")
 app.include_router(shared_ocr_books.router, prefix="/api")

@@ -712,6 +712,44 @@ class MembershipCoupon(Base):
     used: Mapped[int] = mapped_column(Integer, default=0)
 
 
+class UserLoginDay(Base):
+    """UTC calendar days the user authenticated (for trial-extend streak)."""
+
+    __tablename__ = "user_login_days"
+    __table_args__ = (
+        UniqueConstraint("user_id", "day", name="uq_user_login_day"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    user_id: Mapped[int] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), index=True
+    )
+    # YYYY-MM-DD (UTC)
+    day: Mapped[str] = mapped_column(String(10), index=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+
+
+class PointsLedger(Base):
+    """Study-points earn/spend log (PRD 积分经济; balance lives on wallet)."""
+
+    __tablename__ = "points_ledger"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    user_id: Mapped[int] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), index=True
+    )
+    delta: Mapped[int] = mapped_column(Integer)
+    # earn | spend | expire | adjust
+    direction: Mapped[str] = mapped_column(String(16), default="earn", index=True)
+    reason: Mapped[str] = mapped_column(String(64), index=True)
+    meta_json: Mapped[str] = mapped_column(Text, default="{}")
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), index=True
+    )
+
+
 class DeskInvite(Base):
     __tablename__ = "desk_invites"
     id: Mapped[int] = mapped_column(Integer, primary_key=True)

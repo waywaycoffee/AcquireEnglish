@@ -75,6 +75,12 @@ class Endpoints {
   static const String assetsSkus = 'api/assets/skus';
   static const String assetsOrders = 'api/assets/orders';
   static const String assetsConsume = 'api/assets/entitlements/consume';
+  static const String commerceCatalog = 'api/commerce/catalog';
+  static const String commerceTrialStatus = 'api/commerce/trial/status';
+  static const String commerceTrialClaimExtend = 'api/commerce/trial/claim-extend';
+  static const String commercePoints = 'api/commerce/points';
+  static const String commercePointsEarn = 'api/commerce/points/earn';
+  static const String commercePointsSpend = 'api/commerce/points/spend';
   static const String learningTasks = 'api/learning/tasks';
   static const String learningSessions = 'api/learning/sessions';
   static const String learningSceneRecognize = 'api/learning/scene-recognize';

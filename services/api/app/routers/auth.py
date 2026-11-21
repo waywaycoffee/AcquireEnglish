@@ -63,6 +63,23 @@ async def _seed_trial_if_new(db: AsyncSession, user: User, *, is_new: bool) -> N
         pass
 
 
+async def _record_login_day(db: AsyncSession, user: User) -> None:
+    """Track UTC login days for trial-extend streak (idempotent)."""
+    try:
+        from app.services.commerce.trial import record_user_login_day
+
+        await record_user_login_day(db, user.id)
+    except Exception:  # noqa: BLE001 — auth must not fail on streak bookkeeping
+        pass
+
+
+async def _after_auth_success(
+    db: AsyncSession, user: User, *, is_new: bool = False
+) -> None:
+    await _seed_trial_if_new(db, user, is_new=is_new)
+    await _record_login_day(db, user)
+
+
 @router.post("/email/send", response_model=EmailSendOut)
 async def email_send(payload: EmailSendIn, db: AsyncSession = Depends(get_db)) -> EmailSendOut:
     if not email_delivery_ready():
@@ -116,7 +133,7 @@ async def register(payload: UserCreate, db: AsyncSession = Depends(get_db)) -> T
     db.add(user)
     await db.commit()
     await db.refresh(user)
-    await _seed_trial_if_new(db, user, is_new=True)
+    await _after_auth_success(db, user, is_new=True)
     return _token_for(user, is_new_user=True)
 
 
@@ -126,6 +143,7 @@ async def login(payload: UserLogin, db: AsyncSession = Depends(get_db)) -> Token
     user = result.scalar_one_or_none()
     if user is None or not verify_password(payload.password, user.hashed_password):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid email or password")
+    await _after_auth_success(db, user, is_new=False)
     return _token_for(user)
 
 
@@ -179,7 +197,7 @@ async def sms_login(payload: SmsLoginIn, db: AsyncSession = Depends(get_db)) -> 
         db.add(user)
         await db.commit()
         await db.refresh(user)
-        await _seed_trial_if_new(db, user, is_new=True)
+    await _after_auth_success(db, user, is_new=is_new)
     return _token_for(user, is_new_user=is_new)
 
 
@@ -217,7 +235,6 @@ async def wechat_login(payload: WechatLoginIn, db: AsyncSession = Depends(get_db
         db.add(user)
         await db.commit()
         await db.refresh(user)
-        await _seed_trial_if_new(db, user, is_new=True)
     else:
         dirty = False
         if identity.unionid and not user.wechat_unionid:
@@ -229,6 +246,7 @@ async def wechat_login(payload: WechatLoginIn, db: AsyncSession = Depends(get_db
         if dirty:
             await db.commit()
             await db.refresh(user)
+    await _after_auth_success(db, user, is_new=is_new)
     return _token_for(user, is_new_user=is_new)
 
 

@@ -82,6 +82,10 @@ def _kind_from_sku(sku: ProductSku) -> str:
         "coach_minutes": "coach_quota",
         "digital_human_minutes": "digital_human_quota",
         "credits": "credits",
+        "module": "module",
+        "module_permanent": "module",
+        "module_combo": "module_combo",
+        "efficiency": "efficiency",
     }
     return mapping.get(sku.kind, sku.kind)
 
@@ -154,39 +158,11 @@ async def credit_wallet(
 
 
 async def grant_new_user_trial(db: AsyncSession, user_id: int) -> dict[str, object]:
-    """Seed a lightweight trial pack so new accounts are not empty in /api/assets."""
-    membership = await grant_entitlement(
-        db,
-        user_id,
-        asset_kind="membership",
-        asset_ref="pro",
-        source="promo",
-        quantity=None,
-        duration_days=7,
-        meta={"campaign": "new_user_trial"},
-    )
-    coach = await grant_entitlement(
-        db,
-        user_id,
-        asset_kind="coach_quota",
-        asset_ref="coach",
-        source="promo",
-        quantity=10,
-        duration_days=30,
-        meta={"campaign": "new_user_trial"},
-    )
-    wallet = await credit_wallet(
-        db,
-        user_id,
-        50,
-        reason="promo",
-        meta={"campaign": "new_user_trial"},
-    )
-    return {
-        "membership_id": membership.id,
-        "coach_id": coach.id,
-        "wallet_balance": int(wallet.balance_credits or 0),
-    }
+    """Seed 7-day full-feature trial (Pro + all modules + coach + points)."""
+    # Late import avoids cycle: commerce.trial → user_assets.
+    from app.services.commerce.trial import grant_full_feature_trial
+
+    return await grant_full_feature_trial(db, user_id)
 
 
 async def grant_entitlement(
@@ -251,6 +227,31 @@ async def grant_entitlement(
     return row
 
 
+def _sku_meta(sku: ProductSku) -> dict:
+    try:
+        raw = json.loads(sku.meta_json or "{}")
+        return raw if isinstance(raw, dict) else {}
+    except Exception:  # noqa: BLE001
+        return {}
+
+
+def _combo_module_codes(sku: ProductSku, *, selected_modules: list[str] | None) -> list[str]:
+    """Resolve module codes for module_combo SKUs (all4 / any2 pick)."""
+    meta = _sku_meta(sku)
+    catalog = [str(c) for c in (meta.get("modules") or []) if str(c).strip()]
+    pick = meta.get("pick")
+    if pick is not None:
+        need = int(pick)
+        chosen = [str(c) for c in (selected_modules or meta.get("selected_modules") or []) if str(c).strip()]
+        if len(chosen) == need and all(c in catalog for c in chosen):
+            return chosen
+        # P0 fallback when checkout did not send a pick: first N catalog modules.
+        if len(catalog) >= need:
+            return catalog[:need]
+        raise ValueError(f"combo_pick_required:{need}")
+    return catalog
+
+
 async def grant_from_sku(
     db: AsyncSession,
     user_id: int,
@@ -259,12 +260,14 @@ async def grant_from_sku(
     quantity_multiplier: int = 1,
     order_id: int | None = None,
     source: str = "purchase",
-) -> UserEntitlement | WalletAccount:
+    selected_modules: list[str] | None = None,
+) -> UserEntitlement | WalletAccount | list[UserEntitlement]:
     kind = _kind_from_sku(sku)
     ref = _asset_ref_from_sku(sku)
     units = None
     if sku.grant_quantity is not None:
         units = int(sku.grant_quantity) * max(1, int(quantity_multiplier))
+    grant_meta = {"sku_code": sku.sku_code}
     if kind == "credits" and units is not None:
         return await credit_wallet(
             db,
@@ -272,18 +275,41 @@ async def grant_from_sku(
             units,
             reason="purchase",
             order_id=order_id,
-            meta={"sku_code": sku.sku_code},
+            meta=grant_meta,
         )
+    if sku.kind == "module_combo" or kind == "module_combo":
+        codes = _combo_module_codes(sku, selected_modules=selected_modules)
+        if not codes:
+            raise ValueError(f"combo_modules_empty:{sku.sku_code}")
+        granted: list[UserEntitlement] = []
+        for code in codes:
+            granted.append(
+                await grant_entitlement(
+                    db,
+                    user_id,
+                    asset_kind="module",
+                    asset_ref=code,
+                    source=source,
+                    quantity=units,
+                    duration_days=sku.duration_days,
+                    order_id=order_id,
+                    meta={**grant_meta, "combo_ref": ref},
+                )
+            )
+        return granted
+    # module / module_permanent map to asset_kind=module (permanent → no ends_at).
+    duration = None if sku.kind == "module_permanent" else sku.duration_days
+    asset_kind = "module" if sku.kind in ("module", "module_permanent") else kind
     return await grant_entitlement(
         db,
         user_id,
-        asset_kind=kind,
+        asset_kind=asset_kind,
         asset_ref=ref,
         source=source,
         quantity=units,
-        duration_days=sku.duration_days,
+        duration_days=duration,
         order_id=order_id,
-        meta={"sku_code": sku.sku_code},
+        meta=grant_meta,
     )
 
 
@@ -377,6 +403,7 @@ async def create_order(
     sku_codes: list[tuple[str, int]],
     provider: str = "mock",
     coupon_id: int | None = None,
+    selected_modules: list[str] | None = None,
 ) -> Order:
     items: list[tuple[ProductSku, int]] = []
     amount = 0
@@ -392,13 +419,16 @@ async def create_order(
             raise ValueError(f"unknown_or_inactive_sku:{code}")
         items.append((sku, qty))
         amount += int(sku.price_cents) * int(qty)
+    meta: dict = {}
+    if selected_modules:
+        meta["selected_modules"] = [str(c).strip() for c in selected_modules if str(c).strip()]
     order = Order(
         user_id=user.id,
         status="pending",
         provider=provider[:24],
         amount_cents=amount,
         currency="CNY",
-        meta_json="{}",
+        meta_json=json.dumps(meta, ensure_ascii=False),
     )
     db.add(order)
     await db.flush()
@@ -427,7 +457,8 @@ async def create_order(
         if result.rowcount != 1:
             raise ValueError("优惠券已被使用")
         order.amount_cents = max(1, amount - coupon.value)
-        order.meta_json = json.dumps({"coupon_id": coupon_id, "discount_cents": coupon.value})
+        meta.update({"coupon_id": coupon_id, "discount_cents": coupon.value})
+        order.meta_json = json.dumps(meta, ensure_ascii=False)
     await db.commit()
     await db.refresh(order)
     return order
@@ -438,6 +469,17 @@ async def mark_order_paid(db: AsyncSession, order: Order) -> Order:
         return order
     order_id = order.id
     user_id = order.user_id
+    try:
+        order_meta = json.loads(order.meta_json or "{}")
+        if not isinstance(order_meta, dict):
+            order_meta = {}
+    except Exception:  # noqa: BLE001
+        order_meta = {}
+    selected_modules = order_meta.get("selected_modules")
+    if isinstance(selected_modules, list):
+        selected_modules = [str(c) for c in selected_modules if str(c).strip()]
+    else:
+        selected_modules = None
     result = await db.execute(
         select(OrderItem).where(OrderItem.order_id == order_id)
     )
@@ -453,6 +495,7 @@ async def mark_order_paid(db: AsyncSession, order: Order) -> Order:
             quantity_multiplier=item.quantity,
             order_id=order_id,
             source="purchase",
+            selected_modules=selected_modules,
         )
     order = await db.get(Order, order_id)
     if order is None:
