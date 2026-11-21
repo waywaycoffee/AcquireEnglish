@@ -15,6 +15,7 @@ class PadScaffold extends StatelessWidget {
     this.useBottomTabWhenPortrait = true,
     this.showNavigation = true,
     this.showContinueLearning = true,
+    this.backgroundColor,
   });
 
   final AppNavDestination currentDestination;
@@ -24,12 +25,17 @@ class PadScaffold extends StatelessWidget {
   final bool showNavigation;
   final bool showContinueLearning;
 
+  /// Flat canvas override (e.g. library parchment). Skips bubble backdrop.
+  final Color? backgroundColor;
+
   @override
   Widget build(BuildContext context) {
     final Size size = MediaQuery.sizeOf(context);
     final bool isPortrait = size.height > size.width;
     final bool useBottomNavigation = size.width < 840 || isPortrait;
+    final Color scaffoldColor = backgroundColor ?? AppDesignTokens.softWhite;
     final Widget content = _PadBackdrop(
+      flatColor: backgroundColor,
       child: Column(
         children: <Widget>[
           if (topBar != null) topBar!,
@@ -40,7 +46,7 @@ class PadScaffold extends StatelessWidget {
 
     if (showNavigation && useBottomNavigation && useBottomTabWhenPortrait) {
       return Scaffold(
-        backgroundColor: AppDesignTokens.softWhite,
+        backgroundColor: scaffoldColor,
         floatingActionButton: showContinueLearning
             ? const ContinueLearningButton()
             : null,
@@ -53,7 +59,7 @@ class PadScaffold extends StatelessWidget {
     }
 
     return Scaffold(
-      backgroundColor: AppDesignTokens.softWhite,
+      backgroundColor: scaffoldColor,
       floatingActionButton: showContinueLearning
           ? const ContinueLearningButton()
           : null,
@@ -71,12 +77,16 @@ class PadScaffold extends StatelessWidget {
 }
 
 class _PadBackdrop extends StatelessWidget {
-  const _PadBackdrop({required this.child});
+  const _PadBackdrop({required this.child, this.flatColor});
 
   final Widget child;
+  final Color? flatColor;
 
   @override
   Widget build(BuildContext context) {
+    if (flatColor != null) {
+      return ColoredBox(color: flatColor!, child: child);
+    }
     final bool compact = MediaQuery.sizeOf(context).width < 840;
     return DecoratedBox(
       decoration: BoxDecoration(

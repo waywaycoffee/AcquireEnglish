@@ -417,8 +417,10 @@ GoRouter goRouter(Ref ref) => GoRouter(
     ).fade(),
     GoRoute(
       path: '/words/syllabus/catalog',
-      builder: (BuildContext context, GoRouterState state) =>
-          const LilinjiCatalogScreen(),
+      builder: (BuildContext context, GoRouterState state) {
+        final String path = (state.uri.queryParameters['path'] ?? '').trim();
+        return LilinjiCatalogScreen(initialCategoryPath: path);
+      },
     ).fade(),
     GoRoute(
       path: '/reading',
@@ -468,13 +470,13 @@ GoRouter goRouter(Ref ref) => GoRouter(
                   ?.sourceLabel ??
               '';
         } catch (_) {}
+        final bool freePreview = isFreeReadingPreviewDocId(docId) ||
+            sourceLabel.contains('免费体验') ||
+            sourceLabel.contains('入门推荐');
         return ModuleGate(
           moduleCode: 'reading',
           title: '阅读模块',
-          freePreviewAllowed: isGrandfatheredFreeReading(
-            docId: docId,
-            sourceLabel: sourceLabel,
-          ),
+          freePreviewAllowed: freePreview,
           child: ReadingReaderScreen(docId: docId),
         );
       },

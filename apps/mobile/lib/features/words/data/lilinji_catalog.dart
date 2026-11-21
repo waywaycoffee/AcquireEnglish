@@ -4,6 +4,7 @@ import 'dart:typed_data';
 import 'package:crypto/crypto.dart';
 import 'package:dio/dio.dart';
 
+import '../../../constants/endpoints.dart';
 import '../domain/syllabus_book.dart';
 import 'lilinji_xlsx_parser.dart';
 
@@ -74,30 +75,58 @@ class LilinjiCatalogEntry {
 }
 
 class LilinjiCatalogClient {
-  LilinjiCatalogClient({Dio? dio})
-    : _dio = dio ??
+  LilinjiCatalogClient({Dio? dio, String apiBaseUrl = Endpoints.baseUrl})
+    : _apiBaseUrl = Endpoints.normalizeBaseUrl(apiBaseUrl),
+      _dio =
+          dio ??
           Dio(
             BaseOptions(
               connectTimeout: const Duration(seconds: 20),
-              receiveTimeout: const Duration(seconds: 60),
+              receiveTimeout: const Duration(seconds: 90),
               responseType: ResponseType.json,
               headers: const <String, String>{
                 'Accept': 'application/vnd.github+json',
                 'User-Agent': 'AcquireEnglish-SyllabusCatalog',
               },
             ),
-          );
+          ) {
+    if (dio == null) {
+      _dio.interceptors.add(
+        InterceptorsWrapper(
+          onRequest: (RequestOptions options, RequestInterceptorHandler handler) {
+            final Uri source = options.uri;
+            if (_shouldProxy(source)) {
+              options.path = Uri.parse(_apiBaseUrl)
+                  .resolve('api/reading/source')
+                  .replace(queryParameters: <String, String>{
+                    'url': source.toString(),
+                  })
+                  .toString();
+              options.queryParameters = <String, dynamic>{};
+            }
+            handler.next(options);
+          },
+        ),
+      );
+    }
+  }
 
   static const String repoApi =
       'https://api.github.com/repos/lilinji/English/contents';
   static const String rawBase =
       'https://raw.githubusercontent.com/lilinji/English/main';
-  static const String jsdelivrBase =
-      'https://cdn.jsdelivr.net/gh/lilinji/English@main';
+  static const String ghproxyRawBase =
+      'https://ghproxy.net/https://raw.githubusercontent.com/lilinji/English/main';
 
   final Dio _dio;
+  final String _apiBaseUrl;
   final Map<String, List<LilinjiCatalogEntry>> _listCache =
       <String, List<LilinjiCatalogEntry>>{};
+
+  static bool _shouldProxy(Uri source) {
+    return source.host == 'api.github.com' ||
+        source.host == 'raw.githubusercontent.com';
+  }
 
   Future<List<LilinjiCatalogEntry>> listPath(String path) async {
     final String key = path.trim();
@@ -109,11 +138,9 @@ class LilinjiCatalogClient {
         : '$repoApi/${key.split('/').map(Uri.encodeComponent).join('/')}';
     final Response<dynamic> response = await _dio.get<dynamic>(url);
     final Object? data = response.data;
-    if (data is! List) {
-      throw StateError('词库目录格式异常');
-    }
+    final List<dynamic> items = _asJsonList(data);
     final List<LilinjiCatalogEntry> entries = <LilinjiCatalogEntry>[];
-    for (final Object? item in data) {
+    for (final Object? item in items) {
       if (item is! Map) continue;
       final Map<String, dynamic> map = Map<String, dynamic>.from(item);
       final String name = '${map['name'] ?? ''}';
@@ -175,8 +202,7 @@ class LilinjiCatalogClient {
       id: entry.stableBookId,
       title: entry.displayTitle,
       examTag: examTag,
-      disclaimer:
-          '来自开源词库 lilinji/English，仅供个人学习；版权归原作者/出版社。非教育部大纲原文。',
+      disclaimer: '',
       words: words,
       builtin: false,
     );
@@ -184,11 +210,13 @@ class LilinjiCatalogClient {
   }
 
   Future<Uint8List> _downloadBytes(LilinjiCatalogEntry entry) async {
+    final String encodedPath =
+        entry.path.split('/').map(Uri.encodeComponent).join('/');
     final List<String> candidates = <String>[
       if (entry.downloadUrl != null && entry.downloadUrl!.isNotEmpty)
         entry.downloadUrl!,
-      '$jsdelivrBase/${entry.path.split('/').map(Uri.encodeComponent).join('/')}',
-      '$rawBase/${entry.path.split('/').map(Uri.encodeComponent).join('/')}',
+      '$rawBase/$encodedPath',
+      '$ghproxyRawBase/$encodedPath',
     ];
     Object? lastError;
     for (final String url in candidates) {
@@ -212,6 +240,19 @@ class LilinjiCatalogClient {
       }
     }
     throw StateError('下载失败：${lastError ?? 'empty response'}');
+  }
+
+  List<dynamic> _asJsonList(Object? data) {
+    if (data is List) return data;
+    if (data is String) {
+      final Object? decoded = jsonDecode(data);
+      if (decoded is List) return decoded;
+    }
+    if (data is List<int>) {
+      final Object? decoded = jsonDecode(utf8.decode(data));
+      if (decoded is List) return decoded;
+    }
+    throw StateError('词库目录格式异常');
   }
 
   bool _isVocabFile(String name) {

@@ -1,0 +1,622 @@
+{
+  "version": "2.22",
+  "children": [
+    {
+      "type": "frame",
+      "id": "wb-select",
+      "name": "01 词书选择 · 图书馆",
+      "x": 0,
+      "y": 0,
+      "width": 390,
+      "height": 844,
+      "layout": "none",
+      "fill": "#EFE3D5",
+      "children": [
+        {
+          "type": "text",
+          "id": "wb-title",
+          "x": 24,
+          "y": 36,
+          "content": "词书",
+          "fontFamily": "Georgia",
+          "fontSize": 28,
+          "fontWeight": "bold",
+          "fill": "#3A2212"
+        },
+        {
+          "type": "text",
+          "id": "wb-sub",
+          "x": 24,
+          "y": 72,
+          "content": "封面朝外 · 选一本开始背",
+          "fontFamily": "Georgia",
+          "fontSize": 12,
+          "fill": "#8A6D4E"
+        },
+        {
+          "type": "frame",
+          "id": "wb-seg",
+          "x": 20,
+          "y": 104,
+          "width": 350,
+          "height": 40,
+          "fill": "#F7EEE3",
+          "cornerRadius": 12,
+          "children": [
+            {
+              "type": "frame",
+              "id": "wb-seg-a",
+              "x": 4,
+              "y": 4,
+              "width": 110,
+              "height": 32,
+              "fill": "#5C3D2E",
+              "cornerRadius": 10,
+              "children": [
+                {
+                  "type": "text",
+                  "id": "wb-seg-at",
+                  "x": 34,
+                  "y": 7,
+                  "content": "词书",
+                  "fontSize": 13,
+                  "fontWeight": "bold",
+                  "fill": "#F7EEE3"
+                }
+              ]
+            },
+            {
+              "type": "text",
+              "id": "wb-seg-b",
+              "x": 140,
+              "y": 11,
+              "content": "句型书",
+              "fontSize": 13,
+              "fill": "#8A6D4E"
+            },
+            {
+              "type": "text",
+              "id": "wb-seg-c",
+              "x": 250,
+              "y": 11,
+              "content": "零基础",
+              "fontSize": 13,
+              "fill": "#8A6D4E"
+            }
+          ]
+        },
+        {
+          "type": "text",
+          "id": "wb-mine",
+          "x": 24,
+          "y": 164,
+          "content": "我的书架",
+          "fontFamily": "Georgia",
+          "fontSize": 16,
+          "fontWeight": "bold",
+          "fill": "#3A2212"
+        },
+        {
+          "type": "frame",
+          "id": "wb-shelf",
+          "x": 14,
+          "y": 196,
+          "width": 362,
+          "height": 220,
+          "fill": "#5C3D2E",
+          "cornerRadius": 14,
+          "children": [
+            {
+              "type": "frame",
+              "id": "wb-shelf-in",
+              "x": 8,
+              "y": 8,
+              "width": 346,
+              "height": 176,
+              "fill": "#6B4633",
+              "cornerRadius": 10,
+              "children": [
+                {
+                  "type": "frame",
+                  "id": "wb-b1",
+                  "x": 18,
+                  "y": 18,
+                  "width": 78,
+                  "height": 132,
+                  "fill": "#2E4634",
+                  "cornerRadius": 3,
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "wb-b1t",
+                      "x": 8,
+                      "y": 40,
+                      "content": "中考\n核心词",
+                      "fontFamily": "Georgia",
+                      "fontSize": 13,
+                      "fill": "#FFFFFF"
+                    },
+                    {
+                      "type": "text",
+                      "id": "wb-b1p",
+                      "x": 8,
+                      "y": 108,
+                      "content": "42%",
+                      "fontSize": 11,
+                      "fill": "#C8D9C4"
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "wb-b2",
+                  "x": 112,
+                  "y": 26,
+                  "width": 74,
+                  "height": 124,
+                  "fill": "#A4553A",
+                  "cornerRadius": 3,
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "wb-b2t",
+                      "x": 8,
+                      "y": 44,
+                      "content": "CET-4",
+                      "fontFamily": "Georgia",
+                      "fontSize": 14,
+                      "fill": "#FFFFFF"
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "wb-b3",
+                  "x": 202,
+                  "y": 18,
+                  "width": 78,
+                  "height": 132,
+                  "fill": "#1F3557",
+                  "cornerRadius": 3,
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "wb-b3t",
+                      "x": 8,
+                      "y": 40,
+                      "content": "新概念\n一册",
+                      "fontFamily": "Georgia",
+                      "fontSize": 13,
+                      "fill": "#FFFFFF"
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "wb-b4",
+                  "x": 296,
+                  "y": 30,
+                  "width": 36,
+                  "height": 120,
+                  "fill": "#CFA03C",
+                  "cornerRadius": 3,
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "wb-b4t",
+                      "x": 10,
+                      "y": 36,
+                      "content": "IELTS",
+                      "fontFamily": "Georgia",
+                      "fontSize": 11,
+                      "fill": "#3A2212"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "text",
+              "id": "wb-shelf-foot",
+              "x": 18,
+              "y": 192,
+              "content": "4 本 · 点封面继续背",
+              "fontSize": 11,
+              "fill": "#E6CFAE"
+            }
+          ]
+        },
+        {
+          "type": "text",
+          "id": "wb-open",
+          "x": 24,
+          "y": 440,
+          "content": "开源词库",
+          "fontFamily": "Georgia",
+          "fontSize": 16,
+          "fontWeight": "bold",
+          "fill": "#3A2212"
+        },
+        {
+          "type": "text",
+          "id": "wb-open-sub",
+          "x": 24,
+          "y": 464,
+          "content": "按分类浏览，下载后出现在书架",
+          "fontSize": 12,
+          "fill": "#8A6D4E"
+        },
+        {
+          "type": "frame",
+          "id": "wb-cat1",
+          "x": 20,
+          "y": 496,
+          "width": 170,
+          "height": 88,
+          "fill": "#F7EEE3",
+          "cornerRadius": 14,
+          "children": [
+            {
+              "type": "text",
+              "id": "wb-c1t",
+              "x": 16,
+              "y": 18,
+              "content": "中考",
+              "fontFamily": "Georgia",
+              "fontSize": 17,
+              "fontWeight": "bold",
+              "fill": "#3A2212"
+            },
+            {
+              "type": "text",
+              "id": "wb-c1s",
+              "x": 16,
+              "y": 48,
+              "content": "ZK · 打开书架",
+              "fontSize": 12,
+              "fill": "#8A6D4E"
+            }
+          ]
+        },
+        {
+          "type": "frame",
+          "id": "wb-cat2",
+          "x": 200,
+          "y": 496,
+          "width": 170,
+          "height": 88,
+          "fill": "#F7EEE3",
+          "cornerRadius": 14,
+          "children": [
+            {
+              "type": "text",
+              "id": "wb-c2t",
+              "x": 16,
+              "y": 18,
+              "content": "四级 CET-4",
+              "fontFamily": "Georgia",
+              "fontSize": 17,
+              "fontWeight": "bold",
+              "fill": "#3A2212"
+            },
+            {
+              "type": "text",
+              "id": "wb-c2s",
+              "x": 16,
+              "y": 48,
+              "content": "CET4 · 打开书架",
+              "fontSize": 12,
+              "fill": "#8A6D4E"
+            }
+          ]
+        },
+        {
+          "type": "frame",
+          "id": "wb-cat3",
+          "x": 20,
+          "y": 596,
+          "width": 170,
+          "height": 88,
+          "fill": "#F7EEE3",
+          "cornerRadius": 14,
+          "children": [
+            {
+              "type": "text",
+              "id": "wb-c3t",
+              "x": 16,
+              "y": 18,
+              "content": "雅思 IELTS",
+              "fontFamily": "Georgia",
+              "fontSize": 17,
+              "fontWeight": "bold",
+              "fill": "#3A2212"
+            },
+            {
+              "type": "text",
+              "id": "wb-c3s",
+              "x": 16,
+              "y": 48,
+              "content": "IELTS · 打开书架",
+              "fontSize": 12,
+              "fill": "#8A6D4E"
+            }
+          ]
+        },
+        {
+          "type": "frame",
+          "id": "wb-cat4",
+          "x": 200,
+          "y": 596,
+          "width": 170,
+          "height": 88,
+          "fill": "#F7EEE3",
+          "cornerRadius": 14,
+          "children": [
+            {
+              "type": "text",
+              "id": "wb-c4t",
+              "x": 16,
+              "y": 18,
+              "content": "全部开源",
+              "fontFamily": "Georgia",
+              "fontSize": 17,
+              "fontWeight": "bold",
+              "fill": "#3A2212"
+            },
+            {
+              "type": "text",
+              "id": "wb-c4s",
+              "x": 16,
+              "y": 48,
+              "content": "更多分类…",
+              "fontSize": 12,
+              "fill": "#8A6D4E"
+            }
+          ]
+        },
+        {
+          "type": "frame",
+          "id": "wb-cloud",
+          "x": 20,
+          "y": 704,
+          "width": 350,
+          "height": 52,
+          "fill": "#5C3D2E",
+          "cornerRadius": 14,
+          "children": [
+            {
+              "type": "text",
+              "id": "wb-cloud-t",
+              "x": 108,
+              "y": 16,
+              "content": "云端正式词书",
+              "fontSize": 15,
+              "fontWeight": "bold",
+              "fill": "#F7EEE3"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "frame",
+      "id": "wb-browse",
+      "name": "02 开源分类 · 书架浏览",
+      "x": 430,
+      "y": 0,
+      "width": 390,
+      "height": 844,
+      "layout": "none",
+      "fill": "#EFE3D5",
+      "children": [
+        {
+          "type": "text",
+          "id": "br-back",
+          "x": 20,
+          "y": 34,
+          "content": "‹  词书",
+          "fontSize": 16,
+          "fill": "#4A2E1A"
+        },
+        {
+          "type": "text",
+          "id": "br-title",
+          "x": 24,
+          "y": 78,
+          "content": "中考",
+          "fontFamily": "Georgia",
+          "fontSize": 26,
+          "fontWeight": "bold",
+          "fill": "#3A2212"
+        },
+        {
+          "type": "text",
+          "id": "br-sub",
+          "x": 24,
+          "y": 114,
+          "content": "点封面下载到「我的书架」",
+          "fontSize": 12,
+          "fill": "#8A6D4E"
+        },
+        {
+          "type": "frame",
+          "id": "br-shelf",
+          "x": 14,
+          "y": 150,
+          "width": 362,
+          "height": 560,
+          "fill": "#5C3D2E",
+          "cornerRadius": 14,
+          "children": [
+            {
+              "type": "frame",
+              "id": "br-row1",
+              "x": 16,
+              "y": 24,
+              "width": 330,
+              "height": 150,
+              "fill": "#6B4633",
+              "cornerRadius": 10,
+              "children": [
+                {
+                  "type": "frame",
+                  "id": "br-b1",
+                  "x": 16,
+                  "y": 12,
+                  "width": 70,
+                  "height": 118,
+                  "fill": "#2E4634",
+                  "cornerRadius": 3,
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "br-b1t",
+                      "x": 6,
+                      "y": 36,
+                      "content": "初中\n大纲",
+                      "fontFamily": "Georgia",
+                      "fontSize": 12,
+                      "fill": "#FFFFFF"
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "br-b2",
+                  "x": 100,
+                  "y": 12,
+                  "width": 70,
+                  "height": 118,
+                  "fill": "#A4553A",
+                  "cornerRadius": 3,
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "br-b2t",
+                      "x": 6,
+                      "y": 36,
+                      "content": "乱序\n便携",
+                      "fontFamily": "Georgia",
+                      "fontSize": 12,
+                      "fill": "#FFFFFF"
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "br-b3",
+                  "x": 184,
+                  "y": 12,
+                  "width": 70,
+                  "height": 118,
+                  "fill": "#1F3557",
+                  "cornerRadius": 3,
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "br-b3t",
+                      "x": 6,
+                      "y": 42,
+                      "content": "已下载",
+                      "fontFamily": "Georgia",
+                      "fontSize": 12,
+                      "fill": "#C8D9C4"
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "br-b4",
+                  "x": 268,
+                  "y": 12,
+                  "width": 48,
+                  "height": 118,
+                  "fill": "#5E2430",
+                  "cornerRadius": 3,
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "br-b4t",
+                      "x": 10,
+                      "y": 40,
+                      "content": "5·3",
+                      "fontFamily": "Georgia",
+                      "fontSize": 12,
+                      "fill": "#FFFFFF"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "br-plank",
+              "x": 10,
+              "y": 182,
+              "width": 342,
+              "height": 14,
+              "fill": "#4A2E1A",
+              "cornerRadius": 4
+            },
+            {
+              "type": "frame",
+              "id": "br-row2",
+              "x": 16,
+              "y": 210,
+              "width": 330,
+              "height": 150,
+              "fill": "#6B4633",
+              "cornerRadius": 10,
+              "children": [
+                {
+                  "type": "frame",
+                  "id": "br-b5",
+                  "x": 16,
+                  "y": 12,
+                  "width": 70,
+                  "height": 118,
+                  "fill": "#55602E",
+                  "cornerRadius": 3,
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "br-b5t",
+                      "x": 6,
+                      "y": 40,
+                      "content": "正序\n版",
+                      "fontFamily": "Georgia",
+                      "fontSize": 12,
+                      "fill": "#FFFFFF"
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "br-folder",
+                  "x": 100,
+                  "y": 28,
+                  "width": 90,
+                  "height": 96,
+                  "fill": "#CFA03C",
+                  "cornerRadius": 8,
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "br-ft",
+                      "x": 14,
+                      "y": 36,
+                      "content": "文件夹 ›",
+                      "fontSize": 13,
+                      "fontWeight": "bold",
+                      "fill": "#3A2212"
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

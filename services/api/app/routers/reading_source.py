@@ -17,8 +17,13 @@ def allowed(url):
     if u.scheme!='https' or u.username or u.password or port not in (None,443):return False
     if u.hostname=='github.com':return bool(re.fullmatch(r'/standardebooks/[a-z0-9_-]+/archive/refs/heads/(master|main)\.zip',u.path))
     if u.hostname=='codeload.github.com':return bool(re.fullmatch(r'/standardebooks/[a-z0-9_-]+/zip/refs/heads/(master|main)',u.path))
-    if u.hostname=='raw.githubusercontent.com':return any(u.path.startswith('/'+r+'/') for r in ['nishkalavallabhi/OneStopEnglishCorpus','xckevin/magic-english-buddy'])
-    if u.hostname=='api.github.com':return any(u.path.startswith('/repos/'+r+'/contents') for r in ['nishkalavallabhi/OneStopEnglishCorpus','xckevin/magic-english-buddy'])
+    _gh_repos = (
+        'nishkalavallabhi/OneStopEnglishCorpus',
+        'xckevin/magic-english-buddy',
+        'lilinji/English',
+    )
+    if u.hostname=='raw.githubusercontent.com':return any(u.path.startswith('/'+r+'/') for r in _gh_repos)
+    if u.hostname=='api.github.com':return any(u.path.startswith('/repos/'+r+'/contents') for r in _gh_repos)
     return u.hostname=='standardebooks.org' and u.path.startswith(('/ebooks/','/feeds/'))
 
 @router.get('/source')

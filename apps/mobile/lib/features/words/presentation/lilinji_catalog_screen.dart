@@ -7,18 +7,26 @@ import 'package:go_router/go_router.dart';
 import '../../../router/app_router.dart';
 import '../../daily_review/presentation/syllabus_overlap_dialog.dart';
 import '../../navigation/presentation/navigation_destination.dart';
-import '../../shared/presentation/pad/app_design_tokens.dart';
+import '../../settings/presentation/settings_provider.dart';
 import '../../shared/presentation/pad/pad_scaffold.dart';
-import '../../shared/presentation/pad/pad_top_bar.dart';
 import '../data/lilinji_catalog.dart';
 import '../domain/syllabus_book.dart';
 import 'syllabus_books_provider.dart';
+import 'word_book_cover.dart';
+import 'word_book_library_theme.dart';
 
 final Provider<LilinjiCatalogClient> lilinjiCatalogClientProvider =
-    Provider<LilinjiCatalogClient>((Ref ref) => LilinjiCatalogClient());
+    Provider<LilinjiCatalogClient>(
+      (Ref ref) => LilinjiCatalogClient(
+        apiBaseUrl: ref.watch(learningSettingsProvider).resolvedCloudApiBaseUrl,
+      ),
+    );
 
 class LilinjiCatalogScreen extends ConsumerStatefulWidget {
-  const LilinjiCatalogScreen({super.key});
+  const LilinjiCatalogScreen({super.key, this.initialCategoryPath = ''});
+
+  /// When set, open that root category immediately (from 词书 shelf shortcuts).
+  final String initialCategoryPath;
 
   @override
   ConsumerState<LilinjiCatalogScreen> createState() =>
@@ -32,6 +40,7 @@ class _LilinjiCatalogScreenState extends ConsumerState<LilinjiCatalogScreen> {
   String? _error;
   bool _loading = false;
   String? _downloadingPath;
+  bool _openedInitial = false;
 
   LilinjiCategory? get _rootCategory {
     if (_stack.isEmpty) return null;
@@ -43,6 +52,23 @@ class _LilinjiCatalogScreenState extends ConsumerState<LilinjiCatalogScreen> {
   }
 
   String get _examTag => _rootCategory?.tag ?? 'LILINJI';
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || _openedInitial) return;
+      _openedInitial = true;
+      final String want = widget.initialCategoryPath.trim();
+      if (want.isEmpty) return;
+      for (final LilinjiCategory c in kLilinjiCategories) {
+        if (c.path == want) {
+          unawaited(_openCategory(c));
+          return;
+        }
+      }
+    });
+  }
 
   Future<void> _openCategory(LilinjiCategory category) async {
     _stack
@@ -87,7 +113,7 @@ class _LilinjiCatalogScreenState extends ConsumerState<LilinjiCatalogScreen> {
       if (!mounted) return;
       setState(() {
         _loading = false;
-        _error = '加载失败：$e\n（GitHub 接口有频率限制，可稍后重试）';
+        _error = '加载失败：$e';
       });
     }
   }
@@ -111,7 +137,7 @@ class _LilinjiCatalogScreenState extends ConsumerState<LilinjiCatalogScreen> {
       final bool? again = await showDialog<bool>(
         context: context,
         builder: (BuildContext ctx) => AlertDialog(
-          title: const Text('已下载过'),
+          title: const Text('已在书架'),
           content: Text('「${entry.displayTitle}」已在本地，是否重新下载覆盖？'),
           actions: <Widget>[
             TextButton(
@@ -142,7 +168,7 @@ class _LilinjiCatalogScreenState extends ConsumerState<LilinjiCatalogScreen> {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('已下载「${book.title}」· ${book.wordCount} 词'),
+          content: Text('已放到书架「${book.title}」· ${book.wordCount} 词'),
           action: SnackBarAction(
             label: '开始背',
             onPressed: () {
@@ -161,17 +187,9 @@ class _LilinjiCatalogScreenState extends ConsumerState<LilinjiCatalogScreen> {
     }
   }
 
-  String _formatSize(int bytes) {
-    if (bytes <= 0) return '';
-    if (bytes < 1024) return '$bytes B';
-    if (bytes < 1024 * 1024) {
-      return '${(bytes / 1024).toStringAsFixed(0)} KB';
-    }
-    return '${(bytes / (1024 * 1024)).toStringAsFixed(1)} MB';
-  }
-
   @override
   Widget build(BuildContext context) {
+    final WordBookLibraryTheme theme = WordBookLibraryTheme.of(context);
     final SyllabusBooksState local = ref.watch(syllabusBooksProvider);
     final Set<String> downloadedIds = <String>{
       for (final SyllabusBook b in local.imported) b.id,
@@ -181,130 +199,279 @@ class _LilinjiCatalogScreenState extends ConsumerState<LilinjiCatalogScreen> {
     return PadScaffold(
       currentDestination: AppNavDestination.words,
       showContinueLearning: false,
-      topBar: PadTopBar(
-        title: atRoot ? '在线词库' : _stack.last.title,
-        description: atRoot
-            ? '来自 lilinji/English 开源词库，按需下载到本机；仅供个人学习。'
-            : '点选词书下载到「我的词书」。',
-        leading: PadBackButton(onPressed: _popStack),
-      ),
-      body: atRoot
-          ? ListView.separated(
-              padding: const EdgeInsets.all(20),
-              itemCount: kLilinjiCategories.length + 1,
-              separatorBuilder: (_, __) => const SizedBox(height: 8),
-              itemBuilder: (BuildContext context, int index) {
-                if (index == 0) {
-                  return const Text(
-                    '数据来自 GitHub lilinji/English。教材与商业词书版权归原权利人；请勿商用再分发。',
-                    style: TextStyle(height: 1.45, color: Color(0xFF626262)),
-                  );
-                }
-                final LilinjiCategory category =
-                    kLilinjiCategories[index - 1];
-                return Material(
-                  color: AppDesignTokens.appWhite,
-                  borderRadius: BorderRadius.circular(16),
-                  child: ListTile(
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(16),
-                      side: BorderSide(color: AppDesignTokens.borderGray),
-                    ),
-                    title: Text(
-                      category.title,
-                      style: TextStyle(
-                        fontWeight: FontWeight.w800,
-                        color: AppDesignTokens.textPrimary,
-                      ),
-                    ),
-                    subtitle: Text(category.path),
-                    trailing: const Icon(Icons.chevron_right_rounded),
-                    onTap: () => unawaited(_openCategory(category)),
+      backgroundColor: theme.canvas,
+      topBar: null,
+      body: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: <Widget>[
+          Padding(
+            padding: const EdgeInsets.fromLTRB(8, 8, 16, 0),
+            child: Row(
+              children: <Widget>[
+                IconButton(
+                  onPressed: _popStack,
+                  icon: Icon(
+                    Icons.arrow_back_ios_new_rounded,
+                    size: 20,
+                    color: theme.accent,
                   ),
-                );
-              },
-            )
-          : _loading
-          ? const Center(child: CircularProgressIndicator())
-          : _error != null
-          ? Center(
-              child: Padding(
-                padding: const EdgeInsets.all(24),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: <Widget>[
-                    Text(_error!, textAlign: TextAlign.center),
-                    const SizedBox(height: 12),
-                    FilledButton(
-                      onPressed: () => unawaited(_loadCurrent()),
-                      child: const Text('重试'),
-                    ),
-                  ],
                 ),
-              ),
-            )
-          : ListView.separated(
-              padding: const EdgeInsets.all(20),
-              itemCount: _entries?.length ?? 0,
-              separatorBuilder: (_, __) => const SizedBox(height: 8),
-              itemBuilder: (BuildContext context, int index) {
-                final LilinjiCatalogEntry entry = _entries![index];
-                final bool isFolder = entry.kind == LilinjiEntryKind.folder;
-                final bool downloaded = downloadedIds.contains(
-                  entry.stableBookId,
-                );
-                final bool busy = _downloadingPath == entry.path;
-                return Material(
-                  color: AppDesignTokens.appWhite,
-                  borderRadius: BorderRadius.circular(16),
-                  child: ListTile(
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(16),
-                      side: BorderSide(color: AppDesignTokens.borderGray),
-                    ),
-                    leading: Icon(
-                      isFolder
-                          ? Icons.folder_outlined
-                          : Icons.menu_book_outlined,
-                      color: AppDesignTokens.brandGreenDark,
-                    ),
-                    title: Text(
-                      entry.displayTitle,
-                      style: TextStyle(
-                        fontWeight: FontWeight.w700,
-                        color: AppDesignTokens.textPrimary,
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: <Widget>[
+                      Text(
+                        atRoot ? '开源词库' : _stack.last.title,
+                        style: TextStyle(
+                          fontFamily: 'serif',
+                          fontSize: 24,
+                          fontWeight: FontWeight.w800,
+                          color: theme.title,
+                        ),
+                      ),
+                      Text(
+                        atRoot ? '按分类浏览，下载后出现在「我的书架」' : '点封面下载到「我的书架」',
+                        style: TextStyle(fontSize: 12, color: theme.subtitle),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 12),
+          Expanded(
+            child: atRoot
+                ? _CategoryGrid(
+                    theme: theme,
+                    onOpen: (LilinjiCategory c) => unawaited(_openCategory(c)),
+                  )
+                : _loading
+                ? const Center(child: CircularProgressIndicator())
+                : _error != null
+                ? Center(
+                    child: Padding(
+                      padding: const EdgeInsets.all(24),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: <Widget>[
+                          Text(
+                            _error!,
+                            textAlign: TextAlign.center,
+                            style: TextStyle(color: theme.title),
+                          ),
+                          const SizedBox(height: 12),
+                          FilledButton(
+                            style: FilledButton.styleFrom(
+                              backgroundColor: theme.accent,
+                              foregroundColor: theme.onAccent,
+                            ),
+                            onPressed: () => unawaited(_loadCurrent()),
+                            child: const Text('重试'),
+                          ),
+                        ],
                       ),
                     ),
-                    subtitle: Text(
-                      isFolder
-                          ? '文件夹'
-                          : <String>[
-                              if (_formatSize(entry.sizeBytes).isNotEmpty)
-                                _formatSize(entry.sizeBytes),
-                              if (downloaded) '已下载',
-                            ].join(' · '),
-                    ),
-                    trailing: isFolder
-                        ? const Icon(Icons.chevron_right_rounded)
-                        : busy
-                        ? const SizedBox(
-                            width: 24,
-                            height: 24,
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          )
-                        : TextButton(
-                            onPressed: () => unawaited(_download(entry)),
-                            child: Text(downloaded ? '重新下载' : '下载'),
-                          ),
-                    onTap: isFolder
-                        ? () => unawaited(_openFolder(entry))
-                        : busy
-                        ? null
-                        : () => unawaited(_download(entry)),
+                  )
+                : _EntryShelf(
+                    theme: theme,
+                    entries: _entries ?? const <LilinjiCatalogEntry>[],
+                    downloadedIds: downloadedIds,
+                    downloadingPath: _downloadingPath,
+                    onFolder: (LilinjiCatalogEntry e) =>
+                        unawaited(_openFolder(e)),
+                    onBook: (LilinjiCatalogEntry e) => unawaited(_download(e)),
                   ),
-                );
-              },
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _CategoryGrid extends StatelessWidget {
+  const _CategoryGrid({required this.theme, required this.onOpen});
+
+  final WordBookLibraryTheme theme;
+  final ValueChanged<LilinjiCategory> onOpen;
+
+  @override
+  Widget build(BuildContext context) {
+    return GridView.builder(
+      padding: const EdgeInsets.fromLTRB(20, 4, 20, 28),
+      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: 2,
+        mainAxisSpacing: 12,
+        crossAxisSpacing: 12,
+        childAspectRatio: 1.7,
+      ),
+      itemCount: kLilinjiCategories.length,
+      itemBuilder: (BuildContext context, int index) {
+        final LilinjiCategory category = kLilinjiCategories[index];
+        return Material(
+          color: theme.card,
+          borderRadius: BorderRadius.circular(14),
+          child: InkWell(
+            borderRadius: BorderRadius.circular(14),
+            onTap: () => onOpen(category),
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(16, 16, 12, 14),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: <Widget>[
+                  Text(
+                    category.title,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontFamily: 'serif',
+                      fontSize: 16,
+                      fontWeight: FontWeight.w800,
+                      color: theme.title,
+                    ),
+                  ),
+                  const Spacer(),
+                  Text(
+                    '${category.tag} · 打开书架',
+                    style: TextStyle(fontSize: 12, color: theme.subtitle),
+                  ),
+                ],
+              ),
             ),
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _EntryShelf extends StatelessWidget {
+  const _EntryShelf({
+    required this.theme,
+    required this.entries,
+    required this.downloadedIds,
+    required this.downloadingPath,
+    required this.onFolder,
+    required this.onBook,
+  });
+
+  final WordBookLibraryTheme theme;
+  final List<LilinjiCatalogEntry> entries;
+  final Set<String> downloadedIds;
+  final String? downloadingPath;
+  final ValueChanged<LilinjiCatalogEntry> onFolder;
+  final ValueChanged<LilinjiCatalogEntry> onBook;
+
+  @override
+  Widget build(BuildContext context) {
+    if (entries.isEmpty) {
+      return Center(
+        child: Text('这里暂无词书文件', style: TextStyle(color: theme.subtitle)),
+      );
+    }
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(14, 0, 14, 28),
+      children: <Widget>[
+        Container(
+          decoration: BoxDecoration(
+            color: theme.wood,
+            borderRadius: BorderRadius.circular(14),
+          ),
+          padding: const EdgeInsets.fromLTRB(12, 16, 12, 16),
+          child: Wrap(
+            spacing: 14,
+            runSpacing: 18,
+            children: <Widget>[
+              for (final LilinjiCatalogEntry entry in entries)
+                if (entry.kind == LilinjiEntryKind.folder)
+                  _FolderTile(
+                    theme: theme,
+                    title: entry.displayTitle,
+                    onTap: () => onFolder(entry),
+                  )
+                else
+                  Stack(
+                    clipBehavior: Clip.none,
+                    children: <Widget>[
+                      WordBookCover(
+                        title: entry.displayTitle,
+                        badge: downloadedIds.contains(entry.stableBookId)
+                            ? '已下载'
+                            : '开源',
+                        progressLabel:
+                            downloadingPath == entry.path ? '下载中…' : '',
+                        onTap: downloadingPath == entry.path
+                            ? null
+                            : () => onBook(entry),
+                      ),
+                      if (downloadingPath == entry.path)
+                        const Positioned.fill(
+                          child: Center(
+                            child: SizedBox(
+                              width: 22,
+                              height: 22,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: Colors.white,
+                              ),
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _FolderTile extends StatelessWidget {
+  const _FolderTile({
+    required this.theme,
+    required this.title,
+    required this.onTap,
+  });
+
+  final WordBookLibraryTheme theme;
+  final String title;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: const Color(0xFFCFA03C),
+      borderRadius: BorderRadius.circular(8),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(8),
+        child: SizedBox(
+          width: 96,
+          height: 110,
+          child: Padding(
+            padding: const EdgeInsets.all(12),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: <Widget>[
+                Icon(Icons.folder_rounded, color: theme.title.withValues(alpha: 0.75)),
+                const Spacer(),
+                Text(
+                  title,
+                  maxLines: 3,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontWeight: FontWeight.w800,
+                    color: theme.title,
+                    fontSize: 12,
+                    height: 1.2,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
     );
   }
 }

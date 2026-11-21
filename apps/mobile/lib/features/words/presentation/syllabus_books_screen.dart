@@ -12,12 +12,13 @@ import '../../exam/domain/exam_fsrs.dart';
 import '../../exam/domain/exam_profile.dart';
 import '../../exam/presentation/exam_profile_provider.dart';
 import '../../navigation/presentation/navigation_destination.dart';
-import '../../shared/presentation/pad/app_design_tokens.dart';
 import '../../shared/presentation/pad/pad_scaffold.dart';
-import '../../shared/presentation/pad/pad_top_bar.dart';
 import '../../shared/presentation/pill_segmented_control.dart';
+import '../data/lilinji_catalog.dart';
 import '../domain/syllabus_book.dart';
 import 'syllabus_books_provider.dart';
+import 'word_book_cover.dart';
+import 'word_book_library_theme.dart';
 
 class SyllabusBooksScreen extends ConsumerStatefulWidget {
   const SyllabusBooksScreen({super.key, this.initialKind = SyllabusBookKind.word});
@@ -133,14 +134,36 @@ class _SyllabusBooksScreenState extends ConsumerState<SyllabusBooksScreen> {
   }
 
   void _startBook(BuildContext context, SyllabusBook book) {
-    // Unified queue: favorites + active book together.
     unawaited(_selectBook(book).then((_) {
       if (context.mounted) context.push(SGRoute.reviewSession.route);
     }));
   }
 
+  Future<void> _confirmDelete(SyllabusBook book) async {
+    final bool? ok = await showDialog<bool>(
+      context: context,
+      builder: (BuildContext ctx) => AlertDialog(
+        title: Text(book.isPatternBook ? '删除句型书' : '删除词书'),
+        content: Text('确定从本地书架移除「${book.title}」？'),
+        actions: <Widget>[
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('取消'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('删除'),
+          ),
+        ],
+      ),
+    );
+    if (ok != true || !mounted) return;
+    await ref.read(syllabusBooksProvider.notifier).deleteImported(book.id);
+  }
+
   @override
   Widget build(BuildContext context) {
+    final WordBookLibraryTheme theme = WordBookLibraryTheme.of(context);
     final SyllabusBooksState state = ref.watch(syllabusBooksProvider);
     final ExamProfile examProfile = ref.watch(examProfileProvider);
     final List<SyllabusBook> raw = state.booksOf(_kind);
@@ -148,148 +171,380 @@ class _SyllabusBooksScreenState extends ConsumerState<SyllabusBooksScreen> {
         examProfile.isExamMode && examProfile.family != null
         ? filterSyllabusForExam(raw, examProfile.family)
         : raw;
-    // If no tagged books yet, still show the full library so users can download.
     final List<SyllabusBook> books =
         matched.isEmpty && examProfile.isExamMode ? raw : matched;
     final bool isPattern = _kind == SyllabusBookKind.pattern;
     final bool isFoundation = _kind == SyllabusBookKind.foundation;
     final String examHint = examProfile.isExamMode && examProfile.family != null
         ? (matched.isEmpty
-            ? '备考「${examProfile.family!.label}」：暂无匹配标签词书，先显示全部，请下载带考试标签的书。'
-            : '备考模式：已筛选匹配「${examProfile.family!.label}」的词书。')
+            ? '备考「${examProfile.family!.label}」：暂无匹配标签，先显示全部。'
+            : '备考模式：已筛选「${examProfile.family!.label}」')
         : '';
 
     return PadScaffold(
       currentDestination: AppNavDestination.words,
       showContinueLearning: false,
-      topBar: PadTopBar(
-        title: '学习书库',
-        description: examHint.isNotEmpty
-            ? examHint
-            : switch (_kind) {
-                SyllabusBookKind.pattern =>
-                  '从云端下载句型书到本地后练习；也可导入自建句型表。',
-                SyllabusBookKind.foundation =>
-                  '从云端下载音标/拼读书到本地后练习；也可导入自建表。',
-                SyllabusBookKind.word =>
-                  '从云端下载词书到本地后背词；也可导入或开源词库。',
-              },
-        leading: PadBackButton(onPressed: () => context.pop()),
-        actions: <Widget>[
-          TextButton.icon(
-            onPressed: () => context.push(
-              '/words/syllabus/cloud?tab=${Uri.encodeComponent(_kind.storageName)}',
-            ),
-            icon: const Icon(Icons.cloud_download_outlined),
-            label: const Text('云端书库'),
-          ),
-          TextButton.icon(
-            onPressed: () => unawaited(_import(context)),
-            icon: const Icon(Icons.upload_file_rounded),
-            label: Text(switch (_kind) {
-              SyllabusBookKind.pattern => '导入句型',
-              SyllabusBookKind.foundation => '导入',
-              SyllabusBookKind.word => '导入',
-            }),
-          ),
-        ],
-      ),
-      body: !state.ready
-          ? const Center(child: CircularProgressIndicator())
-          : ListView(
-              padding: const EdgeInsets.all(20),
-              children: <Widget>[
-                PillSegmentedControl<SyllabusBookKind>(
-                  value: _kind,
-                  options: const <SegmentOption<SyllabusBookKind>>[
-                    SegmentOption<SyllabusBookKind>(
-                      value: SyllabusBookKind.word,
-                      label: '词书',
-                    ),
-                    SegmentOption<SyllabusBookKind>(
-                      value: SyllabusBookKind.pattern,
-                      label: '句型书',
-                    ),
-                    SegmentOption<SyllabusBookKind>(
-                      value: SyllabusBookKind.foundation,
-                      label: '零基础',
-                    ),
-                  ],
-                  onValueChanged: (SyllabusBookKind value) {
-                    setState(() => _kind = value);
-                  },
-                ),
-                const SizedBox(height: 16),
-                Text(
-                  switch (_kind) {
-                    SyllabusBookKind.pattern =>
-                      '正式书本在服务器托管；下载后出现在本列表，也可导入 CSV/TXT。',
-                    SyllabusBookKind.foundation =>
-                      '正式书本在服务器托管；下载后出现在本列表，也可导入自建表。',
-                    SyllabusBookKind.word =>
-                      '正式词书在服务器托管；下载后离线可用。开源词库与 CSV/TXT 导入仍可用。',
-                  },
-                  style: const TextStyle(height: 1.5, color: Color(0xFF626262)),
-                ),
-                const SizedBox(height: 12),
-                FilledButton.tonalIcon(
-                  onPressed: () => context.push(
-                    '/words/syllabus/cloud?tab=${Uri.encodeComponent(_kind.storageName)}',
-                  ),
-                  icon: const Icon(Icons.cloud_download_outlined),
-                  label: Text(switch (_kind) {
-                    SyllabusBookKind.pattern => '浏览并下载句型书',
-                    SyllabusBookKind.foundation => '浏览并下载零基础书',
-                    SyllabusBookKind.word => '浏览并下载词书',
-                  }),
-                ),
-                if (_kind == SyllabusBookKind.word) ...<Widget>[
-                  const SizedBox(height: 8),
-                  OutlinedButton.icon(
-                    onPressed: () => context.push('/words/syllabus/catalog'),
-                    icon: const Icon(Icons.public_outlined),
-                    label: const Text('更多开源词库（lilinji）'),
-                  ),
-                ],
-                const SizedBox(height: 16),
-                if (books.isEmpty)
-                  Padding(
-                    padding: const EdgeInsets.only(top: 40),
-                    child: Center(
-                      child: Text(
-                        isPattern
-                            ? '本地暂无句型书，请先从云端下载或导入。'
-                            : isFoundation
-                            ? '本地暂无零基础书，请先从云端下载或导入。'
-                            : '本地暂无词书，请先从云端下载或导入。',
+      backgroundColor: theme.canvas,
+      body: SafeArea(
+        bottom: false,
+        child: !state.ready
+            ? const Center(child: CircularProgressIndicator())
+            : CustomScrollView(
+                slivers: <Widget>[
+                  SliverToBoxAdapter(
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(20, 12, 12, 0),
+                      child: Row(
+                        children: <Widget>[
+                          IconButton(
+                            onPressed: () => context.pop(),
+                            icon: Icon(
+                              Icons.arrow_back_ios_new_rounded,
+                              size: 20,
+                              color: theme.accent,
+                            ),
+                          ),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: <Widget>[
+                                Text(
+                                  '词书',
+                                  style: TextStyle(
+                                    fontFamily: 'serif',
+                                    fontSize: 28,
+                                    fontWeight: FontWeight.w800,
+                                    letterSpacing: 2,
+                                    color: theme.title,
+                                  ),
+                                ),
+                                Text(
+                                  examHint.isNotEmpty
+                                      ? examHint
+                                      : '封面朝外 · 选一本开始背',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: theme.subtitle,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          IconButton(
+                            tooltip: '云端书库',
+                            onPressed: () => context.push(
+                              '/words/syllabus/cloud?tab=${Uri.encodeComponent(_kind.storageName)}',
+                            ),
+                            icon: Icon(
+                              Icons.cloud_download_outlined,
+                              color: theme.accent,
+                            ),
+                          ),
+                          IconButton(
+                            tooltip: '导入',
+                            onPressed: () => unawaited(_import(context)),
+                            icon: Icon(
+                              Icons.upload_file_rounded,
+                              color: theme.accent,
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                   ),
-                for (final SyllabusBook book in books) ...<Widget>[
-                  _BookCard(
-                    book: book,
-                    learned: state.learnedCount(book.id),
-                    active: state.activeBookId == book.id,
-                    onOpen: () => unawaited(_selectBook(book)),
-                    onStart: () => _startBook(context, book),
-                    onDelete: book.builtin
-                        ? null
-                        : () => unawaited(
-                            ref
-                                .read(syllabusBooksProvider.notifier)
-                                .deleteImported(book.id),
+                  SliverToBoxAdapter(
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(20, 16, 20, 8),
+                      child: PillSegmentedControl<SyllabusBookKind>(
+                        value: _kind,
+                        options: const <SegmentOption<SyllabusBookKind>>[
+                          SegmentOption<SyllabusBookKind>(
+                            value: SyllabusBookKind.word,
+                            label: '词书',
                           ),
+                          SegmentOption<SyllabusBookKind>(
+                            value: SyllabusBookKind.pattern,
+                            label: '句型书',
+                          ),
+                          SegmentOption<SyllabusBookKind>(
+                            value: SyllabusBookKind.foundation,
+                            label: '零基础',
+                          ),
+                        ],
+                        onValueChanged: (SyllabusBookKind value) {
+                          setState(() => _kind = value);
+                        },
+                      ),
+                    ),
                   ),
-                  const SizedBox(height: 12),
+                  SliverToBoxAdapter(
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(24, 12, 24, 8),
+                      child: Text(
+                        '我的书架',
+                        style: TextStyle(
+                          fontFamily: 'serif',
+                          fontSize: 16,
+                          fontWeight: FontWeight.w800,
+                          color: theme.title,
+                        ),
+                      ),
+                    ),
+                  ),
+                  SliverToBoxAdapter(
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 14),
+                      child: _MyShelf(
+                        theme: theme,
+                        books: books,
+                        state: state,
+                        emptyLabel: isPattern
+                            ? '本地暂无句型书'
+                            : isFoundation
+                            ? '本地暂无零基础书'
+                            : '本地暂无词书，去开源词库挑一本',
+                        onOpen: (SyllabusBook book) =>
+                            unawaited(_selectBook(book)),
+                        onStart: (SyllabusBook book) =>
+                            _startBook(context, book),
+                        onDelete: (SyllabusBook book) =>
+                            unawaited(_confirmDelete(book)),
+                      ),
+                    ),
+                  ),
+                  if (_kind == SyllabusBookKind.word) ...<Widget>[
+                    SliverToBoxAdapter(
+                      child: Padding(
+                        padding: const EdgeInsets.fromLTRB(24, 22, 24, 4),
+                        child: Text(
+                          '开源词库',
+                          style: TextStyle(
+                            fontFamily: 'serif',
+                            fontSize: 16,
+                            fontWeight: FontWeight.w800,
+                            color: theme.title,
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SliverToBoxAdapter(
+                      child: Padding(
+                        padding: EdgeInsets.fromLTRB(24, 0, 24, 10),
+                        child: Text(
+                          '按分类浏览，下载后出现在书架',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: Color(0xFF8A6D4E),
+                          ),
+                        ),
+                      ),
+                    ),
+                    SliverPadding(
+                      padding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
+                      sliver: SliverGrid(
+                        gridDelegate:
+                            const SliverGridDelegateWithFixedCrossAxisCount(
+                          crossAxisCount: 2,
+                          mainAxisSpacing: 12,
+                          crossAxisSpacing: 12,
+                          childAspectRatio: 1.85,
+                        ),
+                        delegate: SliverChildBuilderDelegate(
+                          (BuildContext context, int index) {
+                            const List<LilinjiCategory> featured =
+                                <LilinjiCategory>[
+                              LilinjiCategory(
+                                path: '2.中考',
+                                title: '中考',
+                                tag: 'ZK',
+                              ),
+                              LilinjiCategory(
+                                path: '3.四级',
+                                title: '四级 CET-4',
+                                tag: 'CET4',
+                              ),
+                              LilinjiCategory(
+                                path: '7.雅思',
+                                title: '雅思 IELTS',
+                                tag: 'IELTS',
+                              ),
+                              LilinjiCategory(
+                                path: '',
+                                title: '全部开源',
+                                tag: 'ALL',
+                              ),
+                            ];
+                            final LilinjiCategory cat = featured[index];
+                            return Material(
+                              color: theme.card,
+                              borderRadius: BorderRadius.circular(14),
+                              child: InkWell(
+                                borderRadius: BorderRadius.circular(14),
+                                onTap: () {
+                                  if (cat.path.isEmpty) {
+                                    context.push('/words/syllabus/catalog');
+                                  } else {
+                                    context.push(
+                                      '/words/syllabus/catalog?path=${Uri.encodeComponent(cat.path)}',
+                                    );
+                                  }
+                                },
+                                child: Padding(
+                                  padding: const EdgeInsets.fromLTRB(
+                                    16,
+                                    14,
+                                    12,
+                                    12,
+                                  ),
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: <Widget>[
+                                      Text(
+                                        cat.title,
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: TextStyle(
+                                          fontFamily: 'serif',
+                                          fontSize: 16,
+                                          fontWeight: FontWeight.w800,
+                                          color: theme.title,
+                                        ),
+                                      ),
+                                      const Spacer(),
+                                      Text(
+                                        cat.path.isEmpty
+                                            ? '更多分类…'
+                                            : '${cat.tag} · 打开书架',
+                                        style: TextStyle(
+                                          fontSize: 12,
+                                          color: theme.subtitle,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            );
+                          },
+                          childCount: 4,
+                        ),
+                      ),
+                    ),
+                  ],
+                  SliverToBoxAdapter(
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(20, 12, 20, 36),
+                      child: FilledButton(
+                        style: FilledButton.styleFrom(
+                          backgroundColor: theme.accent,
+                          foregroundColor: theme.onAccent,
+                          minimumSize: const Size.fromHeight(52),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(14),
+                          ),
+                        ),
+                        onPressed: () => context.push(
+                          '/words/syllabus/cloud?tab=${Uri.encodeComponent(_kind.storageName)}',
+                        ),
+                        child: Text(
+                          switch (_kind) {
+                            SyllabusBookKind.pattern => '云端正式句型书',
+                            SyllabusBookKind.foundation => '云端正式零基础书',
+                            SyllabusBookKind.word => '云端正式词书',
+                          },
+                        ),
+                      ),
+                    ),
+                  ),
                 ],
-              ],
-            ),
+              ),
+      ),
     );
   }
 }
 
-class _BookCard extends StatelessWidget {
-  const _BookCard({
+class _MyShelf extends StatelessWidget {
+  const _MyShelf({
+    required this.theme,
+    required this.books,
+    required this.state,
+    required this.emptyLabel,
+    required this.onOpen,
+    required this.onStart,
+    required this.onDelete,
+  });
+
+  final WordBookLibraryTheme theme;
+  final List<SyllabusBook> books;
+  final SyllabusBooksState state;
+  final String emptyLabel;
+  final ValueChanged<SyllabusBook> onOpen;
+  final ValueChanged<SyllabusBook> onStart;
+  final ValueChanged<SyllabusBook> onDelete;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        color: theme.wood,
+        borderRadius: BorderRadius.circular(14),
+      ),
+      padding: const EdgeInsets.fromLTRB(12, 16, 12, 12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: <Widget>[
+          Container(
+            constraints: const BoxConstraints(minHeight: 168),
+            decoration: BoxDecoration(
+              color: theme.woodInner,
+              borderRadius: BorderRadius.circular(10),
+            ),
+            padding: const EdgeInsets.fromLTRB(14, 16, 14, 14),
+            child: books.isEmpty
+                ? Center(
+                    child: Text(
+                      emptyLabel,
+                      style: TextStyle(color: theme.chip, fontSize: 13),
+                    ),
+                  )
+                : SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      children: <Widget>[
+                        for (int i = 0; i < books.length; i++) ...<Widget>[
+                          if (i > 0) const SizedBox(width: 14),
+                          _ShelfBook(
+                            book: books[i],
+                            learned: state.learnedCount(books[i].id),
+                            active: state.activeBookId == books[i].id,
+                            onOpen: () => onOpen(books[i]),
+                            onStart: () => onStart(books[i]),
+                            onDelete: books[i].builtin
+                                ? null
+                                : () => onDelete(books[i]),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+          ),
+          const SizedBox(height: 10),
+          Text(
+            books.isEmpty
+                ? '书架空着 · 从下方开源词库或云端下载'
+                : '${books.length} 本 · 点封面继续背',
+            style: TextStyle(color: theme.chip, fontSize: 11),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ShelfBook extends StatelessWidget {
+  const _ShelfBook({
     required this.book,
     required this.learned,
     required this.active,
@@ -308,102 +563,50 @@ class _BookCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final int remaining = (book.wordCount - learned).clamp(0, book.wordCount);
-    final double progress = book.wordCount == 0 ? 0 : learned / book.wordCount;
-    final String unit = switch (book.kind) {
-      SyllabusBookKind.pattern => '句型',
-      SyllabusBookKind.foundation => '条目',
-      SyllabusBookKind.word => '词',
-    };
-    return Material(
-      color: AppDesignTokens.appWhite,
-      borderRadius: BorderRadius.circular(20),
-      child: InkWell(
-        onTap: onOpen,
-        borderRadius: BorderRadius.circular(20),
-        child: Container(
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(20),
-            border: Border.all(
-              color: active
-                  ? AppDesignTokens.brandGreenDark
-                  : AppDesignTokens.borderGray,
-              width: active ? 2 : 1,
+    final int pct = book.wordCount == 0
+        ? 0
+        : ((learned / book.wordCount) * 100).round();
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: <Widget>[
+        WordBookCover(
+          title: book.title,
+          badge: book.examTag.isEmpty ? 'WORD' : book.examTag,
+          progressLabel: book.wordCount == 0 ? '' : '$pct%',
+          selected: active,
+          onTap: onOpen,
+        ),
+        const SizedBox(height: 8),
+        SizedBox(
+          width: 86,
+          child: FilledButton(
+            onPressed: onStart,
+            style: FilledButton.styleFrom(
+              backgroundColor: const Color(0xFFF2E6DA),
+              foregroundColor: const Color(0xFF3A2212),
+              padding: const EdgeInsets.symmetric(vertical: 6),
+              minimumSize: const Size(0, 32),
+              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              textStyle: const TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w800,
+              ),
             ),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: <Widget>[
-              Row(
-                children: <Widget>[
-                  Expanded(
-                    child: Text(
-                      book.title,
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.w900,
-                        color: AppDesignTokens.textPrimary,
-                      ),
-                    ),
-                  ),
-                  Chip(
-                    label: Text(book.examTag),
-                    visualDensity: VisualDensity.compact,
-                  ),
-                  if (onDelete != null)
-                    IconButton(
-                      tooltip: book.isPatternBook ? '删除导入句型书' : '删除导入词书',
-                      onPressed: onDelete,
-                      icon: const Icon(Icons.delete_outline_rounded),
-                    ),
-                ],
-              ),
-              const SizedBox(height: 6),
-              Text(
-                book.disclaimer.isEmpty
-                    ? '共 ${book.wordCount} $unit · 已学 $learned · 剩余 $remaining'
-                    : '${book.disclaimer}\n共 ${book.wordCount} $unit · 已学 $learned · 剩余 $remaining',
-                style: const TextStyle(
-                  height: 1.45,
-                  color: Color(0xFF626262),
-                  fontSize: 13,
-                ),
-              ),
-              const SizedBox(height: 10),
-              ClipRRect(
-                borderRadius: BorderRadius.circular(99),
-                child: LinearProgressIndicator(
-                  value: progress.clamp(0.0, 1.0),
-                  minHeight: 8,
-                  backgroundColor: const Color(0xFFE8E8E8),
-                  color: AppDesignTokens.brandGreenDark,
-                ),
-              ),
-              const SizedBox(height: 12),
-              SizedBox(
-                width: double.infinity,
-                child: FilledButton.icon(
-                  onPressed: onStart,
-                  icon: const Icon(Icons.play_arrow_rounded),
-                  label: Text(
-                    remaining == 0
-                        ? '再练一轮'
-                        : switch (book.kind) {
-                            SyllabusBookKind.pattern => '开始练这本',
-                            SyllabusBookKind.foundation => '开始练这本',
-                            SyllabusBookKind.word => '开始背这本',
-                          },
-                  ),
-                  style: FilledButton.styleFrom(
-                    backgroundColor: AppDesignTokens.brandGreenDark,
-                    foregroundColor: Colors.white,
-                  ),
-                ),
-              ),
-            ],
+            child: Text(remaining == 0 ? '再练' : '开始'),
           ),
         ),
-      ),
+        if (onDelete != null)
+          IconButton(
+            tooltip: '删除',
+            visualDensity: VisualDensity.compact,
+            onPressed: onDelete,
+            icon: const Icon(
+              Icons.delete_outline_rounded,
+              size: 18,
+              color: Color(0xFFE6CFAE),
+            ),
+          ),
+      ],
     );
   }
 }
