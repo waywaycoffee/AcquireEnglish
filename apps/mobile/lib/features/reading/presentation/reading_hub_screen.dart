@@ -258,7 +258,7 @@ class ReadingHubScreen extends ConsumerWidget {
       body: !state.ready
           ? const Center(child: CircularProgressIndicator())
           : ListView(
-              padding: const EdgeInsets.all(20),
+              padding: const EdgeInsets.fromLTRB(20, 20, 20, 100),
               children: <Widget>[
                 Builder(
                   builder: (BuildContext context) {
