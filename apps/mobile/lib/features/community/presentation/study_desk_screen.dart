@@ -34,8 +34,10 @@ class _StudyDeskScreenState extends ConsumerState<StudyDeskScreen>
   int _days = 7;
   int _generation = 0;
   bool _busy = false;
+  bool _inviteExpanded = false;
   final TextEditingController _invite = TextEditingController();
   final TextEditingController _search = TextEditingController();
+  final GlobalKey _inviteSectionKey = GlobalKey();
 
   @override
   void initState() {
@@ -257,9 +259,18 @@ class _StudyDeskScreenState extends ConsumerState<StudyDeskScreen>
     final Map<String, dynamic>? peer = _desk?['peer'] as Map<String, dynamic>?;
     final Map<String, dynamic> sharing =
         (_desk?['sharing'] as Map<String, dynamic>?) ?? <String, dynamic>{};
+    final CafeProgress progress =
+        ref.watch(cafeProgressProvider).asData?.value ??
+            const CafeProgress(
+              profile: 'guest',
+              completed: <int>{},
+              weekLevels: <int>{},
+            );
     return Scaffold(
-      backgroundColor: AppDesignTokens.softWhite,
+      backgroundColor: const Color(0xFFF7F1E8),
       appBar: AppBar(
+        backgroundColor: AdventurePalette.cafeWarm,
+        foregroundColor: Colors.white,
         title: const Text('学习桌'),
         actions: <Widget>[
           IconButton(
@@ -274,311 +285,385 @@ class _StudyDeskScreenState extends ConsumerState<StudyDeskScreen>
           : RefreshIndicator(
               onRefresh: _load,
               child: ListView(
-                padding: const EdgeInsets.all(16),
+                padding: EdgeInsets.zero,
                 physics: const AlwaysScrollableScrollPhysics(),
                 children: <Widget>[
-                  if (_busy) const LinearProgressIndicator(),
-                  if (_error != null)
-                    _card('连接失败', <Widget>[
-                      Text(_error!),
-                      TextButton(
-                        onPressed: _busy ? null : _load,
-                        child: const Text('重试'),
-                      ),
-                    ]),
-                  Builder(
-                    builder: (BuildContext context) {
-                      final CafeProgress progress =
-                          ref.watch(cafeProgressProvider).asData?.value ??
-                              const CafeProgress(
-                                profile: 'guest',
-                                completed: <int>{},
-                                weekLevels: <int>{},
-                              );
-                      return AdventureHeroBanner(
-                        chapterTitle: '街角咖啡店',
-                        stageLabel: '${progress.stageLabel} · 个人进度永久保留',
-                        progressLabel: progress.progressLabel,
-                        nodeCount: progress.nodeCount,
-                        clearedCount: progress.clearedCount,
-                        onContinue: () => Navigator.of(context).push<void>(
-                          MaterialPageRoute<void>(
-                            builder: (_) => const ExplorationMapScreen(),
-                          ),
-                        ),
-                        partnerLabel: progress.partnerLabel(
-                          hasPeer: peer != null,
-                          peerName: peer == null ? null : '${peer['name']}',
-                        ),
-                        onPartner: peer == null
-                            ? null
-                            : () => Navigator.of(context).push<void>(
-                                  MaterialPageRoute<void>(
-                                    builder: (_) => const StudyPkScreen(),
-                                  ),
-                                ),
-                      );
-                    },
-                  ),
-                  if (peer != null) ...<Widget>[
-                    const SizedBox(height: 8),
-                    _WeeklyQuestCard(
-                      onEncourage: _busy
-                          ? null
-                          : () => unawaited(_action(() async {
-                                await _request('POST', '/encourage');
-                                if (mounted) {
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    const SnackBar(
-                                      content: Text('已发送一次本周提醒（每天最多一次）'),
-                                    ),
-                                  );
-                                }
-                              })),
-                      onOpenMap: () => Navigator.of(context).push<void>(
-                        MaterialPageRoute<void>(
-                          builder: (_) => const ExplorationMapScreen(),
-                        ),
+                  if (_busy) const LinearProgressIndicator(minHeight: 2),
+                  AdventureHeroBanner(
+                    edgeToEdge: true,
+                    chapterTitle: '学习桌',
+                    chapterIndex: 1,
+                    stageLabel: peer == null
+                        ? '先闯关，再邀同桌加分'
+                        : '本周搭子 · ${peer['name']}',
+                    progressLabel: progress.weekLabel,
+                    nodeCount: progress.nodeCount,
+                    clearedCount: progress.clearedCount,
+                    onContinue: () => Navigator.of(context).push<void>(
+                      MaterialPageRoute<void>(
+                        builder: (_) => const ExplorationMapScreen(),
                       ),
                     ),
-                  ],
-                  const SizedBox(height: 12),
-                  OutlinedButton.icon(
-                    onPressed: _busy
-                        ? null
-                        : () => Navigator.of(context).push<void>(
-                              MaterialPageRoute<void>(
-                                builder: (_) => const StudyPlayScreen(),
-                              ),
-                            ),
-                    icon: const Icon(Icons.sports_martial_arts),
-                    label: const Text('打卡 · 大比武 · 背包'),
+                    partnerLabel: progress.partnerLabel(
+                      hasPeer: peer != null,
+                      peerName: peer == null ? null : '${peer['name']}',
+                    ),
                   ),
-                  const SizedBox(height: 8),
-                  if (_desk != null) ...<Widget>[
-                    _card(
-                      peer == null
-                          ? '同桌加分（可选）· 换人不丢个人关卡'
-                          : '本周搭子 · ${peer['name']}',
-                      <Widget>[
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                        children: <Widget>[
-                          AvatarPreview(
-                            loadout:
-                                ref
-                                    .watch(avatarMeProvider)
-                                    .asData
-                                    ?.value
-                                    .loadout ??
-                                <String, String>{'body': 'body.cartoon1'},
-                            height: 130,
-                          ),
-                          if (peer != null)
-                            AvatarPreview(
-                              loadout:
-                                  (peer['avatar'] as Map<String, dynamic>? ??
-                                          <String, dynamic>{})
-                                      .cast<String, String>(),
-                              height: 130,
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 14, 16, 24),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: <Widget>[
+                        if (_error != null)
+                          _card('连接失败', <Widget>[
+                            Text(_error!),
+                            TextButton(
+                              onPressed: _busy ? null : _load,
+                              child: const Text('重试'),
                             ),
-                        ],
-                      ),
-                      SelectableText('我的同桌编号：${_desk!['my_id']}'),
-                      const Text('每人一位正式同桌，双方确认后建立关系。邀请有效期24小时。'),
-                      if (peer == null) ...<Widget>[
-                        TextField(
-                          controller: _invite,
-                          keyboardType: TextInputType.number,
-                          decoration: const InputDecoration(
-                            labelText: '输入朋友的同桌编号',
+                          ]),
+                        _WeeklyQuestCard(
+                          onEncourage: peer == null || _busy
+                              ? null
+                              : () => unawaited(_action(() async {
+                                    await _request('POST', '/encourage');
+                                    if (mounted) {
+                                      ScaffoldMessenger.of(context)
+                                          .showSnackBar(
+                                        const SnackBar(
+                                          content: Text(
+                                            '已发送一次本周提醒（每天最多一次）',
+                                          ),
+                                        ),
+                                      );
+                                    }
+                                  })),
+                        ),
+                        const SizedBox(height: 12),
+                        HubChunkyButton(
+                          label: '打开地图继续冒险',
+                          onPressed: () => Navigator.of(context).push<void>(
+                            MaterialPageRoute<void>(
+                              builder: (_) => const ExplorationMapScreen(),
+                            ),
                           ),
                         ),
-                        const SizedBox(height: 8),
-                        FilledButton(
-                          onPressed: _busy
-                              ? null
-                              : () {
-                                  final int? id = int.tryParse(
-                                    _invite.text.trim(),
-                                  );
-                                  if (id == null || id <= 0) {
-                                    ScaffoldMessenger.of(context).showSnackBar(
-                                      const SnackBar(
-                                        content: Text('请输入有效的同桌编号'),
-                                      ),
-                                    );
-                                    return;
-                                  }
-                                  _action(() async {
-                                    await _request(
-                                      'POST',
-                                      '/invites',
-                                      data: <String, dynamic>{'target_id': id},
-                                    );
+                        const SizedBox(height: 14),
+                        Row(
+                          children: <Widget>[
+                            Expanded(
+                              child: DeskActionTile(
+                                label: '词汇PK',
+                                icon: Icons.sports_esports_rounded,
+                                color: AppDesignTokens.brandGreen,
+                                onTap: _busy
+                                    ? null
+                                    : () => Navigator.of(context).push<void>(
+                                          MaterialPageRoute<void>(
+                                            builder: (_) =>
+                                                const StudyPkScreen(),
+                                          ),
+                                        ),
+                              ),
+                            ),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: DeskActionTile(
+                                label: '每日打卡',
+                                icon: Icons.local_fire_department_rounded,
+                                color: AdventurePalette.pathAmber,
+                                onTap: _busy
+                                    ? null
+                                    : () => Navigator.of(context).push<void>(
+                                          MaterialPageRoute<void>(
+                                            builder: (_) =>
+                                                const StudyPlayScreen(),
+                                          ),
+                                        ),
+                              ),
+                            ),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: DeskActionTile(
+                                label: peer == null ? '邀请同桌' : '同桌管理',
+                                icon: Icons.groups_2_rounded,
+                                color: const Color(0xFF5B8DEF),
+                                onTap: () {
+                                  setState(() => _inviteExpanded = true);
+                                  WidgetsBinding.instance.addPostFrameCallback((
+                                    _,
+                                  ) {
+                                    final BuildContext? target =
+                                        _inviteSectionKey.currentContext;
+                                    if (target != null) {
+                                      Scrollable.ensureVisible(
+                                        target,
+                                        duration: const Duration(
+                                          milliseconds: 280,
+                                        ),
+                                        alignment: 0.05,
+                                      );
+                                    }
                                   });
                                 },
-                          child: const Text('发送邀请'),
-                        ),
-                      ],
-                      for (final dynamic invitation
-                          in (_desk!['invites'] as List<dynamic>))
-                        Padding(
-                          padding: const EdgeInsets.only(top: 12),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: <Widget>[
-                              Text(
-                                '${invitation['name']} · ${invitation['incoming'] == true ? '邀请你一起练' : '等待对方确认'}',
                               ),
-                              Wrap(
-                                children: <Widget>[
-                                  if (invitation['incoming'] == true)
-                                    TextButton(
+                            ),
+                          ],
+                        ),
+                        if (peer != null) ...<Widget>[
+                          const SizedBox(height: 10),
+                          Text(
+                            '同桌在线一起练 · 换人不丢你的关卡',
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w700,
+                              color: AppDesignTokens.textSecondary,
+                            ),
+                          ),
+                        ],
+                        const SizedBox(height: 18),
+                        if (_desk != null)
+                          ExpansionTile(
+                            key: ValueKey<String>(
+                              'invite-${_inviteExpanded || peer == null}',
+                            ),
+                            initiallyExpanded: peer == null || _inviteExpanded,
+                            onExpansionChanged: (bool open) {
+                              setState(() => _inviteExpanded = open);
+                            },
+                            tilePadding: EdgeInsets.zero,
+                            title: Text(
+                              peer == null
+                                  ? '邀请同桌（可选加分）'
+                                  : '同桌与共享设置',
+                              style: const TextStyle(fontWeight: FontWeight.w900),
+                            ),
+                            children: <Widget>[
+                              KeyedSubtree(
+                                key: _inviteSectionKey,
+                                child: const SizedBox.shrink(),
+                              ),
+                              _card(
+                                peer == null
+                                    ? '同桌加分 · 换人不丢个人关卡'
+                                    : '本周搭子 · ${peer['name']}',
+                                <Widget>[
+                                  Row(
+                                    mainAxisAlignment:
+                                        MainAxisAlignment.spaceEvenly,
+                                    children: <Widget>[
+                                      AvatarPreview(
+                                        loadout: ref
+                                                .watch(avatarMeProvider)
+                                                .asData
+                                                ?.value
+                                                .loadout ??
+                                            <String, String>{
+                                              'body': 'body.cartoon1',
+                                            },
+                                        height: 110,
+                                      ),
+                                      if (peer != null)
+                                        AvatarPreview(
+                                          loadout: (peer['avatar']
+                                                      as Map<String, dynamic>? ??
+                                                  <String, dynamic>{})
+                                              .cast<String, String>(),
+                                          height: 110,
+                                        ),
+                                    ],
+                                  ),
+                                  SelectableText('我的同桌编号：${_desk!['my_id']}'),
+                                  const Text(
+                                    '每人一位正式同桌，双方确认后建立。邀请有效期24小时。',
+                                  ),
+                                  if (peer == null) ...<Widget>[
+                                    TextField(
+                                      controller: _invite,
+                                      keyboardType: TextInputType.number,
+                                      decoration: const InputDecoration(
+                                        labelText: '输入朋友的同桌编号',
+                                      ),
+                                    ),
+                                    const SizedBox(height: 8),
+                                    FilledButton(
                                       onPressed: _busy
                                           ? null
-                                          : () async {
-                                              if (!await _confirm(
-                                                    '接受同桌邀请',
-                                                    '与 ${invitation['name']} 建立正式同桌关系。学习动态和收藏明细默认关闭，可在建立后分别授权。',
-                                                  ) ||
-                                                  !mounted)
+                                          : () {
+                                              final int? id = int.tryParse(
+                                                _invite.text.trim(),
+                                              );
+                                              if (id == null || id <= 0) {
+                                                ScaffoldMessenger.of(
+                                                  context,
+                                                ).showSnackBar(
+                                                  const SnackBar(
+                                                    content: Text(
+                                                      '请输入有效的同桌编号',
+                                                    ),
+                                                  ),
+                                                );
                                                 return;
-                                              await _action(() async {
+                                              }
+                                              _action(() async {
                                                 await _request(
                                                   'POST',
-                                                  '/invites/${invitation['id']}/accept',
+                                                  '/invites',
+                                                  data: <String, dynamic>{
+                                                    'target_id': id,
+                                                  },
                                                 );
                                               });
                                             },
-                                      child: const Text('接受'),
+                                      child: const Text('发送邀请'),
                                     ),
+                                  ],
+                                  for (final dynamic invitation
+                                      in (_desk!['invites'] as List<dynamic>))
+                                    Padding(
+                                      padding: const EdgeInsets.only(top: 12),
+                                      child: Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        children: <Widget>[
+                                          Text(
+                                            '${invitation['name']} · ${invitation['incoming'] == true ? '邀请你一起练' : '等待对方确认'}',
+                                          ),
+                                          Wrap(
+                                            children: <Widget>[
+                                              if (invitation['incoming'] ==
+                                                  true)
+                                                TextButton(
+                                                  onPressed: _busy
+                                                      ? null
+                                                      : () async {
+                                                          if (!await _confirm(
+                                                                '接受同桌邀请',
+                                                                '与 ${invitation['name']} 建立正式同桌关系。',
+                                                              ) ||
+                                                              !mounted) {
+                                                            return;
+                                                          }
+                                                          await _action(
+                                                            () async {
+                                                              await _request(
+                                                                'POST',
+                                                                '/invites/${invitation['id']}/accept',
+                                                              );
+                                                            },
+                                                          );
+                                                        },
+                                                  child: const Text('接受'),
+                                                ),
+                                              TextButton(
+                                                onPressed: _busy
+                                                    ? null
+                                                    : () => _action(() async {
+                                                          await _request(
+                                                            'POST',
+                                                            '/invites/${invitation['id']}/${invitation['incoming'] == true ? 'decline' : 'cancel'}',
+                                                          );
+                                                        }),
+                                                child: Text(
+                                                  invitation['incoming'] == true
+                                                      ? '婉拒'
+                                                      : '撤回',
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                ],
+                              ),
+                              if (peer != null) ...<Widget>[
+                                _card('由我决定共享什么', <Widget>[
+                                  for (final (String key, String title)
+                                      in <(String, String)>[
+                                        ('activity', '共享按天学习时长'),
+                                        ('videos', '共享近期公开视频学习记录'),
+                                        ('library', '共享收藏单词（不含私有原句）'),
+                                      ])
+                                    SwitchListTile(
+                                      contentPadding: EdgeInsets.zero,
+                                      title: Text(title),
+                                      value: sharing[key] == true,
+                                      onChanged: _busy
+                                          ? null
+                                          : (bool value) => _action(() async {
+                                                await _request(
+                                                  'PUT',
+                                                  '/sharing',
+                                                  data: <String, dynamic>{
+                                                    'share_activity':
+                                                        key == 'activity'
+                                                            ? value
+                                                            : sharing[
+                                                                    'activity'] ==
+                                                                true,
+                                                    'share_videos':
+                                                        key == 'videos'
+                                                            ? value
+                                                            : sharing[
+                                                                    'videos'] ==
+                                                                true,
+                                                    'share_library':
+                                                        key == 'library'
+                                                            ? value
+                                                            : sharing[
+                                                                    'library'] ==
+                                                                true,
+                                                  },
+                                                );
+                                              }),
+                                    ),
+                                ]),
+                                _activityCard(),
+                                _libraryCard(),
+                                _card('关系管理', <Widget>[
                                   TextButton(
                                     onPressed: _busy
                                         ? null
-                                        : () => _action(() async {
-                                            await _request(
-                                              'POST',
-                                              '/invites/${invitation['id']}/${invitation['incoming'] == true ? 'decline' : 'cancel'}',
-                                            );
-                                          }),
-                                    child: Text(
-                                      invitation['incoming'] == true
-                                          ? '婉拒'
-                                          : '撤回',
-                                    ),
+                                        : () async {
+                                            if (!await _confirm(
+                                                  '解除同桌关系',
+                                                  '双方立即停止访问同桌共享数据。',
+                                                ) ||
+                                                !mounted) {
+                                              return;
+                                            }
+                                            await _action(() async {
+                                              await _request('DELETE', '');
+                                            });
+                                          },
+                                    child: const Text('解除同桌关系'),
                                   ),
-                                ],
-                              ),
+                                  TextButton(
+                                    onPressed: _busy
+                                        ? null
+                                        : () async {
+                                            if (!await _confirm(
+                                                  '屏蔽并解除关系',
+                                                  '解除后双方无法再次互相邀请。',
+                                                ) ||
+                                                !mounted) {
+                                              return;
+                                            }
+                                            await _action(() async {
+                                              await _request('POST', '/block');
+                                            });
+                                          },
+                                    child: const Text('屏蔽并解除'),
+                                  ),
+                                ]),
+                              ],
                             ],
                           ),
-                        ),
-                    ]),
-                    if (peer != null) ...<Widget>[
-                      _card('由我决定共享什么', <Widget>[
-                        const Text('下列开关决定对方能看到我的哪些数据，不影响我查看对方已授权的数据。'),
-                        for (final (String key, String title)
-                            in <(String, String)>[
-                              ('activity', '共享按天学习时长'),
-                              ('videos', '共享近期公开视频学习记录'),
-                              ('library', '共享收藏单词（不含私有原句）'),
-                            ])
-                          SwitchListTile(
-                            contentPadding: EdgeInsets.zero,
-                            title: Text(title),
-                            value: sharing[key] == true,
-                            onChanged: _busy
-                                ? null
-                                : (bool value) => _action(() async {
-                                    await _request(
-                                      'PUT',
-                                      '/sharing',
-                                      data: <String, dynamic>{
-                                        'share_activity': key == 'activity'
-                                            ? value
-                                            : sharing['activity'] == true,
-                                        'share_videos': key == 'videos'
-                                            ? value
-                                            : sharing['videos'] == true,
-                                        'share_library': key == 'library'
-                                            ? value
-                                            : sharing['library'] == true,
-                                      },
-                                    );
-                                  }),
-                          ),
-                      ]),
-                      OutlinedButton.icon(
-                        onPressed: _busy
-                            ? null
-                            : () => _action(() async {
-                                final Map<String, dynamic> result =
-                                    await _request('POST', '/encourage');
-                                if (mounted)
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    SnackBar(
-                                      content: Text(
-                                        result['sent'] == true
-                                            ? '鼓励已送达，同一位同桌每天最多一次。'
-                                            : '今天已鼓励过，或对方关闭了通知。',
-                                      ),
-                                    ),
-                                  );
-                              }),
-                        icon: const Icon(Icons.favorite_border),
-                        label: const Text('给同桌一个鼓励'),
-                      ),
-                      _activityCard(),
-                      _libraryCard(),
-                      _card('近期单词 PK', <Widget>[
-                        const Text('从双方实际学过的共同单词中比赛，查看谁记得更多。'),
-                        FilledButton(
-                          onPressed: _busy
-                              ? null
-                              : () => Navigator.of(context).push<void>(
-                                  MaterialPageRoute<void>(
-                                    builder: (_) => const StudyPkScreen(),
-                                  ),
-                                ),
-                          child: const Text('进入单词PK'),
-                        ),
-                      ]),
-                      _card('关系管理', <Widget>[
-                        TextButton(
-                          onPressed: _busy
-                              ? null
-                              : () async {
-                                  if (!await _confirm(
-                                        '解除同桌关系',
-                                        '双方立即停止访问同桌共享数据。个人学习、收藏和装备不会被删除。',
-                                      ) ||
-                                      !mounted)
-                                    return;
-                                  await _action(() async {
-                                    await _request('DELETE', '');
-                                  });
-                                },
-                          child: const Text('解除同桌关系'),
-                        ),
-                        TextButton(
-                          onPressed: _busy
-                              ? null
-                              : () async {
-                                  if (!await _confirm(
-                                        '屏蔽并解除关系',
-                                        '解除后双方无法再次互相邀请；请谨慎操作。',
-                                      ) ||
-                                      !mounted)
-                                    return;
-                                  await _action(() async {
-                                    await _request('POST', '/block');
-                                  });
-                                },
-                          child: const Text('屏蔽并解除'),
-                        ),
-                      ]),
-                    ],
-                  ],
+                      ],
+                    ),
+                  ),
                 ],
               ),
             ),
@@ -746,11 +831,9 @@ class _StudyDeskScreenState extends ConsumerState<StudyDeskScreen>
 class _WeeklyQuestCard extends ConsumerWidget {
   const _WeeklyQuestCard({
     required this.onEncourage,
-    required this.onOpenMap,
   });
 
   final VoidCallback? onEncourage;
-  final VoidCallback onOpenMap;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -760,71 +843,61 @@ class _WeeklyQuestCard extends ConsumerWidget {
     final int peer = progress?.peerWeekCount ?? 0;
     final int target = progress?.weekTarget ?? 3;
     final bool together = progress?.together ?? false;
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(14),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: <Widget>[
-            Text(
-              together ? '本周已一起完成' : '本周共同目标（可选加分）',
-              style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 16),
-            ),
-            const SizedBox(height: 6),
-            Text(
-              '每人完成 $target 次有效练习（通关不同关卡）。换同桌不丢个人章节进度。',
-              style: TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w600,
-                color: AppDesignTokens.textSecondary,
-              ),
-            ),
-            const SizedBox(height: 10),
-            Row(
-              children: <Widget>[
-                Expanded(
-                  child: Text(
-                    '我 $me/$target',
-                    style: const TextStyle(fontWeight: FontWeight.w800),
-                  ),
-                ),
-                Expanded(
-                  child: Text(
-                    '对方 $peer/$target',
-                    style: const TextStyle(fontWeight: FontWeight.w800),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 8),
-            LinearProgressIndicator(
-              value: (me < peer ? me : peer) / target,
-              minHeight: 8,
-              borderRadius: BorderRadius.circular(8),
+    final int shown = peer > 0 ? (me < peer ? me : peer) : me;
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: AdventurePalette.pathAmber.withValues(alpha: 0.55),
+          width: 2,
+        ),
+        boxShadow: const <BoxShadow>[
+          BoxShadow(color: Color(0x22000000), offset: Offset(0, 4)),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          Text(
+            together
+                ? '本周一起通 $target 关 · 已完成'
+                : '本周一起通 $target 关 · 已完成 $shown',
+            style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 16),
+          ),
+          const SizedBox(height: 8),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(99),
+            child: LinearProgressIndicator(
+              value: (shown / target).clamp(0, 1),
+              minHeight: 10,
+              backgroundColor: const Color(0xFFFFE8B8),
               color: together
                   ? AppDesignTokens.brandGreen
                   : AdventurePalette.pathAmber,
             ),
-            const SizedBox(height: 10),
-            Row(
-              children: <Widget>[
-                Expanded(
-                  child: OutlinedButton(
-                    onPressed: onOpenMap,
-                    child: const Text('去闯关'),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: FilledButton(
-                    onPressed: together ? null : onEncourage,
-                    child: Text(together ? '已点亮' : '提醒一下'),
-                  ),
-                ),
-              ],
+          ),
+          const SizedBox(height: 8),
+          Text(
+            peer > 0 ? '我 $me/$target · 对方 $peer/$target' : '我 $me/$target（邀同桌可一起点亮）',
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w700,
+              color: AppDesignTokens.textSecondary,
+            ),
+          ),
+          if (onEncourage != null) ...<Widget>[
+            const SizedBox(height: 8),
+            Align(
+              alignment: Alignment.centerRight,
+              child: TextButton(
+                onPressed: together ? null : onEncourage,
+                child: Text(together ? '已点亮' : '提醒同桌'),
+              ),
             ),
           ],
-        ),
+        ],
       ),
     );
   }

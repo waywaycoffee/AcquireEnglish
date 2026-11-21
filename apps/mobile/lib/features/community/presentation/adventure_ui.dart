@@ -28,6 +28,9 @@ class AdventureHeroBanner extends StatelessWidget {
     this.onPartner,
     this.nodeCount = 4,
     this.clearedCount = 2,
+    this.nodeLabels,
+    this.chapterIndex = 1,
+    this.edgeToEdge = false,
   });
 
   final String chapterTitle;
@@ -38,140 +41,163 @@ class AdventureHeroBanner extends StatelessWidget {
   final VoidCallback? onPartner;
   final int nodeCount;
   final int clearedCount;
+  final List<String>? nodeLabels;
+  final int chapterIndex;
+  final bool edgeToEdge;
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.fromLTRB(16, 16, 16, 14),
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(24),
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: AppDesignTokens.isDark
-              ? const <Color>[AdventurePalette.cafeWarm, Color(0xFF12141A)]
-              : const <Color>[Color(0xFFFFF6E8), Color(0xFFFFE8C8)],
-        ),
-        boxShadow: AppDesignTokens.toyCardShadow,
-        border: Border.all(
-          color: AdventurePalette.pathAmber.withValues(alpha: 0.35),
-        ),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: <Widget>[
-          Row(
-            children: <Widget>[
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                decoration: BoxDecoration(
-                  color: AdventurePalette.pathAmber,
-                  borderRadius: BorderRadius.circular(999),
-                ),
-                child: const Text(
-                  '单人冒险',
-                  style: TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w900,
-                    color: Color(0xFF3A2A00),
-                  ),
-                ),
-              ),
-              const Spacer(),
-              Text(
-                progressLabel,
-                style: TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w700,
-                  color: AppDesignTokens.textSecondary,
-                ),
-              ),
+    final BorderRadius radius = edgeToEdge
+        ? BorderRadius.zero
+        : BorderRadius.circular(24);
+    return ClipRRect(
+      borderRadius: radius,
+      child: DecoratedBox(
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: <Color>[
+              Color(0xFF3A2C22),
+              AdventurePalette.cafeWarm,
+              AdventurePalette.nightInk,
             ],
           ),
-          const SizedBox(height: 12),
-          Text(
-            chapterTitle,
-            style: TextStyle(
-              fontSize: 22,
-              fontWeight: FontWeight.w900,
-              color: AppDesignTokens.textPrimary,
-              height: 1.15,
-            ),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            stageLabel,
-            style: TextStyle(
-              fontSize: 14,
-              fontWeight: FontWeight.w700,
-              color: AppDesignTokens.textSecondary,
-            ),
-          ),
-          const SizedBox(height: 16),
-          AdventurePathStrip(
-            nodeCount: nodeCount,
-            clearedCount: clearedCount,
-          ),
-          const SizedBox(height: 16),
-          HubChunkyButton(
-            label: '继续冒险',
-            icon: Icons.play_arrow_rounded,
-            onPressed: onContinue,
-          ),
-          if (partnerLabel != null) ...<Widget>[
-            const SizedBox(height: 10),
-            Material(
-              color: Colors.transparent,
-              child: InkWell(
-                onTap: onPartner,
-                borderRadius: BorderRadius.circular(14),
-                child: Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 12,
-                    vertical: 10,
-                  ),
-                  decoration: BoxDecoration(
-                    color: AppDesignTokens.appWhite.withValues(alpha: 0.55),
-                    borderRadius: BorderRadius.circular(14),
-                    border: Border.all(color: AppDesignTokens.borderGray),
-                  ),
-                  child: Row(
-                    children: <Widget>[
-                      Icon(
-                        Icons.groups_2_outlined,
-                        size: 18,
-                        color: AppDesignTokens.primaryBlueDark,
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Text(
-                          partnerLabel!,
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: <Widget>[
+            SizedBox(
+              height: edgeToEdge ? 168 : 132,
+              child: Stack(
+                fit: StackFit.expand,
+                children: <Widget>[
+                  CustomPaint(painter: _CafeNightPainter()),
+                  Positioned(
+                    left: 16,
+                    right: 16,
+                    bottom: 14,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: <Widget>[
+                        Text(
+                          'CHAPTER ${chapterIndex.toString().padLeft(2, '0')}',
+                          style: TextStyle(
+                            fontSize: 12,
+                            letterSpacing: 1.4,
+                            fontWeight: FontWeight.w800,
+                            color: AdventurePalette.pathAmber.withValues(
+                              alpha: 0.95,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          chapterTitle,
+                          style: const TextStyle(
+                            fontSize: 26,
+                            fontWeight: FontWeight.w900,
+                            color: Colors.white,
+                            height: 1.1,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          '$stageLabel · $progressLabel',
                           style: TextStyle(
                             fontSize: 13,
                             fontWeight: FontWeight.w700,
-                            color: AppDesignTokens.textPrimary,
+                            color: AdventurePalette.cafeGlow.withValues(
+                              alpha: 0.9,
+                            ),
                           ),
                         ),
-                      ),
-                      Text(
-                        '可选',
-                        style: TextStyle(
-                          fontSize: 11,
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 14, 16, 16),
+              child: Column(
+                children: <Widget>[
+                  AdventurePathStrip(
+                    nodeCount: nodeCount,
+                    clearedCount: clearedCount,
+                    labels: nodeLabels,
+                  ),
+                  const SizedBox(height: 14),
+                  HubChunkyButton(
+                    label: '继续冒险',
+                    icon: Icons.play_arrow_rounded,
+                    onPressed: onContinue,
+                  ),
+                  if (partnerLabel != null) ...<Widget>[
+                    const SizedBox(height: 8),
+                    TextButton(
+                      onPressed: onPartner,
+                      child: Text(
+                        partnerLabel!,
+                        style: const TextStyle(
                           fontWeight: FontWeight.w800,
-                          color: AppDesignTokens.textSecondary,
+                          color: AdventurePalette.pathAmber,
                         ),
                       ),
-                    ],
-                  ),
-                ),
+                    ),
+                  ],
+                ],
               ),
             ),
           ],
-        ],
+        ),
       ),
     );
   }
+}
+
+/// Soft cafe silhouette for the adventure hero (no bundled media).
+class _CafeNightPainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    final Paint sky = Paint()
+      ..shader = const LinearGradient(
+        begin: Alignment.topCenter,
+        end: Alignment.bottomCenter,
+        colors: <Color>[Color(0xFF1B2436), Color(0xFF2A2118)],
+      ).createShader(Offset.zero & size);
+    canvas.drawRect(Offset.zero & size, sky);
+
+    final Paint building = Paint()..color = const Color(0xFF17120E);
+    final RRect cafe = RRect.fromRectAndRadius(
+      Rect.fromLTWH(size.width * 0.18, size.height * 0.28, size.width * 0.64, size.height * 0.72),
+      const Radius.circular(8),
+    );
+    canvas.drawRRect(cafe, building);
+
+    final Paint window = Paint()..color = const Color(0xFFFFD28A);
+    for (final double x in <double>[0.28, 0.44, 0.60]) {
+      canvas.drawRRect(
+        RRect.fromRectAndRadius(
+          Rect.fromLTWH(size.width * x, size.height * 0.42, size.width * 0.1, size.height * 0.18),
+          const Radius.circular(4),
+        ),
+        window,
+      );
+    }
+    canvas.drawCircle(
+      Offset(size.width * 0.78, size.height * 0.22),
+      10,
+      Paint()..color = AdventurePalette.pathAmber.withValues(alpha: 0.55),
+    );
+    canvas.drawRect(
+      Rect.fromLTWH(0, size.height * 0.88, size.width, size.height * 0.12),
+      Paint()..color = const Color(0xFF0E0C0A),
+    );
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }
 
 class AdventurePathStrip extends StatelessWidget {
@@ -180,40 +206,63 @@ class AdventurePathStrip extends StatelessWidget {
     required this.clearedCount,
     super.key,
     this.currentIndex,
+    this.labels,
   });
 
   final int nodeCount;
   final int clearedCount;
   final int? currentIndex;
+  final List<String>? labels;
 
   @override
   Widget build(BuildContext context) {
     final int current = currentIndex ?? clearedCount.clamp(0, nodeCount - 1);
     return SizedBox(
-      height: 52,
+      height: labels == null ? 52 : 72,
       child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
           for (int i = 0; i < nodeCount; i++) ...<Widget>[
             if (i > 0)
               Expanded(
-                child: Container(
-                  height: 3,
-                  margin: const EdgeInsets.symmetric(horizontal: 2),
-                  decoration: BoxDecoration(
-                    color: i <= clearedCount
-                        ? AppDesignTokens.brandGreen
-                        : AppDesignTokens.borderGray,
-                    borderRadius: BorderRadius.circular(99),
+                child: Padding(
+                  padding: const EdgeInsets.only(top: 16),
+                  child: Container(
+                    height: 3,
+                    margin: const EdgeInsets.symmetric(horizontal: 2),
+                    decoration: BoxDecoration(
+                      color: i <= clearedCount
+                          ? AppDesignTokens.brandGreen
+                          : Colors.white.withValues(alpha: 0.22),
+                      borderRadius: BorderRadius.circular(99),
+                    ),
                   ),
                 ),
               ),
-            _PathNode(
-              index: i,
-              state: i < clearedCount
-                  ? _NodeState.cleared
-                  : i == current
-                      ? _NodeState.current
-                      : _NodeState.locked,
+            Column(
+              children: <Widget>[
+                _PathNode(
+                  index: i,
+                  state: i < clearedCount
+                      ? _NodeState.cleared
+                      : i == current
+                          ? _NodeState.current
+                          : _NodeState.locked,
+                ),
+                if (labels != null && i < labels!.length) ...<Widget>[
+                  const SizedBox(height: 6),
+                  Text(
+                    labels![i],
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w800,
+                      color: i == current
+                          ? AdventurePalette.pathAmber
+                          : Colors.white.withValues(alpha: 0.75),
+                    ),
+                  ),
+                ],
+              ],
             ),
           ],
         ],
@@ -541,6 +590,60 @@ class _DashPainter extends CustomPainter {
   @override
   bool shouldRepaint(covariant _DashPainter oldDelegate) =>
       oldDelegate.fromRight != fromRight || oldDelegate.color != color;
+}
+
+/// Three equal game tiles used on the study desk (PK / check-in / invite).
+class DeskActionTile extends StatelessWidget {
+  const DeskActionTile({
+    required this.label,
+    required this.icon,
+    required this.onTap,
+    super.key,
+    this.color = AdventurePalette.pathAmber,
+  });
+
+  final String label;
+  final IconData icon;
+  final VoidCallback? onTap;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(18),
+        child: Ink(
+          height: 96,
+          decoration: BoxDecoration(
+            color: AppDesignTokens.appWhite,
+            borderRadius: BorderRadius.circular(18),
+            boxShadow: const <BoxShadow>[
+              BoxShadow(color: Color(0x33000000), offset: Offset(0, 4)),
+            ],
+            border: Border.all(color: color.withValues(alpha: 0.45), width: 2),
+          ),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: <Widget>[
+              Icon(icon, color: color, size: 28),
+              const SizedBox(height: 8),
+              Text(
+                label,
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w900,
+                  color: AppDesignTokens.textPrimary,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
 }
 
 class QuestFeedCard extends StatelessWidget {

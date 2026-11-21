@@ -18,12 +18,17 @@ class ExplorationMapScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final AsyncValue<CafeProgress> async = ref.watch(cafeProgressProvider);
+    final CafeProgress? progress = async.asData?.value;
+    final int stage = ((sharedLevel ?? progress?.nextIndex ?? 0) + 1).clamp(
+      1,
+      kCafeLevels.length,
+    );
     return Scaffold(
       backgroundColor: AdventurePalette.nightInk,
       appBar: AppBar(
         backgroundColor: AdventurePalette.cafeWarm,
         foregroundColor: Colors.white,
-        title: const Text('街角咖啡店'),
+        title: Text('街角咖啡店 · 第$stage站'),
         actions: <Widget>[
           TextButton(
             onPressed: () => Navigator.of(context).push<void>(
@@ -193,7 +198,7 @@ class _CafeMapBody extends ConsumerWidget {
                   ),
                   const SizedBox(height: 10),
                   HubChunkyButton(
-                    label: completed.contains(focus) ? '再战本关' : '开战',
+                    label: completed.contains(focus) ? '再战本关' : '开始这一关',
                     onPressed: () => _open(context, ref, focus),
                   ),
                   const SizedBox(height: 8),
