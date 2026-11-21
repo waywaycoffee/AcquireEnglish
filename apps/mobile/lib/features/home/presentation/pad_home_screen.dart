@@ -7,7 +7,7 @@ import '../../authentication/presentation/account_hub_sheet.dart';
 import '../../authentication/presentation/auth_session.dart';
 import '../../growth/presentation/growth_provider.dart';
 import '../../import_course/data/bilibili_cover_refresh.dart';
-import '../../import_course/presentation/bilibili_import_sheet.dart';
+import '../../import_course/data/bilibili_open_or_import.dart';
 import '../../library/presentation/library_catalog_provider.dart';
 import '../../library/presentation/library_mock_data.dart';
 import '../../library/presentation/widgets/library_course_poster.dart';
@@ -315,10 +315,10 @@ class DailyRecommendSection extends ConsumerWidget {
                   subtitle: Text(subtitle),
                   trailing: const Icon(Icons.download_rounded),
                   onTap: () {
-                    showBilibiliImportSheet(
+                    openBilibiliLearningOrImport(
                       context,
                       ref,
-                      initialUrl: item.watchUrl,
+                      watchUrl: item.watchUrl,
                     );
                   },
                 ),

@@ -13,6 +13,7 @@ import '../../subtitle_completion/subtitle_completion_enqueue.dart';
 import '../../subtitle_completion/subtitle_completion_scheduler.dart';
 import '../../sync/data/acquire_api_client.dart';
 import '../../sync/data/personal_import_sync.dart';
+import '../data/bilibili_collection_download.dart';
 import '../data/bilibili_course_builder.dart';
 import '../data/bilibili_import_service.dart';
 import '../domain/bilibili_import.dart';
@@ -126,6 +127,9 @@ class _BilibiliImportFormState extends ConsumerState<_BilibiliImportForm> {
       final LibraryCourseData course = buildLibraryCourseFromBilibiliImport(
         meta,
       );
+      final bool alreadyInLibrary = ref
+          .read(libraryCatalogProvider)
+          .any((LibraryCourseData item) => item.id == course.id);
       final LibraryEpisodeItem? importedEpisode = course.episodes
           .where((LibraryEpisodeItem episode) => !episode.videoMissing)
           .firstOrNull;
@@ -160,11 +164,41 @@ class _BilibiliImportFormState extends ConsumerState<_BilibiliImportForm> {
           ),
         );
       }
+      // 合集/多 P：导入成功后立刻后台下剩余集，避免永远停在「一集试看」。
+      final int pendingOthers = course.episodes
+          .where(
+            (LibraryEpisodeItem e) =>
+                e.videoMissing ||
+                (e.videoAsset ?? '').startsWith('http'),
+          )
+          .length;
+      if (pendingOthers > 0) {
+        final String cookie = ref
+            .read(learningSettingsProvider)
+            .resolvedBilibiliCookieHeader;
+        final ProviderContainer container = ProviderScope.containerOf(context);
+        unawaited(
+          downloadRemainingBilibiliEpisodes(
+            catalog: container.read(libraryCatalogProvider.notifier),
+            readCourses: () => container.read(libraryCatalogProvider),
+            courseId: course.id,
+            service: BilibiliImportService.withCookie(cookie),
+            progressNotifier: container.read(
+              bilibiliCollectionDownloadProgressProvider.notifier,
+            ),
+          ),
+        );
+      }
       final String hint = bilibiliImportSuccessHint(meta);
       final ScaffoldMessengerState messenger = ScaffoldMessenger.of(context);
-      final String success = course.episodes.length > 1
-          ? '已导入一集试看。想继续时，可在课程详情点「下载剩余各集」。'
-          : '已加入书库。$hint 缺失字幕会在课程页后台自动补全。';
+      final String success;
+      if (course.episodes.length > 1) {
+        success = alreadyInLibrary
+            ? '已补下本集；其余未下载的集正在后台继续拉取。'
+            : '已导入合集共 ${course.episodes.length} 集，正在后台下载剩余视频与字幕。';
+      } else {
+        success = '已加入书库。$hint 缺失字幕会在课程页后台自动补全。';
+      }
       Navigator.of(context).pop(importedEpisode.id);
       messenger.showSnackBar(SnackBar(content: Text(success)));
     } catch (e) {

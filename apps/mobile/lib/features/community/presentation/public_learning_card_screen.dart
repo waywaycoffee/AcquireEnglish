@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../authentication/presentation/auth_session.dart';
-import '../../import_course/presentation/bilibili_import_sheet.dart';
+import '../../import_course/data/bilibili_open_or_import.dart';
 import '../../phrases/presentation/phrase_book_provider.dart';
 import '../../sync/data/acquire_api_client.dart';
 
@@ -114,10 +114,10 @@ class _PublicLearningCardScreenState
             child: Text(_saving ? '保存中…' : '保存到我的短语库'),
           ),
           OutlinedButton(
-            onPressed: () => showBilibiliImportSheet(
+            onPressed: () => openBilibiliLearningOrImport(
               context,
               ref,
-              initialUrl: '${_card!['watch_url']}',
+              watchUrl: '${_card!['watch_url']}',
             ),
             child: const Text('导入原视频，开始学习'),
           ),

@@ -9,7 +9,7 @@ import 'package:record/record.dart';
 
 import '../../../router/app_router.dart';
 import '../../authentication/presentation/auth_session.dart';
-import '../../import_course/presentation/bilibili_import_sheet.dart';
+import '../../import_course/data/bilibili_open_or_import.dart';
 import '../../shared/presentation/pad/app_design_tokens.dart';
 import '../../sync/data/acquire_api_client.dart';
 import '../../sync/presentation/daily_feed_provider.dart';
@@ -378,11 +378,12 @@ class CommunityPostCard extends ConsumerWidget {
   Future<void> _openLink(BuildContext context, WidgetRef ref) async {
     final String? url = post.linkUrl?.trim();
     if (url == null || url.isEmpty) return;
-    final String? episodeId = await showBilibiliImportSheet(
+    final String? episodeId = await openBilibiliLearningOrImport(
       context,
       ref,
-      initialUrl: url,
-      startImmediately: true,
+      watchUrl: url,
+      startImportImmediately: true,
+      pushPlayer: false,
     );
     if (!context.mounted || episodeId == null) return;
     await context.pushNamed<void>(

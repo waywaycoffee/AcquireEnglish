@@ -9,7 +9,7 @@ import '../../shared/presentation/media/cover_image.dart';
 import '../../shared/presentation/pad/app_design_tokens.dart';
 import '../../sync/data/acquire_api_client.dart';
 import '../../sync/presentation/daily_feed_provider.dart';
-import 'bilibili_import_sheet.dart';
+import '../data/bilibili_open_or_import.dart';
 import 'recommended_bilibili_provider.dart';
 
 /// Curated Bilibili UPs + sample videos on the import / 视频学习 page.
@@ -240,10 +240,10 @@ class _CreatorCardState extends ConsumerState<_CreatorCard> {
                 borderRadius: BorderRadius.circular(12),
                 onTap: () {
                   unawaited(
-                    showBilibiliImportSheet(
+                    openBilibiliLearningOrImport(
                       context,
                       ref,
-                      initialUrl: video.watchUrl,
+                      watchUrl: video.watchUrl,
                     ),
                   );
                 },

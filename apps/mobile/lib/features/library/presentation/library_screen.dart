@@ -901,17 +901,10 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
                                     subtitleFillActive:
                                         fill != null && fill.isActive,
                                     subtitleFillProgress: fill?.progressFraction,
-                                    onTap: () {
-                                      setState(() {
-                                        selectedEpisodeId = item.id;
-                                      });
-                                      context.pushNamed(
-                                        SGRoute.player.name,
-                                        pathParameters: <String, String>{
-                                          'episodeId': item.id,
-                                        },
-                                      );
-                                    },
+                                    onTap: () => _openEpisodeForLearning(
+                                      selectedCourse,
+                                      item,
+                                    ),
                                     onViewTranscript: () =>
                                         _openTranscriptReader(
                                           selectedCourse,
@@ -1005,17 +998,10 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
                                           fill != null && fill.isActive,
                                       subtitleFillProgress:
                                           fill?.progressFraction,
-                                      onTap: () {
-                                        setState(() {
-                                          selectedEpisodeId = item.id;
-                                        });
-                                        context.pushNamed(
-                                          SGRoute.player.name,
-                                          pathParameters: <String, String>{
-                                            'episodeId': item.id,
-                                          },
-                                        );
-                                      },
+                                      onTap: () => _openEpisodeForLearning(
+                                        selectedCourse,
+                                        item,
+                                      ),
                                       onViewTranscript: () =>
                                           _openTranscriptReader(
                                             selectedCourse,
@@ -1571,6 +1557,31 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
       showDetail = true;
     });
     _maybeBackfillBilibiliEpisodeCovers(course);
+  }
+
+  void _openEpisodeForLearning(
+    LibraryCourseData course,
+    LibraryEpisodeItem item,
+  ) {
+    setState(() {
+      selectedEpisodeId = item.id;
+    });
+    final bool needDownload =
+        item.videoMissing || !isUsableLocalVideoPath(item.videoAsset);
+    if (needDownload && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            '正在打开第 ${item.numberStr} 集并下载到本地…',
+          ),
+          duration: const Duration(seconds: 2),
+        ),
+      );
+    }
+    context.pushNamed(
+      SGRoute.player.name,
+      pathParameters: <String, String>{'episodeId': item.id},
+    );
   }
 
   void _maybeBackfillBilibiliEpisodeCovers(LibraryCourseData course) {
