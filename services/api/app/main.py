@@ -20,6 +20,7 @@ from app.routers import (
     courses,
     creators,
     feed,
+    content_media,
     foundation_media,
     syllabus_books,
     imports,
@@ -94,16 +95,23 @@ app.include_router(rewards.router, prefix="/api")
 app.include_router(cosmetics.router, prefix="/api")
 app.include_router(review_sync.router, prefix="/api")
 app.include_router(foundation_media.router, prefix="/api")
+app.include_router(content_media.router, prefix="/api")
 app.include_router(syllabus_books.router, prefix="/api")
 
-# Zero-foundation IPA / phonics real-person media (uploaded, not embedded).
-_foundation_dir = Path(settings.media_cache_dir).expanduser() / "foundation"
-_foundation_dir.mkdir(parents=True, exist_ok=True)
-app.mount(
-    "/media/foundation",
-    StaticFiles(directory=str(_foundation_dir)),
-    name="foundation_media",
-)
+# Audio/video served from ECS disk only — never bundled into the mobile APK.
+# Namespaces: foundation | reading | oral | course | misc
+from app.services.content_media import ALLOWED_NAMESPACES
+
+_media_root = Path(settings.media_cache_dir).expanduser()
+_media_root.mkdir(parents=True, exist_ok=True)
+for _ns in sorted(ALLOWED_NAMESPACES):
+    _ns_dir = _media_root / _ns
+    _ns_dir.mkdir(parents=True, exist_ok=True)
+    app.mount(
+        f"/media/{_ns}",
+        StaticFiles(directory=str(_ns_dir)),
+        name=f"content_media_{_ns}",
+    )
 
 
 @app.get("/api/health")

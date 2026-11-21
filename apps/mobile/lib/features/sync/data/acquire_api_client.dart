@@ -1551,6 +1551,58 @@ class AcquireApiClient {
     return null;
   }
 
+  /// ECS content media (reading / oral / course / …). Same item shape as foundation.
+  Future<FoundationMediaManifest> contentMediaManifest({
+    String namespace = 'reading',
+    bool refresh = false,
+  }) async {
+    final Response<dynamic> response = await _dio.get(
+      Endpoints.contentMediaManifest,
+      queryParameters: <String, dynamic>{
+        'namespace': namespace,
+        if (refresh) 'refresh': true,
+      },
+    );
+    final Object? data = response.data;
+    if (data is Map<String, dynamic>) {
+      return FoundationMediaManifest.fromJson(data);
+    }
+    if (data is Map) {
+      return FoundationMediaManifest.fromJson(
+        Map<String, dynamic>.from(data),
+      );
+    }
+    return FoundationMediaManifest.empty;
+  }
+
+  Future<FoundationMediaItem?> contentMediaLookup({
+    required String bookId,
+    required String key,
+    String namespace = 'reading',
+  }) async {
+    try {
+      final Response<dynamic> response = await _dio.get(
+        Endpoints.contentMediaLookup,
+        queryParameters: <String, dynamic>{
+          'namespace': namespace,
+          'book_id': bookId,
+          'key': key,
+        },
+      );
+      final Object? data = response.data;
+      if (data is Map<String, dynamic>) {
+        return FoundationMediaItem.fromJson(data);
+      }
+      if (data is Map) {
+        return FoundationMediaItem.fromJson(Map<String, dynamic>.from(data));
+      }
+    } on DioException catch (error) {
+      if (error.response?.statusCode == 404) return null;
+      rethrow;
+    }
+    return null;
+  }
+
   Future<AcquireShareRewardResult> claimShareReward({
     required String episodeId,
     required String clientShareId,

@@ -74,13 +74,16 @@ class FoundationMediaManifest {
   /// Match syllabus entry [word] under [bookId] (tolerant key normalization).
   FoundationMediaItem? lookup(String bookId, String word) {
     final String bid = bookId.trim().toLowerCase();
-    final String want = _normKey(word);
+    final String want = normKey(word);
     for (final FoundationMediaItem item in items) {
       if (item.bookId.toLowerCase() != bid) continue;
-      if (_normKey(item.key) == want) return item;
+      if (normKey(item.key) == want) return item;
     }
     return null;
   }
+
+  /// Public key normalizer shared with reading / content media lookups.
+  static String normKey(String raw) => _normKey(raw);
 
   FoundationMediaManifest withResolvedUrls(String apiBase) {
     final Uri base = Uri.parse(apiBase.endsWith('/') ? apiBase : '$apiBase/');

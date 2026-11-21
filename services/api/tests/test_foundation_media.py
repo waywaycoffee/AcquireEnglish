@@ -1,4 +1,4 @@
-"""Foundation media service + HTTP routes."""
+"""Foundation media service + HTTP routes (wraps content_media)."""
 
 from __future__ import annotations
 
@@ -12,24 +12,14 @@ os.environ.setdefault(
 import pytest
 from httpx import ASGITransport, AsyncClient
 
+from app.config import settings
 from app.main import app
+from app.services import content_media as cm
 from app.services import foundation_media as fm
 
 
 def test_save_upload_rebuilds_manifest(tmp_path, monkeypatch):
-    monkeypatch.setattr(fm, "foundation_root", lambda: tmp_path / "foundation")
-    monkeypatch.setattr(
-        fm,
-        "media_cache_root",
-        lambda: tmp_path,
-    )
-    monkeypatch.setattr(
-        "app.services.foundation_media.settings.media_public_base",
-        "https://example.test",
-        raising=False,
-    )
-    from app.config import settings
-
+    monkeypatch.setattr(cm, "media_cache_root", lambda: tmp_path)
     monkeypatch.setattr(settings, "media_public_base", "https://example.test")
 
     saved = fm.save_upload(
@@ -47,7 +37,6 @@ def test_save_upload_rebuilds_manifest(tmp_path, monkeypatch):
         "/media/foundation/foundation_ipa_48/short-a.mp3"
     )
 
-    # video for same key
     fm.save_upload(
         book_id="foundation_ipa_48",
         key="short a",
