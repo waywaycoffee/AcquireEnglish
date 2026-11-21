@@ -171,8 +171,10 @@ reviewSourcesProvider = Provider<List<ReviewSource>>((Ref ref) {
 });
 
 ReviewSourceLink _linkFromOccurrence(WordOccurrence item) {
-  final WordContext? ctx = item.contexts.firstOrNull;
+  // Same episode/video: always bind the first (earliest) timeline hit.
+  final WordContext? ctx = item.earliestContext;
   final List<String> parts = (ctx?.lineKey ?? '').split('-');
+  final String mediaKind = item.mediaKind;
   return ReviewSourceLink(
     label: '${item.course} · ${item.episode}',
     episodeId: item.episodeId,
@@ -181,16 +183,35 @@ ReviewSourceLink _linkFromOccurrence(WordOccurrence item) {
     endMs: parts.length > 1 ? int.tryParse(parts[1]) : null,
     english: ctx?.sentence ?? item.sentence,
     chinese: ctx?.chinese ?? item.chinese,
+    mediaKind: mediaKind,
   );
+}
+
+List<ReviewSourceLink> _distinctOccurrenceLinks(WordEntry word) {
+  final Set<String> seen = <String>{};
+  final List<ReviewSourceLink> links = <ReviewSourceLink>[];
+  for (final WordOccurrence item in word.occurrences) {
+    final String dedupeKey = item.episodeId.trim().isNotEmpty
+        ? item.episodeId.trim()
+        : '${item.course.trim()}|${item.episode.trim()}';
+    if (!seen.add(dedupeKey)) continue;
+    links.add(_linkFromOccurrence(item));
+  }
+  return links;
 }
 
 ReviewSource _wordReviewSource(WordEntry word, WordPracticeMode mode) {
   final WordOccurrence? occurrence = word.occurrences.firstOrNull;
-  final WordContext? context = occurrence?.contexts.firstOrNull;
+  final WordContext? context = occurrence?.earliestContext;
   final String lineKey = context?.lineKey ?? '';
   final List<String> ms = lineKey.split('-');
   final int? startMs = ms.isNotEmpty ? int.tryParse(ms.first) : null;
   final int? endMs = ms.length > 1 ? int.tryParse(ms[1]) : null;
+  final List<ReviewSourceLink> related = _distinctOccurrenceLinks(word);
+  final String mediaKind = occurrence?.mediaKind ?? '';
+  final String rawLabel = occurrence == null
+      ? '单词本'
+      : '${occurrence.course} · ${occurrence.episode}';
   return ReviewSource(
     key: vocabFsrsKey(word.word, mode),
     kind: switch (word.kind) {
@@ -210,14 +231,11 @@ ReviewSource _wordReviewSource(WordEntry word, WordPracticeMode mode) {
         context?.chinese ??
         occurrence?.chinese ??
         '',
-    sourceLabel: occurrence == null
-        ? '单词本'
-        : '${occurrence.course} · ${occurrence.episode}',
+    sourceLabel: mediaKind.isEmpty || rawLabel == '单词本'
+        ? rawLabel
+        : '$mediaKind · $rawLabel',
     cardType: mode.name,
-    relatedSources: <ReviewSourceLink>[
-      for (final WordOccurrence item in word.occurrences)
-        _linkFromOccurrence(item),
-    ],
+    relatedSources: related,
     episodeId: occurrence?.episodeId,
     time: context?.time ?? occurrence?.time,
     startMs: startMs,

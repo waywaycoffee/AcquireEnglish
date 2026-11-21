@@ -115,6 +115,8 @@ class _DailyReviewScreenState extends ConsumerState<DailyReviewScreen>
   bool _saving = false;
   ReviewKind? _overviewKind;
   final Map<String, fsrs.Rating> _sessionRatings = <String, fsrs.Rating>{};
+  /// Per-card override: episodeId (preferred) or related source label.
+  final Map<String, String> _contextPick = <String, String>{};
 
   bool _speaking = false;
   int _speechSequence = 0;
@@ -235,7 +237,8 @@ class _DailyReviewScreenState extends ConsumerState<DailyReviewScreen>
                 (source.sourceLabel == widget.sourceLabel ||
                     source.relatedSources.any(
                       (ReviewSourceLink link) =>
-                          link.label == widget.sourceLabel,
+                          link.label == widget.sourceLabel ||
+                          link.displayLabel == widget.sourceLabel,
                     ))),
       );
     }
@@ -1430,7 +1433,20 @@ class _DailyReviewScreenState extends ConsumerState<DailyReviewScreen>
     return modes[_modeStep.clamp(0, modes.length - 1)];
   }
 
-  Widget _buildStudy(ReviewSource source, ReviewRecord record) {
+  ReviewSource _displaySource(ReviewSource source) {
+    final String? pick = _contextPick[source.key]?.trim();
+    if (pick == null || pick.isEmpty) return source;
+    final bool asEpisode = source.relatedSources.any(
+      (ReviewSourceLink link) => link.episodeId == pick,
+    );
+    return source.forContext(
+      episode: asEpisode ? pick : null,
+      label: asEpisode ? null : pick,
+    );
+  }
+
+  Widget _buildStudy(ReviewSource rawSource, ReviewRecord record) {
+    final ReviewSource source = _displaySource(rawSource);
     final WordReviewSettings options = ref.watch(wordReviewSettingsProvider);
     final bool word = source.kind == ReviewKind.word;
     final WordPracticeMode mode = _currentMode(source);
@@ -1577,6 +1593,15 @@ class _DailyReviewScreenState extends ConsumerState<DailyReviewScreen>
                 hideSentence: !_revealed &&
                     (useCloze || listenStage || contrastStage),
                 onSpeakSentence: () => _speakSource(source),
+                onSelectRelatedSource: (ReviewSourceLink link) {
+                  setState(() {
+                    final String? episode = link.episodeId?.trim();
+                    _contextPick[rawSource.key] =
+                        (episode != null && episode.isNotEmpty)
+                            ? episode
+                            : link.label;
+                  });
+                },
               ),
             ],
             const SizedBox(height: 16),

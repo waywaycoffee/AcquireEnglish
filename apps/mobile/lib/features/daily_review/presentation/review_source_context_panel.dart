@@ -27,6 +27,7 @@ class ReviewSourceContextPanel extends ConsumerStatefulWidget {
     this.speaking = false,
     this.compact = false,
     this.hideSentence = false,
+    this.onSelectRelatedSource,
     super.key,
   });
 
@@ -37,6 +38,8 @@ class ReviewSourceContextPanel extends ConsumerStatefulWidget {
   final bool compact;
   /// When true (e.g. cloze front), keep source/clip but hide the subtitle line.
   final bool hideSentence;
+  /// Switch example/frame to another distinct video/article/book hit.
+  final ValueChanged<ReviewSourceLink>? onSelectRelatedSource;
 
   @override
   ConsumerState<ReviewSourceContextPanel> createState() =>
@@ -343,29 +346,87 @@ class _ReviewSourceContextPanelState
             ],
           ),
           if (widget.source.relatedSources.length > 1) ...<Widget>[
+            const SizedBox(height: 8),
+            Text(
+              '还出现在这些出处',
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w800,
+                color: AppDesignTokens.textSecondary,
+              ),
+            ),
             const SizedBox(height: 6),
             Wrap(
               spacing: 6,
               runSpacing: 6,
               children: <Widget>[
                 for (final ReviewSourceLink link
-                    in widget.source.relatedSources.take(4))
-                  Chip(
-                    label: Text(
-                      link.label,
-                      style: const TextStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                    visualDensity: VisualDensity.compact,
-                    materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    in widget.source.relatedSources)
+                  _RelatedSourceChip(
+                    link: link,
+                    selected: _isSelectedRelated(link),
+                    onTap: widget.onSelectRelatedSource == null
+                        ? null
+                        : () => widget.onSelectRelatedSource!(link),
                   ),
               ],
             ),
           ],
         ],
       ),
+    );
+  }
+
+  bool _isSelectedRelated(ReviewSourceLink link) {
+    final String? episode = widget.source.episodeId?.trim();
+    if (episode != null &&
+        episode.isNotEmpty &&
+        link.episodeId != null &&
+        link.episodeId!.trim() == episode) {
+      return true;
+    }
+    return link.label == widget.source.sourceLabel ||
+        link.displayLabel == widget.source.sourceLabel;
+  }
+}
+
+class _RelatedSourceChip extends StatelessWidget {
+  const _RelatedSourceChip({
+    required this.link,
+    required this.selected,
+    this.onTap,
+  });
+
+  final ReviewSourceLink link;
+  final bool selected;
+  final VoidCallback? onTap;
+
+  IconData get _icon {
+    switch (link.mediaKind.trim()) {
+      case '文章':
+        return Icons.article_outlined;
+      case '书籍':
+        return Icons.menu_book_outlined;
+      case '视频':
+        return Icons.ondemand_video_outlined;
+      default:
+        return Icons.place_outlined;
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return FilterChip(
+      selected: selected,
+      showCheckmark: false,
+      avatar: Icon(_icon, size: 16),
+      label: Text(
+        link.displayLabel,
+        style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700),
+      ),
+      visualDensity: VisualDensity.compact,
+      materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+      onSelected: onTap == null ? null : (_) => onTap!(),
     );
   }
 }

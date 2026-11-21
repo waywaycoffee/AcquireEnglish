@@ -133,9 +133,7 @@ List<EpisodeWordCard> buildEpisodeWordCards({
     if (hits.isEmpty && !entry.favorite) continue;
     if (hits.isEmpty) continue;
     final WordOccurrence first = hits.first;
-    final WordContext? ctx = first.contexts.isEmpty
-        ? null
-        : first.contexts.first;
+    final WordContext? ctx = first.earliestContext;
     put(
       EpisodeWordCard(
         id: 'word:${entry.word}',

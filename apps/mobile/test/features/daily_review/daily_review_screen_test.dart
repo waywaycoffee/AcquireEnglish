@@ -185,10 +185,7 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.textContaining('视频 B'), findsWidgets);
       expect(container.read(dailyReviewProvider).records.length, 1);
-      final Finder reveal = find.byKey(const Key('daily-review-reveal'));
-      await tester.ensureVisible(reveal);
-      await tester.tap(reveal);
-      await tester.pumpAndSettle();
+      await tapVisibleKey(tester, const Key('daily-review-reveal'));
       expect(
         find.textContaining(RegExp('hello again', caseSensitive: false)),
         findsWidgets,
