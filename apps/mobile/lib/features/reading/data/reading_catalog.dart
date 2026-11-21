@@ -173,7 +173,7 @@ kStandardEbooksFeatured = <({String path, String title, String author})>[
 ];
 
 const ReadingCatalogEntry kDefaultWizardOfOzEntry = ReadingCatalogEntry(
-  id: 'standardebooks:l-frank-baum/the-wonderful-wizard-of-oz',
+  id: 'se:l-frank-baum/the-wonderful-wizard-of-oz',
   title: 'The Wonderful Wizard of Oz',
   kind: ReadingCatalogEntryKind.ebook,
   subtitle: 'L. Frank Baum · 公版奇幻长篇',
