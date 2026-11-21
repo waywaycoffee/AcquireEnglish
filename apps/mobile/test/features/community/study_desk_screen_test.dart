@@ -32,11 +32,38 @@ class FakeDeskApi extends AcquireApiClient {
     requests.add((method: method, path: path, data: data));
     if (method == 'PUT' && path == '/sharing')
       share = data!['share_library'] == true;
+    if (method == 'POST' && path == '/match') {
+      paired = true;
+      return <String, dynamic>{
+        'my_id': 1,
+        'matched': true,
+        'source': 'virtual',
+        'peer': <String, dynamic>{
+          'id': 9,
+          'name': 'Mia',
+          'virtual': true,
+        },
+        'invites': <dynamic>[],
+        'nudge': <String, dynamic>{
+          'title': '同桌学习进展',
+          'body': 'Mia 今天已学 25 分钟，追上他！',
+          'day': '2026-11-22',
+        },
+        'sharing': <String, dynamic>{
+          'activity': true,
+          'videos': false,
+          'library': false,
+        },
+      };
+    }
     if (path == '')
       return <String, dynamic>{
         'my_id': 1,
-        'peer': paired ? <String, dynamic>{'id': 2, 'name': 'Mia'} : null,
+        'peer': paired
+            ? <String, dynamic>{'id': 2, 'name': 'Mia', 'virtual': false}
+            : null,
         'invites': <dynamic>[],
+        'can_find_deskmate': !paired,
         'sharing': <String, dynamic>{
           'activity': false,
           'videos': false,
@@ -74,6 +101,7 @@ void main() {
     );
     await tester.pumpAndSettle();
     expect(find.text('我的同桌编号：1'), findsOneWidget);
+    expect(find.text('寻找同桌'), findsWidgets);
     expect(find.text('发送邀请'), findsOneWidget);
     expect(api.requests.any((r) => r.method == 'PUT'), false);
   });

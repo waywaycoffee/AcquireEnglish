@@ -14,8 +14,17 @@ from app.database import get_db
 from app.deps import get_current_user
 from app.models import (DeskInvite, DeskMember, DeskBlock, DeskLibraryWord, DeskLibrarySnapshot,
                         DeskQuestWeek, ChallengeFirstClear, ChallengeRetest, LessonProgress, User,
-                        UserLinkCourse, UserStudyStatsDaily, UserAvatarLoadout)
+                        UserLinkCourse, UserStudyStatsDaily, UserAvatarLoadout, CommunityProfile)
 from app.course_data import get_course
+from app.services.virtual_deskmate import (
+    VIRTUAL_EMAIL_PREFIX,
+    bind_desk,
+    create_virtual_user,
+    ensure_virtual_daily_stats,
+    is_virtual_email,
+    is_virtual_user,
+    peer_progress_nudge,
+)
 
 
 def no_store(response: Response):
@@ -114,17 +123,35 @@ async def _quest_row(db: AsyncSession, user_id: int, week: str, chapter: str) ->
     return await db.get(DeskQuestWeek, (user_id, week, chapter))
 
 
+async def _peer_payload(db: AsyncSession, member: DeskMember, me_id: int) -> dict:
+    other = await db.get(User, member.user_id)
+    if is_virtual_user(other):
+        await ensure_virtual_daily_stats(db, other, paired_user_id=me_id)
+    avatar_rows = (await db.execute(select(UserAvatarLoadout).where(UserAvatarLoadout.user_id == other.id))).scalars().all()
+    return {
+        'id': other.id,
+        'name': name(other),
+        'virtual': is_virtual_user(other),
+        'avatar': {r.slot: r.sku for r in avatar_rows},
+        'sharing': {
+            'activity': bool(member.share_activity),
+            'videos': bool(member.share_videos),
+            'library': bool(member.share_library),
+        },
+    }
+
+
 @router.get('')
 async def overview(user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
     me = await db.get(DeskMember, user.id)
     peer = None
+    nudge = None
     if me:
         _, member = await pair(db, user.id)
         other = await db.get(User, member.user_id)
-        avatar_rows = (await db.execute(select(UserAvatarLoadout).where(UserAvatarLoadout.user_id == other.id))).scalars().all()
-        peer = {'id': other.id, 'name': name(other), 'avatar': {r.slot: r.sku for r in avatar_rows}, 'sharing': {
-            'activity': bool(member.share_activity), 'videos': bool(member.share_videos),
-            'library': bool(member.share_library)}}
+        peer = await _peer_payload(db, member, user.id)
+        nudge = await peer_progress_nudge(db, user.id, other, member)
+        await db.commit()
     rows = (await db.execute(select(DeskInvite).where(
         or_(DeskInvite.sender_id == user.id, DeskInvite.target_id == user.id),
         DeskInvite.status == 'pending', DeskInvite.expires_at > now(),
@@ -135,11 +162,70 @@ async def overview(user: User = Depends(get_current_user), db: AsyncSession = De
         if await blocked(db, user.id, other_id):
             continue
         other = await db.get(User, other_id)
+        if other is None or is_virtual_user(other):
+            continue
         invites.append({'id': row.id, 'incoming': row.target_id == user.id,
                         'name': name(other), 'expires_at': row.expires_at})
     return {'my_id': user.id, 'peer': peer, 'invites': invites,
+            'nudge': nudge,
+            'can_find_deskmate': peer is None,
             'sharing': {'activity': bool(me and me.share_activity),
                         'videos': bool(me and me.share_videos), 'library': bool(me and me.share_library)}}
+
+
+@router.post('/match')
+async def match_deskmate(user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+    """寻找同桌：优先配对正在找搭子的真人；无人可配则分配虚拟同桌。"""
+    if await db.get(DeskMember, user.id):
+        body = await overview(user=user, db=db)
+        body['matched'] = True
+        body['source'] = 'existing'
+        return body
+
+    # Prefer real seekers who opted into looking_for_partner and have no desk yet.
+    candidates = (await db.execute(
+        select(User).join(CommunityProfile, CommunityProfile.user_id == User.id).where(
+            CommunityProfile.looking_for_partner == 1,
+            User.id != user.id,
+            ~User.email.like(f'{VIRTUAL_EMAIL_PREFIX}%'),
+        ).order_by(CommunityProfile.updated_at.asc()).limit(40)
+    )).scalars().all()
+    chosen: User | None = None
+    for candidate in candidates:
+        if is_virtual_email(candidate.email):
+            continue
+        if await db.get(DeskMember, candidate.id):
+            continue
+        if await blocked(db, user.id, candidate.id):
+            continue
+        chosen = candidate
+        break
+
+    source = 'real'
+    peer_user: User
+    if chosen is not None:
+        peer_user = chosen
+        await bind_desk(db, user.id, peer_user.id)
+        for uid in (user.id, peer_user.id):
+            profile = await db.get(CommunityProfile, uid)
+            if profile:
+                profile.looking_for_partner = 0
+    else:
+        source = 'virtual'
+        peer_user = await create_virtual_user(db, user.id)
+        await bind_desk(db, user.id, peer_user.id)
+        await ensure_virtual_daily_stats(db, peer_user, paired_user_id=user.id)
+
+    # Supersede any pending invites involving the seeker.
+    await db.execute(update(DeskInvite).where(
+        DeskInvite.status == 'pending',
+        or_(DeskInvite.sender_id == user.id, DeskInvite.target_id == user.id),
+    ).values(status='superseded'))
+    await db.commit()
+    body = await overview(user=user, db=db)
+    body['matched'] = True
+    body['source'] = source
+    return body
 
 
 @router.post('/invites', status_code=201)
@@ -215,8 +301,10 @@ async def leave(user: User = Depends(get_current_user), db: AsyncSession = Depen
     if me:
         other = (await db.execute(select(DeskMember).where(DeskMember.desk_id == me.desk_id, DeskMember.user_id != user.id))).scalar_one_or_none()
         if other:
-            from app.routers.community_social import notice
-            await notice(db, other.user_id, user.id, f'desk-left:{me.desk_id}', '对方已解除同桌关系，学习共享已停止')
+            other_user = await db.get(User, other.user_id)
+            if not is_virtual_user(other_user):
+                from app.routers.community_social import notice
+                await notice(db, other.user_id, user.id, f'desk-left:{me.desk_id}', '对方已解除同桌关系，学习共享已停止')
         await db.execute(delete(DeskMember).where(DeskMember.desk_id == me.desk_id))
         await db.commit()
     return {'status': 'left'}
@@ -234,9 +322,16 @@ async def block(user: User = Depends(get_current_user), db: AsyncSession = Depen
 @router.get('/activity')
 async def activity(days: int = Query(7, ge=1, le=30), user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
     _, peer = await pair(db, user.id)
+    peer_user = await db.get(User, peer.user_id)
+    if is_virtual_user(peer_user):
+        await ensure_virtual_daily_stats(db, peer_user, paired_user_id=user.id, days=max(days, 7))
+        await db.commit()
+        # Virtual peers always expose activity.
+        peer.share_activity = 1
     cutoff = (now() + timedelta(hours=8)).date() - timedelta(days=days - 1)
     result = {'days': days, 'summary': None, 'videos': None,
-              'data_note': '来自已同步学习记录；不作为可信奖励或比赛结算依据。'}
+              'data_note': '来自已同步学习记录；不作为可信奖励或比赛结算依据。',
+              'virtual': is_virtual_user(peer_user)}
     if peer.share_activity:
         stats = (await db.execute(select(UserStudyStatsDaily).where(
             UserStudyStatsDaily.user_id == peer.user_id, UserStudyStatsDaily.day >= str(cutoff),
@@ -312,6 +407,10 @@ async def encourage(user: User = Depends(get_current_user), db: AsyncSession = D
     from app.services.study_rewards import day_key
     from app.routers.community_social import notice
     me, peer = await pair(db, user.id)
+    peer_user = await db.get(User, peer.user_id)
+    if is_virtual_user(peer_user):
+        await db.commit()
+        return {'sent': True, 'virtual': True}
     sent = await notice(db, peer.user_id, user.id, f'encourage:{day_key()}:{user.id}', f'{name(user)}给你一个鼓励：今天也一起学一点吧！')
     await db.commit()
     return {'sent': sent}

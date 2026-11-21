@@ -9,6 +9,7 @@ import '../../avatar/presentation/avatar_shop_screen.dart';
 import '../../daily_review/presentation/daily_review_provider.dart';
 import '../../sync/data/acquire_api_client.dart';
 import '../../sync/data/study_activity_service.dart';
+import 'study_desk_screen.dart';
 
 class StudyPlayScreen extends ConsumerStatefulWidget {
   const StudyPlayScreen({super.key});
@@ -358,18 +359,37 @@ class _StudyPlayScreenState extends ConsumerState<StudyPlayScreen> {
           ]),
           _card('学习力大比武', <Widget>[
             const Text('以最近7天核验学习记录形成属性，加入±10%随机浮动。装扮不影响战斗，动画重播不重掷结果，也不发胜负积分。'),
-            if (_battles == null)
-              const Text('先建立同桌关系才能切磋。')
-            else ...<Widget>[
+            if (_battles == null || _battles!['need_deskmate'] == true) ...<Widget>[
+              const Text('还没有同桌时，先去寻找同桌（无人可配会分配练习搭子），打卡不受影响。'),
+              const SizedBox(height: 8),
+              FilledButton.tonal(
+                onPressed: _busy
+                    ? null
+                    : () => Navigator.of(context).push<void>(
+                          MaterialPageRoute<void>(
+                            builder: (_) => const StudyDeskScreen(),
+                          ),
+                        ),
+                child: const Text('去寻找同桌'),
+              ),
+            ] else ...<Widget>[
               if (_battles!['can_battle'] != true)
                 const Text('双方需在同桌页开启学习统计共享，再邀请切磋。'),
               FilledButton(
                 onPressed: _busy || _battles!['can_battle'] != true
                     ? null
                     : () => _action(() async {
-                        await _request('POST', '/battles');
+                        final Map<String, dynamic> created =
+                            await _request('POST', '/battles');
+                        if (created['status'] == 'completed' &&
+                            created['id'] != null &&
+                            mounted) {
+                          await _open(created['id'] as int);
+                        }
                       }),
-                child: const Text('向同桌发起切磋'),
+                child: Text(
+                  _battles!['peer_virtual'] == true ? '与练习搭子切磋' : '向同桌发起切磋',
+                ),
               ),
               for (final dynamic match in _battles!['matches'] as List<dynamic>)
                 ListTile(

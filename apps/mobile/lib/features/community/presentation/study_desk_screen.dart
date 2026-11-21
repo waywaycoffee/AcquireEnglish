@@ -13,6 +13,7 @@ import '../../words/presentation/word_book_provider.dart';
 import '../../shared/presentation/pad/app_design_tokens.dart';
 import '../../shared/presentation/pad/hub_ui.dart';
 import 'adventure_ui.dart';
+import 'deskmate_reminder.dart';
 import 'study_pk_screen.dart';
 import 'study_play_screen.dart';
 
@@ -123,6 +124,9 @@ class _StudyDeskScreenState extends ConsumerState<StudyDeskScreen>
         _library = library;
         _libraryError = libraryError;
       });
+      unawaited(
+        rememberDeskmateNudge(desk['nudge'] as Map<String, dynamic>?),
+      );
     } catch (error) {
       if (mounted && version == _generation)
         setState(() {
@@ -288,8 +292,8 @@ class _StudyDeskScreenState extends ConsumerState<StudyDeskScreen>
                       children: <Widget>[
                         Text(
                           peer == null
-                              ? '邀请同桌，一起练词与备考'
-                              : '本周搭子 · ${peer['name']}',
+                              ? '寻找同桌，一起练词与备考'
+                              : '本周搭子 · ${peer['name']}${peer['virtual'] == true ? '（练习搭子）' : ''}',
                           style: const TextStyle(
                             fontWeight: FontWeight.w900,
                             fontSize: 18,
@@ -297,17 +301,44 @@ class _StudyDeskScreenState extends ConsumerState<StudyDeskScreen>
                         ),
                         const SizedBox(height: 6),
                         Text(
-                          peer == null ? '尚未配对' : '同桌学习中',
+                          peer == null
+                              ? '尚未配对 · 可一键寻找'
+                              : (peer['virtual'] == true
+                                  ? '练习搭子学习中'
+                                  : '同桌学习中'),
                           style: TextStyle(
                             fontWeight: FontWeight.w600,
                             color: AppDesignTokens.textSecondary,
                           ),
                         ),
                         const SizedBox(height: 12),
-                        FilledButton.tonal(
-                          onPressed: () => context.push('/exam'),
-                          child: const Text('打开考试备考'),
-                        ),
+                        if (peer == null)
+                          FilledButton(
+                            onPressed: _busy
+                                ? null
+                                : () => _action(() async {
+                                      final Map<String, dynamic> result =
+                                          await _request('POST', '/match');
+                                      if (!mounted) return;
+                                      final String source =
+                                          '${result['source'] ?? ''}';
+                                      final String tip = source == 'real'
+                                          ? '已配对真实同桌，可以一起练了。'
+                                          : source == 'virtual'
+                                              ? '暂时没有人在找同桌，已为你分配练习搭子。'
+                                              : '同桌状态已更新。';
+                                      ScaffoldMessenger.of(context)
+                                          .showSnackBar(
+                                        SnackBar(content: Text(tip)),
+                                      );
+                                    }),
+                            child: const Text('寻找同桌'),
+                          )
+                        else
+                          FilledButton.tonal(
+                            onPressed: () => context.push('/exam'),
+                            child: const Text('打开考试备考'),
+                          ),
                       ],
                     ),
                   ),
@@ -325,6 +356,24 @@ class _StudyDeskScreenState extends ConsumerState<StudyDeskScreen>
                               child: const Text('重试'),
                             ),
                           ]),
+                        if (_desk?['nudge'] is Map)
+                          Padding(
+                            padding: const EdgeInsets.only(bottom: 12),
+                            child: Material(
+                              color: AppDesignTokens.skyLight,
+                              borderRadius: BorderRadius.circular(16),
+                              child: Padding(
+                                padding: const EdgeInsets.all(14),
+                                child: Text(
+                                  '${(_desk!['nudge'] as Map)['body']}',
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.w700,
+                                    height: 1.35,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
                         _WeeklyQuestCard(
                           hasPeer: peer != null,
                           onEncourage: peer == null || _busy
@@ -380,27 +429,32 @@ class _StudyDeskScreenState extends ConsumerState<StudyDeskScreen>
                             const SizedBox(width: 10),
                             Expanded(
                               child: DeskActionTile(
-                                label: peer == null ? '邀请同桌' : '同桌管理',
+                                label: peer == null ? '寻找同桌' : '同桌管理',
                                 icon: Icons.groups_2_rounded,
                                 color: const Color(0xFF5B8DEF),
-                                onTap: () {
-                                  setState(() => _inviteExpanded = true);
-                                  WidgetsBinding.instance.addPostFrameCallback((
-                                    _,
-                                  ) {
-                                    final BuildContext? target =
-                                        _inviteSectionKey.currentContext;
-                                    if (target != null) {
-                                      Scrollable.ensureVisible(
-                                        target,
-                                        duration: const Duration(
-                                          milliseconds: 280,
-                                        ),
-                                        alignment: 0.05,
-                                      );
-                                    }
-                                  });
-                                },
+                                onTap: peer == null
+                                    ? (_busy
+                                        ? null
+                                        : () => _action(() async {
+                                              await _request('POST', '/match');
+                                            }))
+                                    : () {
+                                        setState(() => _inviteExpanded = true);
+                                        WidgetsBinding.instance
+                                            .addPostFrameCallback((_) {
+                                          final BuildContext? target =
+                                              _inviteSectionKey.currentContext;
+                                          if (target != null) {
+                                            Scrollable.ensureVisible(
+                                              target,
+                                              duration: const Duration(
+                                                milliseconds: 280,
+                                              ),
+                                              alignment: 0.05,
+                                            );
+                                          }
+                                        });
+                                      },
                               ),
                             ),
                           ],
@@ -408,7 +462,9 @@ class _StudyDeskScreenState extends ConsumerState<StudyDeskScreen>
                         if (peer != null) ...<Widget>[
                           const SizedBox(height: 10),
                           Text(
-                            '同桌在线一起练 · 换人不丢个人进度',
+                            peer['virtual'] == true
+                                ? '练习搭子也会每天学习 · 换真人同桌不丢个人进度'
+                                : '同桌在线一起练 · 换人不丢个人进度',
                             textAlign: TextAlign.center,
                             style: TextStyle(
                               fontSize: 12,
@@ -430,7 +486,7 @@ class _StudyDeskScreenState extends ConsumerState<StudyDeskScreen>
                             tilePadding: EdgeInsets.zero,
                             title: Text(
                               peer == null
-                                  ? '邀请同桌（可选加分）'
+                                  ? '寻找或邀请同桌'
                                   : '同桌与共享设置',
                               style: const TextStyle(fontWeight: FontWeight.w900),
                             ),
@@ -441,8 +497,8 @@ class _StudyDeskScreenState extends ConsumerState<StudyDeskScreen>
                               ),
                               _card(
                                 peer == null
-                                    ? '邀请同桌 · 双方确认后建立'
-                                    : '本周搭子 · ${peer['name']}',
+                                    ? '寻找同桌 · 无人可配时自动分配练习搭子'
+                                    : '本周搭子 · ${peer['name']}${peer['virtual'] == true ? '（练习搭子）' : ''}',
                                 <Widget>[
                                   Row(
                                     mainAxisAlignment:
@@ -471,9 +527,21 @@ class _StudyDeskScreenState extends ConsumerState<StudyDeskScreen>
                                   ),
                                   SelectableText('我的同桌编号：${_desk!['my_id']}'),
                                   const Text(
-                                    '每人一位正式同桌，双方确认后建立。邀请有效期24小时。',
+                                    '可一键寻找同桌；也可输入朋友编号邀请。邀请有效期24小时。',
                                   ),
                                   if (peer == null) ...<Widget>[
+                                    FilledButton(
+                                      onPressed: _busy
+                                          ? null
+                                          : () => _action(() async {
+                                                await _request(
+                                                  'POST',
+                                                  '/match',
+                                                );
+                                              }),
+                                      child: const Text('寻找同桌'),
+                                    ),
+                                    const SizedBox(height: 8),
                                     TextField(
                                       controller: _invite,
                                       keyboardType: TextInputType.number,
@@ -482,7 +550,7 @@ class _StudyDeskScreenState extends ConsumerState<StudyDeskScreen>
                                       ),
                                     ),
                                     const SizedBox(height: 8),
-                                    FilledButton(
+                                    FilledButton.tonal(
                                       onPressed: _busy
                                           ? null
                                           : () {

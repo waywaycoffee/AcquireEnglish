@@ -16,6 +16,7 @@ from app.models import (StudyActivityClock, StudyRewardDay, StudyReviewEvidence,
                         DeskBattle, User, UserAvatarLoadout, UserReviewPoints, UserCosmeticInventory)
 from app.routers.study_desk import pair, no_store
 from app.services.study_rewards import now, aware, day_key, insert, ensure_day, grant_points
+from app.services.virtual_deskmate import ensure_virtual_daily_stats, is_virtual_user
 
 router = APIRouter(prefix='/study-play', tags=['study-play'], dependencies=[Depends(no_store)])
 
@@ -83,6 +84,11 @@ async def claim(user: User = Depends(get_current_user), db: AsyncSession = Depen
 
 async def battle_pair(db, uid):
     me, peer = await pair(db, uid)
+    peer_user = await db.get(User, peer.user_id)
+    if is_virtual_user(peer_user):
+        await ensure_virtual_daily_stats(db, peer_user, paired_user_id=uid)
+        peer.share_activity = 1
+        me.share_activity = 1
     if not (me.share_activity and peer.share_activity):
         raise HTTPException(403, '双方需先开启同桌学习统计共享')
     return me, peer
@@ -129,18 +135,39 @@ def simulate(a, b, sa, sb, seed):
 
 @router.get('/battles')
 async def battles(user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
-    me, peer = await pair(db, user.id)
+    try:
+        me, peer = await pair(db, user.id)
+    except HTTPException:
+        return {
+            'my_id': user.id,
+            'peer_id': None,
+            'can_battle': False,
+            'need_deskmate': True,
+            'matches': [],
+        }
+    peer_user = await db.get(User, peer.user_id)
+    if is_virtual_user(peer_user):
+        await ensure_virtual_daily_stats(db, peer_user, paired_user_id=user.id)
+        peer.share_activity = 1
     rows = (await db.execute(select(DeskBattle).where(DeskBattle.desk_id == me.desk_id).order_by(DeskBattle.id.desc()).limit(20))).scalars().all()
     for row in rows:
         if row.status == 'pending' and aware(row.expires_at) <= now():
             row.status, row.pending_desk_id = 'expired', None
     await db.commit()
-    return {'my_id': user.id, 'peer_id': peer.user_id, 'can_battle': bool(me.share_activity and peer.share_activity), 'matches': [{'id': r.id, 'status': r.status, 'incoming': r.target_id == user.id} for r in rows]}
+    return {
+        'my_id': user.id,
+        'peer_id': peer.user_id,
+        'peer_virtual': is_virtual_user(peer_user),
+        'can_battle': bool(me.share_activity and peer.share_activity),
+        'need_deskmate': False,
+        'matches': [{'id': r.id, 'status': r.status, 'incoming': r.target_id == user.id} for r in rows],
+    }
 
 
 @router.post('/battles', status_code=201)
 async def create_battle(user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
     me, peer = await battle_pair(db, user.id)
+    peer_user = await db.get(User, peer.user_id)
     current = (await db.execute(select(DeskBattle).where(DeskBattle.pending_desk_id == me.desk_id))).scalar_one_or_none()
     if current:
         if aware(current.expires_at) > now():
@@ -150,7 +177,28 @@ async def create_battle(user: User = Depends(get_current_user), db: AsyncSession
     count = await db.scalar(select(func.count()).select_from(DeskBattle).where(DeskBattle.sender_id == user.id, DeskBattle.created_at >= now() - timedelta(days=1)))
     if count >= 5:
         raise HTTPException(429, '每天最多发起5场切磋')
-    row = DeskBattle(desk_id=me.desk_id, pending_desk_id=me.desk_id, sender_id=user.id, target_id=peer.user_id, status='pending', seed=secrets.token_hex(16), expires_at=now() + timedelta(hours=24))
+    seed = secrets.token_hex(16)
+    # Virtual deskmate auto-accepts so 大比武 never stalls on an empty peer inbox.
+    if is_virtual_user(peer_user):
+        a, b = await stats(db, user.id), await stats(db, peer.user_id)
+        if a['minutes'] + a['words'] == 0:
+            raise HTTPException(400, '请先完成有效学习并同步记录，再进行切磋')
+        result = simulate(user.id, peer.user_id, a, b, seed)
+        result['avatars'] = await avatars(db, [user.id, peer.user_id])
+        row = DeskBattle(
+            desk_id=me.desk_id,
+            pending_desk_id=None,
+            sender_id=user.id,
+            target_id=peer.user_id,
+            status='completed',
+            seed=seed,
+            expires_at=now() + timedelta(hours=24),
+            result_json=json.dumps(result),
+        )
+        db.add(row)
+        await db.commit()
+        return {'id': row.id, 'status': 'completed', 'auto': True}
+    row = DeskBattle(desk_id=me.desk_id, pending_desk_id=me.desk_id, sender_id=user.id, target_id=peer.user_id, status='pending', seed=seed, expires_at=now() + timedelta(hours=24))
     db.add(row)
     try:
         await db.flush()

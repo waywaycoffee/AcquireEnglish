@@ -17,6 +17,7 @@ from app.deps import get_current_user
 from app.models import DeskPkPermission, DeskWordPk, DeskPkRun, DeskPkAnswer, ReviewBackup, User
 from app.routers.public_lexicon import _connect
 from app.routers.study_desk import pair, no_store, now, aware
+from app.services.virtual_deskmate import is_virtual_user
 
 router = APIRouter(prefix='/study-pk', tags=['study-pk'], dependencies=[Depends(no_store)])
 SECONDS_PER_QUESTION = 20
@@ -79,14 +80,55 @@ async def permissions(db, user_id):
     me, peer = await pair(db, user_id)
     a = await db.get(DeskPkPermission, me.user_id)
     b = await db.get(DeskPkPermission, peer.user_id)
-    return me, peer, bool(a and a.desk_id == me.desk_id and a.enabled), bool(b and b.desk_id == me.desk_id and b.enabled)
+    peer_user = await db.get(User, peer.user_id)
+    peer_ok = bool(b and b.desk_id == me.desk_id and b.enabled) or is_virtual_user(peer_user)
+    return me, peer, bool(a and a.desk_id == me.desk_id and a.enabled), peer_ok
 
 
 async def require_permission(db, user_id):
     me, peer, a, b = await permissions(db, user_id)
+    peer_user = await db.get(User, peer.user_id)
+    # Cafe / syllabus PK only needs the human's consent when peer is virtual.
+    if is_virtual_user(peer_user):
+        if not a:
+            raise HTTPException(403, '请先同意将近期已学单词用于PK（虚拟同桌已默认参加）')
+        return me, peer
     if not (a and b):
         raise HTTPException(403, '双方需分别同意将近期已学单词用于PK')
     return me, peer
+
+
+async def _auto_finish_virtual(db, row, questions: list[dict]):
+    """Fill remaining answers for a virtual peer so the match can settle."""
+    virtual_id = None
+    for uid in (row.sender_id, row.target_id):
+        u = await db.get(User, uid)
+        if is_virtual_user(u):
+            virtual_id = uid
+            break
+    if virtual_id is None:
+        return
+    run = await db.get(DeskPkRun, (row.id, virtual_id))
+    if run is None:
+        return
+    rng = random.Random(f'vpk:{row.id}:{virtual_id}')
+    while run.next_index < len(questions):
+        idx = run.next_index
+        correct_choice = questions[idx]['answer']
+        # ~70% accuracy — competitive but beatable.
+        choice = correct_choice if rng.random() < 0.7 else (correct_choice + 1) % 4
+        db.add(
+            DeskPkAnswer(
+                match_id=row.id,
+                user_id=virtual_id,
+                question_index=idx,
+                choice=choice,
+                correct=int(choice == correct_choice),
+            )
+        )
+        run.next_index = idx + 1
+        run.question_started_at = None
+    await db.flush()
 
 
 async def recent_words(db, user_id, days):
@@ -245,27 +287,40 @@ async def create(payload: CreateIn, user: User = Depends(get_current_user), db: 
         # days < 0 marks syllabus-backed matches for legacy readers
         days_marker = -1
     else:
+        peer_user_early = await db.get(User, peer.user_id)
         recent = await recent_words(db, user.id, payload.days) & await recent_words(db, peer.user_id, payload.days)
-        if len(recent) < payload.count:
+        if len(recent) < payload.count and is_virtual_user(peer_user_early):
+            # Virtual peers have no review backup — fall back to chapter bank.
+            from app.services.cafe_challenge import cafe_pk_questions
+            try:
+                questions = cafe_pk_questions(payload.count, seed=me.desk_id * 1000 + payload.count)
+            except ValueError as exc:
+                raise HTTPException(400, '可用词表不足，请改用词书单元') from exc
+            days_marker = 0
+            meta = {'fallback': 'cafe', 'reason': 'virtual_peer'}
+        elif len(recent) < payload.count:
             raise HTTPException(
                 400,
                 f'双方近{payload.days}天共同学过的词不足{payload.count}个，请同步复习记录、扩大至30天、选5题，或改用「咖啡店章节词表 / 词书单元」',
             )
-        questions = question_pool(recent)
-        if len(questions) < payload.count:
-            raise HTTPException(400, '可用释义题不足，请先学习更多共同单词或改用约定词表')
-        days_marker = payload.days
+        else:
+            questions = question_pool(recent)
+            if len(questions) < payload.count:
+                raise HTTPException(400, '可用释义题不足，请先学习更多共同单词或改用约定词表')
+            days_marker = payload.days
     packed = _pack_questions(
         questions[: payload.count],
         source=payload.source,
         meta=meta,
     )
+    peer_user = await db.get(User, peer.user_id)
+    auto_virtual = is_virtual_user(peer_user)
     row = DeskWordPk(
         desk_id=me.desk_id,
         active_desk_id=me.desk_id,
         sender_id=user.id,
         target_id=peer.user_id,
-        status='pending',
+        status='active' if auto_virtual else 'pending',
         days=days_marker,
         questions_json=packed,
         expires_at=now() + timedelta(hours=24),
@@ -273,13 +328,21 @@ async def create(payload: CreateIn, user: User = Depends(get_current_user), db: 
     db.add(row)
     try:
         await db.flush()
-        from app.routers.community_social import notice
-        await notice(db, peer.user_id, user.id, f'pk-invite:{row.id}', '同桌邀请你进行近期学习单词PK，请到一起练处理')
+        if auto_virtual:
+            db.add_all(
+                [
+                    DeskPkRun(match_id=row.id, user_id=user.id),
+                    DeskPkRun(match_id=row.id, user_id=peer.user_id),
+                ]
+            )
+        else:
+            from app.routers.community_social import notice
+            await notice(db, peer.user_id, user.id, f'pk-invite:{row.id}', '同桌邀请你进行近期学习单词PK，请到一起练处理')
         await db.commit()
     except IntegrityError:
         await db.rollback()
         raise HTTPException(409, '对局已创建，请刷新后继续')
-    return {'id': row.id}
+    return {'id': row.id, 'status': row.status, 'auto': auto_virtual}
 
 
 @router.post('/{match_id}/{action}')
@@ -366,6 +429,10 @@ async def answer(match_id: int, payload: AnswerIn, user: User = Depends(get_curr
     db.add(DeskPkAnswer(match_id=match_id, user_id=user.id, question_index=payload.index, choice=selected, correct=int(selected == questions[payload.index]['answer'])))
     try:
         await db.flush()
+        # After the human finishes, settle the virtual peer immediately.
+        human_done = (await db.get(DeskPkRun, (match_id, user.id))).next_index >= len(questions)
+        if human_done:
+            await _auto_finish_virtual(db, row, questions)
         finished = await db.scalar(select(func.count()).select_from(DeskPkRun).where(DeskPkRun.match_id == match_id, DeskPkRun.next_index == len(questions)))
         if finished == 2:
             await db.execute(update(DeskWordPk).where(DeskWordPk.id == match_id).values(status='completed', active_desk_id=None))

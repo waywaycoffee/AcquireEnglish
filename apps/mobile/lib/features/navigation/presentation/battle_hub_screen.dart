@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../community/presentation/study_desk_screen.dart';
 import '../../community/presentation/study_pk_screen.dart';
 import '../../community/presentation/study_play_screen.dart';
 import '../../shared/presentation/pad/app_design_tokens.dart';
@@ -25,13 +26,25 @@ class BattleHubScreen extends StatelessWidget {
         padding: const EdgeInsets.fromLTRB(16, 12, 16, 32),
         children: <Widget>[
           Text(
-            '和同桌比一比最近学的词，或者一起打卡大比武。',
+            '和同桌比一比最近学的词，或者一起打卡大比武。没有同桌也能先寻找练习搭子。',
             style: TextStyle(
               fontWeight: FontWeight.w700,
               color: AppDesignTokens.textSecondary,
             ),
           ),
           const SizedBox(height: 16),
+          _BattleEntryCard(
+            key: const Key('battle-hub-desk'),
+            icon: Icons.groups_2_rounded,
+            title: '寻找同桌',
+            subtitle: '优先真人配对；无人可配时分配练习搭子。',
+            onTap: () => Navigator.of(context).push<void>(
+              MaterialPageRoute<void>(
+                builder: (_) => const StudyDeskScreen(),
+              ),
+            ),
+          ),
+          const SizedBox(height: 12),
           _BattleEntryCard(
             key: const Key('battle-hub-pk'),
             icon: Icons.flash_on_rounded,

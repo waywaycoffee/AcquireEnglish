@@ -151,3 +151,36 @@ async def test_parallel_accepts_cannot_give_user_two_desks():
             members = list((await db.execute(select(DeskMember))).scalars())
             assert len(members) == 2
             assert len({m.desk_id for m in members}) == 1
+
+
+@pytest.mark.asyncio
+async def test_match_prefers_looking_partner_else_virtual():
+    async with AsyncClient(transport=ASGITransport(app=app), base_url='http://test') as client:
+        a, aid = await account(client, '13900001011')
+        b, bid = await account(client, '13900001012')
+        # No seekers → virtual deskmate.
+        matched = await client.post('/api/study-desk/match', headers=a)
+        assert matched.status_code == 200, matched.text
+        body = matched.json()
+        assert body['source'] == 'virtual'
+        assert body['peer']['virtual'] is True
+        assert body['nudge'] is not None
+        activity = await client.get('/api/study-desk/activity', headers=a)
+        assert activity.status_code == 200, activity.text
+        assert activity.json()['summary']['study_seconds'] > 0
+        battles = await client.get('/api/study-play/battles', headers=a)
+        assert battles.status_code == 200
+        assert battles.json()['need_deskmate'] is False
+        assert battles.json()['can_battle'] is True
+        # Second account looking → real match for a fresh seeker.
+        await client.put(
+            '/api/community/me',
+            headers=b,
+            json={'looking_for_partner': True},
+        )
+        c, _ = await account(client, '13900001013')
+        real = await client.post('/api/study-desk/match', headers=c)
+        assert real.status_code == 200, real.text
+        assert real.json()['source'] == 'real'
+        assert real.json()['peer']['id'] == bid
+        assert real.json()['peer']['virtual'] is False
