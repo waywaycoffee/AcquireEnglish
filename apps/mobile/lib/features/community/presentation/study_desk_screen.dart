@@ -70,6 +70,29 @@ class _StudyDeskScreenState extends ConsumerState<StudyDeskScreen>
       .read(acquireApiClientProvider)
       .studyDeskRequest(method, path, data: data, query: query);
 
+  /// Dio/JSON maps are often `Map<dynamic, dynamic>`; a hard cast crashes.
+  static Map<String, dynamic>? _asStringKeyedMap(Object? value) {
+    if (value == null) return null;
+    if (value is Map<String, dynamic>) return value;
+    if (value is Map) {
+      return <String, dynamic>{
+        for (final MapEntry<dynamic, dynamic> e in value.entries)
+          '${e.key}': e.value,
+      };
+    }
+    return null;
+  }
+
+  static Map<String, String> _avatarLoadout(Object? value) {
+    final Map<String, dynamic>? raw = _asStringKeyedMap(value);
+    if (raw == null || raw.isEmpty) {
+      return const <String, String>{'body': 'body.cartoon1'};
+    }
+    return <String, String>{
+      for (final MapEntry<String, dynamic> e in raw.entries) e.key: '${e.value}',
+    };
+  }
+
   String _message(Object error) {
     if (error is DioException && error.response?.data is Map) {
       final Object? detail =
@@ -125,7 +148,7 @@ class _StudyDeskScreenState extends ConsumerState<StudyDeskScreen>
         _libraryError = libraryError;
       });
       unawaited(
-        rememberDeskmateNudge(desk['nudge'] as Map<String, dynamic>?),
+        rememberDeskmateNudge(_asStringKeyedMap(desk['nudge'])),
       );
     } catch (error) {
       if (mounted && version == _generation)
@@ -356,7 +379,7 @@ class _StudyDeskScreenState extends ConsumerState<StudyDeskScreen>
                               child: const Text('重试'),
                             ),
                           ]),
-                        if (_desk?['nudge'] is Map)
+                        if (_asStringKeyedMap(_desk?['nudge']) != null)
                           Padding(
                             padding: const EdgeInsets.only(bottom: 12),
                             child: Material(
@@ -365,7 +388,7 @@ class _StudyDeskScreenState extends ConsumerState<StudyDeskScreen>
                               child: Padding(
                                 padding: const EdgeInsets.all(14),
                                 child: Text(
-                                  '${(_desk!['nudge'] as Map)['body']}',
+                                  '${_asStringKeyedMap(_desk?['nudge'])?['body'] ?? ''}',
                                   style: const TextStyle(
                                     fontWeight: FontWeight.w700,
                                     height: 1.35,
@@ -517,10 +540,9 @@ class _StudyDeskScreenState extends ConsumerState<StudyDeskScreen>
                                       ),
                                       if (peer != null)
                                         AvatarPreview(
-                                          loadout: (peer['avatar']
-                                                      as Map<String, dynamic>? ??
-                                                  <String, dynamic>{})
-                                              .cast<String, String>(),
+                                          loadout: _avatarLoadout(
+                                            peer['avatar'],
+                                          ),
                                           height: 110,
                                         ),
                                     ],

@@ -80,11 +80,53 @@ class _ReadingReaderScreenState extends ConsumerState<ReadingReaderScreen> {
   bool _glossLoading = false;
   double? _unknownRate;
   String _focusedSentence = '';
+  int _pageIndex = 0;
+  String? _pagedDocId;
+  List<String> _pages = const <String>[];
 
   @override
   void initState() {
     super.initState();
     _loadPrefs();
+  }
+
+  void _ensurePages(ReadingDoc doc) {
+    if (_pagedDocId == doc.id && _pages.isNotEmpty) return;
+    _pagedDocId = doc.id;
+    _pages = splitReadingPages(doc.plainText);
+    final ReadingProgress? progress = ref
+        .read(readingLibraryProvider)
+        .progressFor(doc.id);
+    if (progress != null && doc.plainText.isNotEmpty) {
+      final int offset = progress.offsetChars.clamp(0, doc.plainText.length);
+      int acc = 0;
+      int page = 0;
+      for (int i = 0; i < _pages.length; i++) {
+        acc += _pages[i].length;
+        if (offset <= acc) {
+          page = i;
+          break;
+        }
+        page = i;
+      }
+      _pageIndex = page.clamp(0, _pages.length - 1);
+    } else {
+      _pageIndex = 0;
+    }
+  }
+
+  String get _pageText {
+    if (_pages.isEmpty) return '';
+    return _pages[_pageIndex.clamp(0, _pages.length - 1)];
+  }
+
+  int get _pageBaseOffset {
+    int offset = 0;
+    final int end = _pageIndex.clamp(0, _pages.length);
+    for (int i = 0; i < end; i++) {
+      offset += _pages[i].length;
+    }
+    return offset;
   }
 
   void _loadPrefs() {
@@ -359,7 +401,9 @@ class _ReadingReaderScreenState extends ConsumerState<ReadingReaderScreen> {
         lists: lists,
         learned: learned,
       );
-      final List<String> tokens = extractReadingWordTokens(doc.plainText);
+      // Gloss against the visible page only — full novels are too large.
+      _ensurePages(doc);
+      final List<String> tokens = extractReadingWordTokens(_pageText);
       final Map<String, String> glosses = await buildHardWordGlosses(
         words: tokens.toSet(),
         lexicon: lexicon,
@@ -904,16 +948,15 @@ class _ReadingReaderScreenState extends ConsumerState<ReadingReaderScreen> {
         body: const Center(child: Text('找不到这篇读物')),
       );
     }
+    _ensurePages(doc);
     if (!_opened) {
       _opened = true;
       WidgetsBinding.instance.addPostFrameCallback((_) {
         unawaited(
           ref.read(readingLibraryProvider.notifier).touchOpened(doc.id),
         );
-        final ReadingProgress? p = library.progressFor(doc.id);
-        if (p != null && p.percent > 0 && _scroll.hasClients) {
-          final double max = _scroll.position.maxScrollExtent;
-          _scroll.jumpTo((p.percent * max).clamp(0.0, max));
+        if (_scroll.hasClients) {
+          _scroll.jumpTo(0);
         }
       });
     }
@@ -1171,10 +1214,80 @@ class _ReadingReaderScreenState extends ConsumerState<ReadingReaderScreen> {
                         ],
                       ),
                     ),
+                  if (_pages.length > 1)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 12),
+                      child: Row(
+                        children: <Widget>[
+                          TextButton(
+                            onPressed: _pageIndex <= 0
+                                ? null
+                                : () {
+                                    setState(() {
+                                      _pageIndex -= 1;
+                                      _glossDocId = null;
+                                    });
+                                    if (_scroll.hasClients) {
+                                      _scroll.jumpTo(0);
+                                    }
+                                    unawaited(_ensureGlosses(doc));
+                                    unawaited(
+                                      ref
+                                          .read(readingLibraryProvider.notifier)
+                                          .updateProgress(
+                                            docId: doc.id,
+                                            offsetChars: _pageBaseOffset,
+                                            percent: (_pageIndex + 1) /
+                                                _pages.length,
+                                          ),
+                                    );
+                                  },
+                            child: const Text('上一节'),
+                          ),
+                          Expanded(
+                            child: Text(
+                              '第 ${_pageIndex + 1} / ${_pages.length} 节',
+                              textAlign: TextAlign.center,
+                              style: TextStyle(
+                                fontWeight: FontWeight.w800,
+                                color: _dark
+                                    ? const Color(0xFF9A9AA2)
+                                    : const Color(0xFF6B6B76),
+                              ),
+                            ),
+                          ),
+                          TextButton(
+                            onPressed: _pageIndex >= _pages.length - 1
+                                ? null
+                                : () {
+                                    setState(() {
+                                      _pageIndex += 1;
+                                      _glossDocId = null;
+                                    });
+                                    if (_scroll.hasClients) {
+                                      _scroll.jumpTo(0);
+                                    }
+                                    unawaited(_ensureGlosses(doc));
+                                    unawaited(
+                                      ref
+                                          .read(readingLibraryProvider.notifier)
+                                          .updateProgress(
+                                            docId: doc.id,
+                                            offsetChars: _pageBaseOffset,
+                                            percent: (_pageIndex + 1) /
+                                                _pages.length,
+                                          ),
+                                    );
+                                  },
+                            child: const Text('下一节'),
+                          ),
+                        ],
+                      ),
+                    ),
                   Text.rich(
                     TextSpan(
                       children: buildReadingTextSpans(
-                        text: doc.plainText,
+                        text: _pageText,
                         textColor: fg,
                         fontSize: _fontSize,
                         lineHeight: _lineHeight,
@@ -1186,7 +1299,7 @@ class _ReadingReaderScreenState extends ConsumerState<ReadingReaderScreen> {
                         chunkHighlighter: chunks,
                         onWordTap: (String word, int start, int end) {
                           final String sentence = sentenceBounds(
-                            doc.plainText,
+                            _pageText,
                             start,
                             end,
                           ).text;
@@ -1202,14 +1315,14 @@ class _ReadingReaderScreenState extends ConsumerState<ReadingReaderScreen> {
                           unawaited(
                             _onSentenceLongPress(
                               doc: doc,
-                              start: start,
-                              end: end,
+                              start: _pageBaseOffset + start,
+                              end: _pageBaseOffset + end,
                             ),
                           );
                         },
                         onChunkDoubleTap: (String phrase, int start, int end) {
                           final String sentence = sentenceBounds(
-                            doc.plainText,
+                            _pageText,
                             start,
                             end,
                           ).text;
@@ -1225,8 +1338,8 @@ class _ReadingReaderScreenState extends ConsumerState<ReadingReaderScreen> {
                           unawaited(
                             _onSentenceLongPress(
                               doc: doc,
-                              start: start,
-                              end: end,
+                              start: _pageBaseOffset + start,
+                              end: _pageBaseOffset + end,
                             ),
                           );
                         },

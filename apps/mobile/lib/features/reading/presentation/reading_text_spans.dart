@@ -43,6 +43,82 @@ List<ReadingToken> tokenizeReadingText(String text) {
   return out;
 }
 
+/// Interactive word spans are expensive; long novels must be paged or the
+/// reader OOMs (looks like a crash when opening 绿野仙踪-classics).
+const int kReadingInteractivePageChars = 9000;
+
+/// Split [text] into chapter-sized pages for the interactive reader.
+List<String> splitReadingPages(
+  String text, {
+  int maxChars = kReadingInteractivePageChars,
+}) {
+  final String trimmed = text.replaceAll('\r\n', '\n').trim();
+  if (trimmed.isEmpty) return const <String>[''];
+  if (trimmed.length <= maxChars) return <String>[trimmed];
+
+  final List<String> byHeading = trimmed.split(
+    RegExp(r'\n(?=(?:Chapter|CHAPTER|Part|PART|第[一二三四五六七八九十百零〇两\d]+[章节回幕])\b)'),
+  );
+  final List<String> chunks = <String>[];
+  final StringBuffer buf = StringBuffer();
+  void flush() {
+    final String piece = buf.toString().trim();
+    if (piece.isNotEmpty) chunks.add(piece);
+    buf.clear();
+  }
+
+  void appendBlock(String block) {
+    final String piece = block.trim();
+    if (piece.isEmpty) return;
+    if (buf.isEmpty) {
+      buf.write(piece);
+      return;
+    }
+    if (buf.length + 2 + piece.length <= maxChars) {
+      buf.write('\n\n');
+      buf.write(piece);
+      return;
+    }
+    flush();
+    if (piece.length <= maxChars) {
+      buf.write(piece);
+      return;
+    }
+    // Oversized chapter: cut on paragraph / sentence boundaries.
+    int start = 0;
+    while (start < piece.length) {
+      int end = (start + maxChars).clamp(0, piece.length);
+      if (end < piece.length) {
+        final int para = piece.lastIndexOf('\n\n', end);
+        int sent = -1;
+        for (int i = end - 1; i > start + maxChars ~/ 3; i--) {
+          final String ch = piece[i];
+          if ('.!?。！？'.contains(ch)) {
+            sent = i + 1;
+            break;
+          }
+        }
+        final int cut = para > start + maxChars ~/ 3
+            ? para
+            : (sent > start + maxChars ~/ 3 ? sent : end);
+        end = cut;
+      }
+      chunks.add(piece.substring(start, end).trim());
+      start = end;
+      while (start < piece.length &&
+          (piece[start] == '\n' || piece[start] == ' ')) {
+        start++;
+      }
+    }
+  }
+
+  for (final String block in byHeading) {
+    appendBlock(block);
+  }
+  flush();
+  return chunks.isEmpty ? <String>[trimmed] : chunks;
+}
+
 /// Sentence span covering [start, end) character offsets in [text].
 ({int start, int end, String text}) sentenceBounds(String text, int start, int end) {
   int left = start.clamp(0, text.length);
