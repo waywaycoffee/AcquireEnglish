@@ -114,6 +114,16 @@
           "seed_pages": "all"
         }
       ]
+    },
+    {
+      "id": "creator-476820741",
+      "source": "bilibili",
+      "creator_id": "476820741",
+      "display_name": "小默英语",
+      "avatar_url": "https://i0.hdslb.com/bfs/baselabs/85fb232d3aaa51666291c5441be4a74b3c28deed.jpg",
+      "profile_url": "https://space.bilibili.com/476820741",
+      "blurb": "英语学习推荐博主",
+      "videos": []
     }
   ]
 }

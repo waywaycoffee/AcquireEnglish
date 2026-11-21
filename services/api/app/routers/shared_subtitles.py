@@ -120,3 +120,27 @@ async def put_shared_bilibili_subtitle(
         cue_count=result.cue_count,
         reason=result.reason,
     )
+
+
+class GpuSubtitleJobIn(BaseModel):
+    bvid: str = Field(pattern=r'^BV[0-9A-Za-z]{10}$')
+    page: int = Field(default=1, ge=1, le=9999)
+
+
+@router.post('/jobs')
+async def enqueue_gpu_subtitles(
+    payload: GpuSubtitleJobIn,
+    user: User = Depends(get_current_user),
+):
+    from app.services.gpu_subtitle_queue import enqueue
+    return enqueue(payload.bvid, payload.page)
+
+
+@router.get('/jobs/{job_id}')
+async def gpu_subtitle_status(job_id: str, user: User = Depends(get_current_user)):
+    from app.services.gpu_subtitle_queue import connection, public
+    with connection() as db:
+        row = db.execute('SELECT * FROM jobs WHERE id=?', (job_id,)).fetchone()
+        if row is None:
+            raise HTTPException(404, 'Task not found')
+        return public(row)

@@ -1787,6 +1787,14 @@ class AcquireApiClient {
         ),
       );
       if (response.statusCode == 404 || response.data == null) {
+        try {
+          await _dio.post<Object?>(
+            'api/shared-subtitles/jobs',
+            data: <String, Object>{'bvid': bvid, 'page': page},
+          );
+        } on DioException {
+          // Missing login or an offline worker must not block manual import.
+        }
         return null;
       }
       return SharedBilibiliSubtitlePack.fromJson(
