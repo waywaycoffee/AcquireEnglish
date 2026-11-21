@@ -8,12 +8,17 @@ import '../../../constants/endpoints.dart';
 import '../../authentication/presentation/account_storage.dart';
 import '../../authentication/presentation/auth_session.dart';
 import '../../daily_review/presentation/daily_review_provider.dart';
+import '../../exam/data/exam_error_book_store.dart';
+import '../../exam/domain/exam_profile.dart';
+import '../../exam/presentation/exam_profile_provider.dart';
 import '../../reading/data/reading_vocab_lists.dart';
 import '../../reading/presentation/reading_library_provider.dart';
 import '../../settings/presentation/settings_provider.dart';
 import '../../words/domain/word_review_settings.dart';
 import '../../words/presentation/word_book_provider.dart';
 import '../../words/presentation/word_review_settings_provider.dart';
+import '../../writing/data/writing_draft_store.dart';
+import '../../writing/domain/writing_models.dart';
 import 'acquire_api_client.dart';
 import 'document_revision_store.dart';
 import 'phrase_sync_service.dart';
@@ -335,6 +340,38 @@ Future<void> _syncAppSettingsBackup(
             WordReviewSettings.fromJson(Map<String, dynamic>.from(wr)),
           );
     }
+    final Object? exam = cloud.state!['examProfile'];
+    if (exam is Map && exam.isNotEmpty) {
+      await (ref.read(examProfileProvider.notifier) as ExamProfileNotifier)
+          .replaceFromCloud(
+            ExamProfile.fromJson(Map<String, dynamic>.from(exam)),
+          );
+    }
+    final Object? errors = cloud.state!['examErrorBook'];
+    if (errors is List) {
+      await (ref.read(examErrorBookProvider.notifier) as ExamErrorBookNotifier)
+          .replaceFromCloud(
+            errors
+                .whereType<Map>()
+                .map(
+                  (Map e) =>
+                      ExamErrorItem.fromJson(Map<String, dynamic>.from(e)),
+                )
+                .toList(growable: false),
+          );
+    }
+    final Object? drafts = cloud.state!['writingDrafts'];
+    if (drafts is List) {
+      await (ref.read(writingDraftsProvider.notifier) as WritingDraftStore)
+          .replaceFromCloud(
+            drafts
+                .whereType<Map>()
+                .map(
+                  (Map e) => WritingDraft.fromJson(Map<String, dynamic>.from(e)),
+                )
+                .toList(growable: false),
+          );
+    }
   }
 
   await DocumentRevisionStore.write('appSettings', account, cloud.revision);
@@ -344,6 +381,13 @@ Future<void> _syncAppSettingsBackup(
     'learningSettings': settingsNotifier.toSyncJson(),
     'wordReviewPrefs':
         (ref.read(wordReviewSettingsProvider) as WordReviewSettings).toJson(),
+    'examProfile': (ref.read(examProfileProvider) as ExamProfile).toJson(),
+    'examErrorBook': (ref.read(examErrorBookProvider) as List<ExamErrorItem>)
+        .map((ExamErrorItem e) => e.toJson())
+        .toList(growable: false),
+    'writingDrafts': (ref.read(writingDraftsProvider) as List<WritingDraft>)
+        .map((WritingDraft e) => e.toJson())
+        .toList(growable: false),
   };
 
   // If cloud was empty and local has data, or explicit push, upload.

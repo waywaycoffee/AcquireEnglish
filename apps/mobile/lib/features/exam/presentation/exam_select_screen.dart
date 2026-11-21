@@ -118,6 +118,19 @@ class _ExamSelectScreenState extends ConsumerState<ExamSelectScreen> {
                   },
             child: const Text('进入备考模式'),
           ),
+          const SizedBox(height: 10),
+          OutlinedButton(
+            onPressed: () async {
+              await ref.read(examProfileProvider.notifier).setAcquisition();
+              if (context.mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('已切回日常习得模式')),
+                );
+                context.go('/home');
+              }
+            },
+            child: const Text('不备考，回到日常习得'),
+          ),
         ],
       ),
     );

@@ -74,6 +74,24 @@ class ExamHomeScreen extends ConsumerWidget {
               onTap: () => context.push('/exam/errorbook'),
             ),
             _NavTile(
+              icon: Icons.headphones_outlined,
+              title: '听力专项',
+              subtitle: '社区真题音频与脚本',
+              onTap: () => context.push('/exam/listening'),
+            ),
+            _NavTile(
+              icon: Icons.menu_book_outlined,
+              title: '阅读专项',
+              subtitle: '脚本精读 / 爱快阅读',
+              onTap: () => context.push('/exam/reading'),
+            ),
+            _NavTile(
+              icon: Icons.edit_note_outlined,
+              title: '写作训练',
+              subtitle: '通用英语作文批改',
+              onTap: () => context.push('/writing'),
+            ),
+            _NavTile(
               icon: Icons.cloud_download_outlined,
               title: '社区真题资料',
               subtitle: '下载他人上传的听力 / 脚本 / 词表',
@@ -87,6 +105,7 @@ class ExamHomeScreen extends ConsumerWidget {
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(content: Text('已切换回日常习得模式')),
                   );
+                  context.go('/home');
                 }
               },
               child: const Text('切回日常习得'),

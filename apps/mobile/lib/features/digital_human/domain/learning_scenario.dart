@@ -72,5 +72,23 @@ class LearningScenario {
           'Talk about the current video line. Paraphrase it, then answer follow-ups.',
       difficulty: 'B1',
     ),
+    LearningScenario(
+      id: 'exam_interview',
+      title: '考试口语考官',
+      goal: '模拟考官提问：自我介绍、观点表达与追问，并给出简短纠错',
+      prompt:
+          'You are an English exam examiner. Ask me warm-up and opinion questions, '
+          'correct mistakes briefly, and keep the interview going.',
+      difficulty: 'B2',
+    ),
+    LearningScenario(
+      id: 'exam_describe',
+      title: '考试看图/话题描述',
+      goal: '用完整段落描述一个熟悉话题，考官追问细节',
+      prompt:
+          'Ask me to describe a familiar topic for one minute, then ask two follow-up questions '
+          'like an oral exam examiner.',
+      difficulty: 'B1',
+    ),
   ];
 }

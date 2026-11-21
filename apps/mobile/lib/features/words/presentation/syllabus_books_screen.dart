@@ -6,6 +6,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../router/app_router.dart';
+import '../../exam/domain/exam_fsrs.dart';
+import '../../exam/domain/exam_profile.dart';
+import '../../exam/presentation/exam_profile_provider.dart';
 import '../../navigation/presentation/navigation_destination.dart';
 import '../../shared/presentation/pad/app_design_tokens.dart';
 import '../../shared/presentation/pad/pad_scaffold.dart';
@@ -125,22 +128,38 @@ class _SyllabusBooksScreenState extends ConsumerState<SyllabusBooksScreen> {
   @override
   Widget build(BuildContext context) {
     final SyllabusBooksState state = ref.watch(syllabusBooksProvider);
-    final List<SyllabusBook> books = state.booksOf(_kind);
+    final ExamProfile examProfile = ref.watch(examProfileProvider);
+    final List<SyllabusBook> raw = state.booksOf(_kind);
+    final List<SyllabusBook> matched =
+        examProfile.isExamMode && examProfile.family != null
+        ? filterSyllabusForExam(raw, examProfile.family)
+        : raw;
+    // If no tagged books yet, still show the full library so users can download.
+    final List<SyllabusBook> books =
+        matched.isEmpty && examProfile.isExamMode ? raw : matched;
     final bool isPattern = _kind == SyllabusBookKind.pattern;
     final bool isFoundation = _kind == SyllabusBookKind.foundation;
+    final String examHint = examProfile.isExamMode && examProfile.family != null
+        ? (matched.isEmpty
+            ? '备考「${examProfile.family!.label}」：暂无匹配标签词书，先显示全部，请下载带考试标签的书。'
+            : '备考模式：已筛选匹配「${examProfile.family!.label}」的词书。')
+        : '';
 
     return PadScaffold(
       currentDestination: AppNavDestination.review,
       showContinueLearning: false,
       topBar: PadTopBar(
         title: '学习书库',
-        description: switch (_kind) {
-          SyllabusBookKind.pattern =>
-            '从云端下载句型书到本地后练习；也可导入自建句型表。',
-          SyllabusBookKind.foundation =>
-            '从云端下载音标/拼读书到本地后练习；也可导入自建表。',
-          SyllabusBookKind.word => '从云端下载词书到本地后背词；也可导入或开源词库。',
-        },
+        description: examHint.isNotEmpty
+            ? examHint
+            : switch (_kind) {
+                SyllabusBookKind.pattern =>
+                  '从云端下载句型书到本地后练习；也可导入自建句型表。',
+                SyllabusBookKind.foundation =>
+                  '从云端下载音标/拼读书到本地后练习；也可导入自建表。',
+                SyllabusBookKind.word =>
+                  '从云端下载词书到本地后背词；也可导入或开源词库。',
+              },
         leading: PadBackButton(onPressed: () => context.pop()),
         actions: <Widget>[
           TextButton.icon(

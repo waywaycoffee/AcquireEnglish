@@ -17,6 +17,7 @@ from app.routers import (
     study_play,
     community_social,
     exam_assets,
+    writing,
     learning_cards,
     learning_module_progress,
     public_challenges,
@@ -97,6 +98,7 @@ app.include_router(study_pk.router, prefix="/api")
 app.include_router(study_play.router, prefix="/api")
 app.include_router(community_social.router, prefix="/api")
 app.include_router(exam_assets.router, prefix="/api")
+app.include_router(writing.router, prefix="/api")
 app.include_router(learning_cards.router, prefix="/api")
 app.include_router(public_challenges.router, prefix="/api")
 app.include_router(imports.router, prefix="/api")

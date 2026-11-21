@@ -1,9 +1,15 @@
 import '../features/learning_modules/module_screen.dart';
 import '../features/community/presentation/public_learning_card_screen.dart';
 import '../features/community/presentation/community_screen.dart';
+import '../features/exam/presentation/exam_errorbook_screen.dart';
 import '../features/exam/presentation/exam_home_screen.dart';
-import '../features/exam/presentation/exam_placeholder_screens.dart';
+import '../features/exam/presentation/exam_listening_screen.dart';
+import '../features/exam/presentation/exam_mock_screen.dart';
+import '../features/exam/presentation/exam_practice_screen.dart';
+import '../features/exam/presentation/exam_reading_screen.dart';
 import '../features/exam/presentation/exam_select_screen.dart';
+import '../features/writing/presentation/writing_editor_screen.dart';
+import '../features/writing/presentation/writing_home_screen.dart';
 import '../features/daily_review/domain/daily_review.dart';
 // ignore_for_file: prefer_function_declarations_over_variables
 
@@ -162,6 +168,26 @@ GoRouter goRouter(Ref ref) => GoRouter(
       path: '/exam/errorbook',
       builder: (BuildContext context, GoRouterState state) =>
           const ExamErrorBookScreen(),
+    ),
+    GoRoute(
+      path: '/exam/listening',
+      builder: (BuildContext context, GoRouterState state) =>
+          const ExamListeningScreen(),
+    ),
+    GoRoute(
+      path: '/exam/reading',
+      builder: (BuildContext context, GoRouterState state) =>
+          const ExamReadingScreen(),
+    ),
+    GoRoute(
+      path: '/writing',
+      builder: (BuildContext context, GoRouterState state) =>
+          const WritingHomeScreen(),
+    ),
+    GoRoute(
+      path: '/writing/:essayId',
+      builder: (BuildContext context, GoRouterState state) =>
+          WritingEditorScreen(essayId: state.pathParameters['essayId']!),
     ),
     // Legacy cafe adventure URLs → exam hub (cafe removed).
     GoRoute(

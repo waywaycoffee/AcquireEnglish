@@ -9,6 +9,7 @@ import '../../digital_human/domain/learning_scenario.dart';
 import '../../words/domain/foundation_media.dart';
 import '../../words/domain/server_syllabus_catalog.dart';
 import '../../words/domain/syllabus_book.dart';
+import '../../writing/domain/writing_models.dart';
 
 final Provider<AcquireApiClient> acquireApiClientProvider =
     Provider<AcquireApiClient>((Ref ref) {
@@ -2265,6 +2266,28 @@ class AcquireApiClient {
       '${Endpoints.communityExamAssets}/$assetId/report',
       data: <String, dynamic>{'reason': reason},
       options: _noCache,
+    );
+  }
+
+  Future<WritingGradeResult> gradeWriting({
+    required String text,
+    String prompt = '',
+    String title = '',
+  }) async {
+    final Response<dynamic> response = await _dio.post(
+      Endpoints.writingGrade,
+      data: <String, dynamic>{
+        'text': text,
+        'prompt': prompt,
+        'title': title,
+      },
+      options: Options(
+        extra: _noCache.extra,
+        receiveTimeout: const Duration(seconds: 90),
+      ),
+    );
+    return WritingGradeResult.fromJson(
+      response.data as Map<String, dynamic>,
     );
   }
 

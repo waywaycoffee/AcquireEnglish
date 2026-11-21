@@ -11,6 +11,7 @@ import '../../../utils/url_utils.dart';
 import '../../authentication/presentation/account_hub_sheet.dart';
 import '../../authentication/presentation/auth_session.dart';
 import '../../exam/presentation/exam_profile_provider.dart';
+import '../../exam/presentation/study_mode_switch_sheet.dart';
 import '../../navigation/presentation/navigation_destination.dart';
 import '../../player/presentation/local_whisper_asr.dart';
 import '../../shared/data/aliyun_speech_service.dart';
@@ -258,10 +259,10 @@ class SettingsScreen extends ConsumerWidget {
               _ActionRow(
                 title: '学习模式：日常习得 / 考试备考',
                 description: ref.watch(examProfileProvider).isExamMode
-                    ? '当前：备考 · ${ref.watch(examProfileProvider).family?.label ?? "未选考试"}'
-                    : '当前：日常习得（可切换考试备考）',
+                    ? '当前：备考 · ${ref.watch(examProfileProvider).family?.label ?? "未选考试"}（点此双向切换）'
+                    : '当前：日常习得（点此切换到考试备考）',
                 icon: Icons.school_outlined,
-                onTap: () => context.push('/exam/select'),
+                onTap: () => showStudyModeSwitchSheet(context, ref),
               ),
               _ActionRow(
                 title: '学习偏好 / 每日课程',

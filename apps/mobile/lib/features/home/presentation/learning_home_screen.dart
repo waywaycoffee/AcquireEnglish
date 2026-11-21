@@ -6,7 +6,6 @@ import '../../library/presentation/library_catalog_provider.dart';
 import '../../library/presentation/library_mock_data.dart';
 import '../../exam/domain/exam_profile.dart';
 import '../../exam/presentation/exam_profile_provider.dart';
-import '../../onboarding/domain/onboarding_profile.dart';
 import '../../onboarding/presentation/focus_recommendation.dart';
 import '../../onboarding/presentation/onboarding_provider.dart';
 import '../../reading/domain/reading_doc.dart';
@@ -180,6 +179,24 @@ class LearningHomeScreen extends ConsumerWidget {
                                 child: const Text('专项'),
                               ),
                             ],
+                          ),
+                          Align(
+                            alignment: Alignment.centerRight,
+                            child: TextButton(
+                              onPressed: () async {
+                                await ref
+                                    .read(examProfileProvider.notifier)
+                                    .setAcquisition();
+                                if (context.mounted) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(
+                                      content: Text('已切回日常习得模式'),
+                                    ),
+                                  );
+                                }
+                              },
+                              child: const Text('切回日常习得'),
+                            ),
                           ),
                         ],
                       ),
