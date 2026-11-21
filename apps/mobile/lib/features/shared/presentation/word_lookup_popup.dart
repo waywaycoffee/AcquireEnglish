@@ -266,8 +266,10 @@ class _WordLookupPopupCardState extends ConsumerState<WordLookupPopupCard> {
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
                 style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.w800,
+                  fontSize: 28,
+                  fontWeight: FontWeight.w900,
+                  height: 1.15,
+                  letterSpacing: 0.2,
                   color: AppDesignTokens.textPrimary,
                 ),
               ),

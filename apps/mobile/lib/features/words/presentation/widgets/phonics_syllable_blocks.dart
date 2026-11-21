@@ -1,6 +1,39 @@
 import 'package:flutter/material.dart';
 
+import '../../../shared/presentation/pad/app_design_tokens.dart';
 import '../../domain/word_morphology.dart';
+
+/// Vowels are always red; consonants/syllable groups use distinct text colors.
+const Color _kVowelRed = Color(0xFFE11D48);
+
+/// Light-theme text colors for non-vowel segments (cycled by syllable).
+const List<Color> _kPhonicsTextLight = <Color>[
+  Color(0xFF111827),
+  Color(0xFF1D4ED8),
+  Color(0xFF047857),
+  Color(0xFFB45309),
+  Color(0xFF7C3AED),
+  Color(0xFFBE185D),
+];
+
+/// Dark-theme text colors for non-vowel segments (cycled by syllable).
+const List<Color> _kPhonicsTextDark = <Color>[
+  Color(0xFFE5E7EB),
+  Color(0xFF93C5FD),
+  Color(0xFF86EFAC),
+  Color(0xFFFCD34D),
+  Color(0xFFC4B5FD),
+  Color(0xFFF9A8D4),
+];
+
+Color _segmentTextColor(PhonicsSegment seg) {
+  if (seg.kind == 'vowel') {
+    return _kVowelRed;
+  }
+  final List<Color> palette =
+      AppDesignTokens.isDark ? _kPhonicsTextDark : _kPhonicsTextLight;
+  return palette[seg.colorIndex % palette.length];
+}
 
 /// Headword with vowel letters tinted for natural-phonics awareness.
 class ColoredVowelHeadword extends StatelessWidget {
@@ -23,6 +56,7 @@ class ColoredVowelHeadword extends StatelessWidget {
   Widget build(BuildContext context) {
     final String raw = word.trim();
     if (raw.isEmpty) return const SizedBox.shrink();
+    final Color consonant = AppDesignTokens.textPrimary;
     final List<InlineSpan> spans = <InlineSpan>[];
     for (int i = 0; i < raw.length; i++) {
       final String ch = raw[i];
@@ -38,10 +72,7 @@ class ColoredVowelHeadword extends StatelessWidget {
             height: 1.2,
             fontWeight: FontWeight.w900,
             letterSpacing: 0.6,
-            color: vowel ? const Color(0xFF1D4ED8) : const Color(0xFF111827),
-            backgroundColor: vowel
-                ? const Color(0xFFDBEAFE)
-                : Colors.transparent,
+            color: vowel ? _kVowelRed : consonant,
           ),
         ),
       );
@@ -60,11 +91,11 @@ class ColoredVowelHeadword extends StatelessWidget {
         if (showLegend) ...<Widget>[
           const SizedBox(height: 6),
           Text(
-            onTap == null ? '蓝色高亮 = 元音' : '蓝色高亮 = 元音 · 点单词展开音节 / 拼读',
+            onTap == null ? '红色 = 元音' : '红色 = 元音 · 点单词展开音节 / 拼读',
             style: TextStyle(
               fontSize: 12,
               fontWeight: FontWeight.w700,
-              color: Colors.grey.shade600,
+              color: AppDesignTokens.textSecondary,
             ),
           ),
         ],
@@ -82,7 +113,7 @@ class ColoredVowelHeadword extends StatelessWidget {
   }
 }
 
-/// Colored syllable / phonics blocks under a headword.
+/// Colored syllable / phonics letters under a headword (text color only).
 class PhonicsSyllableBlocks extends StatelessWidget {
   const PhonicsSyllableBlocks({
     required this.word,
@@ -102,58 +133,44 @@ class PhonicsSyllableBlocks extends StatelessWidget {
       return const SizedBox.shrink();
     }
     final List<String> syllables = splitEnglishSyllables(word);
+    final double fontSize = compact ? 18 : 22;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: <Widget>[
         Text(
-          compact ? '自然拼读' : '自然拼读 · 音节色块（元音加亮）',
+          compact ? '自然拼读' : '自然拼读 · 元音红色，音节分色',
           style: TextStyle(
             fontSize: compact ? 12 : 13,
             fontWeight: FontWeight.w800,
-            color: Colors.grey.shade700,
+            color: AppDesignTokens.textSecondary,
           ),
         ),
         const SizedBox(height: 6),
         Wrap(
-          spacing: 6,
-          runSpacing: 6,
+          spacing: 2,
+          runSpacing: 4,
+          crossAxisAlignment: WrapCrossAlignment.center,
           children: <Widget>[
-            for (final PhonicsSegment seg in segments)
-              Material(
-                color: Color(kPhonicsPalette[seg.colorIndex]),
-                borderRadius: BorderRadius.circular(10),
-                child: InkWell(
-                  borderRadius: BorderRadius.circular(10),
-                  onTap: onSegmentTap == null
-                      ? null
-                      : () => onSegmentTap!(seg),
-                  child: Container(
-                    padding: EdgeInsets.symmetric(
-                      horizontal: compact ? 8 : 10,
-                      vertical: compact ? 4 : 6,
-                    ),
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(10),
-                      border: Border.all(
-                        color: Colors.black.withValues(alpha: 0.06),
-                      ),
-                    ),
-                    child: Text(
-                      seg.text,
-                      style: TextStyle(
-                        fontSize: compact ? 16 : 20,
-                        fontWeight: seg.kind == 'vowel'
-                            ? FontWeight.w900
-                            : FontWeight.w700,
-                        letterSpacing: 0.3,
-                        color: seg.kind == 'vowel'
-                            ? const Color(0xFF1D4ED8)
-                            : const Color(0xFF111827),
-                      ),
-                    ),
+            for (int i = 0; i < segments.length; i++) ...<Widget>[
+              if (i > 0 &&
+                  segments[i].colorIndex != segments[i - 1].colorIndex)
+                Text(
+                  '·',
+                  style: TextStyle(
+                    fontSize: fontSize * 0.85,
+                    fontWeight: FontWeight.w700,
+                    color: AppDesignTokens.textSecondary,
                   ),
                 ),
+              _PhonicsLetterSpan(
+                segment: segments[i],
+                fontSize: fontSize,
+                onTap: onSegmentTap == null
+                    ? null
+                    : () => onSegmentTap!(segments[i]),
               ),
+            ],
           ],
         ),
         if (!compact && syllables.length > 1) ...<Widget>[
@@ -162,12 +179,47 @@ class PhonicsSyllableBlocks extends StatelessWidget {
             '音节：${syllables.join(' · ')}',
             style: TextStyle(
               fontSize: 12,
-              color: Colors.grey.shade600,
+              color: AppDesignTokens.textSecondary,
               fontWeight: FontWeight.w600,
             ),
           ),
         ],
       ],
+    );
+  }
+}
+
+class _PhonicsLetterSpan extends StatelessWidget {
+  const _PhonicsLetterSpan({
+    required this.segment,
+    required this.fontSize,
+    this.onTap,
+  });
+
+  final PhonicsSegment segment;
+  final double fontSize;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final Widget text = Text(
+      segment.text,
+      style: TextStyle(
+        fontSize: fontSize,
+        fontWeight: segment.kind == 'vowel' ? FontWeight.w900 : FontWeight.w700,
+        letterSpacing: 0.4,
+        height: 1.2,
+        color: _segmentTextColor(segment),
+      ),
+    );
+    if (onTap == null) return text;
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(6),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 1, vertical: 2),
+        child: text,
+      ),
     );
   }
 }
@@ -229,29 +281,36 @@ class _PhonicsCoachPanelState extends State<PhonicsCoachPanel> {
     final List<PhonicsGuideStep> steps = _steps;
     if (steps.isEmpty) return const SizedBox.shrink();
     final PhonicsGuideStep current = steps[_step.clamp(0, steps.length - 1)];
+    final bool dark = AppDesignTokens.isDark;
 
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: const Color(0xFFEFF6FF),
+        color: dark ? const Color(0xFF1C2430) : const Color(0xFFEFF6FF),
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFFBFDBFE)),
+        border: Border.all(
+          color: dark ? const Color(0xFF2A3444) : const Color(0xFFBFDBFE),
+        ),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: <Widget>[
-          const Text(
+          Text(
             '自然拼读引导',
-            style: TextStyle(fontWeight: FontWeight.w900, fontSize: 15),
+            style: TextStyle(
+              fontWeight: FontWeight.w900,
+              fontSize: 15,
+              color: AppDesignTokens.textPrimary,
+            ),
           ),
           const SizedBox(height: 4),
           Text(
-            '按音节拼出来，再连成整词；点色块或步骤可听真人/云端发音。',
+            '按音节拼出来，再连成整词；点字母或步骤可听真人/云端发音。',
             style: TextStyle(
               fontSize: 12,
               height: 1.4,
-              color: Colors.grey.shade700,
+              color: AppDesignTokens.textSecondary,
               fontWeight: FontWeight.w600,
             ),
           ),
@@ -266,7 +325,11 @@ class _PhonicsCoachPanelState extends State<PhonicsCoachPanel> {
           const SizedBox(height: 12),
           Text(
             '步骤 ${_step + 1}/${steps.length} · ${current.labelCn}',
-            style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 13),
+            style: TextStyle(
+              fontWeight: FontWeight.w800,
+              fontSize: 13,
+              color: AppDesignTokens.textPrimary,
+            ),
           ),
           const SizedBox(height: 6),
           Text(
@@ -276,8 +339,8 @@ class _PhonicsCoachPanelState extends State<PhonicsCoachPanel> {
               fontSize: current.isWholeWord ? 28 : 24,
               fontWeight: FontWeight.w900,
               color: current.isWholeWord
-                  ? const Color(0xFF1D4ED8)
-                  : const Color(0xFF111827),
+                  ? _kVowelRed
+                  : AppDesignTokens.textPrimary,
             ),
           ),
           const SizedBox(height: 10),
@@ -337,15 +400,21 @@ class RootsAffixesCard extends StatelessWidget {
       width: double.infinity,
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
-        color: const Color(0xFFF5F3FF),
+        color: AppDesignTokens.isDark
+            ? const Color(0xFF1E1B2E)
+            : const Color(0xFFF5F3FF),
         borderRadius: BorderRadius.circular(18),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
-          const Text(
+          Text(
             '词根词缀联想',
-            style: TextStyle(fontWeight: FontWeight.w900, fontSize: 16),
+            style: TextStyle(
+              fontWeight: FontWeight.w900,
+              fontSize: 16,
+              color: AppDesignTokens.textPrimary,
+            ),
           ),
           if (affixes.isNotEmpty) ...<Widget>[
             const SizedBox(height: 10),
@@ -360,7 +429,9 @@ class RootsAffixesCard extends StatelessWidget {
                       vertical: 8,
                     ),
                     decoration: BoxDecoration(
-                      color: Colors.white,
+                      color: AppDesignTokens.isDark
+                          ? AppDesignTokens.softWhite
+                          : Colors.white,
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: Text.rich(
@@ -369,30 +440,32 @@ class RootsAffixesCard extends StatelessWidget {
                           TextSpan(
                             text: '${_kindLabel(hit.kind)} ',
                             style: TextStyle(
-                              color: Colors.grey.shade600,
+                              color: AppDesignTokens.textSecondary,
                               fontWeight: FontWeight.w700,
                               fontSize: 12,
                             ),
                           ),
                           TextSpan(
                             text: hit.part,
-                            style: const TextStyle(
+                            style: TextStyle(
                               fontWeight: FontWeight.w900,
                               fontSize: 15,
+                              color: AppDesignTokens.textPrimary,
                             ),
                           ),
                           TextSpan(
                             text: '  ${hit.meaningCn}',
-                            style: const TextStyle(
+                            style: TextStyle(
                               fontWeight: FontWeight.w600,
                               fontSize: 13,
+                              color: AppDesignTokens.textPrimary,
                             ),
                           ),
                           if (hit.examples.isNotEmpty)
                             TextSpan(
                               text: '\n例：${hit.examples.take(3).join(', ')}',
                               style: TextStyle(
-                                color: Colors.grey.shade700,
+                                color: AppDesignTokens.textSecondary,
                                 fontSize: 12,
                                 height: 1.4,
                               ),
@@ -408,7 +481,10 @@ class RootsAffixesCard extends StatelessWidget {
             const SizedBox(height: 12),
             Text(
               aiText.trim(),
-              style: const TextStyle(height: 1.45),
+              style: TextStyle(
+                height: 1.45,
+                color: AppDesignTokens.textPrimary,
+              ),
             ),
           ],
         ],
@@ -443,25 +519,37 @@ class EtymologyCard extends StatelessWidget {
       width: double.infinity,
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
-        color: const Color(0xFFFFF7ED),
+        color: AppDesignTokens.isDark
+            ? const Color(0xFF2A2218)
+            : const Color(0xFFFFF7ED),
         borderRadius: BorderRadius.circular(18),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
-          const Text(
+          Text(
             '单词溯源',
-            style: TextStyle(fontWeight: FontWeight.w900, fontSize: 16),
+            style: TextStyle(
+              fontWeight: FontWeight.w900,
+              fontSize: 16,
+              color: AppDesignTokens.textPrimary,
+            ),
           ),
           const SizedBox(height: 8),
-          Text(body, style: const TextStyle(height: 1.45)),
+          Text(
+            body,
+            style: TextStyle(
+              height: 1.45,
+              color: AppDesignTokens.textPrimary,
+            ),
+          ),
           if (aiText.trim().isEmpty && localHint.trim().isNotEmpty) ...<Widget>[
             const SizedBox(height: 8),
             Text(
               '（本地构词提示；收藏并生成 AI 词卡可获得更完整词源）',
               style: TextStyle(
                 fontSize: 12,
-                color: Colors.grey.shade600,
+                color: AppDesignTokens.textSecondary,
                 fontWeight: FontWeight.w600,
               ),
             ),
