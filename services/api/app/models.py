@@ -1494,3 +1494,29 @@ class CacheHitLog(Base):
     create_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), index=True
     )
+
+
+class ProductFeedback(Base):
+    """Private product feedback — admin-only; never listed in community feed."""
+
+    __tablename__ = "product_feedback"
+    __table_args__ = (Index("idx_product_feedback_created", "created_at"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    user_id: Mapped[int] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), index=True
+    )
+    category: Mapped[str] = mapped_column(String(32), default="general", index=True)
+    title: Mapped[str] = mapped_column(String(200), default="")
+    body: Mapped[str] = mapped_column(Text, default="")
+    contact: Mapped[str] = mapped_column(String(120), default="")
+    app_version: Mapped[str] = mapped_column(String(64), default="")
+    # open | read | done
+    status: Mapped[str] = mapped_column(String(16), default="open", index=True)
+    admin_note: Mapped[str] = mapped_column(Text, default="")
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), index=True
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )

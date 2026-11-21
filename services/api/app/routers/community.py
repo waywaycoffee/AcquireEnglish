@@ -571,7 +571,11 @@ async def community_feed(
     if (following or bookmarked) and user is None:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Not authenticated")
 
-    filters = [CommunityPost.status == "visible"]
+    # Product complaints are private (/api/feedback); never list in public feed.
+    filters = [
+        CommunityPost.status == "visible",
+        CommunityPost.kind != "feedback",
+    ]
     if user is not None:
         filters.append(CommunityPost.user_id.not_in(blocked_ids(user.id)))
     stmt: Select[tuple[CommunityPost]] = (
@@ -593,6 +597,8 @@ async def community_feed(
         assert user is not None
         stmt = stmt.where(CommunityPost.id.in_(select(CommunityBookmark.post_id).where(CommunityBookmark.user_id == user.id)))
     if kind is not None:
+        if kind == "feedback":
+            return []
         stmt = stmt.where(CommunityPost.kind == kind)
     posts = list((await db.execute(stmt)).scalars().all())
     if not posts:
@@ -741,13 +747,10 @@ async def create_post(
         profile = await _ensure_profile(db, user)
         profile.looking_for_partner = 1
     elif kind == "feedback":
-        if not title and not body:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="吐槽需要标题或内容",
-            )
-        if not title:
-            title = "功能吐槽"
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="意见反馈已改为私密提交，请从首页「意见反馈」入口发送（仅运营可见）",
+        )
     elif kind in _OUTPUT_KINDS:
         if not title and not body:
             raise HTTPException(status_code=400, detail="请填写标题或内容")

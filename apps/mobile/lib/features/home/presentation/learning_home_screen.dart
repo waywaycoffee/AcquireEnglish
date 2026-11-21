@@ -21,6 +21,7 @@ import '../../shared/presentation/pad/pad_scaffold.dart';
 import '../../sync/presentation/cloud_catalog_sync.dart';
 import 'learning_dashboard_provider.dart';
 import 'pad_home_screen.dart' show DailyRecommendSection, RecentCourses;
+import 'product_feedback_sheet.dart';
 import 'widgets/continue_learning_poster.dart';
 
 class LearningHomeScreen extends ConsumerWidget {
@@ -130,6 +131,19 @@ class LearningHomeScreen extends ConsumerWidget {
                             const SizedBox(height: 6),
                             text('每一天，都有新收获', 25, bold: true),
                           ],
+                        ),
+                      ),
+                      TextButton.icon(
+                        onPressed: () => showProductFeedbackSheet(context, ref),
+                        icon: Icon(
+                          Icons.feedback_outlined,
+                          color: accent,
+                          size: 20,
+                        ),
+                        label: text('意见反馈', 13, color: accent, bold: true),
+                        style: TextButton.styleFrom(
+                          foregroundColor: accent,
+                          padding: const EdgeInsets.symmetric(horizontal: 8),
                         ),
                       ),
                       IconButton(

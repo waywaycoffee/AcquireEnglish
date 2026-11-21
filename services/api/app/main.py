@@ -31,6 +31,7 @@ from app.routers import (
     courses,
     creators,
     feed,
+    feedback,
     fingerprint_cache,
     content_media,
     foundation_media,
@@ -116,6 +117,8 @@ app.include_router(public_lexicon.router, prefix="/api")
 app.include_router(preferences.router, prefix="/api")
 app.include_router(creators.router, prefix="/api")
 app.include_router(feed.router, prefix="/api")
+app.include_router(feedback.router, prefix="/api")
+app.include_router(feedback.admin_router, prefix="/api")
 app.include_router(community.router, prefix="/api")
 app.include_router(community_packs.router, prefix="/api")
 app.include_router(community_groups.router, prefix="/api")

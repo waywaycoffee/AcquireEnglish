@@ -216,12 +216,6 @@ class CommunityFeedTab extends ConsumerWidget {
                   '找搭子一起练',
                   AppDesignTokens.brandGreen,
                 ),
-                (
-                  'feedback',
-                  '吐槽软件功能',
-                  '反馈缺陷与体验',
-                  AppDesignTokens.orange,
-                ),
               ])
                 Padding(
                   padding: const EdgeInsets.only(bottom: 8),

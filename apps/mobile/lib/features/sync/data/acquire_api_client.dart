@@ -1635,6 +1635,27 @@ class AcquireApiClient {
     return response.data as Map<String, dynamic>;
   }
 
+  /// Private product feedback — admin console only, never community-visible.
+  Future<Map<String, dynamic>> submitProductFeedback({
+    required String body,
+    String title = '',
+    String category = 'general',
+    String contact = '',
+    String appVersion = '',
+  }) async {
+    final Response<dynamic> response = await _dio.post(
+      Endpoints.productFeedback,
+      data: <String, dynamic>{
+        'body': body,
+        if (title.trim().isNotEmpty) 'title': title.trim(),
+        'category': category,
+        if (contact.trim().isNotEmpty) 'contact': contact.trim(),
+        if (appVersion.trim().isNotEmpty) 'app_version': appVersion.trim(),
+      },
+    );
+    return Map<String, dynamic>.from(response.data as Map);
+  }
+
   Future<Map<String, dynamic>> commerceTrialStatus() async {
     final Response<dynamic> response =
         await _dio.get(Endpoints.commerceTrialStatus);

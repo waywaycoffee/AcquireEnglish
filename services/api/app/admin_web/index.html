@@ -49,6 +49,7 @@
 
     <nav class="tabs" id="tabs">
       <button type="button" data-tab="dashboard" class="tab active">看板</button>
+      <button type="button" data-tab="feedback" class="tab">意见反馈</button>
       <button type="button" data-tab="infra" class="tab">ECS / 云盘监控</button>
       <button type="button" data-tab="usage" class="tab">Token / 损益</button>
       <button type="button" data-tab="resources" class="tab">公共资源</button>
@@ -56,6 +57,30 @@
     </nav>
 
     <section id="panel-dashboard" class="tab-panel"></section>
+    <section id="panel-feedback" class="tab-panel hidden">
+      <div class="panel">
+        <div class="panel-head">
+          <h2>用户意见反馈 <span id="feedbackOpenBadge" class="muted"></span></h2>
+          <form id="feedbackSearchForm" class="search">
+            <select id="feedbackStatusFilter">
+              <option value="">全部状态</option>
+              <option value="open" selected>待处理</option>
+              <option value="read">已读</option>
+              <option value="done">已完成</option>
+            </select>
+            <input id="feedbackSearchInput" type="search" placeholder="搜索内容 / 用户" />
+            <button class="btn primary" type="submit">筛选</button>
+          </form>
+        </div>
+        <div id="feedbackList" class="user-list"></div>
+        <div class="pager">
+          <button id="feedbackPrev" class="btn ghost" type="button">上一页</button>
+          <span id="feedbackPageInfo" class="muted"></span>
+          <button id="feedbackNext" class="btn ghost" type="button">下一页</button>
+        </div>
+        <p class="muted">反馈为私密通道：仅后台可见，不会出现在社区 Feed。</p>
+      </div>
+    </section>
     <section id="panel-infra" class="tab-panel hidden"></section>
     <section id="panel-usage" class="tab-panel hidden"></section>
     <section id="panel-resources" class="tab-panel hidden"></section>

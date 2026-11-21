@@ -99,6 +99,8 @@ class Endpoints {
   static String commerceQuotaMetric(String metric) =>
       'api/commerce/quotas/$metric';
   static const String commerceFreeTrialSeeds = 'api/commerce/free-trial-seeds';
+  static const String productFeedback = 'api/feedback';
+  static const String productFeedbackMine = 'api/feedback/mine';
   static const String learningTasks = 'api/learning/tasks';
   static const String learningSessions = 'api/learning/sessions';
   static const String learningSceneRecognize = 'api/learning/scene-recognize';

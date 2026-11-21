@@ -44,11 +44,13 @@
   const loginError = $("loginError");
   const titles = {
     dashboard: "可视化看板",
+    feedback: "意见反馈",
     infra: "ECS / 云盘监控",
     usage: "用量 / 平台账单",
     resources: "公共资源库",
     users: "用户与资产",
   };
+  const feedbackState = { offset: 0, limit: 40, total: 0, status: "open", q: "" };
 
   async function api(path, options = {}) {
     const headers = Object.assign(
@@ -134,9 +136,83 @@
     document.querySelectorAll(".tab").forEach((btn) => {
       btn.classList.toggle("active", btn.dataset.tab === tab);
     });
-    ["dashboard", "infra", "usage", "resources", "users"].forEach((id) => {
+    ["dashboard", "feedback", "infra", "usage", "resources", "users"].forEach((id) => {
       $(`panel-${id}`).classList.toggle("hidden", id !== tab);
     });
+  }
+
+  const FEEDBACK_CAT = {
+    bug: "缺陷",
+    ux: "体验",
+    content: "内容",
+    performance: "性能",
+    billing: "会员/支付",
+    feature: "功能建议",
+    general: "综合",
+  };
+
+  async function loadFeedback() {
+    const params = new URLSearchParams({
+      limit: String(feedbackState.limit),
+      offset: String(feedbackState.offset),
+    });
+    if (feedbackState.status) params.set("status", feedbackState.status);
+    if (feedbackState.q) params.set("q", feedbackState.q);
+    const data = await api(`/feedback?${params.toString()}`);
+    feedbackState.total = data.total || 0;
+    const badge = $("feedbackOpenBadge");
+    if (badge) badge.textContent = `· 待处理 ${data.open_count || 0}`;
+    const list = $("feedbackList");
+    const items = data.items || [];
+    if (!items.length) {
+      list.innerHTML = `<p class="empty">暂无反馈</p>`;
+    } else {
+      list.innerHTML = items
+        .map((item) => {
+          const who =
+            item.user_display_name ||
+            item.user_email ||
+            item.user_phone ||
+            `用户 #${item.user_id}`;
+          const when = item.created_at
+            ? new Date(item.created_at).toLocaleString("zh-CN")
+            : "";
+          return `<article class="user-card" data-fid="${item.id}">
+            <div class="user-card-top">
+              <strong>${escapeHtml(item.title || "意见反馈")}</strong>
+              <span class="chip">${escapeHtml(item.status)}</span>
+            </div>
+            <p class="muted">${escapeHtml(FEEDBACK_CAT[item.category] || item.category)} · ${escapeHtml(who)} · ${escapeHtml(when)}</p>
+            <p style="white-space:pre-wrap;margin:8px 0">${escapeHtml(item.body)}</p>
+            ${item.contact ? `<p class="muted">联系：${escapeHtml(item.contact)}</p>` : ""}
+            ${item.app_version ? `<p class="muted">版本：${escapeHtml(item.app_version)}</p>` : ""}
+            <div class="login-actions" style="margin-top:8px">
+              <button type="button" class="btn ghost fb-status" data-id="${item.id}" data-status="read">标为已读</button>
+              <button type="button" class="btn ghost fb-status" data-id="${item.id}" data-status="done">标为完成</button>
+              <button type="button" class="btn ghost fb-status" data-id="${item.id}" data-status="open">重开</button>
+            </div>
+            ${item.admin_note ? `<p class="muted">备注：${escapeHtml(item.admin_note)}</p>` : ""}
+          </article>`;
+        })
+        .join("");
+      list.querySelectorAll(".fb-status").forEach((btn) => {
+        btn.addEventListener("click", async () => {
+          try {
+            await api(`/feedback/${btn.dataset.id}`, {
+              method: "PATCH",
+              body: JSON.stringify({ status: btn.dataset.status, admin_note: "" }),
+            });
+            await loadFeedback();
+          } catch (e) {
+            alert(e.message);
+          }
+        });
+      });
+    }
+    $("feedbackPageInfo").textContent = `${feedbackState.offset + 1}-${Math.min(
+      feedbackState.offset + feedbackState.limit,
+      feedbackState.total
+    )} / ${feedbackState.total}`;
   }
 
   function pctBar(pct, label) {
@@ -1383,10 +1459,26 @@
     btn.addEventListener("click", () => {
       setTab(btn.dataset.tab);
       if (btn.dataset.tab === "dashboard") loadDashboard().catch((e) => alert(e.message));
+      if (btn.dataset.tab === "feedback") loadFeedback().catch((e) => alert(e.message));
       if (btn.dataset.tab === "infra") loadInfra().catch((e) => alert(e.message));
       if (btn.dataset.tab === "usage") loadUsage().catch((e) => alert(e.message));
       if (btn.dataset.tab === "resources") loadResources().catch((e) => alert(e.message));
     });
+  });
+  $("feedbackSearchForm").addEventListener("submit", (e) => {
+    e.preventDefault();
+    feedbackState.status = $("feedbackStatusFilter").value;
+    feedbackState.q = $("feedbackSearchInput").value.trim();
+    feedbackState.offset = 0;
+    loadFeedback().catch((err) => alert(err.message));
+  });
+  $("feedbackPrev").addEventListener("click", () => {
+    feedbackState.offset = Math.max(0, feedbackState.offset - feedbackState.limit);
+    loadFeedback().catch((err) => alert(err.message));
+  });
+  $("feedbackNext").addEventListener("click", () => {
+    feedbackState.offset += feedbackState.limit;
+    loadFeedback().catch((err) => alert(err.message));
   });
 
   // Always show login gate (username + password + token). Prefill account/token only.
