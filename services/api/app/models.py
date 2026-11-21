@@ -750,6 +750,70 @@ class PointsLedger(Base):
     )
 
 
+class UsageCounter(Base):
+    """Rolling usage meters for free-tier / module quotas."""
+
+    __tablename__ = "usage_counters"
+    __table_args__ = (
+        UniqueConstraint(
+            "user_id", "metric", "period_key", name="uq_usage_user_metric_period"
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    user_id: Mapped[int] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), index=True
+    )
+    metric: Mapped[str] = mapped_column(String(32), index=True)
+    period_key: Mapped[str] = mapped_column(String(24), index=True)
+    count: Mapped[int] = mapped_column(Integer, default=0)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
+
+
+class RankState(Base):
+    """学力值 / 段位 / 赛季榜分 (separate from points wallet)."""
+
+    __tablename__ = "rank_state"
+
+    user_id: Mapped[int] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), primary_key=True
+    )
+    power_points: Mapped[int] = mapped_column(Integer, default=0)
+    tier: Mapped[str] = mapped_column(String(24), default="bronze", index=True)
+    season_id: Mapped[str] = mapped_column(String(32), default="S1", index=True)
+    season_score: Mapped[int] = mapped_column(Integer, default=0)
+    checkin_streak: Mapped[int] = mapped_column(Integer, default=0)
+    last_checkin_day: Mapped[str | None] = mapped_column(String(10), nullable=True)
+    arena_extra: Mapped[int] = mapped_column(Integer, default=0)
+    arena_used_today: Mapped[int] = mapped_column(Integer, default=0)
+    arena_day: Mapped[str | None] = mapped_column(String(10), nullable=True)
+    arena_win_streak: Mapped[int] = mapped_column(Integer, default=0)
+    meta_json: Mapped[str] = mapped_column(Text, default="{}")
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
+
+
+class CommerceEvent(Base):
+    """Paywall / purchase / trial funnel events."""
+
+    __tablename__ = "commerce_events"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    user_id: Mapped[int | None] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True
+    )
+    event: Mapped[str] = mapped_column(String(64), index=True)
+    module: Mapped[str | None] = mapped_column(String(64), nullable=True, index=True)
+    page: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    meta_json: Mapped[str] = mapped_column(Text, default="{}")
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), index=True
+    )
+
+
 class DeskInvite(Base):
     __tablename__ = "desk_invites"
     id: Mapped[int] = mapped_column(Integer, primary_key=True)

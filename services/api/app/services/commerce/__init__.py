@@ -1,4 +1,4 @@
-"""Acquire English commercialization (modules · points · trial)."""
+"""Acquire English commercialization (modules · points · trial · quotas · rank)."""
 
 from app.services.commerce.catalog import MODULE_DEFS, ensure_commerce_skus, public_commerce_catalog
 from app.services.commerce.trial import (

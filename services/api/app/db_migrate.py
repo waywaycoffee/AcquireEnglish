@@ -20,6 +20,7 @@ async def ensure_schema_columns(conn: AsyncConnection) -> None:
     await _ensure_shared_bilibili_cid_bigint(conn)
     await _ensure_shared_bilibili_identity_columns(conn)
     await _ensure_api_usage_module_column(conn)
+    await _ensure_rank_state_columns(conn)
 
 
 async def ensure_user_auth_columns(conn: AsyncConnection) -> None:
@@ -290,3 +291,18 @@ async def _ensure_api_usage_module_column(conn: AsyncConnection) -> None:
             )
     except Exception:  # noqa: BLE001
         pass
+
+
+async def _ensure_rank_state_columns(conn: AsyncConnection) -> None:
+    existing = await _existing_columns(conn, "rank_state")
+    if existing is None:
+        return
+    alters: list[str] = []
+    if "arena_win_streak" not in existing:
+        alters.append(
+            "ALTER TABLE rank_state ADD COLUMN arena_win_streak INTEGER DEFAULT 0"
+        )
+    if "meta_json" not in existing:
+        alters.append("ALTER TABLE rank_state ADD COLUMN meta_json TEXT DEFAULT '{}'")
+    for sql in alters:
+        await conn.execute(text(sql))

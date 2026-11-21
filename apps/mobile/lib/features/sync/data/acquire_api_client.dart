@@ -1652,24 +1652,128 @@ class AcquireApiClient {
     return response.data as Map<String, dynamic>;
   }
 
+  Future<Map<String, dynamic>> commercePayStatus() async {
+    final Response<dynamic> response =
+        await _dio.get(Endpoints.commercePayStatus);
+    return response.data as Map<String, dynamic>;
+  }
+
   Future<Map<String, dynamic>> commerceEarnPoints({
     required String reason,
     int? amount,
+    Map<String, dynamic>? meta,
   }) async {
     final Response<dynamic> response = await _dio.post(
       Endpoints.commercePointsEarn,
       data: <String, dynamic>{
         'reason': reason,
         if (amount != null) 'amount': amount,
+        if (meta != null) 'meta': meta,
       },
     );
     return response.data as Map<String, dynamic>;
   }
 
-  Future<Map<String, dynamic>> commerceSpendPoints({required String item}) async {
+  Future<Map<String, dynamic>> commerceSpendPoints({
+    required String item,
+    Map<String, dynamic>? meta,
+  }) async {
     final Response<dynamic> response = await _dio.post(
       Endpoints.commercePointsSpend,
-      data: <String, dynamic>{'item': item},
+      data: <String, dynamic>{
+        'item': item,
+        if (meta != null) 'meta': meta,
+      },
+    );
+    return response.data as Map<String, dynamic>;
+  }
+
+  Future<Map<String, dynamic>> commerceQuotas({String? moduleCode}) async {
+    final Response<dynamic> response = await _dio.get(
+      Endpoints.commerceQuotas,
+      queryParameters: <String, dynamic>{
+        if (moduleCode != null && moduleCode.isNotEmpty) 'module_code': moduleCode,
+      },
+    );
+    return response.data as Map<String, dynamic>;
+  }
+
+  Future<Map<String, dynamic>> commerceConsumeQuota({
+    required String metric,
+    int amount = 1,
+    String? moduleCode,
+  }) async {
+    final Response<dynamic> response = await _dio.post(
+      Endpoints.commerceQuotasConsume,
+      data: <String, dynamic>{
+        'metric': metric,
+        'amount': amount,
+        if (moduleCode != null) 'module_code': moduleCode,
+      },
+    );
+    return response.data as Map<String, dynamic>;
+  }
+
+  Future<Map<String, dynamic>> commerceEntitlements() async {
+    final Response<dynamic> response =
+        await _dio.get(Endpoints.commerceEntitlements);
+    return response.data as Map<String, dynamic>;
+  }
+
+  Future<Map<String, dynamic>> commerceRank() async {
+    final Response<dynamic> response = await _dio.get(Endpoints.commerceRank);
+    return response.data as Map<String, dynamic>;
+  }
+
+  Future<Map<String, dynamic>> commerceCheckin() async {
+    final Response<dynamic> response = await _dio.post(Endpoints.commerceCheckin);
+    return response.data as Map<String, dynamic>;
+  }
+
+  Future<Map<String, dynamic>> commerceArenaStatus() async {
+    final Response<dynamic> response =
+        await _dio.get(Endpoints.commerceArenaStatus);
+    return response.data as Map<String, dynamic>;
+  }
+
+  Future<Map<String, dynamic>> commerceArenaStart() async {
+    final Response<dynamic> response =
+        await _dio.post(Endpoints.commerceArenaStart);
+    return response.data as Map<String, dynamic>;
+  }
+
+  Future<Map<String, dynamic>> commerceArenaFinish({
+    required String matchId,
+    required List<int?> choices,
+  }) async {
+    final Response<dynamic> response = await _dio.post(
+      Endpoints.commerceArenaFinish,
+      data: <String, dynamic>{'match_id': matchId, 'choices': choices},
+    );
+    return response.data as Map<String, dynamic>;
+  }
+
+  Future<Map<String, dynamic>> commerceTrackEvent({
+    required String event,
+    String? module,
+    String? page,
+    Map<String, dynamic>? meta,
+  }) async {
+    final Response<dynamic> response = await _dio.post(
+      Endpoints.commerceEvents,
+      data: <String, dynamic>{
+        'event': event,
+        if (module != null) 'module': module,
+        if (page != null) 'page': page,
+        if (meta != null) 'meta': meta,
+      },
+    );
+    return response.data as Map<String, dynamic>;
+  }
+
+  Future<Map<String, dynamic>> markAssetOrderPaid({required int orderId}) async {
+    final Response<dynamic> response = await _dio.post(
+      '${Endpoints.assetsOrders}/$orderId/mark-paid',
     );
     return response.data as Map<String, dynamic>;
   }

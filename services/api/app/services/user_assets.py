@@ -334,6 +334,43 @@ async def grant_from_sku(
             meta=grant_meta,
         )
         return granted[0] if len(granted) == 1 else granted
+    if sku.kind == "efficiency" or kind == "efficiency":
+        ent = await grant_entitlement(
+            db,
+            user_id,
+            asset_kind="efficiency",
+            asset_ref=ref,
+            source=source,
+            quantity=units,
+            duration_days=sku.duration_days,
+            order_id=order_id,
+            meta={**grant_meta, "effect": ref},
+        )
+        if ref == "arena_extra":
+            try:
+                from app.services.commerce.gamification import (
+                    sync_arena_extra_from_entitlements,
+                )
+
+                await sync_arena_extra_from_entitlements(db, user_id)
+            except Exception:  # noqa: BLE001
+                pass
+        return ent
+    if sku.kind in ("course_pack", "vocab_pack") or kind in (
+        "course_pack",
+        "vocab_pack",
+    ):
+        return await grant_entitlement(
+            db,
+            user_id,
+            asset_kind=kind,
+            asset_ref=ref,
+            source=source,
+            quantity=units or 1,
+            duration_days=None,
+            order_id=order_id,
+            meta=grant_meta,
+        )
     return await grant_entitlement(
         db,
         user_id,
@@ -564,10 +601,8 @@ async def create_order(
     if coupon_id is not None:
         from app.models import MembershipCoupon
         from sqlalchemy import update
-        # Cash coupons apply to a single Pro or module 月/年卡 order.
-        ok_kinds = {"membership", "module"}
-        if len(items) != 1 or items[0][0].kind not in ok_kinds or items[0][1] != 1:
-            raise ValueError("抵扣券仅限单张会员卡或模块月/年卡")
+        if len(items) != 1 or items[0][0].kind != "membership" or items[0][1] != 1:
+            raise ValueError("抵扣券仅限单张会员卡")
         coupon = await db.get(MembershipCoupon, coupon_id)
         if coupon is None or coupon.user_id != user.id or coupon.kind != "cash" or coupon.used:
             raise ValueError("优惠券不可用")

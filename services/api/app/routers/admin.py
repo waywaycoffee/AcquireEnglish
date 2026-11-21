@@ -19,10 +19,16 @@ from app.deps_admin import (
     verify_admin_login,
 )
 from app.models import (
+    CommerceEvent,
+    MembershipCoupon,
     Order,
+    OrderItem,
+    PointsLedger,
     ProductSku,
+    RankState,
     User,
     UserEntitlement,
+    UserLoginDay,
     UserPointsLedger,
     WalletAccount,
     WalletLedger,
@@ -460,12 +466,14 @@ async def adjust_points(
 
 @router.get("/skus")
 async def list_skus(
+    kind: str | None = Query(default=None, max_length=32),
     _: str = Depends(require_admin_token),
     db: AsyncSession = Depends(get_db),
 ) -> dict[str, Any]:
-    rows = (
-        await db.execute(select(ProductSku).order_by(ProductSku.id.asc()))
-    ).scalars().all()
+    stmt = select(ProductSku).order_by(ProductSku.id.asc())
+    if kind:
+        stmt = stmt.where(ProductSku.kind == kind.strip())
+    rows = (await db.execute(stmt)).scalars().all()
     return {
         "items": [
             {
@@ -480,5 +488,159 @@ async def list_skus(
                 "active": bool(s.active),
             }
             for s in rows
+        ]
+    }
+
+
+@router.get("/commerce/overview")
+async def commerce_overview(
+    _: str = Depends(require_admin_token),
+    db: AsyncSession = Depends(get_db),
+) -> dict[str, Any]:
+    sku_rows = (await db.execute(select(ProductSku))).scalars().all()
+    by_kind: dict[str, int] = {}
+    for s in sku_rows:
+        by_kind[s.kind] = by_kind.get(s.kind, 0) + 1
+    trial_coupons = int(
+        (
+            await db.execute(
+                select(func.count())
+                .select_from(MembershipCoupon)
+                .where(MembershipCoupon.reward_code.like("trial_extend%"))
+            )
+        ).scalar()
+        or 0
+    )
+    trial_used = int(
+        (
+            await db.execute(
+                select(func.count())
+                .select_from(MembershipCoupon)
+                .where(
+                    MembershipCoupon.reward_code.like("trial_extend%"),
+                    MembershipCoupon.used == 1,
+                )
+            )
+        ).scalar()
+        or 0
+    )
+    return {
+        "skus_by_kind": by_kind,
+        "trial": {
+            "extend_coupons": trial_coupons,
+            "extend_redeemed": trial_used,
+            "login_day_rows": int(
+                (await db.execute(select(func.count()).select_from(UserLoginDay))).scalar()
+                or 0
+            ),
+        },
+        "points_ledger_rows": int(
+            (await db.execute(select(func.count()).select_from(PointsLedger))).scalar()
+            or 0
+        ),
+        "rank_states": int(
+            (await db.execute(select(func.count()).select_from(RankState))).scalar() or 0
+        ),
+        "commerce_events": int(
+            (await db.execute(select(func.count()).select_from(CommerceEvent))).scalar()
+            or 0
+        ),
+    }
+
+
+@router.get("/commerce/orders")
+async def commerce_orders(
+    kind: str | None = Query(default=None, max_length=32),
+    status_filter: str | None = Query(default=None, alias="status", max_length=24),
+    limit: int = Query(50, ge=1, le=200),
+    offset: int = Query(0, ge=0),
+    _: str = Depends(require_admin_token),
+    db: AsyncSession = Depends(get_db),
+) -> dict[str, Any]:
+    stmt = select(Order).order_by(Order.id.desc())
+    if status_filter:
+        stmt = stmt.where(Order.status == status_filter.strip())
+    rows = (await db.execute(stmt.offset(offset).limit(limit * 3))).scalars().all()
+    items = []
+    for order in rows:
+        oitems = (
+            await db.execute(select(OrderItem).where(OrderItem.order_id == order.id))
+        ).scalars().all()
+        sku_kinds: list[str] = []
+        sku_codes: list[str] = []
+        for oi in oitems:
+            sku = await db.get(ProductSku, oi.sku_id)
+            if sku is None:
+                continue
+            sku_kinds.append(sku.kind)
+            sku_codes.append(sku.sku_code)
+        if kind and kind.strip() not in sku_kinds:
+            continue
+        items.append(
+            {
+                "id": order.id,
+                "user_id": order.user_id,
+                "status": order.status,
+                "provider": order.provider,
+                "amount_cents": order.amount_cents,
+                "sku_codes": sku_codes,
+                "sku_kinds": sku_kinds,
+                "created_at": _iso(order.created_at),
+                "paid_at": _iso(order.paid_at),
+            }
+        )
+        if len(items) >= limit:
+            break
+    return {"items": items, "offset": offset, "limit": limit}
+
+
+@router.get("/commerce/points-ledger")
+async def commerce_points_ledger_peek(
+    user_id: int | None = Query(default=None),
+    limit: int = Query(40, ge=1, le=200),
+    _: str = Depends(require_admin_token),
+    db: AsyncSession = Depends(get_db),
+) -> dict[str, Any]:
+    stmt = select(PointsLedger).order_by(PointsLedger.id.desc()).limit(limit)
+    if user_id is not None:
+        stmt = stmt.where(PointsLedger.user_id == user_id)
+    rows = (await db.execute(stmt)).scalars().all()
+    return {
+        "items": [
+            {
+                "id": r.id,
+                "user_id": r.user_id,
+                "delta": r.delta,
+                "direction": r.direction,
+                "reason": r.reason,
+                "created_at": _iso(r.created_at),
+            }
+            for r in rows
+        ]
+    }
+
+
+@router.get("/commerce/events")
+async def commerce_events_peek(
+    event: str | None = Query(default=None, max_length=64),
+    limit: int = Query(50, ge=1, le=200),
+    _: str = Depends(require_admin_token),
+    db: AsyncSession = Depends(get_db),
+) -> dict[str, Any]:
+    stmt = select(CommerceEvent).order_by(CommerceEvent.id.desc()).limit(limit)
+    if event:
+        stmt = stmt.where(CommerceEvent.event == event.strip())
+    rows = (await db.execute(stmt)).scalars().all()
+    return {
+        "items": [
+            {
+                "id": r.id,
+                "user_id": r.user_id,
+                "event": r.event,
+                "module": r.module,
+                "page": r.page,
+                "created_at": _iso(r.created_at),
+            }
+            for r in rows
         ]
     }

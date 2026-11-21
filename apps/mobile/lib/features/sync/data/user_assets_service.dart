@@ -113,4 +113,24 @@ class UserAssetsService {
     );
     return order;
   }
+
+  /// Non-production mock fulfillment when WeChat MCH is not configured.
+  Future<Map<String, dynamic>> purchaseWithMock({
+    required String skuCode,
+    int quantity = 1,
+    int? couponId,
+    List<String>? selectedModules,
+  }) async {
+    final AcquireApiClient api = _ref.read(acquireApiClientProvider);
+    final Map<String, dynamic> order = await api.createAssetOrder(
+      items: <({String skuCode, int quantity})>[
+        (skuCode: skuCode, quantity: quantity),
+      ],
+      provider: 'mock',
+      couponId: couponId,
+      selectedModules: selectedModules,
+    );
+    final int orderId = (order['id'] as num).toInt();
+    return api.markAssetOrderPaid(orderId: orderId);
+  }
 }

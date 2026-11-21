@@ -6,8 +6,29 @@ import '../../../../router/app_router.dart';
 import '../../../authentication/presentation/auth_session.dart';
 import '../../../shared/presentation/pad/app_design_tokens.dart';
 import '../../../shared/presentation/pad/hub_ui.dart';
+import '../../../sync/data/acquire_api_client.dart';
 import '../../../sync/data/user_assets_service.dart';
 import '../../../sync/presentation/user_assets_provider.dart';
+
+final FutureProvider<Map<String, dynamic>?> homeTrialProvider =
+    FutureProvider<Map<String, dynamic>?>((Ref ref) async {
+  if (!ref.watch(authSessionProvider).isLoggedIn) return null;
+  try {
+    return await ref.watch(acquireApiClientProvider).commerceTrialStatus();
+  } catch (_) {
+    return null;
+  }
+});
+
+final FutureProvider<Map<String, dynamic>?> homeRankProvider =
+    FutureProvider<Map<String, dynamic>?>((Ref ref) async {
+  if (!ref.watch(authSessionProvider).isLoggedIn) return null;
+  try {
+    return await ref.watch(acquireApiClientProvider).commerceRank();
+  } catch (_) {
+    return null;
+  }
+});
 
 class HomeMembershipSection extends ConsumerWidget {
   const HomeMembershipSection({super.key});
@@ -20,10 +41,64 @@ class HomeMembershipSection extends ConsumerWidget {
     final String? membership = assets?.activeMembership?.trim();
     final bool isMember =
         membership != null && membership.isNotEmpty;
+    final Map<String, dynamic>? trial =
+        ref.watch(homeTrialProvider).asData?.value;
+    final Map<String, dynamic>? rank =
+        ref.watch(homeRankProvider).asData?.value;
+    final bool inTrial = trial?['in_trial'] == true;
+    int? daysLeft;
+    if (inTrial) {
+      final ends = DateTime.tryParse('${trial?['trial_ends_at'] ?? ''}');
+      if (ends != null) {
+        final diff = ends.toUtc().difference(DateTime.now().toUtc());
+        daysLeft = diff.isNegative ? 0 : diff.inDays + 1;
+      }
+    }
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: <Widget>[
+        if (inTrial) ...<Widget>[
+          Material(
+            color: const Color(0xFFE8F5E9),
+            borderRadius: BorderRadius.circular(16),
+            child: InkWell(
+              onTap: () => context.push(SGRoute.membership.route),
+              borderRadius: BorderRadius.circular(16),
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+                child: Row(
+                  children: <Widget>[
+                    const Icon(Icons.timelapse, color: Color(0xFF2E7D32)),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        daysLeft == null
+                            ? '全功能体验进行中 · 去领取延长券'
+                            : '全功能体验剩余约 $daysLeft 天 · 连续登录可延长',
+                        style: const TextStyle(fontWeight: FontWeight.w700),
+                      ),
+                    ),
+                    const Icon(Icons.chevron_right),
+                  ],
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(height: 12),
+        ],
+        if (rank != null) ...<Widget>[
+          Text(
+            '${rank['tier_label'] ?? rank['tier'] ?? '青铜'}'
+            ' · 学力 ${rank['power_points'] ?? 0}'
+            ' · 打卡 ${rank['checkin_streak'] ?? 0} 天',
+            style: TextStyle(
+              fontWeight: FontWeight.w700,
+              color: AppDesignTokens.textSecondary,
+            ),
+          ),
+          const SizedBox(height: 10),
+        ],
         _MembershipPayCard(
           loggedIn: loggedIn,
           isMember: isMember,

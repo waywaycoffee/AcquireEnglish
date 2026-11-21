@@ -76,14 +76,26 @@ class Endpoints {
   static const String assetsOrders = 'api/assets/orders';
   static const String assetsConsume = 'api/assets/entitlements/consume';
   static const String commerceCatalog = 'api/commerce/catalog';
-  static const String commerceFreeTrialSeeds = 'api/commerce/free-trial-seeds';
+  static const String commercePayStatus = 'api/commerce/pay-status';
   static const String commerceTrialStatus = 'api/commerce/trial/status';
   static const String commerceTrialClaimExtend = 'api/commerce/trial/claim-extend';
   static const String commercePoints = 'api/commerce/points';
   static const String commercePointsEarn = 'api/commerce/points/earn';
   static const String commercePointsSpend = 'api/commerce/points/spend';
+  static const String commerceQuotas = 'api/commerce/quotas';
+  static const String commerceQuotasConsume = 'api/commerce/quotas/consume';
+  static const String commerceEntitlements = 'api/commerce/entitlements';
+  static const String commerceRank = 'api/commerce/rank';
+  static const String commerceRankBoard = 'api/commerce/rank/board';
+  static const String commerceCheckin = 'api/commerce/checkin';
+  static const String commerceArenaStatus = 'api/commerce/arena/status';
+  static const String commerceArenaStart = 'api/commerce/arena/start';
+  static const String commerceArenaFinish = 'api/commerce/arena/finish';
+  static const String commerceEvents = 'api/commerce/events';
   static String commerceModuleAccess(String code) =>
       'api/commerce/modules/$code/access';
+  static String commerceQuotaMetric(String metric) =>
+      'api/commerce/quotas/$metric';
   static const String learningTasks = 'api/learning/tasks';
   static const String learningSessions = 'api/learning/sessions';
   static const String learningSceneRecognize = 'api/learning/scene-recognize';

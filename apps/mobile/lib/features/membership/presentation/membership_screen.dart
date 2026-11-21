@@ -18,6 +18,7 @@ class _MembershipScreenState extends ConsumerState<MembershipScreen> {
   List<Map<String, dynamic>> _skus = [];
   List<Map<String, dynamic>> _orders = [];
   List<Map<String, dynamic>> _modules = [];
+  List<Map<String, dynamic>> _combos = [];
   Map<String, dynamic>? _assets;
   Map<String, dynamic>? _trial;
   Map<String, dynamic>? _points;
@@ -31,6 +32,7 @@ class _MembershipScreenState extends ConsumerState<MembershipScreen> {
   bool _rewardBusy = false;
   bool _trialBusy = false;
   bool _pointsBusy = false;
+  final Set<String> _any2Picks = <String>{};
 
   @override
   void initState() {
@@ -80,25 +82,27 @@ class _MembershipScreenState extends ConsumerState<MembershipScreen> {
             .whereType<Map>()
             .map((e) => Map<String, dynamic>.from(e))
             .toList();
+        _combos = ((catalog?['combos'] as List<dynamic>?) ?? const [])
+            .whereType<Map>()
+            .map((e) => Map<String, dynamic>.from(e))
+            .toList();
         final List<Map<String, dynamic>> allSkus =
             results[1] as List<Map<String, dynamic>>;
-        // Storefront: only module 月卡 / 年卡 (no permanent / combo / Pro packs).
         _skus = allSkus
             .where(
               (s) =>
                   s['currency'] == 'CNY' &&
-                  s['kind'] == 'module' &&
-                  ('${s['sku_code']}'.endsWith('.monthly') ||
-                      '${s['sku_code']}'.endsWith('.yearly')),
+                  (s['kind'] == 'membership' ||
+                      s['kind'] == 'module' ||
+                      s['kind'] == 'module_permanent' ||
+                      s['kind'] == 'module_combo' ||
+                      s['kind'] == 'efficiency' ||
+                      s['kind'] == 'course_pack' ||
+                      s['kind'] == 'vocab_pack'),
             )
             .toList();
         _orders = results[2] as List<Map<String, dynamic>>;
-        if (_selected == null ||
-            !_skus.any((s) => s['sku_code'] == _selected)) {
-          _selected = _skus.isEmpty
-              ? null
-              : _skus.first['sku_code'] as String;
-        }
+        _selected ??= _skus.isEmpty ? null : _skus.first['sku_code'] as String;
       });
     } catch (_) {
       if (mounted) setState(() => _error = '暂时无法获取会员信息，请检查网络后重试。');
@@ -182,17 +186,33 @@ class _MembershipScreenState extends ConsumerState<MembershipScreen> {
     );
   }
 
+  void _toggleAny2(String code) {
+    setState(() {
+      if (_any2Picks.contains(code)) {
+        _any2Picks.remove(code);
+      } else {
+        if (_any2Picks.length >= 2) {
+          _any2Picks.remove(_any2Picks.first);
+        }
+        _any2Picks.add(code);
+      }
+    });
+  }
+
+  bool _selectedNeedsAny2() {
+    final String? code = _selected;
+    if (code == null) return false;
+    return code.contains('any2');
+  }
+
   Widget _moduleCatalog() {
-    if (_modules.isEmpty) return const SizedBox.shrink();
+    if (_modules.isEmpty && _combos.isEmpty) return const SizedBox.shrink();
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         const SizedBox(height: 16),
         Text('付费板块', style: Theme.of(context).textTheme.titleLarge),
-        const Text(
-          '视频 / 阅读 / 考试 / 课程：每板块约 3 个免费体验内容；'
-          '继续学习请开通月卡或年卡（微信支付）。',
-        ),
+        const Text('视频 / 阅读 / 考试 / 课程：点选月卡、年卡或永久解锁后微信支付；任选两板块需勾选两个。'),
         for (final mod in _modules) ...[
           Card(
             child: Column(
@@ -201,6 +221,14 @@ class _MembershipScreenState extends ConsumerState<MembershipScreen> {
                 ListTile(
                   title: Text('${mod['title']}'),
                   subtitle: Text('${mod['blurb'] ?? ''}'),
+                  trailing: _selectedNeedsAny2()
+                      ? Checkbox(
+                          value: _any2Picks.contains('${mod['code']}'),
+                          onChanged: _paying
+                              ? null
+                              : (_) => _toggleAny2('${mod['code']}'),
+                        )
+                      : null,
                 ),
                 Wrap(
                   spacing: 8,
@@ -227,11 +255,46 @@ class _MembershipScreenState extends ConsumerState<MembershipScreen> {
                         '${_selected == mod['sku_yearly'] ? ' ✓' : ''}',
                       ),
                     ),
+                    TextButton(
+                      onPressed: _paying
+                          ? null
+                          : () => setState(
+                                () => _selected = '${mod['sku_permanent']}',
+                              ),
+                      child: Text(
+                        '永久 ${_money(1990)}'
+                        '${_selected == mod['sku_permanent'] ? ' ✓' : ''}',
+                      ),
+                    ),
                   ],
                 ),
               ],
             ),
           ),
+        ],
+        if (_combos.isNotEmpty) ...[
+          const SizedBox(height: 8),
+          Text('组合优惠', style: Theme.of(context).textTheme.titleMedium),
+          for (final combo in _combos)
+            Card(
+              child: ListTile(
+                selected: _selected == combo['sku_code'],
+                title: Text('${combo['title']}'),
+                subtitle: Text(
+                  '${combo['duration_days'] ?? ''} 天'
+                  '${combo['pick'] != null ? ' · 任选 ${combo['pick']} 板块（勾选上方板块）' : ''}',
+                ),
+                trailing: Text(
+                  _money(combo['price_cents']),
+                  style: Theme.of(context).textTheme.titleMedium,
+                ),
+                onTap: _paying
+                    ? null
+                    : () => setState(
+                          () => _selected = combo['sku_code'] as String,
+                        ),
+              ),
+            ),
         ],
       ],
     );
@@ -325,6 +388,12 @@ class _MembershipScreenState extends ConsumerState<MembershipScreen> {
       ).showSnackBar(const SnackBar(content: Text('套餐尚未加载，请刷新后选择套餐。')));
       return;
     }
+    if (_selectedNeedsAny2() && _any2Picks.length != 2) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('任选两板块请先勾选恰好 2 个付费板块。')),
+      );
+      return;
+    }
     final Map<String, dynamic> sku = _skus.firstWhere(
       (s) => s['sku_code'] == _selected,
       orElse: () => <String, dynamic>{
@@ -333,8 +402,35 @@ class _MembershipScreenState extends ConsumerState<MembershipScreen> {
         'price_cents': 0,
       },
     );
-    final bool canUseCashCoupon =
-        sku['kind'] == 'membership' || sku['kind'] == 'module';
+    final bool isMembership = sku['kind'] == 'membership';
+    Map<String, dynamic>? payStatus;
+    try {
+      payStatus = await ref.read(acquireApiClientProvider).commercePayStatus();
+    } catch (_) {
+      payStatus = null;
+    }
+    final bool wechatReady = payStatus?['wechat_configured'] == true;
+    final bool mockAllowed = payStatus?['mock_allowed'] == true;
+    if (!wechatReady && !mockAllowed) {
+      setState(() => _paymentMessage = '待配置商户（缺少 WECHAT_MCH_*），收款暂未开放。');
+      if (mounted) {
+        await showDialog<void>(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: const Text('待配置商户'),
+            content: Text('${payStatus?['message'] ?? '微信支付商户未配置'}'),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('知道了'),
+              ),
+            ],
+          ),
+        );
+      }
+      return;
+    }
+    final bool useMock = !wechatReady && mockAllowed;
     final confirmed = await showModalBottomSheet<bool>(
       context: context,
       showDragHandle: true,
@@ -348,24 +444,28 @@ class _MembershipScreenState extends ConsumerState<MembershipScreen> {
               Text('确认订单', style: Theme.of(context).textTheme.titleLarge),
               const SizedBox(height: 20),
               Text('${sku['title']} · ${_money(sku['price_cents'])}'),
+              if (_selectedNeedsAny2())
+                Text('已选模块：${_any2Picks.join(' · ')}'),
               Text(
-                !canUseCashCoupon || _couponId == null
+                !isMembership || _couponId == null
                     ? '未使用抵扣券'
                     : '已选择抵扣券，以服务端结算金额为准',
               ),
               const Text('确认即表示同意当前价格和有效期；一次性付款，不自动续费。'),
-              const ListTile(
+              ListTile(
                 contentPadding: EdgeInsets.zero,
                 leading: Icon(
-                  Icons.account_balance_wallet,
-                  color: Colors.green,
+                  useMock ? Icons.science : Icons.account_balance_wallet,
+                  color: useMock ? Colors.orange : Colors.green,
                 ),
-                title: Text('微信支付'),
-                subtitle: Text('一次性付款，不自动续费'),
+                title: Text(useMock ? '开发环境模拟支付' : '微信支付'),
+                subtitle: Text(
+                  useMock ? '非生产 · 商户未配置时的联调路径' : '一次性付款，不自动续费',
+                ),
               ),
               FilledButton(
                 onPressed: () => Navigator.pop(context, true),
-                child: const Text('确认并前往微信'),
+                child: Text(useMock ? '确认模拟到账' : '确认并前往微信'),
               ),
             ],
           ),
@@ -375,23 +475,36 @@ class _MembershipScreenState extends ConsumerState<MembershipScreen> {
     if (confirmed != true || !mounted) return;
     setState(() {
       _paying = true;
-      _paymentMessage = '正在创建订单并打开微信…';
+      _paymentMessage = useMock ? '正在模拟支付到账…' : '正在创建订单并打开微信…';
     });
     try {
-      final order = await ref.read(userAssetsServiceProvider).purchaseWithWechat(
-            skuCode: _selected!,
-            couponId: canUseCashCoupon ? _couponId : null,
+      final order = useMock
+          ? await ref.read(userAssetsServiceProvider).purchaseWithMock(
+                skuCode: _selected!,
+                couponId: isMembership ? _couponId : null,
+                selectedModules: _selectedNeedsAny2()
+                    ? _any2Picks.toList(growable: false)
+                    : null,
+              )
+          : await ref.read(userAssetsServiceProvider).purchaseWithWechat(
+                skuCode: _selected!,
+                couponId: isMembership ? _couponId : null,
+                selectedModules: _selectedNeedsAny2()
+                    ? _any2Picks.toList(growable: false)
+                    : null,
+              );
+      bool paid = useMock || order['status'] == 'paid';
+      if (!paid) {
+        for (var attempt = 0; attempt < 5; attempt++) {
+          final orders = await ref
+              .read(acquireApiClientProvider)
+              .listAssetOrders();
+          paid = orders.any(
+            (o) => o['id'] == order['id'] && o['status'] == 'paid',
           );
-      bool paid = false;
-      for (var attempt = 0; attempt < 5; attempt++) {
-        final orders = await ref
-            .read(acquireApiClientProvider)
-            .listAssetOrders();
-        paid = orders.any(
-          (o) => o['id'] == order['id'] && o['status'] == 'paid',
-        );
-        if (paid || !mounted) break;
-        await Future<void>.delayed(const Duration(seconds: 2));
+          if (paid || !mounted) break;
+          await Future<void>.delayed(const Duration(seconds: 2));
+        }
       }
       if (mounted)
         setState(
@@ -403,9 +516,15 @@ class _MembershipScreenState extends ConsumerState<MembershipScreen> {
       String message = '支付未完成。若已扣款请刷新订单，勿重复付款。';
       if (error is DioException) {
         final data = error.response?.data;
-        message = data is Map && data['detail'] != null
-            ? '${data['detail']}'
-            : '无法连接支付服务，请检查网络后重试。';
+        final detail = data is Map ? data['detail'] : null;
+        if (detail != null) {
+          message = '$detail';
+          if ('$detail'.contains('WECHAT_MCH') || '$detail'.contains('商户')) {
+            message = '待配置商户：$detail';
+          }
+        } else {
+          message = '无法连接支付服务，请检查网络后重试。';
+        }
       } else if (error is StateError) {
         message = '${error.message}';
       }
@@ -640,14 +759,10 @@ class _MembershipScreenState extends ConsumerState<MembershipScreen> {
                           _rewardCard(),
                           const SizedBox(height: 16),
                           Text(
-                            '确认购买',
+                            '选择权益套餐',
                             style: Theme.of(context).textTheme.titleLarge,
                           ),
-                          Text(
-                            _selected == null
-                                ? '请在上方选择某一板块的月卡或年卡。'
-                                : '已选 $_selected · 价格以列表为准。',
-                          ),
+                          const Text('含 Pro 会员与模块/组合 SKU；价格以当前列表为准。'),
                           if (_loading) const LinearProgressIndicator(),
                           if (_error != null)
                             _card(
@@ -666,12 +781,41 @@ class _MembershipScreenState extends ConsumerState<MembershipScreen> {
                               padding: EdgeInsets.all(24),
                               child: Text('暂无可购买套餐'),
                             ),
+                          for (final sku in _skus)
+                            Card(
+                              child: ListTile(
+                                selected: _selected == sku['sku_code'],
+                                leading: Icon(
+                                  _selected == sku['sku_code']
+                                      ? Icons.radio_button_checked
+                                      : Icons.radio_button_off,
+                                ),
+                                title: Text('${sku['title']}'),
+                                subtitle: Text(
+                                  sku['duration_days'] != null
+                                      ? '${sku['duration_days']} 天 · 到期后手动续费'
+                                      : '购买后到账 · 数量 ${sku['grant_quantity'] ?? 1}',
+                                ),
+                                trailing: Text(
+                                  _money(sku['price_cents']),
+                                  style: Theme.of(
+                                    context,
+                                  ).textTheme.titleMedium,
+                                ),
+                                onTap: _paying
+                                    ? null
+                                    : () => setState(
+                                        () => _selected =
+                                            sku['sku_code'] as String,
+                                      ),
+                              ),
+                            ),
                           const Text(
                             '支付完成后由服务端确认到账。续费有效期在现有有效期基础上顺延；本页面不启用自动扣费。',
                           ),
                           const SizedBox(height: 12),
                           FilledButton.icon(
-                            onPressed: _paying || _selected == null ? null : _pay,
+                            onPressed: _paying ? null : _pay,
                             icon: const Icon(Icons.account_balance_wallet),
                             label: Text(_paying ? '等待支付结果…' : '使用微信支付'),
                           ),
