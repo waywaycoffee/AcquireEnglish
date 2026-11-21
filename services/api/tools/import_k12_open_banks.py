@@ -23,6 +23,7 @@ from __future__ import annotations
 import json
 import re
 import tarfile
+import zipfile
 from collections import defaultdict
 from pathlib import Path
 from typing import Any
@@ -429,9 +430,9 @@ def convert_cloth(root: Path) -> tuple[dict[str, list], dict[str, list]]:
         if p.name.startswith("_"):
             continue
         files.append(p)
-    # also extract tar if only archive present
+    # also extract archive if only tarball/zip present
+    extract_dir = root / "_extracted"
     for tar_path in list(root.glob("*.tar.gz")) + list(root.glob("*.tgz")):
-        extract_dir = root / "_extracted"
         if not extract_dir.exists():
             try:
                 with tarfile.open(tar_path, "r:gz") as tf:
@@ -439,9 +440,29 @@ def convert_cloth(root: Path) -> tuple[dict[str, list], dict[str, list]]:
             except (OSError, tarfile.TarError) as e:
                 print("CLOTH tar fail", e)
                 continue
+    for zip_path in root.glob("*.zip"):
+        if not extract_dir.exists():
+            try:
+                with zipfile.ZipFile(zip_path) as zf:
+                    zf.extractall(extract_dir)
+            except (OSError, zipfile.BadZipFile) as e:
+                print("CLOTH zip fail", e)
+                continue
+    if extract_dir.exists():
         files.extend(extract_dir.rglob("*.json"))
 
+    # Deduplicate by resolved path (manual extract + archive extract can overlap).
+    seen_paths: set[str] = set()
+    unique_files: list[Path] = []
     for path in files:
+        key = str(path.resolve()).lower()
+        if key in seen_paths or path.name.startswith("_"):
+            continue
+        seen_paths.add(key)
+        unique_files.append(path)
+
+    seen_passage_ids: set[str] = set()
+    for path in unique_files:
         try:
             data = json.loads(path.read_text(encoding="utf-8"))
         except (OSError, json.JSONDecodeError):
@@ -468,6 +489,9 @@ def convert_cloth(root: Path) -> tuple[dict[str, list], dict[str, list]]:
         if not qs:
             continue
         rid = safe_id(f"cloth_{level}_{path.stem}")
+        if rid in seen_passage_ids:
+            continue
+        seen_passage_ids.add(rid)
         target["reading"].append(
             {
                 "id": rid,
@@ -491,30 +515,49 @@ def convert_scques(root: Path, *, max_items: int = 2000) -> dict[str, list]:
     out = empty_sections()
     if not root.exists():
         return out
+    for tar_path in list(root.glob("*.tar.gz")) + list(root.rglob("*.tar.gz")):
+        extract_dir = tar_path.parent / "_extracted"
+        if extract_dir.exists():
+            continue
+        try:
+            with tarfile.open(tar_path, "r:gz") as tf:
+                tf.extractall(extract_dir)
+        except (OSError, tarfile.TarError) as e:
+            print("SC-Ques tar fail", e)
     candidates: list[Path] = []
-    for pat in ("**/*.json", "**/*.jsonl", "**/*.csv"):
+    for pat in ("**/*.json", "**/*.jsonl", "**/*.jsons", "**/*.csv"):
         candidates.extend(root.glob(pat))
     count = 0
     for path in candidates:
+        # Skip provenance markers / incomplete downloads.
+        if path.name.startswith("_") or path.name.endswith(".tar.gz"):
+            continue
         if path.stat().st_size > 200 * 1024 * 1024:
             continue
         try:
-            if path.suffix == ".jsonl":
-                lines = path.read_text(encoding="utf-8", errors="ignore").splitlines()
+            if path.suffix in {".jsonl", ".jsons"}:
                 rows = []
-                for line in lines:
-                    line = line.strip()
-                    if not line:
-                        continue
-                    try:
-                        rows.append(json.loads(line))
-                    except json.JSONDecodeError:
-                        continue
+                with path.open(encoding="utf-8", errors="ignore") as f:
+                    for line in f:
+                        line = line.strip()
+                        if not line:
+                            continue
+                        try:
+                            rows.append(json.loads(line))
+                        except json.JSONDecodeError:
+                            continue
+                        if len(rows) >= max_items * 2:
+                            break
             elif path.suffix == ".csv":
                 import csv
 
+                # Official SC-Ques train.csv is label+text (not MCQ) — skip that shape.
                 with path.open(encoding="utf-8", errors="ignore") as f:
-                    rows = list(csv.DictReader(f))
+                    reader = csv.DictReader(f)
+                    fieldnames = {h.lower() for h in (reader.fieldnames or [])}
+                    if fieldnames <= {"label", "text"} or "options" not in fieldnames and "choice" not in fieldnames and "choices" not in fieldnames:
+                        continue
+                    rows = list(reader)
             else:
                 data = json.loads(path.read_text(encoding="utf-8", errors="ignore"))
                 if isinstance(data, list):
@@ -533,13 +576,21 @@ def convert_scques(root: Path, *, max_items: int = 2000) -> dict[str, list]:
                 or row.get("stem")
                 or row.get("prompt")
                 or row.get("sentence")
+                or row.get("text")
                 or ""
             ).strip()
             if not stem:
                 continue
-            opts = row.get("options") or row.get("choices") or row.get("candidates") or []
+            opts = row.get("options") or row.get("choices") or row.get("choice") or row.get("candidates") or []
             if isinstance(opts, dict):
-                opts = [str(v) for _, v in sorted(opts.items())]
+                cleaned = []
+                for k, v in sorted(opts.items()):
+                    s = str(v)
+                    ku = str(k).strip().upper()
+                    if len(s) >= 2 and s[0].upper() == ku[:1] and s[1] in " .、)":
+                        s = s[2:].lstrip(" .、)")
+                    cleaned.append(s)
+                opts = cleaned
             else:
                 opts = [str(o) for o in opts] if isinstance(opts, list) else []
             if len(opts) < 2:
@@ -705,7 +756,11 @@ def main() -> None:
                 "writing": [],
                 "speaking": [],
             },
-            sources=["Xie et al. CLOTH / www.qizhexie.com"],
+            sources=[
+                "Xie et al. CLOTH (research-noncommercial)",
+                "https://www.cs.cmu.edu/~glai1/data/cloth/",
+                "https://www.qizhexie.com/data/CLOTH",
+            ],
             license_id="research-noncommercial",
             commercial_ok=False,
             mock={"duration_minutes": 40, "sections": ["reading", "vocab"]},
@@ -740,8 +795,8 @@ def main() -> None:
             title="SC-Ques ESL 句子填空 / 语法单选",
             cefr="A2",
             sections=scq,
-            sources=["ai4ed/SC-Ques"],
-            license_id="research-check-paper",
+            sources=["ai4ed/SC-Ques (CC BY 4.0)"],
+            license_id="CC-BY-4.0",
             commercial_ok=False,
             mock={"duration_minutes": 30, "sections": ["vocab"]},
             caps=CAPS_DEDICATED,
