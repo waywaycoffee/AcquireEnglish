@@ -87,9 +87,23 @@ def enqueue(bvid, page, *, user_id: int | None = None):
         if row is not None:
             # An English-only translate job cannot produce English; upgrade it.
             if row['kind']=='translate' and row['state'] in ('failed','retry'):
-                db.execute("UPDATE jobs SET kind='asr',state='queued',attempts=0,error=NULL,updated=? WHERE id=?",
-                  (time.time(),row['id']))
-                row=db.execute('SELECT * FROM jobs WHERE id=?',(row['id'],)).fetchone()
+                db.execute(
+                    "UPDATE jobs SET kind='asr',state='queued',attempts=0,error=NULL,"
+                    "lease=NULL,deadline=NULL,updated=? WHERE id=?",
+                    (time.time(), row['id']),
+                )
+                row = db.execute('SELECT * FROM jobs WHERE id=?', (row['id'],)).fetchone()
+            # Terminal failures used to stick forever: app re-scans treated the
+            # existing row as "queued" while claim() permanently skipped them.
+            elif row['state'] == 'failed':
+                db.execute(
+                    "UPDATE jobs SET state='queued', attempts=0, error=NULL, "
+                    "lease=NULL, deadline=NULL, updated=? WHERE id=?",
+                    (time.time(), row['id']),
+                )
+                row = db.execute(
+                    'SELECT * FROM jobs WHERE id=?', (row['id'],)
+                ).fetchone()
             _add_requester(db, row['id'], user_id)
             return public(db.execute('SELECT * FROM jobs WHERE id=?', (row['id'],)).fetchone())
         job_id = uuid.uuid4().hex

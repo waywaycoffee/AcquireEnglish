@@ -31,6 +31,15 @@ class QueueTest(unittest.TestCase):
   self.assertIsNone(queue.claim())
   with queue.connection() as db:
    self.assertEqual(db.execute('SELECT state FROM jobs').fetchone()[0],'failed')
+ def test_enqueue_reopens_failed(self):
+  queue.enqueue('BV1CS4y1v7sQ',1)
+  for _ in range(4):
+   queue.update(queue.claim(),'retry')
+  self.assertIsNone(queue.claim())
+  reopened=queue.enqueue('BV1CS4y1v7sQ',1)
+  self.assertEqual(reopened['state'],'queued')
+  self.assertEqual(reopened['attempts'],0)
+  self.assertIsNotNone(queue.claim())
  def test_invalid(self):
   with self.assertRaises(ValueError):queue.enqueue('bad',1)
 
