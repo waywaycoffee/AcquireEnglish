@@ -67,6 +67,7 @@ List<InlineSpan> buildReadingTextSpans({
   required ReadingRangeCallback onWordLongPress,
   required ReadingRangeCallback onChunkDoubleTap,
   required ReadingRangeCallback onChunkLongPress,
+  int? highlightWordIndex,
 }) {
   final List<ReadingToken> tokens = tokenizeReadingText(text);
   if (tokens.isEmpty) return const <InlineSpan>[];
@@ -165,9 +166,15 @@ List<InlineSpan> buildReadingTextSpans({
     final String norm = normalizeWord(token.raw);
     final String? gloss = showChinese ? hardGlosses[norm] : null;
     final bool learned = learnedWords.contains(norm);
-    final Color wordColor = learned
-        ? (dark ? const Color(0xFF9AE6B4) : const Color(0xFF146638))
-        : textColor;
+    final bool karaoke = highlightWordIndex != null && wordIdx == highlightWordIndex;
+    final Color wordColor = karaoke
+        ? (dark ? const Color(0xFFE8FFC8) : const Color(0xFF146638))
+        : learned
+            ? (dark ? const Color(0xFF9AE6B4) : const Color(0xFF146638))
+            : textColor;
+    final Color? karaokeBg = karaoke
+        ? (dark ? const Color(0xFF3A5A20) : const Color(0xFFDFF8C8))
+        : null;
 
     spans.add(
       WidgetSpan(
@@ -178,8 +185,19 @@ List<InlineSpan> buildReadingTextSpans({
           onTap: () => onWordTap(token.raw, token.start, token.end),
           onLongPress: () =>
               onWordLongPress(token.raw, token.start, token.end),
-          child: Padding(
-            padding: const EdgeInsets.only(right: 1),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 1),
+            decoration: karaokeBg == null
+                ? null
+                : BoxDecoration(
+                    color: karaokeBg,
+                    borderRadius: BorderRadius.circular(4),
+                    border: Border.all(
+                      color: dark
+                          ? const Color(0xFF9AE6B4)
+                          : const Color(0xFF2F6B3A),
+                    ),
+                  ),
             child: gloss != null && gloss.isNotEmpty
                 ? Column(
                     mainAxisSize: MainAxisSize.min,
@@ -190,7 +208,7 @@ List<InlineSpan> buildReadingTextSpans({
                           color: wordColor,
                           fontSize: fontSize,
                           height: 1.15,
-                          fontWeight: FontWeight.w500,
+                          fontWeight: FontWeight.w700,
                         ),
                       ),
                       Text(
@@ -212,7 +230,7 @@ List<InlineSpan> buildReadingTextSpans({
                       color: wordColor,
                       fontSize: fontSize,
                       height: lineHeight,
-                      fontWeight: FontWeight.w500,
+                      fontWeight: karaoke ? FontWeight.w700 : FontWeight.w500,
                     ),
                   ),
           ),

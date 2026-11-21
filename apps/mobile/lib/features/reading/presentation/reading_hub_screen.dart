@@ -15,6 +15,7 @@ import '../../shared/presentation/pad/app_design_tokens.dart';
 import '../../shared/presentation/pad/pad_scaffold.dart';
 import '../../shared/presentation/pad/pad_top_bar.dart';
 import '../data/reading_ingest.dart';
+import '../data/reading_stats.dart';
 import '../domain/reading_doc.dart';
 import 'reading_library_provider.dart';
 
@@ -163,7 +164,7 @@ class ReadingHubScreen extends ConsumerWidget {
       showContinueLearning: false,
       topBar: PadTopBar(
         title: '爱快阅读',
-        description: '泛读短文 · 点词进词书 · 可从视频字幕生成',
+        description: '泛读短文 · 点词进词书 · 连续朗读 / 跟读评测',
         leading: PadBackButton(onPressed: () => context.pop()),
         actions: <Widget>[
           TextButton.icon(
@@ -188,6 +189,33 @@ class ReadingHubScreen extends ConsumerWidget {
           : ListView(
               padding: const EdgeInsets.all(20),
               children: <Widget>[
+                Builder(
+                  builder: (BuildContext context) {
+                    final ReadingHubStats stats = computeReadingHubStats(state);
+                    return Padding(
+                      padding: const EdgeInsets.only(bottom: 16),
+                      child: Wrap(
+                        spacing: 10,
+                        runSpacing: 8,
+                        children: <Widget>[
+                          _StatChip(label: '书架', value: '${stats.docCount}'),
+                          _StatChip(
+                            label: '已打开',
+                            value: '${stats.openedCount}',
+                          ),
+                          _StatChip(
+                            label: '读完',
+                            value: '${stats.completedCount}',
+                          ),
+                          _StatChip(
+                            label: '约读词数',
+                            value: '${stats.wordsReadEstimate}',
+                          ),
+                        ],
+                      ),
+                    );
+                  },
+                ),
                 if (cont != null) ...<Widget>[
                   const _SectionTitle('继续阅读'),
                   _DocTile(
@@ -211,7 +239,7 @@ class ReadingHubScreen extends ConsumerWidget {
                     FilledButton.tonalIcon(
                       onPressed: () => unawaited(_importFile(context, ref)),
                       icon: const Icon(Icons.upload_file_rounded),
-                      label: const Text('导入 TXT / EPUB'),
+                      label: const Text('导入 TXT / EPUB / MD'),
                     ),
                     FilledButton.tonalIcon(
                       onPressed: () =>
@@ -256,6 +284,41 @@ class ReadingHubScreen extends ConsumerWidget {
                 ],
               ],
             ),
+    );
+  }
+}
+
+class _StatChip extends StatelessWidget {
+  const _StatChip({required this.label, required this.value});
+
+  final String label;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF3F6F2),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppDesignTokens.borderGray),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          Text(
+            value,
+            style: const TextStyle(
+              fontWeight: FontWeight.w900,
+              fontSize: 16,
+            ),
+          ),
+          Text(
+            label,
+            style: const TextStyle(fontSize: 12, color: Color(0xFF626262)),
+          ),
+        ],
+      ),
     );
   }
 }

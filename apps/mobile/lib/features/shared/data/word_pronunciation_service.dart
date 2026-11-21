@@ -74,6 +74,7 @@ class WordPronunciationService {
     String language = 'en-US',
     String? recordedUrl,
     bool allowSynthesisFallback = true,
+    double? rate,
   }) async {
     if (speakOverride != null) {
       await speakOverride!(text);
@@ -96,7 +97,7 @@ class WordPronunciationService {
       language: language,
       engine: selectedEngine,
       voice: selectedVoice,
-      rate: selectedRate,
+      rate: (rate ?? selectedRate).clamp(0.5, 1.8),
     );
   }
 

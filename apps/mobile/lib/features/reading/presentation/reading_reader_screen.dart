@@ -16,10 +16,14 @@ import '../../shared/presentation/pad/app_design_tokens.dart';
 import '../../shared/presentation/pad/pad_scaffold.dart';
 import '../../shared/presentation/pad/pad_top_bar.dart';
 import '../../shared/presentation/word_lookup_popup.dart';
+import '../../daily_review/presentation/foundation_media_video_sheet.dart';
+import '../../learning_modules/assessment_panel.dart';
 import '../../words/data/offline_word_dictionary.dart';
 import '../../words/domain/foundation_media.dart';
+import '../../words/presentation/foundation_media_provider.dart';
 import '../../words/presentation/learned_vocabulary_provider.dart';
 import '../../words/presentation/word_book_provider.dart';
+import '../data/reading_continuous_tts.dart';
 import '../data/reading_gloss.dart';
 import '../domain/reading_doc.dart';
 import '../domain/reading_study_mode.dart';
@@ -27,6 +31,9 @@ import 'content_media_provider.dart';
 import 'reading_chunk_provider.dart';
 import 'reading_library_provider.dart';
 import 'reading_text_spans.dart';
+
+const String kReadingSlowModeKey = 'reading_slow_mode_v1';
+const String kReadingSoeEnabledKey = 'reading_soe_enabled_v1';
 
 class ReadingReaderScreen extends ConsumerStatefulWidget {
   const ReadingReaderScreen({required this.docId, super.key});
@@ -50,6 +57,12 @@ class _ReadingReaderScreenState extends ConsumerState<ReadingReaderScreen> {
   bool _opened = false;
   bool _playingRemote = false;
   bool _speakingSentence = false;
+  bool _continuousPlaying = false;
+  bool _slowMode = false;
+  bool _soeEnabled = false;
+  int? _highlightWordIndex;
+  int _continuousGeneration = 0;
+  Timer? _highlightTimer;
   String? _glossDocId;
   int _glossThreshold = -1;
   Map<String, String> _hardGlosses = const <String, String>{};
@@ -76,6 +89,8 @@ class _ReadingReaderScreenState extends ConsumerState<ReadingReaderScreen> {
       }
     }
     _sentenceTranslate = prefs.get(kReadingSentenceTranslateKey) == '1';
+    _slowMode = prefs.get(kReadingSlowModeKey) == '1';
+    _soeEnabled = prefs.get(kReadingSoeEnabledKey) == '1';
     final int? thr = int.tryParse(prefs.get(kReadingFreqThresholdKey) ?? '');
     if (thr != null && kReadingFreqThresholdBands.contains(thr)) {
       _freqThreshold = thr;
@@ -84,6 +99,8 @@ class _ReadingReaderScreenState extends ConsumerState<ReadingReaderScreen> {
 
   @override
   void dispose() {
+    _continuousGeneration += 1;
+    _highlightTimer?.cancel();
     _saveDebounce?.cancel();
     _scroll.dispose();
     super.dispose();
@@ -98,6 +115,115 @@ class _ReadingReaderScreenState extends ConsumerState<ReadingReaderScreen> {
       _sentenceTranslate ? '1' : '0',
     );
     await prefs.put(kReadingFreqThresholdKey, '$_freqThreshold');
+    await prefs.put(kReadingSlowModeKey, _slowMode ? '1' : '0');
+    await prefs.put(kReadingSoeEnabledKey, _soeEnabled ? '1' : '0');
+  }
+
+  double get _effectiveRate {
+    final double base = ref.read(learningSettingsProvider).ttsRate;
+    return _slowMode ? (base * 0.55).clamp(0.5, 1.0) : base.clamp(0.5, 1.8);
+  }
+
+  Future<void> _stopContinuous() async {
+    _continuousGeneration += 1;
+    _highlightTimer?.cancel();
+    await ref.read(wordPronunciationServiceProvider).stop();
+    if (!mounted) return;
+    setState(() {
+      _continuousPlaying = false;
+      _highlightWordIndex = null;
+    });
+  }
+
+  Future<void> _playContinuous(ReadingDoc doc) async {
+    if (_continuousPlaying) {
+      await _stopContinuous();
+      return;
+    }
+    final int generation = ++_continuousGeneration;
+    final List<ReadingSpeakUnit> units = splitReadingSpeakUnits(doc.plainText);
+    if (units.isEmpty) return;
+    setState(() => _continuousPlaying = true);
+    final double rate = _effectiveRate;
+    final int msPerWord = estimatedMsPerWord(rate);
+    try {
+      for (final ReadingSpeakUnit unit in units) {
+        if (!mounted || generation != _continuousGeneration) return;
+        int local = 0;
+        setState(() => _highlightWordIndex = unit.firstWordIndex);
+        _highlightTimer?.cancel();
+        _highlightTimer = Timer.periodic(Duration(milliseconds: msPerWord), (
+          Timer t,
+        ) {
+          if (!mounted || generation != _continuousGeneration) {
+            t.cancel();
+            return;
+          }
+          local += 1;
+          if (local >= unit.wordCount) {
+            t.cancel();
+            return;
+          }
+          setState(
+            () => _highlightWordIndex = unit.firstWordIndex + local,
+          );
+        });
+        await ref.read(wordPronunciationServiceProvider).speak(
+              unit.text,
+              rate: rate,
+            );
+        _highlightTimer?.cancel();
+        if (!mounted || generation != _continuousGeneration) return;
+      }
+    } finally {
+      _highlightTimer?.cancel();
+      if (mounted && generation == _continuousGeneration) {
+        setState(() {
+          _continuousPlaying = false;
+          _highlightWordIndex = null;
+        });
+      }
+    }
+  }
+
+  Future<void> _openMouthVideo(String lexeme) async {
+    final FoundationMediaManifest manifest =
+        await ref.read(foundationMediaManifestProvider.future);
+    final String key = normalizeWord(lexeme);
+    FoundationMediaItem? hit;
+    for (final String book in const <String>[
+      'foundation_ipa_48',
+      'foundation_phonics',
+      'phonics_jolly',
+      'ipa',
+    ]) {
+      hit = manifest.lookup(book, key);
+      if (hit?.hasVideo ?? false) break;
+      hit = null;
+    }
+    // Fall back: any item whose key matches.
+    if (hit == null) {
+      final String want = FoundationMediaManifest.normKey(key);
+      for (final FoundationMediaItem item in manifest.items) {
+        if (FoundationMediaManifest.normKey(item.key) == want &&
+            item.hasVideo) {
+          hit = item;
+          break;
+        }
+      }
+    }
+    if (!mounted) return;
+    if (hit == null || !(hit.hasVideo)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('暂无该词/音素的口型视频（需已上传到服务器）')),
+      );
+      return;
+    }
+    await showFoundationMediaVideoSheet(
+      context,
+      title: '口型示范 · $key',
+      videoUrl: hit.videoUrl!,
+    );
   }
 
   Future<void> _ensureGlosses(ReadingDoc doc) async {
@@ -212,41 +338,73 @@ class _ReadingReaderScreenState extends ConsumerState<ReadingReaderScreen> {
               12,
               MediaQuery.paddingOf(ctx).bottom + 12,
             ),
-            child: WordLookupPopupCard(
-              rawWord: lexeme,
-              contextSentence: sentence,
-              episodeId: doc.episodeId ?? 'reading:${doc.id}',
-              fallbackDefinitionCn: fallback.isEmpty ? null : fallback,
-              maxHeight: maxH,
-              onClose: () => Navigator.pop(ctx),
-              onPronounce: () {
-                unawaited(
-                  ref.read(wordPronunciationServiceProvider).speak(lexeme),
-                );
-              },
-              onFavorite: (String? definitionCn) {
-                final bool ok = ref.read(wordBookProvider.notifier).addFavoriteWord(
-                      rawWord: lexeme,
-                      episodeId: doc.episodeId ?? 'reading:${doc.id}',
-                      course: '阅读 · ${doc.title}',
-                      episode: doc.episodeTitle.isEmpty
-                          ? doc.title
-                          : doc.episodeTitle,
-                      time: '',
-                      lineKey: 'reading:${doc.id}:$lexeme',
-                      sentence: sentence,
-                      chinese: '',
-                      generatedDefinition: (definitionCn ?? '').trim().isEmpty
-                          ? null
-                          : definitionCn!.trim(),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: <Widget>[
+                Wrap(
+                  spacing: 8,
+                  children: <Widget>[
+                    TextButton.icon(
+                      onPressed: () {
+                        unawaited(
+                          ref.read(wordPronunciationServiceProvider).speak(
+                                lexeme,
+                                rate: (_effectiveRate * 0.7).clamp(0.5, 1.0),
+                              ),
+                        );
+                      },
+                      icon: const Icon(Icons.slow_motion_video_rounded),
+                      label: const Text('慢读'),
+                    ),
+                    TextButton.icon(
+                      onPressed: () => unawaited(_openMouthVideo(lexeme)),
+                      icon: const Icon(Icons.face_retouching_natural_outlined),
+                      label: const Text('口型'),
+                    ),
+                  ],
+                ),
+                WordLookupPopupCard(
+                  rawWord: lexeme,
+                  contextSentence: sentence,
+                  episodeId: doc.episodeId ?? 'reading:${doc.id}',
+                  fallbackDefinitionCn: fallback.isEmpty ? null : fallback,
+                  maxHeight: maxH,
+                  onClose: () => Navigator.pop(ctx),
+                  onPronounce: () {
+                    unawaited(
+                      ref.read(wordPronunciationServiceProvider).speak(
+                            lexeme,
+                            rate: _effectiveRate,
+                          ),
                     );
-                Navigator.pop(ctx);
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text(ok ? '已加入词书：$lexeme' : '无法加入：$lexeme'),
-                  ),
-                );
-              },
+                  },
+                  onFavorite: (String? definitionCn) {
+                    final bool ok =
+                        ref.read(wordBookProvider.notifier).addFavoriteWord(
+                              rawWord: lexeme,
+                              episodeId: doc.episodeId ?? 'reading:${doc.id}',
+                              course: '阅读 · ${doc.title}',
+                              episode: doc.episodeTitle.isEmpty
+                                  ? doc.title
+                                  : doc.episodeTitle,
+                              time: '',
+                              lineKey: 'reading:${doc.id}:$lexeme',
+                              sentence: sentence,
+                              chinese: '',
+                              generatedDefinition:
+                                  (definitionCn ?? '').trim().isEmpty
+                                      ? null
+                                      : definitionCn!.trim(),
+                            );
+                    Navigator.pop(ctx);
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text(ok ? '已加入词书：$lexeme' : '无法加入：$lexeme'),
+                      ),
+                    );
+                  },
+                ),
+              ],
             ),
           ),
         );
@@ -282,7 +440,10 @@ class _ReadingReaderScreenState extends ConsumerState<ReadingReaderScreen> {
       if (!mounted) return;
       setState(() => _speakingSentence = true);
       try {
-        await ref.read(wordPronunciationServiceProvider).speak(sentence);
+        await ref.read(wordPronunciationServiceProvider).speak(
+              sentence,
+              rate: _effectiveRate,
+            );
       } finally {
         if (mounted) setState(() => _speakingSentence = false);
       }
@@ -329,7 +490,7 @@ class _ReadingReaderScreenState extends ConsumerState<ReadingReaderScreen> {
                         try {
                           await ref
                               .read(wordPronunciationServiceProvider)
-                              .speak(sentence);
+                              .speak(sentence, rate: _effectiveRate);
                         } finally {
                           if (mounted) {
                             setState(() => _speakingSentence = false);
@@ -363,10 +524,46 @@ class _ReadingReaderScreenState extends ConsumerState<ReadingReaderScreen> {
                   _sentenceTranslate ? '句译：开（点此关闭）' : '句译：关（点此开启）',
                 ),
               ),
+              if (_soeEnabled) ...<Widget>[
+                const SizedBox(height: 12),
+                AssessmentPanel(reference: sentence),
+              ] else
+                TextButton(
+                  onPressed: () {
+                    setState(() => _soeEnabled = true);
+                    unawaited(_persistPrefs());
+                    Navigator.pop(ctx);
+                    unawaited(
+                      _onSentenceLongPress(doc: doc, start: start, end: end),
+                    );
+                  },
+                  child: const Text('开启跟读评测（可选）'),
+                ),
             ],
           ),
         );
       },
+    );
+  }
+
+  void _addHardWordsToBook(ReadingDoc doc) {
+    int added = 0;
+    for (final MapEntry<String, String> e in _hardGlosses.entries.take(25)) {
+      final bool ok = ref.read(wordBookProvider.notifier).addFavoriteWord(
+            rawWord: e.key,
+            episodeId: doc.episodeId ?? 'reading:${doc.id}',
+            course: '阅读难词 · ${doc.title}',
+            episode: doc.title,
+            time: '',
+            lineKey: 'reading:${doc.id}:hard:${e.key}',
+            sentence: '',
+            chinese: '',
+            generatedDefinition: e.value,
+          );
+      if (ok) added += 1;
+    }
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(added == 0 ? '没有可加入的难词' : '已加入 $added 个难词到词书')),
     );
   }
 
@@ -499,10 +696,33 @@ class _ReadingReaderScreenState extends ConsumerState<ReadingReaderScreen> {
       topBar: PadTopBar(
         title: doc.title,
         description: _mode == ReadingStudyMode.immersion
-            ? '沉浸 · 点词查义 · 长按朗读 · 双击语块$rateLabel'
-            : '精读 · 难词中文(>$_freqThreshold) · 语块高亮$rateLabel',
+            ? '沉浸 · 连续朗读 · 长按整句${_slowMode ? ' · 慢读' : ''}$rateLabel'
+            : '精读 · 难词中文(>$_freqThreshold)${_slowMode ? ' · 慢读' : ''}$rateLabel',
         leading: PadBackButton(onPressed: () => context.pop()),
         actions: <Widget>[
+          IconButton(
+            tooltip: _continuousPlaying ? '停止朗读' : '连续朗读',
+            onPressed: () => unawaited(_playContinuous(doc)),
+            icon: Icon(
+              _continuousPlaying
+                  ? Icons.stop_circle_outlined
+                  : Icons.play_circle_outline_rounded,
+              color: _continuousPlaying
+                  ? AppDesignTokens.brandGreenDark
+                  : null,
+            ),
+          ),
+          IconButton(
+            tooltip: _slowMode ? '关闭慢读' : '慢读模式',
+            onPressed: () {
+              setState(() => _slowMode = !_slowMode);
+              unawaited(_persistPrefs());
+            },
+            icon: Icon(
+              Icons.slow_motion_video_rounded,
+              color: _slowMode ? AppDesignTokens.brandGreenDark : null,
+            ),
+          ),
           IconButton(
             tooltip: _mode == ReadingStudyMode.immersion ? '切换精读' : '切换沉浸',
             onPressed: () {
@@ -527,6 +747,12 @@ class _ReadingReaderScreenState extends ConsumerState<ReadingReaderScreen> {
             onPressed: _openFreqSheet,
             icon: const Icon(Icons.tune_rounded),
           ),
+          if (_hardGlosses.isNotEmpty)
+            IconButton(
+              tooltip: '难词进词书',
+              onPressed: () => _addHardWordsToBook(doc),
+              icon: const Icon(Icons.playlist_add_rounded),
+            ),
           if (remoteMedia?.hasAudio ?? false)
             IconButton(
               tooltip: '播放服务器朗读',
@@ -680,6 +906,7 @@ class _ReadingReaderScreenState extends ConsumerState<ReadingReaderScreen> {
                           ),
                         );
                       },
+                      highlightWordIndex: _highlightWordIndex,
                     ),
                   ),
                 ),

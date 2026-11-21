@@ -1,3 +1,4 @@
+import 'package:common_learn_english/features/reading/data/reading_continuous_tts.dart';
 import 'package:common_learn_english/features/reading/data/reading_gloss.dart';
 import 'package:common_learn_english/features/reading/data/reading_ingest.dart';
 import 'package:common_learn_english/features/reading/domain/reading_study_mode.dart';
@@ -103,6 +104,23 @@ void main() {
           highlighter.matchLine("Don't give up now");
       expect(hits[1]?.phrase, 'give up');
       expect(hits[2]?.phrase, 'give up');
+    });
+  });
+
+  group('splitReadingSpeakUnits', () {
+    test('splits sentences with word indices', () {
+      const String text = 'Hello world. Give up now!';
+      final List<ReadingSpeakUnit> units = splitReadingSpeakUnits(text);
+      expect(units.length, greaterThanOrEqualTo(2));
+      expect(units.first.text, contains('Hello'));
+      expect(units.first.wordCount, 2);
+      expect(units[1].firstWordIndex, 2);
+    });
+  });
+
+  group('estimatedMsPerWord', () {
+    test('slows down when rate decreases', () {
+      expect(estimatedMsPerWord(0.5), greaterThan(estimatedMsPerWord(1.0)));
     });
   });
 }
