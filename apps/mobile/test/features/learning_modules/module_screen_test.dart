@@ -27,15 +27,44 @@ void main() {
       }
     },
   );
+  test('curriculum covers British phonemes and all course tracks', () {
+    expect(moduleLessons['ipa']!.length, 46);
+    expect(moduleLessons['phonics']!.length, 32);
+    expect(moduleLessons['chunks']!.length, 22);
+    expect(moduleLessons['listening']!.length, 14);
+    expect(moduleLessons['dialogue']!.length, 14);
+    expect(
+      moduleLessons.values.fold<int>(0, (sum, list) => sum + list.length),
+      128,
+    );
+  });
   testWidgets('completion requires a correct answer', (tester) async {
-    await tester.pumpWidget(const ProviderScope(child: MaterialApp(home: ModuleScreen(kind: 'phonics'))));
+    await tester.pumpWidget(
+      const ProviderScope(
+        child: MaterialApp(home: ModuleScreen(kind: 'phonics')),
+      ),
+    );
     await tester.pumpAndSettle();
-    await tester.scrollUntilVisible(find.text('完成并保存进度'), 200, scrollable: find.byType(Scrollable).first);
-    expect(tester.widget<FilledButton>(find.widgetWithText(FilledButton, '完成并保存进度')).onPressed, isNull);
+    await tester.scrollUntilVisible(
+      find.text('完成并保存进度'),
+      200,
+      scrollable: find.byType(Scrollable).first,
+    );
+    expect(
+      tester
+          .widget<FilledButton>(find.widgetWithText(FilledButton, '完成并保存进度'))
+          .onPressed,
+      isNull,
+    );
     await tester.ensureVisible(find.text('/æ/'));
     await tester.tap(find.text('/æ/'));
     await tester.pumpAndSettle();
-    expect(tester.widget<FilledButton>(find.widgetWithText(FilledButton, '完成并保存进度')).onPressed, isNotNull);
+    expect(
+      tester
+          .widget<FilledButton>(find.widgetWithText(FilledButton, '完成并保存进度'))
+          .onPressed,
+      isNotNull,
+    );
   });
   testWidgets('listening hides subtitles until requested', (tester) async {
     await tester.pumpWidget(

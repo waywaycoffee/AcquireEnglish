@@ -1,3 +1,9 @@
+import 'assessment_panel.dart';
+import '../digital_human/presentation/digital_human_coach_screen.dart';
+import 'dart:convert';
+import 'dart:math';
+import '../authentication/presentation/auth_session.dart';
+import '../sync/data/acquire_api_client.dart';
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -9,6 +15,8 @@ import '../digital_human/data/oral_coach_pipeline_client.dart';
 import '../onboarding/presentation/onboarding_provider.dart';
 import '../settings/presentation/settings_provider.dart';
 import '../phrases/presentation/phrase_book_provider.dart';
+
+part 'module_curriculum.dart';
 
 class ModuleLesson {
   const ModuleLesson(
@@ -23,7 +31,7 @@ class ModuleLesson {
   final List<String> lines, meanings, choices;
 }
 
-const moduleLessons = <String, List<ModuleLesson>>{
+const _introLessons = <String, List<ModuleLesson>>{
   'ipa': [
     ModuleLesson(
       '/ɪ/ 和 /iː/',
@@ -157,6 +165,10 @@ class _ModuleScreenState extends ConsumerState<ModuleScreen>
   bool reveal = false, playing = false, repeat = false, hintDismissed = false;
   String? selected, error;
   int sequence = 0;
+  Set<int> completedLessons = {};
+  bool syncing = false;
+  String syncStatus = '';
+  bool saving = false;
   Timer? sleep;
   final expression = TextEditingController();
   final scroll = ScrollController();
@@ -168,6 +180,9 @@ class _ModuleScreenState extends ConsumerState<ModuleScreen>
       rawBaseUrl: ref.read(learningSettingsProvider).oralCoachPipelineUrl,
       text: text,
       digitalHumanId: 'mia',
+      ttsVoice: widget.kind == 'ipa' || widget.kind == 'phonics'
+          ? 'en-GB-SoniaNeural'
+          : null,
     );
     if (!mounted || generation != sequence) return;
     if (url == null) throw StateError('语音暂不可用');
@@ -196,15 +211,110 @@ class _ModuleScreenState extends ConsumerState<ModuleScreen>
     Future.microtask(load);
   }
 
+  Map<String, dynamic> snapshot() => {
+    'version': 1,
+    'lesson': lesson,
+    'line': line,
+    'completed': completedLessons.toList(),
+  };
+  Future<void> persist() async {
+    if (!Hive.isBoxOpen('prefs')) throw StateError('storage');
+    await Hive.box<String>(
+      'prefs',
+    ).put(key, jsonEncode({...snapshot(), 'dirty': true}));
+  }
+
+  void applyState(Map<String, dynamic> data) {
+    lesson = (data['lesson'] as num).toInt().clamp(0, lessons.length - 1);
+    line = ((data['line'] as num?)?.toInt() ?? 0).clamp(
+      0,
+      lessons[lesson].lines.length - 1,
+    );
+    completedLessons = (data['completed'] as List<dynamic>? ?? [])
+        .whereType<int>()
+        .where((i) => i >= 0 && i < lessons.length)
+        .toSet();
+  }
+
   void load() {
     if (!mounted) return;
     final raw = Hive.isBoxOpen('prefs')
         ? Hive.box<String>('prefs').get(key)
         : null;
-    setState(
-      () =>
-          lesson = (int.tryParse(raw ?? '') ?? 0).clamp(0, lessons.length - 1),
-    );
+    setState(() {
+      completedLessons = {};
+      line = 0;
+      lesson = 0;
+      try {
+        if (raw != null) applyState(jsonDecode(raw) as Map<String, dynamic>);
+      } catch (_) {
+        lesson = (int.tryParse(raw ?? '') ?? 0).clamp(0, lessons.length - 1);
+      }
+    });
+    if (ref.read(authSessionProvider).isLoggedIn) unawaited(sync());
+  }
+
+  Future<void> sync() async {
+    if (syncing) return;
+    if (!ref.read(authSessionProvider).isLoggedIn) {
+      setState(() => syncStatus = '登录后可同步，本机可继续学习');
+      return;
+    }
+    final account = ref.read(studyAccountProvider);
+    final storage = key;
+    setState(() {
+      syncing = true;
+      syncStatus = '同步中';
+    });
+    bool active() => mounted && ref.read(studyAccountProvider) == account;
+    try {
+      final api = ref.read(acquireApiClientProvider);
+      final cloud = await api.moduleProgress(widget.kind);
+      if (!active()) return;
+      final raw = Hive.isBoxOpen('prefs')
+          ? Hive.box<String>('prefs').get(storage)
+          : null;
+      Map<String, dynamic> local = {};
+      try {
+        if (raw != null) local = jsonDecode(raw) as Map<String, dynamic>;
+      } catch (_) {}
+      final remote = cloud['state'] as Map<String, dynamic>?;
+      if (local['dirty'] != true && remote != null) {
+        await Hive.box<String>(
+          'prefs',
+        ).put(storage, jsonEncode({...remote, 'dirty': false}));
+        if (active()) setState(() => applyState(remote));
+      } else {
+        final sent = snapshot();
+        sent['completed'] = {
+          ...completedLessons,
+          ...((remote?['completed'] as List<dynamic>?) ?? []).whereType<int>(),
+        }.toList();
+        final baseline = raw;
+        final saved = await api.moduleProgress(
+          widget.kind,
+          upload: {'revision': cloud['revision'], 'state': sent},
+        );
+        if (!active()) return;
+        if (Hive.box<String>('prefs').get(storage) == baseline) {
+          final state = saved['state'] as Map<String, dynamic>;
+          await Hive.box<String>(
+            'prefs',
+          ).put(storage, jsonEncode({...state, 'dirty': false}));
+          if (active())
+            setState(
+              () => completedLessons = (state['completed'] as List<dynamic>)
+                  .cast<int>()
+                  .toSet(),
+            );
+        }
+      }
+      if (active()) setState(() => syncStatus = '已同步');
+    } catch (_) {
+      if (active()) setState(() => syncStatus = '本机进度保留，点击重试同步');
+    } finally {
+      if (active()) setState(() => syncing = false);
+    }
   }
 
   void stop() {
@@ -262,21 +372,31 @@ class _ModuleScreenState extends ConsumerState<ModuleScreen>
   }
 
   Future<void> complete() async {
-    if (selected != lessons[lesson].answer) return;
-    final next = (lesson + 1) % lessons.length;
+    if (saving || selected != lessons[lesson].answer) return;
+    final account = ref.read(studyAccountProvider);
+    final previous = snapshot();
+    setState(() => saving = true);
     try {
-      if (!Hive.isBoxOpen('prefs')) throw StateError('storage');
-      await Hive.box<String>('prefs').put(key, '$next');
-      if (mounted && scroll.hasClients) scroll.jumpTo(0);
-      if (mounted)
-        setState(() {
-          lesson = next;
-          line = 0;
-          selected = null;
-          reveal = false;
-        });
+      completedLessons.add(lesson);
+      lesson = (lesson + 1) % lessons.length;
+      line = 0;
+      await persist();
+      if (!mounted || account != ref.read(studyAccountProvider)) return;
+      if (scroll.hasClients) scroll.jumpTo(0);
+      setState(() {
+        selected = null;
+        reveal = false;
+      });
+      unawaited(sync());
     } catch (_) {
-      if (mounted) setState(() => error = '进度未保存，请重试。');
+      if (mounted && account == ref.read(studyAccountProvider))
+        setState(() {
+          applyState(previous);
+          error = '进度未保存，请重试。';
+        });
+    } finally {
+      if (mounted && account == ref.read(studyAccountProvider))
+        setState(() => saving = false);
     }
   }
 
@@ -286,6 +406,9 @@ class _ModuleScreenState extends ConsumerState<ModuleScreen>
       stop();
       expression.clear();
       setState(() {
+        syncing = false;
+        saving = false;
+        syncStatus = '';
         line = 0;
         selected = null;
         reveal = false;
@@ -293,14 +416,27 @@ class _ModuleScreenState extends ConsumerState<ModuleScreen>
       load();
     });
     final item = lessons[lesson];
+    final choices = List<String>.of(item.choices)
+      ..shuffle(Random(lesson * 7919 + 17));
     final dark = Theme.of(context).brightness == Brightness.dark;
     return Scaffold(
       backgroundColor: dark ? const Color(0xFF141414) : const Color(0xFFF5F5F5),
-      appBar: AppBar(title: Text(moduleTitles[widget.kind] ?? '学习')),
+      appBar: AppBar(
+        title: Text(moduleTitles[widget.kind] ?? '学习'),
+        actions: [
+          IconButton(
+            tooltip: '同步进度',
+            onPressed: syncing ? null : sync,
+            icon: const Icon(Icons.cloud_sync_outlined),
+          ),
+        ],
+      ),
       body: ListView(
         controller: scroll,
         padding: const EdgeInsets.all(24),
         children: [
+          if (syncStatus.isNotEmpty) Text(syncStatus),
+          Text('已完成 ${completedLessons.length} / ${lessons.length} 课'),
           Text(
             '入门课程 · ${lesson + 1} / ${lessons.length}',
             style: Theme.of(context).textTheme.labelLarge,
@@ -356,6 +492,11 @@ class _ModuleScreenState extends ConsumerState<ModuleScreen>
                 selected = null;
                 reveal = false;
               });
+              unawaited(
+                persist().catchError((_) {
+                  if (mounted) setState(() => error = '位置保存失败，请重试');
+                }),
+              );
             },
           ),
           if (widget.kind == 'dialogue')
@@ -415,6 +556,11 @@ class _ModuleScreenState extends ConsumerState<ModuleScreen>
                         onPressed: () {
                           stop();
                           setState(() => line = (line + 1) % item.lines.length);
+                          unawaited(
+                            persist().catchError((_) {
+                              if (mounted) setState(() => error = '位置保存失败，请重试');
+                            }),
+                          );
                         },
                         child: const Text('下一句'),
                       ),
@@ -461,6 +607,10 @@ class _ModuleScreenState extends ConsumerState<ModuleScreen>
               child: const Text('10分钟定时停止'),
             ),
           ],
+          AssessmentPanel(
+            key: ValueKey('${widget.kind}-$lesson-$line'),
+            reference: item.lines[line],
+          ),
           if (widget.kind == 'chunks') ...[
             const Text('替换练习：保留句型，换成自己的需求。例如 this form → my luggage。'),
             TextField(
@@ -488,10 +638,22 @@ class _ModuleScreenState extends ConsumerState<ModuleScreen>
             ),
           if (widget.kind == 'dialogue')
             OutlinedButton(
-              onPressed: () => context.push(
-                '/digital-human?scenario=${lesson == 0 ? 'restaurant' : 'hotel'}',
-              ),
-              child: const Text('进入外教语音 / 文字对话'),
+              onPressed: () {
+                stop();
+                Navigator.of(context).push(
+                  MaterialPageRoute<void>(
+                    builder: (_) => DigitalHumanCoachScreen(
+                      lessonTitle: item.title,
+                      lessonText: [
+                        for (int i = 0; i < item.lines.length; i++)
+                          '${i.isEven ? 'A' : 'B'}: ${item.lines[i]}',
+                      ].join('\n'),
+                      practiceRole: role == 0 ? 'A' : 'B',
+                    ),
+                  ),
+                );
+              },
+              child: const Text('分角色语音 / 文字实战与反馈'),
             ),
           OutlinedButton.icon(
             onPressed: () async {
@@ -521,7 +683,7 @@ class _ModuleScreenState extends ConsumerState<ModuleScreen>
           ),
           const Divider(height: 32),
           Text(item.question, style: Theme.of(context).textTheme.titleMedium),
-          for (final option in item.choices)
+          for (final option in choices)
             RadioListTile<String>(
               title: Text(option),
               value: option,
@@ -531,7 +693,7 @@ class _ModuleScreenState extends ConsumerState<ModuleScreen>
           if (selected != null)
             Text(selected == item.answer ? '正确，可以完成本课。' : '再听一遍，试着重新选择。'),
           FilledButton(
-            onPressed: selected == item.answer ? complete : null,
+            onPressed: !saving && selected == item.answer ? complete : null,
             child: const Text('完成并保存进度'),
           ),
           if (widget.kind == 'ipa' ||
