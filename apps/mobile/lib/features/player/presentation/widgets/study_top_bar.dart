@@ -9,6 +9,8 @@ class StudyTopBar extends StatelessWidget {
     this.onFavorite,
     this.isFavorite = false,
     this.lessonBadge,
+    this.watchModeLabel,
+    this.onToggleWatchMode,
     super.key,
   });
 
@@ -17,6 +19,10 @@ class StudyTopBar extends StatelessWidget {
   final VoidCallback? onFavorite;
   final bool isFavorite;
   final String? lessonBadge;
+
+  /// `精听` / `追剧` chip; null hides the toggle.
+  final String? watchModeLabel;
+  final VoidCallback? onToggleWatchMode;
 
   @override
   Widget build(BuildContext context) {
@@ -65,6 +71,37 @@ class StudyTopBar extends StatelessWidget {
                 ],
               ),
             ),
+            if (watchModeLabel != null && onToggleWatchMode != null)
+              Padding(
+                padding: const EdgeInsets.only(right: 2),
+                child: Material(
+                  color: watchModeLabel == '追剧'
+                      ? colors.accent.withValues(alpha: 0.2)
+                      : colors.chipIdle,
+                  borderRadius: BorderRadius.circular(999),
+                  child: InkWell(
+                    key: const ValueKey<String>('player-watch-mode-toggle'),
+                    onTap: onToggleWatchMode,
+                    borderRadius: BorderRadius.circular(999),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 6,
+                      ),
+                      child: Text(
+                        watchModeLabel!,
+                        style: TextStyle(
+                          color: watchModeLabel == '追剧'
+                              ? colors.accent
+                              : colors.textSecondary,
+                          fontWeight: FontWeight.w800,
+                          fontSize: 12,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
             IconButton(
               tooltip: '收藏',
               onPressed: onFavorite,

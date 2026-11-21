@@ -78,7 +78,11 @@ const List<String> playbackSpeedOptions = <String>[
   '1.0×',
   '1.25×',
   '1.5×',
+  '2.0×',
 ];
+
+/// 精听 = 字幕/跟读/听写学习壳；追剧 = 放大画面、少打断。
+const List<String> playerWatchModeOptions = <String>['精听', '追剧'];
 const List<String> translationProviderOptions = <String>[
   '本地 Ollama',
   'OpenAI',
@@ -248,6 +252,7 @@ class LearningSettingsState {
     required this.subtitleMode,
     this.subtitleLetterCase = '保留原样',
     required this.playbackSpeed,
+    this.playerWatchMode = '精听',
     required this.fontSize,
     required this.subtitleDelayMs,
     required this.dictionarySource,
@@ -296,6 +301,7 @@ class LearningSettingsState {
     return LearningSettingsState(
       subtitleMode: '双语',
       playbackSpeed: '0.8×',
+      playerWatchMode: '精听',
       fontSize: '中',
       subtitleDelayMs: 0,
       dictionarySource: '牛津学习者',
@@ -329,6 +335,9 @@ class LearningSettingsState {
   final String subtitleMode;
   final String subtitleLetterCase;
   final String playbackSpeed;
+
+  /// `精听` | `追剧`
+  final String playerWatchMode;
   final String fontSize;
   final int subtitleDelayMs;
   final String dictionarySource;
@@ -457,10 +466,13 @@ class LearningSettingsState {
 
   bool get hasBilibiliCookie => resolvedBilibiliCookieHeader.isNotEmpty;
 
+  bool get isBingeWatchMode => playerWatchMode == '追剧';
+
   LearningSettingsState copyWith({
     String? subtitleMode,
     String? subtitleLetterCase,
     String? playbackSpeed,
+    String? playerWatchMode,
     String? fontSize,
     int? subtitleDelayMs,
     String? dictionarySource,
@@ -501,6 +513,7 @@ class LearningSettingsState {
       subtitleMode: subtitleMode ?? this.subtitleMode,
       subtitleLetterCase: subtitleLetterCase ?? this.subtitleLetterCase,
       playbackSpeed: playbackSpeed ?? this.playbackSpeed,
+      playerWatchMode: playerWatchMode ?? this.playerWatchMode,
       fontSize: fontSize ?? this.fontSize,
       subtitleDelayMs: subtitleDelayMs ?? this.subtitleDelayMs,
       dictionarySource: dictionarySource ?? this.dictionarySource,
@@ -669,6 +682,9 @@ class LearningSettingsNotifier extends Notifier<LearningSettingsState> {
             ? json['subtitleLetterCase'] as String
             : null,
         playbackSpeed: _stringOrNull(json['playbackSpeed']),
+        playerWatchMode: playerWatchModeOptions.contains(json['playerWatchMode'])
+            ? json['playerWatchMode'] as String
+            : null,
         fontSize: _stringOrNull(json['fontSize']),
         subtitleDelayMs: _intOrNull(json['subtitleDelayMs']),
         dictionarySource: _stringOrNull(json['dictionarySource']),
@@ -890,6 +906,14 @@ class LearningSettingsNotifier extends Notifier<LearningSettingsState> {
       return;
     }
     state = state.copyWith(playbackSpeed: value);
+    _persist();
+  }
+
+  void setPlayerWatchMode(String value) {
+    if (!playerWatchModeOptions.contains(value)) {
+      return;
+    }
+    state = state.copyWith(playerWatchMode: value);
     _persist();
   }
 
@@ -1256,6 +1280,7 @@ class LearningSettingsNotifier extends Notifier<LearningSettingsState> {
           'subtitleMode': state.subtitleMode,
           'subtitleLetterCase': state.subtitleLetterCase,
           'playbackSpeed': state.playbackSpeed,
+          'playerWatchMode': state.playerWatchMode,
           'fontSize': state.fontSize,
           'subtitleDelayMs': state.subtitleDelayMs,
           'dictionarySource': state.dictionarySource,

@@ -47,6 +47,7 @@ import '../data/dub_accompaniment_service.dart';
 import '../data/dub_export_service.dart';
 import '../data/dub_session_store.dart';
 import '../data/pronunciation_providers.dart';
+import '../domain/dictation_diff.dart';
 import '../domain/episode_word_cards.dart';
 import '../domain/pronunciation_assessment.dart';
 import 'asr_subtitle_cache.dart';
@@ -161,6 +162,7 @@ class PadPortraitPlayerScreen extends ConsumerStatefulWidget {
     this.initialStartTime,
     this.autoPlay = false,
     this.autoOpenFullscreen = false,
+    this.initialLoopSentence = false,
     super.key,
   });
 
@@ -168,6 +170,9 @@ class PadPortraitPlayerScreen extends ConsumerStatefulWidget {
   final String? initialStartTime;
   final bool autoPlay;
   final bool autoOpenFullscreen;
+
+  /// When opened from review “原片”，auto-enable single-sentence loop.
+  final bool initialLoopSentence;
 
   @override
   ConsumerState<PadPortraitPlayerScreen> createState() =>
@@ -847,6 +852,10 @@ class PadPortraitPlayerScreenState
                 ),
         )
         ..isPlaying = widget.autoPlay && (_videoAsset?.isNotEmpty ?? false);
+      if (widget.initialLoopSentence) {
+        _loopSettings = const StudyLoopSettings(mode: StudyLoopMode.sentence);
+        state.isLooping = true;
+      }
       _usingAiSubtitles = usingAsrSentences;
       _usingAsrSentences = usingAsrSentences;
       _asrFragmentsBySentenceStartMs = asrFragments;
@@ -2258,7 +2267,8 @@ Future<void> _settleChineseFillIfAlreadyPresent() async {
       if (!completed) {
         return;
       }
-      if (_loopSettings.mode == StudyLoopMode.full) {
+      if (_loopSettings.mode == StudyLoopMode.full ||
+          _loopSettings.mode == StudyLoopMode.ab) {
         unawaited(_applyLoopRestart());
         return;
       }
@@ -2340,6 +2350,14 @@ Future<void> _settleChineseFillIfAlreadyPresent() async {
     final bool wasPlaying = _videoIsPlaying;
     bool lineChanged = false;
     bool loopRestarted = false;
+
+    if (wasPlaying &&
+        _loopSettings.mode == StudyLoopMode.ab &&
+        _loopSettings.hasAbRange &&
+        position.inMilliseconds >= _loopSettings.abEndMs!) {
+      unawaited(_applyLoopRestart());
+      return;
+    }
 
     // 句末暂停 / 跟读：先卡在当前句，禁止 sync 跳到下一句（可能无英文）。
     if (wasPlaying &&
@@ -2851,6 +2869,7 @@ Future<void> _settleChineseFillIfAlreadyPresent() async {
     final LibraryCourseData? course = courseContext.course;
     final LibraryEpisodeItem? episode = courseContext.episode;
     final LearningSettingsState settings = ref.watch(learningSettingsProvider);
+    final bool bingeMode = settings.isBingeWatchMode;
     final Set<String> savedVocabularyWords =
         SubtitleVocabularyHighlight.savedWordsFromBook(
           ref.watch(wordBookProvider),
@@ -2894,7 +2913,7 @@ Future<void> _settleChineseFillIfAlreadyPresent() async {
         child: Column(
           children: <Widget>[
             StudyTopBar(
-                title: course?.title ?? episode?.title ?? '爱快英语',
+              title: course?.title ?? episode?.title ?? '爱快英语',
               lessonBadge: course == null || episode == null
                   ? null
                   : '${episode.numberStr}/${course.totalEpisodes}',
@@ -2905,15 +2924,35 @@ Future<void> _settleChineseFillIfAlreadyPresent() async {
                 }
                 context.go(libraryDetailUri.toString());
               },
-                isFavorite: _episodeFavorited,
-                onFavorite: () => _handleToggleEpisodeFavorite(courseContext),
+              isFavorite: _episodeFavorited,
+              onFavorite: () => _handleToggleEpisodeFavorite(courseContext),
+              watchModeLabel: settings.playerWatchMode,
+              onToggleWatchMode: () {
+                final String next =
+                    settings.isBingeWatchMode ? '精听' : '追剧';
+                ref
+                    .read(learningSettingsProvider.notifier)
+                    .setPlayerWatchMode(next);
+                if (next == '追剧') {
+                  setState(() {
+                    state.pauseAtSentenceEnd = false;
+                    _hardsubMosaicEnabled = false;
+                  });
+                  _showMessage('追剧模式：少打断，点「精听」回到学习壳');
+                } else {
+                  _showMessage('精听模式：字幕 / 跟读 / 听写 / 背单词');
+                }
+              },
             ),
             Expanded(
               child: Padding(
                 padding: EdgeInsets.fromLTRB(0, compactPlayer ? 2 : 6, 0, 0),
                 child: Column(
                   children: <Widget>[
-                    Padding(
+                    Flexible(
+                      flex: bingeMode ? 1 : 0,
+                      fit: bingeMode ? FlexFit.tight : FlexFit.loose,
+                      child: Padding(
                       padding: EdgeInsets.symmetric(
                         horizontal: playerHorizontalPadding,
                       ),
@@ -3015,58 +3054,62 @@ Future<void> _settleChineseFillIfAlreadyPresent() async {
                             ? null
                             : _handleGenerateAiSubtitles,
                         ),
-                      )),
-                      if (_videoErrorText != null &&
-                          !_videoLoading &&
-                          !(_videoErrorText!.startsWith('正在')))
-                        Padding(
-                          padding: const EdgeInsets.fromLTRB(12, 8, 12, 0),
-                          child: Text(
-                            _videoErrorText!,
-                            textAlign: TextAlign.center,
-                            style: TextStyle(
-                              color: StudyShellColors.of(context).favorite,
-                              fontSize: 13,
-                              fontWeight: FontWeight.w600,
-                              height: 1.35,
-                            ),
                       ),
                     ),
-                    SizedBox(height: compactPlayer ? 4 : 8),
-                    StudyModeTabs(
-                      value: _studyTab,
-                      onChanged: (StudyModeTab tab) {
-                        if (tab == StudyModeTab.coach) {
-                          unawaited(_openOralCoach(courseContext, activeLine));
-                          return;
-                        }
-                        if (tab == StudyModeTab.shadowing) {
-                          _enterShadowingMode(showToast: false);
-                          return;
-                        }
-                        setState(() {
-                          _studyTab = tab;
-                          // Pull out the hardsub cover when entering dictation.
-                          _hardsubMosaicEnabled = tab == StudyModeTab.dictation;
-                        });
-                      },
                     ),
-                    Expanded(
-                      child: Padding(
-                        padding: const EdgeInsets.fromLTRB(12, 0, 12, 4),
-                        child: _buildStudyTabBody(
-                          courseContext: courseContext,
-                          settings: settings,
-                          canGenerateAiSubtitles: canGenerateAiSubtitles,
-                          visibleAssessment: visibleAssessment,
-                          activeLine: activeLine,
+                    if (_videoErrorText != null &&
+                        !_videoLoading &&
+                        !(_videoErrorText!.startsWith('正在')))
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(12, 8, 12, 0),
+                        child: Text(
+                          _videoErrorText!,
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            color: StudyShellColors.of(context).favorite,
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                            height: 1.35,
+                          ),
+                        ),
+                      ),
+                    if (!bingeMode) ...<Widget>[
+                      SizedBox(height: compactPlayer ? 4 : 8),
+                      StudyModeTabs(
+                        value: _studyTab,
+                        onChanged: (StudyModeTab tab) {
+                          if (tab == StudyModeTab.coach) {
+                            unawaited(_openOralCoach(courseContext, activeLine));
+                            return;
+                          }
+                          if (tab == StudyModeTab.shadowing) {
+                            _enterShadowingMode(showToast: false);
+                            return;
+                          }
+                          setState(() {
+                            _studyTab = tab;
+                            _hardsubMosaicEnabled =
+                                tab == StudyModeTab.dictation;
+                          });
+                        },
+                      ),
+                      Expanded(
+                        child: Padding(
+                          padding: const EdgeInsets.fromLTRB(12, 0, 12, 4),
+                          child: _buildStudyTabBody(
+                            courseContext: courseContext,
+                            settings: settings,
+                            canGenerateAiSubtitles: canGenerateAiSubtitles,
+                            visibleAssessment: visibleAssessment,
+                            activeLine: activeLine,
                             savedVocabularyWords: savedVocabularyWords,
                             learnedVocabularyWords: learnedVocabularyWords,
                             keyVocabularyWords: keyVocabularyWords,
                             chunkHighlighter: chunkHighlighter,
+                          ),
                         ),
                       ),
-                    ),
+                    ],
                   ],
                 ),
               ),
@@ -3445,6 +3488,9 @@ Future<void> _settleChineseFillIfAlreadyPresent() async {
               _handleAddDictationQueue(courseContext, difficult: false),
           onMarkDifficult: () =>
               _handleAddDictationQueue(courseContext, difficult: true),
+          onDictationResult: (DictationDiffResult result) {
+            _handleDictationResult(result, courseContext, dictationLine);
+          },
         );
       case StudyModeTab.practice:
         return StudyPracticeTab(
@@ -3805,6 +3851,18 @@ Future<void> _settleChineseFillIfAlreadyPresent() async {
         .addOrUpdate(item);
     if (difficult) {
       await ref.read(dictationQueueProvider.notifier).markDifficult(item.id);
+      // Feed the unified FSRS phrase queue (收藏句).
+      ref.read(phraseBookProvider.notifier).addPhraseIfMissing(
+            english: line.english,
+            chinese: line.chinese,
+            course: course?.title ?? '课程',
+            episode: episode == null ? '本集' : '第 ${episode.numberStr} 集',
+            time: line.startTime,
+            courseId: course?.id,
+            episodeId: episode?.id ?? widget.episodeId,
+            endTime: _formatTimestamp(line.endMs),
+            note: '听写困难句',
+          );
     }
     if (!mounted) return;
     setState(() {
@@ -3816,9 +3874,52 @@ Future<void> _settleChineseFillIfAlreadyPresent() async {
       _dictationQueueIndex = index >= 0 ? index : 0;
     });
     if (difficult) {
-      _showMessage(added ? '已加入听写队列并标记困难' : '已标记为困难句');
+      _showMessage(
+        added ? '已加入听写队列，并进入每日复习（收藏句）' : '已标记困难并同步到复习',
+      );
     } else {
       _showMessage(added ? '已加入听写队列' : '该句已在听写队列中');
+    }
+  }
+
+  void _handleDictationResult(
+    DictationDiffResult result,
+    PlayerCourseLookupResult courseContext,
+    PlayerSubtitleLine line,
+  ) {
+    if (result.exact) return;
+    final LibraryCourseData? course = courseContext.course;
+    final LibraryEpisodeItem? episode = courseContext.episode;
+    // Keep the sentence in phrase book so FSRS can schedule it.
+    ref.read(phraseBookProvider.notifier).addPhraseIfMissing(
+          english: line.english,
+          chinese: line.chinese,
+          course: course?.title ?? '课程',
+          episode: episode == null ? '本集' : '第 ${episode.numberStr} 集',
+          time: line.startTime,
+          courseId: course?.id,
+          episodeId: episode?.id ?? widget.episodeId,
+          endTime: _formatTimestamp(line.endMs),
+          note: '听写错句',
+        );
+    int saved = 0;
+    for (final String word in result.reviewWords) {
+      final bool ok = ref.read(wordBookProvider.notifier).addFavoriteWord(
+            rawWord: word,
+            episodeId: episode?.id ?? widget.episodeId,
+            course: course?.title ?? '课程',
+            episode: episode == null ? '本集' : '第 ${episode.numberStr} 集',
+            time: line.startTime,
+            lineKey: '${line.startMs}-${line.endMs}',
+            sentence: line.english,
+            chinese: line.chinese,
+          );
+      if (ok) saved += 1;
+    }
+    if (saved > 0) {
+      _showMessage('已将 $saved 个错/漏词加入单词本（进入 FSRS）');
+    } else if (result.reviewWords.isEmpty) {
+      _showMessage('本句已加入收藏句复习');
     }
   }
 
@@ -3835,6 +3936,7 @@ Future<void> _settleChineseFillIfAlreadyPresent() async {
     final StudyLoopSettings? next = await showStudyLoopSheet(
       context,
       initial: _loopSettings,
+      currentPositionMs: _videoPosition.inMilliseconds,
     );
     if (!mounted || next == null) {
       return;
@@ -3853,6 +3955,19 @@ Future<void> _settleChineseFillIfAlreadyPresent() async {
         _showMessage('已开启单句循环');
         if (state.hasLines) {
           _seekToActiveLine();
+        }
+      case StudyLoopMode.ab:
+        _showMessage('已开启 A-B 复读');
+        final int? start = next.abStartMs;
+        if (start != null) {
+          final Duration target = Duration(milliseconds: start);
+          setState(() {
+            _videoPosition = target;
+            state.positionMs = start;
+            state.isPlaying = true;
+          });
+          await _videoPlayer?.seek(target);
+          await _videoPlayer?.play();
         }
       case StudyLoopMode.full:
         _showMessage('已开启全片循环');
@@ -3894,6 +4009,17 @@ Future<void> _settleChineseFillIfAlreadyPresent() async {
         _videoPosition = Duration.zero;
       });
       await _videoPlayer?.seek(Duration.zero);
+      await _videoPlayer?.play();
+      return;
+    }
+    if (_loopSettings.mode == StudyLoopMode.ab && _loopSettings.hasAbRange) {
+      final Duration target = Duration(milliseconds: _loopSettings.abStartMs!);
+      setState(() {
+        _videoPosition = target;
+        state.positionMs = target.inMilliseconds;
+        state.isPlaying = true;
+      });
+      await _videoPlayer?.seek(target);
       await _videoPlayer?.play();
       return;
     }

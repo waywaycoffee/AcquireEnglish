@@ -1560,6 +1560,7 @@ class _DailyReviewScreenState extends ConsumerState<DailyReviewScreen>
                       queryParameters: <String, String>{
                         if (source.time != null) 'startTime': source.time!,
                         'autoplay': '1',
+                        'loop': 'sentence',
                       },
                     ),
                     icon: const Icon(Icons.ondemand_video_outlined),
@@ -1914,6 +1915,7 @@ class _DailyReviewScreenState extends ConsumerState<DailyReviewScreen>
                                 if (source.time != null)
                                   'startTime': source.time!,
                                 'autoplay': '1',
+                                'loop': 'sentence',
                               },
                             ),
                           ),

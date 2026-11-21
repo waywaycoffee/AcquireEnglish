@@ -305,7 +305,7 @@ class SettingsScreen extends ConsumerWidget {
               ),
               _SelectRow(
                 title: '默认速度',
-                description: '设置新视频的默认播放速度。',
+                description: '设置新视频的默认播放速度（含 2.0×）。',
                 value: settings.playbackSpeed,
                 options: playbackSpeedOptions,
                 onChanged: (String? value) {
@@ -315,6 +315,18 @@ class SettingsScreen extends ConsumerWidget {
                   ref
                       .read(learningSettingsProvider.notifier)
                       .setPlaybackSpeed(value);
+                },
+              ),
+              _SelectRow(
+                title: '播放默认模式',
+                description: '精听保留跟读/听写壳；追剧放大画面、减少学习打断。可在播放器顶栏随时切换。',
+                value: settings.playerWatchMode,
+                options: playerWatchModeOptions,
+                onChanged: (String? value) {
+                  if (value == null) return;
+                  ref
+                      .read(learningSettingsProvider.notifier)
+                      .setPlayerWatchMode(value);
                 },
               ),
               _SelectRow(

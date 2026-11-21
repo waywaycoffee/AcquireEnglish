@@ -10,6 +10,7 @@ class PlayerScreen extends StatelessWidget {
     this.initialStartTime,
     this.autoPlay = false,
     this.autoOpenFullscreen = false,
+    this.initialLoopSentence = false,
     super.key,
   });
 
@@ -17,6 +18,7 @@ class PlayerScreen extends StatelessWidget {
   final String? initialStartTime;
   final bool autoPlay;
   final bool autoOpenFullscreen;
+  final bool initialLoopSentence;
 
   @override
   Widget build(BuildContext context) {
@@ -26,6 +28,7 @@ class PlayerScreen extends StatelessWidget {
       initialStartTime: initialStartTime,
       autoPlay: autoPlay,
       autoOpenFullscreen: autoOpenFullscreen,
+      initialLoopSentence: initialLoopSentence,
     );
   }
 }

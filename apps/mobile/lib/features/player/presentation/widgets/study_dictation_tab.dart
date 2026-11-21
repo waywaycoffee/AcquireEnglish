@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../data/dictation_queue_provider.dart';
+import '../../domain/dictation_diff.dart';
 import '../player_mock_state.dart';
 import 'study_shell_tokens.dart';
 
@@ -23,6 +24,7 @@ class StudyDictationTab extends StatefulWidget {
     this.suggestedSpeed = '0.8×',
     this.hardsubMosaicEnabled = false,
     this.onToggleHardsubMosaic,
+    this.onDictationResult,
     super.key,
   });
 
@@ -43,6 +45,9 @@ class StudyDictationTab extends StatefulWidget {
   final bool hardsubMosaicEnabled;
   final ValueChanged<bool>? onToggleHardsubMosaic;
 
+  /// Fired after submit with word-level diff (for FSRS / word-book enqueue).
+  final void Function(DictationDiffResult result)? onDictationResult;
+
   @override
   State<StudyDictationTab> createState() => _StudyDictationTabState();
 }
@@ -50,7 +55,7 @@ class StudyDictationTab extends StatefulWidget {
 class _StudyDictationTabState extends State<StudyDictationTab> {
   final TextEditingController _controller = TextEditingController();
   bool _hintShown = false;
-  bool? _correct;
+  DictationDiffResult? _diff;
 
   @override
   void didUpdateWidget(covariant StudyDictationTab oldWidget) {
@@ -59,7 +64,7 @@ class _StudyDictationTabState extends State<StudyDictationTab> {
         oldWidget.queueIndex != widget.queueIndex) {
       _controller.clear();
       _hintShown = false;
-      _correct = null;
+      _diff = null;
     }
   }
 
@@ -70,16 +75,13 @@ class _StudyDictationTabState extends State<StudyDictationTab> {
   }
 
   void _submit() {
-    final String expected = _normalize(widget.line.english);
-    final String actual = _normalize(_controller.text);
-    setState(() => _correct = expected == actual);
+    final DictationDiffResult diff = diffDictation(
+      expected: widget.line.english,
+      actual: _controller.text,
+    );
+    setState(() => _diff = diff);
+    widget.onDictationResult?.call(diff);
   }
-
-  String _normalize(String value) => value
-      .toLowerCase()
-      .replaceAll(RegExp(r"[^a-z0-9\s']"), ' ')
-      .replaceAll(RegExp(r'\s+'), ' ')
-      .trim();
 
   String _hintText() {
     final String english = widget.line.english.trim();
@@ -91,6 +93,32 @@ class _StudyDictationTabState extends State<StudyDictationTab> {
       return words.first;
     }
     return '${words.take(2).join(' ')} …';
+  }
+
+  Color _markColor(StudyShellColors shell, DictationTokenKind kind) {
+    switch (kind) {
+      case DictationTokenKind.correct:
+        return shell.highlight;
+      case DictationTokenKind.missing:
+        return Colors.orangeAccent;
+      case DictationTokenKind.extra:
+        return Colors.redAccent;
+      case DictationTokenKind.wrong:
+        return const Color(0xFFE67E22);
+    }
+  }
+
+  String _markLabel(DictationTokenMark mark) {
+    switch (mark.kind) {
+      case DictationTokenKind.correct:
+        return mark.expected;
+      case DictationTokenKind.missing:
+        return '[漏:${mark.expected}]';
+      case DictationTokenKind.extra:
+        return '[多:${mark.actual}]';
+      case DictationTokenKind.wrong:
+        return '[错:${mark.actual}→${mark.expected}]';
+    }
   }
 
   @override
@@ -189,17 +217,46 @@ class _StudyDictationTabState extends State<StudyDictationTab> {
             ),
           ),
         ],
-        if (_correct != null) ...<Widget>[
+        if (_diff != null) ...<Widget>[
           const SizedBox(height: 10),
           Text(
-            _correct! ? '正确！' : '再听一遍，对照原文修正。',
+            _diff!.exact ? '正确！' : '有出入：漏词 / 错词 / 多词已标出；错词会进入复习。',
             style: TextStyle(
-              color: _correct! ? shell.highlight : Colors.orangeAccent,
+              color: _diff!.exact ? shell.highlight : Colors.orangeAccent,
               fontWeight: FontWeight.w800,
             ),
           ),
-          if (!_correct!) ...<Widget>[
-            const SizedBox(height: 6),
+          if (!_diff!.exact) ...<Widget>[
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 6,
+              runSpacing: 6,
+              children: <Widget>[
+                for (final DictationTokenMark mark in _diff!.marks)
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 4,
+                    ),
+                    decoration: BoxDecoration(
+                      color: _markColor(shell, mark.kind).withValues(alpha: 0.16),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(
+                        color: _markColor(shell, mark.kind).withValues(alpha: 0.55),
+                      ),
+                    ),
+                    child: Text(
+                      _markLabel(mark),
+                      style: TextStyle(
+                        color: _markColor(shell, mark.kind),
+                        fontWeight: FontWeight.w800,
+                        fontSize: 13,
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+            const SizedBox(height: 8),
             Text(
               widget.line.english,
               style: TextStyle(

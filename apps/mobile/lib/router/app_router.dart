@@ -366,6 +366,7 @@ GoRouter goRouter(Ref ref) => GoRouter(
           initialStartTime: state.uri.queryParameters['startTime'],
           autoPlay: state.uri.queryParameters['autoplay'] == '1',
           autoOpenFullscreen: state.uri.queryParameters['fullscreen'] == '1',
+          initialLoopSentence: state.uri.queryParameters['loop'] == 'sentence',
         );
       },
     ).fade(),
