@@ -61,7 +61,23 @@ Related: `/api/assets/membership-coupons/{id}/redeem` honors `trial_extend_7` fu
 
 Membership screen shows trial banner (days left / login streak / claim), per-module 月卡/年卡 purchase, points balance + spend catalog; client methods live on `AcquireApiClient` (`commerce*`).
 
-Module entry gates (`ModuleGate`): `video` / `reading` / `exam` / `course`. Access = active Pro (incl. full trial) **or** matching module entitlement (incl. legacy aliases). API: `GET /api/commerce/modules/{code}/access` (accepts legacy codes).
+Module entry gates (`ModuleGate`): `video` / `reading` / `exam` / `course`. Access = active Pro (incl. full trial) **or** matching module entitlement (incl. legacy aliases). API: `GET /api/commerce/modules/{code}/access` (accepts legacy codes). Soft-browse mode keeps catalogs open; item opens require entitlement **or** a free-trial seed.
+
+## Free-trial default seeds (~3 / module)
+
+Catalog: `services/api/data/free_trial_seeds.json` → `GET /api/commerce/free-trial-seeds`.
+App bootstrap (`freeTrialSeedBootstrapProvider`) auto-downloads these into **local cache** on launch (not APK media assets):
+
+| Module | Default seeds | How they land locally |
+|--------|---------------|------------------------|
+| `video` | BV1fV4y1p7Ex / BV1gm411r7yz / BV1Aw4m1k7qU (page 1) | Bilibili import → library local MP4; shared EN/ZH subs from ECS |
+| `reading` | `starter-first-morning` / `starter-small-cafe` / `starter-new-route` | `GET /api/reading/starter` via reading cold-start |
+| `exam` | CET4 `c4v1` / `c4r1` / `c4l1` | Exam pack JSON from API; optional listening audio under `/media/exam/…` |
+| `course` | `course-seed-*` from the three starters | Written into reading library as「免费体验 · 默认课程」 |
+
+**ECS ops (if missing):** deploy `pack_cet4.json`; seed shared Bilibili subtitles for the three BVs (`tools/subtitle/seed_recommended_bilibili_subs.py`); optional `media/imports/{id}/study.m4a` after first import. Never ship `.mp3/.mp4` under `apps/mobile/assets`.
+
+**Free preview (~3 / module):** `FREE_PREVIEW_COUNT` / `kModuleFreePreviewCount = 3`. Catalog seeds: `GET /api/commerce/free-trial-seeds` (`services/api/data/free_trial_seeds.json`). Enforcement: first N curriculum lessons (video), starter docs (reading), first N exam passages, first N material courses — plus curated seed IDs. Hubs soft-browse; paid units show 开通月卡/年卡 CTA.
 
 Points earn hooks (client → `POST /api/commerce/points/earn`):
 

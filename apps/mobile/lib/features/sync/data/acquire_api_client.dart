@@ -1629,6 +1629,12 @@ class AcquireApiClient {
     return response.data as Map<String, dynamic>;
   }
 
+  Future<Map<String, dynamic>> commerceFreeTrialSeeds() async {
+    final Response<dynamic> response =
+        await _dio.get(Endpoints.commerceFreeTrialSeeds);
+    return response.data as Map<String, dynamic>;
+  }
+
   Future<Map<String, dynamic>> commerceTrialStatus() async {
     final Response<dynamic> response =
         await _dio.get(Endpoints.commerceTrialStatus);

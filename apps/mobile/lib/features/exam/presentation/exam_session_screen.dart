@@ -8,6 +8,8 @@ import '../../authentication/presentation/auth_session.dart';
 import '../../daily_review/domain/daily_review.dart';
 import '../../daily_review/domain/memory_item.dart';
 import '../../daily_review/presentation/daily_review_provider.dart';
+import '../../membership/domain/free_trial_seeds.dart';
+import '../../membership/domain/module_access.dart';
 import '../../shared/presentation/pad/app_design_tokens.dart';
 import '../../sync/data/acquire_api_client.dart';
 import '../data/exam_error_book_store.dart';
@@ -97,6 +99,13 @@ class _ExamSessionScreenState extends ConsumerState<ExamSessionScreen> {
             : pack.mockSections.where((String s) => s != 'writing' && s != 'speaking').toList())
         : <String>[widget.skill];
 
+    final bool examUnlocked = widget.mock
+        ? true
+        : await resolveModuleUnlocked(ref, 'exam');
+    final bool previewOnly = !widget.mock &&
+        (widget.skill == 'listening' || widget.skill == 'reading') &&
+        !examUnlocked;
+
     for (final String skill in skills) {
       if (skill == 'vocab') {
         for (final ExamMcq q in pack.vocab) {
@@ -112,7 +121,10 @@ class _ExamSessionScreenState extends ConsumerState<ExamSessionScreen> {
           );
         }
       } else if (skill == 'listening') {
-        for (final ExamListeningItem item in pack.listening) {
+        final List<ExamListeningItem> items = previewOnly
+            ? _seedExamListening(pack)
+            : pack.listening;
+        for (final ExamListeningItem item in items) {
           for (final ExamMcq q in item.questions) {
             built.add(
               _SessionQ(
@@ -128,7 +140,10 @@ class _ExamSessionScreenState extends ConsumerState<ExamSessionScreen> {
           }
         }
       } else if (skill == 'reading') {
-        for (final ExamReadingItem item in pack.reading) {
+        final List<ExamReadingItem> items = previewOnly
+            ? _seedExamReading(pack)
+            : pack.reading;
+        for (final ExamReadingItem item in items) {
           for (final ExamMcq q in item.questions) {
             built.add(
               _SessionQ(
@@ -151,10 +166,31 @@ class _ExamSessionScreenState extends ConsumerState<ExamSessionScreen> {
       _ready = true;
       _title = widget.mock
           ? '${pack.title} · 模考'
-          : '${pack.title} · ${widget.skill}';
+          : previewOnly
+              ? '${pack.title} · ${widget.skill} · 免费体验'
+              : '${pack.title} · ${widget.skill}';
       _secondsLeft = widget.mock ? pack.mockMinutes * 60 : 0;
     });
 
+    if (previewOnly &&
+        mounted &&
+        ((widget.skill == 'listening' &&
+                pack.listening.length > kModuleFreePreviewCount) ||
+            (widget.skill == 'reading' &&
+                pack.reading.length > kModuleFreePreviewCount))) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            '免费体验为预下载默认题（约 $kModuleFreePreviewCount 篇）；开通月卡 / 年卡可练习全部内容。',
+          ),
+          action: SnackBarAction(
+            label: '开通',
+            onPressed: () =>
+                showModulePaywall(context, moduleCode: 'exam'),
+          ),
+        ),
+      );
+    }
     if (widget.mock && _secondsLeft > 0) {
       _timer = Timer.periodic(const Duration(seconds: 1), (Timer t) {
         if (!mounted) return;
@@ -381,4 +417,30 @@ class _ExamSessionScreenState extends ConsumerState<ExamSessionScreen> {
       ),
     );
   }
+}
+
+List<ExamListeningItem> _seedExamListening(ExamPack pack) {
+  final Set<String> want = freeTrialSeedsFor('exam')
+      .where((FreeTrialSeedItem s) => s.skill == 'listening')
+      .map((FreeTrialSeedItem s) => s.itemId)
+      .where((String id) => id.isNotEmpty)
+      .toSet();
+  final List<ExamListeningItem> hit = pack.listening
+      .where((ExamListeningItem item) => want.contains(item.id))
+      .toList(growable: false);
+  if (hit.isNotEmpty) return hit;
+  return pack.listening.take(kModuleFreePreviewCount).toList(growable: false);
+}
+
+List<ExamReadingItem> _seedExamReading(ExamPack pack) {
+  final Set<String> want = freeTrialSeedsFor('exam')
+      .where((FreeTrialSeedItem s) => s.skill == 'reading')
+      .map((FreeTrialSeedItem s) => s.itemId)
+      .where((String id) => id.isNotEmpty)
+      .toSet();
+  final List<ExamReadingItem> hit = pack.reading
+      .where((ExamReadingItem item) => want.contains(item.id))
+      .toList(growable: false);
+  if (hit.isNotEmpty) return hit;
+  return pack.reading.take(kModuleFreePreviewCount).toList(growable: false);
 }

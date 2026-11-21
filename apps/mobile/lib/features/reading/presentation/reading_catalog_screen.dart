@@ -7,6 +7,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../../membership/domain/module_access.dart';
 import '../../navigation/presentation/navigation_destination.dart';
 import '../../shared/presentation/pad/app_design_tokens.dart';
 import '../../shared/presentation/pad/pad_scaffold.dart';
@@ -171,6 +172,17 @@ class _ReadingCatalogScreenState extends ConsumerState<ReadingCatalogScreen> {
         mode: LaunchMode.externalApplication,
       );
       return;
+    }
+    final bool freeEntry = isFreeReadingPreviewDocId(entry.stableDocId) ||
+        isFreeReadingPreviewDocId(entry.id);
+    if (!freeEntry) {
+      final bool unlocked = await resolveModuleUnlocked(ref, 'reading');
+      if (!unlocked) {
+        if (mounted) {
+          await showModulePaywall(context, moduleCode: 'reading');
+        }
+        return;
+      }
     }
     setState(() => _downloadingId = entry.id);
     try {

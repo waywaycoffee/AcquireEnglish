@@ -52,6 +52,7 @@ import '../features/words/presentation/vocabulary_placement_screen.dart';
 import 'fade_extension.dart';
 import '../features/membership/presentation/membership_screen.dart';
 import '../features/membership/presentation/module_gate.dart';
+import '../features/membership/domain/module_access.dart';
 import '../features/onboarding/presentation/first_open_onboarding_screen.dart';
 import '../features/onboarding/presentation/onboarding_provider.dart';
 import '../features/navigation/presentation/navigation_destination.dart';
@@ -146,9 +147,11 @@ GoRouter goRouter(Ref ref) => GoRouter(
           kind: kind,
         );
         if (kind == 'listening' || kind == 'dialogue') {
+          // Browse + first N lessons free; further lessons gated in ModuleScreen.
           return ModuleGate(
             moduleCode: 'video',
             title: '视频模块',
+            softBrowse: true,
             child: screen,
           );
         }
@@ -206,9 +209,11 @@ GoRouter goRouter(Ref ref) => GoRouter(
           mock: mock,
         );
         if (!mock && (skill == 'reading' || skill == 'listening')) {
+          // First N passages free; session truncates when not entitled.
           return ModuleGate(
             moduleCode: 'exam',
             title: '考试模块',
+            softBrowse: true,
             child: session,
           );
         }
@@ -407,25 +412,20 @@ GoRouter goRouter(Ref ref) => GoRouter(
     ).fade(),
     GoRoute(
       path: '/reading',
-      builder: (BuildContext context, GoRouterState state) => const ModuleGate(
-        moduleCode: 'reading',
-        title: '阅读模块',
-        child: ReadingHubScreen(),
-      ),
+      builder: (BuildContext context, GoRouterState state) =>
+          const ReadingHubScreen(),
     ).fade(),
     GoRoute(
       path: '/reading/catalog',
-      builder: (BuildContext context, GoRouterState state) => const ModuleGate(
-        moduleCode: 'reading',
-        title: '阅读模块',
-        child: ReadingCatalogScreen(),
-      ),
+      builder: (BuildContext context, GoRouterState state) =>
+          const ReadingCatalogScreen(),
     ).fade(),
     GoRoute(
       path: '/material-courses',
       builder: (BuildContext context, GoRouterState state) => const ModuleGate(
         moduleCode: 'course',
         title: '课程板块',
+        softBrowse: true,
         child: MyMaterialCoursesScreen(),
       ),
     ).fade(),
@@ -435,9 +435,11 @@ GoRouter goRouter(Ref ref) => GoRouter(
         final String courseId = Uri.decodeComponent(
           state.pathParameters['courseId'] ?? '',
         );
+        // Index-based free preview enforced inside the course screens.
         return ModuleGate(
           moduleCode: 'course',
           title: '课程板块',
+          softBrowse: true,
           child: MaterialCourseEditScreen(courseId: courseId),
         );
       },
@@ -451,6 +453,7 @@ GoRouter goRouter(Ref ref) => GoRouter(
         return ModuleGate(
           moduleCode: 'reading',
           title: '阅读模块',
+          freePreviewAllowed: isFreeReadingPreviewDocId(docId),
           child: ReadingReaderScreen(docId: docId),
         );
       },

@@ -11,13 +11,15 @@ class ExamReadingScreen extends StatelessWidget {
     return ModuleGate(
       moduleCode: 'exam',
       title: '考试模块',
+      softBrowse: true,
       child: Scaffold(
         appBar: AppBar(title: const Text('阅读专项')),
         body: ListView(
           padding: const EdgeInsets.all(24),
           children: <Widget>[
             const Text(
-              '使用当前考试族阅读短文与理解题；也可打开爱快阅读做泛读。',
+              '使用当前考试族阅读短文与理解题；也可打开爱快阅读做泛读。'
+              '未开通时约可免费体验前 3 篇阅读材料。',
               style: TextStyle(fontWeight: FontWeight.w700, height: 1.45),
             ),
             const SizedBox(height: 16),

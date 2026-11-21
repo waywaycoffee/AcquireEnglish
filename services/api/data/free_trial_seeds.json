@@ -1,0 +1,151 @@
+{
+  "version": 1,
+  "note": "Default free-trial items (~3/module). App auto-downloads on bootstrap into local cache; media stays on ECS (never APK assets).",
+  "modules": {
+    "video": [
+      {
+        "id": "bilibili:BV1fV4y1p7Ex",
+        "title": "48个地道音标口型对照",
+        "freeTrial": true,
+        "defaultSeed": true,
+        "kind": "bilibili",
+        "bvid": "BV1fV4y1p7Ex",
+        "page": 1,
+        "watchUrl": "https://www.bilibili.com/video/BV1fV4y1p7Ex?p=1",
+        "ecs": {
+          "shared_subtitles": "shared_bilibili_subtitles for BV1fV4y1p7Ex p1",
+          "import_media": "optional media/imports/{id}/study.m4a after first import"
+        }
+      },
+      {
+        "id": "bilibili:BV1gm411r7yz",
+        "title": "Pronunciation with Emma · 英音语调",
+        "freeTrial": true,
+        "defaultSeed": true,
+        "kind": "bilibili",
+        "bvid": "BV1gm411r7yz",
+        "page": 1,
+        "watchUrl": "https://www.bilibili.com/video/BV1gm411r7yz?p=1",
+        "ecs": {
+          "shared_subtitles": "shared_bilibili_subtitles for BV1gm411r7yz p1"
+        }
+      },
+      {
+        "id": "bilibili:BV1Aw4m1k7qU",
+        "title": "美国人从小就说的英文100句（试看第1P）",
+        "freeTrial": true,
+        "defaultSeed": true,
+        "kind": "bilibili",
+        "bvid": "BV1Aw4m1k7qU",
+        "page": 1,
+        "watchUrl": "https://www.bilibili.com/video/BV1Aw4m1k7qU?p=1",
+        "ecs": {
+          "shared_subtitles": "shared_bilibili_subtitles for BV1Aw4m1k7qU p1"
+        }
+      }
+    ],
+    "reading": [
+      {
+        "id": "starter-first-morning",
+        "title": "A Quiet Morning",
+        "freeTrial": true,
+        "defaultSeed": true,
+        "kind": "starter_doc",
+        "api": "GET /api/reading/starter"
+      },
+      {
+        "id": "starter-small-cafe",
+        "title": "The Small Cafe",
+        "freeTrial": true,
+        "defaultSeed": true,
+        "kind": "starter_doc",
+        "api": "GET /api/reading/starter"
+      },
+      {
+        "id": "starter-new-route",
+        "title": "A Different Way Home",
+        "freeTrial": true,
+        "defaultSeed": true,
+        "kind": "starter_doc",
+        "api": "GET /api/reading/starter"
+      }
+    ],
+    "exam": [
+      {
+        "id": "exam:cet4:vocab:c4v1",
+        "title": "CET4 词汇体验 · abandon",
+        "freeTrial": true,
+        "defaultSeed": true,
+        "kind": "exam_item",
+        "familyId": "cet4",
+        "skill": "vocab",
+        "itemId": "c4v1",
+        "ecs": {
+          "pack": "data/exam_packs/pack_cet4.json on API host"
+        }
+      },
+      {
+        "id": "exam:cet4:reading:c4r1",
+        "title": "CET4 阅读体验 · Campus Clubs",
+        "freeTrial": true,
+        "defaultSeed": true,
+        "kind": "exam_item",
+        "familyId": "cet4",
+        "skill": "reading",
+        "itemId": "c4r1",
+        "ecs": {
+          "pack": "data/exam_packs/pack_cet4.json on API host"
+        }
+      },
+      {
+        "id": "exam:cet4:listening:c4l1",
+        "title": "CET4 听力体验 · Conversation: Report",
+        "freeTrial": true,
+        "defaultSeed": true,
+        "kind": "exam_item",
+        "familyId": "cet4",
+        "skill": "listening",
+        "itemId": "c4l1",
+        "ecs": {
+          "pack": "data/exam_packs/pack_cet4.json",
+          "audio": "optional /media/exam/… when audio_url set on item"
+        }
+      }
+    ],
+    "course": [
+      {
+        "id": "course-seed-quiet-morning",
+        "title": "体验课 · A Quiet Morning",
+        "freeTrial": true,
+        "defaultSeed": true,
+        "kind": "course_demo",
+        "sourceStarterId": "starter-first-morning",
+        "ecs": {
+          "text": "from /api/reading/starter; TTS via reading namespace on demand"
+        }
+      },
+      {
+        "id": "course-seed-small-cafe",
+        "title": "体验课 · The Small Cafe",
+        "freeTrial": true,
+        "defaultSeed": true,
+        "kind": "course_demo",
+        "sourceStarterId": "starter-small-cafe",
+        "ecs": {
+          "text": "from /api/reading/starter"
+        }
+      },
+      {
+        "id": "course-seed-new-route",
+        "title": "体验课 · A Different Way Home",
+        "freeTrial": true,
+        "defaultSeed": true,
+        "kind": "course_demo",
+        "sourceStarterId": "starter-new-route",
+        "ecs": {
+          "text": "from /api/reading/starter"
+        }
+      }
+    ]
+  }
+}

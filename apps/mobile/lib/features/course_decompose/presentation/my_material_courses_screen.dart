@@ -7,13 +7,14 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../authentication/presentation/auth_session.dart';
+import '../../membership/domain/free_trial_seeds.dart';
+import '../../membership/domain/module_access.dart';
 import '../../navigation/presentation/navigation_destination.dart';
 import '../../reading/data/reading_fingerprint.dart';
 import '../../reading/data/reading_ingest.dart';
 import '../../reading/data/reading_pdf_import.dart';
 import '../../reading/domain/reading_doc.dart';
 import '../../reading/presentation/reading_library_provider.dart';
-import '../../navigation/presentation/navigation_destination.dart';
 import '../../shared/presentation/pad/pad_scaffold.dart';
 import '../../shared/presentation/pad/pad_top_bar.dart';
 import '../../sync/data/acquire_api_client.dart';
@@ -47,7 +48,7 @@ class _MyMaterialCoursesScreenState
     if (!ref.read(authSessionProvider).isLoggedIn) {
       setState(() {
         _loading = false;
-        _error = '请先登录后查看私人教材课';
+        _error = null;
         _items = <Map<String, dynamic>>[];
       });
       return;
@@ -196,7 +197,7 @@ class _MyMaterialCoursesScreenState
       Navigator.of(context, rootNavigator: true).pop();
       await _reload();
       if (courseId != null && courseId.isNotEmpty && mounted) {
-        await context.push('/material-courses/${Uri.encodeComponent(courseId)}');
+        await _openCourse(courseId);
       } else if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text(fp.message.isNotEmpty ? fp.message : '已处理')),
@@ -214,9 +215,56 @@ class _MyMaterialCoursesScreenState
     }
   }
 
+  Future<bool> _ensureCourseAllowed(String courseId) async {
+    if (isFreeTrialCourseSeedId(courseId) || isFreeTrialSeedId(courseId)) {
+      return true;
+    }
+    final int index = _items.indexWhere(
+      (Map<String, dynamic> item) => '${item['id'] ?? ''}' == courseId,
+    );
+    if (isFreePreviewIndex(index)) return true;
+    // Newly uploaded course not yet in list: treat as free if under quota.
+    if (index < 0 && _items.length < kModuleFreePreviewCount) return true;
+    final bool unlocked = await resolveModuleUnlocked(ref, 'course');
+    if (unlocked) return true;
+    if (mounted) {
+      await showModulePaywall(context, moduleCode: 'course');
+    }
+    return false;
+  }
+
+  List<Map<String, dynamic>> _seedCourseRows() {
+    final ReadingLibraryState lib = ref.watch(readingLibraryProvider);
+    final List<Map<String, dynamic>> rows = <Map<String, dynamic>>[];
+    for (final FreeTrialSeedItem seed in freeTrialSeedsFor('course')) {
+      final ReadingDoc? doc = lib.docById(seed.id);
+      if (doc == null) continue;
+      rows.add(<String, dynamic>{
+        'id': doc.id,
+        'asset_title': doc.title,
+        'status': 'ready',
+        'private_only': true,
+        'cefr_level': doc.level,
+        'lesson_count': 1,
+        'free_trial': true,
+        'default_seed': true,
+      });
+    }
+    return rows;
+  }
+
+  Future<void> _openCourse(String courseId) async {
+    final String id = courseId.trim();
+    if (id.isEmpty) return;
+    if (!await _ensureCourseAllowed(id)) return;
+    if (!mounted) return;
+    await context.push('/material-courses/${Uri.encodeComponent(id)}');
+  }
+
   Future<void> _openInReading(Map<String, dynamic> course) async {
     final String id = '${course['id'] ?? ''}'.trim();
     if (id.isEmpty) return;
+    if (!await _ensureCourseAllowed(id)) return;
     final Map<String, dynamic>? detail =
         await ref.read(acquireApiClientProvider).getMyFingerprintCourse(id);
     if (detail == null || !mounted) {
@@ -288,76 +336,97 @@ class _MyMaterialCoursesScreenState
               ? Center(child: Text(_error!))
               : RefreshIndicator(
                   onRefresh: _reload,
-                  child: ListView(
-                    padding: const EdgeInsets.fromLTRB(20, 16, 20, 100),
-                    children: <Widget>[
-                      FilledButton.tonalIcon(
-                        onPressed: () => unawaited(_uploadPrivate()),
-                        icon: const Icon(Icons.menu_book_outlined),
-                        label: const Text('上传 EPUB / PDF 并智能切课'),
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        '默认仅私人课库。命中公共缓存时可复用结构；未命中不会写入公共指纹池。',
-                        style: Theme.of(context).textTheme.bodySmall,
-                      ),
-                      const SizedBox(height: 16),
-                      if (_items.isEmpty)
-                        const Padding(
-                          padding: EdgeInsets.only(top: 48),
-                          child: Center(child: Text('还没有教材课，先上传一本吧')),
-                        ),
-                      for (final Map<String, dynamic> item in _items)
-                        Card(
-                          margin: const EdgeInsets.only(bottom: 10),
-                          child: ListTile(
-                            title: Text(
-                              '${item['asset_title'] ?? '未命名教材'}',
-                              maxLines: 2,
-                              overflow: TextOverflow.ellipsis,
+                  child: Builder(
+                    builder: (BuildContext context) {
+                      final List<Map<String, dynamic>> all =
+                          <Map<String, dynamic>>[
+                        ..._seedCourseRows(),
+                        ..._items,
+                      ];
+                      return ListView(
+                        padding: const EdgeInsets.fromLTRB(20, 16, 20, 100),
+                        children: <Widget>[
+                          FilledButton.tonalIcon(
+                            onPressed: () => unawaited(_uploadPrivate()),
+                            icon: const Icon(Icons.menu_book_outlined),
+                            label: const Text('上传 EPUB / PDF 并智能切课'),
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            '默认仅私人课库。约 $kModuleFreePreviewCount 本免费体验课已预下载；'
+                            '命中公共缓存时可复用结构，未命中不会写入公共指纹池。',
+                            style: Theme.of(context).textTheme.bodySmall,
+                          ),
+                          const SizedBox(height: 16),
+                          if (all.isEmpty)
+                            const Padding(
+                              padding: EdgeInsets.only(top: 48),
+                              child: Center(child: Text('还没有教材课，先上传一本吧')),
                             ),
-                            subtitle: Text(
-                              [
-                                if (item['private_only'] == true) '私人',
-                                '${item['status'] ?? ''}',
-                                if (item['cefr_level'] != null)
-                                  '${item['cefr_level']}',
-                                if (item['lesson_count'] != null)
-                                  '${item['lesson_count']} 课',
-                              ].where((String s) => s.trim().isNotEmpty).join(' · '),
-                            ),
-                            trailing: PopupMenuButton<String>(
-                              onSelected: (String value) {
-                                final String id = '${item['id'] ?? ''}';
-                                if (value == 'edit') {
-                                  unawaited(
-                                    context.push(
-                                      '/material-courses/${Uri.encodeComponent(id)}',
-                                    ),
-                                  );
-                                } else if (value == 'read') {
-                                  unawaited(_openInReading(item));
-                                }
-                              },
-                              itemBuilder: (_) => const <PopupMenuEntry<String>>[
-                                PopupMenuItem<String>(
-                                  value: 'edit',
-                                  child: Text('预览 / 编辑切课'),
+                          for (int i = 0; i < all.length; i++)
+                            Card(
+                              margin: const EdgeInsets.only(bottom: 10),
+                              child: ListTile(
+                                title: Text(
+                                  '${all[i]['asset_title'] ?? '未命名教材'}'
+                                  '${all[i]['free_trial'] == true || isFreePreviewIndex(i) ? ' · 免费体验' : ' · 需开通'}',
+                                  maxLines: 2,
+                                  overflow: TextOverflow.ellipsis,
                                 ),
-                                PopupMenuItem<String>(
-                                  value: 'read',
-                                  child: Text('加入书架阅读'),
+                                subtitle: Text(
+                                  [
+                                    if (all[i]['free_trial'] == true) '默认预下载',
+                                    if (all[i]['private_only'] == true) '私人',
+                                    '${all[i]['status'] ?? ''}',
+                                    if (all[i]['cefr_level'] != null)
+                                      '${all[i]['cefr_level']}',
+                                    if (all[i]['lesson_count'] != null)
+                                      '${all[i]['lesson_count']} 课',
+                                  ]
+                                      .where((String s) => s.trim().isNotEmpty)
+                                      .join(' · '),
                                 ),
-                              ],
-                            ),
-                            onTap: () => unawaited(
-                              context.push(
-                                '/material-courses/${Uri.encodeComponent('${item['id'] ?? ''}')}',
+                                onTap: () {
+                                  final String id = '${all[i]['id'] ?? ''}';
+                                  if (all[i]['free_trial'] == true) {
+                                    unawaited(
+                                      context.push(
+                                        '/reading/${Uri.encodeComponent(id)}',
+                                      ),
+                                    );
+                                    return;
+                                  }
+                                  unawaited(_openInReading(all[i]));
+                                },
+                                trailing: all[i]['free_trial'] == true
+                                    ? const Icon(Icons.menu_book_outlined)
+                                    : PopupMenuButton<String>(
+                                        onSelected: (String value) {
+                                          final String id =
+                                              '${all[i]['id'] ?? ''}';
+                                          if (value == 'edit') {
+                                            unawaited(_openCourse(id));
+                                          } else if (value == 'read') {
+                                            unawaited(_openInReading(all[i]));
+                                          }
+                                        },
+                                        itemBuilder: (_) =>
+                                            const <PopupMenuEntry<String>>[
+                                          PopupMenuItem<String>(
+                                            value: 'edit',
+                                            child: Text('预览 / 编辑切课'),
+                                          ),
+                                          PopupMenuItem<String>(
+                                            value: 'read',
+                                            child: Text('加入书架阅读'),
+                                          ),
+                                        ],
+                                      ),
                               ),
                             ),
-                          ),
-                        ),
-                    ],
+                        ],
+                      );
+                    },
                   ),
                 ),
     );

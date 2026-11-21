@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../membership/domain/module_access.dart';
 import '../../navigation/presentation/navigation_destination.dart';
 import '../../shared/presentation/pad/pad_scaffold.dart';
 import '../../shared/presentation/pad/pad_top_bar.dart';
@@ -39,6 +40,22 @@ class _MaterialCourseEditScreenState
       _loading = true;
       _error = null;
     });
+    final List<Map<String, dynamic>> listed =
+        await ref.read(acquireApiClientProvider).listMyFingerprintCourses();
+    if (!mounted) return;
+    final int index = listed.indexWhere(
+      (Map<String, dynamic> item) => '${item['id'] ?? ''}' == widget.courseId,
+    );
+    final bool unlocked = await resolveModuleUnlocked(ref, 'course');
+    if (!unlocked && !isFreePreviewIndex(index) && index >= 0) {
+      if (!mounted) return;
+      setState(() {
+        _loading = false;
+        _error = 'free_preview_exhausted';
+      });
+      await showModulePaywall(context, moduleCode: 'course');
+      return;
+    }
     final Map<String, dynamic>? detail = await ref
         .read(acquireApiClientProvider)
         .getMyFingerprintCourse(widget.courseId);
@@ -196,7 +213,13 @@ class _MaterialCourseEditScreenState
       body: _loading
           ? const Center(child: CircularProgressIndicator())
           : _error != null
-              ? Center(child: Text(_error!))
+              ? Center(
+                  child: Text(
+                    _error == 'free_preview_exhausted'
+                        ? '免费体验已用完，请开通课程板块月卡 / 年卡'
+                        : _error!,
+                  ),
+                )
               : Column(
                   children: <Widget>[
                     Padding(

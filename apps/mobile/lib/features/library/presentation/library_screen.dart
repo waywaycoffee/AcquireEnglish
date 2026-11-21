@@ -12,6 +12,9 @@ import '../../import_course/data/bilibili_cover_refresh.dart';
 import '../../import_course/data/bilibili_episode_cover_backfill.dart';
 import '../../import_course/data/bilibili_import_service.dart';
 import '../../import_course/data/netdisk_local_download.dart';
+import '../../import_course/domain/bilibili_import.dart';
+import '../../membership/domain/free_trial_seeds.dart';
+import '../../membership/domain/module_access.dart';
 import '../../import_course/presentation/course_import_entry.dart';
 import '../../import_course/presentation/recommended_bilibili_section.dart';
 import '../../import_course/presentation/widgets/import_course_flow.dart';
@@ -1631,13 +1634,15 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
     _maybeBackfillBilibiliEpisodeCovers(course);
   }
 
-  void _openEpisodeForLearning(
+  Future<void> _openEpisodeForLearning(
     LibraryCourseData course,
     LibraryEpisodeItem item,
-  ) {
+  ) async {
     setState(() {
       selectedEpisodeId = item.id;
     });
+    if (!await _ensureVideoEpisodeAllowed(course, item)) return;
+    if (!mounted) return;
     final bool needDownload =
         item.videoMissing || !isUsableLocalVideoPath(item.videoAsset);
     if (needDownload && mounted) {
@@ -1654,6 +1659,31 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
       SGRoute.player.name,
       pathParameters: <String, String>{'episodeId': item.id},
     );
+  }
+
+  Future<bool> _ensureVideoEpisodeAllowed(
+    LibraryCourseData course,
+    LibraryEpisodeItem item,
+  ) async {
+    final bool unlocked = await resolveModuleUnlocked(ref, 'video');
+    if (unlocked) return true;
+    final List<String> candidates = <String>[
+      item.sourceUrl ?? '',
+      item.videoAsset ?? '',
+      course.description,
+    ];
+    for (final String raw in candidates) {
+      final Map<String, String>? ids = BilibiliImport.extractIds(raw);
+      if (ids == null) continue;
+      final String bvid = (ids['bvid'] ?? '').trim();
+      if (bvid.isNotEmpty && isFreeTrialBilibiliBvid(bvid)) {
+        return true;
+      }
+    }
+    if (mounted) {
+      await showModulePaywall(context, moduleCode: 'video');
+    }
+    return false;
   }
 
   void _maybeBackfillBilibiliEpisodeCovers(LibraryCourseData course) {

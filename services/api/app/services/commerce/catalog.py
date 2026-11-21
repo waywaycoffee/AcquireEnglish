@@ -9,6 +9,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models import ProductSku
 
+# Free experience items per module (lessons / docs / passages / courses).
+# Keep in sync with apps/mobile/.../module_access.dart kModuleFreePreviewCount.
+FREE_PREVIEW_COUNT = 3
+
 # Product-area sellable modules (paywall buckets).
 MODULE_DEFS: list[dict] = [
     {
@@ -336,6 +340,7 @@ def public_module_catalog() -> list[dict]:
             "list_cents": m["list_cents"],
             "yearly_cents": m["yearly_cents"],
             "quota": m["quota"],
+            "free_preview_count": FREE_PREVIEW_COUNT,
             "sku_monthly": f"module.{m['code']}.monthly",
             "sku_yearly": f"module.{m['code']}.yearly",
         }
@@ -346,6 +351,7 @@ def public_module_catalog() -> list[dict]:
 def public_commerce_catalog() -> dict:
     return {
         "modules": public_module_catalog(),
+        "free_preview_count": FREE_PREVIEW_COUNT,
         # Combos / efficiency retired from storefront; empty lists keep API shape.
         "combos": [],
         "efficiency": [],

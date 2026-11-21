@@ -1,8 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../router/app_router.dart';
+import '../../authentication/presentation/auth_session.dart';
 import '../../reading/data/reading_catalog.dart';
+import '../../sync/data/acquire_api_client.dart';
+import 'free_trial_seeds.dart';
 
 /// Codes aligned with `services/api/.../commerce/catalog.py` MODULE_DEFS.
 const Map<String, String> kModuleTitlesZh = <String, String>{
@@ -17,10 +21,22 @@ const Map<String, String> kModuleTitlesZh = <String, String>{
   'acquire_listening': '视频模块',
 };
 
-/// Public starter readings stay available before a module purchase.
-bool isFreeReadingPreviewDocId(String docId) =>
-    docId.startsWith('starter-') ||
-    docId == kDefaultWizardOfOzEntry.stableDocId;
+/// Per-module free experience quota (lessons / docs / passages / courses).
+/// Keep in sync with `services/api/.../commerce/catalog.py` FREE_PREVIEW_COUNT.
+const int kModuleFreePreviewCount = 3;
+
+bool isFreePreviewIndex(int index) =>
+    index >= 0 && index < kModuleFreePreviewCount;
+
+/// Public starter / default-seed readings stay available before a module purchase.
+bool isFreeReadingPreviewDocId(String docId) {
+  final String id = docId.trim();
+  if (id.isEmpty) return false;
+  if (id.startsWith('starter-')) return true;
+  if (id == kDefaultWizardOfOzEntry.stableDocId) return true;
+  if (isFreeTrialCourseSeedId(id) || isFreeTrialSeedId(id)) return true;
+  return false;
+}
 
 /// Legacy entitlement refs → current product buckets.
 const Map<String, List<String>> kLegacyModuleAliases = <String, List<String>>{
@@ -74,6 +90,36 @@ bool assetsUnlockModule(Map<String, dynamic>? assets, String moduleCode) {
   return false;
 }
 
+/// Resolves full module unlock (Pro / trial / module 月卡·年卡).
+Future<bool> resolveModuleUnlocked(WidgetRef ref, String moduleCode) async {
+  if (!ref.read(authSessionProvider).isLoggedIn) return false;
+  try {
+    final Map<String, dynamic> assets =
+        await ref.read(acquireApiClientProvider).getAssets();
+    if (assetsUnlockModule(assets, moduleCode)) return true;
+    try {
+      final Map<String, dynamic> access = await ref
+          .read(acquireApiClientProvider)
+          .commerceModuleAccess(moduleCode);
+      return access['allowed'] == true;
+    } catch (_) {
+      return false;
+    }
+  } catch (_) {
+    return false;
+  }
+}
+
+/// True when the user may open this content unit (entitled or free preview).
+Future<bool> resolveModuleContentAccess(
+  WidgetRef ref, {
+  required String moduleCode,
+  bool freePreviewAllowed = false,
+}) async {
+  if (freePreviewAllowed) return true;
+  return resolveModuleUnlocked(ref, moduleCode);
+}
+
 Future<void> showModulePaywall(
   BuildContext context, {
   required String moduleCode,
@@ -92,8 +138,9 @@ Future<void> showModulePaywall(
             children: <Widget>[
               Text('开通「$title」', style: Theme.of(ctx).textTheme.titleLarge),
               const SizedBox(height: 8),
-              const Text(
-                '体验期或 Pro 会员可使用全部板块；也可单独购买本板块或组合套餐。',
+              Text(
+                '每个板块约有 $kModuleFreePreviewCount 个免费体验内容；'
+                '继续学习请开通本板块月卡或年卡。',
               ),
               const SizedBox(height: 16),
               FilledButton(
@@ -101,7 +148,7 @@ Future<void> showModulePaywall(
                   Navigator.pop(ctx);
                   context.push(SGRoute.membership.route);
                 },
-                child: const Text('去会员中心开通'),
+                child: const Text('去开通月卡 / 年卡'),
               ),
               TextButton(
                 onPressed: () => Navigator.pop(ctx),

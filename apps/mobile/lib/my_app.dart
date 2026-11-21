@@ -20,6 +20,7 @@ import 'features/import_course/presentation/video_download_progress_host.dart';
 import 'features/import_course/presentation/video_download_progress_host.dart';
 import 'features/library/presentation/library_catalog_provider.dart';
 import 'features/library/presentation/library_mock_data.dart';
+import 'features/membership/presentation/free_trial_seed_bootstrap.dart';
 import 'features/settings/presentation/bilibili_login_sheet.dart';
 import 'features/settings/presentation/settings_provider.dart';
 import 'features/shared/presentation/app_orientation.dart';
@@ -61,6 +62,8 @@ class _MyAppState extends ConsumerState<MyApp> with WidgetsBindingObserver {
           unawaited(syncCloudCatalogAndFeed(ref));
         }
       }());
+      // Prefetch ~3 default free-trial items per module into local cache.
+      unawaited(ref.read(freeTrialSeedBootstrapProvider.future));
       // Touch status provider so library course UI can show fill progress.
       ref.read(subtitleCompletionStatusProvider);
       configureSharedBilibiliSubtitleApi(

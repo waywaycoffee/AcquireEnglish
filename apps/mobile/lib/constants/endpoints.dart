@@ -76,6 +76,7 @@ class Endpoints {
   static const String assetsOrders = 'api/assets/orders';
   static const String assetsConsume = 'api/assets/entitlements/consume';
   static const String commerceCatalog = 'api/commerce/catalog';
+  static const String commerceFreeTrialSeeds = 'api/commerce/free-trial-seeds';
   static const String commerceTrialStatus = 'api/commerce/trial/status';
   static const String commerceTrialClaimExtend = 'api/commerce/trial/claim-extend';
   static const String commercePoints = 'api/commerce/points';

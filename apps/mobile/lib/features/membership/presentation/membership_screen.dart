@@ -189,7 +189,10 @@ class _MembershipScreenState extends ConsumerState<MembershipScreen> {
       children: [
         const SizedBox(height: 16),
         Text('付费板块', style: Theme.of(context).textTheme.titleLarge),
-        const Text('视频 / 阅读 / 考试 / 课程：每板块仅月卡与年卡，微信支付开通对应时长权益。'),
+        const Text(
+          '视频 / 阅读 / 考试 / 课程：每板块约 3 个免费体验内容；'
+          '继续学习请开通月卡或年卡（微信支付）。',
+        ),
         for (final mod in _modules) ...[
           Card(
             child: Column(

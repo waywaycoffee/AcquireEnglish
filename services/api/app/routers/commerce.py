@@ -10,6 +10,7 @@ from app.database import get_db
 from app.deps import get_current_user
 from app.models import User
 from app.services.commerce.catalog import (
+    FREE_PREVIEW_COUNT,
     LEGACY_MODULE_CODES,
     MODULE_CODES,
     MODULE_DEFS,
@@ -21,6 +22,7 @@ from app.services.commerce.trial import (
     claim_trial_extend_coupon,
     trial_status,
 )
+from app.services.free_trial_seeds import public_free_trial_seeds
 from app.services.user_assets import list_active_entitlements, user_has_module_access
 
 router = APIRouter(prefix="/commerce", tags=["commerce"])
@@ -53,13 +55,23 @@ async def commerce_catalog() -> dict:
     return public_commerce_catalog()
 
 
+@router.get("/free-trial-seeds")
+async def commerce_free_trial_seeds() -> dict:
+    """Public default free-trial items (~3 per module) for app bootstrap."""
+    return public_free_trial_seeds()
+
+
 @router.get("/modules/{module_code}/access")
 async def commerce_module_access(
     module_code: str,
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> dict:
-    """Whether the user may enter a learning module (Pro/trial or module SKU)."""
+    """Whether the user may enter a learning module (Pro/trial or module SKU).
+
+    Free-trial seed items remain playable without a module SKU; ``allowed``
+    means full module unlock. Clients should still serve ``free_trial_seeds``.
+    """
     code = module_code.strip()
     if code not in _MODULE_CODES:
         raise HTTPException(status_code=404, detail="unknown_module")
@@ -69,12 +81,16 @@ async def commerce_module_access(
         (m["title"] for m in MODULE_DEFS if m["code"] == canonical),
         code,
     )
+    seeds = public_free_trial_seeds()["modules"].get(canonical) or []
     return {
         "module": canonical,
         "requested": code,
         "title": title,
         "allowed": allowed,
         "paywall": not allowed,
+        "free_trial_browse": True,
+        "free_preview_count": FREE_PREVIEW_COUNT,
+        "free_trial_seeds": seeds,
     }
 
 

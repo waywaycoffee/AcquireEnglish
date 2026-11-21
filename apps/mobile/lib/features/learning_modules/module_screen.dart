@@ -12,6 +12,7 @@ import 'package:hive_ce/hive.dart';
 import '../authentication/presentation/account_storage.dart';
 import 'package:media_kit/media_kit.dart';
 import '../digital_human/data/oral_coach_pipeline_client.dart';
+import '../membership/domain/module_access.dart';
 import '../onboarding/presentation/onboarding_provider.dart';
 import '../settings/presentation/settings_provider.dart';
 import '../phrases/presentation/phrase_book_provider.dart';
@@ -201,10 +202,23 @@ class _ModuleScreenState extends ConsumerState<ModuleScreen>
   }
 
   List<ModuleLesson> get lessons => moduleLessons[widget.kind] ?? const [];
+  bool get _videoModuleGated =>
+      widget.kind == 'listening' || widget.kind == 'dialogue';
   String get key => studyStorageKey(
     'module-v1:${widget.kind}',
     ref.read(studyAccountProvider),
   );
+
+  Future<bool> _ensureLessonAllowed(int index) async {
+    if (!_videoModuleGated || isFreePreviewIndex(index)) return true;
+    final bool unlocked = await resolveModuleUnlocked(ref, 'video');
+    if (unlocked) return true;
+    if (mounted) {
+      await showModulePaywall(context, moduleCode: 'video');
+    }
+    return false;
+  }
+
   @override
   void initState() {
     super.initState();
@@ -256,7 +270,23 @@ class _ModuleScreenState extends ConsumerState<ModuleScreen>
         lesson = initial.clamp(0, lessons.length - 1);
         line = 0;
       }
+      if (_videoModuleGated && !isFreePreviewIndex(lesson)) {
+        lesson = 0;
+        line = 0;
+      }
     });
+    if (_videoModuleGated &&
+        widget.initialLesson != null &&
+        !isFreePreviewIndex(widget.initialLesson!)) {
+      unawaited(() async {
+        final bool ok = await _ensureLessonAllowed(widget.initialLesson!);
+        if (!mounted || !ok) return;
+        setState(() {
+          lesson = widget.initialLesson!.clamp(0, lessons.length - 1);
+          line = 0;
+        });
+      }());
+    }
     if (ref.read(authSessionProvider).isLoggedIn) unawaited(sync());
   }
 
@@ -384,7 +414,18 @@ class _ModuleScreenState extends ConsumerState<ModuleScreen>
     setState(() => saving = true);
     try {
       completedLessons.add(lesson);
-      lesson = (lesson + 1) % lessons.length;
+      final int next = (lesson + 1) % lessons.length;
+      if (!await _ensureLessonAllowed(next)) {
+        if (!mounted || account != ref.read(studyAccountProvider)) return;
+        setState(() {
+          saving = false;
+          selected = null;
+          reveal = false;
+        });
+        await persist();
+        return;
+      }
+      lesson = next;
       line = 0;
       await persist();
       if (!mounted || account != ref.read(studyAccountProvider)) return;
@@ -490,21 +531,33 @@ class _ModuleScreenState extends ConsumerState<ModuleScreen>
             isExpanded: true,
             items: [
               for (int i = 0; i < lessons.length; i++)
-                DropdownMenuItem(value: i, child: Text(lessons[i].title)),
+                DropdownMenuItem(
+                  value: i,
+                  child: Text(
+                    _videoModuleGated && !isFreePreviewIndex(i)
+                        ? '${lessons[i].title} · 需开通'
+                        : lessons[i].title,
+                  ),
+                ),
             ],
             onChanged: (v) {
-              stop();
-              setState(() {
-                lesson = v!;
-                line = 0;
-                selected = null;
-                reveal = false;
-              });
-              unawaited(
-                persist().catchError((_) {
-                  if (mounted) setState(() => error = '位置保存失败，请重试');
-                }),
-              );
+              if (v == null) return;
+              unawaited(() async {
+                if (!await _ensureLessonAllowed(v)) return;
+                if (!mounted) return;
+                stop();
+                setState(() {
+                  lesson = v;
+                  line = 0;
+                  selected = null;
+                  reveal = false;
+                });
+                unawaited(
+                  persist().catchError((_) {
+                    if (mounted) setState(() => error = '位置保存失败，请重试');
+                  }),
+                );
+              }());
             },
           ),
           if (widget.kind == 'dialogue')
