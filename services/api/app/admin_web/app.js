@@ -488,10 +488,14 @@
   }
 
   async function loadUsage() {
-    const [summary, pnl] = await Promise.all([
+    const [summary, pnl, platform] = await Promise.all([
       api("/usage/summary?days=30"),
       api("/usage/pnl?days=30"),
+      api("/usage/platform").catch((e) => ({ ok: false, error: e.message, keys: [] })),
     ]);
+    const platSum = (platform && platform.summary) || {};
+    const aliyun = (platform && platform.aliyun) || {};
+    const sfm = ((aliyun.products || {}).sfm || {});
     const el = $("panel-usage");
     el.innerHTML = `
       <div class="kpi-row">
@@ -502,7 +506,94 @@
           pnl.margin_pct == null ? "—" : pnl.margin_pct + "%"
         }</strong></div>
       </div>
+      <div class="kpi-row">
+        <div class="stat"><span class="muted">阿里云余额</span><strong>${
+          platSum.aliyun_balance_cny == null ? "—" : money(platSum.aliyun_balance_cny)
+        }</strong></div>
+        <div class="stat"><span class="muted">百炼本月</span><strong>${money(
+          platSum.dashscope_sfm_cny || 0
+        )}</strong></div>
+        <div class="stat"><span class="muted">短信本月</span><strong>${money(
+          platSum.sms_cny || 0
+        )}</strong></div>
+        <div class="stat"><span class="muted">应用相关合计</span><strong>${money(
+          platSum.aliyun_app_products_cny || 0
+        )}</strong></div>
+      </div>
       <div class="dash-grid">
+        <div class="dash-card full">
+          <h3>.env 已接入的 API Key（指纹）</h3>
+          <div class="table-wrap"><table>
+            <thead><tr><th>平台</th><th>环境变量</th><th>状态</th><th>指纹</th><th>用途</th><th>账单来源</th></tr></thead>
+            <tbody>
+              ${(platform.keys || [])
+                .map(
+                  (k) => `<tr>
+                  <td>${escapeHtml(k.label)}</td>
+                  <td><code>${escapeHtml(k.env)}</code></td>
+                  <td><span class="chip ${k.configured ? "ok" : "bad"}">${
+                    k.configured ? "已配置" : "未配置"
+                  }</span></td>
+                  <td>${escapeHtml(k.key_label || k.key_fingerprint || "—")}</td>
+                  <td>${escapeHtml(k.usage || "")}</td>
+                  <td>${escapeHtml(k.billing || "")}</td>
+                </tr>`
+                )
+                .join("")}
+            </tbody>
+          </table></div>
+          <div class="note-box">${escapeHtml(
+            platSum.note || platform.error || `账单月 ${(platform.billing_cycle || "").toString()}`
+          )}</div>
+        </div>
+        <div class="dash-card full">
+          <h3>阿里云 BSS · 百炼 / 短信明细（${escapeHtml(
+            (platform.billing_cycle || "").toString()
+          )}）</h3>
+          <div class="table-wrap"><table>
+            <thead><tr><th>产品</th><th>明细</th><th>用量</th><th>税前 CNY</th><th>实例/模型</th></tr></thead>
+            <tbody>
+              ${["sfm", "dysms", "dysms_system", "ecs"]
+                .flatMap((code) => {
+                  const prod = (aliyun.products || {})[code] || {};
+                  return (prod.lines || []).map(
+                    (line) => `<tr>
+                    <td>${escapeHtml(prod.label || code)}</td>
+                    <td>${escapeHtml(line.detail || line.product_name || "")}</td>
+                    <td>${escapeHtml(
+                      [line.usage, line.usage_unit].filter(Boolean).join(" ") || "—"
+                    )}</td>
+                    <td>${money(line.pretax_cny)}</td>
+                    <td>${escapeHtml(line.instance_id || "—")}</td>
+                  </tr>`
+                  );
+                })
+                .join("") ||
+              `<tr><td colspan="5" class="muted">本月暂无百炼/短信/ECS 明细，或 AccessKey 无 BSS 权限。</td></tr>`}
+            </tbody>
+          </table></div>
+          ${
+            sfm.pretax_cny
+              ? `<div class="note-box">百炼合计税前 ${money(sfm.pretax_cny)} · ${num(
+                  sfm.count
+                )} 条计费项</div>`
+              : ""
+          }
+          ${
+            platform.tencent && platform.tencent.error
+              ? `<div class="note-box">腾讯云：${escapeHtml(platform.tencent.error)}${
+                  platform.tencent.note ? " · " + escapeHtml(platform.tencent.note) : ""
+                }</div>`
+              : ""
+          }
+          ${
+            platform.livekit
+              ? `<div class="note-box">LiveKit：${escapeHtml(
+                  platform.livekit.note || platform.livekit.error || ""
+                )} · project ${escapeHtml(platform.livekit.project_hint || "")}</div>`
+              : ""
+          }
+        </div>
         <div class="dash-card">
           <h3>损益（30 日）</h3>
           <div class="bars">

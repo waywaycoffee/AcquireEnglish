@@ -26,6 +26,7 @@ from app.models import (
 )
 from app.services import api_usage as usage_svc
 from app.services.infra_monitor import collect_infra_snapshot
+from app.services.platform_billing import collect_platform_usage
 
 router = APIRouter(prefix="/admin", tags=["admin-analytics"])
 
@@ -54,6 +55,19 @@ async def usage_pnl(
     db: AsyncSession = Depends(get_db),
 ) -> dict[str, Any]:
     return await usage_svc.pnl_summary(db, days=days or None)
+
+
+@router.get("/usage/platform")
+async def usage_platform(
+    month: str | None = Query(
+        None,
+        pattern=r"^\d{4}-\d{2}$",
+        description="Billing month YYYY-MM; default current UTC month",
+    ),
+    _: str = Depends(require_admin_token),
+) -> dict[str, Any]:
+    """Discover .env API keys and pull vendor billing (Aliyun BSS / Tencent / …)."""
+    return collect_platform_usage(month=month)
 
 
 @router.get("/analytics/users")
