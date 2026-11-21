@@ -18,7 +18,8 @@ class FloatingBottomNav extends StatelessWidget {
         AppNavDestination.library,
         AppNavDestination.reading,
         AppNavDestination.review,
-        AppNavDestination.oralCoach,
+        // Community hosts cafe adventure / gamification — keep it one tap away.
+        AppNavDestination.discover,
       ];
 
   @override

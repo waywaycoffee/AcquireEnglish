@@ -45,10 +45,10 @@ enum AppNavDestination {
   discover(
     route: '/discover',
     label: '社区',
-    title: '社区',
-    subtitle: '分享喜欢的 B 站视频与博主，找搭子一起练。',
-    icon: Icons.groups_outlined,
-    activeIcon: Icons.groups_rounded,
+    title: '学习社区',
+    subtitle: '咖啡店闯关、素材协作、输出互评；积分换装扮。',
+    icon: Icons.sports_esports_outlined,
+    activeIcon: Icons.sports_esports_rounded,
   ),
   review(
     route: '/review',

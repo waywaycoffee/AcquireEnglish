@@ -9,15 +9,15 @@ import '../../shared/presentation/pad/app_design_tokens.dart';
 import '../../shared/presentation/pad/hub_ui.dart';
 import '../../shared/presentation/pad/pad_scaffold.dart';
 import '../../shared/presentation/pad/pad_top_bar.dart';
+import '../domain/cafe_adventure.dart';
 import 'adventure_ui.dart';
 import 'cafe_progress_provider.dart';
+import 'community_adventure_tab.dart';
 import 'community_feed_tab.dart';
-import 'community_groups_tab.dart';
 import 'community_hot_tab.dart';
 import 'community_me_tab.dart';
 import 'community_provider.dart';
 import 'community_social_screen.dart';
-import '../domain/cafe_adventure.dart';
 import 'exploration_map_screen.dart';
 import 'study_desk_screen.dart';
 
@@ -69,6 +69,7 @@ class _CommunityScreenState extends ConsumerState<CommunityScreen> {
     );
 
     final List<Widget> pages = <Widget>[
+      const CommunityAdventureTab(),
       const CommunityHotTab(),
       const CommunityFeedTab(
         kinds: <String>{
@@ -80,15 +81,14 @@ class _CommunityScreenState extends ConsumerState<CommunityScreen> {
         },
         emptyTitle: '发一条练习成果',
         emptyMeta: '仿写、跟读、闯关成果都会出现在这里',
-        emptyHint: '练习区承接输出与反馈；素材分享请看「素材」。',
+        emptyHint: '练习区承接输出与反馈；闯关地图请看「冒险」。',
       ),
       const CommunityFeedTab(
         kinds: <String>{'question'},
         emptyTitle: '还没有英语问答',
         emptyMeta: '可贴台词时间戳或词条提问',
-        emptyHint: '问答聚焦发音、词汇、语法与表达辨析，拒绝灌水。',
+        emptyHint: '问答聚焦发音、词汇、语法与表达辨析。',
       ),
-      const CommunityGroupsTab(),
       const CommunityMeTab(),
     ];
     final CafeProgress progress =
@@ -104,7 +104,7 @@ class _CommunityScreenState extends ConsumerState<CommunityScreen> {
       showContinueLearning: false,
       topBar: PadTopBar(
         title: '学习社区',
-        description: '素材可复用 · 输出可互评 · 拒绝打卡灌水',
+        description: '冒险闯关 · 素材协作 · 输出互评',
         actions: <Widget>[
           IconButton(
             tooltip: '消息、收藏与管理',
@@ -133,7 +133,7 @@ class _CommunityScreenState extends ConsumerState<CommunityScreen> {
         children: <Widget>[
           AdventureHeroBanner(
             edgeToEdge: true,
-            chapterTitle: '协作练习场',
+            chapterTitle: '街角咖啡店',
             chapterIndex: 1,
             stageLabel: progress.stageLabel,
             progressLabel: progress.progressLabel,
@@ -142,7 +142,7 @@ class _CommunityScreenState extends ConsumerState<CommunityScreen> {
             nodeLabels:
                 kCafeLevels.map((CafeLevel e) => e.title).toList(growable: false),
             onContinue: _openAdventure,
-            partnerLabel: loggedIn ? '小组 · 打开学习桌' : '登录后可组队与换装',
+            partnerLabel: loggedIn ? '同桌加分 · 打开学习桌' : '登录后可保存闯关进度',
             onPartner: loggedIn ? _openDesk : null,
           ),
           Padding(
@@ -156,10 +156,10 @@ class _CommunityScreenState extends ConsumerState<CommunityScreen> {
               child: Row(
                 children: <Widget>[
                   for (final (int i, String label) in <(int, String)>[
-                    (0, '素材'),
-                    (1, '练习'),
-                    (2, '问答'),
-                    (3, '小组'),
+                    (0, '冒险'),
+                    (1, '素材'),
+                    (2, '练习'),
+                    (3, '问答'),
                     (4, '我的'),
                   ])
                     Expanded(
@@ -182,7 +182,7 @@ class _CommunityScreenState extends ConsumerState<CommunityScreen> {
                     children: <Widget>[
                       QuestFeedCard(
                         title: '试玩 · 街角咖啡店「看懂菜单」',
-                        meta: '登录后可保存进度、换装并分享素材',
+                        meta: '登录后可保存进度、换装并分享闯关成果',
                         badge: '游客可练',
                         accent: AdventurePalette.pathAmber,
                         onPlay: _openAdventure,
@@ -190,8 +190,8 @@ class _CommunityScreenState extends ConsumerState<CommunityScreen> {
                       const SizedBox(height: 12),
                       HubSurface(
                         child: Text(
-                          '社区定位：分享可练习的素材与语言输出，不做打卡排行。'
-                          '登录后可管理 2D 形象，并在 Feed 看到作者纸娃娃。',
+                          '游戏化：咖啡店闯关地图、同桌学习桌、积分换装扮都在「冒险」。'
+                          '素材与问答是协作社区；不做连续打卡灌水榜。',
                           style: TextStyle(
                             fontSize: 14,
                             height: 1.5,
