@@ -17,9 +17,11 @@ class ServerSyllabusCatalogScreen extends ConsumerStatefulWidget {
   const ServerSyllabusCatalogScreen({
     super.key,
     this.initialKind = SyllabusBookKind.word,
+    this.topic = '',
   });
 
   final SyllabusBookKind initialKind;
+  final String topic;
 
   @override
   ConsumerState<ServerSyllabusCatalogScreen> createState() =>
@@ -33,14 +35,19 @@ class _ServerSyllabusCatalogScreenState
   String? _error;
   bool _loading = true;
   String? _downloadingId;
+  String _query = '';
+  String _topic = '';
+  int _requestVersion = 0;
 
   @override
   void initState() {
     super.initState();
+    _topic = widget.topic;
     unawaited(_load());
   }
 
   Future<void> _load({bool refresh = false}) async {
+    final int version = ++_requestVersion;
     setState(() {
       _loading = true;
       _error = null;
@@ -49,13 +56,13 @@ class _ServerSyllabusCatalogScreenState
       final ServerSyllabusCatalog catalog = await ref
           .read(acquireApiClientProvider)
           .fetchSyllabusCatalog(kind: _kind, refresh: refresh);
-      if (!mounted) return;
+      if (!mounted || version != _requestVersion) return;
       setState(() {
         _catalog = catalog;
         _loading = false;
       });
     } catch (e) {
-      if (!mounted) return;
+      if (!mounted || version != _requestVersion) return;
       setState(() {
         _loading = false;
         _error = '加载云端书库失败：$e';
@@ -69,9 +76,9 @@ class _ServerSyllabusCatalogScreenState
       final SyllabusBook book = await ref
           .read(acquireApiClientProvider)
           .downloadSyllabusBook(item.id);
-      await ref.read(syllabusBooksProvider.notifier).saveImportedBook(
-            book.copyWith(builtin: false),
-          );
+      await ref
+          .read(syllabusBooksProvider.notifier)
+          .saveImportedBook(book.copyWith(builtin: false));
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -82,9 +89,9 @@ class _ServerSyllabusCatalogScreenState
       );
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('下载失败：$e')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('下载失败：$e')));
     } finally {
       if (mounted) setState(() => _downloadingId = null);
     }
@@ -94,7 +101,18 @@ class _ServerSyllabusCatalogScreenState
   Widget build(BuildContext context) {
     final SyllabusBooksState local = ref.watch(syllabusBooksProvider);
     final List<ServerSyllabusCatalogItem> items =
-        _catalog?.ofKind(_kind) ?? const <ServerSyllabusCatalogItem>[];
+        (_catalog?.ofKind(_kind) ?? const <ServerSyllabusCatalogItem>[]).where((
+          item,
+        ) {
+          final hay = '${item.id} ${item.title} ${item.examTag}'.toLowerCase();
+          final topicMatch =
+              _kind != SyllabusBookKind.foundation ||
+              _topic.isEmpty ||
+              (_topic == 'ipa'
+                  ? hay.contains('ipa') || hay.contains('音标')
+                  : hay.contains('phonics') || hay.contains('拼读'));
+          return topicMatch && hay.contains(_query.trim().toLowerCase());
+        }).toList();
 
     return PadScaffold(
       currentDestination: AppNavDestination.words,
@@ -138,11 +156,42 @@ class _ServerSyllabusCatalogScreenState
               selected: <SyllabusBookKind>{_kind},
               onSelectionChanged: (Set<SyllabusBookKind> next) {
                 if (next.isEmpty) return;
-                setState(() => _kind = next.first);
+                setState(() {
+                  _kind = next.first;
+                  _topic = '';
+                });
                 unawaited(_load());
               },
             ),
           ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
+            child: TextField(
+              decoration: const InputDecoration(
+                prefixIcon: Icon(Icons.search),
+                hintText: '搜索名称、级别或主题',
+              ),
+              onChanged: (value) => setState(() => _query = value),
+            ),
+          ),
+          if (_kind == SyllabusBookKind.foundation)
+            Wrap(
+              spacing: 8,
+              children: [
+                for (final topic in ['', 'ipa', 'phonics'])
+                  ChoiceChip(
+                    label: Text(
+                      topic.isEmpty
+                          ? '全部'
+                          : topic == 'ipa'
+                          ? '国际音标'
+                          : '自然拼读',
+                    ),
+                    selected: _topic == topic,
+                    onSelected: (_) => setState(() => _topic = topic),
+                  ),
+              ],
+            ),
           Expanded(
             child: _loading
                 ? const Center(child: CircularProgressIndicator())
@@ -179,9 +228,7 @@ class _ServerSyllabusCatalogScreenState
                         child: ListTile(
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(16),
-                            side: BorderSide(
-                              color: AppDesignTokens.borderGray,
-                            ),
+                            side: BorderSide(color: AppDesignTokens.borderGray),
                           ),
                           title: Text(
                             item.title,
@@ -206,9 +253,11 @@ class _ServerSyllabusCatalogScreenState
                                 )
                               : FilledButton(
                                   onPressed: downloaded
-                                      ? null
+                                      ? () => context.push(
+                                          '/review/session?deck=syllabus&book=${Uri.encodeComponent(item.id)}',
+                                        )
                                       : () => unawaited(_download(item)),
-                                  child: Text(downloaded ? '已下载' : '下载'),
+                                  child: Text(downloaded ? '开始学习' : '下载'),
                                 ),
                         ),
                       );

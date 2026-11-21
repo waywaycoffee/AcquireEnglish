@@ -231,7 +231,10 @@ GoRouter goRouter(Ref ref) => GoRouter(
         final SyllabusBookKind kind = SyllabusBookKind.fromName(
           tab.isEmpty ? 'word' : tab,
         );
-        return ServerSyllabusCatalogScreen(initialKind: kind);
+        return ServerSyllabusCatalogScreen(
+          initialKind: kind,
+          topic: tab == 'ipa' || tab == 'phonics' ? tab : '',
+        );
       },
     ).fade(),
     GoRoute(
@@ -256,11 +259,11 @@ GoRouter goRouter(Ref ref) => GoRouter(
     GoRoute(
       path: '/digital-human',
       builder: (BuildContext context, GoRouterState state) {
-        final String? scenario =
-            state.uri.queryParameters['scenario']?.trim();
+        final String? scenario = state.uri.queryParameters['scenario']?.trim();
         return DigitalHumanCoachScreen(
-          initialScenarioId:
-              (scenario == null || scenario.isEmpty) ? null : scenario,
+          initialScenarioId: (scenario == null || scenario.isEmpty)
+              ? null
+              : scenario,
         );
       },
     ).fade(),
