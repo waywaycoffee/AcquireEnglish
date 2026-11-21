@@ -45,6 +45,10 @@ Direct: `pack.vocab.*`, `pack.course.*`.
 Free: 精读 1/日、AI 精讲 2/周、外教 10 分/周、上传 2/日、对战 3/日.  
 Paid: from `MODULE_DEFS.quota`. Arena free 3 / paid 10 + extras.
 
+## Default owner Pro
+
+Display name `weiwei` (product default / demo account) is granted **lifetime Pro** (`membership` / `pro`, `ends_at=null`, `campaign=default_owner_pro`) on API startup (`ensure_default_pro_users`) and again after each successful auth. Pro unlocks all four modules; no separate module SKUs required.
+
 ## Points
 
 Earn validates PRD gates server-side. Spend grants entitlements. Free users 1.5× spend. Double-points card multiplies earns.

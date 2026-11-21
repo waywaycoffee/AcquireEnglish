@@ -80,9 +80,11 @@ async def lifespan(_: FastAPI):
         await ensure_commerce_skus(session)
         from app.services.community_seed import ensure_community_seed
         from app.services.cosmetics_seed import ensure_cosmetics_catalog
+        from app.services.owner_pro_seed import ensure_default_pro_users
 
         await ensure_community_seed(session)
         await ensure_cosmetics_catalog(session)
+        await ensure_default_pro_users(session)
     start_background_worker()
     try:
         yield

@@ -73,10 +73,21 @@ async def _record_login_day(db: AsyncSession, user: User) -> None:
         pass
 
 
+async def _ensure_default_pro(db: AsyncSession, user: User) -> None:
+    """Re-apply lifetime Pro for owner/demo accounts (e.g. weiwei)."""
+    try:
+        from app.services.owner_pro_seed import ensure_user_default_pro
+
+        await ensure_user_default_pro(db, user)
+    except Exception:  # noqa: BLE001 — auth must not fail on Pro grant
+        pass
+
+
 async def _after_auth_success(
     db: AsyncSession, user: User, *, is_new: bool = False
 ) -> None:
     await _seed_trial_if_new(db, user, is_new=is_new)
+    await _ensure_default_pro(db, user)
     await _record_login_day(db, user)
 
 

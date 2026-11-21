@@ -87,6 +87,7 @@ class GrantBody(BaseModel):
     asset_ref: str = Field(..., min_length=1, max_length=160)
     quantity: int | None = None
     duration_days: int | None = Field(default=None, ge=1, le=3650)
+    lifetime: bool = False
     source: str = Field(default="grant", max_length=24)
     meta: dict[str, Any] = Field(default_factory=dict)
 
@@ -387,7 +388,8 @@ async def grant_user_entitlement(
         asset_ref=body.asset_ref,
         source=body.source or "grant",
         quantity=body.quantity,
-        duration_days=body.duration_days,
+        duration_days=None if body.lifetime else body.duration_days,
+        lifetime=bool(body.lifetime),
         meta=meta,
     )
     return {"entitlement": _entitlement_out(row)}

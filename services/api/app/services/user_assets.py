@@ -174,6 +174,7 @@ async def grant_entitlement(
     source: str = "grant",
     quantity: int | None = None,
     duration_days: int | None = None,
+    lifetime: bool = False,
     order_id: int | None = None,
     meta: dict | None = None,
 ) -> UserEntitlement:
@@ -189,7 +190,9 @@ async def grant_entitlement(
     row = result.scalar_one_or_none()
     now = _utcnow()
     ends = None
-    if duration_days:
+    if lifetime:
+        ends = None
+    elif duration_days:
         ends = now + timedelta(days=int(duration_days))
     if row is None:
         row = UserEntitlement(
@@ -214,7 +217,9 @@ async def grant_entitlement(
                 row.quantity = quantity
             else:
                 row.quantity = int(row.quantity) + int(quantity)
-        if duration_days:
+        if lifetime:
+            row.ends_at = None
+        elif duration_days:
             ends = _as_utc(row.ends_at)
             base = ends if ends is not None and ends > now else now
             row.ends_at = base + timedelta(days=int(duration_days))
