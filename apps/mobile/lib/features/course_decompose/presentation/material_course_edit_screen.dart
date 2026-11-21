@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../navigation/presentation/navigation_destination.dart';
 import '../../shared/presentation/pad/pad_scaffold.dart';
 import '../../shared/presentation/pad/pad_top_bar.dart';
 import '../../sync/data/acquire_api_client.dart';
@@ -179,6 +180,7 @@ class _MaterialCourseEditScreenState
     final String title = '${_course?['asset_title'] ?? '教材课'}';
     final String status = '${_course?['status'] ?? ''}';
     return PadScaffold(
+      currentDestination: AppNavDestination.reading,
       showContinueLearning: false,
       topBar: PadTopBar(
         title: title,

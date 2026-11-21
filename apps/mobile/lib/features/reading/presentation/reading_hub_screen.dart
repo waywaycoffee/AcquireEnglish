@@ -596,7 +596,7 @@ class _ReadingHubScreenState extends ConsumerState<ReadingHubScreen> {
                     ),
                     FilledButton.tonalIcon(
                       onPressed: () => context.push('/material-courses'),
-                      icon: const Icon(Icons.auto_fix_outlined),
+                      icon: const Icon(Icons.auto_stories_outlined),
                       label: const Text('教材智能解构'),
                     ),
                     FilledButton.tonalIcon(

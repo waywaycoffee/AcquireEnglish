@@ -7,6 +7,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../authentication/presentation/auth_session.dart';
+import '../../navigation/presentation/navigation_destination.dart';
 import '../../reading/data/reading_fingerprint.dart';
 import '../../reading/data/reading_ingest.dart';
 import '../../reading/data/reading_pdf_import.dart';
@@ -15,7 +16,6 @@ import '../../reading/presentation/reading_library_provider.dart';
 import '../../shared/presentation/pad/pad_scaffold.dart';
 import '../../shared/presentation/pad/pad_top_bar.dart';
 import '../../sync/data/acquire_api_client.dart';
-import 'material_course_edit_screen.dart';
 
 /// 「我的教材课」— private fingerprint UserCourseAsset list + upload entry.
 class MyMaterialCoursesScreen extends ConsumerStatefulWidget {
@@ -262,6 +262,7 @@ class _MyMaterialCoursesScreenState
   @override
   Widget build(BuildContext context) {
     return PadScaffold(
+      currentDestination: AppNavDestination.reading,
       showContinueLearning: false,
       topBar: PadTopBar(
         title: '我的教材课',
