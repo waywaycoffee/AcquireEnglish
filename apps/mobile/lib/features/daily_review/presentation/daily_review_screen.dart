@@ -1,9 +1,5 @@
-import '../../community/presentation/study_play_screen.dart';
-import 'dart:convert';
-import '../data/review_session_draft.dart';
-import '../../community/presentation/publish_learning_result_screen.dart';
-import '../../sync/data/study_activity_service.dart';
 import 'dart:async';
+import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -12,35 +8,39 @@ import 'package:fsrs/fsrs.dart' as fsrs;
 import 'package:go_router/go_router.dart';
 import 'package:hive_ce/hive.dart';
 
-import '../../authentication/presentation/auth_session.dart';
-
 import '../../../router/app_router.dart';
-import '../../navigation/presentation/navigation_destination.dart';
-import '../../settings/presentation/settings_provider.dart';
-import '../../shared/data/word_lookup_service.dart';
-import '../../shared/data/word_pronunciation_service.dart';
-import '../../shared/domain/word_lookup_entry.dart';
-import '../../shared/domain/subtitle_letter_case.dart';
-import '../../shared/presentation/pad/app_design_tokens.dart';
-import '../../shared/presentation/pad/pad_scaffold.dart';
-import '../../shared/presentation/pad/pad_top_bar.dart';
-import '../../words/domain/foundation_media.dart';
-import '../../words/presentation/foundation_media_provider.dart';
-import '../../words/presentation/vocabulary_placement_provider.dart';
-import '../../words/domain/word_review_settings.dart';
-import '../../words/presentation/word_review_settings_provider.dart';
-import '../../words/presentation/word_review_settings_sheet.dart';
-import 'foundation_media_video_sheet.dart';
 import '../../authentication/presentation/account_storage.dart';
+import '../../authentication/presentation/auth_session.dart';
+import '../../community/domain/cafe_adventure.dart';
+import '../../community/presentation/publish_learning_result_screen.dart';
+import '../../community/presentation/study_play_screen.dart';
+import '../../navigation/presentation/navigation_destination.dart';
 import '../../player/domain/pronunciation_assessment.dart';
 import '../../player/presentation/widgets/pronunciation_assessment_dialog.dart';
 import '../../settings/data/pronunciation_credentials.dart';
+import '../../settings/presentation/settings_provider.dart';
+import '../../shared/data/word_lookup_service.dart';
+import '../../shared/data/word_pronunciation_service.dart';
+import '../../shared/domain/subtitle_letter_case.dart';
+import '../../shared/domain/word_lookup_entry.dart';
+import '../../shared/presentation/pad/app_design_tokens.dart';
+import '../../shared/presentation/pad/pad_scaffold.dart';
+import '../../shared/presentation/pad/pad_top_bar.dart';
+import '../../sync/data/study_activity_service.dart';
+import '../../words/domain/foundation_media.dart';
+import '../../words/domain/word_review_settings.dart';
+import '../../words/presentation/foundation_media_provider.dart';
+import '../../words/presentation/vocabulary_placement_provider.dart';
+import '../../words/presentation/word_review_settings_provider.dart';
+import '../../words/presentation/word_review_settings_sheet.dart';
 import '../data/missed_review_book.dart';
+import '../data/review_session_draft.dart';
 import '../data/word_encounter_store.dart';
 import '../domain/cloze_sentence.dart';
 import '../domain/daily_review.dart';
 import '../domain/weakest_rating.dart';
 import 'daily_review_provider.dart';
+import 'foundation_media_video_sheet.dart';
 import 'review_spelling_screen.dart';
 
 class DailyReviewScreen extends ConsumerStatefulWidget {
@@ -1150,7 +1150,7 @@ class _DailyReviewScreenState extends ConsumerState<DailyReviewScreen>
           const SizedBox(height: 12),
           Text(
             empty
-                ? '在播放器收藏单词，或把表达加入短语库，它们就会进入统一的复习计划。'
+                ? '单词、短语、听写错句、跟读低分、咖啡店技能都会进入同一套 FSRS 计划。'
                 : done
                 ? _completionText(plan, state.dailyNewLimit, now)
                 : '先尝试回忆，再揭晓答案。每次如实反馈，系统会安排适合它的下次见面时间。',
@@ -1225,39 +1225,37 @@ class _DailyReviewScreenState extends ConsumerState<DailyReviewScreen>
             ),
           ],
           const SizedBox(height: 20),
-          Row(
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
             children: <Widget>[
               for (final ReviewKind kind in ReviewKind.values)
-                Expanded(
-                  child: Padding(
-                    padding: const EdgeInsets.only(right: 8),
-                    child: Container(
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: AppDesignTokens.softGray,
-                        borderRadius: BorderRadius.circular(14),
+                Container(
+                  width: 104,
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: AppDesignTokens.softGray,
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: <Widget>[
+                      Text(
+                        '${counts[kind]}',
+                        style: TextStyle(
+                          fontSize: 22,
+                          fontWeight: FontWeight.w800,
+                          color: AppDesignTokens.textPrimary,
+                        ),
                       ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: <Widget>[
-                          Text(
-                            '${counts[kind]}',
-                            style: TextStyle(
-                              fontSize: 24,
-                              fontWeight: FontWeight.w800,
-                              color: AppDesignTokens.textPrimary,
-                            ),
-                          ),
-                          Text(
-                            '${kind.label}收藏',
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: AppDesignTokens.textSecondary,
-                            ),
-                          ),
-                        ],
+                      Text(
+                        kind.label,
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: AppDesignTokens.textSecondary,
+                        ),
                       ),
-                    ),
+                    ],
                   ),
                 ),
             ],
@@ -1417,13 +1415,21 @@ class _DailyReviewScreenState extends ConsumerState<DailyReviewScreen>
     final bool word = source.kind == ReviewKind.word;
     final WordPracticeMode mode = _currentMode(source);
     final bool speakStage = word && mode == WordPracticeMode.speak;
-    final List<String> choices =
-        word &&
-            !speakStage &&
-            options.recallStyle == WordRecallStyle.multipleChoice
-        ? _choices.putIfAbsent(source.key, () => _meaningChoices(source))
+    final bool skill = source.kind == ReviewKind.skill;
+    final List<String> skillChoices = skill &&
+            source.skillLevel != null &&
+            source.skillLevel! >= 0 &&
+            source.skillLevel! < kCafeLevels.length
+        ? List<String>.of(kCafeLevels[source.skillLevel!].answers)
         : const <String>[];
-    final bool choiceMode = choices.length == 4;
+    final List<String> choices = skill
+        ? skillChoices
+        : word &&
+                !speakStage &&
+                options.recallStyle == WordRecallStyle.multipleChoice
+            ? _choices.putIfAbsent(source.key, () => _meaningChoices(source))
+            : const <String>[];
+    final bool choiceMode = choices.length >= 2;
     final int? passes = _freshPasses[source.key];
     final bool completed = _completedKeys.contains(source.key);
     final DateTime now = ref.read(reviewClockProvider)();
@@ -1622,6 +1628,10 @@ class _DailyReviewScreenState extends ConsumerState<DailyReviewScreen>
                     onPressed: () {
                       if (choice == source.answer.trim()) {
                         setState(() => _revealed = true);
+                      } else if (skill) {
+                        unawaited(
+                          _grade(source, record, fsrs.Rating.again),
+                        );
                       } else {
                         _markUnknown(source);
                       }

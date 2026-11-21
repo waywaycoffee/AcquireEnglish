@@ -5,7 +5,9 @@ import 'package:fsrs/fsrs.dart' as fsrs;
 enum ReviewKind {
   word('单词'),
   phrase('短语'),
-  sentence('收藏句子');
+  sentence('收藏句子'),
+  clip('原片片段'),
+  skill('技能复测');
 
   const ReviewKind(this.label);
   final String label;
@@ -37,6 +39,11 @@ class ReviewSource {
     required this.sourceLabel,
     this.episodeId,
     this.time,
+    this.startMs,
+    this.endMs,
+    this.skillChapter,
+    this.skillLevel,
+    this.origin,
     this.relatedSources = const <ReviewSourceLink>[],
     this.legacyLastReview,
     this.legacyDue,
@@ -52,6 +59,11 @@ class ReviewSource {
   final String sourceLabel;
   final String? episodeId;
   final String? time;
+  final int? startMs;
+  final int? endMs;
+  final String? skillChapter;
+  final int? skillLevel;
+  final String? origin;
   final List<ReviewSourceLink> relatedSources;
 
   ReviewSource forContext({String? label, String? episode}) {
@@ -73,6 +85,11 @@ class ReviewSource {
       sourceLabel: link.label,
       episodeId: link.episodeId,
       time: link.time,
+      startMs: startMs,
+      endMs: endMs,
+      skillChapter: skillChapter,
+      skillLevel: skillLevel,
+      origin: origin,
       relatedSources: relatedSources,
       legacyLastReview: legacyLastReview,
       legacyDue: legacyDue,

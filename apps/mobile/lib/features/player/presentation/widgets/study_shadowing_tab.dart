@@ -84,6 +84,7 @@ class StudyShadowingTab extends ConsumerStatefulWidget {
     this.onOpenFullDialog,
     this.onRecordingStarted,
     this.onPracticeCompleted,
+    this.onScoreForReview,
     this.episodeId,
     this.videoSource,
     this.onDubPlaybackRequested,
@@ -109,6 +110,9 @@ class StudyShadowingTab extends ConsumerStatefulWidget {
 
   /// Fired after a successful record + score cycle (for dashboard counts).
   final VoidCallback? onPracticeCompleted;
+
+  /// Optional: feed low scores into the unified FSRS review queue.
+  final void Function(int scorePercent)? onScoreForReview;
 
   /// Episode id for persisting dub takes / export.
   final String? episodeId;
@@ -719,6 +723,11 @@ class _StudyShadowingTabState extends ConsumerState<StudyShadowingTab> {
             _assessment = assessment;
             _message = '发音评测完成';
           });
+          final int? score =
+              (assessment.suggestedScore ?? assessment.accuracy)?.round();
+          if (score != null) {
+            widget.onScoreForReview?.call(score);
+          }
           await _persistDubTake(path);
           return;
         } catch (error) {
@@ -789,6 +798,10 @@ class _StudyShadowingTabState extends ConsumerState<StudyShadowingTab> {
               : '跟读反馈 · 重叠 ${result.scorePercentLabel} · 可点「配音回放」';
         }
       });
+      if (!result.mock) {
+        widget.onScoreForReview
+            ?.call((result.overlap.score * 100).round());
+      }
       unawaited(_persistDubTake(path));
     } finally {
       if (mounted && !_resourcesReleased) {

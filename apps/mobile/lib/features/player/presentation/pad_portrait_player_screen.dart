@@ -6,12 +6,14 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:fsrs/fsrs.dart' as fsrs;
 import 'package:go_router/go_router.dart';
 import 'package:media_kit/media_kit.dart';
 import 'package:media_kit_video/media_kit_video.dart';
 
 import '../../../config/theme/theme_logic.dart';
 import '../../../router/app_router.dart';
+import '../../daily_review/presentation/daily_review_provider.dart';
 import '../../home/presentation/learning_dashboard_provider.dart';
 import '../../import_course/data/bilibili_episode_prepare.dart';
 import '../../import_course/data/bilibili_import_service.dart';
@@ -3405,6 +3407,30 @@ Future<void> _settleChineseFillIfAlreadyPresent() async {
                 .recordShadowingToggle(enabled: true);
             _recordCurrentSentenceStudy();
           },
+          onScoreForReview: (int scorePercent) {
+            if (!state.hasLines) return;
+            final PlayerSubtitleLine line = state.activeLine;
+            final PlayerCourseLookupResult ctx =
+                resolvePlayerCourseForEpisode(
+              courses: ref.read(libraryCatalogProvider),
+              episodeId: widget.episodeId,
+            );
+            unawaited(
+              ref.read(dailyReviewProvider.notifier).ingestShadowingFail(
+                    episodeId: widget.episodeId,
+                    english: line.english,
+                    chinese: line.chinese,
+                    startMs: line.startMs,
+                    endMs: line.endMs,
+                    startTime: line.startTime,
+                    scorePercent: scorePercent,
+                    courseTitle: ctx.course?.title,
+                    episodeTitle: ctx.episode == null
+                        ? null
+                        : '第 ${ctx.episode!.numberStr} 集',
+                  ),
+            );
+          },
         );
       case StudyModeTab.coach:
         return const SizedBox.shrink();
@@ -3851,19 +3877,23 @@ Future<void> _settleChineseFillIfAlreadyPresent() async {
         .addOrUpdate(item);
     if (difficult) {
       await ref.read(dictationQueueProvider.notifier).markDifficult(item.id);
-      // Feed the unified FSRS phrase queue (收藏句).
-      ref.read(phraseBookProvider.notifier).addPhraseIfMissing(
+    }
+    // Always enroll the line into the unified FSRS clip queue.
+    unawaited(
+      ref.read(dailyReviewProvider.notifier).ingestClip(
+            episodeId: episode?.id ?? widget.episodeId,
             english: line.english,
             chinese: line.chinese,
-            course: course?.title ?? '课程',
-            episode: episode == null ? '本集' : '第 ${episode.numberStr} 集',
-            time: line.startTime,
-            courseId: course?.id,
-            episodeId: episode?.id ?? widget.episodeId,
-            endTime: _formatTimestamp(line.endMs),
-            note: '听写困难句',
-          );
-    }
+            startMs: line.startMs,
+            endMs: line.endMs,
+            startTime: line.startTime,
+            courseTitle: course?.title,
+            episodeTitle:
+                episode == null ? '本集' : '第 ${episode.numberStr} 集',
+            origin: difficult ? 'dictation_hard' : 'dictation',
+            softGrade: difficult ? fsrs.Rating.hard : null,
+          ),
+    );
     if (!mounted) return;
     setState(() {
       _dictationQueueMode = true;
@@ -3875,10 +3905,10 @@ Future<void> _settleChineseFillIfAlreadyPresent() async {
     });
     if (difficult) {
       _showMessage(
-        added ? '已加入听写队列，并进入每日复习（收藏句）' : '已标记困难并同步到复习',
+        added ? '已加入听写队列，并进入统一复习' : '已标记困难并同步到统一复习',
       );
     } else {
-      _showMessage(added ? '已加入听写队列' : '该句已在听写队列中');
+      _showMessage(added ? '已加入听写队列（同步复习）' : '该句已在听写队列中');
     }
   }
 
@@ -3890,18 +3920,21 @@ Future<void> _settleChineseFillIfAlreadyPresent() async {
     if (result.exact) return;
     final LibraryCourseData? course = courseContext.course;
     final LibraryEpisodeItem? episode = courseContext.episode;
-    // Keep the sentence in phrase book so FSRS can schedule it.
-    ref.read(phraseBookProvider.notifier).addPhraseIfMissing(
-          english: line.english,
-          chinese: line.chinese,
-          course: course?.title ?? '课程',
-          episode: episode == null ? '本集' : '第 ${episode.numberStr} 集',
-          time: line.startTime,
-          courseId: course?.id,
-          episodeId: episode?.id ?? widget.episodeId,
-          endTime: _formatTimestamp(line.endMs),
-          note: '听写错句',
-        );
+    unawaited(
+      ref.read(dailyReviewProvider.notifier).ingestClip(
+            episodeId: episode?.id ?? widget.episodeId,
+            english: line.english,
+            chinese: line.chinese,
+            startMs: line.startMs,
+            endMs: line.endMs,
+            startTime: line.startTime,
+            courseTitle: course?.title,
+            episodeTitle:
+                episode == null ? '本集' : '第 ${episode.numberStr} 集',
+            origin: 'dictation',
+            softGrade: fsrs.Rating.again,
+          ),
+    );
     int saved = 0;
     for (final String word in result.reviewWords) {
       final bool ok = ref.read(wordBookProvider.notifier).addFavoriteWord(
@@ -3917,9 +3950,9 @@ Future<void> _settleChineseFillIfAlreadyPresent() async {
       if (ok) saved += 1;
     }
     if (saved > 0) {
-      _showMessage('已将 $saved 个错/漏词加入单词本（进入 FSRS）');
-    } else if (result.reviewWords.isEmpty) {
-      _showMessage('本句已加入收藏句复习');
+      _showMessage('已将 $saved 个错/漏词加入单词本，整句进入统一复习');
+    } else {
+      _showMessage('本句已进入统一复习队列');
     }
   }
 

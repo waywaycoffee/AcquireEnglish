@@ -16,9 +16,12 @@ import '../../words/domain/syllabus_book.dart';
 import '../../words/presentation/syllabus_books_provider.dart';
 import '../../words/presentation/vocabulary_placement_provider.dart';
 import '../../words/presentation/word_book_provider.dart';
+import '../data/memory_item_store.dart';
 import '../data/missed_review_book.dart';
 import '../data/word_encounter_store.dart';
 import '../domain/daily_review.dart';
+import '../domain/memory_ingest.dart';
+import '../domain/memory_item.dart';
 
 final Provider<DateTime Function()> reviewClockProvider =
     Provider<DateTime Function()>((Ref ref) => DateTime.now);
@@ -143,6 +146,11 @@ reviewSourcesProvider = Provider<List<ReviewSource>>((Ref ref) {
         ),
   ];
 
+  final List<ReviewSource> memorySources = ref
+      .watch(memoryItemStoreProvider)
+      .map((MemoryItem item) => item.toSource())
+      .toList(growable: false);
+
   // Mix the two sources when first enrolling a legacy library; future additions
   // append to the persistent order and never jump ahead of waiting items.
   return List<ReviewSource>.unmodifiable(<ReviewSource>[
@@ -173,6 +181,7 @@ reviewSourcesProvider = Provider<List<ReviewSource>>((Ref ref) {
       if (i < wordSources.length) wordSources[i],
       if (i < phraseSources.length) phraseSources[i],
     ],
+    ...memorySources,
   ]);
 });
 
@@ -371,6 +380,155 @@ class DailyReviewNotifier extends Notifier<DailyReviewState> {
     final int generation = _generation;
     await _transaction((DailyReviewState current) => current.withLimit(limit));
     if (!_disposed && generation == _generation) scheduleCloudBackup();
+  }
+
+  /// Upsert a catalog memory item and enroll / bump its FSRS card.
+  Future<String> ingestMemoryItem(
+    MemoryItem item, {
+    Duration? dueAfter,
+    bool markLearned = false,
+    fsrs.Rating? softGrade,
+  }) async {
+    await ref.read(memoryItemStoreProvider.notifier).upsert(item);
+    final DateTime now = ref.read(reviewClockProvider)();
+    await _transaction((DailyReviewState current) {
+      DailyReviewState next = current.synchronize(
+        ref.read(reviewSourcesProvider),
+        now,
+      );
+      final ReviewRecord? previous = next.records[item.key];
+      if (previous == null) return next;
+      final fsrs.Card card = fsrs.Card.fromMap(previous.card.toMap());
+      if (dueAfter != null) {
+        card.due = now.toUtc().add(dueAfter);
+      } else if (softGrade == fsrs.Rating.again ||
+          softGrade == fsrs.Rating.hard) {
+        // Pull forward so it appears in today's queue.
+        if (card.due.isAfter(now)) card.due = now.toUtc();
+      }
+      DateTime? first = previous.firstLearnedAt;
+      int reviews = previous.reviews;
+      int? lastRating = previous.lastRating;
+      if (markLearned && first == null) {
+        first = now.toUtc();
+        reviews = reviews == 0 ? 1 : reviews;
+        lastRating = lastRating ?? fsrs.Rating.good.index;
+      }
+      if (softGrade != null && !previous.isNew) {
+        // Apply a quiet grade without consuming daily new quota.
+        final ReviewRecord graded = ReviewRecord(
+          key: previous.key,
+          order: previous.order,
+          addedAt: previous.addedAt,
+          card: previous.scheduledCard(softGrade, now),
+          firstLearnedAt: first ?? now.toUtc(),
+          reviews: previous.reviews + 1,
+          lapses: previous.lapses +
+              (softGrade == fsrs.Rating.again ? 1 : 0),
+          lastRating: softGrade.index,
+        );
+        return DailyReviewState(
+          records: Map<String, ReviewRecord>.unmodifiable(
+            <String, ReviewRecord>{...next.records, item.key: graded},
+          ),
+          days: next.days,
+          dailyNewLimit: next.dailyNewLimit,
+          nextOrder: next.nextOrder,
+          dueReviewsSinceNew: next.dueReviewsSinceNew,
+          storageError: next.storageError,
+        );
+      }
+      final ReviewRecord updated = ReviewRecord(
+        key: previous.key,
+        order: previous.order,
+        addedAt: previous.addedAt,
+        card: card,
+        firstLearnedAt: first,
+        reviews: reviews,
+        lapses: previous.lapses,
+        lastRating: lastRating,
+      );
+      return DailyReviewState(
+        records: Map<String, ReviewRecord>.unmodifiable(
+          <String, ReviewRecord>{...next.records, item.key: updated},
+        ),
+        days: next.days,
+        dailyNewLimit: next.dailyNewLimit,
+        nextOrder: next.nextOrder,
+        dueReviewsSinceNew: next.dueReviewsSinceNew,
+        storageError: next.storageError,
+      );
+    });
+    scheduleCloudBackup();
+    return item.key;
+  }
+
+  Future<String> ingestClip({
+    required String episodeId,
+    required String english,
+    required String chinese,
+    required int startMs,
+    required int endMs,
+    required String startTime,
+    String? courseTitle,
+    String? episodeTitle,
+    String origin = 'manual',
+    fsrs.Rating? softGrade,
+  }) {
+    final MemoryItem item = MemoryIngest.clipFromLine(
+      episodeId: episodeId,
+      english: english,
+      chinese: chinese,
+      startMs: startMs,
+      endMs: endMs,
+      startTime: startTime,
+      courseTitle: courseTitle,
+      episodeTitle: episodeTitle,
+      origin: origin,
+    );
+    return ingestMemoryItem(item, softGrade: softGrade);
+  }
+
+  Future<String> ingestCafeSkill(
+    int levelIndex, {
+    required bool firstClear,
+  }) {
+    final MemoryItem item = MemoryIngest.cafeSkill(levelIndex);
+    if (firstClear) {
+      return ingestMemoryItem(
+        item,
+        dueAfter: const Duration(hours: 24),
+        markLearned: true,
+      );
+    }
+    return ingestMemoryItem(item, softGrade: fsrs.Rating.good);
+  }
+
+  Future<void> ingestShadowingFail({
+    required String episodeId,
+    required String english,
+    required String chinese,
+    required int startMs,
+    required int endMs,
+    required String startTime,
+    required int scorePercent,
+    String? courseTitle,
+    String? episodeTitle,
+  }) async {
+    final fsrs.Rating? rating = MemoryIngest.ratingForShadowScore(scorePercent);
+    if (rating == null) return;
+    await ingestClip(
+      episodeId: episodeId,
+      english: english,
+      chinese: chinese,
+      startMs: startMs,
+      endMs: endMs,
+      startTime: startTime,
+      courseTitle: courseTitle,
+      episodeTitle: episodeTitle,
+      origin: 'shadowing',
+      softGrade: rating,
+    );
   }
 
   Future<void> reviewToday(String key) async {

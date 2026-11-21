@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../authentication/presentation/auth_session.dart';
+import '../../daily_review/presentation/daily_review_provider.dart';
 import '../../sync/data/acquire_api_client.dart';
 import '../domain/cafe_adventure.dart';
 
@@ -57,11 +58,13 @@ class CafeProgress {
   String get weekLabel => '本周有效练习 $weekCount / $weekTarget';
 
   String get retestLabel {
-    if (retestAttempts <= 0) return '延迟复测尚未开始（通关满24小时后重练计入）';
+    if (retestAttempts <= 0) {
+      return '技能卡已进入统一复习（约24小时后到期；也可在每日复习里练）';
+    }
     final String rate = retestPassRate == null
         ? '-'
         : '${(retestPassRate! * 100).round()}%';
-    return '延迟复测 $retestPasses/$retestAttempts · 通过率 $rate';
+    return '延迟复测 $retestPasses/$retestAttempts · 通过率 $rate · 已并入 FSRS';
   }
 
   String partnerLabel({required bool hasPeer, String? peerName}) {
@@ -188,6 +191,14 @@ class CafeProgressNotifier extends AsyncNotifier<CafeProgress> {
       _weekKey(profile, week),
       weekLevels.map((int i) => '$i').toList(growable: false),
     );
+
+    // Unified FSRS: first clear schedules 24h skill card; retest grades Good.
+    try {
+      await ref.read(dailyReviewProvider.notifier).ingestCafeSkill(
+            index,
+            firstClear: !alreadyCleared,
+          );
+    } catch (_) {}
 
     final AuthSessionState session = ref.read(authSessionProvider);
     if (session.isLoggedIn) {
