@@ -188,12 +188,23 @@ async def create_order(
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> OrderOut:
+    provider = (payload.provider or "mock").strip().lower()
+    if settings.production_mode and provider in {"mock", "manual", ""}:
+        raise HTTPException(
+            status_code=400,
+            detail="production_requires_wechat_pay",
+        )
+    if provider == "wechat" and not settings.wechat_pay_configured:
+        raise HTTPException(
+            status_code=503,
+            detail="微信支付商户未配置（缺少 WECHAT_MCH_*）。登录可用，收款暂未开放。",
+        )
     try:
         order = await assets_svc.create_order(
             db,
             user,
             sku_codes=[(item.sku_code, item.quantity) for item in payload.items],
-            provider=payload.provider,
+            provider=provider,
             coupon_id=payload.coupon_id,
             selected_modules=payload.selected_modules,
         )

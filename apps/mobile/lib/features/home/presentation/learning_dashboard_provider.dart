@@ -174,6 +174,15 @@ class LearningActivityNotifier extends Notifier<LearningActivityState> {
         clientEventId: 'shadowing:$dayKey:$count',
       ),
     );
+    // Commerce points: batch every 3 shadow toggles (maps to shadow_batch rule).
+    if (count > 0 && count % 3 == 0) {
+      unawaited(
+        _earnCommercePoints(
+          reason: 'shadow_batch',
+          clientEventId: 'shadow_batch:$dayKey:${count ~/ 3}',
+        ),
+      );
+    }
   }
 
   void recordPhraseSaved({DateTime? occurredAt}) {

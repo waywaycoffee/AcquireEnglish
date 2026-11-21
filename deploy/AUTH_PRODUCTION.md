@@ -18,6 +18,16 @@ curl -fsS https://acquireenglish.curlhairai.com/api/health
 | `auth_email_provider` | `smtp`（或 `webhook`） |
 | `auth_wechat_mock` | `false` |
 | `auth_wechat_configured` | `true` |
+| `wechat_pay_configured` | `true`（需商户号；见下） |
+
+### 生产状态（2026-11-21）
+
+| 能力 | 状态 | 说明 |
+|------|------|------|
+| 短信登录 | **就绪** | `auth_sms_mock=false` · Aliyun |
+| 邮箱注册 | **就绪** | SMTP 已配 |
+| 微信登录 | **就绪** | `auth_wechat_configured=true` · Open Platform AppID/Secret 已写入 ECS `.env` |
+| 微信支付 | **未就绪** | `wechat_pay_configured=false` · `WECHAT_MCH_*` 商户凭证为空。**勿编造密钥**；补齐商户号/证书序列号/APIv3 Key/私钥后重启 API。生产下单拒绝 `mock`/`manual`，未配商户时 `provider=wechat` 返回 503 明文提示。 |
 
 > 生产机通过 systemd `PRODUCTION_MODE=true` 禁用 email/wechat mock。  
 > 未配置 SMTP/Webhook 时，邮箱注册接口会返回「邮箱注册暂未开放」。

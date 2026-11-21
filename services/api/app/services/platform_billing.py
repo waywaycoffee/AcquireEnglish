@@ -611,6 +611,15 @@ def fetch_livekit_note() -> dict[str, Any]:
     secret = _settings_or_env(
         "LIVEKIT_API_SECRET", "livekit_api_secret", file_env=file_env
     )
+    manual_raw = (
+        _settings_or_env("LIVEKIT_MANUAL_COST_CNY", file_env=file_env) or ""
+    ).strip()
+    manual_cost: float | None = None
+    if manual_raw:
+        try:
+            manual_cost = float(manual_raw)
+        except ValueError:
+            manual_cost = None
     project = ""
     if "livekit.cloud" in url:
         try:
@@ -625,9 +634,11 @@ def fetch_livekit_note() -> dict[str, Any]:
         "project_hint": project,
         "url": url[:80] if url else "",
         "key_fingerprint": fingerprint_key(key)[0] if key else "",
+        "manual_cost_cny": manual_cost,
         "note": (
             "LiveKit Cloud 用量需 Analytics API（Scale 计划及以上）或控制台账单；"
             "当前仅检测密钥已配置，未自动拉取分钟/带宽账单。"
+            "可在 .env 写 LIVEKIT_MANUAL_COST_CNY=本月估算元 供运营对照。"
         ),
         "error": "" if (url and key and secret) else "未完整配置 LIVEKIT_URL/KEY/SECRET",
     }

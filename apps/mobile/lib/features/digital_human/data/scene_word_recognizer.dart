@@ -13,6 +13,7 @@ import '../../../constants/endpoints.dart';
 import '../../../constants/env_config.dart';
 import '../../reading/data/reading_gloss.dart';
 import '../../reading/data/reading_vocab_lists.dart';
+import '../../settings/data/api_usage_ledger.dart';
 import '../../settings/presentation/settings_provider.dart';
 import '../../shared/data/word_lookup_service.dart';
 import '../../shared/domain/word_lookup_entry.dart';
@@ -327,6 +328,7 @@ class SceneWordRecognizer {
         headers: <String, String>{
           'Authorization': 'Bearer $apiKey',
           'Content-Type': 'application/json',
+          ...acquireUsageHeaders(module: 'scene_vl'),
         },
         connectTimeout: const Duration(seconds: 20),
         receiveTimeout: const Duration(seconds: 45),

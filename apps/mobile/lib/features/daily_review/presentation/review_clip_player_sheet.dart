@@ -65,7 +65,7 @@ class _ReviewClipPlayerSheetState extends State<_ReviewClipPlayerSheet> {
       final int start = widget.startMs < 0 ? 0 : widget.startMs;
       await _player.seek(Duration(milliseconds: start));
       await _player.play();
-      final int end = start + widget.durationMs.clamp(1200, 3500);
+      final int end = start + widget.durationMs.clamp(1200, 6000);
       _positionSub = _player.stream.position.listen((Duration pos) {
         if (!_looping) return;
         if (pos.inMilliseconds >= end) {

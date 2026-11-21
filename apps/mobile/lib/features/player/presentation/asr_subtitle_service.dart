@@ -358,6 +358,7 @@ class AsrSubtitleService {
       headers: <String, String>{
         'Authorization': 'Bearer ${settings.resolvedAsrApiKey}',
         'Accept': 'application/json',
+        ...acquireUsageHeaders(module: 'subtitle_asr'),
       },
     );
     final List<Map<String, Object?>> lines = <Map<String, Object?>>[];
@@ -498,6 +499,7 @@ class AsrSubtitleService {
         'Authorization': 'Bearer ${settings.resolvedAsrApiKey}',
         'Accept': 'application/json',
         'Content-Type': 'application/json',
+        ...acquireUsageHeaders(module: 'subtitle_asr'),
       },
     );
     final Map<String, Object?> data = <String, Object?>{
@@ -602,11 +604,13 @@ class AsrSubtitleService {
       headers: <String, String>{
         'Authorization': 'Bearer ${settings.resolvedAsrApiKey}',
         'Accept': 'application/json',
+        ...acquireUsageHeaders(module: 'subtitle_asr'),
       },
     );
     final Map<String, String> headers = <String, String>{
       'Authorization': 'Bearer ${settings.resolvedAsrApiKey}',
       'Content-Type': 'application/json',
+      ...acquireUsageHeaders(module: 'subtitle_asr'),
     };
     try {
       final Response<dynamic> policyResponse = await _getJson(

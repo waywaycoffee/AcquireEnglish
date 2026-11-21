@@ -307,6 +307,9 @@ class _MembershipScreenState extends ConsumerState<MembershipScreen> {
     final spend =
         (_points?['spend_catalog'] as Map<String, dynamic>?) ??
         const <String, dynamic>{};
+    final earn =
+        (_points?['earn_rules'] as Map<String, dynamic>?) ??
+        const <String, dynamic>{};
     return _card(
       Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -314,7 +317,19 @@ class _MembershipScreenState extends ConsumerState<MembershipScreen> {
           Text('学习积分', style: Theme.of(context).textTheme.titleLarge),
           Text('余额 $balance · 本月已得 $monthEarned / $monthCap'),
           const SizedBox(height: 8),
-          const Text('积分可兑换消耗型服务（不可兑换永久解锁）。'),
+          const Text('积分可兑换消耗型服务（不可兑换永久解锁）。赛季段位对战暂未上线。'),
+          if (earn.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            Text('获取规则', style: Theme.of(context).textTheme.titleSmall),
+            for (final entry in earn.entries.take(8))
+              Padding(
+                padding: const EdgeInsets.only(bottom: 4),
+                child: Text(
+                  '· ${(entry.value as Map)['title'] ?? entry.key} +${(entry.value as Map)['points'] ?? '?'}',
+                  style: Theme.of(context).textTheme.bodySmall,
+                ),
+              ),
+          ],
           for (final entry in spend.entries)
             ListTile(
               contentPadding: EdgeInsets.zero,

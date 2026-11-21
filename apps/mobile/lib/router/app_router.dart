@@ -44,6 +44,7 @@ import '../features/digital_human/presentation/digital_human_coach_screen.dart';
 import '../features/digital_human/presentation/peer_oral_practice_screen.dart';
 import '../features/words/presentation/server_syllabus_catalog_screen.dart';
 import '../features/words/presentation/syllabus_books_screen.dart';
+import '../features/words/presentation/favorite_word_book_screen.dart';
 import '../features/words/presentation/words_screen.dart';
 import '../features/words/presentation/vocabulary_placement_screen.dart';
 import 'fade_extension.dart';
@@ -375,7 +376,10 @@ GoRouter goRouter(Ref ref) => GoRouter(
         final bool favoritesOnly =
             state.uri.queryParameters['favorites'] == '1' ||
             state.uri.queryParameters['favorites'] == 'true';
-        return WordsScreen(favoritesListOnly: favoritesOnly);
+        if (favoritesOnly) {
+          return const FavoriteWordBookScreen();
+        }
+        return const WordsScreen();
       },
     ).fade(),
     GoRoute(

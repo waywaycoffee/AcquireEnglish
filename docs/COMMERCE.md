@@ -26,7 +26,13 @@ SKUs are upserted on API startup via `ensure_commerce_skus` (after `ensure_defau
 
 ## Points
 
-Balance lives on `wallet_accounts`; audit rows in `points_ledger`. Monthly earn caps: paid 800 / free 200. Spend catalog covers consumables only (no permanent unlocks).
+Balance lives on `wallet_accounts`; audit rows in `points_ledger`. Monthly earn caps: paid 800 / free 200. Spend catalog covers consumables only (no permanent unlocks). Membership screen lists earn rules + spend catalog; client hooks fire on quiz pass / daily check-in / streak milestones / shadow batches.
+
+## Gamification (PRD chapter)
+
+**Shipped (thin):** check-in streak + commerce points earn/spend (above). Streak milestones (`checkin_3/7/14/30`) are the live retention loop.
+
+**Deferred (needs design + content, not fake UI):** season ranks, arena matching, battle pass, avatar skins unlocked by tier. Tables sketched in PRD (`rank_state`, season scores) are **not** implemented. Revisit after pay + points are stable in production.
 
 ## HTTP API (`/api/commerce`)
 
@@ -53,6 +59,7 @@ Points earn hooks (client → `POST /api/commerce/points/earn`):
 |--------|---------|
 | `reading_quiz_pass` | Exam reading session ≥60% correct |
 | `daily_tasks_clear` | Daily learning check-in requirements met |
+| `shadow_batch` | Every 3 shadowing toggles in a day |
 | `checkin_3` / `_7` / `_14` / `_30` | Streak first reaches milestone |
 
 ## Shared subtitle EN→ZH cron
@@ -69,9 +76,17 @@ Manual: `python tools/backfill_shared_zh_translations.py --mismatch --limit 100`
 
 Importer: `services/api/tools/import_k12_open_banks.py` (writes `data/exam_packs/`). Vendor trees are gitignored under `data/exam_bank_vendor/`.
 
+Preflight (exits 2 if missing — does not download):
+
+```bash
+python tools/fetch_cloth_scques_stub.py
+```
+
 | Dataset | Place archive / files at | Upstream |
 |---------|--------------------------|----------|
 | CLOTH | `exam_bank_vendor/CLOTH/CLOTH.tar.gz` (auto-extract) or JSON under that folder | https://www.qizhexie.com/data/CLOTH (research) / paper “CLOTH” (Xie et al.) |
 | SC-Ques | `exam_bank_vendor/SC-Ques/datasets/` (json/jsonl from release) | https://github.com/ai4ed/SC-Ques |
 
 Do **not** invent packs: if archives are missing, the importer prints a skip message and leaves converters ready. After import, redeploy pack JSON to ECS with the usual exam-pack ship path.
+
+**Status (2026-11-21):** archives not found on the developer machine (Downloads / Baidu / vendor). Blocked until research dumps are placed manually.

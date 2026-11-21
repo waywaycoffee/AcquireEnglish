@@ -673,7 +673,11 @@
               ""
           )} · project ${escapeHtml(
             (platform.livekit && platform.livekit.project_hint) || ""
-          )}</div>
+          )}${
+            platform.livekit && platform.livekit.manual_cost_cny != null
+              ? `<br/>本月手工记账 ${money(platform.livekit.manual_cost_cny)}（LIVEKIT_MANUAL_COST_CNY）`
+              : `<br/><span class="muted">无 Scale Analytics；可在 API .env 设 LIVEKIT_MANUAL_COST_CNY</span>`
+          }</div>
         </div>
         <div class="dash-card full">
           <h3>本机 RTX 5060 Ti · 按 App 模块 Token</h3>
