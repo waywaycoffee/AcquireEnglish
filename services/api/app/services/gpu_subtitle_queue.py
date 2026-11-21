@@ -30,7 +30,19 @@ def enqueue(bvid, page):
     with connection() as db:
         db.execute('BEGIN IMMEDIATE')
         row=db.execute('SELECT * FROM jobs WHERE upper(bvid)=upper(?) AND page=?',(bvid,page)).fetchone()
-        if row is not None: return public(row)
+        if row is not None:
+            # Terminal failures used to stick forever: app re-scans treated the
+            # existing row as "queued" while claim() permanently skipped them.
+            if row['state'] == 'failed':
+                db.execute(
+                    "UPDATE jobs SET state='queued', attempts=0, error=NULL, "
+                    "lease=NULL, deadline=NULL, updated=? WHERE id=?",
+                    (time.time(), row['id']),
+                )
+                row = db.execute(
+                    'SELECT * FROM jobs WHERE id=?', (row['id'],)
+                ).fetchone()
+            return public(row)
         db.execute('INSERT OR IGNORE INTO jobs(id,bvid,page,updated) VALUES(?,?,?,?)',
           (uuid.uuid4().hex,bvid,page,time.time()))
         row=db.execute('SELECT * FROM jobs WHERE upper(bvid)=upper(?) AND page=?',(bvid,page)).fetchone()
