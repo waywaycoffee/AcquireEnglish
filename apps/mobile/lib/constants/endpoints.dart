@@ -69,6 +69,11 @@ class Endpoints {
   static const String learningReviewsDue = 'api/learning/reviews/due';
   static const String livekitToken = 'api/livekit/token';
   static const String livekitStatus = 'api/livekit/status';
+  static const String oralMatchEnqueue = 'api/oral-match/enqueue';
+  static const String oralMatchStatus = 'api/oral-match/status';
+  static const String oralMatchLeave = 'api/oral-match/leave';
+  static String oralMatchMessages(String roomId) =>
+      'api/oral-match/rooms/$roomId/messages';
   static const String sharedSubtitlesBilibili =
       'api/shared-subtitles/bilibili';
   static const String imports = 'api/imports';

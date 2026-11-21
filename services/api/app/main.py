@@ -26,6 +26,7 @@ from app.routers import (
     imports,
     learning,
     livekit,
+    oral_match,
     netdisk,
     phrases,
     preferences,
@@ -88,6 +89,7 @@ app.include_router(learning_cards.router, prefix="/api")
 app.include_router(imports.router, prefix="/api")
 app.include_router(learning.router, prefix="/api")
 app.include_router(livekit.router, prefix="/api")
+app.include_router(oral_match.router, prefix="/api")
 app.include_router(assets.router, prefix="/api")
 app.include_router(netdisk.router, prefix="/api")
 app.include_router(shared_subtitles.router, prefix="/api")

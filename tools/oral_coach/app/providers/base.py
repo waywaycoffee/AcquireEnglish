@@ -49,7 +49,15 @@ class VideoContext:
         scenario_title = (self.scenario_title or '').strip()
         scenario_goal = (self.scenario_goal or '').strip()
         scenario_prompt = (self.scenario_prompt or '').strip()
-        if scenario_title and self.scenario_task_id not in {'', 'video_line'}:
+        if (self.scenario_task_id or '').strip() == 'freechat':
+            scene = (self.scene_description or '').strip()
+            scene_bit = f' Live scene: {scene[:800]}.' if scene else ''
+            return (
+                'Free casual English chat with a digital-human friend. '
+                'Any everyday topic is welcome; keep it spoken and natural.'
+                f'{scene_bit}'
+            )
+        if scenario_title and self.scenario_task_id not in {'', 'video_line', 'freechat'}:
             bits = [
                 f'Scenario: {scenario_title}.',
                 f'Learner goal: {scenario_goal}.' if scenario_goal else '',

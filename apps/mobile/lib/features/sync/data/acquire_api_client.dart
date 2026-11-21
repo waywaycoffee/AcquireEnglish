@@ -108,6 +108,78 @@ class AcquireLiveKitToken {
   final int expiresIn;
 }
 
+class OralMatchStatus {
+  const OralMatchStatus({
+    required this.status,
+    this.roomId,
+    this.peerUserId,
+    this.peerDisplayName,
+    this.queuePosition,
+    this.livekit,
+  });
+
+  factory OralMatchStatus.fromJson(Map<String, dynamic> json) {
+    final Object? peer = json['peer'];
+    final Map<String, dynamic>? peerMap = peer is Map
+        ? Map<String, dynamic>.from(peer)
+        : null;
+    final Object? livekit = json['livekit'];
+    return OralMatchStatus(
+      status: '${json['status'] ?? 'idle'}',
+      roomId: '${json['room_id'] ?? ''}'.trim().isEmpty
+          ? null
+          : '${json['room_id']}'.trim(),
+      peerUserId: peerMap == null
+          ? null
+          : int.tryParse('${peerMap['user_id'] ?? ''}'),
+      peerDisplayName: peerMap == null
+          ? null
+          : '${peerMap['display_name'] ?? ''}'.trim(),
+      queuePosition: (json['queue_position'] as num?)?.toInt(),
+      livekit: livekit is Map
+          ? AcquireLiveKitToken.fromJson(Map<String, dynamic>.from(livekit))
+          : null,
+    );
+  }
+
+  final String status; // idle | waiting | matched
+  final String? roomId;
+  final int? peerUserId;
+  final String? peerDisplayName;
+  final int? queuePosition;
+  final AcquireLiveKitToken? livekit;
+
+  bool get isMatched => status == 'matched' && (roomId ?? '').isNotEmpty;
+}
+
+class OralMatchMessage {
+  const OralMatchMessage({
+    required this.id,
+    required this.senderUserId,
+    required this.senderName,
+    required this.text,
+    required this.createdAt,
+    required this.mine,
+  });
+
+  factory OralMatchMessage.fromJson(Map<String, dynamic> json) =>
+      OralMatchMessage(
+        id: '${json['id'] ?? ''}',
+        senderUserId: int.tryParse('${json['sender_user_id'] ?? ''}') ?? 0,
+        senderName: '${json['sender_name'] ?? ''}',
+        text: '${json['text'] ?? ''}',
+        createdAt: (json['created_at'] as num?)?.toDouble() ?? 0,
+        mine: json['mine'] == true,
+      );
+
+  final String id;
+  final int senderUserId;
+  final String senderName;
+  final String text;
+  final double createdAt;
+  final bool mine;
+}
+
 class PersonalImportAsset {
   const PersonalImportAsset({
     required this.id,
@@ -1269,6 +1341,63 @@ class AcquireApiClient {
     return AcquireLiveKitToken.fromJson(
       response.data as Map<String, dynamic>,
     );
+  }
+
+  Future<OralMatchStatus> enqueueOralMatch() async {
+    final Response<dynamic> response = await _dio.post(
+      Endpoints.oralMatchEnqueue,
+    );
+    return OralMatchStatus.fromJson(
+      Map<String, dynamic>.from(response.data as Map),
+    );
+  }
+
+  Future<OralMatchStatus> oralMatchStatus() async {
+    final Response<dynamic> response = await _dio.get(
+      Endpoints.oralMatchStatus,
+    );
+    return OralMatchStatus.fromJson(
+      Map<String, dynamic>.from(response.data as Map),
+    );
+  }
+
+  Future<void> leaveOralMatch() async {
+    await _dio.post(Endpoints.oralMatchLeave);
+  }
+
+  Future<OralMatchMessage> postOralMatchMessage({
+    required String roomId,
+    required String text,
+  }) async {
+    final Response<dynamic> response = await _dio.post(
+      Endpoints.oralMatchMessages(roomId),
+      data: <String, dynamic>{'text': text},
+    );
+    return OralMatchMessage.fromJson(
+      Map<String, dynamic>.from(response.data as Map),
+    );
+  }
+
+  Future<List<OralMatchMessage>> listOralMatchMessages({
+    required String roomId,
+    String? afterId,
+  }) async {
+    final Response<dynamic> response = await _dio.get(
+      Endpoints.oralMatchMessages(roomId),
+      queryParameters: <String, dynamic>{
+        if ((afterId ?? '').trim().isNotEmpty) 'after_id': afterId!.trim(),
+      },
+    );
+    final Object? raw = (response.data as Map)['messages'];
+    if (raw is! List) return const <OralMatchMessage>[];
+    return raw
+        .whereType<Map>()
+        .map(
+          (Map row) => OralMatchMessage.fromJson(
+            Map<String, dynamic>.from(row),
+          ),
+        )
+        .toList(growable: false);
   }
 
   /// Returns null on 404 / network miss (shared cache optional).

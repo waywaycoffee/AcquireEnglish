@@ -28,8 +28,18 @@ class LearningScenario {
 
   bool get isVideoGrounded => id == 'video_line';
 
+  bool get isFreeChat => id == 'freechat';
+
   /// Offline fallback when the API is unreachable.
   static const List<LearningScenario> seeds = <LearningScenario>[
+    LearningScenario(
+      id: 'freechat',
+      title: '自由闲聊',
+      goal: '用自然英语随便聊日常、兴趣或当下想法，外教像朋友一样接话并纠错',
+      prompt:
+          'Let\'s just chat in English about anything — your day, hobbies, or whatever is on your mind.',
+      difficulty: 'B1',
+    ),
     LearningScenario(
       id: 'weekend',
       title: '描述周末',

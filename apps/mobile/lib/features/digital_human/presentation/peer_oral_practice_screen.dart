@@ -7,18 +7,17 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:path_provider/path_provider.dart';
 
+import '../../authentication/presentation/auth_session.dart';
 import '../../phrases/presentation/phrase_book_provider.dart';
 import '../../player/data/pronunciation_providers.dart';
 import '../../player/domain/pronunciation_assessment.dart';
 import '../../settings/presentation/settings_provider.dart';
+import '../../sync/data/acquire_api_client.dart';
 import '../data/oral_coach_pipeline_client.dart';
 import '../domain/oral_expression_diagnosis.dart';
 import 'widgets/oral_diagnosis_card.dart';
 
-/// Peer oral matching scaffold: hold-mic → diagnose → re-say → send.
-///
-/// Matching is currently local/demo; the diagnose → re-say → language-bank
-/// loop mirrors the live-correction flow used with the digital human.
+/// Peer oral matching: server queue → diagnose → re-say → send to peer.
 class PeerOralPracticeScreen extends ConsumerStatefulWidget {
   const PeerOralPracticeScreen({super.key});
 
@@ -52,7 +51,12 @@ class _PeerOralPracticeScreenState
   String? _error;
   OralCoachSession? _session;
   OralExpressionDiagnosis? _pending;
-  String _peerName = 'Luna';
+  String _peerName = '口语搭子';
+  String? _roomId;
+  String? _lastMessageId;
+  Timer? _matchPoll;
+  Timer? _messagePoll;
+  bool _offlineFallback = false;
 
   @override
   void initState() {
@@ -64,27 +68,147 @@ class _PeerOralPracticeScreenState
   @override
   void dispose() {
     _recordingLimitTimer?.cancel();
+    _matchPoll?.cancel();
+    _messagePoll?.cancel();
     unawaited(_recordingSubscription?.cancel());
     unawaited(_microphone?.stop());
     unawaited(_microphone?.dispose());
+    if (!_offlineFallback && ref.read(authSessionProvider).isLoggedIn) {
+      unawaited(
+        ref.read(acquireApiClientProvider).leaveOralMatch().catchError(
+          (Object _) {},
+        ),
+      );
+    }
     _preview.dispose();
     super.dispose();
   }
 
   Future<void> _bootstrapMatch() async {
-    await Future<void>.delayed(const Duration(milliseconds: 900));
-    if (!mounted) return;
+    if (!ref.read(authSessionProvider).isLoggedIn) {
+      _enterOfflineFallback(
+        reason: '未登录，先用本地演示搭子（登录后可真实匹配）',
+      );
+      return;
+    }
+    setState(() {
+      _phase = _PeerPhase.matching;
+      _status = '正在匹配口语搭子…';
+      _error = null;
+    });
+    try {
+      final AcquireApiClient api = ref.read(acquireApiClientProvider);
+      OralMatchStatus status = await api.enqueueOralMatch();
+      if (!mounted) return;
+      if (status.isMatched) {
+        _onMatched(status);
+        return;
+      }
+      _matchPoll?.cancel();
+      _matchPoll = Timer.periodic(const Duration(seconds: 2), (_) {
+        unawaited(_pollMatch());
+      });
+      setState(() {
+        _status = status.queuePosition == null
+            ? '排队中，等待另一位学习者…'
+            : '排队中（第 ${status.queuePosition} 位）…';
+      });
+    } catch (error) {
+      if (!mounted) return;
+      _enterOfflineFallback(reason: '匹配服务暂不可用，先用本地演示：${'$error'}');
+    }
+  }
+
+  Future<void> _pollMatch() async {
+    if (!mounted || _phase != _PeerPhase.matching) return;
+    try {
+      final OralMatchStatus status =
+          await ref.read(acquireApiClientProvider).oralMatchStatus();
+      if (!mounted) return;
+      if (status.isMatched) {
+        _matchPoll?.cancel();
+        _onMatched(status);
+        return;
+      }
+      if (status.status == 'waiting') {
+        setState(() {
+          _status = status.queuePosition == null
+              ? '排队中，等待另一位学习者…'
+              : '排队中（第 ${status.queuePosition} 位）…';
+        });
+        return;
+      }
+      // idle → re-enqueue
+      await ref.read(acquireApiClientProvider).enqueueOralMatch();
+    } catch (_) {}
+  }
+
+  void _onMatched(OralMatchStatus status) {
+    _roomId = status.roomId;
+    _peerName = (status.peerDisplayName ?? '').isEmpty
+        ? '口语搭子'
+        : status.peerDisplayName!;
     setState(() {
       _phase = _PeerPhase.chat;
-      _peerName = 'Luna';
-      _status = '已匹配 · 按住说话（中文 / 英文混说均可）';
+      _offlineFallback = false;
+      _status = '已匹配 $_peerName · 按住说话（中文 / 英文混说均可）';
       _bubbles.add(
-        const _PeerBubble(
+        _PeerBubble(
           role: 'peer',
-          text: 'Hi! Tell me what you did today — Chinese is OK if you get stuck.',
+          text:
+              'Hi! I\'m $_peerName. Tell me what you did today — Chinese is OK if you get stuck.',
         ),
       );
     });
+    _startMessagePoll();
+  }
+
+  void _enterOfflineFallback({required String reason}) {
+    _offlineFallback = true;
+    _matchPoll?.cancel();
+    setState(() {
+      _phase = _PeerPhase.chat;
+      _peerName = 'Luna';
+      _error = reason;
+      _status = '本地演示 · 按住说话（中文 / 英文混说均可）';
+      _bubbles.add(
+        const _PeerBubble(
+          role: 'peer',
+          text:
+              'Hi! Tell me what you did today — Chinese is OK if you get stuck.',
+        ),
+      );
+    });
+  }
+
+  void _startMessagePoll() {
+    _messagePoll?.cancel();
+    if (_roomId == null || _offlineFallback) return;
+    _messagePoll = Timer.periodic(const Duration(seconds: 2), (_) {
+      unawaited(_pullPeerMessages());
+    });
+  }
+
+  Future<void> _pullPeerMessages() async {
+    final String? roomId = _roomId;
+    if (!mounted || roomId == null || _offlineFallback) return;
+    try {
+      final List<OralMatchMessage> rows =
+          await ref.read(acquireApiClientProvider).listOralMatchMessages(
+                roomId: roomId,
+                afterId: _lastMessageId,
+              );
+      if (!mounted || rows.isEmpty) return;
+      setState(() {
+        for (final OralMatchMessage msg in rows) {
+          _lastMessageId = msg.id;
+          if (msg.mine) continue;
+          _bubbles.add(
+            _PeerBubble(role: 'peer', text: msg.text),
+          );
+        }
+      });
+    } catch (_) {}
   }
 
   Future<OralCoachSession?> _ensureSession() async {
@@ -292,27 +416,41 @@ class _PeerOralPracticeScreenState
               ? pending.idiomaticEn
               : pending.literalEn)
         : draft.transcript.trim();
+
+    if (!_offlineFallback && _roomId != null) {
+      try {
+        final OralMatchMessage sent =
+            await ref.read(acquireApiClientProvider).postOralMatchMessage(
+                  roomId: _roomId!,
+                  text: confirmed,
+                );
+        _lastMessageId = sent.id;
+      } catch (error) {
+        if (mounted) {
+          setState(() => _error = '发送失败：$error');
+        }
+      }
+    }
+
+    if (!mounted) return;
     setState(() {
       _bubbles.add(_PeerBubble(role: 'me', text: confirmed, sent: true));
-      _bubbles.add(
-        _PeerBubble(
-          role: 'peer',
-          text: _peerAck(confirmed),
-        ),
-      );
+      if (_offlineFallback) {
+        _bubbles.add(
+          const _PeerBubble(
+            role: 'peer',
+            text: 'Got it! That sounded clearer. Tell me more?',
+          ),
+        );
+      }
       _pending = null;
       _phase = _PeerPhase.chat;
       _preview.clear();
       _busy = false;
-      _status = '已发送 · 继续按住说话';
+      _status = _offlineFallback
+          ? '已发送（本地演示）· 继续按住说话'
+          : '已发给 $_peerName · 等待对方回复';
     });
-  }
-
-  String _peerAck(String line) {
-    if (line.toLowerCase().contains('supermarket')) {
-      return 'Nice — popping to the supermarket sounds natural. What did you get?';
-    }
-    return 'Got it! That sounded clearer. Tell me more?';
   }
 
   void _saveToBank(OralExpressionDiagnosis diagnosis) {

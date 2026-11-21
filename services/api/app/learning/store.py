@@ -16,6 +16,13 @@ def _parse_dt(value: str) -> datetime:
 # Built-in seeds (ChatterPal-style scenarios + video-grounded template).
 SEED_TASKS: list[TaskDefinition] = [
     TaskDefinition(
+        id='freechat',
+        title='自由闲聊',
+        goal='用自然英语随便聊日常、兴趣或当下想法，外教像朋友一样接话并纠错',
+        prompt="Let's just chat in English about anything — your day, hobbies, or whatever is on your mind.",
+        difficulty='B1',
+    ),
+    TaskDefinition(
         id='weekend',
         title='描述周末',
         goal='说清过去的活动、同行的人以及自己的感受或原因',

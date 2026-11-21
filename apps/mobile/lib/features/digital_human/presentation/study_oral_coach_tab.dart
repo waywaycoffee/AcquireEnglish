@@ -8,6 +8,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_tts/flutter_tts.dart';
 import 'package:flutter_webrtc/flutter_webrtc.dart';
+import 'package:camera/camera.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:media_kit/media_kit.dart';
 import 'package:path_provider/path_provider.dart';
@@ -22,6 +23,7 @@ import '../../sync/data/acquire_api_client.dart';
 import '../../sync/data/user_assets_service.dart';
 import '../../words/presentation/word_book_provider.dart';
 import '../data/digital_human_catalog.dart';
+import '../data/live_scene_camera.dart';
 import '../data/livetalking_client.dart';
 import '../data/oral_coach_pipeline_client.dart';
 import '../data/scene_word_recognizer.dart';
@@ -242,6 +244,9 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
   List<SceneWordLabel> _sceneLabels = const <SceneWordLabel>[];
   final Set<String> _sceneSavedWords = <String>{};
   bool _sceneSharing = false;
+  bool _liveSceneOn = false;
+  final LiveSceneCamera _liveSceneCamera = LiveSceneCamera();
+  Timer? _liveSceneTimer;
 
   /// Pre-generated oral Q&A topics from the episode transcript.
   List<String> _talkTopics = const <String>[];
@@ -323,6 +328,8 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
 
   @override
   void dispose() {
+    _liveSceneTimer?.cancel();
+    unawaited(_liveSceneCamera.stop());
     unawaited(_cartoonTts.stop());
     unawaited(_speechPlayer?.stop());
     unawaited(_liveTalking.disconnect());
@@ -397,6 +404,12 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
 
   String _openingCoachPrompt(String coachName) {
     final LearningScenario? scenario = _activeScenario;
+    if (scenario != null && scenario.isFreeChat) {
+      return 'Hi, I\'m $coachName! Let\'s just chat in English — anything you like. '
+          'I\'ll correct grammar gently as we go. '
+          '${scenario.prompt} '
+          '(Say “用中文” anytime if you want Chinese.)';
+    }
     if (scenario != null && !scenario.isVideoGrounded) {
       return 'Hi, I\'m $coachName! Today\'s scene is “${scenario.title}”. '
           'Goal: ${scenario.goal}. '
@@ -482,10 +495,14 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
     return OralCoachVideoContext(
       courseTitle: widget.courseTitle,
       episodeTitle: widget.episodeTitle,
-      topicSummary: scenario != null && !scenario.isVideoGrounded
-          ? scenario.title
-          : _topicLabel,
-      articleExcerpt: widget.articleExcerpt,
+      topicSummary: scenario != null && scenario.isFreeChat
+          ? 'Free casual English chat'
+          : (scenario != null && !scenario.isVideoGrounded
+                ? scenario.title
+                : _topicLabel),
+      articleExcerpt: scenario != null && scenario.isFreeChat
+          ? ''
+          : widget.articleExcerpt,
       talkTopics: _talkTopics,
       difficulty: scenario?.difficulty ?? _difficulty,
       digitalHumanId: persona.id,
@@ -818,13 +835,20 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
       _activeScenario = scenario;
       _difficulty = scenario.difficulty;
       _learningSessionId = null;
-      _talkTopics = scenario.isVideoGrounded
-          ? _localHeuristicTalkTopics()
-          : <String>[
-              scenario.prompt,
-              'Can you add one more detail to that?',
-              'Please ask me a follow-up question in this scene.',
-            ];
+      _talkTopics = scenario.isFreeChat
+          ? <String>[
+              'How has your day been so far?',
+              'What are you into lately?',
+              'Tell me something fun that happened recently.',
+              'If you could travel anywhere next month, where would you go?',
+            ]
+          : (scenario.isVideoGrounded
+                ? _localHeuristicTalkTopics()
+                : <String>[
+                    scenario.prompt,
+                    'Can you add one more detail to that?',
+                    'Please ask me a follow-up question in this scene.',
+                  ]);
       _topicCursor = 0;
       _bubbles.clear();
       _started = false;
@@ -1339,7 +1363,7 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
       _startTopicConversation();
       if (!mounted || !_started) return;
     }
-    final ImageSource? source = await showModalBottomSheet<ImageSource>(
+    final String? action = await showModalBottomSheet<String>(
       context: context,
       backgroundColor: const Color(0xFF1B1438),
       builder: (BuildContext context) {
@@ -1347,6 +1371,31 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: <Widget>[
+              ListTile(
+                leading: Icon(
+                  _liveSceneOn
+                      ? Icons.videocam_off_rounded
+                      : Icons.videocam_rounded,
+                  color: Colors.white,
+                ),
+                title: Text(
+                  _liveSceneOn ? '关闭场景直播' : '持续共享场景',
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                subtitle: Text(
+                  _liveSceneOn
+                      ? '停止摄像头，不再自动更新场景'
+                      : '打开摄像头，周期性告诉数字人眼前有什么',
+                  style: const TextStyle(color: Colors.white70),
+                ),
+                onTap: () => Navigator.pop(
+                  context,
+                  _liveSceneOn ? 'stop_live' : 'start_live',
+                ),
+              ),
               ListTile(
                 leading: const Icon(Icons.photo_camera_rounded, color: Colors.white),
                 title: const Text(
@@ -1357,7 +1406,7 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
                   '给数字人看眼前的东西并识词',
                   style: TextStyle(color: Colors.white70),
                 ),
-                onTap: () => Navigator.pop(context, ImageSource.camera),
+                onTap: () => Navigator.pop(context, 'camera'),
               ),
               ListTile(
                 leading: const Icon(Icons.photo_library_rounded, color: Colors.white),
@@ -1365,7 +1414,7 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
                   '从相册选择',
                   style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700),
                 ),
-                onTap: () => Navigator.pop(context, ImageSource.gallery),
+                onTap: () => Navigator.pop(context, 'gallery'),
               ),
               const SizedBox(height: 8),
             ],
@@ -1373,10 +1422,18 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
         );
       },
     );
-    if (source == null || !mounted) return;
+    if (action == null || !mounted) return;
+    if (action == 'start_live') {
+      await _startLiveSceneShare();
+      return;
+    }
+    if (action == 'stop_live') {
+      await _stopLiveSceneShare();
+      return;
+    }
     try {
       final XFile? shot = await ImagePicker().pickImage(
-        source: source,
+        source: action == 'gallery' ? ImageSource.gallery : ImageSource.camera,
         imageQuality: 85,
         maxWidth: 1600,
       );
@@ -1386,6 +1443,103 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
       if (mounted) {
         setState(() => _error = '无法打开相机/相册：${_pretty(error)}');
       }
+    }
+  }
+
+  Future<void> _startLiveSceneShare() async {
+    try {
+      setState(() {
+        _busy = true;
+        _status = '正在打开摄像头…';
+        _error = null;
+      });
+      await _liveSceneCamera.start();
+      if (!mounted) {
+        await _liveSceneCamera.stop();
+        return;
+      }
+      setState(() {
+        _liveSceneOn = true;
+        _busy = false;
+        _status = '场景直播中 · 数字人会跟着眼前物品聊';
+      });
+      _liveSceneTimer?.cancel();
+      _liveSceneTimer = Timer.periodic(const Duration(seconds: 5), (_) {
+        unawaited(_refreshLiveSceneFrame());
+      });
+      await _refreshLiveSceneFrame(forceSpeak: true);
+    } catch (error) {
+      await _liveSceneCamera.stop();
+      if (mounted) {
+        setState(() {
+          _liveSceneOn = false;
+          _busy = false;
+          _error = '场景直播失败：${_pretty(error)}';
+        });
+      }
+    }
+  }
+
+  Future<void> _stopLiveSceneShare() async {
+    _liveSceneTimer?.cancel();
+    _liveSceneTimer = null;
+    await _liveSceneCamera.stop();
+    if (!mounted) return;
+    setState(() {
+      _liveSceneOn = false;
+      _status = _sceneDescription.isEmpty ? '你可以开始说' : '场景直播已关闭';
+    });
+  }
+
+  Future<void> _refreshLiveSceneFrame({bool forceSpeak = false}) async {
+    if (!_liveSceneOn || _busy || _recordingActive || _coachSpeaking) return;
+    final String? path = await _liveSceneCamera.takeStillPath();
+    if (path == null || !mounted) return;
+    final LearningSettingsState settings = ref.read(learningSettingsProvider);
+    try {
+      final List<SceneWordLabel> labels =
+          await ref.read(sceneWordRecognizerProvider).recognize(
+                path,
+                settings: settings,
+                limit: 6,
+              );
+      if (!mounted || !_liveSceneOn) return;
+      final String description =
+          ref.read(sceneWordRecognizerProvider).buildSceneDescription(labels);
+      final bool changed = description != _sceneDescription;
+      setState(() {
+        _sceneImagePath = path;
+        _sceneLabels = labels;
+        _sceneDescription = description;
+      });
+      if (!changed && !forceSpeak) return;
+      if (_usesVoicePipeline(settings)) {
+        await _ensurePipelineSession(settings);
+        final OralCoachSession? session = _session;
+        if (session != null) {
+          await _pipelineClient.updateContext(
+            session: session,
+            context: _videoContext(settings: settings),
+          );
+        }
+      }
+      if (forceSpeak && mounted) {
+        final String nouns = labels
+            .take(3)
+            .map((SceneWordLabel item) => item.word)
+            .join(', ');
+        final String line = labels.isEmpty
+            ? 'I can see your camera now. What is in front of you?'
+            : 'I can see your live scene with $nouns. What are you looking at?';
+        setState(() {
+          _bubbles.add(_ChatBubble(role: 'coach', text: line));
+          _status = '场景直播中';
+        });
+        _scrollChatToEnd();
+        await _speakCoach(line, settings);
+      }
+    } catch (_) {
+      // Keep streaming; transient ML failures are OK.
     }
   }
 
@@ -1561,6 +1715,7 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
       await _stopRecordingAndSend();
     }
     if (!mounted || !_started) return;
+    await _stopLiveSceneShare();
     _sessionTicker?.cancel();
     _sessionTicker = null;
     _sessionStartedAt = null;
@@ -1830,22 +1985,32 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
                       ),
                     ),
                   ),
-                  if (_sceneImagePath != null &&
-                      File(_sceneImagePath!).existsSync())
+                  if (_liveSceneOn ||
+                      (_sceneImagePath != null &&
+                          File(_sceneImagePath!).existsSync()))
                     Positioned(
                       right: 12,
                       top: 12,
                       child: GestureDetector(
-                        onTap: () => unawaited(
-                          _presentScenePhoto(_sceneImagePath!),
-                        ),
+                        onTap: () {
+                          if (_liveSceneOn) {
+                            unawaited(_stopLiveSceneShare());
+                            return;
+                          }
+                          final String? path = _sceneImagePath;
+                          if (path != null) {
+                            unawaited(_presentScenePhoto(path));
+                          }
+                        },
                         child: Container(
                           width: 78,
                           height: 104,
                           decoration: BoxDecoration(
                             borderRadius: BorderRadius.circular(12),
                             border: Border.all(
-                              color: Colors.white.withValues(alpha: 0.7),
+                              color: _liveSceneOn
+                                  ? const Color(0xFF34D399)
+                                  : Colors.white.withValues(alpha: 0.7),
                               width: 2,
                             ),
                             boxShadow: const <BoxShadow>[
@@ -1859,10 +2024,14 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
                           child: Stack(
                             fit: StackFit.expand,
                             children: <Widget>[
-                              Image.file(
-                                File(_sceneImagePath!),
-                                fit: BoxFit.cover,
-                              ),
+                              if (_liveSceneOn &&
+                                  _liveSceneCamera.controller != null)
+                                CameraPreview(_liveSceneCamera.controller!)
+                              else if (_sceneImagePath != null)
+                                Image.file(
+                                  File(_sceneImagePath!),
+                                  fit: BoxFit.cover,
+                                ),
                               Align(
                                 alignment: Alignment.bottomCenter,
                                 child: Container(
@@ -1872,9 +2041,11 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
                                     vertical: 3,
                                   ),
                                   child: Text(
-                                    _sceneLabels.isEmpty
-                                        ? '场景'
-                                        : '${_sceneLabels.length}词',
+                                    _liveSceneOn
+                                        ? '直播中'
+                                        : (_sceneLabels.isEmpty
+                                              ? '场景'
+                                              : '${_sceneLabels.length}词'),
                                     textAlign: TextAlign.center,
                                     style: const TextStyle(
                                       color: Colors.white,
@@ -1945,11 +2116,14 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
                         padding: const EdgeInsets.symmetric(horizontal: 28),
                         child: Text(
                           _activeScenario != null &&
-                                  !_activeScenario!.isVideoGrounded
-                              ? '数字人将主动教你「${_activeScenario!.title}」情景对话。点上方时钟可换场景。'
-                              : (_talkTopics.isEmpty
-                                    ? 'Hi~ 我会先读字幕，再围绕“$_topicLabel”生成口语问答。'
-                                    : '已准备 ${_talkTopics.length} 个口语话题，点下方话题或直接说话。'),
+                                  _activeScenario!.isFreeChat
+                              ? '自由闲聊模式：随便用英语聊日常。点上方时钟可换情景；点相机可共享眼前场景。'
+                              : (_activeScenario != null &&
+                                      !_activeScenario!.isVideoGrounded
+                                  ? '数字人将主动教你「${_activeScenario!.title}」情景对话。点上方时钟可换场景。'
+                                  : (_talkTopics.isEmpty
+                                        ? 'Hi~ 我会先读字幕，再围绕“$_topicLabel”生成口语问答。'
+                                        : '已准备 ${_talkTopics.length} 个口语话题，点下方话题或直接说话。')),
                           textAlign: TextAlign.center,
                           style: TextStyle(
                             color: Colors.white.withValues(alpha: 0.78),
@@ -2184,8 +2358,10 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: <Widget>[
                   _DockRoundButton(
-                    icon: Icons.photo_camera_outlined,
-                    active: _sceneDescription.isNotEmpty,
+                    icon: _liveSceneOn
+                        ? Icons.videocam_rounded
+                        : Icons.photo_camera_outlined,
+                    active: _liveSceneOn || _sceneDescription.isNotEmpty,
                     onTap: _busy ? null : () => unawaited(_openSceneCapture()),
                   ),
                   _DockRoundButton(
