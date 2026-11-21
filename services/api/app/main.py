@@ -9,6 +9,7 @@ from app.config import settings
 from app.database import Base, engine
 from app.routers import (
     admin,
+    admin_analytics,
     app_settings_backup,
     assets,
     auth,
@@ -50,6 +51,7 @@ from app.routers import (
     shared_ocr_books,
     shared_subtitles,
     sync_status,
+    usage,
     vocab,
     wordbook_backup,
 )
@@ -89,6 +91,8 @@ app.add_middleware(
 
 app.include_router(auth.router, prefix="/api")
 app.include_router(admin.router, prefix="/api")
+app.include_router(admin_analytics.router, prefix="/api")
+app.include_router(usage.router, prefix="/api")
 app.include_router(courses.router, prefix="/api")
 app.include_router(progress.router, prefix="/api")
 app.include_router(vocab.router, prefix="/api")

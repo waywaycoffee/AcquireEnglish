@@ -7,10 +7,13 @@ from tempfile import NamedTemporaryFile
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile
 from pydantic import BaseModel, Field
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import settings
+from app.database import get_db
 from app.deps import get_current_user
 from app.models import User
+from app.services import api_usage as usage_svc
 from app.services import reading_speech_cache as rsc
 from app.services.reading_aliyun import BILINGUAL_VOICES, VOICES, QwenAudioTts
 
@@ -81,8 +84,11 @@ async def list_voices() -> dict:
 
 @router.post("")
 @router.post("/")
-async def speech(body: Speech, user: User = Depends(get_current_user)) -> dict:
-    _ = user
+async def speech(
+    body: Speech,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> dict:
     if not _configured():
         raise HTTPException(status_code=503, detail="阿里云配音尚未配置 DASHSCOPE_API_KEY")
     text = rsc.normalize_speech_text(body.text)
@@ -110,6 +116,20 @@ async def speech(body: Speech, user: User = Depends(get_current_user)) -> dict:
         )
         data = Path(tmp_path).read_bytes()
         saved = rsc.save_bytes(data, text=text, voice=voice, language=language)
+        # TTS billed roughly by character; map chars → prompt_tokens for ledger.
+        await usage_svc.record_usage(
+            db,
+            user_id=user.id,
+            kind="tts",
+            provider="dashscope",
+            model=voice or "qwen-tts",
+            prompt_tokens=max(1, len(text)),
+            completion_tokens=0,
+            api_key=settings.dashscope_api_key,
+            key_owner="platform",
+            note="reading_speech",
+            audio_seconds=max(1.0, len(text.split()) * 0.35),
+        )
         return {
             "audio_url": saved["audio_url"],
             "voice": voice,

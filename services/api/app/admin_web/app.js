@@ -8,40 +8,86 @@
     q: "",
     selectedId: null,
     skus: [],
+    tab: "dashboard",
   };
 
   const $ = (id) => document.getElementById(id);
   const loginView = $("loginView");
   const appView = $("appView");
   const loginError = $("loginError");
-
-  function apiBase() {
-    // Same origin when served from nginx /admin or FastAPI /admin
-    return "";
-  }
+  const titles = {
+    dashboard: "可视化看板",
+    usage: "Token 消耗与损益",
+    resources: "公共资源库",
+    users: "用户与资产",
+  };
 
   async function api(path, options = {}) {
     const headers = Object.assign(
       { "Content-Type": "application/json", "X-Admin-Token": state.token },
       options.headers || {}
     );
-    const res = await fetch(`${apiBase()}/api/admin${path}`, {
-      ...options,
-      headers,
-    });
-    let data = null;
+    const res = await fetch(`/api/admin${path}`, { ...options, headers });
     const text = await res.text();
+    let data = null;
     try {
       data = text ? JSON.parse(text) : null;
     } catch {
       data = { detail: text };
     }
     if (!res.ok) {
-      const detail =
-        (data && (data.detail || data.message)) || `HTTP ${res.status}`;
+      const detail = (data && (data.detail || data.message)) || `HTTP ${res.status}`;
       throw new Error(typeof detail === "string" ? detail : JSON.stringify(detail));
     }
     return data;
+  }
+
+  function escapeHtml(value) {
+    return String(value ?? "")
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;");
+  }
+  function escapeAttr(value) {
+    return escapeHtml(value).replace(/'/g, "&#39;");
+  }
+  function money(n, prefix = "¥") {
+    const v = Number(n || 0);
+    if (Math.abs(v) < 0.01 && v !== 0) return prefix + v.toFixed(4);
+    return prefix + v.toFixed(2);
+  }
+  function num(n) {
+    return Number(n || 0).toLocaleString("zh-CN");
+  }
+
+  function barList(items, labelKey, valueKey) {
+    const max = Math.max(1, ...items.map((i) => Number(i[valueKey] || 0)));
+    if (!items.length) return `<p class="muted">暂无数据</p>`;
+    return `<div class="bars">${items
+      .map((i) => {
+        const v = Number(i[valueKey] || 0);
+        const pct = Math.round((v / max) * 100);
+        return `<div class="bar-row"><span>${escapeHtml(i[labelKey])}</span>
+          <div class="bar-track"><div class="bar-fill" style="width:${pct}%"></div></div>
+          <strong>${num(v)}</strong></div>`;
+      })
+      .join("")}</div>`;
+  }
+
+  function sparkline(series, valueKey = "count") {
+    if (!series.length) return "";
+    const vals = series.map((s) => Number(s[valueKey] || 0));
+    const max = Math.max(1, ...vals);
+    const w = 640;
+    const h = 120;
+    const step = w / Math.max(1, vals.length - 1);
+    const pts = vals
+      .map((v, i) => `${(i * step).toFixed(1)},${(h - (v / max) * (h - 8) - 4).toFixed(1)}`)
+      .join(" ");
+    return `<svg class="spark" viewBox="0 0 ${w} ${h}" preserveAspectRatio="none">
+      <polyline fill="none" stroke="#2f5d3a" stroke-width="3" points="${pts}" />
+    </svg>`;
   }
 
   function showLogin(err = "") {
@@ -49,10 +95,20 @@
     appView.classList.add("hidden");
     loginError.textContent = err;
   }
-
   function showApp() {
     loginView.classList.add("hidden");
     appView.classList.remove("hidden");
+  }
+
+  function setTab(tab) {
+    state.tab = tab;
+    $("pageTitle").textContent = titles[tab] || tab;
+    document.querySelectorAll(".tab").forEach((btn) => {
+      btn.classList.toggle("active", btn.dataset.tab === tab);
+    });
+    ["dashboard", "usage", "resources", "users"].forEach((id) => {
+      $(`panel-${id}`).classList.toggle("hidden", id !== tab);
+    });
   }
 
   async function login() {
@@ -71,7 +127,6 @@
       showLogin(e.message || "登录失败");
     }
   }
-
   function logout() {
     state.token = "";
     localStorage.removeItem(TOKEN_KEY);
@@ -79,10 +134,244 @@
   }
 
   async function bootstrap() {
-    await Promise.all([loadStats(), loadUsers(), loadSkus()]);
+    setTab(state.tab);
+    await Promise.all([
+      loadDashboard().catch((e) => console.warn(e)),
+      loadUsage().catch((e) => console.warn(e)),
+      loadResources().catch((e) => console.warn(e)),
+      loadStats(),
+      loadUsers(),
+      loadSkus(),
+    ]);
     if (state.selectedId) await loadDetail(state.selectedId);
   }
 
+  async function loadDashboard() {
+    const [users, learning, pnl] = await Promise.all([
+      api("/analytics/users?days=90"),
+      api("/analytics/learning"),
+      api("/usage/pnl?days=30"),
+    ]);
+    const el = $("panel-dashboard");
+    el.innerHTML = `
+      <div class="kpi-row">
+        <div class="stat"><span class="muted">总用户</span><strong>${num(users.total_users)}</strong></div>
+        <div class="stat"><span class="muted">近 ${users.days} 日新增</span><strong>${num(users.new_users)}</strong></div>
+        <div class="stat"><span class="muted">30 日收入</span><strong>${money(pnl.revenue_cny)}</strong></div>
+        <div class="stat"><span class="muted">30 日毛利</span><strong>${money(pnl.gross_cny)}</strong></div>
+      </div>
+      <div class="dash-grid">
+        <div class="dash-card full">
+          <h3>注册趋势（90 日）</h3>
+          ${sparkline(users.registration_series)}
+          <div class="note-box">微信绑定 ${num(users.wechat_bound)} · 手机绑定 ${num(users.phone_bound)} · 填写偏好 ${num(users.preference_coverage)}</div>
+        </div>
+        <div class="dash-card">
+          <h3>CEFR / 级别分布</h3>
+          ${barList(users.level_distribution, "level", "count")}
+        </div>
+        <div class="dash-card">
+          <h3>学习偏好标签</h3>
+          ${barList(users.tag_distribution, "tag", "count")}
+          <div class="note-box">${escapeHtml(users.gender?.note || "")}</div>
+        </div>
+        <div class="dash-card">
+          <h3>热门课程（进度）</h3>
+          ${barList(
+            (learning.top_courses || []).slice(0, 12).map((c) => ({
+              label: c.course_id,
+              count: c.sessions,
+            })),
+            "label",
+            "count"
+          )}
+        </div>
+        <div class="dash-card">
+          <h3>词汇量掌握</h3>
+          ${barList(learning.vocab?.mastery || [], "mastery", "count")}
+          <div class="note-box">生词总量 ${num(learning.vocab?.total_items)} · 有词用户 ${num(learning.vocab?.users_with_vocab)}</div>
+        </div>
+        <div class="dash-card full">
+          <h3>热门导入视频</h3>
+          <div class="table-wrap"><table>
+            <thead><tr><th>来源</th><th>标题</th><th>导入次数</th></tr></thead>
+            <tbody>
+              ${(learning.top_imported_videos || [])
+                .slice(0, 15)
+                .map(
+                  (v) =>
+                    `<tr><td>${escapeHtml(v.source)}</td><td>${escapeHtml(
+                      v.title
+                    )}</td><td>${num(v.imports)}</td></tr>`
+                )
+                .join("") || `<tr><td colspan="3" class="muted">暂无</td></tr>`}
+            </tbody>
+          </table></div>
+          <div class="note-box">${escapeHtml(learning.note || "")}</div>
+        </div>
+      </div>`;
+  }
+
+  async function loadUsage() {
+    const [summary, pnl] = await Promise.all([
+      api("/usage/summary?days=30"),
+      api("/usage/pnl?days=30"),
+    ]);
+    const el = $("panel-usage");
+    el.innerHTML = `
+      <div class="kpi-row">
+        <div class="stat"><span class="muted">Token 总量</span><strong>${num(summary.tokens)}</strong></div>
+        <div class="stat"><span class="muted">估算成本</span><strong>${money(summary.cost_cny)}</strong></div>
+        <div class="stat"><span class="muted">平台 COGS</span><strong>${money(pnl.api_cost_cny_platform)}</strong></div>
+        <div class="stat"><span class="muted">毛利率</span><strong>${
+          pnl.margin_pct == null ? "—" : pnl.margin_pct + "%"
+        }</strong></div>
+      </div>
+      <div class="dash-grid">
+        <div class="dash-card">
+          <h3>损益（30 日）</h3>
+          <div class="bars">
+            <div class="bar-row"><span>收入</span><div class="bar-track"><div class="bar-fill" style="width:100%"></div></div><strong>${money(pnl.revenue_cny)}</strong></div>
+            <div class="bar-row"><span>平台成本</span><div class="bar-track"><div class="bar-fill" style="width:${Math.min(
+              100,
+              pnl.revenue_cny > 0
+                ? (pnl.api_cost_cny_platform / pnl.revenue_cny) * 100
+                : 40
+            )}%"></div></div><strong>${money(pnl.api_cost_cny_platform)}</strong></div>
+            <div class="bar-row"><span>毛利</span><div class="bar-track"><div class="bar-fill" style="width:${
+              pnl.gross_cny >= 0 ? 80 : 20
+            }%"></div></div><strong>${money(pnl.gross_cny)}</strong></div>
+          </div>
+          <div class="note-box">${escapeHtml(pnl.note || "")}</div>
+        </div>
+        <div class="dash-card">
+          <h3>按能力消耗</h3>
+          ${barList(
+            (summary.by_kind || []).map((k) => ({
+              label: k.kind,
+              count: Math.round(k.cost_cny * 100) / 100,
+            })),
+            "label",
+            "count"
+          )}
+        </div>
+        <div class="dash-card full">
+          <h3>API Key 消耗明细（指纹，无明文）</h3>
+          <div class="table-wrap"><table>
+            <thead><tr><th>Key</th><th>归属</th><th>Provider</th><th>事件</th><th>Tokens</th><th>成本 CNY</th></tr></thead>
+            <tbody>
+              ${(summary.by_key || [])
+                .map(
+                  (k) => `<tr>
+                  <td>${escapeHtml(k.key_label || k.key_fingerprint)}</td>
+                  <td>${escapeHtml(k.key_owner)}</td>
+                  <td>${escapeHtml(k.provider)}</td>
+                  <td>${num(k.events)}</td>
+                  <td>${num(k.tokens)}</td>
+                  <td>${money(k.cost_cny)}</td>
+                </tr>`
+                )
+                .join("") || `<tr><td colspan="6" class="muted">暂无用量。写作批改 / TTS / App 同步后会累计。</td></tr>`}
+            </tbody>
+          </table></div>
+        </div>
+        <div class="dash-card full">
+          <h3>用户消耗 Top</h3>
+          <div class="table-wrap"><table>
+            <thead><tr><th>User ID</th><th>事件</th><th>Tokens</th><th>成本 CNY</th></tr></thead>
+            <tbody>
+              ${(summary.by_user || [])
+                .map(
+                  (u) =>
+                    `<tr><td>${u.user_id}</td><td>${num(u.events)}</td><td>${num(
+                      u.tokens
+                    )}</td><td>${money(u.cost_cny)}</td></tr>`
+                )
+                .join("") || `<tr><td colspan="4" class="muted">暂无</td></tr>`}
+            </tbody>
+          </table></div>
+          <div class="note-box">${escapeHtml(summary.note || "")}</div>
+        </div>
+      </div>`;
+  }
+
+  async function loadResources() {
+    const data = await api("/analytics/resources");
+    const el = $("panel-resources");
+    el.innerHTML = `
+      <div class="kpi-row">
+        <div class="stat"><span class="muted">B 站共享字幕</span><strong>${num(
+          data.shared_bilibili?.count
+        )}</strong></div>
+        <div class="stat"><span class="muted">OCR 书库</span><strong>${num(
+          data.shared_ocr?.count
+        )}</strong></div>
+        <div class="stat"><span class="muted">社区资料包</span><strong>${num(
+          data.community_packs
+        )}</strong></div>
+        <div class="stat"><span class="muted">官方题包</span><strong>${num(
+          (data.official_exam_packs || []).length
+        )}</strong></div>
+      </div>
+      <div class="dash-grid">
+        <div class="dash-card">
+          <h3>共享字幕命中</h3>
+          <div class="note-box">EN hits ${num(data.shared_bilibili?.en_hits)} · ZH hits ${num(
+      data.shared_bilibili?.zh_hits
+    )} · cues ${num(data.shared_bilibili?.cues)}</div>
+          <div class="table-wrap"><table>
+            <thead><tr><th>BVID</th><th>P</th><th>EN</th><th>ZH</th></tr></thead>
+            <tbody>
+              ${(data.shared_bilibili?.top || [])
+                .map(
+                  (t) =>
+                    `<tr><td>${escapeHtml(t.bvid)}</td><td>${t.page}</td><td>${num(
+                      t.en_hits
+                    )}</td><td>${num(t.zh_hits)}</td></tr>`
+                )
+                .join("") || `<tr><td colspan="4" class="muted">暂无</td></tr>`}
+            </tbody>
+          </table></div>
+        </div>
+        <div class="dash-card">
+          <h3>OCR 书库热度</h3>
+          <div class="note-box">总命中 ${num(data.shared_ocr?.hits)} · 词量 ${num(
+      data.shared_ocr?.words
+    )}</div>
+          ${barList(
+            (data.shared_ocr?.top || []).map((t) => ({
+              label: (t.title || "未命名").slice(0, 18),
+              count: t.hits,
+            })),
+            "label",
+            "count"
+          )}
+        </div>
+        <div class="dash-card">
+          <h3>社区真题资产</h3>
+          ${barList(data.exam_assets_by_kind || [], "kind", "count")}
+        </div>
+        <div class="dash-card">
+          <h3>官方 ExamPack</h3>
+          <div class="table-wrap"><table>
+            <thead><tr><th>包</th><th>CEFR</th><th>技能题量</th></tr></thead>
+            <tbody>
+              ${(data.official_exam_packs || [])
+                .map((p) => {
+                  const counts = p.counts || {};
+                  const sum = Object.values(counts).reduce((a, b) => a + Number(b || 0), 0);
+                  return `<tr><td>${escapeHtml(p.title || p.family_id)}</td><td>${escapeHtml(
+                    p.cefr || ""
+                  )}</td><td>${num(sum)}</td></tr>`;
+                })
+                .join("")}
+            </tbody>
+          </table></div>
+        </div>
+      </div>`;
+  }
+
+  // ---- users tab (existing) ----
   async function loadStats() {
     const s = await api("/stats");
     $("statsRow").innerHTML = [
@@ -101,8 +390,7 @@
 
   async function loadSkus() {
     try {
-      const data = await api("/skus");
-      state.skus = data.items || [];
+      state.skus = (await api("/skus")).items || [];
     } catch {
       state.skus = [];
     }
@@ -169,12 +457,11 @@
             s.kind
           )}" data-ref="${escapeHtml(s.ref_id || s.sku_code)}" data-qty="${
             s.grant_quantity ?? ""
-          }" data-days="${s.duration_days ?? ""}">${escapeHtml(
-            s.title
-          )} (${escapeHtml(s.sku_code)})</option>`
+          }" data-days="${s.duration_days ?? ""}">${escapeHtml(s.title)} (${escapeHtml(
+            s.sku_code
+          )})</option>`
       )
       .join("");
-
     const ents = (data.entitlements || [])
       .map((e) => {
         const revoke =
@@ -183,9 +470,7 @@
             : "";
         return `<tr>
           <td>${e.id}</td>
-          <td>${escapeHtml(e.asset_kind)}<br/><span class="muted">${escapeHtml(
-          e.asset_ref
-        )}</span></td>
+          <td>${escapeHtml(e.asset_kind)}<br/><span class="muted">${escapeHtml(e.asset_ref)}</span></td>
           <td>${escapeHtml(e.status)}</td>
           <td>${e.quantity ?? "∞"}</td>
           <td>${escapeHtml(e.ends_at || "—")}</td>
@@ -193,50 +478,16 @@
         </tr>`;
       })
       .join("");
-
-    const orders = (data.orders || [])
-      .map(
-        (o) => `<tr>
-        <td>${o.id}</td>
-        <td>${escapeHtml(o.status)}</td>
-        <td>${escapeHtml(o.provider)}</td>
-        <td>${(o.amount_cents / 100).toFixed(2)} ${escapeHtml(o.currency || "")}</td>
-        <td>${escapeHtml(o.created_at || "")}</td>
-      </tr>`
-      )
-      .join("");
-
-    const wledger = (data.wallet_ledger || [])
-      .map(
-        (r) =>
-          `<tr><td>${r.id}</td><td>${r.delta}</td><td>${escapeHtml(
-            r.reason
-          )}</td><td>${escapeHtml(r.created_at || "")}</td></tr>`
-      )
-      .join("");
-
-    const pledger = (data.points_ledger || [])
-      .map(
-        (r) =>
-          `<tr><td>${r.id}</td><td>${r.delta}</td><td>${escapeHtml(
-            r.reason
-          )}</td><td>${escapeHtml(r.created_at || "")}</td></tr>`
-      )
-      .join("");
-
     return `
       <div class="detail-head">
         <div>
           <h2>${escapeHtml(u.display_name || u.email)}</h2>
-          <p class="muted">#${u.id} · ${escapeHtml(u.email || "")}${
-      u.phone ? " · " + escapeHtml(u.phone) : ""
-    }</p>
+          <p class="muted">#${u.id} · ${escapeHtml(u.email || "")}</p>
           <div class="chips">
             <span class="chip">钱包 ${u.wallet_credits ?? 0}</span>
             <span class="chip">分享积分 ${u.points_balance ?? 0}</span>
             <span class="chip">导入课 ${c.link_courses ?? 0}</span>
             <span class="chip">生词 ${c.vocab_items ?? 0}</span>
-            <span class="chip">微信 ${u.wechat_bound ? "已绑定" : "未绑定"}</span>
           </div>
         </div>
         <form id="renameForm" class="inline-form" style="width:min(320px,100%)">
@@ -246,7 +497,6 @@
           <button class="btn primary full" type="submit">保存资料</button>
         </form>
       </div>
-
       <section class="section">
         <h3>发放权益</h3>
         <form id="grantForm" class="grant-grid">
@@ -260,80 +510,41 @@
           <button class="btn primary full" type="submit">发放 / 叠加</button>
         </form>
       </section>
-
       <section class="section">
         <h3>调整钱包 / 分享积分</h3>
         <div class="actions">
           <form id="walletForm" class="inline-form" style="flex:1">
-            <input name="delta" type="number" required placeholder="钱包 delta，可负" />
-            <input name="reason" placeholder="原因 admin_adjust" />
-            <button class="btn primary full" type="submit">调整钱包积分</button>
+            <input name="delta" type="number" required placeholder="钱包 delta" />
+            <input name="reason" placeholder="admin_adjust" />
+            <button class="btn primary full" type="submit">调整钱包</button>
           </form>
           <form id="pointsForm" class="inline-form" style="flex:1">
             <input name="delta" type="number" required placeholder="分享积分 delta" />
-            <input name="reason" placeholder="原因 admin_adjust" />
-            <button class="btn primary full" type="submit">调整分享积分</button>
+            <input name="reason" placeholder="admin_adjust" />
+            <button class="btn primary full" type="submit">调整积分</button>
           </form>
         </div>
       </section>
-
       <section class="section">
         <h3>权益列表</h3>
-        <div class="table-wrap">
-          <table>
-            <thead><tr><th>ID</th><th>资产</th><th>状态</th><th>数量</th><th>到期</th><th></th></tr></thead>
-            <tbody>${ents || `<tr><td colspan="6" class="muted">暂无</td></tr>`}</tbody>
-          </table>
-        </div>
-      </section>
-
-      <section class="section">
-        <h3>订单</h3>
-        <div class="table-wrap">
-          <table>
-            <thead><tr><th>ID</th><th>状态</th><th>渠道</th><th>金额</th><th>创建时间</th></tr></thead>
-            <tbody>${orders || `<tr><td colspan="5" class="muted">暂无</td></tr>`}</tbody>
-          </table>
-        </div>
-      </section>
-
-      <section class="section">
-        <h3>钱包流水</h3>
-        <div class="table-wrap">
-          <table>
-            <thead><tr><th>ID</th><th>Delta</th><th>原因</th><th>时间</th></tr></thead>
-            <tbody>${wledger || `<tr><td colspan="4" class="muted">暂无</td></tr>`}</tbody>
-          </table>
-        </div>
-      </section>
-
-      <section class="section">
-        <h3>分享积分流水</h3>
-        <div class="table-wrap">
-          <table>
-            <thead><tr><th>ID</th><th>Delta</th><th>原因</th><th>时间</th></tr></thead>
-            <tbody>${pledger || `<tr><td colspan="4" class="muted">暂无</td></tr>`}</tbody>
-          </table>
-        </div>
-      </section>
-    `;
+        <div class="table-wrap"><table>
+          <thead><tr><th>ID</th><th>资产</th><th>状态</th><th>数量</th><th>到期</th><th></th></tr></thead>
+          <tbody>${ents || `<tr><td colspan="6" class="muted">暂无</td></tr>`}</tbody>
+        </table></div>
+      </section>`;
   }
 
   function wireDetail(data) {
     const userId = data.user.id;
-    const skuPick = $("skuPick");
-    if (skuPick) {
-      skuPick.addEventListener("change", () => {
-        const opt = skuPick.selectedOptions[0];
-        if (!opt || !opt.value) return;
-        const form = $("grantForm");
-        form.asset_kind.value = opt.dataset.kind || "";
-        form.asset_ref.value = opt.dataset.ref || opt.value;
-        form.quantity.value = opt.dataset.qty || "";
-        form.duration_days.value = opt.dataset.days || "";
-      });
-    }
-
+    $("skuPick")?.addEventListener("change", () => {
+      const opt = $("skuPick").selectedOptions[0];
+      if (!opt || !opt.value) return;
+      const form = $("grantForm");
+      form.asset_kind.value = opt.dataset.kind || "";
+      form.asset_ref.value = opt.dataset.ref || opt.value;
+      form.quantity.value = opt.dataset.qty || "";
+      form.duration_days.value = opt.dataset.days || "";
+    });
     $("renameForm")?.addEventListener("submit", async (ev) => {
       ev.preventDefault();
       const fd = new FormData(ev.target);
@@ -347,31 +558,28 @@
         alert(e.message);
       }
     });
-
     $("grantForm")?.addEventListener("submit", async (ev) => {
       ev.preventDefault();
       const fd = new FormData(ev.target);
       const quantityRaw = String(fd.get("quantity") || "").trim();
       const daysRaw = String(fd.get("duration_days") || "").trim();
-      const body = {
-        asset_kind: String(fd.get("asset_kind") || "").trim(),
-        asset_ref: String(fd.get("asset_ref") || "").trim(),
-        quantity: quantityRaw === "" ? null : Number(quantityRaw),
-        duration_days: daysRaw === "" ? null : Number(daysRaw),
-        source: "grant",
-        meta: { via: "admin_web" },
-      };
       try {
         await api(`/users/${userId}/entitlements/grant`, {
           method: "POST",
-          body: JSON.stringify(body),
+          body: JSON.stringify({
+            asset_kind: String(fd.get("asset_kind") || "").trim(),
+            asset_ref: String(fd.get("asset_ref") || "").trim(),
+            quantity: quantityRaw === "" ? null : Number(quantityRaw),
+            duration_days: daysRaw === "" ? null : Number(daysRaw),
+            source: "grant",
+            meta: { via: "admin_web" },
+          }),
         });
         await Promise.all([loadDetail(userId), loadStats()]);
       } catch (e) {
         alert(e.message);
       }
     });
-
     $("walletForm")?.addEventListener("submit", async (ev) => {
       ev.preventDefault();
       const fd = new FormData(ev.target);
@@ -388,7 +596,6 @@
         alert(e.message);
       }
     });
-
     $("pointsForm")?.addEventListener("submit", async (ev) => {
       ev.preventDefault();
       const fd = new FormData(ev.target);
@@ -405,7 +612,6 @@
         alert(e.message);
       }
     });
-
     document.querySelectorAll("[data-revoke]").forEach((btn) => {
       btn.addEventListener("click", async () => {
         if (!confirm("确认吊销该权益？")) return;
@@ -420,17 +626,6 @@
         }
       });
     });
-  }
-
-  function escapeHtml(value) {
-    return String(value ?? "")
-      .replace(/&/g, "&amp;")
-      .replace(/</g, "&lt;")
-      .replace(/>/g, "&gt;")
-      .replace(/"/g, "&quot;");
-  }
-  function escapeAttr(value) {
-    return escapeHtml(value).replace(/'/g, "&#39;");
   }
 
   $("loginBtn").addEventListener("click", login);
@@ -452,6 +647,14 @@
   $("nextPage").addEventListener("click", () => {
     state.offset += state.limit;
     loadUsers().catch((err) => alert(err.message));
+  });
+  document.querySelectorAll(".tab").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      setTab(btn.dataset.tab);
+      if (btn.dataset.tab === "dashboard") loadDashboard().catch((e) => alert(e.message));
+      if (btn.dataset.tab === "usage") loadUsage().catch((e) => alert(e.message));
+      if (btn.dataset.tab === "resources") loadResources().catch((e) => alert(e.message));
+    });
   });
 
   if (state.token) {

@@ -10,9 +10,12 @@ from typing import Any
 import httpx
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel, Field
+from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.database import get_db
 from app.deps import get_current_user
 from app.models import User
+from app.services import api_usage as usage_svc
 
 router = APIRouter(prefix="/writing", tags=["writing"])
 
@@ -148,7 +151,13 @@ def _local_grade(text: str, prompt: str = "", rubric: str = "generic") -> dict[s
 
 
 async def _llm_grade(
-    text: str, prompt: str, title: str, rubric: str
+    text: str,
+    prompt: str,
+    title: str,
+    rubric: str,
+    *,
+    db: AsyncSession | None = None,
+    user_id: int | None = None,
 ) -> dict[str, Any] | None:
     api_key = (
         os.getenv("DEEPSEEK_API_KEY", "").strip()
@@ -158,6 +167,7 @@ async def _llm_grade(
         return None
     base = os.getenv("OPENAI_BASE_URL", "https://api.deepseek.com/v1").rstrip("/")
     model = os.getenv("OPENAI_MODEL", os.getenv("DEEPSEEK_MODEL", "deepseek-chat"))
+    provider = "deepseek" if "deepseek" in base.lower() or "deepseek" in model.lower() else "openai"
     system = _RUBRIC_PROMPTS.get(rubric, _RUBRIC_PROMPTS["generic"])
     user = (
         f"Rubric: {rubric}\nTitle: {title or '(none)'}\n"
@@ -179,7 +189,8 @@ async def _llm_grade(
                 },
             )
             resp.raise_for_status()
-            content = resp.json()["choices"][0]["message"]["content"]
+            payload = resp.json()
+            content = payload["choices"][0]["message"]["content"]
             data = json.loads(content)
             if not isinstance(data, dict):
                 return None
@@ -189,6 +200,22 @@ async def _llm_grade(
             data.setdefault("summary", "")
             data.setdefault("rewrite_full", "")
             data.setdefault("scores", {})
+            usage = payload.get("usage") if isinstance(payload, dict) else None
+            prompt_tokens = int((usage or {}).get("prompt_tokens") or 0)
+            completion_tokens = int((usage or {}).get("completion_tokens") or 0)
+            if db is not None:
+                await usage_svc.record_usage(
+                    db,
+                    user_id=user_id,
+                    kind="writing",
+                    provider=provider,
+                    model=model,
+                    prompt_tokens=prompt_tokens,
+                    completion_tokens=completion_tokens,
+                    api_key=api_key,
+                    key_owner="platform",
+                    note=f"writing:{rubric}",
+                )
             return data
     except Exception:
         return None
@@ -198,10 +225,17 @@ async def _llm_grade(
 async def grade_writing(
     body: GradeIn,
     user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
 ) -> dict[str, Any]:
-    del user
     rubric = _normalize_rubric(body.rubric, body.family_id)
-    llm = await _llm_grade(body.text, body.prompt, body.title, rubric)
+    llm = await _llm_grade(
+        body.text,
+        body.prompt,
+        body.title,
+        rubric,
+        db=db,
+        user_id=user.id,
+    )
     if llm is not None:
         return llm
     return _local_grade(body.text, body.prompt, rubric)

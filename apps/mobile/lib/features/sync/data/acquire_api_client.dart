@@ -2382,6 +2382,18 @@ class AcquireApiClient {
     return ExamPack.fromJson(response.data as Map<String, dynamic>);
   }
 
+  /// Push on-device API usage events to the server ledger (idempotent by event id).
+  Future<void> syncApiUsageEvents(List<Map<String, dynamic>> events) async {
+    if (events.isEmpty) {
+      return;
+    }
+    await _dio.post<dynamic>(
+      Endpoints.usageEvents,
+      data: <String, dynamic>{'events': events},
+      options: _noCache,
+    );
+  }
+
   Future<void> upsertCommunityStudyStats({
     required String day,
     required int studySeconds,

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:math' as math;
 
@@ -281,11 +282,14 @@ int estimateMessagesTokens(List<Map<String, String>> messages) {
   return total;
 }
 
-/// On-device usage ledger keyed by account email (or `local`).
+  /// On-device usage ledger keyed by account email (or `local`).
 class ApiUsageLedger extends ChangeNotifier {
   ApiUsageLedger._();
 
   static final ApiUsageLedger instance = ApiUsageLedger._();
+
+  /// Optional cloud sync (wired by auth/api layer when logged in).
+  static Future<void> Function(List<ApiUsageEvent> batch)? cloudSync;
 
   static const String _storageKey = 'api_usage_ledger_v1';
   static const int _maxEvents = 2000;
@@ -405,6 +409,12 @@ class ApiUsageLedger extends ChangeNotifier {
     }
     await _persist();
     notifyListeners();
+    final Future<void> Function(List<ApiUsageEvent> batch)? sync = cloudSync;
+    if (sync != null && _accountKey != 'local') {
+      unawaited(
+        sync(<ApiUsageEvent>[event]).catchError((Object _) {}),
+      );
+    }
   }
 
   /// Prefer official `usage` from OpenAI-compatible JSON when present.

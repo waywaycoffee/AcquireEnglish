@@ -11,7 +11,7 @@
     <div class="login-card">
       <p class="eyebrow">AcquireEnglish</p>
       <h1>运营后台</h1>
-      <p class="muted">用户管理 · 资产发放 · 积分钱包</p>
+      <p class="muted">用户 · Token 成本 · 看板 · 公共资源 · 损益</p>
       <label class="field">
         <span>管理员令牌</span>
         <input id="tokenInput" type="password" autocomplete="current-password" placeholder="ADMIN_API_TOKEN" />
@@ -25,7 +25,7 @@
     <header class="top">
       <div>
         <p class="eyebrow">AcquireEnglish Admin</p>
-        <h1>用户与资产</h1>
+        <h1 id="pageTitle">可视化看板</h1>
       </div>
       <div class="top-actions">
         <button id="refreshBtn" class="btn ghost" type="button">刷新</button>
@@ -33,30 +33,40 @@
       </div>
     </header>
 
-    <section id="statsRow" class="stats"></section>
+    <nav class="tabs" id="tabs">
+      <button type="button" data-tab="dashboard" class="tab active">看板</button>
+      <button type="button" data-tab="usage" class="tab">Token / 损益</button>
+      <button type="button" data-tab="resources" class="tab">公共资源</button>
+      <button type="button" data-tab="users" class="tab">用户资产</button>
+    </nav>
 
-    <div class="layout">
-      <aside class="panel">
-        <div class="panel-head">
-          <h2>用户</h2>
-          <form id="searchForm" class="search">
-            <input id="searchInput" type="search" placeholder="邮箱 / 手机 / 昵称 / ID" />
-            <button class="btn primary" type="submit">搜索</button>
-          </form>
-        </div>
-        <div id="userList" class="user-list"></div>
-        <div class="pager">
-          <button id="prevPage" class="btn ghost" type="button">上一页</button>
-          <span id="pageInfo" class="muted"></span>
-          <button id="nextPage" class="btn ghost" type="button">下一页</button>
-        </div>
-      </aside>
-
-      <main class="panel detail">
-        <div id="emptyDetail" class="empty">选择左侧用户查看资产</div>
-        <div id="detailView" class="hidden"></div>
-      </main>
-    </div>
+    <section id="panel-dashboard" class="tab-panel"></section>
+    <section id="panel-usage" class="tab-panel hidden"></section>
+    <section id="panel-resources" class="tab-panel hidden"></section>
+    <section id="panel-users" class="tab-panel hidden">
+      <section id="statsRow" class="stats"></section>
+      <div class="layout">
+        <aside class="panel">
+          <div class="panel-head">
+            <h2>用户</h2>
+            <form id="searchForm" class="search">
+              <input id="searchInput" type="search" placeholder="邮箱 / 手机 / 昵称 / ID" />
+              <button class="btn primary" type="submit">搜索</button>
+            </form>
+          </div>
+          <div id="userList" class="user-list"></div>
+          <div class="pager">
+            <button id="prevPage" class="btn ghost" type="button">上一页</button>
+            <span id="pageInfo" class="muted"></span>
+            <button id="nextPage" class="btn ghost" type="button">下一页</button>
+          </div>
+        </aside>
+        <main class="panel detail">
+          <div id="emptyDetail" class="empty">选择左侧用户查看资产</div>
+          <div id="detailView" class="hidden"></div>
+        </main>
+      </div>
+    </section>
   </div>
 
   <script src="./app.js"></script>

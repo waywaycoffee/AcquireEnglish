@@ -1104,3 +1104,43 @@ class ExamAssetReport(Base):
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )
+
+
+class ApiUsageEvent(Base):
+    """Billable LLM/ASR/TTS usage for ops cost + P&L dashboards."""
+
+    __tablename__ = "api_usage_events"
+    __table_args__ = (
+        UniqueConstraint(
+            "user_id",
+            "client_event_id",
+            name="uq_api_usage_user_client_event",
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    user_id: Mapped[int | None] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True
+    )
+    # Client-side id for idempotent sync from the mobile ledger.
+    client_event_id: Mapped[str | None] = mapped_column(String(96), nullable=True, index=True)
+    # translation | word_lookup | grammar | asr | tts | writing | other
+    kind: Mapped[str] = mapped_column(String(32), default="other", index=True)
+    # dashscope | deepseek | openai | tencent | user_key | …
+    provider: Mapped[str] = mapped_column(String(32), default="", index=True)
+    model: Mapped[str] = mapped_column(String(120), default="")
+    # platform | user
+    key_owner: Mapped[str] = mapped_column(String(16), default="platform", index=True)
+    # Never store raw secrets — sha256[:12] + last4.
+    key_fingerprint: Mapped[str] = mapped_column(String(32), default="", index=True)
+    key_label: Mapped[str] = mapped_column(String(64), default="")
+    prompt_tokens: Mapped[int] = mapped_column(Integer, default=0)
+    completion_tokens: Mapped[int] = mapped_column(Integer, default=0)
+    audio_seconds: Mapped[float] = mapped_column(Float, default=0.0)
+    cost_usd: Mapped[float] = mapped_column(Float, default=0.0)
+    cost_cny: Mapped[float] = mapped_column(Float, default=0.0)
+    note: Mapped[str] = mapped_column(String(255), default="")
+    meta_json: Mapped[str] = mapped_column(Text, default="{}")
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), index=True
+    )
