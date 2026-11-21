@@ -12,14 +12,10 @@ from httpx import ASGITransport, AsyncClient
 
 from app.database import Base, engine
 from app.main import app
-from app.routers import oral_match
 
 
 @pytest_asyncio.fixture(autouse=True)
 async def clean():
-    oral_match._queue.clear()
-    oral_match._rooms.clear()
-    oral_match._user_room.clear()
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.drop_all)
         await conn.run_sync(Base.metadata.create_all)
@@ -53,10 +49,15 @@ async def test_oral_match_pairs_two_users():
         assert body['status'] == 'matched'
         room_id = body['room_id']
         assert room_id
+        assert 'peer_online' in body
 
         status_a = await client.get('/api/oral-match/status', headers=a)
         assert status_a.json()['status'] == 'matched'
         assert status_a.json()['room_id'] == room_id
+
+        beat = await client.post('/api/oral-match/heartbeat', headers=a)
+        assert beat.status_code == 200
+        assert beat.json()['status'] == 'matched'
 
         sent = await client.post(
             f'/api/oral-match/rooms/{room_id}/messages',
@@ -73,3 +74,26 @@ async def test_oral_match_pairs_two_users():
         messages = inbox.json()['messages']
         assert any(m['text'].startswith('I just popped') for m in messages)
         assert any(m['mine'] is False for m in messages)
+
+        leave = await client.post('/api/oral-match/leave', headers=b)
+        assert leave.status_code == 200
+        left_status = await client.get('/api/oral-match/status', headers=a)
+        assert left_status.json()['status'] == 'peer_left'
+
+
+@pytest.mark.asyncio
+async def test_oral_match_report():
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url='http://test') as client:
+        a = await account(client, '13900002011')
+        b = await account(client, '13900002012')
+        await client.post('/api/oral-match/enqueue', headers=a)
+        matched = await client.post('/api/oral-match/enqueue', headers=b)
+        room_id = matched.json()['room_id']
+        reported = await client.post(
+            f'/api/oral-match/rooms/{room_id}/report',
+            headers=a,
+            json={'reason': 'spam'},
+        )
+        assert reported.status_code == 200
+        assert reported.json()['status'] == 'reported'

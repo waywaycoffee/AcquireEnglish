@@ -72,8 +72,11 @@ class Endpoints {
   static const String oralMatchEnqueue = 'api/oral-match/enqueue';
   static const String oralMatchStatus = 'api/oral-match/status';
   static const String oralMatchLeave = 'api/oral-match/leave';
+  static const String oralMatchHeartbeat = 'api/oral-match/heartbeat';
   static String oralMatchMessages(String roomId) =>
       'api/oral-match/rooms/$roomId/messages';
+  static String oralMatchReport(String roomId) =>
+      'api/oral-match/rooms/$roomId/report';
   static const String sharedSubtitlesBilibili =
       'api/shared-subtitles/bilibili';
   static const String imports = 'api/imports';

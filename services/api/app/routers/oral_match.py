@@ -1,79 +1,30 @@
-"""Ephemeral oral peer matching: queue → paired room → text messages.
+"""Durable oral peer matching: DB queue → paired room → messages + heartbeat.
 
-LiveKit tokens are optional when the server has LIVEKIT_* configured.
+LiveKit tokens are minted when LIVEKIT_* is configured (agent_name=None).
 """
 
 from __future__ import annotations
 
-import threading
+import asyncio
 import time
 import uuid
-from dataclasses import dataclass, field
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, Field
+from sqlalchemy import delete, select
+from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.database import get_db
 from app.deps import get_current_user
-from app.models import User
+from app.models import OralMatchQueue, OralPeerMessage, OralPeerReport, OralPeerRoom, User
 from app.services.livekit_tokens import create_room_token, livekit_configured
 
 router = APIRouter(prefix="/oral-match", tags=["oral-match"])
 
-_LOCK = threading.Lock()
+_PAIR_LOCK = asyncio.Lock()
 _QUEUE_TTL_SEC = 90
-_ROOM_TTL_SEC = 30 * 60
-
-
-@dataclass
-class _QueueEntry:
-    user_id: int
-    display_name: str
-    enqueued_at: float
-
-
-@dataclass
-class _RoomMessage:
-    id: str
-    sender_user_id: int
-    sender_name: str
-    text: str
-    created_at: float
-
-
-@dataclass
-class _Room:
-    id: str
-    user_a: int
-    name_a: str
-    user_b: int
-    name_b: str
-    created_at: float
-    messages: list[_RoomMessage] = field(default_factory=list)
-
-
-_queue: list[_QueueEntry] = []
-_rooms: dict[str, _Room] = {}
-_user_room: dict[int, str] = {}
-
-
-def _purge_locked(now: float | None = None) -> None:
-    ts = now or time.time()
-    alive: list[_QueueEntry] = []
-    for item in _queue:
-        if ts - item.enqueued_at <= _QUEUE_TTL_SEC:
-            alive.append(item)
-    _queue[:] = alive
-    stale = [
-        rid
-        for rid, room in _rooms.items()
-        if ts - room.created_at > _ROOM_TTL_SEC
-    ]
-    for rid in stale:
-        room = _rooms.pop(rid, None)
-        if room is None:
-            continue
-        _user_room.pop(room.user_a, None)
-        _user_room.pop(room.user_b, None)
+_ROOM_TTL_SEC = 45 * 60
+_HEARTBEAT_ONLINE_SEC = 45
 
 
 def _display_name(user: User) -> str:
@@ -81,34 +32,91 @@ def _display_name(user: User) -> str:
     return raw[:32] or f"learner-{user.id}"
 
 
-def _room_payload(room: _Room, me: int) -> dict:
-    peer_id = room.user_b if me == room.user_a else room.user_a
-    peer_name = room.name_b if me == room.user_a else room.name_a
-    livekit: dict | None = None
-    if livekit_configured():
-        try:
-            livekit = create_room_token(
-                identity=f"user-{me}",
-                room_name=f"oral-peer-{room.id}",
-                name=_display_name_for_id(me, room),
-                agent_name=None,
-            )
-        except RuntimeError:
-            livekit = None
-    return {
-        "status": "matched",
-        "room_id": room.id,
-        "peer": {"user_id": peer_id, "display_name": peer_name},
-        "livekit": livekit,
-    }
-
-
-def _display_name_for_id(user_id: int, room: _Room) -> str:
+def _name_for(room: OralPeerRoom, user_id: int) -> str:
     if user_id == room.user_a:
         return room.name_a
     if user_id == room.user_b:
         return room.name_b
     return f"learner-{user_id}"
+
+
+def _peer_of(room: OralPeerRoom, me: int) -> tuple[int, str]:
+    if me == room.user_a:
+        return room.user_b, room.name_b
+    return room.user_a, room.name_a
+
+
+def _peer_heartbeat(room: OralPeerRoom, me: int) -> float:
+    return room.heartbeat_b if me == room.user_a else room.heartbeat_a
+
+
+async def _purge(db: AsyncSession, now: float | None = None) -> None:
+    ts = now or time.time()
+    await db.execute(
+        delete(OralMatchQueue).where(OralMatchQueue.heartbeat_at < ts - _QUEUE_TTL_SEC)
+    )
+    stale = (
+        await db.execute(
+            select(OralPeerRoom).where(
+                OralPeerRoom.closed_at.is_(None),
+                OralPeerRoom.created_at < ts - _ROOM_TTL_SEC,
+            )
+        )
+    ).scalars().all()
+    for room in stale:
+        room.closed_at = ts
+        room.left_by = None
+    await db.flush()
+
+
+async def _active_room_for(db: AsyncSession, user_id: int) -> OralPeerRoom | None:
+    row = (
+        await db.execute(
+            select(OralPeerRoom)
+            .where(
+                OralPeerRoom.closed_at.is_(None),
+                (OralPeerRoom.user_a == user_id) | (OralPeerRoom.user_b == user_id),
+            )
+            .order_by(OralPeerRoom.created_at.desc())
+            .limit(1)
+        )
+    ).scalar_one_or_none()
+    return row
+
+
+def _livekit_payload(room: OralPeerRoom, me: int) -> dict | None:
+    if not livekit_configured():
+        return None
+    try:
+        return create_room_token(
+            identity=f"user-{me}",
+            room_name=f"oral-peer-{room.id}",
+            name=_name_for(room, me),
+            agent_name=None,
+            ttl_seconds=3600,
+            can_publish=True,
+            can_subscribe=True,
+        )
+    except RuntimeError:
+        return None
+
+
+def _room_payload(room: OralPeerRoom, me: int, *, now: float | None = None) -> dict:
+    ts = now or time.time()
+    peer_id, peer_name = _peer_of(room, me)
+    peer_hb = _peer_heartbeat(room, me)
+    peer_online = (ts - peer_hb) <= _HEARTBEAT_ONLINE_SEC
+    status_value = "matched"
+    if room.closed_at is not None:
+        status_value = "peer_left"
+    return {
+        "status": status_value,
+        "room_id": room.id,
+        "peer": {"user_id": peer_id, "display_name": peer_name},
+        "peer_online": peer_online and room.closed_at is None,
+        "voice_ready": livekit_configured(),
+        "livekit": None if room.closed_at is not None else _livekit_payload(room, me),
+    }
 
 
 class EnqueueOut(BaseModel):
@@ -117,6 +125,8 @@ class EnqueueOut(BaseModel):
     peer: dict | None = None
     livekit: dict | None = None
     queue_position: int | None = None
+    peer_online: bool | None = None
+    voice_ready: bool | None = None
 
 
 class MessageIn(BaseModel):
@@ -130,80 +140,182 @@ class MessageOut(BaseModel):
     text: str
     created_at: float
     mine: bool
+    kind: str = "user"
+
+
+class ReportIn(BaseModel):
+    reason: str = Field(min_length=2, max_length=500)
 
 
 @router.post("/enqueue", response_model=EnqueueOut)
-async def enqueue_match(user: User = Depends(get_current_user)) -> EnqueueOut:
+async def enqueue_match(
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> EnqueueOut:
     now = time.time()
     name = _display_name(user)
-    with _LOCK:
-        _purge_locked(now)
-        existing_room_id = _user_room.get(user.id)
-        if existing_room_id and existing_room_id in _rooms:
-            return EnqueueOut(**_room_payload(_rooms[existing_room_id], user.id))
+    async with _PAIR_LOCK:
+        await _purge(db, now)
+        existing = await _active_room_for(db, user.id)
+        if existing is not None:
+            if user.id == existing.user_a:
+                existing.heartbeat_a = now
+            else:
+                existing.heartbeat_b = now
+            await db.commit()
+            return EnqueueOut(**_room_payload(existing, user.id, now=now))
 
-        # Already waiting?
-        for idx, item in enumerate(_queue):
-            if item.user_id == user.id:
-                item.enqueued_at = now
-                item.display_name = name
-                return EnqueueOut(status="waiting", queue_position=idx + 1)
-
-        # Pair with the oldest waiter who is not me.
-        partner: _QueueEntry | None = None
-        remain: list[_QueueEntry] = []
-        for item in _queue:
-            if partner is None and item.user_id != user.id:
-                partner = item
-                continue
-            remain.append(item)
-        _queue[:] = remain
-
-        if partner is not None:
-            room_id = uuid.uuid4().hex[:12]
-            room = _Room(
-                id=room_id,
-                user_a=partner.user_id,
-                name_a=partner.display_name,
-                user_b=user.id,
-                name_b=name,
-                created_at=now,
+        waiting = (
+            await db.execute(
+                select(OralMatchQueue)
+                .where(OralMatchQueue.user_id != user.id)
+                .order_by(OralMatchQueue.enqueued_at.asc())
+                .limit(1)
             )
-            _rooms[room_id] = room
-            _user_room[partner.user_id] = room_id
-            _user_room[user.id] = room_id
-            return EnqueueOut(**_room_payload(room, user.id))
+        ).scalar_one_or_none()
 
-        _queue.append(
-            _QueueEntry(user_id=user.id, display_name=name, enqueued_at=now)
+        mine = await db.get(OralMatchQueue, user.id)
+        if waiting is None:
+            if mine is None:
+                db.add(
+                    OralMatchQueue(
+                        user_id=user.id,
+                        display_name=name,
+                        enqueued_at=now,
+                        heartbeat_at=now,
+                    )
+                )
+            else:
+                mine.display_name = name
+                mine.heartbeat_at = now
+            await db.commit()
+            position = (
+                await db.execute(select(OralMatchQueue).order_by(OralMatchQueue.enqueued_at.asc()))
+            ).scalars().all()
+            idx = next(
+                (i for i, row in enumerate(position) if row.user_id == user.id),
+                0,
+            )
+            return EnqueueOut(status="waiting", queue_position=idx + 1)
+
+        # Pair with oldest waiter.
+        partner = waiting
+        room_id = uuid.uuid4().hex[:12]
+        room = OralPeerRoom(
+            id=room_id,
+            user_a=partner.user_id,
+            name_a=partner.display_name,
+            user_b=user.id,
+            name_b=name,
+            created_at=now,
+            heartbeat_a=now,
+            heartbeat_b=now,
         )
-        return EnqueueOut(status="waiting", queue_position=len(_queue))
+        db.add(room)
+        await db.execute(delete(OralMatchQueue).where(OralMatchQueue.user_id == partner.user_id))
+        if mine is not None:
+            await db.delete(mine)
+        db.add(
+            OralPeerMessage(
+                id=uuid.uuid4().hex[:10],
+                room_id=room_id,
+                sender_user_id=0,
+                sender_name="system",
+                text="Matched. You can talk live and also hold-to-talk for AI rewrite.",
+                created_at=now,
+                kind="system",
+            )
+        )
+        await db.commit()
+        await db.refresh(room)
+        return EnqueueOut(**_room_payload(room, user.id, now=now))
 
 
 @router.get("/status", response_model=EnqueueOut)
-async def match_status(user: User = Depends(get_current_user)) -> EnqueueOut:
+async def match_status(
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> EnqueueOut:
     now = time.time()
-    with _LOCK:
-        _purge_locked(now)
-        room_id = _user_room.get(user.id)
-        if room_id and room_id in _rooms:
-            return EnqueueOut(**_room_payload(_rooms[room_id], user.id))
-        for idx, item in enumerate(_queue):
-            if item.user_id == user.id:
-                return EnqueueOut(status="waiting", queue_position=idx + 1)
-        return EnqueueOut(status="idle")
+    await _purge(db, now)
+    room = await _active_room_for(db, user.id)
+    if room is not None:
+        if user.id == room.user_a:
+            room.heartbeat_a = now
+        else:
+            room.heartbeat_b = now
+        await db.commit()
+        return EnqueueOut(**_room_payload(room, user.id, now=now))
+
+    # Closed room still visible briefly so client can show "peer left".
+    closed = (
+        await db.execute(
+            select(OralPeerRoom)
+            .where(
+                OralPeerRoom.closed_at.is_not(None),
+                (OralPeerRoom.user_a == user.id) | (OralPeerRoom.user_b == user.id),
+                OralPeerRoom.closed_at >= now - 120,
+            )
+            .order_by(OralPeerRoom.closed_at.desc())
+            .limit(1)
+        )
+    ).scalar_one_or_none()
+    if closed is not None:
+        payload = _room_payload(closed, user.id, now=now)
+        payload["status"] = "peer_left"
+        payload["peer_online"] = False
+        payload["livekit"] = None
+        return EnqueueOut(**payload)
+
+    mine = await db.get(OralMatchQueue, user.id)
+    if mine is not None:
+        mine.heartbeat_at = now
+        await db.commit()
+        rows = (
+            await db.execute(select(OralMatchQueue).order_by(OralMatchQueue.enqueued_at.asc()))
+        ).scalars().all()
+        idx = next((i for i, row in enumerate(rows) if row.user_id == user.id), 0)
+        return EnqueueOut(status="waiting", queue_position=idx + 1)
+    return EnqueueOut(status="idle")
+
+
+@router.post("/heartbeat", response_model=EnqueueOut)
+async def heartbeat(
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> EnqueueOut:
+    return await match_status(user=user, db=db)
 
 
 @router.post("/leave")
-async def leave_match(user: User = Depends(get_current_user)) -> dict[str, str]:
-    with _LOCK:
-        _purge_locked()
-        _queue[:] = [item for item in _queue if item.user_id != user.id]
-        room_id = _user_room.pop(user.id, None)
-        if room_id and room_id in _rooms:
-            room = _rooms.pop(room_id)
-            _user_room.pop(room.user_a, None)
-            _user_room.pop(room.user_b, None)
+async def leave_match(
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> dict[str, str]:
+    now = time.time()
+    await db.execute(delete(OralMatchQueue).where(OralMatchQueue.user_id == user.id))
+    room = await _active_room_for(db, user.id)
+    if room is not None:
+        room.closed_at = now
+        room.left_by = user.id
+        peer_id, _ = _peer_of(room, user.id)
+        db.add(
+            OralPeerMessage(
+                id=uuid.uuid4().hex[:10],
+                room_id=room.id,
+                sender_user_id=0,
+                sender_name="system",
+                text=f"{_name_for(room, user.id)} left the practice.",
+                created_at=now,
+                kind="system",
+            )
+        )
+        # Touch peer side so status poll notices quickly.
+        if peer_id == room.user_a:
+            room.heartbeat_a = room.heartbeat_a
+        else:
+            room.heartbeat_b = room.heartbeat_b
+    await db.commit()
     return {"status": "left"}
 
 
@@ -212,33 +324,51 @@ async def post_message(
     room_id: str,
     body: MessageIn,
     user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
 ) -> MessageOut:
     text = body.text.strip()
     if not text:
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, "Empty message.")
-    with _LOCK:
-        _purge_locked()
-        room = _rooms.get(room_id)
-        if room is None or user.id not in {room.user_a, room.user_b}:
-            raise HTTPException(status.HTTP_404_NOT_FOUND, "Room not found.")
-        msg = _RoomMessage(
-            id=uuid.uuid4().hex[:10],
-            sender_user_id=user.id,
-            sender_name=_display_name_for_id(user.id, room),
-            text=text[:2000],
-            created_at=time.time(),
+    room = await db.get(OralPeerRoom, room_id)
+    if room is None or user.id not in {room.user_a, room.user_b}:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Room not found.")
+    if room.closed_at is not None:
+        raise HTTPException(status.HTTP_409_CONFLICT, "Room already closed.")
+    now = time.time()
+    if user.id == room.user_a:
+        room.heartbeat_a = now
+    else:
+        room.heartbeat_b = now
+    msg = OralPeerMessage(
+        id=uuid.uuid4().hex[:10],
+        room_id=room.id,
+        sender_user_id=user.id,
+        sender_name=_name_for(room, user.id),
+        text=text[:2000],
+        created_at=now,
+        kind="user",
+    )
+    db.add(msg)
+    # Cap retention per room.
+    rows = (
+        await db.execute(
+            select(OralPeerMessage)
+            .where(OralPeerMessage.room_id == room.id)
+            .order_by(OralPeerMessage.created_at.desc())
         )
-        room.messages.append(msg)
-        if len(room.messages) > 200:
-            room.messages = room.messages[-200:]
-        return MessageOut(
-            id=msg.id,
-            sender_user_id=msg.sender_user_id,
-            sender_name=msg.sender_name,
-            text=msg.text,
-            created_at=msg.created_at,
-            mine=True,
-        )
+    ).scalars().all()
+    for old in rows[199:]:
+        await db.delete(old)
+    await db.commit()
+    return MessageOut(
+        id=msg.id,
+        sender_user_id=msg.sender_user_id,
+        sender_name=msg.sender_name,
+        text=msg.text,
+        created_at=msg.created_at,
+        mine=True,
+        kind=msg.kind,
+    )
 
 
 @router.get("/rooms/{room_id}/messages")
@@ -246,13 +376,18 @@ async def list_messages(
     room_id: str,
     after_id: str | None = None,
     user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
 ) -> dict:
-    with _LOCK:
-        _purge_locked()
-        room = _rooms.get(room_id)
-        if room is None or user.id not in {room.user_a, room.user_b}:
-            raise HTTPException(status.HTTP_404_NOT_FOUND, "Room not found.")
-        rows = list(room.messages)
+    room = await db.get(OralPeerRoom, room_id)
+    if room is None or user.id not in {room.user_a, room.user_b}:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Room not found.")
+    rows = (
+        await db.execute(
+            select(OralPeerMessage)
+            .where(OralPeerMessage.room_id == room_id)
+            .order_by(OralPeerMessage.created_at.asc())
+        )
+    ).scalars().all()
     if after_id:
         idx = next((i for i, m in enumerate(rows) if m.id == after_id), -1)
         rows = rows[idx + 1 :] if idx >= 0 else rows
@@ -265,7 +400,36 @@ async def list_messages(
                 text=m.text,
                 created_at=m.created_at,
                 mine=m.sender_user_id == user.id,
+                kind=m.kind or "user",
             ).model_dump()
             for m in rows
-        ]
+        ],
+        "room_closed": room.closed_at is not None,
+        "peer_online": (
+            room.closed_at is None
+            and (time.time() - _peer_heartbeat(room, user.id)) <= _HEARTBEAT_ONLINE_SEC
+        ),
     }
+
+
+@router.post("/rooms/{room_id}/report")
+async def report_peer(
+    room_id: str,
+    body: ReportIn,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> dict[str, str]:
+    room = await db.get(OralPeerRoom, room_id)
+    if room is None or user.id not in {room.user_a, room.user_b}:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Room not found.")
+    peer_id, _ = _peer_of(room, user.id)
+    db.add(
+        OralPeerReport(
+            room_id=room.id,
+            reporter_user_id=user.id,
+            peer_user_id=peer_id,
+            reason=body.reason.strip()[:500],
+        )
+    )
+    await db.commit()
+    return {"status": "reported"}

@@ -116,6 +116,8 @@ class OralMatchStatus {
     this.peerDisplayName,
     this.queuePosition,
     this.livekit,
+    this.peerOnline,
+    this.voiceReady,
   });
 
   factory OralMatchStatus.fromJson(Map<String, dynamic> json) {
@@ -139,17 +141,22 @@ class OralMatchStatus {
       livekit: livekit is Map
           ? AcquireLiveKitToken.fromJson(Map<String, dynamic>.from(livekit))
           : null,
+      peerOnline: json['peer_online'] == true,
+      voiceReady: json['voice_ready'] == true,
     );
   }
 
-  final String status; // idle | waiting | matched
+  final String status; // idle | waiting | matched | peer_left
   final String? roomId;
   final int? peerUserId;
   final String? peerDisplayName;
   final int? queuePosition;
   final AcquireLiveKitToken? livekit;
+  final bool? peerOnline;
+  final bool? voiceReady;
 
   bool get isMatched => status == 'matched' && (roomId ?? '').isNotEmpty;
+  bool get peerLeft => status == 'peer_left';
 }
 
 class OralMatchMessage {
@@ -160,6 +167,7 @@ class OralMatchMessage {
     required this.text,
     required this.createdAt,
     required this.mine,
+    this.kind = 'user',
   });
 
   factory OralMatchMessage.fromJson(Map<String, dynamic> json) =>
@@ -170,6 +178,7 @@ class OralMatchMessage {
         text: '${json['text'] ?? ''}',
         createdAt: (json['created_at'] as num?)?.toDouble() ?? 0,
         mine: json['mine'] == true,
+        kind: '${json['kind'] ?? 'user'}',
       );
 
   final String id;
@@ -178,6 +187,19 @@ class OralMatchMessage {
   final String text;
   final double createdAt;
   final bool mine;
+  final String kind;
+}
+
+class OralMatchInbox {
+  const OralMatchInbox({
+    required this.messages,
+    this.roomClosed = false,
+    this.peerOnline = true,
+  });
+
+  final List<OralMatchMessage> messages;
+  final bool roomClosed;
+  final bool peerOnline;
 }
 
 class PersonalImportAsset {
@@ -1365,6 +1387,25 @@ class AcquireApiClient {
     await _dio.post(Endpoints.oralMatchLeave);
   }
 
+  Future<OralMatchStatus> oralMatchHeartbeat() async {
+    final Response<dynamic> response = await _dio.post(
+      Endpoints.oralMatchHeartbeat,
+    );
+    return OralMatchStatus.fromJson(
+      Map<String, dynamic>.from(response.data as Map),
+    );
+  }
+
+  Future<void> reportOralMatchPeer({
+    required String roomId,
+    required String reason,
+  }) async {
+    await _dio.post(
+      Endpoints.oralMatchReport(roomId),
+      data: <String, dynamic>{'reason': reason},
+    );
+  }
+
   Future<OralMatchMessage> postOralMatchMessage({
     required String roomId,
     required String text,
@@ -1382,22 +1423,42 @@ class AcquireApiClient {
     required String roomId,
     String? afterId,
   }) async {
+    final OralMatchInbox inbox = await fetchOralMatchInbox(
+      roomId: roomId,
+      afterId: afterId,
+    );
+    return inbox.messages;
+  }
+
+  Future<OralMatchInbox> fetchOralMatchInbox({
+    required String roomId,
+    String? afterId,
+  }) async {
     final Response<dynamic> response = await _dio.get(
       Endpoints.oralMatchMessages(roomId),
       queryParameters: <String, dynamic>{
         if ((afterId ?? '').trim().isNotEmpty) 'after_id': afterId!.trim(),
       },
     );
-    final Object? raw = (response.data as Map)['messages'];
-    if (raw is! List) return const <OralMatchMessage>[];
-    return raw
-        .whereType<Map>()
-        .map(
-          (Map row) => OralMatchMessage.fromJson(
-            Map<String, dynamic>.from(row),
-          ),
-        )
-        .toList(growable: false);
+    final Map<String, dynamic> data = Map<String, dynamic>.from(
+      response.data as Map,
+    );
+    final Object? raw = data['messages'];
+    final List<OralMatchMessage> messages = raw is! List
+        ? const <OralMatchMessage>[]
+        : raw
+            .whereType<Map>()
+            .map(
+              (Map row) => OralMatchMessage.fromJson(
+                Map<String, dynamic>.from(row),
+              ),
+            )
+            .toList(growable: false);
+    return OralMatchInbox(
+      messages: messages,
+      roomClosed: data['room_closed'] == true,
+      peerOnline: data['peer_online'] == true,
+    );
   }
 
   /// Returns null on 404 / network miss (shared cache optional).
@@ -1861,6 +1922,20 @@ class AcquireApiClient {
     final Map<String, dynamic> result = response.data as Map<String, dynamic>;
     if (result['public_path'] is String) result['share_url'] = Uri.parse(_dio.options.baseUrl).resolve(result['public_path'] as String).toString();
     return result;
+  }
+
+  Future<Map<String,dynamic>> assessmentStatus() async {
+    final response = await _dio.get<dynamic>('api/pronunciation/status', options: _noCache);
+    return response.data as Map<String,dynamic>;
+  }
+  Future<Map<String,dynamic>> evaluateRecording(String reference, String pcm) async {
+    final response = await _dio.post<dynamic>('api/pronunciation/evaluate', data: {'reference':reference,'pcm_base64':pcm}, options: Options(receiveTimeout: const Duration(seconds:60)));
+    return response.data as Map<String,dynamic>;
+  }
+
+  Future<Map<String, dynamic>> moduleProgress(String kind, {Map<String, dynamic>? upload}) async {
+    final response = await _dio.request<dynamic>('api/learning-modules/$kind/progress', options: Options(method: upload == null ? 'GET' : 'PUT', extra: _noCache.extra), data: upload);
+    return response.data as Map<String, dynamic>;
   }
 
   Future<Map<String, dynamic>> studyPlayRequest(String method, String path, {Map<String, dynamic>? data}) async {

@@ -834,3 +834,75 @@ class CommunityNoticePreference(Base):
     __tablename__ = "community_notice_preferences"
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), primary_key=True)
     enabled: Mapped[int] = mapped_column(Integer, default=1)
+
+
+class LearningModuleProgress(Base):
+    __tablename__ = 'learning_module_progress'
+    user_id: Mapped[int] = mapped_column(ForeignKey('users.id', ondelete='CASCADE'), primary_key=True)
+    kind: Mapped[str] = mapped_column(String(16), primary_key=True)
+    revision: Mapped[int] = mapped_column(Integer, default=1)
+    payload: Mapped[str] = mapped_column(Text)
+
+
+class OralMatchQueue(Base):
+    """Waiting learners for 1:1 peer oral practice."""
+
+    __tablename__ = "oral_match_queue"
+
+    user_id: Mapped[int] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), primary_key=True
+    )
+    display_name: Mapped[str] = mapped_column(String(64))
+    enqueued_at: Mapped[float] = mapped_column(Float)
+    heartbeat_at: Mapped[float] = mapped_column(Float)
+
+
+class OralPeerRoom(Base):
+    """Matched peer oral session (text + optional LiveKit voice)."""
+
+    __tablename__ = "oral_peer_rooms"
+
+    id: Mapped[str] = mapped_column(String(24), primary_key=True)
+    user_a: Mapped[int] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), index=True
+    )
+    name_a: Mapped[str] = mapped_column(String(64))
+    user_b: Mapped[int] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), index=True
+    )
+    name_b: Mapped[str] = mapped_column(String(64))
+    created_at: Mapped[float] = mapped_column(Float)
+    heartbeat_a: Mapped[float] = mapped_column(Float)
+    heartbeat_b: Mapped[float] = mapped_column(Float)
+    closed_at: Mapped[float | None] = mapped_column(Float, nullable=True)
+    left_by: Mapped[int | None] = mapped_column(Integer, nullable=True)
+
+
+class OralPeerMessage(Base):
+    __tablename__ = "oral_peer_messages"
+
+    id: Mapped[str] = mapped_column(String(16), primary_key=True)
+    room_id: Mapped[str] = mapped_column(
+        ForeignKey("oral_peer_rooms.id", ondelete="CASCADE"), index=True
+    )
+    sender_user_id: Mapped[int] = mapped_column(Integer, index=True)
+    sender_name: Mapped[str] = mapped_column(String(64))
+    text: Mapped[str] = mapped_column(Text)
+    created_at: Mapped[float] = mapped_column(Float, index=True)
+    # user | system
+    kind: Mapped[str] = mapped_column(String(16), default="user")
+
+
+class OralPeerReport(Base):
+    __tablename__ = "oral_peer_reports"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    room_id: Mapped[str] = mapped_column(String(24), index=True)
+    reporter_user_id: Mapped[int] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), index=True
+    )
+    peer_user_id: Mapped[int] = mapped_column(Integer, index=True)
+    reason: Mapped[str] = mapped_column(String(500))
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
