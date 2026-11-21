@@ -1,91 +1,76 @@
-# Official OpenMAIC (THU-MAIC) on the 5060 Ti box
+# Official OpenMAIC (THU-MAIC) on the GPU box
 
-AcquireEnglish does **not** vendor OpenMAIC `node_modules`. Clone and run outside the app repo (or under this folder after clone).
+AcquireEnglish does **not** vendor [THU-MAIC/OpenMAIC](https://github.com/THU-MAIC/OpenMAIC) (MIT). Install it **outside** this repo and point the API at it.
 
-## Install path
+## Install path (this PC)
 
-Preferred:
-
-```text
+```
 D:\OpenMAIC
 ```
 
-Fallback if that path is locked: `D:\OpenMAIC_official`.
+Prerequisites:
 
-Upstream: https://github.com/THU-MAIC/OpenMAIC (MIT). Needs Node ≥ 22.19, pnpm ≥ 10, PostgreSQL 16+, and an LLM.
+- Node.js >= 22.19, pnpm >= 10 (`npm i -g pnpm@10.28.0`)
+- PostgreSQL reachable as `DATABASE_URL` (this box **or** ECS via SSH tunnel)
+- LLM key (DeepSeek recommended; reused from `tools/oral_coach/.env`)
 
-## Local LLM (this PC)
+OpenMAIC itself is cloud/local LLM HTTP — it does **not** require CUDA. Optional local Ollama/FunASR stay on this 5060 Ti.
 
-Primary model for OpenMAIC / course generation:
+## Database (ECS Postgres + tunnel)
 
-| Item | Value |
-|------|--------|
-| Tag | `qwen2.5:7b` |
-| Backend | GPU-box OpenAI shim (ModelScope `Qwen/Qwen2.5-7B-Instruct`, 4-bit) |
-| Base URL | `http://127.0.0.1:11434/v1` (Tailscale `http://100.115.252.55:11434/v1`) |
-| Fallback | `qwen2.5:3b` / `Qwen/Qwen2.5-3B-Instruct` only if VRAM is tight |
+ECS already has Postgres listening on `localhost:5432`. Create the OpenMAIC DB once:
 
-Keep the shim running (watchdog / scheduled task `AcquireEnglish-Ollama-Qwen`). See `deploy/gpu-box-ollama/README.md`.
+```bash
+# from GPU box
+scp tools/openmaic/setup_ecs_pg.sh acquireenglish:/tmp/setup_ecs_pg.sh
+ssh acquireenglish 'sed -i "s/\r$//" /tmp/setup_ecs_pg.sh; bash /tmp/setup_ecs_pg.sh'
+```
 
-## Start OpenMAIC
+`start.ps1` opens `ssh -L 5433:127.0.0.1:5432 acquireenglish` automatically.
+
+```env
+DATABASE_URL=postgres://openmaic:openmaic-dev@127.0.0.1:5433/openmaic
+```
+
+## Start (keep this process running)
 
 ```powershell
 cd D:\AcquireEnglish\tools\openmaic
 .\start.ps1
 ```
 
-Defaults:
+| Endpoint | URL |
+|----------|-----|
+| Local | `http://127.0.0.1:3000` |
+| Tailscale (ECS) | `http://100.115.252.55:3000` |
+| Capabilities | `GET /api/generate-classroom/capabilities` |
 
-- Bind `0.0.0.0:3000` so ECS can reach `http://100.115.252.55:3000`
-- `openmaic.yml` slots → Ollama-compatible `qwen2.5:7b`
-- ACCESS_CODE optional for Tailscale-only LAN
+Bind is `0.0.0.0:3000` so Guangzhou ECS can reach the GPU box over Tailscale.
 
-## ECS API
+**Leave `start.ps1` running.** Classroom generation is server-side and stops if Node exits. The SSH tunnel must stay up too.
+
+## ECS
 
 ```env
 OPENMAIC_URL=http://100.115.252.55:3000
 PREFER_OPENMAIC=true
 ```
 
-Mock fallback (optional, keep on another port):
-
-```env
-# OPENMAIC_URL=http://100.115.252.55:8093
-```
+## Mock fallback (optional, :8093)
 
 ```powershell
 cd D:\AcquireEnglish\tools\openmaic_mock
-.\start.ps1   # defaults to qwen2.5:7b @ :11434/v1 when no cloud key
+.\start.ps1
 ```
 
-## Adapter modes
+Point `OPENMAIC_URL` at `:8093` only when official OpenMAIC is down. The API adapter auto-detects mock (`/api/v1/decompose`) vs native (`/api/generate-classroom/capabilities`).
 
-`services/api/.../openmaic_adapter.py` auto-detects:
+## Smoke
 
-1. Native: `/api/generate-classroom/capabilities` → materials + generate + poll
-2. Mock contract: `POST /api/v1/decompose`
-
-Private uploads always soft-fall back to `HeuristicSplitter` on failure.
-
-## Keep alive
-
-OpenMAIC generation runs **inside the Next.js process**. Leave `.\start.ps1` (or `pnpm start`) running on this GPU PC; do not rely on ECS for inference.
-
-## ECS database (`openmaic-pg`)
-
-Guangzhou ECS cannot always `docker pull postgres:16` from Docker Hub (timeout). Use a China mirror, then tag:
-
-```bash
-docker pull docker.1panel.live/library/postgres:16
-docker tag docker.1panel.live/library/postgres:16 postgres:16
-docker run -d --name openmaic-pg --restart unless-stopped \
-  -p 127.0.0.1:5433:5432 \
-  -e POSTGRES_DB=openmaic -e POSTGRES_USER=openmaic -e POSTGRES_PASSWORD=openmaic-dev \
-  -v openmaic-pg-data:/var/lib/postgresql/data postgres:16
+```powershell
+curl http://127.0.0.1:3000/api/generate-classroom/capabilities
+# from ECS after env update:
+curl http://100.115.252.55:3000/api/generate-classroom/capabilities
 ```
 
-`DATABASE_URL=postgresql://openmaic:openmaic-dev@127.0.0.1:5433/openmaic` in `/opt/OpenMAIC/.env.local`.
-
-The host also runs system PostgreSQL on `:5432` (e.g. other services); OpenMAIC uses the isolated container on **5433**.
-
-If no Postgres image can be pulled on ECS, run OpenMAIC on this Windows GPU box only (`D:\OpenMAIC`, `pnpm db:up` or local Postgres) and point ECS at `OPENMAIC_URL` for inference — persistence stays local to the GPU PC.
+Native flow used by `OpenMaicSplitter`: `POST /api/materials` → `POST /api/generate-classroom` → poll `pollUrl`.
