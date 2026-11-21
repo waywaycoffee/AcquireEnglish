@@ -675,7 +675,8 @@ class _DailyReviewScreenState extends ConsumerState<DailyReviewScreen>
       _playedWord = visible!.key;
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted && _currentKey == visible.key) {
-          unawaited(_playWord(visible, silent: true));
+          // Open card → speak immediately (Aliyun cloud TTS preferred).
+          unawaited(_playWord(visible));
         }
       });
     }
@@ -2713,15 +2714,17 @@ class _DailyReviewScreenState extends ConsumerState<DailyReviewScreen>
 
   Future<void> _playWord(ReviewSource source, {bool silent = false}) async {
     final int sequence = _speechSequence;
+    if (!mounted ||
+        sequence != _speechSequence ||
+        _currentKey != source.key ||
+        _speaking) {
+      return;
+    }
     final FoundationMediaItem? foundation = _foundationMediaFor(source);
     final String? foundationAudio = foundation?.audioUrl;
+    // Prefer real foundation recordings; otherwise go straight to Aliyun TTS
+    // (skip public-lexicon eSpeak — quality is too low for card open).
     if (foundationAudio != null && foundationAudio.isNotEmpty) {
-      if (!mounted ||
-          sequence != _speechSequence ||
-          _currentKey != source.key ||
-          _speaking) {
-        return;
-      }
       setState(() => _speaking = true);
       try {
         _speech = ref.read(wordPronunciationServiceProvider);
@@ -2729,6 +2732,7 @@ class _DailyReviewScreenState extends ConsumerState<DailyReviewScreen>
           source.question,
           recordedUrl: foundationAudio,
           allowSynthesisFallback: true,
+          forceCloud: true,
         );
       } catch (_) {
         if (mounted && sequence == _speechSequence && !silent) {
@@ -2741,41 +2745,7 @@ class _DailyReviewScreenState extends ConsumerState<DailyReviewScreen>
       }
       return;
     }
-
-    final LearningSettingsState settings = ref.read(learningSettingsProvider);
-    final WordLookupEntry? entry = await ref
-        .read(wordLookupServiceProvider)
-        .publicLookup
-        ?.call(source.question, settings);
-    if (!mounted ||
-        sequence != _speechSequence ||
-        _currentKey != source.key ||
-        _speaking)
-      return;
-    final String? url = entry?.audioUrl;
-    if (url == null || url.isEmpty) {
-      // Auto-prefetch stays quiet without lexicon audio; manual play uses TTS.
-      if (silent) return;
-      await _speak(source.question);
-      return;
-    }
-    setState(() => _speaking = true);
-    try {
-      _speech = ref.read(wordPronunciationServiceProvider);
-      await _speech!.speak(
-        source.question,
-        recordedUrl: url,
-        allowSynthesisFallback: !silent,
-        forceCloud: !silent,
-      );
-    } catch (_) {
-      if (mounted && sequence == _speechSequence && !silent) {
-        _message('发音暂不可用，请检查网络或本地 TTS。');
-      }
-    } finally {
-      if (mounted && sequence == _speechSequence)
-        setState(() => _speaking = false);
-    }
+    await _speak(source.question);
   }
 
   List<String> _contrastOptions(String target, List<ConfusablePair> pairs) {
@@ -2859,7 +2829,7 @@ class _DailyReviewScreenState extends ConsumerState<DailyReviewScreen>
     setState(() => _speaking = true);
     try {
       _speech = ref.read(wordPronunciationServiceProvider);
-      await _speech!.speak(text);
+      await _speech!.speak(text, forceCloud: true);
     } catch (_) {
       if (mounted) _message('朗读失败，请检查设备的语音设置。');
     } finally {

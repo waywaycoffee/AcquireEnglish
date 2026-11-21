@@ -124,6 +124,7 @@ app.include_router(foundation_media.router, prefix="/api")
 app.include_router(content_media.router, prefix="/api")
 app.include_router(syllabus_books.router, prefix="/api")
 app.include_router(reading_speech.router, prefix="/api")
+app.include_router(reading_speech.voices_router, prefix="/api")
 app.include_router(pregen_cache.router, prefix="/api")
 
 # Audio/video served from ECS disk only — never bundled into the mobile APK.

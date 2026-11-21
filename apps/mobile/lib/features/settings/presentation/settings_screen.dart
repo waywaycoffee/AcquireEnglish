@@ -1604,13 +1604,13 @@ class _AliyunCloudVoiceRowState extends ConsumerState<_AliyunCloudVoiceRow> {
         children: <Widget>[
           Expanded(
             child: _TitleBlock(
-              title: '阿里云英文音色',
+              title: '阿里云配音音色',
               description: _loading
                   ? '正在读取云端音色…'
                   : _error ??
                         (!_configured
                             ? '服务器尚未配置 DASHSCOPE_API_KEY'
-                            : '真人配音，缓存到 ECS /media/reading/speech'),
+                            : '默认龙安风悦（中英双语），缓存到 ECS'),
             ),
           ),
           const SizedBox(width: 16),
