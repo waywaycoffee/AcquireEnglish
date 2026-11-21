@@ -18,6 +18,14 @@ enum AppNavDestination {
     icon: LucideIcons.clapperboard,
     activeIcon: LucideIcons.clapperboard,
   ),
+  oralCoach(
+    route: '/digital-human',
+    label: '口语',
+    title: '数字人口语陪练',
+    subtitle: '和数字人开口练习，也可以拍照识词。',
+    icon: Icons.record_voice_over_outlined,
+    activeIcon: Icons.record_voice_over_rounded,
+  ),
   growth(
     route: '/growth',
     label: '成长',

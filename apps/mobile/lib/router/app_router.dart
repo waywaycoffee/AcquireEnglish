@@ -41,6 +41,8 @@ import 'fade_extension.dart';
 import '../features/membership/presentation/membership_screen.dart';
 import '../features/onboarding/presentation/first_open_onboarding_screen.dart';
 import '../features/onboarding/presentation/onboarding_provider.dart';
+import '../features/navigation/presentation/navigation_destination.dart';
+import '../features/shared/presentation/pad/pad_scaffold.dart';
 
 part 'app_router.g.dart';
 
@@ -315,13 +317,17 @@ GoRouter goRouter(Ref ref) => GoRouter(
       },
     ).fade(),
     GoRoute(
-      path: '/digital-human',
+      path: AppNavDestination.oralCoach.route,
       builder: (BuildContext context, GoRouterState state) {
         final String? scenario = state.uri.queryParameters['scenario']?.trim();
-        return DigitalHumanCoachScreen(
-          initialScenarioId: (scenario == null || scenario.isEmpty)
-              ? null
-              : scenario,
+        return PadScaffold(
+          currentDestination: AppNavDestination.oralCoach,
+          showContinueLearning: false,
+          body: DigitalHumanCoachScreen(
+            initialScenarioId: (scenario == null || scenario.isEmpty)
+                ? null
+                : scenario,
+          ),
         );
       },
     ).fade(),
