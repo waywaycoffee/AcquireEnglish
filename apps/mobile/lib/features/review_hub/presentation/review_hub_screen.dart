@@ -119,8 +119,8 @@ class _ReviewHubScreenState extends ConsumerState<ReviewHubScreen> {
       currentDestination: AppNavDestination.review,
       showContinueLearning: false,
       topBar: PadTopBar(
-        title: '复习枢纽',
-        description: '看进度、练记忆、养形象',
+        title: '背诵',
+        description: 'FSRS 背单词 · 短语 · 词书 · 错词本',
         actions: <Widget>[
           IconButton(
             tooltip: '刷新',
@@ -321,7 +321,7 @@ class _ReviewHubScreenState extends ConsumerState<ReviewHubScreen> {
                   ),
                   const SizedBox(height: 14),
                   HubPrimaryButton(
-                    label: plan.due.isEmpty ? '自由练习 / 再次复习' : '开始今日复习',
+                    label: plan.due.isEmpty ? '自由练习 / 再背一遍' : '开始今日背诵',
                     onPressed: () =>
                         context.push(SGRoute.reviewSession.route),
                   ),
@@ -329,8 +329,162 @@ class _ReviewHubScreenState extends ConsumerState<ReviewHubScreen> {
               ),
             ),
             const SizedBox(height: 18),
+            const HubSectionTitle('背诵模块'),
+            const SizedBox(height: 8),
+            GridView.count(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              crossAxisCount: 2,
+              mainAxisSpacing: 10,
+              crossAxisSpacing: 10,
+              childAspectRatio: 1.55,
+              children: <Widget>[
+                _ReciteModuleTile(
+                  icon: Icons.psychology_rounded,
+                  title: 'FSRS 背词',
+                  subtitle: plan.due.isEmpty
+                      ? '今日已清 · 可自由练'
+                      : '到期 ${plan.due.length} 张',
+                  background: const Color(0xFFE8F8D8),
+                  foreground: AppDesignTokens.brandGreenDark,
+                  onTap: () => context.push(SGRoute.reviewSession.route),
+                ),
+                _ReciteModuleTile(
+                  icon: Icons.menu_book_rounded,
+                  title: '单词本',
+                  subtitle: '$vocabLocal 词 · 收藏源 ${sources.length}',
+                  background: AppDesignTokens.skyLight,
+                  foreground: AppDesignTokens.primaryBlueDark,
+                  onTap: () => context.go(AppNavDestination.words.route),
+                ),
+                _ReciteModuleTile(
+                  icon: Icons.auto_stories_rounded,
+                  title: '短语库',
+                  subtitle: '$phraseCount 条表达',
+                  background: const Color(0xFFFFF1D6),
+                  foreground: AppDesignTokens.orange,
+                  onTap: () => context.go(AppNavDestination.phrases.route),
+                ),
+                _ReciteModuleTile(
+                  icon: Icons.library_books_rounded,
+                  title: '词书 / 考纲',
+                  subtitle: '导入词书 · 核心词',
+                  background: const Color(0xFFEDE7F6),
+                  foreground: const Color(0xFF5E35B1),
+                  onTap: () => context.push('/words/syllabus'),
+                ),
+                _ReciteModuleTile(
+                  icon: Icons.report_gmailerrorred_rounded,
+                  title: '错词本',
+                  subtitle: '优先重练忘记的词',
+                  background: AppDesignTokens.pinkLight,
+                  foreground: const Color(0xFFC2185B),
+                  onTap: () => context.push(
+                    '${SGRoute.reviewSession.route}?deck=missed',
+                  ),
+                ),
+                _ReciteModuleTile(
+                  icon: Icons.tune_rounded,
+                  title: '词汇量测评',
+                  subtitle: '校准推荐与新学量',
+                  background: const Color(0xFFE0F7FA),
+                  foreground: const Color(0xFF00838F),
+                  onTap: () =>
+                      context.push(SGRoute.vocabularyPlacement.route),
+                ),
+              ],
+            ),
+            const SizedBox(height: 14),
+            HubSurface(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: <Widget>[
+                  Text(
+                    '跟读 / 句子记忆',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w800,
+                      color: AppDesignTokens.textPrimary,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    '今日学句 $sentenceToday · 今日跟读 $shadowingToday 次 · 已并入同一套 FSRS',
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                      color: AppDesignTokens.textSecondary,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 14),
+            HubSurface(
+              onTap: () => context.push(SGRoute.learningReview.route),
+              child: Row(
+                children: <Widget>[
+                  Container(
+                    width: 48,
+                    height: 48,
+                    decoration: BoxDecoration(
+                      color: AppDesignTokens.pinkLight,
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    child: const Icon(
+                      Icons.mic_rounded,
+                      color: Color(0xFFC2185B),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: <Widget>[
+                        Text(
+                          '口语错题复习',
+                          style: TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.w800,
+                            color: AppDesignTokens.textPrimary,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          '错题 $_oralWrong · 到期 $_oralDue',
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            color: AppDesignTokens.textSecondary,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 10,
+                    ),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFC2185B),
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                    child: const Text(
+                      '去复习',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w800,
+                        fontSize: 12,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 18),
             HubSectionTitle(
-              '学过的视频',
+              '相关视频进度',
               action: '片库',
               onAction: () => context.go(AppNavDestination.library.route),
             ),
@@ -341,7 +495,7 @@ class _ReviewHubScreenState extends ConsumerState<ReviewHubScreen> {
                   ? Padding(
                       padding: const EdgeInsets.all(14),
                       child: Text(
-                        '还没有学习进度。去片库打开一集开始学。',
+                        '还没有学习进度。去片库打开一集，点词即可进入背诵队列。',
                         style: TextStyle(
                           color: AppDesignTokens.textSecondary,
                           fontWeight: FontWeight.w600,
@@ -387,144 +541,6 @@ class _ReviewHubScreenState extends ConsumerState<ReviewHubScreen> {
                           ),
                       ],
                     ),
-            ),
-            const SizedBox(height: 18),
-            HubSurface(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: <Widget>[
-                  Text(
-                    '要背的单词 / 短语',
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.w800,
-                      color: AppDesignTokens.textPrimary,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    '词本 $vocabLocal · 短语 $phraseCount · 收藏源 ${sources.length}',
-                    style: TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w600,
-                      color: AppDesignTokens.textSecondary,
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
-                    children: <Widget>[
-                      HubPill(
-                        label: '去背词',
-                        background: const Color(0xFFE8F8D8),
-                        foreground: AppDesignTokens.brandGreenDark,
-                        onTap: () => context.go(AppNavDestination.words.route),
-                      ),
-                      HubPill(
-                        label: '去短语',
-                        onTap: () =>
-                            context.go(AppNavDestination.phrases.route),
-                      ),
-                      HubPill(
-                        label: 'FSRS 复习',
-                        background: const Color(0xFFFFF1D6),
-                        foreground: AppDesignTokens.orange,
-                        onTap: () =>
-                            context.push(SGRoute.reviewSession.route),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 14),
-            HubSurface(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: <Widget>[
-                  Text(
-                    '跟读过的句子',
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.w800,
-                      color: AppDesignTokens.textPrimary,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    '今日学句 $sentenceToday · 今日跟读 $shadowingToday 次',
-                    style: TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w600,
-                      color: AppDesignTokens.textSecondary,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 14),
-            HubSurface(
-              onTap: () => context.push(SGRoute.learningReview.route),
-              child: Row(
-                children: <Widget>[
-                  Container(
-                    width: 48,
-                    height: 48,
-                    decoration: BoxDecoration(
-                      color: AppDesignTokens.pinkLight,
-                      borderRadius: BorderRadius.circular(16),
-                    ),
-                    child: const Icon(
-                      Icons.mic_rounded,
-                      color: Color(0xFFC2185B),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: <Widget>[
-                        Text(
-                          '口语发现的错误',
-                          style: TextStyle(
-                            fontSize: 15,
-                            fontWeight: FontWeight.w800,
-                            color: AppDesignTokens.textPrimary,
-                          ),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          '错题 $_oralWrong · 到期 $_oralDue',
-                          style: TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w600,
-                            color: AppDesignTokens.textSecondary,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 12,
-                      vertical: 10,
-                    ),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFC2185B),
-                      borderRadius: BorderRadius.circular(14),
-                    ),
-                    child: const Text(
-                      '去复习',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.w800,
-                        fontSize: 12,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
             ),
           ],
         ),
@@ -582,6 +598,81 @@ class _ReviewHubScreenState extends ConsumerState<ReviewHubScreen> {
       (_VideoProgress a, _VideoProgress b) => b.progress.compareTo(a.progress),
     );
     return out;
+  }
+}
+
+class _ReciteModuleTile extends StatelessWidget {
+  const _ReciteModuleTile({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    required this.background,
+    required this.foreground,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final Color background;
+  final Color foreground;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: AppDesignTokens.appWhite,
+      borderRadius: BorderRadius.circular(20),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(20),
+        child: Ink(
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(20),
+            boxShadow: AppDesignTokens.toyCardShadow,
+          ),
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(14, 14, 12, 12),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: <Widget>[
+                Container(
+                  width: 36,
+                  height: 36,
+                  decoration: BoxDecoration(
+                    color: background,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Icon(icon, size: 20, color: foreground),
+                ),
+                const Spacer(),
+                Text(
+                  title,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w800,
+                    color: AppDesignTokens.textPrimary,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  subtitle,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600,
+                    color: AppDesignTokens.textSecondary,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
   }
 }
 

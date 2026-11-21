@@ -52,11 +52,11 @@ enum AppNavDestination {
   ),
   review(
     route: '/review',
-    label: '复习',
-    title: '复习枢纽',
-    subtitle: '视频、单词短语、跟读与口语错题总览，还有形象换装。',
-    icon: Icons.event_repeat_outlined,
-    activeIcon: Icons.event_repeat_rounded,
+    label: '背诵',
+    title: '背诵',
+    subtitle: 'FSRS 背单词、短语、词书与错词本，统一记忆计划。',
+    icon: Icons.psychology_outlined,
+    activeIcon: Icons.psychology_rounded,
   ),
   phrases(
     route: '/phrases',
@@ -65,6 +65,8 @@ enum AppNavDestination {
     subtitle: '回顾收藏过的句子和表达，集中复习高价值内容。',
     icon: Icons.auto_stories_outlined,
     activeIcon: Icons.auto_stories_rounded,
+    showInNav: false,
+    showInBottomNav: false,
   ),
   words(
     route: '/words',
@@ -73,6 +75,8 @@ enum AppNavDestination {
     subtitle: '查看在视频字幕中见过并收藏的单词。',
     icon: Icons.menu_book_outlined,
     activeIcon: Icons.menu_book_rounded,
+    showInNav: false,
+    showInBottomNav: false,
   ),
   guide(
     route: '/guide',

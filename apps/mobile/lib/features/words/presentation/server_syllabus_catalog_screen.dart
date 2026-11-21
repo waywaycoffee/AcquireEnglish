@@ -115,7 +115,7 @@ class _ServerSyllabusCatalogScreenState
         }).toList();
 
     return PadScaffold(
-      currentDestination: AppNavDestination.words,
+      currentDestination: AppNavDestination.review,
       showContinueLearning: false,
       topBar: PadTopBar(
         title: '云端书库',

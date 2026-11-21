@@ -59,7 +59,7 @@ class _PhrasesScreenState extends ConsumerState<PhrasesScreen> {
     final List<PhraseEntry> filtered = _filterPhrases(phrases);
 
     return PadScaffold(
-      currentDestination: AppNavDestination.phrases,
+      currentDestination: AppNavDestination.review,
       topBar: PadTopBar(
         title: '短语库',
         actions: const <Widget>[AnkiExportButton()],

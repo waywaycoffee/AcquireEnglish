@@ -174,7 +174,7 @@ class _LilinjiCatalogScreenState extends ConsumerState<LilinjiCatalogScreen> {
     final bool atRoot = _stack.isEmpty;
 
     return PadScaffold(
-      currentDestination: AppNavDestination.words,
+      currentDestination: AppNavDestination.review,
       showContinueLearning: false,
       topBar: PadTopBar(
         title: atRoot ? '在线词库' : _stack.last.title,

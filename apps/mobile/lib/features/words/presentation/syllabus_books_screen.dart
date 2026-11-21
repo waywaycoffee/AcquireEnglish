@@ -130,7 +130,7 @@ class _SyllabusBooksScreenState extends ConsumerState<SyllabusBooksScreen> {
     final bool isFoundation = _kind == SyllabusBookKind.foundation;
 
     return PadScaffold(
-      currentDestination: AppNavDestination.words,
+      currentDestination: AppNavDestination.review,
       showContinueLearning: false,
       topBar: PadTopBar(
         title: '学习书库',

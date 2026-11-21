@@ -44,7 +44,7 @@ class _PhraseReviewScreenState extends ConsumerState<PhraseReviewScreen> {
         : byId[sessionIds![currentIndex % sessionIds!.length]];
 
     return PadScaffold(
-      currentDestination: AppNavDestination.phrases,
+      currentDestination: AppNavDestination.review,
       showNavigation: false,
       topBar: _ReviewHeader(
         current: complete ? initialTotal : completedCount + 1,

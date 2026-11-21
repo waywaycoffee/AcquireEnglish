@@ -172,7 +172,7 @@ class _WordsScreenState extends ConsumerState<WordsScreen> {
         .length;
 
     return PadScaffold(
-      currentDestination: AppNavDestination.words,
+      currentDestination: AppNavDestination.review,
       topBar: PadTopBar(
         title: '单词本',
         actions: <Widget>[

@@ -22,8 +22,13 @@ class ReadingFrequencyLexicon {
 
   final Map<String, int> _rankByWord;
 
-  /// Unmodifiable view of the top-frequency lemma set (for CEFR / coverage).
-  Set<String> get topWords => _top;
+  /// Lemmas at or under the classic top-3000 cutoff (CEFR / video coverage).
+  Set<String> get topWords {
+    return <String>{
+      for (final MapEntry<String, int> e in _rankByWord.entries)
+        if (e.value <= 3000) e.key,
+    };
+  }
 
   static Future<ReadingFrequencyLexicon> load() async {
     try {

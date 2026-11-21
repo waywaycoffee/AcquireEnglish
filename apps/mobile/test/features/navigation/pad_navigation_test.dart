@@ -60,13 +60,13 @@ void main() {
               ),
         ),
         GoRoute(
-          path: SGRoute.phrases.route,
+          path: SGRoute.review.route,
           builder: (BuildContext context, GoRouterState state) =>
               const Scaffold(
                 body: Row(
                   children: <Widget>[
-                    PadSidebar(current: AppNavDestination.phrases),
-                    Expanded(child: Center(child: Text('phrases page'))),
+                    PadSidebar(current: AppNavDestination.review),
+                    Expanded(child: Center(child: Text('recite page'))),
                   ],
                 ),
               ),
@@ -95,9 +95,9 @@ void main() {
       findsOneWidget,
     );
 
-    await tester.tap(find.text('短语'));
+    await tester.tap(find.text('背诵'));
     await tester.pumpAndSettle();
-    expect(find.text('phrases page'), findsOneWidget);
+    expect(find.text('recite page'), findsOneWidget);
 
     await tester.tap(find.text('视频'));
     await tester.pumpAndSettle();
@@ -188,17 +188,18 @@ void main() {
     expect(find.text('视频'), findsOneWidget);
     expect(find.text('阅读'), findsOneWidget);
     expect(find.text('学习'), findsOneWidget);
+    expect(find.text('背诵'), findsOneWidget);
     expect(find.text('口语'), findsOneWidget);
-    expect(find.text('社区'), findsOneWidget);
     expect(find.text('更多'), findsOneWidget);
-    expect(find.text('复习'), findsNothing);
+    expect(find.text('社区'), findsNothing);
     expect(find.text('短语'), findsNothing);
+    expect(find.text('单词'), findsNothing);
 
     await tester.tap(find.byKey(const Key('bottom-nav-more')));
     await tester.pumpAndSettle();
-    expect(find.text('复习'), findsOneWidget);
-    expect(find.text('短语'), findsOneWidget);
-    expect(find.text('单词'), findsOneWidget);
+    expect(find.text('社区'), findsOneWidget);
+    expect(find.text('短语'), findsNothing);
+    expect(find.text('单词'), findsNothing);
     expect(find.text('怎么学'), findsOneWidget);
     expect(find.text('设置'), findsOneWidget);
   });
