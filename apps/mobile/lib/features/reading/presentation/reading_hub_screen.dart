@@ -14,20 +14,16 @@ import '../../player/presentation/player_mock_state.dart';
 import '../../player/presentation/player_subtitle_loader.dart';
 import '../../shared/presentation/pad/app_design_tokens.dart';
 import '../../shared/presentation/pad/pad_scaffold.dart';
-import '../../shared/presentation/pad/pad_top_bar.dart';
 import '../../sync/data/acquire_api_client.dart';
 import '../data/reading_fingerprint.dart';
-import '../data/reading_iplus1.dart';
 import '../data/reading_ingest.dart';
 import '../data/reading_pdf_import.dart';
-import '../data/reading_stats.dart';
 import '../data/reading_vocab_lists.dart';
 import '../domain/reading_doc.dart';
-import 'reading_iplus1_provider.dart';
-import 'reading_library_provider.dart';
-import 'reading_stats_row.dart';
+import 'reading_bookshelf.dart';
+import 'reading_bookshelf_theme.dart';
 import 'reading_cold_start.dart';
-import 'reading_book_cover.dart';
+import 'reading_library_provider.dart';
 import 'reading_vocab_lists_sheet.dart';
 
 class ReadingHubScreen extends ConsumerStatefulWidget {
@@ -39,6 +35,14 @@ class ReadingHubScreen extends ConsumerStatefulWidget {
 
 class _ReadingHubScreenState extends ConsumerState<ReadingHubScreen> {
   int _filter = 0;
+  bool _searching = false;
+  final TextEditingController _searchController = TextEditingController();
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
 
   Future<void> _importFile(BuildContext context, WidgetRef ref) async {
     final XFile? file = await openFile(
@@ -463,411 +467,208 @@ class _ReadingHubScreenState extends ConsumerState<ReadingHubScreen> {
     }
   }
 
-  @override
-  Widget build(BuildContext context) {
-    final coldStart = ref.watch(readingColdStartProvider);
-    final ReadingLibraryState state = ref.watch(readingLibraryProvider);
-    final ReadingDoc? cont = state.continueDoc;
-    final ReadingVocabLists lists = ref.watch(readingVocabListsProvider);
-    final AsyncValue<List<ReadingIPlus1Match>> iPlus1 = ref.watch(
-      readingIPlus1MatchesProvider,
-    );
-    return PadScaffold(
-      currentDestination: AppNavDestination.reading,
-      showContinueLearning: false,
-      topBar: PadTopBar(
-        title: '我的书架',
-        trailing: const SizedBox.shrink(),
-        description: '继续你喜欢的故事',
-        leading: PadBackButton(onPressed: () => context.pop()),
+  Future<void> _confirmRemove(BuildContext context, ReadingDoc doc) async {
+    final bool? remove = await showDialog<bool>(
+      context: context,
+      builder: (BuildContext dialog) => AlertDialog(
+        title: Text('删除「${doc.title}」？'),
         actions: <Widget>[
-          IconButton(
-            tooltip: '黑白名单',
-            onPressed: () =>
-                unawaited(showReadingVocabListsSheet(context, ref)),
-            icon: Badge(
-              isLabelVisible: lists.knownCount + lists.focusCount > 0,
-              label: Text('${lists.knownCount + lists.focusCount}'),
-              child: const Icon(Icons.playlist_add_check_rounded),
-            ),
+          TextButton(
+            onPressed: () => Navigator.pop(dialog),
+            child: const Text('取消'),
           ),
-          IconButton(
-            tooltip: '在线书库',
-            onPressed: () => context.push('/reading/catalog'),
-            icon: const Icon(Icons.cloud_download_outlined),
-          ),
-          IconButton(
-            tooltip: '我的教材课',
-            onPressed: () => context.push('/material-courses'),
-            icon: const Icon(Icons.menu_book_outlined),
-          ),
-          IconButton(
-            tooltip: '导入',
-            onPressed: () => unawaited(_importFile(context, ref)),
-            icon: const Icon(Icons.upload_file_rounded),
+          TextButton(
+            onPressed: () => Navigator.pop(dialog, true),
+            child: const Text('删除'),
           ),
         ],
       ),
-      body: !state.ready
-          ? const Center(child: CircularProgressIndicator())
-          : ListView(
-              padding: const EdgeInsets.fromLTRB(20, 20, 20, 100),
-              children: <Widget>[
-                Builder(
-                  builder: (BuildContext context) {
-                    final ReadingHubStats stats = computeReadingHubStats(state);
-                    return Padding(
-                      padding: const EdgeInsets.only(bottom: 16),
-                      child: ReadingStatsRow(
-                        values: {
-                          '藏书': stats.docCount,
-                          '已打开': stats.openedCount,
-                          '读完': stats.completedCount,
-                          '约读词': stats.wordsReadEstimate,
-                          '已会词': lists.knownCount,
-                          '重点词': lists.focusCount,
-                        },
-                      ),
-                    );
-                  },
-                ),
-                if (cont != null) ...<Widget>[
-                  const _SectionTitle('继续阅读'),
-                  _DocTile(
-                    doc: cont,
-                    progress: state.progressFor(cont.id),
-                    onOpen: () => context.push(
-                      '/reading/${Uri.encodeComponent(cont.id)}',
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                ],
-                iPlus1.when(
-                  data: (List<ReadingIPlus1Match> matches) {
-                    if (matches.isEmpty) return const SizedBox.shrink();
-                    return Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: <Widget>[
-                        const _SectionTitle('适合你（i+1）'),
-                        Text(
-                          '按生词率约 2%–8% 排序；白名单与已复习词视为已会',
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: AppDesignTokens.textPrimary.withValues(
-                              alpha: 0.55,
-                            ),
-                          ),
-                        ),
-                        const SizedBox(height: 8),
-                        for (final ReadingIPlus1Match m in matches) ...<Widget>[
-                          _DocTile(
-                            doc: m.doc,
-                            progress: state.progressFor(m.doc.id),
-                            badge: '${m.band.labelCn} · ${m.rateLabel}',
-                            onOpen: () => context.push(
-                              '/reading/${Uri.encodeComponent(m.doc.id)}',
-                            ),
-                          ),
-                          const SizedBox(height: 8),
-                        ],
-                        const SizedBox(height: 8),
-                      ],
-                    );
-                  },
-                  loading: () => const Padding(
-                    padding: EdgeInsets.only(bottom: 16),
-                    child: LinearProgressIndicator(minHeight: 2),
-                  ),
-                  error: (_, __) => const SizedBox.shrink(),
-                ),
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  children: <Widget>[
-                    FilledButton.tonalIcon(
-                      onPressed: () => context.push('/reading/catalog'),
-                      icon: const Icon(Icons.cloud_download_outlined),
-                      label: const Text('在线书库'),
-                    ),
-                    FilledButton.tonalIcon(
-                      onPressed: () => unawaited(_importFile(context, ref)),
-                      icon: const Icon(Icons.upload_file_rounded),
-                      label: const Text('导入 TXT / EPUB / PDF / MOBI'),
-                    ),
-                    FilledButton.tonalIcon(
-                      onPressed: () => context.push('/material-courses'),
-                      icon: const Icon(Icons.auto_stories_outlined),
-                      label: const Text('教材智能解构'),
-                    ),
-                    FilledButton.tonalIcon(
-                      onPressed: () =>
-                          unawaited(_generateFromVideo(context, ref)),
-                      icon: const Icon(Icons.movie_filter_outlined),
-                      label: const Text('从视频生成短文'),
-                    ),
-                    FilledButton.tonalIcon(
-                      onPressed: () =>
-                          unawaited(showReadingVocabListsSheet(context, ref)),
-                      icon: const Icon(Icons.rule_folder_outlined),
-                      label: const Text('黑白名单'),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 20),
-                const _SectionTitle('我的读物'),
-                Wrap(
-                  spacing: 8,
-                  children: <Widget>[
-                    for (int index = 0; index < 3; index++)
-                      ChoiceChip(
-                        label: Text(const <String>['全部', '在读', '已读'][index]),
-                        selected: _filter == index,
-                        onSelected: (_) => setState(() => _filter = index),
-                      ),
-                  ],
-                ),
-                const SizedBox(height: 16),
-                Builder(
-                  builder: (BuildContext context) {
-                    final List<ReadingDoc> books =
-                        <ReadingDoc>[
-                          ...state.userDocs.reversed,
-                          ...state.builtin,
-                        ].where((ReadingDoc doc) {
-                          final double percent =
-                              state.progressFor(doc.id)?.percent ?? 0;
-                          return _filter == 0 ||
-                              (_filter == 1 && percent > 0 && percent < 1) ||
-                              (_filter == 2 && percent >= 1);
-                        }).toList();
-                    if (books.isEmpty) {
-                      return const Padding(
-                        padding: EdgeInsets.all(24),
-                        child: Text('这里还没有读物'),
-                      );
-                    }
-                    return LayoutBuilder(
-                      builder: (BuildContext context, BoxConstraints size) {
-                        final int columns = (size.maxWidth / 145).floor().clamp(
-                          2,
-                          6,
-                        );
-                        final double width =
-                            (size.maxWidth - (columns - 1) * 18) / columns;
-                        return Wrap(
-                          spacing: 18,
-                          runSpacing: 24,
-                          children: <Widget>[
-                            for (final ReadingDoc doc in books)
-                              SizedBox(
-                                width: width,
-                                child: InkWell(
-                                  onTap: () => context.push(
-                                    '/reading/${Uri.encodeComponent(doc.id)}',
-                                  ),
-                                  onLongPress: doc.builtin
-                                      ? null
-                                      : () async {
-                                          final bool?
-                                          remove = await showDialog<bool>(
-                                            context: context,
-                                            builder: (BuildContext dialog) =>
-                                                AlertDialog(
-                                                  title: Text(
-                                                    '删除「${doc.title}」？',
-                                                  ),
-                                                  actions: <Widget>[
-                                                    TextButton(
-                                                      onPressed: () =>
-                                                          Navigator.pop(dialog),
-                                                      child: const Text('取消'),
-                                                    ),
-                                                    TextButton(
-                                                      onPressed: () =>
-                                                          Navigator.pop(
-                                                            dialog,
-                                                            true,
-                                                          ),
-                                                      child: const Text('删除'),
-                                                    ),
-                                                  ],
-                                                ),
-                                          );
-                                          if (remove == true) {
-                                            await ref
-                                                .read(
-                                                  readingLibraryProvider
-                                                      .notifier,
-                                                )
-                                                .removeDoc(doc.id);
-                                          }
-                                        },
-                                  child: Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: <Widget>[
-                                      ReadingBookCover(
-                                        title: doc.title,
-                                        level: doc.level,
-                                      ),
-                                      const SizedBox(height: 10),
-                                      Text(
-                                        doc.title,
-                                        maxLines: 2,
-                                        overflow: TextOverflow.ellipsis,
-                                      ),
-                                      const SizedBox(height: 4),
-                                      Text(
-                                        '${doc.level} · 已读 ${((state.progressFor(doc.id)?.percent ?? 0) * 100).round()}%',
-                                        style: Theme.of(
-                                          context,
-                                        ).textTheme.bodySmall,
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ),
-                          ],
-                        );
-                      },
-                    );
-                  },
-                ),
-              ],
-            ),
     );
-  }
-}
-
-class _SectionTitle extends StatelessWidget {
-  const _SectionTitle(this.text);
-  final String text;
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
-      child: Text(
-        text,
-        style: TextStyle(
-          fontSize: 16,
-          fontWeight: FontWeight.w900,
-          color: AppDesignTokens.textPrimary,
-        ),
-      ),
-    );
-  }
-}
-
-class _DocTile extends StatelessWidget {
-  const _DocTile({
-    required this.doc,
-    required this.onOpen,
-    this.progress,
-    this.onDelete,
-    this.badge,
-  });
-
-  final ReadingDoc doc;
-  final ReadingProgress? progress;
-  final VoidCallback onOpen;
-  final VoidCallback? onDelete;
-  final String? badge;
-
-  String get _sourceLabel {
-    switch (doc.sourceType) {
-      case ReadingSourceType.builtin:
-        return doc.level.isEmpty ? '样例' : '样例 · ${doc.level}';
-      case ReadingSourceType.import:
-        return '导入';
-      case ReadingSourceType.video:
-        return '视频短文';
-      case ReadingSourceType.catalog:
-        return doc.sourceLabel.isEmpty
-            ? (doc.level.isEmpty ? '在线书库' : '在线 · ${doc.level}')
-            : doc.sourceLabel;
+    if (remove == true) {
+      await ref.read(readingLibraryProvider.notifier).removeDoc(doc.id);
     }
   }
 
+  List<ReadingDoc> _filteredBooks(ReadingLibraryState state) {
+    final String query = _searchController.text.trim().toLowerCase();
+    return <ReadingDoc>[
+      ...state.userDocs.reversed,
+      ...state.builtin,
+    ].where((ReadingDoc doc) {
+      final double percent = state.progressFor(doc.id)?.percent ?? 0;
+      final bool filterOk = _filter == 0 ||
+          (_filter == 1 && percent > 0 && percent < 1) ||
+          (_filter == 2 && percent >= 1);
+      if (!filterOk) return false;
+      if (query.isEmpty) return true;
+      return doc.title.toLowerCase().contains(query) ||
+          doc.level.toLowerCase().contains(query);
+    }).toList();
+  }
+
   @override
   Widget build(BuildContext context) {
-    final double pct = progress?.percent ?? 0;
-    return Material(
-      color: AppDesignTokens.appWhite,
-      borderRadius: BorderRadius.circular(16),
-      child: InkWell(
-        onTap: onOpen,
-        borderRadius: BorderRadius.circular(16),
-        child: Container(
-          padding: const EdgeInsets.all(14),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: AppDesignTokens.borderGray),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: <Widget>[
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
+    ref.watch(readingColdStartProvider);
+    final ReadingLibraryState state = ref.watch(readingLibraryProvider);
+    final ReadingVocabLists lists = ref.watch(readingVocabListsProvider);
+    final ReadingBookshelfTheme shelfTheme = ReadingBookshelfTheme.of(context);
+    final ReadingDoc? cont = state.continueDoc;
+    final String subtitle = !state.ready
+        ? '正在整理书架…'
+        : (_searching
+            ? '搜索书架中的书'
+            : (state.all.isEmpty
+                ? '开始你的书架 · 导入第一本书'
+                : (cont == null
+                    ? '封面朝外 · 点书继续读'
+                    : '继续读「${cont.title}」')));
+
+    return PadScaffold(
+      currentDestination: AppNavDestination.reading,
+      showContinueLearning: false,
+      body: ColoredBox(
+        color: shelfTheme.canvas,
+        child: !state.ready
+            ? Center(
+                child: CircularProgressIndicator(color: shelfTheme.action),
+              )
+            : Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: <Widget>[
-                  SizedBox(
-                    width: 76,
-                    child: ReadingBookCover(title: doc.title, level: doc.level),
-                  ),
-                  const SizedBox(width: 14),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: <Widget>[
-                        Text(
-                          doc.title,
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w800,
-                            color: AppDesignTokens.textPrimary,
-                          ),
+                  ReadingBookshelfHeader(
+                    searching: _searching,
+                    searchController: _searchController,
+                    onSearchChanged: (_) => setState(() {}),
+                    onCloseSearch: () {
+                      setState(() {
+                        _searching = false;
+                        _searchController.clear();
+                      });
+                    },
+                    onSearch: () => setState(() => _searching = true),
+                    onImport: () => unawaited(_importFile(context, ref)),
+                    onBack: () => context.pop(),
+                    subtitle: subtitle,
+                    actions: <Widget>[
+                      PopupMenuButton<String>(
+                        tooltip: '更多',
+                        icon: Icon(
+                          Icons.more_horiz_rounded,
+                          color: shelfTheme.action,
                         ),
-                        const SizedBox(height: 6),
-                        Text(
-                          '$_sourceLabel · 约 ${doc.wordCount} 词'
-                          '${pct > 0 ? ' · 进度 ${(pct * 100).round()}%' : ''}'
-                          '${(badge ?? '').isNotEmpty ? ' · $badge' : ''}',
-                          maxLines: 3,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                            color: Color(0xFF626262),
-                            fontSize: 12,
-                            height: 1.35,
+                        onSelected: (String value) {
+                          switch (value) {
+                            case 'catalog':
+                              context.push('/reading/catalog');
+                            case 'materials':
+                              context.push('/material-courses');
+                            case 'video':
+                              unawaited(_generateFromVideo(context, ref));
+                            case 'vocab':
+                              unawaited(
+                                showReadingVocabListsSheet(context, ref),
+                              );
+                            case 'filter0':
+                              setState(() => _filter = 0);
+                            case 'filter1':
+                              setState(() => _filter = 1);
+                            case 'filter2':
+                              setState(() => _filter = 2);
+                          }
+                        },
+                        itemBuilder: (BuildContext context) =>
+                            <PopupMenuEntry<String>>[
+                          const PopupMenuItem<String>(
+                            value: 'catalog',
+                            child: Text('在线书库'),
                           ),
-                        ),
-                        if (pct > 0) ...<Widget>[
-                          const SizedBox(height: 10),
-                          ClipRRect(
-                            borderRadius: BorderRadius.circular(99),
-                            child: LinearProgressIndicator(
-                              value: pct.clamp(0.0, 1.0),
-                              minHeight: 5,
-                              backgroundColor: const Color(0xFFE8E8E8),
-                              color: AppDesignTokens.brandGreenDark,
+                          const PopupMenuItem<String>(
+                            value: 'materials',
+                            child: Text('我的教材课'),
+                          ),
+                          const PopupMenuItem<String>(
+                            value: 'video',
+                            child: Text('从视频生成短文'),
+                          ),
+                          PopupMenuItem<String>(
+                            value: 'vocab',
+                            child: Text(
+                              lists.knownCount + lists.focusCount > 0
+                                  ? '黑白名单（${lists.knownCount + lists.focusCount}）'
+                                  : '黑白名单',
                             ),
                           ),
+                          const PopupMenuDivider(),
+                          CheckedPopupMenuItem<String>(
+                            value: 'filter0',
+                            checked: _filter == 0,
+                            child: const Text('全部'),
+                          ),
+                          CheckedPopupMenuItem<String>(
+                            value: 'filter1',
+                            checked: _filter == 1,
+                            child: const Text('在读'),
+                          ),
+                          CheckedPopupMenuItem<String>(
+                            value: 'filter2',
+                            checked: _filter == 2,
+                            child: const Text('已读'),
+                          ),
                         ],
-                      ],
+                      ),
+                    ],
+                  ),
+                  Expanded(
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(14, 0, 14, 0),
+                      child: Builder(
+                        builder: (BuildContext context) {
+                          final List<ReadingDoc> books = _filteredBooks(state);
+                          final int totalWords = state.all.fold<int>(
+                            0,
+                            (int sum, ReadingDoc doc) => sum + doc.wordCount,
+                          );
+                          return ReadingBookshelf(
+                            books: books,
+                            bookCount: state.all.length,
+                            totalWords: totalWords,
+                            searchQuery: _searchController.text.trim(),
+                            onImport: () =>
+                                unawaited(_importFile(context, ref)),
+                            onOpenBook: (ReadingDoc doc) {
+                              unawaited(
+                                context.push(
+                                  '/reading/${Uri.encodeComponent(doc.id)}',
+                                ),
+                              );
+                            },
+                            onLongPressBook: (ReadingDoc doc) {
+                              if (doc.builtin) return;
+                              unawaited(_confirmRemove(context, doc));
+                            },
+                          );
+                        },
+                      ),
                     ),
                   ),
-                  if (onDelete != null)
-                    IconButton(
-                      tooltip: '删除',
-                      onPressed: onDelete,
-                      icon: const Icon(Icons.delete_outline_rounded),
-                    ),
+                  Builder(
+                    builder: (BuildContext context) {
+                      final int totalWords = state.all.fold<int>(
+                        0,
+                        (int sum, ReadingDoc doc) => sum + doc.wordCount,
+                      );
+                      return ReadingBookshelfFooter(
+                        bookCount: state.all.length,
+                        totalWords: totalWords,
+                        hint: AppDesignTokens.isDark
+                            ? '深胡桃木 · 暖色封面'
+                            : '书架上的书 · 非卡片网格',
+                      );
+                    },
+                  ),
+                  SizedBox(height: MediaQuery.paddingOf(context).bottom + 4),
                 ],
               ),
-            ],
-          ),
-        ),
       ),
     );
   }
