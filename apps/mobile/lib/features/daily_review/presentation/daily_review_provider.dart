@@ -28,6 +28,7 @@ import '../data/word_encounter_store.dart';
 import '../domain/daily_review.dart';
 import '../domain/memory_ingest.dart';
 import '../domain/memory_item.dart';
+import '../domain/vocab_unified_queue.dart';
 
 final Provider<DateTime Function()> reviewClockProvider =
     Provider<DateTime Function()>((Ref ref) => DateTime.now);
@@ -71,6 +72,9 @@ reviewSourcesProvider = Provider<List<ReviewSource>>((Ref ref) {
       .watch(wordBookProvider)
       .where((WordEntry word) => word.isSchedulable)
       .toList();
+  final Set<String> favoriteLemmas = <String>{
+    for (final WordEntry word in words) normalizeWord(word.word),
+  }..remove('');
   final List<PhraseEntry> phrases =
       <PhraseEntry>[
         ...ref.watch(phraseBookProvider).where(
@@ -80,10 +84,37 @@ reviewSourcesProvider = Provider<List<ReviewSource>>((Ref ref) {
         (PhraseEntry a, PhraseEntry b) =>
             (a.collectedAt ?? '').compareTo(b.collectedAt ?? ''),
       );
+  final SyllabusBooksState syllabus = ref.watch(syllabusBooksProvider);
+  final ExamProfile examProfile = ref.watch(examProfileProvider);
+  final SyllabusBook? activeBook = syllabus.activeBook;
+  final Iterable<SyllabusBook> syllabusBooksForReview = () {
+    // Unified queue: active book joins favorites. Optional exam filter still
+    // applies when choosing which books can become active.
+    if (activeBook == null) return const <SyllabusBook>[];
+    if (examProfile.isExamMode && examProfile.family != null) {
+      final List<SyllabusBook> matched = filterSyllabusForExam(
+        <SyllabusBook>[activeBook],
+        examProfile.family,
+      );
+      return matched.isEmpty ? <SyllabusBook>[activeBook] : matched;
+    }
+    return <SyllabusBook>[activeBook];
+  }();
+  final Map<String, String> bookLabelByLemma = <String, String>{};
+  for (final SyllabusBook book in syllabusBooksForReview) {
+    final String label = '${book.title} · ${book.examTag}';
+    for (final SyllabusWord entry in book.words) {
+      bookLabelByLemma.putIfAbsent(normalizeWord(entry.word), () => label);
+    }
+  }
   final List<ReviewSource> wordSources = <ReviewSource>[
     for (final WordEntry word in words)
       for (final WordPracticeMode mode in modes)
-        _wordReviewSource(word, mode),
+        _wordReviewSource(
+          word,
+          mode,
+          bookLabel: bookLabelByLemma[normalizeWord(word.word)],
+        ),
   ];
   final List<ReviewSource> phraseSources = phrases
       .map(
@@ -107,28 +138,25 @@ reviewSourcesProvider = Provider<List<ReviewSource>>((Ref ref) {
         ),
       )
       .toList();
-  final SyllabusBooksState syllabus = ref.watch(syllabusBooksProvider);
-  final ExamProfile examProfile = ref.watch(examProfileProvider);
-  final Iterable<SyllabusBook> syllabusBooksForReview =
-      examProfile.isExamMode && examProfile.family != null
-      ? filterSyllabusForExam(syllabus.all, examProfile.family)
-      : syllabus.all;
+  // Book-only lemmas (not already covered by a favorite card).
   final List<ReviewSource> syllabusSources = <ReviewSource>[
     for (final SyllabusBook book in syllabusBooksForReview)
       for (final SyllabusWord entry in book.words)
-        ReviewSource(
-          key: syllabusReviewKey(book.id, entry.word),
-          kind: book.isPatternBook ? ReviewKind.sentence : ReviewKind.word,
-          question: entry.word,
-          answer: entry.gloss,
-          english: book.isPatternBook || book.isFoundationBook
-              ? entry.word
-              : '',
-          chinese: book.isPatternBook || book.isFoundationBook
-              ? entry.gloss
-              : '',
-          sourceLabel: '${book.title} · ${book.examTag}',
-        ),
+        if (!favoriteLemmas.contains(normalizeWord(entry.word)))
+          ReviewSource(
+            key: syllabusReviewKey(book.id, entry.word),
+            kind: book.isPatternBook ? ReviewKind.sentence : ReviewKind.word,
+            question: entry.word,
+            answer: entry.gloss,
+            english: book.isPatternBook || book.isFoundationBook
+                ? entry.word
+                : '',
+            chinese: book.isPatternBook || book.isFoundationBook
+                ? entry.gloss
+                : '',
+            sourceLabel: '词书 · ${book.title} · ${book.examTag}',
+            origin: 'syllabus',
+          ),
   ];
 
   final List<ReviewSource> memorySources = ref
@@ -136,9 +164,12 @@ reviewSourcesProvider = Provider<List<ReviewSource>>((Ref ref) {
       .map((MemoryItem item) => item.toSource())
       .toList(growable: false);
 
-  // Mix the two sources when first enrolling a legacy library; future additions
-  // append to the persistent order and never jump ahead of waiting items.
+  // Favorites first, then book-only, phrases, memory, optional placement pool.
   return List<ReviewSource>.unmodifiable(<ReviewSource>[
+    ...wordSources,
+    ...syllabusSources,
+    ...phraseSources,
+    ...memorySources,
     for (final PlacementRow row
         in (ref.watch(
                       vocabularyPlacementProvider.select(
@@ -148,25 +179,19 @@ reviewSourcesProvider = Provider<List<ReviewSource>>((Ref ref) {
                     as List<dynamic>? ??
                 const <dynamic>[])
             .cast<PlacementRow>())
-      ReviewSource(
-        key: 'recommended:${row['word']}',
-        kind: ReviewKind.word,
-        question: row['word'] as String,
-        answer: row['definition_cn'] as String,
-        english: '',
-        chinese: '',
-        sourceLabel: '公共词库 · 词频第 ${row['rank']} 位',
-      ),
-    ...syllabusSources,
-    for (
-      int i = 0;
-      i < wordSources.length || i < phraseSources.length;
-      i++
-    ) ...<ReviewSource>[
-      if (i < wordSources.length) wordSources[i],
-      if (i < phraseSources.length) phraseSources[i],
-    ],
-    ...memorySources,
+      if (!favoriteLemmas.contains(
+        normalizeWord('${row['word'] ?? ''}'),
+      ))
+        ReviewSource(
+          key: 'recommended:${row['word']}',
+          kind: ReviewKind.word,
+          question: row['word'] as String,
+          answer: row['definition_cn'] as String,
+          english: '',
+          chinese: '',
+          sourceLabel: '公共词库 · 词频第 ${row['rank']} 位',
+          origin: 'recommended',
+        ),
   ]);
 });
 
@@ -200,17 +225,25 @@ List<ReviewSourceLink> _distinctOccurrenceLinks(WordEntry word) {
   return links;
 }
 
-ReviewSource _wordReviewSource(WordEntry word, WordPracticeMode mode) {
+ReviewSource _wordReviewSource(
+  WordEntry word,
+  WordPracticeMode mode, {
+  String? bookLabel,
+}) {
   final WordOccurrence? occurrence = word.occurrences.firstOrNull;
   final WordContext? context = occurrence?.earliestContext;
   final String lineKey = context?.lineKey ?? '';
   final List<String> ms = lineKey.split('-');
   final int? startMs = ms.isNotEmpty ? int.tryParse(ms.first) : null;
   final int? endMs = ms.length > 1 ? int.tryParse(ms[1]) : null;
-  final List<ReviewSourceLink> related = _distinctOccurrenceLinks(word);
+  final List<ReviewSourceLink> related = <ReviewSourceLink>[
+    ..._distinctOccurrenceLinks(word),
+    if (bookLabel != null && bookLabel.trim().isNotEmpty)
+      ReviewSourceLink(label: bookLabel, mediaKind: '书籍'),
+  ];
   final String mediaKind = occurrence?.mediaKind ?? '';
   final String rawLabel = occurrence == null
-      ? '单词本'
+      ? (bookLabel == null || bookLabel.isEmpty ? '收藏生词' : bookLabel)
       : '${occurrence.course} · ${occurrence.episode}';
   return ReviewSource(
     key: vocabFsrsKey(word.word, mode),
@@ -231,8 +264,10 @@ ReviewSource _wordReviewSource(WordEntry word, WordPracticeMode mode) {
         context?.chinese ??
         occurrence?.chinese ??
         '',
-    sourceLabel: mediaKind.isEmpty || rawLabel == '单词本'
-        ? rawLabel
+    sourceLabel: mediaKind.isEmpty || rawLabel == '收藏生词' || rawLabel == bookLabel
+        ? (bookLabel != null && occurrence == null
+              ? '收藏 · $rawLabel'
+              : rawLabel)
         : '$mediaKind · $rawLabel',
     cardType: mode.name,
     relatedSources: related,
@@ -240,6 +275,7 @@ ReviewSource _wordReviewSource(WordEntry word, WordPracticeMode mode) {
     time: context?.time ?? occurrence?.time,
     startMs: startMs,
     endMs: endMs,
+    origin: 'favorite',
   );
 }
 
@@ -705,6 +741,52 @@ class DailyReviewNotifier extends Notifier<DailyReviewState> {
     if (applied.isNotEmpty) {
       await store.acknowledgeSoftCredits(applied);
     }
+  }
+
+  /// After importing / activating a 词书: mark 熟词 learned + queue one-shot retest.
+  Future<SyllabusImportOverlap> applySyllabusImportOverlap(
+    SyllabusBook book,
+  ) async {
+    final DateTime now = ref.read(reviewClockProvider)();
+    final List<WordEntry> words = ref.read(wordBookProvider);
+    final PlacementRow profile = ref.read(vocabularyPlacementProvider);
+    final Set<String> placementLearned = <String>{
+      for (final dynamic item
+          in profile['learnedWords'] as List<dynamic>? ?? const <dynamic>[])
+        normalizeWord('$item'),
+    }..remove('');
+    // Ensure book cards exist in FSRS before seeding known retests.
+    await _transaction((DailyReviewState current) {
+      return current.synchronize(ref.read(reviewSourcesProvider), now);
+    });
+    final SyllabusImportOverlap overlap = computeSyllabusImportOverlap(
+      book: book,
+      words: words,
+      records: state.records,
+      now: now,
+      placementLearned: placementLearned,
+    );
+    final SyllabusBooksNotifier books = ref.read(
+      syllabusBooksProvider.notifier,
+    );
+    for (final String lemma in <String>[
+      ...overlap.freshFavoriteLemmas,
+      ...overlap.knownLemmas,
+    ]) {
+      await books.recordLearned(book.id, lemma);
+    }
+    if (overlap.knownLemmas.isNotEmpty) {
+      await _transaction((DailyReviewState current) {
+        return seedKnownSyllabusRetests(
+          state: current,
+          book: book,
+          knownLemmas: overlap.knownLemmas,
+          now: now,
+        );
+      });
+    }
+    scheduleCloudBackup();
+    return overlap;
   }
 
   /// Keep FSRS new-learn quota aligned with the words-plan setting.

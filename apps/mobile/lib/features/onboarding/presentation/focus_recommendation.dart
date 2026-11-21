@@ -162,7 +162,7 @@ FocusRecommendation buildFocusRecommendation({
           : recommendation(
               activeBook.title,
               '复习这组词',
-              '/review/session?deck=syllabus&book=${Uri.encodeComponent(activeBook.id)}',
+              '/review/session',
             );
     case 'exam':
       return recommendation(

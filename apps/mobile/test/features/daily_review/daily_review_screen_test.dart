@@ -548,14 +548,19 @@ void main() {
       addTearDown(container.dispose);
       await tester.pumpWidget(app(container, session: true));
       await tester.pumpAndSettle();
+      // Favorites (entry:) are queued before phrases, so the word card leads.
+      expect(find.text('_____ there.'), findsWidgets);
       expect(
         find.byKey(const Key('daily-review-next')).hitTestable(),
         findsOneWidget,
       );
-      await tester.ensureVisible(find.byKey(const Key('daily-review-reveal')));
+      await tester.tap(find.byKey(const Key('daily-review-next')));
       await tester.pumpAndSettle();
-      await tester.tap(find.byKey(const Key('daily-review-reveal')));
-      await tester.pumpAndSettle();
+      final ListView sessionList = tester.widget<ListView>(
+        find.byKey(const Key('daily-review-session-scroll')),
+      );
+      expect(sessionList.controller!.offset, 0);
+      await tapVisibleKey(tester, const Key('daily-review-reveal'));
       await tester.ensureVisible(
         find.byKey(const Key('daily-review-rate-good')),
       );
@@ -568,13 +573,6 @@ void main() {
         find.byKey(const Key('daily-review-next')).hitTestable(),
         findsOneWidget,
       );
-      await tester.tap(find.byKey(const Key('daily-review-next')));
-      await tester.pumpAndSettle();
-      final ListView sessionList = tester.widget<ListView>(
-        find.byKey(const Key('daily-review-session-scroll')),
-      );
-      expect(sessionList.controller!.offset, 0);
-      expect(find.text('_____ there.').hitTestable(), findsOneWidget);
       expect(tester.takeException(), isNull);
       await tester.pumpWidget(const SizedBox.shrink());
     },

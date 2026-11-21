@@ -19,7 +19,10 @@ import '../../shared/presentation/pad/pad_scaffold.dart';
 import '../../shared/presentation/pad/pad_top_bar.dart';
 import '../../sync/data/acquire_api_client.dart';
 import '../../sync/presentation/daily_feed_provider.dart';
+import '../../daily_review/domain/vocab_unified_queue.dart';
 import '../../words/domain/syllabus_book.dart';
+import '../../words/domain/vocab_entry.dart';
+import '../../words/presentation/estimated_vocabulary_provider.dart';
 import '../../words/presentation/syllabus_books_provider.dart';
 import '../../words/presentation/word_book_provider.dart';
 
@@ -93,7 +96,21 @@ class _ReviewHubScreenState extends ConsumerState<ReviewHubScreen> {
     final LearningActivityState activity = ref.watch(learningActivityProvider);
     final String level =
         ref.watch(learningPreferencesProvider).level.toUpperCase();
-    final int vocabLocal = ref.watch(wordBookProvider).length;
+    final List<WordEntry> wordBook = ref.watch(wordBookProvider);
+    final int vocabLocal = wordBook.length;
+    final int favoriteFresh = freshFavoriteLemmas(
+      words: wordBook,
+      records: review.records,
+      now: now,
+    ).length;
+    final int favoriteKnown = wordBook
+        .where(
+          (WordEntry e) =>
+              e.favorite &&
+              isKnownLemma(e.word, entry: e, records: review.records, now: now),
+        )
+        .length;
+    final int? estimatedVocab = ref.watch(estimatedVocabularyProvider);
     final int phraseCount = ref.watch(phraseBookProvider).length;
     final SyllabusBooksState syllabus = ref.watch(syllabusBooksProvider);
     final SyllabusBook? activeBook = syllabus.activeBook;
@@ -103,16 +120,23 @@ class _ReviewHubScreenState extends ConsumerState<ReviewHubScreen> {
     final int nextTarget = nextLevel == null
         ? vocabTarget
         : (_vocabTargets[nextLevel] ?? vocabTarget);
-    final int remain = (nextTarget - vocabLocal).clamp(0, nextTarget);
+    final int remain = (nextTarget - (estimatedVocab ?? vocabLocal))
+        .clamp(0, nextTarget);
     final int sentenceToday = activity.today.learnedSentenceKeys.length;
     final int shadowingToday = activity.today.shadowingCount;
+    final int favoriteDue = plan.due
+        .where((ReviewRecord r) => isFavoriteReviewKey(r.key))
+        .length;
+    final int bookDue = plan.due
+        .where((ReviewRecord r) => isSyllabusReviewKey(r.key))
+        .length;
 
     return PadScaffold(
       currentDestination: AppNavDestination.review,
       showContinueLearning: false,
       topBar: PadTopBar(
         title: '背单词',
-        description: 'FSRS 背单词 · 短语 · 词书 · 错词本',
+        description: '收藏生词与词书同一队列 · 自然拼读 + 语境词卡',
         actions: <Widget>[
           IconButton(
             tooltip: '刷新',
@@ -187,7 +211,7 @@ class _ReviewHubScreenState extends ConsumerState<ReviewHubScreen> {
                   if (activeBook != null) ...<Widget>[
                     const SizedBox(height: 10),
                     Text(
-                      '已学 ${syllabus.learnedCount(activeBook.id)} / ${activeBook.words.length} 词 · 点此更换或下载更多',
+                      '已学 ${syllabus.learnedCount(activeBook.id)} / ${activeBook.words.length} 词 · 与收藏同一队列背诵',
                       style: TextStyle(
                         fontSize: 12,
                         fontWeight: FontWeight.w600,
@@ -197,7 +221,7 @@ class _ReviewHubScreenState extends ConsumerState<ReviewHubScreen> {
                   ] else ...<Widget>[
                     const SizedBox(height: 10),
                     Text(
-                      '先选一本词书，再点「开始背词」。形象换装在社区「一起练」，不在这里。',
+                      '可先背收藏生词；需要时再导入词书，系统会提示与生词/熟词的重复。',
                       style: TextStyle(
                         fontSize: 12,
                         fontWeight: FontWeight.w600,
@@ -207,26 +231,24 @@ class _ReviewHubScreenState extends ConsumerState<ReviewHubScreen> {
                   ],
                   const SizedBox(height: 14),
                   HubPrimaryButton(
-                    label: activeBook == null
-                        ? '去选词书'
-                        : (plan.due.isEmpty ? '自由练习 / 再背一遍' : '开始今日背词'),
+                    label: plan.due.isEmpty && plan.newAvailable == 0
+                        ? '自由练习 / 再背一遍'
+                        : '开始背词（收藏优先）',
                     onPressed: () {
-                      if (activeBook == null) {
-                        context.push('/words/syllabus');
-                        return;
-                      }
                       context.push(
-                        '${SGRoute.reviewSession.route}?deck=syllabus&book=${Uri.encodeComponent(activeBook.id)}',
+                        _mode == _ReciteHubMode.quiz
+                            ? '${SGRoute.reviewSession.route}?practice=1'
+                            : SGRoute.reviewSession.route,
                       );
                     },
                   ),
-                  if (activeBook != null) ...<Widget>[
-                    const SizedBox(height: 8),
-                    TextButton(
-                      onPressed: () => context.push('/words/syllabus'),
-                      child: const Text('更换 / 下载词书'),
+                  const SizedBox(height: 8),
+                  TextButton(
+                    onPressed: () => context.push('/words/syllabus'),
+                    child: Text(
+                      activeBook == null ? '导入 / 选择词书' : '更换 / 下载词书',
                     ),
-                  ],
+                  ),
                 ],
               ),
             ),
@@ -236,7 +258,7 @@ class _ReviewHubScreenState extends ConsumerState<ReviewHubScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: <Widget>[
                   Text(
-                    '今日待办',
+                    '今日待办 · 统一队列',
                     style: TextStyle(
                       fontSize: 18,
                       fontWeight: FontWeight.w800,
@@ -254,17 +276,19 @@ class _ReviewHubScreenState extends ConsumerState<ReviewHubScreen> {
                       ),
                       const SizedBox(width: 8),
                       HubMetricTile(
-                        value: '${plan.today.reviews}',
-                        label: '已练',
+                        value: '$favoriteDue',
+                        label: '收藏到期',
                         background: AppDesignTokens.skyLight,
                         foreground: AppDesignTokens.primaryBlueDark,
                       ),
                       const SizedBox(width: 8),
                       HubMetricTile(
-                        value: '$_oralDue',
-                        label: '口语',
-                        background: AppDesignTokens.pinkLight,
-                        foreground: const Color(0xFFC2185B),
+                        value: estimatedVocab == null
+                            ? '—'
+                            : '$estimatedVocab',
+                        label: '预估词量',
+                        background: const Color(0xFFEDE7F6),
+                        foreground: const Color(0xFF5E35B1),
                       ),
                     ],
                   ),
@@ -307,34 +331,23 @@ class _ReviewHubScreenState extends ConsumerState<ReviewHubScreen> {
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    nextLevel == null
-                        ? '收藏词汇 $vocabLocal / $vocabTarget'
-                        : '收藏词汇 $vocabLocal · 距 $nextLevel 参考还差 $remain · ${dash.todayStudyMinutes} 分钟',
+                    [
+                      '生词 $favoriteFresh · 熟词 $favoriteKnown',
+                      if (activeBook != null) '词书待学到期 $bookDue',
+                      if (estimatedVocab != null)
+                        nextLevel == null
+                            ? '预估词量 $estimatedVocab / $vocabTarget'
+                            : '预估词量 $estimatedVocab · 距 $nextLevel 还差 $remain',
+                      if (estimatedVocab == null)
+                        '收藏 $vocabLocal 词 · 去测词汇量可校准预估',
+                      '${dash.todayStudyMinutes} 分钟',
+                    ].join(' · '),
                     style: TextStyle(
                       fontSize: 12,
                       fontWeight: FontWeight.w600,
                       color: AppDesignTokens.textSecondary,
                     ),
                   ),
-                  if (plan.due.isNotEmpty || activeBook == null) ...<Widget>[
-                    const SizedBox(height: 12),
-                    HubPrimaryButton(
-                      label: activeBook == null
-                          ? '先选词书再背'
-                          : '复习到期卡（含视频收藏）',
-                      onPressed: () {
-                        if (activeBook == null) {
-                          context.push('/words/syllabus');
-                          return;
-                        }
-                        context.push(
-                          _mode == _ReciteHubMode.quiz
-                              ? '${SGRoute.reviewSession.route}?practice=1'
-                              : SGRoute.reviewSession.route,
-                        );
-                      },
-                    ),
-                  ],
                 ],
               ),
             ),

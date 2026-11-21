@@ -69,7 +69,7 @@ class LearningHomeScreen extends ConsumerWidget {
       context.push(
         book == null
             ? '/words/syllabus'
-            : '/review/session?deck=syllabus&book=${Uri.encodeComponent(book.id)}',
+            : '/review/session',
       );
     }
 

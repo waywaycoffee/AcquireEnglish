@@ -22,6 +22,7 @@ import '../../shared/presentation/pad/pad_top_bar.dart';
 import '../../sync/data/acquire_api_client.dart';
 import '../../sync/presentation/cloud_catalog_sync.dart';
 import '../../sync/presentation/daily_feed_provider.dart';
+import '../../words/presentation/estimated_vocabulary_provider.dart';
 import '../../words/presentation/vocabulary_placement_provider.dart';
 import 'learning_dashboard_provider.dart';
 import '../../digital_human/presentation/digital_human_picker.dart';
@@ -46,7 +47,7 @@ class _PadHomeScreenState extends ConsumerState<PadHomeScreen> {
     final LearningDashboardStats stats = ref.watch(learningDashboardProvider);
     final UserGrowth growth = ref.watch(userGrowthProvider);
     final AuthSessionState auth = ref.watch(authSessionProvider);
-    final int? vocabulary = ref.watch(predictedVocabularyProvider);
+    final int? vocabulary = ref.watch(estimatedVocabularyProvider);
     final List<LibraryCourseData> courses = ref.watch(
       recentLearningCoursesProvider,
     );

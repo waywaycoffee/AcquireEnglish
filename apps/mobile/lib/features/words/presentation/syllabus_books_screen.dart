@@ -6,6 +6,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../router/app_router.dart';
+import '../../daily_review/domain/vocab_unified_queue.dart';
+import '../../daily_review/presentation/syllabus_overlap_dialog.dart';
 import '../../exam/domain/exam_fsrs.dart';
 import '../../exam/domain/exam_profile.dart';
 import '../../exam/presentation/exam_profile_provider.dart';
@@ -96,33 +98,45 @@ class _SyllabusBooksScreenState extends ConsumerState<SyllabusBooksScreen> {
         .read(syllabusBooksProvider.notifier)
         .importBook(title: name, rawText: raw, kind: _kind);
     if (!context.mounted) return;
-    final String unit = switch (_kind) {
-      SyllabusBookKind.pattern => '句型',
-      SyllabusBookKind.foundation => '条目',
-      SyllabusBookKind.word => '词',
-    };
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          book == null
-              ? switch (_kind) {
-                  SyllabusBookKind.pattern =>
-                    '未识别到有效句型（每行一句型，或 pattern,释义）',
-                  SyllabusBookKind.foundation =>
-                    '未识别到有效条目（每行一词/音标，或 item,释义）',
-                  SyllabusBookKind.word =>
-                    '未识别到有效单词（每行一词，或 word,释义）',
-                }
-              : '已导入「${book.title}」· ${book.wordCount} $unit',
+    if (book == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            switch (_kind) {
+              SyllabusBookKind.pattern =>
+                '未识别到有效句型（每行一句型，或 pattern,释义）',
+              SyllabusBookKind.foundation =>
+                '未识别到有效条目（每行一词/音标，或 item,释义）',
+              SyllabusBookKind.word =>
+                '未识别到有效单词（每行一词，或 word,释义）',
+            },
+          ),
         ),
-      ),
-    );
+      );
+      return;
+    }
+    final SyllabusImportOverlap? overlap =
+        await activateBookWithOverlap(ref, book, setActive: false);
+    if (!context.mounted) return;
+    if (overlap != null) {
+      await showSyllabusOverlapDialog(context, book, overlap);
+    }
+  }
+
+  Future<void> _selectBook(SyllabusBook book) async {
+    final SyllabusImportOverlap? overlap =
+        await activateBookWithOverlap(ref, book);
+    if (!mounted) return;
+    if (overlap != null) {
+      await showSyllabusOverlapDialog(context, book, overlap);
+    }
   }
 
   void _startBook(BuildContext context, SyllabusBook book) {
-    context.push(
-      '${SGRoute.reviewSession.route}?deck=syllabus&book=${Uri.encodeComponent(book.id)}',
-    );
+    // Unified queue: favorites + active book together.
+    unawaited(_selectBook(book).then((_) {
+      if (context.mounted) context.push(SGRoute.reviewSession.route);
+    }));
   }
 
   @override
@@ -256,11 +270,7 @@ class _SyllabusBooksScreenState extends ConsumerState<SyllabusBooksScreen> {
                     book: book,
                     learned: state.learnedCount(book.id),
                     active: state.activeBookId == book.id,
-                    onOpen: () => unawaited(
-                      ref
-                          .read(syllabusBooksProvider.notifier)
-                          .setActiveBook(book.id),
-                    ),
+                    onOpen: () => unawaited(_selectBook(book)),
                     onStart: () => _startBook(context, book),
                     onDelete: book.builtin
                         ? null
