@@ -11,6 +11,7 @@ from app.database import get_db
 from app.deps import get_current_user
 from app.models import SharedBilibiliSubtitle, User
 from app.shared_subtitle_store import (
+    get_shared_bilibili_pack,
     normalize_bvid,
     preview_zh_from_srt,
     upsert_shared_bilibili_pack,
@@ -251,9 +252,27 @@ class GpuSubtitleJobIn(BaseModel):
 async def enqueue_gpu_subtitles(
     payload: GpuSubtitleJobIn,
     user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
 ):
     from app.services.gpu_subtitle_queue import enqueue
-    return enqueue(payload.bvid, payload.page)
+    from app.shared_subtitle_store import fanout_gpu_pack_to_personal
+
+    job = enqueue(payload.bvid, payload.page, user_id=user.id)
+    # Late joiners still get a private copy when the GPU job already finished.
+    if job.get('state') == 'completed':
+        shared = await get_shared_bilibili_pack(db, bvid=payload.bvid, page=payload.page)
+        if shared is not None and (shared.subtitle_en_srt or '').strip():
+            await fanout_gpu_pack_to_personal(
+                db,
+                bvid=payload.bvid,
+                page=payload.page,
+                subtitle_en_srt=shared.subtitle_en_srt or '',
+                subtitle_zh_srt=shared.subtitle_zh_srt,
+                title=shared.title,
+                duration_sec=shared.duration_sec,
+                requester_user_ids=[user.id],
+            )
+    return job
 
 
 class GpuTranslateJobIn(BaseModel):
@@ -269,20 +288,38 @@ class GpuTranslateJobIn(BaseModel):
 async def enqueue_gpu_translation(
     payload: GpuTranslateJobIn,
     user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
 ):
     """English exists, Chinese missing → EN→ZH on the GPU worker."""
     from app.services.gpu_subtitle_queue import enqueue_translate
+    from app.shared_subtitle_store import fanout_gpu_pack_to_personal
+
     try:
-        return enqueue_translate(
+        job = enqueue_translate(
             payload.bvid,
             payload.page,
             en_srt=payload.subtitle_en_srt,
             title=payload.title,
             cid=payload.cid,
             duration=payload.duration_sec,
+            user_id=user.id,
         )
     except ValueError as exc:
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, str(exc)) from exc
+    if job.get('state') == 'completed':
+        shared = await get_shared_bilibili_pack(db, bvid=payload.bvid, page=payload.page)
+        if shared is not None and (shared.subtitle_en_srt or '').strip():
+            await fanout_gpu_pack_to_personal(
+                db,
+                bvid=payload.bvid,
+                page=payload.page,
+                subtitle_en_srt=shared.subtitle_en_srt or '',
+                subtitle_zh_srt=shared.subtitle_zh_srt,
+                title=shared.title or payload.title,
+                duration_sec=shared.duration_sec or payload.duration_sec,
+                requester_user_ids=[user.id],
+            )
+    return job
 
 
 @router.get('/jobs/{job_id}')

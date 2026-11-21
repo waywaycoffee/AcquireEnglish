@@ -5,10 +5,10 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass
 
-from sqlalchemy import select
+from sqlalchemy import or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models import SharedBilibiliSubtitle
+from app.models import SharedBilibiliSubtitle, UserLinkCourse
 from app.shared_subtitle_quality import evaluate_shared_pack, parse_srt_cues
 
 
@@ -32,6 +32,38 @@ def parse_bvid_page(external_id: str) -> tuple[str, int]:
     if not match:
         return normalize_bvid(eid), 1
     return match.group(1).upper(), int(match.group(2) or 1)
+
+
+def personal_external_id(bvid: str, page: int = 1) -> str:
+    """Match ``link_import`` / App personal asset keys (``BV…`` or ``BV…-pN``)."""
+    key = normalize_bvid(bvid)
+    if page <= 1:
+        return key
+    return f"{key}-p{int(page)}"
+
+
+def personal_external_id_aliases(bvid: str, page: int = 1) -> list[str]:
+    """Canonical + padded variants so older personal rows still match."""
+    key = normalize_bvid(bvid)
+    page = int(page or 1)
+    aliases: list[str] = []
+    if page <= 1:
+        aliases.extend([key, f"{key}-p1", f"{key}-p01"])
+    else:
+        aliases.extend([f"{key}-p{page}", f"{key}-p{page:02d}"])
+    out: list[str] = []
+    for item in aliases:
+        if item and item not in out:
+            out.append(item)
+    return out
+
+
+def bilibili_watch_url(bvid: str, page: int = 1) -> str:
+    key = normalize_bvid(bvid)
+    url = f"https://www.bilibili.com/video/{key}"
+    if int(page or 1) > 1:
+        url = f"{url}?p={int(page)}"
+    return url
 
 
 def preview_zh_from_srt(zh_srt: str | None, *, max_cues: int = 2, max_chars: int = 160) -> str:
@@ -85,6 +117,24 @@ def _apply_identity(
         en_cues = parse_srt_cues(row.subtitle_en_srt or "")
         if en_cues:
             row.preview_zh = re.sub(r"\s+", " ", en_cues[0][2]).strip()[:512]
+
+
+async def get_shared_bilibili_pack(
+    db: AsyncSession,
+    *,
+    bvid: str,
+    page: int = 1,
+) -> SharedBilibiliSubtitle | None:
+    key = normalize_bvid(bvid)
+    if not key:
+        return None
+    result = await db.execute(
+        select(SharedBilibiliSubtitle).where(
+            SharedBilibiliSubtitle.bvid == key,
+            SharedBilibiliSubtitle.page == int(page or 1),
+        )
+    )
+    return result.scalar_one_or_none()
 
 
 async def upsert_shared_bilibili_pack(
@@ -245,3 +295,105 @@ async def promote_personal_bilibili_to_shared(
         source_origin=source_origin,
         commit=True,
     )
+
+
+async def fanout_gpu_pack_to_personal(
+    db: AsyncSession,
+    *,
+    bvid: str,
+    page: int = 1,
+    subtitle_en_srt: str,
+    subtitle_zh_srt: str | None,
+    title: str | None = None,
+    duration_sec: int | None = None,
+    requester_user_ids: list[int] | None = None,
+    commit: bool = True,
+) -> int:
+    """Write GPU EN/ZH into private libraries: requesters + existing BV owners.
+
+    Shared cache must already be upserted by the caller. Returns how many
+    ``UserLinkCourse`` rows were created or refreshed.
+    """
+    en = (subtitle_en_srt or "").strip()
+    if len(en) < 20:
+        return 0
+    zh = (subtitle_zh_srt or "").strip() or None
+    key = normalize_bvid(bvid)
+    page = int(page or 1)
+    eid = personal_external_id(key, page)
+    aliases = personal_external_id_aliases(key, page)
+    watch = bilibili_watch_url(key, page)
+    duration = int(duration_sec or 0) or 60
+    cleaned_title = (title or "").strip() or key
+
+    user_ids: list[int] = []
+    for raw in requester_user_ids or []:
+        try:
+            uid = int(raw)
+        except (TypeError, ValueError):
+            continue
+        if uid > 0 and uid not in user_ids:
+            user_ids.append(uid)
+
+    existing = await db.execute(
+        select(UserLinkCourse).where(
+            UserLinkCourse.source == "bilibili",
+            or_(
+                *[
+                    UserLinkCourse.external_id == alias
+                    for alias in aliases
+                ]
+            ),
+        )
+    )
+    rows = list(existing.scalars().all())
+    for row in rows:
+        if row.user_id not in user_ids:
+            user_ids.append(row.user_id)
+
+    if not user_ids:
+        return 0
+
+    by_user: dict[int, UserLinkCourse] = {}
+    for row in rows:
+        # Prefer the canonical external_id when a user somehow has aliases.
+        prev = by_user.get(row.user_id)
+        if prev is None or row.external_id == eid:
+            by_user[row.user_id] = row
+
+    touched = 0
+    for uid in user_ids:
+        row = by_user.get(uid)
+        if row is None:
+            row = UserLinkCourse(
+                user_id=uid,
+                source="bilibili",
+                external_id=eid,
+                title=cleaned_title[:512],
+                author=None,
+                watch_url=watch,
+                duration_sec=duration,
+                subtitle_en_srt=en,
+                subtitle_zh_srt=zh,
+            )
+            db.add(row)
+            touched += 1
+            continue
+        if cleaned_title and (
+            not (row.title or "").strip() or row.title == row.external_id
+        ):
+            row.title = cleaned_title[:512]
+        row.watch_url = watch or row.watch_url
+        if duration_sec:
+            row.duration_sec = duration
+        row.subtitle_en_srt = en
+        if zh:
+            row.subtitle_zh_srt = zh
+        if row.external_id != eid and row.external_id in aliases:
+            # Normalize alias keys to the App/link_import form.
+            row.external_id = eid
+        touched += 1
+
+    if commit and touched:
+        await db.commit()
+    return touched

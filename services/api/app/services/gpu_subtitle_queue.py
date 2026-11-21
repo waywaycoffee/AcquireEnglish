@@ -33,6 +33,8 @@ def connection():
         db.execute("ALTER TABLE jobs ADD COLUMN kind TEXT NOT NULL DEFAULT 'asr'")
     if 'payload' not in columns:
         db.execute('ALTER TABLE jobs ADD COLUMN payload TEXT')
+    if 'requesters' not in columns:
+        db.execute("ALTER TABLE jobs ADD COLUMN requesters TEXT NOT NULL DEFAULT '[]'")
     try:
         with db:
             yield db
@@ -45,7 +47,39 @@ def _check_identity(bvid, page):
         raise ValueError('Invalid Bilibili identity')
 
 
-def enqueue(bvid, page):
+def _requesters(row) -> list[int]:
+    raw = row['requesters'] if 'requesters' in row.keys() else '[]'
+    try:
+        values = json.loads(raw or '[]')
+    except json.JSONDecodeError:
+        return []
+    out: list[int] = []
+    for item in values if isinstance(values, list) else []:
+        try:
+            uid = int(item)
+        except (TypeError, ValueError):
+            continue
+        if uid > 0 and uid not in out:
+            out.append(uid)
+    return out
+
+
+def _add_requester(db, job_id: str, user_id: int | None) -> None:
+    if not user_id or user_id <= 0:
+        return
+    row = db.execute('SELECT requesters FROM jobs WHERE id=?', (job_id,)).fetchone()
+    if row is None:
+        return
+    users = _requesters(row)
+    if user_id not in users:
+        users.append(user_id)
+        db.execute(
+            'UPDATE jobs SET requesters=?, updated=? WHERE id=?',
+            (json.dumps(users), time.time(), job_id),
+        )
+
+
+def enqueue(bvid, page, *, user_id: int | None = None):
     _check_identity(bvid, page)
     with connection() as db:
         db.execute('BEGIN IMMEDIATE')
@@ -56,11 +90,14 @@ def enqueue(bvid, page):
                 db.execute("UPDATE jobs SET kind='asr',state='queued',attempts=0,error=NULL,updated=? WHERE id=?",
                   (time.time(),row['id']))
                 row=db.execute('SELECT * FROM jobs WHERE id=?',(row['id'],)).fetchone()
-            return public(row)
+            _add_requester(db, row['id'], user_id)
+            return public(db.execute('SELECT * FROM jobs WHERE id=?', (row['id'],)).fetchone())
+        job_id = uuid.uuid4().hex
         db.execute('INSERT OR IGNORE INTO jobs(id,bvid,page,updated) VALUES(?,?,?,?)',
-          (uuid.uuid4().hex,bvid,page,time.time()))
+          (job_id,bvid,page,time.time()))
         row=db.execute('SELECT * FROM jobs WHERE upper(bvid)=upper(?) AND page=?',(bvid,page)).fetchone()
-        return public(row)
+        _add_requester(db, row['id'], user_id)
+        return public(db.execute('SELECT * FROM jobs WHERE id=?', (row['id'],)).fetchone())
 
 
 def parse_srt_cues(raw):
@@ -85,7 +122,16 @@ def parse_srt_cues(raw):
     return cues
 
 
-def enqueue_translate(bvid, page, *, en_srt, title=None, cid=None, duration=None):
+def enqueue_translate(
+    bvid,
+    page,
+    *,
+    en_srt,
+    title=None,
+    cid=None,
+    duration=None,
+    user_id: int | None = None,
+):
     """Queue EN→ZH for an episode whose English already exists."""
     _check_identity(bvid, page)
     cues=parse_srt_cues(en_srt or '')
@@ -98,22 +144,32 @@ def enqueue_translate(bvid, page, *, en_srt, title=None, cid=None, duration=None
         db.execute('BEGIN IMMEDIATE')
         row=db.execute('SELECT * FROM jobs WHERE upper(bvid)=upper(?) AND page=?',(bvid,page)).fetchone()
         if row is None:
+            job_id = uuid.uuid4().hex
             db.execute("INSERT INTO jobs(id,bvid,page,kind,payload,updated) VALUES(?,?,?,'translate',?,?)",
-              (uuid.uuid4().hex,bvid,page,payload,time.time()))
+              (job_id,bvid,page,payload,time.time()))
         elif row['state']=='completed' or (row['kind']=='asr' and row['state'] not in ('failed',)):
             # Done already, or a full ASR run will produce both languages.
-            return public(row)
+            _add_requester(db, row['id'], user_id)
+            return public(db.execute('SELECT * FROM jobs WHERE id=?', (row['id'],)).fetchone())
         else:
             db.execute("UPDATE jobs SET kind='translate',payload=?,state='queued',attempts=0,error=NULL,updated=? WHERE id=?",
               (payload,time.time(),row['id']))
         row=db.execute('SELECT * FROM jobs WHERE upper(bvid)=upper(?) AND page=?',(bvid,page)).fetchone()
-        return public(row)
+        _add_requester(db, row['id'], user_id)
+        return public(db.execute('SELECT * FROM jobs WHERE id=?', (row['id'],)).fetchone())
 
 
 def public(row):
     out={k:row[k] for k in ('id','bvid','page','state','attempts','error')}
     out['kind']=row['kind'] if 'kind' in row.keys() else 'asr'
+    out['requesters']=_requesters(row)
     return out
+
+
+def job_requesters(job_id: str) -> list[int]:
+    with connection() as db:
+        row = db.execute('SELECT * FROM jobs WHERE id=?', (job_id,)).fetchone()
+        return _requesters(row) if row is not None else []
 
 
 def claim():

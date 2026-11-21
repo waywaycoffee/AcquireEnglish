@@ -67,4 +67,13 @@ class QueueTest(unittest.TestCase):
   with self.assertRaises(ValueError):
    queue.enqueue_translate('BV1CS4y1v7sQ',1,en_srt='1\n00:00:01,000 --> 00:00:02,000\nHi\n')
 
+ def test_requesters_accumulate(self):
+  a=queue.enqueue('BV1CS4y1v7sQ',1,user_id=7)
+  self.assertEqual(a['requesters'],[7])
+  b=queue.enqueue('BV1CS4y1v7sQ',1,user_id=9)
+  self.assertEqual(b['requesters'],[7,9])
+  again=queue.enqueue('BV1CS4y1v7sQ',1,user_id=7)
+  self.assertEqual(again['requesters'],[7,9])
+  self.assertEqual(queue.job_requesters(a['id']),[7,9])
+
 if __name__=='__main__':unittest.main()

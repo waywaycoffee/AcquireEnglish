@@ -6,7 +6,10 @@ import httpx
 from app.services import gpu_subtitle_queue as queue
 from app.config import settings
 from app.database import SessionLocal
-from app.shared_subtitle_store import upsert_shared_bilibili_pack
+from app.shared_subtitle_store import (
+    fanout_gpu_pack_to_personal,
+    upsert_shared_bilibili_pack,
+)
 from app.link_import import _bilibili_headers
 
 async def run(command):
@@ -117,15 +120,37 @@ async def _store(job,cues,translated):
     def srt(texts):
         return '\n\n'.join(f"{i+1}\n{stamp(c['start'])} --> {stamp(c['end'])}\n{text}" for i,(c,text) in enumerate(zip(cues,texts)))
     duration=job.get('duration') or int(max((c['end'] for c in cues),default=0))+1
+    en_srt=srt([c['text'] for c in cues])
+    zh_srt=srt(translated)
+    requesters=queue.job_requesters(job['id'])
     async with SessionLocal() as db:
         result=await upsert_shared_bilibili_pack(db,bvid=job['bvid'],page=job['page'],
-          cid=job.get('cid'),duration_sec=duration,subtitle_en_srt=srt([c['text'] for c in cues]),
-          subtitle_zh_srt=srt(translated),title=job.get('title'),
-          source_origin='mixed' if job.get('kind')=='translate' else 'asr')
+          cid=job.get('cid'),duration_sec=duration,subtitle_en_srt=en_srt,
+          subtitle_zh_srt=zh_srt,title=job.get('title'),
+          source_origin='mixed' if job.get('kind')=='translate' else 'asr',
+          commit=False)
         if not result.stored and result.reason!='existing pack has equal or better quality':
             raise ValueError('Subtitle quality gate rejected')
+        # Dual library: shared cache + every requester / existing personal BV owner.
+        personal=await fanout_gpu_pack_to_personal(
+            db,
+            bvid=job['bvid'],
+            page=job['page'],
+            subtitle_en_srt=en_srt,
+            subtitle_zh_srt=zh_srt,
+            title=job.get('title'),
+            duration_sec=duration,
+            requester_user_ids=requesters,
+            commit=False,
+        )
+        await db.commit()
     queue.update(job,'completed')
-    return {'stored':result.stored,'reason':result.reason,'cues':len(cues)}
+    return {
+        'stored':result.stored,
+        'reason':result.reason,
+        'cues':len(cues),
+        'personal':personal,
+    }
 
 if __name__=='__main__':
     try:
