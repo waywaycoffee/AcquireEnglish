@@ -6,7 +6,34 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../authentication/presentation/auth_session.dart';
 import '../player/data/pronunciation_providers.dart';
+import '../shared/presentation/pad/app_design_tokens.dart';
 import '../sync/data/acquire_api_client.dart';
+
+/// Formats 0–100 scores for display (integer when whole, else 1 decimal).
+String formatOralScore100(Object? value) {
+  final double? n = _asFinite(value);
+  if (n == null) return '未返回';
+  final double clamped = n.clamp(0, 100);
+  final double one = (clamped * 10).roundToDouble() / 10;
+  if ((one - one.roundToDouble()).abs() < 0.05) return '${one.round()}';
+  return one.toStringAsFixed(1);
+}
+
+/// Formats fluency/completeness (0–1 or 0–100) as a percent with ≤1 decimal.
+String formatOralRatioPercent(Object? value) {
+  final double? n = _asFinite(value);
+  if (n == null) return '未返回';
+  final double pct = (n <= 1.000001 ? n * 100 : n).clamp(0, 100);
+  final double one = (pct * 10).roundToDouble() / 10;
+  if ((one - one.roundToDouble()).abs() < 0.05) return '${one.round()}%';
+  return '${one.toStringAsFixed(1)}%';
+}
+
+double? _asFinite(Object? value) {
+  if (value is! num) return null;
+  final double n = value.toDouble();
+  return n.isFinite ? n : null;
+}
 
 class AssessmentPanel extends ConsumerStatefulWidget {
   const AssessmentPanel({super.key, required this.reference});
@@ -37,7 +64,7 @@ class _AssessmentPanelState extends ConsumerState<AssessmentPanel> {
   Future<void> start() async {
     if (busy || recording) return;
     if (!ref.read(authSessionProvider).isLoggedIn) {
-      setState(() => error = '请先登录，再使用腾讯云评测');
+      setState(() => error = '请先登录后再跟读评测');
       return;
     }
     final epoch = ++generation;
@@ -51,10 +78,13 @@ class _AssessmentPanelState extends ConsumerState<AssessmentPanel> {
           .read(acquireApiClientProvider)
           .assessmentStatus();
       if (!mounted || epoch != generation) return;
-      if (status['configured'] != true) throw StateError('腾讯云评测尚未配置，请联系管理员');
+      if (status['configured'] != true) {
+        throw StateError('跟读评测尚未配置，请联系管理员');
+      }
       mic ??= ref.read(pronunciationMicrophoneFactoryProvider)();
-      if (!await mic!.requestPermission())
+      if (!await mic!.requestPermission()) {
         throw StateError('没有麦克风权限，可在系统设置中开启');
+      }
       if (!mounted || epoch != generation) return;
       bytes.clear();
       subscription = (await mic!.start()).listen(
@@ -66,10 +96,11 @@ class _AssessmentPanelState extends ConsumerState<AssessmentPanel> {
       setState(() => recording = true);
       limit = Timer(const Duration(seconds: 60), finish);
     } catch (e) {
-      if (mounted && epoch == generation)
+      if (mounted && epoch == generation) {
         setState(
           () => error = e is StateError ? '${e.message}' : '评测服务暂不可用，请重试',
         );
+      }
     } finally {
       if (mounted && epoch == generation) setState(() => busy = false);
     }
@@ -94,17 +125,31 @@ class _AssessmentPanelState extends ConsumerState<AssessmentPanel> {
           .evaluateRecording(widget.reference, base64Encode(pcm));
       if (mounted && epoch == generation) setState(() => result = next);
     } catch (e) {
-      if (mounted && epoch == generation)
+      if (mounted && epoch == generation) {
         setState(
           () => error = e is StateError
               ? '${e.message}'
               : e is DioException && e.response?.data is Map
-              ? '${(e.response!.data as Map)['detail']}'
+              ? _learnerFacingDetail((e.response!.data as Map)['detail'])
               : '评测失败，请重录或稍后重试',
         );
+      }
     } finally {
       if (mounted && epoch == generation) setState(() => busy = false);
     }
+  }
+
+  static String _learnerFacingDetail(Object? detail) {
+    final String raw = '$detail'.trim();
+    if (raw.isEmpty) return '评测失败，请重录或稍后重试';
+    if (raw.contains('腾讯云')) {
+      if (raw.contains('尚未配置')) return '跟读评测尚未配置，请联系管理员';
+      if (raw.contains('暂时不可用') || raw.contains('未成功')) {
+        return '评测暂时不可用，请稍后重试';
+      }
+      return '评测失败，请重录或稍后重试';
+    }
+    return raw;
   }
 
   @override
@@ -121,53 +166,229 @@ class _AssessmentPanelState extends ConsumerState<AssessmentPanel> {
         error = null;
       });
     });
-    return Card(
+    final theme = Theme.of(context);
+    final Color border = AppDesignTokens.borderGray.withValues(alpha: 0.85);
+    final Color surface = AppDesignTokens.appWhite;
+    final Color muted = AppDesignTokens.textSecondary;
+    final Color primary = AppDesignTokens.textPrimary;
+
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: surface,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: border),
+      ),
       child: Padding(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.fromLTRB(16, 16, 16, 14),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('腾讯云真实朗读评测', style: Theme.of(context).textTheme.titleMedium),
-            Text('朗读：${widget.reference}'),
-            const Text('点击开始即同意将本次录音经服务器发送腾讯云评测。最长60秒，结束后展示服务返回的成绩。'),
-            FilledButton.icon(
-              onPressed: busy
-                  ? null
-                  : recording
-                  ? finish
-                  : start,
-              icon: Icon(recording ? Icons.stop : Icons.mic),
-              label: Text(
-                busy
-                    ? '处理中…'
-                    : recording
-                    ? '结束录音并评测'
-                    : '开始录音',
+            Text(
+              '跟读评测',
+              style: theme.textTheme.titleMedium?.copyWith(
+                color: primary,
+                fontWeight: FontWeight.w700,
               ),
             ),
-            if (error != null) Text(error!),
-            if (result != null) ...[
-              Text('总分：${result!['score'] ?? '未返回'} / 100'),
-              Text(
-                '发音准确度：${result!['accuracy'] ?? '未返回'} · 流利度：${result!['fluency'] ?? '未返回'} · 完整度：${result!['completion'] ?? '未返回'}',
-              ),
-              for (final w in (result!['words'] as List<dynamic>? ?? []))
-                ExpansionTile(
-                  title: Text('${w['word']} · ${w['accuracy'] ?? '未返回'}'),
-                  children: [
-                    for (final p in (w['phones'] as List<dynamic>? ?? []))
-                      ListTile(
-                        title: Text(
-                          '${p['reference_phone']?.toString().isNotEmpty == true ? p['reference_phone'] : p['phone']}',
-                        ),
-                        trailing: Text('${p['accuracy'] ?? '未返回'}'),
-                      ),
-                  ],
+            const SizedBox(height: 4),
+            Text(
+              '朗读「${widget.reference}」',
+              style: theme.textTheme.bodyMedium?.copyWith(color: muted),
+            ),
+            const SizedBox(height: 14),
+            SizedBox(
+              width: double.infinity,
+              child: FilledButton.icon(
+                onPressed: busy
+                    ? null
+                    : recording
+                    ? finish
+                    : start,
+                icon: Icon(recording ? Icons.stop_rounded : Icons.mic_rounded),
+                label: Text(
+                  busy
+                      ? '处理中…'
+                      : recording
+                      ? '结束并评分'
+                      : '开始录音',
                 ),
-              const Text('分数与音素明细来自腾讯云；未返回的指标不作推算。'),
+                style: FilledButton.styleFrom(
+                  minimumSize: const Size.fromHeight(46),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(24),
+                  ),
+                ),
+              ),
+            ),
+            if (error != null) ...[
+              const SizedBox(height: 10),
+              Text(
+                error!,
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: theme.colorScheme.error,
+                ),
+              ),
+            ],
+            if (result != null) ...[
+              const SizedBox(height: 16),
+              _ScoreSummary(result: result!),
+              const SizedBox(height: 8),
+              for (final w in (result!['words'] as List<dynamic>? ?? []))
+                _WordScoreTile(word: w is Map ? w : const <String, dynamic>{}),
             ],
           ],
         ),
+      ),
+    );
+  }
+}
+
+class _ScoreSummary extends StatelessWidget {
+  const _ScoreSummary({required this.result});
+  final Map<String, dynamic> result;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final String total = formatOralScore100(result['score']);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.end,
+          children: [
+            Text(
+              total,
+              style: theme.textTheme.headlineMedium?.copyWith(
+                fontWeight: FontWeight.w800,
+                height: 1,
+                color: AppDesignTokens.textPrimary,
+              ),
+            ),
+            const SizedBox(width: 6),
+            Padding(
+              padding: const EdgeInsets.only(bottom: 4),
+              child: Text(
+                '/ 100',
+                style: theme.textTheme.titleSmall?.copyWith(
+                  color: AppDesignTokens.textSecondary,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: [
+            _MetricChip(
+              label: '准确度',
+              value: formatOralScore100(result['accuracy']),
+            ),
+            _MetricChip(
+              label: '流利度',
+              value: formatOralRatioPercent(result['fluency']),
+            ),
+            _MetricChip(
+              label: '完整度',
+              value: formatOralRatioPercent(result['completion']),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+}
+
+class _MetricChip extends StatelessWidget {
+  const _MetricChip({required this.label, required this.value});
+  final String label;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+        color: AppDesignTokens.softGray.withValues(alpha: 0.7),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            label,
+            style: Theme.of(context).textTheme.labelSmall?.copyWith(
+              color: AppDesignTokens.textSecondary,
+            ),
+          ),
+          const SizedBox(height: 2),
+          Text(
+            value,
+            style: Theme.of(context).textTheme.titleSmall?.copyWith(
+              fontWeight: FontWeight.w700,
+              color: AppDesignTokens.textPrimary,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _WordScoreTile extends StatelessWidget {
+  const _WordScoreTile({required this.word});
+  final Map<dynamic, dynamic> word;
+
+  @override
+  Widget build(BuildContext context) {
+    final String label = '${word['word'] ?? ''}';
+    final String score = formatOralScore100(word['accuracy']);
+    final List<dynamic> phones = word['phones'] as List<dynamic>? ?? const [];
+    if (phones.isEmpty) {
+      return Padding(
+        padding: const EdgeInsets.only(top: 6),
+        child: Text(
+          '$label · $score',
+          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+            color: AppDesignTokens.textPrimary,
+          ),
+        ),
+      );
+    }
+    return Theme(
+      data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+      child: ExpansionTile(
+        tilePadding: EdgeInsets.zero,
+        childrenPadding: const EdgeInsets.only(bottom: 4),
+        title: Text(
+          '$label · $score',
+          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+            fontWeight: FontWeight.w600,
+            color: AppDesignTokens.textPrimary,
+          ),
+        ),
+        children: [
+          for (final p in phones)
+            if (p is Map)
+              ListTile(
+                dense: true,
+                contentPadding: const EdgeInsets.symmetric(horizontal: 4),
+                title: Text(
+                  '${p['reference_phone']?.toString().isNotEmpty == true ? p['reference_phone'] : p['phone'] ?? ''}',
+                  style: TextStyle(color: AppDesignTokens.textPrimary),
+                ),
+                trailing: Text(
+                  formatOralScore100(p['accuracy']),
+                  style: TextStyle(
+                    color: AppDesignTokens.textSecondary,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+        ],
       ),
     );
   }

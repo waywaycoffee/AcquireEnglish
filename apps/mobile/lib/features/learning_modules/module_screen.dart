@@ -16,6 +16,7 @@ import '../membership/domain/module_access.dart';
 import '../onboarding/presentation/onboarding_provider.dart';
 import '../settings/presentation/settings_provider.dart';
 import '../phrases/presentation/phrase_book_provider.dart';
+import '../shared/presentation/pad/app_design_tokens.dart';
 
 part 'module_curriculum.dart';
 
@@ -465,9 +466,10 @@ class _ModuleScreenState extends ConsumerState<ModuleScreen>
     final item = lessons[lesson];
     final choices = List<String>.of(item.choices)
       ..shuffle(Random(lesson * 7919 + 17));
-    final dark = Theme.of(context).brightness == Brightness.dark;
+    final theme = Theme.of(context);
+    final double bottomInset = MediaQuery.paddingOf(context).bottom;
     return Scaffold(
-      backgroundColor: dark ? const Color(0xFF141414) : const Color(0xFFF5F5F5),
+      backgroundColor: AppDesignTokens.softWhite,
       appBar: AppBar(
         title: Text(moduleTitles[widget.kind] ?? '学习'),
         actions: [
@@ -480,16 +482,38 @@ class _ModuleScreenState extends ConsumerState<ModuleScreen>
       ),
       body: ListView(
         controller: scroll,
-        padding: const EdgeInsets.all(24),
+        padding: EdgeInsets.fromLTRB(20, 16, 20, 28 + bottomInset),
         children: [
-          if (syncStatus.isNotEmpty) Text(syncStatus),
-          Text('已完成 ${completedLessons.length} / ${lessons.length} 课'),
+          if (syncStatus.isNotEmpty) ...[
+            Text(
+              syncStatus,
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: AppDesignTokens.textSecondary,
+              ),
+            ),
+            const SizedBox(height: 8),
+          ],
+          Text(
+            '已完成 ${completedLessons.length} / ${lessons.length} 课',
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: AppDesignTokens.textSecondary,
+            ),
+          ),
+          const SizedBox(height: 2),
           Text(
             '入门课程 · ${lesson + 1} / ${lessons.length}',
-            style: Theme.of(context).textTheme.labelLarge,
+            style: theme.textTheme.labelLarge?.copyWith(
+              color: AppDesignTokens.textSecondary,
+            ),
           ),
-          const SizedBox(height: 12),
-          Text(item.title, style: Theme.of(context).textTheme.headlineSmall),
+          const SizedBox(height: 10),
+          Text(
+            item.title,
+            style: theme.textTheme.headlineSmall?.copyWith(
+              fontWeight: FontWeight.w700,
+              color: AppDesignTokens.textPrimary,
+            ),
+          ),
           if (!hintDismissed) ...[
             Builder(
               builder: (BuildContext context) {
@@ -508,13 +532,16 @@ class _ModuleScreenState extends ConsumerState<ModuleScreen>
                 return Padding(
                   padding: const EdgeInsets.only(top: 12),
                   child: Material(
-                    color: Theme.of(
-                      context,
-                    ).colorScheme.surfaceContainerHighest,
+                    color: AppDesignTokens.softGray,
                     borderRadius: BorderRadius.circular(12),
                     child: ListTile(
                       dense: true,
-                      title: Text(tip),
+                      title: Text(
+                        tip,
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: AppDesignTokens.textPrimary,
+                        ),
+                      ),
                       trailing: TextButton(
                         onPressed: () => setState(() => hintDismissed = true),
                         child: const Text('跳过'),
@@ -525,42 +552,57 @@ class _ModuleScreenState extends ConsumerState<ModuleScreen>
               },
             ),
           ],
-          const SizedBox(height: 16),
-          DropdownButton<int>(
-            value: lesson,
-            isExpanded: true,
-            items: [
-              for (int i = 0; i < lessons.length; i++)
-                DropdownMenuItem(
-                  value: i,
-                  child: Text(
-                    _videoModuleGated && !isFreePreviewIndex(i)
-                        ? '${lessons[i].title} · 需开通'
-                        : lessons[i].title,
-                  ),
+          const SizedBox(height: 14),
+          DecoratedBox(
+            decoration: BoxDecoration(
+              color: AppDesignTokens.appWhite,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: AppDesignTokens.borderGray),
+            ),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 12),
+              child: DropdownButtonHideUnderline(
+                child: DropdownButton<int>(
+                  value: lesson,
+                  isExpanded: true,
+                  items: [
+                    for (int i = 0; i < lessons.length; i++)
+                      DropdownMenuItem(
+                        value: i,
+                        child: Text(
+                          _videoModuleGated && !isFreePreviewIndex(i)
+                              ? '${lessons[i].title} · 需开通'
+                              : lessons[i].title,
+                        ),
+                      ),
+                  ],
+                  onChanged: (v) {
+                    if (v == null) return;
+                    unawaited(() async {
+                      if (!await _ensureLessonAllowed(v)) return;
+                      if (!mounted) return;
+                      stop();
+                      setState(() {
+                        lesson = v;
+                        line = 0;
+                        selected = null;
+                        reveal = false;
+                      });
+                      unawaited(
+                        persist().catchError((_) {
+                          if (mounted) {
+                            setState(() => error = '位置保存失败，请重试');
+                          }
+                        }),
+                      );
+                    }());
+                  },
                 ),
-            ],
-            onChanged: (v) {
-              if (v == null) return;
-              unawaited(() async {
-                if (!await _ensureLessonAllowed(v)) return;
-                if (!mounted) return;
-                stop();
-                setState(() {
-                  lesson = v;
-                  line = 0;
-                  selected = null;
-                  reveal = false;
-                });
-                unawaited(
-                  persist().catchError((_) {
-                    if (mounted) setState(() => error = '位置保存失败，请重试');
-                  }),
-                );
-              }());
-            },
+              ),
+            ),
           ),
-          if (widget.kind == 'dialogue')
+          if (widget.kind == 'dialogue') ...[
+            const SizedBox(height: 12),
             SegmentedButton<int>(
               segments: const [
                 ButtonSegment(value: 0, label: Text('角色 A')),
@@ -569,6 +611,7 @@ class _ModuleScreenState extends ConsumerState<ModuleScreen>
               selected: {role},
               onSelectionChanged: (v) => setState(() => role = v.first),
             ),
+          ],
           const SizedBox(height: 12),
           Text(
             widget.kind == 'ipa'
@@ -576,11 +619,20 @@ class _ModuleScreenState extends ConsumerState<ModuleScreen>
                 : widget.kind == 'phonics'
                 ? '先听字母组合，再尝试合成完整单词。'
                 : '先听示范，再尝试用自己的话表达。',
+            style: theme.textTheme.bodyMedium?.copyWith(
+              color: AppDesignTokens.textSecondary,
+              height: 1.35,
+            ),
           ),
-          const SizedBox(height: 20),
-          Card(
+          const SizedBox(height: 16),
+          DecoratedBox(
+            decoration: BoxDecoration(
+              color: AppDesignTokens.appWhite,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: AppDesignTokens.borderGray),
+            ),
             child: Padding(
-              padding: const EdgeInsets.all(24),
+              padding: const EdgeInsets.fromLTRB(18, 18, 18, 16),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -588,26 +640,49 @@ class _ModuleScreenState extends ConsumerState<ModuleScreen>
                     widget.kind == 'dialogue'
                         ? '${line % 2 == 0 ? 'A' : 'B'}${line % 2 == role ? ' · 轮到你说' : ''}'
                         : '第 ${line + 1} 句',
+                    style: theme.textTheme.labelLarge?.copyWith(
+                      color: AppDesignTokens.textSecondary,
+                    ),
                   ),
-                  const SizedBox(height: 12),
+                  const SizedBox(height: 10),
                   Text(
                     widget.kind == 'listening' && !reveal
                         ? '先听一遍，再展开字幕'
                         : item.lines[line],
-                    style: const TextStyle(fontSize: 25),
+                    style: theme.textTheme.headlineSmall?.copyWith(
+                      fontSize: 28,
+                      fontWeight: FontWeight.w700,
+                      color: AppDesignTokens.textPrimary,
+                      height: 1.2,
+                    ),
                   ),
                   if (reveal) ...[
-                    const SizedBox(height: 14),
-                    Text(item.meanings[line]),
+                    const SizedBox(height: 12),
+                    Text(
+                      item.meanings[line],
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        color: AppDesignTokens.textSecondary,
+                        height: 1.4,
+                      ),
+                    ),
                   ],
-                  const SizedBox(height: 18),
+                  const SizedBox(height: 16),
                   Wrap(
                     spacing: 8,
+                    runSpacing: 8,
+                    crossAxisAlignment: WrapCrossAlignment.center,
                     children: [
                       FilledButton.icon(
                         onPressed: () => play(),
-                        icon: Icon(playing ? Icons.stop : Icons.volume_up),
+                        icon: Icon(
+                          playing ? Icons.stop_rounded : Icons.volume_up_rounded,
+                        ),
                         label: Text(playing ? '停止' : '听示范'),
+                        style: FilledButton.styleFrom(
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(22),
+                          ),
+                        ),
                       ),
                       TextButton(
                         onPressed: () => setState(() => reveal = !reveal),
@@ -619,7 +694,9 @@ class _ModuleScreenState extends ConsumerState<ModuleScreen>
                           setState(() => line = (line + 1) % item.lines.length);
                           unawaited(
                             persist().catchError((_) {
-                              if (mounted) setState(() => error = '位置保存失败，请重试');
+                              if (mounted) {
+                                setState(() => error = '位置保存失败，请重试');
+                              }
                             }),
                           );
                         },
@@ -631,9 +708,15 @@ class _ModuleScreenState extends ConsumerState<ModuleScreen>
               ),
             ),
           ),
+          const SizedBox(height: 8),
           Row(
             children: [
-              const Text('播放语速'),
+              Text(
+                '播放语速',
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  color: AppDesignTokens.textSecondary,
+                ),
+              ),
               Expanded(
                 child: Slider(
                   value: speed,
@@ -644,11 +727,26 @@ class _ModuleScreenState extends ConsumerState<ModuleScreen>
                   onChanged: playing ? null : (v) => setState(() => speed = v),
                 ),
               ),
+              Text(
+                speed.toStringAsFixed(1),
+                style: theme.textTheme.labelLarge?.copyWith(
+                  color: AppDesignTokens.textPrimary,
+                ),
+              ),
             ],
           ),
-          if (error != null) Text(error!),
+          if (error != null) ...[
+            Text(
+              error!,
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: theme.colorScheme.error,
+              ),
+            ),
+            const SizedBox(height: 8),
+          ],
           if (widget.kind == 'listening') ...[
             SwitchListTile(
+              contentPadding: EdgeInsets.zero,
               title: const Text('整篇循环'),
               value: repeat,
               onChanged: (v) => setState(() => repeat = v),
@@ -667,13 +765,22 @@ class _ModuleScreenState extends ConsumerState<ModuleScreen>
               },
               child: const Text('10分钟定时停止'),
             ),
+            const SizedBox(height: 8),
           ],
+          const SizedBox(height: 8),
           AssessmentPanel(
             key: ValueKey('${widget.kind}-$lesson-$line'),
             reference: item.lines[line],
           ),
+          const SizedBox(height: 12),
           if (widget.kind == 'chunks') ...[
-            const Text('替换练习：保留句型，换成自己的需求。例如 this form → my luggage。'),
+            Text(
+              '替换练习：保留句型，换成自己的需求。例如 this form → my luggage。',
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: AppDesignTokens.textSecondary,
+              ),
+            ),
+            const SizedBox(height: 8),
             TextField(
               controller: expression,
               maxLength: 240,
@@ -691,82 +798,169 @@ class _ModuleScreenState extends ConsumerState<ModuleScreen>
               },
               child: const Text('听听我的表达'),
             ),
+            const SizedBox(height: 8),
           ],
           if (widget.kind == 'ipa' || widget.kind == 'phonics')
-            OutlinedButton(
-              onPressed: () => context.push('/digital-human'),
-              child: const Text('进入口语练习 · 支持录音与文字'),
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton(
+                onPressed: () => context.push('/digital-human'),
+                style: OutlinedButton.styleFrom(
+                  minimumSize: const Size.fromHeight(46),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                ),
+                child: const Text('进入口语练习 · 支持录音与文字'),
+              ),
             ),
           if (widget.kind == 'dialogue')
-            OutlinedButton(
-              onPressed: () {
-                stop();
-                Navigator.of(context).push(
-                  MaterialPageRoute<void>(
-                    builder: (_) => DigitalHumanCoachScreen(
-                      lessonTitle: item.title,
-                      lessonText: [
-                        for (int i = 0; i < item.lines.length; i++)
-                          '${i.isEven ? 'A' : 'B'}: ${item.lines[i]}',
-                      ].join('\n'),
-                      practiceRole: role == 0 ? 'A' : 'B',
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton(
+                onPressed: () {
+                  stop();
+                  Navigator.of(context).push(
+                    MaterialPageRoute<void>(
+                      builder: (_) => DigitalHumanCoachScreen(
+                        lessonTitle: item.title,
+                        lessonText: [
+                          for (int i = 0; i < item.lines.length; i++)
+                            '${i.isEven ? 'A' : 'B'}: ${item.lines[i]}',
+                        ].join('\n'),
+                        practiceRole: role == 0 ? 'A' : 'B',
+                      ),
+                    ),
+                  );
+                },
+                style: OutlinedButton.styleFrom(
+                  minimumSize: const Size.fromHeight(46),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                ),
+                child: const Text('分角色语音 / 文字实战与反馈'),
+              ),
+            ),
+          const SizedBox(height: 8),
+          SizedBox(
+            width: double.infinity,
+            child: OutlinedButton.icon(
+              onPressed: () async {
+                try {
+                  final added = await ref
+                      .read(phraseBookProvider.notifier)
+                      .addSharedLearningCard(
+                        token: 'module-${widget.kind}-$lesson-$line',
+                        english: item.lines[line],
+                        chinese: item.meanings[line],
+                        title: item.title,
+                        source: moduleTitles[widget.kind]!,
+                      );
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text(added ? '已保存到表达库与复习计划' : '表达已在库中'),
+                      ),
+                    );
+                  }
+                } catch (_) {
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('保存失败，请重试')),
+                    );
+                  }
+                }
+              },
+              icon: const Icon(Icons.bookmark_outline),
+              label: const Text('收藏当前表达并复习'),
+              style: OutlinedButton.styleFrom(
+                minimumSize: const Size.fromHeight(46),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(14),
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(height: 20),
+          DecoratedBox(
+            decoration: BoxDecoration(
+              color: AppDesignTokens.appWhite,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: AppDesignTokens.borderGray),
+            ),
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(16, 16, 16, 14),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    item.question,
+                    style: theme.textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.w700,
+                      color: AppDesignTokens.textPrimary,
                     ),
                   ),
-                );
-              },
-              child: const Text('分角色语音 / 文字实战与反馈'),
+                  const SizedBox(height: 4),
+                  for (final option in choices)
+                    RadioListTile<String>(
+                      contentPadding: EdgeInsets.zero,
+                      dense: true,
+                      title: Text(option),
+                      value: option,
+                      groupValue: selected,
+                      onChanged: (v) => setState(() => selected = v),
+                    ),
+                  if (selected != null)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 8),
+                      child: Text(
+                        selected == item.answer
+                            ? '正确，可以完成本课。'
+                            : '再听一遍，试着重新选择。',
+                        style: theme.textTheme.bodyMedium?.copyWith(
+                          color: selected == item.answer
+                              ? AppDesignTokens.brandGreen
+                              : AppDesignTokens.textSecondary,
+                        ),
+                      ),
+                    ),
+                  SizedBox(
+                    width: double.infinity,
+                    child: FilledButton(
+                      onPressed:
+                          !saving && selected == item.answer ? complete : null,
+                      style: FilledButton.styleFrom(
+                        minimumSize: const Size.fromHeight(46),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(14),
+                        ),
+                      ),
+                      child: const Text('完成并保存进度'),
+                    ),
+                  ),
+                ],
+              ),
             ),
-          OutlinedButton.icon(
-            onPressed: () async {
-              try {
-                final added = await ref
-                    .read(phraseBookProvider.notifier)
-                    .addSharedLearningCard(
-                      token: 'module-${widget.kind}-$lesson-$line',
-                      english: item.lines[line],
-                      chinese: item.meanings[line],
-                      title: item.title,
-                      source: moduleTitles[widget.kind]!,
-                    );
-                if (context.mounted)
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text(added ? '已保存到表达库与复习计划' : '表达已在库中')),
-                  );
-              } catch (_) {
-                if (context.mounted)
-                  ScaffoldMessenger.of(
-                    context,
-                  ).showSnackBar(const SnackBar(content: Text('保存失败，请重试')));
-              }
-            },
-            icon: const Icon(Icons.bookmark_outline),
-            label: const Text('收藏当前表达并复习'),
-          ),
-          const Divider(height: 32),
-          Text(item.question, style: Theme.of(context).textTheme.titleMedium),
-          for (final option in choices)
-            RadioListTile<String>(
-              title: Text(option),
-              value: option,
-              groupValue: selected,
-              onChanged: (v) => setState(() => selected = v),
-            ),
-          if (selected != null)
-            Text(selected == item.answer ? '正确，可以完成本课。' : '再听一遍，试着重新选择。'),
-          FilledButton(
-            onPressed: !saving && selected == item.answer ? complete : null,
-            child: const Text('完成并保存进度'),
           ),
           if (widget.kind == 'ipa' ||
               widget.kind == 'phonics' ||
-              widget.kind == 'chunks')
+              widget.kind == 'chunks') ...[
+            const SizedBox(height: 8),
             TextButton(
               onPressed: () => context.push(
                 '/words/syllabus/cloud?tab=${widget.kind == 'chunks' ? 'pattern' : widget.kind}',
               ),
               child: const Text('更多课程 · 下载完整学习书'),
             ),
-          const Text('示范语音由服务器合成并在线播放。口语训练支持语音和文字，不在本页自动评分。'),
+          ],
+          const SizedBox(height: 8),
+          Text(
+            '示范语音由服务器合成并在线播放。',
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: AppDesignTokens.textSecondary,
+            ),
+          ),
         ],
       ),
     );

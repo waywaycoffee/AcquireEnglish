@@ -25,6 +25,16 @@ class UnconfiguredApi extends AcquireApiClient {
 }
 
 void main() {
+  test('oral score formatting keeps short decimals', () {
+    expect(formatOralScore100(99.21669006347656), '99.2');
+    expect(formatOralScore100(100), '100');
+    expect(formatOralScore100(88.04), '88');
+    expect(formatOralScore100(null), '未返回');
+    expect(formatOralRatioPercent(0.8072285652160645), '80.7%');
+    expect(formatOralRatioPercent(1), '100%');
+    expect(formatOralRatioPercent(0.8), '80%');
+  });
+
   testWidgets(
     'no microphone request before click and unconfigured service does not record',
     (tester) async {
@@ -42,11 +52,13 @@ void main() {
       );
       await tester.pumpAndSettle();
       expect(api.statuses, 0);
+      expect(find.text('跟读评测'), findsOneWidget);
+      expect(find.textContaining('腾讯云'), findsNothing);
       await tester.tap(find.text('开始录音'));
       await tester.pumpAndSettle();
       expect(api.statuses, 1);
-      expect(find.text('腾讯云评测尚未配置，请联系管理员'), findsOneWidget);
-      expect(find.text('结束录音并评测'), findsNothing);
+      expect(find.text('跟读评测尚未配置，请联系管理员'), findsOneWidget);
+      expect(find.text('结束并评分'), findsNothing);
     },
   );
 }
