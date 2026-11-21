@@ -1,0 +1,24 @@
+{
+  "version":"2.22",
+  "children":[
+    {"type":"frame","id":"light-list","name":"03 收藏词本 · 浅色","x":0,"y":0,"width":390,"height":844,"layout":"none","fill":"#F7F8F4","children":[
+      {"type":"text","id":"ll-back","x":20,"y":30,"content":"‹","fontSize":28,"fill":"#397A2B"},
+      {"type":"text","id":"ll-title","x":56,"y":35,"content":"收藏词本","fontSize":23,"fontWeight":"bold","fill":"#203026"},
+      {"type":"text","id":"ll-subtitle","x":22,"y":88,"content":"原样保留你收藏的生词 · 共 8 词","fontSize":13,"fill":"#657267"},
+      {"type":"frame","id":"ll-search","x":20,"y":128,"width":350,"height":49,"fill":"#FFFFFF","cornerRadius":15,"children":[{"type":"text","id":"ll-search-text","x":18,"y":15,"content":"⌕  搜索收藏的单词","fontSize":15,"fill":"#758177"}]},
+      {"type":"frame","id":"ll-summary","x":20,"y":197,"width":350,"height":70,"fill":"#E9F3E2","cornerRadius":17,"children":[{"type":"text","id":"ll-count","x":18,"y":14,"content":"8 个收藏","fontSize":16,"fontWeight":"bold","fill":"#315B2B"},{"type":"text","id":"ll-hint","x":18,"y":39,"content":"点词查看收藏时的真实场景","fontSize":12,"fill":"#657267"}]},
+      {"type":"frame","id":"ll-word-a","x":20,"y":287,"width":350,"height":139,"fill":"#FFFFFF","cornerRadius":19,"children":[{"type":"text","id":"ll-a-name","x":17,"y":14,"content":"cutlery","fontSize":23,"fontWeight":"bold","fill":"#203026"},{"type":"text","id":"ll-a-meaning","x":17,"y":49,"content":"餐具","fontSize":14,"fill":"#58645C"},{"type":"text","id":"ll-a-stats","x":17,"y":80,"content":"背诵 1 次    ·    见过 2 个场景","fontSize":13,"fill":"#397A2B"},{"type":"text","id":"ll-a-origin","x":17,"y":108,"content":"视频《餐厅英语》第 03 集  04:12","fontSize":11,"fill":"#758177"}]},
+      {"type":"frame","id":"ll-word-b","x":20,"y":439,"width":350,"height":139,"fill":"#FFFFFF","cornerRadius":19,"children":[{"type":"text","id":"ll-b-name","x":17,"y":14,"content":"reservation","fontSize":23,"fontWeight":"bold","fill":"#203026"},{"type":"text","id":"ll-b-meaning","x":17,"y":49,"content":"预订；预约","fontSize":14,"fill":"#58645C"},{"type":"text","id":"ll-b-stats","x":17,"y":80,"content":"背诵 3 次    ·    见过 4 个场景","fontSize":13,"fill":"#397A2B"},{"type":"text","id":"ll-b-origin","x":17,"y":108,"content":"阅读《Weekend Plans》","fontSize":11,"fill":"#758177"}]}
+    ]},
+    {"type":"frame","id":"light-detail","name":"04 收藏词详情 · 浅色","x":430,"y":0,"width":390,"height":844,"layout":"none","fill":"#F7F8F4","children":[
+      {"type":"text","id":"ld-back","x":20,"y":30,"content":"‹  收藏词本","fontSize":17,"fill":"#397A2B"},
+      {"type":"text","id":"ld-word","x":21,"y":91,"content":"cutlery","fontSize":33,"fontWeight":"bold","fill":"#203026"},
+      {"type":"text","id":"ld-meaning","x":23,"y":138,"content":"餐具  /ˈkʌtləri/","fontSize":16,"fill":"#58645C"},
+      {"type":"frame","id":"ld-stats","x":20,"y":183,"width":350,"height":77,"fill":"#E9F3E2","cornerRadius":18,"children":[{"type":"text","id":"ld-review","x":19,"y":22,"content":"背诵 1 次","fontSize":17,"fontWeight":"bold","fill":"#315B2B"},{"type":"text","id":"ld-scenes","x":170,"y":22,"content":"见过 2 个场景","fontSize":17,"fontWeight":"bold","fill":"#315B2B"}]},
+      {"type":"text","id":"ld-heading","x":21,"y":289,"content":"见过的场景","fontSize":17,"fontWeight":"bold","fill":"#203026"},
+      {"type":"frame","id":"ld-scene-a","x":20,"y":326,"width":350,"height":216,"fill":"#FFFFFF","cornerRadius":18,"children":[{"type":"frame","id":"ld-photo-a","x":13,"y":13,"width":324,"height":106,"fill":"#D4E1D8","cornerRadius":11,"children":[{"type":"text","id":"ld-photo-label","x":28,"y":40,"content":"04:12  视频画面截图","fontSize":16,"fill":"#315B2B"}]},{"type":"text","id":"ld-source-a","x":15,"y":129,"content":"餐厅英语 · 第 03 集  04:12","fontSize":13,"fill":"#657267"},{"type":"text","id":"ld-line-a","x":15,"y":153,"content":"Could you bring some cutlery?","fontSize":14,"fontWeight":"bold","fill":"#203026"},{"type":"text","id":"ld-play-a","x":15,"y":182,"content":"▶ 播放 04:10–04:14 片段","fontSize":13,"fill":"#397A2B"}]},
+      {"type":"frame","id":"ld-scene-b","x":20,"y":556,"width":350,"height":154,"fill":"#FFFFFF","cornerRadius":18,"children":[{"type":"frame","id":"ld-photo-b","x":13,"y":13,"width":105,"height":86,"fill":"#D4E1D8","cornerRadius":10,"children":[{"type":"text","id":"ld-photo-time","x":19,"y":33,"content":"08:26","fontSize":14,"fill":"#315B2B"}]},{"type":"text","id":"ld-source-b","x":132,"y":19,"content":"日常口语 · 第 07 集","fontSize":13,"fill":"#657267"},{"type":"text","id":"ld-line-b","x":132,"y":48,"content":"The cutlery is on...","fontSize":13,"fill":"#203026"},{"type":"text","id":"ld-play-b","x":132,"y":77,"content":"▶ 前后各 2 秒","fontSize":12,"fill":"#397A2B"},{"type":"text","id":"ld-note","x":15,"y":120,"content":"视频不可用时保留原句与时间点","fontSize":11,"fill":"#758177"}]}
+    ]}
+  ]
+}
+

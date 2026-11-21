@@ -1,0 +1,55 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="860" height="900" viewBox="0 0 860 900">
+  <defs>
+    <style>
+      .bg{fill:#111318}.card{fill:#242832}.muted{fill:#AAB0BB;font:14px Arial,sans-serif}.white{fill:#fff;font-family:Arial,sans-serif}.green{fill:#B8F174;font-family:Arial,sans-serif}.small{font-size:12px}.body{font-size:15px}.title{font-size:24px;font-weight:700}.word{font-size:29px;font-weight:700}
+    </style>
+  </defs>
+  <rect width="860" height="900" fill="#E8ECE8"/>
+  <text x="32" y="32" font-family="Arial,sans-serif" font-size="16" font-weight="700" fill="#26362B">Pencil · 收藏词本 / 场景时间轴</text>
+  <rect x="24" y="52" width="390" height="820" rx="30" class="bg"/>
+  <rect x="446" y="52" width="390" height="820" rx="30" class="bg"/>
+  <text x="46" y="91" class="green body">‹ 返回</text>
+  <text x="99" y="91" class="white title">收藏词本</text>
+  <text x="47" y="127" class="muted">原样保留你收藏的生词 · 共 8 词</text>
+  <rect x="44" y="150" width="350" height="52" rx="16" class="card"/>
+  <text x="63" y="183" class="muted">⌕  搜索收藏的单词</text>
+  <rect x="44" y="221" width="350" height="70" rx="17" fill="#202A24"/>
+  <text x="63" y="251" class="green body" font-weight="700">8 个收藏</text>
+  <text x="63" y="274" class="muted small">点词查看真实场景</text>
+  <rect x="44" y="311" width="350" height="145" rx="18" class="card"/>
+  <text x="63" y="346" class="white word">cutlery</text>
+  <text x="63" y="374" class="muted">餐具</text>
+  <text x="63" y="407" class="green body">背诵 1 次   ·   见过 2 个场景</text>
+  <text x="63" y="438" class="muted small">视频《餐厅英语》第 03 集  04:12</text>
+  <rect x="44" y="471" width="350" height="145" rx="18" class="card"/>
+  <text x="63" y="506" class="white word">reservation</text>
+  <text x="63" y="534" class="muted">预订；预约</text>
+  <text x="63" y="567" class="green body">背诵 3 次   ·   见过 4 个场景</text>
+  <text x="63" y="598" class="muted small">阅读《Weekend Plans》</text>
+  <text x="47" y="647" class="muted small">仅展示实际收藏的词，不混入推荐词或词书</text>
+  <text x="468" y="91" class="green body">‹ 收藏词本</text>
+  <text x="468" y="151" class="white word">cutlery</text>
+  <text x="469" y="181" class="muted">餐具  /ˈkʌtləri/</text>
+  <rect x="466" y="206" width="350" height="76" rx="18" fill="#202A24"/>
+  <text x="486" y="251" class="green body" font-weight="700">背诵 1 次</text>
+  <text x="639" y="251" class="green body" font-weight="700">见过 2 个场景</text>
+  <text x="468" y="326" class="white body" font-weight="700">见过的场景</text>
+  <rect x="466" y="346" width="350" height="229" rx="18" class="card"/>
+  <rect x="479" y="359" width="324" height="112" rx="11" fill="#38474A"/>
+  <rect x="592" y="391" width="66" height="45" rx="22" fill="#B8F174"/>
+  <text x="617" y="423" font-size="26" fill="#203323">▶</text>
+  <text x="491" y="462" class="white small">04:12  ·  该时间点的视频画面</text>
+  <text x="481" y="496" class="muted">餐厅英语 · 第 03 集  04:12</text>
+  <text x="481" y="522" class="white body" font-weight="700">Could you bring some cutlery?</text>
+  <text x="481" y="555" class="green body">▶ 播放 04:10–04:14 片段</text>
+  <rect x="466" y="590" width="350" height="148" rx="18" class="card"/>
+  <rect x="479" y="603" width="110" height="87" rx="10" fill="#566477"/>
+  <text x="510" y="651" class="white body">08:26</text>
+  <text x="605" y="626" class="muted">日常口语 · 第 07 集</text>
+  <text x="605" y="650" class="white body">The cutlery is on...</text>
+  <text x="605" y="680" class="green body">▶ 前后各 2 秒</text>
+  <text x="480" y="721" class="muted small">视频不可用时仍保留原句与时间点</text>
+  <text x="44" y="844" class="muted small">01  收藏词列表</text>
+  <text x="466" y="844" class="muted small">02  单词场景详情</text>
+</svg>
+
