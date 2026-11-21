@@ -213,6 +213,8 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
   StreamSubscription<Uint8List>? _recordingSubscription;
   Timer? _recordingLimitTimer;
   Timer? _sessionTicker;
+  Timer? _idlePromptTimer;
+  int _idlePromptCount = 0;
   DateTime? _sessionStartedAt;
   Duration _sessionLeft = _sessionBudget;
   OralCoachSession? _session;
@@ -346,6 +348,7 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
 
   @override
   void dispose() {
+    _idlePromptTimer?.cancel();
     _liveSceneTimer?.cancel();
     unawaited(_liveSceneCamera.stop());
     unawaited(_cartoonTts.stop());
@@ -1009,6 +1012,8 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
         _bubbles.add(_ChatBubble(role: 'coach', text: opening));
     });
     _armSessionClock();
+    _idlePromptCount = 0;
+    _scheduleIdlePrompt();
     _scrollChatToEnd();
     unawaited(_consumeCoachQuotaIfNeeded());
     if (_usesVoicePipeline(settings)) {
@@ -1020,6 +1025,28 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
     if (opening != null) {
       unawaited(_speakCoach(opening, settings));
     }
+  }
+
+  void _scheduleIdlePrompt() {
+    _idlePromptTimer?.cancel();
+    if (!_started || _idlePromptCount >= 2) return;
+    _idlePromptTimer = Timer(const Duration(seconds: 18), () async {
+      if (!mounted || !_started || _busy || _recordingActive || _coachSpeaking) {
+        if (mounted && _started) _scheduleIdlePrompt();
+        return;
+      }
+      final String prompt = _idlePromptCount == 0
+          ? '不知道说什么也没关系。你可以用中文告诉我想表达什么，或者先说：I had a busy day.'
+          : '我们从简单的一句开始：How was your day? 你可以说 It was good，或者用中文求助。';
+      _idlePromptCount++;
+      setState(() {
+        _bubbles.add(_ChatBubble(role: 'coach', text: prompt));
+        _status = '可以用中文求助，也可以跟着示例说';
+      });
+      _scrollChatToEnd();
+      await _speakCoach(prompt, ref.read(learningSettingsProvider));
+      if (mounted) _scheduleIdlePrompt();
+    });
   }
 
   Future<void> _applyScenario(LearningScenario scenario) async {
@@ -1178,6 +1205,7 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
       return;
     }
     _recordingLimitTimer?.cancel();
+    _scheduleIdlePrompt();
     _recordingActive = false;
     if (mounted) {
       setState(() {
@@ -1281,37 +1309,6 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
     await _speakCoach(reply, settings);
   }
 
-  Future<String?> _reviewTranscript(String transcript) {
-    String edited = transcript.trim();
-    return showDialog<String>(
-      context: context,
-      builder: (BuildContext dialogContext) => StatefulBuilder(
-        builder: (BuildContext context, StateSetter update) => AlertDialog(
-          title: const Text('确认语音转写'),
-          content: TextFormField(
-            initialValue: edited,
-            minLines: 2,
-            maxLines: 5,
-            decoration: const InputDecoration(hintText: '输入或修改刚才说的话'),
-            onChanged: (String value) => update(() => edited = value),
-          ),
-          actions: <Widget>[
-            TextButton(
-              onPressed: () => Navigator.pop(dialogContext, ''),
-              child: const Text('重新录音'),
-            ),
-            FilledButton(
-              onPressed: edited.trim().isEmpty
-                  ? null
-                  : () => Navigator.pop(dialogContext, edited.trim()),
-              child: const Text('发送给教练'),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
   void _updateReplyLanguageFromLearner(String transcript) {
     if (learnerRequestsChineseReply(transcript)) {
       _preferChineseReply = true;
@@ -1335,14 +1332,13 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
       audioPath: audioPath,
     );
     if (!mounted || !identical(_session, session)) return;
-    final String? confirmed = await _reviewTranscript(draft.transcript);
+    final String confirmed = draft.transcript.trim();
     if (!mounted || !_started || !identical(_session, session)) return;
-    if (confirmed == null || confirmed.isEmpty) {
+    if (confirmed.isEmpty || confirmed == '(empty)') {
       setState(() {
         _busy = false;
         _status = '点麦克风重新录音';
       });
-      if (confirmed == '') await _onHoldStart();
       return;
     }
 
@@ -1992,6 +1988,7 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
         return;
       }
     }
+    _idlePromptTimer?.cancel();
     await _startRecording();
   }
 
@@ -2003,6 +2000,7 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
   }
 
   Future<void> _hangUp() async {
+    _idlePromptTimer?.cancel();
     if (!_started) return;
     if (_recordingActive) {
       await _stopRecordingAndSend();

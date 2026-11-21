@@ -46,7 +46,7 @@ class DeepgramAsr:
                 'https://api.deepgram.com/v1/listen',
                 params={
                     'model': 'nova-2',
-                    'language': language or 'en',
+                    **({'detect_language': 'true'} if language == 'auto' else {'language': language or 'en'}),
                     'punctuate': 'true',
                     'smart_format': 'true',
                 },
@@ -93,7 +93,7 @@ class WhisperXAsr:
         device = 'cpu'
         model = whisperx.load_model(self.model, device, compute_type='int8')
         audio = whisperx.load_audio(audio_path)
-        result = model.transcribe(audio, batch_size=8, language=language)
+        result = model.transcribe(audio, batch_size=8, language=None if language == 'auto' else language)
         parts = [seg.get('text', '').strip() for seg in result.get('segments', [])]
         transcript = ' '.join(p for p in parts if p).strip()
         return AsrResult(transcript=transcript or '(empty)', provider=self.name)

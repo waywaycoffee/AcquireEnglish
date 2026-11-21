@@ -192,7 +192,7 @@ class OralCoachPipeline:
         """ASR + pronunciation only — no LLM until confirm."""
         # Free topic talk often has no drill line — score softly vs transcript.
         reference = (reference_override or session.context.current_english or '').strip()
-        asr = await self.asr.transcribe(audio_path)
+        asr = await self.asr.transcribe(audio_path, language='auto')
         transcript = asr.transcript.strip()
         if not reference:
             reference = transcript
