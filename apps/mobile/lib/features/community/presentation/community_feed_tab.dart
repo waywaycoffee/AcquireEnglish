@@ -120,12 +120,17 @@ class CommunityFeedTab extends ConsumerWidget {
     );
   }
 
+  static bool _hasChallenge(CommunityPostDto post) =>
+      cafeLevelFromPath(post.linkUrl) != null &&
+      (post.kind == 'learning_result' ||
+          post.kind == 'method' ||
+          post.kind == 'question');
+
   static List<CommunityPostDto> _orderQuestFirst(List<CommunityPostDto> posts) {
     final List<CommunityPostDto> quests = <CommunityPostDto>[];
     final List<CommunityPostDto> rest = <CommunityPostDto>[];
     for (final CommunityPostDto post in posts) {
-      if (post.kind == 'learning_result' &&
-          cafeLevelFromPath(post.linkUrl) != null) {
+      if (_hasChallenge(post)) {
         quests.add(post);
       } else {
         rest.add(post);
@@ -252,7 +257,7 @@ class CommunityPostCard extends ConsumerWidget {
     final CommunityPostDto post =
         ref.watch(communityPostUpdatesProvider)[this.post.id] ?? this.post;
 
-    final int? challengeLevel = post.kind == 'learning_result'
+    final int? challengeLevel = CommunityFeedTab._hasChallenge(post)
         ? cafeLevelFromPath(post.linkUrl)
         : null;
     final String? cover = post.linkCover?.trim();
@@ -797,6 +802,12 @@ class _ComposeSheetState extends ConsumerState<_ComposeSheet> {
   final TextEditingController _body = TextEditingController();
   final TextEditingController _link = TextEditingController();
   bool _busy = false;
+  int? _challengeLevel;
+
+  bool get _canAttachChallenge =>
+      widget.kind == 'learning_result' ||
+      widget.kind == 'method' ||
+      widget.kind == 'question';
 
   @override
   void dispose() {
@@ -867,13 +878,18 @@ class _ComposeSheetState extends ConsumerState<_ComposeSheet> {
     }
     setState(() => _busy = true);
     try {
+      final String? challengePath = _canAttachChallenge && _challengeLevel != null
+          ? cafeChallengePath(_challengeLevel!)
+          : null;
       await ref
           .read(communityFeedProvider.notifier)
           .createPost(
             kind: widget.kind,
             title: _title.text.trim(),
             body: _body.text.trim(),
-            linkUrl: widget.kind == 'share_bilibili' ? _link.text.trim() : null,
+            linkUrl: widget.kind == 'share_bilibili'
+                ? _link.text.trim()
+                : challengePath,
             linkTitle: widget.kind == 'share_bilibili'
                 ? _title.text.trim()
                 : null,
@@ -936,6 +952,30 @@ class _ComposeSheetState extends ConsumerState<_ComposeSheet> {
                   hintText: 'https://www.bilibili.com/video/… 或 b23.tv/…',
                   border: OutlineInputBorder(),
                 ),
+              ),
+            ],
+            if (_canAttachChallenge) ...<Widget>[
+              const SizedBox(height: 10),
+              DropdownButtonFormField<int?>(
+                value: _challengeLevel,
+                decoration: const InputDecoration(
+                  labelText: '关联关卡（可选）',
+                  border: OutlineInputBorder(),
+                ),
+                items: <DropdownMenuItem<int?>>[
+                  const DropdownMenuItem<int?>(
+                    value: null,
+                    child: Text('不关联关卡'),
+                  ),
+                  for (int i = 0; i < kCafeLevels.length; i++)
+                    DropdownMenuItem<int?>(
+                      value: i,
+                      child: Text('街角咖啡店 · ${kCafeLevels[i].title}'),
+                    ),
+                ],
+                onChanged: _busy
+                    ? null
+                    : (int? value) => setState(() => _challengeLevel = value),
               ),
             ],
             const SizedBox(height: 14),

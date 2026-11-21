@@ -267,3 +267,15 @@ async def test_learning_result_challenge_is_visible_to_another_user():
             json={"kind": "learning_result", "body": "测试", "link_url": path + "0"},
         )
         assert invalid.status_code == 400
+
+        method = await client.post(
+            "/api/community/posts",
+            headers=author,
+            json={
+                "kind": "method",
+                "body": "这里用 Could I get…?",
+                "link_url": path,
+            },
+        )
+        assert method.status_code == 201, method.text
+        assert method.json()["link_url"] == path

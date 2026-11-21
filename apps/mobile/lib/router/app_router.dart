@@ -1,4 +1,5 @@
 import '../features/learning_modules/module_screen.dart';
+import '../features/community/presentation/exploration_map_screen.dart';
 import '../features/community/presentation/public_learning_card_screen.dart';
 import '../features/community/presentation/community_screen.dart';
 import '../features/daily_review/domain/daily_review.dart';
@@ -104,6 +105,15 @@ GoRouter goRouter(Ref ref) => GoRouter(
       path: '/shared/:token',
       builder: (BuildContext context, GoRouterState state) =>
           PublicLearningCardScreen(token: state.pathParameters['token']!),
+    ),
+    GoRoute(
+      path: '/explore/cafe/:stage',
+      builder: (BuildContext context, GoRouterState state) {
+        final int stage =
+            int.tryParse(state.pathParameters['stage'] ?? '') ?? 1;
+        final int levelIndex = (stage - 1).clamp(0, 3);
+        return ExplorationMapScreen(sharedLevel: levelIndex);
+      },
     ),
     GoRoute(
       path: SGRoute.membership.route,

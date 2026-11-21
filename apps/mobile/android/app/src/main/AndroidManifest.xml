@@ -64,6 +64,7 @@
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.BROWSABLE" />
                 <data android:scheme="acquireenglish" android:host="app" android:pathPrefix="/shared/" />
+                <data android:scheme="acquireenglish" android:host="app" android:pathPrefix="/explore/" />
             </intent-filter>
         </activity>
         <!-- flutter_foreground_task: subtitle completion while backgrounded -->

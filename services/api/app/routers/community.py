@@ -523,8 +523,10 @@ async def create_post(
             "method": "学习方法",
             "question": "学习问答",
         }[kind]
-        if kind == "learning_result" and payload.link_url:
-            challenge_paths = {f"/community/explore/cafe/{stage}" for stage in range(1, 5)}
+        if payload.link_url:
+            challenge_paths = {
+                f"/community/explore/cafe/{stage}" for stage in range(1, 5)
+            }
             if payload.link_url not in challenge_paths:
                 raise HTTPException(status_code=400, detail="无法识别探索地图关卡")
             link_url = payload.link_url

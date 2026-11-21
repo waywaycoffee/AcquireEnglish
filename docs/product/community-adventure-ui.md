@@ -30,3 +30,5 @@
 - 成果卡 `learning_result` 可带 `link_url=/community/explore/cafe/{1-4}`；动态优先展示并可「练同一关」。
 - 学习桌有同桌时显示本周共同目标卡（换人不丢个人关卡）；提醒复用 `/encourage`。
 - 词汇 PK 入口仍在学习桌；发现页不再并行旧 PK。
+- 微信/浏览器落地：`GET /api/public/challenges/cafe/{1-4}`；App 深链 `acquireenglish://app/explore/cafe/{n}` 与路由 `/explore/cafe/:stage`。
+- 方法/提问帖也可挂同一关卡 `link_url`，任务流同样置顶可开练。
