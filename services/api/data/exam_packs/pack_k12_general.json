@@ -2,11 +2,12 @@
   "family_id": "k12_general",
   "title": "K12 英语通用备考包",
   "cefr": "A2",
-  "version": 4,
+  "version": 7,
   "sources": [
     "guorentao/SmartGaokaoPastPapers",
     "mirrored-zhongkao/gaokao-slice",
-    "cn-math-taxonomy English primary (CC-BY-NC)"
+    "cn-math-taxonomy English primary (CC-BY-NC)",
+    "SC-Ques (check license)"
   ],
   "counts": {
     "vocab": 800,
