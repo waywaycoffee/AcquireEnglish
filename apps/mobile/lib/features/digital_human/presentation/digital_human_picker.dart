@@ -219,11 +219,13 @@ class _DigitalHumanPickerState extends ConsumerState<DigitalHumanPicker> {
           thumbColor: AppDesignTokens.brandGreenDark,
           trackColor: AppDesignTokens.borderGray,
           child: SizedBox(
-            height: 215,
+            // Keep cards shorter than this; overflow here paints over bottom nav
+            // and eats taps (首页以外“打不开”).
+            height: 248,
             child: ListView.separated(
               controller: _personas,
               primary: false,
-              padding: const EdgeInsets.only(bottom: 16),
+              padding: const EdgeInsets.only(bottom: 10),
               scrollDirection: Axis.horizontal,
               itemCount: visible.length,
               separatorBuilder: (_, __) => const SizedBox(width: 12),
@@ -348,13 +350,15 @@ class _PersonaCard extends StatelessWidget {
                 ),
               ),
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: 4),
             Text(
               persona.displayName,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               style: TextStyle(
+                fontSize: 13,
                 fontWeight: FontWeight.w900,
+                height: 1.1,
                 color: selected
                     ? AppDesignTokens.brandGreenDark
                     : AppDesignTokens.textPrimary,
@@ -363,27 +367,34 @@ class _PersonaCard extends StatelessWidget {
             Text(
               bilingual ? '中英同音色' : '中文另用音色',
               maxLines: 1,
+              overflow: TextOverflow.ellipsis,
               style: TextStyle(
-                fontSize: 11,
+                fontSize: 10,
+                height: 1.1,
                 color: AppDesignTokens.textSecondary,
               ),
             ),
-            IconButton(
-              tooltip: playing
-                  ? '停止试听 ${persona.displayName}'
-                  : '试听 ${persona.displayName}',
-              onPressed: onPreview,
-              visualDensity: VisualDensity.compact,
-              icon: loading
-                  ? const SizedBox.square(
-                      dimension: 16,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    )
-                  : Icon(
-                      playing
-                          ? Icons.stop_circle_outlined
-                          : Icons.play_circle_outline,
-                    ),
+            SizedBox(
+              height: 28,
+              child: IconButton(
+                tooltip: playing
+                    ? '停止试听 ${persona.displayName}'
+                    : '试听 ${persona.displayName}',
+                onPressed: onPreview,
+                padding: EdgeInsets.zero,
+                visualDensity: VisualDensity.compact,
+                iconSize: 22,
+                icon: loading
+                    ? const SizedBox.square(
+                        dimension: 16,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : Icon(
+                        playing
+                            ? Icons.stop_circle_outlined
+                            : Icons.play_circle_outline,
+                      ),
+              ),
             ),
           ],
         ),

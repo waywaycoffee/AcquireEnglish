@@ -48,6 +48,8 @@ class PadTopBar extends ConsumerWidget {
     final double scale = MediaQuery.textScalerOf(context)
         .scale(1)
         .clamp(1.0, 1.35);
+    // Do not set clipBehavior without decoration — Container asserts and
+    // every PadTopBar screen (视频/阅读/背单词/社区) red-screens.
     return Container(
       height: contentHeight * scale + topInset + windowControlsInset,
       padding: EdgeInsets.fromLTRB(
@@ -57,7 +59,6 @@ class PadTopBar extends ConsumerWidget {
         0,
       ),
       color: Colors.transparent,
-      clipBehavior: Clip.hardEdge,
       child: Row(
         children: <Widget>[
           if (leading != null) ...<Widget>[

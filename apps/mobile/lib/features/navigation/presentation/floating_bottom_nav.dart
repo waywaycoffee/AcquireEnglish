@@ -3,7 +3,6 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../shared/presentation/android_system_inset.dart';
 import '../../shared/presentation/pad/app_design_tokens.dart';
 import 'navigation_destination.dart';
 
@@ -44,13 +43,16 @@ class FloatingBottomNav extends StatelessWidget {
         ? _primaryDestinations
         : destinations;
 
-    final double systemBottom = systemBottomInsetOf(context);
-    return Padding(
-      padding: EdgeInsets.fromLTRB(
+    // SafeArea owns the system gesture/nav inset. Do not also add
+    // systemBottomInsetOf here — double padding was blowing past Scaffold's
+    // bottom bar budget (~74px overflow on gesture phones).
+    return SafeArea(
+      top: false,
+      minimum: EdgeInsets.fromLTRB(
+        compact ? 10 : 16,
+        compact ? 6 : 10,
         compact ? 10 : 16,
         compact ? 8 : 12,
-        compact ? 10 : 16,
-        (compact ? 10 : 16) + systemBottom,
       ),
       child: ClipRRect(
         borderRadius: BorderRadius.circular(compact ? 22 : 28),
@@ -64,8 +66,8 @@ class FloatingBottomNav extends StatelessWidget {
             ),
             child: Padding(
               padding: EdgeInsets.symmetric(
-                horizontal: compact ? 4 : 8,
-                vertical: compact ? 6 : 8,
+                horizontal: compact ? 2 : 6,
+                vertical: compact ? 4 : 6,
               ),
               child: Row(
                 children: <Widget>[
@@ -112,7 +114,7 @@ class _MoreNavItem extends StatelessWidget {
         curve: Curves.easeOut,
         padding: EdgeInsets.symmetric(
           horizontal: compact ? 2 : 4,
-          vertical: compact ? 8 : 10,
+          vertical: compact ? 6 : 8,
         ),
         decoration: BoxDecoration(
           color: selected ? AppDesignTokens.brandGreen : Colors.transparent,
@@ -123,8 +125,8 @@ class _MoreNavItem extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           children: <Widget>[
             SizedBox(
-              width: compact ? 30 : 34,
-              height: compact ? 30 : 34,
+              width: compact ? 28 : 32,
+              height: compact ? 28 : 32,
               child: selected
                   ? DecoratedBox(
                       decoration: BoxDecoration(
@@ -133,19 +135,21 @@ class _MoreNavItem extends StatelessWidget {
                       ),
                       child: Icon(
                         Icons.grid_view_rounded,
-                        size: compact ? 18 : 20,
+                        size: compact ? 17 : 19,
                         color: AppDesignTokens.brandGreenDark,
                       ),
                     )
                   : Icon(
                       Icons.grid_view_outlined,
-                      size: compact ? 18 : 20,
+                      size: compact ? 17 : 19,
                       color: AppDesignTokens.textSecondary,
                     ),
             ),
-            SizedBox(height: compact ? 3 : 4),
+            SizedBox(height: compact ? 2 : 3),
             Text(
               '更多',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
               style: TextStyle(
                 color: selected
                     ? AppDesignTokens.onAccent
@@ -216,7 +220,7 @@ class _NavItem extends StatelessWidget {
         curve: Curves.easeOut,
         padding: EdgeInsets.symmetric(
           horizontal: compact ? 2 : 4,
-          vertical: compact ? 8 : 10,
+          vertical: compact ? 6 : 8,
         ),
         decoration: BoxDecoration(
           color: selected ? AppDesignTokens.brandGreen : Colors.transparent,
@@ -227,8 +231,8 @@ class _NavItem extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           children: <Widget>[
             SizedBox(
-              width: compact ? 30 : 34,
-              height: compact ? 30 : 34,
+              width: compact ? 28 : 32,
+              height: compact ? 28 : 32,
               child: selected
                   ? DecoratedBox(
                       decoration: BoxDecoration(
@@ -237,17 +241,17 @@ class _NavItem extends StatelessWidget {
                       ),
                       child: Icon(
                         destination.activeIcon,
-                        size: compact ? 18 : 20,
+                        size: compact ? 17 : 19,
                         color: AppDesignTokens.brandGreenDark,
                       ),
                     )
                   : Icon(
                       destination.icon,
-                      size: compact ? 18 : 20,
+                      size: compact ? 17 : 19,
                       color: AppDesignTokens.textSecondary,
                     ),
             ),
-            SizedBox(height: compact ? 3 : 4),
+            SizedBox(height: compact ? 2 : 3),
             Text(
               destination.label,
               maxLines: 1,

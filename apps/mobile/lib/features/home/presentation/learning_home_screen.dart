@@ -105,12 +105,15 @@ class LearningHomeScreen extends ConsumerWidget {
       showContinueLearning: false,
       body: ColoredBox(
         color: bg,
+        // PadScaffold already hosts the bottom nav; only pad the top/sides
+        // so SafeArea does not fight the floating tab bar.
         child: SafeArea(
+          bottom: false,
           child: Center(
             child: ConstrainedBox(
               constraints: const BoxConstraints(maxWidth: 760),
               child: ListView(
-                padding: const EdgeInsets.all(24),
+                padding: const EdgeInsets.fromLTRB(24, 24, 24, 96),
                 children: [
                   Row(
                     children: [
