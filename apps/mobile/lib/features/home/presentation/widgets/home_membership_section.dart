@@ -74,8 +74,8 @@ class HomeMembershipSection extends ConsumerWidget {
                     Expanded(
                       child: Text(
                         daysLeft == null
-                            ? '全功能体验进行中 · 去领取延长券'
-                            : '全功能体验剩余约 $daysLeft 天 · 连续登录可延长',
+                            ? 'Pro 体验进行中（注册赠送 1 个月）· 去领取延长券'
+                            : 'Pro 体验剩余约 $daysLeft 天 · 连续登录可延长',
                         style: const TextStyle(fontWeight: FontWeight.w700),
                       ),
                     ),

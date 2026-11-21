@@ -6,6 +6,7 @@ import 'package:go_router/go_router.dart';
 import 'package:hive_ce/hive.dart';
 
 import '../../../../router/app_router.dart';
+import '../../../shared/audio/success_sfx.dart';
 import '../../../sync/presentation/cloud_catalog_sync.dart';
 import '../../domain/login_response.dart';
 import '../account_hub_sheet.dart';
@@ -48,9 +49,17 @@ Future<void> completeLoginAndGoHome(
   if (!context.mounted) {
     return;
   }
+  if (isNew) {
+    playSuccessSfx(SuccessSfxKind.fanfare);
+  }
   ScaffoldMessenger.of(context).showSnackBar(
     SnackBar(
-      content: Text(isNew ? '已自动注册并登录' : '正在同步云端视频与字幕…'),
+      content: Text(
+        isNew
+            ? '欢迎加入！已赠送 1 个月 Pro，全功能免费畅用'
+            : '正在同步云端视频与字幕…',
+      ),
+      duration: Duration(seconds: isNew ? 5 : 3),
     ),
   );
   ref.invalidate(cloudCatalogSyncProvider);

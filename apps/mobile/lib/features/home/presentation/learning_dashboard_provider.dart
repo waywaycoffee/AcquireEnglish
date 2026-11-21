@@ -10,6 +10,7 @@ import '../../authentication/presentation/auth_session.dart';
 import '../../avatar/presentation/avatar_provider.dart';
 import '../../library/presentation/library_catalog_provider.dart';
 import '../../library/presentation/library_mock_data.dart';
+import '../../shared/audio/success_sfx.dart';
 import '../../sync/data/acquire_api_client.dart';
 
 const int _checkInStudyMinuteTarget = 10;
@@ -168,6 +169,7 @@ class LearningActivityNotifier extends Notifier<LearningActivityState> {
       return record.copyWith(shadowingCount: record.shadowingCount + 1);
     });
     final int count = state.records[dayKey]?.shadowingCount ?? 0;
+    playSuccessSfx(SuccessSfxKind.nudge);
     unawaited(
       _earnPoints(
         reason: 'shadowing',
@@ -176,6 +178,7 @@ class LearningActivityNotifier extends Notifier<LearningActivityState> {
     );
     // Commerce points: batch every 3 shadow toggles (maps to shadow_batch rule).
     if (count > 0 && count % 3 == 0) {
+      playSuccessSfx(SuccessSfxKind.reward);
       unawaited(
         _earnCommercePoints(
           reason: 'shadow_batch',
@@ -259,6 +262,7 @@ class LearningActivityNotifier extends Notifier<LearningActivityState> {
     _schedulePersist();
     _scheduleStudyStatsSync();
     if (justCheckedIn) {
+      playSuccessSfx(SuccessSfxKind.complete);
       unawaited(
         _earnCommercePoints(
           reason: 'daily_tasks_clear',
@@ -269,6 +273,7 @@ class LearningActivityNotifier extends Notifier<LearningActivityState> {
       final int streakAfter = state.streakDays;
       for (final int milestone in const <int>[3, 7, 14, 30]) {
         if (streakBefore < milestone && streakAfter >= milestone) {
+          playSuccessSfx(SuccessSfxKind.fanfare);
           unawaited(
             _earnCommercePoints(
               reason: 'checkin_$milestone',

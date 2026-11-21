@@ -19,6 +19,7 @@ import '../../player/domain/pronunciation_assessment.dart';
 import '../../player/presentation/widgets/pronunciation_assessment_dialog.dart';
 import '../../settings/data/pronunciation_credentials.dart';
 import '../../settings/presentation/settings_provider.dart';
+import '../../shared/audio/success_sfx.dart';
 import '../../shared/data/word_lookup_service.dart';
 import '../../shared/data/word_pronunciation_service.dart';
 import '../../shared/domain/subtitle_letter_case.dart';
@@ -2330,6 +2331,9 @@ class _DailyReviewScreenState extends ConsumerState<DailyReviewScreen>
   void _nextCard(String key, {required bool complete}) {
     _stopSpeech();
     if (_sessionScroll.hasClients) _sessionScroll.jumpTo(0);
+    final bool wasFinished =
+        (_deckKeys ?? <String>[]).isNotEmpty &&
+        (_deckKeys!.every(_completedKeys.contains));
     setState(() {
       if (complete) _completedKeys.add(key);
       _retryWord = false;
@@ -2348,6 +2352,16 @@ class _DailyReviewScreenState extends ConsumerState<DailyReviewScreen>
       _forward = true;
       _revealed = false;
     });
+    if (complete) {
+      final List<String> keys = _deckKeys ?? <String>[];
+      final bool nowFinished =
+          keys.isNotEmpty && keys.every(_completedKeys.contains);
+      if (nowFinished && !wasFinished) {
+        playSuccessSfx(SuccessSfxKind.complete);
+      } else {
+        playSuccessSfx(SuccessSfxKind.nudge);
+      }
+    }
     unawaited(_persistDraft());
   }
 

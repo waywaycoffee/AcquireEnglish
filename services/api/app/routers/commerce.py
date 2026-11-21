@@ -202,7 +202,7 @@ async def commerce_claim_trial_extend(
         "kind": coupon.kind,
         "value": coupon.value,
         "used": bool(coupon.used),
-        "message": "已领取 7 天全功能延长券，请在会员中心兑换",
+        "message": "已领取 7 天 Pro 延长券，请在会员中心兑换",
     }
 
 

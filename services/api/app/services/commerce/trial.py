@@ -1,4 +1,4 @@
-"""Full-feature trial (7d) + daily-login extension coupon (+7d)."""
+"""New-user Pro welcome (30d) + daily-login extension coupon (+7d)."""
 
 from __future__ import annotations
 
@@ -11,7 +11,11 @@ from app.models import MembershipCoupon, UserEntitlement, UserLoginDay
 from app.services.commerce.catalog import MODULE_DEFS
 from app.services.user_assets import credit_wallet, grant_entitlement, list_active_entitlements
 
-TRIAL_DAYS = 7
+# Registration gift: one free Pro month (full feature unlock).
+TRIAL_DAYS = 30
+# Extra +7 days coupon after consecutive logins during the welcome month.
+TRIAL_EXTEND_LOGIN_DAYS = 7
+TRIAL_EXTEND_DAYS = 7
 TRIAL_EXTEND_CODE = "trial_extend_7"
 TRIAL_CAMPAIGN = "new_user_trial_full"
 
@@ -101,7 +105,7 @@ async def _find_trial_membership(
 
 
 async def grant_full_feature_trial(db: AsyncSession, user_id: int) -> dict[str, object]:
-    """7-day full-feature trial: Pro + all four modules + starter points/coach."""
+    """30-day Pro welcome: Pro + all modules + starter coach/points."""
     membership = await grant_entitlement(
         db,
         user_id,
@@ -109,7 +113,7 @@ async def grant_full_feature_trial(db: AsyncSession, user_id: int) -> dict[str, 
         asset_ref="pro",
         source="promo",
         duration_days=TRIAL_DAYS,
-        meta={"campaign": TRIAL_CAMPAIGN, "full_feature": True},
+        meta={"campaign": TRIAL_CAMPAIGN, "full_feature": True, "welcome_pro_month": True},
     )
     module_ids: list[int] = []
     for mod in MODULE_DEFS:
@@ -129,7 +133,7 @@ async def grant_full_feature_trial(db: AsyncSession, user_id: int) -> dict[str, 
         asset_kind="coach_quota",
         asset_ref="coach",
         source="promo",
-        quantity=30,
+        quantity=120,
         duration_days=TRIAL_DAYS,
         meta={"campaign": TRIAL_CAMPAIGN},
     )
@@ -165,30 +169,31 @@ async def trial_status(db: AsyncSession, user_id: int) -> dict[str, object]:
         return {
             "in_trial": False,
             "trial_ends_at": None,
+            "trial_days": TRIAL_DAYS,
             "login_days": 0,
-            "required_login_days": TRIAL_DAYS,
+            "required_login_days": TRIAL_EXTEND_LOGIN_DAYS,
             "extend_eligible": False,
             "extend_claimed": coupon is not None,
             "extend_coupon_id": coupon.id if coupon else None,
             "extend_coupon_used": bool(coupon.used) if coupon else False,
-            "message": "当前不在全功能体验期内",
+            "message": "当前不在 Pro 体验期内",
         }
 
     starts = _as_utc(trial.starts_at) or _utcnow()
     ends = _as_utc(trial.ends_at)
     login_days = await _login_days_since(db, user_id, starts)
     streak = _consecutive_from_start(
-        login_days, starts.astimezone(timezone.utc).date(), need=TRIAL_DAYS
+        login_days,
+        starts.astimezone(timezone.utc).date(),
+        need=TRIAL_EXTEND_LOGIN_DAYS,
     )
-    # Also accept "logged in on every calendar day of the trial so far"
-    # with at least TRIAL_DAYS distinct days.
-    distinct_ok = len(login_days) >= TRIAL_DAYS
-    eligible = coupon is None and (streak >= TRIAL_DAYS or distinct_ok)
+    distinct_ok = len(login_days) >= TRIAL_EXTEND_LOGIN_DAYS
+    eligible = coupon is None and (streak >= TRIAL_EXTEND_LOGIN_DAYS or distinct_ok)
     message = (
-        "已可领取 7 天全功能延长券"
+        f"已可领取 {TRIAL_EXTEND_DAYS} 天 Pro 延长券"
         if eligible
         else (
-            f"体验期内连续登录可领延长券（已登录 {len(login_days)}/{TRIAL_DAYS} 天）"
+            f"体验期内连续登录可领延长券（已登录 {len(login_days)}/{TRIAL_EXTEND_LOGIN_DAYS} 天）"
             if coupon is None
             else ("延长券已兑换" if coupon.used else "延长券已领取，可在会员中心兑换")
         )
@@ -196,9 +201,10 @@ async def trial_status(db: AsyncSession, user_id: int) -> dict[str, object]:
     return {
         "in_trial": True,
         "trial_ends_at": ends.isoformat() if ends else None,
+        "trial_days": TRIAL_DAYS,
         "login_days": len(login_days),
         "login_streak_from_start": streak,
-        "required_login_days": TRIAL_DAYS,
+        "required_login_days": TRIAL_EXTEND_LOGIN_DAYS,
         "extend_eligible": eligible,
         "extend_claimed": coupon is not None,
         "extend_coupon_id": coupon.id if coupon else None,
@@ -215,13 +221,14 @@ async def claim_trial_extend_coupon(
         if status["extend_claimed"]:
             raise ValueError("延长券已领取")
         raise ValueError(
-            f"需在体验期内每天登录满 {TRIAL_DAYS} 天（当前 {status['login_days']} 天）"
+            f"需在体验期内每天登录满 {TRIAL_EXTEND_LOGIN_DAYS} 天"
+            f"（当前 {status['login_days']} 天）"
         )
     row = MembershipCoupon(
         user_id=user_id,
         reward_code=TRIAL_EXTEND_CODE,
         kind="days",
-        value=TRIAL_DAYS,
+        value=TRIAL_EXTEND_DAYS,
         used=0,
     )
     db.add(row)

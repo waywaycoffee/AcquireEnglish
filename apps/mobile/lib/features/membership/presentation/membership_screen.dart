@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../authentication/presentation/auth_session.dart';
+import '../../shared/audio/success_sfx.dart';
 import '../../sync/data/acquire_api_client.dart';
 import '../../sync/data/user_assets_service.dart';
 
@@ -125,8 +126,9 @@ class _MembershipScreenState extends ConsumerState<MembershipScreen> {
     try {
       await ref.read(acquireApiClientProvider).commerceClaimTrialExtend();
       if (!mounted) return;
+      playSuccessSfx(SuccessSfxKind.reward);
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('已领取 7 天全功能延长券，可在下方优惠券兑换')),
+        const SnackBar(content: Text('已领取 7 天 Pro 延长券，可在下方优惠券兑换')),
       );
       await _load();
     } catch (_) {
@@ -155,12 +157,12 @@ class _MembershipScreenState extends ConsumerState<MembershipScreen> {
       Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Text('全功能体验', style: Theme.of(context).textTheme.titleLarge),
+          Text('Pro 体验（注册赠送 1 个月）', style: Theme.of(context).textTheme.titleLarge),
           const SizedBox(height: 8),
           Text(
             daysLeft == null
-                ? '体验进行中'
-                : '剩余约 $daysLeft 天 · 登录 $loginDays / $required 天',
+                ? 'Pro 体验进行中 · 全功能可用'
+                : '剩余约 $daysLeft 天 · 登录 $loginDays / $required 天可领延长券',
           ),
           if (message.isNotEmpty) ...[
             const SizedBox(height: 4),
@@ -358,6 +360,7 @@ class _MembershipScreenState extends ConsumerState<MembershipScreen> {
           .read(acquireApiClientProvider)
           .commerceSpendPoints(item: item);
       if (!mounted) return;
+      playSuccessSfx(SuccessSfxKind.reward);
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(

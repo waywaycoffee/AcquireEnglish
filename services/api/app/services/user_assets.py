@@ -158,7 +158,7 @@ async def credit_wallet(
 
 
 async def grant_new_user_trial(db: AsyncSession, user_id: int) -> dict[str, object]:
-    """Seed 7-day full-feature trial (Pro + all modules + coach + points)."""
+    """Seed 30-day Pro welcome (full modules + coach + points) for new accounts."""
     # Late import avoids cycle: commerce.trial → user_assets.
     from app.services.commerce.trial import grant_full_feature_trial
 

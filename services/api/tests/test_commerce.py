@@ -19,7 +19,12 @@ from app.database import Base, SessionLocal, engine
 from app.main import app as fastapi_app
 from app.models import MembershipCoupon, UserLoginDay
 from app.services.commerce.catalog import ensure_commerce_skus
-from app.services.commerce.trial import TRIAL_DAYS, TRIAL_EXTEND_CODE
+from app.services.commerce.trial import (
+    TRIAL_DAYS,
+    TRIAL_EXTEND_CODE,
+    TRIAL_EXTEND_DAYS,
+    TRIAL_EXTEND_LOGIN_DAYS,
+)
 from app.services.user_assets import ensure_default_skus
 
 
@@ -93,7 +98,8 @@ async def test_new_user_full_trial_and_module_access():
         assert trial.status_code == 200, trial.text
         t = trial.json()
         assert t["in_trial"] is True
-        assert t["required_login_days"] == TRIAL_DAYS
+        assert t["required_login_days"] == TRIAL_EXTEND_LOGIN_DAYS
+        assert t.get("trial_days") == TRIAL_DAYS
         assert t["login_days"] >= 1
         assert t["extend_claimed"] is False
 
@@ -118,14 +124,16 @@ async def test_claim_trial_extend_after_login_days():
         token = await _sms_token(client, phone="13900006666")
         headers = {"Authorization": f"Bearer {token}"}
 
-        # Backdate trial start and seed TRIAL_DAYS consecutive login days.
+        # Backdate trial start and seed TRIAL_EXTEND_LOGIN_DAYS consecutive logins.
         me = await client.get("/api/auth/me", headers=headers)
         assert me.status_code == 200, me.text
         user_id = int(me.json()["id"])
         async with SessionLocal() as session:
             from app.models import UserEntitlement
 
-            start_dt = datetime.now(timezone.utc) - timedelta(days=TRIAL_DAYS - 1)
+            start_dt = datetime.now(timezone.utc) - timedelta(
+                days=TRIAL_EXTEND_LOGIN_DAYS - 1
+            )
             ents = (
                 await session.execute(
                     select(UserEntitlement).where(
@@ -139,7 +147,7 @@ async def test_claim_trial_extend_after_login_days():
                 if ent.ends_at is not None:
                     ent.ends_at = start_dt + timedelta(days=TRIAL_DAYS)
             start = start_dt.date()
-            for i in range(TRIAL_DAYS):
+            for i in range(TRIAL_EXTEND_LOGIN_DAYS):
                 day = (start + timedelta(days=i)).isoformat()
                 exists = (
                     await session.execute(
@@ -176,7 +184,7 @@ async def test_claim_trial_extend_after_login_days():
             ).scalar_one()
             assert coupon.used == 0
             assert coupon.kind == "days"
-            assert coupon.value == TRIAL_DAYS
+            assert coupon.value == TRIAL_EXTEND_DAYS
 
 
 @pytest.mark.asyncio

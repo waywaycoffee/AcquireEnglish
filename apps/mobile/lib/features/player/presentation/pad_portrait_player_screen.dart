@@ -25,6 +25,7 @@ import '../../library/presentation/library_catalog_provider.dart';
 import '../../library/presentation/library_mock_data.dart';
 import '../../phrases/presentation/phrase_book_provider.dart';
 import '../../settings/presentation/settings_provider.dart';
+import '../../shared/audio/success_sfx.dart';
 import '../../subtitle_completion/reset_episode_subtitles.dart';
 import '../../subtitle_completion/spoken_language.dart';
 import '../../subtitle_completion/subtitle_completion_enqueue.dart';
@@ -5421,12 +5422,14 @@ Future<void> _settleChineseFillIfAlreadyPresent() async {
           return;
         }
         if (reward.awarded) {
+          playSuccessSfx(SuccessSfxKind.reward);
           _showMessage('分享成功 · +${reward.delta} 积分（余额 ${reward.balance}）');
         } else if (reward.reason == 'daily_cap') {
           _showMessage('分享成功 · 今日积分已达上限（余额 ${reward.balance}）');
         } else if (reward.reason == 'already_awarded') {
           _showMessage('分享成功 · 该分享已领过积分（余额 ${reward.balance}）');
         } else {
+          playSuccessSfx(SuccessSfxKind.nudge);
           _showMessage('分享成功 · 积分 ${reward.balance}');
         }
       } catch (_) {
