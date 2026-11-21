@@ -108,6 +108,32 @@ class _ReadingHubScreenState extends ConsumerState<ReadingHubScreen> {
       if (text.trim().isEmpty) {
         throw StateError('未能从文件中提取正文');
       }
+
+      String fingerprintNote = '';
+      if (ref.read(authSessionProvider).isLoggedIn && text.trim().length >= 80) {
+        progress.value = '正在检索同源解析资产…';
+        final String sourceType = lower.endsWith('.epub')
+            ? 'epub'
+            : lower.endsWith('.srt')
+            ? 'srt'
+            : 'pdf_text';
+        final FingerprintCacheSearchResult? fp = await ref
+            .read(acquireApiClientProvider)
+            .searchFingerprintCache(
+              cleanedText: text,
+              sourceType: sourceType,
+              fileName: file.name,
+              fileType: lower.contains('.')
+                  ? lower.split('.').last
+                  : 'pdf',
+            );
+        if (fp != null) {
+          fingerprintNote = fp.message.trim().isNotEmpty
+              ? ' · ${fp.message}'
+              : (fp.hit ? ' · 已复用云端课程结构' : ' · 未命中缓存，可排队 GPU 解析');
+        }
+      }
+
       final ReadingDoc doc = ReadingDoc(
         id: 'import_${DateTime.now().millisecondsSinceEpoch}',
         title: titleFromFilename(file.name),
@@ -120,7 +146,9 @@ class _ReadingHubScreenState extends ConsumerState<ReadingHubScreen> {
       Navigator.of(context, rootNavigator: true).pop();
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('已导入「${doc.title}」· 约 ${doc.wordCount} 词$sourceNote'),
+          content: Text(
+            '已导入「${doc.title}」· 约 ${doc.wordCount} 词$sourceNote$fingerprintNote',
+          ),
         ),
       );
       unawaited(context.push('/reading/${Uri.encodeComponent(doc.id)}'));

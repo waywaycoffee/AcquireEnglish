@@ -369,6 +369,58 @@ class SharedOcrBookPack {
   final int hitCount;
 }
 
+class FingerprintCacheSearchResult {
+  const FingerprintCacheSearchResult({
+    required this.hit,
+    required this.message,
+    this.degraded = false,
+    this.assetId = '',
+    this.fingerprintId = '',
+    this.similarBlocks = 0,
+    this.costMs = 0,
+    this.uploadTaskId = '',
+    this.assetName = '',
+    this.lessonCount = 0,
+    this.userCourseAssetId = '',
+  });
+
+  factory FingerprintCacheSearchResult.fromJson(Map<String, dynamic> json) {
+    final Object? assetRaw = json['asset'];
+    final Map<String, dynamic> asset = assetRaw is Map
+        ? Map<String, dynamic>.from(assetRaw)
+        : <String, dynamic>{};
+    final Object? courseRaw = json['user_course_asset'];
+    final Map<String, dynamic> course = courseRaw is Map
+        ? Map<String, dynamic>.from(courseRaw)
+        : <String, dynamic>{};
+    return FingerprintCacheSearchResult(
+      hit: json['hit'] == true,
+      degraded: json['degraded'] == true,
+      message: '${json['message'] ?? ''}',
+      assetId: '${json['asset_id'] ?? ''}',
+      fingerprintId: '${json['fingerprint_id'] ?? ''}',
+      similarBlocks: (json['similar_blocks'] as num?)?.toInt() ?? 0,
+      costMs: (json['cost_ms'] as num?)?.toInt() ?? 0,
+      uploadTaskId: '${json['upload_task_id'] ?? ''}',
+      assetName: '${asset['asset_name'] ?? ''}',
+      lessonCount: (asset['total_lesson_count'] as num?)?.toInt() ?? 0,
+      userCourseAssetId: '${course['id'] ?? ''}',
+    );
+  }
+
+  final bool hit;
+  final bool degraded;
+  final String message;
+  final String assetId;
+  final String fingerprintId;
+  final int similarBlocks;
+  final int costMs;
+  final String uploadTaskId;
+  final String assetName;
+  final int lessonCount;
+  final String userCourseAssetId;
+}
+
 class SharedOcrBookUpsertResult {
   const SharedOcrBookUpsertResult({
     required this.stored,
@@ -1779,6 +1831,43 @@ class AcquireApiClient {
       );
       if (response.data is! Map) return null;
       return SharedOcrBookUpsertResult.fromJson(
+        Map<String, dynamic>.from(response.data as Map),
+      );
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// 指纹检索：命中则复用公共课程资产，未命中由上游排队 GPU 解构。
+  Future<FingerprintCacheSearchResult?> searchFingerprintCache({
+    required String cleanedText,
+    String sourceType = 'pdf_text',
+    String? fileName,
+    String fileType = 'pdf',
+    bool createUploadTask = true,
+    bool autoBindCourse = true,
+  }) async {
+    final String text = cleanedText.trim();
+    if (text.length < 80) return null;
+    try {
+      final Response<dynamic> response = await _dio.post(
+        Endpoints.fingerprintCacheSearch,
+        data: <String, dynamic>{
+          'cleaned_text': text,
+          'source_type': sourceType,
+          if (fileName != null && fileName.trim().isNotEmpty)
+            'file_name': fileName.trim(),
+          'file_type': fileType,
+          'create_upload_task': createUploadTask,
+          'auto_bind_course': autoBindCourse,
+        },
+        options: Options(
+          receiveTimeout: const Duration(seconds: 30),
+          sendTimeout: const Duration(seconds: 30),
+        ),
+      );
+      if (response.data is! Map) return null;
+      return FingerprintCacheSearchResult.fromJson(
         Map<String, dynamic>.from(response.data as Map),
       );
     } catch (_) {

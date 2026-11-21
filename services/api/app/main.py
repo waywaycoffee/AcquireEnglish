@@ -30,6 +30,7 @@ from app.routers import (
     courses,
     creators,
     feed,
+    fingerprint_cache,
     content_media,
     foundation_media,
     syllabus_books,
@@ -124,6 +125,8 @@ app.include_router(assets.router, prefix="/api")
 app.include_router(netdisk.router, prefix="/api")
 app.include_router(shared_subtitles.router, prefix="/api")
 app.include_router(shared_ocr_books.router, prefix="/api")
+app.include_router(fingerprint_cache.router, prefix="/api")
+app.include_router(fingerprint_cache.admin_router, prefix="/api")
 app.include_router(rewards.router, prefix="/api")
 app.include_router(cosmetics.router, prefix="/api")
 app.include_router(review_sync.router, prefix="/api")

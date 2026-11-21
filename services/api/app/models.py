@@ -2,9 +2,11 @@ from datetime import datetime
 
 from sqlalchemy import (
     BigInteger,
+    Boolean,
     DateTime,
     Float,
     ForeignKey,
+    Index,
     Integer,
     String,
     Text,
@@ -1204,5 +1206,182 @@ class ApiUsageEvent(Base):
     note: Mapped[str] = mapped_column(String(255), default="")
     meta_json: Mapped[str] = mapped_column(Text, default="{}")
     created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), index=True
+    )
+
+
+# ---------------------------------------------------------------------------
+# 素材指纹缓存复用（PRD：一次 GPU 解构，全平台复用）
+# UUID 主键便于多节点共享；user_id 仍用现有 users.id（Integer）。
+# JSON 字段以 Text 存储，兼容 SQLite / Postgres。
+# ---------------------------------------------------------------------------
+
+
+class AssetCache(Base):
+    """公共缓存课程资产包（结构化元数据，不含原始 PDF/MP4）。"""
+
+    __tablename__ = "asset_cache"
+    __table_args__ = (
+        Index("idx_asset_cache_hit_count", "hit_count"),
+        Index("idx_asset_cache_last_hit_at", "last_hit_at"),
+        Index("idx_asset_cache_is_ban", "is_ban"),
+        Index("idx_asset_cache_ban_hit", "is_ban", "hit_count"),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    asset_name: Mapped[str] = mapped_column(String(256), default="")
+    source_type: Mapped[str] = mapped_column(String(32), default="pdf_text", index=True)
+    total_lesson_count: Mapped[int] = mapped_column(Integer, default=0)
+    cefr_level: Mapped[str | None] = mapped_column(String(16), nullable=True)
+    wordbank_ref_url: Mapped[str | None] = mapped_column(String(512), nullable=True)
+    lesson_structure_url: Mapped[str | None] = mapped_column(String(512), nullable=True)
+    summary_text: Mapped[str | None] = mapped_column(Text, nullable=True)
+    tag_list_json: Mapped[str] = mapped_column(Text, default="[]")
+    hit_count: Mapped[int] = mapped_column(BigInteger, default=0)
+    last_hit_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    is_ban: Mapped[bool] = mapped_column(Boolean, default=False)
+    created_by: Mapped[int | None] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True
+    )
+    create_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+    update_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
+
+
+class FingerprintIndex(Base):
+    """指纹索引：SimHash 分块 + 外部向量引用。"""
+
+    __tablename__ = "fingerprint_index"
+    __table_args__ = (
+        Index("idx_fingerprint_asset_id", "asset_id"),
+        Index("idx_fingerprint_is_valid", "is_valid"),
+        Index(
+            "idx_fingerprint_valid_type_len",
+            "is_valid",
+            "source_type",
+            "text_length",
+        ),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    asset_id: Mapped[str] = mapped_column(
+        ForeignKey("asset_cache.id", ondelete="CASCADE"), index=True
+    )
+    source_type: Mapped[str] = mapped_column(String(32), default="pdf_text")
+    simhash_blocks_json: Mapped[str] = mapped_column(Text, default="[]")
+    vector_ref_id: Mapped[str] = mapped_column(String(128), unique=True, index=True)
+    text_length: Mapped[int] = mapped_column(Integer, default=0)
+    version_tag: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    is_valid: Mapped[bool] = mapped_column(Boolean, default=True)
+    create_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+    update_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
+
+
+class SimhashBand(Base):
+    """SimHash 16 位分带召回表（每指纹 4 行）。"""
+
+    __tablename__ = "simhash_band"
+    __table_args__ = (
+        Index("idx_simhash_band_value_no", "band_value", "band_no"),
+        Index("idx_simhash_band_fp", "fingerprint_id"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    fingerprint_id: Mapped[str] = mapped_column(
+        ForeignKey("fingerprint_index.id", ondelete="CASCADE"), index=True
+    )
+    asset_id: Mapped[str] = mapped_column(String(36), index=True)
+    band_no: Mapped[int] = mapped_column(Integer)  # 0..3
+    band_value: Mapped[int] = mapped_column(Integer)
+    source_type: Mapped[str] = mapped_column(String(32), default="pdf_text")
+    text_length: Mapped[int] = mapped_column(Integer, default=0)
+
+
+class UserCourseAsset(Base):
+    """用户私有课程副本（diff 补丁，不改公共缓存）。"""
+
+    __tablename__ = "user_course_asset"
+    __table_args__ = (
+        Index("idx_user_course_asset_user_id", "user_id"),
+        Index("idx_user_course_asset_cache_id", "asset_cache_id"),
+        Index("idx_user_course_user_cache", "user_id", "asset_cache_id"),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    user_id: Mapped[int] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), index=True
+    )
+    asset_cache_id: Mapped[str | None] = mapped_column(
+        ForeignKey("asset_cache.id", ondelete="SET NULL"), nullable=True
+    )
+    asset_title: Mapped[str] = mapped_column(String(256), default="")
+    diff_patch_json: Mapped[str | None] = mapped_column(Text, nullable=True)
+    is_from_cache: Mapped[bool] = mapped_column(Boolean, default=True)
+    source_upload_id: Mapped[str | None] = mapped_column(String(36), nullable=True)
+    is_shared: Mapped[bool] = mapped_column(Boolean, default=False)
+    share_audit_status: Mapped[str] = mapped_column(String(32), default="pending")
+    create_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+    update_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
+
+
+class UploadTask(Base):
+    """用户上传与解析任务状态。"""
+
+    __tablename__ = "upload_task"
+    __table_args__ = (
+        Index("idx_upload_task_user_id", "user_id"),
+        Index("idx_upload_task_status", "status"),
+        Index("idx_upload_task_status_time", "status", "create_at"),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    user_id: Mapped[int] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), index=True
+    )
+    file_name: Mapped[str | None] = mapped_column(String(256), nullable=True)
+    file_type: Mapped[str] = mapped_column(String(32), default="pdf")
+    raw_file_key: Mapped[str | None] = mapped_column(String(256), nullable=True)
+    # pending / fingerprint_match / queue_gpu / success / failed
+    status: Mapped[str] = mapped_column(String(32), default="pending", index=True)
+    fingerprint_id: Mapped[str | None] = mapped_column(String(36), nullable=True)
+    user_course_asset_id: Mapped[str | None] = mapped_column(String(36), nullable=True)
+    fail_reason: Mapped[str | None] = mapped_column(Text, nullable=True)
+    create_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+    update_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
+
+
+class CacheHitLog(Base):
+    """指纹检索命中/未命中埋点。"""
+
+    __tablename__ = "cache_hit_log"
+    __table_args__ = (
+        Index("idx_cache_hit_log_asset", "asset_cache_id"),
+        Index("idx_cache_hit_log_create_at", "create_at"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    user_id: Mapped[int] = mapped_column(Integer, index=True)
+    fingerprint_id: Mapped[str | None] = mapped_column(String(36), nullable=True)
+    asset_cache_id: Mapped[str | None] = mapped_column(String(36), nullable=True)
+    hit_result: Mapped[str] = mapped_column(String(16), default="miss")  # hit / miss
+    cost_ms: Mapped[int] = mapped_column(Integer, default=0)
+    create_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), index=True
     )

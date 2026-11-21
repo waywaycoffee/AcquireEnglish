@@ -105,6 +105,22 @@ class Settings(BaseSettings):
     tencent_soe_secret_id: str = ""
     tencent_soe_secret_key: str = ""
 
+    # 素材指纹缓存复用（PRD）：SimHash + Embedding 双重校验。
+    fingerprint_cache_enabled: bool = True
+    fingerprint_sim_hamming_max: int = 9  # ~0.86 similarity on 64-bit
+    fingerprint_min_similar_blocks: int = 3
+    fingerprint_vec_score_min: float = 0.92
+    fingerprint_len_ratio_max: float = 0.20
+    fingerprint_max_blocks: int = 64
+    fingerprint_block_chars: int = 512
+    fingerprint_top_k: int = 20
+    fingerprint_embed_dim: int = 256
+    # Optional 5060Ti embed HTTP endpoint; empty → local hashing-trick embed.
+    fingerprint_embed_url: str = ""
+    fingerprint_lru_min_hits: int = 3
+    fingerprint_lru_idle_days: int = 180
+    fingerprint_gpu_save_minutes: int = 8
+
     def validate_auth_configuration(self) -> None:
         if self.production_mode and (
             not self.secret_key.strip()

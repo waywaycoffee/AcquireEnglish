@@ -124,6 +124,14 @@ class Endpoints {
       'api/pregen/oral-topics/${Uri.encodeComponent(key)}';
   static const String sharedOcrBooks = 'api/shared-ocr-books';
 
+  /// 素材指纹缓存复用（同源教材秒出课程包）。
+  static const String fingerprintCacheConfig = 'api/fingerprint-cache/config';
+  static const String fingerprintCacheSearch = 'api/fingerprint-cache/search';
+  static const String fingerprintCacheRegister = 'api/fingerprint-cache/register';
+  static const String fingerprintCacheMyCourses = 'api/fingerprint-cache/my-courses';
+  static String fingerprintCacheAsset(String assetId) =>
+      'api/fingerprint-cache/assets/${Uri.encodeComponent(assetId)}';
+
   /// Kept for Dio header compatibility; AcquireEnglish API ignores it.
   static const String apiKey = '';
 }
