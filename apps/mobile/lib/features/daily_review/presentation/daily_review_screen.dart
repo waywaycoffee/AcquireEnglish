@@ -109,6 +109,8 @@ class _DailyReviewScreenState extends ConsumerState<DailyReviewScreen>
   bool _retryWord = false;
   bool _forward = true;
   bool _revealed = false;
+  /// Expanded syllable / phonics coach under the headword.
+  bool _phonicsOpen = false;
   bool _saving = false;
   ReviewKind? _overviewKind;
   final Map<String, fsrs.Rating> _sessionRatings = <String, fsrs.Rating>{};
@@ -625,6 +627,7 @@ class _DailyReviewScreenState extends ConsumerState<DailyReviewScreen>
       _forward = offset > 0;
       _currentKey = keys[next];
       _playedWord = null;
+      _phonicsOpen = false;
       _retryWord = false;
       _modeStep = 0;
       _revealed = _completedKeys.contains(_currentKey);
@@ -1547,7 +1550,9 @@ class _DailyReviewScreenState extends ConsumerState<DailyReviewScreen>
                 !listenStage &&
                 !useCloze &&
                 !contrastStage)
-              ColoredVowelHeadword(word: source.question)
+              _wordPhonicsSurface(source.question, expandByDefault: false)
+            else if (word && _revealed)
+              _wordPhonicsSurface(source.question, expandByDefault: true)
             else
               SelectableText(
                 frontText,
@@ -1582,11 +1587,13 @@ class _DailyReviewScreenState extends ConsumerState<DailyReviewScreen>
                   ),
                 if (word)
                   IconButton(
-                    tooltip: '分音节与自然拼读',
-                    onPressed: () => unawaited(
-                      _showPhonicsSheet(source.question, record),
+                    tooltip: _phonicsOpen ? '收起自然拼读' : '展开音节与自然拼读',
+                    onPressed: () => setState(() => _phonicsOpen = !_phonicsOpen),
+                    icon: Icon(
+                      _phonicsOpen
+                          ? Icons.spa_rounded
+                          : Icons.spa_outlined,
                     ),
-                    icon: const Icon(Icons.spa_outlined),
                   ),
                 IconButton(
                   tooltip: _speaking ? '正在朗读' : '听原句',
@@ -1781,9 +1788,7 @@ class _DailyReviewScreenState extends ConsumerState<DailyReviewScreen>
                 ),
             ] else ...<Widget>[
               const Divider(height: 24),
-              if (word)
-                ColoredVowelHeadword(word: source.question, fontSize: 28),
-              if (word) const SizedBox(height: 8),
+              // Headword + phonics live in the top surface when revealed.
               Text(
                 source.answer.trim().isEmpty
                     ? '暂无单词释义，可以结合下方原句回忆，或在单词本补充。'
@@ -2274,6 +2279,7 @@ class _DailyReviewScreenState extends ConsumerState<DailyReviewScreen>
       if (complete) _completedKeys.add(key);
       _retryWord = false;
       _playedWord = null;
+      _phonicsOpen = false;
       _choices.remove(key);
       _stageRatings.remove(key);
       _modeStep = 0;
@@ -2764,34 +2770,43 @@ class _DailyReviewScreenState extends ConsumerState<DailyReviewScreen>
     return options;
   }
 
-  Future<void> _showPhonicsSheet(String word, ReviewRecord record) async {
-    await showModalBottomSheet<void>(
-      context: context,
-      isScrollControlled: true,
-      showDragHandle: true,
-      builder: (BuildContext context) {
-        return SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(16, 0, 16, 20),
-            child: SingleChildScrollView(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: <Widget>[
-                  ColoredVowelHeadword(word: word, fontSize: 28),
-                  const SizedBox(height: 12),
-                  PhonicsCoachPanel(
-                    word: word,
-                    speaking: _speaking,
-                    onSpeak: (String text) => _speak(text),
-                  ),
-                  const SizedBox(height: 12),
-                  FsrsSdMeter(record: record),
-                ],
-              ),
-            ),
+  /// Headword with vowel tint + tappable syllable blocks + optional coach.
+  Widget _wordPhonicsSurface(
+    String word, {
+    required bool expandByDefault,
+  }) {
+    final bool open = _phonicsOpen || expandByDefault;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: <Widget>[
+        ColoredVowelHeadword(
+          word: word,
+          showLegend: true,
+          onTap: () => setState(() => _phonicsOpen = !_phonicsOpen),
+        ),
+        const SizedBox(height: 10),
+        PhonicsSyllableBlocks(
+          word: word,
+          compact: !open,
+          onSegmentTap: (PhonicsSegment seg) {
+            unawaited(_speak(seg.text));
+            if (!_phonicsOpen) setState(() => _phonicsOpen = true);
+          },
+        ),
+        if (open) ...<Widget>[
+          const SizedBox(height: 12),
+          PhonicsCoachPanel(
+            word: word,
+            speaking: _speaking,
+            onSpeak: (String text) => _speak(text),
           ),
-        );
-      },
+        ] else
+          TextButton.icon(
+            onPressed: () => setState(() => _phonicsOpen = true),
+            icon: const Icon(Icons.spellcheck_rounded, size: 18),
+            label: const Text('展开自然拼读引导'),
+          ),
+      ],
     );
   }
 

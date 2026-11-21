@@ -8,12 +8,16 @@ class ColoredVowelHeadword extends StatelessWidget {
     required this.word,
     this.fontSize = 34,
     this.textAlign = TextAlign.center,
+    this.showLegend = false,
+    this.onTap,
     super.key,
   });
 
   final String word;
   final double fontSize;
   final TextAlign textAlign;
+  final bool showLegend;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
@@ -33,15 +37,47 @@ class ColoredVowelHeadword extends StatelessWidget {
             fontSize: fontSize,
             height: 1.2,
             fontWeight: FontWeight.w900,
-            letterSpacing: 0.4,
+            letterSpacing: 0.6,
             color: vowel ? const Color(0xFF1D4ED8) : const Color(0xFF111827),
+            backgroundColor: vowel
+                ? const Color(0xFFDBEAFE)
+                : Colors.transparent,
           ),
         ),
       );
     }
-    return Text.rich(
+    final Widget rich = Text.rich(
       TextSpan(children: spans),
       textAlign: textAlign,
+    );
+    final Widget body = Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: textAlign == TextAlign.start
+          ? CrossAxisAlignment.start
+          : CrossAxisAlignment.center,
+      children: <Widget>[
+        rich,
+        if (showLegend) ...<Widget>[
+          const SizedBox(height: 6),
+          Text(
+            onTap == null ? '蓝色高亮 = 元音' : '蓝色高亮 = 元音 · 点单词展开音节 / 拼读',
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w700,
+              color: Colors.grey.shade600,
+            ),
+          ),
+        ],
+      ],
+    );
+    if (onTap == null) return body;
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(12),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+        child: body,
+      ),
     );
   }
 }
