@@ -625,6 +625,41 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
                                         ),
                                       ),
                                     ),
+                                    if (subtitleFill.activeCount > 0)
+                                      TextButton(
+                                        onPressed: () {
+                                          unawaited(() async {
+                                            final int removed = await ref
+                                                .read(
+                                                  subtitleCompletionStatusProvider
+                                                      .notifier,
+                                                )
+                                                .stopAll(
+                                                  episodeIds: selectedCourse
+                                                      .episodes
+                                                      .map(
+                                                        (LibraryEpisodeItem e) =>
+                                                            e.id,
+                                                      ),
+                                                );
+                                            if (!context.mounted) {
+                                              return;
+                                            }
+                                            ScaffoldMessenger.of(
+                                              context,
+                                            ).showSnackBar(
+                                              SnackBar(
+                                                content: Text(
+                                                  removed > 0
+                                                      ? '已停止本课补字幕（清除 $removed 个任务）'
+                                                      : '已停止补字幕',
+                                                ),
+                                              ),
+                                            );
+                                          }());
+                                        },
+                                        child: const Text('停止'),
+                                      ),
                                     if (subtitleFill.failedCount > 0)
                                       TextButton(
                                         onPressed: () {
@@ -1785,9 +1820,11 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
       status: SubtitleCompletionStatus.pending,
     );
     // Failed jobs may already be at maxAttempts — force requeue before enqueue.
+    // Explicit chip tap should also revive jobs the user previously 停止'd.
     if (wantChinese || wantEnglish) {
       await SubtitleCompletionQueue.shared.requeueFailedJobs(
         onlyConfigErrors: false,
+        includeUserStopped: true,
       );
     }
     await enqueueSubtitleCompletionForEpisode(

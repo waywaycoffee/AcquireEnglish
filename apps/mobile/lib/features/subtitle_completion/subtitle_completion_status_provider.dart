@@ -570,12 +570,22 @@ class SubtitleCompletionStatusNotifier
       }
       await SubtitleCompletionQueue.shared.requeueFailedJobs(
         onlyConfigErrors: false,
+        includeUserStopped: true,
       );
       break;
     }
     // Also re-detect + enqueue from catalog via scheduler bootstrap path.
     SubtitleCompletionScheduler.instance.kick(delay: Duration.zero);
     await refresh();
+  }
+
+  /// Stop in-flight ASR/translation and clear pending jobs (optionally scoped).
+  Future<int> stopAll({Iterable<String>? episodeIds}) async {
+    final int removed = await SubtitleCompletionScheduler.instance
+        .stopAndClearQueue(episodeIds: episodeIds);
+    state = state.copyWith(clearActive: true);
+    await refresh();
+    return removed;
   }
 
   Future<void> retryEpisode({

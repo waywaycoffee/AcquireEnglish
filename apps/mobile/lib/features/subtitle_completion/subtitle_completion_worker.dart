@@ -160,9 +160,22 @@ class SubtitleCompletionWorker {
       return true;
     } catch (error) {
       if (_isCancellation(error, cancellationToken)) {
-        // Do not burn attempts — phone lock / detach should retry on resume.
+        // If user tapped 停止, clearActiveWork already failed the job; markDeferred
+        // is a no-op for 用户已停止 so we do not auto-resume.
         await queue.markDeferred(job.episodeId, '$error');
-        onProgress?.call(job.episodeId, '字幕补全已暂停，稍后自动继续');
+        final List<SubtitleCompletionJob> after = await queue.loadJobs();
+        final bool userStopped = after.any(
+          (SubtitleCompletionJob row) =>
+              row.episodeId == job.episodeId &&
+              row.status == SubtitleCompletionStatus.failed &&
+              (row.lastError ?? '').contains(
+                SubtitleCompletionQueue.userStoppedError,
+              ),
+        );
+        onProgress?.call(
+          job.episodeId,
+          userStopped ? '字幕补全已停止' : '字幕补全已暂停，稍后自动继续',
+        );
         return true;
       }
       // ignore: avoid_print

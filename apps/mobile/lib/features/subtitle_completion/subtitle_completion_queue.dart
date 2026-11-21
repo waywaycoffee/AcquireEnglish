@@ -237,6 +237,12 @@ class SubtitleCompletionQueue {
             return existing;
           }
         }
+        // User tapped 停止 — do not revive via catalog scan until force/重试.
+        if (!force &&
+            existing.status == SubtitleCompletionStatus.failed &&
+            (existing.lastError ?? '').contains(userStoppedError)) {
+          return existing;
+        }
         if (existing.status == SubtitleCompletionStatus.running && !force) {
           // Must persist path/flag refreshes — a bare return left disk stale and
           // dropped newly discovered missing sides until the next cold start.
@@ -322,37 +328,44 @@ class SubtitleCompletionQueue {
   }
 
   Future<void> markRunning(String episodeId) async {
-    await _update(
-      episodeId,
-      (SubtitleCompletionJob job) => job.copyWith(
+    await _update(episodeId, (SubtitleCompletionJob job) {
+      // User tapped 停止 — do not let an in-flight worker revive the job.
+      if (_isUserStopped(job)) {
+        return job;
+      }
+      return job.copyWith(
         status: SubtitleCompletionStatus.running,
         updatedAtMs: DateTime.now().millisecondsSinceEpoch,
         clearError: true,
-      ),
-    );
+      );
+    });
   }
 
   Future<void> markDone(String episodeId) async {
-    await _update(
-      episodeId,
-      (SubtitleCompletionJob job) => job.copyWith(
+    await _update(episodeId, (SubtitleCompletionJob job) {
+      if (_isUserStopped(job)) {
+        return job;
+      }
+      return job.copyWith(
         status: SubtitleCompletionStatus.done,
         updatedAtMs: DateTime.now().millisecondsSinceEpoch,
         clearError: true,
-      ),
-    );
+      );
+    });
   }
 
   Future<void> markFailed(String episodeId, String error) async {
-    await _update(
-      episodeId,
-      (SubtitleCompletionJob job) => job.copyWith(
+    await _update(episodeId, (SubtitleCompletionJob job) {
+      if (_isUserStopped(job)) {
+        return job;
+      }
+      return job.copyWith(
         status: SubtitleCompletionStatus.failed,
         attempts: job.attempts + 1,
         lastError: error,
         updatedAtMs: DateTime.now().millisecondsSinceEpoch,
-      ),
-    );
+      );
+    });
   }
 
   /// Drop a side that is already satisfied (e.g. official ZH softsub present).
@@ -412,6 +425,9 @@ class SubtitleCompletionQueue {
         return;
       }
       final SubtitleCompletionJob job = jobs[index];
+      if (_isUserStopped(job)) {
+        return;
+      }
       final int attempts = job.attempts + 1;
       final bool giveUp = attempts >= maxAttempts;
       jobs[index] = job.copyWith(
@@ -431,14 +447,17 @@ class SubtitleCompletionQueue {
 
   /// Pause a job without consuming an attempt (lifecycle cancel / lock screen).
   Future<void> markDeferred(String episodeId, String reason) async {
-    await _update(
-      episodeId,
-      (SubtitleCompletionJob job) => job.copyWith(
+    await _update(episodeId, (SubtitleCompletionJob job) {
+      // stopAndClearQueue marks failed first; cancel handlers must not reopen.
+      if (_isUserStopped(job)) {
+        return job;
+      }
+      return job.copyWith(
         status: SubtitleCompletionStatus.pending,
         lastError: reason,
         updatedAtMs: DateTime.now().millisecondsSinceEpoch,
-      ),
-    );
+      );
+    });
   }
 
   /// Reset interrupted "running" jobs back to pending (app killed mid-ASR).
@@ -464,7 +483,10 @@ class SubtitleCompletionQueue {
 
   /// Re-open failed jobs so a fixed ASR config (e.g. switch to local Whisper)
   /// can drain the import backlog again.
-  Future<int> requeueFailedJobs({bool onlyConfigErrors = true}) {
+  Future<int> requeueFailedJobs({
+    bool onlyConfigErrors = true,
+    bool includeUserStopped = false,
+  }) {
     return _withLock(() async {
       final List<SubtitleCompletionJob> jobs = await loadJobs();
       bool changed = false;
@@ -476,6 +498,10 @@ class SubtitleCompletionQueue {
           continue;
         }
         final String error = (job.lastError ?? '').toLowerCase();
+        final bool userStopped = error.contains(userStoppedError.toLowerCase());
+        if (userStopped && !includeUserStopped) {
+          continue;
+        }
         final bool configError =
             error.contains('api key') ||
             error.contains('密钥') ||
@@ -485,7 +511,7 @@ class SubtitleCompletionQueue {
             error.contains('whisper');
         final bool cancelError =
             error.contains('取消') || error.contains('cancel');
-        if (onlyConfigErrors && !configError && !cancelError) {
+        if (onlyConfigErrors && !configError && !cancelError && !userStopped) {
           continue;
         }
         jobs[i] = job.copyWith(
@@ -543,6 +569,54 @@ class SubtitleCompletionQueue {
         return;
       }
       await _saveJobs(next);
+    });
+  }
+
+  static const String userStoppedError = '用户已停止';
+
+  static bool _isUserStopped(SubtitleCompletionJob job) {
+    return job.status == SubtitleCompletionStatus.failed &&
+        (job.lastError ?? '').contains(userStoppedError);
+  }
+
+  /// Mark pending/running jobs as failed so ASR/translation stops and will not
+  /// auto-resume (catalog scan + enqueue respect [userStoppedError] until force).
+  ///
+  /// When [episodeIds] is null, stops the whole active queue.
+  Future<int> clearActiveWork({Iterable<String>? episodeIds}) {
+    final Set<String>? scope = episodeIds == null
+        ? null
+        : episodeIds
+            .map((String id) => id.trim())
+            .where((String id) => id.isNotEmpty)
+            .toSet();
+    return _withLock(() async {
+      final List<SubtitleCompletionJob> jobs = await loadJobs();
+      bool changed = false;
+      int stopped = 0;
+      final int now = DateTime.now().millisecondsSinceEpoch;
+      for (int i = 0; i < jobs.length; i++) {
+        final SubtitleCompletionJob job = jobs[i];
+        final bool inScope = scope == null || scope.contains(job.episodeId);
+        final bool active =
+            job.status == SubtitleCompletionStatus.pending ||
+            job.status == SubtitleCompletionStatus.running;
+        if (!inScope || !active) {
+          continue;
+        }
+        jobs[i] = job.copyWith(
+          status: SubtitleCompletionStatus.failed,
+          attempts: maxAttempts,
+          lastError: userStoppedError,
+          updatedAtMs: now,
+        );
+        changed = true;
+        stopped += 1;
+      }
+      if (changed) {
+        await _saveJobs(jobs);
+      }
+      return stopped;
     });
   }
 

@@ -79,6 +79,22 @@ class SubtitleCompletionScheduler with WidgetsBindingObserver {
     _token?.cancel();
   }
 
+  /// Cancel the in-flight job and drop pending/running queue entries.
+  ///
+  /// Returns how many active jobs were removed. Pass [episodeIds] to scope
+  /// to one course; omit to clear the whole app queue.
+  Future<int> stopAndClearQueue({Iterable<String>? episodeIds}) async {
+    _debounce?.cancel();
+    _token?.cancel();
+    _token = null;
+    final int removed = await queue.clearActiveWork(episodeIds: episodeIds);
+    _onQueueChanged?.call();
+    if (!await queue.hasPendingWork()) {
+      await SubtitleCompletionRuntime.instance.stop();
+    }
+    return removed;
+  }
+
   /// Playback no longer cancels import-time subtitle ASR.
   ///
   /// Missing EN/ZH must be filled when the video is imported (queue + Whisper),
