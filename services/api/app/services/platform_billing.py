@@ -1,11 +1,13 @@
 """Pull platform-side spend from vendor billing APIs using keys in .env / settings.
 
 Never returns raw secrets — only fingerprints, product lines, and amounts.
+Scans API + oral_coach + digital_human_coach env files so ALL connected platforms appear.
 """
 
 from __future__ import annotations
 
 import base64
+import calendar
 import hashlib
 import hmac
 import json
@@ -16,19 +18,84 @@ import urllib.parse
 import urllib.request
 import uuid
 from datetime import datetime, timezone
+from pathlib import Path
 from typing import Any
 
 from app.config import settings
 from app.services.api_usage import fingerprint_key
+
+# Sidecar env files on ECS (and local checkout mirrors).
+_ENV_CANDIDATES = (
+    Path("/opt/acquireenglish/services/api/.env"),
+    Path("/opt/acquireenglish/tools/oral_coach/.env"),
+    Path("/opt/acquireenglish/tools/digital_human_coach/.env"),
+    Path(__file__).resolve().parents[2] / ".env",
+    Path(__file__).resolve().parents[3] / "tools" / "oral_coach" / ".env",
+    Path(__file__).resolve().parents[3] / "tools" / "digital_human_coach" / ".env",
+)
+
+_MODULE_LABELS_ZH = {
+    "oral_coach": "口语陪练",
+    "digital_human": "数字人对话",
+    "peer_oral": "双人口语",
+    "subtitle_asr": "字幕补全·ASR",
+    "subtitle_translate": "字幕补全·翻译",
+    "subtitle_resegment": "字幕重切分",
+    "translation": "阅读/播放器翻译",
+    "word_lookup": "查词",
+    "grammar": "语法解析",
+    "writing_grade": "写作批改",
+    "reading_tts": "阅读配音 TTS",
+    "fingerprint": "素材指纹 Embedding",
+    "scene_vl": "场景识词 VL",
+    "vocab_enrich": "词卡 enrichment",
+    "membership": "会员相关",
+    "local_ollama": "本地 Ollama（未标注模块）",
+    "unknown": "未标注模块",
+}
 
 
 def _env(name: str) -> str:
     return (os.getenv(name, "") or "").strip()
 
 
-def _settings_or_env(*names: str) -> str:
+def _parse_dotenv(path: Path) -> dict[str, str]:
+    out: dict[str, str] = {}
+    if not path.is_file():
+        return out
+    try:
+        text = path.read_text(encoding="utf-8", errors="replace")
+    except OSError:
+        return out
+    for raw in text.splitlines():
+        line = raw.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        key, _, val = line.partition("=")
+        key = key.strip()
+        val = val.strip().strip("'").strip('"')
+        if key:
+            out[key] = val
+    return out
+
+
+def _merged_env_files() -> dict[str, tuple[str, str]]:
+    """name -> (value, source_path). First wins for each key."""
+    merged: dict[str, tuple[str, str]] = {}
+    seen_paths: set[str] = set()
+    for path in _ENV_CANDIDATES:
+        resolved = str(path.resolve()) if path.exists() else str(path)
+        if resolved in seen_paths:
+            continue
+        seen_paths.add(resolved)
+        for k, v in _parse_dotenv(path).items():
+            if k not in merged and v:
+                merged[k] = (v, path.name)
+    return merged
+
+
+def _settings_or_env(*names: str, file_env: dict[str, tuple[str, str]] | None = None) -> str:
     for n in names:
-        # settings field style: DASHSCOPE_API_KEY -> dashscope_api_key
         attr = n.lower()
         if hasattr(settings, attr):
             v = getattr(settings, attr)
@@ -37,17 +104,37 @@ def _settings_or_env(*names: str) -> str:
         v = _env(n)
         if v:
             return v
+        if file_env and n in file_env:
+            return file_env[n][0]
+    return ""
+
+
+def _source_for(*names: str, file_env: dict[str, tuple[str, str]]) -> str:
+    for n in names:
+        if _env(n) or (hasattr(settings, n.lower()) and getattr(settings, n.lower())):
+            return "api/.env / process"
+        if n in file_env:
+            return file_env[n][1]
     return ""
 
 
 def discover_keys() -> list[dict[str, Any]]:
     """Map configured platform credentials (presence only)."""
+    file_env = _merged_env_files()
+
+    def val(*names: str) -> str:
+        return _settings_or_env(*names, file_env=file_env)
+
+    def src(*names: str) -> str:
+        return _source_for(*names, file_env=file_env)
+
     catalog = [
         {
             "id": "dashscope",
             "label": "阿里云百炼 / DashScope",
             "env": "DASHSCOPE_API_KEY",
-            "value": _settings_or_env("DASHSCOPE_API_KEY", "dashscope_api_key"),
+            "value": val("DASHSCOPE_API_KEY", "dashscope_api_key"),
+            "source": src("DASHSCOPE_API_KEY"),
             "usage": "LLM / ASR / TTS / VL",
             "billing": "aliyun_bss:sfm",
         },
@@ -55,11 +142,10 @@ def discover_keys() -> list[dict[str, Any]]:
             "id": "aliyun_sms",
             "label": "阿里云短信",
             "env": "ALIYUN_SMS_ACCESS_KEY_ID",
-            "value": _settings_or_env("ALIYUN_SMS_ACCESS_KEY_ID", "aliyun_sms_access_key_id"),
+            "value": val("ALIYUN_SMS_ACCESS_KEY_ID", "aliyun_sms_access_key_id"),
+            "source": src("ALIYUN_SMS_ACCESS_KEY_ID"),
             "secret_set": bool(
-                _settings_or_env(
-                    "ALIYUN_SMS_ACCESS_KEY_SECRET", "aliyun_sms_access_key_secret"
-                )
+                val("ALIYUN_SMS_ACCESS_KEY_SECRET", "aliyun_sms_access_key_secret")
             ),
             "usage": "登录验证码 SMS",
             "billing": "aliyun_bss:dysms",
@@ -68,12 +154,17 @@ def discover_keys() -> list[dict[str, Any]]:
             "id": "aliyun_ecs",
             "label": "阿里云 ECS / 云盘（复用 AK）",
             "env": "ALIYUN_ECS_ACCESS_KEY_ID|ALIYUN_SMS_ACCESS_KEY_ID",
-            "value": _settings_or_env(
+            "value": val(
                 "ALIYUN_ECS_ACCESS_KEY_ID",
                 "ALIYUN_ACCESS_KEY_ID",
                 "ALIYUN_SMS_ACCESS_KEY_ID",
                 "aliyun_ecs_access_key_id",
                 "aliyun_sms_access_key_id",
+            ),
+            "source": src(
+                "ALIYUN_ECS_ACCESS_KEY_ID",
+                "ALIYUN_ACCESS_KEY_ID",
+                "ALIYUN_SMS_ACCESS_KEY_ID",
             ),
             "usage": "主机与云盘监控 / 账单",
             "billing": "aliyun_bss:ecs",
@@ -82,10 +173,9 @@ def discover_keys() -> list[dict[str, Any]]:
             "id": "tencent_soe",
             "label": "腾讯云智聆口语评测 SOE",
             "env": "TENCENT_SOE_SECRET_ID",
-            "value": _settings_or_env("TENCENT_SOE_SECRET_ID", "tencent_soe_secret_id"),
-            "secret_set": bool(
-                _settings_or_env("TENCENT_SOE_SECRET_KEY", "tencent_soe_secret_key")
-            ),
+            "value": val("TENCENT_SOE_SECRET_ID", "tencent_soe_secret_id"),
+            "source": src("TENCENT_SOE_SECRET_ID"),
+            "secret_set": bool(val("TENCENT_SOE_SECRET_KEY", "tencent_soe_secret_key")),
             "usage": "跟读 / 发音评测",
             "billing": "tencent_billing:soe",
         },
@@ -93,11 +183,10 @@ def discover_keys() -> list[dict[str, Any]]:
             "id": "livekit",
             "label": "LiveKit Cloud",
             "env": "LIVEKIT_API_KEY",
-            "value": _settings_or_env("LIVEKIT_API_KEY", "livekit_api_key"),
-            "secret_set": bool(
-                _settings_or_env("LIVEKIT_API_SECRET", "livekit_api_secret")
-            ),
-            "extra": {"url": _settings_or_env("LIVEKIT_URL", "livekit_url")},
+            "value": val("LIVEKIT_API_KEY", "livekit_api_key"),
+            "source": src("LIVEKIT_API_KEY"),
+            "secret_set": bool(val("LIVEKIT_API_SECRET", "livekit_api_secret")),
+            "extra": {"url": val("LIVEKIT_URL", "livekit_url")},
             "usage": "实时口语房间",
             "billing": "livekit_cloud",
         },
@@ -105,24 +194,90 @@ def discover_keys() -> list[dict[str, Any]]:
             "id": "deepseek",
             "label": "DeepSeek",
             "env": "DEEPSEEK_API_KEY",
-            "value": _env("DEEPSEEK_API_KEY"),
-            "usage": "写作批改 LLM（可选）",
-            "billing": "deepseek_portal",
+            "value": val("DEEPSEEK_API_KEY"),
+            "source": src("DEEPSEEK_API_KEY"),
+            "usage": "写作批改 / 口语陪练 LLM / 字幕翻译",
+            "billing": "deepseek_portal + ApiUsageEvent",
         },
         {
             "id": "openai",
-            "label": "OpenAI",
+            "label": "OpenAI / OpenAI 兼容",
             "env": "OPENAI_API_KEY",
-            "value": _env("OPENAI_API_KEY"),
-            "usage": "写作批改 LLM（可选）",
-            "billing": "openai_usage",
+            "value": val("OPENAI_API_KEY"),
+            "source": src("OPENAI_API_KEY"),
+            "extra": {
+                "base_url": val("OPENAI_BASE_URL"),
+                "model": val("OPENAI_MODEL", "DEEPSEEK_MODEL"),
+            },
+            "usage": "OpenAI 兼容聊天（可能指向 DeepSeek）",
+            "billing": "openai_usage / 兼容端点",
+        },
+        {
+            "id": "deepgram",
+            "label": "Deepgram ASR/TTS",
+            "env": "DEEPGRAM_API_KEY",
+            "value": val("DEEPGRAM_API_KEY"),
+            "source": src("DEEPGRAM_API_KEY"),
+            "usage": "口语陪练语音识别",
+            "billing": "deepgram_projects",
+        },
+        {
+            "id": "local_gpu_ollama",
+            "label": "本机 RTX 5060 Ti · 本地 LLM（Ollama 兼容）",
+            "env": "OLLAMA_URL|GPU_USAGE_STATS_URL",
+            "value": val(
+                "GPU_USAGE_STATS_URL",
+                "OLLAMA_URL",
+                "LOCAL_LLM_URL",
+            )
+            or "http://100.115.252.55:11434",
+            "source": src("GPU_USAGE_STATS_URL", "OLLAMA_URL", "LOCAL_LLM_URL")
+            or "default Tailscale",
+            "usage": "App 本地 Ollama / 字幕翻译备选 / 口语 LLM",
+            "billing": "gpu_usage_monitor + ApiUsageEvent",
+            "force_configured": True,
+            "extra": {
+                "stats_url": val("GPU_USAGE_STATS_URL")
+                or "http://100.115.252.55:11435/stats",
+                "inference_hint": "http://100.115.252.55:11434/v1",
+            },
+        },
+        {
+            "id": "livetalking",
+            "label": "LiveTalking 数字人（5060 Ti）",
+            "env": "LIVETALKING_URL",
+            "value": val("LIVETALKING_URL"),
+            "source": src("LIVETALKING_URL"),
+            "usage": "数字人口型驱动（GPU，不计 LLM token）",
+            "billing": "local_gpu_runtime",
+        },
+        {
+            "id": "fingerprint_embed",
+            "label": "素材指纹 Embedding（可选远程 GPU）",
+            "env": "FINGERPRINT_EMBED_URL",
+            "value": val("FINGERPRINT_EMBED_URL", "fingerprint_embed_url"),
+            "source": src("FINGERPRINT_EMBED_URL"),
+            "usage": "指纹缓存向量；空则本机 hashing-trick",
+            "billing": "ApiUsageEvent:fingerprint",
         },
     ]
     out: list[dict[str, Any]] = []
     for item in catalog:
-        val = item.get("value") or ""
-        present = bool(val)
-        fp, label = fingerprint_key(val) if present else ("", "")
+        val_raw = item.get("value") or ""
+        force = bool(item.get("force_configured"))
+        present = bool(val_raw) or force
+        # For URL-only entries, fingerprint the URL string (not a secret).
+        is_url = str(val_raw).startswith("http") or item["id"] in {
+            "local_gpu_ollama",
+            "livetalking",
+            "fingerprint_embed",
+        }
+        if present and val_raw and not is_url:
+            fp, label = fingerprint_key(val_raw)
+        elif present and val_raw:
+            fp, label = "", (val_raw[:64] + ("…" if len(val_raw) > 64 else ""))
+        else:
+            fp, label = "", ""
         out.append(
             {
                 "id": item["id"],
@@ -130,10 +285,11 @@ def discover_keys() -> list[dict[str, Any]]:
                 "env": item["env"],
                 "usage": item["usage"],
                 "billing": item["billing"],
-                "configured": present,
+                "configured": present if not force else bool(val_raw) or force,
                 "key_fingerprint": fp,
                 "key_label": label,
-                "secret_set": bool(item.get("secret_set", present)),
+                "secret_set": bool(item.get("secret_set", present and not is_url)),
+                "source": item.get("source") or "",
                 "extra": item.get("extra") or {},
             }
         )
@@ -183,17 +339,20 @@ def _bill_items(resp: dict[str, Any]) -> list[dict[str, Any]]:
 
 
 def fetch_aliyun_bss(month: str | None = None) -> dict[str, Any]:
+    file_env = _merged_env_files()
     ak = _settings_or_env(
         "ALIYUN_ECS_ACCESS_KEY_ID",
         "ALIYUN_ACCESS_KEY_ID",
         "ALIYUN_SMS_ACCESS_KEY_ID",
         "aliyun_sms_access_key_id",
+        file_env=file_env,
     )
     sk = _settings_or_env(
         "ALIYUN_ECS_ACCESS_KEY_SECRET",
         "ALIYUN_ACCESS_KEY_SECRET",
         "ALIYUN_SMS_ACCESS_KEY_SECRET",
         "aliyun_sms_access_key_secret",
+        file_env=file_env,
     )
     out: dict[str, Any] = {
         "ok": False,
@@ -221,7 +380,6 @@ def fetch_aliyun_bss(month: str | None = None) -> dict[str, Any]:
 
     overview = _aliyun_bss_call("QueryBillOverview", {"BillingCycle": cycle}, ak=ak, sk=sk)
     ov_items = _bill_items(overview)
-    # Deduplicate by ProductCode+ProductName summing payment
     merged: dict[str, dict[str, Any]] = {}
     for it in ov_items:
         key = f"{it.get('ProductCode')}|{it.get('ProductName')}"
@@ -238,7 +396,6 @@ def fetch_aliyun_bss(month: str | None = None) -> dict[str, Any]:
         row["pretax_cny"] += float(it.get("PretaxAmount") or 0)
     out["overview"] = sorted(merged.values(), key=lambda x: x["payment_cny"], reverse=True)
 
-    # App-relevant product codes
     wanted = {
         "sfm": "阿里云百炼（DashScope / 模型调用）",
         "dysms": "阿里云短信",
@@ -247,7 +404,6 @@ def fetch_aliyun_bss(month: str | None = None) -> dict[str, Any]:
         "disk": "阿里云云盘",
         "snapshot": "快照",
     }
-    relevant_codes = set()
     for code, label in wanted.items():
         resp = _aliyun_bss_call(
             "DescribeInstanceBill",
@@ -285,10 +441,7 @@ def fetch_aliyun_bss(month: str | None = None) -> dict[str, Any]:
             "lines": lines,
             "count": len(lines),
         }
-        if pretax > 0 or lines:
-            relevant_codes.add(code)
 
-    # Also mark overview rows that match app products
     app_codes = {"sfm", "dysms", "dysms_system", "ecs", "disk"}
     for row in out["overview"]:
         code = str(row.get("product_code") or "")
@@ -297,7 +450,6 @@ def fetch_aliyun_bss(month: str | None = None) -> dict[str, Any]:
         ):
             out["app_relevant"].append(row)
 
-    # Prefer product detail sums for app_relevant when overview pretax is rough
     for code in ("sfm", "dysms", "dysms_system", "ecs"):
         prod = out["products"].get(code) or {}
         if prod.get("count"):
@@ -321,8 +473,13 @@ def fetch_aliyun_bss(month: str | None = None) -> dict[str, Any]:
 
 def fetch_tencent_billing(month: str | None = None) -> dict[str, Any]:
     """Best-effort Tencent Cloud bill summary (needs billing permission on SOE key)."""
-    secret_id = _settings_or_env("TENCENT_SOE_SECRET_ID", "tencent_soe_secret_id")
-    secret_key = _settings_or_env("TENCENT_SOE_SECRET_KEY", "tencent_soe_secret_key")
+    file_env = _merged_env_files()
+    secret_id = _settings_or_env(
+        "TENCENT_SOE_SECRET_ID", "tencent_soe_secret_id", file_env=file_env
+    )
+    secret_key = _settings_or_env(
+        "TENCENT_SOE_SECRET_KEY", "tencent_soe_secret_key", file_env=file_env
+    )
     out: dict[str, Any] = {
         "ok": False,
         "provider": "tencent",
@@ -332,23 +489,19 @@ def fetch_tencent_billing(month: str | None = None) -> dict[str, Any]:
         "items": [],
         "error": "",
         "note": "",
+        "key_fingerprint": fingerprint_key(secret_id)[0] if secret_id else "",
     }
     if not secret_id or not secret_key:
         out["error"] = "未配置 TENCENT_SOE_SECRET_ID/KEY"
         return out
 
-    # TC3-HMAC-SHA256 for billing.tencentcloudapi.com DescribeBillSummaryByProduct
     service = "billing"
     host = "billing.tencentcloudapi.com"
     action = "DescribeBillSummaryByProduct"
     version = "2018-07-09"
     region = ""
-    # DescribeBillSummaryByProduct expects BeginTime/EndTime (YYYY-MM-DD)
     y, m = out["billing_cycle"].split("-")
     begin = f"{y}-{m}-01"
-    # last day approx: next month - 1 day via calendar
-    import calendar
-
     last = calendar.monthrange(int(y), int(m))[1]
     end = f"{y}-{m}-{last:02d}"
     payload = json.dumps(
@@ -432,7 +585,11 @@ def fetch_tencent_billing(month: str | None = None) -> dict[str, Any]:
     for row in summary if isinstance(summary, list) else []:
         if not isinstance(row, dict):
             continue
-        name = row.get("BusinessCodeName") or row.get("ProductCodeName") or row.get("BusinessCode")
+        name = (
+            row.get("BusinessCodeName")
+            or row.get("ProductCodeName")
+            or row.get("BusinessCode")
+        )
         items.append(
             {
                 "product": name,
@@ -443,17 +600,19 @@ def fetch_tencent_billing(month: str | None = None) -> dict[str, Any]:
         )
     out["items"] = items
     out["ok"] = True
-    out["raw_keys"] = list(resp.keys())[:20]
+    out["total_cny"] = round(sum(i["real_total_cost"] for i in items), 4)
     return out
 
 
 def fetch_livekit_note() -> dict[str, Any]:
-    url = _settings_or_env("LIVEKIT_URL", "livekit_url")
-    key = _settings_or_env("LIVEKIT_API_KEY", "livekit_api_key")
-    secret = _settings_or_env("LIVEKIT_API_SECRET", "livekit_api_secret")
+    file_env = _merged_env_files()
+    url = _settings_or_env("LIVEKIT_URL", "livekit_url", file_env=file_env)
+    key = _settings_or_env("LIVEKIT_API_KEY", "livekit_api_key", file_env=file_env)
+    secret = _settings_or_env(
+        "LIVEKIT_API_SECRET", "livekit_api_secret", file_env=file_env
+    )
     project = ""
     if "livekit.cloud" in url:
-        # wss://acquireenglish-e5la1koz.livekit.cloud → subdomain hint
         try:
             host = url.split("//", 1)[1].split("/", 1)[0]
             project = host.split(".")[0]
@@ -474,27 +633,198 @@ def fetch_livekit_note() -> dict[str, Any]:
     }
 
 
+def fetch_deepgram_usage() -> dict[str, Any]:
+    """List Deepgram projects (balance/usage details need project-scoped calls)."""
+    file_env = _merged_env_files()
+    key = _settings_or_env("DEEPGRAM_API_KEY", file_env=file_env)
+    out: dict[str, Any] = {
+        "ok": False,
+        "provider": "deepgram",
+        "configured": bool(key),
+        "projects": [],
+        "error": "",
+        "note": "Deepgram 控制台可查分钟用量；此处校验密钥并列出项目。",
+        "key_fingerprint": fingerprint_key(key)[0] if key else "",
+        "key_label": fingerprint_key(key)[1] if key else "",
+    }
+    if not key:
+        out["error"] = "未配置 DEEPGRAM_API_KEY（通常在 oral_coach/.env）"
+        return out
+    req = urllib.request.Request(
+        "https://api.deepgram.com/v1/projects",
+        headers={"Authorization": f"Token {key}"},
+        method="GET",
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=20) as r:
+            data = json.loads(r.read().decode())
+    except urllib.error.HTTPError as e:
+        try:
+            body = json.loads(e.read().decode())
+            out["error"] = str(body.get("err_msg") or body.get("message") or e)
+        except Exception:
+            out["error"] = str(e)
+        return out
+    except Exception as e:  # noqa: BLE001
+        out["error"] = str(e)
+        return out
+    projects = data.get("projects") or data.get("Projects") or []
+    for p in projects if isinstance(projects, list) else []:
+        if not isinstance(p, dict):
+            continue
+        out["projects"].append(
+            {
+                "project_id": str(p.get("project_id") or p.get("projectId") or "")[:40],
+                "name": str(p.get("name") or "")[:80],
+            }
+        )
+    out["ok"] = True
+    return out
+
+
+def fetch_deepseek_note() -> dict[str, Any]:
+    file_env = _merged_env_files()
+    key = _settings_or_env("DEEPSEEK_API_KEY", file_env=file_env)
+    base = _settings_or_env("OPENAI_BASE_URL", file_env=file_env) or "https://api.deepseek.com/v1"
+    model = (
+        _settings_or_env("DEEPSEEK_MODEL", "OPENAI_MODEL", file_env=file_env)
+        or "deepseek-chat"
+    )
+    return {
+        "ok": bool(key),
+        "provider": "deepseek",
+        "configured": bool(key),
+        "base_url": base[:100],
+        "model": model,
+        "key_fingerprint": fingerprint_key(key)[0] if key else "",
+        "key_label": fingerprint_key(key)[1] if key else "",
+        "note": (
+            "DeepSeek 无公开账单 API；消耗以 ApiUsageEvent / oral_coach 调用为准，"
+            "可在平台门户核对。"
+        ),
+        "error": "" if key else "未配置 DEEPSEEK_API_KEY",
+    }
+
+
+def fetch_gpu_usage() -> dict[str, Any]:
+    """Pull local 5060 Ti usage_monitor stats over Tailscale (module breakdown)."""
+    file_env = _merged_env_files()
+    stats_url = (
+        _settings_or_env("GPU_USAGE_STATS_URL", file_env=file_env)
+        or "http://100.115.252.55:11435/stats"
+    )
+    out: dict[str, Any] = {
+        "ok": False,
+        "provider": "local_gpu_5060ti",
+        "stats_url": stats_url,
+        "label": "本机 RTX 5060 Ti（本地 LLM）",
+        "day": "",
+        "requests": 0,
+        "input_tokens": 0,
+        "output_tokens": 0,
+        "total_tokens": 0,
+        "by_module": [],
+        "error": "",
+        "note": (
+            "Token 来自 GPU 箱 usage_monitor；按 X-Acquire-Module 归因到 App 模块。"
+            "LiveTalking 口型不产生 LLM token，单独计 GPU 运行时。"
+        ),
+    }
+    req = urllib.request.Request(stats_url, method="GET")
+    try:
+        with urllib.request.urlopen(req, timeout=8) as r:
+            data = json.loads(r.read().decode())
+    except Exception as e:  # noqa: BLE001
+        out["error"] = (
+            f"无法拉取 GPU 用量（{stats_url}）：{e}。"
+            "请确认本机 deploy/gpu-box-ollama 已启动且 stats 监听 Tailscale。"
+        )
+        return out
+
+    out["day"] = str(data.get("day") or "")
+    out["requests"] = int(data.get("requests") or 0)
+    out["input_tokens"] = int(data.get("input_tokens") or 0)
+    out["output_tokens"] = int(data.get("output_tokens") or 0)
+    out["total_tokens"] = int(data.get("total_tokens") or 0)
+    out["failures"] = int(data.get("failures") or 0)
+    by_module = data.get("by_module") or []
+    modules: list[dict[str, Any]] = []
+    if isinstance(by_module, list) and by_module:
+        for row in by_module:
+            if not isinstance(row, dict):
+                continue
+            mid = str(row.get("module") or "unknown")
+            modules.append(
+                {
+                    "module": mid,
+                    "label_zh": _MODULE_LABELS_ZH.get(mid, mid),
+                    "requests": int(row.get("requests") or 0),
+                    "tokens": int(row.get("tokens") or 0),
+                    "input_tokens": int(row.get("input_tokens") or 0),
+                    "output_tokens": int(row.get("output_tokens") or 0),
+                }
+            )
+    else:
+        # Fallback: roll up clients[].kind if older monitor without by_module.
+        rolled: dict[str, dict[str, Any]] = {}
+        for row in data.get("clients") or []:
+            if not isinstance(row, dict):
+                continue
+            mid = str(row.get("module") or row.get("kind") or "unknown")
+            slot = rolled.setdefault(
+                mid,
+                {
+                    "module": mid,
+                    "label_zh": _MODULE_LABELS_ZH.get(mid, mid),
+                    "requests": 0,
+                    "tokens": 0,
+                    "input_tokens": 0,
+                    "output_tokens": 0,
+                },
+            )
+            slot["requests"] += int(row.get("requests") or 0)
+            slot["tokens"] += int(row.get("tokens") or 0)
+        modules = sorted(rolled.values(), key=lambda x: x["tokens"], reverse=True)
+    out["by_module"] = modules
+    out["ok"] = True
+    return out
+
+
+def module_label_zh(module: str) -> str:
+    return _MODULE_LABELS_ZH.get(module, module or "未标注模块")
+
+
 def collect_platform_usage(*, month: str | None = None) -> dict[str, Any]:
     keys = discover_keys()
     aliyun = fetch_aliyun_bss(month)
     tencent = fetch_tencent_billing(month)
     livekit = fetch_livekit_note()
+    deepgram = fetch_deepgram_usage()
+    deepseek = fetch_deepseek_note()
+    gpu = fetch_gpu_usage()
 
-    # Roll up app-facing cost estimate from Aliyun products we care about
     aliyun_app_cny = 0.0
     for code in ("sfm", "dysms", "dysms_system", "ecs"):
-        aliyun_app_cny += float((aliyun.get("products") or {}).get(code, {}).get("pretax_cny") or 0)
+        aliyun_app_cny += float(
+            (aliyun.get("products") or {}).get(code, {}).get("pretax_cny") or 0
+        )
 
+    configured = [k for k in keys if k.get("configured")]
     return {
         "ok": True,
         "collected_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
         "billing_cycle": month
         or datetime.now(tz=timezone.utc).strftime("%Y-%m"),
         "keys": keys,
-        "configured_count": sum(1 for k in keys if k.get("configured")),
+        "configured_count": len(configured),
+        "configured_platforms": [k["id"] for k in configured],
         "aliyun": aliyun,
         "tencent": tencent,
         "livekit": livekit,
+        "deepgram": deepgram,
+        "deepseek": deepseek,
+        "gpu": gpu,
+        "module_labels_zh": _MODULE_LABELS_ZH,
         "summary": {
             "aliyun_balance_cny": aliyun.get("balance_cny"),
             "aliyun_app_products_cny": round(aliyun_app_cny, 4),
@@ -505,11 +835,18 @@ def collect_platform_usage(*, month: str | None = None) -> dict[str, Any]:
                 (aliyun.get("products") or {}).get("dysms", {}).get("pretax_cny") or 0
             )
             + float(
-                (aliyun.get("products") or {}).get("dysms_system", {}).get("pretax_cny") or 0
+                (aliyun.get("products") or {}).get("dysms_system", {}).get("pretax_cny")
+                or 0
             ),
+            "tencent_total_cny": float(tencent.get("total_cny") or 0)
+            if tencent.get("ok")
+            else None,
+            "gpu_tokens_today": int(gpu.get("total_tokens") or 0) if gpu.get("ok") else None,
+            "deepgram_projects": len(deepgram.get("projects") or []),
             "note": (
-                "平台账单来自阿里云 BSS（与账号 AccessKey 绑定）；"
-                "App 内 ledger 是按次估算，两者口径不同可并存对照。"
+                "平台账单聚合：阿里云 BSS + 腾讯云费用中心（需权限）+ Deepgram 项目校验；"
+                "DeepSeek / 本地 5060Ti 以 ApiUsageEvent 与 GPU usage_monitor 按模块对照；"
+                "App 内 ledger 是按次估算，与厂商账单口径不同可并存。"
             ),
         },
     }

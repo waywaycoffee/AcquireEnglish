@@ -74,7 +74,8 @@ async def usage_platform(
 ) -> dict[str, Any]:
     """Discover .env API keys and pull vendor billing (Aliyun BSS / Tencent / …)."""
     # Sync vendor HTTP — keep off the asyncio event loop so admin user APIs stay responsive.
-    return await asyncio.to_thread(collect_platform_usage, month)
+    # collect_platform_usage is keyword-only for month.
+    return await asyncio.to_thread(collect_platform_usage, month=month)
 
 
 @router.get("/analytics/users")

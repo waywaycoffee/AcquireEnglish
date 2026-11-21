@@ -19,6 +19,7 @@ async def ensure_schema_columns(conn: AsyncConnection) -> None:
     await _ensure_oral_match_queue_columns(conn)
     await _ensure_shared_bilibili_cid_bigint(conn)
     await _ensure_shared_bilibili_identity_columns(conn)
+    await _ensure_api_usage_module_column(conn)
 
 
 async def ensure_user_auth_columns(conn: AsyncConnection) -> None:
@@ -257,3 +258,35 @@ async def _ensure_shared_bilibili_identity_columns(conn: AsyncConnection) -> Non
                 "ADD COLUMN preview_zh VARCHAR(512) DEFAULT ''"
             )
         )
+
+
+async def _ensure_api_usage_module_column(conn: AsyncConnection) -> None:
+    """App-module attribution for GPU / vendor COGS dashboards."""
+    existing = await _existing_columns(conn, "api_usage_events")
+    if existing is None:
+        return
+    if "module" not in existing:
+        await conn.execute(
+            text(
+                "ALTER TABLE api_usage_events "
+                "ADD COLUMN module VARCHAR(48) DEFAULT ''"
+            )
+        )
+    dialect = _dialect_name(conn)
+    try:
+        if dialect == "sqlite":
+            await conn.execute(
+                text(
+                    "CREATE INDEX IF NOT EXISTS ix_api_usage_events_module "
+                    "ON api_usage_events (module)"
+                )
+            )
+        else:
+            await conn.execute(
+                text(
+                    "CREATE INDEX IF NOT EXISTS ix_api_usage_events_module "
+                    "ON api_usage_events (module)"
+                )
+            )
+    except Exception:  # noqa: BLE001
+        pass

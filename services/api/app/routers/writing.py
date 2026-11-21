@@ -210,6 +210,7 @@ async def _llm_grade(
                     kind="writing",
                     provider=provider,
                     model=model,
+                    module="writing_grade",
                     prompt_tokens=prompt_tokens,
                     completion_tokens=completion_tokens,
                     api_key=api_key,

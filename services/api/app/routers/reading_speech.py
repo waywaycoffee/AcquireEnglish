@@ -123,6 +123,7 @@ async def speech(
             kind="tts",
             provider="dashscope",
             model=voice or "qwen-tts",
+            module="reading_tts",
             prompt_tokens=max(1, len(text)),
             completion_tokens=0,
             api_key=settings.dashscope_api_key,

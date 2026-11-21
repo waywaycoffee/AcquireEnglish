@@ -314,6 +314,7 @@ class WordLookupService {
               headers: <String, String>{
                 'Authorization': 'Bearer ${settings.translationApiKey}',
                 'Content-Type': 'application/json',
+                ...acquireUsageHeaders(module: 'translation'),
               },
             ),
           ).post<dynamic>(
@@ -665,6 +666,7 @@ class WordLookupService {
             'Authorization': 'Bearer ${settings.translationApiKey}',
             'Content-Type': 'application/json',
             'Accept': 'application/json',
+            ...acquireUsageHeaders(module: 'grammar'),
           },
         ),
         method: 'POST',
@@ -780,6 +782,7 @@ class WordLookupService {
         headers: <String, String>{
           'Authorization': 'Bearer ${settings.translationApiKey}',
           'Content-Type': 'application/json',
+          ...acquireUsageHeaders(module: 'translation'),
         },
       ),
       method: 'POST',
@@ -891,6 +894,7 @@ class WordLookupService {
         'Authorization': 'Bearer ${settings.translationApiKey}',
         'Content-Type': 'application/json',
         'Accept': 'application/json',
+        ...acquireUsageHeaders(module: 'word_lookup'),
       },
     );
     final Response<dynamic> response = await _sendRequest(

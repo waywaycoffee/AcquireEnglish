@@ -21,7 +21,7 @@
   const titles = {
     dashboard: "可视化看板",
     infra: "ECS / 云盘监控",
-    usage: "Token 消耗与损益",
+    usage: "用量 / 平台账单",
     resources: "公共资源库",
     users: "用户与资产",
   };
@@ -505,7 +505,14 @@
     ]);
     const platSum = (platform && platform.summary) || {};
     const aliyun = (platform && platform.aliyun) || {};
+    const tencent = (platform && platform.tencent) || {};
+    const deepgram = (platform && platform.deepgram) || {};
+    const deepseek = (platform && platform.deepseek) || {};
+    const gpu = (platform && platform.gpu) || {};
+    const labelsZh = (platform && platform.module_labels_zh) || {};
     const sfm = ((aliyun.products || {}).sfm || {});
+    const gpuLedger = (summary && summary.gpu) || {};
+    const moduleLabel = (m) => labelsZh[m] || (m && m !== "unknown" ? m : "未标注模块");
     const el = $("panel-usage");
     el.innerHTML = `
       <div class="kpi-row">
@@ -517,30 +524,31 @@
         }</strong></div>
       </div>
       <div class="kpi-row">
+        <div class="stat"><span class="muted">已接入平台数</span><strong>${num(
+          platform.configured_count || 0
+        )}</strong></div>
         <div class="stat"><span class="muted">阿里云余额</span><strong>${
           platSum.aliyun_balance_cny == null ? "—" : money(platSum.aliyun_balance_cny)
         }</strong></div>
         <div class="stat"><span class="muted">百炼本月</span><strong>${money(
           platSum.dashscope_sfm_cny || 0
         )}</strong></div>
-        <div class="stat"><span class="muted">短信本月</span><strong>${money(
-          platSum.sms_cny || 0
-        )}</strong></div>
-        <div class="stat"><span class="muted">应用相关合计</span><strong>${money(
-          platSum.aliyun_app_products_cny || 0
-        )}</strong></div>
+        <div class="stat"><span class="muted">5060Ti 今日 Token</span><strong>${
+          platSum.gpu_tokens_today == null ? "—" : num(platSum.gpu_tokens_today)
+        }</strong></div>
       </div>
       <div class="dash-grid">
         <div class="dash-card full">
-          <h3>.env 已接入的 API Key（指纹）</h3>
+          <h3>全部接入平台 / API Key（指纹，无明文）</h3>
           <div class="table-wrap"><table>
-            <thead><tr><th>平台</th><th>环境变量</th><th>状态</th><th>指纹</th><th>用途</th><th>账单来源</th></tr></thead>
+            <thead><tr><th>平台</th><th>环境变量</th><th>来源</th><th>状态</th><th>指纹/端点</th><th>用途</th><th>账单来源</th></tr></thead>
             <tbody>
               ${(platform.keys || [])
                 .map(
                   (k) => `<tr>
                   <td>${escapeHtml(k.label)}</td>
                   <td><code>${escapeHtml(k.env)}</code></td>
+                  <td>${escapeHtml(k.source || "—")}</td>
                   <td><span class="chip ${k.configured ? "ok" : "bad"}">${
                     k.configured ? "已配置" : "未配置"
                   }</span></td>
@@ -549,7 +557,7 @@
                   <td>${escapeHtml(k.billing || "")}</td>
                 </tr>`
                 )
-                .join("")}
+                .join("") || `<tr><td colspan="7" class="muted">未发现密钥</td></tr>`}
             </tbody>
           </table></div>
           <div class="note-box">${escapeHtml(
@@ -557,7 +565,7 @@
           )}</div>
         </div>
         <div class="dash-card full">
-          <h3>阿里云 BSS · 百炼 / 短信明细（${escapeHtml(
+          <h3>阿里云 BSS · 百炼 / 短信 / ECS（${escapeHtml(
             (platform.billing_cycle || "").toString()
           )}）</h3>
           <div class="table-wrap"><table>
@@ -589,20 +597,116 @@
                 )} 条计费项</div>`
               : ""
           }
+        </div>
+        <div class="dash-card">
+          <h3>腾讯云费用中心</h3>
           ${
-            platform.tencent && platform.tencent.error
-              ? `<div class="note-box">腾讯云：${escapeHtml(platform.tencent.error)}${
-                  platform.tencent.note ? " · " + escapeHtml(platform.tencent.note) : ""
-                }</div>`
+            tencent.ok
+              ? `<div class="table-wrap"><table>
+            <thead><tr><th>产品</th><th>实付 CNY</th><th>现金</th><th>代金券</th></tr></thead>
+            <tbody>
+              ${(tencent.items || [])
+                .map(
+                  (it) => `<tr>
+                  <td>${escapeHtml(it.product)}</td>
+                  <td>${money(it.real_total_cost)}</td>
+                  <td>${money(it.cash_pay)}</td>
+                  <td>${money(it.voucher)}</td>
+                </tr>`
+                )
+                .join("") || `<tr><td colspan="4" class="muted">本月无明细</td></tr>`}
+            </tbody>
+          </table></div>
+          <div class="note-box">合计 ${money(tencent.total_cny || 0)} · 密钥 ${escapeHtml(
+            tencent.key_fingerprint || ""
+          )}</div>`
+              : `<div class="note-box">${escapeHtml(
+                  tencent.error || "未拉取"
+                )}${tencent.note ? " · " + escapeHtml(tencent.note) : ""}</div>`
+          }
+        </div>
+        <div class="dash-card">
+          <h3>DeepSeek / Deepgram / LiveKit</h3>
+          <div class="note-box"><strong>DeepSeek</strong>：${
+            deepseek.configured ? "已配置 " + escapeHtml(deepseek.key_label || "") : "未配置"
+          } · ${escapeHtml(deepseek.model || "")}<br/>${escapeHtml(
+            deepseek.note || deepseek.error || ""
+          )}</div>
+          <div class="note-box"><strong>Deepgram</strong>：${
+            deepgram.ok
+              ? `密钥 ${escapeHtml(deepgram.key_label || "")} · 项目 ${num(
+                  (deepgram.projects || []).length
+                )}`
+              : escapeHtml(deepgram.error || "未配置")
+          }${
+            (deepgram.projects || [])
+              .map((p) => `<br/>· ${escapeHtml(p.name || p.project_id || "")}`)
+              .join("") || ""
+          }</div>
+          <div class="note-box"><strong>LiveKit</strong>：${escapeHtml(
+            (platform.livekit &&
+              (platform.livekit.note || platform.livekit.error)) ||
+              ""
+          )} · project ${escapeHtml(
+            (platform.livekit && platform.livekit.project_hint) || ""
+          )}</div>
+        </div>
+        <div class="dash-card full">
+          <h3>本机 RTX 5060 Ti · 按 App 模块 Token</h3>
+          <div class="kpi-row">
+            <div class="stat"><span class="muted">GPU 监控日</span><strong>${escapeHtml(
+              gpu.day || "—"
+            )}</strong></div>
+            <div class="stat"><span class="muted">请求数</span><strong>${
+              gpu.ok ? num(gpu.requests) : "—"
+            }</strong></div>
+            <div class="stat"><span class="muted">今日 Token</span><strong>${
+              gpu.ok ? num(gpu.total_tokens) : "—"
+            }</strong></div>
+            <div class="stat"><span class="muted">Ledger GPU Token</span><strong>${num(
+              gpuLedger.tokens || 0
+            )}</strong></div>
+          </div>
+          ${
+            gpu.error
+              ? `<div class="note-box">${escapeHtml(gpu.error)}</div>`
               : ""
           }
-          ${
-            platform.livekit
-              ? `<div class="note-box">LiveKit：${escapeHtml(
-                  platform.livekit.note || platform.livekit.error || ""
-                )} · project ${escapeHtml(platform.livekit.project_hint || "")}</div>`
-              : ""
-          }
+          <div class="table-wrap"><table>
+            <thead><tr><th>来源</th><th>App 模块</th><th>请求/事件</th><th>Tokens</th><th>说明</th></tr></thead>
+            <tbody>
+              ${(gpu.by_module || [])
+                .map(
+                  (m) => `<tr>
+                  <td>GPU monitor</td>
+                  <td>${escapeHtml(m.label_zh || moduleLabel(m.module))}</td>
+                  <td>${num(m.requests)}</td>
+                  <td>${num(m.tokens)}</td>
+                  <td><code>${escapeHtml(m.module || "")}</code></td>
+                </tr>`
+                )
+                .join("")}
+              ${(gpuLedger.by_module || [])
+                .map(
+                  (m) => `<tr>
+                  <td>ApiUsageEvent</td>
+                  <td>${escapeHtml(moduleLabel(m.module))}</td>
+                  <td>${num(m.events)}</td>
+                  <td>${num(m.tokens)}</td>
+                  <td>成本 ${money(m.cost_cny)}</td>
+                </tr>`
+                )
+                .join("")}
+              ${
+                !(gpu.by_module || []).length && !(gpuLedger.by_module || []).length
+                  ? `<tr><td colspan="5" class="muted">暂无 5060Ti 模块用量。App 调用本地 Ollama 时会带 X-Acquire-Module。</td></tr>`
+                  : ""
+              }
+            </tbody>
+          </table></div>
+          <div class="note-box">${escapeHtml(
+            gpu.note || gpuLedger.note || ""
+          )}</div>
         </div>
         <div class="dash-card">
           <h3>损益（30 日）</h3>
@@ -626,6 +730,17 @@
             (summary.by_kind || []).map((k) => ({
               label: k.kind,
               count: Math.round(k.cost_cny * 100) / 100,
+            })),
+            "label",
+            "count"
+          )}
+        </div>
+        <div class="dash-card">
+          <h3>按 App 模块消耗</h3>
+          ${barList(
+            (summary.by_module || []).map((m) => ({
+              label: moduleLabel(m.module),
+              count: Math.round((m.tokens || 0) * 100) / 100,
             })),
             "label",
             "count"

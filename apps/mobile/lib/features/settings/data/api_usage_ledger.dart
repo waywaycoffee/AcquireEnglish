@@ -32,6 +32,39 @@ extension ApiUsageKindLabel on ApiUsageKind {
 }
 
 @immutable
+/// Maps ledger kind → App module tag (GPU / admin attribution).
+String moduleForUsageKind(ApiUsageKind kind, {String? override}) {
+  final String forced = (override ?? '').trim();
+  if (forced.isNotEmpty) {
+    return forced;
+  }
+  switch (kind) {
+    case ApiUsageKind.translation:
+      return 'translation';
+    case ApiUsageKind.wordLookup:
+      return 'word_lookup';
+    case ApiUsageKind.grammar:
+      return 'grammar';
+    case ApiUsageKind.asr:
+      return 'subtitle_asr';
+    case ApiUsageKind.other:
+      return 'unknown';
+  }
+}
+
+/// Headers for OpenAI-compatible calls so GPU usage_monitor can attribute modules.
+Map<String, String> acquireUsageHeaders({
+  required String module,
+  String? clientId,
+}) {
+  return <String, String>{
+    'X-Acquire-Module': module,
+    'X-Acquire-Client-Id': (clientId ?? 'mobile-app').trim().isEmpty
+        ? 'mobile-app'
+        : clientId!.trim(),
+  };
+}
+
 class ApiUsageEvent {
   const ApiUsageEvent({
     required this.id,
@@ -45,6 +78,7 @@ class ApiUsageEvent {
     required this.atMs,
     this.note = '',
     this.audioSeconds = 0,
+    this.module = '',
   });
 
   final String id;
@@ -58,6 +92,7 @@ class ApiUsageEvent {
   final int atMs;
   final String note;
   final double audioSeconds;
+  final String module;
 
   int get totalTokens => promptTokens + completionTokens;
 
@@ -73,6 +108,7 @@ class ApiUsageEvent {
     'atMs': atMs,
     'note': note,
     'audioSeconds': audioSeconds,
+    'module': module,
   };
 
   static ApiUsageEvent? fromJson(Object? raw) {
@@ -100,6 +136,9 @@ class ApiUsageEvent {
       atMs: _asInt(raw['atMs']),
       note: '${raw['note'] ?? ''}',
       audioSeconds: _asDouble(raw['audioSeconds']),
+      module: '${raw['module'] ?? ''}'.trim().isEmpty
+          ? moduleForUsageKind(kind)
+          : '${raw['module']}'.trim(),
     );
   }
 
@@ -359,6 +398,7 @@ class ApiUsageLedger extends ChangeNotifier {
     List<Map<String, String>>? messages,
     double audioSeconds = 0,
     String note = '',
+    String module = '',
     bool free = false,
   }) async {
     await ensureLoaded();
@@ -402,6 +442,7 @@ class ApiUsageLedger extends ChangeNotifier {
       atMs: DateTime.now().millisecondsSinceEpoch,
       note: note,
       audioSeconds: audioSeconds,
+      module: moduleForUsageKind(kind, override: module),
     );
     _events.add(event);
     while (_events.length > _maxEvents) {
@@ -426,6 +467,7 @@ class ApiUsageLedger extends ChangeNotifier {
     List<Map<String, String>>? messages,
     String? completionText,
     String note = '',
+    String module = '',
   }) async {
     int? prompt;
     int? completion;
@@ -449,6 +491,7 @@ class ApiUsageLedger extends ChangeNotifier {
       messages: messages,
       completionText: completionText,
       note: note,
+      module: module,
     );
   }
 

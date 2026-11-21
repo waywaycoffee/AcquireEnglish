@@ -53,21 +53,49 @@ async def run(command):
         if not key: raise RuntimeError('Translation LLM unavailable')
         cues=command['cues']
         translated=[]
+        prompt_tokens=0
+        completion_tokens=0
         async with httpx.AsyncClient(timeout=120) as client:
             for offset in range(0,len(cues),25):
                 chunk=cues[offset:offset+25]
                 response=await client.post(base.rstrip('/')+'/chat/completions',
-                  headers={'Authorization':'Bearer '+key},
+                  headers={
+                    'Authorization':'Bearer '+key,
+                    'X-Acquire-Module':'subtitle_translate',
+                    'X-Acquire-Client-Id':'ecs-gpu-subtitle',
+                  },
                   json={'model':model,'temperature':0,'messages':[
                     {'role':'system','content':'Translate each English string into Simplified Chinese. Return a JSON object with key translations containing an array of strings in exactly the same order and length. Do not add explanations.'},
                     {'role':'user','content':json.dumps([c['text'] for c in chunk])}],
                     'response_format':{'type':'json_object'}})
                 response.raise_for_status()
-                rows=json.loads(response.json()['choices'][0]['message']['content'])['translations']
+                payload=response.json()
+                usage=(payload.get('usage') or {}) if isinstance(payload,dict) else {}
+                prompt_tokens+=int(usage.get('prompt_tokens') or 0)
+                completion_tokens+=int(usage.get('completion_tokens') or 0)
+                rows=json.loads(payload['choices'][0]['message']['content'])['translations']
                 if len(rows)!=len(chunk) or not all(isinstance(r,str) and r.strip() for r in rows):
                     raise ValueError('Translation alignment failed')
                 translated.extend(rows)
                 queue.update(job,'translating')
+        try:
+            from app.services import api_usage as usage_svc
+            async with SessionLocal() as usage_db:
+                await usage_svc.record_usage(
+                    usage_db,
+                    user_id=None,
+                    kind='translation',
+                    provider='deepseek' if 'deepseek' in (base or '').lower() else 'openai',
+                    model=model,
+                    module='subtitle_translate',
+                    prompt_tokens=prompt_tokens,
+                    completion_tokens=completion_tokens,
+                    api_key=key,
+                    key_owner='platform',
+                    note=f"subtitle_translate:{job.get('bvid')}",
+                )
+        except Exception:
+            pass
         def stamp(t):
             n=round(t*1000); h,n=divmod(n,3600000);m,n=divmod(n,60000);s,n=divmod(n,1000)
             return f'{h:02}:{m:02}:{s:02},{n:03}'

@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import 'package:dio/dio.dart';
 
+import '../../settings/data/api_usage_ledger.dart';
 import '../../settings/presentation/settings_provider.dart';
 import 'player_mock_state.dart';
 
@@ -24,6 +25,7 @@ Future<List<PlayerSubtitleLine>> resegmentSubtitles({
       headers: <String, String>{
         'Authorization':
             'Bearer ${settings.translationApiKey.trim().isEmpty ? 'ollama' : settings.translationApiKey.trim()}',
+        ...acquireUsageHeaders(module: 'subtitle_resegment'),
       },
     ),
   );

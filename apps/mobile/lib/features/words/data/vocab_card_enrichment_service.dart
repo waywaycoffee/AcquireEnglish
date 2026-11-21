@@ -142,6 +142,7 @@ class VocabCardEnrichmentService {
               'Bearer ${settings.translationApiKey.trim().isEmpty ? 'ollama' : settings.translationApiKey.trim()}',
           'Content-Type': 'application/json',
           'Accept': 'application/json',
+          ...acquireUsageHeaders(module: 'vocab_enrich'),
         },
         sendTimeout: const Duration(seconds: 45),
         receiveTimeout: const Duration(seconds: 90),
@@ -192,6 +193,7 @@ class VocabCardEnrichmentService {
     unawaited(
       ApiUsageLedger.instance.recordChatCompletionResponse(
         kind: ApiUsageKind.wordLookup,
+        module: 'vocab_enrich',
         provider: settings.translationProvider,
         model: settings.translationModel,
         responseData: responseData,

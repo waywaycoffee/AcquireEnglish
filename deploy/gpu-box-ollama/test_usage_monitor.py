@@ -20,16 +20,23 @@ class UsageTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as folder:
             path = Path(folder) / 'usage.db'
             store = UsageStore(path)
-            request_id = store.begin('private-user@example.com', 'anonymous client')
+            request_id = store.begin(
+                'private-user@example.com', 'anonymous client', module='translation'
+            )
             self.assertEqual(store.snapshot()['clients'][0]['in_flight'], 1)
             store.finish(request_id, 200, dict(prompt_tokens=10, completion_tokens=7))
             snap = UsageStore(path).snapshot()
             self.assertEqual(snap['total_tokens'], 17)
             self.assertEqual(snap['active_clients'], 1)
+            self.assertEqual(snap['by_module'][0]['module'], 'translation')
             self.assertNotIn('private-user', json.dumps(snap))
-            store.finish(store.begin('another', 'anonymous client'), 502, {})
+            store.finish(
+                store.begin('another', 'anonymous client', module='oral_coach'), 502, {}
+            )
             self.assertEqual(store.snapshot()['failures'], 1)
             self.assertEqual(store.snapshot()['requests_without_usage'], 1)
+            mods = {row['module'] for row in store.snapshot()['by_module']}
+            self.assertIn('oral_coach', mods)
 
     def test_middleware_collects_chunked_response_usage(self):
         with tempfile.TemporaryDirectory() as folder:

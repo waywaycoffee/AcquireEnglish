@@ -203,7 +203,11 @@ async def _openai_chat_json(
     async with httpx.AsyncClient(timeout=60) as client:
         response = await client.post(
             f'{settings.openai_base_url}/chat/completions',
-            headers={'Authorization': f'Bearer {settings.openai_api_key}'},
+            headers={
+                'Authorization': f'Bearer {settings.openai_api_key}',
+                'X-Acquire-Module': 'oral_coach',
+                'X-Acquire-Client-Id': 'oral_coach',
+            },
             json=payload,
         )
         response.raise_for_status()

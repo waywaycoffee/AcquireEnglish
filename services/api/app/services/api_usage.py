@@ -16,6 +16,47 @@ from app.models import ApiUsageEvent, Order
 
 USD_TO_CNY = 7.2
 
+# Default App-module tags when callers omit `module`.
+_KIND_TO_MODULE = {
+    "translation": "translation",
+    "word_lookup": "word_lookup",
+    "grammar": "grammar",
+    "asr": "subtitle_asr",
+    "tts": "reading_tts",
+    "writing": "writing_grade",
+    "oral": "oral_coach",
+    "oral_coach": "oral_coach",
+    "fingerprint": "fingerprint",
+    "scene_vl": "scene_vl",
+}
+
+_GPU_PROVIDERS = {
+    "ollama",
+    "local",
+    "local_ollama",
+    "qwen2.5",
+    "5060ti",
+    "gpu",
+}
+
+
+def normalize_module(module: str | None, *, kind: str = "", provider: str = "") -> str:
+    raw = (module or "").strip().lower().replace(" ", "_")
+    if raw:
+        return raw[:48]
+    mapped = _KIND_TO_MODULE.get((kind or "").strip().lower(), "")
+    if mapped:
+        return mapped
+    p = (provider or "").lower()
+    if any(g in p for g in _GPU_PROVIDERS):
+        return "local_ollama"
+    return ""
+
+
+def is_gpu_provider(provider: str, model: str = "") -> bool:
+    blob = f"{provider} {model}".lower()
+    return any(g in blob for g in _GPU_PROVIDERS) or "qwen2.5" in blob
+
 
 def fingerprint_key(api_key: str | None) -> tuple[str, str]:
     raw = (api_key or "").strip()
@@ -90,6 +131,7 @@ async def record_usage(
     api_key: str | None = None,
     key_owner: str = "platform",
     note: str = "",
+    module: str | None = None,
     client_event_id: str | None = None,
     meta: dict[str, Any] | None = None,
     cost_usd: float | None = None,
@@ -126,10 +168,17 @@ async def record_usage(
             kind=kind,
         )
     )
+    mod = normalize_module(module, kind=kind, provider=provider)
+    meta_payload = dict(meta or {})
+    if mod and "module" not in meta_payload:
+        meta_payload["module"] = mod
+    if is_gpu_provider(provider, model):
+        meta_payload.setdefault("gpu", "5060ti")
     row = ApiUsageEvent(
         user_id=user_id,
         client_event_id=(client_event_id or None),
         kind=(kind or "other")[:32],
+        module=mod,
         provider=(provider or "")[:32],
         model=(model or "")[:120],
         key_owner=(key_owner or "platform")[:16],
@@ -141,7 +190,7 @@ async def record_usage(
         cost_usd=usd,
         cost_cny=usd * USD_TO_CNY,
         note=(note or "")[:255],
-        meta_json=json.dumps(meta or {}, ensure_ascii=False),
+        meta_json=json.dumps(meta_payload, ensure_ascii=False),
     )
     db.add(row)
     if commit:
@@ -172,6 +221,7 @@ async def ingest_client_events(
         kind = str(raw.get("kind") or "other")
         provider = str(raw.get("provider") or "")
         model = str(raw.get("model") or "")
+        module = str(raw.get("module") or "")
         prompt = int(raw.get("promptTokens") or raw.get("prompt_tokens") or 0)
         completion = int(raw.get("completionTokens") or raw.get("completion_tokens") or 0)
         audio = float(raw.get("audioSeconds") or raw.get("audio_seconds") or 0)
@@ -186,6 +236,7 @@ async def ingest_client_events(
             kind=kind,
             provider=provider,
             model=model,
+            module=module,
             prompt_tokens=prompt,
             completion_tokens=completion,
             audio_seconds=audio,
@@ -261,6 +312,75 @@ async def usage_summary(db: AsyncSession, *, days: int | None = 30) -> dict[str,
         )
     by_kind.sort(key=lambda x: x["cost_cny"], reverse=True)
 
+    by_module: list[dict[str, Any]] = []
+    mod_q = select(
+        ApiUsageEvent.module,
+        func.count(ApiUsageEvent.id),
+        func.coalesce(func.sum(ApiUsageEvent.prompt_tokens), 0),
+        func.coalesce(func.sum(ApiUsageEvent.completion_tokens), 0),
+        func.coalesce(func.sum(ApiUsageEvent.cost_cny), 0.0),
+        func.coalesce(func.sum(ApiUsageEvent.cost_usd), 0.0),
+    )
+    for f in filters:
+        mod_q = mod_q.where(f)
+    mod_q = mod_q.group_by(ApiUsageEvent.module)
+    for row in (await db.execute(mod_q)).all():
+        mid = (row[0] or "") or "unknown"
+        by_module.append(
+            {
+                "module": mid,
+                "events": int(row[1] or 0),
+                "prompt_tokens": int(row[2] or 0),
+                "completion_tokens": int(row[3] or 0),
+                "tokens": int(row[2] or 0) + int(row[3] or 0),
+                "cost_cny": float(row[4] or 0),
+                "cost_usd": float(row[5] or 0),
+            }
+        )
+    by_module.sort(key=lambda x: x["tokens"], reverse=True)
+
+    # GPU / local-LLM slice (5060 Ti attribution via provider/model heuristics).
+    gpu_by_module: list[dict[str, Any]] = []
+    gpu_events = 0
+    gpu_tokens = 0
+    # Pull rows then filter in Python — provider/model heuristics are not pure SQL.
+    gpu_rows_q = select(
+        ApiUsageEvent.module,
+        ApiUsageEvent.provider,
+        ApiUsageEvent.model,
+        ApiUsageEvent.prompt_tokens,
+        ApiUsageEvent.completion_tokens,
+        ApiUsageEvent.cost_cny,
+    )
+    for f in filters:
+        gpu_rows_q = gpu_rows_q.where(f)
+    rolled_gpu: dict[str, dict[str, Any]] = {}
+    for row in (await db.execute(gpu_rows_q)).all():
+        if not is_gpu_provider(str(row[1] or ""), str(row[2] or "")):
+            continue
+        mid = (row[0] or "") or "local_ollama"
+        slot = rolled_gpu.setdefault(
+            mid,
+            {
+                "module": mid,
+                "events": 0,
+                "tokens": 0,
+                "prompt_tokens": 0,
+                "completion_tokens": 0,
+                "cost_cny": 0.0,
+            },
+        )
+        pt = int(row[3] or 0)
+        ct = int(row[4] or 0)
+        slot["events"] += 1
+        slot["prompt_tokens"] += pt
+        slot["completion_tokens"] += ct
+        slot["tokens"] += pt + ct
+        slot["cost_cny"] += float(row[5] or 0)
+        gpu_events += 1
+        gpu_tokens += pt + ct
+    gpu_by_module = sorted(rolled_gpu.values(), key=lambda x: x["tokens"], reverse=True)
+
     key_q = select(
         ApiUsageEvent.key_fingerprint,
         ApiUsageEvent.key_label,
@@ -331,6 +451,13 @@ async def usage_summary(db: AsyncSession, *, days: int | None = 30) -> dict[str,
         "cost_cny": float(total[4] or 0),
         "audio_seconds": float(total[5] or 0),
         "by_kind": by_kind,
+        "by_module": by_module[:40],
+        "gpu": {
+            "events": gpu_events,
+            "tokens": gpu_tokens,
+            "by_module": gpu_by_module[:40],
+            "note": "按 provider/model 识别本地 Ollama / 5060Ti；需 App 上报 module 才可细分模块。",
+        },
         "by_key": by_key[:40],
         "by_user": by_user,
         "fx_usd_cny": USD_TO_CNY,

@@ -1194,7 +1194,9 @@ class ApiUsageEvent(Base):
     client_event_id: Mapped[str | None] = mapped_column(String(96), nullable=True, index=True)
     # translation | word_lookup | grammar | asr | tts | writing | other
     kind: Mapped[str] = mapped_column(String(32), default="other", index=True)
-    # dashscope | deepseek | openai | tencent | user_key | …
+    # App / pipeline module for GPU & COGS attribution, e.g. oral_coach | subtitle_asr
+    module: Mapped[str] = mapped_column(String(48), default="", index=True)
+    # dashscope | deepseek | openai | tencent | ollama | user_key | …
     provider: Mapped[str] = mapped_column(String(32), default="", index=True)
     model: Mapped[str] = mapped_column(String(120), default="")
     # platform | user

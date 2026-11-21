@@ -13,6 +13,35 @@ from pathlib import Path
 
 SHANGHAI = timezone(timedelta(hours=8))
 
+# Known App modules → Chinese labels (mirrored in platform_billing).
+MODULE_LABELS_ZH = {
+    "oral_coach": "口语陪练",
+    "digital_human": "数字人对话",
+    "peer_oral": "双人口语",
+    "subtitle_asr": "字幕补全·ASR",
+    "subtitle_translate": "字幕补全·翻译",
+    "subtitle_resegment": "字幕重切分",
+    "translation": "阅读/播放器翻译",
+    "word_lookup": "查词",
+    "grammar": "语法解析",
+    "writing_grade": "写作批改",
+    "reading_tts": "阅读配音 TTS",
+    "fingerprint": "素材指纹 Embedding",
+    "scene_vl": "场景识词 VL",
+    "vocab_enrich": "词卡 enrichment",
+    "local_ollama": "本地 Ollama（未标注模块）",
+    "unknown": "未标注模块",
+}
+
+
+def normalize_module(raw: str) -> str:
+    value = (raw or "").strip().lower().replace(" ", "_")
+    if not value:
+        return "unknown"
+    # Keep a short stable token.
+    value = re.sub(r"[^a-z0-9_\-]", "", value)[:48]
+    return value or "unknown"
+
 
 def normalize_json_response(text):
     """Honor json_object mode even when a small model emits JS-style keys."""
@@ -40,6 +69,9 @@ class UsageStore:
                 id INTEGER PRIMARY KEY, started REAL, day TEXT, client TEXT,
                 kind TEXT, finished REAL, status INTEGER, input_tokens INTEGER DEFAULT 0,
                 output_tokens INTEGER DEFAULT 0, estimated INTEGER DEFAULT 0)''')
+            cols = {row[1] for row in db.execute('PRAGMA table_info(requests)')}
+            if 'module' not in cols:
+                db.execute("ALTER TABLE requests ADD COLUMN module TEXT DEFAULT 'unknown'")
             db.execute('''UPDATE requests SET finished=?, status=499, estimated=1
                           WHERE finished IS NULL''', (time.time(),))
 
@@ -52,13 +84,16 @@ class UsageStore:
         finally:
             db.close()
 
-    def begin(self, client, kind):
+    def begin(self, client, kind, module='unknown'):
         now = time.time()
         # Client identifiers are pseudonyms, not authenticated account identities.
         client = hashlib.sha256(client.encode()).hexdigest()[:12]
+        module = normalize_module(module)
         with self.lock, self.connect() as db:
-            cursor = db.execute('INSERT INTO requests(started, day, client, kind) VALUES(?,?,?,?)',
-                                (now, datetime.now(SHANGHAI).date().isoformat(), client, kind))
+            cursor = db.execute(
+                'INSERT INTO requests(started, day, client, kind, module) VALUES(?,?,?,?,?)',
+                (now, datetime.now(SHANGHAI).date().isoformat(), client, kind, module),
+            )
             return cursor.lastrowid
 
     def finish(self, request_id, status, usage):
@@ -76,16 +111,55 @@ class UsageStore:
                 COALESCE(SUM(status>=400),0), COALESCE(SUM(input_tokens),0),
                 COALESCE(SUM(output_tokens),0), COALESCE(SUM(estimated),0)
                 FROM requests WHERE day=?''', (day,)).fetchone()
-            rows = db.execute('''SELECT client, kind, COUNT(*), MAX(started),
-                COALESCE(SUM(input_tokens+output_tokens),0), SUM(finished IS NULL)
-                FROM requests WHERE day=? GROUP BY client, kind ORDER BY MAX(started) DESC''', (day,)).fetchall()
+            rows = db.execute('''SELECT client, kind, module, COUNT(*), MAX(started),
+                COALESCE(SUM(input_tokens+output_tokens),0),
+                COALESCE(SUM(input_tokens),0), COALESCE(SUM(output_tokens),0),
+                SUM(finished IS NULL)
+                FROM requests WHERE day=? GROUP BY client, kind, module
+                ORDER BY MAX(started) DESC''', (day,)).fetchall()
+            module_rows = db.execute('''SELECT COALESCE(NULLIF(module,''),'unknown'),
+                COUNT(*), COALESCE(SUM(input_tokens),0), COALESCE(SUM(output_tokens),0),
+                COALESCE(SUM(input_tokens+output_tokens),0)
+                FROM requests WHERE day=? GROUP BY COALESCE(NULLIF(module,''),'unknown')
+                ORDER BY COALESCE(SUM(input_tokens+output_tokens),0) DESC''', (day,)).fetchall()
         now = time.time()
-        return dict(day=day, timezone='Asia/Shanghai', requests=total, failures=failed,
-                    input_tokens=inputs, output_tokens=outputs, total_tokens=inputs+outputs,
-                    requests_without_usage=unknown,
-                    active_clients=sum(row[3] > now-300 for row in rows),
-                    clients=[dict(client=r[0], kind=r[1], requests=r[2], last_seen=r[3],
-                                  tokens=r[4], in_flight=r[5]) for r in rows])
+        by_module = [
+            dict(
+                module=r[0],
+                label_zh=MODULE_LABELS_ZH.get(r[0], r[0]),
+                requests=r[1],
+                input_tokens=r[2],
+                output_tokens=r[3],
+                tokens=r[4],
+            )
+            for r in module_rows
+        ]
+        return dict(
+            day=day,
+            timezone='Asia/Shanghai',
+            requests=total,
+            failures=failed,
+            input_tokens=inputs,
+            output_tokens=outputs,
+            total_tokens=inputs + outputs,
+            requests_without_usage=unknown,
+            active_clients=sum(row[4] > now - 300 for row in rows),
+            by_module=by_module,
+            clients=[
+                dict(
+                    client=r[0],
+                    kind=r[1],
+                    module=r[2] or 'unknown',
+                    requests=r[3],
+                    last_seen=r[4],
+                    tokens=r[5],
+                    input_tokens=r[6],
+                    output_tokens=r[7],
+                    in_flight=r[8],
+                )
+                for r in rows
+            ],
+        )
 
 
 class UsageMiddleware:
@@ -98,9 +172,13 @@ class UsageMiddleware:
         headers = dict(scope.get('headers', []))
         client = headers.get(b'x-acquire-client-id', b'').decode(errors='replace')[:128]
         kind = 'self-reported account' if headers.get(b'x-acquire-client-kind') == b'account' else 'anonymous client'
+        module = headers.get(b'x-acquire-module', b'').decode(errors='replace')
+        if not module:
+            # Optional query-ish fallback via custom header aliases.
+            module = headers.get(b'x-ae-module', b'').decode(errors='replace')
         if not client:
             client = str(scope.get('client', ('unknown',))[0])
-        request_id = self.store.begin(client, kind)
+        request_id = self.store.begin(client, kind, module=module or 'unknown')
         chunks, status = bytearray(), 500
 
         async def observed(message):
@@ -143,8 +221,11 @@ def install_monitor(app):
 
     @app.on_event('startup')
     def start():
-        # Never expose user/usage statistics through the public inference proxy.
-        server = ThreadingHTTPServer(('127.0.0.1', 11435), Handler)
+        # Bind beyond loopback so ECS can scrape over Tailscale.
+        # Do NOT put this port behind the public nginx ollama proxy.
+        host = os.getenv('ACQUIRE_USAGE_STATS_HOST', '0.0.0.0')
+        port = int(os.getenv('ACQUIRE_USAGE_STATS_PORT', '11435'))
+        server = ThreadingHTTPServer((host, port), Handler)
         app.state.usage_server = server
         threading.Thread(target=server.serve_forever, daemon=True).start()
 
