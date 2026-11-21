@@ -1,103 +1,50 @@
-import 'dart:async';
-
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../router/app_router.dart';
-import '../../authentication/presentation/auth_session.dart';
 import '../../daily_review/domain/daily_review.dart';
+import '../../daily_review/domain/vocab_unified_queue.dart';
 import '../../daily_review/presentation/daily_review_provider.dart';
 import '../../home/presentation/learning_dashboard_provider.dart';
-import '../../library/presentation/library_catalog_provider.dart';
-import '../../library/presentation/library_mock_data.dart';
 import '../../navigation/presentation/navigation_destination.dart';
 import '../../phrases/presentation/phrase_book_provider.dart';
 import '../../shared/presentation/pad/app_design_tokens.dart';
 import '../../shared/presentation/pad/hub_ui.dart';
 import '../../shared/presentation/pad/pad_scaffold.dart';
 import '../../shared/presentation/pad/pad_top_bar.dart';
-import '../../sync/data/acquire_api_client.dart';
-import '../../sync/presentation/daily_feed_provider.dart';
-import '../../daily_review/domain/vocab_unified_queue.dart';
 import '../../words/domain/syllabus_book.dart';
-import '../../words/domain/vocab_entry.dart';
+import '../../words/domain/word_review_settings.dart';
 import '../../words/presentation/estimated_vocabulary_provider.dart';
 import '../../words/presentation/syllabus_books_provider.dart';
 import '../../words/presentation/word_book_provider.dart';
+import '../../words/presentation/word_review_settings_provider.dart';
+import '../../words/presentation/word_review_settings_sheet.dart';
 
-const Map<String, int> _vocabTargets = <String, int>{
-  'A1': 800,
-  'A2': 1500,
-  'B1': 2500,
-  'B2': 4000,
-  'C1': 6000,
-  'C2': 8000,
-};
-
-const List<String> _levelOrder = <String>[
-  'A1',
-  'A2',
-  'B1',
-  'B2',
-  'C1',
-  'C2',
-];
-
-class ReviewHubScreen extends ConsumerStatefulWidget {
+/// Confirmed entry layout: estimated vocab hero → start review → quiet queue →
+/// six secondary rows (no entrance wall).
+class ReviewHubScreen extends ConsumerWidget {
   const ReviewHubScreen({super.key});
 
-  @override
-  ConsumerState<ReviewHubScreen> createState() => _ReviewHubScreenState();
-}
-
-enum _ReciteHubMode { memory, browse, quiz }
-
-class _ReviewHubScreenState extends ConsumerState<ReviewHubScreen> {
-  int _oralWrong = 0;
-  int _oralDue = 0;
-  _ReciteHubMode _mode = _ReciteHubMode.memory;
-
-  @override
-  void initState() {
-    super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      unawaited(_refreshOral());
-    });
-  }
-
-  Future<void> _refreshOral() async {
-    if (!ref.read(authSessionProvider).isLoggedIn) return;
-    try {
-      final ({int wrongItemCount, int dueReviewCount}) summary =
-          await ref.read(acquireApiClientProvider).learningSummary();
-      if (!mounted) return;
-      setState(() {
-        _oralWrong = summary.wrongItemCount;
-        _oralDue = summary.dueReviewCount;
-      });
-    } catch (_) {}
-  }
-
-  String? _nextLevel(String current) {
-    final String key = current.toUpperCase();
-    final int idx = _levelOrder.indexOf(key);
-    if (idx < 0 || idx >= _levelOrder.length - 1) return null;
-    return _levelOrder[idx + 1];
+  static String _formatCount(int value) {
+    final String raw = value.abs().toString();
+    final StringBuffer out = StringBuffer();
+    for (int i = 0; i < raw.length; i++) {
+      final int fromEnd = raw.length - i;
+      if (i > 0 && fromEnd % 3 == 0) out.write(',');
+      out.write(raw[i]);
+    }
+    return value < 0 ? '-$out' : out.toString();
   }
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final DailyReviewState review = ref.watch(dailyReviewProvider);
     final List<ReviewSource> sources = ref.watch(reviewSourcesProvider);
     final DateTime now = DateTime.now();
     final ReviewPlan plan = review.plan(sources, now);
     final LearningDashboardStats dash = ref.watch(learningDashboardProvider);
-    final LearningActivityState activity = ref.watch(learningActivityProvider);
-    final String level =
-        ref.watch(learningPreferencesProvider).level.toUpperCase();
     final List<WordEntry> wordBook = ref.watch(wordBookProvider);
-    final int vocabLocal = wordBook.length;
     final int favoriteFresh = freshFavoriteLemmas(
       words: wordBook,
       records: review.records,
@@ -112,236 +59,317 @@ class _ReviewHubScreenState extends ConsumerState<ReviewHubScreen> {
         .length;
     final int? estimatedVocab = ref.watch(estimatedVocabularyProvider);
     final int phraseCount = ref.watch(phraseBookProvider).length;
-    final SyllabusBooksState syllabus = ref.watch(syllabusBooksProvider);
-    final SyllabusBook? activeBook = syllabus.activeBook;
-    final List<_VideoProgress> videos = _recentVideos(ref);
-    final int vocabTarget = _vocabTargets[level] ?? 2500;
-    final String? nextLevel = _nextLevel(level);
-    final int nextTarget = nextLevel == null
-        ? vocabTarget
-        : (_vocabTargets[nextLevel] ?? vocabTarget);
-    final int remain = (nextTarget - (estimatedVocab ?? vocabLocal))
-        .clamp(0, nextTarget);
-    final int sentenceToday = activity.today.learnedSentenceKeys.length;
-    final int shadowingToday = activity.today.shadowingCount;
+    final SyllabusBook? activeBook = ref.watch(syllabusBooksProvider).activeBook;
     final int favoriteDue = plan.due
         .where((ReviewRecord r) => isFavoriteReviewKey(r.key))
         .length;
     final int bookDue = plan.due
         .where((ReviewRecord r) => isSyllabusReviewKey(r.key))
         .length;
+    final int newQuota = ref.watch(
+      wordReviewSettingsProvider.select(
+        (WordReviewSettings settings) => settings.dailyNewLimit,
+      ),
+    );
+    final int displayEstimate = estimatedVocab ?? wordBook.length;
+    final String bookLink = activeBook == null
+        ? '导入词书 · 未选词书，可先背收藏'
+        : '导入词书 · 当前：${activeBook.title}';
 
     return PadScaffold(
       currentDestination: AppNavDestination.review,
       showContinueLearning: false,
       topBar: PadTopBar(
         title: '背单词',
-        description: '收藏生词与词书同一队列 · 自然拼读 + 语境词卡',
+        description: '收藏与词书同一队列',
         actions: <Widget>[
           IconButton(
-            tooltip: '刷新',
-            onPressed: () => unawaited(_refreshOral()),
-            icon: const Icon(Icons.refresh_rounded),
+            tooltip: '背词设置',
+            onPressed: () => showWordReviewSettingsSheet(context),
+            icon: const Icon(Icons.tune_rounded),
           ),
         ],
       ),
-      body: RefreshIndicator(
-        onRefresh: () async {
-          await _refreshOral();
-        },
-        child: ListView(
-          physics: const AlwaysScrollableScrollPhysics(),
-          padding: const EdgeInsets.fromLTRB(16, 8, 16, 96),
+      body: ListView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: const EdgeInsets.fromLTRB(16, 8, 16, 96),
+        children: <Widget>[
+          _VocabHero(
+            estimateLabel: estimatedVocab == null ? '本地词量' : '预估词量',
+            estimateText: _formatCount(displayEstimate),
+            summary:
+                '生词 $favoriteFresh · 熟词 $favoriteKnown · 今日到期 ${plan.due.length}',
+            onStart: () => context.push(SGRoute.reviewSession.route),
+            bookLink: bookLink,
+            onBook: () => context.push('/words/syllabus'),
+            streakDays: dash.streakDays,
+          ),
+          const SizedBox(height: 18),
+          Text(
+            '今日队列',
+            style: TextStyle(
+              fontSize: 15,
+              fontWeight: FontWeight.w800,
+              color: AppDesignTokens.textPrimary,
+            ),
+          ),
+          const SizedBox(height: 10),
+          _QueueStrip(
+            items: <(String, String)>[
+              ('收藏优先', '$favoriteDue'),
+              ('词书', '$bookDue'),
+              ('新学额度', '$newQuota'),
+            ],
+          ),
+          const SizedBox(height: 22),
+          Text(
+            '更多',
+            style: TextStyle(
+              fontSize: 15,
+              fontWeight: FontWeight.w800,
+              color: AppDesignTokens.textPrimary,
+            ),
+          ),
+          const SizedBox(height: 8),
+          HubSurface(
+            padding: EdgeInsets.zero,
+            child: Column(
+              children: <Widget>[
+                _SecondaryRow(
+                  title: '收藏词本',
+                  subtitle: '${wordBook.length} 词',
+                  onTap: () => context.go(AppNavDestination.words.route),
+                ),
+                const Divider(height: 1),
+                _SecondaryRow(
+                  title: '错词本',
+                  subtitle: '优先重练忘记的词',
+                  onTap: () => context.push(
+                    '${SGRoute.reviewSession.route}?deck=missed',
+                  ),
+                ),
+                const Divider(height: 1),
+                _SecondaryRow(
+                  title: '自由练习',
+                  subtitle: '不按到期压力刷一遍',
+                  onTap: () => context.push(
+                    '${SGRoute.reviewSession.route}?practice=1&kind=word',
+                  ),
+                ),
+                const Divider(height: 1),
+                _SecondaryRow(
+                  title: '短语',
+                  subtitle: '$phraseCount 条',
+                  onTap: () => context.go(AppNavDestination.phrases.route),
+                ),
+                const Divider(height: 1),
+                _SecondaryRow(
+                  title: '词汇量测评',
+                  subtitle: estimatedVocab == null ? '校准预估词量' : '重新校准预估',
+                  onTap: () =>
+                      context.push(SGRoute.vocabularyPlacement.route),
+                ),
+                const Divider(height: 1),
+                _SecondaryRow(
+                  title: '背词设置',
+                  subtitle: '每日新学 · 题型',
+                  onTap: () => showWordReviewSettingsSheet(context),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _VocabHero extends StatelessWidget {
+  const _VocabHero({
+    required this.estimateLabel,
+    required this.estimateText,
+    required this.summary,
+    required this.onStart,
+    required this.bookLink,
+    required this.onBook,
+    required this.streakDays,
+  });
+
+  final String estimateLabel;
+  final String estimateText;
+  final String summary;
+  final VoidCallback onStart;
+  final String bookLink;
+  final VoidCallback onBook;
+  final int streakDays;
+
+  @override
+  Widget build(BuildContext context) {
+    final bool dark = AppDesignTokens.isDark;
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(28),
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: dark
+              ? const <Color>[Color(0xFF1E2A22), Color(0xFF243028)]
+              : const <Color>[Color(0xFFE8F5E4), Color(0xFFF7F3EA)],
+        ),
+        boxShadow: AppDesignTokens.toyCardShadow,
+      ),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(20, 22, 20, 18),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: <Widget>[
-            HubSurface(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: <Widget>[
-                  InkWell(
-                    onTap: () => context.push('/words/syllabus'),
-                    borderRadius: BorderRadius.circular(12),
-                    child: Row(
-                      children: <Widget>[
-                        Container(
-                          width: 44,
-                          height: 44,
-                          decoration: BoxDecoration(
-                            color: const Color(0xFFEDE7F6),
-                            borderRadius: BorderRadius.circular(14),
-                          ),
-                          child: const Icon(
-                            Icons.library_books_rounded,
-                            color: Color(0xFF5E35B1),
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: <Widget>[
-                              Text(
-                                activeBook == null ? '选择词书开始背' : '当前词书',
-                                style: TextStyle(
-                                  fontSize: 13,
-                                  fontWeight: FontWeight.w700,
-                                  color: AppDesignTokens.textSecondary,
-                                ),
-                              ),
-                              const SizedBox(height: 2),
-                              Text(
-                                activeBook?.title ?? '四六级 / 考研 / 教材词书可下载',
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: TextStyle(
-                                  fontSize: 18,
-                                  fontWeight: FontWeight.w900,
-                                  color: AppDesignTokens.textPrimary,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                        Icon(
-                          Icons.chevron_right_rounded,
-                          color: AppDesignTokens.textSecondary,
-                        ),
-                      ],
+            Row(
+              children: <Widget>[
+                Text(
+                  estimateLabel,
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w700,
+                    color: AppDesignTokens.textSecondary,
+                  ),
+                ),
+                const Spacer(),
+                if (streakDays > 0)
+                  Text(
+                    '连续 $streakDays 天',
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                      color: AppDesignTokens.textSecondary,
                     ),
                   ),
-                  if (activeBook != null) ...<Widget>[
-                    const SizedBox(height: 10),
-                    Text(
-                      '已学 ${syllabus.learnedCount(activeBook.id)} / ${activeBook.words.length} 词 · 与收藏同一队列背诵',
-                      style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
-                        color: AppDesignTokens.textSecondary,
-                      ),
-                    ),
-                  ] else ...<Widget>[
-                    const SizedBox(height: 10),
-                    Text(
-                      '可先背收藏生词；需要时再导入词书，系统会提示与生词/熟词的重复。',
-                      style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
-                        color: AppDesignTokens.textSecondary,
-                      ),
-                    ),
-                  ],
-                  const SizedBox(height: 14),
-                  HubPrimaryButton(
-                    label: plan.due.isEmpty && plan.newAvailable == 0
-                        ? '自由练习 / 再背一遍'
-                        : '开始背词（收藏优先）',
-                    onPressed: () {
-                      context.push(
-                        _mode == _ReciteHubMode.quiz
-                            ? '${SGRoute.reviewSession.route}?practice=1'
-                            : SGRoute.reviewSession.route,
-                      );
-                    },
-                  ),
-                  const SizedBox(height: 8),
-                  TextButton(
-                    onPressed: () => context.push('/words/syllabus'),
-                    child: Text(
-                      activeBook == null ? '导入 / 选择词书' : '更换 / 下载词书',
-                    ),
-                  ),
-                ],
+              ],
+            ),
+            const SizedBox(height: 6),
+            Text(
+              estimateText,
+              style: TextStyle(
+                fontSize: 52,
+                height: 1.05,
+                fontWeight: FontWeight.w900,
+                letterSpacing: -1.2,
+                color: AppDesignTokens.textPrimary,
               ),
             ),
-            const SizedBox(height: 14),
-            HubSurface(
+            const SizedBox(height: 8),
+            Text(
+              summary,
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
+                height: 1.35,
+                color: AppDesignTokens.textSecondary,
+              ),
+            ),
+            const SizedBox(height: 18),
+            HubPrimaryButton(
+              label: '开始背词',
+              onPressed: onStart,
+            ),
+            const SizedBox(height: 4),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: TextButton(
+                onPressed: onBook,
+                style: TextButton.styleFrom(
+                  foregroundColor: AppDesignTokens.brandGreenDark,
+                  padding: const EdgeInsets.symmetric(horizontal: 4),
+                ),
+                child: Text(
+                  bookLink,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(fontWeight: FontWeight.w700),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _QueueStrip extends StatelessWidget {
+  const _QueueStrip({required this.items});
+
+  final List<(String, String)> items;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: <Widget>[
+        for (int i = 0; i < items.length; i++) ...<Widget>[
+          if (i > 0) const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: <Widget>[
+                Text(
+                  items[i].$2,
+                  style: TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.w900,
+                    color: AppDesignTokens.textPrimary,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  items[i].$1,
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: AppDesignTokens.textSecondary,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+}
+
+class _SecondaryRow extends StatelessWidget {
+  const _SecondaryRow({
+    required this.title,
+    required this.subtitle,
+    required this.onTap,
+  });
+
+  final String title;
+  final String subtitle;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        child: Row(
+          children: <Widget>[
+            Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: <Widget>[
                   Text(
-                    '今日待办 · 统一队列',
+                    title,
                     style: TextStyle(
-                      fontSize: 18,
+                      fontSize: 16,
                       fontWeight: FontWeight.w800,
                       color: AppDesignTokens.textPrimary,
                     ),
                   ),
-                  const SizedBox(height: 12),
-                  Row(
-                    children: <Widget>[
-                      HubMetricTile(
-                        value: '${plan.due.length}',
-                        label: '到期',
-                        background: const Color(0xFFE8F8D8),
-                        foreground: AppDesignTokens.brandGreenDark,
-                      ),
-                      const SizedBox(width: 8),
-                      HubMetricTile(
-                        value: '$favoriteDue',
-                        label: '收藏到期',
-                        background: AppDesignTokens.skyLight,
-                        foreground: AppDesignTokens.primaryBlueDark,
-                      ),
-                      const SizedBox(width: 8),
-                      HubMetricTile(
-                        value: estimatedVocab == null
-                            ? '—'
-                            : '$estimatedVocab',
-                        label: '预估词量',
-                        background: const Color(0xFFEDE7F6),
-                        foreground: const Color(0xFF5E35B1),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
-                    children: <Widget>[
-                      HubPill(
-                        label: '记忆 (FSRS)',
-                        selected: _mode == _ReciteHubMode.memory,
-                        onTap: () =>
-                            setState(() => _mode = _ReciteHubMode.memory),
-                      ),
-                      HubPill(
-                        label: '浏览收藏词',
-                        selected: _mode == _ReciteHubMode.browse,
-                        onTap: () {
-                          setState(() => _mode = _ReciteHubMode.browse);
-                          context.go(AppNavDestination.words.route);
-                        },
-                      ),
-                      HubPill(
-                        label: '自测',
-                        selected: _mode == _ReciteHubMode.quiz,
-                        onTap: () {
-                          setState(() => _mode = _ReciteHubMode.quiz);
-                          context.push(
-                            '${SGRoute.reviewSession.route}?practice=1&kind=word',
-                          );
-                        },
-                      ),
-                      _softChip(
-                        Icons.local_fire_department_rounded,
-                        '连续 ${dash.streakDays} 天',
-                        const Color(0xFFFFF1D6),
-                        AppDesignTokens.orange,
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
+                  const SizedBox(height: 2),
                   Text(
-                    [
-                      '生词 $favoriteFresh · 熟词 $favoriteKnown',
-                      if (activeBook != null) '词书待学到期 $bookDue',
-                      if (estimatedVocab != null)
-                        nextLevel == null
-                            ? '预估词量 $estimatedVocab / $vocabTarget'
-                            : '预估词量 $estimatedVocab · 距 $nextLevel 还差 $remain',
-                      if (estimatedVocab == null)
-                        '收藏 $vocabLocal 词 · 去测词汇量可校准预估',
-                      '${dash.todayStudyMinutes} 分钟',
-                    ].join(' · '),
+                    subtitle,
                     style: TextStyle(
                       fontSize: 12,
                       fontWeight: FontWeight.w600,
@@ -351,372 +379,13 @@ class _ReviewHubScreenState extends ConsumerState<ReviewHubScreen> {
                 ],
               ),
             ),
-            const SizedBox(height: 18),
-            const HubSectionTitle('更多背词入口'),
-            const SizedBox(height: 8),
-            GridView.count(
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              crossAxisCount: 2,
-              mainAxisSpacing: 10,
-              crossAxisSpacing: 10,
-              childAspectRatio: 1.22,
-              children: <Widget>[
-                _ReciteModuleTile(
-                  icon: Icons.library_books_rounded,
-                  title: '词书 / 考纲',
-                  subtitle: activeBook == null
-                      ? '下载四六级 · 考研等'
-                      : activeBook.title,
-                  background: const Color(0xFFEDE7F6),
-                  foreground: const Color(0xFF5E35B1),
-                  onTap: () => context.push('/words/syllabus'),
-                ),
-                _ReciteModuleTile(
-                  icon: Icons.psychology_rounded,
-                  title: 'FSRS 到期',
-                  subtitle: plan.due.isEmpty
-                      ? '今日已清 · 可自由练'
-                      : '到期 ${plan.due.length} 张',
-                  background: const Color(0xFFE8F8D8),
-                  foreground: AppDesignTokens.brandGreenDark,
-                  onTap: () => context.push(SGRoute.reviewSession.route),
-                ),
-                _ReciteModuleTile(
-                  icon: Icons.menu_book_rounded,
-                  title: '视频收藏词',
-                  subtitle: '$vocabLocal 词 · 来源 ${sources.length}',
-                  background: AppDesignTokens.skyLight,
-                  foreground: AppDesignTokens.primaryBlueDark,
-                  onTap: () => context.go(AppNavDestination.words.route),
-                ),
-                _ReciteModuleTile(
-                  icon: Icons.auto_stories_rounded,
-                  title: '短语库',
-                  subtitle: '$phraseCount 条表达',
-                  background: const Color(0xFFFFF1D6),
-                  foreground: AppDesignTokens.orange,
-                  onTap: () => context.go(AppNavDestination.phrases.route),
-                ),
-                _ReciteModuleTile(
-                  icon: Icons.report_gmailerrorred_rounded,
-                  title: '错词本',
-                  subtitle: '优先重练忘记的词',
-                  background: AppDesignTokens.pinkLight,
-                  foreground: const Color(0xFFC2185B),
-                  onTap: () => context.push(
-                    '${SGRoute.reviewSession.route}?deck=missed',
-                  ),
-                ),
-                _ReciteModuleTile(
-                  icon: Icons.tune_rounded,
-                  title: '词汇量测评',
-                  subtitle: '校准推荐与新学量',
-                  background: const Color(0xFFE0F7FA),
-                  foreground: const Color(0xFF00838F),
-                  onTap: () =>
-                      context.push(SGRoute.vocabularyPlacement.route),
-                ),
-              ],
-            ),
-            const SizedBox(height: 14),
-            HubSurface(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: <Widget>[
-                  Text(
-                    '跟读 / 句子记忆',
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.w800,
-                      color: AppDesignTokens.textPrimary,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    '今日学句 $sentenceToday · 今日跟读 $shadowingToday 次 · 已并入同一套 FSRS',
-                    style: TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w600,
-                      color: AppDesignTokens.textSecondary,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 14),
-            HubSurface(
-              onTap: () => context.push(SGRoute.learningReview.route),
-              child: Row(
-                children: <Widget>[
-                  Container(
-                    width: 48,
-                    height: 48,
-                    decoration: BoxDecoration(
-                      color: AppDesignTokens.pinkLight,
-                      borderRadius: BorderRadius.circular(16),
-                    ),
-                    child: const Icon(
-                      Icons.mic_rounded,
-                      color: Color(0xFFC2185B),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: <Widget>[
-                        Text(
-                          '口语错题复习',
-                          style: TextStyle(
-                            fontSize: 15,
-                            fontWeight: FontWeight.w800,
-                            color: AppDesignTokens.textPrimary,
-                          ),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          '错题 $_oralWrong · 到期 $_oralDue',
-                          style: TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w600,
-                            color: AppDesignTokens.textSecondary,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 12,
-                      vertical: 10,
-                    ),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFC2185B),
-                      borderRadius: BorderRadius.circular(14),
-                    ),
-                    child: const Text(
-                      '去复习',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.w800,
-                        fontSize: 12,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 18),
-            HubSectionTitle(
-              '相关视频进度',
-              action: '片库',
-              onAction: () => context.go(AppNavDestination.library.route),
-            ),
-            const SizedBox(height: 8),
-            HubSurface(
-              padding: const EdgeInsets.symmetric(vertical: 6),
-              child: videos.isEmpty
-                  ? Padding(
-                      padding: const EdgeInsets.all(14),
-                      child: Text(
-                        '还没有学习进度。去片库打开一集，点词即可进入背诵队列。',
-                        style: TextStyle(
-                          color: AppDesignTokens.textSecondary,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    )
-                  : Column(
-                      children: <Widget>[
-                        for (final _VideoProgress v in videos.take(5))
-                          ListTile(
-                            onTap: () => context.pushNamed(
-                              SGRoute.player.name,
-                              pathParameters: <String, String>{
-                                'episodeId': v.episodeId,
-                              },
-                            ),
-                            leading: Container(
-                              width: 44,
-                              height: 44,
-                              decoration: BoxDecoration(
-                                color: AppDesignTokens.softGray,
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                              child: Icon(
-                                Icons.play_circle_fill_rounded,
-                                color: AppDesignTokens.primaryBlueDark,
-                              ),
-                            ),
-                            title: Text(
-                              v.title,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(fontWeight: FontWeight.w700),
-                            ),
-                            subtitle: Text('${v.courseTitle} · ${v.progress}%'),
-                            trailing: Text(
-                              v.progress >= 100 ? '重看' : '继续',
-                              style: const TextStyle(
-                                fontWeight: FontWeight.w800,
-                                color: AppDesignTokens.brandGreenDark,
-                              ),
-                            ),
-                          ),
-                      ],
-                    ),
+            Icon(
+              Icons.chevron_right_rounded,
+              color: AppDesignTokens.textSecondary,
             ),
           ],
         ),
       ),
     );
   }
-
-  Widget _softChip(
-    IconData icon,
-    String label,
-    Color bg,
-    Color fg,
-  ) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-      decoration: BoxDecoration(
-        color: bg,
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: <Widget>[
-          Icon(icon, size: 16, color: fg),
-          const SizedBox(width: 6),
-          Text(
-            label,
-            style: TextStyle(
-              fontSize: 12,
-              fontWeight: FontWeight.w800,
-              color: fg,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  List<_VideoProgress> _recentVideos(WidgetRef ref) {
-    final List<LibraryCourseData> courses = ref.watch(libraryCatalogProvider);
-    final List<_VideoProgress> out = <_VideoProgress>[];
-    for (final LibraryCourseData course in courses) {
-      for (final LibraryEpisodeItem ep in course.episodes) {
-        if (ep.progressPercent <= 0 && !ep.completed) continue;
-        out.add(
-          _VideoProgress(
-            episodeId: ep.id,
-            title: ep.title,
-            courseTitle: course.title,
-            progress: ep.progressPercent.clamp(0, 100),
-          ),
-        );
-      }
-    }
-    out.sort(
-      (_VideoProgress a, _VideoProgress b) => b.progress.compareTo(a.progress),
-    );
-    return out;
-  }
-}
-
-class _ReciteModuleTile extends StatelessWidget {
-  const _ReciteModuleTile({
-    required this.icon,
-    required this.title,
-    required this.subtitle,
-    required this.background,
-    required this.foreground,
-    required this.onTap,
-  });
-
-  final IconData icon;
-  final String title;
-  final String subtitle;
-  final Color background;
-  final Color foreground;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return Material(
-      color: AppDesignTokens.appWhite,
-      borderRadius: BorderRadius.circular(20),
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(20),
-        child: Ink(
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(20),
-            boxShadow: AppDesignTokens.toyCardShadow,
-          ),
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(12, 12, 10, 10),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: <Widget>[
-                Container(
-                  width: 36,
-                  height: 36,
-                  decoration: BoxDecoration(
-                    color: background,
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Icon(icon, size: 20, color: foreground),
-                ),
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: <Widget>[
-                    Text(
-                      title,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        fontSize: 15,
-                        fontWeight: FontWeight.w800,
-                        color: AppDesignTokens.textPrimary,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      subtitle,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.w600,
-                        height: 1.2,
-                        color: AppDesignTokens.textSecondary,
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _VideoProgress {
-  const _VideoProgress({
-    required this.episodeId,
-    required this.title,
-    required this.courseTitle,
-    required this.progress,
-  });
-
-  final String episodeId;
-  final String title;
-  final String courseTitle;
-  final int progress;
 }
