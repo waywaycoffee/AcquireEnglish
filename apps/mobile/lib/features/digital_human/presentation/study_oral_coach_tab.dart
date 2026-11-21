@@ -18,9 +18,13 @@ import '../../authentication/presentation/auth_session.dart';
 import '../../phrases/presentation/phrase_book_provider.dart';
 import '../../player/data/pronunciation_providers.dart';
 import '../../player/domain/pronunciation_assessment.dart';
+import '../../reading/data/reading_gloss.dart';
+import '../../reading/data/reading_vocab_lists.dart';
+import '../../reading/presentation/reading_iplus1_provider.dart';
 import '../../settings/presentation/settings_provider.dart';
 import '../../sync/data/acquire_api_client.dart';
 import '../../sync/data/user_assets_service.dart';
+import '../../words/presentation/learned_vocabulary_provider.dart';
 import '../../words/presentation/word_book_provider.dart';
 import '../data/coach_english_voices.dart';
 import '../data/digital_human_catalog.dart';
@@ -1731,18 +1735,45 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
     });
   }
 
+  Future<List<SceneWordLabel>> _filterSceneLabels(
+    List<SceneWordLabel> labels,
+  ) async {
+    final ReadingFrequencyLexicon lexicon =
+        await ref.read(readingFrequencyLexiconProvider.future);
+    final ReadingVocabLists lists = ref.read(readingVocabListsProvider);
+    final Set<String> known = effectiveKnownWords(
+      lists: lists,
+      learned: ref.read(learnedVocabularyProvider),
+    );
+    return SceneWordRecognizer.keepLearningTargets(
+      labels,
+      lexicon: lexicon,
+      freqThreshold: readingFreqThresholdFromPrefs(),
+      knownWords: known,
+      focusWords: lists.focus,
+    );
+  }
+
+  Set<String> _favoriteWordsSnapshot() {
+    return <String>{
+      for (final WordEntry entry in ref.read(wordBookProvider))
+        if (entry.favorite) normalizeWord(entry.word),
+    }..remove('');
+  }
+
   Future<void> _refreshLiveSceneFrame({bool forceSpeak = false}) async {
     if (!_liveSceneOn || _busy || _recordingActive || _coachSpeaking) return;
     final String? path = await _liveSceneCamera.takeStillPath();
     if (path == null || !mounted) return;
     final LearningSettingsState settings = ref.read(learningSettingsProvider);
     try {
-      final List<SceneWordLabel> labels =
+      final List<SceneWordLabel> raw =
           await ref.read(sceneWordRecognizerProvider).recognize(
                 path,
                 settings: settings,
-                limit: 6,
+                limit: 8,
               );
+      final List<SceneWordLabel> labels = await _filterSceneLabels(raw);
       if (!mounted || !_liveSceneOn) return;
       final String description =
           ref.read(sceneWordRecognizerProvider).buildSceneDescription(labels);
@@ -1789,13 +1820,16 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
       _busy = true;
       _status = '正在识别场景里的单词…';
       _error = null;
+      _sceneSavedWords.addAll(_favoriteWordsSnapshot());
     });
     List<SceneWordLabel> labels = const <SceneWordLabel>[];
     try {
-      labels = await ref.read(sceneWordRecognizerProvider).recognize(
-            imagePath,
-            settings: settings,
-          );
+      final List<SceneWordLabel> raw =
+          await ref.read(sceneWordRecognizerProvider).recognize(
+                imagePath,
+                settings: settings,
+              );
+      labels = await _filterSceneLabels(raw);
     } catch (error) {
       if (mounted) {
         setState(() => _error = '识词失败：${_pretty(error)}');
@@ -1806,7 +1840,9 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
       _busy = false;
       _sceneImagePath = imagePath;
       _sceneLabels = labels;
-      _status = labels.isEmpty ? '未识别到清晰物品' : '端上已识别 ${labels.length} 个词';
+      _status = labels.isEmpty
+          ? '没有待学新词（高频已会词已隐藏）'
+          : '端上已识别 ${labels.length} 个待学词';
     });
     await showModalBottomSheet<void>(
       context: context,
@@ -1818,7 +1854,10 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
           child: _ScenePhotoRecognizeHost(
             imagePath: imagePath,
             initialLabels: labels,
-            savedWords: _sceneSavedWords,
+            savedWords: <String>{
+              ..._sceneSavedWords,
+              ..._favoriteWordsSnapshot(),
+            },
             autoRefine: true,
             onAddWord: _addSceneWordToBook,
             onShareWithCoach: (List<SceneWordLabel> current) =>
@@ -1837,6 +1876,7 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
               Navigator.of(context).maybePop();
               unawaited(_openSceneCapture());
             },
+            filterLabels: _filterSceneLabels,
           ),
         );
       },
@@ -1844,8 +1884,11 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
   }
 
   Future<void> _addSceneWordToBook(SceneWordLabel label) async {
-    final String word = label.word.trim().toLowerCase();
+    final String word = normalizeWord(label.word);
     if (word.isEmpty) return;
+    final bool wasFavorite = ref.read(wordBookProvider).any(
+          (WordEntry entry) => entry.word == word && entry.favorite,
+        );
     final bool added = ref.read(wordBookProvider.notifier).addFavoriteWord(
           rawWord: word,
           episodeId: 'scene:${widget.episodeId ?? 'digital-human'}',
@@ -1864,16 +1907,18 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
               : '${label.phonetic.isEmpty ? '' : '${label.phonetic} · '}${label.chinese}',
         );
     if (!mounted) return;
-    setState(() {
-      if (added || _sceneSavedWords.contains(word)) {
-        _sceneSavedWords.add(word);
-      }
-    });
-    if (added && mounted) {
+    setState(() => _sceneSavedWords.add(word));
+    if (!added) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('已加入生词本：$word')),
+        SnackBar(content: Text('无法收藏：$word')),
       );
+      return;
     }
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(wasFavorite ? '已在生词本：$word' : '已收藏到生词本：$word'),
+      ),
+    );
   }
 
   Future<void> _shareSceneWithCoach({
@@ -2950,6 +2995,7 @@ class _ScenePhotoRecognizeHost extends ConsumerStatefulWidget {
     required this.onShareWithCoach,
     required this.onRetake,
     required this.onLabelsChanged,
+    required this.filterLabels,
     this.autoRefine = true,
   });
 
@@ -2960,6 +3006,8 @@ class _ScenePhotoRecognizeHost extends ConsumerStatefulWidget {
   final Future<void> Function(List<SceneWordLabel> labels) onShareWithCoach;
   final VoidCallback onRetake;
   final ValueChanged<List<SceneWordLabel>> onLabelsChanged;
+  final Future<List<SceneWordLabel>> Function(List<SceneWordLabel> labels)
+      filterLabels;
   final bool autoRefine;
 
   @override
@@ -3001,20 +3049,22 @@ class _ScenePhotoRecognizeHostState
     });
     try {
       final LearningSettingsState settings = ref.read(learningSettingsProvider);
-      final List<SceneWordLabel> refined =
+      final List<SceneWordLabel> refinedRaw =
           await ref.read(sceneWordRecognizerProvider).refineWithCloud(
                 widget.imagePath,
                 settings: settings,
                 seed: _labels,
               );
+      final List<SceneWordLabel> refined =
+          await widget.filterLabels(refinedRaw);
       if (!mounted) return;
       setState(() {
         _labels = refined;
         _refined = true;
         _refining = false;
         _hint = refined.isEmpty
-            ? '云端未识别到清晰物品，可重拍。'
-            : '已云端精修 ${refined.length} 个词。';
+            ? '没有待学新词（高频已会词已隐藏），可重拍。'
+            : '已云端精修 ${refined.length} 个待学词；点标注可收藏。';
       });
       widget.onLabelsChanged(refined);
     } catch (error) {

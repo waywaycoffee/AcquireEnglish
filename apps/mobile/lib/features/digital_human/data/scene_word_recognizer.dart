@@ -10,6 +10,8 @@ import 'package:google_mlkit_text_recognition/google_mlkit_text_recognition.dart
 import 'package:image/image.dart' as img;
 
 import '../../../constants/endpoints.dart';
+import '../../reading/data/reading_gloss.dart';
+import '../../reading/data/reading_vocab_lists.dart';
 import '../../settings/presentation/settings_provider.dart';
 import '../../shared/data/word_lookup_service.dart';
 import '../../shared/domain/word_lookup_entry.dart';
@@ -431,6 +433,34 @@ class SceneWordRecognizer {
     }
     if (!_wordRe.hasMatch(text)) return '';
     return text;
+  }
+
+  /// Drop words the learner already knows: high frequency (≤ threshold) or
+  /// marked known / mastered. Focus-list words always keep.
+  static List<SceneWordLabel> keepLearningTargets(
+    List<SceneWordLabel> labels, {
+    required ReadingFrequencyLexicon lexicon,
+    required int freqThreshold,
+    required Set<String> knownWords,
+    Set<String> focusWords = const <String>{},
+  }) {
+    final List<SceneWordLabel> out = <SceneWordLabel>[];
+    final Set<String> seen = <String>{};
+    for (final SceneWordLabel label in labels) {
+      final String word = label.word.trim().toLowerCase();
+      if (word.length < 2 || !seen.add(word)) continue;
+      if (!isReadingHardWord(
+        word: word,
+        lexicon: lexicon,
+        threshold: freqThreshold,
+        known: knownWords,
+        focus: focusWords,
+      )) {
+        continue;
+      }
+      out.add(label);
+    }
+    return out;
   }
 
   String buildSceneDescription(List<SceneWordLabel> labels) {

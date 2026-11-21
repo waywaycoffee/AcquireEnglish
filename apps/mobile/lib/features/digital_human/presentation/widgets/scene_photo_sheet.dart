@@ -62,12 +62,12 @@ class _ScenePhotoSheetState extends State<ScenePhotoSheet> {
     if (widget.refining) return '云端精修中（Qwen-VL）…';
     if (widget.refined) {
       return widget.labels.isEmpty
-          ? '云端也未识别到清晰物品，可重拍或仍交给数字人描述。'
-          : '已云端精修；点标注加入生词本，或点「聊这个场景」。';
+          ? '没有需要学的新词（高频已会词已隐藏），可重拍或仍交给数字人描述。'
+          : '点标注收藏进生词本；已会的高频词不会显示。';
     }
     return widget.labels.isEmpty
-        ? '端上暂无清晰物品，可点「再识别一次」走云端，或重拍。'
-        : '端上快标已出；云端精修可提高准确度。点标注可加入生词本。';
+        ? '暂无待学新词，可点「再识别一次」或重拍。'
+        : '点标注可收藏；云端精修后更准。已会的高频词已隐藏。';
   }
 
   @override
@@ -306,6 +306,16 @@ class _FloatingWordChip extends StatelessWidget {
                         fontWeight: FontWeight.w700,
                       ),
                     ),
+                  Text(
+                    saved ? '已收藏' : '点击收藏',
+                    style: TextStyle(
+                      color: saved
+                          ? const Color(0xFFD97706)
+                          : const Color(0xFF6D28D9),
+                      fontSize: 10,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
                 ],
               ),
               const SizedBox(width: 8),
