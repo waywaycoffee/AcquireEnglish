@@ -276,7 +276,7 @@ class CommunityPostCard extends ConsumerWidget {
             badge: '可开练',
             accent: AdventurePalette.pathAmber,
             onPlay: () {
-              ref.read(pendingChallengePostIdProvider.notifier).state = post.id;
+              ref.read(pendingChallengePostIdProvider.notifier).set(post.id);
               unawaited(() async {
                 try {
                   await ref

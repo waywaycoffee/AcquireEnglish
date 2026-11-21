@@ -6,8 +6,16 @@ import '../../sync/data/acquire_api_client.dart';
 import '../domain/cafe_adventure.dart';
 
 /// When set, the next level complete reports a challenge-post "complete" event.
-final StateProvider<int?> pendingChallengePostIdProvider =
-    StateProvider<int?>((Ref ref) => null);
+class PendingChallengePostId extends Notifier<int?> {
+  @override
+  int? build() => null;
+
+  void set(int? id) => state = id;
+}
+
+final NotifierProvider<PendingChallengePostId, int?>
+    pendingChallengePostIdProvider =
+    NotifierProvider<PendingChallengePostId, int?>(PendingChallengePostId.new);
 
 class CafeProgress {
   const CafeProgress({
@@ -214,7 +222,7 @@ class CafeProgressNotifier extends AsyncNotifier<CafeProgress> {
         try {
           await api.reportChallengeEvent(postId: postId, event: 'complete');
         } catch (_) {}
-        ref.read(pendingChallengePostIdProvider.notifier).state = null;
+        ref.read(pendingChallengePostIdProvider.notifier).set(null);
       }
     }
     state = AsyncData<CafeProgress>(await _load());
