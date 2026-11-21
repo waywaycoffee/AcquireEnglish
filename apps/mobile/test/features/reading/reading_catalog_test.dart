@@ -2,6 +2,22 @@ import 'package:common_learn_english/features/reading/data/reading_catalog.dart'
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
+  test('default long-form book is the Standard Ebooks Wizard of Oz', () {
+    expect(kDefaultWizardOfOzEntry.title, 'The Wonderful Wizard of Oz');
+    expect(
+      kDefaultWizardOfOzEntry.path,
+      'l-frank-baum/the-wonderful-wizard-of-oz',
+    );
+    expect(kDefaultWizardOfOzEntry.kind, ReadingCatalogEntryKind.ebook);
+    expect(kDefaultWizardOfOzEntry.stableDocId, startsWith('catalog_'));
+    expect(
+      kStandardEbooksFeatured.any(
+        (book) => book.path == kDefaultWizardOfOzEntry.path,
+      ),
+      isTrue,
+    );
+  });
+
   group('parseCefrLeveledCsv', () {
     test('reads text and label columns', () {
       const String csv = '''

@@ -120,6 +120,11 @@ class ReadingCatalogEntry {
 const List<({String path, String title, String author})>
 kStandardEbooksFeatured = <({String path, String title, String author})>[
   (
+    path: 'l-frank-baum/the-wonderful-wizard-of-oz',
+    title: 'The Wonderful Wizard of Oz',
+    author: 'L. Frank Baum',
+  ),
+  (
     path: 'jane-austen/pride-and-prejudice',
     title: 'Pride and Prejudice',
     author: 'Jane Austen',
@@ -166,6 +171,17 @@ kStandardEbooksFeatured = <({String path, String title, String author})>[
     author: 'Herman Melville',
   ),
 ];
+
+const ReadingCatalogEntry kDefaultWizardOfOzEntry = ReadingCatalogEntry(
+  id: 'standardebooks:l-frank-baum/the-wonderful-wizard-of-oz',
+  title: 'The Wonderful Wizard of Oz',
+  kind: ReadingCatalogEntryKind.ebook,
+  subtitle: 'L. Frank Baum · 公版奇幻长篇',
+  level: 'B1',
+  path: 'l-frank-baum/the-wonderful-wizard-of-oz',
+  externalUrl:
+      'https://standardebooks.org/ebooks/l-frank-baum/the-wonderful-wizard-of-oz',
+);
 
 class ReadingCatalogClient {
   ReadingCatalogClient({Dio? dio, String apiBaseUrl = Endpoints.baseUrl})
