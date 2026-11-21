@@ -7,6 +7,8 @@ import '../../sync/presentation/daily_feed_provider.dart';
 final FutureProvider<List<RecommendedBilibiliCreatorDto>>
     recommendedBilibiliCreatorsProvider =
     FutureProvider<List<RecommendedBilibiliCreatorDto>>((Ref ref) async {
+  // Keep the rail warm across tab switches; invalidate only on pull-to-refresh.
+  ref.keepAlive();
   try {
     return await ref.read(acquireApiClientProvider).listRecommendedCreators();
   } catch (_) {

@@ -1351,10 +1351,9 @@ class AcquireApiClient {
   Future<List<RecommendedBilibiliCreatorDto>> listRecommendedCreators() async {
     final Response<dynamic> response = await _dio.get(
       Endpoints.creatorsRecommended,
+      // Allow short HTTP cache; server also keeps a 15‑minute payload cache.
       options: Options(
-        extra: const <String, Object>{
-          'dio_cache_interceptor_force_refresh': true,
-        },
+        receiveTimeout: const Duration(seconds: 20),
       ),
     );
     return (response.data as List<dynamic>)

@@ -21,7 +21,23 @@ class RecommendedBilibiliSection extends ConsumerWidget {
     final AsyncValue<List<RecommendedBilibiliCreatorDto>> async =
         ref.watch(recommendedBilibiliCreatorsProvider);
     return async.when(
-      loading: () => const SizedBox.shrink(),
+      loading: () => const Padding(
+        padding: EdgeInsets.symmetric(vertical: 12),
+        child: Row(
+          children: <Widget>[
+            SizedBox(
+              width: 18,
+              height: 18,
+              child: CircularProgressIndicator(strokeWidth: 2),
+            ),
+            SizedBox(width: 10),
+            Text(
+              '正在加载推荐博主…',
+              style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13),
+            ),
+          ],
+        ),
+      ),
       error: (_, __) => const SizedBox.shrink(),
       data: (List<RecommendedBilibiliCreatorDto> items) {
         if (items.isEmpty) {
