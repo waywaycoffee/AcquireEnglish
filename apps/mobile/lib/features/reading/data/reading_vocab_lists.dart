@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hive_ce/hive.dart';
 
 import '../../authentication/presentation/account_storage.dart';
+import '../../sync/data/schedule_device_cloud_sync.dart';
 import '../../words/presentation/word_book_provider.dart';
 import 'reading_gloss.dart';
 
@@ -146,10 +147,14 @@ class ReadingVocabListsNotifier extends Notifier<ReadingVocabLists> {
     return const ReadingVocabLists();
   }
 
-  Future<void> _persist(ReadingVocabLists next) async {
+  Future<void> _persist(
+    ReadingVocabLists next, {
+    bool scheduleSync = true,
+  }) async {
     state = next;
     if (!Hive.isBoxOpen('prefs')) return;
     await Hive.box<String>('prefs').put(_key, jsonEncode(next.toJson()));
+    if (scheduleSync) scheduleDeviceCloudSync(key: 'reading');
   }
 
   Future<void> markKnown(String word) => _persist(state.markKnown(word));
@@ -161,4 +166,7 @@ class ReadingVocabListsNotifier extends Notifier<ReadingVocabLists> {
   Future<void> removeKnown(String word) => _persist(state.removeKnown(word));
 
   Future<void> removeFocus(String word) => _persist(state.removeFocus(word));
+
+  Future<void> replaceFromCloud(ReadingVocabLists lists) =>
+      _persist(lists, scheduleSync: false);
 }

@@ -8,6 +8,7 @@ from fastapi.staticfiles import StaticFiles
 from app.config import settings
 from app.database import Base, engine
 from app.routers import (
+    app_settings_backup,
     assets,
     auth,
     community,
@@ -16,6 +17,7 @@ from app.routers import (
     study_play,
     community_social,
     learning_cards,
+    learning_module_progress,
     public_challenges,
     cosmetics,
     courses,
@@ -35,12 +37,15 @@ from app.routers import (
     pronunciation_assessment,
     public_lexicon,
     pregen_cache,
+    reading_backup,
     reading_speech,
     review_sync,
     rewards,
     shared_ocr_books,
     shared_subtitles,
+    sync_status,
     vocab,
+    wordbook_backup,
 )
 
 
@@ -104,6 +109,11 @@ app.include_router(shared_ocr_books.router, prefix="/api")
 app.include_router(rewards.router, prefix="/api")
 app.include_router(cosmetics.router, prefix="/api")
 app.include_router(review_sync.router, prefix="/api")
+app.include_router(reading_backup.router, prefix="/api")
+app.include_router(wordbook_backup.router, prefix="/api")
+app.include_router(app_settings_backup.router, prefix="/api")
+app.include_router(sync_status.router, prefix="/api")
+app.include_router(learning_module_progress.router, prefix="/api")
 app.include_router(foundation_media.router, prefix="/api")
 app.include_router(content_media.router, prefix="/api")
 app.include_router(syllabus_books.router, prefix="/api")

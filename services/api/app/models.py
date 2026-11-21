@@ -427,6 +427,36 @@ class ReviewBackup(Base):
     payload: Mapped[str] = mapped_column(Text, nullable=False)
 
 
+class ReadingLibraryBackup(Base):
+    """Versioned reading shelf + progress + vocab lists for cross-device restore."""
+
+    __tablename__ = "reading_library_backups"
+
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), primary_key=True)
+    revision: Mapped[int] = mapped_column(Integer, nullable=False)
+    payload: Mapped[str] = mapped_column(Text, nullable=False)
+
+
+class WordbookBackup(Base):
+    """Full word book (favorites + non-favorites) for cross-device restore."""
+
+    __tablename__ = "wordbook_backups"
+
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), primary_key=True)
+    revision: Mapped[int] = mapped_column(Integer, nullable=False)
+    payload: Mapped[str] = mapped_column(Text, nullable=False)
+
+
+class AppSettingsBackup(Base):
+    """Learning settings + word-review prefs (device-local keys stripped client-side)."""
+
+    __tablename__ = "app_settings_backups"
+
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), primary_key=True)
+    revision: Mapped[int] = mapped_column(Integer, nullable=False)
+    payload: Mapped[str] = mapped_column(Text, nullable=False)
+
+
 class CommunityPost(Base):
     """User-generated community posts (team_invite / share_bilibili / feedback)."""
 

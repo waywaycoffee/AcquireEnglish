@@ -921,17 +921,31 @@ class AcquireApiClient {
     String token, {
     int? revision,
     Map<String, dynamic>? state,
+  }) =>
+      documentBackup(
+        Endpoints.reviewBackup,
+        token: token,
+        revision: revision,
+        state: state,
+      );
+
+  /// Revision-CAS document blob (reading / wordbook / settings / review).
+  Future<({int revision, Map<String, dynamic>? state})> documentBackup(
+    String path, {
+    String? token,
+    int? revision,
+    Map<String, dynamic>? state,
   }) async {
     final Options options = Options(
-      headers: <String, String>{'Authorization': 'Bearer $token'},
+      headers: token == null || token.isEmpty
+          ? null
+          : <String, String>{'Authorization': 'Bearer $token'},
+      extra: _noCache.extra,
     );
     final Response<Map<String, dynamic>> response = revision == null
-        ? await _dio.get<Map<String, dynamic>>(
-            Endpoints.reviewBackup,
-            options: options,
-          )
+        ? await _dio.get<Map<String, dynamic>>(path, options: options)
         : await _dio.put<Map<String, dynamic>>(
-            Endpoints.reviewBackup,
+            path,
             data: <String, dynamic>{'revision': revision, 'state': state},
             options: options,
           );
@@ -940,6 +954,20 @@ class AcquireApiClient {
       revision: body['revision'] as int,
       state: body['state'] as Map<String, dynamic>?,
     );
+  }
+
+  Future<Map<String, dynamic>> syncStatus({String? token}) async {
+    final Response<Map<String, dynamic>> response =
+        await _dio.get<Map<String, dynamic>>(
+      Endpoints.syncStatus,
+      options: Options(
+        headers: token == null || token.isEmpty
+            ? null
+            : <String, String>{'Authorization': 'Bearer $token'},
+        extra: _noCache.extra,
+      ),
+    );
+    return response.data ?? <String, dynamic>{};
   }
 
   Future<AcquireTokenResult> login({

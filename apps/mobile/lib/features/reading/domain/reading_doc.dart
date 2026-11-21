@@ -39,6 +39,7 @@ class ReadingDoc {
     this.sourceLabel = '',
     this.createdAt,
     this.builtin = false,
+    this.contentHash,
   });
 
   final String id;
@@ -55,12 +56,40 @@ class ReadingDoc {
   final DateTime? createdAt;
   final bool builtin;
 
+  /// sha256 of original plainText when body was stripped for cloud size limits.
+  final String? contentHash;
+
+  bool get hasBody => plainText.trim().isNotEmpty;
+
   int get wordCount {
     final Iterable<String> parts = plainText
         .split(RegExp(r"\s+"))
         .where((String w) => w.trim().isNotEmpty);
     return parts.length;
   }
+
+  ReadingDoc copyWith({
+    String? plainText,
+    List<ReadingSegment>? segments,
+    String? contentHash,
+    bool clearContentHash = false,
+  }) =>
+      ReadingDoc(
+        id: id,
+        title: title,
+        sourceType: sourceType,
+        level: level,
+        plainText: plainText ?? this.plainText,
+        segments: segments ?? this.segments,
+        courseId: courseId,
+        episodeId: episodeId,
+        courseTitle: courseTitle,
+        episodeTitle: episodeTitle,
+        sourceLabel: sourceLabel,
+        createdAt: createdAt,
+        builtin: builtin,
+        contentHash: clearContentHash ? null : (contentHash ?? this.contentHash),
+      );
 
   Map<String, Object?> toJson() => <String, Object?>{
     'id': id,
@@ -76,6 +105,7 @@ class ReadingDoc {
     'sourceLabel': sourceLabel,
     'createdAt': createdAt?.toIso8601String(),
     'builtin': builtin,
+    if (contentHash != null && contentHash!.isNotEmpty) 'contentHash': contentHash,
   };
 
   factory ReadingDoc.fromJson(
@@ -98,6 +128,7 @@ class ReadingDoc {
       (ReadingSourceType t) => t.name == sourceName,
       orElse: () => ReadingSourceType.import,
     );
+    final String? hash = (json['contentHash'] as String?)?.trim();
     return ReadingDoc(
       id: '${json['id'] ?? ''}'.trim(),
       title: '${json['title'] ?? ''}'.trim(),
@@ -112,6 +143,7 @@ class ReadingDoc {
       sourceLabel: '${json['sourceLabel'] ?? ''}'.trim(),
       createdAt: DateTime.tryParse('${json['createdAt'] ?? ''}'),
       builtin: json['builtin'] as bool? ?? builtin,
+      contentHash: (hash == null || hash.isEmpty) ? null : hash,
     );
   }
 }

@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hive_ce/hive.dart';
 
 import '../../authentication/presentation/account_storage.dart';
+import '../../sync/data/schedule_device_cloud_sync.dart';
 import '../domain/reading_doc.dart';
 
 const String kReadingLibraryKey = 'reading_library_v1';
@@ -133,7 +134,9 @@ class ReadingLibraryNotifier extends Notifier<ReadingLibraryState> {
         final ReadingDoc doc = ReadingDoc.fromJson(
           Map<String, dynamic>.from(item),
         );
-        if (doc.id.isNotEmpty && doc.plainText.trim().isNotEmpty) {
+        if (doc.id.isEmpty) continue;
+        if (doc.hasBody ||
+            (doc.contentHash != null && doc.contentHash!.isNotEmpty)) {
           docs.add(doc);
         }
       }
@@ -164,21 +167,23 @@ class ReadingLibraryNotifier extends Notifier<ReadingLibraryState> {
     }
   }
 
-  Future<void> _persistLibrary() async {
+  Future<void> _persistLibrary({bool scheduleSync = true}) async {
     if (!Hive.isBoxOpen('prefs')) return;
     final String payload = jsonEncode(
       state.userDocs.map((ReadingDoc d) => d.toJson()).toList(),
     );
     await Hive.box<String>('prefs').put(_libraryKey, payload);
+    if (scheduleSync) scheduleDeviceCloudSync(key: 'reading');
   }
 
-  Future<void> _persistProgress() async {
+  Future<void> _persistProgress({bool scheduleSync = true}) async {
     if (!Hive.isBoxOpen('prefs')) return;
     final Map<String, Object?> payload = <String, Object?>{
       for (final MapEntry<String, ReadingProgress> e in state.progress.entries)
         e.key: e.value.toJson(),
     };
     await Hive.box<String>('prefs').put(_progressKey, jsonEncode(payload));
+    if (scheduleSync) scheduleDeviceCloudSync(key: 'reading');
   }
 
   Future<ReadingDoc?> addDoc(ReadingDoc doc, {bool checkQuota = true}) async {
@@ -264,6 +269,20 @@ class ReadingLibraryNotifier extends Notifier<ReadingLibraryState> {
       },
     );
     await _persistProgress();
+  }
+
+  /// Apply merged cloud user docs + progress (builtin list unchanged).
+  Future<void> replaceUserLibraryFromCloud({
+    required List<ReadingDoc> userDocs,
+    required Map<String, ReadingProgress> progress,
+  }) async {
+    state = state.copyWith(
+      userDocs: List<ReadingDoc>.unmodifiable(userDocs),
+      progress: Map<String, ReadingProgress>.unmodifiable(progress),
+      ready: true,
+    );
+    await _persistLibrary(scheduleSync: false);
+    await _persistProgress(scheduleSync: false);
   }
 }
 

@@ -12,6 +12,7 @@ import '../../authentication/presentation/auth_session.dart';
 import '../../digital_human/data/digital_human_catalog.dart';
 import '../../shared/domain/subtitle_letter_case.dart';
 import '../../sync/data/acquire_api_client.dart';
+import '../../sync/data/schedule_device_cloud_sync.dart';
 
 export '../../shared/domain/subtitle_letter_case.dart'
     show subtitleLetterCaseOptions;
@@ -1295,7 +1296,116 @@ class LearningSettingsNotifier extends Notifier<LearningSettingsState> {
         .setBaseUrl(state.resolvedCloudApiBaseUrl);
   }
 
-  void _persist() {
+  Map<String, Object?> toSyncJson() => <String, Object?>{
+    'subtitleMode': state.subtitleMode,
+    'subtitleLetterCase': state.subtitleLetterCase,
+    'playbackSpeed': state.playbackSpeed,
+    'playerWatchMode': state.playerWatchMode,
+    'fontSize': state.fontSize,
+    'subtitleDelayMs': state.subtitleDelayMs,
+    'dictionarySource': state.dictionarySource,
+    'highlightWords': state.highlightWords,
+    'subtitleWordHighlightStyle': state.subtitleWordHighlightStyle,
+    'subtitleWordHighlightBorderWidth': state.subtitleWordHighlightBorderWidth,
+    'reminder': state.reminder,
+    'translationProvider': state.translationProvider,
+    'translationApiKey': state.translationApiKey,
+    'translationApiSecret': state.translationApiSecret,
+    'translationBaseUrl': state.translationBaseUrl,
+    'translationModel': state.translationModel,
+    'useCustomTranslationEndpoint': state.useCustomTranslationEndpoint,
+    'asrProvider': state.asrProvider,
+    'asrApiKey': state.asrApiKey,
+    'asrBaseUrl': state.asrBaseUrl,
+    'asrModel': state.asrModel,
+    'useCustomAsrEndpoint': state.useCustomAsrEndpoint,
+    'generateBilingualAsrSubtitles': state.generateBilingualAsrSubtitles,
+    'enableChineseSpeechAsr': state.enableChineseSpeechAsr,
+    'ttsEngine': state.ttsEngine,
+    'ttsVoice': state.ttsVoice,
+    'ttsRate': state.ttsRate,
+    'preferAliyunTts': state.preferAliyunTts,
+    'cloudTtsVoice': state.cloudTtsVoice,
+    'oralCoachBackend': state.oralCoachBackend,
+    'oralCoachPipelineUrl': state.oralCoachPipelineUrl,
+    'liveKitUrl': state.liveKitUrl,
+    'bilibiliSessdata': state.bilibiliSessdata,
+    'bilibiliUserId': state.bilibiliUserId,
+    'digitalHumanId': state.digitalHumanId,
+    'cartoonDigitalHuman': state.cartoonDigitalHuman,
+    // Device-local keys intentionally omitted: cloudApiBaseUrl,
+    // voicePracticeServerUrl, oralCoachServerUrl (often LAN).
+  };
+
+  /// Apply cloud learning settings while keeping this device's API / LAN URLs.
+  Future<void> applyFromCloud(Map<String, dynamic> json) async {
+    final LearningSettingsState defaults = LearningSettingsState.defaults();
+    final LearningSettingsState loaded = defaults.copyWith(
+      subtitleMode: _normalizeSubtitleModeOrNull(json['subtitleMode']),
+      subtitleLetterCase:
+          subtitleLetterCaseOptions.contains(json['subtitleLetterCase'])
+          ? json['subtitleLetterCase'] as String
+          : null,
+      playbackSpeed: _stringOrNull(json['playbackSpeed']),
+      playerWatchMode: playerWatchModeOptions.contains(json['playerWatchMode'])
+          ? json['playerWatchMode'] as String
+          : null,
+      fontSize: _stringOrNull(json['fontSize']),
+      subtitleDelayMs: _intOrNull(json['subtitleDelayMs']),
+      dictionarySource: _stringOrNull(json['dictionarySource']),
+      highlightWords: _boolOrNull(json['highlightWords']),
+      subtitleWordHighlightStyle: _subtitleWordHighlightStyleOrNull(
+        json['subtitleWordHighlightStyle'],
+      ),
+      subtitleWordHighlightBorderWidth: _subtitleWordHighlightBorderWidthOrNull(
+        json['subtitleWordHighlightBorderWidth'],
+      ),
+      reminder: _boolOrNull(json['reminder']),
+      translationProvider: _translationProviderOrNull(json['translationProvider']),
+      translationApiKey: _stringOrNull(json['translationApiKey']),
+      translationApiSecret: _stringOrNull(json['translationApiSecret']),
+      translationBaseUrl: _stringOrNull(json['translationBaseUrl']),
+      translationModel: _stringOrNull(json['translationModel']),
+      useCustomTranslationEndpoint: _boolOrNull(
+        json['useCustomTranslationEndpoint'],
+      ),
+      asrProvider: _asrProviderOrNull(json['asrProvider']),
+      asrApiKey: _stringOrNull(json['asrApiKey']),
+      asrBaseUrl: _stringOrNull(json['asrBaseUrl']),
+      asrModel: _stringOrNull(json['asrModel']),
+      useCustomAsrEndpoint: _boolOrNull(json['useCustomAsrEndpoint']),
+      generateBilingualAsrSubtitles: _boolOrNull(
+        json['generateBilingualAsrSubtitles'],
+      ),
+      enableChineseSpeechAsr: _boolOrNull(json['enableChineseSpeechAsr']),
+      ttsEngine: _stringOrNull(json['ttsEngine']),
+      ttsVoice: _stringOrNull(json['ttsVoice']),
+      ttsRate: _doubleOrNull(json['ttsRate']),
+      preferAliyunTts: json['preferAliyunTts'] is bool
+          ? json['preferAliyunTts'] as bool
+          : null,
+      cloudTtsVoice: _stringOrNull(json['cloudTtsVoice']),
+      oralCoachBackend: oralCoachBackendOptions.contains(json['oralCoachBackend'])
+          ? json['oralCoachBackend'] as String
+          : null,
+      oralCoachPipelineUrl: _stringOrNull(json['oralCoachPipelineUrl']),
+      liveKitUrl: _stringOrNull(json['liveKitUrl']),
+      bilibiliSessdata: _stringOrNull(json['bilibiliSessdata']),
+      bilibiliUserId: _stringOrNull(json['bilibiliUserId']),
+      cartoonDigitalHuman: json['cartoonDigitalHuman'] is bool
+          ? json['cartoonDigitalHuman'] as bool
+          : null,
+      digitalHumanId: _stringOrNull(json['digitalHumanId']),
+      // Preserve device-local endpoints.
+      cloudApiBaseUrl: state.cloudApiBaseUrl,
+      voicePracticeServerUrl: state.voicePracticeServerUrl,
+      oralCoachServerUrl: state.oralCoachServerUrl,
+    );
+    state = loaded;
+    _persist(scheduleSync: false);
+  }
+
+  void _persist({bool scheduleSync = true}) {
     if (!Hive.isBoxOpen('prefs')) {
       return;
     }
@@ -1303,49 +1413,14 @@ class LearningSettingsNotifier extends Notifier<LearningSettingsState> {
       Hive.box<String>('prefs').put(
         _learningSettingsStorageKey,
         jsonEncode(<String, Object?>{
-          'subtitleMode': state.subtitleMode,
-          'subtitleLetterCase': state.subtitleLetterCase,
-          'playbackSpeed': state.playbackSpeed,
-          'playerWatchMode': state.playerWatchMode,
-          'fontSize': state.fontSize,
-          'subtitleDelayMs': state.subtitleDelayMs,
-          'dictionarySource': state.dictionarySource,
-          'highlightWords': state.highlightWords,
-          'subtitleWordHighlightStyle': state.subtitleWordHighlightStyle,
-          'subtitleWordHighlightBorderWidth':
-              state.subtitleWordHighlightBorderWidth,
-          'reminder': state.reminder,
-          'translationProvider': state.translationProvider,
-          'translationApiKey': state.translationApiKey,
-          'translationApiSecret': state.translationApiSecret,
-          'translationBaseUrl': state.translationBaseUrl,
-          'translationModel': state.translationModel,
-          'useCustomTranslationEndpoint': state.useCustomTranslationEndpoint,
-          'asrProvider': state.asrProvider,
-          'asrApiKey': state.asrApiKey,
-          'asrBaseUrl': state.asrBaseUrl,
-          'asrModel': state.asrModel,
-          'useCustomAsrEndpoint': state.useCustomAsrEndpoint,
-          'generateBilingualAsrSubtitles': state.generateBilingualAsrSubtitles,
-          'enableChineseSpeechAsr': state.enableChineseSpeechAsr,
-          'ttsEngine': state.ttsEngine,
-          'ttsVoice': state.ttsVoice,
-          'ttsRate': state.ttsRate,
-          'preferAliyunTts': state.preferAliyunTts,
-          'cloudTtsVoice': state.cloudTtsVoice,
+          ...toSyncJson(),
           'cloudApiBaseUrl': state.cloudApiBaseUrl,
-          'oralCoachBackend': state.oralCoachBackend,
           'oralCoachServerUrl': state.oralCoachServerUrl,
-          'oralCoachPipelineUrl': state.oralCoachPipelineUrl,
           'voicePracticeServerUrl': state.voicePracticeServerUrl,
-          'liveKitUrl': state.liveKitUrl,
-          'bilibiliSessdata': state.bilibiliSessdata,
-          'bilibiliUserId': state.bilibiliUserId,
-          'digitalHumanId': state.digitalHumanId,
-          'cartoonDigitalHuman': state.cartoonDigitalHuman,
         }),
       ),
     );
+    if (scheduleSync) scheduleDeviceCloudSync(key: 'settings');
   }
 
   String _normalizeSubtitleMode(String value) {

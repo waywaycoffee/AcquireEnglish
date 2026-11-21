@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hive_ce/hive.dart';
 
 import '../../daily_review/presentation/daily_review_provider.dart';
+import '../../sync/data/schedule_device_cloud_sync.dart';
 import '../domain/word_review_settings.dart';
 
 const String kWordReviewSettingsKey = 'word_review_prefs_v1';
@@ -43,7 +44,10 @@ class WordReviewSettingsNotifier extends Notifier<WordReviewSettings> {
     }
   }
 
-  Future<void> _persist(WordReviewSettings next) async {
+  Future<void> _persist(
+    WordReviewSettings next, {
+    bool scheduleSync = true,
+  }) async {
     state = next;
     if (!Hive.isBoxOpen('prefs')) {
       return;
@@ -52,6 +56,7 @@ class WordReviewSettingsNotifier extends Notifier<WordReviewSettings> {
       kWordReviewSettingsKey,
       jsonEncode(next.toJson()),
     );
+    if (scheduleSync) scheduleDeviceCloudSync(key: 'settings');
   }
 
   Future<void> update(WordReviewSettings next) async {
@@ -70,6 +75,9 @@ class WordReviewSettingsNotifier extends Notifier<WordReviewSettings> {
 
   Future<void> setDailyReviewLimit(int value) =>
       _persist(state.copyWith(dailyReviewLimit: value));
+
+  Future<void> replaceFromCloud(WordReviewSettings settings) =>
+      _persist(settings, scheduleSync: false);
 
   Future<void> setModeEnabled(WordPracticeMode mode, {required bool enabled}) {
     final Set<WordPracticeMode> next = state.enabledModes.toSet();

@@ -19,11 +19,7 @@ import '../../daily_review/presentation/daily_review_provider.dart';
 import '../../debug/demo_seed_service.dart';
 import '../../idle_jobs/idle_job_queue.dart';
 import '../../idle_jobs/idle_job_scheduler.dart';
-import '../../sync/data/phrase_sync_service.dart';
-import '../../sync/data/progress_sync_service.dart';
 import '../../sync/data/user_assets_service.dart';
-import '../../sync/data/vocab_sync_service.dart';
-import '../../sync/presentation/daily_feed_provider.dart';
 import '../../shared/presentation/pad/app_design_tokens.dart';
 import '../../shared/presentation/pad/pad_compact.dart';
 import '../../shared/presentation/pad/pad_scaffold.dart';
@@ -1101,7 +1097,7 @@ class SettingsScreen extends ConsumerWidget {
               _ActionRow(
                 title: '备份同步云端数据',
                 description: authSession.isLoggedIn
-                    ? '上传收藏生词 / 短语并拉取云端进度 / 词库 / 学习偏好 / 私人字幕。'
+                    ? '换机无感：推送并拉取进度 / 词书 / 短语 / 阅读书架 / 学习设置 / 复习与导入课。'
                     : '请先登录爱快账号后再同步。',
                 icon: Icons.cloud_sync_rounded,
                 onTap: () async {
@@ -1110,29 +1106,11 @@ class SettingsScreen extends ConsumerWidget {
                     return;
                   }
                   try {
-                    final (:uploaded, :failed) = await ref
-                        .read(vocabSyncServiceProvider)
-                        .pushAllFavorites();
-                    final (uploaded: phrasesUploaded, failed: phrasesFailed) = await ref
-                        .read(phraseSyncServiceProvider)
-                        .pushAll();
-                    await ref.read(vocabSyncServiceProvider).pullAndMerge();
-                    await ref.read(phraseSyncServiceProvider).pullAndMerge();
-                    await ref
-                        .read(progressSyncServiceProvider)
-                        .pullIndexed();
-                    await ref
-                        .read(learningPreferencesProvider.notifier)
-                        .pullRemote();
-                    await syncCloudCatalogAndFeed(ref);
+                    await syncCloudCatalogAndFeed(ref, pushLocal: true);
                     if (!context.mounted) {
                       return;
                     }
-                    _showMessage(
-                      context,
-                      '已上传 $uploaded 个收藏词、$phrasesUploaded 条短语。'
-                      '上传失败：${failed + phrasesFailed} 条。',
-                    );
+                    _showMessage(context, '云端同步完成（含阅读书架与完整词书）。');
                   } catch (error) {
                     if (!context.mounted) {
                       return;

@@ -5,11 +5,15 @@ import '../../library/data/course_pack_mapper.dart';
 import '../../library/presentation/library_catalog_provider.dart';
 import '../../library/presentation/library_mock_data.dart';
 import '../data/acquire_api_client.dart';
+import '../data/device_sync_bootstrap.dart';
 import '../data/personal_import_sync.dart';
 import 'daily_feed_provider.dart';
 
 /// [ref] may be a [Ref] or [WidgetRef] (both expose `.read`).
-Future<void> syncCloudCatalogAndFeed(dynamic ref) async {
+Future<void> syncCloudCatalogAndFeed(
+  dynamic ref, {
+  bool pushLocal = false,
+}) async {
   try {
     final AcquireApiClient api =
         ref.read(acquireApiClientProvider) as AcquireApiClient;
@@ -44,6 +48,10 @@ Future<void> syncCloudCatalogAndFeed(dynamic ref) async {
   } catch (_) {}
   try {
     await (ref.read(dailyFeedProvider.notifier) as dynamic).refresh();
+  } catch (_) {}
+  // Reading / wordbook / settings / progress / FSRS / modules.
+  try {
+    await runDeviceSyncBootstrap(ref, pushLocal: pushLocal);
   } catch (_) {}
 }
 

@@ -7,6 +7,7 @@ import 'package:hive_ce/hive.dart';
 import '../../authentication/presentation/account_storage.dart';
 import '../../idle_jobs/idle_job_queue.dart';
 import '../../idle_jobs/idle_job_scheduler.dart';
+import '../../sync/data/schedule_device_cloud_sync.dart';
 import '../../sync/data/vocab_sync_service.dart';
 import '../data/offline_word_dictionary.dart';
 import '../domain/sm2_scheduler.dart';
@@ -190,6 +191,7 @@ class WordEntry {
     this.repetitions = 0,
     this.dueAtMs,
     this.mastery = WordMastery.fresh,
+    this.updatedAtMs,
   });
 
   factory WordEntry.fromJson(Map<String, Object?> json) {
@@ -249,6 +251,7 @@ class WordEntry {
       repetitions: json['repetitions'] as int? ?? 0,
       dueAtMs: (json['dueAtMs'] as num?)?.toInt(),
       mastery: Sm2Scheduler.masteryFromName(json['mastery'] as String?),
+      updatedAtMs: (json['updatedAtMs'] as num?)?.toInt(),
     );
   }
 
@@ -280,6 +283,9 @@ class WordEntry {
   final int repetitions;
   final int? dueAtMs;
   final WordMastery mastery;
+
+  /// Client clock for cross-device LWW merge; optional for legacy rows.
+  final int? updatedAtMs;
 
   String get entryId => vocabEntryIdForLemma(word);
 
@@ -376,6 +382,7 @@ class WordEntry {
     int? repetitions,
     int? dueAtMs,
     WordMastery? mastery,
+    int? updatedAtMs,
   }) => WordEntry(
     word: word,
     favorite: favorite ?? this.favorite,
@@ -405,6 +412,7 @@ class WordEntry {
     repetitions: repetitions ?? this.repetitions,
     dueAtMs: dueAtMs ?? this.dueAtMs,
     mastery: mastery ?? this.mastery,
+    updatedAtMs: updatedAtMs ?? this.updatedAtMs,
   );
 
   Map<String, Object?> toJson() => <String, Object?>{
@@ -438,6 +446,7 @@ class WordEntry {
     'repetitions': repetitions,
     'dueAtMs': dueAtMs,
     'mastery': mastery.name,
+    if (updatedAtMs != null) 'updatedAtMs': updatedAtMs,
   };
 }
 
@@ -448,15 +457,26 @@ class WordBookNotifier extends Notifier<List<WordEntry>> {
   @override
   List<WordEntry> build() {
     _studyAccount = ref.watch(studyAccountProvider);
-    if (!Hive.isBoxOpen('prefs')) return const <WordEntry>[];
+    if (!Hive.isBoxOpen('prefs')) {
+      _lastPersistedPayload = <String, String>{};
+      return const <WordEntry>[];
+    }
     final String? stored = readStudyStorage(_wordBookStorageKey, _studyAccount);
-    if (stored == null || stored.isEmpty) return const <WordEntry>[];
+    if (stored == null || stored.isEmpty) {
+      _lastPersistedPayload = <String, String>{};
+      return const <WordEntry>[];
+    }
     try {
-      return (jsonDecode(stored) as List<Object?>)
+      final List<WordEntry> loaded = (jsonDecode(stored) as List<Object?>)
           .cast<Map<String, Object?>>()
           .map(WordEntry.fromJson)
           .toList(growable: false);
+      _lastPersistedPayload = <String, String>{
+        for (final WordEntry item in loaded) item.word: _entryPayload(item),
+      };
+      return loaded;
     } catch (_) {
+      _lastPersistedPayload = <String, String>{};
       return const <WordEntry>[];
     }
   }
@@ -1414,7 +1434,42 @@ class WordBookNotifier extends Notifier<List<WordEntry>> {
     }
   }
 
+  Map<String, String> _lastPersistedPayload = <String, String>{};
+
   Future<void> _persist() async {
+    if (!Hive.isBoxOpen('prefs')) return;
+    final int now = DateTime.now().millisecondsSinceEpoch;
+    final Map<String, String> prevPayload = _lastPersistedPayload;
+    final List<WordEntry> next = <WordEntry>[
+      for (final WordEntry item in state)
+        if (prevPayload[item.word] != _entryPayload(item))
+          item.copyWith(updatedAtMs: now)
+        else
+          item,
+    ];
+    state = List<WordEntry>.unmodifiable(next);
+    _lastPersistedPayload = <String, String>{
+      for (final WordEntry item in state) item.word: _entryPayload(item),
+    };
+    await Hive.box<String>('prefs').put(
+      studyStorageKey(_wordBookStorageKey, _studyAccount),
+      jsonEncode(state.map((WordEntry item) => item.toJson()).toList()),
+    );
+    scheduleDeviceCloudSync(key: 'wordbook');
+  }
+
+  static String _entryPayload(WordEntry item) {
+    final Map<String, Object?> json = Map<String, Object?>.from(item.toJson());
+    json.remove('updatedAtMs');
+    return jsonEncode(json);
+  }
+
+  /// Replace local word book after cloud merge (does not bump [updatedAtMs]).
+  Future<void> replaceFromCloud(List<WordEntry> entries) async {
+    state = List<WordEntry>.unmodifiable(entries);
+    _lastPersistedPayload = <String, String>{
+      for (final WordEntry item in state) item.word: _entryPayload(item),
+    };
     if (!Hive.isBoxOpen('prefs')) return;
     await Hive.box<String>('prefs').put(
       studyStorageKey(_wordBookStorageKey, _studyAccount),

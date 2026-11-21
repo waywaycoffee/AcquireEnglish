@@ -27,7 +27,7 @@ Future<void> drainIdleJobs(WidgetRef ref) async {
         await _drainVocabEnrich(ref, job);
       case IdleJobKind.cloudSync:
         try {
-          await syncCloudCatalogAndFeed(ref);
+          await syncCloudCatalogAndFeed(ref, pushLocal: true);
           await IdleJobQueue.shared.markDone(job.id);
         } catch (error) {
           await IdleJobQueue.shared.markFailed(job.id, '$error');
