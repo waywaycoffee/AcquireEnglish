@@ -12,7 +12,12 @@ from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
-from app.deps_admin import require_admin_token, resolved_admin_token
+from app.deps_admin import (
+    require_admin_token,
+    resolved_admin_token,
+    resolved_admin_username,
+    verify_admin_login,
+)
 from app.models import (
     Order,
     ProductSku,
@@ -97,11 +102,30 @@ class UserPatchBody(BaseModel):
     display_name: str | None = Field(default=None, max_length=120)
 
 
+class AdminLoginBody(BaseModel):
+    username: str = Field(..., min_length=1, max_length=64)
+    password: str = Field(..., min_length=1, max_length=256)
+    token: str = Field(..., min_length=1, max_length=512)
+
+
+@router.post("/login")
+async def login(body: AdminLoginBody) -> dict[str, Any]:
+    """Gate: username + password + login token. APIs still use X-Admin-Token after."""
+    verify_admin_login(body.username, body.password, body.token)
+    return {
+        "ok": True,
+        "username": resolved_admin_username(),
+        "token": resolved_admin_token(),
+        "token_file_hint": "acquireenglish-admin-login.token",
+    }
+
+
 @router.get("/ping")
 async def ping(_: str = Depends(require_admin_token)) -> dict[str, Any]:
     return {
         "ok": True,
         "admin_configured": bool(resolved_admin_token()),
+        "username_configured": bool(resolved_admin_username()),
     }
 
 

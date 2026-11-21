@@ -1,7 +1,10 @@
 (() => {
   const TOKEN_KEY = "ae_admin_token";
+  const USER_KEY = "ae_admin_username";
+  const TOKEN_FILENAME = "acquireenglish-admin-login.token";
   const state = {
     token: localStorage.getItem(TOKEN_KEY) || "",
+    username: localStorage.getItem(USER_KEY) || "admin",
     offset: 0,
     limit: 40,
     total: 0,
@@ -111,15 +114,64 @@
     });
   }
 
+  function downloadTokenFile(token) {
+    const blob = new Blob([token + "\n"], { type: "text/plain;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = TOKEN_FILENAME;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  }
+
+  function parseTokenFileText(raw) {
+    const text = String(raw || "").trim();
+    if (!text) return "";
+    try {
+      const obj = JSON.parse(text);
+      if (obj && typeof obj === "object") {
+        return String(obj.token || obj.admin_api_token || obj.ADMIN_API_TOKEN || "").trim();
+      }
+    } catch {
+      /* plain token file */
+    }
+    const first = text.split(/\r?\n/).map((l) => l.trim()).find((l) => l && !l.startsWith("#"));
+    return first || "";
+  }
+
   async function login() {
-    state.token = $("tokenInput").value.trim();
-    if (!state.token) {
-      loginError.textContent = "请输入管理员令牌";
+    const username = $("usernameInput").value.trim();
+    const password = $("passwordInput").value;
+    const token = $("tokenInput").value.trim();
+    if (!username || !password || !token) {
+      loginError.textContent = "请填写管理员账号、密码和登录令牌";
       return;
     }
+    loginError.textContent = "";
     try {
-      await api("/ping");
+      const res = await fetch("/api/admin/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username, password, token }),
+      });
+      const text = await res.text();
+      let data = null;
+      try {
+        data = text ? JSON.parse(text) : null;
+      } catch {
+        data = { detail: text };
+      }
+      if (!res.ok) {
+        const detail = (data && (data.detail || data.message)) || `HTTP ${res.status}`;
+        throw new Error(typeof detail === "string" ? detail : JSON.stringify(detail));
+      }
+      state.token = (data && data.token) || token;
+      state.username = (data && data.username) || username;
       localStorage.setItem(TOKEN_KEY, state.token);
+      localStorage.setItem(USER_KEY, state.username);
+      $("passwordInput").value = "";
       showApp();
       await bootstrap();
     } catch (e) {
@@ -130,7 +182,35 @@
   function logout() {
     state.token = "";
     localStorage.removeItem(TOKEN_KEY);
+    $("passwordInput").value = "";
     showLogin();
+  }
+
+  function loadTokenFromFile(file) {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const token = parseTokenFileText(reader.result);
+      if (!token) {
+        loginError.textContent = "令牌文件为空或格式无法识别";
+        return;
+      }
+      $("tokenInput").value = token;
+      loginError.textContent = "";
+    };
+    reader.onerror = () => {
+      loginError.textContent = "读取令牌文件失败";
+    };
+    reader.readAsText(file);
+  }
+
+  function saveTokenToLocal() {
+    const token = ($("tokenInput").value.trim() || state.token || "").trim();
+    if (!token) {
+      loginError.textContent = "没有可保存的令牌，请先填写或登录";
+      return;
+    }
+    downloadTokenFile(token);
+    loginError.textContent = "";
   }
 
   async function bootstrap() {
@@ -629,9 +709,18 @@
   }
 
   $("loginBtn").addEventListener("click", login);
-  $("tokenInput").addEventListener("keydown", (e) => {
-    if (e.key === "Enter") login();
+  ["usernameInput", "passwordInput", "tokenInput"].forEach((id) => {
+    $(id).addEventListener("keydown", (e) => {
+      if (e.key === "Enter") login();
+    });
   });
+  $("loadTokenBtn").addEventListener("click", () => $("tokenFileInput").click());
+  $("tokenFileInput").addEventListener("change", (e) => {
+    const file = e.target.files && e.target.files[0];
+    if (file) loadTokenFromFile(file);
+    e.target.value = "";
+  });
+  $("saveTokenBtn").addEventListener("click", saveTokenToLocal);
   $("logoutBtn").addEventListener("click", logout);
   $("refreshBtn").addEventListener("click", () => bootstrap().catch((e) => alert(e.message)));
   $("searchForm").addEventListener("submit", (e) => {
@@ -657,10 +746,8 @@
     });
   });
 
-  if (state.token) {
-    showApp();
-    bootstrap().catch((e) => showLogin(e.message || "令牌无效，请重新登录"));
-  } else {
-    showLogin();
-  }
+  // Always show login gate (username + password + token). Prefill account/token only.
+  showLogin();
+  $("usernameInput").value = state.username || "admin";
+  if (state.token) $("tokenInput").value = state.token;
 })();

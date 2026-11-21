@@ -11,13 +11,27 @@
     <div class="login-card">
       <p class="eyebrow">AcquireEnglish</p>
       <h1>运营后台</h1>
-      <p class="muted">用户 · Token 成本 · 看板 · 公共资源 · 损益</p>
+      <p class="muted">账号密码 + 登录令牌（令牌可保存为本机文件）</p>
       <label class="field">
-        <span>管理员令牌</span>
-        <input id="tokenInput" type="password" autocomplete="current-password" placeholder="ADMIN_API_TOKEN" />
+        <span>管理员账号</span>
+        <input id="usernameInput" type="text" autocomplete="username" placeholder="admin" />
       </label>
+      <label class="field">
+        <span>管理员密码</span>
+        <input id="passwordInput" type="password" autocomplete="current-password" placeholder="密码" />
+      </label>
+      <label class="field">
+        <span>登录令牌</span>
+        <input id="tokenInput" type="password" autocomplete="off" placeholder="从本机令牌文件加载或粘贴" />
+      </label>
+      <div class="login-actions">
+        <button id="loadTokenBtn" class="btn ghost" type="button">从本机文件加载令牌</button>
+        <button id="saveTokenBtn" class="btn ghost" type="button">保存令牌到本机</button>
+        <input id="tokenFileInput" type="file" accept=".token,.txt,text/plain" class="hidden" />
+      </div>
       <button id="loginBtn" class="btn primary" type="button">进入后台</button>
       <p id="loginError" class="error"></p>
+      <p class="muted login-hint">建议把令牌保存为 <code>acquireenglish-admin-login.token</code>，放在本机安全目录；不要提交到 Git。</p>
     </div>
   </div>
 

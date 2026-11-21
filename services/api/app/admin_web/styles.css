@@ -44,14 +44,28 @@ h3 { margin: 0 0 10px; font-size: 15px; }
   place-items: center;
 }
 .login-card {
-  width: min(420px, 100%);
+  width: min(460px, 100%);
   background: var(--card);
   border: 1px solid var(--line);
   border-radius: 24px;
   padding: 28px;
   box-shadow: var(--shadow);
 }
-.field { display: grid; gap: 8px; margin: 22px 0 14px; font-size: 13px; font-weight: 600; }
+.field { display: grid; gap: 8px; margin: 14px 0; font-size: 13px; font-weight: 600; }
+.login-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 4px 0 16px;
+}
+.login-hint { margin: 14px 0 0; line-height: 1.5; }
+.login-hint code {
+  font-size: 12px;
+  background: var(--accent-soft);
+  padding: 1px 6px;
+  border-radius: 6px;
+}
+.login-card .btn.primary { width: 100%; margin-top: 4px; }
 .field input, .grant-grid input, .grant-grid select, .inline-form input, .inline-form select {
   width: 100%;
   border: 1px solid var(--line);
