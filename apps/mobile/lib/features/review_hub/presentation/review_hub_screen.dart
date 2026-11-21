@@ -137,8 +137,9 @@ class ReviewHubScreen extends ConsumerWidget {
               children: <Widget>[
                 _SecondaryRow(
                   title: '收藏词本',
-                  subtitle: '${wordBook.length} 词',
-                  onTap: () => context.go(AppNavDestination.words.route),
+                  subtitle:
+                      '${wordBook.where((WordEntry e) => e.favorite).length} 个收藏',
+                  onTap: () => context.push('${SGRoute.words.route}?favorites=1'),
                 ),
                 const Divider(height: 1),
                 _SecondaryRow(

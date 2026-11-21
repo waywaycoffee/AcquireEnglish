@@ -344,8 +344,12 @@ GoRouter goRouter(Ref ref) => GoRouter(
     ).fade(),
     GoRoute(
       path: SGRoute.words.route,
-      builder: (BuildContext context, GoRouterState state) =>
-          const WordsScreen(),
+      builder: (BuildContext context, GoRouterState state) {
+        final bool favoritesOnly =
+            state.uri.queryParameters['favorites'] == '1' ||
+            state.uri.queryParameters['favorites'] == 'true';
+        return WordsScreen(favoritesListOnly: favoritesOnly);
+      },
     ).fade(),
     GoRoute(
       path: '/words/syllabus',

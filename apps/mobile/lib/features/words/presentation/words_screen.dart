@@ -32,7 +32,14 @@ import 'word_review_settings_provider.dart';
 import 'word_review_settings_sheet.dart';
 
 class WordsScreen extends ConsumerStatefulWidget {
-  const WordsScreen({super.key});
+  const WordsScreen({
+    super.key,
+    this.favoritesListOnly = false,
+  });
+
+  /// When true (收藏词本入口): show the favorite word list only — no second
+  /// 「背单词」dashboard / syllabus / today-plan hub.
+  final bool favoritesListOnly;
 
   @override
   ConsumerState<WordsScreen> createState() => _WordsScreenState();
@@ -50,7 +57,7 @@ class _WordsScreenState extends ConsumerState<WordsScreen> {
   }
 
   String _query = '';
-  bool _favoritesOnly = true;
+  late bool _favoritesOnly;
   VocabScheduleStatus? _statusFilter;
   String? _cefrFilter;
   bool _videoContextOnly = false;
@@ -58,6 +65,7 @@ class _WordsScreenState extends ConsumerState<WordsScreen> {
   @override
   void initState() {
     super.initState();
+    _favoritesOnly = true;
     ref.read(wordBookProvider.notifier).refreshOfflineDefinitions();
   }
 
@@ -177,9 +185,10 @@ class _WordsScreenState extends ConsumerState<WordsScreen> {
               e.favorite && e.scheduleStatus == VocabScheduleStatus.pending,
         )
         .length;
+    final bool forceFavorites = widget.favoritesListOnly || _favoritesOnly;
     final List<WordEntry> filtered = entries
         .where((WordEntry entry) {
-          if (_favoritesOnly && !entry.favorite) return false;
+          if (forceFavorites && !entry.favorite) return false;
           if (_statusFilter != null &&
               entry.scheduleStatus != _statusFilter) {
             return false;
@@ -198,25 +207,39 @@ class _WordsScreenState extends ConsumerState<WordsScreen> {
         .toSet()
         .length;
 
+    final bool listOnly = widget.favoritesListOnly;
+    final int favoriteCount =
+        entries.where((WordEntry item) => item.favorite).length;
+
     return PadScaffold(
       currentDestination: AppNavDestination.review,
       topBar: PadTopBar(
-        title: '单词本',
+        title: listOnly ? '收藏词本' : '单词本',
+        description: listOnly ? '共 $favoriteCount 个收藏单词' : null,
         actions: <Widget>[
-          IconButton(
-            tooltip: '背词计划设置',
-            onPressed: () => showWordReviewSettingsSheet(context),
-            icon: const Icon(Icons.tune_rounded),
-          ),
-          TextButton.icon(
-            onPressed: () => unawaited(_startTodayReview(newLimit)),
-            icon: const Icon(Icons.style_rounded),
-            label: const Text('今日背词'),
-          ),
+          if (!listOnly) ...<Widget>[
+            IconButton(
+              tooltip: '背词计划设置',
+              onPressed: () => showWordReviewSettingsSheet(context),
+              icon: const Icon(Icons.tune_rounded),
+            ),
+            TextButton.icon(
+              onPressed: () => unawaited(_startTodayReview(newLimit)),
+              icon: const Icon(Icons.style_rounded),
+              label: const Text('今日背词'),
+            ),
+          ],
           IconButton(
             tooltip: '导出 Markdown',
             onPressed: () async {
-              final String md = exportVocabMarkdown(ref.read(wordBookProvider));
+              final String md = exportVocabMarkdown(
+                listOnly
+                    ? ref
+                        .read(wordBookProvider)
+                        .where((WordEntry e) => e.favorite)
+                        .toList(growable: false)
+                    : ref.read(wordBookProvider),
+              );
               await Clipboard.setData(ClipboardData(text: md));
               if (!context.mounted) return;
               ScaffoldMessenger.of(context).showSnackBar(
@@ -225,7 +248,7 @@ class _WordsScreenState extends ConsumerState<WordsScreen> {
             },
             icon: const Icon(Icons.notes_rounded),
           ),
-          const AnkiExportButton(),
+          if (!listOnly) const AnkiExportButton(),
         ],
       ),
       body: Padding(
@@ -243,165 +266,181 @@ class _WordsScreenState extends ConsumerState<WordsScreen> {
                 );
                 return Column(
                   children: <Widget>[
-                    ConstrainedBox(
-                      constraints: BoxConstraints(maxHeight: headerCap),
-                      child: SingleChildScrollView(
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: <Widget>[
-                            _Summary(
-                              entries: entries.length,
-                              videos: coveredVideos,
-                              favorites: entries
-                                  .where((WordEntry item) => item.favorite)
-                                  .length,
-                              streak: streak,
-                            ),
-                            const SizedBox(height: 12),
-                            _PhaseBreakdown(
-                              counts: _phaseCounts(
-                                entries.where((WordEntry e) => e.favorite),
-                                reviewState,
-                                now,
+                    if (!listOnly) ...<Widget>[
+                      ConstrainedBox(
+                        constraints: BoxConstraints(maxHeight: headerCap),
+                        child: SingleChildScrollView(
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: <Widget>[
+                              _Summary(
+                                entries: entries.length,
+                                videos: coveredVideos,
+                                favorites: favoriteCount,
+                                streak: streak,
                               ),
-                            ),
-                            const SizedBox(height: 12),
-                            Row(
-                              children: <Widget>[
-                                Expanded(
-                                  child: _BookTypeCard(
-                                    title: '词书',
-                                    subtitle: '云端词书 · 下载到本地',
-                                    icon: Icons.menu_book_rounded,
-                                    onTap: () =>
-                                        context.push('/words/syllabus'),
-                                  ),
+                              const SizedBox(height: 12),
+                              _PhaseBreakdown(
+                                counts: _phaseCounts(
+                                  entries.where((WordEntry e) => e.favorite),
+                                  reviewState,
+                                  now,
                                 ),
-                                const SizedBox(width: 10),
-                                Expanded(
-                                  child: _BookTypeCard(
-                                    title: '句型书',
-                                    subtitle: '语块与口语句型',
-                                    icon: Icons.format_quote_rounded,
-                                    onTap: () => context.push(
-                                      '/words/syllabus?tab=pattern',
+                              ),
+                              const SizedBox(height: 12),
+                              Row(
+                                children: <Widget>[
+                                  Expanded(
+                                    child: _BookTypeCard(
+                                      title: '词书',
+                                      subtitle: '云端词书 · 下载到本地',
+                                      icon: Icons.menu_book_rounded,
+                                      onTap: () =>
+                                          context.push('/words/syllabus'),
                                     ),
                                   ),
-                                ),
-                                const SizedBox(width: 10),
-                                Expanded(
-                                  child: _BookTypeCard(
-                                    title: '零基础',
-                                    subtitle: '音标与自然拼读',
-                                    icon: Icons.record_voice_over_rounded,
-                                    onTap: () => context.push(
-                                      '/words/syllabus?tab=foundation',
+                                  const SizedBox(width: 10),
+                                  Expanded(
+                                    child: _BookTypeCard(
+                                      title: '句型书',
+                                      subtitle: '语块与口语句型',
+                                      icon: Icons.format_quote_rounded,
+                                      onTap: () => context.push(
+                                        '/words/syllabus?tab=pattern',
+                                      ),
                                     ),
                                   ),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 10),
-                            Wrap(
-                              spacing: 8,
-                              runSpacing: 8,
-                              children: <Widget>[
-                                ActionChip(
-                                  label: const Text('背推荐单词'),
-                                  onPressed: () => context.push(
-                                    ref.read(recommendedWordsProvider).isEmpty
-                                        ? SGRoute.vocabularyPlacement.route
-                                        : '${SGRoute.reviewSession.route}?deck=recommended',
+                                  const SizedBox(width: 10),
+                                  Expanded(
+                                    child: _BookTypeCard(
+                                      title: '零基础',
+                                      subtitle: '音标与自然拼读',
+                                      icon: Icons.record_voice_over_rounded,
+                                      onTap: () => context.push(
+                                        '/words/syllabus?tab=foundation',
+                                      ),
+                                    ),
                                   ),
-                                ),
-                                ActionChip(
-                                  label: const Text('爱快阅读'),
-                                  onPressed: () => context.push('/reading'),
-                                ),
-                                ActionChip(
-                                  label: const Text('自测模式'),
-                                  onPressed: () => context.push(
-                                    '${SGRoute.reviewSession.route}?practice=1&kind=word',
-                                  ),
-                                ),
-                                if (pendingCount > 0)
+                                ],
+                              ),
+                              const SizedBox(height: 10),
+                              Wrap(
+                                spacing: 8,
+                                runSpacing: 8,
+                                children: <Widget>[
                                   ActionChip(
-                                    avatar: const Icon(
-                                      Icons.preview_rounded,
-                                      size: 18,
-                                    ),
-                                    label: Text('待学习 $pendingCount'),
-                                    onPressed: () => setState(() {
-                                      _favoritesOnly = true;
-                                      _statusFilter =
-                                          VocabScheduleStatus.pending;
-                                    }),
-                                  ),
-                                if (missedCount > 0)
-                                  ActionChip(
-                                    avatar: const Icon(
-                                      Icons.replay_rounded,
-                                      size: 18,
-                                    ),
-                                    label: Text('错词本 $missedCount'),
+                                    label: const Text('背推荐单词'),
                                     onPressed: () => context.push(
-                                      '${SGRoute.reviewSession.route}?deck=missed&kind=word',
+                                      ref.read(recommendedWordsProvider).isEmpty
+                                          ? SGRoute.vocabularyPlacement.route
+                                          : '${SGRoute.reviewSession.route}?deck=recommended',
                                     ),
                                   ),
-                              ],
-                            ),
-                            const SizedBox(height: 10),
-                            _VocabDashboard(
-                              total: entries.where((WordEntry e) => e.favorite).length,
-                              pending: pendingCount,
-                              active: entries
-                                  .where(
-                                    (WordEntry e) =>
-                                        e.favorite &&
-                                        e.scheduleStatus ==
-                                            VocabScheduleStatus.active,
-                                  )
-                                  .length,
-                              due: planReview,
-                              newToday: planNew,
-                              ratingShare: _ratingShare(reviewState),
-                            ),
-                            const SizedBox(height: 12),
-                            _TodayPlanCard(
-                              planNew: planNew,
-                              planReview: planReview,
-                              newLimit: newLimit,
-                              reviewLimit: reviewSettings.dailyReviewLimit,
-                              modes: reviewSettings.orderedModes,
-                              streak: streak,
-                              onStart: () =>
-                                  unawaited(_startTodayReview(newLimit)),
-                              onSettings: () =>
-                                  showWordReviewSettingsSheet(context),
-                            ),
-                            const SizedBox(height: 12),
-                            _WeekStatsCard(
-                              stats: ReviewWeekStats.fromState(reviewState, now),
-                            ),
-                          ],
+                                  ActionChip(
+                                    label: const Text('爱快阅读'),
+                                    onPressed: () => context.push('/reading'),
+                                  ),
+                                  ActionChip(
+                                    label: const Text('自测模式'),
+                                    onPressed: () => context.push(
+                                      '${SGRoute.reviewSession.route}?practice=1&kind=word',
+                                    ),
+                                  ),
+                                  if (pendingCount > 0)
+                                    ActionChip(
+                                      avatar: const Icon(
+                                        Icons.preview_rounded,
+                                        size: 18,
+                                      ),
+                                      label: Text('待学习 $pendingCount'),
+                                      onPressed: () => setState(() {
+                                        _favoritesOnly = true;
+                                        _statusFilter =
+                                            VocabScheduleStatus.pending;
+                                      }),
+                                    ),
+                                  if (missedCount > 0)
+                                    ActionChip(
+                                      avatar: const Icon(
+                                        Icons.replay_rounded,
+                                        size: 18,
+                                      ),
+                                      label: Text('错词本 $missedCount'),
+                                      onPressed: () => context.push(
+                                        '${SGRoute.reviewSession.route}?deck=missed&kind=word',
+                                      ),
+                                    ),
+                                ],
+                              ),
+                              const SizedBox(height: 10),
+                              _VocabDashboard(
+                                total: favoriteCount,
+                                pending: pendingCount,
+                                active: entries
+                                    .where(
+                                      (WordEntry e) =>
+                                          e.favorite &&
+                                          e.scheduleStatus ==
+                                              VocabScheduleStatus.active,
+                                    )
+                                    .length,
+                                due: planReview,
+                                newToday: planNew,
+                                ratingShare: _ratingShare(reviewState),
+                              ),
+                              const SizedBox(height: 12),
+                              _TodayPlanCard(
+                                planNew: planNew,
+                                planReview: planReview,
+                                newLimit: newLimit,
+                                reviewLimit: reviewSettings.dailyReviewLimit,
+                                modes: reviewSettings.orderedModes,
+                                streak: streak,
+                                onStart: () =>
+                                    unawaited(_startTodayReview(newLimit)),
+                                onSettings: () =>
+                                    showWordReviewSettingsSheet(context),
+                              ),
+                              const SizedBox(height: 12),
+                              _WeekStatsCard(
+                                stats:
+                                    ReviewWeekStats.fromState(reviewState, now),
+                              ),
+                            ],
+                          ),
                         ),
                       ),
-                    ),
-                    const SizedBox(height: 20),
-                    SizedBox(
-                      key: const Key('words-view-tabs'),
-                      width: double.infinity,
-                      child: PillSegmentedControl<bool>(
-                        value: _favoritesOnly,
-                        options: const <SegmentOption<bool>>[
-                          SegmentOption<bool>(value: true, label: '已收藏'),
-                          SegmentOption<bool>(value: false, label: '全部单词'),
-                        ],
-                        onValueChanged: (bool value) =>
-                            setState(() => _favoritesOnly = value),
+                      const SizedBox(height: 20),
+                      SizedBox(
+                        key: const Key('words-view-tabs'),
+                        width: double.infinity,
+                        child: PillSegmentedControl<bool>(
+                          value: _favoritesOnly,
+                          options: const <SegmentOption<bool>>[
+                            SegmentOption<bool>(value: true, label: '已收藏'),
+                            SegmentOption<bool>(value: false, label: '全部单词'),
+                          ],
+                          onValueChanged: (bool value) =>
+                              setState(() => _favoritesOnly = value),
+                        ),
                       ),
-                    ),
-                    const SizedBox(height: 12),
+                      const SizedBox(height: 12),
+                    ],
+                    if (listOnly) ...<Widget>[
+                      Align(
+                        alignment: Alignment.centerLeft,
+                        child: Text(
+                          favoriteCount == 0
+                              ? '还没有收藏单词'
+                              : '点进单词可看释义、原句与复习状态',
+                          style: TextStyle(
+                            color: AppDesignTokens.textSecondary,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                    ],
                     SingleChildScrollView(
                       scrollDirection: Axis.horizontal,
                       child: Row(
@@ -458,7 +497,7 @@ class _WordsScreenState extends ConsumerState<WordsScreen> {
                       onChanged: (String value) => setState(() => _query = value),
                       style: TextStyle(color: AppDesignTokens.textPrimary),
                       decoration: InputDecoration(
-                        hintText: _favoritesOnly ? '搜索收藏的单词' : '搜索学过的单词',
+                        hintText: forceFavorites ? '搜索收藏的单词' : '搜索学过的单词',
                         hintStyle: TextStyle(color: AppDesignTokens.textSecondary),
                         prefixIcon: Icon(
                           Icons.search_rounded,
@@ -479,7 +518,7 @@ class _WordsScreenState extends ConsumerState<WordsScreen> {
                           child: Text(
                             _query.trim().isNotEmpty
                                 ? '没有找到匹配的单词，换个关键词试试。'
-                                : _favoritesOnly
+                                : forceFavorites
                                 ? '还没有收藏单词，点击单词旁的收藏图标就能加入。'
                                 : '播放带英文字幕的视频后，单词会自动出现在这里。',
                             textAlign: TextAlign.center,
@@ -489,7 +528,7 @@ class _WordsScreenState extends ConsumerState<WordsScreen> {
                           ),
                         )
                       : AlphabetListView(
-                          key: ValueKey<bool>(_favoritesOnly),
+                          key: ValueKey<bool>(forceFavorites),
                           items: _buildGroups(filtered),
                           options: AlphabetListViewOptions(
                             listOptions: ListOptions(
