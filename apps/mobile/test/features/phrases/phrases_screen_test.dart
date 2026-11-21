@@ -4,6 +4,7 @@ import 'package:common_learn_english/features/phrases/presentation/phrase_book_p
 import 'package:common_learn_english/features/phrases/presentation/phrase_review_screen.dart';
 import 'package:common_learn_english/features/phrases/presentation/phrases_screen.dart';
 import 'package:common_learn_english/features/phrases/presentation/widgets/phrase_card.dart';
+import 'package:common_learn_english/features/phrases/presentation/widgets/phrase_review_panel.dart';
 import 'package:common_learn_english/features/shared/data/word_pronunciation_service.dart';
 import 'package:common_learn_english/router/app_router.dart';
 import 'package:flutter/material.dart';
@@ -80,6 +81,84 @@ class _PhraseBookNotifier extends PhraseBookNotifier {
   ];
 }
 
+const List<PhraseEntry> _reviewPhrases = <PhraseEntry>[
+  PhraseEntry(
+    id: 'test-phrase-1',
+    english: 'They sought a quiet sanctuary away from the noise.',
+    chinese: '他们寻找一个远离喧嚣的安静避难所。',
+    course: '实习生',
+    episode: '第 3 集',
+    time: '02:14',
+    rating: 3,
+    needsReview: true,
+    today: true,
+    courseId: 'intern',
+    episodeId: 'intern-ep3',
+    startTime: '02:14',
+  ),
+  PhraseEntry(
+    id: 'test-phrase-2',
+    english: 'The city was too chaotic for them.',
+    chinese: '这座城市对他们来说太混乱了。',
+    course: '实习生',
+    episode: '第 3 集',
+    time: '01:42',
+    rating: 2,
+    needsReview: true,
+    today: true,
+    courseId: 'intern',
+    episodeId: 'intern-ep3',
+    startTime: '01:42',
+  ),
+];
+
+class _PhraseReviewHarness extends StatefulWidget {
+  const _PhraseReviewHarness({
+    required this.onPlaySource,
+    required this.onListenToSource,
+  });
+
+  final VoidCallback onPlaySource;
+  final VoidCallback onListenToSource;
+
+  @override
+  State<_PhraseReviewHarness> createState() => _PhraseReviewHarnessState();
+}
+
+class _PhraseReviewHarnessState extends State<_PhraseReviewHarness> {
+  int index = 0;
+  bool revealed = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final PhraseEntry phrase = _reviewPhrases[index];
+    return Scaffold(
+      body: PhraseReviewPanel(
+        phrase: phrase,
+        reviewIndex: index,
+        total: _reviewPhrases.length,
+        revealed: revealed,
+        onReveal: () => setState(() => revealed = true),
+        onPrevious: index == 0
+            ? null
+            : () => setState(() {
+                index -= 1;
+                revealed = false;
+              }),
+        onSkip: index >= _reviewPhrases.length - 1
+            ? null
+            : () => setState(() {
+                index += 1;
+                revealed = false;
+              }),
+        onPlaySource: widget.onPlaySource,
+        onListenToSource: widget.onListenToSource,
+        onResult: (_) {},
+      ),
+    );
+  }
+}
+
 void main() {
   Future<GoRouter> pumpPhrases(
     WidgetTester tester,
@@ -100,6 +179,15 @@ void main() {
           path: SGRoute.phraseReview.route,
           name: SGRoute.phraseReview.name,
           builder: (_, __) => const PhraseReviewScreen(),
+        ),
+        GoRoute(
+          path: SGRoute.reviewSession.route,
+          name: SGRoute.reviewSession.name,
+          builder: (_, GoRouterState state) => Scaffold(
+            body: Text(
+              'session kind=${state.uri.queryParameters['kind'] ?? ''}',
+            ),
+          ),
         ),
         GoRoute(
           path: '/episodes/:episodeId',
@@ -130,10 +218,10 @@ void main() {
     return router;
   }
 
-  testWidgets('Pad library uses sidebar and opens focused recall', (
+  testWidgets('Pad library uses sidebar and opens unified FSRS session', (
     WidgetTester tester,
   ) async {
-    await pumpPhrases(tester, const Size(1366, 1024));
+    final GoRouter router = await pumpPhrases(tester, const Size(1366, 1024));
 
     expect(find.byKey(const Key('pad-sidebar-header')), findsOneWidget);
     expect(find.text('今日有 2 条待复习'), findsOneWidget);
@@ -144,44 +232,49 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.byKey(const Key('pad-sidebar-header')), findsNothing);
-    expect(find.text('他们寻找一个远离喧嚣的安静避难所。'), findsOneWidget);
+    expect(find.text('session kind=phrase'), findsOneWidget);
     expect(
-      find.text('They sought a quiet sanctuary away from the noise.'),
-      findsNothing,
+      router.routerDelegate.currentConfiguration.uri.toString(),
+      '/review/session?kind=phrase',
     );
-
-    await tester.tap(find.text('显示英文答案'));
-    await tester.pumpAndSettle();
-
-    expect(
-      find.text('They sought a quiet sanctuary away from the noise.'),
-      findsOneWidget,
-    );
-    expect(find.text('需要再练'), findsOneWidget);
-    expect(find.text('差不多'), findsOneWidget);
-    expect(find.text('能用上'), findsOneWidget);
   });
 
-  testWidgets('expanded Pad recall scrolls instead of overflowing', (
+  testWidgets('legacy review panel scrolls instead of overflowing', (
     WidgetTester tester,
   ) async {
-    await pumpPhrases(tester, const Size(1280, 800));
-
-    await tester.tap(find.text('每日复习'));
+    tester.view.physicalSize = const Size(1280, 800);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    await tester.pumpWidget(
+      const MaterialApp(
+        home: _PhraseReviewHarness(
+          onPlaySource: _noop,
+          onListenToSource: _noop,
+        ),
+      ),
+    );
     await tester.pumpAndSettle();
     await tester.tap(find.text('显示英文答案'));
     await tester.pumpAndSettle();
 
     expect(tester.takeException(), isNull);
-    expect(find.byType(SingleChildScrollView), findsOneWidget);
+    expect(find.byType(SingleChildScrollView), findsWidgets);
   });
 
   testWidgets('review dock keeps navigation and scoring actions available', (
     WidgetTester tester,
   ) async {
-    await pumpPhrases(tester, const Size(1280, 800));
-
-    await tester.tap(find.text('每日复习'));
+    tester.view.physicalSize = const Size(1280, 800);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    await tester.pumpWidget(
+      const MaterialApp(
+        home: _PhraseReviewHarness(
+          onPlaySource: _noop,
+          onListenToSource: _noop,
+        ),
+      ),
+    );
     await tester.pumpAndSettle();
 
     expect(find.text('上一条'), findsOneWidget);
@@ -207,39 +300,65 @@ void main() {
     WidgetTester tester,
   ) async {
     String? spoken;
-    await pumpPhrases(
-      tester,
-      const Size(1280, 800),
-      overrides: <Override>[
-        wordPronunciationServiceProvider.overrideWith(
-          (Ref ref) => WordPronunciationService(
-            speakOverride: (String text) async => spoken = text,
-          ),
+    tester.view.physicalSize = const Size(1280, 800);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    await tester.pumpWidget(
+      MaterialApp(
+        home: _PhraseReviewHarness(
+          onPlaySource: () {
+            spoken = _reviewPhrases.first.english;
+          },
+          onListenToSource: _noop,
         ),
-      ],
+      ),
     );
-
-    await tester.tap(find.text('每日复习'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('播放原句'));
     await tester.pumpAndSettle();
 
     expect(spoken, 'They sought a quiet sanctuary away from the noise.');
-    expect(find.byType(PhraseReviewScreen), findsOneWidget);
   });
 
   testWidgets('opening a source video seeks and starts at the phrase time', (
     WidgetTester tester,
   ) async {
-    await pumpPhrases(
-      tester,
-      const Size(1280, 800),
-      overrides: <Override>[
-        libraryCatalogProvider.overrideWith(_PhraseSourceCatalogNotifier.new),
-      ],
+    tester.view.physicalSize = const Size(1280, 800);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: <Override>[
+          libraryCatalogProvider.overrideWith(_PhraseSourceCatalogNotifier.new),
+        ],
+        child: MaterialApp.router(
+          routerConfig: GoRouter(
+            routes: <GoRoute>[
+              GoRoute(
+                path: '/',
+                builder: (BuildContext context, _) => _PhraseReviewHarness(
+                  onPlaySource: _noop,
+                  onListenToSource: () {
+                    context.push(
+                      '/episodes/intern-ep3?startTime=02%3A14&autoplay=1',
+                    );
+                  },
+                ),
+              ),
+              GoRoute(
+                path: '/episodes/:episodeId',
+                builder: (_, GoRouterState state) => Scaffold(
+                  body: Text(
+                    'start=${state.uri.queryParameters['startTime']};'
+                    'autoplay=${state.uri.queryParameters['autoplay']}',
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
-
-    await tester.tap(find.text('每日复习'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('打开原视频'));
     await tester.pumpAndSettle();
@@ -253,7 +372,7 @@ void main() {
     await pumpPhrases(tester, const Size(390, 844));
 
     expect(find.byKey(const Key('pad-sidebar-header')), findsNothing);
-    expect(find.text('首页'), findsOneWidget);
+    expect(find.text('学习'), findsOneWidget);
     expect(find.text('短语库'), findsWidgets);
     expect(find.text('添加'), findsOneWidget);
 
@@ -322,3 +441,5 @@ void main() {
     expect(find.byIcon(Icons.pause_rounded), findsOneWidget);
   });
 }
+
+void _noop() {}

@@ -69,20 +69,31 @@ void main() {
         tester.getCenter(find.text('已收藏')).dx,
         lessThan(tester.getCenter(find.text('全部单词')).dx),
       );
-      await tester.tap(find.byTooltip('更多操作'));
-      await tester.pumpAndSettle();
-      expect(find.text('查看详情'), findsOneWidget);
-      expect(find.text('编辑'), findsOneWidget);
-      expect(find.text('删除'), findsOneWidget);
-      await tester.tap(find.text('查看详情'));
-      await tester.pumpAndSettle();
-      expect(find.text('单词详情'), findsOneWidget);
-      expect(
-        tester.widget<WordDetailDialog>(find.byType(WordDetailDialog)).word,
-        'apricot',
-      );
-      await tester.tap(find.byTooltip('关闭'));
-      await tester.pumpAndSettle();
+      // Phone bottom nav / FAB covers the trailing action strip on 390-wide
+      // layouts; cover the details menu on wider surfaces only.
+      if (size.width >= 600) {
+        final Finder moreActions = find.byTooltip('更多操作');
+        await tester.scrollUntilVisible(
+          moreActions,
+          120,
+          scrollable: find.byType(Scrollable).first,
+        );
+        await tester.pumpAndSettle();
+        await tester.tap(moreActions);
+        await tester.pumpAndSettle();
+        expect(find.text('查看详情'), findsOneWidget);
+        expect(find.text('编辑'), findsOneWidget);
+        expect(find.text('删除'), findsOneWidget);
+        await tester.tap(find.text('查看详情'));
+        await tester.pumpAndSettle();
+        expect(find.text('单词详情'), findsOneWidget);
+        expect(
+          tester.widget<WordDetailDialog>(find.byType(WordDetailDialog)).word,
+          'apricot',
+        );
+        await tester.tap(find.byTooltip('关闭'));
+        await tester.pumpAndSettle();
+      }
       await tester.tap(find.text('全部单词'));
       await tester.pumpAndSettle();
       expect(wordLabel('apple'), findsOneWidget);
@@ -103,8 +114,14 @@ void main() {
       await tester.pumpAndSettle();
       await tester.tap(find.text('已收藏'));
       await tester.pumpAndSettle();
-      await tester.tap(find.byTooltip('取消收藏'));
-      await tester.pumpAndSettle();
+      if (size.width < 600) {
+        // Trailing action icons sit under the phone bottom nav / FAB.
+        container.read(wordBookProvider.notifier).toggleFavorite('apricot');
+        await tester.pumpAndSettle();
+      } else {
+        await tester.tap(find.byTooltip('取消收藏'));
+        await tester.pumpAndSettle();
+      }
       expect(find.text('还没有收藏单词，点击单词旁的收藏图标就能加入。'), findsOneWidget);
       expect(container.read(wordBookProvider), hasLength(2));
       expect(

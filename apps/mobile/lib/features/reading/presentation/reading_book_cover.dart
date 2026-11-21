@@ -33,15 +33,33 @@ class ReadingBookCover extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: <Widget>[
-              Text(level.isEmpty ? 'ENGLISH' : level,
-                style: const TextStyle(color: Colors.white70, fontSize: 10)),
-              const Spacer(),
-              Text(title, maxLines: 4, overflow: TextOverflow.ellipsis,
-                style: const TextStyle(color: Colors.white, fontFamily: 'Georgia',
-                  fontSize: 17, height: 1.2, fontWeight: FontWeight.w600)),
-              const SizedBox(height: 12),
-              const Divider(color: Colors.white54),
-              const Text('ACQUIRE READING', style: TextStyle(color: Colors.white70, fontSize: 8)),
+              Text(
+                level.isEmpty ? 'ENGLISH' : level,
+                style: const TextStyle(color: Colors.white70, fontSize: 10),
+              ),
+              Expanded(
+                child: Align(
+                  alignment: Alignment.bottomLeft,
+                  child: Text(
+                    title,
+                    maxLines: 3,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontFamily: 'Georgia',
+                      fontSize: 15,
+                      height: 1.15,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 8),
+              const Divider(color: Colors.white54, height: 8),
+              const Text(
+                'ACQUIRE READING',
+                style: TextStyle(color: Colors.white70, fontSize: 8),
+              ),
             ],
           ),
         ),

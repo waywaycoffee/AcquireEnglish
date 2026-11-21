@@ -72,16 +72,23 @@ void main() {
         await tester.pumpAndSettle();
       }
 
+      Future<void> revealOriginalSentences() async {
+        await tester.scrollUntilVisible(
+          find.textContaining('单词原句 ·'),
+          300,
+          scrollable: find.byType(Scrollable).first,
+        );
+        await tester.pumpAndSettle();
+      }
+
       await pumpDialog();
-      await tester.ensureVisible(find.text('单词原句'));
-      await tester.pumpAndSettle();
+      await revealOriginalSentences();
       expect(find.text("OH, HERE'S SOME ANTACID."), findsWidgets);
       container
           .read(learningSettingsProvider.notifier)
           .setSubtitleLetterCase('句首字母大写');
       await pumpDialog();
-      await tester.ensureVisible(find.text('单词原句'));
-      await tester.pumpAndSettle();
+      await revealOriginalSentences();
       expect(
         find.textContaining("Oh, here's some antacid"),
         findsWidgets,
@@ -90,8 +97,7 @@ void main() {
           .read(learningSettingsProvider.notifier)
           .setSubtitleLetterCase('全部小写');
       await pumpDialog();
-      await tester.ensureVisible(find.text('单词原句'));
-      await tester.pumpAndSettle();
+      await revealOriginalSentences();
       expect(
         find.textContaining("oh, here's some antacid"),
         findsWidgets,
@@ -100,8 +106,7 @@ void main() {
           .read(learningSettingsProvider.notifier)
           .setSubtitleLetterCase('保留原样');
       await pumpDialog();
-      await tester.ensureVisible(find.text('单词原句'));
-      await tester.pumpAndSettle();
+      await revealOriginalSentences();
       expect(
         find.textContaining("OH, HERE'S SOME ANTACID"),
         findsWidgets,
@@ -182,20 +187,18 @@ void main() {
           child: MaterialApp.router(routerConfig: router),
         ),
       );
+      Future<void> revealJumpControl() async {
+        await tester.scrollUntilVisible(
+          find.text('跳到影片'),
+          300,
+          scrollable: find.byType(Scrollable).first,
+        );
+        await tester.pumpAndSettle();
+      }
+
       await tester.tap(find.text('查看单词'));
       await tester.pumpAndSettle();
-      await tester.ensureVisible(find.text('单词原句'));
-      await tester.pumpAndSettle();
-      await Scrollable.ensureVisible(
-        tester.element(find.text('跳到影片')),
-        alignment: 0.5,
-      );
-      await tester.pumpAndSettle();
-      await Scrollable.ensureVisible(
-        tester.element(find.text('跳到影片')),
-        alignment: 0.5,
-      );
-      await tester.pumpAndSettle();
+      await revealJumpControl();
       await tester.tap(find.text('跳到影片'));
       await tester.pumpAndSettle();
       if (ambiguous) {
@@ -210,13 +213,7 @@ void main() {
           container.read(wordBookProvider).single.occurrences.single.episodeId,
           old.episodeId,
         );
-        await tester.ensureVisible(find.text('单词原句'));
-        await tester.pumpAndSettle();
-        await Scrollable.ensureVisible(
-          tester.element(find.text('跳到影片')),
-          alignment: 0.5,
-        );
-        await tester.pumpAndSettle();
+        await revealJumpControl();
         await tester.tap(find.text('跳到影片'));
         await tester.pumpAndSettle();
         await tester.tap(find.text('B · Peppa.S01E01'));

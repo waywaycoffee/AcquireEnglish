@@ -3,6 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
+
   test('learning dashboard reflects activity changes', () {
     final ProviderContainer container = ProviderContainer();
     addTearDown(container.dispose);

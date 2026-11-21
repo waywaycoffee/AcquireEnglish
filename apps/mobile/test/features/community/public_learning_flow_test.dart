@@ -38,6 +38,14 @@ class ShareApi extends AcquireApiClient {
     String? linkUrl,
     String? linkTitle,
     String? linkCover,
+    String? embedWord,
+    double? embedTimestampSec,
+    String? oralAudioUrl,
+    String? oralBookId,
+    String? oralKey,
+    String? transcript,
+    String? referenceLine,
+    Map<String, dynamic>? meta,
   }) async {
     published++;
     return CommunityPostDto(
@@ -111,12 +119,16 @@ void main() {
         false,
       );
       expect(api.published, 0);
-      await tester.tap(find.text('公开到社区'));
-      await tester.pump();
-      await tester.ensureVisible(find.text('预览并确认发布'));
-      await tester.tap(find.text('预览并确认发布'));
+      await tester.tap(find.text('公开发布到社区'));
+      await tester.pumpAndSettle();
+      expect(
+        tester.widget<SwitchListTile>(find.byType(SwitchListTile)).value,
+        true,
+      );
+      await tester.tap(find.text('发布'));
       await tester.pumpAndSettle();
       expect(api.published, 0);
+      expect(find.text('确认公开发布'), findsOneWidget);
       await tester.tap(find.text('确认发布'));
       await tester.pumpAndSettle();
       expect(api.published, 1);

@@ -1,6 +1,8 @@
 import 'package:common_learn_english/features/digital_human/data/scene_word_recognizer.dart';
 import 'package:common_learn_english/features/digital_human/domain/scene_word_label.dart';
 import 'package:common_learn_english/features/shared/data/word_lookup_service.dart';
+import 'package:common_learn_english/features/sync/data/acquire_api_client.dart';
+import 'package:dio/dio.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
@@ -11,6 +13,7 @@ void main() {
         clientId: 'test',
         clientKind: 'anonymous',
       ),
+      api: AcquireApiClient(Dio()),
     );
     final String text = recognizer.buildSceneDescription(const <SceneWordLabel>[
       SceneWordLabel(word: 'watermelon', chinese: '西瓜'),
