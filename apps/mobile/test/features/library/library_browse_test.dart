@@ -1,3 +1,4 @@
+import 'package:common_learn_english/features/library/domain/video_difficulty.dart';
 import 'package:common_learn_english/features/library/presentation/library_browse.dart';
 import 'package:common_learn_english/features/library/presentation/library_mock_data.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -107,6 +108,48 @@ void main() {
     expect(
       LibraryCourseViewModeLabel.fromStorage('list'),
       LibraryCourseViewMode.feed,
+    );
+  });
+
+  test('cefr filter uses estimate then catalog level', () {
+    final VideoDifficultyEstimate estimate = VideoDifficultyEstimate(
+      cefr: 'A2',
+      top3000Coverage: 0.94,
+      tokenCount: 40,
+      typeCount: 20,
+      fingerprint: 'f',
+      computedAtMs: 1,
+    );
+    final List<LibraryCourseMatch> matches = browseLibraryCourses(
+      courses: <LibraryCourseData>[
+        _course(id: 'a', title: 'Easy', level: '自定义'),
+        _course(id: 'b', title: 'Tagged', level: 'B2'),
+        _course(id: 'c', title: 'Hard', level: 'C1'),
+      ],
+      query: '',
+      sort: LibraryCourseSort.title,
+      cefrFilter: 'A2',
+      difficultyByCourseId: <String, VideoDifficultyEstimate>{
+        'a': estimate,
+      },
+    );
+    expect(matches.map((LibraryCourseMatch m) => m.course.id), <String>['a']);
+    expect(matches.first.course.level, '约 A2');
+  });
+
+  test('difficulty sort goes easy to hard', () {
+    final List<LibraryCourseMatch> matches = browseLibraryCourses(
+      courses: <LibraryCourseData>[
+        _course(id: 'c', title: 'C', level: 'C1', lastStudiedAtMs: 3),
+        _course(id: 'a', title: 'A', level: 'A1', lastStudiedAtMs: 1),
+        _course(id: 'b', title: 'B', level: 'B1', lastStudiedAtMs: 2),
+      ],
+      query: '',
+      sort: LibraryCourseSort.difficulty,
+    );
+    expect(
+      matches.map((LibraryCourseMatch m) => m.course.id).toList(),
+      <String>['a', 'b', 'c'],
     );
   });
 }

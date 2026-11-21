@@ -1,4 +1,6 @@
+import '../domain/video_difficulty.dart';
 import 'library_mock_data.dart';
+import 'video_difficulty_provider.dart';
 
 enum LibraryCourseViewMode { grid, compact, rows, feed }
 
@@ -7,6 +9,7 @@ enum LibraryCourseSort {
   title,
   progress,
   episodes,
+  difficulty,
 }
 
 extension LibraryCourseViewModeLabel on LibraryCourseViewMode {
@@ -53,6 +56,8 @@ extension LibraryCourseSortLabel on LibraryCourseSort {
         return '进度优先';
       case LibraryCourseSort.episodes:
         return '集数最多';
+      case LibraryCourseSort.difficulty:
+        return '难度：易→难';
     }
   }
 
@@ -66,6 +71,8 @@ extension LibraryCourseSortLabel on LibraryCourseSort {
         return LibraryCourseSort.progress;
       case 'episodes':
         return LibraryCourseSort.episodes;
+      case 'difficulty':
+        return LibraryCourseSort.difficulty;
       case 'recent':
       default:
         return LibraryCourseSort.recent;
@@ -134,15 +141,38 @@ List<LibraryCourseMatch> browseLibraryCourses({
   required List<LibraryCourseData> courses,
   required String query,
   required LibraryCourseSort sort,
+  String? cefrFilter,
+  Map<String, VideoDifficultyEstimate> difficultyByCourseId =
+      const <String, VideoDifficultyEstimate>{},
 }) {
   final String keyword = query.trim().toLowerCase();
+  final String? cefr = cefrFilter?.trim().toUpperCase();
   final List<LibraryCourseMatch> matches = courses
-      .where((LibraryCourseData course) => courseMatchesLibraryQuery(course, keyword))
+      .where((LibraryCourseData course) {
+        if (!courseMatchesLibraryQuery(course, keyword)) {
+          return false;
+        }
+        if (cefr == null || cefr.isEmpty) {
+          return true;
+        }
+        final String? resolved = resolvedCourseCefr(
+          course,
+          difficultyByCourseId[course.id],
+        );
+        return resolved == cefr;
+      })
       .map(
-        (LibraryCourseData course) => LibraryCourseMatch(
-          course: course,
-          matchedEpisodeTitles: matchedEpisodeTitlesForQuery(course, keyword),
-        ),
+        (LibraryCourseData course) {
+          final VideoDifficultyEstimate? estimate =
+              difficultyByCourseId[course.id];
+          final LibraryCourseData display = course.copyWith(
+            level: displayCourseLevel(course, estimate),
+          );
+          return LibraryCourseMatch(
+            course: display,
+            matchedEpisodeTitles: matchedEpisodeTitlesForQuery(course, keyword),
+          );
+        },
       )
       .toList(growable: true);
 
@@ -153,6 +183,14 @@ List<LibraryCourseMatch> browseLibraryCourses({
       return bMs.compareTo(aMs);
     }
     return a.title.toLowerCase().compareTo(b.title.toLowerCase());
+  }
+
+  int difficultyRank(LibraryCourseData course) {
+    final String? resolved = resolvedCourseCefr(
+      course,
+      difficultyByCourseId[course.id],
+    );
+    return resolved == null ? 99 : cefrRank(resolved);
   }
 
   matches.sort((LibraryCourseMatch a, LibraryCourseMatch b) {
@@ -175,6 +213,13 @@ List<LibraryCourseMatch> browseLibraryCourses({
         );
         if (byEpisodes != 0) {
           return byEpisodes;
+        }
+        return compareRecent(a.course, b.course);
+      case LibraryCourseSort.difficulty:
+        final int byDiff =
+            difficultyRank(a.course).compareTo(difficultyRank(b.course));
+        if (byDiff != 0) {
+          return byDiff;
         }
         return compareRecent(a.course, b.course);
     }

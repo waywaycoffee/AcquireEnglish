@@ -22,6 +22,9 @@ class ReadingFrequencyLexicon {
 
   final Map<String, int> _rankByWord;
 
+  /// Unmodifiable view of the top-frequency lemma set (for CEFR / coverage).
+  Set<String> get topWords => _top;
+
   static Future<ReadingFrequencyLexicon> load() async {
     try {
       final String raw = await rootBundle.loadString(kEnglishFreqTop20000Asset);

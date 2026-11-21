@@ -38,9 +38,11 @@ import '../../subtitle_completion/subtitle_completion_scheduler.dart';
 import '../../subtitle_completion/subtitle_completion_status_provider.dart';
 import '../../sync/data/acquire_api_client.dart';
 import '../../words/data/offline_word_dictionary.dart';
+import '../domain/video_difficulty.dart';
 import 'library_browse.dart';
 import 'library_catalog_provider.dart';
 import 'library_mock_data.dart';
+import 'video_difficulty_provider.dart';
 import 'widgets/course_overview_card.dart';
 import 'widgets/course_resource_directory_dialog.dart';
 import 'widgets/episode_list_item.dart';
@@ -53,6 +55,7 @@ export 'library_browse.dart'
 
 const String _libraryViewModePrefsKey = 'library_course_view_mode_v1';
 const String _librarySortPrefsKey = 'library_course_sort_v1';
+const String _libraryCefrFilterPrefsKey = 'library_course_cefr_filter_v1';
 
 class LibraryScreen extends ConsumerStatefulWidget {
   const LibraryScreen({
@@ -90,6 +93,7 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
   bool appliedInitialSelection = false;
   LibraryCourseViewMode viewMode = LibraryCourseViewMode.grid;
   LibraryCourseSort courseSort = LibraryCourseSort.recent;
+  String? cefrFilter;
   String query = '';
   bool editMode = false;
   bool showScrollToTop = false;
@@ -132,6 +136,12 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
     courseSort = LibraryCourseSortLabel.fromStorage(
       box.get(_librarySortPrefsKey),
     );
+    final String? storedCefr = box.get(_libraryCefrFilterPrefsKey);
+    if (storedCefr != null &&
+        storedCefr.isNotEmpty &&
+        kCefrLevels.contains(storedCefr.toUpperCase())) {
+      cefrFilter = storedCefr.toUpperCase();
+    }
   }
 
   void _persistBrowsePrefs() {
@@ -140,7 +150,8 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
     }
     Hive.box<String>('prefs')
       ..put(_libraryViewModePrefsKey, viewMode.storageValue)
-      ..put(_librarySortPrefsKey, courseSort.storageValue);
+      ..put(_librarySortPrefsKey, courseSort.storageValue)
+      ..put(_libraryCefrFilterPrefsKey, cefrFilter ?? '');
   }
 
   @override
@@ -279,10 +290,14 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
     );
     selectedCourse = currentCourse;
 
+    final VideoDifficultyState difficultyState =
+        ref.watch(videoDifficultyProvider);
     final List<LibraryCourseMatch> browsedCourses = browseLibraryCourses(
       courses: courses,
       query: query,
       sort: courseSort,
+      cefrFilter: cefrFilter,
+      difficultyByCourseId: difficultyState.byCourseId,
     );
     final List<LibraryCourseData> filteredCourses = browsedCourses
         .map((LibraryCourseMatch match) => match.course)
@@ -385,7 +400,8 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
             : null,
         trailing: showDetail
             ? _LibraryDetailTopStatus(
-                courseMeta: '${selectedCourse.level} · ${selectedCourse.category}',
+                courseMeta:
+                    '${displayCourseLevel(selectedCourse, difficultyState[selectedCourse.id])} · ${selectedCourse.category}',
                 episodeName: activeEpisode?.title,
               )
             : null,
@@ -638,7 +654,12 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
                       },
                     ),
                     CourseOverviewCard(
-                      course: selectedCourse,
+                      course: selectedCourse.copyWith(
+                        level: displayCourseLevel(
+                          selectedCourse,
+                          difficultyState[selectedCourse.id],
+                        ),
+                      ),
                       activeEpisode:
                           activeEpisode ??
                           const LibraryEpisodeItem(
@@ -1124,6 +1145,17 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
                   ),
                 ),
                 const SizedBox(height: 14),
+                _CefrFilterChips(
+                  value: cefrFilter,
+                  scanning: difficultyState.scanning,
+                  onChanged: (String? next) {
+                    setState(() {
+                      cefrFilter = next;
+                    });
+                    _persistBrowsePrefs();
+                  },
+                ),
+                const SizedBox(height: 12),
                 Wrap(
                   spacing: 10,
                   runSpacing: 10,
@@ -2268,6 +2300,121 @@ class _LibraryCourseMatchShell extends StatelessWidget {
           ),
         ),
       ],
+    );
+  }
+}
+
+class _CefrFilterChips extends StatelessWidget {
+  const _CefrFilterChips({
+    required this.value,
+    required this.onChanged,
+    this.scanning = false,
+  });
+
+  final String? value;
+  final ValueChanged<String?> onChanged;
+  final bool scanning;
+
+  @override
+  Widget build(BuildContext context) {
+    final List<String?> options = <String?>[null, ...kCefrLevels];
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: <Widget>[
+        Row(
+          children: <Widget>[
+            const Text(
+              '难度 / 词频',
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w800,
+                color: AppDesignTokens.primaryBlueDark,
+              ),
+            ),
+            if (scanning) ...<Widget>[
+              const SizedBox(width: 8),
+              const SizedBox(
+                width: 12,
+                height: 12,
+                child: CircularProgressIndicator(strokeWidth: 2),
+              ),
+              const SizedBox(width: 6),
+              Text(
+                '分析字幕中',
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w600,
+                  color: AppDesignTokens.textSecondary,
+                ),
+              ),
+            ],
+          ],
+        ),
+        const SizedBox(height: 8),
+        SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          child: Row(
+            children: <Widget>[
+              for (int i = 0; i < options.length; i++) ...<Widget>[
+                if (i > 0) const SizedBox(width: 8),
+                _CefrChip(
+                  label: options[i] ?? '全部',
+                  selected: value == options[i],
+                  onTap: () => onChanged(options[i]),
+                ),
+              ],
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _CefrChip extends StatelessWidget {
+  const _CefrChip({
+    required this.label,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: selected
+          ? AppDesignTokens.primaryBlueDark
+          : AppDesignTokens.appWhite.withValues(alpha: 0.92),
+      borderRadius: BorderRadius.circular(999),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(999),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(999),
+            boxShadow: selected ? null : AppDesignTokens.toyCardShadow,
+            border: Border.all(
+              color: selected
+                  ? AppDesignTokens.primaryBlueDark
+                  : AppDesignTokens.borderGray.withValues(alpha: 0.55),
+            ),
+          ),
+          child: Text(
+            label,
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w800,
+              color: selected
+                  ? AppDesignTokens.appWhite
+                  : AppDesignTokens.primaryBlueDark,
+            ),
+          ),
+        ),
+      ),
     );
   }
 }
