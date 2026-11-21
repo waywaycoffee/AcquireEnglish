@@ -9,6 +9,9 @@ import '../../avatar/presentation/avatar_preview.dart';
 import '../../avatar/presentation/avatar_provider.dart';
 import '../../sync/data/acquire_api_client.dart';
 import '../../words/presentation/word_book_provider.dart';
+import '../../shared/presentation/pad/app_design_tokens.dart';
+import 'adventure_ui.dart';
+import 'exploration_map_screen.dart';
 import 'study_pk_screen.dart';
 import 'study_play_screen.dart';
 
@@ -254,8 +257,9 @@ class _StudyDeskScreenState extends ConsumerState<StudyDeskScreen>
     final Map<String, dynamic> sharing =
         (_desk?['sharing'] as Map<String, dynamic>?) ?? <String, dynamic>{};
     return Scaffold(
+      backgroundColor: AppDesignTokens.softWhite,
       appBar: AppBar(
-        title: const Text('一起练 · 我的同桌'),
+        title: const Text('学习桌'),
         actions: <Widget>[
           IconButton(
             onPressed: _busy ? null : _load,
@@ -281,21 +285,47 @@ class _StudyDeskScreenState extends ConsumerState<StudyDeskScreen>
                         child: const Text('重试'),
                       ),
                     ]),
-                  FilledButton.icon(
+                  AdventureHeroBanner(
+                    chapterTitle: '街角咖啡店',
+                    stageLabel: '单人主线 · 进度永久保留',
+                    progressLabel: '打开地图',
+                    nodeCount: 4,
+                    clearedCount: 2,
+                    onContinue: () => Navigator.of(context).push<void>(
+                      MaterialPageRoute<void>(
+                        builder: (_) => const ExplorationMapScreen(),
+                      ),
+                    ),
+                    partnerLabel: peer == null
+                        ? '同桌加分（可选）· 向下邀请好友'
+                        : '同桌本周 · ${peer['name']}',
+                    onPartner: peer == null
+                        ? null
+                        : () => Navigator.of(context).push<void>(
+                              MaterialPageRoute<void>(
+                                builder: (_) => const StudyPkScreen(),
+                              ),
+                            ),
+                  ),
+                  const SizedBox(height: 12),
+                  OutlinedButton.icon(
                     onPressed: _busy
                         ? null
                         : () => Navigator.of(context).push<void>(
-                            MaterialPageRoute<void>(
-                              builder: (_) => const StudyPlayScreen(),
+                              MaterialPageRoute<void>(
+                                builder: (_) => const StudyPlayScreen(),
+                              ),
                             ),
-                          ),
                     icon: const Icon(Icons.sports_martial_arts),
                     label: const Text('打卡 · 大比武 · 背包'),
                   ),
+                  const SizedBox(height: 8),
                   if (_desk != null) ...<Widget>[
-                    _card(peer == null ? '邀请一个人，一起坚持' : '我的同桌 · ${peer['name']}', <
-                      Widget
-                    >[
+                    _card(
+                      peer == null
+                          ? '同桌加分（可选）· 换人不丢个人关卡'
+                          : '本周搭子 · ${peer['name']}',
+                      <Widget>[
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                         children: <Widget>[

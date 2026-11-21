@@ -1,7 +1,6 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:go_router/go_router.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../authentication/presentation/auth_session.dart';
@@ -15,13 +14,15 @@ import '../../shared/presentation/pad/pad_scaffold.dart';
 import '../../shared/presentation/pad/pad_top_bar.dart';
 import '../../sync/data/acquire_api_client.dart';
 import '../../sync/presentation/daily_feed_provider.dart';
+import 'adventure_ui.dart';
 import 'community_feed_tab.dart';
 import 'community_hot_tab.dart';
 import 'community_leaderboard_tab.dart';
 import 'community_people_tab.dart';
 import 'community_provider.dart';
-import 'study_desk_screen.dart';
 import 'community_social_screen.dart';
+import 'exploration_map_screen.dart';
+import 'study_desk_screen.dart';
 
 class CommunityScreen extends ConsumerStatefulWidget {
   const CommunityScreen({super.key});
@@ -40,6 +41,22 @@ class _CommunityScreenState extends ConsumerState<CommunityScreen> {
       ref.read(communityPeopleProvider.notifier).refresh(),
       ref.read(communityHotProvider.notifier).refresh(),
     ]);
+  }
+
+  void _openAdventure() {
+    Navigator.of(context).push<void>(
+      MaterialPageRoute<void>(
+        builder: (_) => const ExplorationMapScreen(),
+      ),
+    );
+  }
+
+  void _openDesk() {
+    Navigator.of(context).push<void>(
+      MaterialPageRoute<void>(
+        builder: (_) => const StudyDeskScreen(),
+      ),
+    );
   }
 
   @override
@@ -68,29 +85,18 @@ class _CommunityScreenState extends ConsumerState<CommunityScreen> {
       currentDestination: AppNavDestination.discover,
       showContinueLearning: false,
       topBar: PadTopBar(
-        title: '社区',
-        description: '分享 B 站视频，找搭子一起练',
+        title: '冒险广场',
+        description: '单人闯关为主 · 同桌加分为辅',
         actions: <Widget>[
           IconButton(
             tooltip: '消息、收藏与管理',
             icon: const Icon(Icons.notifications_outlined),
             onPressed: loggedIn
                 ? () => Navigator.of(context).push<void>(
-                    MaterialPageRoute<void>(
-                      builder: (_) => const CommunitySocialScreen(),
-                    ),
-                  )
-                : null,
-          ),
-          TextButton.icon(
-            icon: const Icon(Icons.groups_outlined),
-            label: const Text('一起练'),
-            onPressed: loggedIn
-                ? () => Navigator.of(context).push<void>(
-                    MaterialPageRoute<void>(
-                      builder: (_) => const StudyDeskScreen(),
-                    ),
-                  )
+                      MaterialPageRoute<void>(
+                        builder: (_) => const CommunitySocialScreen(),
+                      ),
+                    )
                 : null,
           ),
           IconButton(
@@ -103,39 +109,20 @@ class _CommunityScreenState extends ConsumerState<CommunityScreen> {
       body: Column(
         children: <Widget>[
           Padding(
-            padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
-            child: Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: Theme.of(context).colorScheme.primaryContainer,
-                borderRadius: BorderRadius.circular(16),
-              ),
-              child: Row(
-                children: <Widget>[
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: <Widget>[
-                        Text(
-                          '一起学，更容易坚持',
-                          style: Theme.of(context).textTheme.titleLarge,
-                        ),
-                        const SizedBox(height: 6),
-                        const Text('发现一个好表达，开始今天的学习。'),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  FilledButton(
-                    onPressed: () => context.go('/library'),
-                    child: const Text('去学习'),
-                  ),
-                ],
-              ),
+            padding: const EdgeInsets.fromLTRB(16, 10, 16, 4),
+            child: AdventureHeroBanner(
+              chapterTitle: '街角咖啡店',
+              stageLabel: '当前关卡 · 修改订单',
+              progressLabel: '2 / 4 站',
+              nodeCount: 4,
+              clearedCount: 2,
+              onContinue: _openAdventure,
+              partnerLabel: loggedIn ? '同桌本周目标（可选）· 去学习桌' : '登录后可邀同桌加分',
+              onPartner: loggedIn ? _openDesk : null,
             ),
           ),
           Padding(
-            padding: const EdgeInsets.fromLTRB(16, 4, 16, 0),
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: <Widget>[
@@ -148,10 +135,10 @@ class _CommunityScreenState extends ConsumerState<CommunityScreen> {
                   child: Row(
                     children: <Widget>[
                       for (final (int i, String label) in <(int, String)>[
-                        (0, '动态'),
+                        (0, '任务'),
                         (1, '热门'),
-                        (2, '搭子'),
-                        (3, '排行'),
+                        (2, '找人'),
+                        (3, '榜'),
                       ])
                         Expanded(
                           child: _SegTab(
@@ -169,23 +156,21 @@ class _CommunityScreenState extends ConsumerState<CommunityScreen> {
                   child: Row(
                     children: <Widget>[
                       HubPill(
-                        label: '找搭子',
-                        background: const Color(0xFFE8F8D8),
-                        foreground: AppDesignTokens.brandGreenDark,
-                        onTap: () {
-                          setState(() => _tab = 2);
-                          unawaited(
-                            Navigator.of(context).push<void>(
-                              MaterialPageRoute<void>(
-                                builder: (_) => const FollowedCreatorsScreen(),
-                              ),
-                            ),
-                          );
-                        },
+                        label: '打开地图',
+                        background: AdventurePalette.pathAmber,
+                        foreground: const Color(0xFF3A2A00),
+                        onTap: _openAdventure,
                       ),
                       const SizedBox(width: 8),
                       HubPill(
-                        label: '英语水平 · ${preferences.level}',
+                        label: '学习桌',
+                        background: const Color(0xFFE8F8D8),
+                        foreground: AppDesignTokens.brandGreenDark,
+                        onTap: loggedIn ? _openDesk : null,
+                      ),
+                      const SizedBox(width: 8),
+                      HubPill(
+                        label: '水平 · ${preferences.level}',
                         background: const Color(0xFFFFF1D6),
                         foreground: AppDesignTokens.orange,
                         onTap: () => Navigator.of(context).push<void>(
@@ -196,7 +181,7 @@ class _CommunityScreenState extends ConsumerState<CommunityScreen> {
                       ),
                       const SizedBox(width: 8),
                       HubPill(
-                        label: '兴趣标签',
+                        label: '兴趣',
                         onTap: () => Navigator.of(context).push<void>(
                           MaterialPageRoute<void>(
                             builder: (_) => const LearningPreferencesScreen(),
@@ -205,7 +190,7 @@ class _CommunityScreenState extends ConsumerState<CommunityScreen> {
                       ),
                       const SizedBox(width: 8),
                       HubPill(
-                        label: '关注博主 · ${preferences.followedCreators.length}',
+                        label: '博主 · ${preferences.followedCreators.length}',
                         onTap: () => Navigator.of(context).push<void>(
                           MaterialPageRoute<void>(
                             builder: (_) => const FollowedCreatorsScreen(),
@@ -225,13 +210,21 @@ class _CommunityScreenState extends ConsumerState<CommunityScreen> {
                 : ListView(
                     padding: const EdgeInsets.all(24),
                     children: <Widget>[
+                      QuestFeedCard(
+                        title: '试玩 · 街角咖啡店「看懂菜单」',
+                        meta: '登录后可保存进度并分享成果卡',
+                        badge: '游客可练',
+                        accent: AdventurePalette.pathAmber,
+                        onPlay: _openAdventure,
+                      ),
+                      const SizedBox(height: 12),
                       HubSurface(
                         child: Text(
-                          '登录后可看学习时长榜、兴趣相近的人，发帖吐槽，或分享你喜欢的 B 站视频与博主。',
+                          '单人冒险进度永远属于你。同桌只是本周加分，换人不丢关卡。',
                           style: TextStyle(
-                            fontSize: 15,
+                            fontSize: 14,
                             height: 1.5,
-                            fontWeight: FontWeight.w600,
+                            fontWeight: FontWeight.w700,
                             color: AppDesignTokens.textPrimary,
                           ),
                         ),
