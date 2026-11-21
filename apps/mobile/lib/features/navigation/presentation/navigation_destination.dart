@@ -53,9 +53,9 @@ enum AppNavDestination {
   ),
   review(
     route: '/review',
-    label: '单词',
-    title: '背单词',
-    subtitle: 'FSRS 统一复习；考试备考模式下优先考试标签词书与错题回流。',
+    label: '复习',
+    title: '复习',
+    subtitle: '把学过的真正记住：今日计划、主动回忆与 FSRS 评分。',
     icon: Icons.style_outlined,
     activeIcon: Icons.style_rounded,
   ),

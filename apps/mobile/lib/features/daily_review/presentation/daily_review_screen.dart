@@ -24,6 +24,7 @@ import '../../shared/data/word_lookup_service.dart';
 import '../../shared/data/word_pronunciation_service.dart';
 import '../../shared/domain/subtitle_letter_case.dart';
 import '../../shared/domain/word_lookup_entry.dart';
+import '../../review_hub/presentation/review_recall_theme.dart';
 import '../../shared/presentation/pad/app_design_tokens.dart';
 import '../../shared/presentation/pad/pad_scaffold.dart';
 import '../../shared/presentation/pad/pad_top_bar.dart';
@@ -297,10 +298,12 @@ class _DailyReviewScreenState extends ConsumerState<DailyReviewScreen>
     final DateTime now = ref.read(reviewClockProvider)();
     if (widget.session) _restoreWordPasses(now);
     final ReviewPlan plan = state.plan(sources, now);
+    final bool recallChrome = widget.session;
     return PadScaffold(
       currentDestination: AppNavDestination.review,
       showContinueLearning: false,
       showNavigation: !widget.session,
+      backgroundColor: recallChrome ? ReviewRecallTheme.bg : null,
       topBar: PadTopBar(
         title: widget.syllabusOnly
             ? '学习书库'
@@ -313,7 +316,7 @@ class _DailyReviewScreenState extends ConsumerState<DailyReviewScreen>
                   ? (widget.focusWord != null && widget.focusWord!.isNotEmpty
                         ? '复习此词'
                         : '自由复习')
-                  : (widget.practiceKind == ReviewKind.word ? '今日背词' : '正在复习'))
+                  : (_revealed ? '核对与评分' : '主动回忆'))
             : '每日复习',
         description: widget.session
             ? (widget.syllabusOnly
@@ -322,12 +325,10 @@ class _DailyReviewScreenState extends ConsumerState<DailyReviewScreen>
                   ? '优先重练标记为「忘记」的词。'
                   : widget.practice
                   ? '随时再练，不改变复习计划。'
-                  : widget.practiceKind == ReviewKind.word
-                  ? '仅安排收藏单词的新学与到期复习。'
                   : null)
             : '复习单词、短语和收藏句子。',
         leading: widget.session
-            ? PadBackButton(onPressed: _leaveSession, tooltip: '返回每日概览')
+            ? PadBackButton(onPressed: _leaveSession, tooltip: '返回复习首页')
             : null,
         actions: <Widget>[
           if (widget.session &&
@@ -335,16 +336,24 @@ class _DailyReviewScreenState extends ConsumerState<DailyReviewScreen>
                 (ReviewSource source) => source.kind == ReviewKind.word,
               ))
             IconButton(
-              tooltip: '背词方式与拼写',
+              tooltip: '让计划适合你',
               onPressed: _saving
                   ? null
                   : () => showWordReviewSettingsSheet(context),
-              icon: const Icon(Icons.tune_rounded),
+              icon: Icon(
+                Icons.tune_rounded,
+                color: recallChrome ? ReviewRecallTheme.textSecondary : null,
+              ),
             ),
         ],
         trailing: widget.session
             ? TextButton(
                 onPressed: _saving ? null : _leaveSession,
+                style: TextButton.styleFrom(
+                  foregroundColor: recallChrome
+                      ? ReviewRecallTheme.lime
+                      : null,
+                ),
                 child: const Text('稍后继续'),
               )
             : IconButton(
@@ -740,23 +749,26 @@ class _DailyReviewScreenState extends ConsumerState<DailyReviewScreen>
                               mainAxisAlignment: MainAxisAlignment.spaceBetween,
                               children: <Widget>[
                                 Text(
-                                  '${widget.practice ? '已练习' : '已完成'} $completed / ${keys.length}',
+                                  finished
+                                      ? (widget.practice
+                                            ? '本轮已练习完'
+                                            : '今天的复习，完成了')
+                                      : '${widget.practice ? '自由练习' : '计划复习'} · ${index < 0 ? completed + 1 : index + 1}/${keys.length}',
                                   key: const Key(
                                     'daily-review-session-progress',
                                   ),
-                                  style: TextStyle(
+                                  style: const TextStyle(
                                     fontWeight: FontWeight.w800,
-                                    color: AppDesignTokens.textPrimary,
+                                    color: ReviewRecallTheme.textPrimary,
                                   ),
                                 ),
-                                Text(
-                                  finished
-                                      ? '本轮已完成'
-                                      : '还剩 ${keys.length - completed} 张',
-                                  style: TextStyle(
-                                    color: AppDesignTokens.textSecondary,
+                                if (!finished)
+                                  Text(
+                                    '还剩 ${keys.length - completed}',
+                                    style: const TextStyle(
+                                      color: ReviewRecallTheme.textSecondary,
+                                    ),
                                   ),
-                                ),
                               ],
                             ),
                             const SizedBox(height: 12),
@@ -764,8 +776,8 @@ class _DailyReviewScreenState extends ConsumerState<DailyReviewScreen>
                               value: keys.isEmpty ? 0 : completed / keys.length,
                               minHeight: 6,
                               borderRadius: BorderRadius.circular(6),
-                              backgroundColor: AppDesignTokens.borderGray,
-                              color: AppDesignTokens.brandGreen,
+                              backgroundColor: ReviewRecallTheme.border,
+                              color: ReviewRecallTheme.lime,
                             ),
                           ],
                         ),
@@ -782,7 +794,7 @@ class _DailyReviewScreenState extends ConsumerState<DailyReviewScreen>
                                 const Icon(
                                   Icons.task_alt_rounded,
                                   size: 52,
-                                  color: AppDesignTokens.brandGreenDark,
+                                  color: ReviewRecallTheme.lime,
                                 ),
                                 const SizedBox(height: 20),
                                 Text(
@@ -790,10 +802,11 @@ class _DailyReviewScreenState extends ConsumerState<DailyReviewScreen>
                                       ? '暂时没有可复习的卡片'
                                       : widget.practice
                                       ? '这轮自由复习完成了'
-                                      : '这一轮，完成了',
-                                  style: TextStyle(
+                                      : '今天的复习，完成了',
+                                  style: const TextStyle(
                                     fontSize: 26,
                                     fontWeight: FontWeight.w900,
+                                    color: ReviewRecallTheme.textPrimary,
                                   ),
                                 ),
                                 const SizedBox(height: 12),
@@ -802,41 +815,60 @@ class _DailyReviewScreenState extends ConsumerState<DailyReviewScreen>
                                       ? '这轮练习不会改变复习计划或新学额度，想巩固时可以随时再练。'
                                       : sources.isEmpty
                                       ? '在播放器收藏单词，或把表达加入短语库，它们就会进入统一的复习计划。'
-                                      : plan.next == null
-                                      ? _completionText(
-                                          plan,
-                                          state.dailyNewLimit,
-                                          now,
-                                        )
-                                      : '本轮进度已保存，还有到期或新加入的内容可以继续。',
+                                      : '把一点点进步累积起来。剩下的交给时间。',
                                   textAlign: TextAlign.center,
-                                  style: TextStyle(
+                                  style: const TextStyle(
                                     height: 1.7,
-                                    color: AppDesignTokens.textSecondary,
+                                    color: ReviewRecallTheme.textSecondary,
                                   ),
                                 ),
                                 if (!widget.practice &&
                                     _sessionRatings.isNotEmpty) ...<Widget>[
-                                  const SizedBox(height: 16),
-                                  Text(
-                                    '本轮已保存 ${_sessionRatings.length} 条评分',
-                                    key: const Key('review-saved-summary'),
-                                  ),
-                                  Text(
-                                    '本轮有效互动约 ${(_activeMilliseconds / 60000).ceil()} 分钟 · 长时间无操作不累计',
-                                  ),
-                                  Wrap(
-                                    spacing: 12,
-                                    children: <Widget>[
-                                      for (final fsrs.Rating rating
-                                          in fsrs.Rating.values)
-                                        Text(
-                                          '${const <String>['忘记', '吃力', '记得', '很轻松'][rating.index]} ${_sessionRatings.values.where((fsrs.Rating value) => value == rating).length}',
+                                  const SizedBox(height: 18),
+                                  Container(
+                                    width: double.infinity,
+                                    padding: const EdgeInsets.all(16),
+                                    decoration: BoxDecoration(
+                                      color: ReviewRecallTheme.cardOlive,
+                                      borderRadius: BorderRadius.circular(16),
+                                    ),
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: <Widget>[
+                                        const Text(
+                                          '本轮进度已保存',
+                                          style: TextStyle(
+                                            fontWeight: FontWeight.w800,
+                                            color: ReviewRecallTheme.lime,
+                                          ),
                                         ),
-                                    ],
+                                        const SizedBox(height: 8),
+                                        Text(
+                                          '${_sessionRatings.length} 条 · ${(_activeMilliseconds / 60000).ceil().clamp(1, 999)} 分钟',
+                                          key: const Key('review-saved-summary'),
+                                          style: const TextStyle(
+                                            fontSize: 22,
+                                            fontWeight: FontWeight.w900,
+                                            color: ReviewRecallTheme.textPrimary,
+                                          ),
+                                        ),
+                                        const SizedBox(height: 8),
+                                        Text(
+                                          '记得 / 很轻松 ${_sessionRatings.values.where((fsrs.Rating v) => v == fsrs.Rating.good || v == fsrs.Rating.easy).length} 条\n'
+                                          '吃力 ${_sessionRatings.values.where((fsrs.Rating v) => v == fsrs.Rating.hard).length} 条 · 忘记 ${_sessionRatings.values.where((fsrs.Rating v) => v == fsrs.Rating.again).length} 条',
+                                          style: const TextStyle(
+                                            height: 1.55,
+                                            color:
+                                                ReviewRecallTheme.textSecondary,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
                                   ),
-                                  if (_missedKeys.isNotEmpty)
-                                    TextButton(
+                                  if (_missedKeys.isNotEmpty) ...<Widget>[
+                                    const SizedBox(height: 12),
+                                    FilledButton(
                                       onPressed: () => context.push(
                                         Uri(
                                           path: SGRoute.reviewSession.route,
@@ -848,10 +880,12 @@ class _DailyReviewScreenState extends ConsumerState<DailyReviewScreen>
                                           },
                                         ).toString(),
                                       ),
+                                      style: ReviewRecallTheme.secondaryButton,
                                       child: Text(
-                                        '自由巩固薄弱项（${_missedKeys.length} 条本轮反馈）',
+                                        '再练薄弱内容（${_missedKeys.length}）',
                                       ),
                                     ),
+                                  ],
                                   TextButton(
                                     onPressed: () async {
                                       await ref
@@ -868,18 +902,22 @@ class _DailyReviewScreenState extends ConsumerState<DailyReviewScreen>
                                           ),
                                         );
                                     },
+                                    style: TextButton.styleFrom(
+                                      foregroundColor: ReviewRecallTheme.lime,
+                                    ),
                                     child: const Text('同步并去一起练打卡'),
                                   ),
-                                  TextButton(
+                                  FilledButton(
                                     onPressed: () => _showResultPreview(),
-                                    child: const Text('预览学习成果'),
+                                    style: ReviewRecallTheme.secondaryButton,
+                                    child: const Text('预览成果卡'),
                                   ),
                                 ],
                                 const SizedBox(height: 24),
                                 FilledButton(
                                   onPressed: _leaveSession,
-                                  style: _primaryButtonStyle,
-                                  child: const Text('返回每日概览'),
+                                  style: ReviewRecallTheme.primaryButton,
+                                  child: const Text('返回学习'),
                                 ),
                                 if (widget.practice &&
                                     keys.any(_missedKeys.contains))
@@ -1544,8 +1582,8 @@ class _DailyReviewScreenState extends ConsumerState<DailyReviewScreen>
                         : record.isNew
                         ? '首次学习'
                         : '到期复习'}$stageLabel',
-                    style: TextStyle(
-                      color: Color(0xFF377D05),
+                    style: const TextStyle(
+                      color: ReviewRecallTheme.lime,
                       fontSize: 13,
                       fontWeight: FontWeight.w800,
                     ),
@@ -1807,14 +1845,24 @@ class _DailyReviewScreenState extends ConsumerState<DailyReviewScreen>
                     },
                     child: Text(choice),
                   )
-              else
-                FilledButton.icon(
+              else ...<Widget>[
+                Text(
+                  '没想起来也没关系，诚实反馈更有帮助。',
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                    fontSize: 12,
+                    height: 1.5,
+                    color: ReviewRecallTheme.textMuted,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                FilledButton(
                   key: const Key('daily-review-reveal'),
                   onPressed: () => setState(() => _revealed = true),
-                  style: _primaryButtonStyle,
-                  icon: const Icon(Icons.visibility_outlined),
-                  label: Text(useCloze ? '显示答案与原词' : '显示答案'),
+                  style: ReviewRecallTheme.primaryButton,
+                  child: Text(useCloze ? '显示答案与原词' : '显示答案'),
                 ),
+              ],
               if (word && (record.isNew || choiceMode))
                 TextButton(
                   onPressed: () => _markUnknown(source),
@@ -1927,12 +1975,13 @@ class _DailyReviewScreenState extends ConsumerState<DailyReviewScreen>
                   !choiceMode &&
                   !widget.practice) ...<Widget>[
                 const SizedBox(height: 26),
-                Text(
-                  '刚才回忆得怎么样？忘记了就选“忘记”，不要选“费力想起”。',
+                const Text(
+                  '按真实回忆情况选择',
                   style: TextStyle(
-                    fontSize: 12,
+                    fontSize: 13,
                     height: 1.6,
-                    color: AppDesignTokens.textSecondary,
+                    fontWeight: FontWeight.w700,
+                    color: ReviewRecallTheme.textSecondary,
                   ),
                 ),
                 const SizedBox(height: 12),
@@ -1941,6 +1990,14 @@ class _DailyReviewScreenState extends ConsumerState<DailyReviewScreen>
                   record: record,
                   now: now,
                   practice: false,
+                ),
+                const SizedBox(height: 8),
+                const Text(
+                  '点击一个评分即保存并进入下一条。',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: ReviewRecallTheme.textMuted,
+                  ),
                 ),
               ],
               if (_saving)
@@ -2204,92 +2261,83 @@ class _DailyReviewScreenState extends ConsumerState<DailyReviewScreen>
     required bool practice,
     bool speakHints = false,
   }) {
-    return LayoutBuilder(
-      builder: (BuildContext context, BoxConstraints constraints) {
-        return Wrap(
-          spacing: 8,
-          runSpacing: 10,
-          children: <Widget>[
-            for (final (
-                  fsrs.Rating rating,
-                  String label,
-                  String hint,
-                  Color color,
-                )
-                in <(fsrs.Rating, String, String, Color)>[
-                  (
-                    fsrs.Rating.again,
-                    speakHints ? '跟读困难' : '忘记',
-                    speakHints ? '读不准或读不出' : '没想起 · 重学',
-                    const Color(0xFFAF3434),
-                  ),
-                  (
-                    fsrs.Rating.hard,
-                    speakHints ? '勉强过关' : '费力想起',
-                    speakHints ? '能读但吃力' : '想对了，但吃力',
-                    const Color(0xFF925600),
-                  ),
-                  (
-                    fsrs.Rating.good,
-                    speakHints ? '跟读顺利' : '记得',
-                    speakHints ? '基本正确' : '正常回忆出来',
-                    const Color(0xFF377D05),
-                  ),
-                  (
-                    fsrs.Rating.easy,
-                    speakHints ? '很流利' : '很轻松',
-                    speakHints ? '发音清晰自信' : '立刻轻松答对',
-                    const Color(0xFF0874A8),
-                  ),
-                ])
-              SizedBox(
-                width: constraints.maxWidth < 520
-                    ? (constraints.maxWidth - 8) / 2
-                    : (constraints.maxWidth - 24) / 4,
-                child: OutlinedButton(
-                  key: Key('daily-review-rate-${rating.name}'),
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: color,
-                    minimumSize: const Size(0, 84),
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 8,
-                      vertical: 10,
-                    ),
-                  ),
-                  onPressed: _saving
-                      ? null
-                      : () => _grade(source, record, rating),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: <Widget>[
-                      Text(
-                        label,
-                        style: TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w800,
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        hint,
-                        textAlign: TextAlign.center,
-                        style: TextStyle(fontSize: 11, height: 1.4),
-                      ),
-                      if (!practice && !speakHints) ...<Widget>[
-                        const SizedBox(height: 4),
-                        Text(
-                          '预计 ${_formatReviewDelay(record.scheduledCard(rating, now).due, now)}',
-                          textAlign: TextAlign.center,
-                          style: TextStyle(fontSize: 11, height: 1.4),
-                        ),
-                      ],
-                    ],
-                  ),
+    final List<(fsrs.Rating, String, String, Color)> options =
+        <(fsrs.Rating, String, String, Color)>[
+      (
+        fsrs.Rating.again,
+        speakHints ? '跟读困难' : '忘记',
+        speakHints ? '读不准或读不出' : '没想起来，需要重新学',
+        ReviewRecallTheme.rateAgain,
+      ),
+      (
+        fsrs.Rating.hard,
+        speakHints ? '勉强过关' : '吃力',
+        speakHints ? '能读但吃力' : '想了很久，才想起来',
+        ReviewRecallTheme.rateHard,
+      ),
+      (
+        fsrs.Rating.good,
+        speakHints ? '跟读顺利' : '记得',
+        speakHints ? '基本正确' : '能独立回忆出来',
+        ReviewRecallTheme.rateGood,
+      ),
+      (
+        fsrs.Rating.easy,
+        speakHints ? '很流利' : '很轻松',
+        speakHints ? '发音清晰自信' : '立刻答对，几乎不费力',
+        ReviewRecallTheme.rateEasy,
+      ),
+    ];
+    return Column(
+      children: <Widget>[
+        for (final (fsrs.Rating rating, String label, String hint, Color color)
+            in options) ...<Widget>[
+          SizedBox(
+            width: double.infinity,
+            child: FilledButton(
+              key: Key('daily-review-rate-${rating.name}'),
+              style: FilledButton.styleFrom(
+                backgroundColor: color,
+                foregroundColor: ReviewRecallTheme.textPrimary,
+                disabledBackgroundColor: color.withValues(alpha: 0.45),
+                minimumSize: const Size(0, 64),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 12,
+                ),
+                alignment: Alignment.centerLeft,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(14),
                 ),
               ),
-          ],
-        );
-      },
+              onPressed: _saving ? null : () => _grade(source, record, rating),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: <Widget>[
+                  Text(
+                    '$label  ·  $hint',
+                    style: const TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                  if (!practice && !speakHints) ...<Widget>[
+                    const SizedBox(height: 4),
+                    Text(
+                      '下一次：${_formatReviewDelay(record.scheduledCard(rating, now).due, now)}',
+                      style: const TextStyle(
+                        fontSize: 12,
+                        color: ReviewRecallTheme.textSecondary,
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 8),
+        ],
+      ],
     );
   }
 
@@ -3035,14 +3083,7 @@ class _DailyReviewScreenState extends ConsumerState<DailyReviewScreen>
   ).showSnackBar(SnackBar(content: Text(message)));
 }
 
-final ButtonStyle _primaryButtonStyle = FilledButton.styleFrom(
-  backgroundColor: AppDesignTokens.brandGreen,
-  foregroundColor: Colors.white,
-  minimumSize: const Size(0, 50),
-  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
-  textStyle: const TextStyle(fontSize: 15, fontWeight: FontWeight.w800),
-  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-);
+final ButtonStyle _primaryButtonStyle = ReviewRecallTheme.primaryButton;
 
 class _ReviewSurface extends StatelessWidget {
   const _ReviewSurface({required this.child});
@@ -3051,10 +3092,9 @@ class _ReviewSurface extends StatelessWidget {
   Widget build(BuildContext context) => Container(
     padding: EdgeInsets.all(MediaQuery.sizeOf(context).width < 600 ? 22 : 32),
     decoration: BoxDecoration(
-      color: AppDesignTokens.appWhite,
+      color: ReviewRecallTheme.card,
       borderRadius: BorderRadius.circular(24),
-      border: Border.all(color: AppDesignTokens.borderGray),
-      boxShadow: AppDesignTokens.toyCardShadow,
+      border: Border.all(color: ReviewRecallTheme.border.withValues(alpha: 0.7)),
     ),
     child: child,
   );

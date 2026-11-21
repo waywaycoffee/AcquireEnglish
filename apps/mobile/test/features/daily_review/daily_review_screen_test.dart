@@ -136,7 +136,7 @@ void main() {
       expect(state.records['phrase:1']!.reviews, 1);
       expect(state.records['entry:hello:recognize']!.reviews, 0);
       expect(find.byKey(const Key('review-saved-summary')), findsOneWidget);
-      expect(find.text('记得 1'), findsOneWidget);
+      expect(find.textContaining('记得 / 很轻松 1 条'), findsOneWidget);
       expect(tester.takeException(), isNull);
     },
   );
@@ -284,9 +284,7 @@ void main() {
       addTearDown(container.dispose);
       await tester.pumpWidget(app(container, session: true));
       await tester.pumpAndSettle();
-      await tester.ensureVisible(find.byKey(const Key('daily-review-reveal')));
-      await tester.tap(find.byKey(const Key('daily-review-reveal')));
-      await tester.pumpAndSettle();
+      await tapVisibleKey(tester, const Key('daily-review-reveal'));
       // Changing the setting updates an already revealed, previously saved card.
       container
           .read(learningSettingsProvider.notifier)
@@ -295,12 +293,9 @@ void main() {
       expect(find.text(mode.value), findsOneWidget);
       expect(find.text('买得起 API'), findsOneWidget);
       expect(find.text('中文翻译 API'), findsOneWidget);
-      await tester.tap(find.byKey(const Key('daily-review-next')));
-      await tester.pumpAndSettle();
+      await tapVisibleKey(tester, const Key('daily-review-next'));
       expect(find.text(mode.value), findsNothing);
-      await tester.ensureVisible(find.byKey(const Key('daily-review-reveal')));
-      await tester.tap(find.byKey(const Key('daily-review-reveal')));
-      await tester.pumpAndSettle();
+      await tapVisibleKey(tester, const Key('daily-review-reveal'));
       expect(find.text(mode.value), findsOneWidget);
       expect(uppercaseSources.first.english, original);
       expect(uppercaseSources.last.answer, original);
@@ -391,7 +386,7 @@ void main() {
         await tester.ensureVisible(find.byKey(const Key('daily-review-start')));
         await tester.tap(find.byKey(const Key('daily-review-start')));
         await tester.pumpAndSettle();
-        expect(find.text('正在复习'), findsOneWidget);
+        expect(find.text('主动回忆'), findsOneWidget);
         expect(find.byKey(const Key('pad-sidebar-header')), findsNothing);
         expect(
           find.byKey(const Key('daily-review-session-progress')),
@@ -404,9 +399,9 @@ void main() {
         expect(find.byKey(const Key('daily-review-rate-good')), findsNothing);
         await tapVisibleKey(tester, const Key('daily-review-reveal'));
         expect(find.text('你好'), findsOneWidget);
-        expect(find.text('没想起 · 重学'), findsOneWidget);
-        expect(find.text('想对了，但吃力'), findsOneWidget);
-        expect(find.textContaining('预计 '), findsNWidgets(4));
+        expect(find.textContaining('没想起来，需要重新学'), findsOneWidget);
+        expect(find.textContaining('想了很久，才想起来'), findsOneWidget);
+        expect(find.textContaining('下一次：'), findsNWidgets(4));
         expect(
           container.read(dailyReviewProvider).records['entry:hello:recognize']!.reviews,
           0,
@@ -478,7 +473,7 @@ void main() {
       await tester.pumpAndSettle();
       await tapVisibleKey(tester, const Key('daily-review-reveal'));
       await tapVisibleKey(tester, const Key('daily-review-rate-good'));
-      expect(find.text('已完成 1 / 2'), findsOneWidget);
+      expect(find.textContaining('计划复习 ·'), findsOneWidget);
       await tester.tap(find.byKey(const Key('daily-review-previous')));
       await tester.pumpAndSettle();
       expect(find.text('你好'), findsOneWidget);
@@ -502,7 +497,7 @@ void main() {
       addTearDown(container.dispose);
       await tester.pumpWidget(app(container, session: true));
       await tester.pumpAndSettle();
-      await tester.tap(find.byTooltip('返回每日概览'));
+      await tester.tap(find.byTooltip('返回复习首页'));
       await tester.pumpAndSettle();
       expect(find.text('每日复习'), findsOneWidget);
       await tester.scrollUntilVisible(
@@ -652,7 +647,7 @@ void main() {
       await tester.ensureVisible(find.byKey(const Key('daily-review-start')));
       await tester.tap(find.byKey(const Key('daily-review-start')));
       await tester.pumpAndSettle();
-      expect(find.text('正在复习'), findsOneWidget);
+      expect(find.text('主动回忆'), findsOneWidget);
       await tapVisibleKey(tester, const Key('daily-review-reveal'));
       await tapVisibleKey(tester, const Key('daily-review-rate-good'));
       final DailyReviewState state = container.read(dailyReviewProvider);
