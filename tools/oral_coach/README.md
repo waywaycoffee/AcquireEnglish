@@ -45,12 +45,39 @@ cd tools/oral_coach
 ASR_PROVIDER=mock          # whisperx | deepgram | mock
 PRON_PROVIDER=simple       # simple | phoneme | http | wav2vec2 | mock
 LLM_PROVIDER=mock          # deepseek | openai | ollama | mock
-TTS_PROVIDER=mock          # xtts | fishspeech | edge | mock
+TTS_PROVIDER=mock          # qwen-audio | xtts | fishspeech | edge | mock
 AVATAR_PROVIDER=livetalking  # none | livetalking | musetalk | liveportrait
 LIVETALKING_URL=http://127.0.0.1:8010
 ```
 
 `PRON_PROVIDER=simple` 为默认真分（词重叠 + 序列 Levenshtein，无需 GPU）。非 simple 实现多为 **adapter 壳**：填 API Key / 本机服务地址后启用。
+
+## 阿里云百炼音色
+
+在运行陪练服务的机器上配置 `tools/oral_coach/.env`，重启陪练服务：
+
+```dotenv
+TTS_PROVIDER=qwen-audio
+DASHSCOPE_API_KEY=在服务器填写百炼API密钥
+```
+
+App 调用陪练服务，服务端使用 `qwen-audio-3.0-tts-flash`。App 和 GitHub 仓库里只配置公开的音色 ID，实际密钥留在服务端。`GET /api/health` 的 `providers.tts` 应显示 `qwen-audio`。
+
+在服务端本机调用，以下以 Luna 的英文音色为例：
+
+```bash
+curl -fsS http://127.0.0.1:8770/api/tts/speak \
+  -H 'Content-Type: application/json' \
+  -d '{"text":"Hi! Let us practise English together.","digital_human_id":"luna","tts_voice":"qwen-audio-3.0-tts-flash-loonglunawang","language":"en"}'
+```
+
+响应里的 `tts_url` 是相对地址。将其拼到同一个陪练服务地址之后，用 GET 获取 MP3。线上使用陪练服务的 `/coach` 基地址。
+
+双语试听可传 `tts_voice: longanxiaoxin`、`language: zh` 和中英混合文本。英文音色的中文回复走角色的独立中文音色。百炼调用失败时会回退到 Edge，所以健康检查和拿到 MP3 只确认陪练服务工作正常。要确认实际使用了百炼音色，还需查看陪练日志中是否出现 `Coach TTS fell back to Edge`。
+
+- `app/providers/qwen_audio_tts.py` 中的 `VOICES`、`BILINGUAL_VOICES` 和 `PERSONA_VOICES` 定义可调用音色及默认映射。
+- `app/providers/tts.py` 根据语言和音色选择合成服务。
+- Flutter 的音色选单和角色推荐分别在 `coach_english_voices.dart` 和 `digital_human_catalog.dart` 中。
 
 ## 与 App
 
