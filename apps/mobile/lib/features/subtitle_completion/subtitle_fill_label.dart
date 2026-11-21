@@ -72,6 +72,14 @@ const String kSubtitleSharedCachePartialLabel =
 /// Looking up shared pack before local Whisper (not ASR progress).
 const String kSubtitleSharedCacheLookupLabel = '正在检查校验字幕缓存…';
 
+/// Local still missing after shared lookup — durable ECS GPU job accepted.
+const String kSubtitleCloudGenerationQueuedLabel = '已推送云端生成字幕…';
+
+bool isSubtitleCloudGenerationQueuedLabel(String? label) {
+  final String live = (label ?? '').trim();
+  return live.contains('推送云端生成') || live.contains('云端生成字幕');
+}
+
 bool isSubtitleSharedCacheReadyLabel(String? label) {
   final String live = (label ?? '').trim();
   if (live.isEmpty) {
@@ -88,6 +96,10 @@ bool isSubtitleSharedCacheReadyLabel(String? label) {
 bool isSubtitleFillTerminalLabel(String? label) {
   final String live = (label ?? '').trim();
   if (live.isEmpty) {
+    return false;
+  }
+  // Cloud queued is waiting, not a finished fill.
+  if (isSubtitleCloudGenerationQueuedLabel(live)) {
     return false;
   }
   return live.contains('已补全') ||

@@ -7,6 +7,7 @@ import '../import_course/data/bilibili_multipage.dart';
 import '../import_course/domain/bilibili_import.dart';
 import '../library/presentation/library_mock_data.dart';
 import '../sync/data/acquire_api_client.dart';
+import 'shared_subtitle_api.dart';
 import 'shared_subtitle_quality.dart';
 
 export 'shared_subtitle_api.dart';
@@ -149,13 +150,69 @@ Future<({String? enPath, String? zhPath})> writeSharedBilibiliSubtitleFiles({
   return (enPath: enFile.path, zhPath: zhPath);
 }
 
+/// Paths already on disk under `Documents/bilibili/<idKey>/`.
+Future<({String? enPath, String? zhPath})> localSharedBilibiliSubtitlePaths({
+  required String idKey,
+  Future<Directory> Function()? documentsDirectory,
+}) async {
+  final String key = idKey.trim();
+  if (key.isEmpty) {
+    return (enPath: null, zhPath: null);
+  }
+  final Directory docs =
+      documentsDirectory != null
+          ? await documentsDirectory()
+          : await getApplicationDocumentsDirectory();
+  final Directory dir = Directory(
+    '${docs.path}${Platform.pathSeparator}bilibili'
+    '${Platform.pathSeparator}$key',
+  );
+  if (!dir.existsSync()) {
+    // Fall back to official key aliases (BV vs BV-p01) via Documents scan.
+    return (
+      enPath: await existingOfficialBilibiliSubtitle(
+        idKey: key,
+        fileName: 'en.srt',
+      ),
+      zhPath: await existingOfficialBilibiliSubtitle(
+        idKey: key,
+        fileName: 'zh.srt',
+      ),
+    );
+  }
+  final File enFile = File('${dir.path}${Platform.pathSeparator}en.srt');
+  final File zhFile = File('${dir.path}${Platform.pathSeparator}zh.srt');
+  return (
+    enPath: isUsableSubtitlePath(enFile.path) ? enFile.path : null,
+    zhPath: isUsableSubtitlePath(zhFile.path) ? zhFile.path : null,
+  );
+}
+
 /// Lookup shared pack and apply locally. Returns paths written, or null on miss.
+///
+/// Skips the network round-trip when a bilingual pack is already on disk.
 Future<({String? enPath, String? zhPath})?> tryApplySharedBilibiliSubtitles({
   required AcquireApiClient api,
   required BilibiliSharedSubtitleIds ids,
   Future<Directory> Function()? documentsDirectory,
+  bool requireBilingual = false,
 }) async {
   try {
+    final String folder = (ids.idKey ?? ids.bvid).trim();
+    if (folder.isEmpty) {
+      return null;
+    }
+    final ({String? enPath, String? zhPath}) local =
+        await localSharedBilibiliSubtitlePaths(
+          idKey: folder,
+          documentsDirectory: documentsDirectory,
+        );
+    final bool localEn = isUsableSubtitlePath(local.enPath);
+    final bool localZh = isUsableSubtitlePath(local.zhPath);
+    if (localEn && localZh) {
+      return local;
+    }
+
     final SharedBilibiliSubtitlePack? pack = await api.getSharedBilibiliSubtitle(
       bvid: ids.bvid,
       page: ids.page,
@@ -164,8 +221,10 @@ Future<({String? enPath, String? zhPath})?> tryApplySharedBilibiliSubtitles({
     if (pack == null) {
       return null;
     }
-    final String folder = (ids.idKey ?? ids.bvid).trim();
-    if (folder.isEmpty) {
+    final bool packHasZh =
+        pack.hasZh || ((pack.subtitleZhSrt ?? '').trim().length >= 20);
+    if (requireBilingual && !packHasZh) {
+      // Caller wants ZH+EN; do not treat EN-only community packs as a hit.
       return null;
     }
     final ({String? enPath, String? zhPath}) written =
@@ -183,6 +242,78 @@ Future<({String? enPath, String? zhPath})?> tryApplySharedBilibiliSubtitles({
     return null;
   }
 }
+
+/// Cloud lookup (+ local write) runs in parallel with the media download.
+///
+/// When ECS already has a bilingual pack and this device does not, the SRT
+/// files are written under `Documents/bilibili/<idKey>/` so playback / enqueue
+/// can skip Whisper/translate. Misses still enqueue ECS GPU generation.
+Future<({String? enPath, String? zhPath})?> requestSharedSubtitlesForDownload({
+  required String bvid,
+  required int page,
+  int? cid,
+  String? idKey,
+  Future<Directory> Function()? documentsDirectory,
+  AcquireApiClient? api,
+}) async {
+  final AcquireApiClient? client = resolveSharedBilibiliSubtitleApi(api);
+  if (client == null) {
+    return null;
+  }
+  final String trimmedBvid = bvid.trim();
+  if (trimmedBvid.isEmpty) {
+    return null;
+  }
+  final int safePage = page < 1 ? 1 : page;
+  final String folder =
+      (idKey ??
+              BilibiliImport.mediaIdKey(
+                bvidOrAv: trimmedBvid,
+                page: safePage,
+                pageCount: safePage,
+              ))
+          .trim();
+  if (folder.isEmpty) {
+    return null;
+  }
+  try {
+    final ({String? enPath, String? zhPath})? applied =
+        await tryApplySharedBilibiliSubtitles(
+          api: client,
+          ids: BilibiliSharedSubtitleIds(
+            bvid: trimmedBvid,
+            page: safePage,
+            cid: cid,
+            idKey: folder,
+          ),
+          documentsDirectory: documentsDirectory,
+        );
+    if (applied != null) {
+      return applied;
+    }
+    // Miss: durable cloud GPU job (getShared already tries; keep explicit).
+    await requestCloudSubtitleGeneration(
+      bvid: trimmedBvid,
+      page: safePage,
+      api: client,
+    );
+    return null;
+  } catch (_) {
+    // Offline cloud or expired login must not block the video download.
+    return null;
+  }
+}
+
+/// After official + shared miss: push ECS GPU generation for this BV page.
+Future<bool> tryRequestCloudSubtitleGeneration({
+  required AcquireApiClient api,
+  required BilibiliSharedSubtitleIds ids,
+}) =>
+    requestCloudSubtitleGeneration(
+      bvid: ids.bvid,
+      page: ids.page,
+      api: api,
+    );
 
 /// Upload a validated pack after local fill. Failures are silent.
 Future<void> tryUploadSharedBilibiliSubtitles({

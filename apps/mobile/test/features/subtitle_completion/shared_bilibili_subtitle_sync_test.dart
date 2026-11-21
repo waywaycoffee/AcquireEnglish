@@ -12,10 +12,14 @@ import 'package:path_provider_platform_interface/path_provider_platform_interfac
 import 'package:plugin_platform_interface/plugin_platform_interface.dart';
 
 class _FakeSharedApi extends AcquireApiClient {
-  _FakeSharedApi(this.pack) : super(Dio());
+  _FakeSharedApi(this.pack, {this.enqueueSucceeds = true}) : super(Dio());
 
   final SharedBilibiliSubtitlePack? pack;
+  final bool enqueueSucceeds;
   int getCalls = 0;
+  int enqueueCalls = 0;
+  String? lastEnqueuedBvid;
+  int? lastEnqueuedPage;
 
   @override
   Future<SharedBilibiliSubtitlePack?> getSharedBilibiliSubtitle({
@@ -25,6 +29,25 @@ class _FakeSharedApi extends AcquireApiClient {
   }) async {
     getCalls += 1;
     return pack;
+  }
+
+  @override
+  Future<SharedSubtitleGpuJob?> enqueueSharedSubtitleJob({
+    required String bvid,
+    int page = 1,
+  }) async {
+    enqueueCalls += 1;
+    lastEnqueuedBvid = bvid;
+    lastEnqueuedPage = page;
+    if (!enqueueSucceeds) {
+      return null;
+    }
+    return SharedSubtitleGpuJob(
+      id: 'job-$enqueueCalls',
+      bvid: bvid,
+      page: page,
+      state: 'queued',
+    );
   }
 }
 
@@ -95,10 +118,47 @@ void main() {
     configureSharedBilibiliSubtitleApi(api);
     await requestSharedSubtitlesForDownload(bvid: 'BV1CS4y1v7sQ', page: 151);
     expect(api.getCalls, 1);
+    expect(api.enqueueCalls, 1);
+    expect(api.lastEnqueuedBvid, 'BV1CS4y1v7sQ');
+    expect(api.lastEnqueuedPage, 151);
   });
 
   test('download continues when the cloud API is not configured', () async {
     await requestSharedSubtitlesForDownload(bvid: 'BV1CS4y1v7sQ', page: 1);
+  });
+
+  test('download writes bilingual shared pack to Documents/bilibili', () async {
+    final String enSrt = buildSampleEnglishSrt(cues: 6);
+    final String zhSrt = buildSampleChineseSrt(cues: 6);
+    final _FakeSharedApi api = _FakeSharedApi(
+      SharedBilibiliSubtitlePack(
+        bvid: 'BV1DOWNLOADWRITE',
+        page: 1,
+        subtitleEnSrt: enSrt,
+        subtitleZhSrt: zhSrt,
+        qualityScore: 0.9,
+        cueCount: 6,
+        hasZh: true,
+      ),
+    );
+    configureSharedBilibiliSubtitleApi(api);
+
+    final ({String? enPath, String? zhPath})? written =
+        await requestSharedSubtitlesForDownload(
+          bvid: 'BV1DOWNLOADWRITE',
+          page: 1,
+          documentsDirectory: () async => docs,
+        );
+
+    expect(api.getCalls, 1);
+    expect(api.enqueueCalls, 0);
+    expect(written?.enPath, isNotNull);
+    expect(written?.zhPath, isNotNull);
+    final File enFile = File('${docs.path}/bilibili/BV1DOWNLOADWRITE/en.srt');
+    final File zhFile = File('${docs.path}/bilibili/BV1DOWNLOADWRITE/zh.srt');
+    expect(enFile.existsSync(), isTrue);
+    expect(zhFile.existsSync(), isTrue);
+    expect(enFile.readAsStringSync(), contains('Hello world'));
   });
 
   test('source URL restores case lost in a disk cache key', () {
@@ -185,7 +245,7 @@ void main() {
     expect(writtenEn.readAsStringSync(), contains('Hello world'));
   });
 
-  test('enqueue still ASR when shared lookup misses', () async {
+  test('enqueue pushes cloud generation when shared lookup misses', () async {
     final File video = _fakeVideo(temp, 'miss.mp4');
     final _FakeSharedApi api = _FakeSharedApi(null);
 
@@ -200,7 +260,67 @@ void main() {
     );
 
     expect(api.getCalls, 1);
+    expect(api.enqueueCalls, 1);
+    expect(api.lastEnqueuedBvid, 'BV1SHAREDMISS01');
+    // Cloud is the default path — do not auto-queue on-device Whisper.
+    expect(await queue.loadJobs(), isEmpty);
+  });
+
+  test('enqueue falls back to local ASR when cloud submit fails', () async {
+    final File video = _fakeVideo(temp, 'cloud-fail.mp4');
+    final _FakeSharedApi api = _FakeSharedApi(null, enqueueSucceeds: false);
+
+    await enqueueSubtitleCompletionForEpisode(
+      episodeId: 'ep-cloud-fail',
+      videoPath: video.path,
+      sourceUrl: 'https://www.bilibili.com/video/BV1CLOUDFAIL01',
+      queue: queue,
+      appSupportDirectory: () async => temp,
+      documentsDirectory: () async => docs,
+      sharedSubtitleApi: api,
+    );
+
+    expect(api.enqueueCalls, 1);
     final SubtitleCompletionJob job = (await queue.loadJobs()).single;
     expect(job.needEnglish, isTrue);
+  });
+
+  test('cloud generation works without a local video file', () async {
+    final _FakeSharedApi api = _FakeSharedApi(null);
+
+    await enqueueSubtitleCompletionForEpisode(
+      episodeId: 'ep-no-video',
+      videoPath: null,
+      sourceUrl: 'https://www.bilibili.com/video/BV1NOVIDEO0001',
+      queue: queue,
+      appSupportDirectory: () async => temp,
+      documentsDirectory: () async => docs,
+      sharedSubtitleApi: api,
+      networkFetchOfficial: false,
+    );
+
+    expect(api.enqueueCalls, 1);
+    expect(api.lastEnqueuedBvid, 'BV1NOVIDEO0001');
+    expect(await queue.loadJobs(), isEmpty);
+  });
+
+  test('force still queues local ASR after cloud push', () async {
+    final File video = _fakeVideo(temp, 'force.mp4');
+    final _FakeSharedApi api = _FakeSharedApi(null);
+
+    await enqueueSubtitleCompletionForEpisode(
+      episodeId: 'ep-force-local',
+      videoPath: video.path,
+      sourceUrl: 'https://www.bilibili.com/video/BV1FORCELOCAL01',
+      queue: queue,
+      appSupportDirectory: () async => temp,
+      documentsDirectory: () async => docs,
+      sharedSubtitleApi: api,
+      force: true,
+    );
+
+    // force skips shared lookup / cloud prefer path → local queue only.
+    expect(api.enqueueCalls, 0);
+    expect(await queue.loadJobs(), isNotEmpty);
   });
 }

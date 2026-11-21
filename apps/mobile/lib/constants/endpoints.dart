@@ -103,6 +103,10 @@ class Endpoints {
       'api/shared-subtitles/bilibili';
   static const String sharedSubtitlesBilibiliList =
       'api/shared-subtitles/bilibili/list';
+  /// ECS durable queue for GPU ASR + translate (Bilibili shared packs).
+  static const String sharedSubtitlesJobs = 'api/shared-subtitles/jobs';
+  static String sharedSubtitlesJob(String jobId) =>
+      'api/shared-subtitles/jobs/${Uri.encodeComponent(jobId)}';
   static const String imports = 'api/imports';
   static const String importsAsset = 'api/imports/asset';
   static const String netdiskStatus = 'api/netdisk/status';

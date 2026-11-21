@@ -7,7 +7,6 @@ import '../import_course/data/bilibili_episode_prepare.dart';
 import '../import_course/data/bilibili_multipage.dart';
 import '../import_course/data/ensure_official_softsubs.dart';
 import '../import_course/data/subtitle_source_policy.dart';
-import '../import_course/domain/bilibili_import.dart';
 import '../library/presentation/library_mock_data.dart';
 import '../player/presentation/bilingual_subtitle_helpers.dart';
 import '../player/presentation/player_mock_state.dart';
@@ -267,7 +266,8 @@ enum SubtitleFillChip { english, chinese }
 
 /// Enqueue completion when English and/or Chinese is missing.
 ///
-/// Pipeline: ASR the spoken language first, then translate the other side.
+/// Order: official softsubs → shared cloud pack → cloud GPU generation →
+/// local EN→ZH translate only when English is already present.
 /// Tapping a missing-subtitle chip sets [chip] so that side is requested.
 Future<void> enqueueSubtitleCompletionForEpisode({
   required String episodeId,
@@ -290,9 +290,7 @@ Future<void> enqueueSubtitleCompletionForEpisode({
   bool skipSharedLookup = false,
   bool networkFetchOfficial = true,
 }) async {
-  if (!isUsableLocalVideoPath(videoPath)) {
-    return;
-  }
+  final bool hasLocalVideo = isUsableLocalVideoPath(videoPath);
 
   final String? resolvedSource = sourceUrl ?? episode?.sourceUrl;
   final String? sourceKey = bilibiliEpisodeCacheKey(
@@ -340,27 +338,35 @@ Future<void> enqueueSubtitleCompletionForEpisode({
     enPath = null;
   }
 
-  // Shared community cache: after official softsubs, before local Whisper.
+  // Shared community cache: after official softsubs, before cloud / local ASR.
+  // Language-aware: a wrong-language file on disk still counts as missing so
+  // cloud bilingual packs are pulled before Whisper/translate.
   bool usedSharedCache = false;
+  BilibiliSharedSubtitleIds? sharedIds;
   final AcquireApiClient? sharedApi = resolveSharedBilibiliSubtitleApi(
     sharedSubtitleApi,
   );
+  final SubtitleCompletionQueue store = queue ?? SubtitleCompletionQueue.shared;
   if (!force &&
       !skipSharedLookup &&
       sharedApi != null &&
       !sourcePolicy.ignoreAllOfficialSoftsubs) {
-    final bool missingEn = !isUsableSubtitlePath(enPath);
+    final bool missingEn = !(await _subtitleFileHasLanguage(
+      enPath,
+      requireEnglish: true,
+    ));
     final bool missingZh =
-        !sourcePolicy.ignoreOfficialChinese && !isUsableSubtitlePath(zhPath);
+        !sourcePolicy.ignoreOfficialChinese &&
+        !(await _subtitleFileHasLanguage(zhPath, requireEnglish: false));
     if (missingEn || missingZh) {
-      final BilibiliSharedSubtitleIds? ids = resolveBilibiliSharedSubtitleIds(
+      sharedIds = resolveBilibiliSharedSubtitleIds(
         sourceKey: sourceKey,
         sourceUrl: sourceUrl ?? episode?.sourceUrl,
         course: course,
         episode: episode,
         videoAsset: videoPath,
       );
-      if (ids != null) {
+      if (sharedIds != null) {
         SubtitleCompletionStatusHub.instance.reportProgress(
           episodeId,
           kSubtitleSharedCacheLookupLabel,
@@ -371,7 +377,7 @@ Future<void> enqueueSubtitleCompletionForEpisode({
         final ({String? enPath, String? zhPath})? shared =
             await tryApplySharedBilibiliSubtitles(
               api: sharedApi,
-              ids: ids,
+              ids: sharedIds,
               documentsDirectory: documentsDirectory,
             );
         if (shared != null) {
@@ -419,6 +425,8 @@ Future<void> enqueueSubtitleCompletionForEpisode({
         needEnglish: false,
         needChinese: false,
       );
+      // Drop stuck ASR/translate jobs for this episode — cloud already has both.
+      await store.markDone(episodeId);
     }
     return;
   }
@@ -458,14 +466,64 @@ Future<void> enqueueSubtitleCompletionForEpisode({
     return;
   }
 
-  final SubtitleCompletionQueue store = queue ?? SubtitleCompletionQueue.shared;
+  // Still missing after official + shared → push ECS GPU generation (Bilibili).
+  // On-device Whisper is not packaged; English ASR is cloud-only.
+  bool cloudQueued = false;
+  final bool needCloudAsr =
+      plan.needEnglish && !sourcePolicy.ignoreAllOfficialSoftsubs;
+  if (needCloudAsr && sharedApi != null) {
+    sharedIds ??= resolveBilibiliSharedSubtitleIds(
+      sourceKey: sourceKey,
+      sourceUrl: sourceUrl ?? episode?.sourceUrl,
+      course: course,
+      episode: episode,
+      videoAsset: videoPath,
+    );
+    if (sharedIds != null) {
+      cloudQueued = await tryRequestCloudSubtitleGeneration(
+        api: sharedApi,
+        ids: sharedIds,
+      );
+      if (cloudQueued) {
+        SubtitleCompletionStatusHub.instance.reportProgress(
+          episodeId,
+          kSubtitleCloudGenerationQueuedLabel,
+          status: SubtitleCompletionStatus.running,
+          needEnglish: plan.needEnglish,
+          needChinese: plan.needChinese,
+        );
+        SubtitleCompletionStatusHub.instance.notifyChanged();
+      }
+    }
+  }
+
+  // English still missing → wait for cloud pack; do not queue on-device ASR.
+  if (plan.needEnglish) {
+    if (!cloudQueued && needCloudAsr) {
+      SubtitleCompletionStatusHub.instance.reportProgress(
+        episodeId,
+        '云端字幕未就绪，请稍后下拉刷新',
+        status: SubtitleCompletionStatus.failed,
+        needEnglish: plan.needEnglish,
+        needChinese: plan.needChinese,
+      );
+      SubtitleCompletionStatusHub.instance.notifyChanged();
+    }
+    return;
+  }
+
+  // ZH-only translate needs local video + English already on disk.
+  if (!hasLocalVideo) {
+    return;
+  }
+
   await store.enqueue(
     episodeId: episodeId,
     videoPath: videoPath!.trim(),
     zhPath: zhPath,
     enPath: enPath,
     sourceKey: sourceKey,
-    needEnglish: plan.needEnglish,
+    needEnglish: false,
     needChinese: plan.needChinese,
     asrPrimary: plan.asrPrimary.code,
     force: force || chip != null,

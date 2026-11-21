@@ -10,19 +10,29 @@ AcquireApiClient? resolveSharedBilibiliSubtitleApi([
   AcquireApiClient? override,
 ]) => override ?? _configuredSharedSubtitleApi;
 
-/// Cloud lookup and GPU enqueue run in parallel with the media download.
-Future<void> requestSharedSubtitlesForDownload({
+/// Push one Bilibili page to the ECS GPU subtitle queue.
+///
+/// Returns true when the API accepted (or already had) a durable job.
+Future<bool> requestCloudSubtitleGeneration({
   required String bvid,
-  required int page,
-  int? cid,
+  int page = 1,
+  AcquireApiClient? api,
 }) async {
+  final AcquireApiClient? client = resolveSharedBilibiliSubtitleApi(api);
+  if (client == null) {
+    return false;
+  }
+  final String id = bvid.trim();
+  if (id.isEmpty) {
+    return false;
+  }
   try {
-    await _configuredSharedSubtitleApi?.getSharedBilibiliSubtitle(
-      bvid: bvid,
-      page: page,
-      cid: cid,
+    final SharedSubtitleGpuJob? job = await client.enqueueSharedSubtitleJob(
+      bvid: id,
+      page: page < 1 ? 1 : page,
     );
+    return job != null;
   } catch (_) {
-    // Offline cloud or expired login must not block the video download.
+    return false;
   }
 }

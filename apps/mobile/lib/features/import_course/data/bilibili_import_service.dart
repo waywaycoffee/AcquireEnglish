@@ -9,7 +9,7 @@ import 'package:dio/io.dart';
 import 'package:path_provider/path_provider.dart';
 
 import '../../../constants/env_config.dart';
-import '../../subtitle_completion/shared_subtitle_api.dart';
+import '../../subtitle_completion/shared_bilibili_subtitle_sync.dart';
 import '../domain/bilibili_import.dart';
 import 'bilibili_media_proxy.dart';
 import 'subtitle_source_policy.dart';

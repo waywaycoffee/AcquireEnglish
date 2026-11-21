@@ -17,8 +17,12 @@ import '../player/presentation/subtitle_file_persist.dart';
 import '../player/presentation/subtitle_sentence_merge.dart';
 import '../settings/presentation/settings_provider.dart';
 import '../shared/data/word_lookup_service.dart';
+import '../sync/data/acquire_api_client.dart';
 import 'external_subtitle_fill.dart';
+import 'shared_bilibili_subtitle_sync.dart';
 import 'subtitle_completion_queue.dart';
+import 'subtitle_completion_status_hub.dart';
+import 'subtitle_fill_label.dart';
 
 typedef SubtitleCompletionProgress =
     void Function(String episodeId, String label);
@@ -60,32 +64,18 @@ class SubtitleCompletionWorker {
   final Future<Directory> Function() _appSupportDirectory;
 
   LearningSettingsState _settingsForAsr(LearningSettingsState settings) {
-    // Mobile import fill always uses on-device Whisper: no Bailian key prompts
-    // and no multi‑hundred‑MB cloud uploads that stall the queue for hours.
-    if (Platform.isAndroid || Platform.isIOS) {
-      final TranslationProviderPreset local = asrProviderPresets['本地 Whisper']!;
-      final String model =
-          settings.asrProvider == local.name &&
-              settings.asrModel.trim().isNotEmpty
-          ? settings.asrModel.trim()
-          : (local.model.isEmpty ? 'base.en' : local.model);
-      return settings.copyWith(
-        asrProvider: local.name,
-        asrApiKey: '',
-        asrBaseUrl: local.baseUrl,
-        asrModel: model,
-        useCustomAsrEndpoint: false,
-      );
-    }
-    if (describeAsrConfigurationError(settings) == null) {
+    // On-device Whisper is no longer packaged. Prefer configured cloud ASR
+    // (Bailian/Tencent). Import-time English fill should use shared pack /
+    // ECS GPU enqueue instead of this path.
+    if (!LocalWhisperAsr.isLocalProvider(settings) &&
+        describeAsrConfigurationError(settings) == null) {
       return settings;
     }
-    final TranslationProviderPreset local = asrProviderPresets['本地 Whisper']!;
+    final TranslationProviderPreset bailian = asrProviderPresets['阿里云百炼']!;
     return settings.copyWith(
-      asrProvider: local.name,
-      asrApiKey: '',
-      asrBaseUrl: local.baseUrl,
-      asrModel: local.model.isEmpty ? 'base.en' : local.model,
+      asrProvider: bailian.name,
+      asrBaseUrl: bailian.baseUrl,
+      asrModel: bailian.model.isEmpty ? settings.asrModel : bailian.model,
       useCustomAsrEndpoint: false,
     );
   }
@@ -102,6 +92,18 @@ class SubtitleCompletionWorker {
     }
     final LearningSettingsState asrSettings = _settingsForAsr(settings);
     await queue.markRunning(job.episodeId);
+
+    // Stuck translate/ASR jobs: pull bilingual shared pack before Whisper.
+    final bool sharedDone = await _trySatisfyFromSharedCache(
+      job: job,
+      onProgress: onProgress,
+    );
+    if (sharedDone) {
+      await queue.markDone(job.episodeId);
+      onProgress?.call(job.episodeId, kSubtitleSharedCacheReadyDetailLabel);
+      return true;
+    }
+
     final String asrPrimary = job.asrPrimary.trim().toLowerCase();
     final bool asrZh = asrPrimary.startsWith('zh');
     final bool asrMixed = asrPrimary == 'auto' || asrPrimary == 'mixed';
@@ -195,6 +197,83 @@ class SubtitleCompletionWorker {
     }
     final String text = '$error'.toLowerCase();
     return text.contains('取消') || text.contains('cancel');
+  }
+
+  /// Pull ECS shared bilingual pack before local Whisper/translate.
+  ///
+  /// Returns true when the job's requested sides are fully satisfied on disk.
+  Future<bool> _trySatisfyFromSharedCache({
+    required SubtitleCompletionJob job,
+    SubtitleCompletionProgress? onProgress,
+  }) async {
+    final AcquireApiClient? api = resolveSharedBilibiliSubtitleApi();
+    if (api == null) {
+      return false;
+    }
+    final BilibiliSharedSubtitleIds? ids = resolveBilibiliSharedSubtitleIds(
+      sourceKey: job.sourceKey,
+      videoAsset: job.videoPath,
+    );
+    if (ids == null) {
+      return false;
+    }
+    onProgress?.call(job.episodeId, kSubtitleSharedCacheLookupLabel);
+    final ({String? enPath, String? zhPath})? shared =
+        await tryApplySharedBilibiliSubtitles(api: api, ids: ids);
+    if (shared == null) {
+      // Local still missing → durable ECS GPU generation (not on-device Whisper).
+      if (job.needEnglish) {
+        await tryRequestCloudSubtitleGeneration(api: api, ids: ids);
+      }
+      return false;
+    }
+    final String? enPath = isUsableSubtitlePath(shared.enPath)
+        ? shared.enPath
+        : (isUsableSubtitlePath(job.enPath) ? job.enPath : null);
+    final String? zhPath = isUsableSubtitlePath(shared.zhPath)
+        ? shared.zhPath
+        : (isUsableSubtitlePath(job.zhPath) ? job.zhPath : null);
+    SubtitleCompletionStatusHub.instance.reportSharedApplied(
+      episodeId: job.episodeId,
+      enPath: enPath,
+      zhPath: zhPath,
+    );
+    final SubtitleCompletionJob updated = job.copyWith(
+      enPath: enPath,
+      zhPath: zhPath,
+    );
+    final ({bool needEnglish, bool needChinese})? still =
+        await _remainingNeedAfterJob(updated);
+    final bool needEn = still?.needEnglish ?? job.needEnglish;
+    final bool needZh = still?.needChinese ?? job.needChinese;
+    if (needEn || needZh) {
+      if (needEn) {
+        await tryRequestCloudSubtitleGeneration(api: api, ids: ids);
+      }
+      // Partial shared hit — refresh paths/flags so local only fills the rest
+      // when cloud submit is unavailable (enqueue still runs as fallback).
+      await queue.enqueue(
+        episodeId: job.episodeId,
+        videoPath: job.videoPath,
+        enPath: enPath,
+        zhPath: zhPath,
+        sourceKey: job.sourceKey,
+        needEnglish: needEn,
+        needChinese: needZh,
+        asrPrimary: job.asrPrimary,
+      );
+      return false;
+    }
+    if (onPersisted != null &&
+        isUsableSubtitlePath(enPath) &&
+        isUsableSubtitlePath(zhPath)) {
+      await onPersisted!(
+        episodeId: job.episodeId,
+        englishPath: enPath!,
+        chinesePath: zhPath!,
+      );
+    }
+    return true;
   }
 
   Future<bool> _asrHasAnyChinese(SubtitleCompletionJob job) async {

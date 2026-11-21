@@ -260,6 +260,38 @@ class PersonalImportAsset {
   final String? subtitleZhUrl;
 }
 
+/// Durable ECS GPU subtitle job (`POST /api/shared-subtitles/jobs`).
+class SharedSubtitleGpuJob {
+  const SharedSubtitleGpuJob({
+    required this.id,
+    required this.bvid,
+    required this.page,
+    required this.state,
+    this.attempts = 0,
+    this.error = '',
+  });
+
+  factory SharedSubtitleGpuJob.fromJson(Map<String, dynamic> json) =>
+      SharedSubtitleGpuJob(
+        id: '${json['id'] ?? ''}',
+        bvid: '${json['bvid'] ?? ''}',
+        page: (json['page'] as num?)?.toInt() ?? 1,
+        state: '${json['state'] ?? ''}',
+        attempts: (json['attempts'] as num?)?.toInt() ?? 0,
+        error: '${json['error'] ?? ''}',
+      );
+
+  final String id;
+  final String bvid;
+  final int page;
+  final String state;
+  final int attempts;
+  final String error;
+
+  bool get isTerminalFailure =>
+      state == 'failed' || (error.trim().isNotEmpty && state == 'failed');
+}
+
 class SharedBilibiliSubtitlePack {
   const SharedBilibiliSubtitlePack({
     required this.bvid,
@@ -2357,7 +2389,49 @@ class AcquireApiClient {
     }
   }
 
+  /// Submit / reuse a durable ECS GPU subtitle job for one Bilibili page.
+  ///
+  /// Returns null when offline, unauthenticated, or the identity is invalid.
+  Future<SharedSubtitleGpuJob?> enqueueSharedSubtitleJob({
+    required String bvid,
+    int page = 1,
+  }) async {
+    final String id = bvid.trim();
+    if (id.isEmpty) {
+      return null;
+    }
+    try {
+      final Response<dynamic> response = await _dio.post<Object?>(
+        Endpoints.sharedSubtitlesJobs,
+        data: <String, Object>{'bvid': id, 'page': page < 1 ? 1 : page},
+        options: Options(
+          validateStatus: (int? status) =>
+              status != null && status >= 200 && status < 300,
+        ),
+      );
+      if (response.data is Map<String, dynamic>) {
+        return SharedSubtitleGpuJob.fromJson(
+          response.data as Map<String, dynamic>,
+        );
+      }
+      if (response.data is Map) {
+        return SharedSubtitleGpuJob.fromJson(
+          Map<String, dynamic>.from(response.data as Map),
+        );
+      }
+      return SharedSubtitleGpuJob(id: '', bvid: id, page: page, state: 'queued');
+    } on DioException {
+      // Missing login or offline ECS must not block local fill / import.
+      return null;
+    } catch (_) {
+      return null;
+    }
+  }
+
   /// Returns null on 404 / network miss (shared cache optional).
+  ///
+  /// On miss, best-effort enqueues a cloud GPU generation job so workers can
+  /// fill the shared pack for later downloads.
   Future<SharedBilibiliSubtitlePack?> getSharedBilibiliSubtitle({
     required String bvid,
     int page = 1,
@@ -2381,14 +2455,7 @@ class AcquireApiClient {
         ),
       );
       if (response.statusCode == 404 || response.data == null) {
-        try {
-          await _dio.post<Object?>(
-            'api/shared-subtitles/jobs',
-            data: <String, Object>{'bvid': bvid, 'page': page},
-          );
-        } on DioException {
-          // Missing login or an offline worker must not block manual import.
-        }
+        await enqueueSharedSubtitleJob(bvid: bvid, page: page);
         return null;
       }
       return SharedBilibiliSubtitlePack.fromJson(
@@ -2396,6 +2463,7 @@ class AcquireApiClient {
       );
     } on DioException catch (error) {
       if (error.response?.statusCode == 404) {
+        await enqueueSharedSubtitleJob(bvid: bvid, page: page);
         return null;
       }
       rethrow;
