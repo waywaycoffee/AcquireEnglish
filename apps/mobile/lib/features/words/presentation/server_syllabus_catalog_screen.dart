@@ -179,7 +179,7 @@ class _ServerSyllabusCatalogScreenState
                         child: ListTile(
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(16),
-                            side: const BorderSide(
+                            side: BorderSide(
                               color: AppDesignTokens.borderGray,
                             ),
                           ),

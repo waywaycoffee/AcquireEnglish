@@ -15,7 +15,7 @@ import '../features/authentication/presentation/register/register_screen.dart';
 import '../features/daily_review/presentation/daily_review_screen.dart';
 import '../features/growth/presentation/growth_screen.dart';
 import '../features/guide/presentation/guide_screen.dart';
-import '../features/home/presentation/pad_home_screen.dart';
+import '../features/home/presentation/learning_home_screen.dart';
 import '../features/import_course/presentation/import_course_screen.dart';
 import '../features/library/presentation/library_screen.dart';
 import '../features/phrases/presentation/phrases_screen.dart';
@@ -129,7 +129,7 @@ GoRouter goRouter(Ref ref) => GoRouter(
     GoRoute(
       path: SGRoute.home.route,
       builder: (BuildContext context, GoRouterState state) =>
-          const PadHomeScreen(),
+          const LearningHomeScreen(),
     ).fade(),
     GoRoute(
       path: SGRoute.library.route,

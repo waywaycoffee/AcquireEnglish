@@ -6,6 +6,23 @@ import 'package:hive_ce/hive.dart';
 import '../../library/presentation/library_catalog_provider.dart';
 import '../../library/presentation/library_mock_data.dart';
 
+final currentLearningKindProvider =
+    NotifierProvider<CurrentLearningKind, String>(CurrentLearningKind.new);
+
+class CurrentLearningKind extends Notifier<String> {
+  @override
+  String build() => Hive.isBoxOpen('prefs')
+      ? Hive.box<String>(
+          'prefs',
+        ).get('current_learning_kind', defaultValue: 'video')!
+      : 'video';
+  void record(String kind) {
+    state = kind;
+    if (Hive.isBoxOpen('prefs'))
+      unawaited(Hive.box<String>('prefs').put('current_learning_kind', kind));
+  }
+}
+
 const String _lastLearningEpisodeKey = 'last_learning_episode_v1';
 
 final NotifierProvider<LastLearningEpisodeNotifier, String?>
@@ -21,7 +38,13 @@ class LastLearningEpisodeNotifier extends Notifier<String?> {
       : null;
 
   void record(String episodeId) {
-    if (episodeId.trim().isEmpty || state == episodeId) return;
+    if (episodeId.trim().isEmpty) return;
+    ref.read(currentLearningKindProvider.notifier).record('video');
+    if (Hive.isBoxOpen('prefs'))
+      unawaited(
+        Hive.box<String>('prefs').put('current_learning_kind', 'video'),
+      );
+    if (state == episodeId) return;
     state = episodeId;
     if (Hive.isBoxOpen('prefs')) {
       unawaited(

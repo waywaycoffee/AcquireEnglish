@@ -1,3 +1,4 @@
+import '../../player/presentation/learning_resume_provider.dart';
 import 'dart:convert';
 
 import 'package:flutter/services.dart';
@@ -8,6 +9,7 @@ import '../../authentication/presentation/account_storage.dart';
 import '../domain/syllabus_book.dart';
 
 const String kSyllabusStateKey = 'syllabus_books_v1';
+
 /// First-party books live on the API (`/api/syllabus/*`) and are stored locally
 /// only after the user downloads them. Keep this empty to avoid shipping large
 /// JSON inside the APK; notice/source markdown may remain under assets/syllabus.
@@ -93,7 +95,11 @@ class SyllabusBooksNotifier extends Notifier<SyllabusBooksState> {
       }
     }
     if (!ref.mounted) return;
-    final ({List<SyllabusBook> imported, String active, Map<String, Set<String>> learned})
+    final ({
+      List<SyllabusBook> imported,
+      String active,
+      Map<String, Set<String>> learned,
+    })
     persisted = _loadPersisted();
     final List<SyllabusBook> available = <SyllabusBook>[
       ...builtin,
@@ -114,7 +120,11 @@ class SyllabusBooksNotifier extends Notifier<SyllabusBooksState> {
     );
   }
 
-  ({List<SyllabusBook> imported, String active, Map<String, Set<String>> learned})
+  ({
+    List<SyllabusBook> imported,
+    String active,
+    Map<String, Set<String>> learned,
+  })
   _loadPersisted() {
     if (!Hive.isBoxOpen('prefs')) {
       return (
@@ -181,7 +191,8 @@ class SyllabusBooksNotifier extends Notifier<SyllabusBooksState> {
       'activeBookId': state.activeBookId,
       'imported': state.imported.map((SyllabusBook b) => b.toJson()).toList(),
       'learnedByBook': <String, List<String>>{
-        for (final MapEntry<String, Set<String>> e in state.learnedByBook.entries)
+        for (final MapEntry<String, Set<String>> e
+            in state.learnedByBook.entries)
           e.key: e.value.toList(growable: false),
       },
     };
@@ -190,6 +201,9 @@ class SyllabusBooksNotifier extends Notifier<SyllabusBooksState> {
 
   Future<void> setActiveBook(String bookId) async {
     if (state.bookById(bookId) == null) return;
+    ref.read(currentLearningKindProvider.notifier).record('book');
+    if (Hive.isBoxOpen('prefs'))
+      await Hive.box<String>('prefs').put('current_learning_kind', 'book');
     state = state.copyWith(activeBookId: bookId);
     await _persist();
   }
@@ -214,7 +228,8 @@ class SyllabusBooksNotifier extends Notifier<SyllabusBooksState> {
   }) async {
     final List<SyllabusWord> words = parseSyllabusImport(
       rawText,
-      allowPhrases: kind == SyllabusBookKind.pattern ||
+      allowPhrases:
+          kind == SyllabusBookKind.pattern ||
           kind == SyllabusBookKind.foundation,
     );
     if (words.isEmpty) return null;
