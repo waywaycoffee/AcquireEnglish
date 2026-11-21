@@ -490,6 +490,14 @@ class _ReadingReaderScreenState extends ConsumerState<ReadingReaderScreen> {
     await showVocabPreviewSheet(context, word: lexeme);
   }
 
+  Future<void> _pauseReadingForLookup() async {
+    // Opening a word/sentence card should not compete with continuous TTS.
+    await _stopContinuous();
+    if (_speakingSentence && mounted) {
+      setState(() => _speakingSentence = false);
+    }
+  }
+
   Future<void> _showLookupCard({
     required ReadingDoc doc,
     required String rawLexeme,
@@ -497,6 +505,8 @@ class _ReadingReaderScreenState extends ConsumerState<ReadingReaderScreen> {
   }) async {
     final String lexeme = rawLexeme.trim();
     if (lexeme.length < 2) return;
+    await _pauseReadingForLookup();
+    if (!mounted) return;
     if (sentence.trim().isNotEmpty) {
       setState(() => _focusedSentence = sentence.trim());
     }
@@ -619,6 +629,8 @@ class _ReadingReaderScreenState extends ConsumerState<ReadingReaderScreen> {
     );
     final String sentence = bounds.text;
     if (sentence.isEmpty) return;
+    await _pauseReadingForLookup();
+    if (!mounted) return;
     setState(() => _focusedSentence = sentence);
 
     String? zh;
