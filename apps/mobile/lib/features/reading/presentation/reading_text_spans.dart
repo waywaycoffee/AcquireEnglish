@@ -1,10 +1,9 @@
-import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 
 import '../../player/presentation/widgets/subtitle_chunk_highlight.dart';
 import '../../words/presentation/word_book_provider.dart' show normalizeWord;
 
-typedef ReadingWordTap = void Function(String word, int start, int end);
+typedef ReadingRangeCallback = void Function(String lexeme, int start, int end);
 
 class ReadingToken {
   const ReadingToken({
@@ -37,6 +36,21 @@ List<ReadingToken> tokenizeReadingText(String text) {
   return out;
 }
 
+/// Sentence span covering [start, end) character offsets in [text].
+({int start, int end, String text}) sentenceBounds(String text, int start, int end) {
+  int left = start.clamp(0, text.length);
+  int right = end.clamp(0, text.length);
+  while (left > 0 && !'.!?。！？'.contains(text[left - 1])) {
+    left--;
+  }
+  while (right < text.length && !'.!?。！？'.contains(text[right])) {
+    right++;
+  }
+  if (right < text.length) right++;
+  final String sentence = text.substring(left, right).trim();
+  return (start: left, end: right, text: sentence);
+}
+
 /// Build rich-text spans with chunk highlight + optional hard-word Chinese.
 List<InlineSpan> buildReadingTextSpans({
   required String text,
@@ -45,10 +59,14 @@ List<InlineSpan> buildReadingTextSpans({
   required double lineHeight,
   required bool dark,
   required bool showChinese,
+  required bool showChunks,
   required Set<String> learnedWords,
   required Map<String, String> hardGlosses,
   required SubtitleChunkHighlighter? chunkHighlighter,
-  required ReadingWordTap onWordTap,
+  required ReadingRangeCallback onWordTap,
+  required ReadingRangeCallback onWordLongPress,
+  required ReadingRangeCallback onChunkDoubleTap,
+  required ReadingRangeCallback onChunkLongPress,
 }) {
   final List<ReadingToken> tokens = tokenizeReadingText(text);
   if (tokens.isEmpty) return const <InlineSpan>[];
@@ -60,10 +78,11 @@ List<InlineSpan> buildReadingTextSpans({
   final String wordLine = <String>[
     for (final int idx in wordTokenIndexes) tokens[idx].raw,
   ].join(' ');
-  final Map<int, SubtitleChunkSpan> chunkHits =
-      chunkHighlighter?.matchLine(wordLine) ?? const <int, SubtitleChunkSpan>{};
+  final Map<int, SubtitleChunkSpan> chunkHits = showChunks
+      ? (chunkHighlighter?.matchLine(wordLine) ??
+            const <int, SubtitleChunkSpan>{})
+      : const <int, SubtitleChunkSpan>{};
 
-  // word-token-index → absolute token index covered by a chunk (from start).
   final Set<int> consumed = <int>{};
   final List<InlineSpan> spans = <InlineSpan>[];
 
@@ -104,21 +123,40 @@ List<InlineSpan> buildReadingTextSpans({
         onDarkVideo: dark,
       );
       spans.add(
-        TextSpan(
-          text: buf.toString(),
-          style: TextStyle(
-            color: fg,
-            fontSize: fontSize,
-            height: lineHeight,
-            fontWeight: FontWeight.w600,
-            backgroundColor: fill,
-          ),
-          recognizer: TapGestureRecognizer()
-            ..onTap = () => onWordTap(
+        WidgetSpan(
+          alignment: PlaceholderAlignment.baseline,
+          baseline: TextBaseline.alphabetic,
+          child: GestureDetector(
+            behavior: HitTestBehavior.translucent,
+            onDoubleTap: () => onChunkDoubleTap(
               chunk.phrase,
               tokens[firstAbs].start,
               tokens[lastAbs].end,
             ),
+            onLongPress: () => onChunkLongPress(
+              chunk.phrase,
+              tokens[firstAbs].start,
+              tokens[lastAbs].end,
+            ),
+            onTap: () => onWordTap(
+              chunk.phrase,
+              tokens[firstAbs].start,
+              tokens[lastAbs].end,
+            ),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 1),
+              color: fill,
+              child: Text(
+                buf.toString(),
+                style: TextStyle(
+                  color: fg,
+                  fontSize: fontSize,
+                  height: lineHeight,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+          ),
         ),
       );
       continue;
@@ -131,59 +169,56 @@ List<InlineSpan> buildReadingTextSpans({
         ? (dark ? const Color(0xFF9AE6B4) : const Color(0xFF146638))
         : textColor;
 
-    if (gloss != null && gloss.isNotEmpty) {
-      spans.add(
-        WidgetSpan(
-          alignment: PlaceholderAlignment.baseline,
-          baseline: TextBaseline.alphabetic,
-          child: GestureDetector(
-            onTap: () => onWordTap(token.raw, token.start, token.end),
-            child: Padding(
-              padding: const EdgeInsets.only(right: 2),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: <Widget>[
-                  Text(
+    spans.add(
+      WidgetSpan(
+        alignment: PlaceholderAlignment.baseline,
+        baseline: TextBaseline.alphabetic,
+        child: GestureDetector(
+          behavior: HitTestBehavior.translucent,
+          onTap: () => onWordTap(token.raw, token.start, token.end),
+          onLongPress: () =>
+              onWordLongPress(token.raw, token.start, token.end),
+          child: Padding(
+            padding: const EdgeInsets.only(right: 1),
+            child: gloss != null && gloss.isNotEmpty
+                ? Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: <Widget>[
+                      Text(
+                        token.raw,
+                        style: TextStyle(
+                          color: wordColor,
+                          fontSize: fontSize,
+                          height: 1.15,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                      Text(
+                        gloss,
+                        style: TextStyle(
+                          color: dark
+                              ? const Color(0xFFB0B0B8)
+                              : const Color(0xFF6B6B76),
+                          fontSize: fontSize * 0.52,
+                          height: 1.05,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ],
+                  )
+                : Text(
                     token.raw,
                     style: TextStyle(
                       color: wordColor,
                       fontSize: fontSize,
-                      height: 1.15,
+                      height: lineHeight,
                       fontWeight: FontWeight.w500,
                     ),
                   ),
-                  Text(
-                    gloss,
-                    style: TextStyle(
-                      color: dark
-                          ? const Color(0xFFB0B0B8)
-                          : const Color(0xFF6B6B76),
-                      fontSize: fontSize * 0.52,
-                      height: 1.05,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                ],
-              ),
-            ),
           ),
         ),
-      );
-    } else {
-      spans.add(
-        TextSpan(
-          text: token.raw,
-          style: TextStyle(
-            color: wordColor,
-            fontSize: fontSize,
-            height: lineHeight,
-            fontWeight: FontWeight.w500,
-          ),
-          recognizer: TapGestureRecognizer()
-            ..onTap = () => onWordTap(token.raw, token.start, token.end),
-        ),
-      );
-    }
+      ),
+    );
   }
   return spans;
 }

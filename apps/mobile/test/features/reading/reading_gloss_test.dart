@@ -1,4 +1,6 @@
 import 'package:common_learn_english/features/reading/data/reading_gloss.dart';
+import 'package:common_learn_english/features/reading/data/reading_ingest.dart';
+import 'package:common_learn_english/features/reading/domain/reading_study_mode.dart';
 import 'package:common_learn_english/features/reading/presentation/reading_text_spans.dart';
 import 'package:common_learn_english/features/player/presentation/widgets/subtitle_chunk_highlight.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -15,13 +17,60 @@ void main() {
   });
 
   group('ReadingFrequencyLexicon', () {
-    test('marks words outside the top set as hard', () {
+    test('marks words outside the threshold as hard', () {
       final ReadingFrequencyLexicon lexicon = ReadingFrequencyLexicon(
-        const <String>{'the', 'is', 'and', 'you'},
+        const <String, int>{'the': 1, 'is': 2, 'and': 3, 'you': 4},
       );
-      expect(lexicon.isHard('the'), isFalse);
-      expect(lexicon.isHard('serendipity'), isTrue);
-      expect(lexicon.isCommon('IS'), isTrue);
+      expect(lexicon.isHard('the', threshold: 3), isFalse);
+      expect(lexicon.isHard('you', threshold: 3), isTrue);
+      expect(lexicon.isHard('serendipity', threshold: 3), isTrue);
+      expect(lexicon.rankOf('IS'), 2);
+    });
+  });
+
+  group('unknownWordRate', () {
+    test('computes share above threshold', () {
+      final ReadingFrequencyLexicon lexicon = ReadingFrequencyLexicon(
+        const <String, int>{'the': 1, 'cat': 100, 'serendipity': 9000},
+      );
+      final double rate = unknownWordRate(
+        words: const <String>['the', 'cat', 'serendipity'],
+        lexicon: lexicon,
+        threshold: 3000,
+      );
+      expect(rate, closeTo(1 / 3, 0.001));
+    });
+  });
+
+  group('ReadingStudyMode', () {
+    test('defaults to immersion', () {
+      expect(
+        ReadingStudyModeX.fromStorage(null),
+        ReadingStudyMode.immersion,
+      );
+      expect(ReadingStudyMode.immersion.showInlineChinese, isFalse);
+      expect(ReadingStudyMode.intensive.showInlineChinese, isTrue);
+    });
+  });
+
+  group('sentenceBounds', () {
+    test('expands to surrounding clause', () {
+      const String text = 'Hello there. This is a test sentence! Next.';
+      final ({int start, int end, String text}) b =
+          sentenceBounds(text, 14, 16); // "is"
+      expect(b.text, 'This is a test sentence!');
+    });
+  });
+
+  group('stripMarkdownLight', () {
+    test('strips headings and links', () {
+      const String md = '# Title\n\nHello **world** and [link](https://x.test).';
+      final String plain = stripMarkdownLight(md);
+      expect(plain, contains('Title'));
+      expect(plain, contains('Hello world'));
+      expect(plain, contains('link'));
+      expect(plain, isNot(contains('https://')));
+      expect(plain, isNot(contains('##')));
     });
   });
 

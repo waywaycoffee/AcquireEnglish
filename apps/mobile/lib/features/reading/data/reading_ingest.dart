@@ -113,6 +113,34 @@ String parseTxtImport(Uint8List bytes, {String? filename}) {
   String text = utf8.decode(bytes, allowMalformed: true);
   // Strip UTF-8 BOM.
   if (text.startsWith('\uFEFF')) text = text.substring(1);
+  final String name = (filename ?? '').toLowerCase();
+  if (name.endsWith('.md') || name.endsWith('.markdown')) {
+    text = stripMarkdownLight(text);
+  }
+  return text.trim();
+}
+
+/// Lightweight Markdown → plain text for reading import (not a full parser).
+String stripMarkdownLight(String raw) {
+  String text = raw;
+  text = text.replaceAll(RegExp(r'```[\s\S]*?```'), ' ');
+  text = text.replaceAllMapped(RegExp(r'`([^`]+)`'), (Match m) => m.group(1)!);
+  text = text.replaceAllMapped(
+    RegExp(r'!\[([^\]]*)\]\([^)]+\)'),
+    (Match m) => m.group(1) ?? '',
+  );
+  text = text.replaceAllMapped(
+    RegExp(r'\[([^\]]+)\]\([^)]+\)'),
+    (Match m) => m.group(1) ?? '',
+  );
+  text = text.replaceAll(RegExp(r'^#{1,6}\s*', multiLine: true), '');
+  text = text.replaceAll(RegExp(r'^\s*[-*+]\s+', multiLine: true), '');
+  text = text.replaceAll(RegExp(r'^\s*\d+\.\s+', multiLine: true), '');
+  text = text.replaceAllMapped(
+    RegExp(r'[*_]{1,3}([^*_]+)[*_]{1,3}'),
+    (Match m) => m.group(1) ?? '',
+  );
+  text = text.replaceAll(RegExp(r'\s+\n'), '\n');
   return text.trim();
 }
 
@@ -189,7 +217,7 @@ String titleFromFilename(String name) {
   final int cut = slash > backslash ? slash : backslash;
   if (cut >= 0) base = base.substring(cut + 1);
   base = base.replaceAll(
-    RegExp(r'\.(txt|epub|md|html?)$', caseSensitive: false),
+    RegExp(r'\.(txt|epub|md|markdown|html?)$', caseSensitive: false),
     '',
   );
   return base.isEmpty ? '导入读物' : base;

@@ -26,7 +26,7 @@ class ReadingHubScreen extends ConsumerWidget {
       acceptedTypeGroups: const <XTypeGroup>[
         XTypeGroup(
           label: 'reading',
-          extensions: <String>['txt', 'epub'],
+          extensions: <String>['txt', 'epub', 'md', 'markdown'],
         ),
       ],
       confirmButtonText: '导入读物',

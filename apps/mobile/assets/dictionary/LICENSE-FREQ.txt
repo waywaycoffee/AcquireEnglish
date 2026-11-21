@@ -1,6 +1,6 @@
-english_freq_top3000.txt is derived from Hermit Dave's FrequencyWords
-(en_50k, 2018), MIT License:
+english_freq_top3000.txt and english_freq_top20000.txt are derived from
+Hermit Dave's FrequencyWords (en_50k, 2018), MIT License:
 https://github.com/hermitdave/FrequencyWords
 
-Only the first 3000 alphabetic word forms are retained for offline
-“rank > 3000 → show Chinese gloss” gating in Acquire Reading.
+Alphabetic / apostrophe word forms only. Used offline for reading difficulty
+bands (3k / 5k / 8k / 12k / 20k) and hard-word Chinese gloss gating.
