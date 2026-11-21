@@ -783,17 +783,6 @@ class _ReadingReaderScreenState extends ConsumerState<ReadingReaderScreen> {
             ),
           ),
           IconButton(
-            tooltip: _slowMode ? '关闭慢读' : '慢读模式',
-            onPressed: () {
-              setState(() => _slowMode = !_slowMode);
-              unawaited(_persistPrefs());
-            },
-            icon: Icon(
-              Icons.slow_motion_video_rounded,
-              color: _slowMode ? AppDesignTokens.brandGreenDark : null,
-            ),
-          ),
-          IconButton(
             tooltip: _mode == ReadingStudyMode.immersion ? '切换精读' : '切换沉浸',
             onPressed: () {
               setState(() {
@@ -812,52 +801,76 @@ class _ReadingReaderScreenState extends ConsumerState<ReadingReaderScreen> {
                   : null,
             ),
           ),
-          IconButton(
-            tooltip: '词频阈值',
-            onPressed: _openFreqSheet,
-            icon: const Icon(Icons.tune_rounded),
-          ),
-          if (_hardGlosses.isNotEmpty)
-            IconButton(
-              tooltip: '难词进词书',
-              onPressed: () => _addHardWordsToBook(doc),
-              icon: const Icon(Icons.playlist_add_rounded),
-            ),
-          if (remoteMedia?.hasAudio ?? false)
-            IconButton(
-              tooltip: '播放服务器朗读',
-              onPressed: _playingRemote
-                  ? null
-                  : () => unawaited(_playRemoteAudio(remoteMedia!)),
-              icon: Icon(
-                _playingRemote
-                    ? Icons.hourglass_top_rounded
-                    : Icons.volume_up_rounded,
-              ),
-            ),
-          if (doc.sourceType == ReadingSourceType.video &&
-              (doc.episodeId ?? '').isNotEmpty)
-            TextButton(
-              onPressed: () => context.push(
-                '/episodes/${Uri.encodeComponent(doc.episodeId!)}',
-              ),
-              child: const Text('打开原集'),
-            ),
-          IconButton(
-            tooltip: '字号',
-            onPressed: () {
-              setState(() {
-                _fontSize = _fontSize >= 24 ? 18 : _fontSize + 2;
-              });
+          PopupMenuButton<String>(
+            tooltip: '更多',
+            onSelected: (String value) {
+              switch (value) {
+                case 'slow':
+                  setState(() => _slowMode = !_slowMode);
+                  unawaited(_persistPrefs());
+                case 'freq':
+                  _openFreqSheet();
+                case 'hard':
+                  _addHardWordsToBook(doc);
+                case 'remote':
+                  if (remoteMedia != null) {
+                    unawaited(_playRemoteAudio(remoteMedia));
+                  }
+                case 'lists':
+                  unawaited(showReadingVocabListsSheet(context, ref));
+                case 'font':
+                  setState(() {
+                    _fontSize = _fontSize >= 24 ? 18 : _fontSize + 2;
+                  });
+                case 'theme':
+                  setState(() => _dark = !_dark);
+                case 'episode':
+                  if ((doc.episodeId ?? '').isNotEmpty) {
+                    context.push(
+                      '/episodes/${Uri.encodeComponent(doc.episodeId!)}',
+                    );
+                  }
+              }
             },
-            icon: const Icon(Icons.format_size_rounded),
-          ),
-          IconButton(
-            tooltip: _dark ? '浅色' : '深色',
-            onPressed: () => setState(() => _dark = !_dark),
-            icon: Icon(
-              _dark ? Icons.light_mode_outlined : Icons.dark_mode_outlined,
-            ),
+            itemBuilder: (BuildContext context) => <PopupMenuEntry<String>>[
+              PopupMenuItem<String>(
+                value: 'slow',
+                child: Text(_slowMode ? '关闭慢读' : '慢读模式'),
+              ),
+              const PopupMenuItem<String>(
+                value: 'freq',
+                child: Text('词频阈值 / 名单'),
+              ),
+              const PopupMenuItem<String>(
+                value: 'lists',
+                child: Text('黑白名单'),
+              ),
+              if (_hardGlosses.isNotEmpty)
+                const PopupMenuItem<String>(
+                  value: 'hard',
+                  child: Text('难词进词书'),
+                ),
+              if (remoteMedia?.hasAudio ?? false)
+                PopupMenuItem<String>(
+                  value: 'remote',
+                  enabled: !_playingRemote,
+                  child: Text(_playingRemote ? '朗读中…' : '服务器朗读'),
+                ),
+              const PopupMenuItem<String>(
+                value: 'font',
+                child: Text('字号'),
+              ),
+              PopupMenuItem<String>(
+                value: 'theme',
+                child: Text(_dark ? '浅色' : '深色'),
+              ),
+              if (doc.sourceType == ReadingSourceType.video &&
+                  (doc.episodeId ?? '').isNotEmpty)
+                const PopupMenuItem<String>(
+                  value: 'episode',
+                  child: Text('打开原集'),
+                ),
+            ],
           ),
         ],
       ),

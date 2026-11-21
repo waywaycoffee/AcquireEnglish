@@ -174,25 +174,25 @@ class ReadingHubScreen extends ConsumerWidget {
         description: '泛读短文 · i+1 推荐 · 黑白名单',
         leading: PadBackButton(onPressed: () => context.pop()),
         actions: <Widget>[
-          TextButton.icon(
-            onPressed: () => unawaited(showReadingVocabListsSheet(context, ref)),
-            icon: const Icon(Icons.playlist_add_check_rounded),
-            label: Text('词表 ${lists.knownCount + lists.focusCount}'),
+          IconButton(
+            tooltip: '黑白名单',
+            onPressed: () =>
+                unawaited(showReadingVocabListsSheet(context, ref)),
+            icon: Badge(
+              isLabelVisible: lists.knownCount + lists.focusCount > 0,
+              label: Text('${lists.knownCount + lists.focusCount}'),
+              child: const Icon(Icons.playlist_add_check_rounded),
+            ),
           ),
-          TextButton.icon(
+          IconButton(
+            tooltip: '在线书库',
             onPressed: () => context.push('/reading/catalog'),
             icon: const Icon(Icons.cloud_download_outlined),
-            label: const Text('书库'),
           ),
-          TextButton.icon(
+          IconButton(
+            tooltip: '导入',
             onPressed: () => unawaited(_importFile(context, ref)),
             icon: const Icon(Icons.upload_file_rounded),
-            label: const Text('导入'),
-          ),
-          TextButton.icon(
-            onPressed: () => unawaited(_generateFromVideo(context, ref)),
-            icon: const Icon(Icons.movie_filter_outlined),
-            label: const Text('从视频'),
           ),
         ],
       ),
