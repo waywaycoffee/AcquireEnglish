@@ -946,12 +946,33 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
                                         ),
                                       );
                                     },
-                                    trailing: ReorderableDragStartListener(
-                                      index: index,
-                                      child: Icon(
-                                        Icons.drag_indicator_rounded,
-                                        color: AppDesignTokens.textSecondary,
-                                      ),
+                                    trailing: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: <Widget>[
+                                        if (_pendingCollectionEpisodes(
+                                              selectedCourse,
+                                            ) >
+                                            0)
+                                          IconButton(
+                                            tooltip: '下载合集全部未下视频',
+                                            onPressed: () => unawaited(
+                                              _confirmCollectionDownload(
+                                                selectedCourse,
+                                              ),
+                                            ),
+                                            icon: const Icon(
+                                              Icons.download_rounded,
+                                            ),
+                                          ),
+                                        ReorderableDragStartListener(
+                                          index: index,
+                                          child: Icon(
+                                            Icons.drag_indicator_rounded,
+                                            color:
+                                                AppDesignTokens.textSecondary,
+                                          ),
+                                        ),
+                                      ],
                                     ),
                                   );
                                     },
@@ -1043,6 +1064,22 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
                                           ),
                                         );
                                       },
+                                      trailing: _pendingCollectionEpisodes(
+                                                selectedCourse,
+                                              ) >
+                                              0
+                                          ? IconButton(
+                                              tooltip: '下载合集全部未下视频',
+                                              onPressed: () => unawaited(
+                                                _confirmCollectionDownload(
+                                                  selectedCourse,
+                                                ),
+                                              ),
+                                              icon: const Icon(
+                                                Icons.download_rounded,
+                                              ),
+                                            )
+                                          : null,
                                     );
                                   },
                                 ),
@@ -1623,16 +1660,16 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
     final bool? confirmed = await showDialog<bool>(
       context: context,
       builder: (BuildContext dialogContext) => AlertDialog(
-        title: const Text('下载合集剩余各集？'),
-        content: Text('还有 $count 集未下载。继续后会在后台下载到本地。'),
+        title: const Text('下载合集全部未下视频？'),
+        content: Text('还有 $count 集未下载到本地。确认后会在后台拉取整部合集。'),
         actions: <Widget>[
           TextButton(
             onPressed: () => Navigator.of(dialogContext).pop(false),
-            child: const Text('继续试看'),
+            child: const Text('取消'),
           ),
           FilledButton(
             onPressed: () => Navigator.of(dialogContext).pop(true),
-            child: const Text('全部下载'),
+            child: const Text('下载全部'),
           ),
         ],
       ),

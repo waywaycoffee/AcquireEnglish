@@ -234,10 +234,10 @@ String bilibiliImportSuccessHint(BilibiliImportResult meta) {
         ? '第 ${meta.seasonEpisodes[currentIndex].index} 集'
         : '当前集';
     collectionHint =
-        '合集共 ${meta.seasonEpisodes.length} 集，已下载$currentLabel；导入后会自动后台下载其余集。';
+        '合集共 ${meta.seasonEpisodes.length} 集，已下载$currentLabel；其余集请在课程页点下载按钮拉取。';
   } else if (meta.pages.length > 1) {
     collectionHint =
-        '共 ${meta.pages.length} 个分 P，已下载 P${meta.page}；导入后会自动后台下载其余分 P。';
+        '共 ${meta.pages.length} 个分 P，已下载 P${meta.page}；其余分 P 请在课程页点下载按钮拉取。';
   } else {
     collectionHint = '';
   }

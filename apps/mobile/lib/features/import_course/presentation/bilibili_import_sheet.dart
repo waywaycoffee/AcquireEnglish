@@ -13,7 +13,6 @@ import '../../subtitle_completion/subtitle_completion_enqueue.dart';
 import '../../subtitle_completion/subtitle_completion_scheduler.dart';
 import '../../sync/data/acquire_api_client.dart';
 import '../../sync/data/personal_import_sync.dart';
-import '../data/bilibili_collection_download.dart';
 import '../data/bilibili_course_builder.dart';
 import '../data/bilibili_import_service.dart';
 import '../domain/bilibili_import.dart';
@@ -164,38 +163,14 @@ class _BilibiliImportFormState extends ConsumerState<_BilibiliImportForm> {
           ),
         );
       }
-      // 合集/多 P：导入成功后立刻后台下剩余集，避免永远停在「一集试看」。
-      final int pendingOthers = course.episodes
-          .where(
-            (LibraryEpisodeItem e) =>
-                e.videoMissing ||
-                (e.videoAsset ?? '').startsWith('http'),
-          )
-          .length;
-      if (pendingOthers > 0) {
-        final String cookie = ref
-            .read(learningSettingsProvider)
-            .resolvedBilibiliCookieHeader;
-        final ProviderContainer container = ProviderScope.containerOf(context);
-        unawaited(
-          downloadRemainingBilibiliEpisodes(
-            catalog: container.read(libraryCatalogProvider.notifier),
-            readCourses: () => container.read(libraryCatalogProvider),
-            courseId: course.id,
-            service: BilibiliImportService.withCookie(cookie),
-            progressNotifier: container.read(
-              bilibiliCollectionDownloadProgressProvider.notifier,
-            ),
-          ),
-        );
-      }
+      // 试看/点推荐：只下载当前这一集。整部合集请点视频列表旁的下载按钮。
       final String hint = bilibiliImportSuccessHint(meta);
       final ScaffoldMessengerState messenger = ScaffoldMessenger.of(context);
       final String success;
       if (course.episodes.length > 1) {
         success = alreadyInLibrary
-            ? '已补下本集；其余未下载的集正在后台继续拉取。'
-            : '已导入合集共 ${course.episodes.length} 集，正在后台下载剩余视频与字幕。';
+            ? '已补下本集。其余集请在课程页点下载按钮一次拉取。'
+            : '已导入合集目录（共 ${course.episodes.length} 集），本集已下载；其余集请点列表旁下载。';
       } else {
         success = '已加入书库。$hint 缺失字幕会在课程页后台自动补全。';
       }

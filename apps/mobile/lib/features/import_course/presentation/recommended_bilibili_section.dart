@@ -5,10 +5,15 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../utils/url_utils.dart';
 import '../../authentication/presentation/auth_session.dart';
+import '../../library/presentation/library_catalog_provider.dart';
+import '../../library/presentation/library_mock_data.dart';
+import '../../settings/presentation/settings_provider.dart';
 import '../../shared/presentation/media/cover_image.dart';
 import '../../shared/presentation/pad/app_design_tokens.dart';
 import '../../sync/data/acquire_api_client.dart';
 import '../../sync/presentation/daily_feed_provider.dart';
+import '../data/bilibili_collection_download.dart';
+import '../data/bilibili_import_service.dart';
 import '../data/bilibili_open_or_import.dart';
 import 'recommended_bilibili_provider.dart';
 
@@ -56,8 +61,8 @@ class RecommendedBilibiliSection extends ConsumerWidget {
             ),
             const SizedBox(height: 4),
             Text(
-              '头像进空间；点视频即可导入学习。推荐片中英字幕已在云端缓存，导入后优先直用。'
-              '关注仅保存在本 App，不会同步到 B 站。',
+              '点封面/标题：试看并只下当前一集；点右侧下载：拉取合集全部视频。'
+              '推荐片中英字幕已在云端缓存。关注仅保存在本 App，不会同步到 B 站。',
               style: TextStyle(
                 fontSize: 12,
                 fontWeight: FontWeight.w600,
@@ -108,6 +113,92 @@ class _CreatorCardState extends ConsumerState<_CreatorCard> {
         );
     ref.invalidate(followedCreatorsListProvider);
     await ref.read(dailyFeedProvider.notifier).refresh(force: true);
+  }
+
+  Future<void> _openOneEpisode(String watchUrl) async {
+    await openBilibiliLearningOrImport(
+      context,
+      ref,
+      watchUrl: watchUrl,
+      startImportImmediately: true,
+    );
+  }
+
+  Future<void> _downloadFullCollection(String watchUrl) async {
+    if (_busy) {
+      return;
+    }
+    setState(() => _busy = true);
+    try {
+      // Ensure the course exists with at least the tapped episode downloaded.
+      final String? episodeId = await openBilibiliLearningOrImport(
+        context,
+        ref,
+        watchUrl: watchUrl,
+        startImportImmediately: true,
+        pushPlayer: false,
+      );
+      if (!mounted) {
+        return;
+      }
+      final List<LibraryCourseData> courses = ref.read(libraryCatalogProvider);
+      LibraryCourseData? course;
+      if (episodeId != null && episodeId.isNotEmpty) {
+        for (final LibraryCourseData c in courses) {
+          if (c.episodes.any((LibraryEpisodeItem e) => e.id == episodeId)) {
+            course = c;
+            break;
+          }
+        }
+      }
+      course ??= findLibraryEpisodeForBilibiliInput(courses, watchUrl)?.course;
+      if (course == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('请先导入本集，再下载整部合集')),
+        );
+        return;
+      }
+      final int pending = course.episodes
+          .where(
+            (LibraryEpisodeItem e) =>
+                e.videoMissing ||
+                (e.videoAsset ?? '').startsWith('http'),
+          )
+          .length;
+      if (pending <= 0) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('合集视频已全部在本地')),
+        );
+        return;
+      }
+      if (isBilibiliCollectionDownloadInFlight(course.id)) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('合集正在下载中…')),
+        );
+        return;
+      }
+      final String cookie =
+          ref.read(learningSettingsProvider).resolvedBilibiliCookieHeader;
+      final ProviderContainer container = ProviderScope.containerOf(context);
+      unawaited(
+        downloadRemainingBilibiliEpisodes(
+          catalog: container.read(libraryCatalogProvider.notifier),
+          readCourses: () => container.read(libraryCatalogProvider),
+          courseId: course.id,
+          service: BilibiliImportService.withCookie(cookie),
+          progressNotifier: container.read(
+            bilibiliCollectionDownloadProgressProvider.notifier,
+          ),
+        ),
+      );
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('开始下载合集剩余 $pending 集…')),
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _busy = false);
+      }
+    }
   }
 
   Future<void> _toggleFollow(bool currentlyFollowed) async {
@@ -252,79 +343,90 @@ class _CreatorCardState extends ConsumerState<_CreatorCard> {
             ),
             if (video != null) ...<Widget>[
               const SizedBox(height: 10),
-              InkWell(
-                borderRadius: BorderRadius.circular(12),
-                onTap: () {
-                  unawaited(
-                    openBilibiliLearningOrImport(
-                      context,
-                      ref,
-                      watchUrl: video.watchUrl,
-                    ),
-                  );
-                },
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: <Widget>[
-                    ClipRRect(
-                      borderRadius: BorderRadius.circular(10),
-                      child: SizedBox(
-                        width: 96,
-                        height: 64,
-                        child: video.coverUrl == null || video.coverUrl!.isEmpty
-                            ? const ColoredBox(
-                                color: Color(0xFFFFE4EC),
-                                child: Icon(
-                                  Icons.play_arrow_rounded,
-                                  color: Color(0xFFFB7299),
-                                ),
-                              )
-                            : CoverImage(
-                                path: video.coverUrl!,
-                                fit: BoxFit.cover,
-                                errorBuilder: (_, __, ___) => const ColoredBox(
-                                  color: Color(0xFFFFE4EC),
-                                  child: Icon(
-                                    Icons.play_arrow_rounded,
-                                    color: Color(0xFFFB7299),
-                                  ),
-                                ),
-                              ),
-                      ),
-                    ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: Column(
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: <Widget>[
+                  Expanded(
+                    child: InkWell(
+                      borderRadius: BorderRadius.circular(12),
+                      onTap: _busy
+                          ? null
+                          : () => unawaited(_openOneEpisode(video.watchUrl)),
+                      child: Row(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: <Widget>[
-                          Text(
-                            video.title,
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
-                              fontWeight: FontWeight.w800,
-                              fontSize: 13,
+                          ClipRRect(
+                            borderRadius: BorderRadius.circular(10),
+                            child: SizedBox(
+                              width: 96,
+                              height: 64,
+                              child: video.coverUrl == null ||
+                                      video.coverUrl!.isEmpty
+                                  ? const ColoredBox(
+                                      color: Color(0xFFFFE4EC),
+                                      child: Icon(
+                                        Icons.play_arrow_rounded,
+                                        color: Color(0xFFFB7299),
+                                      ),
+                                    )
+                                  : CoverImage(
+                                      path: video.coverUrl!,
+                                      fit: BoxFit.cover,
+                                      errorBuilder: (_, __, ___) =>
+                                          const ColoredBox(
+                                        color: Color(0xFFFFE4EC),
+                                        child: Icon(
+                                          Icons.play_arrow_rounded,
+                                          color: Color(0xFFFB7299),
+                                        ),
+                                      ),
+                                    ),
                             ),
                           ),
-                          const SizedBox(height: 4),
-                          Text(
-                            video.hasSharedSubs
-                                ? '云端已备中英字幕 · 点此导入'
-                                : '点此导入学习',
-                            style: TextStyle(
-                              fontSize: 11,
-                              fontWeight: FontWeight.w700,
-                              color: video.hasSharedSubs
-                                  ? AppDesignTokens.brandGreen
-                                  : AppDesignTokens.textSecondary,
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: <Widget>[
+                                Text(
+                                  video.title,
+                                  maxLines: 2,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.w800,
+                                    fontSize: 13,
+                                  ),
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  video.hasSharedSubs
+                                      ? '云端已备中英字幕 · 点此试看本集'
+                                      : '点此试看并下载本集',
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w700,
+                                    color: video.hasSharedSubs
+                                        ? AppDesignTokens.brandGreen
+                                        : AppDesignTokens.textSecondary,
+                                  ),
+                                ),
+                              ],
                             ),
                           ),
                         ],
                       ),
                     ),
-                    const Icon(Icons.download_rounded, size: 20),
-                  ],
-                ),
+                  ),
+                  IconButton(
+                    tooltip: '下载合集全部视频',
+                    onPressed: _busy
+                        ? null
+                        : () => unawaited(
+                              _downloadFullCollection(video.watchUrl),
+                            ),
+                    icon: const Icon(Icons.download_rounded),
+                  ),
+                ],
               ),
             ],
           ],
