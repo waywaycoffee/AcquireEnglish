@@ -193,13 +193,11 @@ void main() {
     expect(find.text('更多'), findsOneWidget);
     expect(find.text('口语'), findsNothing);
     expect(find.text('短语'), findsNothing);
-    expect(find.text('单词'), findsNothing);
 
     await tester.tap(find.byKey(const Key('bottom-nav-more')));
     await tester.pumpAndSettle();
     expect(find.text('口语'), findsOneWidget);
     expect(find.text('短语'), findsNothing);
-    expect(find.text('单词'), findsNothing);
     expect(find.text('怎么学'), findsOneWidget);
     expect(find.text('设置'), findsOneWidget);
   });

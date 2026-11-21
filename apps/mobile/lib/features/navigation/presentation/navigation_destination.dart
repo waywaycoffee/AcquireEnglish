@@ -70,7 +70,7 @@ enum AppNavDestination {
   ),
   words(
     route: '/words',
-    label: '单词',
+    label: '单词本',
     title: '单词本',
     subtitle: '查看在视频字幕中见过并收藏的单词。',
     icon: Icons.menu_book_outlined,
