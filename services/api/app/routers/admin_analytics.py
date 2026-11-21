@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import json
 from collections import Counter
 from datetime import datetime, timedelta, timezone
@@ -67,7 +68,8 @@ async def usage_platform(
     _: str = Depends(require_admin_token),
 ) -> dict[str, Any]:
     """Discover .env API keys and pull vendor billing (Aliyun BSS / Tencent / …)."""
-    return collect_platform_usage(month=month)
+    # Sync vendor HTTP — keep off the asyncio event loop so admin user APIs stay responsive.
+    return await asyncio.to_thread(collect_platform_usage, month)
 
 
 @router.get("/analytics/users")
@@ -336,4 +338,5 @@ async def analytics_infra(
     _: str = Depends(require_admin_token),
 ) -> dict[str, Any]:
     """ECS host vitals + Aliyun cloud-disk inventory for the ops monitor tab."""
-    return collect_infra_snapshot()
+    # Sync du/walk + Aliyun HTTP blocked the event loop (~10s+) and froze user detail loading.
+    return await asyncio.to_thread(collect_infra_snapshot)

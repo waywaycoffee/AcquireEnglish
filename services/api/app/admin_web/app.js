@@ -225,16 +225,26 @@
 
   async function bootstrap() {
     setTab(state.tab);
+    // Do not eagerly load infra/usage here: those endpoints do heavy sync I/O / vendor HTTP
+    // and used to block the API event loop, leaving the users pane stuck on 「加载中…」.
     await Promise.all([
       loadDashboard().catch((e) => console.warn(e)),
-      loadInfra().catch((e) => console.warn(e)),
-      loadUsage().catch((e) => console.warn(e)),
-      loadResources().catch((e) => console.warn(e)),
       loadStats(),
       loadUsers(),
       loadSkus(),
     ]);
+    if (state.tab === "resources") {
+      loadResources().catch((e) => console.warn(e));
+    }
     if (state.selectedId) await loadDetail(state.selectedId);
+  }
+
+  function formatBytes(n) {
+    const v = Number(n || 0);
+    if (v < 1024) return `${v} B`;
+    if (v < 1024 * 1024) return `${(v / 1024).toFixed(1)} KB`;
+    if (v < 1024 * 1024 * 1024) return `${(v / (1024 * 1024)).toFixed(1)} MB`;
+    return `${(v / (1024 * 1024 * 1024)).toFixed(2)} GB`;
   }
 
   async function loadInfra() {
@@ -775,19 +785,30 @@
         .map((u) => {
           const active = u.id === state.selectedId ? "active" : "";
           const name = u.display_name || u.email || `用户 ${u.id}`;
+          const assetBits = [
+            `资产 ${u.asset_count ?? 0}`,
+            `导入 ${u.link_courses ?? 0}`,
+            `考试 ${u.exam_assets ?? 0}`,
+            `OCR ${u.ocr_books ?? 0}`,
+            `字幕 ${u.shared_subtitles ?? 0}`,
+          ].join(" · ");
           return `<button class="user-item ${active}" data-id="${u.id}" type="button">
             <div class="title">${escapeHtml(name)}</div>
             <div class="meta">#${u.id} · ${escapeHtml(u.email || "")}${
             u.phone ? " · " + escapeHtml(u.phone) : ""
           }</div>
             <div class="meta">钱包 ${u.wallet_credits ?? "—"} · 积分 ${u.points_balance ?? 0}</div>
+            <div class="meta">${escapeHtml(assetBits)}</div>
+            <div class="meta">服务器占用 ${formatBytes(u.storage_bytes)}</div>
           </button>`;
         })
         .join("");
       list.querySelectorAll(".user-item").forEach((btn) => {
         btn.addEventListener("click", () => {
           state.selectedId = Number(btn.dataset.id);
-          loadUsers();
+          list.querySelectorAll(".user-item").forEach((b) => {
+            b.classList.toggle("active", Number(b.dataset.id) === state.selectedId);
+          });
           loadDetail(state.selectedId);
         });
       });
@@ -799,18 +820,132 @@
     $("nextPage").disabled = state.offset + state.limit >= state.total;
   }
 
+  let detailSeq = 0;
   async function loadDetail(userId) {
+    const seq = ++detailSeq;
     $("emptyDetail").classList.add("hidden");
     const view = $("detailView");
     view.classList.remove("hidden");
     view.innerHTML = `<p class="muted">加载中…</p>`;
     try {
       const data = await api(`/users/${userId}`);
+      if (seq !== detailSeq || state.selectedId !== userId) return;
       view.innerHTML = renderDetail(data);
       wireDetail(data);
     } catch (e) {
+      if (seq !== detailSeq || state.selectedId !== userId) return;
       view.innerHTML = `<p class="error">${escapeHtml(e.message)}</p>`;
     }
+  }
+
+  function renderAssetTables(data) {
+    const assets = data.assets || {};
+    const storage = data.storage || {};
+    const br = storage.breakdown || {};
+    const links = (assets.link_courses || [])
+      .map(
+        (r) => `<tr>
+          <td>${r.id}</td>
+          <td>${escapeHtml(r.source)}</td>
+          <td>${escapeHtml(r.title || r.external_id || "")}</td>
+          <td>${r.has_en_sub ? "EN" : "—"}/${r.has_zh_sub ? "ZH" : "—"}</td>
+          <td>${formatBytes(r.media_bytes)}</td>
+        </tr>`
+      )
+      .join("");
+    const exams = (assets.exam_assets || [])
+      .map(
+        (r) => `<tr>
+          <td>${r.id}</td>
+          <td>${escapeHtml(r.kind)} / ${escapeHtml(r.family_id)}</td>
+          <td>${escapeHtml(r.title)}</td>
+          <td>${escapeHtml(r.status)}</td>
+          <td>${formatBytes(r.size_bytes)}</td>
+        </tr>`
+      )
+      .join("");
+    const ocr = (assets.ocr_books || [])
+      .map(
+        (r) => `<tr>
+          <td>${r.id}</td>
+          <td>${escapeHtml(r.title || "")}</td>
+          <td>${num(r.page_count)} 页 · ${num(r.word_count)} 词</td>
+          <td>${num(r.hit_count)}</td>
+          <td>${formatBytes(r.approx_bytes)}</td>
+        </tr>`
+      )
+      .join("");
+    const subs = (assets.shared_subtitles || [])
+      .map(
+        (r) => `<tr>
+          <td>${r.id}</td>
+          <td>${escapeHtml(r.bvid)} P${r.page}</td>
+          <td>${num(r.cue_count)} 句</td>
+          <td>${num(r.en_hits)} / ${num(r.zh_hits)}</td>
+          <td>${formatBytes(r.approx_bytes)}</td>
+        </tr>`
+      )
+      .join("");
+    const netdisk = (assets.netdisk || [])
+      .map(
+        (r) => `<tr>
+          <td>${r.id}</td>
+          <td>${escapeHtml(r.provider)}</td>
+          <td>${escapeHtml(r.mount_path || "")}</td>
+          <td>${r.storage_id ?? "—"}</td>
+        </tr>`
+      )
+      .join("");
+    return `
+      <section class="section">
+        <h3>服务器容量占用</h3>
+        <div class="chips">
+          <span class="chip">合计 ${formatBytes(storage.storage_bytes)}</span>
+          <span class="chip">考试文件 ${formatBytes(br.exam_bytes)}</span>
+          <span class="chip">导入媒体缓存 ${formatBytes(br.import_media_bytes)}</span>
+          <span class="chip">备份 JSON ${formatBytes(br.backup_bytes)}</span>
+          <span class="chip">OCR 文本 ${formatBytes(br.ocr_db_bytes)}</span>
+          <span class="chip">字幕文本 ${formatBytes(br.subtitle_db_bytes)}</span>
+        </div>
+        <p class="muted" style="margin-top:8px">媒体目录：${escapeHtml(
+          storage.media_cache_dir || "—"
+        )}</p>
+      </section>
+      <section class="section">
+        <h3>导入课程 / 网盘课（${(assets.link_courses || []).length}）</h3>
+        <div class="table-wrap"><table>
+          <thead><tr><th>ID</th><th>来源</th><th>标题</th><th>字幕</th><th>缓存</th></tr></thead>
+          <tbody>${links || `<tr><td colspan="5" class="muted">暂无</td></tr>`}</tbody>
+        </table></div>
+      </section>
+      <section class="section">
+        <h3>考试资料（${(assets.exam_assets || []).length}）</h3>
+        <div class="table-wrap"><table>
+          <thead><tr><th>ID</th><th>类型</th><th>标题</th><th>状态</th><th>大小</th></tr></thead>
+          <tbody>${exams || `<tr><td colspan="5" class="muted">暂无</td></tr>`}</tbody>
+        </table></div>
+      </section>
+      <section class="section">
+        <h3>OCR 书贡献（${(assets.ocr_books || []).length}）</h3>
+        <div class="table-wrap"><table>
+          <thead><tr><th>ID</th><th>标题</th><th>页/词</th><th>命中</th><th>约占用</th></tr></thead>
+          <tbody>${ocr || `<tr><td colspan="5" class="muted">暂无</td></tr>`}</tbody>
+        </table></div>
+      </section>
+      <section class="section">
+        <h3>共享字幕贡献（${(assets.shared_subtitles || []).length}）</h3>
+        <div class="table-wrap"><table>
+          <thead><tr><th>ID</th><th>BVID</th><th>句数</th><th>EN/ZH 命中</th><th>约占用</th></tr></thead>
+          <tbody>${subs || `<tr><td colspan="5" class="muted">暂无</td></tr>`}</tbody>
+        </table></div>
+      </section>
+      <section class="section">
+        <h3>网盘绑定（${(assets.netdisk || []).length}）</h3>
+        <div class="table-wrap"><table>
+          <thead><tr><th>ID</th><th>厂商</th><th>挂载路径</th><th>Storage</th></tr></thead>
+          <tbody>${netdisk || `<tr><td colspan="4" class="muted">暂无</td></tr>`}</tbody>
+        </table></div>
+      </section>`;
   }
 
   function renderDetail(data) {
@@ -844,6 +979,22 @@
         </tr>`;
       })
       .join("");
+    const walletRows = (data.wallet_ledger || [])
+      .map(
+        (r) => `<tr>
+          <td>${r.id}</td><td>${r.delta}</td><td>${escapeHtml(r.reason)}</td>
+          <td>${escapeHtml(r.created_at || "")}</td>
+        </tr>`
+      )
+      .join("");
+    const pointsRows = (data.points_ledger || [])
+      .map(
+        (r) => `<tr>
+          <td>${r.id}</td><td>${r.delta}</td><td>${escapeHtml(r.reason)}</td>
+          <td>${escapeHtml(r.ref || "")}</td>
+        </tr>`
+      )
+      .join("");
     return `
       <div class="detail-head">
         <div>
@@ -852,8 +1003,18 @@
           <div class="chips">
             <span class="chip">钱包 ${u.wallet_credits ?? 0}</span>
             <span class="chip">分享积分 ${u.points_balance ?? 0}</span>
+            <span class="chip">资产合计 ${c.asset_count ?? 0}</span>
+            <span class="chip">服务器占用 ${formatBytes(
+              (data.storage && data.storage.storage_bytes) || u.storage_bytes || 0
+            )}</span>
             <span class="chip">导入课 ${c.link_courses ?? 0}</span>
+            <span class="chip">考试 ${c.exam_assets ?? 0}</span>
+            <span class="chip">OCR ${c.ocr_books ?? 0}</span>
+            <span class="chip">字幕 ${c.shared_subtitles ?? 0}</span>
+            <span class="chip">网盘 ${c.netdisk_bindings ?? 0}</span>
             <span class="chip">生词 ${c.vocab_items ?? 0}</span>
+            <span class="chip">有效权益 ${c.active_entitlements ?? 0}</span>
+            <span class="chip">学习进度 ${c.lesson_progress ?? 0}</span>
           </div>
         </div>
         <form id="renameForm" class="inline-form" style="width:min(320px,100%)">
@@ -863,6 +1024,7 @@
           <button class="btn primary full" type="submit">保存资料</button>
         </form>
       </div>
+      ${renderAssetTables(data)}
       <section class="section">
         <h3>发放权益</h3>
         <form id="grantForm" class="grant-grid">
@@ -896,6 +1058,20 @@
         <div class="table-wrap"><table>
           <thead><tr><th>ID</th><th>资产</th><th>状态</th><th>数量</th><th>到期</th><th></th></tr></thead>
           <tbody>${ents || `<tr><td colspan="6" class="muted">暂无</td></tr>`}</tbody>
+        </table></div>
+      </section>
+      <section class="section">
+        <h3>钱包流水</h3>
+        <div class="table-wrap"><table>
+          <thead><tr><th>ID</th><th>变动</th><th>原因</th><th>时间</th></tr></thead>
+          <tbody>${walletRows || `<tr><td colspan="4" class="muted">暂无</td></tr>`}</tbody>
+        </table></div>
+      </section>
+      <section class="section">
+        <h3>分享积分流水</h3>
+        <div class="table-wrap"><table>
+          <thead><tr><th>ID</th><th>变动</th><th>原因</th><th>备注</th></tr></thead>
+          <tbody>${pointsRows || `<tr><td colspan="4" class="muted">暂无</td></tr>`}</tbody>
         </table></div>
       </section>`;
   }

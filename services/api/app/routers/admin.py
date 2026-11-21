@@ -23,12 +23,11 @@ from app.models import (
     ProductSku,
     User,
     UserEntitlement,
-    UserLinkCourse,
     UserPointsLedger,
-    VocabItem,
     WalletAccount,
     WalletLedger,
 )
+from app.services import admin_user_assets as admin_assets_svc
 from app.services import user_assets as assets_svc
 
 router = APIRouter(prefix="/admin", tags=["admin"])
@@ -201,16 +200,37 @@ async def list_users(
     ).scalars().all()
     user_ids = [u.id for u in rows]
     wallets: dict[int, WalletAccount] = {}
+    asset_map: dict[int, dict[str, Any]] = {}
     if user_ids:
         wrows = (
             await db.execute(select(WalletAccount).where(WalletAccount.user_id.in_(user_ids)))
         ).scalars().all()
         wallets = {w.user_id: w for w in wrows}
+        asset_map = await admin_assets_svc.batch_asset_summaries(db, user_ids)
+    items = []
+    for u in rows:
+        brief = _user_brief(u, wallet=wallets.get(u.id))
+        assets = asset_map.get(u.id) or {}
+        brief.update(
+            {
+                "asset_count": int(assets.get("asset_count") or 0),
+                "storage_bytes": int(assets.get("storage_bytes") or 0),
+                "link_courses": int(assets.get("link_courses") or 0),
+                "exam_assets": int(assets.get("exam_assets") or 0),
+                "ocr_books": int(assets.get("ocr_books") or 0),
+                "shared_subtitles": int(assets.get("shared_subtitles") or 0),
+                "netdisk_bindings": int(assets.get("netdisk_bindings") or 0),
+                "vocab_items": int(assets.get("vocab_items") or 0),
+                "active_entitlements": int(assets.get("active_entitlements") or 0),
+                "storage_breakdown": assets.get("storage_breakdown") or {},
+            }
+        )
+        items.append(brief)
     return {
         "total": total,
         "offset": offset,
         "limit": limit,
-        "items": [_user_brief(u, wallet=wallets.get(u.id)) for u in rows],
+        "items": items,
     }
 
 
@@ -236,24 +256,7 @@ async def get_user(
             select(Order).where(Order.user_id == user_id).order_by(Order.id.desc()).limit(30)
         )
     ).scalars().all()
-    link_count = int(
-        (
-            await db.execute(
-                select(func.count())
-                .select_from(UserLinkCourse)
-                .where(UserLinkCourse.user_id == user_id)
-            )
-        ).scalar()
-        or 0
-    )
-    vocab_count = int(
-        (
-            await db.execute(
-                select(func.count()).select_from(VocabItem).where(VocabItem.user_id == user_id)
-            )
-        ).scalar()
-        or 0
-    )
+    assets = await admin_assets_svc.detailed_asset_report(db, user_id)
     wallet_ledger = (
         await db.execute(
             select(WalletLedger)
@@ -270,8 +273,15 @@ async def get_user(
             .limit(40)
         )
     ).scalars().all()
+    brief = _user_brief(user, wallet=wallet)
+    brief.update(
+        {
+            "asset_count": int(assets.get("asset_count") or 0),
+            "storage_bytes": int(assets.get("storage_bytes") or 0),
+        }
+    )
     return {
-        "user": _user_brief(user, wallet=wallet),
+        "user": brief,
         "entitlements": [_entitlement_out(e) for e in entitlements],
         "orders": [
             {
@@ -286,10 +296,29 @@ async def get_user(
             for o in orders
         ],
         "counts": {
-            "link_courses": link_count,
-            "vocab_items": vocab_count,
+            "link_courses": int(assets.get("link_courses") or 0),
+            "vocab_items": int(assets.get("vocab_items") or 0),
+            "exam_assets": int(assets.get("exam_assets") or 0),
+            "ocr_books": int(assets.get("ocr_books") or 0),
+            "shared_subtitles": int(assets.get("shared_subtitles") or 0),
+            "netdisk_bindings": int(assets.get("netdisk_bindings") or 0),
+            "active_entitlements": int(assets.get("active_entitlements") or 0),
+            "lesson_progress": int(assets.get("lesson_progress") or 0),
+            "asset_count": int(assets.get("asset_count") or 0),
             "entitlements": len(entitlements),
             "orders": len(orders),
+        },
+        "storage": {
+            "storage_bytes": int(assets.get("storage_bytes") or 0),
+            "breakdown": assets.get("storage_breakdown") or {},
+            "media_cache_dir": assets.get("media_cache_dir"),
+        },
+        "assets": {
+            "link_courses": assets.get("link_courses_items") or [],
+            "exam_assets": assets.get("exam_assets_items") or [],
+            "ocr_books": assets.get("ocr_books_items") or [],
+            "shared_subtitles": assets.get("shared_subtitles_items") or [],
+            "netdisk": assets.get("netdisk_items") or [],
         },
         "wallet_ledger": [
             {
