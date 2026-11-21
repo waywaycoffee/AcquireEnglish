@@ -12,10 +12,7 @@ import 'package:flutter_test/flutter_test.dart';
 void main() {
   group('shortReadingGloss', () {
     test('keeps first Chinese sense', () {
-      expect(
-        shortReadingGloss(r"n. 苹果, 家伙\n[医] 苹果"),
-        '苹果',
-      );
+      expect(shortReadingGloss(r"n. 苹果, 家伙\n[医] 苹果"), '苹果');
       expect(shortReadingGloss('vt. 承认, 告知收悉'), '承认');
     });
   });
@@ -48,10 +45,7 @@ void main() {
 
   group('ReadingStudyMode', () {
     test('defaults to immersion', () {
-      expect(
-        ReadingStudyModeX.fromStorage(null),
-        ReadingStudyMode.immersion,
-      );
+      expect(ReadingStudyModeX.fromStorage(null), ReadingStudyMode.immersion);
       expect(ReadingStudyMode.immersion.showInlineChinese, isFalse);
       expect(ReadingStudyMode.intensive.showInlineChinese, isTrue);
     });
@@ -60,15 +54,19 @@ void main() {
   group('sentenceBounds', () {
     test('expands to surrounding clause', () {
       const String text = 'Hello there. This is a test sentence! Next.';
-      final ({int start, int end, String text}) b =
-          sentenceBounds(text, 14, 16); // "is"
+      final ({int start, int end, String text}) b = sentenceBounds(
+        text,
+        14,
+        16,
+      ); // "is"
       expect(b.text, 'This is a test sentence!');
     });
   });
 
   group('stripMarkdownLight', () {
     test('strips headings and links', () {
-      const String md = '# Title\n\nHello **world** and [link](https://x.test).';
+      const String md =
+          '# Title\n\nHello **world** and [link](https://x.test).';
       final String plain = stripMarkdownLight(md);
       expect(plain, contains('Title'));
       expect(plain, contains('Hello world'));
@@ -103,8 +101,9 @@ void main() {
           ),
         ],
       );
-      final Map<int, SubtitleChunkSpan> hits =
-          highlighter.matchLine("Don't give up now");
+      final Map<int, SubtitleChunkSpan> hits = highlighter.matchLine(
+        "Don't give up now",
+      );
       expect(hits[1]?.phrase, 'give up');
       expect(hits[2]?.phrase, 'give up');
     });
@@ -118,6 +117,14 @@ void main() {
       expect(units.first.text, contains('Hello'));
       expect(units.first.wordCount, 2);
       expect(units[1].firstWordIndex, 2);
+    });
+
+    test('keeps word indices aligned across a long book', () {
+      final text = List.filled(3000, 'Dorothy walked home.').join(' ');
+      final units = splitReadingSpeakUnits(text);
+      expect(units.length, 3000);
+      expect(units.last.firstWordIndex, 8997);
+      expect(units.last.wordCount, 3);
     });
   });
 
@@ -179,8 +186,8 @@ void main() {
 
     test('rankDocsForIPlus1 prefers ideal unknown rate', () {
       // 1/20 = 5% unknown → ideal.
-      final String idealText = List<String>.filled(19, 'the').join(' ') +
-          ' serendipity';
+      final String idealText =
+          List<String>.filled(19, 'the').join(' ') + ' serendipity';
       const ReadingDoc hard = ReadingDoc(
         id: 'hard',
         title: 'Hard',

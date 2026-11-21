@@ -35,8 +35,11 @@ List<ReadingSpeakUnit> splitReadingSpeakUnits(String text) {
       cursor += 1;
     }
     if (cursor >= text.length) break;
-    final ({int start, int end, String text}) bounds =
-        sentenceBounds(text, cursor, cursor + 1);
+    final ({int start, int end, String text}) bounds = sentenceBounds(
+      text,
+      cursor,
+      cursor + 1,
+    );
     final String sentence = bounds.text;
     if (sentence.isEmpty) {
       cursor = bounds.end;
