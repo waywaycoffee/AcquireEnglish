@@ -146,10 +146,12 @@ async def translate_batch(
     if not isinstance(rows, list) or len(rows) != len(texts):
         raise ValueError(f"bad translation length {len(rows) if isinstance(rows, list) else type(rows)}")
     out = []
-    for r in rows:
-        if not isinstance(r, str) or not r.strip():
-            raise ValueError("empty translation line")
-        out.append(r.strip())
+    for i, r in enumerate(rows):
+        if not isinstance(r, str):
+            raise ValueError(f"non-string translation at {i}")
+        cleaned = r.strip()
+        # Keep timeline aligned even if the model blanks a short/noisy cue.
+        out.append(cleaned if cleaned else "…")
     return out
 
 
@@ -160,16 +162,29 @@ async def translate_cues(
     base: str,
     model: str,
     cues: list[dict],
-    chunk: int = 25,
+    chunk: int = 20,
 ) -> list[str]:
-    translated: list[str] = []
-    for offset in range(0, len(cues), chunk):
-        batch = cues[offset : offset + chunk]
-        texts = [c["text"] for c in batch]
-        translated.extend(
-            await translate_batch(client, key=key, base=base, model=model, texts=texts)
-        )
-    return translated
+    async def _one(texts: list[str], size: int) -> list[str]:
+        if not texts:
+            return []
+        if len(texts) <= size:
+            try:
+                return await translate_batch(
+                    client, key=key, base=base, model=model, texts=texts
+                )
+            except Exception:
+                if len(texts) == 1:
+                    raise
+                mid = max(1, len(texts) // 2)
+                left = await _one(texts[:mid], mid)
+                right = await _one(texts[mid:], mid)
+                return left + right
+        out: list[str] = []
+        for i in range(0, len(texts), size):
+            out.extend(await _one(texts[i : i + size], size))
+        return out
+
+    return await _one([c["text"] for c in cues], chunk)
 
 
 def needs_zh(en_srt: str, zh_srt: str | None, *, mismatch: bool) -> bool:
