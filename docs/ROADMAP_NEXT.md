@@ -73,6 +73,7 @@
 | 考纲词书（四级/六级自建 + CSV/TXT 导入） | ✅ v1 已交付；卡通配图词书仍不做 |
 | 在线词库 lilinji/English 按需下载 | ✅ 用户自选分类下载到本机词书 |
 | 爱快阅读（App 内模块 v1） | ✅ 导入 TXT/EPUB · 内置样例 · 视频字幕生成 · 点词进词书 |
+| 爱快阅读在线书库 | ✅ OneStop / CEFR CSV / Magic / Standard Ebooks；Readseasy·ClickBook 外链 |
 | 真机覆盖安装 | ⛔ 签名不一致（需与机上同 keystore） |
 
 

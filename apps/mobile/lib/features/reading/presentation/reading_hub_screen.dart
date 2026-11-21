@@ -167,6 +167,11 @@ class ReadingHubScreen extends ConsumerWidget {
         leading: PadBackButton(onPressed: () => context.pop()),
         actions: <Widget>[
           TextButton.icon(
+            onPressed: () => context.push('/reading/catalog'),
+            icon: const Icon(Icons.cloud_download_outlined),
+            label: const Text('书库'),
+          ),
+          TextButton.icon(
             onPressed: () => unawaited(_importFile(context, ref)),
             icon: const Icon(Icons.upload_file_rounded),
             label: const Text('导入'),
@@ -184,7 +189,7 @@ class ReadingHubScreen extends ConsumerWidget {
               padding: const EdgeInsets.all(20),
               children: <Widget>[
                 if (cont != null) ...<Widget>[
-                  _SectionTitle('继续阅读'),
+                  const _SectionTitle('继续阅读'),
                   _DocTile(
                     doc: cont,
                     progress: state.progressFor(cont.id),
@@ -199,6 +204,11 @@ class ReadingHubScreen extends ConsumerWidget {
                   runSpacing: 8,
                   children: <Widget>[
                     FilledButton.tonalIcon(
+                      onPressed: () => context.push('/reading/catalog'),
+                      icon: const Icon(Icons.cloud_download_outlined),
+                      label: const Text('在线书库'),
+                    ),
+                    FilledButton.tonalIcon(
                       onPressed: () => unawaited(_importFile(context, ref)),
                       icon: const Icon(Icons.upload_file_rounded),
                       label: const Text('导入 TXT / EPUB'),
@@ -212,7 +222,7 @@ class ReadingHubScreen extends ConsumerWidget {
                   ],
                 ),
                 const SizedBox(height: 20),
-                _SectionTitle('内置样例'),
+                const _SectionTitle('内置样例'),
                 for (final ReadingDoc doc in state.builtin) ...<Widget>[
                   _DocTile(
                     doc: doc,
@@ -225,7 +235,7 @@ class ReadingHubScreen extends ConsumerWidget {
                 ],
                 if (state.userDocs.isNotEmpty) ...<Widget>[
                   const SizedBox(height: 12),
-                  _SectionTitle('我的书架'),
+                  const _SectionTitle('我的书架'),
                   for (final ReadingDoc doc in state.userDocs.reversed) ...<Widget>[
                     _DocTile(
                       doc: doc,
@@ -291,6 +301,10 @@ class _DocTile extends StatelessWidget {
         return '导入';
       case ReadingSourceType.video:
         return '视频短文';
+      case ReadingSourceType.catalog:
+        return doc.sourceLabel.isEmpty
+            ? (doc.level.isEmpty ? '在线书库' : '在线 · ${doc.level}')
+            : doc.sourceLabel;
     }
   }
 

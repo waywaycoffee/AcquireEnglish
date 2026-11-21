@@ -1,4 +1,4 @@
-enum ReadingSourceType { import, builtin, video }
+enum ReadingSourceType { import, builtin, video, catalog }
 
 class ReadingSegment {
   const ReadingSegment({
@@ -36,6 +36,7 @@ class ReadingDoc {
     this.episodeId,
     this.courseTitle = '',
     this.episodeTitle = '',
+    this.sourceLabel = '',
     this.createdAt,
     this.builtin = false,
   });
@@ -50,6 +51,7 @@ class ReadingDoc {
   final String? episodeId;
   final String courseTitle;
   final String episodeTitle;
+  final String sourceLabel;
   final DateTime? createdAt;
   final bool builtin;
 
@@ -71,6 +73,7 @@ class ReadingDoc {
     'episodeId': episodeId,
     'courseTitle': courseTitle,
     'episodeTitle': episodeTitle,
+    'sourceLabel': sourceLabel,
     'createdAt': createdAt?.toIso8601String(),
     'builtin': builtin,
   };
@@ -106,6 +109,7 @@ class ReadingDoc {
       episodeId: (json['episodeId'] as String?)?.trim(),
       courseTitle: '${json['courseTitle'] ?? ''}'.trim(),
       episodeTitle: '${json['episodeTitle'] ?? ''}'.trim(),
+      sourceLabel: '${json['sourceLabel'] ?? ''}'.trim(),
       createdAt: DateTime.tryParse('${json['createdAt'] ?? ''}'),
       builtin: json['builtin'] as bool? ?? builtin,
     );

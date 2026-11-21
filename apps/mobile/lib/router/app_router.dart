@@ -20,6 +20,7 @@ import '../features/import_course/presentation/import_course_screen.dart';
 import '../features/library/presentation/library_screen.dart';
 import '../features/phrases/presentation/phrases_screen.dart';
 import '../features/player/presentation/player_screen.dart';
+import '../features/reading/presentation/reading_catalog_screen.dart';
 import '../features/reading/presentation/reading_hub_screen.dart';
 import '../features/reading/presentation/reading_reader_screen.dart';
 import '../features/review_hub/presentation/review_hub_screen.dart';
@@ -246,6 +247,11 @@ GoRouter goRouter(Ref ref) => GoRouter(
       path: '/reading',
       builder: (BuildContext context, GoRouterState state) =>
           const ReadingHubScreen(),
+    ).fade(),
+    GoRoute(
+      path: '/reading/catalog',
+      builder: (BuildContext context, GoRouterState state) =>
+          const ReadingCatalogScreen(),
     ).fade(),
     GoRoute(
       path: '/reading/:docId',
