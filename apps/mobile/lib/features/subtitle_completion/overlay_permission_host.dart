@@ -94,11 +94,7 @@ class _OverlayPermissionHostState extends State<OverlayPermissionHost>
     if (!pending && !snap.active) {
       return;
     }
-    final bool granted = await NativeSubtitleBall.canDrawOverlays();
-    if (!granted) {
-      return;
-    }
-    // ensureRunning always rewrites label to 已完成N（P%）/T.
+    // Keep FGS + notification alive for补字幕; floating ball is video-download only.
     await SubtitleCompletionRuntime.instance.ensureRunning(
       progress: snap.progress <= 0 ? 0.08 : snap.progress,
     );
@@ -137,7 +133,7 @@ class _OverlayPermissionHostState extends State<OverlayPermissionHost>
           return AlertDialog(
             title: const Text('需要悬浮窗权限'),
             content: const Text(
-              '补字幕切到后台/锁屏时需要「显示在其他应用上层」。'
+              '下载视频切到后台时需要「显示在其他应用上层」以显示进度悬浮球。'
               '请允许本应用；App 内用右下角按钮看进度，离开 App 后才显示系统悬浮窗。',
             ),
             actions: <Widget>[

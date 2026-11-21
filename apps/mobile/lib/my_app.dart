@@ -16,6 +16,8 @@ import 'features/idle_jobs/idle_job_drain.dart';
 import 'features/idle_jobs/idle_job_queue.dart';
 import 'features/idle_jobs/idle_job_scheduler.dart';
 import 'features/import_course/data/bilibili_multipage.dart';
+import 'features/import_course/presentation/video_download_progress_host.dart';
+import 'features/import_course/presentation/video_download_progress_host.dart';
 import 'features/library/presentation/library_catalog_provider.dart';
 import 'features/library/presentation/library_mock_data.dart';
 import 'features/settings/presentation/bilibili_login_sheet.dart';
@@ -261,7 +263,9 @@ class _MyAppState extends ConsumerState<MyApp> with WidgetsBindingObserver {
                 ),
                 child: BilibiliLoginGate(
                   child: OverlayPermissionHost(
-                    child: child ?? const SizedBox.shrink(),
+                    child: VideoDownloadProgressHost(
+                      child: child ?? const SizedBox.shrink(),
+                    ),
                   ),
                 ),
               ),

@@ -69,7 +69,7 @@ class SubtitleFloatingBall private constructor(private val context: Context) {
         setUserDismissed(true)
         Toast.makeText(
             context,
-            "已隐藏悬浮球，补字幕仍在后台进行",
+            "已隐藏悬浮球，下载仍在后台进行",
             Toast.LENGTH_SHORT,
         ).show()
     }
@@ -118,7 +118,7 @@ class SubtitleFloatingBall private constructor(private val context: Context) {
         if (!canDrawOverlays()) {
             Toast.makeText(
                 context,
-                "请开启「悬浮窗」权限以显示补字幕进度",
+                "请开启「悬浮窗」权限以显示下载进度",
                 Toast.LENGTH_LONG,
             ).show()
             openOverlaySettings()
@@ -305,9 +305,9 @@ class SubtitleFloatingBall private constructor(private val context: Context) {
             return trimmed
         }
         return if (frac >= 0.99f) {
-            "补字幕完成"
+            "下载完成"
         } else {
-            "补字幕 ${(frac * 100).roundToInt()}%"
+            "下载 ${(frac * 100).roundToInt()}%"
         }
     }
 

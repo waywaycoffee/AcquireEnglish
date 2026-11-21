@@ -11,8 +11,9 @@ import 'subtitle_completion_queue.dart';
 import 'subtitle_completion_scheduler.dart';
 import 'subtitle_fill_label.dart';
 
-/// Keeps subtitle completion alive in background / lock screen, and shows a
-/// system overlay floating ball with live progress (Android).
+/// Keeps subtitle completion alive in background / lock screen via FGS +
+/// notification (Android). The system overlay floating ball is reserved for
+/// **video download** progress (see VideoDownloadProgressHost).
 ///
 /// Critical OEM rule (Android 12+ / 小米): the foreground service **must** be
 /// started while the Activity is still foreground. Starting it from `paused`
@@ -28,8 +29,6 @@ class SubtitleCompletionRuntime {
   bool _overlayVisible = false;
   bool _needsOverlayPermission = false;
 
-  /// In-app FAB covers progress while resumed; native ball only when backgrounded.
-  bool _appInForeground = true;
   bool _notifPermissionAsked = false;
   bool _batteryAsked = false;
   String _lastTitle = '爱快英语 · 补字幕';
@@ -60,30 +59,18 @@ class SubtitleCompletionRuntime {
     _emit();
   }
 
-  /// Foreground → hide system ball (FAB shows). Background → show system ball.
+  /// Foreground tracking for FGS; floating ball is owned by video download.
   Future<void> setAppForeground(bool foreground) async {
-    _appInForeground = foreground;
     if (kIsWeb || !Platform.isAndroid) {
       return;
     }
+    // Never drive the system ball from subtitle fill — download host owns it.
+    // Still clear orphans when returning to foreground.
     if (foreground) {
-      // Always hide — Activity recreate can leave orphan WindowManager views
-      // even when Dart thinks the ball is already gone.
       await NativeSubtitleBall.hide();
       _overlayVisible = false;
       _emit();
-      return;
     }
-    final bool pending = await SubtitleCompletionQueue.shared.hasPendingWork();
-    if (!pending && !_serviceRunning) {
-      return;
-    }
-    await _showOrUpdateOverlay(
-      busy: true,
-      label: _lastBody,
-      progress: _lastProgress <= 0 ? 0.08 : _lastProgress,
-    );
-    _emit();
   }
 
   Future<void> init() async {
@@ -313,12 +300,8 @@ class SubtitleCompletionRuntime {
     try {
       await WakelockPlus.disable();
     } catch (_) {}
-    if (_overlayVisible) {
-      await NativeSubtitleBall.update(progress: 1.0, label: '完成');
-      await Future<void>.delayed(const Duration(milliseconds: 400));
-      await NativeSubtitleBall.hide();
-      _overlayVisible = false;
-    }
+    // Do not touch the download floating ball on subtitle stop.
+    _overlayVisible = false;
     if (await FlutterForegroundTask.isRunningService) {
       await FlutterForegroundTask.stopService();
     }
@@ -339,15 +322,8 @@ class SubtitleCompletionRuntime {
     } catch (_) {
       _notifPermissionAsked = true;
     }
-    try {
-      final bool overlayOk = await NativeSubtitleBall.canDrawOverlays();
-      if (!overlayOk) {
-        _needsOverlayPermission = true;
-        _emit();
-      } else {
-        _needsOverlayPermission = false;
-      }
-    } catch (_) {}
+    // Overlay permission is requested by VideoDownloadProgressHost for downloads.
+    _needsOverlayPermission = false;
     if (!_batteryAsked) {
       _batteryAsked = true;
       try {
@@ -363,35 +339,9 @@ class SubtitleCompletionRuntime {
     required String label,
     required double progress,
   }) async {
-    try {
-      // Avoid double balls: in-app FAB already shows progress while resumed.
-      if (_appInForeground) {
-        await NativeSubtitleBall.hide();
-        _overlayVisible = false;
-        return;
-      }
-      final bool granted = await NativeSubtitleBall.canDrawOverlays();
-      if (!granted) {
-        _needsOverlayPermission = true;
-        _overlayVisible = false;
-        _emit();
-        return;
-      }
-      _needsOverlayPermission = false;
-      final bool shown = _overlayVisible
-          ? await NativeSubtitleBall.update(
-              progress: busy ? progress : 1.0,
-              label: label,
-            )
-          : await NativeSubtitleBall.show(
-              progress: busy ? progress : 1.0,
-              label: label,
-            );
-      _overlayVisible = shown;
-    } catch (error) {
-      debugPrint('subtitle overlay failed: $error');
-      _overlayVisible = false;
-    }
+    // Floating ball shows video download progress only; subtitle uses FGS
+    // notification + in-library banner / stop controls.
+    _overlayVisible = false;
   }
 
   Future<void> dispose() async {
