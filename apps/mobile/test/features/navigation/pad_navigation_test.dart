@@ -168,7 +168,7 @@ void main() {
     );
   });
 
-  testWidgets('portrait bottom navigation moves secondary pages into more', (
+  testWidgets('portrait bottom navigation scrolls and keeps secondary in more', (
     WidgetTester tester,
   ) async {
     tester.view.physicalSize = const Size(390, 844);
@@ -179,27 +179,33 @@ void main() {
       const MaterialApp(
         home: Scaffold(
           bottomNavigationBar: FloatingBottomNav(
-            current: AppNavDestination.phrases,
+            current: AppNavDestination.settings,
+            forceShowScrollHint: false,
           ),
         ),
       ),
     );
+    await tester.pumpAndSettle();
 
+    expect(find.text('学习'), findsOneWidget);
     expect(find.text('视频'), findsOneWidget);
     expect(find.text('阅读'), findsOneWidget);
-    expect(find.text('学习'), findsOneWidget);
     expect(find.text('单词'), findsOneWidget);
-    expect(find.text('社区'), findsOneWidget);
-    expect(find.text('更多'), findsOneWidget);
-    expect(find.text('口语'), findsNothing);
+    expect(find.text('口语'), findsOneWidget);
+    expect(find.text('更多', skipOffstage: false), findsOneWidget);
     expect(find.text('短语'), findsNothing);
 
+    await tester.drag(
+      find.byKey(const Key('bottom-nav-scroll')),
+      const Offset(-320, 0),
+    );
+    await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('bottom-nav-more')));
     await tester.pumpAndSettle();
-    expect(find.text('口语'), findsOneWidget);
-    expect(find.text('短语'), findsNothing);
+    expect(find.text('成长'), findsOneWidget);
     expect(find.text('怎么学'), findsOneWidget);
     expect(find.text('设置'), findsOneWidget);
+    expect(find.text('短语'), findsNothing);
   });
 
   testWidgets('sidebar companion shows and cycles daily English', (

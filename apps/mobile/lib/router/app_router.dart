@@ -55,6 +55,7 @@ import '../features/membership/presentation/module_gate.dart';
 import '../features/membership/domain/module_access.dart';
 import '../features/onboarding/presentation/first_open_onboarding_screen.dart';
 import '../features/onboarding/presentation/onboarding_provider.dart';
+import '../features/navigation/presentation/battle_hub_screen.dart';
 import '../features/navigation/presentation/navigation_destination.dart';
 import '../features/shared/presentation/pad/pad_scaffold.dart';
 
@@ -317,6 +318,11 @@ GoRouter goRouter(Ref ref) => GoRouter(
       name: SGRoute.discover.name,
       builder: (BuildContext context, GoRouterState state) =>
           const CommunityScreen(),
+    ).fade(),
+    GoRoute(
+      path: AppNavDestination.battle.route,
+      builder: (BuildContext context, GoRouterState state) =>
+          const BattleHubScreen(),
     ).fade(),
     GoRoute(
       path: SGRoute.review.route,

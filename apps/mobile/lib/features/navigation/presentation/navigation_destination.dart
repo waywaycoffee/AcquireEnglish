@@ -41,6 +41,7 @@ enum AppNavDestination {
     subtitle: '记录你的每一次进步，查看学习轨迹与掌握度。',
     icon: LucideIcons.sprout,
     activeIcon: LucideIcons.trophy,
+    showInBottomNav: false,
   ),
   discover(
     route: '/discover',
@@ -58,15 +59,23 @@ enum AppNavDestination {
     icon: Icons.style_outlined,
     activeIcon: Icons.style_rounded,
   ),
+  battle(
+    route: '/battle',
+    label: '对战',
+    title: '学习对战',
+    subtitle: '打卡比武与近期单词 PK，和同桌比一比。',
+    icon: Icons.sports_esports_outlined,
+    activeIcon: Icons.sports_esports_rounded,
+    showInNav: false,
+  ),
   exam(
     route: '/exam',
-    label: '考试',
+    label: '备考',
     title: '考试备考',
     subtitle: '专项、模考、错题本与社区真题；可随时切回日常习得。',
     icon: Icons.school_outlined,
     activeIcon: Icons.school_rounded,
     showInNav: false,
-    showInBottomNav: false,
   ),
   phrases(
     route: '/phrases',
@@ -79,14 +88,13 @@ enum AppNavDestination {
     showInBottomNav: false,
   ),
   words(
-    route: '/words',
-    label: '单词本',
-    title: '单词本',
-    subtitle: '查看在视频字幕中见过并收藏的单词。',
+    route: '/words/syllabus',
+    label: '词书',
+    title: '词书',
+    subtitle: '导入与管理词书，按考试或日常目标选书背词。',
     icon: Icons.menu_book_outlined,
     activeIcon: Icons.menu_book_rounded,
     showInNav: false,
-    showInBottomNav: false,
   ),
   guide(
     route: '/guide',
@@ -104,6 +112,7 @@ enum AppNavDestination {
     subtitle: '管理播放偏好、界面设置和本地学习体验。',
     icon: Icons.tune_outlined,
     activeIcon: Icons.tune_rounded,
+    showInBottomNav: false,
   ),
   importCourse(
     route: '/importCourse',
@@ -113,6 +122,7 @@ enum AppNavDestination {
     icon: Icons.file_upload_outlined,
     activeIcon: Icons.file_upload_rounded,
     showInNav: false,
+    showInBottomNav: false,
   );
 
   const AppNavDestination({
@@ -134,4 +144,34 @@ enum AppNavDestination {
   final IconData activeIcon;
   final bool showInNav;
   final bool showInBottomNav;
+
+  /// Ordered bottom-bar tabs (excluding the trailing 「更多」 action).
+  ///
+  /// Default viewport shows the first [bottomBarVisibleCount]; swipe to
+  /// reveal the rest. Append new slots here without rewriting layout.
+  static const List<AppNavDestination> bottomBarDestinations =
+      <AppNavDestination>[
+        home,
+        library,
+        reading,
+        review,
+        oralCoach,
+        discover,
+        battle,
+        exam,
+        words,
+      ];
+
+  /// How many tabs fit in the fixed visible area before scrolling.
+  static const int bottomBarVisibleCount = 5;
+
+  /// Destinations offered from the trailing 「更多」 sheet.
+  static List<AppNavDestination> get moreMenuDestinations =>
+      values
+          .where(
+            (AppNavDestination destination) =>
+                destination.showInNav &&
+                !bottomBarDestinations.contains(destination),
+          )
+          .toList(growable: false);
 }
