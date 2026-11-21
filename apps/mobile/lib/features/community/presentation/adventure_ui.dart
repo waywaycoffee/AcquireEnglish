@@ -1,3 +1,5 @@
+import 'dart:ui';
+
 import 'package:flutter/material.dart';
 
 import '../../shared/presentation/pad/app_design_tokens.dart';
@@ -332,6 +334,213 @@ class HubChunkyButton extends StatelessWidget {
       ),
     );
   }
+}
+
+/// Zigzag Duolingo-style path for the cafe chapter map.
+class CafeWindingPath extends StatelessWidget {
+  const CafeWindingPath({
+    required this.titles,
+    required this.cleared,
+    required this.currentIndex,
+    required this.onTapLevel,
+    super.key,
+  });
+
+  final List<String> titles;
+  final Set<int> cleared;
+  final int currentIndex;
+  final ValueChanged<int> onTapLevel;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: <Widget>[
+        for (int i = 0; i < titles.length; i++) ...<Widget>[
+          _WindingRow(
+            index: i,
+            title: titles[i],
+            alignRight: i.isOdd,
+            cleared: cleared.contains(i),
+            current: i == currentIndex,
+            onTap: () => onTapLevel(i),
+          ),
+          if (i < titles.length - 1)
+            _PathDash(
+              fromRight: i.isOdd,
+              lit: cleared.contains(i),
+            ),
+        ],
+      ],
+    );
+  }
+}
+
+class _WindingRow extends StatelessWidget {
+  const _WindingRow({
+    required this.index,
+    required this.title,
+    required this.alignRight,
+    required this.cleared,
+    required this.current,
+    required this.onTap,
+  });
+
+  final int index;
+  final String title;
+  final bool alignRight;
+  final bool cleared;
+  final bool current;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final Color fill = cleared
+        ? AppDesignTokens.brandGreen
+        : current
+            ? AdventurePalette.pathAmber
+            : AdventurePalette.locked;
+    final Color border = cleared
+        ? AppDesignTokens.brandGreenDark
+        : current
+            ? AdventurePalette.pathAmberDeep
+            : const Color(0xFF2E3340);
+    final Widget node = GestureDetector(
+      onTap: onTap,
+      child: Column(
+        children: <Widget>[
+          AnimatedContainer(
+            duration: const Duration(milliseconds: 220),
+            width: current ? 72 : 60,
+            height: current ? 72 : 60,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              color: fill,
+              shape: BoxShape.circle,
+              border: Border.all(color: border, width: 4),
+              boxShadow: <BoxShadow>[
+                BoxShadow(
+                  color: border,
+                  offset: const Offset(0, 5),
+                ),
+                if (current)
+                  const BoxShadow(
+                    color: Color(0x66FFC800),
+                    blurRadius: 18,
+                    spreadRadius: 1,
+                  ),
+              ],
+            ),
+            child: cleared
+                ? const Icon(Icons.check_rounded, color: Colors.white, size: 32)
+                : Text(
+                    '${index + 1}',
+                    style: TextStyle(
+                      fontSize: current ? 26 : 22,
+                      fontWeight: FontWeight.w900,
+                      color: current
+                          ? const Color(0xFF3A2A00)
+                          : Colors.white.withValues(alpha: 0.92),
+                    ),
+                  ),
+          ),
+          const SizedBox(height: 8),
+          ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 140),
+            child: Text(
+              title,
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w900,
+                color: current
+                    ? AdventurePalette.pathAmber
+                    : Colors.white.withValues(alpha: 0.92),
+              ),
+            ),
+          ),
+          if (current)
+            const Padding(
+              padding: EdgeInsets.only(top: 4),
+              child: Text(
+                '当前关',
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w800,
+                  color: AdventurePalette.cafeGlow,
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+      child: Row(
+        children: <Widget>[
+          if (alignRight) const Spacer(flex: 3),
+          node,
+          if (!alignRight) const Spacer(flex: 3),
+        ],
+      ),
+    );
+  }
+}
+
+class _PathDash extends StatelessWidget {
+  const _PathDash({required this.fromRight, required this.lit});
+
+  final bool fromRight;
+  final bool lit;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      height: 36,
+      child: CustomPaint(
+        painter: _DashPainter(
+          fromRight: fromRight,
+          color: lit
+              ? AppDesignTokens.brandGreen
+              : Colors.white.withValues(alpha: 0.28),
+        ),
+        child: const SizedBox.expand(),
+      ),
+    );
+  }
+}
+
+class _DashPainter extends CustomPainter {
+  _DashPainter({required this.fromRight, required this.color});
+
+  final bool fromRight;
+  final Color color;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final Paint paint = Paint()
+      ..color = color
+      ..strokeWidth = 4
+      ..style = PaintingStyle.stroke
+      ..strokeCap = StrokeCap.round;
+    final Path path = Path();
+    final double startX = fromRight ? size.width * 0.72 : size.width * 0.28;
+    final double endX = fromRight ? size.width * 0.28 : size.width * 0.72;
+    path.moveTo(startX, 0);
+    path.quadraticBezierTo(size.width * 0.5, size.height * 0.55, endX, size.height);
+    final PathMetrics metrics = path.computeMetrics();
+    for (final PathMetric metric in metrics) {
+      double distance = 0;
+      while (distance < metric.length) {
+        final double next = (distance + 10).clamp(0, metric.length);
+        canvas.drawPath(metric.extractPath(distance, next), paint);
+        distance += 18;
+      }
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _DashPainter oldDelegate) =>
+      oldDelegate.fromRight != fromRight || oldDelegate.color != color;
 }
 
 class QuestFeedCard extends StatelessWidget {

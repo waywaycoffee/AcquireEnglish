@@ -276,14 +276,23 @@ class _SegTab extends StatelessWidget {
         decoration: BoxDecoration(
           color: selected ? AppDesignTokens.appWhite : Colors.transparent,
           borderRadius: BorderRadius.circular(12),
+          boxShadow: selected
+              ? const <BoxShadow>[
+                  BoxShadow(
+                    color: Color(0x22000000),
+                    blurRadius: 4,
+                    offset: Offset(0, 2),
+                  ),
+                ]
+              : null,
         ),
         child: Text(
           label,
           style: TextStyle(
             fontSize: 13,
-            fontWeight: selected ? FontWeight.w800 : FontWeight.w700,
+            fontWeight: selected ? FontWeight.w900 : FontWeight.w700,
             color: selected
-                ? AppDesignTokens.textPrimary
+                ? AppDesignTokens.brandGreenDark
                 : AppDesignTokens.textSecondary,
           ),
         ),

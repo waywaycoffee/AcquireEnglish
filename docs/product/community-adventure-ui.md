@@ -21,7 +21,9 @@
 
 ## 组件
 
-`adventure_ui.dart`：`AdventureHeroBanner`、`AdventurePathStrip`、`HubChunkyButton`、`QuestFeedCard`。
+`adventure_ui.dart`：`AdventureHeroBanner`、`AdventurePathStrip`、`CafeWindingPath`（夜景蜿蜒关卡）、`HubChunkyButton`、`QuestFeedCard`。
+
+地图页（`exploration_map_screen.dart`）使用咖啡夜景底 + 蜿蜒节点；底部固定「开战 / 约同桌」厚按钮区。
 
 ## 已落地行为
 
