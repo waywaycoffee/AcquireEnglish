@@ -234,11 +234,22 @@ class _WordLookupPopupCardState extends ConsumerState<WordLookupPopupCard> {
         ),
       );
     } else if (_entry != null) {
+      final WordEntry? bookEntry = ref.watch(
+        wordBookProvider.select(
+          (List<WordEntry> entries) => entries
+              .where((WordEntry e) => e.word == word)
+              .cast<WordEntry?>()
+              .firstOrNull,
+        ),
+      );
       body = _WordLookupPopupBody(
         entry: _entry!,
         contextSentence: widget.contextSentence,
         isPronouncing: _isPronouncing,
         onPronounce: _handlePronounce,
+        analysisCn: bookEntry?.analysisCn,
+        mnemonicCn: bookEntry?.mnemonicCn,
+        rootsAffixesCn: bookEntry?.rootsAffixesCn,
       );
     } else {
       body = const SizedBox.shrink();
@@ -407,6 +418,9 @@ class _WordLookupPopupBody extends StatelessWidget {
     required this.contextSentence,
     required this.isPronouncing,
     required this.onPronounce,
+    this.analysisCn,
+    this.mnemonicCn,
+    this.rootsAffixesCn,
   });
 
   final WordLookupEntry entry;
@@ -414,6 +428,9 @@ class _WordLookupPopupBody extends StatelessWidget {
   final bool isPronouncing;
   final Future<void> Function(String text, {String language, bool preferSource})
   onPronounce;
+  final String? analysisCn;
+  final String? mnemonicCn;
+  final String? rootsAffixesCn;
 
   @override
   Widget build(BuildContext context) {
@@ -624,6 +641,66 @@ class _WordLookupPopupBody extends StatelessWidget {
             ],
           ),
         ),
+        if ((analysisCn ?? '').trim().isNotEmpty ||
+            (mnemonicCn ?? '').trim().isNotEmpty ||
+            (rootsAffixesCn ?? '').trim().isNotEmpty) ...<Widget>[
+          const SizedBox(height: 12),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: const Color(0xFFF2FBEA),
+              borderRadius: BorderRadius.circular(14),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: <Widget>[
+                Text(
+                  '单词解析',
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w800,
+                    color: AppDesignTokens.brandGreenDark,
+                  ),
+                ),
+                if ((analysisCn ?? '').trim().isNotEmpty) ...<Widget>[
+                  const SizedBox(height: 6),
+                  Text(
+                    analysisCn!.trim(),
+                    style: TextStyle(
+                      fontSize: 14,
+                      height: 1.45,
+                      fontWeight: FontWeight.w600,
+                      color: AppDesignTokens.textPrimary,
+                    ),
+                  ),
+                ],
+                if ((rootsAffixesCn ?? '').trim().isNotEmpty) ...<Widget>[
+                  const SizedBox(height: 8),
+                  Text(
+                    '词根词缀：${rootsAffixesCn!.trim()}',
+                    style: TextStyle(
+                      fontSize: 13,
+                      height: 1.4,
+                      color: AppDesignTokens.textSecondary,
+                    ),
+                  ),
+                ],
+                if ((mnemonicCn ?? '').trim().isNotEmpty) ...<Widget>[
+                  const SizedBox(height: 6),
+                  Text(
+                    '助记：${mnemonicCn!.trim()}',
+                    style: TextStyle(
+                      fontSize: 13,
+                      height: 1.4,
+                      color: AppDesignTokens.textSecondary,
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ],
         if (entry.exampleCredit != null && exampleSentence.isNotEmpty)
           SelectableText(
             entry.exampleCredit!,

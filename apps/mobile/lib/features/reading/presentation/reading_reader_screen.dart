@@ -9,7 +9,10 @@ import '../../sync/data/acquire_api_client.dart';
 
 import '../../authentication/presentation/account_storage.dart';
 import '../../daily_review/data/word_encounter_store.dart';
+import '../../daily_review/presentation/foundation_media_video_sheet.dart';
+import '../../learning_modules/assessment_panel.dart';
 import '../../navigation/presentation/navigation_destination.dart';
+import '../../player/presentation/widgets/ai_grammar_analysis_sheet.dart';
 import '../../player/presentation/widgets/subtitle_chunk_highlight.dart';
 import '../../settings/presentation/settings_provider.dart';
 import '../../shared/data/word_lookup_service.dart';
@@ -18,12 +21,11 @@ import '../../shared/presentation/pad/app_design_tokens.dart';
 import '../../shared/presentation/pad/pad_scaffold.dart';
 import '../../shared/presentation/pad/pad_top_bar.dart';
 import '../../shared/presentation/word_lookup_popup.dart';
-import '../../daily_review/presentation/foundation_media_video_sheet.dart';
-import '../../learning_modules/assessment_panel.dart';
 import '../../words/data/offline_word_dictionary.dart';
 import '../../words/domain/foundation_media.dart';
 import '../../words/presentation/foundation_media_provider.dart';
 import '../../words/presentation/learned_vocabulary_provider.dart';
+import '../../words/presentation/vocab_preview_sheet.dart';
 import '../../words/presentation/word_book_provider.dart';
 import '../data/reading_continuous_tts.dart';
 import '../data/reading_gloss.dart';
@@ -402,13 +404,63 @@ class _ReadingReaderScreenState extends ConsumerState<ReadingReaderScreen> {
 
   Future<void> _recordLearnedContext(String rawWord, String sentence) async {
     final String word = normalizeWord(rawWord);
-    if (word.isEmpty) return;
-    if (!ref.read(learnedVocabularyProvider).contains(word)) return;
+    if (word.isEmpty || sentence.trim().isEmpty) return;
     try {
       await WordEncounterStore(
         account: ref.read(studyAccountProvider),
       ).recordContext(word, sentence);
     } catch (_) {}
+  }
+
+  Future<String> _translateSentenceQuiet(String sentence) async {
+    final String text = sentence.trim();
+    if (text.isEmpty) return '';
+    try {
+      final String? zh = await ref
+          .read(wordLookupServiceProvider)
+          .translateSentence(
+            sentence: text,
+            settings: ref.read(learningSettingsProvider),
+          )
+          .timeout(const Duration(seconds: 4), onTimeout: () => null);
+      return (zh ?? '').trim();
+    } catch (_) {
+      return '';
+    }
+  }
+
+  Future<void> _favoriteFromReading({
+    required ReadingDoc doc,
+    required String lexeme,
+    required String sentence,
+    String? definitionCn,
+  }) async {
+    final String chinese = await _translateSentenceQuiet(sentence);
+    if (!mounted) return;
+    final bool ok = ref.read(wordBookProvider.notifier).addFavoriteWord(
+          rawWord: lexeme,
+          episodeId: doc.episodeId ?? 'reading:${doc.id}',
+          course: '阅读 · ${doc.title}',
+          episode: doc.episodeTitle.isEmpty ? doc.title : doc.episodeTitle,
+          time: '',
+          lineKey: 'reading:${doc.id}:$lexeme',
+          sentence: sentence,
+          chinese: chinese,
+          generatedDefinition: (definitionCn ?? '').trim().isEmpty
+              ? null
+              : definitionCn!.trim(),
+        );
+    if (!mounted) return;
+    if (!ok) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('无法加入：$lexeme')),
+      );
+      return;
+    }
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('已收藏 $lexeme · 正在生成 AI 解析')),
+    );
+    await showVocabPreviewSheet(context, word: lexeme);
   }
 
   Future<void> _showLookupCard({
@@ -509,28 +561,13 @@ class _ReadingReaderScreenState extends ConsumerState<ReadingReaderScreen> {
                     unawaited(_speakReading(lexeme));
                   },
                   onFavorite: (String? definitionCn) {
-                    final bool ok = ref
-                        .read(wordBookProvider.notifier)
-                        .addFavoriteWord(
-                          rawWord: lexeme,
-                          episodeId: doc.episodeId ?? 'reading:${doc.id}',
-                          course: '阅读 · ${doc.title}',
-                          episode: doc.episodeTitle.isEmpty
-                              ? doc.title
-                              : doc.episodeTitle,
-                          time: '',
-                          lineKey: 'reading:${doc.id}:$lexeme',
-                          sentence: sentence,
-                          chinese: '',
-                          generatedDefinition:
-                              (definitionCn ?? '').trim().isEmpty
-                              ? null
-                              : definitionCn!.trim(),
-                        );
                     Navigator.pop(ctx);
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text(ok ? '已加入词书：$lexeme' : '无法加入：$lexeme'),
+                    unawaited(
+                      _favoriteFromReading(
+                        doc: doc,
+                        lexeme: lexeme,
+                        sentence: sentence,
+                        definitionCn: definitionCn,
                       ),
                     );
                   },
@@ -657,6 +694,20 @@ class _ReadingReaderScreenState extends ConsumerState<ReadingReaderScreen> {
                 },
                 child: Text(_sentenceTranslate ? '句译：开（点此关闭）' : '句译：关（点此开启）'),
               ),
+              OutlinedButton.icon(
+                onPressed: () {
+                  Navigator.pop(ctx);
+                  unawaited(
+                    showAiGrammarAnalysisSheet(
+                      context,
+                      english: sentence,
+                      chinese: (zh ?? '').trim(),
+                    ),
+                  );
+                },
+                icon: const Icon(Icons.auto_awesome_outlined),
+                label: const Text('句子语法解析'),
+              ),
               if (_soeEnabled) ...<Widget>[
                 const SizedBox(height: 12),
                 AssessmentPanel(reference: sentence),
@@ -681,6 +732,7 @@ class _ReadingReaderScreenState extends ConsumerState<ReadingReaderScreen> {
 
   void _addHardWordsToBook(ReadingDoc doc) {
     int added = 0;
+    final List<String> enrolled = <String>[];
     for (final MapEntry<String, String> e in _hardGlosses.entries.take(25)) {
       final bool ok = ref
           .read(wordBookProvider.notifier)
@@ -692,13 +744,25 @@ class _ReadingReaderScreenState extends ConsumerState<ReadingReaderScreen> {
             time: '',
             lineKey: 'reading:${doc.id}:hard:${e.key}',
             sentence: '',
-            chinese: '',
+            chinese: e.value,
             generatedDefinition: e.value,
           );
-      if (ok) added += 1;
+      if (ok) {
+        added += 1;
+        if (ref.read(wordBookProvider.notifier).enrollForReview(e.key)) {
+          enrolled.add(e.key);
+        }
+      }
     }
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(added == 0 ? '没有可加入的难词' : '已加入 $added 个难词到词书')),
+      SnackBar(
+        content: Text(
+          added == 0
+              ? '没有可加入的难词'
+              : '已加入 $added 个难词到复习'
+                  '${enrolled.isEmpty ? '' : '（${enrolled.length} 个已入队）'}',
+        ),
+      ),
     );
   }
 

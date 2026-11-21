@@ -2101,20 +2101,40 @@ class _DailyReviewScreenState extends ConsumerState<DailyReviewScreen>
                     trailing: source.episodeId == null
                         ? null
                         : IconButton(
-                            tooltip: '回到收藏时的视频',
-                            icon: const Icon(Icons.play_circle_outline),
-                            onPressed: () => context.pushNamed(
-                              SGRoute.player.name,
-                              pathParameters: <String, String>{
-                                'episodeId': source.episodeId!,
-                              },
-                              queryParameters: <String, String>{
-                                if (source.time != null)
-                                  'startTime': source.time!,
-                                'autoplay': '1',
-                                'loop': 'sentence',
-                              },
+                            tooltip:
+                                source.episodeId!.startsWith('reading:')
+                                ? '回到阅读原文'
+                                : '回到收藏时的视频',
+                            icon: Icon(
+                              source.episodeId!.startsWith('reading:')
+                                  ? Icons.menu_book_outlined
+                                  : Icons.play_circle_outline,
                             ),
+                            onPressed: () {
+                              final String episodeId = source.episodeId!;
+                              if (episodeId.startsWith('reading:')) {
+                                final String docId = episodeId
+                                    .substring('reading:'.length)
+                                    .trim();
+                                if (docId.isEmpty) return;
+                                context.push(
+                                  '/reading/${Uri.encodeComponent(docId)}',
+                                );
+                                return;
+                              }
+                              context.pushNamed(
+                                SGRoute.player.name,
+                                pathParameters: <String, String>{
+                                  'episodeId': episodeId,
+                                },
+                                queryParameters: <String, String>{
+                                  if (source.time != null)
+                                    'startTime': source.time!,
+                                  'autoplay': '1',
+                                  'loop': 'sentence',
+                                },
+                              );
+                            },
                           ),
                     onTap: () => showDialog<void>(
                       context: context,

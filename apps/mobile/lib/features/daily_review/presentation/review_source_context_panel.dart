@@ -147,6 +147,12 @@ class _ReviewSourceContextPanelState
   void _openFullPlayer() {
     final String? episodeId = widget.source.episodeId?.trim();
     if (episodeId == null || episodeId.isEmpty) return;
+    if (episodeId.startsWith('reading:')) {
+      final String docId = episodeId.substring('reading:'.length).trim();
+      if (docId.isEmpty) return;
+      context.push('/reading/${Uri.encodeComponent(docId)}');
+      return;
+    }
     final String? time = widget.source.time;
     context.pushNamed(
       SGRoute.player.name,
@@ -338,10 +344,19 @@ class _ReviewSourceContextPanelState
                   ),
                 ),
               ),
-              if (hasVideo)
+              if (hasVideo ||
+                  (widget.source.episodeId ?? '')
+                      .trim()
+                      .startsWith('reading:'))
                 TextButton(
                   onPressed: _openFullPlayer,
-                  child: const Text('打开原片'),
+                  child: Text(
+                    (widget.source.episodeId ?? '')
+                            .trim()
+                            .startsWith('reading:')
+                        ? '打开原文'
+                        : '打开原片',
+                  ),
                 ),
             ],
           ),

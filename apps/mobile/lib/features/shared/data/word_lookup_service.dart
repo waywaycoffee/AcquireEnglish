@@ -68,8 +68,32 @@ class PublicLexiconLookup {
     String word,
     LearningSettingsState settings,
   ) async {
-    final String key = word.trim().toLowerCase().replaceAll('’', "'");
-    if (!RegExp(r"^[a-z]+(?:'[a-z]+)*$").hasMatch(key)) return null;
+    final String key = word
+        .trim()
+        .toLowerCase()
+        .replaceAll('’', "'")
+        .replaceAll(RegExp(r"[^a-z'-]+"), '');
+    if (!RegExp(r"^[a-z]+(?:[-'][a-z]+)*$").hasMatch(key)) return null;
+    // Prefer hyphenated lemma; also try collapsed form for older lexicon rows.
+    final List<String> candidates = <String>[
+      key,
+      if (key.contains('-')) key.replaceAll('-', ''),
+    ];
+    for (final String candidate in candidates) {
+      final WordLookupEntry? hit = await _lookupKey(candidate, settings);
+      if (hit != null) return hit;
+    }
+    return null;
+  }
+
+  Future<WordLookupEntry?> _lookupKey(
+    String key,
+    LearningSettingsState settings,
+  ) async {
+    if (!RegExp(r"^[a-z]+(?:[-'][a-z]+)*$").hasMatch(key) &&
+        !RegExp(r"^[a-z]+(?:'[a-z]+)*$").hasMatch(key)) {
+      return null;
+    }
     final Uri? base = Uri.tryParse(settings.resolvedCloudApiBaseUrl);
     if (base == null ||
         !<String>{'https', 'http'}.contains(base.scheme) ||
@@ -86,7 +110,12 @@ class PublicLexiconLookup {
           .getUri<Map<String, dynamic>>(url)
           .timeout(const Duration(seconds: 3));
       final Map<String, dynamic>? row = response.data;
-      if (row == null || row['word'] != key) return null;
+      if (row == null) return null;
+      final String remoteWord =
+          (row['word'] as String?)?.trim().toLowerCase() ?? '';
+      if (remoteWord != key && remoteWord.replaceAll('-', '') != key) {
+        return null;
+      }
       String field(String name) => (row[name] as String?)?.trim() ?? '';
       final Object? credit = row['example_source'];
       final Object? author = credit is Map<String, dynamic>
@@ -1147,7 +1176,12 @@ class WordLookupService {
   }
 
   String _normalizeWord(String rawWord) {
-    return rawWord.toLowerCase().replaceAll(RegExp(r'[^\w]'), '').trim();
+    // Keep hyphens/apostrophes so well-known ≠ wellknown for lookup.
+    return rawWord
+        .toLowerCase()
+        .replaceAll('’', "'")
+        .replaceAll(RegExp(r"[^a-z0-9'-]+"), '')
+        .trim();
   }
 
   String _normalizePhrase(String rawWord) {
