@@ -2772,9 +2772,13 @@ class _DailyReviewScreenState extends ConsumerState<DailyReviewScreen>
         await _speech!.speak(
           source.question,
           recordedUrl: foundationAudio,
-          allowSynthesisFallback: true,
+          allowSynthesisFallback: false,
           forceCloud: true,
         );
+      } on WordPronunciationException catch (error) {
+        if (mounted && sequence == _speechSequence && !silent) {
+          _message(error.message);
+        }
       } catch (_) {
         if (mounted && sequence == _speechSequence && !silent) {
           _message('示范音频播放失败。');
@@ -2857,8 +2861,11 @@ class _DailyReviewScreenState extends ConsumerState<DailyReviewScreen>
         await _speech!.speak(
           source.english.isEmpty ? source.question : source.english,
           recordedUrl: audio,
-          allowSynthesisFallback: true,
+          allowSynthesisFallback: false,
+          forceCloud: true,
         );
+      } on WordPronunciationException catch (error) {
+        if (mounted) _message(error.message);
       } catch (_) {
         if (mounted) _message('示范音频播放失败。');
       } finally {
@@ -2879,9 +2886,18 @@ class _DailyReviewScreenState extends ConsumerState<DailyReviewScreen>
     setState(() => _speaking = true);
     try {
       _speech = ref.read(wordPronunciationServiceProvider);
-      await _speech!.speak(text, forceCloud: true);
+      // Prefer Aliyun English voices; avoid silent eSpeak fallback on cards.
+      await _speech!.speak(
+        text,
+        forceCloud: true,
+        allowSynthesisFallback: false,
+      );
+    } on WordPronunciationException catch (error) {
+      if (mounted) _message(error.message);
     } catch (_) {
-      if (mounted) _message('朗读失败，请检查设备的语音设置。');
+      if (mounted) {
+        _message('阿里云发音失败，请确认已登录，或在设置里切换配音音色。');
+      }
     } finally {
       if (mounted && sequence == _speechSequence)
         setState(() => _speaking = false);

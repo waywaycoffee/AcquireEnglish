@@ -2096,6 +2096,7 @@ class AcquireApiClient {
       data: <String, dynamic>{
         'text': text,
         'voice': voice,
+        'language': 'en',
       },
       options: Options(
         receiveTimeout: const Duration(seconds: 45),
@@ -2108,11 +2109,17 @@ class AcquireApiClient {
     final Map<String, dynamic> json = data is Map<String, dynamic>
         ? data
         : Map<String, dynamic>.from(data as Map);
-    final String url = (json['audio_url'] as String? ?? '').trim();
-    if (url.isEmpty) {
+    final String rawUrl = (json['audio_url'] as String? ?? '').trim();
+    if (rawUrl.isEmpty) {
       throw StateError('阿里云配音未返回音频地址');
     }
-    return url;
+    // ECS may return `/media/...`; media_kit needs an absolute URL.
+    if (rawUrl.startsWith('http://') || rawUrl.startsWith('https://')) {
+      return rawUrl;
+    }
+    return Uri.parse(
+      Endpoints.normalizeBaseUrl(_dio.options.baseUrl),
+    ).resolve(rawUrl).toString();
   }
 
   Future<FoundationMediaItem?> contentMediaLookup({

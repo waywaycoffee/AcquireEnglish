@@ -1610,7 +1610,7 @@ class _AliyunCloudVoiceRowState extends ConsumerState<_AliyunCloudVoiceRow> {
                   : _error ??
                         (!_configured
                             ? '服务器尚未配置 DASHSCOPE_API_KEY'
-                            : '默认龙安风悦（中英双语），缓存到 ECS'),
+                            : '默认 Olivia Lin 英音，缓存到 ECS；中英混读可选龙安系列'),
             ),
           ),
           const SizedBox(width: 16),
