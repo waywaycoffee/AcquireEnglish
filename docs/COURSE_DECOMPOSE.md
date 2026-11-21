@@ -1,0 +1,109 @@
+# 教材智能解构（课程模块）
+
+用户上传 EPUB/PDF → 清洗 → SUBTLEX 频次 + CEFR → 切课 → 阅读 + 词汇热身任务包 → **仅私人课程库**。  
+本模块**优先复用**已有指纹缓存 / 阅读导入，不另起平行栈。社区广场分享为 **P2**，P0 不启用公开发布。
+
+## PRD → 现有能力映射
+
+| PRD 能力 | 落点（已有 / P0 扩展） | 说明 |
+|----------|------------------------|------|
+| 上传 EPUB/PDF | App `reading_ingest` / `reading_pdf_import` | 客户端抽正文（含 OCR）；不进 APK 媒体资源 |
+| 清洗 boilerplate | `clean_material_text`（P0）+ 既有字幕清洗启发 | 页眉页脚、重复行、空白压缩 |
+| 指纹复用 | `POST /api/fingerprint-cache/search` | 命中 → 绑定 `UserCourseAsset` + `ReadingDoc` |
+| Miss 解构 | `queue_gpu` → `decompose_text_to_lessons` | CPU 启发式切课；可换 LLM/OpenMAIC |
+| 私人课库 | `GET /api/fingerprint-cache/my-courses` | `UserCourseAsset`；`is_shared=false` 默认 |
+| 切课预览/编辑 | `GET/PATCH …/my-courses/{id}` + `/lessons`（P0） | merge / split / delete / 改目标词 |
+| 词频 + CEFR | `annotate` + `cefr_from_freq_rank`（对齐 App `cefrFromFreqRank`） | 可选读 `public-lexicon`（SUBTLEX） |
+| 任务包 | 每课 `goal` + `target_words` 3–8 + `tasks[]` | reading + vocab_warmup；口语 P1 |
+| 版权免责 | 上传需 `license_ack`；文案固定 | 用户自负；**无自动发布** |
+| 共享 OCR | `shared-ocr-books` | 私人解构流默认 **不上传** OCR（`share_ocr=false`） |
+| OpenMAIC 编排 | `OpenMaicSplitter` 适配器 stub | 仓库无 OpenMAIC；P0 用启发式，不阻塞 |
+| 每日课程 | lessons 结构兼容 `lesson_no` / `goal` / `cefr` | 后续日程编排消费同一 JSON |
+| 社区分享 | `POST …/share` 仅 stub | **P2**；App P0 不暴露入口 |
+
+## 数据流（P0）
+
+```
+App 选 PDF/EPUB
+  → 本地解析（可选 OCR；private 流不 put shared-ocr）
+  → POST /fingerprint-cache/search { cleaned_text, private_only: true }
+       ├─ hit  → UserCourseAsset + lessons → 阅读库 /「我的教材课」
+       └─ miss → upload_task(queue_gpu, private_only)
+                  → decompose(+annotate wordbank/CEFR)
+                  → register_private_user_course（不写公共 asset_cache）
+                  → App 轮询 upload-tasks → 预览切课 → PATCH lessons → 确认入库
+```
+
+`private_only=true`（默认教材流）：只写用户私有 `UserCourseAsset`（`asset_cache_id=null`，课结构在 `diff_patch_json`），**不**注册全局 `asset_cache` / fingerprint，避免用户版权素材进入公共复用池。
+
+同源公开复用仍走既有 `private_only=false` 路径（阅读库「导入读物」可选用）。
+
+## API（P0）
+
+| 方法 | 路径 | 作用 |
+|------|------|------|
+| POST | `/api/fingerprint-cache/search` | +`private_only`（默认 false 兼容旧客户端） |
+| GET | `/api/fingerprint-cache/my-courses` | 私人教材课列表 |
+| GET | `/api/fingerprint-cache/my-courses/{id}` | 详情 + 合并后的 lessons |
+| PATCH | `/api/fingerprint-cache/my-courses/{id}/lessons` | merge/split/delete/edit/replace |
+| POST | `/api/fingerprint-cache/my-courses/{id}/finalize` | 确认课包（状态 ready，可供阅读/每日课） |
+| GET | `/api/fingerprint-cache/upload-tasks/{id}` | 异步任务状态 |
+| POST | `/api/fingerprint-cache/my-courses/{id}/share` | **P2 stub**，App 不调用 |
+
+## 课结构（兼容每日课程）
+
+```json
+{
+  "lesson_no": 1,
+  "title": "Lesson 1 · A quiet morning",
+  "text_content": "...",
+  "cefr": "A2",
+  "goal": "理解段落大意并掌握 5 个目标词",
+  "target_words": [
+    {"word": "quiet", "rank": 1200, "cefr": "A2"}
+  ],
+  "tasks": [
+    {"type": "reading", "title": "精读本课"},
+    {"type": "vocab_warmup", "title": "词汇热身", "word_count": 5}
+  ]
+}
+```
+
+## 版权与合规
+
+- 上传确认：用户保证仅供个人学习或已获授权；平台不审核版权实体。
+- P0 **禁止**自动进社区广场 / 公共 `asset_cache`（`private_only`）。
+- 原文 PDF/EPUB **不**进 APK；服务端 miss 载荷仅存清洗后正文 JSON（`media/course/upload_task/…`）。
+- 音视频一律 ECS namespace；本模块 P0 无 TTS/ASR。
+
+## 分期
+
+### P0（本迭代）
+
+- [x] 设计文档映射 PRD → fingerprint / reading
+- [x] `decompose` 输出 CEFR + 3–8 目标词 + reading/vocab tasks
+- [x] `private_only` 私人入库，不写公共指纹池
+- [x] 切课 PATCH（merge/split/delete/edit）+ finalize
+- [x] App「我的教材课」+ 预览编辑 + 阅读入口；OCR 默认不共享
+- [x] OpenMAIC 适配器接口（启发式实现）
+- [x] 单元测试 annotate / splitter / private path
+
+### P1
+
+- 服务端 PDF/EPUB 直传抽取；扫描件 ASR/对齐走本机 5060 Ti
+- LLM / OpenMAIC 真编排替换启发式 splitter
+- 口语跟读任务挂 oral_coach；TTS 走 ECS `reading` namespace
+- 「每日课程」日程消费私人课包
+
+### P2
+
+- 社区分享 / 审核广场（现有 share stub 接产品）
+- 教材作者页、协作编辑、公开词表贡献
+
+## 复用约束（勿重复造轮）
+
+1. 切课核心继续调用 `decompose_text_to_lessons`（可换 adapter）。
+2. 命中复用继续 `search` → `create_user_course_from_cache`。
+3. App 阅读呈现继续 `ReadingDoc` / `readingDocsFromFingerprintAsset`。
+4. 词级 CEFR 与 App `cefrFromFreqRank` 阈值阈值保持一致。
+5. 不引入第二套 UserMaterial 表，除非 P1 需要原文二进制托管审计。

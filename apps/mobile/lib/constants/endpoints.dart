@@ -145,8 +145,14 @@ class Endpoints {
       'api/fingerprint-cache/assets/${Uri.encodeComponent(assetId)}';
   static String fingerprintCacheUploadTask(String taskId) =>
       'api/fingerprint-cache/upload-tasks/${Uri.encodeComponent(taskId)}';
+  static String fingerprintCacheMyCourse(String courseId) =>
+      'api/fingerprint-cache/my-courses/${Uri.encodeComponent(courseId)}';
   static String fingerprintCacheCourseDiff(String courseId) =>
       'api/fingerprint-cache/my-courses/${Uri.encodeComponent(courseId)}/diff';
+  static String fingerprintCacheCourseLessons(String courseId) =>
+      'api/fingerprint-cache/my-courses/${Uri.encodeComponent(courseId)}/lessons';
+  static String fingerprintCacheCourseFinalize(String courseId) =>
+      'api/fingerprint-cache/my-courses/${Uri.encodeComponent(courseId)}/finalize';
   static String fingerprintCacheCourseShare(String courseId) =>
       'api/fingerprint-cache/my-courses/${Uri.encodeComponent(courseId)}/share';
 

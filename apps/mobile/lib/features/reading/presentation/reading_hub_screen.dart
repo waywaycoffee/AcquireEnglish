@@ -497,6 +497,11 @@ class _ReadingHubScreenState extends ConsumerState<ReadingHubScreen> {
             icon: const Icon(Icons.cloud_download_outlined),
           ),
           IconButton(
+            tooltip: '我的教材课',
+            onPressed: () => context.push('/material-courses'),
+            icon: const Icon(Icons.menu_book_outlined),
+          ),
+          IconButton(
             tooltip: '导入',
             onPressed: () => unawaited(_importFile(context, ref)),
             icon: const Icon(Icons.upload_file_rounded),
@@ -588,6 +593,11 @@ class _ReadingHubScreenState extends ConsumerState<ReadingHubScreen> {
                       onPressed: () => unawaited(_importFile(context, ref)),
                       icon: const Icon(Icons.upload_file_rounded),
                       label: const Text('导入 TXT / EPUB / PDF / MOBI'),
+                    ),
+                    FilledButton.tonalIcon(
+                      onPressed: () => context.push('/material-courses'),
+                      icon: const Icon(Icons.auto_fix_outlined),
+                      label: const Text('教材智能解构'),
                     ),
                     FilledButton.tonalIcon(
                       onPressed: () =>

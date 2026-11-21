@@ -60,13 +60,20 @@ def _asset_out(asset: AssetCache, *, include_lessons: bool = False) -> dict[str,
     return out
 
 
-def _user_course_out(row: UserCourseAsset) -> dict[str, Any]:
+def _user_course_out(
+    row: UserCourseAsset,
+    *,
+    include_lessons: bool = False,
+) -> dict[str, Any]:
     patch: Any = None
     if row.diff_patch_json:
         try:
             patch = json.loads(row.diff_patch_json)
         except json.JSONDecodeError:
             patch = None
+    patch_dict = patch if isinstance(patch, dict) else {}
+    lessons = fp_svc.resolve_user_course_lessons_sync(row) if include_lessons else []
+    status = str(patch_dict.get("status") or ("ready" if row.asset_cache_id else "draft"))
     return {
         "id": row.id,
         "user_id": row.user_id,
@@ -77,8 +84,28 @@ def _user_course_out(row: UserCourseAsset) -> dict[str, Any]:
         "source_upload_id": row.source_upload_id,
         "is_shared": bool(row.is_shared),
         "share_audit_status": row.share_audit_status,
+        "private_only": bool(
+            patch_dict.get("private_only") or row.asset_cache_id is None
+        ),
+        "status": status,
+        "cefr_level": (
+            str(patch_dict["cefr_level"])
+            if isinstance(patch_dict.get("cefr_level"), str)
+            and patch_dict.get("cefr_level")
+            else None
+        ),
+        "lesson_count": len(lessons)
+        if include_lessons
+        else (
+            len(patch_dict["lessons"])
+            if isinstance(patch_dict.get("lessons"), list)
+            else None
+        ),
+        "copyright_disclaimer": patch_dict.get("copyright_disclaimer")
+        or "用户声明素材仅供个人学习或已获授权；平台不自动公开发布。",
         "create_at": _iso(row.create_at),
         "update_at": _iso(row.update_at),
+        **({"lessons": lessons} if include_lessons else {}),
     }
 
 
@@ -92,6 +119,9 @@ class SearchBody(BaseModel):
     file_type: str = Field(default="pdf", max_length=32)
     create_upload_task: bool = True
     auto_bind_course: bool = True
+    # P0 教材流默认建议 true：未命中时只写私人课，不进公共 asset_cache。
+    private_only: bool = False
+    license_ack: bool = False
 
 
 class RegisterBody(BaseModel):
@@ -147,6 +177,23 @@ class ShareAuditBody(BaseModel):
     reason: str | None = Field(default=None, max_length=500)
 
 
+class LessonPatchBody(BaseModel):
+    action: str = Field(
+        ...,
+        description="merge | split | delete | edit | replace",
+        max_length=32,
+    )
+    lesson_nos: list[int] = Field(default_factory=list)
+    split_at_char: int | None = Field(default=None, ge=1)
+    lesson: dict[str, Any] | None = None
+    lessons: list[dict[str, Any]] | None = None
+
+
+class FinalizeBody(BaseModel):
+    title: str | None = Field(default=None, max_length=256)
+    license_ack: bool = True
+
+
 # ----- user APIs -----
 
 
@@ -169,6 +216,19 @@ async def search_and_reuse(
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> dict[str, Any]:
+    if body.private_only and not body.license_ack:
+        raise HTTPException(
+            status_code=400,
+            detail="private material upload requires license_ack=true "
+            "(personal study / authorized use only; no auto-publish)",
+        )
+
+    from app.services.fingerprint.annotate import clean_material_text
+
+    cleaned = clean_material_text(body.cleaned_text)
+    if len(cleaned) < 80:
+        raise HTTPException(status_code=422, detail="cleaned text too short")
+
     upload_id: str | None = None
     if body.create_upload_task:
         upload_id = str(uuid.uuid4())
@@ -183,9 +243,11 @@ async def search_and_reuse(
         )
         await db.flush()
 
+    # private_only miss path never needs public fingerprint hit for promote;
+    # still allow hit reuse of already-public cache into a private UserCourseAsset.
     result = await fp_svc.search_fingerprint(
         db,
-        cleaned_text=body.cleaned_text,
+        cleaned_text=cleaned,
         source_type=body.source_type,
         user_id=user.id,
     )
@@ -212,8 +274,9 @@ async def search_and_reuse(
             await db.execute(select(UploadTask).where(UploadTask.id == upload_id))
         ).scalar_one_or_none()
         if task:
-            # Degraded SimHash candidates: keep pending confirm; else queue decompose.
-            if result.degraded and result.candidates:
+            # Degraded SimHash candidates: keep pending confirm unless private-only
+            # (private flow prefers fresh private decompose over uncertain public bind).
+            if result.degraded and result.candidates and not body.private_only:
                 task.status = "pending_confirm"
                 task.fail_reason = None
             else:
@@ -221,7 +284,7 @@ async def search_and_reuse(
                 task.fail_reason = None
                 fp_svc.store_upload_task_payload(
                     upload_id,
-                    cleaned_text=body.cleaned_text,
+                    cleaned_text=cleaned,
                     source_type=body.source_type,
                     file_name=body.file_name,
                     file_type=body.file_type,
@@ -229,6 +292,7 @@ async def search_and_reuse(
                     asset_name=body.file_name,
                     candidates=result.candidates,
                     degraded=result.degraded,
+                    private_only=body.private_only,
                 )
             await db.commit()
     else:
@@ -238,20 +302,26 @@ async def search_and_reuse(
     if result.asset is not None:
         asset_payload = _asset_out(result.asset, include_lessons=True)
 
+    miss_msg = (
+        "素材未命中公共缓存，已加入私人解构队列（不会公开发布）"
+        if body.private_only
+        else "素材未找到匹配解析资产，已加入 GPU 解析队列，完成后通知你"
+    )
     return {
         "hit": result.hit,
-        "degraded": result.degraded,
+        "degraded": result.degraded and not body.private_only,
+        "private_only": body.private_only,
         "message": result.message
         or (
             "检测到该教材已有解析资产，直接复用课程结构，无需重新分析"
             if result.hit
-            else "素材未找到匹配解析资产，已加入 GPU 解析队列，完成后通知你"
+            else miss_msg
         ),
         "asset_id": result.asset_id,
         "fingerprint_id": result.fingerprint_id,
         "similar_blocks": result.similar_blocks,
         "cost_ms": result.cost_ms,
-        "candidates": result.candidates,
+        "candidates": [] if body.private_only else result.candidates,
         "upload_task_id": upload_id,
         "asset": asset_payload,
         "user_course_asset": _user_course_out(user_course) if user_course else None,
@@ -323,6 +393,25 @@ async def list_my_courses(
     return {"items": [_user_course_out(r) for r in rows]}
 
 
+@router.get("/my-courses/{course_id}")
+async def get_my_course(
+    course_id: str,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> dict[str, Any]:
+    row = (
+        await db.execute(
+            select(UserCourseAsset).where(
+                UserCourseAsset.id == course_id,
+                UserCourseAsset.user_id == user.id,
+            )
+        )
+    ).scalar_one_or_none()
+    if row is None:
+        raise HTTPException(status_code=404, detail="课程不存在")
+    return _user_course_out(row, include_lessons=True)
+
+
 @router.patch("/my-courses/{course_id}/diff")
 async def patch_my_course_diff(
     course_id: str,
@@ -339,7 +428,60 @@ async def patch_my_course_diff(
         )
     except ValueError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
-    return _user_course_out(row)
+    return _user_course_out(row, include_lessons=True)
+
+
+@router.patch("/my-courses/{course_id}/lessons")
+async def patch_my_course_lessons(
+    course_id: str,
+    body: LessonPatchBody,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> dict[str, Any]:
+    try:
+        row, lessons = await fp_svc.patch_user_course_lessons(
+            db,
+            user_id=user.id,
+            user_course_asset_id=course_id,
+            action=body.action,
+            lesson_nos=body.lesson_nos,
+            split_at_char=body.split_at_char,
+            lesson_edit=body.lesson,
+            replace_lessons=body.lessons,
+        )
+    except ValueError as exc:
+        msg = str(exc)
+        code = 404 if "not found" in msg else 422
+        raise HTTPException(status_code=code, detail=msg) from exc
+    out = _user_course_out(row, include_lessons=True)
+    out["lessons"] = lessons
+    return out
+
+
+@router.post("/my-courses/{course_id}/finalize")
+async def finalize_my_course(
+    course_id: str,
+    body: FinalizeBody,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> dict[str, Any]:
+    if not body.license_ack:
+        raise HTTPException(
+            status_code=400,
+            detail="finalize requires license_ack=true",
+        )
+    try:
+        row, _lessons = await fp_svc.finalize_user_course(
+            db,
+            user_id=user.id,
+            user_course_asset_id=course_id,
+            title=body.title,
+        )
+    except ValueError as exc:
+        msg = str(exc)
+        code = 404 if "not found" in msg else 422
+        raise HTTPException(status_code=code, detail=msg) from exc
+    return _user_course_out(row, include_lessons=True)
 
 
 @router.post("/confirm-bind")
@@ -396,23 +538,15 @@ async def request_share_course(
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> dict[str, Any]:
-    """Minimal share stub — marks private course for admin audit."""
-    _ = body.note
-    row = (
-        await db.execute(
-            select(UserCourseAsset).where(
-                UserCourseAsset.id == course_id,
-                UserCourseAsset.user_id == user.id,
-            )
-        )
-    ).scalar_one_or_none()
-    if row is None:
-        raise HTTPException(status_code=404, detail="课程不存在")
-    row.is_shared = True
-    row.share_audit_status = "pending"
-    await db.commit()
-    await db.refresh(row)
-    return _user_course_out(row)
+    """P2 stub — community share is disabled in P0 (no auto-publish)."""
+    _ = body
+    _ = user
+    _ = db
+    _ = course_id
+    raise HTTPException(
+        status_code=status.HTTP_501_NOT_IMPLEMENTED,
+        detail="社区分享为 P2，当前仅支持私人课程库",
+    )
 
 
 @router.post("/upload-tasks")

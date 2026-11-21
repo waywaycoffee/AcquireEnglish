@@ -696,10 +696,12 @@ def decompose_text_to_lessons(
     asset_name: str = "",
     max_lesson_chars: int = 2800,
     min_lesson_chars: int = 160,
+    annotate: bool = True,
 ) -> list[dict[str, Any]]:
     """Light CPU decompose: split by lesson/chapter headings or sized paragraphs.
 
-    Heavy LLM/GPU 解构 can replace this later; workers still call register the same way.
+    When annotate=True (default), each lesson gets CEFR, 3–8 target_words, goal, tasks.
+    Heavy LLM/OpenMAIC 解构 can replace this later; workers still call register the same way.
     """
     text = (cleaned_text or "").strip()
     if not text:
@@ -791,6 +793,10 @@ def decompose_text_to_lessons(
                 "text_content": body,
             }
         )
+    if annotate:
+        from app.services.fingerprint.annotate import annotate_lessons
+
+        lessons, _, _ = annotate_lessons(lessons)
     return lessons
 
 
@@ -805,6 +811,7 @@ def store_upload_task_payload(
     asset_name: str | None = None,
     candidates: list[str] | None = None,
     degraded: bool = False,
+    private_only: bool = False,
 ) -> str:
     return write_upload_payload(
         task_id,
@@ -817,8 +824,301 @@ def store_upload_task_payload(
             "asset_name": (asset_name or file_name or "导入教材")[:256],
             "candidates": candidates or [],
             "degraded": bool(degraded),
+            "private_only": bool(private_only),
         },
     )
+
+
+def _renumber_lessons(lessons: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    out: list[dict[str, Any]] = []
+    for i, raw in enumerate(lessons, start=1):
+        item = dict(raw)
+        item["lesson_no"] = i
+        out.append(item)
+    return out
+
+
+def _patch_dict(row: UserCourseAsset) -> dict[str, Any]:
+    if not row.diff_patch_json:
+        return {}
+    try:
+        data = json.loads(row.diff_patch_json)
+    except json.JSONDecodeError:
+        return {}
+    return data if isinstance(data, dict) else {}
+
+
+def resolve_user_course_lessons_sync(row: UserCourseAsset) -> list[dict[str, Any]]:
+    """Merge public asset lessons with private diff_patch lessons overlay."""
+    patch = _patch_dict(row)
+    if isinstance(patch.get("lessons"), list) and patch["lessons"]:
+        return [dict(x) for x in patch["lessons"] if isinstance(x, dict)]
+    if row.asset_cache_id:
+        return load_asset_lessons(row.asset_cache_id)
+    return []
+
+
+async def register_private_user_course(
+    db: AsyncSession,
+    *,
+    user_id: int,
+    asset_name: str,
+    lessons: list[dict[str, Any]],
+    cefr_level: str | None = None,
+    wordbank: dict[str, Any] | list[Any] | None = None,
+    summary_text: str | None = None,
+    upload_task_id: str | None = None,
+    source_type: str = "pdf_text",
+) -> dict[str, Any]:
+    """Private-only finalize: UserCourseAsset without public asset_cache / fingerprint."""
+    from app.services.fingerprint.annotate import annotate_lessons
+
+    annotated, pack_cefr, pack_bank = annotate_lessons(list(lessons or []))
+    if cefr_level:
+        pack_cefr = cefr_level
+    if wordbank is not None:
+        pack_bank = wordbank if isinstance(wordbank, dict) else {"words": wordbank}
+
+    course_id = _new_id()
+    patch = {
+        "private_only": True,
+        "status": "draft",
+        "source_type": source_type,
+        "cefr_level": pack_cefr,
+        "wordbank": pack_bank,
+        "summary_text": (summary_text or "")[:500],
+        "lessons": annotated,
+        "copyright_disclaimer": (
+            "用户声明素材仅供个人学习或已获授权；平台不自动公开发布。"
+        ),
+    }
+    row = UserCourseAsset(
+        id=course_id,
+        user_id=user_id,
+        asset_cache_id=None,
+        asset_title=(asset_name or "私人教材课")[:256],
+        diff_patch_json=_dumps(patch),
+        is_from_cache=False,
+        source_upload_id=upload_task_id,
+        is_shared=False,
+        share_audit_status="private",
+    )
+    db.add(row)
+    if upload_task_id:
+        task = (
+            await db.execute(select(UploadTask).where(UploadTask.id == upload_task_id))
+        ).scalar_one_or_none()
+        if task:
+            task.status = "success"
+            task.user_course_asset_id = course_id
+            task.fail_reason = None
+            task.update_at = _now()
+    await db.commit()
+    await db.refresh(row)
+    return {
+        "user_course_asset_id": course_id,
+        "asset_id": None,
+        "fingerprint_id": None,
+        "private_only": True,
+        "cefr_level": pack_cefr,
+        "lesson_count": len(annotated),
+    }
+
+
+def apply_lesson_ops(
+    lessons: list[dict[str, Any]],
+    *,
+    action: str,
+    lesson_nos: list[int] | None = None,
+    split_at_char: int | None = None,
+    lesson_edit: dict[str, Any] | None = None,
+    replace_lessons: list[dict[str, Any]] | None = None,
+) -> list[dict[str, Any]]:
+    """Apply merge/split/delete/edit/replace on a lesson list."""
+    from app.services.fingerprint.annotate import annotate_lesson
+
+    action = (action or "").strip().lower()
+    if action == "replace":
+        if not isinstance(replace_lessons, list):
+            raise ValueError("replace requires lessons array")
+        return _renumber_lessons(
+            [annotate_lesson(dict(x)) for x in replace_lessons if isinstance(x, dict)]
+        )
+
+    current = _renumber_lessons([dict(x) for x in lessons if isinstance(x, dict)])
+    nos = [int(n) for n in (lesson_nos or [])]
+
+    if action == "delete":
+        if not nos:
+            raise ValueError("delete requires lesson_nos")
+        drop = set(nos)
+        current = [L for L in current if int(L.get("lesson_no") or 0) not in drop]
+        return _renumber_lessons(current)
+
+    if action == "edit":
+        if len(nos) != 1 or not isinstance(lesson_edit, dict):
+            raise ValueError("edit requires one lesson_no and lesson object")
+        target = nos[0]
+        out: list[dict[str, Any]] = []
+        for L in current:
+            if int(L.get("lesson_no") or 0) == target:
+                merged = dict(L)
+                for key in (
+                    "title",
+                    "text_content",
+                    "goal",
+                    "cefr",
+                    "target_words",
+                    "tasks",
+                ):
+                    if key in lesson_edit:
+                        merged[key] = lesson_edit[key]
+                out.append(annotate_lesson(merged))
+            else:
+                out.append(L)
+        return _renumber_lessons(out)
+
+    if action == "merge":
+        if len(nos) < 2:
+            raise ValueError("merge requires at least two lesson_nos")
+        nos_sorted = sorted(set(nos))
+        by_no = {int(L.get("lesson_no") or 0): L for L in current}
+        missing = [n for n in nos_sorted if n not in by_no]
+        if missing:
+            raise ValueError(f"unknown lesson_nos: {missing}")
+        first = dict(by_no[nos_sorted[0]])
+        bodies = [str(by_no[n].get("text_content") or "").strip() for n in nos_sorted]
+        titles = [str(by_no[n].get("title") or "").strip() for n in nos_sorted]
+        first["text_content"] = "\n\n".join(b for b in bodies if b)
+        first["title"] = " / ".join(t for t in titles if t)[:256]
+        drop = set(nos_sorted[1:])
+        out = []
+        for L in current:
+            n = int(L.get("lesson_no") or 0)
+            if n == nos_sorted[0]:
+                out.append(annotate_lesson(first))
+            elif n in drop:
+                continue
+            else:
+                out.append(L)
+        return _renumber_lessons(out)
+
+    if action == "split":
+        if len(nos) != 1:
+            raise ValueError("split requires exactly one lesson_no")
+        target = nos[0]
+        out = []
+        for L in current:
+            n = int(L.get("lesson_no") or 0)
+            if n != target:
+                out.append(L)
+                continue
+            body = str(L.get("text_content") or "")
+            if split_at_char is None:
+                cut = max(80, len(body) // 2)
+                # Prefer paragraph boundary near midpoint.
+                para = body.find("\n\n", cut - 40)
+                if para > 40:
+                    cut = para
+            else:
+                cut = max(1, min(len(body) - 1, int(split_at_char)))
+            left = body[:cut].strip()
+            right = body[cut:].strip()
+            if not left or not right:
+                raise ValueError("split produced empty half")
+            a = dict(L)
+            b = dict(L)
+            a["text_content"] = left
+            a["title"] = f"{L.get('title') or 'Lesson'} (1)"
+            b["text_content"] = right
+            b["title"] = f"{L.get('title') or 'Lesson'} (2)"
+            out.append(annotate_lesson(a))
+            out.append(annotate_lesson(b))
+        return _renumber_lessons(out)
+
+    raise ValueError(f"unsupported action: {action}")
+
+
+async def patch_user_course_lessons(
+    db: AsyncSession,
+    *,
+    user_id: int,
+    user_course_asset_id: str,
+    action: str,
+    lesson_nos: list[int] | None = None,
+    split_at_char: int | None = None,
+    lesson_edit: dict[str, Any] | None = None,
+    replace_lessons: list[dict[str, Any]] | None = None,
+) -> tuple[UserCourseAsset, list[dict[str, Any]]]:
+    row = (
+        await db.execute(
+            select(UserCourseAsset).where(
+                UserCourseAsset.id == user_course_asset_id,
+                UserCourseAsset.user_id == user_id,
+            )
+        )
+    ).scalar_one_or_none()
+    if row is None:
+        raise ValueError("user course asset not found")
+    current = resolve_user_course_lessons_sync(row)
+    updated = apply_lesson_ops(
+        current,
+        action=action,
+        lesson_nos=lesson_nos,
+        split_at_char=split_at_char,
+        lesson_edit=lesson_edit,
+        replace_lessons=replace_lessons,
+    )
+    patch = _patch_dict(row)
+    patch["lessons"] = updated
+    patch["private_only"] = bool(patch.get("private_only") or row.asset_cache_id is None)
+    if "status" not in patch:
+        patch["status"] = "draft"
+    row.diff_patch_json = _dumps(patch)
+    row.update_at = _now()
+    await db.commit()
+    await db.refresh(row)
+    return row, updated
+
+
+async def finalize_user_course(
+    db: AsyncSession,
+    *,
+    user_id: int,
+    user_course_asset_id: str,
+    title: str | None = None,
+) -> tuple[UserCourseAsset, list[dict[str, Any]]]:
+    row = (
+        await db.execute(
+            select(UserCourseAsset).where(
+                UserCourseAsset.id == user_course_asset_id,
+                UserCourseAsset.user_id == user_id,
+            )
+        )
+    ).scalar_one_or_none()
+    if row is None:
+        raise ValueError("user course asset not found")
+    lessons = resolve_user_course_lessons_sync(row)
+    if not lessons:
+        raise ValueError("course has no lessons to finalize")
+    patch = _patch_dict(row)
+    patch["lessons"] = lessons
+    patch["status"] = "ready"
+    patch["finalized_at"] = _now().isoformat()
+    patch["private_only"] = True if row.asset_cache_id is None else bool(
+        patch.get("private_only", False)
+    )
+    # Never auto-share on finalize.
+    row.is_shared = False
+    if row.share_audit_status not in ("private", "rejected"):
+        row.share_audit_status = "private"
+    if title and title.strip():
+        row.asset_title = title.strip()[:256]
+    row.diff_patch_json = _dumps(patch)
+    row.update_at = _now()
+    await db.commit()
+    await db.refresh(row)
+    return row, lessons
 
 
 async def drain_queue_gpu(
@@ -882,20 +1182,44 @@ async def _process_queue_gpu_task(
     except (TypeError, ValueError):
         created_by = int(task.user_id)
 
+    private_only = bool(payload.get("private_only"))
     try:
-        lessons = decompose_text_to_lessons(cleaned, asset_name=asset_name)
-        summary = cleaned[:280].replace("\n", " ").strip()
-        reg = await register_decomposed_asset(
-            db,
-            cleaned_text=cleaned,
-            source_type=source_type,
+        from app.services.fingerprint.annotate import clean_material_text
+        from app.services.fingerprint.openmaic_adapter import decompose_and_annotate
+
+        cleaned = clean_material_text(cleaned)
+        lessons, pack_cefr, wordbank = decompose_and_annotate(
+            cleaned,
             asset_name=asset_name,
-            lessons=lessons,
-            summary_text=summary,
-            tags=["auto_decompose"],
-            created_by=created_by,
-            upload_task_id=task.id,
+            already_cleaned=True,
         )
+        summary = cleaned[:280].replace("\n", " ").strip()
+        if private_only:
+            reg = await register_private_user_course(
+                db,
+                user_id=created_by,
+                asset_name=asset_name,
+                lessons=lessons,
+                cefr_level=pack_cefr,
+                wordbank=wordbank,
+                summary_text=summary,
+                upload_task_id=task.id,
+                source_type=source_type,
+            )
+        else:
+            reg = await register_decomposed_asset(
+                db,
+                cleaned_text=cleaned,
+                source_type=source_type,
+                asset_name=asset_name,
+                lessons=lessons,
+                wordbank=wordbank,
+                cefr_level=pack_cefr,
+                summary_text=summary,
+                tags=["auto_decompose"],
+                created_by=created_by,
+                upload_task_id=task.id,
+            )
         delete_upload_payload(task.id)
         return {"task_id": task.id, "ok": True, **reg}
     except Exception as exc:  # noqa: BLE001

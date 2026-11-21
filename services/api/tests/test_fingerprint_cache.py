@@ -18,12 +18,15 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_asyn
 from app.config import settings
 from app.database import Base, get_db
 from app.main import app
-from app.models import User
+import json
+
+from app.models import User, UserCourseAsset
 from app.security import create_access_token, hash_password
 from app.services.fingerprint import embedding as emb
 from app.services.fingerprint import service as fp_svc
 from app.services.fingerprint import simhash as sh
 from app.services import content_media as cm
+from sqlalchemy import select
 
 
 SAMPLE_A = (
@@ -82,6 +85,38 @@ def test_decompose_text_to_lessons() -> None:
     assert lessons[0]["lesson_no"] == 1
     assert "text_content" in lessons[0]
     assert len(lessons[0]["text_content"]) >= 80
+    assert 3 <= len(lessons[0].get("target_words") or []) <= 8
+    assert lessons[0].get("cefr") in {"A1", "A2", "B1", "B2", "C1", "C2"}
+    assert any(
+        t.get("type") == "vocab_warmup" for t in (lessons[0].get("tasks") or [])
+    )
+
+
+def test_annotate_and_lesson_ops() -> None:
+    from app.services.fingerprint.annotate import (
+        cefr_from_freq_rank,
+        clean_material_text,
+        pick_target_words,
+    )
+
+    assert cefr_from_freq_rank(100) == "A1"
+    assert cefr_from_freq_rank(2000) == "B1"
+    assert cefr_from_freq_rank(9000) == "C1"
+    cleaned = clean_material_text("Header\n" + SAMPLE_A + "\nHeader\nHeader\nHeader")
+    assert "Header" not in cleaned or cleaned.count("Header") < 3
+    words = pick_target_words(SAMPLE_A + " " + SAMPLE_B)
+    assert 3 <= len(words) <= 8
+
+    lessons = fp_svc.decompose_text_to_lessons(
+        "Lesson 1\n" + SAMPLE_A + "\n\nLesson 2\n" + SAMPLE_B,
+        asset_name="T",
+    )
+    merged = fp_svc.apply_lesson_ops(lessons, action="merge", lesson_nos=[1, 2])
+    assert len(merged) == 1
+    split = fp_svc.apply_lesson_ops(
+        merged, action="split", lesson_nos=[1], split_at_char=200
+    )
+    assert len(split) == 2
 
 
 @pytest_asyncio.fixture
@@ -285,3 +320,59 @@ async def test_http_search_flow(tmp_path, monkeypatch):
     finally:
         app.dependency_overrides.pop(get_db, None)
         await engine.dispose()
+
+@pytest.mark.asyncio
+async def test_private_only_no_public_asset(db_session: AsyncSession) -> None:
+    user = User(
+        email="fp-private@example.com",
+        hashed_password=hash_password("x"),
+        display_name="priv",
+    )
+    db_session.add(user)
+    await db_session.commit()
+    await db_session.refresh(user)
+
+    lessons = fp_svc.decompose_text_to_lessons(SAMPLE_B, asset_name="Sahara")
+    reg = await fp_svc.register_private_user_course(
+        db_session,
+        user_id=user.id,
+        asset_name="Sahara Private",
+        lessons=lessons,
+        summary_text=SAMPLE_B[:120],
+    )
+    assert reg["private_only"] is True
+    assert reg["asset_id"] is None
+    course_id = reg["user_course_asset_id"]
+
+    row = (
+        await db_session.execute(
+            select(UserCourseAsset).where(UserCourseAsset.id == course_id)
+        )
+    ).scalar_one()
+    assert row.asset_cache_id is None
+    assert row.is_shared is False
+
+    # Miss search should not hit this private pack as public cache.
+    miss = await fp_svc.search_fingerprint(
+        db_session,
+        cleaned_text=SAMPLE_B,
+        source_type="pdf_text",
+        user_id=user.id,
+    )
+    assert miss.hit is False
+
+    _row2, updated = await fp_svc.patch_user_course_lessons(
+        db_session,
+        user_id=user.id,
+        user_course_asset_id=course_id,
+        action="edit",
+        lesson_nos=[1],
+        lesson_edit={"title": "Desert intro"},
+    )
+    assert updated[0]["title"] == "Desert intro"
+    fin, ready = await fp_svc.finalize_user_course(
+        db_session, user_id=user.id, user_course_asset_id=course_id
+    )
+    patch = json.loads(fin.diff_patch_json or "{}")
+    assert patch.get("status") == "ready"
+    assert len(ready) >= 1

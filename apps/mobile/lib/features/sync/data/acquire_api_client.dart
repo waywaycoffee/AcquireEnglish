@@ -2043,6 +2043,8 @@ class AcquireApiClient {
   }
 
   /// 指纹检索：命中则复用公共课程资产，未命中由上游排队 GPU 解构。
+  ///
+  /// [privateOnly] 教材流：miss 只写私人课，不进公共 asset_cache；需 [licenseAck]。
   Future<FingerprintCacheSearchResult?> searchFingerprintCache({
     required String cleanedText,
     String sourceType = 'pdf_text',
@@ -2050,6 +2052,8 @@ class AcquireApiClient {
     String fileType = 'pdf',
     bool createUploadTask = true,
     bool autoBindCourse = true,
+    bool privateOnly = false,
+    bool licenseAck = false,
   }) async {
     final String text = cleanedText.trim();
     if (text.length < 80) return null;
@@ -2064,6 +2068,8 @@ class AcquireApiClient {
           'file_type': fileType,
           'create_upload_task': createUploadTask,
           'auto_bind_course': autoBindCourse,
+          'private_only': privateOnly,
+          'license_ack': licenseAck,
         },
         options: Options(
           receiveTimeout: const Duration(seconds: 30),
@@ -2155,6 +2161,82 @@ class AcquireApiClient {
       ];
     } catch (_) {
       return const <Map<String, dynamic>>[];
+    }
+  }
+
+  Future<Map<String, dynamic>?> getMyFingerprintCourse(String courseId) async {
+    final String id = courseId.trim();
+    if (id.isEmpty) return null;
+    try {
+      final Response<dynamic> response = await _dio.get(
+        Endpoints.fingerprintCacheMyCourse(id),
+        options: Options(
+          receiveTimeout: const Duration(seconds: 20),
+          sendTimeout: const Duration(seconds: 20),
+        ),
+      );
+      if (response.data is! Map) return null;
+      return Map<String, dynamic>.from(response.data as Map);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Future<Map<String, dynamic>?> patchMyFingerprintCourseLessons({
+    required String courseId,
+    required String action,
+    List<int> lessonNos = const <int>[],
+    int? splitAtChar,
+    Map<String, dynamic>? lesson,
+    List<Map<String, dynamic>>? lessons,
+  }) async {
+    final String id = courseId.trim();
+    if (id.isEmpty || action.trim().isEmpty) return null;
+    try {
+      final Response<dynamic> response = await _dio.patch(
+        Endpoints.fingerprintCacheCourseLessons(id),
+        data: <String, dynamic>{
+          'action': action.trim(),
+          'lesson_nos': lessonNos,
+          if (splitAtChar != null) 'split_at_char': splitAtChar,
+          if (lesson != null) 'lesson': lesson,
+          if (lessons != null) 'lessons': lessons,
+        },
+        options: Options(
+          receiveTimeout: const Duration(seconds: 30),
+          sendTimeout: const Duration(seconds: 30),
+        ),
+      );
+      if (response.data is! Map) return null;
+      return Map<String, dynamic>.from(response.data as Map);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Future<Map<String, dynamic>?> finalizeMyFingerprintCourse({
+    required String courseId,
+    String? title,
+    bool licenseAck = true,
+  }) async {
+    final String id = courseId.trim();
+    if (id.isEmpty) return null;
+    try {
+      final Response<dynamic> response = await _dio.post(
+        Endpoints.fingerprintCacheCourseFinalize(id),
+        data: <String, dynamic>{
+          if (title != null && title.trim().isNotEmpty) 'title': title.trim(),
+          'license_ack': licenseAck,
+        },
+        options: Options(
+          receiveTimeout: const Duration(seconds: 20),
+          sendTimeout: const Duration(seconds: 20),
+        ),
+      );
+      if (response.data is! Map) return null;
+      return Map<String, dynamic>.from(response.data as Map);
+    } catch (_) {
+      return null;
     }
   }
 

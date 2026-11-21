@@ -20,12 +20,15 @@ class ReadingPdfImportResult {
 }
 
 /// PDF import: embedded text → shared OCR library → on-device OCR (+ optional upload).
+///
+/// [shareOcr] false：私人教材解构流不读/不写共享 OCR（默认阅读导入仍为 true）。
 Future<ReadingPdfImportResult> importPdfForReading({
   required Uint8List bytes,
   required String filename,
   required AcquireApiClient api,
   required bool isLoggedIn,
   ReadingPdfOcrProgress? onProgress,
+  bool shareOcr = true,
 }) async {
   final String sha = sha256HexOfBytes(bytes);
   final String embedded = parsePdfImport(bytes);
@@ -37,28 +40,30 @@ Future<ReadingPdfImportResult> importPdfForReading({
     );
   }
 
-  onProgress?.call(0, 1, '正在查询云端 OCR 图书库…');
-  try {
-    final SharedOcrBookPack? shared = await api.getSharedOcrBook(
-      contentSha256: sha,
-    );
-    final String sharedText = (shared?.plainText ?? '').trim();
-    if (sharedText.length >= 40) {
-      return ReadingPdfImportResult(
-        text: sharedText,
-        source: 'shared_ocr',
-        pageCount: shared?.pageCount ?? 0,
+  if (shareOcr) {
+    onProgress?.call(0, 1, '正在查询云端 OCR 图书库…');
+    try {
+      final SharedOcrBookPack? shared = await api.getSharedOcrBook(
         contentSha256: sha,
       );
-    }
-  } catch (_) {}
+      final String sharedText = (shared?.plainText ?? '').trim();
+      if (sharedText.length >= 40) {
+        return ReadingPdfImportResult(
+          text: sharedText,
+          source: 'shared_ocr',
+          pageCount: shared?.pageCount ?? 0,
+          contentSha256: sha,
+        );
+      }
+    } catch (_) {}
+  }
 
   final ({String text, int pageCount, int ocrPages}) ocr = await ocrScannedPdf(
     bytes,
     onProgress: onProgress,
   );
 
-  if (isLoggedIn) {
+  if (isLoggedIn && shareOcr) {
     onProgress?.call(ocr.ocrPages, ocr.pageCount, '正在上传到云端 OCR 图书库…');
     try {
       await api.putSharedOcrBook(
