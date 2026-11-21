@@ -12,6 +12,7 @@ class DigitalHumanPersona {
     this.voiceGender = 'female',
     this.recommendedVoiceId,
     this.hasCartoonAtlas = true,
+    this.isChild = false,
     this.localPitch = 1.0,
     this.localSpeechRate = 0.48,
   });
@@ -37,6 +38,7 @@ class DigitalHumanPersona {
   final String voiceLabel;
   final String? recommendedVoiceId;
   final bool hasCartoonAtlas;
+  final bool isChild;
 
   /// `female` / `male` — used to pick a local device voice as Edge fallback.
   final String voiceGender;
@@ -213,6 +215,62 @@ const List<DigitalHumanPersona> digitalHumanCatalog = <DigitalHumanPersona>[
     voiceGender: 'male',
     recommendedVoiceId: 'qwen-audio-3.0-tts-flash-loongryanma',
     hasCartoonAtlas: false,
+  ),
+  DigitalHumanPersona(
+    id: 'finley',
+    displayName: 'Finley',
+    tagline: '好奇爱提问 · 英语练习伙伴',
+    assetPath: 'assets/img/digital_human/finley.webp',
+    liveTalkingAvatarId: '',
+    edgeVoiceEn: 'en-US-ChristopherNeural',
+    edgeVoiceZh: 'zh-CN-YunxiNeural',
+    voiceLabel: '推荐音色 · Ryan',
+    voiceGender: 'male',
+    recommendedVoiceId: 'qwen-audio-3.0-tts-flash-loongryanma',
+    hasCartoonAtlas: false,
+    isChild: true,
+  ),
+  DigitalHumanPersona(
+    id: 'miles',
+    displayName: 'Miles',
+    tagline: '开朗爱分享 · 英语练习伙伴',
+    assetPath: 'assets/img/digital_human/miles.webp',
+    liveTalkingAvatarId: '',
+    edgeVoiceEn: 'en-US-ChristopherNeural',
+    edgeVoiceZh: 'zh-CN-YunxiNeural',
+    voiceLabel: '推荐音色 · Adrian',
+    voiceGender: 'male',
+    recommendedVoiceId: 'qwen-audio-3.0-tts-flash-loongadriangao',
+    hasCartoonAtlas: false,
+    isChild: true,
+  ),
+  DigitalHumanPersona(
+    id: 'ruby',
+    displayName: 'Ruby',
+    tagline: '喜欢讲故事 · 英语练习伙伴',
+    assetPath: 'assets/img/digital_human/ruby.webp',
+    liveTalkingAvatarId: '',
+    edgeVoiceEn: 'en-US-AnaNeural',
+    edgeVoiceZh: 'zh-CN-XiaoxiaoNeural',
+    voiceLabel: '推荐音色 · 龙安小昕',
+    voiceGender: 'female',
+    recommendedVoiceId: 'longanxiaoxin',
+    hasCartoonAtlas: false,
+    isChild: true,
+  ),
+  DigitalHumanPersona(
+    id: 'sophie',
+    displayName: 'Sophie',
+    tagline: '喜欢猜谜语 · 英语练习伙伴',
+    assetPath: 'assets/img/digital_human/sophie.webp',
+    liveTalkingAvatarId: '',
+    edgeVoiceEn: 'en-US-AnaNeural',
+    edgeVoiceZh: 'zh-CN-XiaoxiaoNeural',
+    voiceLabel: '推荐音色 · 龙安灵希',
+    voiceGender: 'female',
+    recommendedVoiceId: 'longanlingxi',
+    hasCartoonAtlas: false,
+    isChild: true,
   ),
 ];
 

@@ -15,8 +15,26 @@ class DigitalHumanPicker extends ConsumerStatefulWidget {
   ConsumerState<DigitalHumanPicker> createState() => _DigitalHumanPickerState();
 }
 
+enum _PersonaFilter {
+  all('全部'),
+  women('女外教'),
+  men('男外教'),
+  children('儿童伙伴');
+
+  const _PersonaFilter(this.label);
+  final String label;
+
+  bool matches(DigitalHumanPersona persona) => switch (this) {
+    all => true,
+    women => !persona.isChild && persona.isFemaleVoice,
+    men => !persona.isChild && !persona.isFemaleVoice,
+    children => persona.isChild,
+  };
+}
+
 class _DigitalHumanPickerState extends ConsumerState<DigitalHumanPicker> {
   final ScrollController _personas = ScrollController();
+  _PersonaFilter _filter = _PersonaFilter.all;
 
   @override
   void dispose() {
@@ -28,6 +46,9 @@ class _DigitalHumanPickerState extends ConsumerState<DigitalHumanPicker> {
   Widget build(BuildContext context) {
     final LearningSettingsState settings = ref.watch(learningSettingsProvider);
     final DigitalHumanPersona selected = settings.selectedDigitalHuman;
+    final List<DigitalHumanPersona> visible = digitalHumanCatalog
+        .where(_filter.matches)
+        .toList(growable: false);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -69,6 +90,22 @@ class _DigitalHumanPickerState extends ConsumerState<DigitalHumanPicker> {
               .setCartoonDigitalHuman(values.first),
         ),
         const SizedBox(height: 12),
+        Wrap(
+          spacing: 8,
+          children: <Widget>[
+            for (final _PersonaFilter filter in _PersonaFilter.values)
+              ChoiceChip(
+                label: Text(filter.label),
+                selected: filter == _filter,
+                onSelected: (bool selected) {
+                  if (!selected) return;
+                  if (_personas.hasClients) _personas.jumpTo(0);
+                  setState(() => _filter = filter);
+                },
+              ),
+          ],
+        ),
+        const SizedBox(height: 8),
         RawScrollbar(
           controller: _personas,
           thumbVisibility: true,
@@ -86,10 +123,10 @@ class _DigitalHumanPickerState extends ConsumerState<DigitalHumanPicker> {
               primary: false,
               padding: const EdgeInsets.only(bottom: 16),
               scrollDirection: Axis.horizontal,
-              itemCount: digitalHumanCatalog.length,
+              itemCount: visible.length,
               separatorBuilder: (_, __) => const SizedBox(width: 12),
               itemBuilder: (BuildContext context, int index) {
-                final DigitalHumanPersona persona = digitalHumanCatalog[index];
+                final DigitalHumanPersona persona = visible[index];
                 final bool active = persona.id == selected.id;
                 return _PersonaCard(
                   persona: persona,

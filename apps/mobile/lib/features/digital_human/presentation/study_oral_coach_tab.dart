@@ -664,9 +664,10 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
     _difficulty = session.difficulty;
   }
 
-  bool get _usesCloudVoice => !_preferChineseReply || isBilingualCoachVoice(_englishVoiceId);
+  bool _usesCloudVoice(DigitalHumanPersona persona) => !_preferChineseReply ||
+      isBilingualCoachVoice(_englishVoiceId ?? persona.recommendedVoiceId);
 
-  String _coachVoice(DigitalHumanPersona persona) => _preferChineseReply && !_usesCloudVoice
+  String _coachVoice(DigitalHumanPersona persona) => _preferChineseReply && !_usesCloudVoice(persona)
       ? persona.edgeVoice(chinese: true)
       : _englishVoiceId ?? persona.recommendedVoiceId ?? persona.edgeVoice(chinese: false);
 
@@ -771,7 +772,8 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
     if (!mounted || !_started || _coachSpeaking || speak.isEmpty) return;
     setState(() => _coachSpeaking = true);
     try {
-      if (_usesCloudVoice) {
+      final bool usesCloudVoice = _usesCloudVoice(settings.selectedDigitalHuman);
+      if (usesCloudVoice) {
         String? remote = ttsUrl;
         if (remote == null || remote.isEmpty) {
           try {
@@ -804,7 +806,7 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
           }
         }
       }
-      if (!_usesCloudVoice && ttsUrl != null && ttsUrl.isNotEmpty && await _playRemoteTts(ttsUrl))
+      if (!usesCloudVoice && ttsUrl != null && ttsUrl.isNotEmpty && await _playRemoteTts(ttsUrl))
         return;
       if (!mounted || !_started) return;
       await _configureLocalPersonaVoice(settings.selectedDigitalHuman);
