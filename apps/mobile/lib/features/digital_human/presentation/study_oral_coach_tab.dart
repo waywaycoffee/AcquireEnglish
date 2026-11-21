@@ -749,7 +749,8 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
                       selected: _englishVoiceId == null,
                       onTap: () => Navigator.pop(sheetContext, ''),
                     ),
-                    for (final CoachEnglishVoice voice in coachVoices)
+                    for (final CoachEnglishVoice voice
+                        in coachVoicesForPersona(persona))
                       ListTile(
                         selected: voice.id == (_englishVoiceId ?? persona.recommendedVoiceId),
                         title: Text(voice.name),

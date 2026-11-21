@@ -26,12 +26,28 @@ BILINGUAL_VOICES = frozenset({
     'longanxiaoxin',
     'longanlingxi',
     'longanhuan_v3.6',
+    'longpaopao_v3.6',
+    'longjielidou_v3.6',
+    'longhuohuo_v3.6',
+    'longchuanshu_v3.6',
 })
 PERSONA_VOICES = {
-    'mia': VOICE_PREFIX + 'olivialin',
-    'leo': VOICE_PREFIX + 'adriangao',
+    'mia': 'longanfengyue',
+    'leo': 'longchuanshu_v3.6',
     'emma': VOICE_PREFIX + 'norahu',
-    'arun': VOICE_PREFIX + 'jameszhao',
+    'arun': 'longchuanshu_v3.6',
+    'olivia': 'longanfengyue',
+    'luna': 'longanxiaoxin',
+    'nora': 'longanlingxi',
+    'ivy': 'longanhuan_v3.6',
+    'alexander': 'longchuanshu_v3.6',
+    'adrian': 'longchuanshu_v3.6',
+    'james': 'longchuanshu_v3.6',
+    'ryan': 'longhuohuo_v3.6',
+    'finley': 'longjielidou_v3.6',
+    'miles': 'longhuohuo_v3.6',
+    'ruby': 'longanxiaoxin',
+    'sophie': 'longanlingxi',
 }
 
 

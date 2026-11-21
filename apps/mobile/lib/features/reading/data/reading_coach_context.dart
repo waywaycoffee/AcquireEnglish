@@ -1,3 +1,4 @@
+import '../../digital_human/data/coach_english_voices.dart';
 import '../../digital_human/data/digital_human_catalog.dart';
 import '../../digital_human/data/oral_coach_pipeline_client.dart';
 import '../domain/reading_doc.dart';
@@ -50,6 +51,7 @@ OralCoachVideoContext buildReadingCoachContext({
 String readingCoachVoiceForPersona(DigitalHumanPersona persona) {
   final String? recommended = persona.recommendedVoiceId?.trim();
   if (recommended != null && recommended.isNotEmpty) return recommended;
+  if (persona.isAsianAppearance) return bilingualVoiceIdForPersona(persona);
   return persona.isFemaleVoice
       ? 'qwen-audio-3.0-tts-flash-loongolivialin'
       : 'qwen-audio-3.0-tts-flash-loongadriangao';

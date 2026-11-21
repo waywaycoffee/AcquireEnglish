@@ -23,7 +23,9 @@ void main() {
     expect(find.byType(CartoonCoachSprite), findsNothing);
     expect(find.text('卡通版'), findsNothing);
     expect(find.byTooltip('试听 Mia'), findsOneWidget);
-    expect(find.text('中文另用音色'), findsWidgets);
+    // Asian home personas (Mia / Leo / Arun) wire bilingual TTS by default.
+    expect(find.text('中英同音色'), findsWidgets);
+    expect(find.text('中文另用音色'), findsOneWidget); // Emma only
     final Iterable<Image> photos = tester.widgetList<Image>(find.byType(Image));
     expect(
       photos.any(
@@ -36,6 +38,6 @@ void main() {
     await tester.tap(find.text('儿童伙伴'));
     await tester.pumpAndSettle();
     expect(find.byTooltip('试听 Ruby'), findsOneWidget);
-    expect(find.text('中英同音色'), findsNWidgets(2));
+    expect(find.text('中英同音色'), findsNWidgets(4));
   });
 }
