@@ -266,11 +266,7 @@ class ReadingCatalogClient {
       case ReadingCatalogKind.cefr:
         return _downloadCefrCached(entry);
       case ReadingCatalogKind.standardebooks:
-        return _downloadEpub(
-          entry: entry,
-          sourceLabel: 'Standard Ebooks',
-          disclaimer: '公版文本 · Standard Ebooks 排版（CC0）。仅供个人学习。',
-        );
+        return _downloadStandardEbook(entry);
       case ReadingCatalogKind.readseasy:
       case ReadingCatalogKind.clickbook:
         throw StateError('请在浏览器打开站点后，用「导入」加入 EPUB/TXT');
@@ -651,6 +647,67 @@ class ReadingCatalogClient {
     );
   }
 
+  /// Standard Ebooks site serves an HTML interstitial instead of the EPUB bytes
+  /// to non-browser clients. Pull the public GitHub source zip and extract text.
+  Future<ReadingDoc> _downloadStandardEbook(ReadingCatalogEntry entry) async {
+    final List<String> slugs = _standardEbooksGithubSlugs(entry.path);
+    if (slugs.isEmpty) {
+      throw StateError('缺少 Standard Ebooks 路径');
+    }
+    Object? lastError;
+    for (final String slug in slugs) {
+      final String url =
+          'https://github.com/standardebooks/$slug/archive/refs/heads/master.zip';
+      try {
+        final Response<List<int>> response = await _dio.get<List<int>>(
+          url,
+          options: Options(
+            responseType: ResponseType.bytes,
+            followRedirects: true,
+            validateStatus: (int? code) => code != null && code >= 200 && code < 400,
+          ),
+        );
+        final List<int>? data = response.data;
+        if (data == null || data.isEmpty) {
+          throw StateError('空响应');
+        }
+        final String text = parseEpubImport(Uint8List.fromList(data));
+        if (text.trim().isEmpty) {
+          throw StateError('未能从源码包提取正文');
+        }
+        return ReadingDoc(
+          id: entry.stableDocId,
+          title: entry.title,
+          sourceType: ReadingSourceType.catalog,
+          level: entry.level,
+          plainText: text,
+          sourceLabel: 'Standard Ebooks',
+          courseTitle: '公版文本 · Standard Ebooks 排版（CC0）。仅供个人学习。',
+          episodeTitle: entry.subtitle,
+          createdAt: DateTime.now(),
+        );
+      } catch (e) {
+        lastError = e;
+      }
+    }
+    throw StateError('Standard Ebooks 下载失败：$lastError');
+  }
+
+  static List<String> _standardEbooksGithubSlugs(String path) {
+    final List<String> parts = path
+        .split('/')
+        .map((String p) => p.trim())
+        .where((String p) => p.isNotEmpty)
+        .toList(growable: false);
+    if (parts.isEmpty) return const <String>[];
+    final List<String> out = <String>[parts.join('_')];
+    // Translator / illustrator segment is often not in the GitHub repo name.
+    if (parts.length >= 3) {
+      out.add(parts.take(2).join('_'));
+    }
+    return out.toSet().toList(growable: false);
+  }
+
   List<Map<String, String>> _loadCefrCache() {
     if (!Hive.isBoxOpen('prefs')) return const <Map<String, String>>[];
     final String? raw = Hive.box<String>('prefs').get(_cefrCacheKey);
@@ -692,7 +749,8 @@ class ReadingCatalogClient {
 
   static String _standardEbooksEpubUrl(String path) {
     final String slug = path.replaceAll('/', '_');
-    return 'https://standardebooks.org/ebooks/$path/downloads/$slug.epub';
+    // Prefer GitHub source zip — standardebooks.org returns HTML to app clients.
+    return 'https://github.com/standardebooks/$slug/archive/refs/heads/master.zip';
   }
 
   static String _pathFromSeEpub(String epubUrl) {
@@ -806,6 +864,9 @@ List<List<String>> _parseCsv(String raw) {
 }
 
 /// Extract stories from Magic English Buddy `index.ts` story arrays.
+///
+/// Real files nest `words: [...]` inside each paragraph; a naive non-greedy
+/// `content: [...]` regex stops at the first nested `]`, so we walk brackets.
 List<ReadingCatalogEntry> parseMagicStoriesIndex(
   String raw, {
   required String path,
@@ -816,20 +877,26 @@ List<ReadingCatalogEntry> parseMagicStoriesIndex(
       ).firstMatch(path)?.group(1) ??
       '';
   final List<ReadingCatalogEntry> out = <ReadingCatalogEntry>[];
+  // Stories have `level: N` right after id; quiz items use `type:` instead.
+  // Without that anchor, `id: '…_q1' … title:` would skip into the next story.
   final RegExp storyRe = RegExp(
-    r"\{\s*id:\s*'([^']+)'[\s\S]*?title:\s*'((?:\\'|[^'])*)'[\s\S]*?content:\s*\[([\s\S]*?)\]\s*,",
+    r"id:\s*'([^']+)'\s*,\s*level:\s*\d+[\s\S]*?title:\s*'((?:\\'|[^'])*)'[\s\S]*?content:\s*\[",
   );
+  final RegExp quizIdRe = RegExp(r'_q\d+$');
   for (final RegExpMatch m in storyRe.allMatches(raw)) {
     final String id = m.group(1) ?? '';
+    if (id.isEmpty || quizIdRe.hasMatch(id)) continue;
     final String title = (m.group(2) ?? '').replaceAll(r"\'", "'");
-    final String contentBlock = m.group(3) ?? '';
+    final int openIdx = m.end - 1; // points at '['
+    final String contentBlock = _extractBalancedBracketBlock(raw, openIdx);
+    if (contentBlock.isEmpty) continue;
     final List<String> paras = <String>[];
     for (final RegExpMatch tm in RegExp(
       r"text:\s*'((?:\\'|[^'])*)'",
     ).allMatches(contentBlock)) {
       paras.add((tm.group(1) ?? '').replaceAll(r"\'", "'"));
     }
-    if (id.isEmpty || title.isEmpty || paras.isEmpty) continue;
+    if (title.isEmpty || paras.isEmpty) continue;
     final String text = paras.join(' ');
     out.add(
       ReadingCatalogEntry(
@@ -843,4 +910,26 @@ List<ReadingCatalogEntry> parseMagicStoriesIndex(
     );
   }
   return out;
+}
+
+/// Returns the interior of a `[...]` block starting at [openIndex].
+String _extractBalancedBracketBlock(String source, int openIndex) {
+  if (openIndex < 0 ||
+      openIndex >= source.length ||
+      source.codeUnitAt(openIndex) != 0x5B /* [ */) {
+    return '';
+  }
+  int depth = 0;
+  for (int i = openIndex; i < source.length; i++) {
+    final int cu = source.codeUnitAt(i);
+    if (cu == 0x5B) {
+      depth += 1;
+    } else if (cu == 0x5D) {
+      depth -= 1;
+      if (depth == 0) {
+        return source.substring(openIndex + 1, i);
+      }
+    }
+  }
+  return '';
 }

@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:typed_data';
 
+import 'package:archive/archive.dart';
 import 'package:common_learn_english/features/player/presentation/player_mock_state.dart';
 import 'package:common_learn_english/features/reading/data/reading_ingest.dart';
 import 'package:common_learn_english/features/reading/domain/reading_doc.dart';
@@ -72,6 +73,47 @@ void main() {
         utf8.encode('\uFEFFHello reading\n'),
       );
       expect(parseTxtImport(bytes), 'Hello reading');
+    });
+  });
+
+  group('parseEpubImport', () {
+    test('extracts xhtml body text from zip', () {
+      final Archive archive = Archive();
+      final List<int> chapter = utf8.encode(
+        '<html xmlns="http://www.w3.org/1999/xhtml"><body>'
+        '<p>The cafe opens early.</p>'
+        '<p>I order coffee to go.</p>'
+        '</body></html>',
+      );
+      final List<int> colophon = utf8.encode(
+        '<html><body><p>Should be skipped colophon.</p></body></html>',
+      );
+      archive.addFile(
+        ArchiveFile('OEBPS/chapter-1.xhtml', chapter.length, chapter),
+      );
+      archive.addFile(
+        ArchiveFile('OEBPS/colophon.xhtml', colophon.length, colophon),
+      );
+      final List<int>? encoded = ZipEncoder().encode(archive);
+      expect(encoded, isNotNull);
+      final String text = parseEpubImport(Uint8List.fromList(encoded!));
+      expect(text, contains('cafe opens early'));
+      expect(text, contains('coffee to go'));
+      expect(text, isNot(contains('colophon')));
+    });
+
+    test('rejects non-zip payloads', () {
+      expect(
+        () => parseEpubImport(Uint8List.fromList(utf8.encode('<html>nope</html>'))),
+        throwsA(isA<StateError>()),
+      );
+    });
+  });
+
+  group('titleFromFilename', () {
+    test('strips extension', () {
+      expect(titleFromFilename('My Book.epub'), 'My Book');
+      expect(titleFromFilename(r'C:\tmp\sample_cafe.txt'), 'sample_cafe');
     });
   });
 

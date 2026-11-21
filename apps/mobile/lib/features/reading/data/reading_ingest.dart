@@ -117,20 +117,45 @@ String parseTxtImport(Uint8List bytes, {String? filename}) {
 }
 
 /// Extract readable plain text from an EPUB (xhtml/html bodies).
+///
+/// Also works on Standard Ebooks GitHub source zips (`*/src/epub/text/*.xhtml`).
 String parseEpubImport(Uint8List bytes) {
+  if (bytes.length < 4 || bytes[0] != 0x50 || bytes[1] != 0x4B) {
+    throw StateError('不是有效的 EPUB/ZIP（可能下载到了网页）');
+  }
   final Archive archive = ZipDecoder().decodeBytes(bytes);
   final List<ArchiveFile> htmlFiles = archive.files
       .where((ArchiveFile f) {
-        final String name = f.name.toLowerCase();
-        return name.endsWith('.xhtml') ||
+        if (!f.isFile) return false;
+        final String name = f.name.toLowerCase().replaceAll('\\', '/');
+        if (!(name.endsWith('.xhtml') ||
             name.endsWith('.html') ||
-            name.endsWith('.htm');
+            name.endsWith('.htm'))) {
+          return false;
+        }
+        // Skip boilerplate / navigation when present (SE source + many EPUBs).
+        final String base = name.split('/').last;
+        if (base.startsWith('toc') ||
+            base.contains('nav') ||
+            base.contains('colophon') ||
+            base.contains('imprint') ||
+            base.contains('uncopyright') ||
+            base.contains('titlepage') ||
+            base.contains('cover') ||
+            base.contains('dedication') ||
+            base.contains('halftitle') ||
+            base.contains('epigraph') ||
+            base.contains('loi') ||
+            base.contains('copyright')) {
+          return false;
+        }
+        return true;
       })
       .toList()
-    ..sort((ArchiveFile a, ArchiveFile b) => a.name.compareTo(b.name));
+    ..sort((ArchiveFile a, ArchiveFile b) =>
+        _naturalEpubPathCompare(a.name, b.name));
   final StringBuffer buf = StringBuffer();
   for (final ArchiveFile file in htmlFiles) {
-    if (!file.isFile) continue;
     final String xml = utf8.decode(file.content as List<int>, allowMalformed: true);
     final String plain = html_parser.parse(xml).body?.text ?? '';
     final String cleaned = plain.replaceAll(RegExp(r'\s+'), ' ').trim();
@@ -141,10 +166,28 @@ String parseEpubImport(Uint8List bytes) {
   return buf.toString().trim();
 }
 
+int _naturalEpubPathCompare(String a, String b) {
+  final List<String> pa = a.toLowerCase().replaceAll('\\', '/').split('/');
+  final List<String> pb = b.toLowerCase().replaceAll('\\', '/').split('/');
+  final String fa = pa.isEmpty ? a : pa.last;
+  final String fb = pb.isEmpty ? b : pb.last;
+  final RegExp numRe = RegExp(r'(\d+)');
+  final Match? ma = numRe.firstMatch(fa);
+  final Match? mb = numRe.firstMatch(fb);
+  if (ma != null && mb != null) {
+    final int na = int.tryParse(ma.group(1)!) ?? 0;
+    final int nb = int.tryParse(mb.group(1)!) ?? 0;
+    if (na != nb) return na.compareTo(nb);
+  }
+  return a.compareTo(b);
+}
+
 String titleFromFilename(String name) {
-  String base = name.replaceAll(RegExp(r'[/\\]+'), ' ').trim();
+  String base = name.trim();
   final int slash = base.lastIndexOf('/');
-  if (slash >= 0) base = base.substring(slash + 1);
+  final int backslash = base.lastIndexOf(r'\');
+  final int cut = slash > backslash ? slash : backslash;
+  if (cut >= 0) base = base.substring(cut + 1);
   base = base.replaceAll(
     RegExp(r'\.(txt|epub|md|html?)$', caseSensitive: false),
     '',
