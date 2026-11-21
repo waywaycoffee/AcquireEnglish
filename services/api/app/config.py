@@ -81,6 +81,9 @@ class Settings(BaseSettings):
     openlist_public_base: str = ""
     # Optional token for approving community reclassify requests (header X-Community-Admin-Token).
     community_admin_token: str = ""
+    # Ops console (/admin + /api/admin/*). Header: X-Admin-Token.
+    # Falls back to community_admin_token when empty so one secret can unlock both.
+    admin_api_token: str = ""
 
     # Tencent Cloud SOE (server-side pronunciation). Never ship these in the APK.
     tencent_soe_app_id: str = ""

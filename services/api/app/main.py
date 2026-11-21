@@ -8,6 +8,7 @@ from fastapi.staticfiles import StaticFiles
 from app.config import settings
 from app.database import Base, engine
 from app.routers import (
+    admin,
     app_settings_backup,
     assets,
     auth,
@@ -86,6 +87,7 @@ app.add_middleware(
 )
 
 app.include_router(auth.router, prefix="/api")
+app.include_router(admin.router, prefix="/api")
 app.include_router(courses.router, prefix="/api")
 app.include_router(progress.router, prefix="/api")
 app.include_router(vocab.router, prefix="/api")
@@ -199,9 +201,19 @@ async def health() -> dict[str, str]:
             else "unset"
         ),
         "user_assets": "/api/assets",
+        "admin": "/admin/",
         "openlist": "configured" if settings.openlist_configured else "unset",
         "netdisk": "/api/netdisk",
     }
+
+# Ops console (also deployed to /opt/acquireenglish/www/admin for nginx).
+_admin_web = Path(__file__).resolve().parent / "admin_web"
+if _admin_web.is_dir():
+    app.mount(
+        "/admin",
+        StaticFiles(directory=str(_admin_web), html=True),
+        name="admin_web",
+    )
 
 # Public reading catalogs are cached by ECS for reliable domestic downloads.
 from app.routers import reading_source
