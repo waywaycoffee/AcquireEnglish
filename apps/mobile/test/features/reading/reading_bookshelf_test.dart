@@ -48,7 +48,9 @@ void main() {
     expect(find.text('A Morning Walk'), findsOneWidget);
     expect(find.text('The Lost Key'), findsOneWidget);
     expect(find.text('导入'), findsOneWidget);
-    expect(find.text('＋'), findsOneWidget);
+    expect(find.text('＋'), findsNothing);
+    expect(find.byIcon(Icons.file_download_outlined), findsWidgets);
+    expect(find.text('ACQUIRE ENGLISH'), findsNWidgets(2));
     expect(tester.takeException(), isNull);
   });
 
@@ -59,17 +61,17 @@ void main() {
           body: ReadingBookshelfFooter(
             bookCount: 10,
             totalWords: 1860,
-            hint: '书架上的书 · 非卡片网格',
           ),
         ),
       ),
     );
     expect(find.textContaining('10 本'), findsOneWidget);
     expect(find.textContaining('1,860 词'), findsOneWidget);
-    expect(find.text('书架上的书 · 非卡片网格'), findsOneWidget);
+    expect(find.text('10 本 · 1,860 词'), findsOneWidget);
+    expect(find.text('◇'), findsNWidgets(2));
   });
 
-  testWidgets('bookshelf view shows title search add and stats', (
+  testWidgets('bookshelf view shows centered title, search, import and stats', (
     WidgetTester tester,
   ) async {
     await tester.pumpWidget(
@@ -82,13 +84,15 @@ void main() {
             onOpen: (_) {},
             onImport: () {},
             onSearch: () {},
-            footerHint: '书架上的书 · 非卡片网格',
           ),
         ),
       ),
     );
     expect(find.text('我的书架'), findsOneWidget);
-    expect(find.text('封面朝外 · 点书继续读'), findsOneWidget);
+    expect(find.text('封面朝外 · 点书继续读'), findsNothing);
+    final Offset titleCenter = tester.getCenter(find.text('我的书架'));
+    expect(titleCenter.dx, closeTo(tester.view.physicalSize.width / tester.view.devicePixelRatio / 2, 1));
+    expect(find.byIcon(Icons.search_rounded), findsOneWidget);
     expect(find.textContaining('0 本'), findsOneWidget);
     expect(find.text('导入'), findsOneWidget);
   });

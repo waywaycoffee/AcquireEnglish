@@ -4,9 +4,8 @@ import '../domain/reading_doc.dart';
 import 'reading_bookshelf.dart';
 import 'reading_bookshelf_theme.dart';
 
-/// Light oak bookshelf panel: brown wood, 3 shelf ledges, ~4 cover tiles per row,
-/// last slot = Import (＋). Colors follow [ReadingBookshelfTheme.light] (#5C3D2E /
-/// #8B5E3C).
+/// Light oak bookshelf panel: 3 ledges, ~3 gold hardcovers per row, dashed
+/// import slot last. Colors follow [ReadingBookshelfTheme.light].
 class ReadingBookshelfView extends StatelessWidget {
   const ReadingBookshelfView({
     required this.docs,
@@ -61,7 +60,7 @@ class ReadingBookshelfHubLayout extends StatelessWidget {
     this.onSearchChanged,
     this.onCloseSearch,
     this.searchQuery = '',
-    this.subtitle = '封面朝外 · 点书继续读',
+    this.subtitle = '',
     this.footerHint,
     this.showImportSlot = true,
     super.key,

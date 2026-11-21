@@ -12,7 +12,6 @@ import '../../library/presentation/library_mock_data.dart';
 import '../../navigation/presentation/navigation_destination.dart';
 import '../../player/presentation/player_mock_state.dart';
 import '../../player/presentation/player_subtitle_loader.dart';
-import '../../shared/presentation/pad/app_design_tokens.dart';
 import '../../shared/presentation/pad/pad_scaffold.dart';
 import '../../sync/data/acquire_api_client.dart';
 import '../data/reading_fingerprint.dart';
@@ -512,16 +511,6 @@ class _ReadingHubScreenState extends ConsumerState<ReadingHubScreen> {
     final ReadingLibraryState state = ref.watch(readingLibraryProvider);
     final ReadingVocabLists lists = ref.watch(readingVocabListsProvider);
     final ReadingBookshelfTheme shelfTheme = ReadingBookshelfTheme.of(context);
-    final ReadingDoc? cont = state.continueDoc;
-    final String subtitle = !state.ready
-        ? '正在整理书架…'
-        : (_searching
-            ? '搜索书架中的书'
-            : (state.all.isEmpty
-                ? '开始你的书架 · 导入第一本书'
-                : (cont == null
-                    ? '封面朝外 · 点书继续读'
-                    : '继续读「${cont.title}」')));
 
     final List<ReadingDoc> books = _filteredBooks(state);
     final int totalWords = state.all.fold<int>(
@@ -556,10 +545,6 @@ class _ReadingHubScreenState extends ConsumerState<ReadingHubScreen> {
               onSearch: () => setState(() => _searching = true),
               onImport: () => unawaited(_importFile(context, ref)),
               onBack: () => context.pop(),
-              subtitle: subtitle,
-              footerHint: AppDesignTokens.isDark
-                  ? '深胡桃木 · 暖色封面'
-                  : '书架上的书 · 非卡片网格',
               onOpen: (ReadingDoc doc) {
                 unawaited(
                   context.push('/reading/${Uri.encodeComponent(doc.id)}'),
