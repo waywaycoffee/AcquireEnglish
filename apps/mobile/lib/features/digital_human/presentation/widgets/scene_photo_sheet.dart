@@ -1,0 +1,313 @@
+import 'dart:io';
+
+import 'package:flutter/material.dart';
+
+import '../../domain/scene_word_label.dart';
+
+/// Live-style photo overlay with floating word chips (word / IPA / Chinese).
+class ScenePhotoSheet extends StatefulWidget {
+  const ScenePhotoSheet({
+    required this.imagePath,
+    required this.labels,
+    required this.savedWords,
+    required this.onAddWord,
+    required this.onShareWithCoach,
+    required this.onRetake,
+    this.busy = false,
+    super.key,
+  });
+
+  final String imagePath;
+  final List<SceneWordLabel> labels;
+  final Set<String> savedWords;
+  final Future<void> Function(SceneWordLabel label) onAddWord;
+  final Future<void> Function() onShareWithCoach;
+  final VoidCallback onRetake;
+  final bool busy;
+
+  @override
+  State<ScenePhotoSheet> createState() => _ScenePhotoSheetState();
+}
+
+class _ScenePhotoSheetState extends State<ScenePhotoSheet> {
+  bool _showLabels = true;
+  bool _showPhonetic = true;
+  String? _savingWord;
+  late Set<String> _saved;
+
+  @override
+  void initState() {
+    super.initState();
+    _saved = <String>{...widget.savedWords};
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return SafeArea(
+      child: Material(
+        color: const Color(0xFF0F0A24),
+        child: Column(
+          children: <Widget>[
+            Padding(
+              padding: const EdgeInsets.fromLTRB(12, 8, 8, 4),
+              child: Row(
+                children: <Widget>[
+                  const Expanded(
+                    child: Text(
+                      '拍照识词',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 17,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                  ),
+                  IconButton(
+                    onPressed: () => Navigator.of(context).maybePop(),
+                    icon: const Icon(Icons.close_rounded, color: Colors.white70),
+                  ),
+                ],
+              ),
+            ),
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(18),
+                  child: LayoutBuilder(
+                    builder: (BuildContext context, BoxConstraints constraints) {
+                      return Stack(
+                        fit: StackFit.expand,
+                        children: <Widget>[
+                          Image.file(
+                            File(widget.imagePath),
+                            fit: BoxFit.cover,
+                          ),
+                          if (_showLabels)
+                            ...widget.labels.map((SceneWordLabel label) {
+                              final bool saved = _saved.contains(label.word);
+                              return Positioned(
+                                left: constraints.maxWidth * label.anchorX - 72,
+                                top: constraints.maxHeight * label.anchorY - 28,
+                                child: _FloatingWordChip(
+                                  label: label,
+                                  showPhonetic: _showPhonetic,
+                                  saved: saved,
+                                  saving: _savingWord == label.word,
+                                  onTap: widget.busy
+                                      ? null
+                                      : () async {
+                                          setState(
+                                            () => _savingWord = label.word,
+                                          );
+                                          try {
+                                            await widget.onAddWord(label);
+                                            if (mounted) {
+                                              setState(
+                                                () => _saved.add(label.word),
+                                              );
+                                            }
+                                          } finally {
+                                            if (mounted) {
+                                              setState(
+                                                () => _savingWord = null,
+                                              );
+                                            }
+                                          }
+                                        },
+                                ),
+                              );
+                            }),
+                          if (widget.busy)
+                            const ColoredBox(
+                              color: Color(0x66000000),
+                              child: Center(
+                                child: CircularProgressIndicator(),
+                              ),
+                            ),
+                        ],
+                      );
+                    },
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(height: 10),
+            SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              padding: const EdgeInsets.symmetric(horizontal: 12),
+              child: Row(
+                children: <Widget>[
+                  _ToolChip(
+                    label: '标注',
+                    active: _showLabels,
+                    onTap: () => setState(() => _showLabels = !_showLabels),
+                  ),
+                  _ToolChip(
+                    label: '音标',
+                    active: _showPhonetic,
+                    onTap: () => setState(() => _showPhonetic = !_showPhonetic),
+                  ),
+                  _ToolChip(
+                    label: '重拍',
+                    onTap: widget.onRetake,
+                  ),
+                  _ToolChip(
+                    label: '聊这个场景',
+                    emphasized: true,
+                    onTap: widget.busy
+                        ? null
+                        : () => widget.onShareWithCoach(),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 8),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 14),
+              child: Text(
+                widget.labels.isEmpty
+                    ? '未识别到清晰物品，可重拍或仍把照片交给数字人描述。'
+                    : '点标注可加入生词本；点「聊这个场景」让数字人围绕眼前事物开口。',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  color: Colors.white.withValues(alpha: 0.72),
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _FloatingWordChip extends StatelessWidget {
+  const _FloatingWordChip({
+    required this.label,
+    required this.showPhonetic,
+    required this.saved,
+    required this.saving,
+    this.onTap,
+  });
+
+  final SceneWordLabel label;
+  final bool showPhonetic;
+  final bool saved;
+  final bool saving;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.white,
+      elevation: 6,
+      shadowColor: const Color(0x44000000),
+      borderRadius: BorderRadius.circular(14),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(14),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(12, 8, 10, 8),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: <Widget>[
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: <Widget>[
+                  Text(
+                    label.word,
+                    style: const TextStyle(
+                      color: Color(0xFF111827),
+                      fontSize: 15,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                  if (showPhonetic && label.phonetic.isNotEmpty)
+                    Text(
+                      label.phonetic,
+                      style: const TextStyle(
+                        color: Color(0xFF6B7280),
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  if (label.chinese.isNotEmpty)
+                    Text(
+                      label.chinese,
+                      style: const TextStyle(
+                        color: Color(0xFF374151),
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                ],
+              ),
+              const SizedBox(width: 8),
+              if (saving)
+                const SizedBox(
+                  width: 18,
+                  height: 18,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              else
+                Icon(
+                  saved ? Icons.star_rounded : Icons.star_border_rounded,
+                  size: 20,
+                  color: saved
+                      ? const Color(0xFFF59E0B)
+                      : const Color(0xFF9CA3AF),
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _ToolChip extends StatelessWidget {
+  const _ToolChip({
+    required this.label,
+    this.onTap,
+    this.active = false,
+    this.emphasized = false,
+  });
+
+  final String label;
+  final VoidCallback? onTap;
+  final bool active;
+  final bool emphasized;
+
+  @override
+  Widget build(BuildContext context) {
+    final Color bg = emphasized
+        ? const Color(0xFF6D28D9)
+        : (active ? const Color(0xFF4C1D95) : Colors.white.withValues(alpha: 0.12));
+    return Padding(
+      padding: const EdgeInsets.only(right: 8),
+      child: Material(
+        color: bg,
+        borderRadius: BorderRadius.circular(999),
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(999),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+            child: Text(
+              label,
+              style: TextStyle(
+                color: Colors.white.withValues(alpha: onTap == null ? 0.45 : 0.95),
+                fontWeight: FontWeight.w800,
+                fontSize: 13,
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}

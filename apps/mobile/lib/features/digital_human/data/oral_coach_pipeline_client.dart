@@ -290,6 +290,7 @@ class OralCoachVideoContext {
     this.scenarioTitle = '',
     this.scenarioGoal = '',
     this.scenarioPrompt = '',
+    this.sceneDescription = '',
   });
 
   final String courseTitle;
@@ -318,6 +319,9 @@ class OralCoachVideoContext {
   final String scenarioGoal;
   final String scenarioPrompt;
 
+  /// Live camera/photo scene description for real-world conversation.
+  final String sceneDescription;
+
   Map<String, Object?> toJson() => <String, Object?>{
     'course_title': courseTitle,
     'episode_title': episodeTitle,
@@ -336,6 +340,8 @@ class OralCoachVideoContext {
     if (scenarioTitle.trim().isNotEmpty) 'scenario_title': scenarioTitle.trim(),
     if (scenarioGoal.trim().isNotEmpty) 'scenario_goal': scenarioGoal.trim(),
     if (scenarioPrompt.trim().isNotEmpty) 'scenario_prompt': scenarioPrompt.trim(),
+    if (sceneDescription.trim().isNotEmpty)
+      'scene_description': sceneDescription.trim(),
   };
 }
 

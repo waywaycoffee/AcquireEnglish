@@ -37,6 +37,7 @@ class SessionFields(BaseModel):
     scenario_title: str = ''
     scenario_goal: str = ''
     scenario_prompt: str = ''
+    scene_description: str = ''
 
 
 class SessionCreate(SessionFields):
@@ -61,6 +62,7 @@ class ContextUpdate(BaseModel):
     scenario_title: str | None = None
     scenario_goal: str | None = None
     scenario_prompt: str | None = None
+    scene_description: str | None = None
 
 
 class TopicsBody(BaseModel):

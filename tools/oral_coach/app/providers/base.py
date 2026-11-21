@@ -23,6 +23,8 @@ class VideoContext:
     scenario_title: str = ''
     scenario_goal: str = ''
     scenario_prompt: str = ''
+    # Live camera / photo scene the learner is showing the tutor.
+    scene_description: str = ''
 
     def as_public_dict(self) -> dict[str, Any]:
         return {
@@ -40,6 +42,7 @@ class VideoContext:
             'scenario_title': self.scenario_title,
             'scenario_goal': self.scenario_goal,
             'scenario_prompt': self.scenario_prompt,
+            'scene_description': self.scene_description,
         }
 
     def topic_blurb(self) -> str:
@@ -61,16 +64,23 @@ class VideoContext:
         topic_line = (
             f" Prepared oral topics: {' | '.join(topics[:8])}." if topics else ''
         )
+        scene = (self.scene_description or '').strip()
+        scene_line = f' Live scene from learner camera/photo: {scene[:1200]}.' if scene else ''
         if summary and excerpt:
-            return f'Video: {head}. Topic: {summary}. Excerpt: {excerpt[:3500]}.{topic_line}'
+            return (
+                f'Video: {head}. Topic: {summary}. Excerpt: {excerpt[:3500]}.'
+                f'{topic_line}{scene_line}'
+            )
         if summary:
-            return f'Video: {head}. Topic: {summary}.{topic_line}'
+            return f'Video: {head}. Topic: {summary}.{topic_line}{scene_line}'
         if excerpt:
-            return f'Video: {head}. Excerpt: {excerpt[:3500]}.{topic_line}'
+            return f'Video: {head}. Excerpt: {excerpt[:3500]}.{topic_line}{scene_line}'
+        if scene:
+            return f'Real-world scene practice. {scene[:1200]}.{topic_line}'
         line = self.current_english.strip()
         if line:
-            return f'Video: {head}. Related line: "{line}".{topic_line}'
-        return f'Video: {head}.{topic_line}'
+            return f'Video: {head}. Related line: "{line}".{topic_line}{scene_line}'
+        return f'Video: {head}.{topic_line}{scene_line}'
 
 
 @dataclass

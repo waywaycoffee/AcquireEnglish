@@ -8,25 +8,31 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_tts/flutter_tts.dart';
 import 'package:flutter_webrtc/flutter_webrtc.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:media_kit/media_kit.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../authentication/presentation/auth_session.dart';
+import '../../phrases/presentation/phrase_book_provider.dart';
 import '../../player/data/pronunciation_providers.dart';
 import '../../player/domain/pronunciation_assessment.dart';
 import '../../settings/presentation/settings_provider.dart';
 import '../../sync/data/acquire_api_client.dart';
 import '../../sync/data/user_assets_service.dart';
-import '../../phrases/presentation/phrase_book_provider.dart';
+import '../../words/presentation/word_book_provider.dart';
+import '../../words/presentation/word_book_provider.dart';
 import '../data/digital_human_catalog.dart';
 import '../data/livetalking_client.dart';
 import '../data/oral_coach_pipeline_client.dart';
+import '../data/scene_word_recognizer.dart';
 import '../domain/learning_scenario.dart';
 import '../domain/oral_expression_diagnosis.dart';
+import '../domain/scene_word_label.dart';
 import 'widgets/cartoon_coach_sprite.dart';
 import 'widgets/coach_avatar_stage.dart';
 import 'widgets/oral_diagnosis_card.dart';
+import 'widgets/scene_photo_sheet.dart';
 
 final RegExp _hanChars = RegExp(r'[\u4e00-\u9fff]');
 
@@ -230,6 +236,13 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
   /// After content diagnosis: learner must hold-mic and re-say idiomatic EN.
   OralExpressionDiagnosis? _pendingResay;
   bool _pendingDiagnosisSaved = false;
+
+  /// Live camera/photo scene shared with the digital human.
+  String _sceneDescription = '';
+  String? _sceneImagePath;
+  List<SceneWordLabel> _sceneLabels = const <SceneWordLabel>[];
+  final Set<String> _sceneSavedWords = <String>{};
+  bool _sceneSharing = false;
 
   /// Pre-generated oral Q&A topics from the episode transcript.
   List<String> _talkTopics = const <String>[];
@@ -483,6 +496,7 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
       scenarioTitle: scenario?.title ?? '',
       scenarioGoal: scenario?.goal ?? '',
       scenarioPrompt: scenario?.prompt ?? '',
+      sceneDescription: _sceneDescription,
     );
   }
 
@@ -1320,6 +1334,208 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
     } catch (_) {}
   }
 
+  Future<void> _openSceneCapture() async {
+    if (_busy || _recordingActive) return;
+    if (!_started) {
+      _startTopicConversation();
+      if (!mounted || !_started) return;
+    }
+    final ImageSource? source = await showModalBottomSheet<ImageSource>(
+      context: context,
+      backgroundColor: const Color(0xFF1B1438),
+      builder: (BuildContext context) {
+        return SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: <Widget>[
+              ListTile(
+                leading: const Icon(Icons.photo_camera_rounded, color: Colors.white),
+                title: const Text(
+                  '拍摄真实场景',
+                  style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700),
+                ),
+                subtitle: const Text(
+                  '给数字人看眼前的东西并识词',
+                  style: TextStyle(color: Colors.white70),
+                ),
+                onTap: () => Navigator.pop(context, ImageSource.camera),
+              ),
+              ListTile(
+                leading: const Icon(Icons.photo_library_rounded, color: Colors.white),
+                title: const Text(
+                  '从相册选择',
+                  style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700),
+                ),
+                onTap: () => Navigator.pop(context, ImageSource.gallery),
+              ),
+              const SizedBox(height: 8),
+            ],
+          ),
+        );
+      },
+    );
+    if (source == null || !mounted) return;
+    try {
+      final XFile? shot = await ImagePicker().pickImage(
+        source: source,
+        imageQuality: 85,
+        maxWidth: 1600,
+      );
+      if (shot == null || !mounted) return;
+      await _presentScenePhoto(shot.path);
+    } catch (error) {
+      if (mounted) {
+        setState(() => _error = '无法打开相机/相册：${_pretty(error)}');
+      }
+    }
+  }
+
+  Future<void> _presentScenePhoto(String imagePath) async {
+    final LearningSettingsState settings = ref.read(learningSettingsProvider);
+    setState(() {
+      _busy = true;
+      _status = '正在识别场景里的单词…';
+      _error = null;
+    });
+    List<SceneWordLabel> labels = const <SceneWordLabel>[];
+    try {
+      labels = await ref.read(sceneWordRecognizerProvider).recognize(
+            imagePath,
+            settings: settings,
+          );
+    } catch (error) {
+      if (mounted) {
+        setState(() => _error = '识词失败：${_pretty(error)}');
+      }
+    }
+    if (!mounted) return;
+    setState(() {
+      _busy = false;
+      _sceneImagePath = imagePath;
+      _sceneLabels = labels;
+      _status = labels.isEmpty ? '未识别到清晰物品' : '已识别 ${labels.length} 个词';
+    });
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (BuildContext context) {
+        return SizedBox(
+          height: MediaQuery.sizeOf(context).height * 0.88,
+          child: ScenePhotoSheet(
+            imagePath: imagePath,
+            labels: labels,
+            savedWords: _sceneSavedWords,
+            busy: _sceneSharing,
+            onAddWord: _addSceneWordToBook,
+            onShareWithCoach: () => _shareSceneWithCoach(
+              imagePath: imagePath,
+              labels: labels,
+            ),
+            onRetake: () {
+              Navigator.of(context).maybePop();
+              unawaited(_openSceneCapture());
+            },
+          ),
+        );
+      },
+    );
+  }
+
+  Future<void> _addSceneWordToBook(SceneWordLabel label) async {
+    final String word = label.word.trim().toLowerCase();
+    if (word.isEmpty) return;
+    final bool added = ref.read(wordBookProvider.notifier).addFavoriteWord(
+          rawWord: word,
+          episodeId: 'scene:${widget.episodeId ?? 'digital-human'}',
+          course: '数字人识物',
+          episode: widget.episodeTitle.isNotEmpty
+              ? widget.episodeTitle
+              : (_activeScenario?.title ?? '真实场景'),
+          time: DateTime.now().toIso8601String(),
+          lineKey: 'scene:$word:${DateTime.now().millisecondsSinceEpoch}',
+          sentence: _sceneDescription.isNotEmpty
+              ? _sceneDescription
+              : 'I can see a $word in this photo.',
+          chinese: label.chinese,
+          generatedDefinition: label.chinese.isEmpty
+              ? null
+              : '${label.phonetic.isEmpty ? '' : '${label.phonetic} · '}${label.chinese}',
+        );
+    if (!mounted) return;
+    setState(() {
+      if (added || _sceneSavedWords.contains(word)) {
+        _sceneSavedWords.add(word);
+      }
+    });
+    if (added && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('已加入生词本：$word')),
+      );
+    }
+  }
+
+  Future<void> _shareSceneWithCoach({
+    required String imagePath,
+    required List<SceneWordLabel> labels,
+  }) async {
+    if (_sceneSharing) return;
+    final LearningSettingsState settings = ref.read(learningSettingsProvider);
+    final SceneWordRecognizer recognizer = ref.read(sceneWordRecognizerProvider);
+    final String description = recognizer.buildSceneDescription(labels);
+    setState(() {
+      _sceneSharing = true;
+      _sceneDescription = description;
+      _sceneImagePath = imagePath;
+      _sceneLabels = labels;
+      _status = '正在把场景告诉数字人…';
+    });
+    try {
+      if (_usesVoicePipeline(settings)) {
+        await _ensurePipelineSession(settings);
+        final OralCoachSession? session = _session;
+        if (session != null) {
+          await _pipelineClient.updateContext(
+            session: session,
+            context: _videoContext(settings: settings),
+          );
+        }
+      }
+      final String nouns = labels
+          .take(4)
+          .map((SceneWordLabel item) => item.word)
+          .join(', ');
+      final String coachLine = labels.isEmpty
+          ? "Thanks for sharing your photo. What do you see? Try one English sentence."
+          : "Nice — I can see your scene with $nouns. "
+              "Can you describe what you are holding or looking at in one English sentence?";
+      if (!mounted) return;
+      setState(() {
+        _bubbles.add(
+          _ChatBubble(
+            role: 'coach',
+            text: coachLine,
+          ),
+        );
+        _busy = false;
+        _sceneSharing = false;
+        _status = '围绕眼前场景继续说';
+      });
+      _scrollChatToEnd();
+      if (mounted) {
+        Navigator.of(context).maybePop();
+      }
+      await _speakCoach(coachLine, settings);
+    } catch (error) {
+      if (mounted) {
+        setState(() {
+          _sceneSharing = false;
+          _error = '场景同步失败：${_pretty(error)}';
+        });
+      }
+    }
+  }
+
   Future<void> _onHoldStart() async {
     if (_busy || _recordingActive || _coachSpeaking) {
       return;
@@ -1602,7 +1818,9 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
                     right: 0,
                     bottom: 8,
                     child: Text(
-                      '内容由 AI 生成 · $_topicLabel',
+                      _sceneDescription.isNotEmpty
+                          ? '正在看你的真实场景 · $_topicLabel'
+                          : '内容由 AI 生成 · $_topicLabel',
                       textAlign: TextAlign.center,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
@@ -1613,6 +1831,65 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
                       ),
                     ),
                   ),
+                  if (_sceneImagePath != null &&
+                      File(_sceneImagePath!).existsSync())
+                    Positioned(
+                      right: 12,
+                      top: 12,
+                      child: GestureDetector(
+                        onTap: () => unawaited(
+                          _presentScenePhoto(_sceneImagePath!),
+                        ),
+                        child: Container(
+                          width: 78,
+                          height: 104,
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(
+                              color: Colors.white.withValues(alpha: 0.7),
+                              width: 2,
+                            ),
+                            boxShadow: const <BoxShadow>[
+                              BoxShadow(
+                                color: Color(0x66000000),
+                                blurRadius: 10,
+                              ),
+                            ],
+                          ),
+                          clipBehavior: Clip.antiAlias,
+                          child: Stack(
+                            fit: StackFit.expand,
+                            children: <Widget>[
+                              Image.file(
+                                File(_sceneImagePath!),
+                                fit: BoxFit.cover,
+                              ),
+                              Align(
+                                alignment: Alignment.bottomCenter,
+                                child: Container(
+                                  width: double.infinity,
+                                  color: const Color(0xAA111827),
+                                  padding: const EdgeInsets.symmetric(
+                                    vertical: 3,
+                                  ),
+                                  child: Text(
+                                    _sceneLabels.isEmpty
+                                        ? '场景'
+                                        : '${_sceneLabels.length}词',
+                                    textAlign: TextAlign.center,
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.w800,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
                 ],
               ),
             ),
@@ -1908,18 +2185,9 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: <Widget>[
                   _DockRoundButton(
-                    icon: Icons.lightbulb_outline_rounded,
-                    onTap: () {
-                      final String hint =
-                          'Stuck? Retell one moment: "In the video, …" or ask me for a key word.';
-                      setState(() {
-                        _bubbles.add(
-                          _ChatBubble(role: 'coach', text: hint, hint: true),
-                        );
-                        _status = '试试上面的提示';
-                      });
-                      _scrollChatToEnd();
-                    },
+                    icon: Icons.photo_camera_outlined,
+                    active: _sceneDescription.isNotEmpty,
+                    onTap: _busy ? null : () => unawaited(_openSceneCapture()),
                   ),
                   _DockRoundButton(
                     icon: Icons.grid_view_rounded,

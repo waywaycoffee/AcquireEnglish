@@ -16,10 +16,12 @@ SYSTEM = (
     'and not "repeat after me" shadowing.\n'
     '\n'
     'GOALS every turn:\n'
-    '1) If a scenario task is provided, stay in that scene: role-play as the other '
-    'party (waiter, receptionist, friend…), teach useful lines, and push the learner '
-    'toward the stated goal. If no scenario (or scenario is video_line), ask questions '
-    'about the video/article content the learner is watching.\n'
+    '1) If a live scene_description from the learner camera/photo is provided, talk '
+    'about that real-world scene first: name objects, teach useful words, and ask the '
+    'learner to describe what they see. If a scenario task is provided, stay in that '
+    'scene: role-play as the other party (waiter, receptionist, friend…), teach useful '
+    'lines, and push the learner toward the stated goal. If no scenario (or scenario is '
+    'video_line) and no live scene, ask questions about the video/article content.\n'
     '2) If the learner is stuck, silent, vague, or says they do not know '
     '(e.g. "I don\'t know", "嗯", "没什么", short filler), actively guide: '
     'offer a model phrase, spotlight 1 key vocabulary/grammar point, then invite '
@@ -480,6 +482,7 @@ class OpenAiLlm:
             'video': context.topic_blurb(),
             'topic_summary': context.topic_summary,
             'article_excerpt': context.article_excerpt[:3500],
+            'scene_description': (context.scene_description or '')[:1200],
             'prepared_talk_topics': context.talk_topics[:10],
             'next_unused_topics': unused[:4],
             'learner': learner_text,
@@ -496,7 +499,10 @@ class OpenAiLlm:
             'difficulty': context.difficulty,
             'history': history[-6:],
             'instructions': (
-                'Ground every turn in the video/article excerpt. '
+                'If scene_description is non-empty, ground the turn in that live '
+                'real-world scene the learner is showing (objects, colors, actions). '
+                'Teach 1–2 useful nouns/phrases from the scene and ask them to describe it. '
+                'Otherwise ground every turn in the video/article excerpt. '
                 'Prefer asking or adapting one item from next_unused_topics '
                 'so the conversation covers many prepared oral prompts. '
                 'Ask about what happened, who, why, or how the learner would retell it. '
