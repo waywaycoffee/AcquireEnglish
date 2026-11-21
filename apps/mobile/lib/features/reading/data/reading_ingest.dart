@@ -130,11 +130,7 @@ List<ReadingDoc> splitSubtitlesIntoReadingDocs({
       flush(force: true);
     }
     buffer.add(
-      ReadingSegment(
-        text: english,
-        startMs: line.startMs,
-        endMs: line.endMs,
-      ),
+      ReadingSegment(text: english, startMs: line.startMs, endMs: line.endMs),
     );
     bufferWords += words;
     if (bufferWords >= kReadingChunkMaxWords) {
@@ -192,8 +188,8 @@ String parseEpubImport(Uint8List bytes) {
     throw StateError('不是有效的 EPUB/ZIP（可能下载到了网页）');
   }
   final Archive archive = ZipDecoder().decodeBytes(bytes);
-  final List<ArchiveFile> htmlFiles = archive.files
-      .where((ArchiveFile f) {
+  final List<ArchiveFile> htmlFiles =
+      archive.files.where((ArchiveFile f) {
         if (!f.isFile) return false;
         final String name = f.name.toLowerCase().replaceAll('\\', '/');
         if (!(name.endsWith('.xhtml') ||
@@ -218,13 +214,16 @@ String parseEpubImport(Uint8List bytes) {
           return false;
         }
         return true;
-      })
-      .toList()
-    ..sort((ArchiveFile a, ArchiveFile b) =>
-        _naturalEpubPathCompare(a.name, b.name));
+      }).toList()..sort(
+        (ArchiveFile a, ArchiveFile b) =>
+            _naturalEpubPathCompare(a.name, b.name),
+      );
   final StringBuffer buf = StringBuffer();
   for (final ArchiveFile file in htmlFiles) {
-    final String xml = utf8.decode(file.content as List<int>, allowMalformed: true);
+    final String xml = utf8.decode(
+      file.content as List<int>,
+      allowMalformed: true,
+    );
     final String plain = html_parser.parse(xml).body?.text ?? '';
     final String cleaned = plain.replaceAll(RegExp(r'\s+'), ' ').trim();
     if (cleaned.isEmpty) continue;
@@ -337,6 +336,11 @@ int _naturalEpubPathCompare(String a, String b) {
   final List<String> pb = b.toLowerCase().replaceAll('\\', '/').split('/');
   final String fa = pa.isEmpty ? a : pa.last;
   final String fb = pb.isEmpty ? b : pb.last;
+  final bool aPreface =
+      fa.startsWith('preface') || fa.startsWith('introduction');
+  final bool bPreface =
+      fb.startsWith('preface') || fb.startsWith('introduction');
+  if (aPreface != bPreface) return aPreface ? -1 : 1;
   final RegExp numRe = RegExp(r'(\d+)');
   final Match? ma = numRe.firstMatch(fa);
   final Match? mb = numRe.firstMatch(fb);

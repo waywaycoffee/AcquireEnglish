@@ -78,6 +78,30 @@ void main() {
   });
 
   group('parseEpubImport', () {
+    test('places the introduction before numbered chapters', () {
+      final archive = Archive();
+      for (final entry in <String, String>{
+        'text/chapter-2.xhtml': 'Second chapter text.',
+        'text/chapter-1.xhtml': 'First chapter text.',
+        'text/preface.xhtml': 'Introduction text.',
+      }.entries) {
+        final bytes = utf8.encode(
+          '<html><body><p>${entry.value}</p></body></html>',
+        );
+        archive.addFile(ArchiveFile(entry.key, bytes.length, bytes));
+      }
+      final encoded = ZipEncoder().encode(archive)!;
+      final text = parseEpubImport(Uint8List.fromList(encoded));
+      expect(
+        text.indexOf('Introduction text.'),
+        lessThan(text.indexOf('First chapter text.')),
+      );
+      expect(
+        text.indexOf('First chapter text.'),
+        lessThan(text.indexOf('Second chapter text.')),
+      );
+    });
+
     test('extracts xhtml body text from zip', () {
       final Archive archive = Archive();
       final List<int> chapter = utf8.encode(
@@ -105,7 +129,9 @@ void main() {
 
     test('rejects non-zip payloads', () {
       expect(
-        () => parseEpubImport(Uint8List.fromList(utf8.encode('<html>nope</html>'))),
+        () => parseEpubImport(
+          Uint8List.fromList(utf8.encode('<html>nope</html>')),
+        ),
         throwsA(isA<StateError>()),
       );
     });
@@ -115,9 +141,9 @@ void main() {
     test('extracts text-layer PDF content', () {
       final PdfDocument document = PdfDocument();
       document.pages.add().graphics.drawString(
-            'The cafe opens early for reading practice.',
-            PdfStandardFont(PdfFontFamily.helvetica, 12),
-          );
+        'The cafe opens early for reading practice.',
+        PdfStandardFont(PdfFontFamily.helvetica, 12),
+      );
       final List<int> saved = document.saveSync();
       document.dispose();
       final String text = parsePdfImport(Uint8List.fromList(saved));
