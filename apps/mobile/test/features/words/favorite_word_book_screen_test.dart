@@ -197,8 +197,9 @@ void main() {
     );
   });
 
-  test('four-second clip starts two seconds before the timeline hit', () {
-    expect(favoriteSceneClipStartMs(252000), 250000);
-    expect(favoriteSceneClipStartMs(900), 0);
+  test('four-second clip starts at the timeline hit', () {
+    expect(favoriteSceneClipStartMs(252000), 252000);
+    expect(favoriteSceneClipStartMs(900), 900);
+    expect(favoriteSceneClipStartMs(-1), 0);
   });
 }

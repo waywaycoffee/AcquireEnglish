@@ -253,8 +253,7 @@ favoriteWordDistinctScenes(WordEntry word) {
   return byKey.values.toList(growable: false);
 }
 
-int favoriteSceneClipStartMs(int positionMs) =>
-    (positionMs - 2000).clamp(0, positionMs);
+int favoriteSceneClipStartMs(int positionMs) => positionMs < 0 ? 0 : positionMs;
 
 class FavoriteWordDetailScreen extends ConsumerWidget {
   const FavoriteWordDetailScreen({required this.word, super.key});
@@ -406,7 +405,7 @@ class _FavoriteSceneCard extends ConsumerWidget {
                   ),
                   icon: const Icon(Icons.play_circle_outline_rounded),
                   label: Text(
-                    '播放时间点前后各 2 秒',
+                    '从时间点播放 4 秒',
                     style: TextStyle(color: colors.accent),
                   ),
                 ),
