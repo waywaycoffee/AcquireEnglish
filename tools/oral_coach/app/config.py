@@ -27,6 +27,7 @@ class Settings:
     pron_provider: str = 'simple'
     llm_provider: str = 'mock'
     tts_provider: str = 'mock'
+    dashscope_api_key: str = ''
     avatar_provider: str = 'livetalking'
     deepgram_api_key: str = ''
     whisperx_model: str = 'base.en'
@@ -104,6 +105,7 @@ class Settings:
             pron_provider=os.getenv('PRON_PROVIDER', 'simple').strip().lower(),
             llm_provider=llm_provider,
             tts_provider=os.getenv('TTS_PROVIDER', 'mock').strip().lower(),
+            dashscope_api_key=os.getenv('DASHSCOPE_API_KEY', '').strip(),
             avatar_provider=os.getenv('AVATAR_PROVIDER', 'livetalking').strip().lower(),
             deepgram_api_key=deepgram_key,
             whisperx_model=os.getenv('WHISPERX_MODEL', 'base.en').strip(),

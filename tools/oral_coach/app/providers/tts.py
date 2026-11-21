@@ -1,10 +1,14 @@
 from __future__ import annotations
 
+import logging
 import wave
 from pathlib import Path
 
 from ..config import Settings
 from .base import TtsResult
+from .qwen_audio_tts import VOICES, QwenAudioTts
+
+logger = logging.getLogger(__name__)
 
 
 def _write_silent_wav(path: str, seconds: float = 0.6) -> None:
@@ -59,8 +63,27 @@ class FishSpeechTts:
         )
 
 
+class CoachTts:
+    def __init__(self, english: QwenAudioTts, edge: EdgeTts) -> None:
+        self.english = english
+        self.edge = edge
+
+    async def synthesize(self, text: str, out_path: str, *, voice: str | None = None, digital_human_id: str | None = None, language: str | None = None) -> TtsResult:
+        options = dict(voice=voice, digital_human_id=digital_human_id, language=language)
+        if (language or 'en').lower().startswith('en'):
+            try:
+                return await self.english.synthesize(text, out_path, **options)
+            except Exception as exc:
+                logger.warning('English coach TTS fell back to Edge (%s)', type(exc).__name__)
+        if voice in VOICES:
+            options['voice'] = None
+        return await self.edge.synthesize(text, out_path, **options)
+
+
 def build_tts(settings: Settings):
     name = settings.tts_provider
+    if name == 'qwen-audio':
+        return CoachTts(QwenAudioTts(settings.dashscope_api_key), EdgeTts())
     if name == 'edge':
         return EdgeTts()
     if name == 'xtts':

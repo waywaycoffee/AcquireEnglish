@@ -22,6 +22,7 @@ import '../../settings/presentation/settings_provider.dart';
 import '../../sync/data/acquire_api_client.dart';
 import '../../sync/data/user_assets_service.dart';
 import '../../words/presentation/word_book_provider.dart';
+import '../data/coach_english_voices.dart';
 import '../data/digital_human_catalog.dart';
 import '../data/live_scene_camera.dart';
 import '../data/livetalking_client.dart';
@@ -233,6 +234,7 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
 
   /// Default English. Flip only when the learner asks for Chinese.
   bool _preferChineseReply = false;
+  String? _englishVoiceId;
 
   /// After content diagnosis: learner must hold-mic and re-say idiomatic EN.
   OralExpressionDiagnosis? _pendingResay;
@@ -323,7 +325,17 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
       }
     } catch (_) {}
     if (!mounted) return;
-    await _restoreHistoryAndStart();
+    try {
+      final String? saved = await SharedPreferencesAsync().getString(
+        coachEnglishVoicePreference,
+      );
+      if (mounted && coachEnglishVoices.any((CoachEnglishVoice voice) => voice.id == saved)) {
+        setState(() => _englishVoiceId = saved);
+      }
+    } catch (_) {
+      // Use the coach's default voice when preferences are unavailable.
+    }
+    if (mounted) await _restoreHistoryAndStart();
   }
 
   @override
@@ -506,7 +518,7 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
       talkTopics: _talkTopics,
       difficulty: scenario?.difficulty ?? _difficulty,
       digitalHumanId: persona.id,
-      ttsVoice: persona.edgeVoice(chinese: _preferChineseReply),
+      ttsVoice: _coachVoice(persona),
       replyLanguage: _preferChineseReply ? 'zh' : 'en',
       scenarioTaskId: scenario?.id ?? '',
       scenarioTitle: scenario?.title ?? '',
@@ -648,6 +660,80 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
     _difficulty = session.difficulty;
   }
 
+  String _coachVoice(DigitalHumanPersona persona) => _preferChineseReply
+      ? persona.edgeVoice(chinese: true)
+      : _englishVoiceId ?? persona.edgeVoice(chinese: false);
+
+  Future<void> _chooseEnglishVoice() async {
+    final CoachEnglishVoice? chosen = await showModalBottomSheet<CoachEnglishVoice>(
+      context: context,
+      isScrollControlled: true,
+      showDragHandle: true,
+      builder: (BuildContext sheetContext) => SafeArea(
+        child: FractionallySizedBox(
+          heightFactor: 0.72,
+          child: Column(
+            children: <Widget>[
+              Text('英文音色', style: Theme.of(sheetContext).textTheme.titleLarge),
+              Expanded(
+                child: ListView(
+                  children: <Widget>[
+                    for (final CoachEnglishVoice voice in coachEnglishVoices)
+                      ListTile(
+                        selected: voice.id == _englishVoiceId,
+                        title: Text(voice.name),
+                        subtitle: Text(voice.description),
+                        onTap: () => Navigator.pop(sheetContext, voice),
+                        trailing: IconButton(
+                          tooltip: '试听 ${voice.name}',
+                          icon: const Icon(Icons.play_circle_outline),
+                          onPressed: () => unawaited(_previewEnglishVoice(voice)),
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+    if (!mounted || chosen == null) return;
+    setState(() => _englishVoiceId = chosen.id);
+    try {
+      await SharedPreferencesAsync().setString(coachEnglishVoicePreference, chosen.id);
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('已切换音色，但保存偏好失败。')),
+        );
+      }
+    }
+  }
+
+  Future<void> _previewEnglishVoice(CoachEnglishVoice voice) async {
+    if (_coachSpeaking || _busy || _recordingActive) return;
+    setState(() => _coachSpeaking = true);
+    try {
+      final LearningSettingsState settings = ref.read(learningSettingsProvider);
+      final String? url = await _pipelineClient.synthesizeSpeech(
+        rawBaseUrl: settings.oralCoachPipelineUrl,
+        text: 'Nice try! Let’s say it again, a little more slowly.',
+        digitalHumanId: settings.selectedDigitalHuman.id,
+        ttsVoice: voice.id,
+      );
+      if (url == null || !await _playRemoteTts(url)) throw StateError('无试听音频');
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('暂时无法试听，请稍后重试。')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _coachSpeaking = false);
+    }
+  }
+
   Future<bool> _playRemoteTts(String url) async {
     if (!mounted) return false;
     final Player player = Player();
@@ -675,6 +761,24 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
     if (!mounted || !_started || _coachSpeaking || speak.isEmpty) return;
     setState(() => _coachSpeaking = true);
     try {
+      if (!_preferChineseReply) {
+        String? remote = ttsUrl;
+        if (remote == null || remote.isEmpty) {
+          try {
+            remote = await _pipelineClient.synthesizeSpeech(
+              rawBaseUrl: settings.oralCoachPipelineUrl,
+              text: speak,
+              digitalHumanId: settings.selectedDigitalHuman.id,
+              ttsVoice: _coachVoice(settings.selectedDigitalHuman),
+            );
+          } catch (_) {
+            // The local voice remains available when cloud synthesis fails.
+          }
+        }
+        if (remote != null && remote.isNotEmpty && await _playRemoteTts(remote)) {
+          return;
+        }
+      }
       if (_wantsLiveTalking(settings)) {
         await _ensureLiveTalking(settings);
         if (_liveTalking.isConnected) {
@@ -689,7 +793,7 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
           }
         }
       }
-      if (ttsUrl != null && ttsUrl.isNotEmpty && await _playRemoteTts(ttsUrl))
+      if (_preferChineseReply && ttsUrl != null && ttsUrl.isNotEmpty && await _playRemoteTts(ttsUrl))
         return;
       if (!mounted || !_started) return;
       await _configureLocalPersonaVoice(settings.selectedDigitalHuman);
@@ -1127,7 +1231,7 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
       draftId: draft.draftId,
       confirmedText: confirmed,
       digitalHumanId: persona.id,
-      ttsVoice: persona.edgeVoice(chinese: _preferChineseReply),
+      ttsVoice: _coachVoice(persona),
       replyLanguage: _preferChineseReply ? 'zh' : 'en',
       textOnly: true,
     );
@@ -1247,7 +1351,7 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
       draftId: draft.draftId,
       confirmedText: prompt,
       digitalHumanId: persona.id,
-      ttsVoice: persona.edgeVoice(chinese: _preferChineseReply),
+      ttsVoice: _coachVoice(persona),
       replyLanguage: _preferChineseReply ? 'zh' : 'en',
       textOnly: true,
     );
@@ -2367,6 +2471,13 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
                   _DockRoundButton(
                     icon: Icons.grid_view_rounded,
                     onTap: _showSceneSheet,
+                  ),
+                  Tooltip(
+                    message: '英文音色',
+                    child: _DockRoundButton(
+                      icon: Icons.record_voice_over_outlined,
+                      onTap: _busy ? null : _chooseEnglishVoice,
+                    ),
                   ),
                   _DockRoundButton(
                     icon: _recordingActive
