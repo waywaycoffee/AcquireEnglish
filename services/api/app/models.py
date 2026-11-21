@@ -757,6 +757,45 @@ class DeskQuestWeek(Base):
     )
 
 
+class ChallengeFirstClear(Base):
+    """First clear timestamp per user/chapter/level for delayed retest."""
+
+    __tablename__ = "challenge_first_clears"
+    user_id: Mapped[int] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), primary_key=True
+    )
+    chapter: Mapped[str] = mapped_column(String(32), primary_key=True)
+    level: Mapped[int] = mapped_column(Integer, primary_key=True)
+    cleared_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+
+
+class ChallengeRetest(Base):
+    """Delayed retest attempts after first clear (>=1 day)."""
+
+    __tablename__ = "challenge_retests"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    user_id: Mapped[int] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), index=True
+    )
+    chapter: Mapped[str] = mapped_column(String(32), index=True)
+    level: Mapped[int] = mapped_column(Integer)
+    passed: Mapped[int] = mapped_column(Integer, default=1)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+
+
+class ChallengePostStat(Base):
+    """Open / complete counters for challenge-linked community posts."""
+
+    __tablename__ = "challenge_post_stats"
+    post_id: Mapped[int] = mapped_column(
+        ForeignKey("community_posts.id", ondelete="CASCADE"), primary_key=True
+    )
+    opens: Mapped[int] = mapped_column(Integer, default=0)
+    completes: Mapped[int] = mapped_column(Integer, default=0)
+
+
 class DeskBattle(Base):
     __tablename__ = "desk_battles"
     id: Mapped[int] = mapped_column(Integer, primary_key=True)

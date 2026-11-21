@@ -14,6 +14,7 @@ import '../../sync/presentation/daily_feed_provider.dart';
 import '../data/community_models.dart';
 import '../domain/cafe_adventure.dart';
 import 'adventure_ui.dart';
+import 'cafe_progress_provider.dart';
 import 'community_provider.dart';
 import 'community_post_actions.dart';
 import 'exploration_map_screen.dart';
@@ -263,20 +264,33 @@ class CommunityPostCard extends ConsumerWidget {
     final String? cover = post.linkCover?.trim();
     if (challengeLevel != null) {
       final CafeLevel level = kCafeLevels[challengeLevel];
+      final String playMeta = post.challengeCompletes > 0
+          ? '${_metaLine} · ${level.ability} · ${post.challengeCompletes}人完成'
+          : '${_metaLine} · ${level.ability}';
       return Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: <Widget>[
           QuestFeedCard(
             title: '${post.authorName} · ${level.title}',
-            meta: '${_metaLine} · ${level.ability}',
+            meta: playMeta,
             badge: '可开练',
             accent: AdventurePalette.pathAmber,
-            onPlay: () => Navigator.of(context).push<void>(
-              MaterialPageRoute<void>(
-                builder: (_) =>
-                    ExplorationMapScreen(sharedLevel: challengeLevel),
-              ),
-            ),
+            onPlay: () {
+              ref.read(pendingChallengePostIdProvider.notifier).state = post.id;
+              unawaited(() async {
+                try {
+                  await ref
+                      .read(acquireApiClientProvider)
+                      .reportChallengeEvent(postId: post.id, event: 'open');
+                } catch (_) {}
+              }());
+              Navigator.of(context).push<void>(
+                MaterialPageRoute<void>(
+                  builder: (_) =>
+                      ExplorationMapScreen(sharedLevel: challengeLevel),
+                ),
+              );
+            },
           ),
           const SizedBox(height: 8),
           HubSurface(

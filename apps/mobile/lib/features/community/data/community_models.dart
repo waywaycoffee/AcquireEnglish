@@ -44,6 +44,8 @@ class CommunityPostDto {
     this.authorLevel,
     this.authorAvatar = const <String, String>{},
     this.bilibiliOpenUrl,
+    this.challengeOpens = 0,
+    this.challengeCompletes = 0,
   });
 
   factory CommunityPostDto.fromJson(Map<String, dynamic> json) {
@@ -71,6 +73,8 @@ class CommunityPostDto {
       bilibiliOpenUrl: json['bilibili_open_url'] as String?,
       createdAt: DateTime.tryParse((json['created_at'] as String?) ?? '') ??
           DateTime.fromMillisecondsSinceEpoch(0),
+      challengeOpens: (json['challenge_opens'] as num?)?.toInt() ?? 0,
+      challengeCompletes: (json['challenge_completes'] as num?)?.toInt() ?? 0,
     );
   }
 
@@ -93,6 +97,8 @@ class CommunityPostDto {
   final Map<String, String> authorAvatar;
   final String? bilibiliOpenUrl;
   final DateTime createdAt;
+  final int challengeOpens;
+  final int challengeCompletes;
 
   bool get isShareBilibili => kind == 'share_bilibili';
   bool get isTeamInvite => kind == 'team_invite';

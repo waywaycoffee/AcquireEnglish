@@ -1948,6 +1948,17 @@ class AcquireApiClient {
     return response.data as Map<String, dynamic>;
   }
 
+  Future<void> reportChallengeEvent({
+    required int postId,
+    required String event,
+  }) async {
+    await _dio.post(
+      '${Endpoints.communityPosts}/$postId/challenge-event',
+      data: <String, dynamic>{'event': event},
+      options: _noCache,
+    );
+  }
+
   Future<Map<String, dynamic>> studyDeskRequest(String method, String path, {Map<String, dynamic>? data, Map<String, dynamic>? query}) async {
     final Response<dynamic> response = await _dio.request<dynamic>(
       'api/study-desk$path', options: Options(method: method, extra: _noCache.extra), data: data, queryParameters: query,

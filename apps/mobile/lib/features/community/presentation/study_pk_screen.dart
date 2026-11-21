@@ -21,6 +21,7 @@ class _StudyPkScreenState extends ConsumerState<StudyPkScreen>
   bool _busy = false;
   int _days = 7;
   int _count = 10;
+  String _source = 'intersection'; // intersection | cafe
   int? _selected;
   int _seconds = 0;
   int _generation = 0;
@@ -261,14 +262,29 @@ class _StudyPkScreenState extends ConsumerState<StudyPkScreen>
             Wrap(
               spacing: 8,
               children: <Widget>[
-                for (final int days in <int>[7, 30])
-                  ChoiceChip(
-                    label: Text('近$days天'),
-                    selected: _days == days,
-                    onSelected: _busy
-                        ? null
-                        : (_) => setState(() => _days = days),
-                  ),
+                ChoiceChip(
+                  label: const Text('共同学过词'),
+                  selected: _source == 'intersection',
+                  onSelected: _busy
+                      ? null
+                      : (_) => setState(() => _source = 'intersection'),
+                ),
+                ChoiceChip(
+                  label: const Text('咖啡店章节词表'),
+                  selected: _source == 'cafe',
+                  onSelected: _busy
+                      ? null
+                      : (_) => setState(() => _source = 'cafe'),
+                ),
+                if (_source == 'intersection')
+                  for (final int days in <int>[7, 30])
+                    ChoiceChip(
+                      label: Text('近$days天'),
+                      selected: _days == days,
+                      onSelected: _busy
+                          ? null
+                          : (_) => setState(() => _days = days),
+                    ),
                 for (final int count in <int>[5, 10])
                   ChoiceChip(
                     label: Text('$count题'),
@@ -279,7 +295,11 @@ class _StudyPkScreenState extends ConsumerState<StudyPkScreen>
                   ),
               ],
             ),
-            const Text('只取双方共同学过的单词；不足时请扩大范围或选择5题。仅收藏但没学过的词不计入。'),
+            Text(
+              _source == 'cafe'
+                  ? '约定章节词表：双方用街角咖啡店公共表达对战，不要求词库交集。'
+                  : '只取双方共同学过的单词；不足时请扩大范围、选5题，或改用章节词表。',
+            ),
             FilledButton(
               onPressed:
                   _busy ||
@@ -290,10 +310,16 @@ class _StudyPkScreenState extends ConsumerState<StudyPkScreen>
                       await _request(
                         'POST',
                         '',
-                        data: <String, dynamic>{'days': _days, 'count': _count},
+                        data: <String, dynamic>{
+                          'days': _days,
+                          'count': _count,
+                          'source': _source,
+                        },
                       );
                     }),
-              child: const Text('向同桌发起比赛'),
+              child: Text(
+                _source == 'cafe' ? '发起咖啡店词表 PK' : '向同桌发起比赛',
+              ),
             ),
             const SizedBox(height: 20),
             const Text(
@@ -310,7 +336,8 @@ class _StudyPkScreenState extends ConsumerState<StudyPkScreen>
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: <Widget>[
                       Text(
-                        '第 ${match['id']} 局 · ${match['count']} 题 · 近${match['days']}天',
+                        '第 ${match['id']} 局 · ${match['count']} 题 · '
+                        '${match['source'] == 'cafe' ? '咖啡店词表' : '近${match['days']}天'}',
                       ),
                       Text(_status('${match['status']}')),
                       if (match['status'] == 'pending')

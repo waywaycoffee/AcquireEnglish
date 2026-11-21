@@ -19,6 +19,7 @@ from app.database import get_db
 from app.deps import get_current_user
 from app.followed_creators import parse_followed_creators
 from app.models import (
+    ChallengePostStat,
     CommunityComment,
     CommunityPost,
     CommunityPostLike,
@@ -138,6 +139,8 @@ class CommunityPostOut(BaseModel):
     author_avatar: dict[str, str] = Field(default_factory=dict)
     created_at: datetime
     bilibili_open_url: str | None = None
+    challenge_opens: int = 0
+    challenge_completes: int = 0
 
 
 class CommunityPostCreate(BaseModel):
@@ -193,6 +196,15 @@ def _bilibili_open_url(bvid: str | None, link_url: str | None) -> str | None:
     return None
 
 
+def _is_challenge_post(post: CommunityPost) -> bool:
+    url = (post.link_url or "").strip()
+    return bool(url.startswith("/community/explore/cafe/")) and post.kind in {
+        "learning_result",
+        "method",
+        "question",
+    }
+
+
 def _serialize_post(
     post: CommunityPost,
     *,
@@ -200,6 +212,8 @@ def _serialize_post(
     author_level: str | None,
     liked_by_me: bool,
     author_avatar: dict[str, str] | None = None,
+    challenge_opens: int = 0,
+    challenge_completes: int = 0,
 ) -> CommunityPostOut:
     kind = _normalize_kind(post.kind)
     bvid = post.bvid or extract_bvid(post.link_url or "")
@@ -223,6 +237,8 @@ def _serialize_post(
         author_level=author_level,
         created_at=post.created_at,
         bilibili_open_url=_bilibili_open_url(bvid, post.link_url),
+        challenge_opens=challenge_opens,
+        challenge_completes=challenge_completes,
     )
 
 
@@ -435,10 +451,30 @@ async def community_feed(
         ).scalars().all()
     }
     avatar_rows = (await db.execute(select(UserAvatarLoadout).where(UserAvatarLoadout.user_id.in_(author_ids)))).scalars().all()
+    post_ids = [p.id for p in posts]
+    stats = {
+        s.post_id: s
+        for s in (
+            await db.execute(
+                select(ChallengePostStat).where(ChallengePostStat.post_id.in_(post_ids))
+            )
+        ).scalars().all()
+    }
+
+    def _rank_key(post: CommunityPost) -> tuple:
+        if _is_challenge_post(post):
+            s = stats.get(post.id)
+            completes = int(s.completes) if s else 0
+            opens = int(s.opens) if s else 0
+            return (0, -completes, -opens, -post.id)
+        return (1, 0, 0, -post.id)
+
+    posts.sort(key=_rank_key)
     out: list[CommunityPostOut] = []
     for post in posts:
         author = users.get(post.user_id)
         pref = prefs.get(post.user_id)
+        s = stats.get(post.id)
         out.append(
             _serialize_post(
                 post,
@@ -446,9 +482,40 @@ async def community_feed(
                 author_level=pref.level if pref else None,
                 liked_by_me=post.id in liked_ids,
                 author_avatar={r.slot: r.sku for r in avatar_rows if r.user_id == post.user_id},
+                challenge_opens=int(s.opens) if s else 0,
+                challenge_completes=int(s.completes) if s else 0,
             )
         )
     return out
+
+
+class ChallengeEventIn(BaseModel):
+    event: Literal["open", "complete"]
+
+
+@router.post("/posts/{post_id}/challenge-event")
+async def challenge_event(
+    post_id: int,
+    payload: ChallengeEventIn,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(get_current_user),
+) -> dict:
+    post = await db.get(CommunityPost, post_id)
+    if post is None or post.status != "visible":
+        raise HTTPException(404, "帖子不存在")
+    if not _is_challenge_post(post):
+        raise HTTPException(400, "该帖未关联可开练关卡")
+    row = await db.get(ChallengePostStat, post_id)
+    if row is None:
+        row = ChallengePostStat(post_id=post_id, opens=0, completes=0)
+        db.add(row)
+        await db.flush()
+    if payload.event == "open":
+        row.opens = int(row.opens or 0) + 1
+    else:
+        row.completes = int(row.completes or 0) + 1
+    await db.commit()
+    return {"post_id": post_id, "opens": row.opens, "completes": row.completes}
 
 
 @router.post("/posts", response_model=CommunityPostOut, status_code=201)

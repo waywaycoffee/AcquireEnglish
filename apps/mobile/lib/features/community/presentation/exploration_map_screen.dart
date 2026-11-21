@@ -128,6 +128,15 @@ class _CafeMapBody extends ConsumerWidget {
                   color: AppDesignTokens.textSecondary,
                 ),
               ),
+              const SizedBox(height: 4),
+              Text(
+                progress.retestLabel,
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w600,
+                  color: AppDesignTokens.textSecondary,
+                ),
+              ),
               const SizedBox(height: 14),
               AdventurePathStrip(
                 nodeCount: progress.nodeCount,

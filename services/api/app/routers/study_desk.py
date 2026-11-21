@@ -13,8 +13,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.database import get_db
 from app.deps import get_current_user
 from app.models import (DeskInvite, DeskMember, DeskBlock, DeskLibraryWord, DeskLibrarySnapshot,
-                        DeskQuestWeek, LessonProgress, User, UserLinkCourse, UserStudyStatsDaily,
-                        UserAvatarLoadout)
+                        DeskQuestWeek, ChallengeFirstClear, ChallengeRetest, LessonProgress, User,
+                        UserLinkCourse, UserStudyStatsDaily, UserAvatarLoadout)
 from app.course_data import get_course
 
 
@@ -72,6 +72,12 @@ class LibraryIn(BaseModel):
 class WeeklyQuestIn(BaseModel):
     chapter: str = Field(default="cafe", max_length=32)
     level: int = Field(ge=0, le=31)
+
+
+class RetestIn(BaseModel):
+    chapter: str = Field(default="cafe", max_length=32)
+    level: int = Field(ge=0, le=31)
+    passed: bool = True
 
 
 WEEKLY_TARGET = 3
@@ -377,5 +383,69 @@ async def weekly_quest_report(
         )
     else:
         row.levels_json = blob
+    # Record first clear for delayed retest baseline.
+    first = await db.get(ChallengeFirstClear, (user.id, chapter, payload.level))
+    if first is None:
+        db.add(
+            ChallengeFirstClear(
+                user_id=user.id,
+                chapter=chapter,
+                level=payload.level,
+                cleared_at=now(),
+            )
+        )
     await db.commit()
     return await weekly_quest_state(chapter=chapter, user=user, db=db)
+
+
+@router.get('/retest-stats')
+async def retest_stats(
+    chapter: str = Query('cafe'),
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    chapter = (chapter or 'cafe').strip().lower()
+    if chapter not in _ALLOWED_CHAPTERS:
+        raise HTTPException(400, 'unsupported chapter')
+    rows = (
+        await db.execute(
+            select(ChallengeRetest).where(
+                ChallengeRetest.user_id == user.id,
+                ChallengeRetest.chapter == chapter,
+            )
+        )
+    ).scalars().all()
+    attempts = len(rows)
+    passes = sum(1 for r in rows if r.passed)
+    return {
+        'chapter': chapter,
+        'attempts': attempts,
+        'passes': passes,
+        'pass_rate': (passes / attempts) if attempts else None,
+    }
+
+
+@router.post('/retest')
+async def report_retest(
+    payload: RetestIn,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    chapter = (payload.chapter or 'cafe').strip().lower()
+    if chapter not in _ALLOWED_CHAPTERS:
+        raise HTTPException(400, 'unsupported chapter')
+    first = await db.get(ChallengeFirstClear, (user.id, chapter, payload.level))
+    if first is None:
+        raise HTTPException(400, '请先完成该关首次通关，再记录延迟复测')
+    if aware(first.cleared_at) > now() - timedelta(days=1):
+        raise HTTPException(400, '距首次通关未满24小时，暂不计入延迟复测')
+    db.add(
+        ChallengeRetest(
+            user_id=user.id,
+            chapter=chapter,
+            level=payload.level,
+            passed=int(payload.passed),
+        )
+    )
+    await db.commit()
+    return await retest_stats(chapter=chapter, user=user, db=db)

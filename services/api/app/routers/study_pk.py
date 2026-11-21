@@ -29,6 +29,8 @@ class ConsentIn(BaseModel):
 class CreateIn(BaseModel):
     days: Literal[7, 30] = 7
     count: Literal[5, 10] = 10
+    # intersection = shared recent words; cafe = chapter public bank (agreed vocab)
+    source: Literal["intersection", "cafe"] = "intersection"
 
 
 class AnswerIn(BaseModel):
@@ -129,7 +131,14 @@ async def lobby(user: User = Depends(get_current_user), db: AsyncSession = Depen
     for row in rows:
         if row.status in {'pending', 'active'} and aware(row.expires_at) <= now():
             row.status, row.active_desk_id = 'expired', None
-        matches.append({'id': row.id, 'status': row.status, 'incoming': row.target_id == user.id, 'count': len(json.loads(row.questions_json)), 'days': row.days})
+        matches.append({
+            'id': row.id,
+            'status': row.status,
+            'incoming': row.target_id == user.id,
+            'count': len(json.loads(row.questions_json)),
+            'days': row.days,
+            'source': 'cafe' if row.days == 0 else 'intersection',
+        })
     await db.commit()
     return {'my_consent': a, 'peer_consent': b, 'matches': matches if a and b else []}
 
@@ -143,13 +152,24 @@ async def create(payload: CreateIn, user: User = Depends(get_current_user), db: 
             raise HTTPException(409, '已有待处理或进行中的对局，请先继续或取消')
         current.status, current.active_desk_id = 'expired', None
         await db.flush()
-    recent = await recent_words(db, user.id, payload.days) & await recent_words(db, peer.user_id, payload.days)
-    if len(recent) < payload.count:
-        raise HTTPException(400, f'双方近{payload.days}天共同学过的词不足{payload.count}个，请同步复习记录、扩大至30天或选择5题')
-    questions = question_pool(recent)
-    if len(questions) < payload.count:
-        raise HTTPException(400, '可用释义题不足，请先学习更多共同单词')
-    row = DeskWordPk(desk_id=me.desk_id, active_desk_id=me.desk_id, sender_id=user.id, target_id=peer.user_id, status='pending', days=payload.days, questions_json=json.dumps(questions[:payload.count], ensure_ascii=False), expires_at=now() + timedelta(hours=24))
+    if payload.source == 'cafe':
+        from app.services.cafe_challenge import cafe_pk_questions
+
+        try:
+            questions = cafe_pk_questions(payload.count, seed=me.desk_id * 1000 + payload.count)
+        except ValueError as exc:
+            raise HTTPException(400, '咖啡店章节词表不足，请改用共同词或减少题量') from exc
+        # days column reused as marker: 0 = cafe chapter bank
+        days_marker = 0
+    else:
+        recent = await recent_words(db, user.id, payload.days) & await recent_words(db, peer.user_id, payload.days)
+        if len(recent) < payload.count:
+            raise HTTPException(400, f'双方近{payload.days}天共同学过的词不足{payload.count}个，请同步复习记录、扩大至30天、选5题，或改用「咖啡店章节词表」')
+        questions = question_pool(recent)
+        if len(questions) < payload.count:
+            raise HTTPException(400, '可用释义题不足，请先学习更多共同单词或改用章节词表')
+        days_marker = payload.days
+    row = DeskWordPk(desk_id=me.desk_id, active_desk_id=me.desk_id, sender_id=user.id, target_id=peer.user_id, status='pending', days=days_marker, questions_json=json.dumps(questions[:payload.count], ensure_ascii=False), expires_at=now() + timedelta(hours=24))
     db.add(row)
     try:
         await db.flush()

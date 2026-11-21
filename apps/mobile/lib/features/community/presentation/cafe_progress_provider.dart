@@ -5,6 +5,10 @@ import '../../authentication/presentation/auth_session.dart';
 import '../../sync/data/acquire_api_client.dart';
 import '../domain/cafe_adventure.dart';
 
+/// When set, the next level complete reports a challenge-post "complete" event.
+final StateProvider<int?> pendingChallengePostIdProvider =
+    StateProvider<int?>((Ref ref) => null);
+
 class CafeProgress {
   const CafeProgress({
     required this.profile,
@@ -12,6 +16,9 @@ class CafeProgress {
     required this.weekLevels,
     this.peerWeekCount,
     this.together = false,
+    this.retestAttempts = 0,
+    this.retestPasses = 0,
+    this.retestPassRate,
   });
 
   final String profile;
@@ -19,6 +26,9 @@ class CafeProgress {
   final Set<int> weekLevels;
   final int? peerWeekCount;
   final bool together;
+  final int retestAttempts;
+  final int retestPasses;
+  final double? retestPassRate;
 
   int get clearedCount => completed.length;
   int get nodeCount => kCafeLevels.length;
@@ -37,6 +47,14 @@ class CafeProgress {
       clearedCount >= nodeCount ? '本章已通关 · 可重练' : '当前关卡 · $nextTitle';
   String get progressLabel => '$clearedCount / $nodeCount 站';
   String get weekLabel => '本周有效练习 $weekCount / $weekTarget';
+
+  String get retestLabel {
+    if (retestAttempts <= 0) return '延迟复测尚未开始（通关满24小时后重练计入）';
+    final String rate = retestPassRate == null
+        ? '-'
+        : '${(retestPassRate! * 100).round()}%';
+    return '延迟复测 $retestPasses/$retestAttempts · 通过率 $rate';
+  }
 
   String partnerLabel({required bool hasPeer, String? peerName}) {
     if (!hasPeer) return '同桌加分（可选）· 去学习桌邀请';
@@ -86,6 +104,9 @@ class CafeProgressNotifier extends AsyncNotifier<CafeProgress> {
 
     int? peerWeek;
     bool together = false;
+    int retestAttempts = 0;
+    int retestPasses = 0;
+    double? retestPassRate;
     final AuthSessionState session = ref.read(authSessionProvider);
     if (session.isLoggedIn) {
       try {
@@ -115,6 +136,19 @@ class CafeProgressNotifier extends AsyncNotifier<CafeProgress> {
       } catch (_) {
         // Offline / no desk — local progress still works.
       }
+      try {
+        final Map<String, dynamic> retest = await ref
+            .read(acquireApiClientProvider)
+            .studyDeskRequest(
+              'GET',
+              '/retest-stats',
+              query: <String, dynamic>{'chapter': 'cafe'},
+            );
+        retestAttempts = (retest['attempts'] as num?)?.toInt() ?? 0;
+        retestPasses = (retest['passes'] as num?)?.toInt() ?? 0;
+        final Object? rate = retest['pass_rate'];
+        if (rate is num) retestPassRate = rate.toDouble();
+      } catch (_) {}
     }
 
     return CafeProgress(
@@ -123,6 +157,9 @@ class CafeProgressNotifier extends AsyncNotifier<CafeProgress> {
       weekLevels: weekLevels,
       peerWeekCount: peerWeek,
       together: together,
+      retestAttempts: retestAttempts,
+      retestPasses: retestPasses,
+      retestPassRate: retestPassRate,
     );
   }
 
@@ -135,8 +172,9 @@ class CafeProgressNotifier extends AsyncNotifier<CafeProgress> {
     if (index < 0 || index >= kCafeLevels.length) return;
     final String profile = _profile();
     final String week = cafeWeekId();
-    await _prefs.setBool(_doneKey(profile, index), true);
     final CafeProgress current = state.asData?.value ?? await _load();
+    final bool alreadyCleared = current.completed.contains(index);
+    await _prefs.setBool(_doneKey(profile, index), true);
     final Set<int> weekLevels = Set<int>.of(current.weekLevels)..add(index);
     await _prefs.setStringList(
       _weekKey(profile, week),
@@ -145,16 +183,39 @@ class CafeProgressNotifier extends AsyncNotifier<CafeProgress> {
 
     final AuthSessionState session = ref.read(authSessionProvider);
     if (session.isLoggedIn) {
+      final AcquireApiClient api = ref.read(acquireApiClientProvider);
       try {
-        await ref.read(acquireApiClientProvider).studyDeskRequest(
-              'POST',
-              '/weekly-quest',
-              data: <String, dynamic>{
-                'chapter': 'cafe',
-                'level': index,
-              },
-            );
+        await api.studyDeskRequest(
+          'POST',
+          '/weekly-quest',
+          data: <String, dynamic>{
+            'chapter': 'cafe',
+            'level': index,
+          },
+        );
       } catch (_) {}
+      if (alreadyCleared) {
+        try {
+          await api.studyDeskRequest(
+            'POST',
+            '/retest',
+            data: <String, dynamic>{
+              'chapter': 'cafe',
+              'level': index,
+              'passed': true,
+            },
+          );
+        } catch (_) {
+          // Too soon (<24h) or offline — ignore.
+        }
+      }
+      final int? postId = ref.read(pendingChallengePostIdProvider);
+      if (postId != null) {
+        try {
+          await api.reportChallengeEvent(postId: postId, event: 'complete');
+        } catch (_) {}
+        ref.read(pendingChallengePostIdProvider.notifier).state = null;
+      }
     }
     state = AsyncData<CafeProgress>(await _load());
   }
