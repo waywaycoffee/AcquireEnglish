@@ -32,6 +32,13 @@
 - 兼容：`/api/foundation/media/*` → `namespace=foundation`
 - 静态：`GET /media/{namespace}/…`
 
+### Nginx `/media/` 必须指向 API 缓存目录
+
+生产机 uvicorn 工作目录下的 `{media_cache_dir}` 通常是  
+`/opt/acquireenglish/services/api/media/`。  
+`location /media/` 的 `alias` 必须与此一致（见 `deploy/nginx/acquireenglish-media.conf`），  
+不要指到空的 `/opt/acquireenglish/media/`，否则阅读/背词 TTS 会返回 200 URL 但播放 404。
+
 ## 上传示例
 
 ```bash

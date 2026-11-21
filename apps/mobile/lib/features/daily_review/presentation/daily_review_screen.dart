@@ -2792,7 +2792,7 @@ class _DailyReviewScreenState extends ConsumerState<DailyReviewScreen>
         await _speech!.speak(
           source.question,
           recordedUrl: foundationAudio,
-          allowSynthesisFallback: false,
+          allowSynthesisFallback: true,
           forceCloud: true,
         );
       } on WordPronunciationException catch (error) {
@@ -2881,7 +2881,7 @@ class _DailyReviewScreenState extends ConsumerState<DailyReviewScreen>
         await _speech!.speak(
           source.english.isEmpty ? source.question : source.english,
           recordedUrl: audio,
-          allowSynthesisFallback: false,
+          allowSynthesisFallback: true,
           forceCloud: true,
         );
       } on WordPronunciationException catch (error) {
@@ -2906,11 +2906,12 @@ class _DailyReviewScreenState extends ConsumerState<DailyReviewScreen>
     setState(() => _speaking = true);
     try {
       _speech = ref.read(wordPronunciationServiceProvider);
-      // Prefer Aliyun English voices; avoid silent eSpeak fallback on cards.
+      // Prefer Aliyun English voices; fall back to on-device TTS if media CDN
+      // briefly 404s so the review session keeps moving.
       await _speech!.speak(
         text,
         forceCloud: true,
-        allowSynthesisFallback: false,
+        allowSynthesisFallback: true,
       );
     } on WordPronunciationException catch (error) {
       if (mounted) _message(error.message);

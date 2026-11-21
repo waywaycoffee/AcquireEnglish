@@ -109,8 +109,8 @@ class WordPronunciationService {
           await _playRecording(cloudUrl)) {
         return;
       }
-      // Word cards request cloud on purpose — don't silently fall back to
-      // robotic on-device voices when Aliyun was expected.
+      // Prefer Aliyun, but keep learning moving if CDN/media path is briefly
+      // broken: fall back to on-device TTS unless the caller forbids it.
       if (forceCloud && !allowSynthesisFallback) {
         throw const WordPronunciationException(
           '阿里云发音暂不可用，请确认已登录且服务器已配置配音。',

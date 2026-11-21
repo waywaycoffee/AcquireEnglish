@@ -70,8 +70,9 @@ class _ReadingDigitalHumanBallHostState
     final String avatar = persona.assetPath;
 
     return Stack(
+      fit: StackFit.expand,
       children: <Widget>[
-        widget.child,
+        Positioned.fill(child: widget.child),
         Positioned(
           right: _offset.dx,
           bottom: _offset.dy,
