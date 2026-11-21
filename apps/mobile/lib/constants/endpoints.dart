@@ -83,6 +83,10 @@ class Endpoints {
   static const String foundationMediaManifest = 'api/foundation/media/manifest';
   static const String foundationMediaLookup = 'api/foundation/media/lookup';
   static const String foundationMediaUpload = 'api/foundation/media/upload';
+  /// ECS-hosted A/V for any namespace (`foundation|reading|oral|course|misc`).
+  static const String contentMediaManifest = 'api/content/media/manifest';
+  static const String contentMediaLookup = 'api/content/media/lookup';
+  static const String contentMediaUpload = 'api/content/media/upload';
   static const String syllabusCatalog = 'api/syllabus/catalog';
   static String syllabusBook(String bookId) =>
       'api/syllabus/books/${Uri.encodeComponent(bookId)}';

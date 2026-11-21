@@ -76,3 +76,4 @@ deploy/gpu-box-ollama/aria2c.exe
 
 
 deploy/_probe_shared_subs.py
+services/api/media/

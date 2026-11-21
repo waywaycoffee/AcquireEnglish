@@ -464,6 +464,16 @@ class ReadingCatalogClient {
       final String name = '${map['name'] ?? ''}';
       final String itemPath = '${map['path'] ?? ''}';
       if ('${map['type']}' != 'file') continue;
+      // Text story index only — never pull Magicaudio / video into the app.
+      final String lower = name.toLowerCase();
+      if (lower.endsWith('.mp3') ||
+          lower.endsWith('.mp4') ||
+          lower.endsWith('.m4a') ||
+          lower.endsWith('.wav') ||
+          lower.endsWith('.webm') ||
+          lower.endsWith('.ogg')) {
+        continue;
+      }
       if (!name.endsWith('.ts') && !name.endsWith('.json')) continue;
       if (name == 'index.ts') {
         final String dl = '${map['download_url'] ?? ''}'.trim();

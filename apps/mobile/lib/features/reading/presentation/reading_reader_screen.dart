@@ -12,8 +12,11 @@ import '../../shared/domain/word_lookup_entry.dart';
 import '../../shared/presentation/pad/app_design_tokens.dart';
 import '../../shared/presentation/pad/pad_scaffold.dart';
 import '../../shared/presentation/pad/pad_top_bar.dart';
+import '../../shared/data/word_pronunciation_service.dart';
+import '../../words/domain/foundation_media.dart';
 import '../../words/presentation/word_book_provider.dart';
 import '../domain/reading_doc.dart';
+import 'content_media_provider.dart';
 import 'reading_library_provider.dart';
 
 class ReadingReaderScreen extends ConsumerStatefulWidget {
@@ -33,12 +36,34 @@ class _ReadingReaderScreenState extends ConsumerState<ReadingReaderScreen> {
   bool _dark = false;
   Timer? _saveDebounce;
   bool _opened = false;
+  bool _playingRemote = false;
 
   @override
   void dispose() {
     _saveDebounce?.cancel();
     _scroll.dispose();
     super.dispose();
+  }
+
+  Future<void> _playRemoteAudio(FoundationMediaItem item) async {
+    final String? url = item.audioUrl;
+    if (url == null || url.isEmpty || _playingRemote) return;
+    setState(() => _playingRemote = true);
+    try {
+      await ref.read(wordPronunciationServiceProvider).speak(
+            item.key,
+            recordedUrl: url,
+            allowSynthesisFallback: false,
+          );
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('朗读音频暂不可用（需已上传到服务器）')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _playingRemote = false);
+    }
   }
 
   void _scheduleProgressSave(ReadingDoc doc) {
@@ -229,6 +254,15 @@ class _ReadingReaderScreenState extends ConsumerState<ReadingReaderScreen> {
 
     final Color bg = _dark ? const Color(0xFF1C1C1E) : AppDesignTokens.appWhite;
     final Color fg = _dark ? const Color(0xFFF2F2F7) : AppDesignTokens.textPrimary;
+    final AsyncValue<FoundationMediaManifest> mediaAsync =
+        ref.watch(readingContentMediaProvider);
+    final FoundationMediaItem? remoteMedia = mediaAsync.maybeWhen(
+      data: (FoundationMediaManifest m) =>
+          readingMediaForDoc(m, doc.id) ??
+          readingMediaForDoc(m, doc.title) ??
+          readingMediaForDoc(m, doc.sourceLabel),
+      orElse: () => null,
+    );
 
     return PadScaffold(
       currentDestination: AppNavDestination.reading,
@@ -238,9 +272,23 @@ class _ReadingReaderScreenState extends ConsumerState<ReadingReaderScreen> {
         title: doc.title,
         description: doc.sourceType == ReadingSourceType.video
             ? '来自视频字幕 · 点词可加入词书'
-            : '点词查义 · 加入词书',
+            : (remoteMedia?.hasAudio ?? false)
+                ? '点词查义 · 服务器朗读'
+                : '点词查义 · 加入词书',
         leading: PadBackButton(onPressed: () => context.pop()),
         actions: <Widget>[
+          if (remoteMedia?.hasAudio ?? false)
+            IconButton(
+              tooltip: '播放服务器朗读',
+              onPressed: _playingRemote
+                  ? null
+                  : () => unawaited(_playRemoteAudio(remoteMedia!)),
+              icon: Icon(
+                _playingRemote
+                    ? Icons.hourglass_top_rounded
+                    : Icons.volume_up_rounded,
+              ),
+            ),
           if (doc.sourceType == ReadingSourceType.video &&
               (doc.episodeId ?? '').isNotEmpty)
             TextButton(
