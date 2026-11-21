@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../discovery/presentation/english_level_screen.dart';
+import '../../onboarding/domain/onboarding_profile.dart';
+import '../../onboarding/presentation/onboarding_provider.dart';
 import '../../player/presentation/widgets/study_shell_tokens.dart';
 import '../../sync/data/acquire_api_client.dart';
 import '../../sync/presentation/daily_feed_provider.dart';
@@ -35,11 +37,14 @@ class _LearningPreferencesScreenState
       ];
 
   late AcquirePreferencesDto _draft;
+  String? _focusId;
 
   @override
   void initState() {
     super.initState();
     _draft = ref.read(learningPreferencesProvider);
+    final OnboardingProfile profile = ref.read(onboardingProvider);
+    _focusId = profile.focusId ?? focusIdFromTags(_draft.tags);
   }
 
   @override
@@ -54,6 +59,51 @@ class _LearningPreferencesScreenState
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: <Widget>[
+          const Text(
+            '学习重点',
+            style: TextStyle(
+              color: StudyShellTokens.textSecondary,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          const SizedBox(height: 6),
+          const Text(
+            '决定首页优先推荐哪一节课；社区地图对所有重点开放。',
+            style: TextStyle(
+              color: StudyShellTokens.textSecondary,
+              fontSize: 13,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: kLearningFocuses.map((LearningFocus focus) {
+              final bool selected = _focusId == focus.id;
+              return ChoiceChip(
+                label: Text(focus.label),
+                selected: selected,
+                onSelected: (_) => setState(() {
+                  _focusId = focus.id;
+                  _draft = _draft.copyWith(
+                    tags: prefsTagsForProfile(
+                      interestIds: _draft.tags
+                          .where(
+                            (String t) => kOnboardingInterests.any(
+                              (OnboardingInterest i) => i.id == t,
+                            ),
+                          )
+                          .toList(growable: false),
+                      ageBandId: ref.read(onboardingProvider).ageBandId,
+                      focusId: focus.id,
+                      keepTags: _draft.tags,
+                    ),
+                  );
+                }),
+              );
+            }).toList(),
+          ),
+          const SizedBox(height: 20),
           const Text(
             '级别',
             style: TextStyle(
@@ -145,6 +195,14 @@ class _LearningPreferencesScreenState
           const SizedBox(height: 16),
           FilledButton(
             onPressed: () async {
+              final String? focusId = _focusId;
+              if (focusId != null) {
+                await ref
+                    .read(onboardingProvider.notifier)
+                    .update(
+                      (OnboardingProfile p) => p.copyWith(focusId: focusId),
+                    );
+              }
               await ref.read(learningPreferencesProvider.notifier).save(_draft);
               if (context.mounted) {
                 ScaffoldMessenger.of(

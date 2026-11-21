@@ -48,22 +48,43 @@ class OnboardingNotifier extends Notifier<OnboardingProfile> {
     await _persist(fn(state));
   }
 
+  Future<void> setFocus(String focusId) async {
+    await _persist(state.copyWith(focusId: focusId));
+    final AcquirePreferencesDto current = ref.read(learningPreferencesProvider);
+    await ref.read(learningPreferencesProvider.notifier).save(
+          current.copyWith(
+            tags: prefsTagsForProfile(
+              interestIds: state.interestIds.isEmpty
+                  ? current.tags
+                      .where(
+                        (String t) => kOnboardingInterests.any(
+                          (OnboardingInterest i) => i.id == t,
+                        ),
+                      )
+                      .toList(growable: false)
+                  : state.interestIds,
+              ageBandId: state.ageBandId,
+              focusId: focusId,
+              keepTags: current.tags,
+            ),
+          ),
+        );
+  }
+
   Future<void> completeAndApply() async {
     final OnboardingProfile done = state.copyWith(completed: true);
     await _persist(done);
-
-    final List<String> tags = <String>[
-      ...done.interestIds,
-      if (done.ageBandId != null) 'age_${done.ageBandId}',
-      if (done.primaryModeId != null) 'mode_${done.primaryModeId}',
-    ];
-    if (tags.isEmpty) tags.add('daily');
 
     final AcquirePreferencesDto current = ref.read(learningPreferencesProvider);
     await ref.read(learningPreferencesProvider.notifier).save(
           current.copyWith(
             level: done.resolvedLevel,
-            tags: tags.take(12).toList(growable: false),
+            tags: prefsTagsForProfile(
+              interestIds: done.interestIds,
+              ageBandId: done.ageBandId,
+              focusId: done.focusId,
+              keepTags: current.tags,
+            ),
           ),
         );
   }

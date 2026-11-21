@@ -1,21 +1,24 @@
-/// Answers from the first-open three-screen intake.
+/// First-open intake: focus (single) + filters for content inside that module.
 class OnboardingInterest {
   const OnboardingInterest({required this.id, required this.label});
   final String id;
   final String label;
 }
 
-class OnboardingMode {
-  const OnboardingMode({
+class LearningFocus {
+  const LearningFocus({
     required this.id,
     required this.label,
     required this.route,
-    required this.blurb,
+    required this.homeBlurb,
+    required this.startLabel,
   });
+
   final String id;
   final String label;
   final String route;
-  final String blurb;
+  final String homeBlurb;
+  final String startLabel;
 }
 
 const List<OnboardingInterest> kOnboardingInterests = <OnboardingInterest>[
@@ -37,37 +40,46 @@ const List<({String id, String label})> kOnboardingAgeBands =
   (id: 'adult', label: '职场成人'),
 ];
 
-const List<OnboardingMode> kOnboardingModes = <OnboardingMode>[
-  OnboardingMode(
+const List<LearningFocus> kLearningFocuses = <LearningFocus>[
+  LearningFocus(
     id: 'video',
     label: '视频精听',
     route: '/library',
-    blurb: '跟视频听懂、跟读、收藏表达',
+    homeBlurb: '符合兴趣和水平的一段视频',
+    startLabel: '开始视频精听',
   ),
-  OnboardingMode(
+  LearningFocus(
     id: 'reading',
     label: '阅读',
     route: '/reading',
-    blurb: '逛书库、点词查义、积累阅读量',
+    homeBlurb: '符合兴趣和水平的一篇短文',
+    startLabel: '开始阅读',
   ),
-  OnboardingMode(
+  LearningFocus(
     id: 'oral',
     label: '日常口语',
     route: '/learn/dialogue',
-    blurb: '场景对话里开口练',
+    homeBlurb: '一个能立即开口的生活场景',
+    startLabel: '开始口语练习',
   ),
-  OnboardingMode(
+  LearningFocus(
     id: 'vocab',
     label: '背单词',
     route: '/words/syllabus',
-    blurb: '按词书与复习计划记词',
+    homeBlurb: '一组符合目标和水平的词',
+    startLabel: '打开统一词书',
   ),
 ];
+
+/// Backward-compatible alias used by older call sites.
+typedef OnboardingMode = LearningFocus;
+
+const List<LearningFocus> kOnboardingModes = kLearningFocuses;
 
 const List<({String id, String label, String level})> kOnboardingAbility =
     <({String id, String label, String level})>[
   (id: 'beginner', label: '刚开始学', level: '零基础'),
-  (id: 'words', label: '能看懂简单词句', level: 'A2'),
+  (id: 'words', label: '能读懂简单句子', level: 'A2'),
   (id: 'daily', label: '能应付日常交流', level: 'B1'),
   (id: 'complex', label: '想练更复杂的表达', level: 'B2'),
   (id: 'unsure', label: '不确定', level: 'A2'),
@@ -75,77 +87,135 @@ const List<({String id, String label, String level})> kOnboardingAbility =
 
 const Object _unset = Object();
 
+const String kFocusTagPrefix = 'mode_';
+const String kAgeTagPrefix = 'age_';
+
+String? focusIdFromTags(List<String> tags) {
+  for (final String tag in tags) {
+    if (tag.startsWith(kFocusTagPrefix)) {
+      return tag.substring(kFocusTagPrefix.length);
+    }
+  }
+  return null;
+}
+
+LearningFocus? focusById(String? id) {
+  if (id == null || id.isEmpty) return null;
+  for (final LearningFocus focus in kLearningFocuses) {
+    if (focus.id == id) return focus;
+  }
+  return null;
+}
+
+List<String> prefsTagsForProfile({
+  required List<String> interestIds,
+  String? ageBandId,
+  String? focusId,
+  List<String> keepTags = const <String>[],
+}) {
+  final Set<String> next = <String>{};
+  for (final String tag in keepTags) {
+    if (tag.startsWith(kFocusTagPrefix) || tag.startsWith(kAgeTagPrefix)) {
+      continue;
+    }
+    // Drop interest ids we manage so the list stays in sync.
+    final bool isInterest = kOnboardingInterests.any(
+      (OnboardingInterest i) => i.id == tag,
+    );
+    if (!isInterest) next.add(tag);
+  }
+  next.addAll(interestIds);
+  if (ageBandId != null && ageBandId.isNotEmpty) {
+    next.add('$kAgeTagPrefix$ageBandId');
+  }
+  if (focusId != null && focusId.isNotEmpty) {
+    next.add('$kFocusTagPrefix$focusId');
+  }
+  if (next.isEmpty) next.add('daily');
+  return next.take(12).toList(growable: false);
+}
+
 class OnboardingProfile {
   const OnboardingProfile({
     this.interestIds = const <String>[],
     this.ageBandId,
-    this.modeIds = const <String>[],
-    this.primaryModeId,
+    this.focusId,
     this.abilityId,
     this.canSyllableSplit,
     this.learnedPhonics,
     this.completed = false,
+    // Legacy fields kept for JSON migration.
+    this.modeIds = const <String>[],
+    this.primaryModeId,
   });
 
   factory OnboardingProfile.fromJson(Map<String, dynamic> json) {
+    final List<dynamic> legacyModes =
+        json['modeIds'] as List<dynamic>? ?? const <dynamic>[];
+    final String? focus = json['focusId'] as String? ??
+        json['primaryModeId'] as String? ??
+        (legacyModes.isEmpty ? null : '${legacyModes.first}');
     return OnboardingProfile(
       interestIds: (json['interestIds'] as List<dynamic>? ?? const <dynamic>[])
           .map((dynamic e) => '$e')
           .toList(growable: false),
       ageBandId: json['ageBandId'] as String?,
-      modeIds: (json['modeIds'] as List<dynamic>? ?? const <dynamic>[])
-          .map((dynamic e) => '$e')
-          .toList(growable: false),
-      primaryModeId: json['primaryModeId'] as String?,
+      focusId: focus,
       abilityId: json['abilityId'] as String?,
       canSyllableSplit: json['canSyllableSplit'] as bool?,
       learnedPhonics: json['learnedPhonics'] as bool?,
       completed: json['completed'] == true,
+      modeIds: focus == null ? const <String>[] : <String>[focus],
+      primaryModeId: focus,
     );
   }
 
   final List<String> interestIds;
   final String? ageBandId;
-  final List<String> modeIds;
-  final String? primaryModeId;
+  final String? focusId;
   final String? abilityId;
   final bool? canSyllableSplit;
   final bool? learnedPhonics;
   final bool completed;
+  final List<String> modeIds;
+  final String? primaryModeId;
 
   Map<String, dynamic> toJson() => <String, dynamic>{
         'interestIds': interestIds,
         'ageBandId': ageBandId,
-        'modeIds': modeIds,
-        'primaryModeId': primaryModeId,
+        'focusId': focusId,
         'abilityId': abilityId,
         'canSyllableSplit': canSyllableSplit,
         'learnedPhonics': learnedPhonics,
         'completed': completed,
+        // Keep legacy keys so older builds still restore focus.
+        'modeIds': focusId == null ? const <String>[] : <String>[focusId!],
+        'primaryModeId': focusId,
       };
 
   OnboardingProfile copyWith({
     List<String>? interestIds,
     String? ageBandId,
     bool clearAgeBand = false,
-    List<String>? modeIds,
-    Object? primaryModeId = _unset,
+    Object? focusId = _unset,
     String? abilityId,
     bool? canSyllableSplit,
     bool? learnedPhonics,
     bool? completed,
   }) {
+    final String? nextFocus = identical(focusId, _unset)
+        ? this.focusId
+        : focusId as String?;
     return OnboardingProfile(
       interestIds: interestIds ?? this.interestIds,
       ageBandId: clearAgeBand ? null : (ageBandId ?? this.ageBandId),
-      modeIds: modeIds ?? this.modeIds,
-      primaryModeId: identical(primaryModeId, _unset)
-          ? this.primaryModeId
-          : primaryModeId as String?,
+      focusId: nextFocus,
       abilityId: abilityId ?? this.abilityId,
       canSyllableSplit: canSyllableSplit ?? this.canSyllableSplit,
       learnedPhonics: learnedPhonics ?? this.learnedPhonics,
       completed: completed ?? this.completed,
+      modeIds: nextFocus == null ? const <String>[] : <String>[nextFocus],
+      primaryModeId: nextFocus,
     );
   }
 
@@ -157,28 +227,22 @@ class OnboardingProfile {
     return 'A2';
   }
 
-  OnboardingMode? get primaryMode {
-    final String? id = primaryModeId;
-    if (id == null) return null;
-    for (final OnboardingMode mode in kOnboardingModes) {
-      if (mode.id == id) return mode;
-    }
-    return null;
-  }
+  LearningFocus? get focus => focusById(focusId);
 
-  List<OnboardingMode> get otherModes {
-    final String? primary = primaryModeId;
-    return kOnboardingModes
-        .where(
-          (OnboardingMode m) => modeIds.contains(m.id) && m.id != primary,
-        )
-        .toList(growable: false);
-  }
+  /// Legacy getter.
+  LearningFocus? get primaryMode => focus;
+
+  List<LearningFocus> get otherModes => kLearningFocuses
+      .where((LearningFocus m) => m.id != focusId)
+      .toList(growable: false);
+
+  bool get showSyllableHints => canSyllableSplit == false;
+  bool get showPhonicsHints => learnedPhonics == false;
 
   List<String> get warmUpRoutes {
     final List<String> routes = <String>[];
-    if (canSyllableSplit == false) routes.add('/learn/ipa');
-    if (learnedPhonics == false) routes.add('/learn/phonics');
+    if (showSyllableHints) routes.add('/learn/ipa');
+    if (showPhonicsHints) routes.add('/learn/phonics');
     return routes;
   }
 }

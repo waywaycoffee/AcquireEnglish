@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import '../../onboarding/presentation/focus_recommendation.dart';
 import '../../words/presentation/syllabus_books_provider.dart';
 import '../../player/presentation/learning_resume_provider.dart';
 import '../../library/presentation/widgets/library_course_poster.dart';
@@ -18,6 +19,7 @@ class LearningHomeScreen extends ConsumerWidget {
     final video = ref.watch(continueLearningTargetProvider);
     final lastVideo = ref.watch(lastLearningEpisodeProvider);
     final stats = ref.watch(learningDashboardProvider);
+    final focusRec = ref.watch(focusRecommendationProvider);
     final book = books.activeBook;
     final useBook =
         book != null &&
@@ -97,6 +99,44 @@ class LearningHomeScreen extends ConsumerWidget {
                     ],
                   ),
                   const SizedBox(height: 24),
+                  if (focusRec != null) ...[
+                    text('今日优先 · ${focusRec.focus.label}', 17, bold: true),
+                    const SizedBox(height: 12),
+                    section(
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          text(focusRec.title, 17, bold: true),
+                          const SizedBox(height: 6),
+                          text(focusRec.subtitle, 12, color: muted),
+                          const SizedBox(height: 14),
+                          Row(
+                            children: [
+                              Expanded(
+                                child: FilledButton(
+                                  style: FilledButton.styleFrom(
+                                    backgroundColor: accent,
+                                    foregroundColor: dark
+                                        ? const Color(0xFF203A27)
+                                        : Colors.white,
+                                  ),
+                                  onPressed: () =>
+                                      context.push(focusRec.route),
+                                  child: Text(focusRec.startLabel),
+                                ),
+                              ),
+                              const SizedBox(width: 10),
+                              OutlinedButton(
+                                onPressed: () => context.go('/discover'),
+                                child: const Text('社区地图'),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+                  ],
                   text('继续学习', 17, bold: true),
                   const SizedBox(height: 12),
                   section(

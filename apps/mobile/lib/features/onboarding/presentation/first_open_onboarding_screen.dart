@@ -108,32 +108,31 @@ class _FirstOpenOnboardingScreenState
                 controller: _pages,
                 physics: const NeverScrollableScrollPhysics(),
                 children: <Widget>[
-                  _InterestPage(
+                  _FocusPage(
                     profile: profile,
                     onChanged: (OnboardingProfile next) => ref
                         .read(onboardingProvider.notifier)
                         .update((_) => next),
                     onNext: () {
-                      if (profile.interestIds.isEmpty) {
+                      if (profile.focusId == null) {
                         ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('请至少选一个兴趣')),
+                          const SnackBar(content: Text('请选择一个学习重点')),
                         );
                         return;
                       }
                       _go(1);
                     },
                   ),
-                  _ModePage(
+                  _FilterPage(
                     profile: profile,
                     onChanged: (OnboardingProfile next) => ref
                         .read(onboardingProvider.notifier)
                         .update((_) => next),
                     onBack: () => _go(0),
                     onNext: () {
-                      if (profile.modeIds.isEmpty ||
-                          profile.primaryModeId == null) {
+                      if (profile.interestIds.isEmpty) {
                         ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('请选择学习方式，并指定今天先试哪一个')),
+                          const SnackBar(content: Text('请至少选一个兴趣领域')),
                         );
                         return;
                       }
@@ -166,6 +165,7 @@ class _FirstOpenOnboardingScreenState
                     profile: profile,
                     onStart: (String route) => context.go(route),
                     onHome: () => context.go('/home'),
+                    onMap: () => context.go('/discover'),
                   ),
                 ],
               ),
@@ -177,8 +177,8 @@ class _FirstOpenOnboardingScreenState
   }
 }
 
-class _InterestPage extends StatelessWidget {
-  const _InterestPage({
+class _FocusPage extends StatelessWidget {
+  const _FocusPage({
     required this.profile,
     required this.onChanged,
     required this.onNext,
@@ -194,7 +194,7 @@ class _InterestPage extends StatelessWidget {
       padding: const EdgeInsets.fromLTRB(20, 20, 20, 28),
       children: <Widget>[
         Text(
-          '你喜欢什么？',
+          '你现在最想重点练什么？',
           style: TextStyle(
             fontSize: 28,
             fontWeight: FontWeight.w900,
@@ -203,7 +203,131 @@ class _InterestPage extends StatelessWidget {
         ),
         const SizedBox(height: 8),
         Text(
-          '兴趣可多选。年龄段可选，用来筛选更合适的场景和素材。',
+          '单选一项作为首页优先推荐。其他模块和社区地图照常可用，之后也能在设置里更换。',
+          style: TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.w600,
+            color: AppDesignTokens.textSecondary,
+            height: 1.45,
+          ),
+        ),
+        const SizedBox(height: 16),
+        for (final LearningFocus focus in kLearningFocuses) ...<Widget>[
+          _FocusTile(
+            focus: focus,
+            selected: profile.focusId == focus.id,
+            onTap: () => onChanged(profile.copyWith(focusId: focus.id)),
+          ),
+          const SizedBox(height: 10),
+        ],
+        const SizedBox(height: 12),
+        HubChunkyButton(label: '下一步', onPressed: onNext),
+      ],
+    );
+  }
+}
+
+class _FocusTile extends StatelessWidget {
+  const _FocusTile({
+    required this.focus,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final LearningFocus focus;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: AppDesignTokens.appWhite,
+      borderRadius: BorderRadius.circular(18),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(18),
+        onTap: onTap,
+        child: Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(
+              color: selected
+                  ? AdventurePalette.pathAmber
+                  : AppDesignTokens.borderGray,
+              width: selected ? 2 : 1,
+            ),
+          ),
+          child: Row(
+            children: <Widget>[
+              Icon(
+                selected
+                    ? Icons.radio_button_checked
+                    : Icons.radio_button_off,
+                color: selected
+                    ? AdventurePalette.pathAmber
+                    : AppDesignTokens.textSecondary,
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: <Widget>[
+                    Text(
+                      focus.label,
+                      style: TextStyle(
+                        fontWeight: FontWeight.w900,
+                        color: AppDesignTokens.textPrimary,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      focus.homeBlurb,
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: AppDesignTokens.textSecondary,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _FilterPage extends StatelessWidget {
+  const _FilterPage({
+    required this.profile,
+    required this.onChanged,
+    required this.onBack,
+    required this.onNext,
+  });
+
+  final OnboardingProfile profile;
+  final ValueChanged<OnboardingProfile> onChanged;
+  final VoidCallback onBack;
+  final VoidCallback onNext;
+
+  @override
+  Widget build(BuildContext context) {
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(20, 20, 20, 28),
+      children: <Widget>[
+        Text(
+          '兴趣和年龄段',
+          style: TextStyle(
+            fontSize: 28,
+            fontWeight: FontWeight.w900,
+            color: AppDesignTokens.textPrimary,
+          ),
+        ),
+        const SizedBox(height: 8),
+        Text(
+          '用来在你的重点模块里筛选场景和素材，例如「阅读 + 科技」会优先推入门科技短文。',
           style: TextStyle(
             fontSize: 14,
             fontWeight: FontWeight.w600,
@@ -212,6 +336,15 @@ class _InterestPage extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 20),
+        Text(
+          '兴趣领域（可多选）',
+          style: TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.w800,
+            color: AppDesignTokens.textPrimary,
+          ),
+        ),
+        const SizedBox(height: 10),
         Wrap(
           spacing: 10,
           runSpacing: 10,
@@ -264,81 +397,6 @@ class _InterestPage extends StatelessWidget {
           ],
         ),
         const SizedBox(height: 28),
-        HubChunkyButton(label: '下一步', onPressed: onNext),
-      ],
-    );
-  }
-}
-
-class _ModePage extends StatelessWidget {
-  const _ModePage({
-    required this.profile,
-    required this.onChanged,
-    required this.onBack,
-    required this.onNext,
-  });
-
-  final OnboardingProfile profile;
-  final ValueChanged<OnboardingProfile> onChanged;
-  final VoidCallback onBack;
-  final VoidCallback onNext;
-
-  @override
-  Widget build(BuildContext context) {
-    return ListView(
-      padding: const EdgeInsets.fromLTRB(20, 20, 20, 28),
-      children: <Widget>[
-        Text(
-          '你想怎么学？',
-          style: TextStyle(
-            fontSize: 28,
-            fontWeight: FontWeight.w900,
-            color: AppDesignTokens.textPrimary,
-          ),
-        ),
-        const SizedBox(height: 8),
-        Text(
-          '可多选。再告诉我：今天想先试哪一个？',
-          style: TextStyle(
-            fontSize: 14,
-            fontWeight: FontWeight.w600,
-            color: AppDesignTokens.textSecondary,
-            height: 1.45,
-          ),
-        ),
-        const SizedBox(height: 16),
-        for (final OnboardingMode mode in kOnboardingModes) ...<Widget>[
-          _ModeTile(
-            mode: mode,
-            selected: profile.modeIds.contains(mode.id),
-            primary: profile.primaryModeId == mode.id,
-            onToggle: (bool selected) {
-              final List<String> next = List<String>.from(profile.modeIds);
-              if (selected) {
-                next.add(mode.id);
-              } else {
-                next.remove(mode.id);
-              }
-              String? primary = profile.primaryModeId;
-              if (!selected && primary == mode.id) {
-                primary = next.isEmpty ? null : next.first;
-              }
-              if (selected && primary == null) primary = mode.id;
-              onChanged(
-                profile.copyWith(modeIds: next, primaryModeId: primary),
-              );
-            },
-            onPrimary: () {
-              final List<String> next = List<String>.from(profile.modeIds);
-              if (!next.contains(mode.id)) next.add(mode.id);
-              onChanged(
-                profile.copyWith(modeIds: next, primaryModeId: mode.id),
-              );
-            },
-          ),
-          const SizedBox(height: 10),
-        ],
-        const SizedBox(height: 12),
         Row(
           children: <Widget>[
             Expanded(
@@ -354,82 +412,6 @@ class _ModePage extends StatelessWidget {
           ],
         ),
       ],
-    );
-  }
-}
-
-class _ModeTile extends StatelessWidget {
-  const _ModeTile({
-    required this.mode,
-    required this.selected,
-    required this.primary,
-    required this.onToggle,
-    required this.onPrimary,
-  });
-
-  final OnboardingMode mode;
-  final bool selected;
-  final bool primary;
-  final ValueChanged<bool> onToggle;
-  final VoidCallback onPrimary;
-
-  @override
-  Widget build(BuildContext context) {
-    return Material(
-      color: AppDesignTokens.appWhite,
-      borderRadius: BorderRadius.circular(18),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(18),
-        onTap: () => onToggle(!selected),
-        child: Container(
-          padding: const EdgeInsets.all(14),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(18),
-            border: Border.all(
-              color: primary
-                  ? AdventurePalette.pathAmber
-                  : selected
-                      ? AppDesignTokens.brandGreen
-                      : AppDesignTokens.borderGray,
-              width: primary || selected ? 2 : 1,
-            ),
-          ),
-          child: Row(
-            children: <Widget>[
-              Checkbox(
-                value: selected,
-                onChanged: (bool? v) => onToggle(v ?? false),
-              ),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: <Widget>[
-                    Text(
-                      mode.label,
-                      style: TextStyle(
-                        fontWeight: FontWeight.w900,
-                        color: AppDesignTokens.textPrimary,
-                      ),
-                    ),
-                    Text(
-                      mode.blurb,
-                      style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
-                        color: AppDesignTokens.textSecondary,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              TextButton(
-                onPressed: onPrimary,
-                child: Text(primary ? '今天先试 ✓' : '今天先试'),
-              ),
-            ],
-          ),
-        ),
-      ),
     );
   }
 }
@@ -462,7 +444,7 @@ class _AbilityPage extends StatelessWidget {
         ),
         const SizedBox(height: 8),
         Text(
-          '自评给出初始难度。音节与自然拼读用于提示或可选热身。',
+          '自评给出初始难度。音节与自然拼读只决定相关练习里是否提供可跳过的提示。',
           style: TextStyle(
             fontSize: 14,
             fontWeight: FontWeight.w600,
@@ -576,22 +558,22 @@ class _ResultPage extends StatelessWidget {
     required this.profile,
     required this.onStart,
     required this.onHome,
+    required this.onMap,
   });
 
   final OnboardingProfile profile;
   final ValueChanged<String> onStart;
   final VoidCallback onHome;
+  final VoidCallback onMap;
 
   @override
   Widget build(BuildContext context) {
-    final OnboardingMode? primary = profile.primaryMode;
-    final List<OnboardingMode> others = profile.otherModes;
-    final List<String> warmUps = profile.warmUpRoutes;
+    final LearningFocus? focus = profile.focus;
     return ListView(
       padding: const EdgeInsets.fromLTRB(20, 20, 20, 28),
       children: <Widget>[
         Text(
-          '好，按你的节奏开始',
+          '好，按你的重点开始',
           style: TextStyle(
             fontSize: 28,
             fontWeight: FontWeight.w900,
@@ -608,9 +590,9 @@ class _ResultPage extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 18),
-        if (primary != null) ...<Widget>[
+        if (focus != null) ...<Widget>[
           Text(
-            '今天先试 · ${primary.label}',
+            '首页优先 · ${focus.label}',
             style: TextStyle(
               fontSize: 18,
               fontWeight: FontWeight.w900,
@@ -619,7 +601,7 @@ class _ResultPage extends StatelessWidget {
           ),
           const SizedBox(height: 6),
           Text(
-            primary.blurb,
+            focus.homeBlurb,
             style: TextStyle(
               fontWeight: FontWeight.w600,
               color: AppDesignTokens.textSecondary,
@@ -627,61 +609,41 @@ class _ResultPage extends StatelessWidget {
           ),
           const SizedBox(height: 14),
           HubChunkyButton(
-            label: '开始 ${primary.label}',
-            onPressed: () => onStart(primary.route),
+            label: focus.startLabel,
+            onPressed: () => onStart(focus.route),
           ),
-        ],
-        if (others.isNotEmpty) ...<Widget>[
-          const SizedBox(height: 20),
-          Text(
-            '也保留了这些入口',
-            style: TextStyle(
-              fontWeight: FontWeight.w800,
-              color: AppDesignTokens.textPrimary,
-            ),
-          ),
-          const SizedBox(height: 8),
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: <Widget>[
-              for (final OnboardingMode mode in others)
-                ActionChip(
-                  label: Text(mode.label),
-                  onPressed: () => onStart(mode.route),
-                ),
-            ],
-          ),
-        ],
-        if (warmUps.isNotEmpty) ...<Widget>[
-          const SizedBox(height: 20),
-          Text(
-            '可选热身',
-            style: TextStyle(
-              fontWeight: FontWeight.w800,
-              color: AppDesignTokens.textPrimary,
-            ),
-          ),
-          const SizedBox(height: 8),
-          if (warmUps.contains('/learn/ipa'))
-            ListTile(
-              contentPadding: EdgeInsets.zero,
-              title: const Text('国际音标提示'),
-              subtitle: const Text('你标记了还不熟悉按音节拆读'),
-              trailing: const Icon(Icons.chevron_right),
-              onTap: () => onStart('/learn/ipa'),
-            ),
-          if (warmUps.contains('/learn/phonics'))
-            ListTile(
-              contentPadding: EdgeInsets.zero,
-              title: const Text('自然拼读热身'),
-              subtitle: const Text('你标记了还没学过自然拼读'),
-              trailing: const Icon(Icons.chevron_right),
-              onTap: () => onStart('/learn/phonics'),
-            ),
         ],
         const SizedBox(height: 16),
-        TextButton(onPressed: onHome, child: const Text('先去首页逛逛')),
+        Text(
+          '社区地图对所有人开放，关卡规则一致；随时可去玩，也可在设置里更换重点。',
+          style: TextStyle(
+            fontWeight: FontWeight.w600,
+            color: AppDesignTokens.textSecondary,
+            height: 1.4,
+          ),
+        ),
+        const SizedBox(height: 12),
+        OutlinedButton(
+          onPressed: onMap,
+          child: const Text('先去社区地图看看'),
+        ),
+        if (profile.warmUpRoutes.isNotEmpty) ...<Widget>[
+          const SizedBox(height: 20),
+          Text(
+            '相关练习会带可跳过提示',
+            style: TextStyle(
+              fontWeight: FontWeight.w800,
+              color: AppDesignTokens.textPrimary,
+            ),
+          ),
+          const SizedBox(height: 8),
+          if (profile.showSyllableHints)
+            const Text('· 音节拆读提示（可跳过）'),
+          if (profile.showPhonicsHints)
+            const Text('· 自然拼读提示（可跳过）'),
+        ],
+        const SizedBox(height: 16),
+        TextButton(onPressed: onHome, child: const Text('先去首页自由选课')),
       ],
     );
   }

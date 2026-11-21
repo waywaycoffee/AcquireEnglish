@@ -6,6 +6,7 @@ import 'package:hive_ce/hive.dart';
 import '../authentication/presentation/account_storage.dart';
 import 'package:media_kit/media_kit.dart';
 import '../digital_human/data/oral_coach_pipeline_client.dart';
+import '../onboarding/presentation/onboarding_provider.dart';
 import '../settings/presentation/settings_provider.dart';
 import '../phrases/presentation/phrase_book_provider.dart';
 
@@ -153,7 +154,7 @@ class ModuleScreen extends ConsumerStatefulWidget {
 class _ModuleScreenState extends ConsumerState<ModuleScreen>
     with WidgetsBindingObserver {
   int lesson = 0, line = 0, role = 1;
-  bool reveal = false, playing = false, repeat = false;
+  bool reveal = false, playing = false, repeat = false, hintDismissed = false;
   String? selected, error;
   int sequence = 0;
   Timer? sleep;
@@ -306,6 +307,39 @@ class _ModuleScreenState extends ConsumerState<ModuleScreen>
           ),
           const SizedBox(height: 12),
           Text(item.title, style: Theme.of(context).textTheme.headlineSmall),
+          if (!hintDismissed) ...[
+            Builder(
+              builder: (BuildContext context) {
+                final profile = ref.watch(onboardingProvider);
+                String? tip;
+                if (widget.kind == 'ipa' && profile.showSyllableHints) {
+                  tip = '提示：可以先按音节拆开读，听准再拼回去。可随时跳过。';
+                } else if (widget.kind == 'phonics' &&
+                    profile.showPhonicsHints) {
+                  tip = '提示：先盯住字母组合的发音，再合成整词。可随时跳过。';
+                } else if (widget.kind == 'dialogue' &&
+                    (profile.showSyllableHints || profile.showPhonicsHints)) {
+                  tip = '提示：生词可先拆音节或用字母音试读，不会也不影响继续对话。';
+                }
+                if (tip == null) return const SizedBox.shrink();
+                return Padding(
+                  padding: const EdgeInsets.only(top: 12),
+                  child: Material(
+                    color: Theme.of(context).colorScheme.surfaceContainerHighest,
+                    borderRadius: BorderRadius.circular(12),
+                    child: ListTile(
+                      dense: true,
+                      title: Text(tip),
+                      trailing: TextButton(
+                        onPressed: () => setState(() => hintDismissed = true),
+                        child: const Text('跳过'),
+                      ),
+                    ),
+                  ),
+                );
+              },
+            ),
+          ],
           const SizedBox(height: 16),
           DropdownButton<int>(
             value: lesson,

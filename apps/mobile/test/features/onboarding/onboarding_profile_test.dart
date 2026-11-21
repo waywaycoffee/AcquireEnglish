@@ -1,48 +1,43 @@
 import 'package:common_learn_english/features/onboarding/domain/onboarding_profile.dart';
+import 'package:common_learn_english/features/onboarding/presentation/focus_recommendation.dart';
+import 'package:common_learn_english/features/reading/domain/reading_doc.dart';
+import 'package:common_learn_english/features/sync/data/acquire_api_client.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
+  test('four focuses deep-link to their modules', () {
+    expect(focusById('video')?.route, '/library');
+    expect(focusById('reading')?.route, '/reading');
+    expect(focusById('oral')?.route, '/learn/dialogue');
+    expect(focusById('vocab')?.route, '/words/syllabus');
+  });
+
   test('resolvedLevel maps ability ids', () {
     expect(
       const OnboardingProfile(abilityId: 'beginner').resolvedLevel,
       '零基础',
     );
+    expect(const OnboardingProfile(abilityId: 'words').resolvedLevel, 'A2');
     expect(const OnboardingProfile(abilityId: 'daily').resolvedLevel, 'B1');
-    expect(const OnboardingProfile(abilityId: 'unsure').resolvedLevel, 'A2');
     expect(const OnboardingProfile().resolvedLevel, 'A2');
   });
 
-  test('primary and other modes + warm-up routes', () {
+  test('syllable and phonics flags drive skippable hints', () {
     const OnboardingProfile profile = OnboardingProfile(
-      modeIds: <String>['video', 'oral', 'vocab'],
-      primaryModeId: 'oral',
+      focusId: 'oral',
       canSyllableSplit: false,
       learnedPhonics: false,
     );
-    expect(profile.primaryMode?.id, 'oral');
-    expect(
-      profile.otherModes.map((OnboardingMode m) => m.id).toList(),
-      <String>['video', 'vocab'],
-    );
+    expect(profile.showSyllableHints, isTrue);
+    expect(profile.showPhonicsHints, isTrue);
     expect(profile.warmUpRoutes, <String>['/learn/ipa', '/learn/phonics']);
   });
 
-  test('copyWith can clear primaryModeId', () {
-    const OnboardingProfile profile = OnboardingProfile(
-      modeIds: <String>['reading'],
-      primaryModeId: 'reading',
-    );
-    final OnboardingProfile cleared = profile.copyWith(primaryModeId: null);
-    expect(cleared.primaryModeId, isNull);
-    expect(cleared.modeIds, <String>['reading']);
-  });
-
-  test('json round-trip', () {
+  test('json round-trip keeps focusId and legacy keys', () {
     const OnboardingProfile original = OnboardingProfile(
-      interestIds: <String>['travel', 'tech'],
+      interestIds: <String>['tech', 'travel'],
       ageBandId: 'college',
-      modeIds: <String>['reading', 'vocab'],
-      primaryModeId: 'reading',
+      focusId: 'reading',
       abilityId: 'words',
       canSyllableSplit: true,
       learnedPhonics: false,
@@ -51,12 +46,48 @@ void main() {
     final OnboardingProfile restored = OnboardingProfile.fromJson(
       original.toJson(),
     );
-    expect(restored.interestIds, original.interestIds);
-    expect(restored.ageBandId, 'college');
+    expect(restored.focusId, 'reading');
     expect(restored.primaryModeId, 'reading');
-    expect(restored.abilityId, 'words');
-    expect(restored.canSyllableSplit, isTrue);
+    expect(restored.interestIds, <String>['tech', 'travel']);
     expect(restored.learnedPhonics, isFalse);
-    expect(restored.completed, isTrue);
+  });
+
+  test('reading + tech + simple sentences recommends reading route', () {
+    final FocusRecommendation rec = buildFocusRecommendation(
+      profile: const OnboardingProfile(
+        interestIds: <String>['tech'],
+        focusId: 'reading',
+        abilityId: 'words',
+      ),
+      prefs: const AcquirePreferencesDto(level: 'A2'),
+      feed: const <AcquireDailyFeedItemDto>[],
+      readingDocs: const <ReadingDoc>[
+        ReadingDoc(
+          id: 'builtin_a2_lost_key',
+          title: 'The Lost Key',
+          sourceType: ReadingSourceType.builtin,
+          plainText: 'Tom could not find his house key.',
+          level: 'A2',
+          builtin: true,
+        ),
+      ],
+      activeBookTitle: null,
+    );
+    expect(rec.focus.id, 'reading');
+    expect(rec.route, '/reading/builtin_a2_lost_key');
+    expect(rec.subtitle, contains('科技'));
+  });
+
+  test('prefs tags encode focus without gating community', () {
+    final List<String> tags = prefsTagsForProfile(
+      interestIds: <String>['tech'],
+      ageBandId: 'college',
+      focusId: 'oral',
+      keepTags: <String>['slow', 'mode_video'],
+    );
+    expect(tags.contains('mode_oral'), isTrue);
+    expect(tags.contains('mode_video'), isFalse);
+    expect(tags.contains('tech'), isTrue);
+    expect(focusIdFromTags(tags), 'oral');
   });
 }
