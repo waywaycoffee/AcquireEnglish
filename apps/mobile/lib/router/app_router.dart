@@ -29,6 +29,7 @@ import '../features/words/presentation/sm2_daily_session_screen.dart';
 import '../features/words/presentation/lilinji_catalog_screen.dart';
 import '../features/words/domain/syllabus_book.dart';
 import '../features/digital_human/presentation/digital_human_coach_screen.dart';
+import '../features/digital_human/presentation/peer_oral_practice_screen.dart';
 import '../features/words/presentation/server_syllabus_catalog_screen.dart';
 import '../features/words/presentation/syllabus_books_screen.dart';
 import '../features/words/presentation/words_screen.dart';
@@ -262,6 +263,11 @@ GoRouter goRouter(Ref ref) => GoRouter(
               (scenario == null || scenario.isEmpty) ? null : scenario,
         );
       },
+    ).fade(),
+    GoRoute(
+      path: '/peer-oral',
+      builder: (BuildContext context, GoRouterState state) =>
+          const PeerOralPracticeScreen(),
     ).fade(),
     GoRoute(
       path: SGRoute.phraseReview.route,

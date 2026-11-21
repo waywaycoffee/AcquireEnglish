@@ -43,6 +43,34 @@ void main() {
     expect(turn.livetalkingUrl, 'http://127.0.0.1:8010');
   });
 
+  test('turn result parses diagnosis and Chinese fallback', () {
+    final OralCoachTurnResult withDiag = OralCoachTurnResult.fromJson(
+      <String, Object?>{
+        'transcript': '我刚才去了一趟超市',
+        'coach_text': 'Hold the mic and say it again.',
+        'diagnosis': <String, Object?>{
+          'source': '我刚才去了一趟超市',
+          'literal_en': 'I just went to the supermarket.',
+          'idiomatic_en': 'I just popped to the supermarket.',
+          'tip': 'popped to 更口语',
+        },
+      },
+      'http://127.0.0.1:8770',
+    );
+    expect(withDiag.diagnosis?.idiomaticEn, 'I just popped to the supermarket.');
+    expect(withDiag.diagnosis?.literalEn, 'I just went to the supermarket.');
+
+    final OralCoachTurnResult chineseFallback = OralCoachTurnResult.fromJson(
+      <String, Object?>{
+        'transcript': '我刚才去了一趟超市',
+        'coach_text': 'ok',
+      },
+      'http://127.0.0.1:8770',
+    );
+    expect(chineseFallback.diagnosis?.source, '我刚才去了一趟超市');
+    expect(chineseFallback.diagnosis?.isUseful, isTrue);
+  });
+
   test('tts_url joins subpath base and scheme-relative URLs', () {
     final OralCoachTurnResult relative = OralCoachTurnResult.fromJson(
       <String, Object?>{

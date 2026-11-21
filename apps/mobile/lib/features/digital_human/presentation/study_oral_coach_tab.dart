@@ -18,12 +18,15 @@ import '../../player/domain/pronunciation_assessment.dart';
 import '../../settings/presentation/settings_provider.dart';
 import '../../sync/data/acquire_api_client.dart';
 import '../../sync/data/user_assets_service.dart';
+import '../../phrases/presentation/phrase_book_provider.dart';
 import '../data/digital_human_catalog.dart';
 import '../data/livetalking_client.dart';
 import '../data/oral_coach_pipeline_client.dart';
 import '../domain/learning_scenario.dart';
+import '../domain/oral_expression_diagnosis.dart';
 import 'widgets/cartoon_coach_sprite.dart';
 import 'widgets/coach_avatar_stage.dart';
+import 'widgets/oral_diagnosis_card.dart';
 
 final RegExp _hanChars = RegExp(r'[\u4e00-\u9fff]');
 
@@ -135,12 +138,14 @@ class _ChatBubble {
     required this.text,
     this.hint = false,
     this.zh = '',
+    this.diagnosis,
   });
 
-  final String role; // user | coach
+  final String role; // user | coach | diagnosis
   final String text;
   final bool hint;
   final String zh;
+  final OralExpressionDiagnosis? diagnosis;
 }
 
 /// Midoo-style digital-human coach: free talk on the whole video/article theme.
@@ -221,6 +226,10 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
 
   /// Default English. Flip only when the learner asks for Chinese.
   bool _preferChineseReply = false;
+
+  /// After content diagnosis: learner must hold-mic and re-say idiomatic EN.
+  OralExpressionDiagnosis? _pendingResay;
+  bool _pendingDiagnosisSaved = false;
 
   /// Pre-generated oral Q&A topics from the episode transcript.
   List<String> _talkTopics = const <String>[];
@@ -322,12 +331,22 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
           final List<dynamic> rows = jsonDecode(raw) as List<dynamic>;
           _bubbles.addAll(
             rows.whereType<Map<String, dynamic>>().map(
-              (Map<String, dynamic> row) => _ChatBubble(
-                role: row['role'] as String,
-                text: row['text'] as String,
-                hint: row['hint'] == true,
-                zh: row['zh'] as String? ?? '',
-              ),
+              (Map<String, dynamic> row) {
+                OralExpressionDiagnosis? diagnosis;
+                final Object? rawDiag = row['diagnosis'];
+                if (rawDiag is Map) {
+                  diagnosis = OralExpressionDiagnosis.fromJson(
+                    Map<String, dynamic>.from(rawDiag),
+                  );
+                }
+                return _ChatBubble(
+                  role: row['role'] as String? ?? 'coach',
+                  text: row['text'] as String? ?? '',
+                  hint: row['hint'] == true,
+                  zh: row['zh'] as String? ?? '',
+                  diagnosis: diagnosis,
+                );
+              },
             ),
           );
         }
@@ -346,11 +365,13 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
     final String snapshot = jsonEncode(
       _bubbles
           .map(
-            (_ChatBubble bubble) => <String, Object>{
+            (_ChatBubble bubble) => <String, Object?>{
               'role': bubble.role,
               'text': bubble.text,
               'hint': bubble.hint,
               'zh': bubble.zh,
+              if (bubble.diagnosis != null)
+                'diagnosis': bubble.diagnosis!.toJson(),
             },
           )
           .toList(),
@@ -1043,6 +1064,19 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
     if (!mounted || !identical(_session, session)) return;
     final String confirmed = draft.transcript.trim();
     if (confirmed.isEmpty) throw StateError('语音转写为空');
+
+    final OralExpressionDiagnosis? pending = _pendingResay;
+    if (pending != null) {
+      await _completePendingResay(
+        settings: settings,
+        session: session,
+        draft: draft,
+        confirmed: confirmed,
+        pending: pending,
+      );
+      return;
+    }
+
     _updateReplyLanguageFromLearner(confirmed);
     setState(() {
       _busy = true;
@@ -1062,6 +1096,44 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
     );
     if (!mounted || !identical(_session, session)) return;
     _difficulty = turn.difficulty;
+    final OralExpressionDiagnosis? diagnosis =
+        turn.diagnosis ??
+        (transcriptLooksChineseHeavy(confirmed)
+            ? OralExpressionDiagnosis.fallback(source: confirmed)
+            : null);
+    if (diagnosis != null && diagnosis.isUseful) {
+      _saveDiagnosisToLanguageBank(diagnosis);
+      if (!mounted) return;
+      setState(() {
+        _pendingResay = diagnosis;
+        _pendingDiagnosisSaved = true;
+        _bubbles.add(
+          _ChatBubble(
+            role: 'diagnosis',
+            text: diagnosis.idiomaticEn.isNotEmpty
+                ? diagnosis.idiomaticEn
+                : diagnosis.literalEn,
+            diagnosis: diagnosis,
+          ),
+        );
+        _busy = false;
+        _status = '按住再说一次地道英文';
+      });
+      _scrollChatToEnd();
+      unawaited(_persistLearningTurn(turn));
+      final String tip = diagnosis.idiomaticEn.isNotEmpty
+          ? 'Hold the mic and say: “${diagnosis.idiomaticEn}”'
+          : (turn.coachText.trim().isNotEmpty
+                ? preferEnglishCoachReply(
+                    turn.coachText,
+                    allowChinese: _preferChineseReply,
+                    topic: _topicLabel,
+                  )
+                : 'Hold the mic and say it again in idiomatic English.');
+      await _speakCoach(tip, settings);
+      return;
+    }
+
     final String rawSpeak = turn.avatarText.trim().isNotEmpty
         ? turn.avatarText.trim()
         : turn.coachText.trim();
@@ -1113,6 +1185,81 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
         _status = '你可以开始说';
       });
     }
+  }
+
+  Future<void> _completePendingResay({
+    required LearningSettingsState settings,
+    required OralCoachSession session,
+    required OralCoachDraftResult draft,
+    required String confirmed,
+    required OralExpressionDiagnosis pending,
+  }) async {
+    setState(() {
+      _busy = true;
+      _status = '已收到跟读，继续对话…';
+      _bubbles.add(_ChatBubble(role: 'user', text: confirmed));
+      _pendingResay = null;
+    });
+    _scrollChatToEnd();
+    final DigitalHumanPersona persona = settings.selectedDigitalHuman;
+    final String prompt =
+        'I practiced the idiomatic line “${pending.idiomaticEn.isNotEmpty ? pending.idiomaticEn : pending.literalEn}”. '
+        'My attempt: “$confirmed”. Please continue the conversation briefly.';
+    final OralCoachTurnResult turn = await _pipelineClient.confirmDraft(
+      session: session,
+      draftId: draft.draftId,
+      confirmedText: prompt,
+      digitalHumanId: persona.id,
+      ttsVoice: persona.edgeVoice(chinese: _preferChineseReply),
+      replyLanguage: _preferChineseReply ? 'zh' : 'en',
+      textOnly: true,
+    );
+    if (!mounted || !identical(_session, session)) return;
+    _difficulty = turn.difficulty;
+    final String rawSpeak = turn.avatarText.trim().isNotEmpty
+        ? turn.avatarText.trim()
+        : turn.coachText.trim();
+    final String speakText = preferEnglishCoachReply(
+      rawSpeak.isEmpty ? 'Nice — that sounds more natural. What happened next?' : rawSpeak,
+      allowChinese: _preferChineseReply,
+      topic: _topicLabel,
+    );
+    if (!mounted) return;
+    setState(() {
+      if (speakText.isNotEmpty) {
+        _bubbles.add(_ChatBubble(role: 'coach', text: speakText));
+      }
+      _busy = false;
+      _status = '你可以开始说';
+    });
+    _scrollChatToEnd();
+    unawaited(_persistLearningTurn(turn));
+    await _speakCoach(speakText, settings);
+  }
+
+  void _saveDiagnosisToLanguageBank(OralExpressionDiagnosis diagnosis) {
+    final String english = diagnosis.idiomaticEn.isNotEmpty
+        ? diagnosis.idiomaticEn
+        : diagnosis.literalEn;
+    if (english.trim().isEmpty) return;
+    final bool added = ref.read(phraseBookProvider.notifier).addPhraseIfMissing(
+          english: english,
+          chinese: diagnosis.source,
+          course: '口语诊断',
+          episode: widget.episodeTitle.isNotEmpty
+              ? widget.episodeTitle
+              : (_activeScenario?.title ?? '数字人对话'),
+          time: DateTime.now().toIso8601String(),
+          needsReview: true,
+          today: true,
+          note: diagnosis.tip.isNotEmpty
+              ? diagnosis.tip
+              : (diagnosis.literalEn.isNotEmpty &&
+                        diagnosis.literalEn != english
+                    ? '直译：${diagnosis.literalEn}'
+                    : null),
+        );
+    _pendingDiagnosisSaved = added || _pendingDiagnosisSaved;
   }
 
   Future<void> _persistLearningTurn(OralCoachTurnResult turn) async {
@@ -1378,12 +1525,14 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
     final LearningSettingsState settings = ref.watch(learningSettingsProvider);
     final DigitalHumanPersona persona = settings.selectedDigitalHuman;
     final String orbHint = _recordingActive
-        ? '正在听你说…'
+        ? (_pendingResay != null ? '正在跟读地道英文…' : '正在听你说…')
         : (_busy
               ? '外教思考中…'
-              : (_status.trim().isNotEmpty
-                    ? _status
-                    : (_started ? '你可以开始说' : '点麦克风开始对话')));
+              : (_pendingResay != null
+                    ? '按住再说一次'
+                    : (_status.trim().isNotEmpty
+                          ? _status
+                          : (_started ? '你可以开始说' : '点麦克风开始对话'))));
     final String stageLabel = _coachSpeaking
         ? '外教在说…'
         : (_recordingActive
@@ -1543,6 +1692,50 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
                       itemBuilder: (BuildContext context, int offset) {
                         final int index = _bubbles.length - 1 - offset;
                         final _ChatBubble bubble = _bubbles[index];
+                        final OralExpressionDiagnosis? diagnosis =
+                            bubble.diagnosis;
+                        if (bubble.role == 'diagnosis' && diagnosis != null) {
+                          return Padding(
+                            padding: const EdgeInsets.only(bottom: 10),
+                            child: OralDiagnosisCard(
+                              diagnosis: diagnosis,
+                              saved: _pendingDiagnosisSaved,
+                              onSpeakLiteral: () => unawaited(
+                                _replayBubble(
+                                  diagnosis.literalEn.isNotEmpty
+                                      ? diagnosis.literalEn
+                                      : diagnosis.idiomaticEn,
+                                ),
+                              ),
+                              onSpeakIdiomatic: () => unawaited(
+                                _replayBubble(
+                                  diagnosis.idiomaticEn.isNotEmpty
+                                      ? diagnosis.idiomaticEn
+                                      : diagnosis.literalEn,
+                                ),
+                              ),
+                              onSave: () {
+                                _saveDiagnosisToLanguageBank(diagnosis);
+                                setState(() => _pendingDiagnosisSaved = true);
+                              },
+                              onGrammar: () {
+                                final String tip = diagnosis.tip.isNotEmpty
+                                    ? diagnosis.tip
+                                    : '对比直译与地道说法，注意动词搭配与时态。';
+                                setState(() {
+                                  _bubbles.add(
+                                    _ChatBubble(
+                                      role: 'coach',
+                                      text: tip,
+                                      hint: true,
+                                    ),
+                                  );
+                                });
+                                _scrollChatToEnd();
+                              },
+                            ),
+                          );
+                        }
                         return _ConversationBubble(
                           bubble: bubble,
                           showZh: _showZhIndexes.contains(index),
@@ -1594,63 +1787,112 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
                   },
                 ),
               ),
-            GestureDetector(
-              key: const ValueKey<String>('study-oral-coach-mic'),
-              onLongPressStart: _busy ? null : (_) => unawaited(_onHoldStart()),
-              onLongPressEnd: _busy ? null : (_) => unawaited(_onHoldEnd()),
-              onLongPressCancel: _busy ? null : () => unawaited(_onHoldEnd()),
-              onTap: _busy
-                  ? null
-                  : () => unawaited(
-                      _recordingActive
-                          ? _stopRecordingAndSend()
-                          : _onHoldStart(),
-                    ),
-              child: AnimatedBuilder(
-                animation: _orbPulse,
-                builder: (BuildContext context, Widget? child) {
-                  final double t = _recordingActive
-                      ? 0.55 + _orbPulse.value * 0.45
-                      : 0.35 + _orbPulse.value * 0.25;
-                  return Container(
-                    width: 60,
-                    height: 60,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      gradient: RadialGradient(
-                        colors: <Color>[
-                          Color.lerp(
-                                const Color(0xFF9B7CFF),
-                                const Color(0xFFE8DEFF),
-                                t,
-                              ) ??
-                              const Color(0xFFB9A6FF),
-                          const Color(0xFF5B3FD4),
-                          const Color(0xFF2A1B6A),
-                        ],
-                        stops: const <double>[0, 0.55, 1],
+            if (_pendingResay != null)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(14, 0, 14, 8),
+                child: Material(
+                  color: const Color(0xFF6D28D9),
+                  borderRadius: BorderRadius.circular(16),
+                  child: InkWell(
+                    borderRadius: BorderRadius.circular(16),
+                    onTapDown: _busy
+                        ? null
+                        : (_) => unawaited(_onHoldStart()),
+                    onTapUp: _busy
+                        ? null
+                        : (_) => unawaited(_onHoldEnd()),
+                    onTapCancel: _busy
+                        ? null
+                        : () => unawaited(_onHoldEnd()),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 14,
                       ),
-                      boxShadow: <BoxShadow>[
-                        BoxShadow(
-                          color: const Color(
-                            0xFF8B6CFF,
-                          ).withValues(alpha: 0.25 + t * 0.35),
-                          blurRadius: 28 + t * 18,
-                          spreadRadius: 2,
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: <Widget>[
+                          Icon(
+                            _recordingActive
+                                ? Icons.graphic_eq_rounded
+                                : Icons.mic_rounded,
+                            color: Colors.white,
+                          ),
+                          const SizedBox(width: 8),
+                          Text(
+                            _recordingActive ? '松开发送跟读' : '按住再说一次',
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 16,
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              )
+            else
+              GestureDetector(
+                key: const ValueKey<String>('study-oral-coach-mic'),
+                onLongPressStart:
+                    _busy ? null : (_) => unawaited(_onHoldStart()),
+                onLongPressEnd: _busy ? null : (_) => unawaited(_onHoldEnd()),
+                onLongPressCancel:
+                    _busy ? null : () => unawaited(_onHoldEnd()),
+                onTap: _busy
+                    ? null
+                    : () => unawaited(
+                        _recordingActive
+                            ? _stopRecordingAndSend()
+                            : _onHoldStart(),
+                      ),
+                child: AnimatedBuilder(
+                  animation: _orbPulse,
+                  builder: (BuildContext context, Widget? child) {
+                    final double t = _recordingActive
+                        ? 0.55 + _orbPulse.value * 0.45
+                        : 0.35 + _orbPulse.value * 0.25;
+                    return Container(
+                      width: 60,
+                      height: 60,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        gradient: RadialGradient(
+                          colors: <Color>[
+                            Color.lerp(
+                                  const Color(0xFF9B7CFF),
+                                  const Color(0xFFE8DEFF),
+                                  t,
+                                ) ??
+                                const Color(0xFFB9A6FF),
+                            const Color(0xFF5B3FD4),
+                            const Color(0xFF2A1B6A),
+                          ],
+                          stops: const <double>[0, 0.55, 1],
                         ),
-                      ],
-                    ),
-                    child: Icon(
-                      _recordingActive
-                          ? Icons.graphic_eq_rounded
-                          : Icons.mic_none_rounded,
-                      color: Colors.white.withValues(alpha: 0.92),
-                      size: 32,
-                    ),
-                  );
-                },
+                        boxShadow: <BoxShadow>[
+                          BoxShadow(
+                            color: const Color(
+                              0xFF8B6CFF,
+                            ).withValues(alpha: 0.25 + t * 0.35),
+                            blurRadius: 28 + t * 18,
+                            spreadRadius: 2,
+                          ),
+                        ],
+                      ),
+                      child: Icon(
+                        _recordingActive
+                            ? Icons.graphic_eq_rounded
+                            : Icons.mic_none_rounded,
+                        color: Colors.white.withValues(alpha: 0.92),
+                        size: 32,
+                      ),
+                    );
+                  },
+                ),
               ),
-            ),
             const SizedBox(height: 6),
             Text(
               orbHint,

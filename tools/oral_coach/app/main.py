@@ -113,7 +113,7 @@ def _session_payload(
 
 
 def _turn_payload(result: TurnResult) -> dict[str, Any]:
-    return {
+    payload: dict[str, Any] = {
         'session_id': result.session_id,
         'transcript': result.transcript,
         'pronunciation': result.pronunciation,
@@ -124,6 +124,9 @@ def _turn_payload(result: TurnResult) -> dict[str, Any]:
         'avatar': result.avatar,
         'providers': result.providers,
     }
+    if result.diagnosis:
+        payload['diagnosis'] = result.diagnosis
+    return payload
 
 
 async def _store_upload(sid: str, file: UploadFile) -> Path:

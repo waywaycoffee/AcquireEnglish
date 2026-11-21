@@ -2,6 +2,8 @@ import 'dart:io';
 
 import 'package:dio/dio.dart';
 
+import '../domain/oral_expression_diagnosis.dart';
+
 /// Client for `tools/oral_coach` video-topic conversation sidecar.
 class OralCoachPipelineClient {
   OralCoachPipelineClient({Dio? dio}) : _dio = dio ?? Dio();
@@ -376,6 +378,7 @@ class OralCoachTurnResult {
     required this.avatarText,
     required this.livetalkingUrl,
     required this.providers,
+    this.diagnosis,
   });
 
   factory OralCoachTurnResult.fromJson(
@@ -420,9 +423,23 @@ class OralCoachTurnResult {
         providers['$key'] = '$value';
       });
     }
+    OralExpressionDiagnosis? diagnosis;
+    final Object? rawDiagnosis = raw['diagnosis'];
+    if (rawDiagnosis is Map) {
+      final OralExpressionDiagnosis parsed = OralExpressionDiagnosis.fromJson(
+        Map<String, dynamic>.from(rawDiagnosis),
+      );
+      if (parsed.isUseful) {
+        diagnosis = parsed;
+      }
+    }
+    final String transcript = '${raw['transcript'] ?? ''}';
+    if (diagnosis == null && transcriptLooksChineseHeavy(transcript)) {
+      diagnosis = OralExpressionDiagnosis.fallback(source: transcript);
+    }
     final Object? overall = pron['overall'];
     return OralCoachTurnResult(
-      transcript: '${raw['transcript'] ?? ''}',
+      transcript: transcript,
       coachText: '${raw['coach_text'] ?? ''}',
       difficulty: '${raw['difficulty'] ?? 'B1'}',
       pronunciationOverall: overall is num
@@ -435,6 +452,7 @@ class OralCoachTurnResult {
       avatarText: '${avatar['text'] ?? raw['coach_text'] ?? ''}',
       livetalkingUrl: '${avatar['livetalking_url'] ?? ''}',
       providers: providers,
+      diagnosis: diagnosis,
     );
   }
 
@@ -449,6 +467,7 @@ class OralCoachTurnResult {
   final String avatarText;
   final String livetalkingUrl;
   final Map<String, String> providers;
+  final OralExpressionDiagnosis? diagnosis;
 
   String get scoreLabel {
     final int pct = (pronunciationOverall * 100).round().clamp(0, 100);

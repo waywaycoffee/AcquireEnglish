@@ -1,0 +1,230 @@
+import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+
+import '../../domain/oral_expression_diagnosis.dart';
+
+/// Live-style content diagnosis + idiomatic rewrite card.
+class OralDiagnosisCard extends StatelessWidget {
+  const OralDiagnosisCard({
+    required this.diagnosis,
+    this.onSpeakLiteral,
+    this.onSpeakIdiomatic,
+    this.onSave,
+    this.onGrammar,
+    this.saved = false,
+    super.key,
+  });
+
+  final OralExpressionDiagnosis diagnosis;
+  final VoidCallback? onSpeakLiteral;
+  final VoidCallback? onSpeakIdiomatic;
+  final VoidCallback? onSave;
+  final VoidCallback? onGrammar;
+  final bool saved;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.white,
+      elevation: 10,
+      shadowColor: const Color(0x33000000),
+      borderRadius: BorderRadius.circular(22),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 14, 16, 16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: <Widget>[
+            _Section(
+              title: '内容诊断',
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: <Widget>[
+                  Text.rich(
+                    TextSpan(
+                      children: <InlineSpan>[
+                        TextSpan(
+                          text: diagnosis.source,
+                          style: const TextStyle(
+                            color: Color(0xFFE11D48),
+                            fontSize: 16,
+                            fontWeight: FontWeight.w700,
+                            decoration: TextDecoration.lineThrough,
+                            decorationColor: Color(0xFFE11D48),
+                            height: 1.35,
+                          ),
+                        ),
+                        if (diagnosis.literalEn.isNotEmpty) ...<InlineSpan>[
+                          const TextSpan(text: '  '),
+                          TextSpan(
+                            text: diagnosis.literalEn,
+                            style: const TextStyle(
+                              color: Color(0xFF16A34A),
+                              fontSize: 16,
+                              fontWeight: FontWeight.w800,
+                              height: 1.35,
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  _ActionRow(
+                    onSpeak: onSpeakLiteral,
+                    onSave: onSave,
+                    onCopy: () => _copy(
+                      context,
+                      diagnosis.literalEn.isNotEmpty
+                          ? diagnosis.literalEn
+                          : diagnosis.idiomaticEn,
+                    ),
+                    onGrammar: onGrammar,
+                    saved: saved,
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 14),
+            _Section(
+              title: '地道表达',
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: <Widget>[
+                  Text(
+                    diagnosis.idiomaticEn.isNotEmpty
+                        ? diagnosis.idiomaticEn
+                        : (diagnosis.literalEn.isNotEmpty
+                              ? diagnosis.literalEn
+                              : '先用英文说清楚刚才的意思'),
+                    style: const TextStyle(
+                      color: Color(0xFF111827),
+                      fontSize: 17,
+                      fontWeight: FontWeight.w800,
+                      height: 1.35,
+                    ),
+                  ),
+                  if (diagnosis.tip.isNotEmpty) ...<Widget>[
+                    const SizedBox(height: 6),
+                    Text(
+                      diagnosis.tip,
+                      style: const TextStyle(
+                        color: Color(0xFF6B7280),
+                        fontSize: 12,
+                        height: 1.35,
+                      ),
+                    ),
+                  ],
+                  const SizedBox(height: 10),
+                  _ActionRow(
+                    onSpeak: onSpeakIdiomatic,
+                    onSave: onSave,
+                    onCopy: () => _copy(
+                      context,
+                      diagnosis.idiomaticEn.isNotEmpty
+                          ? diagnosis.idiomaticEn
+                          : diagnosis.literalEn,
+                    ),
+                    onGrammar: onGrammar,
+                    saved: saved,
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _copy(BuildContext context, String text) {
+    if (text.trim().isEmpty) return;
+    Clipboard.setData(ClipboardData(text: text));
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('已复制')),
+    );
+  }
+}
+
+class _Section extends StatelessWidget {
+  const _Section({required this.title, required this.child});
+
+  final String title;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: <Widget>[
+        Text(
+          title,
+          style: const TextStyle(
+            color: Color(0xFF6B7280),
+            fontSize: 13,
+            fontWeight: FontWeight.w800,
+          ),
+        ),
+        const SizedBox(height: 8),
+        child,
+      ],
+    );
+  }
+}
+
+class _ActionRow extends StatelessWidget {
+  const _ActionRow({
+    this.onSpeak,
+    this.onSave,
+    this.onCopy,
+    this.onGrammar,
+    this.saved = false,
+  });
+
+  final VoidCallback? onSpeak;
+  final VoidCallback? onSave;
+  final VoidCallback? onCopy;
+  final VoidCallback? onGrammar;
+  final bool saved;
+
+  @override
+  Widget build(BuildContext context) {
+    return Wrap(
+      spacing: 4,
+      runSpacing: 4,
+      crossAxisAlignment: WrapCrossAlignment.center,
+      children: <Widget>[
+        IconButton(
+          tooltip: '朗读',
+          onPressed: onSpeak,
+          visualDensity: VisualDensity.compact,
+          icon: const Icon(Icons.volume_up_rounded, size: 20),
+        ),
+        IconButton(
+          tooltip: saved ? '已加入语言库' : '加入语言库',
+          onPressed: onSave,
+          visualDensity: VisualDensity.compact,
+          icon: Icon(
+            saved ? Icons.star_rounded : Icons.star_border_rounded,
+            size: 20,
+            color: saved ? const Color(0xFFF59E0B) : null,
+          ),
+        ),
+        IconButton(
+          tooltip: '复制',
+          onPressed: onCopy,
+          visualDensity: VisualDensity.compact,
+          icon: const Icon(Icons.copy_rounded, size: 18),
+        ),
+        TextButton.icon(
+          onPressed: onGrammar,
+          icon: const Icon(Icons.visibility_outlined, size: 16),
+          label: const Text('语法解析'),
+          style: TextButton.styleFrom(
+            foregroundColor: const Color(0xFF6D28D9),
+            visualDensity: VisualDensity.compact,
+          ),
+        ),
+      ],
+    );
+  }
+}

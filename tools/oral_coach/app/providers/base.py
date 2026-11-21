@@ -97,6 +97,9 @@ class LlmReply:
     difficulty: str = 'B1'
     corrections: list[str] = field(default_factory=list)
     role: str = 'friendly_tutor'
+    # When learner used Chinese / mixed / awkward English:
+    # source (original), literal_en, idiomatic_en, tip.
+    diagnosis: dict[str, str] | None = None
 
 
 @dataclass

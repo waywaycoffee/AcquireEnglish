@@ -74,6 +74,7 @@ class LearningHomeScreen extends ConsumerWidget {
         '/words/syllabus/cloud?tab=pattern',
       ),
       ('场景对话', '在情境里开口', Icons.forum_outlined, '/digital-human'),
+      ('真人口语', '匹配对练 · AI改写', Icons.record_voice_over_outlined, '/peer-oral'),
     ];
     return PadScaffold(
       currentDestination: AppNavDestination.home,

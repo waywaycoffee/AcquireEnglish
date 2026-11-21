@@ -233,6 +233,50 @@ def _pick_focus_bits(excerpt: str, topic: str) -> tuple[str, str]:
     return (vocab, grammar)
 
 
+def _looks_chinese_heavy(text: str) -> bool:
+    raw = (text or '').strip()
+    if not raw:
+        return False
+    han = len(re.findall(r'[\u4e00-\u9fff]', raw))
+    if han < 2:
+        return False
+    letters = len(re.findall(r'[A-Za-z]', raw))
+    return han >= letters
+
+
+def _parse_diagnosis(raw: object, learner_text: str) -> dict[str, str] | None:
+    source = (learner_text or '').strip()
+    if isinstance(raw, dict):
+        out = {
+            'source': str(raw.get('source') or raw.get('source_zh') or source).strip(),
+            'literal_en': str(
+                raw.get('literal_en') or raw.get('literal') or ''
+            ).strip(),
+            'idiomatic_en': str(
+                raw.get('idiomatic_en') or raw.get('idiomatic') or ''
+            ).strip(),
+            'tip': str(raw.get('tip') or raw.get('note') or '').strip(),
+        }
+        if out['idiomatic_en'] or out['literal_en']:
+            if not out['literal_en']:
+                out['literal_en'] = out['idiomatic_en']
+            if not out['idiomatic_en']:
+                out['idiomatic_en'] = out['literal_en']
+            if not out['tip']:
+                out['tip'] = '先按住再说一次地道英文，再说给对方听。'
+            if not out['source']:
+                out['source'] = source
+            return out
+    if _looks_chinese_heavy(source):
+        return {
+            'source': source,
+            'literal_en': '',
+            'idiomatic_en': '',
+            'tip': '先用英文说清楚意思；不会的词可先说中文，我再帮你改成地道说法。',
+        }
+    return None
+
+
 def _guided_fallback(context: VideoContext, learner_text: str) -> LlmReply:
     topic = (
         context.topic_summary.strip()
@@ -244,6 +288,19 @@ def _guided_fallback(context: VideoContext, learner_text: str) -> LlmReply:
     learner = (learner_text or '').strip() or '(silence)'
     stuck = _is_stuck(learner)
     corrections: list[str] = []
+    diagnosis = _parse_diagnosis(None, learner)
+    if diagnosis is not None and _looks_chinese_heavy(learner):
+        text = (
+            'Nice — I got your meaning. Hold the mic and say the idiomatic English '
+            'once, then we continue.'
+        )
+        return LlmReply(
+            text=text,
+            provider='mock',
+            difficulty=context.difficulty,
+            corrections=corrections,
+            diagnosis=diagnosis,
+        )
     if stuck:
         text = (
             f"No worries — let's recall the video “{topic[:80]}”. "
@@ -269,6 +326,7 @@ def _guided_fallback(context: VideoContext, learner_text: str) -> LlmReply:
         provider='mock',
         difficulty=context.difficulty,
         corrections=corrections,
+        diagnosis=diagnosis,
     )
 
 
@@ -297,7 +355,7 @@ class MockLlm:
         if tip and 'Missing:' in tip:
             corrections.append(tip)
         unused = _unused_talk_topics(context, history)
-        if unused and _is_stuck(learner_text):
+        if unused and _is_stuck(learner_text) and reply.diagnosis is None:
             reply = LlmReply(
                 text=(
                     f"No worries — let's use this prompt: {unused[0]} "
@@ -306,13 +364,23 @@ class MockLlm:
                 provider=self.name,
                 difficulty=context.difficulty,
                 corrections=corrections,
+                diagnosis=reply.diagnosis,
             )
-        elif unused and not _is_stuck(learner_text):
+        elif unused and not _is_stuck(learner_text) and reply.diagnosis is None:
             reply = LlmReply(
                 text=f'{reply.text.rstrip()} Next: {unused[0]}',
                 provider=self.name,
                 difficulty=context.difficulty,
                 corrections=corrections,
+                diagnosis=reply.diagnosis,
+            )
+        elif corrections != reply.corrections or reply.provider != self.name:
+            reply = LlmReply(
+                text=reply.text,
+                provider=self.name,
+                difficulty=context.difficulty,
+                corrections=corrections,
+                diagnosis=reply.diagnosis,
             )
         difficulty = context.difficulty
         if pronunciation.overall >= 0.85 and difficulty in {'A2', 'B1'}:
@@ -324,6 +392,7 @@ class MockLlm:
             provider=self.name,
             difficulty=difficulty,
             corrections=list(reply.corrections)[:4] or corrections[:4],
+            diagnosis=reply.diagnosis,
         )
 
 
@@ -437,6 +506,11 @@ class OpenAiLlm:
                 '(preferably from next_unused_topics). '
                 'If the learner made grammar mistakes, correct them immediately in '
                 '"text" and list brief notes in "corrections". '
+                'If the learner spoke Chinese, mixed Chinese/English, or awkward English, '
+                'fill "diagnosis" with: source (their utterance), literal_en '
+                '(clear English meaning), idiomatic_en (natural spoken English), '
+                'and tip (brief Chinese tip). Then in "text" ask them to hold the mic '
+                'and say the idiomatic sentence once. '
                 'Do not ask the learner to repeat a single subtitle line verbatim. '
                 'Default spoken language: English only. '
                 'Switch to Chinese only if the learner explicitly asks.'
@@ -445,6 +519,12 @@ class OpenAiLlm:
                 'text': 'spoken tutor reply in English (Chinese only if asked)',
                 'difficulty': 'A2|B1|B2|C1',
                 'corrections': ['short grammar/vocab fixes when needed'],
+                'diagnosis': {
+                    'source': 'original learner utterance when Chinese/mixed/awkward',
+                    'literal_en': 'clear English meaning',
+                    'idiomatic_en': 'natural spoken English',
+                    'tip': 'short Chinese tip or empty',
+                },
             },
         }
         data = await _openai_chat_json(
@@ -456,6 +536,7 @@ class OpenAiLlm:
                         SYSTEM
                         + ' Reply as compact JSON. The "text" field must be English'
                         ' unless the learner asked for Chinese.'
+                        ' Include diagnosis when learner used Chinese or non-idiomatic English.'
                     ),
                 },
                 {'role': 'user', 'content': json.dumps(user, ensure_ascii=False)},
@@ -470,6 +551,7 @@ class OpenAiLlm:
             provider=self.name,
             difficulty=str(data.get('difficulty') or context.difficulty),
             corrections=[str(x) for x in (data.get('corrections') or [])][:4],
+            diagnosis=_parse_diagnosis(data.get('diagnosis'), learner_text),
         )
 
 
@@ -536,6 +618,8 @@ class OllamaLlm:
             'Ask about the video using prepared topics when possible. '
             'If stuck, guide recall with vocab + grammar. '
             'Correct grammar mistakes immediately. '
+            'If learner used Chinese/mixed/awkward English, start with a short '
+            'diagnosis line, then ask them to hold the mic and re-say idiomatic English. '
             'Reply in plain English only, max 4 sentences. '
             'Never mix Chinese characters into the reply unless the learner '
             'explicitly asked for Chinese.'
@@ -553,7 +637,11 @@ class OllamaLlm:
             text = (response.json().get('response') or '').strip()
         if not text:
             return _guided_fallback(context, learner_text)
-        return LlmReply(text=text, provider=self.name)
+        return LlmReply(
+            text=text,
+            provider=self.name,
+            diagnosis=_parse_diagnosis(None, learner_text),
+        )
 
 
 def build_llm(settings: Settings):

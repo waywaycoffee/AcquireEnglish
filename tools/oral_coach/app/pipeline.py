@@ -47,6 +47,7 @@ class TurnResult:
     tts_url: str | None
     avatar: dict
     providers: dict
+    diagnosis: dict[str, str] | None = None
 
 
 class OralCoachPipeline:
@@ -260,6 +261,7 @@ class OralCoachPipeline:
             tts_url=tts_url,
             avatar=avatar,
             providers=self.provider_map(),
+            diagnosis=reply.diagnosis,
         )
 
     async def run_turn(
