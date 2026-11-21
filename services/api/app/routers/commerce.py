@@ -12,6 +12,7 @@ from app.deps import get_current_user
 from app.models import User
 from app.services.commerce.catalog import (
     FREE_PREVIEW_COUNT,
+    FREE_TIER_PROMISES,
     LEGACY_MODULE_CODES,
     MODULE_CODES,
     MODULE_DEFS,
@@ -97,7 +98,7 @@ async def commerce_catalog() -> dict:
 
 @router.get("/free-trial-seeds")
 async def commerce_free_trial_seeds() -> dict:
-    """Public default free-trial items (~3 per module) for app bootstrap."""
+    """Public permanent free-trial items (~5 per module) for app bootstrap."""
     return public_free_trial_seeds()
 
 
@@ -144,6 +145,8 @@ async def commerce_module_access(
         "free_trial_browse": True,
         "free_preview_count": FREE_PREVIEW_COUNT,
         "free_trial_seeds": seeds,
+        "free_tier_promises": FREE_TIER_PROMISES,
+        "bookshelf_free_stays_free": True,
     }
 
 

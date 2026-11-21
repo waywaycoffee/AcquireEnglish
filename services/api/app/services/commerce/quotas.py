@@ -16,11 +16,15 @@ FREE_CAPS: dict[str, dict] = {
     "reading_article": {"period": "day", "limit": 1, "title": "精读篇数"},
     "ai_explain": {"period": "week", "limit": 2, "title": "AI 精讲"},
     "coach_minutes": {"period": "week", "limit": 10, "title": "外教对话分钟"},
-    "upload": {"period": "day", "limit": 2, "title": "素材上传"},
-    "upload_month": {"period": "month", "limit": 10, "title": "素材上传（月）"},
+    # Free users may keep ≥15 personal video + reading uploads; monthly cap ≥15.
+    "upload": {"period": "day", "limit": 5, "title": "素材上传"},
+    "upload_month": {"period": "month", "limit": 20, "title": "素材上传（月）"},
     "arena_match": {"period": "day", "limit": 3, "title": "对战场次"},
     "video_lesson": {"period": "week", "limit": 1, "title": "视频课"},
 }
+
+# Soft stock caps for personal libraries (not period counters).
+FREE_PERSONAL_LIBRARY_SLOTS = 20
 
 # Paid module monthly quotas — mirrored from MODULE_DEFS.
 PAID_MODULE_CAPS: dict[str, dict[str, int]] = {
@@ -231,6 +235,7 @@ async def quotas_snapshot(
         "ai_explain",
         "coach_minutes",
         "upload",
+        "upload_month",
         "arena_match",
         "video_lesson",
     ]
@@ -242,4 +247,9 @@ async def quotas_snapshot(
             )
         except ValueError:
             continue
-    return {"module": module_code, "items": items}
+    return {
+        "module": module_code,
+        "items": items,
+        "personal_library_slots": FREE_PERSONAL_LIBRARY_SLOTS,
+        "bookshelf_free_stays_free": True,
+    }

@@ -2,6 +2,7 @@ import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../constants/endpoints.dart';
 import '../../authentication/presentation/account_storage.dart';
+import '../../membership/domain/free_trial_seeds.dart';
 import '../../settings/presentation/settings_provider.dart';
 import '../data/reading_catalog.dart';
 import '../domain/reading_doc.dart';
@@ -37,7 +38,7 @@ final readingColdStartProvider = FutureProvider<void>((ref) async {
             .map(
               (d) => ReadingDoc.fromJson(Map<String, dynamic>.from(d as Map)),
             )
-            .take(3)
+            .take(kModuleFreePreviewCount)
             .toList();
         for (final doc in docs) {
           if (!ref.mounted || account != ref.read(studyAccountProvider)) return;

@@ -1,8 +1,19 @@
-/// Default free-trial / seed catalog (~3 items × video/reading/exam/course).
+/// Default free-trial / seed catalog (~5 items × video/reading/exam/course).
 ///
 /// Media is never shipped in the APK; seeds are auto-downloaded into local
 /// cache from ECS/API on bootstrap (`freeTrialSeedBootstrapProvider`).
-/// Cap stays aligned with `kModuleFreePreviewCount` / API `FREE_PREVIEW_COUNT`.
+/// Cap stays aligned with API `FREE_PREVIEW_COUNT`.
+///
+/// Product promises:
+/// - each module always keeps enough permanent free content;
+/// - bookshelf items acquired as free stay free;
+/// - free users may keep ≥15 personal video + reading uploads.
+
+/// Per-module free experience quota (lessons / docs / passages / courses).
+const int kModuleFreePreviewCount = 5;
+
+/// Free users may keep at least this many personal video + reading uploads.
+const int kFreePersonalUploadSlotsMin = 15;
 
 class FreeTrialSeedItem {
   const FreeTrialSeedItem({
@@ -19,6 +30,7 @@ class FreeTrialSeedItem {
     this.skill = '',
     this.itemId = '',
     this.sourceStarterId = '',
+    this.learningPath = const <String>[],
   });
 
   final String module;
@@ -34,11 +46,16 @@ class FreeTrialSeedItem {
   final String skill;
   final String itemId;
   final String sourceStarterId;
+  final List<String> learningPath;
 
   factory FreeTrialSeedItem.fromJson(
     Map<String, dynamic> json, {
     String? module,
   }) {
+    final Object? pathRaw = json['learningPath'] ?? json['learning_path'];
+    final List<String> path = pathRaw is List
+        ? pathRaw.map((Object? e) => '$e'.trim()).where((String s) => s.isNotEmpty).toList()
+        : const <String>[];
     return FreeTrialSeedItem(
       module: (module ?? '${json['module'] ?? ''}').trim(),
       id: '${json['id'] ?? ''}'.trim(),
@@ -55,6 +72,7 @@ class FreeTrialSeedItem {
       sourceStarterId:
           '${json['sourceStarterId'] ?? json['source_starter_id'] ?? ''}'
               .trim(),
+      learningPath: path,
     );
   }
 }
@@ -71,6 +89,7 @@ const Map<String, List<FreeTrialSeedItem>> kDefaultFreeTrialSeeds =
       bvid: 'BV1fV4y1p7Ex',
       page: 1,
       watchUrl: 'https://www.bilibili.com/video/BV1fV4y1p7Ex?p=1',
+      learningPath: <String>['字幕', '分句精听', '跟读', '复习'],
     ),
     FreeTrialSeedItem(
       module: 'video',
@@ -80,6 +99,7 @@ const Map<String, List<FreeTrialSeedItem>> kDefaultFreeTrialSeeds =
       bvid: 'BV1gm411r7yz',
       page: 1,
       watchUrl: 'https://www.bilibili.com/video/BV1gm411r7yz?p=1',
+      learningPath: <String>['字幕', '分句精听', '跟读', '复习'],
     ),
     FreeTrialSeedItem(
       module: 'video',
@@ -89,6 +109,27 @@ const Map<String, List<FreeTrialSeedItem>> kDefaultFreeTrialSeeds =
       bvid: 'BV1Aw4m1k7qU',
       page: 1,
       watchUrl: 'https://www.bilibili.com/video/BV1Aw4m1k7qU?p=1',
+      learningPath: <String>['字幕', '分句精听', '跟读', '复习'],
+    ),
+    FreeTrialSeedItem(
+      module: 'video',
+      id: 'bilibili:BV127411n7nj',
+      title: 'BBC官方音标教程（试看第1P）',
+      kind: 'bilibili',
+      bvid: 'BV127411n7nj',
+      page: 1,
+      watchUrl: 'https://www.bilibili.com/video/BV127411n7nj?p=1',
+      learningPath: <String>['字幕', '分句精听', '跟读', '复习'],
+    ),
+    FreeTrialSeedItem(
+      module: 'video',
+      id: 'bilibili:BV1CS4y1v7sQ',
+      title: '英语核心口语句型（试看第1课）',
+      kind: 'bilibili',
+      bvid: 'BV1CS4y1v7sQ',
+      page: 1,
+      watchUrl: 'https://www.bilibili.com/video/BV1CS4y1v7sQ?p=1',
+      learningPath: <String>['字幕', '分句精听', '跟读', '复习'],
     ),
   ],
   'reading': <FreeTrialSeedItem>[
@@ -97,18 +138,35 @@ const Map<String, List<FreeTrialSeedItem>> kDefaultFreeTrialSeeds =
       id: 'starter-first-morning',
       title: 'A Quiet Morning',
       kind: 'starter_doc',
+      learningPath: <String>['阅读一章', '查词', '收藏难词', '复习'],
     ),
     FreeTrialSeedItem(
       module: 'reading',
       id: 'starter-small-cafe',
       title: 'The Small Cafe',
       kind: 'starter_doc',
+      learningPath: <String>['阅读一章', '查词', '收藏难词', '复习'],
     ),
     FreeTrialSeedItem(
       module: 'reading',
       id: 'starter-new-route',
       title: 'A Different Way Home',
       kind: 'starter_doc',
+      learningPath: <String>['阅读一章', '查词', '收藏难词', '复习'],
+    ),
+    FreeTrialSeedItem(
+      module: 'reading',
+      id: 'starter-rainy-afternoon',
+      title: 'A Rainy Afternoon',
+      kind: 'starter_doc',
+      learningPath: <String>['阅读一章', '查词', '收藏难词', '复习'],
+    ),
+    FreeTrialSeedItem(
+      module: 'reading',
+      id: 'starter-library-corner',
+      title: 'The Library Corner',
+      kind: 'starter_doc',
+      learningPath: <String>['阅读一章', '查词', '收藏难词', '复习'],
     ),
   ],
   'exam': <FreeTrialSeedItem>[
@@ -120,6 +178,17 @@ const Map<String, List<FreeTrialSeedItem>> kDefaultFreeTrialSeeds =
       familyId: 'cet4',
       skill: 'vocab',
       itemId: 'c4v1',
+      learningPath: <String>['练习', '看解析', '错题本', '复习'],
+    ),
+    FreeTrialSeedItem(
+      module: 'exam',
+      id: 'exam:cet4:vocab:c4v2',
+      title: 'CET4 词汇体验 · desire',
+      kind: 'exam_item',
+      familyId: 'cet4',
+      skill: 'vocab',
+      itemId: 'c4v2',
+      learningPath: <String>['练习', '看解析', '错题本', '复习'],
     ),
     FreeTrialSeedItem(
       module: 'exam',
@@ -129,6 +198,17 @@ const Map<String, List<FreeTrialSeedItem>> kDefaultFreeTrialSeeds =
       familyId: 'cet4',
       skill: 'reading',
       itemId: 'c4r1',
+      learningPath: <String>['阅读短文', '答题', '解析', '复习'],
+    ),
+    FreeTrialSeedItem(
+      module: 'exam',
+      id: 'exam:cet4:reading:c4r2',
+      title: 'CET4 阅读体验 · Online Learning',
+      kind: 'exam_item',
+      familyId: 'cet4',
+      skill: 'reading',
+      itemId: 'c4r2',
+      learningPath: <String>['阅读短文', '答题', '解析', '复习'],
     ),
     FreeTrialSeedItem(
       module: 'exam',
@@ -138,6 +218,7 @@ const Map<String, List<FreeTrialSeedItem>> kDefaultFreeTrialSeeds =
       familyId: 'cet4',
       skill: 'listening',
       itemId: 'c4l1',
+      learningPath: <String>['听脚本', '答题', '精听回放', '复习'],
     ),
   ],
   'course': <FreeTrialSeedItem>[
@@ -147,6 +228,7 @@ const Map<String, List<FreeTrialSeedItem>> kDefaultFreeTrialSeeds =
       title: '体验课 · A Quiet Morning',
       kind: 'course_demo',
       sourceStarterId: 'starter-first-morning',
+      learningPath: <String>['选课', '精读', '跟读/查词', '复习'],
     ),
     FreeTrialSeedItem(
       module: 'course',
@@ -154,6 +236,7 @@ const Map<String, List<FreeTrialSeedItem>> kDefaultFreeTrialSeeds =
       title: '体验课 · The Small Cafe',
       kind: 'course_demo',
       sourceStarterId: 'starter-small-cafe',
+      learningPath: <String>['选课', '精读', '跟读/查词', '复习'],
     ),
     FreeTrialSeedItem(
       module: 'course',
@@ -161,6 +244,23 @@ const Map<String, List<FreeTrialSeedItem>> kDefaultFreeTrialSeeds =
       title: '体验课 · A Different Way Home',
       kind: 'course_demo',
       sourceStarterId: 'starter-new-route',
+      learningPath: <String>['选课', '精读', '跟读/查词', '复习'],
+    ),
+    FreeTrialSeedItem(
+      module: 'course',
+      id: 'course-seed-rainy-afternoon',
+      title: '体验课 · A Rainy Afternoon',
+      kind: 'course_demo',
+      sourceStarterId: 'starter-rainy-afternoon',
+      learningPath: <String>['选课', '精读', '跟读/查词', '复习'],
+    ),
+    FreeTrialSeedItem(
+      module: 'course',
+      id: 'course-seed-library-corner',
+      title: '体验课 · The Library Corner',
+      kind: 'course_demo',
+      sourceStarterId: 'starter-library-corner',
+      learningPath: <String>['选课', '精读', '跟读/查词', '复习'],
     ),
   ],
 };
@@ -245,7 +345,7 @@ Map<String, List<FreeTrialSeedItem>> parseFreeTrialSeedsPayload(
     }
     out[code] = parsed.isEmpty
         ? freeTrialSeedsFor(code)
-        : parsed.take(3).toList(growable: false);
+        : parsed.take(kModuleFreePreviewCount).toList(growable: false);
   }
   return out;
 }

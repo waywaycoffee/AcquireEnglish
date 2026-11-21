@@ -102,13 +102,14 @@ class _ExamSessionScreenState extends ConsumerState<ExamSessionScreen> {
     final bool examUnlocked = widget.mock
         ? true
         : await resolveModuleUnlocked(ref, 'exam');
-    final bool previewOnly = !widget.mock &&
-        (widget.skill == 'listening' || widget.skill == 'reading') &&
-        !examUnlocked;
+    final bool previewOnly = !widget.mock && !examUnlocked;
 
     for (final String skill in skills) {
       if (skill == 'vocab') {
-        for (final ExamMcq q in pack.vocab) {
+        final List<ExamMcq> vocabItems = previewOnly && widget.skill == 'vocab'
+            ? _seedExamVocab(pack)
+            : pack.vocab;
+        for (final ExamMcq q in vocabItems) {
           built.add(
             _SessionQ(
               id: q.id,
@@ -174,14 +175,14 @@ class _ExamSessionScreenState extends ConsumerState<ExamSessionScreen> {
 
     if (previewOnly &&
         mounted &&
-        ((widget.skill == 'listening' &&
-                pack.listening.length > kModuleFreePreviewCount) ||
-            (widget.skill == 'reading' &&
-                pack.reading.length > kModuleFreePreviewCount))) {
+        (widget.skill == 'listening' ||
+            widget.skill == 'reading' ||
+            widget.skill == 'vocab')) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
-            '免费体验为预下载默认题（约 $kModuleFreePreviewCount 篇）；开通月卡 / 年卡可练习全部内容。',
+            '永久免费体验为预下载默认题（约 $kModuleFreePreviewCount 份）；'
+            '已加入的免费题不会变为付费。开通月卡 / 年卡可练习全部内容。',
           ),
           action: SnackBarAction(
             label: '开通',
@@ -417,6 +418,19 @@ class _ExamSessionScreenState extends ConsumerState<ExamSessionScreen> {
       ),
     );
   }
+}
+
+List<ExamMcq> _seedExamVocab(ExamPack pack) {
+  final Set<String> want = freeTrialSeedsFor('exam')
+      .where((FreeTrialSeedItem s) => s.skill == 'vocab')
+      .map((FreeTrialSeedItem s) => s.itemId)
+      .where((String id) => id.isNotEmpty)
+      .toSet();
+  final List<ExamMcq> hit = pack.vocab
+      .where((ExamMcq item) => want.contains(item.id))
+      .toList(growable: false);
+  if (hit.isNotEmpty) return hit;
+  return pack.vocab.take(kModuleFreePreviewCount).toList(growable: false);
 }
 
 List<ExamListeningItem> _seedExamListening(ExamPack pack) {

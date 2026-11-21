@@ -20,7 +20,7 @@ class ExamListeningScreen extends StatelessWidget {
           children: <Widget>[
             const Text(
               '官方备考包提供听力脚本 + 选择题；社区可上传配套音频到 ECS。'
-              '未开通时约可免费体验前 3 段听力材料。',
+              '未开通时约可永久免费体验预下载听力材料（约 5 段）。',
               style: TextStyle(fontWeight: FontWeight.w700, height: 1.45),
             ),
             const SizedBox(height: 16),

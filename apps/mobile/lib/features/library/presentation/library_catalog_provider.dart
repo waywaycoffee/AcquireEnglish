@@ -9,6 +9,7 @@ import '../../import_course/data/bilibili_episode_prepare.dart';
 import '../../import_course/data/bilibili_multipage.dart';
 import '../../import_course/domain/bilibili_import.dart';
 import '../../import_course/domain/import_match.dart';
+import '../../membership/domain/free_trial_seeds.dart';
 import '../../player/presentation/asr_subtitle_cache.dart';
 import '../data/course_pack_mapper.dart';
 import 'course_directory_relink.dart';
@@ -60,6 +61,21 @@ class LibraryCatalogNotifier extends Notifier<List<LibraryCourseData>> {
     return <LibraryCourseData>[...baseCatalog, ..._decodeCourses(stored)];
   }
 
+  bool _isFreeTrialCourse(LibraryCourseData course) {
+    for (final LibraryEpisodeItem ep in course.episodes) {
+      final String url = (ep.sourceUrl ?? '').trim();
+      if (url.isEmpty) continue;
+      final Map<String, String>? ids = BilibiliImport.extractIds(url);
+      final String bvid = (ids?['bvid'] ?? '').trim();
+      if (bvid.isNotEmpty && isFreeTrialBilibiliBvid(bvid)) return true;
+    }
+    return false;
+  }
+
+  int get personalVideoCourseCount {
+    return state.where((LibraryCourseData c) => !_isFreeTrialCourse(c)).length;
+  }
+
   Future<bool> importCourse(LibraryCourseData course) async {
     if (libraryCourses.any((LibraryCourseData item) => item.id == course.id)) {
       return false;
@@ -67,6 +83,16 @@ class LibraryCatalogNotifier extends Notifier<List<LibraryCourseData>> {
     final int existingIndex = state.indexWhere(
       (LibraryCourseData item) => item.id == course.id,
     );
+    // Free-tier personal video library: keep ≥15 slots (default 20 headroom).
+    // Free-trial seeds do not consume personal slots; re-import refresh is OK.
+    if (existingIndex < 0 &&
+        !_isFreeTrialCourse(course) &&
+        personalVideoCourseCount >= kFreePersonalUploadSlotsMin + 5) {
+      throw StateError(
+        '个人视频课已达上限（${kFreePersonalUploadSlotsMin + 5}）；'
+        '开通视频模块可继续导入，已加入的免费体验课不会变为付费。',
+      );
+    }
     if (existingIndex >= 0) {
       // Re-importing the same Bilibili / online course should refresh media
       // paths (local download + cover) while keeping learning progress.

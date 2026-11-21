@@ -5,6 +5,7 @@ import 'package:flutter_test/flutter_test.dart';
 void main() {
   test('starter stories and the default Oz book are free previews', () {
     expect(isFreeReadingPreviewDocId('starter-cafe'), isTrue);
+    expect(isFreeReadingPreviewDocId('starter-rainy-afternoon'), isTrue);
     expect(
       isFreeReadingPreviewDocId(kDefaultWizardOfOzEntry.stableDocId),
       isTrue,

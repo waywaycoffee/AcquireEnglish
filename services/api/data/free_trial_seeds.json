@@ -1,6 +1,13 @@
 {
-  "version": 1,
-  "note": "Default free-trial items (~3/module). App auto-downloads on bootstrap into local cache; media stays on ECS (never APK assets).",
+  "version": 2,
+  "note": "Permanent free-tier starters (~5/module). Each item supports a short learn path (not download-only). App caches text/metadata locally; media stays on ECS. Bookshelf grandfather: once added as free, stays free. Personal uploads: free users may keep ≥15 video + ≥15 reading imports.",
+  "promises": {
+    "enough_free_per_module": true,
+    "min_free_preview_count": 5,
+    "bookshelf_free_stays_free": true,
+    "personal_upload_slots_min": 15,
+    "full_learn_path": "select → learn → review → progress"
+  },
   "modules": {
     "video": [
       {
@@ -12,6 +19,7 @@
         "bvid": "BV1fV4y1p7Ex",
         "page": 1,
         "watchUrl": "https://www.bilibili.com/video/BV1fV4y1p7Ex?p=1",
+        "learningPath": ["字幕", "分句精听", "跟读", "复习"],
         "ecs": {
           "shared_subtitles": "shared_bilibili_subtitles for BV1fV4y1p7Ex p1",
           "import_media": "optional media/imports/{id}/study.m4a after first import"
@@ -26,6 +34,7 @@
         "bvid": "BV1gm411r7yz",
         "page": 1,
         "watchUrl": "https://www.bilibili.com/video/BV1gm411r7yz?p=1",
+        "learningPath": ["字幕", "分句精听", "跟读", "复习"],
         "ecs": {
           "shared_subtitles": "shared_bilibili_subtitles for BV1gm411r7yz p1"
         }
@@ -39,8 +48,37 @@
         "bvid": "BV1Aw4m1k7qU",
         "page": 1,
         "watchUrl": "https://www.bilibili.com/video/BV1Aw4m1k7qU?p=1",
+        "learningPath": ["字幕", "分句精听", "跟读", "复习"],
         "ecs": {
           "shared_subtitles": "shared_bilibili_subtitles for BV1Aw4m1k7qU p1"
+        }
+      },
+      {
+        "id": "bilibili:BV127411n7nj",
+        "title": "BBC官方音标教程（试看第1P）",
+        "freeTrial": true,
+        "defaultSeed": true,
+        "kind": "bilibili",
+        "bvid": "BV127411n7nj",
+        "page": 1,
+        "watchUrl": "https://www.bilibili.com/video/BV127411n7nj?p=1",
+        "learningPath": ["字幕", "分句精听", "跟读", "复习"],
+        "ecs": {
+          "shared_subtitles": "shared_bilibili_subtitles for BV127411n7nj p1"
+        }
+      },
+      {
+        "id": "bilibili:BV1CS4y1v7sQ",
+        "title": "英语核心口语句型（试看第1课）",
+        "freeTrial": true,
+        "defaultSeed": true,
+        "kind": "bilibili",
+        "bvid": "BV1CS4y1v7sQ",
+        "page": 1,
+        "watchUrl": "https://www.bilibili.com/video/BV1CS4y1v7sQ?p=1",
+        "learningPath": ["字幕", "分句精听", "跟读", "复习"],
+        "ecs": {
+          "shared_subtitles": "shared_bilibili_subtitles for BV1CS4y1v7sQ p1"
         }
       }
     ],
@@ -51,7 +89,8 @@
         "freeTrial": true,
         "defaultSeed": true,
         "kind": "starter_doc",
-        "api": "GET /api/reading/starter"
+        "api": "GET /api/reading/starter",
+        "learningPath": ["阅读一章", "查词", "收藏难词", "复习"]
       },
       {
         "id": "starter-small-cafe",
@@ -59,7 +98,8 @@
         "freeTrial": true,
         "defaultSeed": true,
         "kind": "starter_doc",
-        "api": "GET /api/reading/starter"
+        "api": "GET /api/reading/starter",
+        "learningPath": ["阅读一章", "查词", "收藏难词", "复习"]
       },
       {
         "id": "starter-new-route",
@@ -67,7 +107,26 @@
         "freeTrial": true,
         "defaultSeed": true,
         "kind": "starter_doc",
-        "api": "GET /api/reading/starter"
+        "api": "GET /api/reading/starter",
+        "learningPath": ["阅读一章", "查词", "收藏难词", "复习"]
+      },
+      {
+        "id": "starter-rainy-afternoon",
+        "title": "A Rainy Afternoon",
+        "freeTrial": true,
+        "defaultSeed": true,
+        "kind": "starter_doc",
+        "api": "GET /api/reading/starter",
+        "learningPath": ["阅读一章", "查词", "收藏难词", "复习"]
+      },
+      {
+        "id": "starter-library-corner",
+        "title": "The Library Corner",
+        "freeTrial": true,
+        "defaultSeed": true,
+        "kind": "starter_doc",
+        "api": "GET /api/reading/starter",
+        "learningPath": ["阅读一章", "查词", "收藏难词", "复习"]
       }
     ],
     "exam": [
@@ -80,6 +139,21 @@
         "familyId": "cet4",
         "skill": "vocab",
         "itemId": "c4v1",
+        "learningPath": ["练习", "看解析", "错题本", "复习"],
+        "ecs": {
+          "pack": "data/exam_packs/pack_cet4.json on API host"
+        }
+      },
+      {
+        "id": "exam:cet4:vocab:c4v2",
+        "title": "CET4 词汇体验 · desire",
+        "freeTrial": true,
+        "defaultSeed": true,
+        "kind": "exam_item",
+        "familyId": "cet4",
+        "skill": "vocab",
+        "itemId": "c4v2",
+        "learningPath": ["练习", "看解析", "错题本", "复习"],
         "ecs": {
           "pack": "data/exam_packs/pack_cet4.json on API host"
         }
@@ -93,6 +167,21 @@
         "familyId": "cet4",
         "skill": "reading",
         "itemId": "c4r1",
+        "learningPath": ["阅读短文", "答题", "解析", "复习"],
+        "ecs": {
+          "pack": "data/exam_packs/pack_cet4.json on API host"
+        }
+      },
+      {
+        "id": "exam:cet4:reading:c4r2",
+        "title": "CET4 阅读体验 · Online Learning",
+        "freeTrial": true,
+        "defaultSeed": true,
+        "kind": "exam_item",
+        "familyId": "cet4",
+        "skill": "reading",
+        "itemId": "c4r2",
+        "learningPath": ["阅读短文", "答题", "解析", "复习"],
         "ecs": {
           "pack": "data/exam_packs/pack_cet4.json on API host"
         }
@@ -106,6 +195,7 @@
         "familyId": "cet4",
         "skill": "listening",
         "itemId": "c4l1",
+        "learningPath": ["听脚本", "答题", "精听回放", "复习"],
         "ecs": {
           "pack": "data/exam_packs/pack_cet4.json",
           "audio": "optional /media/exam/… when audio_url set on item"
@@ -120,6 +210,7 @@
         "defaultSeed": true,
         "kind": "course_demo",
         "sourceStarterId": "starter-first-morning",
+        "learningPath": ["选课", "精读", "跟读/查词", "复习"],
         "ecs": {
           "text": "from /api/reading/starter; TTS via reading namespace on demand"
         }
@@ -131,6 +222,7 @@
         "defaultSeed": true,
         "kind": "course_demo",
         "sourceStarterId": "starter-small-cafe",
+        "learningPath": ["选课", "精读", "跟读/查词", "复习"],
         "ecs": {
           "text": "from /api/reading/starter"
         }
@@ -142,6 +234,31 @@
         "defaultSeed": true,
         "kind": "course_demo",
         "sourceStarterId": "starter-new-route",
+        "learningPath": ["选课", "精读", "跟读/查词", "复习"],
+        "ecs": {
+          "text": "from /api/reading/starter"
+        }
+      },
+      {
+        "id": "course-seed-rainy-afternoon",
+        "title": "体验课 · A Rainy Afternoon",
+        "freeTrial": true,
+        "defaultSeed": true,
+        "kind": "course_demo",
+        "sourceStarterId": "starter-rainy-afternoon",
+        "learningPath": ["选课", "精读", "跟读/查词", "复习"],
+        "ecs": {
+          "text": "from /api/reading/starter"
+        }
+      },
+      {
+        "id": "course-seed-library-corner",
+        "title": "体验课 · The Library Corner",
+        "freeTrial": true,
+        "defaultSeed": true,
+        "kind": "course_demo",
+        "sourceStarterId": "starter-library-corner",
+        "learningPath": ["选课", "精读", "跟读/查词", "复习"],
         "ecs": {
           "text": "from /api/reading/starter"
         }

@@ -55,9 +55,13 @@ async def source(url:str=Query(max_length=2048)):
 
 @router.get('/starter')
 async def starter():
+    # Permanent free reading starters (~5). Each is a short chapter: readable,
+    # look-up-able, and reviewable — not a bare file download.
     entries=[
       ('first-morning','A Quiet Morning','A1','I wake up early on Saturday. The house is quiet. I make some tea and open the window. A small bird sits in the tree outside. I read a short story while my tea cools. I do not need to hurry today. After breakfast, I put on my shoes and walk to the park.'),
       ('small-cafe','The Small Cafe','A1','There is a small cafe near my home. The owner knows my name. Today I order a coffee and a sandwich. I sit by the window and watch people walk past. A student asks if the next chair is free. I say yes, and we begin to talk about our favourite books.'),
       ('new-route','A Different Way Home','A2','Mina usually takes the bus home, but one evening she decides to walk. She follows a quiet street and discovers a little bookshop. A handwritten sign in the window says that every book has a story beyond its pages. She goes inside and finds an old travel journal. That small change in her routine gives her a new idea for the weekend.'),
+      ('rainy-afternoon','A Rainy Afternoon','A1','Rain taps on the window while I sit at my desk. I open a notebook and write three new English words. Outside, umbrellas move like colorful flowers. I listen to a short podcast and repeat each sentence aloud. When the rain slows, I feel proud of this quiet practice.'),
+      ('library-corner','The Library Corner','A2','Leo finds a quiet corner behind the history shelves. He chooses a thin novel and reads the first chapter slowly. When he meets an unknown word, he looks it up and writes a simple example. Before leaving, he reviews the five new words on a small card. The library corner becomes his favourite place to learn.'),
     ]
-    return {'version':1,'documents':[{'id':'starter-'+key,'title':title,'level':level,'plainText':text,'sourceType':'catalog','sourceLabel':'入门推荐 · 自编短文','courseTitle':'Acquire English 原创入门阅读','segments':[{'text':sentence.strip()+'.'} for sentence in text.split('.') if sentence.strip()]} for key,title,level,text in entries]}
+    return {'version':2,'documents':[{'id':'starter-'+key,'title':title,'level':level,'plainText':text,'sourceType':'catalog','sourceLabel':'免费体验 · 入门推荐','courseTitle':'Acquire English 原创入门阅读','freeTrial':True,'learningPath':['阅读一章','查词','收藏难词','复习'],'segments':[{'text':sentence.strip()+'.'} for sentence in text.split('.') if sentence.strip()]} for key,title,level,text in entries]}

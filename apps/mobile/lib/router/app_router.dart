@@ -16,6 +16,7 @@ import '../features/daily_review/domain/daily_review.dart';
 // ignore_for_file: prefer_function_declarations_over_variables
 
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
@@ -36,6 +37,7 @@ import '../features/course_decompose/presentation/material_course_edit_screen.da
 import '../features/course_decompose/presentation/my_material_courses_screen.dart';
 import '../features/reading/presentation/reading_catalog_screen.dart';
 import '../features/reading/presentation/reading_hub_screen.dart';
+import '../features/reading/presentation/reading_library_provider.dart';
 import '../features/reading/presentation/reading_reader_screen.dart';
 import '../features/review_hub/presentation/review_hub_screen.dart';
 import '../features/settings/presentation/settings_screen.dart';
@@ -464,10 +466,21 @@ GoRouter goRouter(Ref ref) => GoRouter(
         final String docId = Uri.decodeComponent(
           state.pathParameters['docId'] ?? '',
         );
+        String sourceLabel = '';
+        try {
+          sourceLabel = ProviderScope.containerOf(context)
+                  .read(readingLibraryProvider)
+                  .docById(docId)
+                  ?.sourceLabel ??
+              '';
+        } catch (_) {}
         return ModuleGate(
           moduleCode: 'reading',
           title: '阅读模块',
-          freePreviewAllowed: isFreeReadingPreviewDocId(docId),
+          freePreviewAllowed: isGrandfatheredFreeReading(
+            docId: docId,
+            sourceLabel: sourceLabel,
+          ),
           child: ReadingReaderScreen(docId: docId),
         );
       },

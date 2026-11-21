@@ -194,7 +194,8 @@ class ReadingProgress {
       );
 }
 
-/// Soft quota hooks for later membership SKUs.
+/// Soft quota hooks for membership / free-tier personal libraries.
+/// Free promise: personal reading uploads stay ≥15 (default headroom 50).
 class ReadingQuota {
   const ReadingQuota({
     this.maxImportDocs = 50,

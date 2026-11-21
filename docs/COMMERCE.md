@@ -42,8 +42,12 @@ Direct: `pack.vocab.*`, `pack.course.*`.
 
 ## Quotas
 
-Free: 精读 1/日、AI 精讲 2/周、外教 10 分/周、上传 2/日、对战 3/日.  
+Free: 精读 1/日、AI 精讲 2/周、外教 10 分/周、上传 5/日 · 20/月、对战 3/日.  
 Paid: from `MODULE_DEFS.quota`. Arena free 3 / paid 10 + extras.
+
+## Free tier (permanent starters)
+
+See [FREE_TIER.md](./FREE_TIER.md). Each module keeps ~5 permanent free starters with a short learn path; bookshelf free stays free; personal uploads ≥15.
 
 ## Default owner Pro
 

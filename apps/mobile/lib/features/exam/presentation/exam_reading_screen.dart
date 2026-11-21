@@ -19,7 +19,7 @@ class ExamReadingScreen extends StatelessWidget {
           children: <Widget>[
             const Text(
               '使用当前考试族阅读短文与理解题；也可打开爱快阅读做泛读。'
-              '未开通时约可免费体验前 3 篇阅读材料。',
+              '未开通时约可永久免费体验预下载阅读材料（约 5 篇）。',
               style: TextStyle(fontWeight: FontWeight.w700, height: 1.45),
             ),
             const SizedBox(height: 16),

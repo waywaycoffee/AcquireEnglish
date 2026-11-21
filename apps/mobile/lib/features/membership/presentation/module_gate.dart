@@ -116,8 +116,8 @@ class _ModuleGateState extends ConsumerState<ModuleGate> {
               const SizedBox(height: 8),
               Text(
                 _error == 'login'
-                    ? '登录后可免费体验约 $kModuleFreePreviewCount 个内容，或开通月卡 / 年卡。'
-                    : '「$title」约有 $kModuleFreePreviewCount 个免费体验内容；'
+                    ? '登录后可永久免费体验约 $kModuleFreePreviewCount 份入门内容，或开通月卡 / 年卡。'
+                    : '「$title」始终保留约 $kModuleFreePreviewCount 份永久免费入门内容；'
                         '继续学习请开通月卡或年卡。',
                 textAlign: TextAlign.center,
               ),

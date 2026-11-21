@@ -9,8 +9,17 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models import ProductSku
 
-# Free-tier browse: ~3 seeded items remain open without module purchase.
-FREE_PREVIEW_COUNT = 3
+# Free-tier browse: ~5 permanent seeded items remain open without module purchase.
+# Product promise: each module always keeps enough free content; bookshelf free stays free.
+FREE_PREVIEW_COUNT = 5
+
+FREE_TIER_PROMISES: dict = {
+    "enough_free_per_module": True,
+    "min_free_preview_count": FREE_PREVIEW_COUNT,
+    "bookshelf_free_stays_free": True,
+    "personal_upload_slots_min": 15,
+    "full_learn_path": "select → learn → review → progress",
+}
 
 # Product-area sellable modules (paywall buckets).
 MODULE_DEFS: list[dict] = [

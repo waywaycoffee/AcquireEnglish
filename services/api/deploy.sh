@@ -33,6 +33,10 @@ if [[ -f "$ROOT/data/recommended_bilibili.json" ]]; then
   echo "==> Sync curated Bilibili recommendations"
   rsync -az "$ROOT/data/recommended_bilibili.json" "$HOST:$PATH_REMOTE/data/recommended_bilibili.json"
 fi
+if [[ -f "$ROOT/data/free_trial_seeds.json" ]]; then
+  echo "==> Sync permanent free-trial seed catalog"
+  rsync -az "$ROOT/data/free_trial_seeds.json" "$HOST:$PATH_REMOTE/data/free_trial_seeds.json"
+fi
 
 echo "==> restart systemd (skip pip unless FORCE_PIP=1; remote venv is py3.14 and pip may hang)"
 if [[ "${FORCE_PIP:-0}" == "1" ]]; then
