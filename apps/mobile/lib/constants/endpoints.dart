@@ -119,6 +119,9 @@ class Endpoints {
       'api/shared-subtitles/bilibili/list';
   /// ECS durable queue for GPU ASR + translate (Bilibili shared packs).
   static const String sharedSubtitlesJobs = 'api/shared-subtitles/jobs';
+  /// EN exists, ZH missing → GPU EN→ZH only (no Whisper).
+  static const String sharedSubtitlesTranslateJobs =
+      'api/shared-subtitles/translate-jobs';
   static String sharedSubtitlesJob(String jobId) =>
       'api/shared-subtitles/jobs/${Uri.encodeComponent(jobId)}';
   static const String imports = 'api/imports';

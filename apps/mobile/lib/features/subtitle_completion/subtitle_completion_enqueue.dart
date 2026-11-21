@@ -466,12 +466,18 @@ Future<void> enqueueSubtitleCompletionForEpisode({
     return;
   }
 
-  // Still missing after official + shared → push ECS GPU generation (Bilibili).
-  // On-device Whisper is not packaged; English ASR is cloud-only.
+  // Still missing after official + shared → push ECS GPU (Bilibili).
+  // On-device Whisper is not packaged; English ASR and EN→ZH both go to the
+  // 5060 Ti worker via the ECS queue. App startup scan already calls this.
   bool cloudQueued = false;
   final bool needCloudAsr =
       plan.needEnglish && !sourcePolicy.ignoreAllOfficialSoftsubs;
-  if (needCloudAsr && sharedApi != null) {
+  final bool needCloudTranslate =
+      !plan.needEnglish &&
+      plan.needChinese &&
+      !sourcePolicy.ignoreAllOfficialSoftsubs &&
+      isUsableSubtitlePath(enPath);
+  if (sharedApi != null && (needCloudAsr || needCloudTranslate)) {
     sharedIds ??= resolveBilibiliSharedSubtitleIds(
       sourceKey: sourceKey,
       sourceUrl: sourceUrl ?? episode?.sourceUrl,
@@ -480,14 +486,30 @@ Future<void> enqueueSubtitleCompletionForEpisode({
       videoAsset: videoPath,
     );
     if (sharedIds != null) {
-      cloudQueued = await tryRequestCloudSubtitleGeneration(
-        api: sharedApi,
-        ids: sharedIds,
-      );
+      if (needCloudAsr) {
+        cloudQueued = await tryRequestCloudSubtitleGeneration(
+          api: sharedApi,
+          ids: sharedIds,
+        );
+      } else if (needCloudTranslate) {
+        try {
+          final String enSrt = await File(enPath!.trim()).readAsString();
+          cloudQueued = await tryRequestCloudSubtitleTranslation(
+            api: sharedApi,
+            ids: sharedIds,
+            subtitleEnSrt: enSrt,
+            title: title ?? episode?.title,
+          );
+        } catch (_) {
+          cloudQueued = false;
+        }
+      }
       if (cloudQueued) {
         SubtitleCompletionStatusHub.instance.reportProgress(
           episodeId,
-          kSubtitleCloudGenerationQueuedLabel,
+          needCloudAsr
+              ? kSubtitleCloudGenerationQueuedLabel
+              : '已排队云端中文翻译（GPU）',
           status: SubtitleCompletionStatus.running,
           needEnglish: plan.needEnglish,
           needChinese: plan.needChinese,
@@ -512,7 +534,8 @@ Future<void> enqueueSubtitleCompletionForEpisode({
     return;
   }
 
-  // ZH-only translate needs local video + English already on disk.
+  // Cloud EN→ZH queued: local translate is optional fallback when GPU is down.
+  // Keep local queue when we have a video so work still progresses offline.
   if (!hasLocalVideo) {
     return;
   }

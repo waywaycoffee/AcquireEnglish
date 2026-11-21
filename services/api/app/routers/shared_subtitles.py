@@ -256,6 +256,35 @@ async def enqueue_gpu_subtitles(
     return enqueue(payload.bvid, payload.page)
 
 
+class GpuTranslateJobIn(BaseModel):
+    bvid: str = Field(pattern=r'^BV[0-9A-Za-z]{10}$')
+    page: int = Field(default=1, ge=1, le=9999)
+    subtitle_en_srt: str = Field(min_length=20, max_length=600_000)
+    title: str | None = Field(default=None, max_length=300)
+    cid: int | None = None
+    duration_sec: int | None = Field(default=None, ge=0)
+
+
+@router.post('/translate-jobs')
+async def enqueue_gpu_translation(
+    payload: GpuTranslateJobIn,
+    user: User = Depends(get_current_user),
+):
+    """English exists, Chinese missing → EN→ZH on the GPU worker."""
+    from app.services.gpu_subtitle_queue import enqueue_translate
+    try:
+        return enqueue_translate(
+            payload.bvid,
+            payload.page,
+            en_srt=payload.subtitle_en_srt,
+            title=payload.title,
+            cid=payload.cid,
+            duration=payload.duration_sec,
+        )
+    except ValueError as exc:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, str(exc)) from exc
+
+
 @router.get('/jobs/{job_id}')
 async def gpu_subtitle_status(job_id: str, user: User = Depends(get_current_user)):
     from app.services.gpu_subtitle_queue import connection, public

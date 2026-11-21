@@ -14,6 +14,11 @@ async def run(command):
     if action=='claim':
         job=queue.claim()
         if job is None: return None
+        if job.get('kind')=='translate':
+            payload=json.loads(job.pop('payload') or '{}')
+            return {**job,'cues':payload.get('cues') or [],'title':payload.get('title') or job['bvid'],
+              'cid':payload.get('cid'),'duration':payload.get('duration')}
+        job.pop('payload',None)
         async with httpx.AsyncClient(headers=_bilibili_headers(settings.bilibili_cookie),timeout=40) as client:
             view=(await client.get('https://api.bilibili.com/x/web-interface/view',params={'bvid':job['bvid']})).json()
             data=(view.get('data') or {})
@@ -44,14 +49,19 @@ async def run(command):
         return {'ok':True}
     if action=='complete':
         queue.update(job,'translating')
-        # Translation uses the configured coach LLM; only text leaves the GPU.
+        cues=command['cues']
+        local_zh=command.get('zh')
+        if (isinstance(local_zh,list) and len(local_zh)==len(cues)
+                and all(isinstance(t,str) and any('\u4e00'<=ch<='\u9fff' for ch in t) for t in local_zh)):
+            # Translated on the 5060 Ti; no cloud LLM call.
+            return await _store(job,cues,local_zh)
+        # Fallback: the configured coach LLM; only text leaves the GPU.
         from dotenv import dotenv_values
         values=dotenv_values('/opt/acquireenglish/tools/oral_coach/.env')
         key=values.get('DEEPSEEK_API_KEY') or values.get('OPENAI_API_KEY')
         base=values.get('OPENAI_BASE_URL') or 'https://api.deepseek.com/v1'
         model=values.get('DEEPSEEK_MODEL') or values.get('OPENAI_MODEL') or 'deepseek-chat'
         if not key: raise RuntimeError('Translation LLM unavailable')
-        cues=command['cues']
         translated=[]
         prompt_tokens=0
         completion_tokens=0
@@ -96,20 +106,26 @@ async def run(command):
                 )
         except Exception:
             pass
-        def stamp(t):
-            n=round(t*1000); h,n=divmod(n,3600000);m,n=divmod(n,60000);s,n=divmod(n,1000)
-            return f'{h:02}:{m:02}:{s:02},{n:03}'
-        def srt(texts):
-            return '\n\n'.join(f"{i+1}\n{stamp(c['start'])} --> {stamp(c['end'])}\n{text}" for i,(c,text) in enumerate(zip(cues,texts)))
-        async with SessionLocal() as db:
-            result=await upsert_shared_bilibili_pack(db,bvid=job['bvid'],page=job['page'],
-              cid=job['cid'],duration_sec=job['duration'],subtitle_en_srt=srt([c['text'] for c in cues]),
-              subtitle_zh_srt=srt(translated),title=job.get('title'),source_origin='asr')
-            if not result.stored and result.reason!='existing pack has equal or better quality':
-                raise ValueError('Subtitle quality gate rejected')
-        queue.update(job,'completed')
-        return {'stored':result.stored,'reason':result.reason,'cues':len(cues)}
+        return await _store(job,cues,translated)
     raise ValueError('Unknown action')
+
+
+async def _store(job,cues,translated):
+    def stamp(t):
+        n=round(t*1000); h,n=divmod(n,3600000);m,n=divmod(n,60000);s,n=divmod(n,1000)
+        return f'{h:02}:{m:02}:{s:02},{n:03}'
+    def srt(texts):
+        return '\n\n'.join(f"{i+1}\n{stamp(c['start'])} --> {stamp(c['end'])}\n{text}" for i,(c,text) in enumerate(zip(cues,texts)))
+    duration=job.get('duration') or int(max((c['end'] for c in cues),default=0))+1
+    async with SessionLocal() as db:
+        result=await upsert_shared_bilibili_pack(db,bvid=job['bvid'],page=job['page'],
+          cid=job.get('cid'),duration_sec=duration,subtitle_en_srt=srt([c['text'] for c in cues]),
+          subtitle_zh_srt=srt(translated),title=job.get('title'),
+          source_origin='mixed' if job.get('kind')=='translate' else 'asr')
+        if not result.stored and result.reason!='existing pack has equal or better quality':
+            raise ValueError('Subtitle quality gate rejected')
+    queue.update(job,'completed')
+    return {'stored':result.stored,'reason':result.reason,'cues':len(cues)}
 
 if __name__=='__main__':
     try:

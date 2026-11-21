@@ -2538,6 +2538,54 @@ class AcquireApiClient {
     }
   }
 
+  /// English SRT already known → GPU EN→ZH only (no Whisper download).
+  Future<SharedSubtitleGpuJob?> enqueueSharedSubtitleTranslateJob({
+    required String bvid,
+    required String subtitleEnSrt,
+    int page = 1,
+    String? title,
+    int? cid,
+    int? durationSec,
+  }) async {
+    final String id = bvid.trim();
+    final String en = subtitleEnSrt.trim();
+    if (id.isEmpty || en.length < 20) {
+      return null;
+    }
+    try {
+      final Response<dynamic> response = await _dio.post<Object?>(
+        Endpoints.sharedSubtitlesTranslateJobs,
+        data: <String, Object?>{
+          'bvid': id,
+          'page': page < 1 ? 1 : page,
+          'subtitle_en_srt': en,
+          if ((title ?? '').trim().isNotEmpty) 'title': title!.trim(),
+          if (cid != null) 'cid': cid,
+          if (durationSec != null) 'duration_sec': durationSec,
+        },
+        options: Options(
+          validateStatus: (int? status) =>
+              status != null && status >= 200 && status < 300,
+        ),
+      );
+      if (response.data is Map<String, dynamic>) {
+        return SharedSubtitleGpuJob.fromJson(
+          response.data as Map<String, dynamic>,
+        );
+      }
+      if (response.data is Map) {
+        return SharedSubtitleGpuJob.fromJson(
+          Map<String, dynamic>.from(response.data as Map),
+        );
+      }
+      return SharedSubtitleGpuJob(id: '', bvid: id, page: page, state: 'queued');
+    } on DioException {
+      return null;
+    } catch (_) {
+      return null;
+    }
+  }
+
   /// Returns null on 404 / network miss (shared cache optional).
   ///
   /// On miss, best-effort enqueues a cloud GPU generation job so workers can

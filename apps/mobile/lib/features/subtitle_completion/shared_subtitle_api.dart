@@ -36,3 +36,37 @@ Future<bool> requestCloudSubtitleGeneration({
     return false;
   }
 }
+
+/// English already on disk → push GPU EN→ZH (no Whisper).
+Future<bool> requestCloudSubtitleTranslation({
+  required String bvid,
+  required String subtitleEnSrt,
+  int page = 1,
+  String? title,
+  int? cid,
+  int? durationSec,
+  AcquireApiClient? api,
+}) async {
+  final AcquireApiClient? client = resolveSharedBilibiliSubtitleApi(api);
+  if (client == null) {
+    return false;
+  }
+  final String id = bvid.trim();
+  if (id.isEmpty || subtitleEnSrt.trim().length < 20) {
+    return false;
+  }
+  try {
+    final SharedSubtitleGpuJob? job =
+        await client.enqueueSharedSubtitleTranslateJob(
+      bvid: id,
+      page: page < 1 ? 1 : page,
+      subtitleEnSrt: subtitleEnSrt,
+      title: title,
+      cid: cid,
+      durationSec: durationSec,
+    );
+    return job != null;
+  } catch (_) {
+    return false;
+  }
+}

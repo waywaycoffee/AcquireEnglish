@@ -315,6 +315,24 @@ Future<bool> tryRequestCloudSubtitleGeneration({
       api: api,
     );
 
+/// English SRT on disk, Chinese missing → GPU EN→ZH only.
+Future<bool> tryRequestCloudSubtitleTranslation({
+  required AcquireApiClient api,
+  required BilibiliSharedSubtitleIds ids,
+  required String subtitleEnSrt,
+  String? title,
+  int? durationSec,
+}) =>
+    requestCloudSubtitleTranslation(
+      bvid: ids.bvid,
+      page: ids.page,
+      cid: ids.cid,
+      subtitleEnSrt: subtitleEnSrt,
+      title: title,
+      durationSec: durationSec,
+      api: api,
+    );
+
 /// Upload a validated pack after local fill. Failures are silent.
 Future<void> tryUploadSharedBilibiliSubtitles({
   required AcquireApiClient api,
