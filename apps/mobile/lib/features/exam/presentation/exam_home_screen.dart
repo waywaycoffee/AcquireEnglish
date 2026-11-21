@@ -27,7 +27,7 @@ class ExamHomeScreen extends ConsumerWidget {
         : ref.watch(examProgressProvider).forFamily(family.id);
 
     return PadScaffold(
-      currentDestination: AppNavDestination.home,
+      currentDestination: AppNavDestination.exam,
       showContinueLearning: false,
       topBar: PadTopBar(
         title: '考试备考',

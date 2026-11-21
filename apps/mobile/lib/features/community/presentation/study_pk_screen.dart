@@ -8,7 +8,11 @@ import '../../sync/data/acquire_api_client.dart';
 import '../../words/presentation/word_book_provider.dart';
 
 class StudyPkScreen extends ConsumerStatefulWidget {
-  const StudyPkScreen({super.key});
+  const StudyPkScreen({super.key, this.embedded = false});
+
+  /// When true, omit the outer [Scaffold] so [PadScaffold] can own chrome.
+  final bool embedded;
+
   @override
   ConsumerState<StudyPkScreen> createState() => _StudyPkScreenState();
 }
@@ -238,20 +242,7 @@ class _StudyPkScreenState extends ConsumerState<StudyPkScreen>
         _match?['question'] as Map<String, dynamic>?;
     final Map<String, dynamic>? result =
         _match?['result'] as Map<String, dynamic>?;
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('近期单词 PK'),
-        actions: <Widget>[
-          IconButton(
-            onPressed: _busy
-                ? null
-                : () => _match == null ? _load() : _open(_match!['id'] as int),
-            icon: const Icon(Icons.refresh),
-            tooltip: '刷新对局',
-          ),
-        ],
-      ),
-      body: ListView(
+    final Widget body = ListView(
         padding: const EdgeInsets.all(20),
         children: <Widget>[
           if (_busy) const LinearProgressIndicator(),
@@ -594,7 +585,26 @@ class _StudyPkScreenState extends ConsumerState<StudyPkScreen>
             ),
           ],
         ],
+    );
+
+    if (widget.embedded) {
+      return body;
+    }
+
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('近期单词 PK'),
+        actions: <Widget>[
+          IconButton(
+            onPressed: _busy
+                ? null
+                : () => _match == null ? _load() : _open(_match!['id'] as int),
+            icon: const Icon(Icons.refresh),
+            tooltip: '刷新对局',
+          ),
+        ],
       ),
+      body: body,
     );
   }
 

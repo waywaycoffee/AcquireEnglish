@@ -34,14 +34,6 @@ enum AppNavDestination {
     icon: Icons.record_voice_over_outlined,
     activeIcon: Icons.record_voice_over_rounded,
   ),
-  growth(
-    route: '/growth',
-    label: '成长',
-    title: '英语成长之旅',
-    subtitle: '记录你的每一次进步，查看学习轨迹与掌握度。',
-    icon: LucideIcons.sprout,
-    activeIcon: LucideIcons.trophy,
-  ),
   discover(
     route: '/discover',
     label: '社区',
@@ -49,6 +41,30 @@ enum AppNavDestination {
     subtitle: '真题资料共享、素材协作、同桌与输出互评。',
     icon: Icons.groups_outlined,
     activeIcon: Icons.groups_rounded,
+  ),
+  battle(
+    route: '/study-pk',
+    label: '对战',
+    title: '词汇对战',
+    subtitle: '和同桌比拼近期单词，赛季与段位会陆续上线。',
+    icon: Icons.sports_esports_outlined,
+    activeIcon: Icons.sports_esports_rounded,
+  ),
+  exam(
+    route: '/exam',
+    label: '备考',
+    title: '考试备考',
+    subtitle: '专项、模考、错题本与社区真题；可随时切回日常习得。',
+    icon: Icons.school_outlined,
+    activeIcon: Icons.school_rounded,
+  ),
+  words(
+    route: '/words',
+    label: '词书',
+    title: '词书',
+    subtitle: '云端词书下载到本地，也可查看字幕收藏词。',
+    icon: Icons.menu_book_outlined,
+    activeIcon: Icons.menu_book_rounded,
   ),
   review(
     route: '/review',
@@ -58,14 +74,13 @@ enum AppNavDestination {
     icon: Icons.style_outlined,
     activeIcon: Icons.style_rounded,
   ),
-  exam(
-    route: '/exam',
-    label: '考试',
-    title: '考试备考',
-    subtitle: '专项、模考、错题本与社区真题；可随时切回日常习得。',
-    icon: Icons.school_outlined,
-    activeIcon: Icons.school_rounded,
-    showInNav: false,
+  growth(
+    route: '/growth',
+    label: '成长',
+    title: '英语成长之旅',
+    subtitle: '记录你的每一次进步，查看学习轨迹与掌握度。',
+    icon: LucideIcons.sprout,
+    activeIcon: LucideIcons.trophy,
     showInBottomNav: false,
   ),
   phrases(
@@ -75,16 +90,6 @@ enum AppNavDestination {
     subtitle: '回顾收藏过的句子和表达，集中复习高价值内容。',
     icon: Icons.auto_stories_outlined,
     activeIcon: Icons.auto_stories_rounded,
-    showInNav: false,
-    showInBottomNav: false,
-  ),
-  words(
-    route: '/words',
-    label: '单词本',
-    title: '单词本',
-    subtitle: '查看在视频字幕中见过并收藏的单词。',
-    icon: Icons.menu_book_outlined,
-    activeIcon: Icons.menu_book_rounded,
     showInNav: false,
     showInBottomNav: false,
   ),
@@ -104,6 +109,7 @@ enum AppNavDestination {
     subtitle: '管理播放偏好、界面设置和本地学习体验。',
     icon: Icons.tune_outlined,
     activeIcon: Icons.tune_rounded,
+    showInBottomNav: false,
   ),
   importCourse(
     route: '/importCourse',
@@ -134,4 +140,17 @@ enum AppNavDestination {
   final IconData activeIcon;
   final bool showInNav;
   final bool showInBottomNav;
+
+  /// Portrait bottom strip order: first five fit the viewport; swipe for the rest.
+  static const List<AppNavDestination> bottomStrip = <AppNavDestination>[
+    home,
+    library,
+    reading,
+    review,
+    oralCoach,
+    discover,
+    battle,
+    exam,
+    words,
+  ];
 }

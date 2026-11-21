@@ -9,6 +9,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:riverpod/src/framework.dart' show Override;
+import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
   test('pad prototype routes stay addressable', () {
@@ -168,36 +169,52 @@ void main() {
     );
   });
 
-  testWidgets('portrait bottom navigation moves secondary pages into more', (
+  testWidgets('portrait bottom nav shows five tabs and scrolls for more', (
     WidgetTester tester,
   ) async {
     tester.view.physicalSize = const Size(390, 844);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.reset);
+    SharedPreferences.setMockInitialValues(<String, Object>{
+      kBottomNavScrollHintKey: true,
+    });
 
     await tester.pumpWidget(
       const MaterialApp(
         home: Scaffold(
           bottomNavigationBar: FloatingBottomNav(
-            current: AppNavDestination.phrases,
+            current: AppNavDestination.home,
           ),
         ),
       ),
     );
+    await tester.pumpAndSettle();
 
+    expect(find.text('学习'), findsOneWidget);
     expect(find.text('视频'), findsOneWidget);
     expect(find.text('阅读'), findsOneWidget);
-    expect(find.text('学习'), findsOneWidget);
     expect(find.text('单词'), findsOneWidget);
+    expect(find.text('口语'), findsOneWidget);
+    expect(find.byKey(const Key('bottom-nav-scroll')), findsOneWidget);
+    expect(find.byKey(const Key('bottom-nav-indicator')), findsOneWidget);
+
+    // First viewport fits 5 items; remaining tabs require a horizontal drag.
+    expect(find.text('社区'), findsNothing);
+    final Finder scrollable = find.byKey(const Key('bottom-nav-scroll'));
+    await tester.drag(scrollable, const Offset(-220, 0));
+    await tester.pumpAndSettle();
     expect(find.text('社区'), findsOneWidget);
+    expect(find.text('对战'), findsOneWidget);
+
+    await tester.drag(scrollable, const Offset(-420, 0));
+    await tester.pumpAndSettle();
+    expect(find.text('备考'), findsOneWidget);
+    expect(find.text('词书'), findsOneWidget);
     expect(find.text('更多'), findsOneWidget);
-    expect(find.text('口语'), findsNothing);
-    expect(find.text('短语'), findsNothing);
 
     await tester.tap(find.byKey(const Key('bottom-nav-more')));
     await tester.pumpAndSettle();
-    expect(find.text('口语'), findsOneWidget);
-    expect(find.text('短语'), findsNothing);
+    expect(find.text('成长'), findsOneWidget);
     expect(find.text('怎么学'), findsOneWidget);
     expect(find.text('设置'), findsOneWidget);
   });

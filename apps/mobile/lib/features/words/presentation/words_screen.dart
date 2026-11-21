@@ -212,9 +212,9 @@ class _WordsScreenState extends ConsumerState<WordsScreen> {
         entries.where((WordEntry item) => item.favorite).length;
 
     return PadScaffold(
-      currentDestination: AppNavDestination.review,
+      currentDestination: AppNavDestination.words,
       topBar: PadTopBar(
-        title: listOnly ? '收藏词本' : '单词本',
+        title: listOnly ? '收藏词本' : '词书',
         description: listOnly ? '共 $favoriteCount 个收藏单词' : null,
         actions: <Widget>[
           if (!listOnly) ...<Widget>[
