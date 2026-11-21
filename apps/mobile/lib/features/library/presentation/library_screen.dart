@@ -13,6 +13,7 @@ import '../../import_course/data/bilibili_episode_cover_backfill.dart';
 import '../../import_course/data/bilibili_import_service.dart';
 import '../../import_course/data/netdisk_local_download.dart';
 import '../../import_course/presentation/course_import_entry.dart';
+import '../../import_course/presentation/recommended_bilibili_section.dart';
 import '../../import_course/presentation/widgets/import_course_flow.dart';
 import '../../navigation/presentation/navigation_destination.dart';
 import '../../player/presentation/asr_subtitle_cache.dart';
@@ -1195,6 +1196,10 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
                 // Keep import actions on their own full-width row so B站 is
                 // never clipped by the phone's right edge. Same entry as 首页.
                 CourseImportActionButtons(enabled: !editMode),
+                if (!editMode) ...<Widget>[
+                  const SizedBox(height: 18),
+                  const RecommendedBilibiliSection(),
+                ],
                 if (hasActiveQuery) ...<Widget>[
                   const SizedBox(height: 14),
                   Text(

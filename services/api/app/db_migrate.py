@@ -16,6 +16,7 @@ async def ensure_schema_columns(conn: AsyncConnection) -> None:
     await _ensure_link_course_series_columns(conn)
     await _ensure_link_course_series_columns(conn)
     await _ensure_community_post_columns(conn)
+    await _ensure_shared_bilibili_cid_bigint(conn)
 
 
 async def ensure_user_auth_columns(conn: AsyncConnection) -> None:
@@ -186,3 +187,24 @@ async def _ensure_community_post_columns(conn: AsyncConnection) -> None:
             "WHERE kind IN ('method', 'podcast_placeholder')"
         )
     )
+
+
+async def _ensure_shared_bilibili_cid_bigint(conn: AsyncConnection) -> None:
+    """Newer Bilibili cids exceed PostgreSQL INTEGER / int32."""
+    existing = await _existing_columns(conn, "shared_bilibili_subtitles")
+    if existing is None or "cid" not in existing:
+        return
+    dialect = _dialect_name(conn)
+    try:
+        if dialect == "postgresql":
+            await conn.execute(
+                text(
+                    "ALTER TABLE shared_bilibili_subtitles "
+                    "ALTER COLUMN cid TYPE BIGINT"
+                )
+            )
+        elif dialect == "sqlite":
+            # SQLite affinity is flexible; no-op for existing installs.
+            pass
+    except Exception:  # noqa: BLE001
+        pass

@@ -1,6 +1,16 @@
 from datetime import datetime
 
-from sqlalchemy import DateTime, Float, ForeignKey, Integer, String, Text, UniqueConstraint, func
+from sqlalchemy import (
+    BigInteger,
+    DateTime,
+    Float,
+    ForeignKey,
+    Integer,
+    String,
+    Text,
+    UniqueConstraint,
+    func,
+)
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database import Base
@@ -205,7 +215,8 @@ class SharedBilibiliSubtitle(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     bvid: Mapped[str] = mapped_column(String(32), index=True)
     page: Mapped[int] = mapped_column(Integer, default=1)
-    cid: Mapped[int | None] = mapped_column(Integer, nullable=True, index=True)
+    # Bilibili cid can exceed int32 on newer uploads.
+    cid: Mapped[int | None] = mapped_column(BigInteger, nullable=True, index=True)
     duration_sec: Mapped[int | None] = mapped_column(Integer, nullable=True)
     subtitle_en_srt: Mapped[str] = mapped_column(Text)
     subtitle_zh_srt: Mapped[str | None] = mapped_column(Text, nullable=True)

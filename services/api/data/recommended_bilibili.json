@@ -1,0 +1,81 @@
+{
+  "version": 1,
+  "items": [
+    {
+      "id": "haos-rp",
+      "source": "bilibili",
+      "creator_id": "510508936",
+      "display_name": "豪斯英音自修室",
+      "avatar_url": "https://i1.hdslb.com/bfs/face/aabaf220bfdf0aaef2939760e3f5d2437770321f.jpg",
+      "profile_url": "https://space.bilibili.com/510508936",
+      "blurb": "Pronunciation with Emma · 现代 RP、连读弱读",
+      "videos": [
+        {
+          "bvid": "BV1gm411r7yz",
+          "title": "【Pronunciation with Emma】英语发音语调讲解",
+          "watch_url": "https://www.bilibili.com/video/BV1gm411r7yz",
+          "cover_url": "http://i2.hdslb.com/bfs/archive/2d819df654e47435a7ef4408b2c2dee535de0ad1.jpg",
+          "duration_sec": 1305,
+          "seed_pages": "all"
+        }
+      ]
+    },
+    {
+      "id": "bbc-ipa-official",
+      "source": "bilibili",
+      "creator_id": "25893643",
+      "display_name": "BBC官方音标教程",
+      "avatar_url": "http://i1.hdslb.com/bfs/face/e16031a99ba468f6e4a2ac860271244bb1de806c.jpg",
+      "profile_url": "https://space.bilibili.com/25893643",
+      "blurb": "Alex Bellem / The Sounds of English · 44 音合集",
+      "videos": [
+        {
+          "bvid": "BV127411n7nj",
+          "title": "【中英双语字幕】BBC官方音标教程",
+          "watch_url": "https://www.bilibili.com/video/BV127411n7nj",
+          "cover_url": "http://i0.hdslb.com/bfs/archive/9944bf5247ff93ff00afdbaf7a4a4fa2aa752d05.jpg",
+          "duration_sec": 10439,
+          "seed_pages": "all"
+        }
+      ]
+    },
+    {
+      "id": "ipa-48-mouth",
+      "source": "bilibili",
+      "creator_id": "57365341",
+      "display_name": "音标标准发音",
+      "avatar_url": "https://i1.hdslb.com/bfs/face/c661cc3f12fc29304b57cf8ca7b880f6cdfd716d.jpg",
+      "profile_url": "https://space.bilibili.com/57365341",
+      "blurb": "48 音标 · 真人口型对照练习",
+      "videos": [
+        {
+          "bvid": "BV1fV4y1p7Ex",
+          "title": "一个视频掌握48个地道音标·对着镜子大声练",
+          "watch_url": "https://www.bilibili.com/video/BV1fV4y1p7Ex",
+          "cover_url": "http://i2.hdslb.com/bfs/archive/5a8b164edf07af472703a336afa75bf49b00bd8d.jpg",
+          "duration_sec": 518,
+          "seed_pages": "all"
+        }
+      ]
+    },
+    {
+      "id": "youtube-english-house",
+      "source": "bilibili",
+      "creator_id": "481885544",
+      "display_name": "YouTube英语屋",
+      "avatar_url": "https://i2.hdslb.com/bfs/face/8a3b0fa867ca9b78d9416e67ee92d74eef515052.jpg",
+      "profile_url": "https://space.bilibili.com/481885544",
+      "blurb": "BBC / 真题听力与原声精听合集",
+      "videos": [
+        {
+          "bvid": "BV1J5Wj63Esq",
+          "title": "BBC 原版听力120集精选精制（第1期）",
+          "watch_url": "https://www.bilibili.com/video/BV1J5Wj63Esq",
+          "cover_url": "http://i0.hdslb.com/bfs/archive/e7d673368218d8069438a24a2e30334c5271cfd4.jpg",
+          "duration_sec": 89202,
+          "seed_pages": "all"
+        }
+      ]
+    }
+  ]
+}

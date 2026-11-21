@@ -215,7 +215,62 @@ def _parse_vtt_ts(value: str) -> float:
     return int(h) * 3600 + int(m) * 60 + float(s)
 
 
-async def _import_bilibili(raw: str, *, cookie: str | None = None) -> LinkImportPayload:
+async def fetch_bilibili_official_subs(
+    client: httpx.AsyncClient,
+    *,
+    bvid: str,
+    cid: int,
+) -> tuple[str | None, str | None]:
+    """Pull EN/ZH official or AI CC tracks for one cid. Returns (en_srt, zh_srt)."""
+    en_srt = None
+    zh_srt = None
+    try:
+        player = await client.get(
+            "https://api.bilibili.com/x/player/v2",
+            params={"bvid": bvid, "cid": cid},
+        )
+        player_root = player.json()
+        subs = (((player_root.get("data") or {}).get("subtitle") or {}).get("subtitles")) or []
+        for item in subs:
+            lan = (item.get("lan") or "").lower()
+            sub_url = item.get("subtitle_url") or ""
+            if not sub_url:
+                continue
+            if sub_url.startswith("//"):
+                sub_url = "https:" + sub_url
+            is_zh = "zh" in lan or "中" in lan
+            is_en = lan.startswith("en") or "英" in lan
+            if not is_zh and not is_en:
+                continue
+            sub_res = await client.get(sub_url)
+            body = (
+                sub_res.json()
+                if sub_res.headers.get("content-type", "").startswith("application/json")
+                else json.loads(sub_res.text)
+            )
+            cues = [
+                (float(c.get("from") or 0), float(c.get("to") or 0), str(c.get("content") or ""))
+                for c in (body.get("body") or [])
+            ]
+            srt = _cues_to_srt(cues)
+            if not srt:
+                continue
+            # lan tags lie often (ai-en with Chinese body). Prefer body.
+            body_zh = _srt_looks_chinese(srt)
+            if is_en and en_srt is None and not body_zh:
+                en_srt = srt
+            elif (is_zh or body_zh) and zh_srt is None:
+                zh_srt = srt
+            elif is_en and en_srt is None and body_zh and zh_srt is None:
+                zh_srt = srt
+    except Exception:
+        return en_srt, zh_srt
+    return en_srt, zh_srt
+
+
+async def _import_bilibili(
+    raw: str, *, cookie: str | None = None, page: int = 1
+) -> LinkImportPayload:
     text = raw.strip()
     params: dict[str, str] = {}
     bv = _BV.search(text)
@@ -229,6 +284,7 @@ async def _import_bilibili(raw: str, *, cookie: str | None = None) -> LinkImport
             raise ValueError("无效的 Bilibili 链接")
         params["aid"] = av.group(1)
 
+    want_page = max(1, int(page or 1))
     headers = _bilibili_headers(cookie)
     async with httpx.AsyncClient(headers=headers, timeout=25.0, follow_redirects=True) as client:
         view = await client.get(
@@ -244,54 +300,37 @@ async def _import_bilibili(raw: str, *, cookie: str | None = None) -> LinkImport
         aid = data.get("aid") or params.get("aid")
         title = (data.get("title") or "").strip() or (bvid or f"av{aid}")
         author = (data.get("owner") or {}).get("name")
-        duration = int(data.get("duration") or 60)
-        cid = data.get("cid")
-        if not cid and data.get("pages"):
-            cid = data["pages"][0].get("cid")
+        pages = data.get("pages") if isinstance(data.get("pages"), list) else []
+        page_row = None
+        for row in pages:
+            if isinstance(row, dict) and int(row.get("page") or 0) == want_page:
+                page_row = row
+                break
+        if page_row is None and pages and want_page == 1 and isinstance(pages[0], dict):
+            page_row = pages[0]
+        cid = (page_row or {}).get("cid") if isinstance(page_row, dict) else data.get("cid")
+        duration = int(
+            (page_row or {}).get("duration")
+            if isinstance(page_row, dict) and page_row.get("duration")
+            else data.get("duration") or 60
+        )
+        if isinstance(page_row, dict) and page_row.get("part"):
+            part = str(page_row.get("part") or "").strip()
+            if part and part not in title:
+                title = f"{title} · {part}"
         watch = f"https://www.bilibili.com/video/{bvid}" if bvid else f"https://www.bilibili.com/video/av{aid}"
+        if want_page > 1 and bvid:
+            watch = f"{watch}?p={want_page}"
         external_id = bvid or f"av{aid}"
+        if want_page > 1 and bvid:
+            external_id = f"{bvid}-p{want_page}"
 
         en_srt = None
         zh_srt = None
         if cid and bvid:
-            try:
-                # Official / AI CC lists often require login Cookie (SESSDATA).
-                player = await client.get(
-                    "https://api.bilibili.com/x/player/v2",
-                    params={"bvid": bvid, "cid": cid},
-                )
-                player_root = player.json()
-                subs = (((player_root.get("data") or {}).get("subtitle") or {}).get("subtitles")) or []
-                for item in subs:
-                    lan = (item.get("lan") or "").lower()
-                    sub_url = item.get("subtitle_url") or ""
-                    if not sub_url:
-                        continue
-                    if sub_url.startswith("//"):
-                        sub_url = "https:" + sub_url
-                    is_zh = "zh" in lan or "中" in lan
-                    is_en = lan.startswith("en") or "英" in lan
-                    if not is_zh and not is_en:
-                        continue
-                    sub_res = await client.get(sub_url)
-                    body = sub_res.json() if sub_res.headers.get("content-type", "").startswith("application/json") else json.loads(sub_res.text)
-                    cues = [
-                        (float(c.get("from") or 0), float(c.get("to") or 0), str(c.get("content") or ""))
-                        for c in (body.get("body") or [])
-                    ]
-                    srt = _cues_to_srt(cues)
-                    if not srt:
-                        continue
-                    # lan tags lie often (ai-en with Chinese body). Prefer body.
-                    body_zh = _srt_looks_chinese(srt)
-                    if is_en and en_srt is None and not body_zh:
-                        en_srt = srt
-                    elif (is_zh or body_zh) and zh_srt is None:
-                        zh_srt = srt
-                    elif is_en and en_srt is None and body_zh and zh_srt is None:
-                        zh_srt = srt
-            except Exception:
-                pass
+            en_srt, zh_srt = await fetch_bilibili_official_subs(
+                client, bvid=str(bvid), cid=int(cid)
+            )
 
     return LinkImportPayload(
         source="bilibili",

@@ -217,6 +217,29 @@ class DailyFeedItemOut(BaseModel):
     reason: str = "interest"  # interest | followed
 
 
+class RecommendedBilibiliVideoOut(BaseModel):
+    bvid: str
+    title: str
+    watch_url: str
+    cover_url: str | None = None
+    duration_sec: float | None = None
+    has_shared_subs: bool = False
+    shared_page_count: int = 0
+
+
+class RecommendedBilibiliCreatorOut(BaseModel):
+    """Curated UP + sample videos for the import-study recommendation rail."""
+
+    id: str
+    source: str = "bilibili"
+    creator_id: str
+    display_name: str
+    avatar_url: str | None = None
+    profile_url: str | None = None
+    blurb: str | None = None
+    videos: list[RecommendedBilibiliVideoOut] = Field(default_factory=list)
+
+
 # --- User assets (entitlements / orders / wallet) ---
 
 

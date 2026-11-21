@@ -38,6 +38,7 @@ class Endpoints {
   static const String creatorsFollowed = 'api/creators/followed';
   static const String creatorsFollow = 'api/creators/follow';
   static const String creatorsUnfollow = 'api/creators/unfollow';
+  static const String creatorsRecommended = 'api/creators/recommended';
   static const String communityFeed = 'api/community/feed';
   static const String communityPosts = 'api/community/posts';
   static const String communityLeaderboard = 'api/community/leaderboard';

@@ -518,6 +518,93 @@ class FollowedCreatorDto {
       };
 }
 
+class RecommendedBilibiliVideoDto {
+  const RecommendedBilibiliVideoDto({
+    required this.bvid,
+    required this.title,
+    required this.watchUrl,
+    this.coverUrl,
+    this.durationSec,
+    this.hasSharedSubs = false,
+    this.sharedPageCount = 0,
+  });
+
+  factory RecommendedBilibiliVideoDto.fromJson(Map<String, dynamic> json) =>
+      RecommendedBilibiliVideoDto(
+        bvid: '${json['bvid'] ?? ''}'.trim(),
+        title: '${json['title'] ?? ''}'.trim(),
+        watchUrl: '${json['watch_url'] ?? ''}'.trim(),
+        coverUrl: _nullableString(json['cover_url']),
+        durationSec: (json['duration_sec'] as num?)?.toDouble(),
+        hasSharedSubs: json['has_shared_subs'] == true,
+        sharedPageCount: (json['shared_page_count'] as num?)?.toInt() ?? 0,
+      );
+
+  final String bvid;
+  final String title;
+  final String watchUrl;
+  final String? coverUrl;
+  final double? durationSec;
+  final bool hasSharedSubs;
+  final int sharedPageCount;
+}
+
+class RecommendedBilibiliCreatorDto {
+  const RecommendedBilibiliCreatorDto({
+    required this.id,
+    required this.creatorId,
+    required this.displayName,
+    this.source = 'bilibili',
+    this.avatarUrl,
+    this.profileUrl,
+    this.blurb,
+    this.videos = const <RecommendedBilibiliVideoDto>[],
+  });
+
+  factory RecommendedBilibiliCreatorDto.fromJson(Map<String, dynamic> json) {
+    final List<RecommendedBilibiliVideoDto> videos =
+        <RecommendedBilibiliVideoDto>[];
+    final Object? raw = json['videos'];
+    if (raw is List) {
+      for (final Object? row in raw) {
+        if (row is Map) {
+          final RecommendedBilibiliVideoDto video =
+              RecommendedBilibiliVideoDto.fromJson(
+            Map<String, dynamic>.from(row),
+          );
+          if (video.bvid.isNotEmpty && video.watchUrl.isNotEmpty) {
+            videos.add(video);
+          }
+        }
+      }
+    }
+    return RecommendedBilibiliCreatorDto(
+      id: '${json['id'] ?? ''}'.trim(),
+      source: '${json['source'] ?? 'bilibili'}'.trim(),
+      creatorId: '${json['creator_id'] ?? ''}'.trim(),
+      displayName: '${json['display_name'] ?? ''}'.trim(),
+      avatarUrl: _nullableString(json['avatar_url']),
+      profileUrl: _nullableString(json['profile_url']),
+      blurb: _nullableString(json['blurb']),
+      videos: List<RecommendedBilibiliVideoDto>.unmodifiable(videos),
+    );
+  }
+
+  final String id;
+  final String source;
+  final String creatorId;
+  final String displayName;
+  final String? avatarUrl;
+  final String? profileUrl;
+  final String? blurb;
+  final List<RecommendedBilibiliVideoDto> videos;
+}
+
+String? _nullableString(Object? raw) {
+  final String value = '$raw'.trim();
+  return value.isEmpty || value == 'null' ? null : value;
+}
+
 class AcquireProgressDto {
   const AcquireProgressDto({
     required this.courseId,
@@ -955,6 +1042,25 @@ class AcquireApiClient {
     return (response.data as List<dynamic>)
         .cast<Map<String, dynamic>>()
         .map(FollowedCreatorDto.fromJson)
+        .toList(growable: false);
+  }
+
+  Future<List<RecommendedBilibiliCreatorDto>> listRecommendedCreators() async {
+    final Response<dynamic> response = await _dio.get(
+      Endpoints.creatorsRecommended,
+      options: Options(
+        extra: const <String, Object>{
+          'dio_cache_interceptor_force_refresh': true,
+        },
+      ),
+    );
+    return (response.data as List<dynamic>)
+        .cast<Map<String, dynamic>>()
+        .map(RecommendedBilibiliCreatorDto.fromJson)
+        .where(
+          (RecommendedBilibiliCreatorDto item) =>
+              item.displayName.isNotEmpty && item.videos.isNotEmpty,
+        )
         .toList(growable: false);
   }
 

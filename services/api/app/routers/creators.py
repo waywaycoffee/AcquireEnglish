@@ -7,6 +7,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.bilibili_search import fetch_bilibili_creator_card, parse_bilibili_space_mid
+from app.config import settings
 from app.database import get_db
 from app.deps import get_current_user
 from app.followed_creators import (
@@ -22,9 +23,49 @@ from app.schemas import (
     CreatorFollowRequest,
     CreatorUnfollowRequest,
     FollowedCreator,
+    RecommendedBilibiliCreatorOut,
+    RecommendedBilibiliVideoOut,
 )
+from app.services.recommended_bilibili import build_recommended_payload
 
 router = APIRouter(prefix="/creators", tags=["creators"])
+
+
+@router.get("/recommended", response_model=list[RecommendedBilibiliCreatorOut])
+async def list_recommended_creators(
+    db: AsyncSession = Depends(get_db),
+) -> list[RecommendedBilibiliCreatorOut]:
+    """Public curated Bilibili UPs + sample videos for the import page."""
+    cookie = (settings.bilibili_cookie or "").strip() or None
+    rows = await build_recommended_payload(db, cookie=cookie)
+    out: list[RecommendedBilibiliCreatorOut] = []
+    for row in rows:
+        videos = [
+            RecommendedBilibiliVideoOut(
+                bvid=str(v.get("bvid") or ""),
+                title=str(v.get("title") or ""),
+                watch_url=str(v.get("watch_url") or ""),
+                cover_url=v.get("cover_url"),  # type: ignore[arg-type]
+                duration_sec=v.get("duration_sec"),  # type: ignore[arg-type]
+                has_shared_subs=bool(v.get("has_shared_subs")),
+                shared_page_count=int(v.get("shared_page_count") or 0),
+            )
+            for v in (row.get("videos") or [])
+            if isinstance(v, dict) and str(v.get("bvid") or "").strip()
+        ]
+        out.append(
+            RecommendedBilibiliCreatorOut(
+                id=str(row.get("id") or ""),
+                source="bilibili",
+                creator_id=str(row.get("creator_id") or ""),
+                display_name=str(row.get("display_name") or ""),
+                avatar_url=row.get("avatar_url"),  # type: ignore[arg-type]
+                profile_url=row.get("profile_url"),  # type: ignore[arg-type]
+                blurb=row.get("blurb"),  # type: ignore[arg-type]
+                videos=videos,
+            )
+        )
+    return out
 
 
 async def _prefs_row(user_id: int, db: AsyncSession) -> UserPreference:
