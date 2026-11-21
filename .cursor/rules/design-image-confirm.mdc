@@ -1,0 +1,27 @@
+---
+description: Show design mockup images for user confirmation before treating visual designs as approved
+alwaysApply: true
+---
+
+# Design drafts require image confirmation
+
+User standing preference: after any design mockup/draft is ready, **show image(s) for confirmation** before treating the design as approved.
+
+## When this applies
+
+- Pencil / Figma-like / Canvas design drafts
+- Flutter UI redesigns that start with a visual mock
+- Any new design-first work where layout, hierarchy, or look-and-feel matter
+
+## Required behavior
+
+1. When a design draft is ready, **export or screenshot** the frame(s) and **present the image(s) in chat** for the user to confirm.
+2. Prefer attaching screenshots of Pencil frames / UI mocks directly in the conversation (not text-only walkthroughs).
+3. Do **not** assume approval from a text description, checklist, or “looks good in prose” summary alone.
+4. Do **not** start large implementation follow-ups that depend on visual sign-off until the user confirms the images (unless the user already approved that specific visual, or explicitly asked to implement without waiting).
+
+## Examples
+
+- ✅ Export Pencil frame → attach PNG/JPEG in chat → wait for “可以 / 按这个做”
+- ❌ Describe the layout in bullets and proceed to rewrite Flutter screens without showing a picture
+- ❌ Treat “I made a .pen file” as approval without posting a screenshot
