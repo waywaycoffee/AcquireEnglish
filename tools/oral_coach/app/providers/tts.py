@@ -20,7 +20,7 @@ def _write_silent_wav(path: str, seconds: float = 0.6) -> None:
 class MockTts:
     name = 'mock'
 
-    async def synthesize(self, text: str, out_path: str, *, voice: str | None = None, language: str | None = None) -> TtsResult:
+    async def synthesize(self, text: str, out_path: str, *, voice: str | None = None, digital_human_id: str | None = None, language: str | None = None) -> TtsResult:
         Path(out_path).parent.mkdir(parents=True, exist_ok=True)
         # Duration scales mildly with text length so UI can show a cue.
         seconds = min(4.0, 0.35 + 0.04 * max(1, len(text.split())))
@@ -31,7 +31,7 @@ class MockTts:
 class EdgeTts:
     name = 'edge'
 
-    async def synthesize(self, text: str, out_path: str, *, voice: str | None = None, language: str | None = None) -> TtsResult:
+    async def synthesize(self, text: str, out_path: str, *, voice: str | None = None, digital_human_id: str | None = None, language: str | None = None) -> TtsResult:
         try:
             import edge_tts  # type: ignore
         except ImportError as exc:
@@ -44,7 +44,7 @@ class EdgeTts:
 class XttsTts:
     name = 'xtts'
 
-    async def synthesize(self, text: str, out_path: str, *, voice: str | None = None, language: str | None = None) -> TtsResult:
+    async def synthesize(self, text: str, out_path: str, *, voice: str | None = None, digital_human_id: str | None = None, language: str | None = None) -> TtsResult:
         raise RuntimeError(
             'XTTS scaffold: point to your Coqui XTTS server / local API, then implement synthesize().'
         )
@@ -53,7 +53,7 @@ class XttsTts:
 class FishSpeechTts:
     name = 'fishspeech'
 
-    async def synthesize(self, text: str, out_path: str, *, voice: str | None = None, language: str | None = None) -> TtsResult:
+    async def synthesize(self, text: str, out_path: str, *, voice: str | None = None, digital_human_id: str | None = None, language: str | None = None) -> TtsResult:
         raise RuntimeError(
             'FishSpeech scaffold: call your FishSpeech HTTP endpoint here.'
         )
