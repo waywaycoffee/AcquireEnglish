@@ -7,7 +7,7 @@
 | 位置 | 内容 |
 |------|------|
 | **服务器** `services/api` | 账号（邮箱 / 手机 / 微信）、课程目录、进度 / 词库同步 |
-| **App 内** | 播放、本地 Whisper ASR、翻译 key、选词、影子跟读 UI、口语陪练（默认真机 TTS） |
+| **App 内** | 播放、云端字幕（共享包 / GPU 队列）、翻译 key、选词、影子跟读 UI、口语陪练（默认真机 TTS） |
 | **可选本机 sidecar** | `tools/voice`、`tools/oral_coach`、`tools/digital_human_coach`（LiveKit 数字人口语外教） |
 | **产品文档** | `docs/digital-human-coach/`（PRD / 时序 / 抓包手册） |
 

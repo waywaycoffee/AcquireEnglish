@@ -93,7 +93,7 @@ class SubtitleCompletionWorker {
     final LearningSettingsState asrSettings = _settingsForAsr(settings);
     await queue.markRunning(job.episodeId);
 
-    // Stuck translate/ASR jobs: pull bilingual shared pack before Whisper.
+    // Stuck translate/ASR jobs: pull bilingual shared pack / push cloud GPU.
     final bool sharedDone = await _trySatisfyFromSharedCache(
       job: job,
       onProgress: onProgress,
@@ -101,6 +101,16 @@ class SubtitleCompletionWorker {
     if (sharedDone) {
       await queue.markDone(job.episodeId);
       onProgress?.call(job.episodeId, kSubtitleSharedCacheReadyDetailLabel);
+      return true;
+    }
+
+    // On-device Whisper removed: English ASR jobs wait on cloud generation.
+    if (job.needEnglish) {
+      onProgress?.call(job.episodeId, kSubtitleCloudGenerationQueuedLabel);
+      await queue.markDeferred(
+        job.episodeId,
+        '等待云端字幕生成（本机 ASR 已移除）',
+      );
       return true;
     }
 

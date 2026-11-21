@@ -18,31 +18,27 @@ const MethodChannel _audioToolsChannel = MethodChannel(
 
 /// Null when ASR (+ optional bilingual translation) settings are ready.
 String? describeAsrConfigurationError(LearningSettingsState settings) {
-  final bool localWhisper = settings.asrProvider == '本地 Whisper';
-  if (localWhisper) {
-    if (settings.asrModel.trim().isEmpty) {
-      return '请选择本地 Whisper 模型（tiny.en / base.en / small.en）。';
+  if (settings.asrProvider == '本地 Whisper') {
+    return LocalWhisperAsr.removedMessage;
+  }
+  if (settings.resolvedAsrApiKey.isEmpty) {
+    final String field = settings.asrProvider == '腾讯云'
+        ? '腾讯云 SecretId / SecretKey'
+        : '阿里云百炼 API Key（设置页或 apps/mobile/.env 的 BAILIAN_ASR_API_KEY）';
+    return '未配置 ASR 密钥。请填写 $field。导入缺字幕时优先走云端共享包 / GPU 队列。';
+  }
+  if (settings.asrProvider == '腾讯云') {
+    final String trimmed = settings.resolvedAsrApiKey;
+    int separator = trimmed.indexOf(':');
+    if (separator < 0) {
+      separator = trimmed.indexOf('：');
     }
-  } else {
-    if (settings.resolvedAsrApiKey.isEmpty) {
-      final String field = settings.asrProvider == '腾讯云'
-          ? '腾讯云 SecretId / SecretKey'
-          : '阿里云百炼 API Key（设置页或 apps/mobile/.env 的 BAILIAN_ASR_API_KEY）';
-      return '未配置 ASR 密钥。请填写 $field。';
+    if (separator <= 0 || separator >= trimmed.length - 1) {
+      return '腾讯云 ASR 需同时填写 SecretId 和 SecretKey。';
     }
-    if (settings.asrProvider == '腾讯云') {
-      final String trimmed = settings.resolvedAsrApiKey;
-      int separator = trimmed.indexOf(':');
-      if (separator < 0) {
-        separator = trimmed.indexOf('：');
-      }
-      if (separator <= 0 || separator >= trimmed.length - 1) {
-        return '腾讯云 ASR 需同时填写 SecretId 和 SecretKey。';
-      }
-    }
-    if (settings.asrBaseUrl.trim().isEmpty || settings.asrModel.trim().isEmpty) {
-      return 'ASR 服务地址或模型为空，请到设置中检查，或关闭“自定义 ASR 接口地址”。';
-    }
+  }
+  if (settings.asrBaseUrl.trim().isEmpty || settings.asrModel.trim().isEmpty) {
+    return 'ASR 服务地址或模型为空，请到设置中检查，或关闭“自定义 ASR 接口地址”。';
   }
   // Missing translation keys are handled as a soft warning after English ASR
   // succeeds, so bilingual can degrade to English-only instead of blocking.
@@ -67,8 +63,11 @@ String humanizeAsrSubtitleError(Object error) {
       lower.contains('invalid api key') ||
       lower.contains('incorrect api key') ||
       (lower.contains('unauthorized') && lower.contains('key'))) {
-    return '未配置或无效的 API Key。请到「更多 → 设置 → AI生成字幕」填写百炼/腾讯云密钥，'
-        '或改用「本地 Whisper」。开启双语时还需填写「翻译」API Key。';
+    return '未配置或无效的 API Key。请到「更多 → 设置 → AI生成字幕」填写百炼/腾讯云密钥。'
+        '导入缺字幕时也可等待云端共享包 / GPU 生成。开启双语时还需填写「翻译」API Key。';
+  }
+  if (text.contains('本机 Whisper') || lower.contains('whisper asr 已从')) {
+    return LocalWhisperAsr.removedMessage;
   }
   if (lower.contains('already has an active transcription') ||
       lower.contains('reserved by an active transcription') ||
@@ -82,27 +81,7 @@ String humanizeAsrSubtitleError(Object error) {
   }
   if (lower.contains('未开启中文语音识别') ||
       lower.contains('中文语音模型尚未下载')) {
-    return text;
-  }
-  if (lower.contains('huggingface') ||
-      lower.contains('hf-mirror') ||
-      lower.contains('国内镜像') ||
-      ((lower.contains('socket') ||
-              lower.contains('timed out') ||
-              lower.contains('connection')) &&
-          (lower.contains('whisper') ||
-              lower.contains('模型') ||
-              lower.contains('ggml') ||
-              lower.contains('download') ||
-              lower.contains('下载')))) {
-    return 'Whisper 模型下载失败：国内镜像不可用。请检查网络后在「设置 → AI生成字幕」重试下载。';
-  }
-  if (lower.contains('whisper') &&
-      (lower.contains('下载') ||
-          lower.contains('download') ||
-          lower.contains('未安装') ||
-          lower.contains('model'))) {
-    return text;
+    return LocalWhisperAsr.removedMessage;
   }
   if (text.contains('没有识别到有效字幕') ||
       text.contains('段处理失败')) {

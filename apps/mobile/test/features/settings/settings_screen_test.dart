@@ -412,7 +412,7 @@ void main() {
           .widget<DropdownButton<String>>(asr)
           .items!
           .map((DropdownMenuItem<String> item) => item.value),
-      <String>['本地 Whisper', '阿里云百炼', '腾讯云'],
+      <String>['阿里云百炼', '腾讯云'],
     );
     expect(find.text('获取 ASR 模型'), findsNothing);
     expect(tester.takeException(), isNull);

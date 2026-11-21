@@ -360,13 +360,13 @@ void main() {
       final LearningSettingsState state = container.read(
         learningSettingsProvider,
       );
-      expect(asrProviderOptions, <String>['本地 Whisper', '阿里云百炼', '腾讯云']);
+      expect(asrProviderOptions, <String>['阿里云百炼', '腾讯云']);
       expect(asrProviderPresets.containsKey('OpenAI'), isFalse);
-      expect(asrProviderPresets['本地 Whisper']?.model, 'base.en');
-      expect(state.asrProvider, '本地 Whisper');
+      expect(asrProviderPresets['阿里云百炼']?.model, 'qwen3-asr-flash-filetrans');
+      expect(state.asrProvider, '阿里云百炼');
       expect(state.asrApiKey, isEmpty);
-      expect(state.asrBaseUrl, 'local://whisper');
-      expect(state.asrModel, 'base.en');
+      expect(state.asrBaseUrl, 'https://dashscope.aliyuncs.com');
+      expect(state.asrModel, 'qwen3-asr-flash-filetrans');
       expect(state.useCustomAsrEndpoint, isFalse);
       expect(state.subtitleMode, '双语');
       expect(state.translationProvider, 'OpenAI');
@@ -380,7 +380,7 @@ void main() {
       await Hive.box<String>('prefs').flush();
       final ProviderContainer restored = ProviderContainer();
       addTearDown(restored.dispose);
-      expect(restored.read(learningSettingsProvider).asrProvider, '本地 Whisper');
+      expect(restored.read(learningSettingsProvider).asrProvider, '阿里云百炼');
       expect(restored.read(learningSettingsProvider).asrApiKey, isEmpty);
       expect(
         restored.read(learningSettingsProvider).translationApiKey,
@@ -401,7 +401,7 @@ void main() {
 
       expect(
         container.read(learningSettingsProvider).asrProvider,
-        '本地 Whisper',
+        '阿里云百炼',
       );
 
       await Hive.box<String>('prefs').put(
@@ -417,9 +417,9 @@ void main() {
       addTearDown(legacy.dispose);
 
       final LearningSettingsState state = legacy.read(learningSettingsProvider);
-      expect(state.asrProvider, '本地 Whisper');
-      expect(state.asrBaseUrl, 'local://whisper');
-      expect(state.asrModel, 'base.en');
+      expect(state.asrProvider, '阿里云百炼');
+      expect(state.asrBaseUrl, 'https://dashscope.aliyuncs.com');
+      expect(state.asrModel, 'qwen3-asr-flash-filetrans');
     },
   );
 

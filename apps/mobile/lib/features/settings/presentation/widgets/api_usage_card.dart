@@ -211,7 +211,7 @@ class _ApiUsageCardState extends ConsumerState<ApiUsageCard> {
             padding: const EdgeInsets.fromLTRB(18, 0, 18, 8),
             child: Text(
               '按公开价目粗算（如 gpt-4o-mini / DeepSeek / 百炼 ASR），'
-              '有官方 usage 优先用官方；本地 Whisper / 免费翻译不计费。'
+              '有官方 usage 优先用官方；免费翻译不计费。'
               '实际以服务商账单为准。',
               style: TextStyle(
                 fontSize: 11,

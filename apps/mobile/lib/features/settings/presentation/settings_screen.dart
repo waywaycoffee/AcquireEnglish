@@ -13,7 +13,6 @@ import '../../authentication/presentation/auth_session.dart';
 import '../../exam/presentation/exam_profile_provider.dart';
 import '../../exam/presentation/study_mode_switch_sheet.dart';
 import '../../navigation/presentation/navigation_destination.dart';
-import '../../player/presentation/local_whisper_asr.dart';
 import '../../shared/data/aliyun_speech_service.dart';
 import '../../shared/data/word_pronunciation_service.dart';
 import '../../sync/data/acquire_api_client.dart';
@@ -550,7 +549,7 @@ class SettingsScreen extends ConsumerWidget {
                 title: 'Voice 服务地址',
                 description:
                     '接入开源 Zemksh/voice：电脑运行 tools/voice/run_server.sh，'
-                    '手机跟读录音后可上传做本地 Whisper 转写 + 词重叠反馈。留空则关闭。',
+                    '手机跟读录音后可上传做转写 + 词重叠反馈。留空则关闭。',
                 value: settings.voicePracticeServerUrl,
                 hintText: 'http://192.168.1.8:8765',
                 onChanged: (String value) {
@@ -852,14 +851,8 @@ class SettingsScreen extends ConsumerWidget {
             children: <Widget>[
               Builder(
                 builder: (BuildContext context) {
-                  final bool isLocalWhisper =
-                      settings.asrProvider == LocalWhisperAsr.providerName;
                   final bool isTencentAsr = settings.asrProvider == '腾讯云';
                   final bool isAlibabaAsr = settings.asrProvider == '阿里云百炼';
-                  final String whisperModel =
-                      localWhisperModelOptions.contains(settings.asrModel)
-                      ? settings.asrModel
-                      : LocalWhisperAsr.defaultModel;
                   final ({String secretId, String secretKey})
                   tencentCredential = _splitTencentCredential(
                     settings.asrApiKey,
@@ -869,10 +862,9 @@ class SettingsScreen extends ConsumerWidget {
                       Padding(
                         padding: const EdgeInsets.fromLTRB(16, 4, 16, 12),
                         child: Text(
-                          '默认本地 Whisper + base.en（首次使用时从官方服务器下载，约 141MB，不打进安装包）。'
-                          '有可靠官方英文字幕时优先用官方、跳过识别；'
-                          '硬字幕/双语课会忽略 B 站软字幕并走语音识别'
-                          '（仅缺可靠英文时才 ASR，不每集重复识别）。',
+                          '导入缺字幕时：先下云端共享中英包，未命中则推送 ECS GPU 生成。'
+                          '本机不再打包 Whisper 模型。下方百炼/腾讯云仅用于手工云端识别。'
+                          '有可靠官方英文字幕时优先用官方、跳过识别。',
                           style: Theme.of(context).textTheme.bodySmall?.copyWith(
                             color: Theme.of(
                               context,
@@ -893,9 +885,7 @@ class SettingsScreen extends ConsumerWidget {
                       ),
                       _SelectRow(
                         title: 'ASR 来源',
-                        description: isLocalWhisper
-                            ? '设备端 Whisper.cpp，无需云端 API Key。推荐默认。'
-                            : '独立于翻译 API，用于生成视频字幕。',
+                        description: '可选云端 ASR（手工重新识别）；导入补全走共享包 / GPU 队列。',
                         value: settings.asrProvider,
                         options: asrProviderOptions,
                         onChanged: (String? value) {
@@ -907,46 +897,7 @@ class SettingsScreen extends ConsumerWidget {
                               .setAsrProvider(value);
                         },
                       ),
-                      if (isLocalWhisper) ...<Widget>[
-                        _SelectRow(
-                          title: '英语 Whisper 模型',
-                          description:
-                              '英语口播用。推荐 base.en（首次下载）；弱设备用 tiny.en。',
-                          value: whisperModel,
-                          options: localWhisperModelOptions,
-                          optionLabel: _whisperModelLabel,
-                          onChanged: (String? value) {
-                            if (value == null) {
-                              return;
-                            }
-                            ref
-                                .read(learningSettingsProvider.notifier)
-                                .setAsrModel(value);
-                          },
-                        ),
-                        _LocalWhisperModelStatusRow(modelId: whisperModel),
-                        _SwitchRow(
-                          title: '支持中文语音识别',
-                          description:
-                              '中文口播 / 中英混合教学视频需另下多语言模型（base，约 142MB，官方服务器）。'
-                              '手工导入选「中英混合」时会自动开启。',
-                          value: settings.enableChineseSpeechAsr,
-                          onChanged: (bool value) {
-                            ref
-                                .read(learningSettingsProvider.notifier)
-                                .setEnableChineseSpeechAsr(value: value);
-                          },
-                        ),
-                        if (settings.enableChineseSpeechAsr)
-                          _LocalWhisperModelStatusRow(
-                            modelId: LocalWhisperAsr.defaultMultilingualModel,
-                            titleWhenReady: '中文语音模型已就绪',
-                            titleWhenIdle: '下载中文语音模型（base）',
-                            titleWhenBusy: '正在下载中文语音模型',
-                            pendingHint:
-                                'base 多语言模型未下载；点此从官方服务器下载后即可识别中文 / 中英混合口播。',
-                          ),
-                      ] else ...<Widget>[
+
                         if (isTencentAsr) ...<Widget>[
                           _InputRow(
                             title: '腾讯云 SecretId',
@@ -1050,7 +1001,6 @@ class SettingsScreen extends ConsumerWidget {
                                 .setAsrModel(value);
                           },
                         ),
-                      ],
                     ],
                   );
                 },
@@ -1330,164 +1280,6 @@ String _joinTencentCredential({
     return '';
   }
   return '$id:$key';
-}
-
-String _whisperModelLabel(String modelId) {
-  switch (modelId) {
-    case 'tiny.en':
-      return 'tiny.en（最快）';
-    case 'base.en':
-      return 'base.en（默认）';
-    case 'small.en':
-      return 'small.en（更准）';
-    default:
-      return modelId;
-  }
-}
-
-class _LocalWhisperModelStatusRow extends StatefulWidget {
-  const _LocalWhisperModelStatusRow({
-    required this.modelId,
-    this.titleWhenReady,
-    this.titleWhenIdle,
-    this.titleWhenBusy,
-    this.pendingHint,
-  });
-
-  final String modelId;
-  final String? titleWhenReady;
-  final String? titleWhenIdle;
-  final String? titleWhenBusy;
-  final String? pendingHint;
-
-  @override
-  State<_LocalWhisperModelStatusRow> createState() =>
-      _LocalWhisperModelStatusRowState();
-}
-
-class _LocalWhisperModelStatusRowState
-    extends State<_LocalWhisperModelStatusRow> {
-  bool _ready = false;
-  bool _busy = false;
-  String _status = '正在检查模型…';
-  double? _progress;
-
-  bool get _isChineseMultilingual =>
-      widget.modelId == LocalWhisperAsr.defaultMultilingualModel ||
-      widget.modelId == 'tiny';
-
-  @override
-  void initState() {
-    super.initState();
-    unawaited(_refresh());
-  }
-
-  @override
-  void didUpdateWidget(covariant _LocalWhisperModelStatusRow oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    if (oldWidget.modelId != widget.modelId) {
-      unawaited(_refresh());
-    }
-  }
-
-  Future<void> _refresh() async {
-    setState(() {
-      _busy = false;
-      _progress = null;
-      _status = '正在检查 ${widget.modelId}…';
-    });
-    final String modelId = widget.modelId;
-    final bool ready = await LocalWhisperAsr.instance.isModelReady(modelId);
-    if (!mounted || widget.modelId != modelId) {
-      return;
-    }
-    setState(() {
-      _ready = ready;
-      if (ready) {
-        _status = '$modelId 已就绪，可直接生成字幕';
-      } else if (widget.pendingHint != null) {
-        _status = widget.pendingHint!;
-      } else if (_isChineseMultilingual) {
-        _status = '$modelId 未下载；开启中文语音识别后请在此下载（官方服务器）';
-      } else {
-        _status = '$modelId 未下载，点此从官方服务器首次下载（不占用安装包体积）';
-      }
-    });
-  }
-
-  Future<void> _download() async {
-    if (_busy) {
-      return;
-    }
-    setState(() {
-      _busy = true;
-      _progress = null;
-      _status = _isChineseMultilingual
-          ? '正在从官方服务器下载中文语音模型 ${widget.modelId}…'
-          : '正在从官方服务器下载 ${widget.modelId}…';
-    });
-    try {
-      await LocalWhisperAsr.instance.ensureModel(
-        widget.modelId,
-        onProgress: (double? fraction, String message) {
-          if (!mounted) {
-            return;
-          }
-          setState(() {
-            _progress = fraction;
-            _status = message;
-          });
-        },
-      );
-      if (!mounted) {
-        return;
-      }
-      setState(() {
-        _ready = true;
-        _busy = false;
-        _progress = 1;
-        _status = '${widget.modelId} 已就绪，可直接生成字幕';
-      });
-    } catch (error) {
-      if (!mounted) {
-        return;
-      }
-      setState(() {
-        _busy = false;
-        _progress = null;
-        _status = error.toString().replaceFirst(RegExp(r'^Bad state:\s*'), '');
-      });
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final String title = _ready
-        ? (widget.titleWhenReady ?? '模型已就绪')
-        : (_busy
-              ? (widget.titleWhenBusy ?? '正在下载模型')
-              : (widget.titleWhenIdle ??
-                    (_isChineseMultilingual
-                        ? '下载中文语音模型'
-                        : '首次下载 Whisper 模型')));
-    return Column(
-      children: <Widget>[
-        _ActionRow(
-          title: title,
-          description: _status,
-          icon: _ready
-              ? Icons.check_circle_outline_rounded
-              : Icons.download_rounded,
-          onTap: _ready || _busy ? () {} : _download,
-        ),
-        if (_busy)
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
-            child: LinearProgressIndicator(value: _progress),
-          ),
-      ],
-    );
-  }
 }
 
 class _ModelFetchRow extends StatelessWidget {

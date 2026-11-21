@@ -467,15 +467,11 @@ Future<void> enqueueSubtitleCompletionForEpisode({
   }
 
   // Still missing after official + shared → push ECS GPU generation (Bilibili).
-  // Prefer cloud over auto on-device Whisper; local remains for force / chip /
-  // ZH-only translate / non-Bilibili / cloud submit failure.
+  // On-device Whisper is not packaged; English ASR is cloud-only.
   bool cloudQueued = false;
-  final bool preferCloudAsr =
-      !force &&
-      chip == null &&
-      plan.needEnglish &&
-      !sourcePolicy.ignoreAllOfficialSoftsubs;
-  if (preferCloudAsr && sharedApi != null) {
+  final bool needCloudAsr =
+      plan.needEnglish && !sourcePolicy.ignoreAllOfficialSoftsubs;
+  if (needCloudAsr && sharedApi != null) {
     sharedIds ??= resolveBilibiliSharedSubtitleIds(
       sourceKey: sourceKey,
       sourceUrl: sourceUrl ?? episode?.sourceUrl,
@@ -501,13 +497,23 @@ Future<void> enqueueSubtitleCompletionForEpisode({
     }
   }
 
-  // No local media: cloud (or shared) is the only path — cannot Whisper.
-  if (!hasLocalVideo) {
+  // English still missing → wait for cloud pack; do not queue on-device ASR.
+  if (plan.needEnglish) {
+    if (!cloudQueued && needCloudAsr) {
+      SubtitleCompletionStatusHub.instance.reportProgress(
+        episodeId,
+        '云端字幕未就绪，请稍后下拉刷新',
+        status: SubtitleCompletionStatus.failed,
+        needEnglish: plan.needEnglish,
+        needChinese: plan.needChinese,
+      );
+      SubtitleCompletionStatusHub.instance.notifyChanged();
+    }
     return;
   }
 
-  // Cloud accepted: wait for shared pack on a later scan; skip auto local ASR.
-  if (cloudQueued && preferCloudAsr) {
+  // ZH-only translate needs local video + English already on disk.
+  if (!hasLocalVideo) {
     return;
   }
 
@@ -517,7 +523,7 @@ Future<void> enqueueSubtitleCompletionForEpisode({
     zhPath: zhPath,
     enPath: enPath,
     sourceKey: sourceKey,
-    needEnglish: plan.needEnglish,
+    needEnglish: false,
     needChinese: plan.needChinese,
     asrPrimary: plan.asrPrimary.code,
     force: force || chip != null,

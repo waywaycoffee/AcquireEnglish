@@ -739,7 +739,7 @@ class _StudyShadowingTabState extends ConsumerState<StudyShadowingTab> {
         .replaceFirst(RegExp(r'^Exception:\s*'), '');
   }
 
-  /// Prefer on-device Whisper → Voice sidecar → duration heuristic.
+  /// Prefer Tencent assessment → Voice sidecar → duration heuristic.
   Future<void> _scoreAfterRecording({
     required String path,
     required Pcm16MonoAudio audio,

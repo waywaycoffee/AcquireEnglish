@@ -223,10 +223,35 @@ int favoriteWordReviewCount(WordEntry word, Map<String, ReviewRecord> records) {
       : (records[legacyWordFsrsKey(word.word)]?.reviews ?? word.repetitions);
 }
 
-int favoriteWordSceneCount(WordEntry word) => word.occurrences.fold<int>(
-  0,
-  (int count, WordOccurrence occurrence) => count + occurrence.contexts.length,
-);
+/// One scene per distinct video/article/book (not every timeline hit).
+int favoriteWordSceneCount(WordEntry word) =>
+    favoriteWordDistinctScenes(word).length;
+
+/// Same-video repeats collapse to the earliest timeline hit only.
+List<({WordOccurrence occurrence, WordContext scene})>
+favoriteWordDistinctScenes(WordEntry word) {
+  final Map<String, ({WordOccurrence occurrence, WordContext scene})> byKey =
+      <String, ({WordOccurrence occurrence, WordContext scene})>{};
+  for (final WordOccurrence occurrence in word.occurrences) {
+    final WordContext? scene = occurrence.earliestContext;
+    if (scene == null) continue;
+    final String dedupeKey = occurrence.episodeId.trim().isNotEmpty
+        ? occurrence.episodeId.trim()
+        : '${occurrence.course.trim()}|${occurrence.episode.trim()}';
+    final ({WordOccurrence occurrence, WordContext scene})? existing =
+        byKey[dedupeKey];
+    if (existing == null) {
+      byKey[dedupeKey] = (occurrence: occurrence, scene: scene);
+      continue;
+    }
+    final int? existingMs = WordOccurrence.contextStartMs(existing.scene);
+    final int? nextMs = WordOccurrence.contextStartMs(scene);
+    if (nextMs != null && (existingMs == null || nextMs < existingMs)) {
+      byKey[dedupeKey] = (occurrence: occurrence, scene: scene);
+    }
+  }
+  return byKey.values.toList(growable: false);
+}
 
 int favoriteSceneClipStartMs(int positionMs) =>
     (positionMs - 2000).clamp(0, positionMs);
@@ -304,12 +329,15 @@ class FavoriteWordDetailScreen extends ConsumerWidget {
           ),
           const SizedBox(height: 10),
           if (scenes == 0) const Text('这个词暂无带时间轴的场景。'),
-          for (final WordOccurrence occurrence in entry.occurrences)
-            for (final WordContext scene in occurrence.contexts)
-              Padding(
-                padding: const EdgeInsets.only(bottom: 12),
-                child: _FavoriteSceneCard(occurrence: occurrence, scene: scene),
+          for (final ({WordOccurrence occurrence, WordContext scene}) item
+              in favoriteWordDistinctScenes(entry))
+            Padding(
+              padding: const EdgeInsets.only(bottom: 12),
+              child: _FavoriteSceneCard(
+                occurrence: item.occurrence,
+                scene: item.scene,
               ),
+            ),
         ],
       ),
     );

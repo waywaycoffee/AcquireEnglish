@@ -69,7 +69,7 @@ const String kSubtitleSharedCacheReadyDetailLabel =
 const String kSubtitleSharedCachePartialLabel =
     '已使用校验字幕缓存，正在补齐其余字幕…';
 
-/// Looking up shared pack before local Whisper (not ASR progress).
+/// Looking up shared pack before cloud generation (not local ASR progress).
 const String kSubtitleSharedCacheLookupLabel = '正在检查校验字幕缓存…';
 
 /// Local still missing after shared lookup — durable ECS GPU job accepted.

@@ -95,10 +95,10 @@ const List<String> translationProviderOptions = <String>[
   '阿里云翻译',
 ];
 const List<String> asrProviderOptions = <String>[
-  '本地 Whisper',
   '阿里云百炼',
   '腾讯云',
 ];
+/// Legacy option ids kept for migration / docs; not selectable in Settings.
 const List<String> localWhisperModelOptions = <String>[
   'tiny.en',
   'base.en',
@@ -298,9 +298,10 @@ class LearningSettingsState {
     // EN↔ZH defaults to GPU-box Ollama (qwen2.5) — not DeepSeek / OpenAI cloud.
     final TranslationProviderPreset defaultPreset =
         translationProviderPresets['本地 Ollama']!;
-    // Phone installs often lack dart-define Bailian keys — default on-device.
+    // Import-time English fill uses shared cloud / ECS GPU, not on-device ASR.
+    // Optional Bailian/Tencent remain for manual cloud API regenerate.
     final TranslationProviderPreset defaultAsrPreset =
-        asrProviderPresets['本地 Whisper']!;
+        asrProviderPresets['阿里云百炼']!;
     return LearningSettingsState(
       subtitleMode: '双语',
       playbackSpeed: '0.8×',
@@ -323,9 +324,7 @@ class LearningSettingsState {
       asrProvider: defaultAsrPreset.name,
       asrApiKey: '',
       asrBaseUrl: defaultAsrPreset.baseUrl,
-      asrModel: defaultAsrPreset.model.isEmpty
-          ? 'base.en'
-          : defaultAsrPreset.model,
+      asrModel: defaultAsrPreset.model,
       useCustomAsrEndpoint: false,
       generateBilingualAsrSubtitles: true,
       enableChineseSpeechAsr: false,
@@ -763,8 +762,7 @@ class LearningSettingsNotifier extends Notifier<LearningSettingsState> {
           return digitalHumanById(raw).id;
         }(),
       );
-      LearningSettingsState coerced =
-          _fallbackLocalWhisperIfCloudKeyMissing(loaded);
+      LearningSettingsState coerced = _migrateAwayFromLocalWhisper(loaded);
       coerced = _preferGpuOllamaTranslation(coerced);
       // Prod LiveKit was added after some installs saved an empty liveKitUrl.
       if (coerced.liveKitUrl.trim().isEmpty) {
@@ -845,26 +843,20 @@ class LearningSettingsNotifier extends Notifier<LearningSettingsState> {
     });
   }
 
-  /// Cloud ASR without a key typed in Settings → fall back to on-device Whisper.
-  /// (Env/dart-define Bailian keys alone must not keep the import queue on
-  /// cloud uploads; mobile completion always prefers Whisper.)
-  LearningSettingsState _fallbackLocalWhisperIfCloudKeyMissing(
+  /// On-device Whisper is no longer packaged; map legacy saves to Bailian.
+  LearningSettingsState _migrateAwayFromLocalWhisper(
     LearningSettingsState settings,
   ) {
-    if (settings.asrProvider == '本地 Whisper') {
+    if (settings.asrProvider != '本地 Whisper' &&
+        asrProviderOptions.contains(settings.asrProvider)) {
       return settings;
     }
-    // Only keep cloud ASR when the user explicitly saved a key in Settings.
-    if (settings.asrApiKey.trim().isNotEmpty) {
-      return settings;
-    }
-    final TranslationProviderPreset local =
-        asrProviderPresets['本地 Whisper']!;
+    final TranslationProviderPreset bailian =
+        asrProviderPresets['阿里云百炼']!;
     return settings.copyWith(
-      asrProvider: local.name,
-      asrApiKey: '',
-      asrBaseUrl: local.baseUrl,
-      asrModel: local.model.isEmpty ? 'base.en' : local.model,
+      asrProvider: bailian.name,
+      asrBaseUrl: bailian.baseUrl,
+      asrModel: bailian.model,
       useCustomAsrEndpoint: false,
     );
   }
@@ -1512,6 +1504,10 @@ class LearningSettingsNotifier extends Notifier<LearningSettingsState> {
   String _normalizeAsrProvider(String value) {
     if (value == 'Tencent Cloud') return '腾讯云';
     if (value == 'Alibaba Cloud') return '阿里云百炼';
+    // Removed from the APK — treat as Bailian for Settings / restore.
+    if (value == '本地 Whisper' || value == 'Local Whisper') {
+      return '阿里云百炼';
+    }
     return value;
   }
 

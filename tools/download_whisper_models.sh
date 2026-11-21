@@ -1,7 +1,6 @@
 #!/usr/bin/env bash
-# Optional local cache for developers. Whisper weights are NOT packaged into the
-# APK — the app downloads them on first use via hf-mirror.
-# Do not add assets/whisper/*.bin to pubspec.yaml.
+# Optional developer cache of Whisper GGML weights for desktop / GPU workers.
+# Mobile App no longer downloads or ships these — do not add to pubspec.yaml.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"

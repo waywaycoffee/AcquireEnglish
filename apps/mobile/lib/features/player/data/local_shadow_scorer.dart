@@ -90,7 +90,7 @@ class LocalShadowScorer {
         referenceWords: refWords.length,
         hypothesisWords: 0,
       ),
-      label: '时长粗评（未识别内容）· 请检查本地 Whisper 模型或 Voice 地址',
+      label: '时长粗评（未识别内容）· 请配置 Voice 服务或腾讯云评测',
     );
   }
 

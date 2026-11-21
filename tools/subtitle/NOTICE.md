@@ -9,5 +9,5 @@ This directory vendors source from:
    License: see upstream repository (`vendor/whisper-subtitle-generator`)
 
 AcquireEnglish uses them for **import-time fill of missing English subtitles** on
-developer / desktop machines. Mobile builds use on-device Whisper.cpp with the
-same “fill only what’s missing” rules.
+developer / desktop machines. Mobile builds use shared cloud ZH+EN packs and ECS
+GPU ASR generation (no on-device Whisper models in the APK).
