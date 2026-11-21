@@ -40,7 +40,6 @@
 
 | 来源 | 核查结果 | 处理 |
 | --- | --- | --- |
-| Seeing Speech | 真人唇部/超声/MRI视频，但明确CC BY-NC-ND 4.0，仅非商业原样分发 | 不复制到会员App；https://www.seeingspeech.ac.uk/ |
 | Mozilla口唇数据集 | 标示CC BY-SA 4.0，但同页另列禁止重新托管/分享数据集；非完整44音素教学教程 | 不导入ECS，需解决分发条款；https://mozilladatacollective.com/datasets/cmpe4rs9800r2nv07qpq8972c |
 | OpenPronounce / Papagayo-NG Hunanbean | 找到CMU39口型PNG；OpenPronounce的MIT不能自动覆盖从Papagayo继承的第三方资源，原项目说明GPL | 不是已核准的真人教学视频库，暂不移植素材；https://github.com/xuanhoatrieu/openpronounce 、https://github.com/morevnaproject-org/papagayo-ng |
 
@@ -48,14 +47,14 @@
 
 最终验证：89项App相关测试、3项后端进度/腾讯适配测试通过；APK构建成功。手机随后重新连接，已对com.acquire.english覆盖安装成功，保留应用数据。腾讯云与学习进度接口匿名请求均为401，腾讯云服务端配置状态为未配置；尚未进行真实腾讯云付费评测调用。
 
-## Seeing Speech 原站接入
-
-根据用户选择，音标和自然拼读页增加原站IPA Charts入口，使用外部浏览器打开 https://www.seeingspeech.ac.uk/ipa-charts/ 。保留作者、大学及CC BY-NC-ND 4.0说明；不下载、缓存、转码、重新托管或作为会员专属视频。该页主要为动画/MRI/超声，不将其误标为正面真人口型。原站访问依赖浏览器及网络。
-
 ## 2026-11-21 配置与联调复核
 
 旧记录中的“腾讯云未配置”已不再代表当前服务器状态。此次在 ECS 检查确认腾讯云与阿里云配置存在，未输出任何凭据。用已有阿里云合成示例音频（不是用户录音）转换为16kHz单声道PCM，经当前评测入口发往腾讯云，成功返回 `tencent-soe`、数值评分及5个单词的结果。此项验证了服务联通，不代表真人发音质量验收，也不写入用户学习成绩。
 
 本次阅读收尾：书架六项统计改为一行，使用细分隔线、不加大卡片；保留完整数值的无障碍标签和长按提示，大数显示“万”。深浅主题及320/390宽度均有测试。阅读正文已修复与App主题混用导致的浅底白字，阅读页顶部封面已移除。Pencil深浅主题单行方案已保存。Standard Ebooks的GitHub书籍源压缩包及其codeload跳转也通过ECS白名单缓存转发。
 
-仍保留的边界：当前阅读句内逐词高亮按音频播放进度估算，尚非声学逐词时间戳；Seeing Speech仍为原站入口，尚无重新托管及作为自有课程发布的授权。以上两项不标记为全部完成。角色分层素材、评论专项举报等复习与社区后续边界继续见 `review-community-implementation.md`，不因阅读收尾而视为已交付。
+仍保留的边界：当前阅读句内逐词高亮按音频播放进度估算，尚非声学逐词时间戳。角色分层素材、评论专项举报等复习与社区后续边界继续见 `review-community-implementation.md`，不因阅读收尾而视为已交付。
+
+## 2026-11-21 移除第三方发音器官入口
+
+按产品决定，音标与自然拼读页面已移除第三方发音器官站点入口、来源说明和后续重新托管计划。课程继续使用已有文字指导、ECS 英文示范音频和腾讯云发音评测。

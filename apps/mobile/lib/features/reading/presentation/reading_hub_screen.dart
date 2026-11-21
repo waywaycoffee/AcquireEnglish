@@ -564,17 +564,50 @@ class _DocTile extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: <Widget>[
                   SizedBox(
-                    width: 92,
+                    width: 76,
                     child: ReadingBookCover(title: doc.title, level: doc.level),
                   ),
-                  const SizedBox(width: 18),
+                  const SizedBox(width: 14),
                   Expanded(
-                    child: Text(
-                      doc.title,
-                      style: TextStyle(
-                        fontWeight: FontWeight.w800,
-                        color: AppDesignTokens.textPrimary,
-                      ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: <Widget>[
+                        Text(
+                          doc.title,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w800,
+                            color: AppDesignTokens.textPrimary,
+                          ),
+                        ),
+                        const SizedBox(height: 6),
+                        Text(
+                          '$_sourceLabel · 约 ${doc.wordCount} 词'
+                          '${pct > 0 ? ' · 进度 ${(pct * 100).round()}%' : ''}'
+                          '${(badge ?? '').isNotEmpty ? ' · $badge' : ''}',
+                          maxLines: 3,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            color: Color(0xFF626262),
+                            fontSize: 12,
+                            height: 1.35,
+                          ),
+                        ),
+                        if (pct > 0) ...<Widget>[
+                          const SizedBox(height: 10),
+                          ClipRRect(
+                            borderRadius: BorderRadius.circular(99),
+                            child: LinearProgressIndicator(
+                              value: pct.clamp(0.0, 1.0),
+                              minHeight: 5,
+                              backgroundColor: const Color(0xFFE8E8E8),
+                              color: AppDesignTokens.brandGreenDark,
+                            ),
+                          ),
+                        ],
+                      ],
                     ),
                   ),
                   if (onDelete != null)
@@ -585,24 +618,6 @@ class _DocTile extends StatelessWidget {
                     ),
                 ],
               ),
-              Text(
-                '$_sourceLabel · 约 ${doc.wordCount} 词'
-                '${pct > 0 ? ' · 进度 ${(pct * 100).round()}%' : ''}'
-                '${(badge ?? '').isNotEmpty ? ' · $badge' : ''}',
-                style: const TextStyle(color: Color(0xFF626262), fontSize: 13),
-              ),
-              if (pct > 0) ...<Widget>[
-                const SizedBox(height: 8),
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(99),
-                  child: LinearProgressIndicator(
-                    value: pct.clamp(0.0, 1.0),
-                    minHeight: 6,
-                    backgroundColor: const Color(0xFFE8E8E8),
-                    color: AppDesignTokens.brandGreenDark,
-                  ),
-                ),
-              ],
             ],
           ),
         ),
