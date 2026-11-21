@@ -682,11 +682,11 @@
       <div class="dash-grid">
         <div class="dash-card">
           <h3>共享字幕命中</h3>
-          <div class="note-box">EN hits ${num(data.shared_bilibili?.en_hits)} · ZH hits ${num(
+          <div class="note-box">英文命中 ${num(data.shared_bilibili?.en_hits)} · 中文命中 ${num(
       data.shared_bilibili?.zh_hits
-    )} · cues ${num(data.shared_bilibili?.cues)}</div>
+    )} · 句数 ${num(data.shared_bilibili?.cues)}</div>
           <div class="table-wrap"><table>
-            <thead><tr><th>BVID</th><th>P</th><th>EN</th><th>ZH</th></tr></thead>
+            <thead><tr><th>BVID</th><th>分P</th><th>英文</th><th>中文</th></tr></thead>
             <tbody>
               ${(data.shared_bilibili?.top || [])
                 .map(
