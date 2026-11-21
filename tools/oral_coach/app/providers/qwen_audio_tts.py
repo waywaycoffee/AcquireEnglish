@@ -1,4 +1,4 @@
-"""Alibaba Cloud Model Studio speech synthesis for English coach replies."""
+"""Alibaba Cloud Model Studio speech synthesis for coach replies."""
 from __future__ import annotations
 
 import asyncio
@@ -21,6 +21,12 @@ VOICES = frozenset(VOICE_PREFIX + name for name in (
     'ryanma',
     'ivyhu',
 ))
+BILINGUAL_VOICES = frozenset({
+    'longanfengyue',
+    'longanxiaoxin',
+    'longanlingxi',
+    'longanhuan_v3.6',
+})
 PERSONA_VOICES = {
     'mia': VOICE_PREFIX + 'olivialin',
     'leo': VOICE_PREFIX + 'adriangao',
@@ -41,7 +47,7 @@ class QwenAudioTts:
         from websockets.asyncio.client import connect
 
         task_id = str(uuid4())
-        speaker = voice if voice in VOICES else PERSONA_VOICES.get(
+        speaker = voice if voice in VOICES or voice in BILINGUAL_VOICES else PERSONA_VOICES.get(
             (digital_human_id or '').strip().lower(), PERSONA_VOICES['mia']
         )
 

@@ -326,10 +326,14 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
     } catch (_) {}
     if (!mounted) return;
     try {
-      final String? saved = await SharedPreferencesAsync().getString(
-        coachEnglishVoicePreference,
-      );
-      if (mounted && coachEnglishVoices.any((CoachEnglishVoice voice) => voice.id == saved)) {
+      final DigitalHumanPersona persona = ref.read(learningSettingsProvider).selectedDigitalHuman;
+      final SharedPreferencesAsync preferences = SharedPreferencesAsync();
+      final String? saved = await preferences.getString(
+        '$coachEnglishVoicePreference:${persona.id}',
+      ) ?? (persona.recommendedVoiceId == null
+          ? await preferences.getString(coachEnglishVoicePreference)
+          : null);
+      if (mounted && coachVoices.any((CoachEnglishVoice voice) => voice.id == saved)) {
         setState(() => _englishVoiceId = saved);
       }
     } catch (_) {
@@ -660,11 +664,14 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
     _difficulty = session.difficulty;
   }
 
-  String _coachVoice(DigitalHumanPersona persona) => _preferChineseReply
+  bool get _usesCloudVoice => !_preferChineseReply || isBilingualCoachVoice(_englishVoiceId);
+
+  String _coachVoice(DigitalHumanPersona persona) => _preferChineseReply && !_usesCloudVoice
       ? persona.edgeVoice(chinese: true)
-      : _englishVoiceId ?? persona.edgeVoice(chinese: false);
+      : _englishVoiceId ?? persona.recommendedVoiceId ?? persona.edgeVoice(chinese: false);
 
   Future<void> _chooseEnglishVoice() async {
+    final DigitalHumanPersona persona = ref.read(learningSettingsProvider).selectedDigitalHuman;
     final CoachEnglishVoice? chosen = await showModalBottomSheet<CoachEnglishVoice>(
       context: context,
       isScrollControlled: true,
@@ -674,13 +681,13 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
           heightFactor: 0.72,
           child: Column(
             children: <Widget>[
-              Text('英文音色', style: Theme.of(sheetContext).textTheme.titleLarge),
+              Text('陪练音色', style: Theme.of(sheetContext).textTheme.titleLarge),
               Expanded(
                 child: ListView(
                   children: <Widget>[
-                    for (final CoachEnglishVoice voice in coachEnglishVoices)
+                    for (final CoachEnglishVoice voice in coachVoices)
                       ListTile(
-                        selected: voice.id == _englishVoiceId,
+                        selected: voice.id == (_englishVoiceId ?? persona.recommendedVoiceId),
                         title: Text(voice.name),
                         subtitle: Text(voice.description),
                         onTap: () => Navigator.pop(sheetContext, voice),
@@ -701,7 +708,7 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
     if (!mounted || chosen == null) return;
     setState(() => _englishVoiceId = chosen.id);
     try {
-      await SharedPreferencesAsync().setString(coachEnglishVoicePreference, chosen.id);
+      await SharedPreferencesAsync().setString('$coachEnglishVoicePreference:${persona.id}', chosen.id);
     } catch (_) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -718,7 +725,10 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
       final LearningSettingsState settings = ref.read(learningSettingsProvider);
       final String? url = await _pipelineClient.synthesizeSpeech(
         rawBaseUrl: settings.oralCoachPipelineUrl,
-        text: 'Nice try! Let’s say it again, a little more slowly.',
+        text: isBilingualCoachVoice(voice.id)
+            ? '很好，我们慢一点再说一遍。 Nice try! Let’s say it again, a little more slowly.'
+            : 'Nice try! Let’s say it again, a little more slowly.',
+        language: isBilingualCoachVoice(voice.id) ? 'zh' : 'en',
         digitalHumanId: settings.selectedDigitalHuman.id,
         ttsVoice: voice.id,
       );
@@ -761,7 +771,7 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
     if (!mounted || !_started || _coachSpeaking || speak.isEmpty) return;
     setState(() => _coachSpeaking = true);
     try {
-      if (!_preferChineseReply) {
+      if (_usesCloudVoice) {
         String? remote = ttsUrl;
         if (remote == null || remote.isEmpty) {
           try {
@@ -770,6 +780,7 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
               text: speak,
               digitalHumanId: settings.selectedDigitalHuman.id,
               ttsVoice: _coachVoice(settings.selectedDigitalHuman),
+              language: _preferChineseReply ? 'zh' : 'en',
             );
           } catch (_) {
             // The local voice remains available when cloud synthesis fails.
@@ -793,7 +804,7 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
           }
         }
       }
-      if (_preferChineseReply && ttsUrl != null && ttsUrl.isNotEmpty && await _playRemoteTts(ttsUrl))
+      if (!_usesCloudVoice && ttsUrl != null && ttsUrl.isNotEmpty && await _playRemoteTts(ttsUrl))
         return;
       if (!mounted || !_started) return;
       await _configureLocalPersonaVoice(settings.selectedDigitalHuman);
@@ -2046,7 +2057,7 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
                 fit: StackFit.expand,
                 children: <Widget>[
                   CoachAvatarStage(
-                    spriteAsset: settings.cartoonDigitalHuman
+                    spriteAsset: settings.cartoonDigitalHuman && persona.hasCartoonAtlas
                         ? persona.cartoonAssetPath
                         : null,
                     pulse: _orbPulse,
@@ -2294,7 +2305,7 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
                           bubble: bubble,
                           showZh: _showZhIndexes.contains(index),
                           coachAvatarAsset: persona.assetPath,
-                          cartoonAvatarAsset: settings.cartoonDigitalHuman
+                          cartoonAvatarAsset: settings.cartoonDigitalHuman && persona.hasCartoonAtlas
                               ? persona.cartoonAssetPath
                               : null,
                           onToggleZh: () => _toggleZh(index, bubble.zh),
@@ -2473,7 +2484,7 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
                     onTap: _showSceneSheet,
                   ),
                   Tooltip(
-                    message: '英文音色',
+                    message: '陪练音色',
                     child: _DockRoundButton(
                       icon: Icons.record_voice_over_outlined,
                       onTap: _busy ? null : _chooseEnglishVoice,

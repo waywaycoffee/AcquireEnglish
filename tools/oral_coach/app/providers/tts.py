@@ -6,7 +6,7 @@ from pathlib import Path
 
 from ..config import Settings
 from .base import TtsResult
-from .qwen_audio_tts import VOICES, QwenAudioTts
+from .qwen_audio_tts import BILINGUAL_VOICES, VOICES, QwenAudioTts
 
 logger = logging.getLogger(__name__)
 
@@ -70,13 +70,20 @@ class CoachTts:
 
     async def synthesize(self, text: str, out_path: str, *, voice: str | None = None, digital_human_id: str | None = None, language: str | None = None) -> TtsResult:
         options = dict(voice=voice, digital_human_id=digital_human_id, language=language)
-        if (language or 'en').lower().startswith('en'):
+        if (language or 'en').lower().startswith('en') or voice in BILINGUAL_VOICES:
             try:
                 return await self.english.synthesize(text, out_path, **options)
             except Exception as exc:
-                logger.warning('English coach TTS fell back to Edge (%s)', type(exc).__name__)
-        if voice in VOICES:
-            options['voice'] = None
+                logger.warning('Coach TTS fell back to Edge (%s)', type(exc).__name__)
+        if voice in VOICES or voice in BILINGUAL_VOICES:
+            male = (digital_human_id or '').lower() in {
+                'leo', 'arun', 'alexander', 'adrian', 'james', 'ryan',
+            }
+            chinese = (language or '').lower().startswith('zh')
+            if male:
+                options['voice'] = 'zh-CN-YunxiNeural' if chinese else 'en-US-GuyNeural'
+            else:
+                options['voice'] = 'zh-CN-XiaoxiaoNeural' if chinese else 'en-US-AriaNeural'
         return await self.edge.synthesize(text, out_path, **options)
 
 

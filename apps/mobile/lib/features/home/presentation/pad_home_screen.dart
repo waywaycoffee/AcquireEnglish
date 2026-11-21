@@ -156,7 +156,7 @@ class _PadHomeScreenState extends ConsumerState<PadHomeScreen> {
             SizedBox(height: compact ? 26 : 30),
             _SectionTitle(title: '每日推荐', compact: compact),
             SizedBox(height: compact ? 12 : 14),
-            const _DailyRecommendSection(),
+            const DailyRecommendSection(),
             SizedBox(height: compact ? 26 : 30),
             _SectionTitle(title: '今日挑战', compact: compact),
             SizedBox(height: compact ? 12 : 14),
@@ -175,7 +175,7 @@ class _PadHomeScreenState extends ConsumerState<PadHomeScreen> {
             SizedBox(height: compact ? 26 : 30),
             _SectionTitle(title: '最近学习的课程', compact: compact),
             SizedBox(height: compact ? 12 : 14),
-            _RecentCourses(courses: courses, onTap: openCourse),
+            RecentCourses(courses: courses, onTap: openCourse),
             SizedBox(height: compact ? 26 : 30),
             Text(
               '下一步想做什么？',
@@ -198,8 +198,10 @@ class _PadHomeScreenState extends ConsumerState<PadHomeScreen> {
   }
 }
 
-class _DailyRecommendSection extends ConsumerWidget {
-  const _DailyRecommendSection();
+class DailyRecommendSection extends ConsumerWidget {
+  const DailyRecommendSection({this.limit, super.key});
+
+  final int? limit;
 
   static String _formatDuration(double? sec) {
     if (sec == null || sec <= 0) {
@@ -253,8 +255,9 @@ class _DailyRecommendSection extends ConsumerWidget {
         ),
       );
     }
+    final Iterable<AcquireDailyFeedItemDto> items = limit == null ? feed : feed.take(limit!);
     return Column(
-      children: feed
+      children: items
           .map(
             (AcquireDailyFeedItemDto item) {
               final String duration = _formatDuration(item.durationSec);
@@ -920,8 +923,8 @@ class _CollectionMetric extends StatelessWidget {
   }
 }
 
-class _RecentCourses extends StatelessWidget {
-  const _RecentCourses({required this.courses, required this.onTap});
+class RecentCourses extends StatelessWidget {
+  const RecentCourses({required this.courses, required this.onTap, super.key});
   final List<LibraryCourseData> courses;
   final ValueChanged<LibraryCourseData> onTap;
 

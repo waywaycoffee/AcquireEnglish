@@ -44,3 +44,18 @@ const List<CoachEnglishVoice> coachEnglishVoices = <CoachEnglishVoice>[
     description: '自信从容 · 女声',
   ),
 ];
+
+const List<CoachEnglishVoice> coachBilingualVoices = <CoachEnglishVoice>[
+  (id: 'longanfengyue', name: '龙安风悦', description: '自然亲切 · 中英双语'),
+  (id: 'longanxiaoxin', name: '龙安小昕', description: '亲切活泼 · 中英双语'),
+  (id: 'longanlingxi', name: '龙安灵希', description: '甜美轻快 · 中英双语'),
+  (id: 'longanhuan_v3.6', name: '龙安欢', description: '女声 · 中英双语'),
+];
+
+const List<CoachEnglishVoice> coachVoices = <CoachEnglishVoice>[
+  ...coachBilingualVoices,
+  ...coachEnglishVoices,
+];
+
+bool isBilingualCoachVoice(String? id) =>
+    coachBilingualVoices.any((CoachEnglishVoice voice) => voice.id == id);

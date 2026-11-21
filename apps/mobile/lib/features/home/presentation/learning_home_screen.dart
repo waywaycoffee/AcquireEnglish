@@ -1,7 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import '../../digital_human/presentation/digital_human_picker.dart';
+import '../../library/presentation/library_catalog_provider.dart';
+import '../../library/presentation/library_mock_data.dart';
+import '../../onboarding/domain/onboarding_profile.dart';
 import '../../onboarding/presentation/focus_recommendation.dart';
+import '../../onboarding/presentation/onboarding_provider.dart';
+import '../../reading/domain/reading_doc.dart';
+import '../../reading/presentation/reading_library_provider.dart';
+import '../../sync/presentation/daily_feed_provider.dart';
 import '../../words/presentation/syllabus_books_provider.dart';
 import '../../player/presentation/learning_resume_provider.dart';
 import '../../library/presentation/widgets/library_course_poster.dart';
@@ -9,6 +17,7 @@ import '../../navigation/presentation/navigation_destination.dart';
 import '../../shared/presentation/pad/pad_scaffold.dart';
 import '../../sync/presentation/cloud_catalog_sync.dart';
 import 'learning_dashboard_provider.dart';
+import 'pad_home_screen.dart' show DailyRecommendSection, RecentCourses;
 
 class LearningHomeScreen extends ConsumerWidget {
   const LearningHomeScreen({super.key});
@@ -19,7 +28,27 @@ class LearningHomeScreen extends ConsumerWidget {
     final video = ref.watch(continueLearningTargetProvider);
     final lastVideo = ref.watch(lastLearningEpisodeProvider);
     final stats = ref.watch(learningDashboardProvider);
+    final List<LibraryCourseData> recentCourses = ref
+        .watch(recentLearningCoursesProvider)
+        .where((LibraryCourseData course) =>
+            course.lastStudiedAtMs != null || course.progressPercent > 0)
+        .take(8)
+        .toList(growable: false);
     final focusRec = ref.watch(focusRecommendationProvider);
+    final readingLibrary = ref.watch(readingLibraryProvider);
+    final reading = buildFocusRecommendation(
+      profile: ref.watch(onboardingProvider).copyWith(focusId: 'reading'),
+      prefs: ref.watch(learningPreferencesProvider),
+      courses: const <LibraryCourseData>[],
+      readingDocs: readingLibrary.builtin,
+      activeBook: null,
+    );
+    final articles = <ReadingDoc>[
+      ...readingLibrary.builtin.where((ReadingDoc doc) =>
+          reading.route == '/reading/${Uri.encodeComponent(doc.id)}'),
+      ...readingLibrary.builtin.where((ReadingDoc doc) =>
+          reading.route != '/reading/${Uri.encodeComponent(doc.id)}'),
+    ].take(3);
     final book = books.activeBook;
     final useBook =
         book != null &&
@@ -260,6 +289,54 @@ class LearningHomeScreen extends ConsumerWidget {
                       ),
                     ],
                   ),
+                  const SizedBox(height: 24),
+                  const DigitalHumanPicker(),
+                  const SizedBox(height: 24),
+                  text('学习记录', 21, bold: true),
+                  const SizedBox(height: 12),
+                  section(
+                    text(
+                      '累计学习 ${stats.totalStudyDays} 天 · ${stats.totalStudyMinutes} 分钟',
+                      14,
+                      bold: true,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  text('最近学习的课程', 16, bold: true),
+                  const SizedBox(height: 10),
+                  RecentCourses(
+                    courses: recentCourses,
+                    onTap: (LibraryCourseData course) => context.push(
+                      Uri(path: '/library', queryParameters: <String, String>{
+                        'courseId': course.id,
+                      }).toString(),
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+                  text('推荐视频', 21, bold: true),
+                  const SizedBox(height: 12),
+                  const DailyRecommendSection(limit: 3),
+                  const SizedBox(height: 24),
+                  text('推荐文章', 21, bold: true),
+                  const SizedBox(height: 12),
+                  if (articles.isEmpty)
+                    ListTile(
+                      leading: const Icon(Icons.auto_stories_outlined),
+                      title: const Text('打开阅读书库'),
+                      onTap: () => context.push('/reading'),
+                    ),
+                  for (final ReadingDoc article in articles)
+                    Card(
+                      child: ListTile(
+                        leading: const Icon(Icons.auto_stories_outlined),
+                        title: Text(article.title),
+                        subtitle: Text('${article.level} · ${article.wordCount} 词'),
+                        trailing: const Icon(Icons.chevron_right),
+                        onTap: () => context.push(
+                          '/reading/${Uri.encodeComponent(article.id)}',
+                        ),
+                      ),
+                    ),
                   const SizedBox(height: 24),
                   text('我的学习', 21, bold: true),
                   const SizedBox(height: 14),

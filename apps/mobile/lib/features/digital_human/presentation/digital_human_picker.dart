@@ -171,7 +171,7 @@ class _PersonaCard extends StatelessWidget {
             Expanded(
               child: ClipRRect(
                 borderRadius: BorderRadius.circular(14),
-                child: cartoon
+                child: cartoon && persona.hasCartoonAtlas
                     ? CartoonCoachSprite.portrait(
                         asset: persona.cartoonAssetPath,
                       )
