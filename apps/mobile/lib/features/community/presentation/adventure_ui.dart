@@ -51,6 +51,10 @@ class AdventureHeroBanner extends StatelessWidget {
     final BorderRadius radius = edgeToEdge
         ? BorderRadius.zero
         : BorderRadius.circular(24);
+    // Community hub stacks hero + tabs + feed above the bottom nav; keep
+    // the edge-to-edge variant short enough that the Column never overflows.
+    final bool compact = edgeToEdge;
+    final double artHeight = compact ? 112 : 132;
     return ClipRRect(
       borderRadius: radius,
       child: DecoratedBox(
@@ -66,10 +70,11 @@ class AdventureHeroBanner extends StatelessWidget {
           ),
         ),
         child: Column(
+          mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: <Widget>[
             SizedBox(
-              height: edgeToEdge ? 168 : 132,
+              height: artHeight,
               child: Stack(
                 fit: StackFit.expand,
                 children: <Widget>[
@@ -77,14 +82,14 @@ class AdventureHeroBanner extends StatelessWidget {
                   Positioned(
                     left: 16,
                     right: 16,
-                    bottom: 14,
+                    bottom: compact ? 10 : 14,
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: <Widget>[
                         Text(
                           'CHAPTER ${chapterIndex.toString().padLeft(2, '0')}',
                           style: TextStyle(
-                            fontSize: 12,
+                            fontSize: 11,
                             letterSpacing: 1.4,
                             fontWeight: FontWeight.w800,
                             color: AdventurePalette.pathAmber.withValues(
@@ -92,21 +97,21 @@ class AdventureHeroBanner extends StatelessWidget {
                             ),
                           ),
                         ),
-                        const SizedBox(height: 4),
+                        const SizedBox(height: 2),
                         Text(
                           chapterTitle,
-                          style: const TextStyle(
-                            fontSize: 26,
+                          style: TextStyle(
+                            fontSize: compact ? 22 : 26,
                             fontWeight: FontWeight.w900,
                             color: Colors.white,
                             height: 1.1,
                           ),
                         ),
-                        const SizedBox(height: 4),
+                        const SizedBox(height: 2),
                         Text(
                           '$stageLabel · $progressLabel',
                           style: TextStyle(
-                            fontSize: 13,
+                            fontSize: 12,
                             fontWeight: FontWeight.w700,
                             color: AdventurePalette.cafeGlow.withValues(
                               alpha: 0.9,
@@ -120,23 +125,28 @@ class AdventureHeroBanner extends StatelessWidget {
               ),
             ),
             Padding(
-              padding: const EdgeInsets.fromLTRB(16, 14, 16, 16),
+              padding: EdgeInsets.fromLTRB(16, compact ? 8 : 14, 16, compact ? 10 : 16),
               child: Column(
+                mainAxisSize: MainAxisSize.min,
                 children: <Widget>[
                   AdventurePathStrip(
                     nodeCount: nodeCount,
                     clearedCount: clearedCount,
                     labels: nodeLabels,
                   ),
-                  const SizedBox(height: 14),
+                  SizedBox(height: compact ? 8 : 14),
                   HubChunkyButton(
                     label: '继续冒险',
                     icon: Icons.play_arrow_rounded,
                     onPressed: onContinue,
                   ),
                   if (partnerLabel != null) ...<Widget>[
-                    const SizedBox(height: 8),
+                    SizedBox(height: compact ? 2 : 8),
                     TextButton(
+                      style: TextButton.styleFrom(
+                        visualDensity: VisualDensity.compact,
+                        padding: const EdgeInsets.symmetric(horizontal: 8),
+                      ),
                       onPressed: onPartner,
                       child: Text(
                         partnerLabel!,

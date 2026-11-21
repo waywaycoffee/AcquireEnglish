@@ -45,14 +45,11 @@ class PadTopBar extends ConsumerWidget {
         ? (compact ? 72 : 80)
         : (compact ? 64 : 72);
 
+    final double scale = MediaQuery.textScalerOf(context)
+        .scale(1)
+        .clamp(1.0, 1.35);
     return Container(
-      height:
-          contentHeight *
-              MediaQuery.textScalerOf(
-                context,
-              ).scale(1).clamp(1.0, double.infinity) +
-          topInset +
-          windowControlsInset,
+      height: contentHeight * scale + topInset + windowControlsInset,
       padding: EdgeInsets.fromLTRB(
         compact ? 16 : 22,
         topInset + windowControlsInset + 6,
@@ -60,6 +57,7 @@ class PadTopBar extends ConsumerWidget {
         0,
       ),
       color: Colors.transparent,
+      clipBehavior: Clip.hardEdge,
       child: Row(
         children: <Widget>[
           if (leading != null) ...<Widget>[
@@ -70,6 +68,7 @@ class PadTopBar extends ConsumerWidget {
             child: Align(
               alignment: Alignment.centerLeft,
               child: Column(
+                mainAxisSize: MainAxisSize.min,
                 mainAxisAlignment: MainAxisAlignment.center,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: <Widget>[

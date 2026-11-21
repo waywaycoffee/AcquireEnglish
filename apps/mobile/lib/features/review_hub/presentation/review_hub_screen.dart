@@ -142,7 +142,7 @@ class _ReviewHubScreenState extends ConsumerState<ReviewHubScreen> {
         },
         child: ListView(
           physics: const AlwaysScrollableScrollPhysics(),
-          padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 96),
           children: <Widget>[
             HubSurface(
               child: Column(
@@ -398,7 +398,8 @@ class _ReviewHubScreenState extends ConsumerState<ReviewHubScreen> {
               crossAxisCount: 2,
               mainAxisSpacing: 10,
               crossAxisSpacing: 10,
-              childAspectRatio: 1.55,
+              // Taller cells so title+subtitle never bottom-overflow on phones.
+              childAspectRatio: 1.22,
               children: <Widget>[
                 _ReciteModuleTile(
                   icon: Icons.psychology_rounded,
@@ -693,9 +694,10 @@ class _ReciteModuleTile extends StatelessWidget {
             boxShadow: AppDesignTokens.toyCardShadow,
           ),
           child: Padding(
-            padding: const EdgeInsets.fromLTRB(14, 14, 12, 12),
+            padding: const EdgeInsets.fromLTRB(12, 12, 10, 10),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: <Widget>[
                 Container(
                   width: 36,
@@ -706,27 +708,32 @@ class _ReciteModuleTile extends StatelessWidget {
                   ),
                   child: Icon(icon, size: 20, color: foreground),
                 ),
-                const Spacer(),
-                Text(
-                  title,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    fontSize: 15,
-                    fontWeight: FontWeight.w800,
-                    color: AppDesignTokens.textPrimary,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  subtitle,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w600,
-                    color: AppDesignTokens.textSecondary,
-                  ),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: <Widget>[
+                    Text(
+                      title,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w800,
+                        color: AppDesignTokens.textPrimary,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      subtitle,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                        height: 1.2,
+                        color: AppDesignTokens.textSecondary,
+                      ),
+                    ),
+                  ],
                 ),
               ],
             ),
