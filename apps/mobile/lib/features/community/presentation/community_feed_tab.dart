@@ -10,19 +10,16 @@ import '../../shared/presentation/pad/app_design_tokens.dart';
 import '../../sync/data/acquire_api_client.dart';
 import '../../sync/presentation/daily_feed_provider.dart';
 import '../data/community_models.dart';
-import '../domain/cafe_adventure.dart';
 import 'adventure_ui.dart';
-import 'cafe_progress_provider.dart';
 import 'community_provider.dart';
-import 'exploration_map_screen.dart';
 
 class CommunityFeedTab extends ConsumerWidget {
   const CommunityFeedTab({
     super.key,
     this.kinds,
-    this.emptyTitle = '试玩 · 街角咖啡店「看懂菜单」',
-    this.emptyMeta = '通关后可发成果卡；也可分享素材或提问',
-    this.emptyHint = '练习流优先展示成果卡与可开练关卡；素材请看「素材」页。',
+    this.emptyTitle = '还没有练习成果',
+    this.emptyMeta = '发一条跟读、模考或仿写成果；也可分享素材或提问',
+    this.emptyHint = '练习流优先展示成果卡；真题资料请看「考试」页。',
   });
 
   /// When set, only posts whose [CommunityPostDto.kind] is in this set.
@@ -65,11 +62,7 @@ class CommunityFeedTab extends ConsumerWidget {
                       meta: emptyMeta,
                       badge: '推荐',
                       accent: AdventurePalette.pathAmber,
-                      onPlay: () => Navigator.of(context).push<void>(
-                        MaterialPageRoute<void>(
-                          builder: (_) => const ExplorationMapScreen(),
-                        ),
-                      ),
+                      onPlay: () => context.push('/exam'),
                     ),
                     const SizedBox(height: 12),
                     Text(emptyHint),
@@ -123,11 +116,7 @@ class CommunityFeedTab extends ConsumerWidget {
     );
   }
 
-  static bool _hasChallenge(CommunityPostDto post) =>
-      cafeLevelFromPath(post.linkUrl) != null &&
-      (post.kind == 'learning_result' ||
-          post.kind == 'method' ||
-          post.kind == 'question');
+  static bool _hasChallenge(CommunityPostDto post) => false;
 
   static List<CommunityPostDto> _orderQuestFirst(List<CommunityPostDto> posts) {
     final List<CommunityPostDto> quests = <CommunityPostDto>[];
@@ -279,40 +268,6 @@ class CommunityPostCard extends ConsumerWidget {
     final CommunityPostDto post =
         ref.watch(communityPostUpdatesProvider)[this.post.id] ?? this.post;
 
-    final int? challengeLevel = CommunityFeedTab._hasChallenge(post)
-        ? cafeLevelFromPath(post.linkUrl)
-        : null;
-    if (challengeLevel != null) {
-      final CafeLevel level = kCafeLevels[challengeLevel];
-      final String body = (post.body.trim().isEmpty ? post.title : post.body)
-          .replaceAll('\n', ' ');
-      final String playMeta = post.challengeCompletes > 0
-          ? '$_metaLine · ${level.ability} · ${post.challengeCompletes}人完成 · $body'
-          : '$_metaLine · ${level.ability} · $body';
-      return QuestFeedCard(
-        title: '${post.authorName} · ${level.title}',
-        meta: playMeta,
-        badge: '可开练',
-        accent: AdventurePalette.pathAmber,
-        authorAvatar: post.authorAvatar,
-        onPlay: () {
-          ref.read(pendingChallengePostIdProvider.notifier).set(post.id);
-          unawaited(() async {
-            try {
-              await ref
-                  .read(acquireApiClientProvider)
-                  .reportChallengeEvent(postId: post.id, event: 'open');
-            } catch (_) {}
-          }());
-          Navigator.of(context).push<void>(
-            MaterialPageRoute<void>(
-              builder: (_) =>
-                  ExplorationMapScreen(sharedLevel: challengeLevel),
-            ),
-          );
-        },
-      );
-    }
     final String bodyPreview = post.body.trim().isEmpty ? post.title : post.body;
     final String compact = bodyPreview.replaceAll('\n', ' ');
     if (post.isShareBilibili) {
@@ -547,12 +502,6 @@ class _ComposeSheetState extends ConsumerState<_ComposeSheet> {
   final TextEditingController _body = TextEditingController();
   final TextEditingController _link = TextEditingController();
   bool _busy = false;
-  int? _challengeLevel;
-
-  bool get _canAttachChallenge =>
-      widget.kind == 'learning_result' ||
-      widget.kind == 'method' ||
-      widget.kind == 'question';
 
   @override
   void dispose() {
@@ -623,9 +572,6 @@ class _ComposeSheetState extends ConsumerState<_ComposeSheet> {
     }
     setState(() => _busy = true);
     try {
-      final String? challengePath = _canAttachChallenge && _challengeLevel != null
-          ? cafeChallengePath(_challengeLevel!)
-          : null;
       await ref
           .read(communityFeedProvider.notifier)
           .createPost(
@@ -634,7 +580,7 @@ class _ComposeSheetState extends ConsumerState<_ComposeSheet> {
             body: _body.text.trim(),
             linkUrl: widget.kind == 'share_bilibili'
                 ? _link.text.trim()
-                : challengePath,
+                : null,
             linkTitle: widget.kind == 'share_bilibili'
                 ? _title.text.trim()
                 : null,
@@ -697,30 +643,6 @@ class _ComposeSheetState extends ConsumerState<_ComposeSheet> {
                   hintText: 'https://www.bilibili.com/video/… 或 b23.tv/…',
                   border: OutlineInputBorder(),
                 ),
-              ),
-            ],
-            if (_canAttachChallenge) ...<Widget>[
-              const SizedBox(height: 10),
-              DropdownButtonFormField<int?>(
-                value: _challengeLevel,
-                decoration: const InputDecoration(
-                  labelText: '关联关卡（可选）',
-                  border: OutlineInputBorder(),
-                ),
-                items: <DropdownMenuItem<int?>>[
-                  const DropdownMenuItem<int?>(
-                    value: null,
-                    child: Text('不关联关卡'),
-                  ),
-                  for (int i = 0; i < kCafeLevels.length; i++)
-                    DropdownMenuItem<int?>(
-                      value: i,
-                      child: Text('街角咖啡店 · ${kCafeLevels[i].title}'),
-                    ),
-                ],
-                onChanged: _busy
-                    ? null
-                    : (int? value) => setState(() => _challengeLevel = value),
               ),
             ],
             const SizedBox(height: 14),

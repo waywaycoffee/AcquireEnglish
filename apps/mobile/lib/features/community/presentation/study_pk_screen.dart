@@ -21,7 +21,7 @@ class _StudyPkScreenState extends ConsumerState<StudyPkScreen>
   bool _busy = false;
   int _days = 7;
   int _count = 10;
-  String _source = 'intersection'; // intersection | cafe | syllabus
+  String _source = 'intersection'; // intersection | syllabus
   List<Map<String, dynamic>> _syllabusUnits = <Map<String, dynamic>>[];
   String? _bookId;
   int _unitIndex = 0;
@@ -140,12 +140,12 @@ class _StudyPkScreenState extends ConsumerState<StudyPkScreen>
 
   String _sourceLabel(Map<String, dynamic> match) {
     final String source = '${match['source'] ?? ''}';
-    if (source == 'cafe') return '咖啡店词表';
     if (source == 'syllabus') {
       final String book = '${match['book_title'] ?? match['book_id'] ?? '词书'}';
       final String unit = '${match['unit_label'] ?? ''}';
       return unit.isEmpty ? book : '$book · $unit';
     }
+    if (source == 'cafe') return '约定词表';
     return '近${match['days']}天';
   }
 
@@ -321,13 +321,6 @@ class _StudyPkScreenState extends ConsumerState<StudyPkScreen>
                       : (_) => setState(() => _source = 'intersection'),
                 ),
                 ChoiceChip(
-                  label: const Text('咖啡店章节词表'),
-                  selected: _source == 'cafe',
-                  onSelected: _busy
-                      ? null
-                      : (_) => setState(() => _source = 'cafe'),
-                ),
-                ChoiceChip(
                   label: const Text('词书单元'),
                   selected: _source == 'syllabus',
                   onSelected: _busy
@@ -393,9 +386,7 @@ class _StudyPkScreenState extends ConsumerState<StudyPkScreen>
                 ),
             ],
             Text(
-              _source == 'cafe'
-                  ? '约定章节词表：双方用街角咖啡店公共表达对战，不要求词库交集。'
-                  : _source == 'syllabus'
+              _source == 'syllabus'
                   ? '约定词书单元：双方用同一本服务端词书的同一单元对战，不要求共同学过。'
                   : '只取双方共同学过的单词；不足时请扩大范围、选5题，或改用约定词表。',
             ),
@@ -423,11 +414,7 @@ class _StudyPkScreenState extends ConsumerState<StudyPkScreen>
                       );
                     }),
               child: Text(
-                _source == 'cafe'
-                    ? '发起咖啡店词表 PK'
-                    : _source == 'syllabus'
-                    ? '发起词书单元 PK'
-                    : '向同桌发起比赛',
+                _source == 'syllabus' ? '发起词书单元 PK' : '向同桌发起比赛',
               ),
             ),
             const SizedBox(height: 20),

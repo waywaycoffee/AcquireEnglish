@@ -290,3 +290,54 @@ class VocabPkDto {
   final bool iAmOpponent;
   final bool iAmChallenger;
 }
+
+class ExamAssetDto {
+  const ExamAssetDto({
+    required this.id,
+    required this.familyId,
+    required this.kind,
+    required this.title,
+    required this.sha256,
+    required this.sizeBytes,
+    required this.downloadUrl,
+    required this.uploaderName,
+    required this.uploaderId,
+    required this.createdAt,
+    this.meta = const <String, dynamic>{},
+    this.status = 'visible',
+    this.reportCount = 0,
+  });
+
+  factory ExamAssetDto.fromJson(Map<String, dynamic> json) => ExamAssetDto(
+        id: (json['id'] as num?)?.toInt() ?? 0,
+        familyId: '${json['family_id'] ?? ''}',
+        kind: '${json['kind'] ?? 'other'}',
+        title: '${json['title'] ?? ''}',
+        sha256: '${json['sha256'] ?? ''}',
+        sizeBytes: (json['size_bytes'] as num?)?.toInt() ?? 0,
+        downloadUrl: '${json['download_url'] ?? ''}',
+        uploaderName: '${json['uploader_name'] ?? '学员'}',
+        uploaderId: (json['uploader_id'] as num?)?.toInt() ?? 0,
+        createdAt: DateTime.tryParse('${json['created_at'] ?? ''}') ??
+            DateTime.fromMillisecondsSinceEpoch(0),
+        meta: json['meta'] is Map
+            ? Map<String, dynamic>.from(json['meta'] as Map)
+            : const <String, dynamic>{},
+        status: '${json['status'] ?? 'visible'}',
+        reportCount: (json['report_count'] as num?)?.toInt() ?? 0,
+      );
+
+  final int id;
+  final String familyId;
+  final String kind;
+  final String title;
+  final String sha256;
+  final int sizeBytes;
+  final String downloadUrl;
+  final String uploaderName;
+  final int uploaderId;
+  final DateTime createdAt;
+  final Map<String, dynamic> meta;
+  final String status;
+  final int reportCount;
+}

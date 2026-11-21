@@ -3,6 +3,8 @@ import 'dart:convert';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hive_ce/hive.dart';
 
+import '../../exam/domain/exam_profile.dart';
+import '../../exam/presentation/exam_profile_provider.dart';
 import '../../sync/data/acquire_api_client.dart';
 import '../../sync/presentation/daily_feed_provider.dart';
 import '../domain/onboarding_profile.dart';
@@ -87,6 +89,9 @@ class OnboardingNotifier extends Notifier<OnboardingProfile> {
             ),
           ),
         );
+    if (done.focusId == 'exam') {
+      await ref.read(examProfileProvider.notifier).setMode(StudyMode.exam);
+    }
   }
 
   Future<void> skipForNow() async {

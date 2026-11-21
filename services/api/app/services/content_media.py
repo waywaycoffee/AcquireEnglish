@@ -30,7 +30,7 @@ from typing import Any
 from app.config import settings
 
 ALLOWED_NAMESPACES = frozenset(
-    {"foundation", "reading", "oral", "course", "misc"}
+    {"foundation", "reading", "oral", "course", "misc", "exam"}
 )
 
 _AUDIO_EXT = {".mp3", ".m4a", ".aac", ".wav", ".ogg", ".opus"}

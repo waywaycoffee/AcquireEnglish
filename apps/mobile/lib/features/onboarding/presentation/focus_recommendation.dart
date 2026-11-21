@@ -152,7 +152,7 @@ FocusRecommendation buildFocusRecommendation({
     case 'oral':
       final bool travel = preferredTopics.contains('travel');
       return recommendation(
-        travel ? '酒店入住' : '咖啡店点单',
+        travel ? '酒店入住' : '日常对话',
         '听示范，再分角色练习。',
         '/learn/dialogue?lesson=${travel ? 1 : 0}',
       );
@@ -164,6 +164,12 @@ FocusRecommendation buildFocusRecommendation({
               '复习这组词',
               '/review/session?deck=syllabus&book=${Uri.encodeComponent(activeBook.id)}',
             );
+    case 'exam':
+      return recommendation(
+        '选择考试目标',
+        '按考试族刷词、听力与模考。',
+        '/exam/select',
+      );
     default:
       return recommendation(focus.label, focus.homeBlurb, focus.route);
   }

@@ -1013,3 +1013,50 @@ class OralPeerReport(Base):
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )
+
+
+class ExamAsset(Base):
+    """Community-uploaded exam materials stored on ECS under exam/."""
+
+    __tablename__ = "exam_assets"
+    __table_args__ = (
+        UniqueConstraint("sha256", "family_id", name="uq_exam_asset_hash_family"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    user_id: Mapped[int] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), index=True
+    )
+    family_id: Mapped[str] = mapped_column(String(32), index=True)
+    kind: Mapped[str] = mapped_column(String(24), index=True)
+    title: Mapped[str] = mapped_column(String(200))
+    storage_path: Mapped[str] = mapped_column(String(500))
+    sha256: Mapped[str] = mapped_column(String(64), index=True)
+    size_bytes: Mapped[int] = mapped_column(Integer, default=0)
+    meta_json: Mapped[str] = mapped_column(Text, default="{}")
+    # visible | hidden | removed
+    status: Mapped[str] = mapped_column(String(16), default="visible", index=True)
+    license_ack: Mapped[int] = mapped_column(Integer, default=0)
+    report_count: Mapped[int] = mapped_column(Integer, default=0)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+
+
+class ExamAssetReport(Base):
+    __tablename__ = "exam_asset_reports"
+    __table_args__ = (
+        UniqueConstraint("user_id", "asset_id", name="uq_exam_asset_report"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    user_id: Mapped[int] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), index=True
+    )
+    asset_id: Mapped[int] = mapped_column(
+        ForeignKey("exam_assets.id", ondelete="CASCADE"), index=True
+    )
+    reason: Mapped[str] = mapped_column(String(500))
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )

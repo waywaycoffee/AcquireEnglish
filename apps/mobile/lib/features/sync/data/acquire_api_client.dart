@@ -2212,6 +2212,62 @@ class AcquireApiClient {
     return CommunityPostDto.fromJson(response.data as Map<String, dynamic>);
   }
 
+  Future<List<ExamAssetDto>> listExamAssets({
+    String? familyId,
+    String? kind,
+    int limit = 40,
+  }) async {
+    final Response<dynamic> response = await _dio.get(
+      Endpoints.communityExamAssets,
+      queryParameters: <String, dynamic>{
+        if (familyId != null && familyId.isNotEmpty) 'family_id': familyId,
+        if (kind != null && kind.isNotEmpty) 'kind': kind,
+        'limit': limit,
+      },
+      options: _noCache,
+    );
+    return (response.data as List<dynamic>)
+        .cast<Map<String, dynamic>>()
+        .map(ExamAssetDto.fromJson)
+        .toList(growable: false);
+  }
+
+  Future<ExamAssetDto> uploadExamAsset({
+    required List<int> bytes,
+    required String filename,
+    required String familyId,
+    required String title,
+    String kind = 'other',
+  }) async {
+    final FormData form = FormData.fromMap(<String, dynamic>{
+      'file': MultipartFile.fromBytes(bytes, filename: filename),
+      'family_id': familyId,
+      'kind': kind,
+      'title': title,
+      'license_ack': '1',
+      'meta_json': '{}',
+    });
+    final Response<dynamic> response = await _dio.post(
+      Endpoints.communityExamAssets,
+      data: form,
+      options: Options(
+        extra: _noCache.extra,
+        contentType: 'multipart/form-data',
+        receiveTimeout: const Duration(minutes: 2),
+        sendTimeout: const Duration(minutes: 2),
+      ),
+    );
+    return ExamAssetDto.fromJson(response.data as Map<String, dynamic>);
+  }
+
+  Future<void> reportExamAsset(int assetId, {required String reason}) async {
+    await _dio.post(
+      '${Endpoints.communityExamAssets}/$assetId/report',
+      data: <String, dynamic>{'reason': reason},
+      options: _noCache,
+    );
+  }
+
   Future<void> upsertCommunityStudyStats({
     required String day,
     required int studySeconds,

@@ -10,6 +10,7 @@ import '../../../router/app_router.dart';
 import '../../../utils/url_utils.dart';
 import '../../authentication/presentation/account_hub_sheet.dart';
 import '../../authentication/presentation/auth_session.dart';
+import '../../exam/presentation/exam_profile_provider.dart';
 import '../../navigation/presentation/navigation_destination.dart';
 import '../../player/presentation/local_whisper_asr.dart';
 import '../../shared/data/aliyun_speech_service.dart';
@@ -254,6 +255,14 @@ class SettingsScreen extends ConsumerWidget {
             title: '课程与偏好',
             icon: Icons.tune_rounded,
             children: <Widget>[
+              _ActionRow(
+                title: '学习模式：日常习得 / 考试备考',
+                description: ref.watch(examProfileProvider).isExamMode
+                    ? '当前：备考 · ${ref.watch(examProfileProvider).family?.label ?? "未选考试"}'
+                    : '当前：日常习得（可切换考试备考）',
+                icon: Icons.school_outlined,
+                onTap: () => context.push('/exam/select'),
+              ),
               _ActionRow(
                 title: '学习偏好 / 每日课程',
                 description: '按级别与标签每日后台更新推荐课',

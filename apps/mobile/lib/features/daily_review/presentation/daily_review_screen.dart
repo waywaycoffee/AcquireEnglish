@@ -1158,7 +1158,7 @@ class _DailyReviewScreenState extends ConsumerState<DailyReviewScreen>
           const SizedBox(height: 12),
           Text(
             empty
-                ? '单词、短语、听写错句、跟读低分、咖啡店技能都会进入同一套 FSRS 计划。'
+                ? '单词、短语、听写错句、跟读低分都会进入同一套 FSRS 计划；考试错题也可回流。'
                 : done
                 ? _completionText(plan, state.dailyNewLimit, now)
                 : '先尝试回忆，再揭晓答案。每次如实反馈，系统会安排适合它的下次见面时间。',

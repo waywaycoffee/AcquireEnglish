@@ -4,7 +4,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../authentication/presentation/auth_session.dart';
 import '../../sync/data/acquire_api_client.dart';
-import '../domain/cafe_adventure.dart';
 import 'community_provider.dart';
 
 class PublishLearningResultScreen extends ConsumerStatefulWidget {
@@ -14,6 +13,7 @@ class PublishLearningResultScreen extends ConsumerStatefulWidget {
     this.challengePath,
   });
 
+  /// Legacy field; cafe challenge links are ignored.
   final String? challengePath;
   final String initialText;
 
@@ -29,20 +29,6 @@ class _PublishLearningResultScreenState
   bool _public = false;
   bool _busy = false;
 
-  int? get _challengeLevel => cafeLevelFromPath(widget.challengePath);
-
-  String? get _publicWebUrl {
-    final int? level = _challengeLevel;
-    if (level == null) return null;
-    return 'https://acquireenglish.curlhairai.com/api/public/challenges/cafe/${level + 1}';
-  }
-
-  String? get _appDeepLink {
-    final int? level = _challengeLevel;
-    if (level == null) return null;
-    return 'acquireenglish://app/explore/cafe/${level + 1}';
-  }
-
   @override
   void initState() {
     super.initState();
@@ -54,17 +40,6 @@ class _PublishLearningResultScreenState
     _body.dispose();
     _title.dispose();
     super.dispose();
-  }
-
-  Future<void> _copyWeChatLink() async {
-    final String? url = _publicWebUrl;
-    if (url == null) return;
-    await Clipboard.setData(ClipboardData(text: url));
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('已复制微信可打开的关卡链接')),
-      );
-    }
   }
 
   Future<void> _submit() async {
@@ -115,7 +90,6 @@ class _PublishLearningResultScreenState
             kind: 'learning_result',
             title: _title.text.trim(),
             body: _body.text.trim(),
-            linkUrl: widget.challengePath,
           );
       if (!mounted || token != ref.read(authSessionProvider).accessToken) {
         return;
@@ -152,67 +126,31 @@ class _PublishLearningResultScreenState
         }
       },
     );
-    final int? level = _challengeLevel;
     return Scaffold(
       appBar: AppBar(title: const Text('编辑学习成果')),
       body: ListView(
         padding: const EdgeInsets.all(20),
         children: <Widget>[
           const Text('默认仅保留给自己。不会自动附带录音、具体词条或个人视频。'),
-          if (level != null) ...<Widget>[
-            const SizedBox(height: 12),
-            Card(
-              child: ListTile(
-                title: Text('关卡 · ${kCafeLevels[level].title}'),
-                subtitle: Text(
-                  '微信打开：${_publicWebUrl}\n已安装深链：${_appDeepLink}',
-                ),
-                isThreeLine: true,
-                trailing: IconButton(
-                  tooltip: '复制微信链接',
-                  onPressed: _copyWeChatLink,
-                  icon: const Icon(Icons.copy_rounded),
-                ),
-              ),
-            ),
-          ],
           TextField(
             controller: _title,
-            maxLength: 200,
             decoration: const InputDecoration(labelText: '标题'),
           ),
           TextField(
             controller: _body,
-            maxLength: 4000,
-            maxLines: 8,
-            decoration: const InputDecoration(labelText: '分享文案'),
+            minLines: 4,
+            maxLines: 10,
+            decoration: const InputDecoration(labelText: '内容'),
           ),
           SwitchListTile(
+            title: const Text('公开发布到社区'),
             value: _public,
-            onChanged: _busy
-                ? null
-                : (bool value) => setState(() => _public = value),
-            title: const Text('公开到社区'),
-            subtitle: const Text('关闭时仅复制文案，不提交到服务器。'),
+            onChanged: _busy ? null : (bool v) => setState(() => _public = v),
           ),
           FilledButton(
             onPressed: _busy ? null : _submit,
-            child: Text(
-              _busy
-                  ? '发布中…'
-                  : _public
-                      ? '预览并确认发布'
-                      : '复制我的文案',
-            ),
+            child: Text(_busy ? '处理中…' : (_public ? '发布' : '仅复制文案')),
           ),
-          if (level != null) ...<Widget>[
-            const SizedBox(height: 8),
-            OutlinedButton.icon(
-              onPressed: _copyWeChatLink,
-              icon: const Icon(Icons.ios_share_rounded),
-              label: const Text('复制关卡链接（未安装也可打开看题）'),
-            ),
-          ],
         ],
       ),
     );

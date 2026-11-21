@@ -16,6 +16,7 @@ from app.routers import (
     study_pk,
     study_play,
     community_social,
+    exam_assets,
     learning_cards,
     learning_module_progress,
     public_challenges,
@@ -95,6 +96,7 @@ app.include_router(study_desk.router, prefix="/api")
 app.include_router(study_pk.router, prefix="/api")
 app.include_router(study_play.router, prefix="/api")
 app.include_router(community_social.router, prefix="/api")
+app.include_router(exam_assets.router, prefix="/api")
 app.include_router(learning_cards.router, prefix="/api")
 app.include_router(public_challenges.router, prefix="/api")
 app.include_router(imports.router, prefix="/api")
@@ -121,7 +123,7 @@ app.include_router(reading_speech.router, prefix="/api")
 app.include_router(pregen_cache.router, prefix="/api")
 
 # Audio/video served from ECS disk only — never bundled into the mobile APK.
-# Namespaces: foundation | reading | oral | course | misc
+# Namespaces: foundation | reading | oral | course | misc | exam
 from app.services.content_media import ALLOWED_NAMESPACES
 
 _media_root = Path(settings.media_cache_dir).expanduser()

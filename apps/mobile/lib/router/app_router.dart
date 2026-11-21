@@ -1,7 +1,9 @@
 import '../features/learning_modules/module_screen.dart';
-import '../features/community/presentation/exploration_map_screen.dart';
 import '../features/community/presentation/public_learning_card_screen.dart';
 import '../features/community/presentation/community_screen.dart';
+import '../features/exam/presentation/exam_home_screen.dart';
+import '../features/exam/presentation/exam_placeholder_screens.dart';
+import '../features/exam/presentation/exam_select_screen.dart';
 import '../features/daily_review/domain/daily_review.dart';
 // ignore_for_file: prefer_function_declarations_over_variables
 
@@ -137,18 +139,38 @@ GoRouter goRouter(Ref ref) => GoRouter(
           PublicLearningCardScreen(token: state.pathParameters['token']!),
     ),
     GoRoute(
-      path: '/explore',
+      path: '/exam',
       builder: (BuildContext context, GoRouterState state) =>
-          const ExplorationMapScreen(),
+          const ExamHomeScreen(),
+    ),
+    GoRoute(
+      path: '/exam/select',
+      builder: (BuildContext context, GoRouterState state) =>
+          const ExamSelectScreen(),
+    ),
+    GoRoute(
+      path: '/exam/practice',
+      builder: (BuildContext context, GoRouterState state) =>
+          const ExamPracticeScreen(),
+    ),
+    GoRoute(
+      path: '/exam/mock',
+      builder: (BuildContext context, GoRouterState state) =>
+          const ExamMockScreen(),
+    ),
+    GoRoute(
+      path: '/exam/errorbook',
+      builder: (BuildContext context, GoRouterState state) =>
+          const ExamErrorBookScreen(),
+    ),
+    // Legacy cafe adventure URLs → exam hub (cafe removed).
+    GoRoute(
+      path: '/explore',
+      redirect: (BuildContext context, GoRouterState state) => '/exam',
     ),
     GoRoute(
       path: '/explore/cafe/:stage',
-      builder: (BuildContext context, GoRouterState state) {
-        final int stage =
-            int.tryParse(state.pathParameters['stage'] ?? '') ?? 1;
-        final int levelIndex = (stage - 1).clamp(0, 3);
-        return ExplorationMapScreen(sharedLevel: levelIndex);
-      },
+      redirect: (BuildContext context, GoRouterState state) => '/exam',
     ),
     GoRoute(
       path: SGRoute.membership.route,

@@ -8,6 +8,6 @@ alwaysApply: true
 - **Never** add `.mp3` / `.mp4` / `.m4a` / `.aac` / `.wav` / `.webm` / `.mov` under `apps/mobile/assets` (or any Flutter asset path shipped in the APK).
 - Store speech and video on the API host (ECS) under `{media_cache_dir}/{namespace}/…` and expose via `/media/{namespace}/…`.
 - App playback must resolve URLs through API manifests (`/api/foundation/media/*` or `/api/content/media/*`) then stream from the server; do not hardcode third-party audio CDNs into the APK as bundled files.
-- Namespaces: `foundation` | `reading` | `oral` | `course` | `misc`.
+- Namespaces: `foundation` | `reading` | `oral` | `course` | `misc` | `exam`.
 - Text corpora (JSON/TXT/CSV/EPUB text) may still be cached on device after download; accompanying **audio/video** for those texts must be uploaded to ECS (`reading` namespace) before the app plays them.
 - Imported Bilibili/YouTube study media is cached server-side (`media/imports/`), not in the app package.

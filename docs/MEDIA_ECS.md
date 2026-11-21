@@ -17,6 +17,7 @@
   oral/...
   course/...
   misc/...
+  exam/{family_id}/{sha256[:2]}/{sha256}.ext   # 社区真题资料
   imports/{import_id}/study.m4a   # 外链课缓存，服务端生成
 ```
 
@@ -27,6 +28,7 @@
 - `GET /api/content/media/manifest?namespace=reading`
 - `GET /api/content/media/lookup?namespace=reading&book_id=…&key=…`
 - `POST /api/content/media/upload`（form: `namespace`, `book_id`, `key`, `file`）
+- 社区真题：`GET/POST /api/community/exam-assets`（`exam` 命名空间，含文本/音视频）
 - 兼容：`/api/foundation/media/*` → `namespace=foundation`
 - 静态：`GET /media/{namespace}/…`
 

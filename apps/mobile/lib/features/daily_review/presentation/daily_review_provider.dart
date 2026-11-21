@@ -10,6 +10,9 @@ import 'package:hive_ce/hive.dart';
 import '../../authentication/presentation/account_storage.dart';
 import '../../authentication/presentation/auth_session.dart';
 import '../../avatar/presentation/avatar_provider.dart';
+import '../../exam/domain/exam_fsrs.dart';
+import '../../exam/domain/exam_profile.dart';
+import '../../exam/presentation/exam_profile_provider.dart';
 import '../../phrases/presentation/phrase_book_provider.dart';
 import '../../sync/data/acquire_api_client.dart';
 import '../../words/domain/syllabus_book.dart';
@@ -105,8 +108,13 @@ reviewSourcesProvider = Provider<List<ReviewSource>>((Ref ref) {
       )
       .toList();
   final SyllabusBooksState syllabus = ref.watch(syllabusBooksProvider);
+  final ExamProfile examProfile = ref.watch(examProfileProvider);
+  final Iterable<SyllabusBook> syllabusBooksForReview =
+      examProfile.isExamMode && examProfile.family != null
+      ? filterSyllabusForExam(syllabus.all, examProfile.family)
+      : syllabus.all;
   final List<ReviewSource> syllabusSources = <ReviewSource>[
-    for (final SyllabusBook book in syllabus.all)
+    for (final SyllabusBook book in syllabusBooksForReview)
       for (final SyllabusWord entry in book.words)
         ReviewSource(
           key: syllabusReviewKey(book.id, entry.word),

@@ -4,6 +4,8 @@ import 'package:go_router/go_router.dart';
 import '../../digital_human/presentation/digital_human_picker.dart';
 import '../../library/presentation/library_catalog_provider.dart';
 import '../../library/presentation/library_mock_data.dart';
+import '../../exam/domain/exam_profile.dart';
+import '../../exam/presentation/exam_profile_provider.dart';
 import '../../onboarding/domain/onboarding_profile.dart';
 import '../../onboarding/presentation/focus_recommendation.dart';
 import '../../onboarding/presentation/onboarding_provider.dart';
@@ -25,6 +27,7 @@ class LearningHomeScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     ref.watch(cloudCatalogSyncProvider);
+    final ExamProfile examProfile = ref.watch(examProfileProvider);
     // Backfill missing Bilibili posters so Home never sticks on app_icon.
     ref.watch(bilibiliCoverRefreshProvider);
     final books = ref.watch(syllabusBooksProvider);
@@ -134,7 +137,55 @@ class LearningHomeScreen extends ConsumerWidget {
                     ],
                   ),
                   const SizedBox(height: 24),
-                  if (focusRec != null) ...[
+                  if (examProfile.isExamMode && examProfile.family != null) ...[
+                    text('备考进度 · ${examProfile.family!.label}', 17, bold: true),
+                    const SizedBox(height: 12),
+                    section(
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          text(
+                            examProfile.targetScore == null ||
+                                    examProfile.targetScore!.isEmpty
+                                ? '目标 CEFR ${examProfile.resolvedCefr}'
+                                : '目标 ${examProfile.targetScore}',
+                            17,
+                            bold: true,
+                          ),
+                          const SizedBox(height: 6),
+                          text(
+                            '专项训练 · 模考 · 错题回流复习 · 社区真题资料',
+                            12,
+                            color: muted,
+                          ),
+                          const SizedBox(height: 14),
+                          Row(
+                            children: [
+                              Expanded(
+                                child: FilledButton(
+                                  style: FilledButton.styleFrom(
+                                    backgroundColor: accent,
+                                    foregroundColor: dark
+                                        ? const Color(0xFF203A27)
+                                        : Colors.white,
+                                  ),
+                                  onPressed: () => context.push('/exam'),
+                                  child: const Text('打开考试备考'),
+                                ),
+                              ),
+                              const SizedBox(width: 10),
+                              OutlinedButton(
+                                onPressed: () =>
+                                    context.push('/exam/practice'),
+                                child: const Text('专项'),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+                  ] else if (focusRec != null) ...[
                     text('今日优先 · ${focusRec.focus.label}', 17, bold: true),
                     const SizedBox(height: 12),
                     section(
@@ -162,8 +213,8 @@ class LearningHomeScreen extends ConsumerWidget {
                               ),
                               const SizedBox(width: 10),
                               OutlinedButton(
-                                onPressed: () => context.go('/discover'),
-                                child: const Text('社区地图'),
+                                onPressed: () => context.push('/exam/select'),
+                                child: const Text('考试备考'),
                               ),
                             ],
                           ),

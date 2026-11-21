@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../authentication/presentation/auth_session.dart';
 import '../../avatar/presentation/avatar_preview.dart';
@@ -11,8 +12,6 @@ import '../../sync/data/acquire_api_client.dart';
 import '../../words/presentation/word_book_provider.dart';
 import '../../shared/presentation/pad/app_design_tokens.dart';
 import 'adventure_ui.dart';
-import 'cafe_progress_provider.dart';
-import 'exploration_map_screen.dart';
 import 'study_pk_screen.dart';
 import 'study_play_screen.dart';
 
@@ -259,13 +258,6 @@ class _StudyDeskScreenState extends ConsumerState<StudyDeskScreen>
     final Map<String, dynamic>? peer = _desk?['peer'] as Map<String, dynamic>?;
     final Map<String, dynamic> sharing =
         (_desk?['sharing'] as Map<String, dynamic>?) ?? <String, dynamic>{};
-    final CafeProgress progress =
-        ref.watch(cafeProgressProvider).asData?.value ??
-            const CafeProgress(
-              profile: 'guest',
-              completed: <int>{},
-              weekLevels: <int>{},
-            );
     return Scaffold(
       backgroundColor: const Color(0xFFF7F1E8),
       appBar: AppBar(
@@ -294,20 +286,15 @@ class _StudyDeskScreenState extends ConsumerState<StudyDeskScreen>
                     chapterTitle: '学习桌',
                     chapterIndex: 1,
                     stageLabel: peer == null
-                        ? '先闯关，再邀同桌加分'
+                        ? '邀请同桌，一起练词与备考'
                         : '本周搭子 · ${peer['name']}',
-                    progressLabel: progress.weekLabel,
-                    nodeCount: progress.nodeCount,
-                    clearedCount: progress.clearedCount,
-                    onContinue: () => Navigator.of(context).push<void>(
-                      MaterialPageRoute<void>(
-                        builder: (_) => const ExplorationMapScreen(),
-                      ),
-                    ),
-                    partnerLabel: progress.partnerLabel(
-                      hasPeer: peer != null,
-                      peerName: peer == null ? null : '${peer['name']}',
-                    ),
+                    progressLabel: peer == null ? '尚未配对' : '同桌学习中',
+                    nodeCount: 1,
+                    clearedCount: peer == null ? 0 : 1,
+                    onContinue: () => context.push('/exam'),
+                    partnerLabel: peer == null
+                        ? '暂无同桌'
+                        : '同桌 · ${peer['name']}',
                   ),
                   Padding(
                     padding: const EdgeInsets.fromLTRB(16, 14, 16, 24),
@@ -323,6 +310,7 @@ class _StudyDeskScreenState extends ConsumerState<StudyDeskScreen>
                             ),
                           ]),
                         _WeeklyQuestCard(
+                          hasPeer: peer != null,
                           onEncourage: peer == null || _busy
                               ? null
                               : () => unawaited(_action(() async {
@@ -341,12 +329,8 @@ class _StudyDeskScreenState extends ConsumerState<StudyDeskScreen>
                         ),
                         const SizedBox(height: 12),
                         HubChunkyButton(
-                          label: '打开地图继续冒险',
-                          onPressed: () => Navigator.of(context).push<void>(
-                            MaterialPageRoute<void>(
-                              builder: (_) => const ExplorationMapScreen(),
-                            ),
-                          ),
+                          label: '打开考试备考',
+                          onPressed: () => context.push('/exam'),
                         ),
                         const SizedBox(height: 14),
                         Row(
@@ -828,22 +812,17 @@ class _StudyDeskScreenState extends ConsumerState<StudyDeskScreen>
   }
 }
 
-class _WeeklyQuestCard extends ConsumerWidget {
+class _WeeklyQuestCard extends StatelessWidget {
   const _WeeklyQuestCard({
+    required this.hasPeer,
     required this.onEncourage,
   });
 
+  final bool hasPeer;
   final VoidCallback? onEncourage;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final CafeProgress? progress =
-        ref.watch(cafeProgressProvider).asData?.value;
-    final int me = progress?.weekCount ?? 0;
-    final int peer = progress?.peerWeekCount ?? 0;
-    final int target = progress?.weekTarget ?? 3;
-    final bool together = progress?.together ?? false;
-    final int shown = peer > 0 ? (me < peer ? me : peer) : me;
+  Widget build(BuildContext context) {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -861,26 +840,14 @@ class _WeeklyQuestCard extends ConsumerWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
           Text(
-            together
-                ? '本周一起通 $target 关 · 已完成'
-                : '本周一起通 $target 关 · 已完成 $shown',
+            hasPeer ? '本周同桌一起练' : '本周目标 · 邀请同桌一起练',
             style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 16),
           ),
           const SizedBox(height: 8),
-          ClipRRect(
-            borderRadius: BorderRadius.circular(99),
-            child: LinearProgressIndicator(
-              value: (shown / target).clamp(0, 1),
-              minHeight: 10,
-              backgroundColor: const Color(0xFFFFE8B8),
-              color: together
-                  ? AppDesignTokens.brandGreen
-                  : AdventurePalette.pathAmber,
-            ),
-          ),
-          const SizedBox(height: 8),
           Text(
-            peer > 0 ? '我 $me/$target · 对方 $peer/$target' : '我 $me/$target（邀同桌可一起点亮）',
+            hasPeer
+                ? '用词汇 PK、考试备考或共享词库互相督促。'
+                : '配对后可发起词汇 PK，并互相提醒坚持学习。',
             style: TextStyle(
               fontSize: 12,
               fontWeight: FontWeight.w700,
@@ -892,8 +859,8 @@ class _WeeklyQuestCard extends ConsumerWidget {
             Align(
               alignment: Alignment.centerRight,
               child: TextButton(
-                onPressed: together ? null : onEncourage,
-                child: Text(together ? '已点亮' : '提醒同桌'),
+                onPressed: onEncourage,
+                child: const Text('提醒同桌'),
               ),
             ),
           ],

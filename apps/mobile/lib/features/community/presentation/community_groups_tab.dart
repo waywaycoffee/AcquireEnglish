@@ -1,27 +1,18 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../shared/presentation/pad/app_design_tokens.dart';
 import 'adventure_ui.dart';
-import 'cafe_progress_provider.dart';
 import 'community_people_tab.dart';
-import 'exploration_map_screen.dart';
 import 'study_desk_screen.dart';
 
-/// Groups MVP: theme rooms + cafe adventure + study desk as first activities.
+/// Theme rooms + study desk + partner matching (cafe adventure removed).
 class CommunityGroupsTab extends ConsumerWidget {
   const CommunityGroupsTab({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final CafeProgress progress =
-        ref.watch(cafeProgressProvider).asData?.value ??
-            const CafeProgress(
-              profile: 'guest',
-              completed: <int>{},
-              weekLevels: <int>{},
-            );
-
     return ListView(
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 32),
       children: <Widget>[
@@ -40,20 +31,16 @@ class CommunityGroupsTab extends ConsumerWidget {
         ),
         const SizedBox(height: 14),
         QuestFeedCard(
-          title: '街角咖啡店 · 口语闯关小组',
-          meta: '${progress.stageLabel} · ${progress.progressLabel}',
-          badge: '公开可加入',
+          title: '考试备考小组',
+          meta: '按考试族组队刷词、听力与模考 · 入口在考试页',
+          badge: '备考',
           accent: AdventurePalette.pathAmber,
-          onPlay: () => Navigator.of(context).push<void>(
-            MaterialPageRoute<void>(
-              builder: (_) => const ExplorationMapScreen(),
-            ),
-          ),
+          onPlay: () => context.push('/exam'),
         ),
         const SizedBox(height: 12),
         QuestFeedCard(
           title: '本周同桌 · 学习桌',
-          meta: '1:1 一起练；换人不丢自己的闯关进度',
+          meta: '1:1 一起练；换人不丢自己的进度',
           badge: '申请加入',
           accent: AppDesignTokens.brandGreen,
           showPlayChevron: false,

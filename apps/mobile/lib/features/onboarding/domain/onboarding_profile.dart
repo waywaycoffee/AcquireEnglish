@@ -69,6 +69,13 @@ const List<LearningFocus> kLearningFocuses = <LearningFocus>[
     homeBlurb: '一组符合目标和水平的词',
     startLabel: '打开统一词书',
   ),
+  LearningFocus(
+    id: 'exam',
+    label: '考试备考',
+    route: '/exam/select',
+    homeBlurb: '按考试族刷词、听力与模考',
+    startLabel: '选择考试目标',
+  ),
 ];
 
 /// Backward-compatible alias used by older call sites.
