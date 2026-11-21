@@ -46,16 +46,12 @@ class LiveKitPeerClient {
     _listener = listener;
     listener
       ..on<ParticipantConnectedEvent>((ParticipantConnectedEvent event) {
-        if (event.participant is RemoteParticipant) {
-          onPeerPresence?.call(peerConnected: true);
-          onStatus?.call('对方已进入语音房间');
-        }
+        onPeerPresence?.call(peerConnected: true);
+        onStatus?.call('对方已进入语音房间');
       })
       ..on<ParticipantDisconnectedEvent>((ParticipantDisconnectedEvent event) {
-        if (event.participant is RemoteParticipant) {
-          onPeerPresence?.call(peerConnected: false);
-          onStatus?.call('对方语音已断开');
-        }
+        onPeerPresence?.call(peerConnected: false);
+        onStatus?.call('对方语音已断开');
       })
       ..on<TrackSubscribedEvent>((TrackSubscribedEvent event) {
         if (event.track.kind == TrackType.AUDIO) {

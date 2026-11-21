@@ -50,6 +50,13 @@ SEED_TASKS: list[TaskDefinition] = [
         prompt='Talk about the current video line. Paraphrase it, then answer follow-ups.',
         difficulty='B1',
     ),
+    TaskDefinition(
+        id='peer_oral',
+        title='真人口语对练',
+        goal='与匹配搭子实时口语交流，把中英混说改写成地道表达并纳入复习',
+        prompt='Practice spoken English with a matched peer. Rewrite mixed Chinese into natural English.',
+        difficulty='B1',
+    ),
 ]
 
 

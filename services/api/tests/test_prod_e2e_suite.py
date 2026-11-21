@@ -717,6 +717,143 @@ class TestPostgresPersistence:
 
 
 # ---------------------------------------------------------------------------
+# Peer oral match (durable queue + LiveKit token + leave)
+# ---------------------------------------------------------------------------
+
+
+class TestOralPeerMatch:
+    def test_two_users_match_message_heartbeat_leave(
+        self, api: httpx.Client, unique_suffix: str
+    ):
+        """Public API path. Uses email register when mock code is returned.
+
+        Full LiveKit+DB closed loop is also covered by scripts/e2e_oral_peer_prod.py
+        on ECS (real JWT mint without email delivery).
+        """
+
+        def _register(tag: str) -> dict[str, str] | None:
+            email = f"peer_{tag}_{unique_suffix}@example.com"
+            password = f"PeerPass_{unique_suffix}!"
+            send = api.post("/api/auth/email/send", json={"email": email})
+            if send.status_code != 200:
+                return None
+            code = send.json().get("debug_code")
+            if not code:
+                return None
+            r = api.post(
+                "/api/auth/register",
+                json={
+                    "email": email,
+                    "password": password,
+                    "display_name": f"Peer {tag}",
+                    "code": code,
+                },
+            )
+            assert r.status_code == 200, r.text[:300]
+            return _auth_headers(r.json()["access_token"])
+
+        a = _register("a")
+        b = _register("b")
+        if a is None or b is None:
+            pytest.skip(
+                "Prod email verification has no debug_code; "
+                "run scripts/e2e_oral_peer_prod.py on ECS instead."
+            )
+
+        first = api.post("/api/oral-match/enqueue", headers=a)
+        assert first.status_code == 200, first.text[:300]
+        assert first.json()["status"] == "waiting"
+
+        second = api.post("/api/oral-match/enqueue", headers=b)
+        assert second.status_code == 200, second.text[:300]
+        body = second.json()
+        assert body["status"] == "matched"
+        room_id = body["room_id"]
+        assert room_id
+        assert body.get("peer_online") is True
+
+        livekit_status = api.get("/api/livekit/status")
+        configured = (
+            str(livekit_status.json().get("configured", "")).lower() == "true"
+        )
+        if configured:
+            assert body.get("livekit"), "matched payload must include livekit when configured"
+            assert body["livekit"].get("token")
+            assert body["livekit"].get("url")
+            assert str(body["livekit"].get("room", "")).startswith("oral-peer-")
+
+        beat = api.post("/api/oral-match/heartbeat", headers=a)
+        assert beat.status_code == 200, beat.text[:300]
+        assert beat.json()["status"] == "matched"
+        assert beat.json()["room_id"] == room_id
+
+        sent = api.post(
+            f"/api/oral-match/rooms/{room_id}/messages",
+            headers=b,
+            json={"text": "I just popped to the supermarket."},
+        )
+        assert sent.status_code == 200, sent.text[:300]
+
+        inbox = api.get(
+            f"/api/oral-match/rooms/{room_id}/messages",
+            headers=a,
+        )
+        assert inbox.status_code == 200, inbox.text[:300]
+        messages = inbox.json()["messages"]
+        assert any(
+            (m.get("text") or "").startswith("I just popped") for m in messages
+        )
+        assert inbox.json().get("room_closed") is False
+
+        tasks = api.get("/api/learning/tasks")
+        assert tasks.status_code == 200, tasks.text[:300]
+        assert any(t.get("id") == "peer_oral" for t in tasks.json())
+
+        session = api.post(
+            "/api/learning/sessions",
+            headers=a,
+            json={
+                "task_id": "peer_oral",
+                "course_title": "真人口语对练",
+                "current_english": "I just popped to the supermarket.",
+            },
+        )
+        assert session.status_code == 200, session.text[:300]
+        sid = session.json()["id"]
+        turn = api.post(
+            f"/api/learning/sessions/{sid}/turns",
+            headers=a,
+            json={
+                "role": "user",
+                "text": "I just popped to the supermarket.",
+                "confirmed": True,
+            },
+        )
+        assert turn.status_code == 200, turn.text[:300]
+        review = api.post(
+            "/api/learning/reviews",
+            headers=a,
+            json={
+                "expression": "I just popped to the supermarket.",
+                "source_quote": "我刚去了一趟超市。",
+            },
+        )
+        assert review.status_code == 200, review.text[:300]
+        assert review.json().get("id")
+
+        leave = api.post("/api/oral-match/leave", headers=b)
+        assert leave.status_code == 200, leave.text[:300]
+        left = api.get("/api/oral-match/status", headers=a)
+        assert left.status_code == 200, left.text[:300]
+        assert left.json()["status"] == "peer_left"
+
+        wait_again = api.post("/api/oral-match/enqueue", headers=a)
+        assert wait_again.status_code == 200, wait_again.text[:300]
+        assert wait_again.json()["status"] in {"waiting", "matched"}
+        api.post("/api/oral-match/leave", headers=a)
+
+
+# ---------------------------------------------------------------------------
 # Sanity: no secrets leaked in common authenticated responses
 # ---------------------------------------------------------------------------
 

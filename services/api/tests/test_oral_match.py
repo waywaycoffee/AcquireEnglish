@@ -97,3 +97,33 @@ async def test_oral_match_report():
         )
         assert reported.status_code == 200
         assert reported.json()['status'] == 'reported'
+
+
+@pytest.mark.asyncio
+async def test_oral_match_rematch_after_leave_and_closed_messages():
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url='http://test') as client:
+        a = await account(client, '13900002021')
+        b = await account(client, '13900002022')
+        c = await account(client, '13900002023')
+
+        await client.post('/api/oral-match/enqueue', headers=a)
+        matched = await client.post('/api/oral-match/enqueue', headers=b)
+        room_id = matched.json()['room_id']
+        assert room_id
+
+        await client.post('/api/oral-match/leave', headers=a)
+        closed_post = await client.post(
+            f'/api/oral-match/rooms/{room_id}/messages',
+            headers=b,
+            json={'text': 'still here?'},
+        )
+        assert closed_post.status_code == 409
+
+        # B leaves leftover closed room association via leave, then rematches with C.
+        await client.post('/api/oral-match/leave', headers=b)
+        waiting = await client.post('/api/oral-match/enqueue', headers=b)
+        assert waiting.json()['status'] == 'waiting'
+        rematched = await client.post('/api/oral-match/enqueue', headers=c)
+        assert rematched.json()['status'] == 'matched'
+        assert rematched.json()['room_id'] != room_id

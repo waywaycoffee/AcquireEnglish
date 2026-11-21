@@ -60,6 +60,7 @@ class _PeerOralPracticeScreenState
   String _peerName = '口语搭子';
   String? _roomId;
   String? _lastMessageId;
+  String? _learningSessionId;
   Timer? _matchPoll;
   Timer? _messagePoll;
   Timer? _heartbeat;
@@ -194,7 +195,23 @@ class _PeerOralPracticeScreenState
     });
     _startMessagePoll();
     _startHeartbeat();
+    unawaited(_ensureLearningSession());
     await _connectVoice(status.livekit);
+  }
+
+  Future<void> _ensureLearningSession() async {
+    if (_learningSessionId != null) return;
+    try {
+      final String sid =
+          await ref.read(acquireApiClientProvider).startLearningSession(
+                taskId: 'peer_oral',
+                courseTitle: '真人口语对练',
+                currentEnglish: 'Peer oral practice with $_peerName',
+              );
+      _learningSessionId = sid;
+    } catch (_) {
+      // Learning write is best-effort; voice/chat must still work.
+    }
   }
 
   Future<void> _connectVoice(AcquireLiveKitToken? token) async {
@@ -547,6 +564,7 @@ class _PeerOralPracticeScreenState
     }
 
     _saveToBank(diagnosis);
+    unawaited(_recordLearningDiagnosis(source: confirmed, diagnosis: diagnosis));
     setState(() {
       _pending = diagnosis;
       _saved = true;
@@ -562,6 +580,46 @@ class _PeerOralPracticeScreenState
       _busy = false;
       _status = '按住再说一次，再说给对方听';
     });
+  }
+
+  Future<void> _recordLearningDiagnosis({
+    required String source,
+    required OralExpressionDiagnosis diagnosis,
+  }) async {
+    await _ensureLearningSession();
+    final String? sid = _learningSessionId;
+    if (sid == null) return;
+    final AcquireApiClient api = ref.read(acquireApiClientProvider);
+    final String idiomatic = diagnosis.idiomaticEn.isNotEmpty
+        ? diagnosis.idiomaticEn
+        : diagnosis.literalEn;
+    try {
+      await api.appendLearningTurn(
+        sessionId: sid,
+        role: 'user',
+        text: source,
+        machineTranscript: source,
+        confirmed: true,
+      );
+      if (idiomatic.trim().isNotEmpty) {
+        await api.saveReviewExpression(
+          expression: idiomatic,
+          sourceQuote: source,
+        );
+        await api.finalizeLearningFeedback(
+          sessionId: sid,
+          items: <Map<String, dynamic>>[
+            <String, dynamic>{
+              'quote': source,
+              'suggestion': idiomatic,
+              'reason': diagnosis.tip.isNotEmpty
+                  ? diagnosis.tip
+                  : 'peer_oral_diagnosis',
+            },
+          ],
+        );
+      }
+    } catch (_) {}
   }
 
   Future<void> _finishResayAndSend(String audioPath) async {
@@ -591,6 +649,19 @@ class _PeerOralPracticeScreenState
           setState(() => _error = '发送失败：$error');
         }
       }
+    }
+
+    final String? sid = _learningSessionId;
+    if (sid != null) {
+      try {
+        await ref.read(acquireApiClientProvider).appendLearningTurn(
+              sessionId: sid,
+              role: 'user',
+              text: confirmed,
+              confirmed: true,
+              scores: <String, dynamic>{'peer_sent': true},
+            );
+      } catch (_) {}
     }
 
     if (!mounted) return;
