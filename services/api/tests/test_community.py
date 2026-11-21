@@ -233,3 +233,37 @@ async def test_hot_shares_and_creators():
         )
         assert team.status_code == 201, team.text
         assert team.json()["kind"] == "team_invite"
+
+
+@pytest.mark.asyncio
+async def test_learning_result_challenge_is_visible_to_another_user():
+    transport = ASGITransport(app=fastapi_app)
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
+        author = await _login(client, "13900003381")
+        reader = await _login(client, "13900003382")
+        path = "/community/explore/cafe/3"
+        result = await client.post(
+            "/api/community/posts",
+            headers=author,
+            json={"kind": "learning_result", "body": "完成修改订单", "link_url": path},
+        )
+        assert result.status_code == 201, result.text
+        feed = await client.get("/api/community/feed", headers=reader)
+        assert feed.status_code == 200, feed.text
+        post = next(item for item in feed.json() if item["id"] == result.json()["id"])
+        assert post["link_url"] == path
+
+        legacy = await client.post(
+            "/api/community/posts",
+            headers=author,
+            json={"kind": "learning_result", "body": "完成今日复习"},
+        )
+        assert legacy.status_code == 201, legacy.text
+        assert legacy.json()["link_url"] is None
+
+        invalid = await client.post(
+            "/api/community/posts",
+            headers=author,
+            json={"kind": "learning_result", "body": "测试", "link_url": path + "0"},
+        )
+        assert invalid.status_code == 400

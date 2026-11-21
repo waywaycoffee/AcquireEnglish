@@ -515,6 +515,19 @@ async def create_post(
             )
         if not title:
             title = "功能吐槽"
+    elif kind in {"learning_result", "method", "question"}:
+        if not title and not body:
+            raise HTTPException(status_code=400, detail="请填写标题或内容")
+        title = title or {
+            "learning_result": "学习成果",
+            "method": "学习方法",
+            "question": "学习问答",
+        }[kind]
+        if kind == "learning_result" and payload.link_url:
+            challenge_paths = {f"/community/explore/cafe/{stage}" for stage in range(1, 5)}
+            if payload.link_url not in challenge_paths:
+                raise HTTPException(status_code=400, detail="无法识别探索地图关卡")
+            link_url = payload.link_url
     else:
         raise HTTPException(status_code=400, detail="unsupported post kind")
 

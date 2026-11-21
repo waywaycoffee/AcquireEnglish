@@ -15,6 +15,7 @@ import '../../shared/presentation/pad/pad_top_bar.dart';
 import '../../sync/data/acquire_api_client.dart';
 import '../../sync/presentation/daily_feed_provider.dart';
 import 'adventure_ui.dart';
+import 'cafe_progress_provider.dart';
 import 'community_feed_tab.dart';
 import 'community_hot_tab.dart';
 import 'community_leaderboard_tab.dart';
@@ -80,6 +81,13 @@ class _CommunityScreenState extends ConsumerState<CommunityScreen> {
       const CommunityPeopleTab(),
       const CommunityLeaderboardTab(),
     ];
+    final CafeProgress progress =
+        ref.watch(cafeProgressProvider).asData?.value ??
+            const CafeProgress(
+              profile: 'guest',
+              completed: <int>{},
+              weekLevels: <int>{},
+            );
 
     return PadScaffold(
       currentDestination: AppNavDestination.discover,
@@ -101,7 +109,12 @@ class _CommunityScreenState extends ConsumerState<CommunityScreen> {
           ),
           IconButton(
             tooltip: '刷新',
-            onPressed: loggedIn ? () => unawaited(_refreshAll()) : null,
+            onPressed: loggedIn
+                ? () async {
+                    await _refreshAll();
+                    await ref.read(cafeProgressProvider.notifier).refresh();
+                  }
+                : null,
             icon: const Icon(Icons.refresh_rounded),
           ),
         ],
@@ -112,12 +125,14 @@ class _CommunityScreenState extends ConsumerState<CommunityScreen> {
             padding: const EdgeInsets.fromLTRB(16, 10, 16, 4),
             child: AdventureHeroBanner(
               chapterTitle: '街角咖啡店',
-              stageLabel: '当前关卡 · 修改订单',
-              progressLabel: '2 / 4 站',
-              nodeCount: 4,
-              clearedCount: 2,
+              stageLabel: progress.stageLabel,
+              progressLabel: progress.progressLabel,
+              nodeCount: progress.nodeCount,
+              clearedCount: progress.clearedCount,
               onContinue: _openAdventure,
-              partnerLabel: loggedIn ? '同桌本周目标（可选）· 去学习桌' : '登录后可邀同桌加分',
+              partnerLabel: loggedIn
+                  ? progress.partnerLabel(hasPeer: progress.peerWeekCount != null)
+                  : '登录后可邀同桌加分',
               onPartner: loggedIn ? _openDesk : null,
             ),
           ),

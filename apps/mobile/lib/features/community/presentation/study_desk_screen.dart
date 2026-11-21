@@ -11,6 +11,7 @@ import '../../sync/data/acquire_api_client.dart';
 import '../../words/presentation/word_book_provider.dart';
 import '../../shared/presentation/pad/app_design_tokens.dart';
 import 'adventure_ui.dart';
+import 'cafe_progress_provider.dart';
 import 'exploration_map_screen.dart';
 import 'study_pk_screen.dart';
 import 'study_play_screen.dart';
@@ -285,28 +286,62 @@ class _StudyDeskScreenState extends ConsumerState<StudyDeskScreen>
                         child: const Text('重试'),
                       ),
                     ]),
-                  AdventureHeroBanner(
-                    chapterTitle: '街角咖啡店',
-                    stageLabel: '单人主线 · 进度永久保留',
-                    progressLabel: '打开地图',
-                    nodeCount: 4,
-                    clearedCount: 2,
-                    onContinue: () => Navigator.of(context).push<void>(
-                      MaterialPageRoute<void>(
-                        builder: (_) => const ExplorationMapScreen(),
+                  Builder(
+                    builder: (BuildContext context) {
+                      final CafeProgress progress =
+                          ref.watch(cafeProgressProvider).asData?.value ??
+                              const CafeProgress(
+                                profile: 'guest',
+                                completed: <int>{},
+                                weekLevels: <int>{},
+                              );
+                      return AdventureHeroBanner(
+                        chapterTitle: '街角咖啡店',
+                        stageLabel: '${progress.stageLabel} · 个人进度永久保留',
+                        progressLabel: progress.progressLabel,
+                        nodeCount: progress.nodeCount,
+                        clearedCount: progress.clearedCount,
+                        onContinue: () => Navigator.of(context).push<void>(
+                          MaterialPageRoute<void>(
+                            builder: (_) => const ExplorationMapScreen(),
+                          ),
+                        ),
+                        partnerLabel: progress.partnerLabel(
+                          hasPeer: peer != null,
+                          peerName: peer == null ? null : '${peer['name']}',
+                        ),
+                        onPartner: peer == null
+                            ? null
+                            : () => Navigator.of(context).push<void>(
+                                  MaterialPageRoute<void>(
+                                    builder: (_) => const StudyPkScreen(),
+                                  ),
+                                ),
+                      );
+                    },
+                  ),
+                  if (peer != null) ...<Widget>[
+                    const SizedBox(height: 8),
+                    _WeeklyQuestCard(
+                      onEncourage: _busy
+                          ? null
+                          : () => unawaited(_action(() async {
+                                await _request('POST', '/encourage');
+                                if (mounted) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(
+                                      content: Text('已发送一次本周提醒（每天最多一次）'),
+                                    ),
+                                  );
+                                }
+                              })),
+                      onOpenMap: () => Navigator.of(context).push<void>(
+                        MaterialPageRoute<void>(
+                          builder: (_) => const ExplorationMapScreen(),
+                        ),
                       ),
                     ),
-                    partnerLabel: peer == null
-                        ? '同桌加分（可选）· 向下邀请好友'
-                        : '同桌本周 · ${peer['name']}',
-                    onPartner: peer == null
-                        ? null
-                        : () => Navigator.of(context).push<void>(
-                              MaterialPageRoute<void>(
-                                builder: (_) => const StudyPkScreen(),
-                              ),
-                            ),
-                  ),
+                  ],
                   const SizedBox(height: 12),
                   OutlinedButton.icon(
                     onPressed: _busy
@@ -705,5 +740,92 @@ class _StudyDeskScreenState extends ConsumerState<StudyDeskScreen>
           ),
       ],
     ]);
+  }
+}
+
+class _WeeklyQuestCard extends ConsumerWidget {
+  const _WeeklyQuestCard({
+    required this.onEncourage,
+    required this.onOpenMap,
+  });
+
+  final VoidCallback? onEncourage;
+  final VoidCallback onOpenMap;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final CafeProgress? progress =
+        ref.watch(cafeProgressProvider).asData?.value;
+    final int me = progress?.weekCount ?? 0;
+    final int peer = progress?.peerWeekCount ?? 0;
+    final int target = progress?.weekTarget ?? 3;
+    final bool together = progress?.together ?? false;
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(14),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: <Widget>[
+            Text(
+              together ? '本周已一起完成' : '本周共同目标（可选加分）',
+              style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 16),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              '每人完成 $target 次有效练习（通关不同关卡）。换同桌不丢个人章节进度。',
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+                color: AppDesignTokens.textSecondary,
+              ),
+            ),
+            const SizedBox(height: 10),
+            Row(
+              children: <Widget>[
+                Expanded(
+                  child: Text(
+                    '我 $me/$target',
+                    style: const TextStyle(fontWeight: FontWeight.w800),
+                  ),
+                ),
+                Expanded(
+                  child: Text(
+                    '对方 $peer/$target',
+                    style: const TextStyle(fontWeight: FontWeight.w800),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            LinearProgressIndicator(
+              value: (me < peer ? me : peer) / target,
+              minHeight: 8,
+              borderRadius: BorderRadius.circular(8),
+              color: together
+                  ? AppDesignTokens.brandGreen
+                  : AdventurePalette.pathAmber,
+            ),
+            const SizedBox(height: 10),
+            Row(
+              children: <Widget>[
+                Expanded(
+                  child: OutlinedButton(
+                    onPressed: onOpenMap,
+                    child: const Text('去闯关'),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: FilledButton(
+                    onPressed: together ? null : onEncourage,
+                    child: Text(together ? '已点亮' : '提醒一下'),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }

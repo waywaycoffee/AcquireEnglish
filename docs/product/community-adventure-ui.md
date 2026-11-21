@@ -22,3 +22,11 @@
 ## 组件
 
 `adventure_ui.dart`：`AdventureHeroBanner`、`AdventurePathStrip`、`HubChunkyButton`、`QuestFeedCard`。
+
+## 已落地行为
+
+- 英雄条读取真实通关进度（`cafeProgressProvider`）。
+- 通关记入本周有效练习；登录后同步 `POST /api/study-desk/weekly-quest`。
+- 成果卡 `learning_result` 可带 `link_url=/community/explore/cafe/{1-4}`；动态优先展示并可「练同一关」。
+- 学习桌有同桌时显示本周共同目标卡（换人不丢个人关卡）；提醒复用 `/encourage`。
+- 词汇 PK 入口仍在学习桌；发现页不再并行旧 PK。

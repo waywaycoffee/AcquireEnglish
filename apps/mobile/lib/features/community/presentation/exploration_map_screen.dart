@@ -1,68 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
-import '../../authentication/presentation/auth_session.dart';
 import '../../shared/presentation/pad/app_design_tokens.dart';
+import '../domain/cafe_adventure.dart';
 import 'adventure_ui.dart';
+import 'cafe_progress_provider.dart';
 import 'publish_learning_result_screen.dart';
 import 'study_desk_screen.dart';
 
-const _chapterPath = '/community/explore/cafe';
-const _levels = [
-  (
-    title: '看懂菜单',
-    prompt:
-        '菜单：Small coffee £2 · Large coffee £3 · Small tea £2。\n你有 £2，想喝咖啡。选哪一款？',
-    answers: ['Large coffee', 'Small coffee', 'Small tea'],
-    correct: 1,
-    explanation: 'Small coffee 同时满足饮品和预算要求。',
-    ability: '读懂价目与预算',
-  ),
-  (
-    title: '开口点单',
-    prompt: '店员问 “What can I get for you?” 你想点一杯小杯咖啡外带。',
-    answers: [
-      'A small coffee to go, please.',
-      'A large coffee to go, please.',
-      'A small coffee for here, please.',
-    ],
-    correct: 0,
-    explanation: 'To go 表示外带。选好后可以把整句话读一遍。',
-    ability: '点单 + 外带',
-  ),
-  (
-    title: '修改订单',
-    prompt: '你已经点了咖啡，想把牛奶换成燕麦奶。怎么说？',
-    answers: [
-      'Could I get another coffee?',
-      'Could I have it without milk?',
-      'Could I get that with oat milk instead?',
-    ],
-    correct: 2,
-    explanation: 'With oat milk instead 表示改用燕麦奶。',
-    ability: '改规格 / 替换配料',
-  ),
-  (
-    title: '售罄挑战',
-    prompt: '店员说 “Sorry, we’re out of coffee.” 你想改成小杯茶，并确认外带。',
-    answers: [
-      'I’ll have a small tea to go, then.',
-      'I’ll wait for the coffee.',
-      'A small tea for here, please.',
-    ],
-    correct: 0,
-    explanation: 'Then 在这里表示「那就」，to go 确认外带。',
-    ability: '应变换单',
-  ),
-];
-
-int? explorationLevel(String? path) {
-  for (int index = 0; index < _levels.length; index++) {
-    if (path == '$_chapterPath/${index + 1}') return index;
-  }
-  return null;
-}
+int? explorationLevel(String? path) => cafeLevelFromPath(path);
 
 class ExplorationMapScreen extends ConsumerWidget {
   const ExplorationMapScreen({super.key, this.sharedLevel});
@@ -71,88 +17,7 @@ class ExplorationMapScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final session = ref.watch(authSessionProvider);
-    final profile = session.isLoggedIn ? 'account:${session.email}' : 'guest';
-    return _CafeMap(
-      key: ValueKey(profile),
-      profile: profile,
-      sharedLevel: sharedLevel,
-    );
-  }
-}
-
-class _CafeMap extends StatefulWidget {
-  const _CafeMap({super.key, required this.profile, this.sharedLevel});
-
-  final String profile;
-  final int? sharedLevel;
-
-  @override
-  State<_CafeMap> createState() => _CafeMapState();
-}
-
-class _CafeMapState extends State<_CafeMap> {
-  final _preferences = SharedPreferencesAsync();
-  Set<int>? _completed;
-  bool _failed = false;
-
-  String _key(int index) =>
-      'community.exploration.cafe.v1.${widget.profile}.$index';
-
-  @override
-  void initState() {
-    super.initState();
-    _load();
-  }
-
-  Future<void> _load() async {
-    setState(() => _failed = false);
-    try {
-      final flags = await Future.wait([
-        for (int index = 0; index < _levels.length; index++)
-          _preferences.getBool(_key(index)),
-      ]);
-      if (mounted) {
-        setState(
-          () => _completed = {
-            for (int index = 0; index < flags.length; index++)
-              if (flags[index] == true) index,
-          },
-        );
-      }
-    } catch (_) {
-      if (mounted) setState(() => _failed = true);
-    }
-  }
-
-  void _open(int index) {
-    Navigator.of(context)
-        .push<void>(
-          MaterialPageRoute(
-            builder: (_) => _CafeLevel(
-              index: index,
-              onComplete: () async {
-                await _preferences.setBool(_key(index), true);
-                if (mounted) setState(() => _completed?.add(index));
-              },
-            ),
-          ),
-        )
-        .then((_) {
-          if (mounted) _load();
-        });
-  }
-
-  int _nextIndex(Set<int> completed) {
-    for (int i = 0; i < _levels.length; i++) {
-      if (!completed.contains(i)) return i;
-    }
-    return _levels.length - 1;
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final completed = _completed;
+    final AsyncValue<CafeProgress> async = ref.watch(cafeProgressProvider);
     return Scaffold(
       backgroundColor: AppDesignTokens.softWhite,
       appBar: AppBar(
@@ -168,131 +33,158 @@ class _CafeMapState extends State<_CafeMap> {
           ),
         ],
       ),
-      body: _failed
-          ? Center(
-              child: HubChunkyButton(
-                label: '重新读取进度',
-                onPressed: _load,
-                icon: Icons.refresh_rounded,
-              ),
-            )
-          : completed == null
-              ? const Center(child: CircularProgressIndicator())
-              : ListView(
-                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 28),
-                  children: <Widget>[
-                    Container(
-                      padding: const EdgeInsets.all(16),
-                      decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(22),
-                        gradient: LinearGradient(
-                          begin: Alignment.topCenter,
-                          end: Alignment.bottomCenter,
-                          colors: AppDesignTokens.isDark
-                              ? const <Color>[
-                                  AdventurePalette.cafeWarm,
-                                  Color(0xFF12141A),
-                                ]
-                              : const <Color>[
-                                  Color(0xFFFFF3DE),
-                                  Color(0xFFFFE2B8),
-                                ],
-                        ),
-                        border: Border.all(
-                          color: AdventurePalette.pathAmber.withValues(
-                            alpha: 0.4,
-                          ),
-                        ),
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: <Widget>[
-                          Text(
-                            '章节路线',
-                            style: TextStyle(
-                              fontSize: 13,
-                              fontWeight: FontWeight.w800,
-                              color: AppDesignTokens.textSecondary,
-                            ),
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            '点单 · 外带 · 改规格',
-                            style: TextStyle(
-                              fontSize: 20,
-                              fontWeight: FontWeight.w900,
-                              color: AppDesignTokens.textPrimary,
-                            ),
-                          ),
-                          const SizedBox(height: 6),
-                          Text(
-                            '个人通关永久保留 · 同桌只是加分',
-                            style: TextStyle(
-                              fontSize: 12,
-                              fontWeight: FontWeight.w700,
-                              color: AppDesignTokens.textSecondary,
-                            ),
-                          ),
-                          const SizedBox(height: 14),
-                          AdventurePathStrip(
-                            nodeCount: _levels.length,
-                            clearedCount: completed.length,
-                            currentIndex: _nextIndex(completed),
-                          ),
-                          const SizedBox(height: 14),
-                          HubChunkyButton(
-                            label: completed.length >= _levels.length
-                                ? '重温本章'
-                                : '继续第 ${_nextIndex(completed) + 1} 关',
-                            onPressed: () => _open(_nextIndex(completed)),
-                          ),
-                        ],
-                      ),
-                    ),
-                    if (widget.sharedLevel case final int index) ...<Widget>[
-                      const SizedBox(height: 12),
-                      QuestFeedCard(
-                        title: '练同一关 · ${_levels[index].title}',
-                        meta: '来自成果卡 · ${_levels[index].ability}',
-                        badge: '跟练',
-                        accent: AdventurePalette.pathAmber,
-                        onPlay: () => _open(index),
-                      ),
+      body: async.when(
+        loading: () => const Center(child: CircularProgressIndicator()),
+        error: (Object e, StackTrace st) => Center(
+          child: HubChunkyButton(
+            label: '重新读取进度',
+            icon: Icons.refresh_rounded,
+            onPressed: () =>
+                ref.read(cafeProgressProvider.notifier).refresh(),
+          ),
+        ),
+        data: (CafeProgress progress) => _CafeMapBody(
+          progress: progress,
+          sharedLevel: sharedLevel,
+        ),
+      ),
+    );
+  }
+}
+
+class _CafeMapBody extends ConsumerWidget {
+  const _CafeMapBody({required this.progress, this.sharedLevel});
+
+  final CafeProgress progress;
+  final int? sharedLevel;
+
+  void _open(BuildContext context, WidgetRef ref, int index) {
+    Navigator.of(context)
+        .push<void>(
+          MaterialPageRoute<void>(
+            builder: (_) => _CafeLevel(
+              index: index,
+              onComplete: () =>
+                  ref.read(cafeProgressProvider.notifier).markLevelComplete(index),
+            ),
+          ),
+        )
+        .then((_) => ref.read(cafeProgressProvider.notifier).refresh());
+  }
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final Set<int> completed = progress.completed;
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 28),
+      children: <Widget>[
+        Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(22),
+            gradient: LinearGradient(
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+              colors: AppDesignTokens.isDark
+                  ? const <Color>[
+                      AdventurePalette.cafeWarm,
+                      Color(0xFF12141A),
+                    ]
+                  : const <Color>[
+                      Color(0xFFFFF3DE),
+                      Color(0xFFFFE2B8),
                     ],
-                    const SizedBox(height: 18),
-                    Text(
-                      '关卡节点',
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w900,
-                        color: AppDesignTokens.textPrimary,
-                      ),
-                    ),
-                    const SizedBox(height: 10),
-                    for (int index = 0; index < _levels.length; index++) ...<
-                        Widget>[
-                      _LevelNodeTile(
-                        index: index,
-                        title: _levels[index].title,
-                        ability: _levels[index].ability,
-                        cleared: completed.contains(index),
-                        current: index == _nextIndex(completed) &&
-                            !completed.contains(index),
-                        onTap: () => _open(index),
-                      ),
-                      if (index < _levels.length - 1)
-                        Center(
-                          child: Container(
-                            width: 3,
-                            height: 18,
-                            color: completed.contains(index)
-                                ? AppDesignTokens.brandGreen
-                                : AppDesignTokens.borderGray,
-                          ),
-                        ),
-                    ],
-                  ],
+            ),
+            border: Border.all(
+              color: AdventurePalette.pathAmber.withValues(alpha: 0.4),
+            ),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: <Widget>[
+              Text(
+                '章节路线',
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w800,
+                  color: AppDesignTokens.textSecondary,
                 ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                '点单 · 外带 · 改规格',
+                style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.w900,
+                  color: AppDesignTokens.textPrimary,
+                ),
+              ),
+              const SizedBox(height: 6),
+              Text(
+                '${progress.progressLabel} · ${progress.weekLabel}',
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                  color: AppDesignTokens.textSecondary,
+                ),
+              ),
+              const SizedBox(height: 14),
+              AdventurePathStrip(
+                nodeCount: progress.nodeCount,
+                clearedCount: progress.clearedCount,
+                currentIndex: progress.nextIndex,
+              ),
+              const SizedBox(height: 14),
+              HubChunkyButton(
+                label: progress.clearedCount >= progress.nodeCount
+                    ? '重温本章'
+                    : '继续第 ${progress.nextIndex + 1} 关',
+                onPressed: () => _open(context, ref, progress.nextIndex),
+              ),
+            ],
+          ),
+        ),
+        if (sharedLevel != null) ...<Widget>[
+          const SizedBox(height: 12),
+          QuestFeedCard(
+            title: '练同一关 · ${kCafeLevels[sharedLevel!].title}',
+            meta: '来自成果卡 · ${kCafeLevels[sharedLevel!].ability}',
+            badge: '跟练',
+            accent: AdventurePalette.pathAmber,
+            onPlay: () => _open(context, ref, sharedLevel!),
+          ),
+        ],
+        const SizedBox(height: 18),
+        Text(
+          '关卡节点',
+          style: TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.w900,
+            color: AppDesignTokens.textPrimary,
+          ),
+        ),
+        const SizedBox(height: 10),
+        for (int index = 0; index < kCafeLevels.length; index++) ...<Widget>[
+          _LevelNodeTile(
+            index: index,
+            title: kCafeLevels[index].title,
+            ability: kCafeLevels[index].ability,
+            cleared: completed.contains(index),
+            current: index == progress.nextIndex && !completed.contains(index),
+            onTap: () => _open(context, ref, index),
+          ),
+          if (index < kCafeLevels.length - 1)
+            Center(
+              child: Container(
+                width: 3,
+                height: 18,
+                color: completed.contains(index)
+                    ? AppDesignTokens.brandGreen
+                    : AppDesignTokens.borderGray,
+              ),
+            ),
+        ],
+      ],
     );
   }
 }
@@ -426,7 +318,7 @@ class _CafeLevelState extends State<_CafeLevel> {
   String? _feedback;
 
   Future<void> _answer(int index) async {
-    final level = _levels[widget.index];
+    final CafeLevel level = kCafeLevels[widget.index];
     if (index != level.correct) {
       setState(() => _feedback = '再看看顾客的要求，试一次。');
       return;
@@ -447,7 +339,7 @@ class _CafeLevelState extends State<_CafeLevel> {
 
   @override
   Widget build(BuildContext context) {
-    final level = _levels[widget.index];
+    final CafeLevel level = kCafeLevels[widget.index];
     return Scaffold(
       backgroundColor: AppDesignTokens.softWhite,
       appBar: AppBar(title: Text('第 ${widget.index + 1} 关 · ${level.title}')),
@@ -509,11 +401,11 @@ class _CafeLevelState extends State<_CafeLevel> {
               label: '发布成果卡，邀人练同一关',
               icon: Icons.ios_share_rounded,
               onPressed: () => Navigator.of(context).push<void>(
-                MaterialPageRoute(
+                MaterialPageRoute<void>(
                   builder: (_) => PublishLearningResultScreen(
                     initialText:
                         '我完成了街角咖啡店的「${level.title}」关卡（${level.ability}）。一起来练吧！',
-                    challengePath: '$_chapterPath/${widget.index + 1}',
+                    challengePath: cafeChallengePath(widget.index),
                   ),
                 ),
               ),
@@ -524,8 +416,7 @@ class _CafeLevelState extends State<_CafeLevel> {
               child: const Text('返回地图'),
             ),
           ] else ...<Widget>[
-            for (int index = 0; index < level.answers.length; index++) ...<
-                Widget>[
+            for (int index = 0; index < level.answers.length; index++)
               Padding(
                 padding: const EdgeInsets.only(bottom: 10),
                 child: Material(
@@ -556,7 +447,6 @@ class _CafeLevelState extends State<_CafeLevel> {
                   ),
                 ),
               ),
-            ],
             if (_saving) const LinearProgressIndicator(),
             if (_feedback != null)
               Padding(

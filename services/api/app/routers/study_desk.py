@@ -1,5 +1,6 @@
 """One-to-one study desks with revocable, default-private sharing."""
 from datetime import datetime, timedelta, timezone
+import json
 import re
 from typing import Literal
 
@@ -12,7 +13,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.database import get_db
 from app.deps import get_current_user
 from app.models import (DeskInvite, DeskMember, DeskBlock, DeskLibraryWord, DeskLibrarySnapshot,
-                        LessonProgress, User, UserLinkCourse, UserStudyStatsDaily, UserAvatarLoadout)
+                        DeskQuestWeek, LessonProgress, User, UserLinkCourse, UserStudyStatsDaily,
+                        UserAvatarLoadout)
 from app.course_data import get_course
 
 
@@ -65,6 +67,44 @@ class ConsentIn(BaseModel):
 
 class LibraryIn(BaseModel):
     words: list[str] = Field(max_length=20000)
+
+
+class WeeklyQuestIn(BaseModel):
+    chapter: str = Field(default="cafe", max_length=32)
+    level: int = Field(ge=0, le=31)
+
+
+WEEKLY_TARGET = 3
+_ALLOWED_CHAPTERS = frozenset({"cafe"})
+
+
+def week_id(moment: datetime | None = None) -> str:
+    """ISO week id, e.g. 2026-W47."""
+    moment = moment or now()
+    iso = moment.isocalendar()
+    return f"{iso.year}-W{iso.week:02d}"
+
+
+def _levels_of(row: DeskQuestWeek | None) -> list[int]:
+    if row is None:
+        return []
+    try:
+        data = json.loads(row.levels_json or "[]")
+    except json.JSONDecodeError:
+        return []
+    if not isinstance(data, list):
+        return []
+    out: list[int] = []
+    for item in data:
+        if isinstance(item, int):
+            out.append(item)
+        elif isinstance(item, str) and item.isdigit():
+            out.append(int(item))
+    return sorted(set(out))
+
+
+async def _quest_row(db: AsyncSession, user_id: int, week: str, chapter: str) -> DeskQuestWeek | None:
+    return await db.get(DeskQuestWeek, (user_id, week, chapter))
 
 
 @router.get('')
@@ -268,3 +308,74 @@ async def encourage(user: User = Depends(get_current_user), db: AsyncSession = D
     sent = await notice(db, peer.user_id, user.id, f'encourage:{day_key()}:{user.id}', f'{name(user)}给你一个鼓励：今天也一起学一点吧！')
     await db.commit()
     return {'sent': sent}
+
+
+@router.get('/weekly-quest')
+async def weekly_quest_state(
+    chapter: str = Query('cafe'),
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    chapter = (chapter or 'cafe').strip().lower()
+    if chapter not in _ALLOWED_CHAPTERS:
+        raise HTTPException(400, 'unsupported chapter')
+    week = week_id()
+    me_row = await _quest_row(db, user.id, week, chapter)
+    me_levels = _levels_of(me_row)
+    peer_levels: list[int] | None = None
+    peer_count = None
+    try:
+        _, peer = await pair(db, user.id)
+        peer_row = await _quest_row(db, peer.user_id, week, chapter)
+        peer_levels = _levels_of(peer_row)
+        peer_count = len(peer_levels)
+    except HTTPException:
+        peer_levels = None
+        peer_count = None
+    me_count = len(me_levels)
+    together = (
+        peer_count is not None
+        and me_count >= WEEKLY_TARGET
+        and peer_count >= WEEKLY_TARGET
+    )
+    return {
+        'week_id': week,
+        'chapter': chapter,
+        'target': WEEKLY_TARGET,
+        'me_count': me_count,
+        'me_levels': me_levels,
+        'peer_count': peer_count,
+        'peer_levels': peer_levels,
+        'together': together,
+    }
+
+
+@router.post('/weekly-quest')
+async def weekly_quest_report(
+    payload: WeeklyQuestIn,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    chapter = (payload.chapter or 'cafe').strip().lower()
+    if chapter not in _ALLOWED_CHAPTERS:
+        raise HTTPException(400, 'unsupported chapter')
+    week = week_id()
+    row = await _quest_row(db, user.id, week, chapter)
+    levels = _levels_of(row)
+    if payload.level not in levels:
+        levels.append(payload.level)
+        levels = sorted(set(levels))
+    blob = json.dumps(levels)
+    if row is None:
+        db.add(
+            DeskQuestWeek(
+                user_id=user.id,
+                week_id=week,
+                chapter=chapter,
+                levels_json=blob,
+            )
+        )
+    else:
+        row.levels_json = blob
+    await db.commit()
+    return await weekly_quest_state(chapter=chapter, user=user, db=db)

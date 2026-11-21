@@ -12,8 +12,11 @@ import '../../shared/presentation/pad/hub_ui.dart';
 import '../../sync/data/acquire_api_client.dart';
 import '../../sync/presentation/daily_feed_provider.dart';
 import '../data/community_models.dart';
+import '../domain/cafe_adventure.dart';
+import 'adventure_ui.dart';
 import 'community_provider.dart';
 import 'community_post_actions.dart';
+import 'exploration_map_screen.dart';
 import '../../avatar/presentation/avatar_preview.dart';
 
 class CommunityFeedTab extends ConsumerWidget {
@@ -37,14 +40,26 @@ class CommunityFeedTab extends ConsumerWidget {
               children: <Widget>[Text('加载失败：$e')],
             ),
             data: (List<CommunityPostDto> posts) {
-              if (posts.isEmpty) {
+              final List<CommunityPostDto> ordered = _orderQuestFirst(posts);
+              if (ordered.isEmpty) {
                 return ListView(
                   physics: const AlwaysScrollableScrollPhysics(),
                   padding: const EdgeInsets.all(24),
-                  children: const <Widget>[
-                    Text(
-                      '社区以大家分享的 B 站视频帖为主。点右下角发帖：'
-                      '分享视频、组队邀请或吐槽软件功能。',
+                  children: <Widget>[
+                    QuestFeedCard(
+                      title: '试玩 · 街角咖啡店「看懂菜单」',
+                      meta: '通关后可发成果卡，邀人练同一关',
+                      badge: '推荐任务',
+                      accent: AdventurePalette.pathAmber,
+                      onPlay: () => Navigator.of(context).push<void>(
+                        MaterialPageRoute<void>(
+                          builder: (_) => const ExplorationMapScreen(),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    const Text(
+                      '任务流优先展示可开练的成果卡。也可分享 B 站视频、组队或提问。',
                     ),
                   ],
                 );
@@ -52,10 +67,10 @@ class CommunityFeedTab extends ConsumerWidget {
               return ListView.separated(
                 physics: const AlwaysScrollableScrollPhysics(),
                 padding: const EdgeInsets.fromLTRB(16, 12, 16, 88),
-                itemCount: posts.length + 1,
+                itemCount: ordered.length + 1,
                 separatorBuilder: (_, __) => const SizedBox(height: 12),
                 itemBuilder: (BuildContext context, int index) {
-                  if (index == posts.length)
+                  if (index == ordered.length)
                     return TextButton(
                       onPressed:
                           ref.read(communityFeedProvider.notifier).hasMore
@@ -78,7 +93,7 @@ class CommunityFeedTab extends ConsumerWidget {
                             : '已显示全部内容',
                       ),
                     );
-                  return CommunityPostCard(post: posts[index]);
+                  return CommunityPostCard(post: ordered[index]);
                 },
               );
             },
@@ -103,6 +118,20 @@ class CommunityFeedTab extends ConsumerWidget {
         ),
       ],
     );
+  }
+
+  static List<CommunityPostDto> _orderQuestFirst(List<CommunityPostDto> posts) {
+    final List<CommunityPostDto> quests = <CommunityPostDto>[];
+    final List<CommunityPostDto> rest = <CommunityPostDto>[];
+    for (final CommunityPostDto post in posts) {
+      if (post.kind == 'learning_result' &&
+          cafeLevelFromPath(post.linkUrl) != null) {
+        quests.add(post);
+      } else {
+        rest.add(post);
+      }
+    }
+    return <CommunityPostDto>[...quests, ...rest];
   }
 
   Future<void> _showComposer(BuildContext context, WidgetRef ref) async {
@@ -223,7 +252,44 @@ class CommunityPostCard extends ConsumerWidget {
     final CommunityPostDto post =
         ref.watch(communityPostUpdatesProvider)[this.post.id] ?? this.post;
 
+    final int? challengeLevel = post.kind == 'learning_result'
+        ? cafeLevelFromPath(post.linkUrl)
+        : null;
     final String? cover = post.linkCover?.trim();
+    if (challengeLevel != null) {
+      final CafeLevel level = kCafeLevels[challengeLevel];
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: <Widget>[
+          QuestFeedCard(
+            title: '${post.authorName} · ${level.title}',
+            meta: '${_metaLine} · ${level.ability}',
+            badge: '可开练',
+            accent: AdventurePalette.pathAmber,
+            onPlay: () => Navigator.of(context).push<void>(
+              MaterialPageRoute<void>(
+                builder: (_) =>
+                    ExplorationMapScreen(sharedLevel: challengeLevel),
+              ),
+            ),
+          ),
+          const SizedBox(height: 8),
+          HubSurface(
+            onTap: () => unawaited(_openComments(context, ref)),
+            child: Text(
+              post.body.trim().isEmpty ? post.title : post.body,
+              maxLines: 3,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+                color: AppDesignTokens.textSecondary,
+              ),
+            ),
+          ),
+        ],
+      );
+    }
     return HubSurface(
       onTap: () => unawaited(_openComments(context, ref)),
       padding: const EdgeInsets.all(14),
@@ -391,6 +457,15 @@ class CommunityPostCard extends ConsumerWidget {
                 ),
               ),
               const Spacer(),
+              if (challengeLevel != null)
+                TextButton(
+                  onPressed: () => Navigator.of(context).push<void>(
+                    MaterialPageRoute(
+                      builder: (_) => ExplorationMapScreen(sharedLevel: challengeLevel),
+                    ),
+                  ),
+                  child: const Text('练同一关'),
+                ),
               if (post.isShareBilibili)
                 TextButton.icon(
                   onPressed: () => unawaited(_openLink(context, ref)),

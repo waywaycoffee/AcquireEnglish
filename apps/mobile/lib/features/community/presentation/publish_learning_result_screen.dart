@@ -6,7 +6,12 @@ import '../../sync/data/acquire_api_client.dart';
 import 'community_provider.dart';
 
 class PublishLearningResultScreen extends ConsumerStatefulWidget {
-  const PublishLearningResultScreen({super.key, required this.initialText});
+  const PublishLearningResultScreen({
+    super.key,
+    required this.initialText,
+    this.challengePath,
+  });
+  final String? challengePath;
   final String initialText;
   @override
   ConsumerState<PublishLearningResultScreen> createState() =>
@@ -80,6 +85,7 @@ class _PublishLearningResultScreenState
             kind: 'learning_result',
             title: _title.text.trim(),
             body: _body.text.trim(),
+            linkUrl: widget.challengePath,
           );
       if (!mounted || token != ref.read(authSessionProvider).accessToken)
         return;
