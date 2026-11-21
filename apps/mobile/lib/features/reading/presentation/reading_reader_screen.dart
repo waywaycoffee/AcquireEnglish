@@ -33,6 +33,7 @@ import 'content_media_provider.dart';
 import 'reading_chunk_provider.dart';
 import 'reading_digital_human_ball.dart';
 import 'reading_library_provider.dart';
+import 'reading_book_cover.dart';
 import 'reading_text_spans.dart';
 import 'reading_vocab_lists_sheet.dart';
 
@@ -762,7 +763,7 @@ class _ReadingReaderScreenState extends ConsumerState<ReadingReaderScreen> {
     unawaited(_ensureGlosses(doc));
 
     final bool showChinese = _mode.showInlineChinese;
-    final Color bg = _dark ? const Color(0xFF1C1C1E) : AppDesignTokens.appWhite;
+    final Color bg = _dark ? const Color(0xFF1C1C1E) : const Color(0xFFF7F3E9);
     final Color fg =
         _dark ? const Color(0xFFF2F2F7) : AppDesignTokens.textPrimary;
     final AsyncValue<FoundationMediaManifest> mediaAsync =
@@ -787,6 +788,7 @@ class _ReadingReaderScreenState extends ConsumerState<ReadingReaderScreen> {
       showNavigation: false,
       topBar: PadTopBar(
         title: doc.title,
+        trailing: const SizedBox.shrink(),
         description: _mode == ReadingStudyMode.immersion
             ? '沉浸 · ${_ttsGender.labelCn} · 连续朗读${_slowMode ? ' · 慢读' : ''}$rateLabel'
             : '精读 · ${_ttsGender.labelCn} · 难词(>$_freqThreshold)${_slowMode ? ' · 慢读' : ''}$rateLabel',
@@ -947,6 +949,20 @@ class _ReadingReaderScreenState extends ConsumerState<ReadingReaderScreen> {
               child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: <Widget>[
+                Center(
+                  child: SizedBox(
+                    width: 100,
+                    child: ReadingBookCover(title: doc.title, level: doc.level),
+                  ),
+                ),
+                const SizedBox(height: 24),
+                Text(doc.title, textAlign: TextAlign.center,
+                  style: TextStyle(fontSize: 26, height: 1.25,
+                    fontFamily: 'Georgia', color: fg, fontWeight: FontWeight.w600)),
+                const SizedBox(height: 8),
+                Text('${doc.level} · ${doc.wordCount} words', textAlign: TextAlign.center,
+                  style: TextStyle(color: fg.withValues(alpha: 0.6), fontSize: 12)),
+                const SizedBox(height: 28),
                 if (_mode.showChunkLegend || showChinese)
                   Padding(
                     padding: const EdgeInsets.only(bottom: 10),

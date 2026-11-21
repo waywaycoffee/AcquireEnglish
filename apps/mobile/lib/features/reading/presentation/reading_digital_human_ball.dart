@@ -67,9 +67,7 @@ class _ReadingDigitalHumanBallHostState
   Widget build(BuildContext context) {
     final DigitalHumanPersona persona =
         ref.watch(learningSettingsProvider).selectedDigitalHuman;
-    final String avatar = persona.hasCartoonAtlas
-        ? persona.cartoonAssetPath
-        : persona.assetPath;
+    final String avatar = persona.assetPath;
 
     return Stack(
       children: <Widget>[
@@ -599,9 +597,7 @@ class _ReadingCoachAskSheetState extends ConsumerState<ReadingCoachAskSheet> {
                   CircleAvatar(
                     radius: 22,
                     backgroundImage: AssetImage(
-                      persona.hasCartoonAtlas
-                          ? persona.cartoonAssetPath
-                          : persona.assetPath,
+                      persona.assetPath,
                     ),
                     onBackgroundImageError: (_, __) {},
                   ),

@@ -1,0 +1,209 @@
+{
+  "version": "2.22",
+  "children": [
+    {
+      "type": "frame",
+      "id": "s0",
+      "name": "Reading · Bookshelf",
+      "x": 0,
+      "y": 0,
+      "width": 390,
+      "height": 844,
+      "layout": "none",
+      "fill": "#F7F3E9",
+      "children": [
+        {
+          "type": "text",
+          "id": "t0",
+          "x": 24,
+          "y": 32,
+          "content": "Acquire Reading",
+          "fontFamily": "Georgia",
+          "fontSize": 25,
+          "fill": "#243F36"
+        },
+        {
+          "type": "text",
+          "id": "h",
+          "x": 24,
+          "y": 88,
+          "content": "我的书架",
+          "fontFamily": "Georgia",
+          "fontSize": 21,
+          "fill": "#243F36"
+        },
+        {
+          "type": "frame",
+          "id": "b0",
+          "x": 24,
+          "y": 152,
+          "width": 106,
+          "height": 162,
+          "fill": "#315B50",
+          "cornerRadius": 5,
+          "children": [
+            {
+              "type": "text",
+              "id": "bt0",
+              "x": 12,
+              "y": 66,
+              "content": "A Morning Walk",
+              "fontFamily": "Georgia",
+              "fontSize": 16,
+              "fill": "#FFFFFF"
+            }
+          ]
+        },
+        {
+          "type": "frame",
+          "id": "b1",
+          "x": 146,
+          "y": 152,
+          "width": 106,
+          "height": 162,
+          "fill": "#AD6842",
+          "cornerRadius": 5,
+          "children": [
+            {
+              "type": "text",
+              "id": "bt1",
+              "x": 12,
+              "y": 66,
+              "content": "The Lost Key",
+              "fontFamily": "Georgia",
+              "fontSize": 16,
+              "fill": "#FFFFFF"
+            }
+          ]
+        },
+        {
+          "type": "frame",
+          "id": "b2",
+          "x": 268,
+          "y": 152,
+          "width": 106,
+          "height": 162,
+          "fill": "#384F74",
+          "cornerRadius": 5,
+          "children": [
+            {
+              "type": "text",
+              "id": "bt2",
+              "x": 12,
+              "y": 66,
+              "content": "A Robot at Home",
+              "fontFamily": "Georgia",
+              "fontSize": 16,
+              "fill": "#FFFFFF"
+            }
+          ]
+        },
+        {
+          "type": "text",
+          "id": "continue",
+          "x": 24,
+          "y": 370,
+          "content": "继续阅读",
+          "fontFamily": "Georgia",
+          "fontSize": 21,
+          "fill": "#243F36"
+        },
+        {
+          "type": "text",
+          "id": "last",
+          "x": 24,
+          "y": 420,
+          "content": "The Lost Key · A2",
+          "fontFamily": "Georgia",
+          "fontSize": 17,
+          "fill": "#243F36"
+        }
+      ]
+    },
+    {
+      "type": "frame",
+      "id": "s1",
+      "name": "Reading · Reader",
+      "x": 440,
+      "y": 0,
+      "width": 390,
+      "height": 844,
+      "layout": "none",
+      "fill": "#F7F3E9",
+      "children": [
+        {
+          "type": "text",
+          "id": "t1",
+          "x": 24,
+          "y": 32,
+          "content": "Acquire Reading",
+          "fontFamily": "Georgia",
+          "fontSize": 25,
+          "fill": "#243F36"
+        },
+        {
+          "type": "text",
+          "id": "tools",
+          "x": 24,
+          "y": 86,
+          "content": "‹                    听书    Aa    ⋮",
+          "fontFamily": "Georgia",
+          "fontSize": 18,
+          "fill": "#243F36"
+        },
+        {
+          "type": "frame",
+          "id": "cover",
+          "x": 140,
+          "y": 148,
+          "width": 110,
+          "height": 160,
+          "fill": "#AD6842",
+          "cornerRadius": 5,
+          "children": [
+            {
+              "type": "text",
+              "id": "coverTitle",
+              "x": 12,
+              "y": 65,
+              "content": "The Lost Key",
+              "fontFamily": "Georgia",
+              "fontSize": 17,
+              "fill": "#FFFFFF"
+            }
+          ]
+        },
+        {
+          "type": "text",
+          "id": "title",
+          "x": 108,
+          "y": 346,
+          "content": "The Lost Key",
+          "fontFamily": "Georgia",
+          "fontSize": 27,
+          "fill": "#243F36"
+        },
+        {
+          "type": "text",
+          "id": "meta",
+          "x": 142,
+          "y": 390,
+          "content": "A2 · 76 words",
+          "fontFamily": "Georgia",
+          "fontSize": 12,
+          "fill": "#243F36"
+        },
+        {
+          "type": "text",
+          "id": "body",
+          "x": 26,
+          "y": 450,
+          "content": "Tom could not find his house key.\nHe looked in his bag, on the table,\nand under the sofa. Then he\nremembered the small pocket\nin his jacket.",
+          "fontFamily": "Georgia",
+          "fontSize": 19,
+          "fill": "#243F36"
+        }
+      ]
+    }
+  ]
+}

@@ -24,10 +24,18 @@ import '../data/reading_vocab_lists.dart';
 import '../domain/reading_doc.dart';
 import 'reading_iplus1_provider.dart';
 import 'reading_library_provider.dart';
+import 'reading_book_cover.dart';
 import 'reading_vocab_lists_sheet.dart';
 
-class ReadingHubScreen extends ConsumerWidget {
+class ReadingHubScreen extends ConsumerStatefulWidget {
   const ReadingHubScreen({super.key});
+
+  @override
+  ConsumerState<ReadingHubScreen> createState() => _ReadingHubScreenState();
+}
+
+class _ReadingHubScreenState extends ConsumerState<ReadingHubScreen> {
+  int _filter = 0;
 
   Future<void> _importFile(BuildContext context, WidgetRef ref) async {
     final XFile? file = await openFile(
@@ -219,7 +227,7 @@ class ReadingHubScreen extends ConsumerWidget {
   }
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  Widget build(BuildContext context) {
     final ReadingLibraryState state = ref.watch(readingLibraryProvider);
     final ReadingDoc? cont = state.continueDoc;
     final ReadingVocabLists lists = ref.watch(readingVocabListsProvider);
@@ -229,8 +237,9 @@ class ReadingHubScreen extends ConsumerWidget {
       currentDestination: AppNavDestination.reading,
       showContinueLearning: false,
       topBar: PadTopBar(
-        title: '爱快阅读',
-        description: '泛读短文 · i+1 推荐 · 黑白名单',
+        title: '我的书架',
+        trailing: const SizedBox.shrink(),
+        description: '继续你喜欢的故事',
         leading: PadBackButton(onPressed: () => context.pop()),
         actions: <Widget>[
           IconButton(
@@ -373,38 +382,79 @@ class ReadingHubScreen extends ConsumerWidget {
                   ],
                 ),
                 const SizedBox(height: 20),
-                const _SectionTitle('内置样例'),
-                for (final ReadingDoc doc in state.builtin) ...<Widget>[
-                  _DocTile(
-                    doc: doc,
-                    progress: state.progressFor(doc.id),
-                    onOpen: () => context.push(
-                      '/reading/${Uri.encodeComponent(doc.id)}',
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                ],
-                if (state.userDocs.isNotEmpty) ...<Widget>[
-                  const SizedBox(height: 12),
-                  const _SectionTitle('我的书架'),
-                  for (final ReadingDoc doc in state.userDocs.reversed) ...<Widget>[
-                    _DocTile(
-                      doc: doc,
-                      progress: state.progressFor(doc.id),
-                      onOpen: () => context.push(
-                        '/reading/${Uri.encodeComponent(doc.id)}',
+                const _SectionTitle('我的读物'),
+                Wrap(
+                  spacing: 8,
+                  children: <Widget>[
+                    for (int index = 0; index < 3; index++)
+                      ChoiceChip(
+                        label: Text(const <String>['全部', '在读', '已读'][index]),
+                        selected: _filter == index,
+                        onSelected: (_) => setState(() => _filter = index),
                       ),
-                      onDelete: doc.builtin
-                          ? null
-                          : () => unawaited(
-                              ref
-                                  .read(readingLibraryProvider.notifier)
-                                  .removeDoc(doc.id),
-                            ),
-                    ),
-                    const SizedBox(height: 8),
                   ],
-                ],
+                ),
+                const SizedBox(height: 16),
+                Builder(builder: (BuildContext context) {
+                  final List<ReadingDoc> books = <ReadingDoc>[
+                    ...state.userDocs.reversed,
+                    ...state.builtin,
+                  ].where((ReadingDoc doc) {
+                    final double percent = state.progressFor(doc.id)?.percent ?? 0;
+                    return _filter == 0 ||
+                        (_filter == 1 && percent > 0 && percent < 1) ||
+                        (_filter == 2 && percent >= 1);
+                  }).toList();
+                  if (books.isEmpty) {
+                    return const Padding(
+                      padding: EdgeInsets.all(24),
+                      child: Text('这里还没有读物'),
+                    );
+                  }
+                  return LayoutBuilder(builder: (BuildContext context, BoxConstraints size) {
+                    final int columns = (size.maxWidth / 145).floor().clamp(2, 6);
+                    final double width = (size.maxWidth - (columns - 1) * 18) / columns;
+                    return Wrap(
+                      spacing: 18,
+                      runSpacing: 24,
+                      children: <Widget>[
+                        for (final ReadingDoc doc in books)
+                          SizedBox(
+                            width: width,
+                            child: InkWell(
+                              onTap: () => context.push('/reading/${Uri.encodeComponent(doc.id)}'),
+                              onLongPress: doc.builtin ? null : () async {
+                                final bool? remove = await showDialog<bool>(
+                                  context: context,
+                                  builder: (BuildContext dialog) => AlertDialog(
+                                    title: Text('删除「${doc.title}」？'),
+                                    actions: <Widget>[
+                                      TextButton(onPressed: () => Navigator.pop(dialog), child: const Text('取消')),
+                                      TextButton(onPressed: () => Navigator.pop(dialog, true), child: const Text('删除')),
+                                    ],
+                                  ),
+                                );
+                                if (remove == true) {
+                                  await ref.read(readingLibraryProvider.notifier).removeDoc(doc.id);
+                                }
+                              },
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: <Widget>[
+                                  ReadingBookCover(title: doc.title, level: doc.level),
+                                  const SizedBox(height: 10),
+                                  Text(doc.title, maxLines: 2, overflow: TextOverflow.ellipsis),
+                                  const SizedBox(height: 4),
+                                  Text('${doc.level} · 已读 ${((state.progressFor(doc.id)?.percent ?? 0) * 100).round()}%',
+                                    style: Theme.of(context).textTheme.bodySmall),
+                                ],
+                              ),
+                            ),
+                          ),
+                      ],
+                    );
+                  });
+                }),
               ],
             ),
     );
@@ -515,7 +565,10 @@ class _DocTile extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: <Widget>[
               Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: <Widget>[
+                  SizedBox(width: 92, child: ReadingBookCover(title: doc.title, level: doc.level)),
+                  const SizedBox(width: 18),
                   Expanded(
                     child: Text(
                       doc.title,
