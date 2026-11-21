@@ -5,7 +5,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hive_ce/hive.dart';
 
 import '../../../constants/endpoints.dart';
-import '../../authentication/presentation/account_storage.dart';
 import '../../exam/presentation/exam_pack_provider.dart';
 import '../../import_course/data/bilibili_course_builder.dart';
 import '../../import_course/data/bilibili_import_service.dart';
@@ -99,9 +98,9 @@ Future<void> _ensureCourseSeedDocs(
         );
         final docs = (response.data['documents'] as List<dynamic>? ??
                 const <dynamic>[])
-            .whereType<Map>()
+            .whereType<Map<dynamic, dynamic>>()
             .map(
-              (Map d) =>
+              (Map<dynamic, dynamic> d) =>
                   ReadingDoc.fromJson(Map<String, dynamic>.from(d)),
             );
         for (final ReadingDoc doc in docs) {
