@@ -2,6 +2,7 @@ import 'dart:ui';
 
 import 'package:flutter/material.dart';
 
+import '../../avatar/presentation/avatar_preview.dart';
 import '../../shared/presentation/pad/app_design_tokens.dart';
 
 /// Game-flavored surfaces for the community adventure loop.
@@ -668,12 +669,14 @@ class AdventureBuddyCard extends StatelessWidget {
     required this.actionLabel,
     required this.onAction,
     super.key,
+    this.avatarLoadout = const <String, String>{},
   });
 
   final String name;
   final String meta;
   final String actionLabel;
   final VoidCallback onAction;
+  final Map<String, String> avatarLoadout;
 
   @override
   Widget build(BuildContext context) {
@@ -693,17 +696,20 @@ class AdventureBuddyCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
-          CircleAvatar(
-            radius: 22,
-            backgroundColor: AdventurePalette.pathAmber,
-            child: Text(
-              name.isEmpty ? '?' : name.substring(0, 1),
-              style: const TextStyle(
-                fontWeight: FontWeight.w900,
-                color: Color(0xFF3A2A00),
+          if (avatarLoadout.isNotEmpty)
+            AvatarPreview(loadout: avatarLoadout, height: 56)
+          else
+            CircleAvatar(
+              radius: 22,
+              backgroundColor: AdventurePalette.pathAmber,
+              child: Text(
+                name.isEmpty ? '?' : name.substring(0, 1),
+                style: const TextStyle(
+                  fontWeight: FontWeight.w900,
+                  color: Color(0xFF3A2A00),
+                ),
               ),
             ),
-          ),
           const SizedBox(height: 10),
           Text(
             name,
@@ -902,6 +908,8 @@ class QuestFeedCard extends StatelessWidget {
     super.key,
     this.badge = '可开练',
     this.accent,
+    this.authorAvatar = const <String, String>{},
+    this.showPlayChevron = true,
   });
 
   final String title;
@@ -909,10 +917,14 @@ class QuestFeedCard extends StatelessWidget {
   final VoidCallback onPlay;
   final String badge;
   final Color? accent;
+  /// Cosmetics paper-doll loadout from API `author_avatar`.
+  final Map<String, String> authorAvatar;
+  final bool showPlayChevron;
 
   @override
   Widget build(BuildContext context) {
     final Color stripe = accent ?? AppDesignTokens.brandGreen;
+    final bool hasAvatar = authorAvatar.isNotEmpty;
     return Material(
       color: Colors.transparent,
       child: InkWell(
@@ -937,6 +949,11 @@ class QuestFeedCard extends StatelessWidget {
                     ),
                   ),
                 ),
+                if (hasAvatar)
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(10, 10, 0, 10),
+                    child: AvatarPreview(loadout: authorAvatar, height: 52),
+                  ),
                 Expanded(
                   child: Padding(
                     padding: const EdgeInsets.fromLTRB(14, 12, 8, 12),
@@ -983,17 +1000,18 @@ class QuestFeedCard extends StatelessWidget {
                     ),
                   ),
                 ),
-                Padding(
-                  padding: const EdgeInsets.only(right: 12),
-                  child: CircleAvatar(
-                    radius: 18,
-                    backgroundColor: stripe,
-                    child: const Icon(
-                      Icons.play_arrow_rounded,
-                      color: Colors.white,
+                if (showPlayChevron)
+                  Padding(
+                    padding: const EdgeInsets.only(right: 12),
+                    child: CircleAvatar(
+                      radius: 18,
+                      backgroundColor: stripe,
+                      child: const Icon(
+                        Icons.play_arrow_rounded,
+                        color: Colors.white,
+                      ),
                     ),
                   ),
-                ),
               ],
             ),
           ),

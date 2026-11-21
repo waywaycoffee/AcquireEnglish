@@ -36,12 +36,12 @@ class CommunityHotTab extends ConsumerWidget {
             padding: const EdgeInsets.fromLTRB(16, 12, 16, 32),
             children: <Widget>[
               const Text(
-                '热门 · 视频任务',
+                '素材 · 可练习视频',
                 style: TextStyle(fontWeight: FontWeight.w900, fontSize: 18),
               ),
               const SizedBox(height: 4),
               Text(
-                '大家正在练的 B 站片子，点进去就是一关任务',
+                '社区只存链接与学习笔记，视频请自行准备；后续支持 CEFR / 词表 fork',
                 style: TextStyle(
                   fontSize: 13,
                   fontWeight: FontWeight.w600,
@@ -51,8 +51,8 @@ class CommunityHotTab extends ConsumerWidget {
               const SizedBox(height: 14),
               if (data.shares.isEmpty)
                 QuestFeedCard(
-                  title: '还没有人分享视频任务',
-                  meta: '去「任务」贴一条你喜欢的 B 站链接吧',
+                  title: '还没有人分享学习素材',
+                  meta: '去「练习」发一条 B 站链接或成果卡',
                   badge: '等你来发',
                   accent: AdventurePalette.pathAmber,
                   onPlay: () {},

@@ -12,9 +12,9 @@ import '../../shared/presentation/pad/pad_top_bar.dart';
 import 'adventure_ui.dart';
 import 'cafe_progress_provider.dart';
 import 'community_feed_tab.dart';
+import 'community_groups_tab.dart';
 import 'community_hot_tab.dart';
-import 'community_leaderboard_tab.dart';
-import 'community_people_tab.dart';
+import 'community_me_tab.dart';
 import 'community_provider.dart';
 import 'community_social_screen.dart';
 import '../domain/cafe_adventure.dart';
@@ -69,10 +69,27 @@ class _CommunityScreenState extends ConsumerState<CommunityScreen> {
     );
 
     final List<Widget> pages = <Widget>[
-      const CommunityFeedTab(),
       const CommunityHotTab(),
-      const CommunityPeopleTab(),
-      const CommunityLeaderboardTab(),
+      const CommunityFeedTab(
+        kinds: <String>{
+          'learning_result',
+          'method',
+          'team_invite',
+          'share_bilibili',
+          'feedback',
+        },
+        emptyTitle: '发一条练习成果',
+        emptyMeta: '仿写、跟读、闯关成果都会出现在这里',
+        emptyHint: '练习区承接输出与反馈；素材分享请看「素材」。',
+      ),
+      const CommunityFeedTab(
+        kinds: <String>{'question'},
+        emptyTitle: '还没有英语问答',
+        emptyMeta: '可贴台词时间戳或词条提问',
+        emptyHint: '问答聚焦发音、词汇、语法与表达辨析，拒绝灌水。',
+      ),
+      const CommunityGroupsTab(),
+      const CommunityMeTab(),
     ];
     final CafeProgress progress =
         ref.watch(cafeProgressProvider).asData?.value ??
@@ -86,8 +103,8 @@ class _CommunityScreenState extends ConsumerState<CommunityScreen> {
       currentDestination: AppNavDestination.discover,
       showContinueLearning: false,
       topBar: PadTopBar(
-        title: '冒险广场',
-        description: '先闯关，再找人一起练',
+        title: '学习社区',
+        description: '素材可复用 · 输出可互评 · 拒绝打卡灌水',
         actions: <Widget>[
           IconButton(
             tooltip: '消息、收藏与管理',
@@ -116,7 +133,7 @@ class _CommunityScreenState extends ConsumerState<CommunityScreen> {
         children: <Widget>[
           AdventureHeroBanner(
             edgeToEdge: true,
-            chapterTitle: '街角咖啡店',
+            chapterTitle: '协作练习场',
             chapterIndex: 1,
             stageLabel: progress.stageLabel,
             progressLabel: progress.progressLabel,
@@ -125,11 +142,11 @@ class _CommunityScreenState extends ConsumerState<CommunityScreen> {
             nodeLabels:
                 kCafeLevels.map((CafeLevel e) => e.title).toList(growable: false),
             onContinue: _openAdventure,
-            partnerLabel: loggedIn ? '本周同桌加分 · 打开学习桌' : '登录后可邀同桌加分',
+            partnerLabel: loggedIn ? '小组 · 打开学习桌' : '登录后可组队与换装',
             onPartner: loggedIn ? _openDesk : null,
           ),
           Padding(
-            padding: const EdgeInsets.fromLTRB(16, 10, 16, 0),
+            padding: const EdgeInsets.fromLTRB(8, 10, 8, 0),
             child: Container(
               padding: const EdgeInsets.all(4),
               decoration: BoxDecoration(
@@ -139,10 +156,11 @@ class _CommunityScreenState extends ConsumerState<CommunityScreen> {
               child: Row(
                 children: <Widget>[
                   for (final (int i, String label) in <(int, String)>[
-                    (0, '任务'),
-                    (1, '热门'),
-                    (2, '找人'),
-                    (3, '榜'),
+                    (0, '素材'),
+                    (1, '练习'),
+                    (2, '问答'),
+                    (3, '小组'),
+                    (4, '我的'),
                   ])
                     Expanded(
                       child: _SegTab(
@@ -164,7 +182,7 @@ class _CommunityScreenState extends ConsumerState<CommunityScreen> {
                     children: <Widget>[
                       QuestFeedCard(
                         title: '试玩 · 街角咖啡店「看懂菜单」',
-                        meta: '登录后可保存进度并分享成果卡',
+                        meta: '登录后可保存进度、换装并分享素材',
                         badge: '游客可练',
                         accent: AdventurePalette.pathAmber,
                         onPlay: _openAdventure,
@@ -172,7 +190,8 @@ class _CommunityScreenState extends ConsumerState<CommunityScreen> {
                       const SizedBox(height: 12),
                       HubSurface(
                         child: Text(
-                          '单人冒险进度永远属于你。同桌只是本周加分，换人不丢关卡。',
+                          '社区定位：分享可练习的素材与语言输出，不做打卡排行。'
+                          '登录后可管理 2D 形象，并在 Feed 看到作者纸娃娃。',
                           style: TextStyle(
                             fontSize: 14,
                             height: 1.5,
@@ -226,7 +245,7 @@ class _SegTab extends StatelessWidget {
         child: Text(
           label,
           style: TextStyle(
-            fontSize: 13,
+            fontSize: 12,
             fontWeight: selected ? FontWeight.w900 : FontWeight.w700,
             color: selected
                 ? AppDesignTokens.brandGreenDark

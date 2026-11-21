@@ -17,7 +17,19 @@ import 'community_provider.dart';
 import 'exploration_map_screen.dart';
 
 class CommunityFeedTab extends ConsumerWidget {
-  const CommunityFeedTab({super.key});
+  const CommunityFeedTab({
+    super.key,
+    this.kinds,
+    this.emptyTitle = '试玩 · 街角咖啡店「看懂菜单」',
+    this.emptyMeta = '通关后可发成果卡；也可分享素材或提问',
+    this.emptyHint = '练习流优先展示成果卡与可开练关卡；素材请看「素材」页。',
+  });
+
+  /// When set, only posts whose [CommunityPostDto.kind] is in this set.
+  final Set<String>? kinds;
+  final String emptyTitle;
+  final String emptyMeta;
+  final String emptyHint;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -37,16 +49,21 @@ class CommunityFeedTab extends ConsumerWidget {
               children: <Widget>[Text('加载失败：$e')],
             ),
             data: (List<CommunityPostDto> posts) {
-              final List<CommunityPostDto> ordered = _orderQuestFirst(posts);
+              final List<CommunityPostDto> ordered = _orderQuestFirst(posts)
+                  .where(
+                    (CommunityPostDto p) =>
+                        kinds == null || kinds!.contains(p.kind),
+                  )
+                  .toList(growable: false);
               if (ordered.isEmpty) {
                 return ListView(
                   physics: const AlwaysScrollableScrollPhysics(),
                   padding: const EdgeInsets.all(24),
                   children: <Widget>[
                     QuestFeedCard(
-                      title: '试玩 · 街角咖啡店「看懂菜单」',
-                      meta: '通关后可发成果卡，邀人练同一关',
-                      badge: '推荐任务',
+                      title: emptyTitle,
+                      meta: emptyMeta,
+                      badge: '推荐',
                       accent: AdventurePalette.pathAmber,
                       onPlay: () => Navigator.of(context).push<void>(
                         MaterialPageRoute<void>(
@@ -55,9 +72,7 @@ class CommunityFeedTab extends ConsumerWidget {
                       ),
                     ),
                     const SizedBox(height: 12),
-                    const Text(
-                      '任务流优先展示可开练的成果卡。也可分享 B 站视频、组队或提问。',
-                    ),
+                    Text(emptyHint),
                   ],
                 );
               }
@@ -279,6 +294,7 @@ class CommunityPostCard extends ConsumerWidget {
         meta: playMeta,
         badge: '可开练',
         accent: AdventurePalette.pathAmber,
+        authorAvatar: post.authorAvatar,
         onPlay: () {
           ref.read(pendingChallengePostIdProvider.notifier).set(post.id);
           unawaited(() async {
@@ -308,8 +324,9 @@ class CommunityPostCard extends ConsumerWidget {
         meta:
             '$_metaLine · ♥${post.likeCount} · 💬${post.commentCount}'
             '${compact.isEmpty ? '' : ' · $compact'}',
-        badge: '视频任务',
+        badge: '视频素材',
         accent: const Color(0xFFE67E22),
+        authorAvatar: post.authorAvatar,
         onPlay: () => unawaited(_openLink(context, ref)),
       );
     }
@@ -324,6 +341,8 @@ class CommunityPostCard extends ConsumerWidget {
               : post.kind == 'feedback'
                   ? AppDesignTokens.orange
                   : AppDesignTokens.brandGreen,
+      authorAvatar: post.authorAvatar,
+      showPlayChevron: post.kind != 'question' && post.kind != 'method',
       onPlay: () => unawaited(_openComments(context, ref)),
     );
   }
