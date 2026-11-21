@@ -60,6 +60,27 @@ void main() {
         'aid': '170001',
       });
     });
+
+    test('keeps aid query beside bvid for case recovery', () {
+      expect(
+        BilibiliImport.extractIds(
+          'https://www.bilibili.com/video/BV1BwGKzbEF1?aid=114823987725947',
+        ),
+        <String, String>{
+          'bvid': 'BV1BwGKzbEF1',
+          'aid': '114823987725947',
+        },
+      );
+    });
+
+    test('never uppercases BV letters', () {
+      expect(
+        BilibiliImport.idKeyFromPath(
+          '/data/bilibili_media/BV1BwGKzbEF1-p01.mp4',
+        ),
+        'BV1BwGKzbEF1-p01',
+      );
+    });
   });
 
   group('BilibiliImport share / short link detection', () {

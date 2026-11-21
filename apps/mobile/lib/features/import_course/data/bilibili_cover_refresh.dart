@@ -99,25 +99,92 @@ bool _courseNeedsLocalVideo(LibraryCourseData course) {
 
 /// Backfill Bilibili posters + local MP4 for courses that still need them.
 Future<void> refreshMissingBilibiliCovers(Ref ref) async {
-  final List<LibraryCourseData> courses = ref.read(libraryCatalogProvider);
+  List<LibraryCourseData> courses = ref.read(libraryCatalogProvider);
   final String cookie = ref
       .read(learningSettingsProvider)
       .resolvedBilibiliCookieHeader;
   final BilibiliImportService service = BilibiliImportService.withCookie(
     cookie,
   );
+  // One-shot: rewrite force-uppercased BV urls via UGC season archives.
+  try {
+    final List<LibraryCourseData> repaired =
+        await repairUppercasedBilibiliCourses(
+          service: service,
+          courses: courses,
+        );
+    int fixed = 0;
+    for (final LibraryCourseData course in repaired) {
+      LibraryCourseData? previous;
+      for (final LibraryCourseData c in courses) {
+        if (c.id == course.id) {
+          previous = c;
+          break;
+        }
+      }
+      if (previous == null) {
+        continue;
+      }
+      final bool descriptionChanged =
+          previous.description.trim() != course.description.trim();
+      bool episodeChanged = false;
+      for (final LibraryEpisodeItem ep in course.episodes) {
+        LibraryEpisodeItem? old;
+        for (final LibraryEpisodeItem e in previous.episodes) {
+          if (e.id == ep.id) {
+            old = e;
+            break;
+          }
+        }
+        if (old == null) {
+          continue;
+        }
+        if ((old.sourceUrl ?? '') != (ep.sourceUrl ?? '') ||
+            (old.videoAsset ?? '') != (ep.videoAsset ?? '')) {
+          episodeChanged = true;
+          break;
+        }
+      }
+      if (!descriptionChanged && !episodeChanged) {
+        continue;
+      }
+      await ref.read(libraryCatalogProvider.notifier).importCourse(course);
+      fixed += 1;
+    }
+    if (fixed > 0) {
+      courses = ref.read(libraryCatalogProvider);
+      // ignore: avoid_print
+      print('bilibili.backfill repaired $fixed uppercased BV course(s)');
+    }
+  } catch (e, st) {
+    developer.log(
+      'catalog BV case repair failed: $e',
+      name: 'bilibili.backfill',
+      error: e,
+      stackTrace: st,
+    );
+  }
   for (final LibraryCourseData course in courses) {
     if (!_isBilibiliCourse(course)) {
       continue;
     }
-    final String? source = _sourceForCourse(course);
-    if (source == null || source.isEmpty) {
+    final String? rawSource = _sourceForCourse(course);
+    if (rawSource == null || rawSource.isEmpty) {
       developer.log(
         'skip bilibili course ${course.id}: no source',
         name: 'bilibili.backfill',
       );
       continue;
     }
+    String source = rawSource;
+    try {
+      source = await repairBilibiliSourceCase(
+        service: service,
+        source: source,
+        course: course,
+        episode: course.episodes.isNotEmpty ? course.episodes.first : null,
+      );
+    } catch (_) {}
 
     final bool courseNeedsCover = _isPlaceholderCover(course.coverImage);
     if (courseNeedsCover) {

@@ -26,13 +26,14 @@ LibraryCourseData _buildSeasonCourse(BilibiliImportResult meta) {
       (BilibiliImport.extractIds(meta.watchUrl)?['bvid'] ??
               BilibiliImport.extractIds(meta.idKey)?['bvid'] ??
               '')
-          .trim()
-          .toUpperCase();
+          .trim();
+  final String currentBvidKey = currentBvid.toUpperCase();
   final String currentAid =
       (meta.aid ?? BilibiliImport.extractIds(meta.watchUrl)?['aid'] ?? '')
           .trim();
   final String localBvid =
-      (bilibiliIdKeyFromPath(meta.localVideoPath) ?? '').trim().toUpperCase();
+      (bilibiliIdKeyFromPath(meta.localVideoPath) ?? '').trim();
+  final String localBvidKey = localBvid.toUpperCase();
   final bool hasEn = meta.enSubtitlePath != null;
   final bool hasZh = meta.cnSubtitlePath != null;
   final String coverImage = meta.bestCoverImage;
@@ -41,12 +42,13 @@ LibraryCourseData _buildSeasonCourse(BilibiliImportResult meta) {
   final List<LibraryEpisodeItem> episodes = <LibraryEpisodeItem>[
     for (final BilibiliSeasonEpisodeMeta episode in meta.seasonEpisodes)
       () {
-        final String episodeBvid = episode.bvid.trim().toUpperCase();
+        final String episodeBvid = episode.bvid.trim();
+        final String episodeBvidKey = episodeBvid.toUpperCase();
         final bool isCurrent =
-            (episodeBvid.isNotEmpty && episodeBvid == currentBvid) ||
-            (episodeBvid.isNotEmpty &&
-                localBvid.isNotEmpty &&
-                episodeBvid == localBvid) ||
+            (episodeBvidKey.isNotEmpty && episodeBvidKey == currentBvidKey) ||
+            (episodeBvidKey.isNotEmpty &&
+                localBvidKey.isNotEmpty &&
+                episodeBvidKey == localBvidKey) ||
             (episode.bvid.isEmpty &&
                 episode.aid.isNotEmpty &&
                 episode.aid == currentAid);
@@ -226,7 +228,7 @@ String bilibiliImportSuccessHint(BilibiliImportResult meta) {
       final String currentBvid =
           (BilibiliImport.extractIds(meta.watchUrl)?['bvid'] ?? '')
               .toUpperCase();
-      return episode.bvid.toUpperCase() == currentBvid;
+      return episode.bvid.trim().toUpperCase() == currentBvid;
     });
     final String currentLabel = currentIndex >= 0
         ? '第 ${meta.seasonEpisodes[currentIndex].index} 集'

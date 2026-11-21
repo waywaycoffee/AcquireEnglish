@@ -4,7 +4,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:hive_ce/hive.dart';
 import '../authentication/presentation/account_storage.dart';
-import '../shared/data/word_pronunciation_service.dart';
+import 'package:media_kit/media_kit.dart';
+import '../digital_human/data/oral_coach_pipeline_client.dart';
+import '../settings/presentation/settings_provider.dart';
 import '../phrases/presentation/phrase_book_provider.dart';
 
 class ModuleLesson {
@@ -158,7 +160,29 @@ class _ModuleScreenState extends ConsumerState<ModuleScreen>
   final expression = TextEditingController();
   final scroll = ScrollController();
   double speed = 0.75;
-  WordPronunciationService? speech;
+  Player? streamed;
+  Future<void> remoteSpeech(String text) async {
+    final generation = sequence;
+    final url = await OralCoachPipelineClient().synthesizeSpeech(
+      rawBaseUrl: ref.read(learningSettingsProvider).oralCoachPipelineUrl,
+      text: text,
+      digitalHumanId: 'mia',
+    );
+    if (!mounted || generation != sequence) return;
+    if (url == null) throw StateError('语音暂不可用');
+    final player = Player();
+    streamed = player;
+    try {
+      final done = player.stream.completed.firstWhere((v) => v);
+      await player.open(Media(url));
+      await player.setRate(speed / .75);
+      await done.timeout(const Duration(seconds: 60));
+    } finally {
+      if (identical(streamed, player)) streamed = null;
+      await player.dispose();
+    }
+  }
+
   List<ModuleLesson> get lessons => moduleLessons[widget.kind] ?? const [];
   String get key => studyStorageKey(
     'module-v1:${widget.kind}',
@@ -185,7 +209,7 @@ class _ModuleScreenState extends ConsumerState<ModuleScreen>
   void stop() {
     sequence++;
     sleep?.cancel();
-    unawaited(speech?.stop());
+    unawaited(streamed?.stop());
     if (mounted) setState(() => playing = false);
   }
 
@@ -198,7 +222,7 @@ class _ModuleScreenState extends ConsumerState<ModuleScreen>
   void dispose() {
     sequence++;
     sleep?.cancel();
-    unawaited(speech?.stop());
+    unawaited(streamed?.stop());
     expression.dispose();
     scroll.dispose();
     WidgetsBinding.instance.removeObserver(this);
@@ -212,7 +236,7 @@ class _ModuleScreenState extends ConsumerState<ModuleScreen>
     }
     final generation = ++sequence;
     final item = lessons[lesson];
-    speech = WordPronunciationService(selectedRate: speed);
+
     setState(() {
       playing = true;
       error = null;
@@ -226,11 +250,11 @@ class _ModuleScreenState extends ConsumerState<ModuleScreen>
         ) {
           if (!mounted || generation != sequence) return;
           setState(() => line = i);
-          await speech!.speak(item.lines[i]);
+          await remoteSpeech(item.lines[i]);
         }
       } while (all && repeat && mounted && generation == sequence);
     } catch (_) {
-      if (mounted) setState(() => error = '播放失败，请检查系统英语语音引擎后重试。');
+      if (mounted) setState(() => error = '播放失败，请检查网络和语音服务后重试。');
     } finally {
       if (mounted && generation == sequence) setState(() => playing = false);
     }
@@ -413,9 +437,9 @@ class _ModuleScreenState extends ConsumerState<ModuleScreen>
             OutlinedButton(
               onPressed: () async {
                 if (expression.text.trim().isEmpty || playing) return;
-                speech = WordPronunciationService(selectedRate: speed);
+
                 try {
-                  await speech!.speak(expression.text.trim());
+                  await remoteSpeech(expression.text.trim());
                 } catch (_) {
                   if (mounted) setState(() => error = '示范播放失败，请重试。');
                 }
@@ -485,7 +509,7 @@ class _ModuleScreenState extends ConsumerState<ModuleScreen>
               ),
               child: const Text('更多课程 · 下载完整学习书'),
             ),
-          const Text('示范音频使用设备语音合成，不等同于真人发音评分。练习不会自动公开，也不自动发放积分。'),
+          const Text('示范语音由服务器合成并在线播放。口语训练支持语音和文字，不在本页自动评分。'),
         ],
       ),
     );

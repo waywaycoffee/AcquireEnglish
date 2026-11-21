@@ -45,29 +45,45 @@ class BilibiliImport {
         .trim();
   }
 
-  /// Returns a map with either `bvid` or `aid` key when parse succeeds.
+  /// Returns a map with `bvid` and/or `aid` when parse succeeds.
+  ///
+  /// BV ids are **case-sensitive** — never uppercase the matched letters.
+  /// Optional `?aid=` on a watch URL is kept as a fallback when a stale
+  /// uppercased BV would 404.
   /// Does not resolve short links; use [looksLikeBilibiliInput] + network resolve.
   static Map<String, String>? extractIds(String raw) {
     final String input = sanitize(raw);
     if (input.isEmpty) {
       return null;
     }
+    final Map<String, String> out = <String, String>{};
     final RegExpMatch? bvUrl = _bvInUrl.firstMatch(input);
     if (bvUrl != null) {
-      return <String, String>{'bvid': bvUrl.group(1)!};
+      out['bvid'] = bvUrl.group(1)!;
+    } else if (_bvOnly.hasMatch(input)) {
+      out['bvid'] = input;
     }
-    if (_bvOnly.hasMatch(input)) {
-      return <String, String>{'bvid': input};
+    final RegExpMatch? aidQuery = RegExp(
+      r'[?&#]aid=(\d+)',
+      caseSensitive: false,
+    ).firstMatch(input);
+    if (aidQuery != null) {
+      out['aid'] = aidQuery.group(1)!;
+    } else {
+      final RegExpMatch? avUrl = _avInUrl.firstMatch(input);
+      if (avUrl != null) {
+        out['aid'] = avUrl.group(1)!;
+      } else {
+        final RegExpMatch? avOnly = _avOnly.firstMatch(input);
+        if (avOnly != null) {
+          out['aid'] = avOnly.group(1)!;
+        }
+      }
     }
-    final RegExpMatch? avUrl = _avInUrl.firstMatch(input);
-    if (avUrl != null) {
-      return <String, String>{'aid': avUrl.group(1)!};
+    if (out.isEmpty) {
+      return null;
     }
-    final RegExpMatch? avOnly = _avOnly.firstMatch(input);
-    if (avOnly != null) {
-      return <String, String>{'aid': avOnly.group(1)!};
-    }
-    return null;
+    return out;
   }
 
   /// True for BV/av, full bilibili URLs, share paste text, or b23.tv short links.
@@ -193,10 +209,21 @@ class BilibiliImport {
     final String base = (bvid != null && bvid.isNotEmpty)
         ? 'https://www.bilibili.com/video/$bvid'
         : 'https://www.bilibili.com/video/av$aid';
+    final List<String> query = <String>[];
     if (page != null && page > 1) {
-      return '$base?p=$page';
+      query.add('p=$page');
     }
-    return base;
+    // Persist aid beside BV so a later uppercased/stale BV can still resolve.
+    if (bvid != null &&
+        bvid.isNotEmpty &&
+        aid != null &&
+        aid.trim().isNotEmpty) {
+      query.add('aid=${aid.trim()}');
+    }
+    if (query.isEmpty) {
+      return base;
+    }
+    return '$base?${query.join('&')}';
   }
 
   /// Cache / subtitle folder key. Multi-part anthologies must not share one file.
@@ -212,6 +239,8 @@ class BilibiliImport {
   }
 
   /// Extract BV/av (+ optional `-p02`) from a local path or filename.
+  ///
+  /// Preserves BV letter case — uppercasing breaks B站 view/playurl (-404).
   static String? idKeyFromPath(String? path) {
     final String value = path?.trim() ?? '';
     if (value.isEmpty) {
@@ -224,15 +253,16 @@ class BilibiliImport {
     if (bvPage != null) {
       final String raw = bvPage.group(1)!;
       final int dash = raw.toLowerCase().lastIndexOf('-p');
-      return '${raw.substring(0, dash).toUpperCase()}'
-          '${raw.substring(dash).toLowerCase()}';
+      final String bv = raw.substring(0, dash);
+      final String suffix = raw.substring(dash).toLowerCase();
+      return '$bv$suffix';
     }
     final RegExpMatch? bv = RegExp(
       r'(BV[0-9A-Za-z]+)',
       caseSensitive: false,
     ).firstMatch(value);
     if (bv != null) {
-      return bv.group(1)!.toUpperCase();
+      return bv.group(1)!;
     }
     final RegExpMatch? avPage = RegExp(
       r'(?:^|[/\\_-])(av\d+-p\d{2,})(?:[/\\_.-]|$)',

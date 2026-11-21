@@ -49,8 +49,50 @@ class BilibiliSeasonEpisodeMeta {
 
   String get watchUrl => BilibiliImport.watchUrl(
         bvid: bvid.isNotEmpty ? bvid : null,
+        // Always keep aid with BV so a corrupted uppercased BV can recover.
         aid: aid.isNotEmpty ? aid : null,
       );
+}
+
+/// One row from UGC `seasons_archives_list` (canonical BV letter case).
+class BilibiliSeasonArchiveMatch {
+  const BilibiliSeasonArchiveMatch({
+    required this.index,
+    required this.bvid,
+    required this.aid,
+    required this.title,
+  });
+
+  final int index;
+  final String bvid;
+  final String aid;
+  final String title;
+}
+
+/// Parse `bilibili-season-{id}` / `bilibili-season-{id}-{ep}` hints from text.
+({String seasonId, int? episodeIndex})? parseBilibiliSeasonHint(String? raw) {
+  final String text = (raw ?? '').trim();
+  if (text.isEmpty) {
+    return null;
+  }
+  final RegExpMatch? withEp = RegExp(
+    r'bilibili-season-(\d+)-(\d+)',
+    caseSensitive: false,
+  ).firstMatch(text);
+  if (withEp != null) {
+    return (
+      seasonId: withEp.group(1)!,
+      episodeIndex: int.tryParse(withEp.group(2) ?? ''),
+    );
+  }
+  final RegExpMatch? seasonOnly = RegExp(
+    r'bilibili-season-(\d+)',
+    caseSensitive: false,
+  ).firstMatch(text);
+  if (seasonOnly != null) {
+    return (seasonId: seasonOnly.group(1)!, episodeIndex: null);
+  }
+  return null;
 }
 
 class BilibiliImportResult {
@@ -601,24 +643,12 @@ class BilibiliImportService {
   }
 
   Future<BilibiliImportResult> fetch(String rawInput) async {
-    final Map<String, String>? ids = await resolveIds(rawInput);
+    Map<String, String>? ids = await resolveIds(rawInput);
     if (ids == null) {
       throw ArgumentError('无效的 Bilibili 链接（含短链未能解析）');
     }
-
-    final Response<dynamic> viewRes = await _dio.get<dynamic>(
-      'https://api.bilibili.com/x/web-interface/view',
-      queryParameters: ids,
-    );
-    final Map<String, dynamic> viewRoot =
-        viewRes.data as Map<String, dynamic>? ?? <String, dynamic>{};
-    if ((viewRoot['code'] as int? ?? -1) != 0) {
-      throw StateError(
-        (viewRoot['message'] as String?) ?? '无法获取 Bilibili 视频信息',
-      );
-    }
-    final Map<String, dynamic> data =
-        viewRoot['data'] as Map<String, dynamic>? ?? <String, dynamic>{};
+    ids = await _repairIdsIfViewMissing(ids, rawInput: rawInput);
+    final Map<String, dynamic> data = await _fetchViewData(ids);
     final String bvid = (data['bvid'] as String?) ?? ids['bvid'] ?? '';
     final int? aid =
         (data['aid'] as num?)?.toInt() ?? int.tryParse(ids['aid'] ?? '');
@@ -1288,40 +1318,14 @@ class BilibiliImportService {
   }
 
   Future<_BilibiliVideoRef> _resolveVideoRef(String rawInput) async {
-    final Map<String, String>? ids = await resolveIds(rawInput);
+    Map<String, String>? ids = await resolveIds(rawInput);
     if (ids == null) {
       throw StateError('无法识别 B 站链接（请贴完整 BV 或分享文案）');
     }
-    final Response<dynamic> viewRes;
-    try {
-      viewRes = await _dio.get<dynamic>(
-        'https://api.bilibili.com/x/web-interface/view',
-        queryParameters: ids,
-        options: Options(
-          headers: <String, dynamic>{
-            'Accept': 'application/json, text/plain, */*',
-          },
-          validateStatus: (int? code) =>
-              code != null && code >= 200 && code < 500,
-        ),
-      );
-    } catch (e) {
-      throw StateError('获取视频信息失败：${_dioErrorSummary(e)}');
-    }
-    if ((viewRes.statusCode ?? 0) >= 400) {
-      throw StateError(
-        '获取视频信息失败：HTTP ${viewRes.statusCode} '
-        '(${ids.entries.map((e) => '${e.key}=${e.value}').join('&')})',
-      );
-    }
-    final Map<String, dynamic> viewRoot = _asJsonMap(viewRes.data);
-    final int code = viewRoot['code'] as int? ?? -1;
-    if (code != 0) {
-      throw StateError(
-        (viewRoot['message'] as String?) ?? '无法获取 B 站视频信息（code=$code）',
-      );
-    }
-    final Map<String, dynamic> data = _asJsonMap(viewRoot['data']);
+    // Stale catalogs uppercased BV ids → view -404「啥都木有」. Prefer aid, then
+    // UGC 合集 archive rematch when season hint is present in the raw input.
+    ids = await _repairIdsIfViewMissing(ids, rawInput: rawInput);
+    final Map<String, dynamic> data = await _fetchViewData(ids);
     final String bvid = (data['bvid'] as String?) ?? ids['bvid'] ?? '';
     final String? aid =
         ids['aid'] ?? (data['aid'] as num?)?.toInt().toString();
@@ -1352,6 +1356,219 @@ class BilibiliImportService {
       idKey: idKey,
       page: selected.page,
     );
+  }
+
+  /// View payload for [ids], trying bvid first then aid-only on -404.
+  Future<Map<String, dynamic>> _fetchViewData(Map<String, String> ids) async {
+    final List<Map<String, String>> attempts = <Map<String, String>>[
+      if ((ids['bvid'] ?? '').isNotEmpty)
+        <String, String>{'bvid': ids['bvid']!},
+      if ((ids['aid'] ?? '').isNotEmpty) <String, String>{'aid': ids['aid']!},
+      // Last resort: original map (may include both).
+      ids,
+    ];
+    Object? lastError;
+    for (final Map<String, String> query in attempts) {
+      if (query.isEmpty) {
+        continue;
+      }
+      try {
+        final Response<dynamic> viewRes = await _dio.get<dynamic>(
+          'https://api.bilibili.com/x/web-interface/view',
+          queryParameters: query,
+          options: Options(
+            headers: <String, dynamic>{
+              'Accept': 'application/json, text/plain, */*',
+            },
+            validateStatus: (int? code) =>
+                code != null && code >= 200 && code < 500,
+          ),
+        );
+        if ((viewRes.statusCode ?? 0) >= 400) {
+          lastError = StateError(
+            '获取视频信息失败：HTTP ${viewRes.statusCode} '
+            '(${query.entries.map((e) => '${e.key}=${e.value}').join('&')})',
+          );
+          continue;
+        }
+        final Map<String, dynamic> viewRoot = _asJsonMap(viewRes.data);
+        final int code = viewRoot['code'] as int? ?? -1;
+        if (code != 0) {
+          lastError = StateError(
+            (viewRoot['message'] as String?) ??
+                '无法获取 B 站视频信息（code=$code）',
+          );
+          continue;
+        }
+        return _asJsonMap(viewRoot['data']);
+      } catch (e) {
+        lastError = e;
+      }
+    }
+    if (lastError is StateError) {
+      throw lastError;
+    }
+    throw StateError('获取视频信息失败：${_dioErrorSummary(lastError)}');
+  }
+
+  /// When a BV was uppercased in the catalog, recover via `aid=` or UGC season.
+  Future<Map<String, String>> _repairIdsIfViewMissing(
+    Map<String, String> ids, {
+    required String rawInput,
+  }) async {
+    final String bvid = (ids['bvid'] ?? '').trim();
+    final String aid = (ids['aid'] ?? '').trim();
+    if (bvid.isEmpty) {
+      return ids;
+    }
+    try {
+      await _fetchViewData(<String, String>{'bvid': bvid});
+      return ids;
+    } catch (_) {
+      // fall through
+    }
+    if (aid.isNotEmpty) {
+      try {
+        final Map<String, dynamic> data = await _fetchViewData(
+          <String, String>{'aid': aid},
+        );
+        final String fixed =
+            (data['bvid'] as String?)?.trim().isNotEmpty == true
+            ? (data['bvid'] as String).trim()
+            : bvid;
+        // ignore: avoid_print
+        print(
+          'bilibili.repair bvid via aid=$aid '
+          '$bvid -> $fixed',
+        );
+        return <String, String>{
+          'bvid': fixed,
+          'aid': aid,
+        };
+      } catch (_) {
+        // fall through to season repair
+      }
+    }
+    final ({String seasonId, int? episodeIndex})? hint =
+        parseBilibiliSeasonHint(rawInput);
+    if (hint == null) {
+      return ids;
+    }
+    final BilibiliSeasonArchiveMatch? match = await matchSeasonArchive(
+      seasonId: hint.seasonId,
+      staleBvid: bvid,
+      episodeIndex: hint.episodeIndex,
+    );
+    if (match == null) {
+      return ids;
+    }
+    // ignore: avoid_print
+    print(
+      'bilibili.repair bvid via season=${hint.seasonId} '
+      '$bvid -> ${match.bvid}',
+    );
+    return <String, String>{
+      'bvid': match.bvid,
+      if (match.aid.isNotEmpty) 'aid': match.aid,
+    };
+  }
+
+  /// UGC 合集 archives (correct-case bvid) for [seasonId].
+  Future<List<BilibiliSeasonArchiveMatch>> fetchSeasonArchives(
+    String seasonId, {
+    String mid = '0',
+  }) async {
+    final String id = seasonId.trim();
+    if (id.isEmpty) {
+      return const <BilibiliSeasonArchiveMatch>[];
+    }
+    final List<BilibiliSeasonArchiveMatch> out =
+        <BilibiliSeasonArchiveMatch>[];
+    int pageNum = 1;
+    const int pageSize = 50;
+    while (pageNum <= 20) {
+      final Response<dynamic> res = await _dio.get<dynamic>(
+        'https://api.bilibili.com/x/polymer/web-space/seasons_archives_list',
+        queryParameters: <String, dynamic>{
+          'mid': mid,
+          'season_id': id,
+          'page_num': pageNum,
+          'page_size': pageSize,
+        },
+        options: Options(
+          headers: <String, dynamic>{
+            'Accept': 'application/json, text/plain, */*',
+          },
+          validateStatus: (int? code) =>
+              code != null && code >= 200 && code < 500,
+        ),
+      );
+      if ((res.statusCode ?? 0) >= 400) {
+        break;
+      }
+      final Map<String, dynamic> root = _asJsonMap(res.data);
+      if ((root['code'] as int? ?? -1) != 0) {
+        break;
+      }
+      final Map<String, dynamic> data = _asJsonMap(root['data']);
+      final List<dynamic> archives =
+          data['archives'] as List<dynamic>? ?? const <dynamic>[];
+      if (archives.isEmpty) {
+        break;
+      }
+      for (final dynamic raw in archives) {
+        if (raw is! Map) {
+          continue;
+        }
+        final Map<String, dynamic> row = raw.cast<String, dynamic>();
+        final String archiveBvid = (row['bvid'] as String?)?.trim() ?? '';
+        final String archiveAid = '${row['aid'] ?? ''}'.trim();
+        if (archiveBvid.isEmpty && archiveAid.isEmpty) {
+          continue;
+        }
+        out.add(
+          BilibiliSeasonArchiveMatch(
+            index: out.length + 1,
+            bvid: archiveBvid,
+            aid: archiveAid,
+            title: (row['title'] as String?)?.trim() ?? '',
+          ),
+        );
+      }
+      final Map<String, dynamic> page = _asJsonMap(data['page']);
+      final int total = (page['total'] as num?)?.toInt() ?? out.length;
+      if (out.length >= total || archives.length < pageSize) {
+        break;
+      }
+      pageNum += 1;
+    }
+    return out;
+  }
+
+  Future<BilibiliSeasonArchiveMatch?> matchSeasonArchive({
+    required String seasonId,
+    String? staleBvid,
+    int? episodeIndex,
+  }) async {
+    final List<BilibiliSeasonArchiveMatch> archives =
+        await fetchSeasonArchives(seasonId);
+    if (archives.isEmpty) {
+      return null;
+    }
+    final String stale = (staleBvid ?? '').trim().toUpperCase();
+    if (stale.isNotEmpty) {
+      for (final BilibiliSeasonArchiveMatch row in archives) {
+        if (row.bvid.toUpperCase() == stale) {
+          return row;
+        }
+      }
+    }
+    if (episodeIndex != null &&
+        episodeIndex >= 1 &&
+        episodeIndex <= archives.length) {
+      return archives[episodeIndex - 1];
+    }
+    return null;
   }
 
   Future<List<String>> _fetchPlayableDurlCandidates(

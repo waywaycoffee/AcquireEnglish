@@ -1538,7 +1538,8 @@ class SubtitleCompletionWorker {
       root = key.substring(0, pageMatch.start);
     }
     if (root.toUpperCase().startsWith('BV')) {
-      return BilibiliImport.watchUrl(bvid: root.toUpperCase(), page: page);
+      // Keep original BV letter case for view/playurl.
+      return BilibiliImport.watchUrl(bvid: root, page: page);
     }
     if (root.toLowerCase().startsWith('av')) {
       final String aid = root.toLowerCase().startsWith('av')

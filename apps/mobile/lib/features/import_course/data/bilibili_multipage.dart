@@ -6,6 +6,182 @@ import 'bilibili_course_builder.dart';
 import 'bilibili_import_service.dart';
 import 'subtitle_source_policy.dart';
 
+/// True when a BV looks like it was force-uppercased (breaks B站 APIs).
+bool bilibiliBvidLooksForceUppercased(String? bvid) {
+  final String value = (bvid ?? '').trim();
+  if (value.length < 3 || !value.toUpperCase().startsWith('BV')) {
+    return false;
+  }
+  final String body = value.substring(2);
+  return body.isNotEmpty && body == body.toUpperCase();
+}
+
+/// Rewrite a watch URL whose BV letters were uppercased (API → 啥都木有).
+///
+/// Uses `?aid=` when present, otherwise UGC season archives when [course] /
+/// [episode] carry a `bilibili-season-{id}` hint.
+Future<String> repairBilibiliSourceCase({
+  required BilibiliImportService service,
+  required String source,
+  LibraryCourseData? course,
+  LibraryEpisodeItem? episode,
+  Map<String, List<BilibiliSeasonArchiveMatch>>? seasonArchiveCache,
+}) async {
+  final String raw = source.trim();
+  if (raw.isEmpty) {
+    return raw;
+  }
+  final Map<String, String>? ids = BilibiliImport.extractIds(raw);
+  final String bvid = (ids?['bvid'] ?? '').trim();
+  if (bvid.isEmpty) {
+    return raw;
+  }
+  final bool looksForcedUpper = bilibiliBvidLooksForceUppercased(bvid);
+  final String aid = (ids?['aid'] ?? '').trim();
+  if (!looksForcedUpper && aid.isEmpty) {
+    return raw;
+  }
+
+  if (aid.isNotEmpty) {
+    try {
+      final BilibiliImportResult meta = await service.fetch('av$aid');
+      final String fixed = meta.watchUrl.trim();
+      if (fixed.isNotEmpty) {
+        return fixed;
+      }
+    } catch (_) {}
+  }
+
+  final String hintBlob =
+      '${course?.id ?? ''} ${course?.title ?? ''} ${course?.description ?? ''} '
+      '${episode?.id ?? ''} ${episode?.title ?? ''} ${episode?.sourceUrl ?? ''}';
+  final ({String seasonId, int? episodeIndex})? hint =
+      parseBilibiliSeasonHint(hintBlob) ?? parseBilibiliSeasonHint(raw);
+  if (hint == null) {
+    // ignore: avoid_print
+    print(
+      'bilibili.repair skip (no season/aid) bvid=$bvid '
+      'course=${course?.id} title=${course?.title}',
+    );
+    return raw;
+  }
+  final int? indexFromNumber = int.tryParse(episode?.numberStr ?? '');
+  final int? episodeIndex = hint.episodeIndex ?? indexFromNumber;
+  List<BilibiliSeasonArchiveMatch>? archives =
+      seasonArchiveCache?[hint.seasonId];
+  if (archives == null) {
+    archives = await service.fetchSeasonArchives(hint.seasonId);
+    seasonArchiveCache?[hint.seasonId] = archives;
+  }
+  BilibiliSeasonArchiveMatch? match;
+  final String stale = bvid.toUpperCase();
+  for (final BilibiliSeasonArchiveMatch row in archives) {
+    if (row.bvid.toUpperCase() == stale) {
+      match = row;
+      break;
+    }
+  }
+  match ??= (episodeIndex != null &&
+          episodeIndex >= 1 &&
+          episodeIndex <= archives.length)
+      ? archives[episodeIndex - 1]
+      : null;
+  if (match == null) {
+    // ignore: avoid_print
+    print(
+      'bilibili.repair season=${hint.seasonId} no match for $bvid '
+      'index=$episodeIndex archives=${archives.length}',
+    );
+    return raw;
+  }
+  final String fixed = BilibiliImport.watchUrl(
+    bvid: match.bvid,
+    aid: match.aid.isNotEmpty ? match.aid : null,
+    page: BilibiliImport.extractPage(raw),
+  );
+  // ignore: avoid_print
+  print('bilibili.repair $bvid -> ${match.bvid} via season=${hint.seasonId}');
+  return fixed;
+}
+
+/// Fix uppercased BV sourceUrls on season-split courses (title like
+/// `bilibili-season-{id}-{ep}`). Persists nothing — caller writes catalog.
+Future<List<LibraryCourseData>> repairUppercasedBilibiliCourses({
+  required BilibiliImportService service,
+  required List<LibraryCourseData> courses,
+}) async {
+  final Map<String, List<BilibiliSeasonArchiveMatch>> cache =
+      <String, List<BilibiliSeasonArchiveMatch>>{};
+  final List<LibraryCourseData> out = <LibraryCourseData>[];
+  for (final LibraryCourseData course in courses) {
+    final bool isBili =
+        course.category == 'bilibili' ||
+        course.sourceLabel.toLowerCase().contains('bilibili') ||
+        course.id.startsWith('bilibili-');
+    if (!isBili) {
+      out.add(course);
+      continue;
+    }
+    final List<LibraryEpisodeItem> nextEpisodes = <LibraryEpisodeItem>[];
+    bool changed = false;
+    for (final LibraryEpisodeItem episode in course.episodes) {
+      final String? source = bilibiliSourceForEpisode(
+        course: course,
+        episode: episode,
+        videoAsset: episode.videoAsset,
+      );
+      if (source == null || source.isEmpty) {
+        nextEpisodes.add(episode);
+        continue;
+      }
+      final String repaired = await repairBilibiliSourceCase(
+        service: service,
+        source: source,
+        course: course,
+        episode: episode,
+        seasonArchiveCache: cache,
+      );
+      if (repaired == source) {
+        nextEpisodes.add(episode);
+        continue;
+      }
+      changed = true;
+      final bool assetWasSource =
+          (episode.videoAsset ?? '').trim() == source.trim() ||
+          BilibiliImport.isWatchPageUrl(episode.videoAsset ?? '');
+      nextEpisodes.add(
+        episode.copyWith(
+          videoAsset: assetWasSource ? repaired : episode.videoAsset,
+          sourceUrl: repaired,
+        ),
+      );
+    }
+    if (!changed) {
+      out.add(course);
+      continue;
+    }
+    String description = course.description;
+    final String? descBvid = BilibiliImport.extractIds(description)?['bvid'];
+    if (bilibiliBvidLooksForceUppercased(descBvid)) {
+      description = await repairBilibiliSourceCase(
+        service: service,
+        source: description,
+        course: course,
+        episode: nextEpisodes.isNotEmpty ? nextEpisodes.first : null,
+        seasonArchiveCache: cache,
+      );
+    }
+    out.add(
+      course.copyWith(
+        description: description,
+        episodes: nextEpisodes,
+        totalEpisodes: nextEpisodes.length,
+      ),
+    );
+  }
+  return out;
+}
+
 /// If a Bilibili course was imported as a single episode but belongs to a
 /// 合集 or multi-page BV, expand to one episode per member/page.
 /// Preserves the current episode's local video / subtitle paths.
@@ -158,9 +334,8 @@ String? bilibiliEpisodeCacheKey({
   if (root.isEmpty) {
     return null;
   }
-  if (root.toUpperCase().startsWith('BV')) {
-    root = root.toUpperCase();
-  } else if (root.toLowerCase().startsWith('av')) {
+  // Preserve BV letter case — uppercasing makes view/playurl return 啥都木有.
+  if (root.toLowerCase().startsWith('av')) {
     root = root.toLowerCase();
   }
 

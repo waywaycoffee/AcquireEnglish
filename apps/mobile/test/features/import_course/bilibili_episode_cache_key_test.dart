@@ -9,16 +9,16 @@ void main() {
         bilibiliEpisodeCacheKey(
           sourceUrl: 'https://www.bilibili.com/video/BV1xx411c7mD?p=2',
         ),
-        'BV1XX411C7MD-p02',
+        'BV1xx411c7mD-p02',
       );
     });
 
-    test('page 1 stays bare BV', () {
+    test('page 1 stays bare BV with original letter case', () {
       expect(
         bilibiliEpisodeCacheKey(
           sourceUrl: 'https://www.bilibili.com/video/BV1xx411c7mD',
         ),
-        'BV1XX411C7MD',
+        'BV1xx411c7mD',
       );
     });
 
@@ -81,24 +81,24 @@ void main() {
   });
 
   group('bilibiliIdKeyFromPath page suffix', () {
-    test('keeps -p02 from media filename', () {
+    test('keeps -p02 from media filename with original case', () {
       expect(
-        bilibiliIdKeyFromPath('/data/bilibili_media/BV1XX411C7MD-p02.mp4'),
-        'BV1XX411C7MD-p02',
+        bilibiliIdKeyFromPath('/data/bilibili_media/BV1xx411c7mD-p02.mp4'),
+        'BV1xx411c7mD-p02',
       );
     });
 
-    test('keeps -p02 from subtitle folder', () {
+    test('keeps -p02 from subtitle folder with original case', () {
       expect(
-        bilibiliIdKeyFromPath('/docs/bilibili/BV1XX411C7MD-p02/zh.srt'),
-        'BV1XX411C7MD-p02',
+        bilibiliIdKeyFromPath('/docs/bilibili/BV1xx411c7mD-p02/zh.srt'),
+        'BV1xx411c7mD-p02',
       );
     });
 
-    test('bare BV stays bare', () {
+    test('bare BV preserves letter case', () {
       expect(
-        bilibiliIdKeyFromPath('/data/bilibili_media/BV1XX411C7MD.mp4'),
-        'BV1XX411C7MD',
+        bilibiliIdKeyFromPath('/data/bilibili_media/BV1BwGKzbEF1.mp4'),
+        'BV1BwGKzbEF1',
       );
     });
   });

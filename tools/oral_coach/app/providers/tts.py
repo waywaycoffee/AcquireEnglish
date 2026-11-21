@@ -20,7 +20,7 @@ def _write_silent_wav(path: str, seconds: float = 0.6) -> None:
 class MockTts:
     name = 'mock'
 
-    async def synthesize(self, text: str, out_path: str) -> TtsResult:
+    async def synthesize(self, text: str, out_path: str, *, voice: str | None = None, language: str | None = None) -> TtsResult:
         Path(out_path).parent.mkdir(parents=True, exist_ok=True)
         # Duration scales mildly with text length so UI can show a cue.
         seconds = min(4.0, 0.35 + 0.04 * max(1, len(text.split())))
@@ -31,12 +31,12 @@ class MockTts:
 class EdgeTts:
     name = 'edge'
 
-    async def synthesize(self, text: str, out_path: str) -> TtsResult:
+    async def synthesize(self, text: str, out_path: str, *, voice: str | None = None, language: str | None = None) -> TtsResult:
         try:
             import edge_tts  # type: ignore
         except ImportError as exc:
             raise RuntimeError('pip install edge-tts, or set TTS_PROVIDER=mock.') from exc
-        communicate = edge_tts.Communicate(text, 'en-US-JennyNeural')
+        communicate = edge_tts.Communicate(text, voice or ('zh-CN-XiaoxiaoNeural' if (language or '').startswith('zh') else 'en-US-JennyNeural'))
         await communicate.save(out_path)
         return TtsResult(audio_path=out_path, provider=self.name, mime='audio/mpeg')
 
@@ -44,7 +44,7 @@ class EdgeTts:
 class XttsTts:
     name = 'xtts'
 
-    async def synthesize(self, text: str, out_path: str) -> TtsResult:
+    async def synthesize(self, text: str, out_path: str, *, voice: str | None = None, language: str | None = None) -> TtsResult:
         raise RuntimeError(
             'XTTS scaffold: point to your Coqui XTTS server / local API, then implement synthesize().'
         )
@@ -53,7 +53,7 @@ class XttsTts:
 class FishSpeechTts:
     name = 'fishspeech'
 
-    async def synthesize(self, text: str, out_path: str) -> TtsResult:
+    async def synthesize(self, text: str, out_path: str, *, voice: str | None = None, language: str | None = None) -> TtsResult:
         raise RuntimeError(
             'FishSpeech scaffold: call your FishSpeech HTTP endpoint here.'
         )
