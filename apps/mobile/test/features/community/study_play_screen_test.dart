@@ -104,11 +104,11 @@ void main() {
     );
     await tester.pumpAndSettle();
     await tester.scrollUntilVisible(
-      find.text('确认打卡并领取积分'),
+      find.text('确认打卡'),
       180,
       scrollable: find.byType(Scrollable).first,
     );
-    await tester.tap(find.text('确认打卡并领取积分'));
+    await tester.tap(find.text('确认打卡'));
     await tester.pumpAndSettle();
     expect(api.claims, 1);
     expect(find.text('今日已打卡'), findsOneWidget);
