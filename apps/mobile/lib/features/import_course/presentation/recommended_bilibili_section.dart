@@ -3,11 +3,12 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../utils/url_utils.dart';
 import '../../authentication/presentation/auth_session.dart';
 import '../../shared/presentation/media/cover_image.dart';
 import '../../shared/presentation/pad/app_design_tokens.dart';
 import '../../sync/data/acquire_api_client.dart';
-import '../../../utils/url_utils.dart';
+import '../../sync/presentation/daily_feed_provider.dart';
 import 'bilibili_import_sheet.dart';
 import 'recommended_bilibili_provider.dart';
 
@@ -39,7 +40,8 @@ class RecommendedBilibiliSection extends ConsumerWidget {
             ),
             const SizedBox(height: 4),
             Text(
-              '头像进空间；点视频即可导入学习。推荐片中英字幕已在云端缓存，导入后优先直用。',
+              '头像进空间；点视频即可导入学习。推荐片中英字幕已在云端缓存，导入后优先直用。'
+              '关注仅保存在本 App，不会同步到 B 站。',
               style: TextStyle(
                 fontSize: 12,
                 fontWeight: FontWeight.w600,
@@ -60,12 +62,42 @@ class RecommendedBilibiliSection extends ConsumerWidget {
   }
 }
 
-class _CreatorCard extends ConsumerWidget {
+class _CreatorCard extends ConsumerStatefulWidget {
   const _CreatorCard({required this.item});
 
   final RecommendedBilibiliCreatorDto item;
 
-  Future<void> _follow(BuildContext context, WidgetRef ref) async {
+  @override
+  ConsumerState<_CreatorCard> createState() => _CreatorCardState();
+}
+
+class _CreatorCardState extends ConsumerState<_CreatorCard> {
+  bool _busy = false;
+
+  bool _isFollowed(List<FollowedCreatorDto> followed) {
+    final String mid = widget.item.creatorId.trim();
+    if (mid.isEmpty) {
+      return false;
+    }
+    return followed.any(
+      (FollowedCreatorDto c) =>
+          c.source == 'bilibili' && c.creatorId.trim() == mid,
+    );
+  }
+
+  Future<void> _syncFollowed(List<FollowedCreatorDto> list) async {
+    final AcquirePreferencesDto prefs = ref.read(learningPreferencesProvider);
+    await ref.read(learningPreferencesProvider.notifier).applyLocal(
+          prefs.copyWith(followedCreators: list),
+        );
+    ref.invalidate(followedCreatorsListProvider);
+    await ref.read(dailyFeedProvider.notifier).refresh(force: true);
+  }
+
+  Future<void> _toggleFollow(bool currentlyFollowed) async {
+    if (_busy) {
+      return;
+    }
     final AuthSessionState auth = ref.read(authSessionProvider);
     if (!auth.isLoggedIn) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -73,30 +105,63 @@ class _CreatorCard extends ConsumerWidget {
       );
       return;
     }
+    setState(() => _busy = true);
     try {
-      await ref.read(acquireApiClientProvider).followCreator(
-            source: 'bilibili',
-            creatorId: item.creatorId,
-            displayName: item.displayName,
-          );
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('已关注 ${item.displayName}')),
-        );
+      final AcquireApiClient api = ref.read(acquireApiClientProvider);
+      final List<FollowedCreatorDto> list = currentlyFollowed
+          ? await api.unfollowCreator(
+              source: 'bilibili',
+              creatorId: widget.item.creatorId,
+            )
+          : await api.followCreator(
+              source: 'bilibili',
+              creatorId: widget.item.creatorId,
+              displayName: widget.item.displayName,
+            );
+      await _syncFollowed(list);
+      if (!mounted) {
+        return;
       }
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            currentlyFollowed
+                ? '已取消关注 ${widget.item.displayName}'
+                : '已关注 ${widget.item.displayName}',
+          ),
+        ),
+      );
     } catch (e) {
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('关注失败：$e')),
-        );
+      if (!mounted) {
+        return;
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            currentlyFollowed ? '取消关注失败：$e' : '关注失败：$e',
+          ),
+        ),
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _busy = false);
       }
     }
   }
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  Widget build(BuildContext context) {
+    final RecommendedBilibiliCreatorDto item = widget.item;
     final RecommendedBilibiliVideoDto? video =
         item.videos.isEmpty ? null : item.videos.first;
+    final AsyncValue<List<FollowedCreatorDto>> followedAsync =
+        ref.watch(followedCreatorsListProvider);
+    final List<FollowedCreatorDto> followed = followedAsync.maybeWhen(
+      data: (List<FollowedCreatorDto> list) => list,
+      orElse: () => ref.watch(learningPreferencesProvider).followedCreators,
+    );
+    final bool isFollowed = _isFollowed(followed);
+
     return Material(
       color: AppDesignTokens.appWhite,
       shape: RoundedRectangleBorder(
@@ -152,8 +217,20 @@ class _CreatorCard extends ConsumerWidget {
                   ),
                 ),
                 TextButton(
-                  onPressed: () => unawaited(_follow(context, ref)),
-                  child: const Text('关注'),
+                  onPressed: _busy
+                      ? null
+                      : () => unawaited(_toggleFollow(isFollowed)),
+                  child: Text(
+                    _busy
+                        ? '…'
+                        : (isFollowed ? '已关注' : '关注'),
+                    style: TextStyle(
+                      fontWeight: FontWeight.w800,
+                      color: isFollowed
+                          ? AppDesignTokens.textSecondary
+                          : null,
+                    ),
+                  ),
                 ),
               ],
             ),
