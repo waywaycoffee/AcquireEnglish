@@ -114,8 +114,9 @@ class Settings(BaseSettings):
     fingerprint_max_blocks: int = 64
     fingerprint_block_chars: int = 512
     fingerprint_top_k: int = 20
-    fingerprint_embed_dim: int = 256
+    fingerprint_embed_dim: int = 512  # bge-small-zh-v1.5; hashing fallback also uses this
     # Optional 5060Ti embed HTTP endpoint; empty → local hashing-trick embed.
+    # Example: http://100.115.252.55:8092/embed
     fingerprint_embed_url: str = ""
     fingerprint_lru_min_hits: int = 3
     fingerprint_lru_idle_days: int = 180

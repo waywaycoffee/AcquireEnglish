@@ -63,7 +63,7 @@ async def embed_text(text: str) -> list[float]:
     url = (settings.fingerprint_embed_url or "").strip()
     if url:
         try:
-            async with httpx.AsyncClient(timeout=30.0) as client:
+            async with httpx.AsyncClient(timeout=60.0) as client:
                 resp = await client.post(url, json={"text": text[:200_000]})
                 resp.raise_for_status()
                 data = resp.json()
@@ -71,17 +71,17 @@ async def embed_text(text: str) -> list[float]:
                 if isinstance(emb, list) and emb:
                     return [float(x) for x in emb]
         except Exception:  # noqa: BLE001
+            # Fall back to CPU hashing if GPU embed is unreachable.
             pass
     return local_hash_embed(text, dim=settings.fingerprint_embed_dim)
 
 
 def cosine_similarity(a: list[float], b: list[float]) -> float:
-    if not a or not b:
+    if not a or not b or len(a) != len(b):
         return 0.0
-    n = min(len(a), len(b))
-    dot = sum(a[i] * b[i] for i in range(n))
-    na = math.sqrt(sum(a[i] * a[i] for i in range(n))) or 1.0
-    nb = math.sqrt(sum(b[i] * b[i] for i in range(n))) or 1.0
+    dot = sum(a[i] * b[i] for i in range(len(a)))
+    na = math.sqrt(sum(x * x for x in a)) or 1.0
+    nb = math.sqrt(sum(x * x for x in b)) or 1.0
     return dot / (na * nb)
 
 

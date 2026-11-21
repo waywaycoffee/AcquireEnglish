@@ -446,6 +446,7 @@ async def admin_get_config(
         "lru_idle_days": settings.fingerprint_lru_idle_days,
         "gpu_save_minutes": settings.fingerprint_gpu_save_minutes,
         "embed_url_configured": bool((settings.fingerprint_embed_url or "").strip()),
+        "embed_dim": int(settings.fingerprint_embed_dim),
     }
 
 

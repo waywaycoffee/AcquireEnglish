@@ -1,0 +1,9 @@
+.venv/
+__pycache__/
+*.pyc
+uvicorn.out.log
+uvicorn.err.log
+_smoke_embed.json
+_ecs_wire.sh
+_ecs_wire.py
+_ecs_verify.py
