@@ -6,6 +6,7 @@ import '../../library/presentation/library_catalog_provider.dart';
 import '../../library/presentation/library_mock_data.dart';
 import '../../exam/domain/exam_profile.dart';
 import '../../exam/presentation/exam_profile_provider.dart';
+import '../../exam/presentation/study_mode_switch_sheet.dart';
 import '../../onboarding/presentation/focus_recommendation.dart';
 import '../../onboarding/presentation/onboarding_provider.dart';
 import '../../reading/domain/reading_doc.dart';
@@ -135,6 +136,52 @@ class LearningHomeScreen extends ConsumerWidget {
                       ),
                     ],
                   ),
+                  const SizedBox(height: 12),
+                  Material(
+                    color: surface,
+                    borderRadius: BorderRadius.circular(16),
+                    child: InkWell(
+                      borderRadius: BorderRadius.circular(16),
+                      onTap: () => showStudyModeSwitchSheet(context, ref),
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 14,
+                          vertical: 12,
+                        ),
+                        child: Row(
+                          children: [
+                            Icon(
+                              examProfile.isExamMode
+                                  ? Icons.school_outlined
+                                  : Icons.auto_stories_outlined,
+                              color: accent,
+                              size: 22,
+                            ),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  text('学习模式', 12, color: muted),
+                                  const SizedBox(height: 2),
+                                  text(
+                                    examProfile.isExamMode
+                                        ? '考试备考'
+                                            '${examProfile.family == null ? '' : ' · ${examProfile.family!.label}'}'
+                                        : '日常习得',
+                                    15,
+                                    bold: true,
+                                  ),
+                                ],
+                              ),
+                            ),
+                            text('切换', 13, color: accent, bold: true),
+                            Icon(Icons.chevron_right, color: accent, size: 20),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
                   const SizedBox(height: 24),
                   if (examProfile.isExamMode && examProfile.family != null) ...[
                     text('备考进度 · ${examProfile.family!.label}', 17, bold: true),
@@ -183,19 +230,9 @@ class LearningHomeScreen extends ConsumerWidget {
                           Align(
                             alignment: Alignment.centerRight,
                             child: TextButton(
-                              onPressed: () async {
-                                await ref
-                                    .read(examProfileProvider.notifier)
-                                    .setAcquisition();
-                                if (context.mounted) {
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    const SnackBar(
-                                      content: Text('已切回日常习得模式'),
-                                    ),
-                                  );
-                                }
-                              },
-                              child: const Text('切回日常习得'),
+                              onPressed: () =>
+                                  showStudyModeSwitchSheet(context, ref),
+                              child: const Text('切换学习模式'),
                             ),
                           ),
                         ],
@@ -230,8 +267,9 @@ class LearningHomeScreen extends ConsumerWidget {
                               ),
                               const SizedBox(width: 10),
                               OutlinedButton(
-                                onPressed: () => context.push('/exam/select'),
-                                child: const Text('考试备考'),
+                                onPressed: () =>
+                                    showStudyModeSwitchSheet(context, ref),
+                                child: const Text('切换模式'),
                               ),
                             ],
                           ),

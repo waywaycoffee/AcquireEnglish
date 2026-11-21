@@ -12,6 +12,7 @@ import '../domain/exam_profile.dart';
 import '../domain/exam_registry.dart';
 import 'exam_pack_provider.dart';
 import 'exam_profile_provider.dart';
+import 'study_mode_switch_sheet.dart';
 
 class ExamHomeScreen extends ConsumerWidget {
   const ExamHomeScreen({super.key});
@@ -118,16 +119,8 @@ class ExamHomeScreen extends ConsumerWidget {
             ),
             const SizedBox(height: 8),
             OutlinedButton(
-              onPressed: () async {
-                await ref.read(examProfileProvider.notifier).setAcquisition();
-                if (context.mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('已切换回日常习得模式')),
-                  );
-                  context.go('/home');
-                }
-              },
-              child: const Text('切回日常习得'),
+              onPressed: () => showStudyModeSwitchSheet(context, ref),
+              child: const Text('切换学习模式'),
             ),
           ],
         ],
