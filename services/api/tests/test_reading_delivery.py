@@ -43,9 +43,10 @@ def test_reading_voices_lists_default_bilingual() -> None:
 
     async def run() -> None:
         data = await r.list_voices()
-        assert data['default'] == 'longanfengyue'
+        assert data['default'] == 'qwen-audio-3.0-tts-flash-loongolivialin'
+        assert 'qwen-audio-3.0-tts-flash-loongolivialin' in data['voices']
+        assert data['labels']['qwen-audio-3.0-tts-flash-loongolivialin']
         assert 'longanfengyue' in data['voices']
-        assert data['labels']['longanfengyue']
 
     asyncio.run(run())
 

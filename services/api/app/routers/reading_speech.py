@@ -19,11 +19,7 @@ voices_router = APIRouter(prefix="/reading", tags=["reading-speech"])
 
 # Published voice catalog for settings + vocab pronunciation.
 VOICE_LABELS: dict[str, str] = {
-    "longanfengyue": "龙安风悦 · 中英双语（推荐）",
-    "longanxiaoxin": "龙安小昕 · 中英双语",
-    "longanlingxi": "龙安灵希 · 中英双语",
-    "longanhuan_v3.6": "龙安欢 · 中英双语",
-    "qwen-audio-3.0-tts-flash-loongolivialin": "Olivia Lin · 英音女声",
+    "qwen-audio-3.0-tts-flash-loongolivialin": "Olivia Lin · 英音女声（推荐）",
     "qwen-audio-3.0-tts-flash-loonglunawang": "Luna Wang · 英音女声",
     "qwen-audio-3.0-tts-flash-loongnorahu": "Nora Hu · 英音女声",
     "qwen-audio-3.0-tts-flash-loongivyhu": "Ivy Hu · 英音女声",
@@ -31,9 +27,14 @@ VOICE_LABELS: dict[str, str] = {
     "qwen-audio-3.0-tts-flash-loongalexanderhu": "Alexander Hu · 英音男声",
     "qwen-audio-3.0-tts-flash-loongjameszhao": "James Zhao · 英音男声",
     "qwen-audio-3.0-tts-flash-loongryanma": "Ryan Ma · 英音男声",
+    "longanfengyue": "龙安风悦 · 中英双语",
+    "longanxiaoxin": "龙安小昕 · 中英双语",
+    "longanlingxi": "龙安灵希 · 中英双语",
+    "longanhuan_v3.6": "龙安欢 · 中英双语",
 }
 NAMES = frozenset(VOICE_LABELS)
-DEFAULT_VOICE = "longanfengyue"
+# English-first default for vocab / reading cards; bilingual voices stay selectable.
+DEFAULT_VOICE = "qwen-audio-3.0-tts-flash-loongolivialin"
 
 
 class SpeechLookupOut(BaseModel):

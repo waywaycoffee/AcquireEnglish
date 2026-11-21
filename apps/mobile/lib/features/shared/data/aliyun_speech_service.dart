@@ -4,8 +4,10 @@ import '../../authentication/presentation/auth_session.dart';
 import '../../settings/presentation/settings_provider.dart';
 import '../../sync/data/acquire_api_client.dart';
 
-/// Default Aliyun Qwen voice for vocab / reading (natural Mandarin+English).
-const String kDefaultAliyunTtsVoice = 'longanfengyue';
+/// Default Aliyun Qwen voice for vocab / English sentences (native English).
+/// Bilingual 龙安风悦 remains available in settings for mixed CN/EN text.
+const String kDefaultAliyunTtsVoice =
+    'qwen-audio-3.0-tts-flash-loongolivialin';
 
 final Provider<AliyunSpeechService> aliyunSpeechServiceProvider =
     Provider<AliyunSpeechService>((Ref ref) {

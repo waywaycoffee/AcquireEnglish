@@ -109,6 +109,17 @@ class WordPronunciationService {
           await _playRecording(cloudUrl)) {
         return;
       }
+      // Word cards request cloud on purpose — don't silently fall back to
+      // robotic on-device voices when Aliyun was expected.
+      if (forceCloud && !allowSynthesisFallback) {
+        throw const WordPronunciationException(
+          '阿里云发音暂不可用，请确认已登录且服务器已配置配音。',
+        );
+      }
+    } else if (forceCloud && cloudAudioResolver == null) {
+      throw const WordPronunciationException(
+        '请先登录账号以使用阿里云真人音色。',
+      );
     }
 
     if (!allowSynthesisFallback) {
