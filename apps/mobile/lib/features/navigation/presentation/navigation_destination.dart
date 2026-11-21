@@ -18,6 +18,14 @@ enum AppNavDestination {
     icon: LucideIcons.clapperboard,
     activeIcon: LucideIcons.clapperboard,
   ),
+  reading(
+    route: '/reading',
+    label: '阅读',
+    title: '爱快阅读',
+    subtitle: '泛读短文，点词进词书；可导入或从视频字幕生成。',
+    icon: Icons.chrome_reader_mode_outlined,
+    activeIcon: Icons.chrome_reader_mode_rounded,
+  ),
   oralCoach(
     route: '/digital-human',
     label: '口语',
@@ -65,15 +73,6 @@ enum AppNavDestination {
     subtitle: '查看在视频字幕中见过并收藏的单词。',
     icon: Icons.menu_book_outlined,
     activeIcon: Icons.menu_book_rounded,
-  ),
-  reading(
-    route: '/reading',
-    label: '阅读',
-    title: '爱快阅读',
-    subtitle: '泛读短文，点词进词书；可导入或从视频字幕生成。',
-    icon: Icons.chrome_reader_mode_outlined,
-    activeIcon: Icons.chrome_reader_mode_rounded,
-    showInBottomNav: false,
   ),
   guide(
     route: '/guide',

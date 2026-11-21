@@ -17,6 +17,7 @@ void main() {
       containsAll(const <String>[
         '/home',
         '/library',
+        '/reading',
         '/growth',
         '/phrases',
         '/guide',
@@ -98,7 +99,7 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('phrases page'), findsOneWidget);
 
-    await tester.tap(find.text('学习'));
+    await tester.tap(find.text('视频'));
     await tester.pumpAndSettle();
     expect(find.text('library page'), findsOneWidget);
 
@@ -185,15 +186,17 @@ void main() {
     );
 
     expect(find.text('视频'), findsOneWidget);
+    expect(find.text('阅读'), findsOneWidget);
     expect(find.text('学习'), findsOneWidget);
     expect(find.text('口语'), findsOneWidget);
     expect(find.text('社区'), findsOneWidget);
-    expect(find.text('复习'), findsOneWidget);
     expect(find.text('更多'), findsOneWidget);
+    expect(find.text('复习'), findsNothing);
     expect(find.text('短语'), findsNothing);
 
     await tester.tap(find.byKey(const Key('bottom-nav-more')));
     await tester.pumpAndSettle();
+    expect(find.text('复习'), findsOneWidget);
     expect(find.text('短语'), findsOneWidget);
     expect(find.text('单词'), findsOneWidget);
     expect(find.text('怎么学'), findsOneWidget);
