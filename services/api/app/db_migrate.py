@@ -16,6 +16,7 @@ async def ensure_schema_columns(conn: AsyncConnection) -> None:
     await _ensure_link_course_series_columns(conn)
     await _ensure_link_course_series_columns(conn)
     await _ensure_community_post_columns(conn)
+    await _ensure_oral_match_queue_columns(conn)
     await _ensure_shared_bilibili_cid_bigint(conn)
 
 
@@ -191,6 +192,28 @@ async def _ensure_community_post_columns(conn: AsyncConnection) -> None:
             "WHERE kind IN ('method', 'podcast_placeholder')"
         )
     )
+
+
+async def _ensure_oral_match_queue_columns(conn: AsyncConnection) -> None:
+    existing = await _existing_columns(conn, "oral_match_queue")
+    if existing is None:
+        return
+    alters: list[tuple[str, str]] = [
+        ("mode", "ALTER TABLE oral_match_queue ADD COLUMN mode VARCHAR(32) DEFAULT 'peer_oral'"),
+        (
+            "native_lang",
+            "ALTER TABLE oral_match_queue ADD COLUMN native_lang VARCHAR(16) DEFAULT ''",
+        ),
+        (
+            "target_lang",
+            "ALTER TABLE oral_match_queue ADD COLUMN target_lang VARCHAR(16) DEFAULT ''",
+        ),
+        ("topic", "ALTER TABLE oral_match_queue ADD COLUMN topic VARCHAR(64) DEFAULT ''"),
+        ("cefr", "ALTER TABLE oral_match_queue ADD COLUMN cefr VARCHAR(8) DEFAULT ''"),
+    ]
+    for col, sql in alters:
+        if col not in existing:
+            await conn.execute(text(sql))
 
 
 async def _ensure_shared_bilibili_cid_bigint(conn: AsyncConnection) -> None:

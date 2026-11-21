@@ -11,6 +11,7 @@ import '../../avatar/presentation/avatar_provider.dart';
 import '../../sync/data/acquire_api_client.dart';
 import '../../words/presentation/word_book_provider.dart';
 import '../../shared/presentation/pad/app_design_tokens.dart';
+import '../../shared/presentation/pad/hub_ui.dart';
 import 'adventure_ui.dart';
 import 'study_pk_screen.dart';
 import 'study_play_screen.dart';
@@ -259,10 +260,10 @@ class _StudyDeskScreenState extends ConsumerState<StudyDeskScreen>
     final Map<String, dynamic> sharing =
         (_desk?['sharing'] as Map<String, dynamic>?) ?? <String, dynamic>{};
     return Scaffold(
-      backgroundColor: const Color(0xFFF7F1E8),
+      backgroundColor: AppDesignTokens.softGray,
       appBar: AppBar(
-        backgroundColor: AdventurePalette.cafeWarm,
-        foregroundColor: Colors.white,
+        backgroundColor: AppDesignTokens.appWhite,
+        foregroundColor: AppDesignTokens.textPrimary,
         title: const Text('学习桌'),
         actions: <Widget>[
           IconButton(
@@ -277,26 +278,40 @@ class _StudyDeskScreenState extends ConsumerState<StudyDeskScreen>
           : RefreshIndicator(
               onRefresh: _load,
               child: ListView(
-                padding: EdgeInsets.zero,
+                padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
                 physics: const AlwaysScrollableScrollPhysics(),
                 children: <Widget>[
                   if (_busy) const LinearProgressIndicator(minHeight: 2),
-                  AdventureHeroBanner(
-                    edgeToEdge: true,
-                    chapterTitle: '学习桌',
-                    chapterIndex: 1,
-                    stageLabel: peer == null
-                        ? '邀请同桌，一起练词与备考'
-                        : '本周搭子 · ${peer['name']}',
-                    progressLabel: peer == null ? '尚未配对' : '同桌学习中',
-                    nodeCount: 1,
-                    clearedCount: peer == null ? 0 : 1,
-                    ctaLabel: '打开考试备考',
-                    onContinue: () => context.push('/exam'),
-                    partnerLabel: peer == null
-                        ? '暂无同桌'
-                        : '同桌 · ${peer['name']}',
+                  HubSurface(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: <Widget>[
+                        Text(
+                          peer == null
+                              ? '邀请同桌，一起练词与备考'
+                              : '本周搭子 · ${peer['name']}',
+                          style: const TextStyle(
+                            fontWeight: FontWeight.w900,
+                            fontSize: 18,
+                          ),
+                        ),
+                        const SizedBox(height: 6),
+                        Text(
+                          peer == null ? '尚未配对' : '同桌学习中',
+                          style: TextStyle(
+                            fontWeight: FontWeight.w600,
+                            color: AppDesignTokens.textSecondary,
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        FilledButton.tonal(
+                          onPressed: () => context.push('/exam'),
+                          child: const Text('打开考试备考'),
+                        ),
+                      ],
+                    ),
                   ),
+                  const SizedBox(height: 12),
                   Padding(
                     padding: const EdgeInsets.fromLTRB(16, 14, 16, 24),
                     child: Column(
@@ -351,7 +366,7 @@ class _StudyDeskScreenState extends ConsumerState<StudyDeskScreen>
                               child: DeskActionTile(
                                 label: '每日打卡',
                                 icon: Icons.local_fire_department_rounded,
-                                color: AdventurePalette.pathAmber,
+                                color: AppDesignTokens.brandGreen,
                                 onTap: _busy
                                     ? null
                                     : () => Navigator.of(context).push<void>(
@@ -825,7 +840,7 @@ class _WeeklyQuestCard extends StatelessWidget {
         color: Colors.white,
         borderRadius: BorderRadius.circular(20),
         border: Border.all(
-          color: AdventurePalette.pathAmber.withValues(alpha: 0.55),
+          color: AppDesignTokens.brandGreen.withValues(alpha: 0.55),
           width: 2,
         ),
         boxShadow: const <BoxShadow>[

@@ -76,6 +76,12 @@ class CommunityFeedNotifier extends AsyncNotifier<List<CommunityPostDto>> {
     String? linkTitle,
     String? embedWord,
     double? embedTimestampSec,
+    String? oralAudioUrl,
+    String? oralBookId,
+    String? oralKey,
+    String? transcript,
+    String? referenceLine,
+    Map<String, dynamic>? meta,
   }) async {
     final CommunityPostDto post = await ref
         .read(acquireApiClientProvider)
@@ -87,6 +93,12 @@ class CommunityFeedNotifier extends AsyncNotifier<List<CommunityPostDto>> {
           linkTitle: linkTitle,
           embedWord: embedWord,
           embedTimestampSec: embedTimestampSec,
+          oralAudioUrl: oralAudioUrl,
+          oralBookId: oralBookId,
+          oralKey: oralKey,
+          transcript: transcript,
+          referenceLine: referenceLine,
+          meta: meta,
         );
     final List<CommunityPostDto> current =
         state.asData?.value ?? const <CommunityPostDto>[];

@@ -14,6 +14,7 @@ from app.routers import (
     assets,
     auth,
     community,
+    community_groups,
     community_packs,
     study_desk,
     study_pk,
@@ -103,6 +104,7 @@ app.include_router(creators.router, prefix="/api")
 app.include_router(feed.router, prefix="/api")
 app.include_router(community.router, prefix="/api")
 app.include_router(community_packs.router, prefix="/api")
+app.include_router(community_groups.router, prefix="/api")
 app.include_router(study_desk.router, prefix="/api")
 app.include_router(study_pk.router, prefix="/api")
 app.include_router(study_play.router, prefix="/api")

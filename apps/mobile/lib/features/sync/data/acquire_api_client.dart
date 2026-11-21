@@ -1617,9 +1617,22 @@ class AcquireApiClient {
         .toList(growable: false);
   }
 
-  Future<OralMatchStatus> enqueueOralMatch() async {
+  Future<OralMatchStatus> enqueueOralMatch({
+    String mode = 'peer_oral',
+    String nativeLang = '',
+    String targetLang = '',
+    String topic = '',
+    String cefr = '',
+  }) async {
     final Response<dynamic> response = await _dio.post(
       Endpoints.oralMatchEnqueue,
+      data: <String, dynamic>{
+        'mode': mode,
+        if (nativeLang.trim().isNotEmpty) 'native_lang': nativeLang.trim(),
+        if (targetLang.trim().isNotEmpty) 'target_lang': targetLang.trim(),
+        if (topic.trim().isNotEmpty) 'topic': topic.trim(),
+        if (cefr.trim().isNotEmpty) 'cefr': cefr.trim(),
+      },
     );
     return OralMatchStatus.fromJson(
       Map<String, dynamic>.from(response.data as Map),
@@ -2264,6 +2277,12 @@ class AcquireApiClient {
     String? linkCover,
     String? embedWord,
     double? embedTimestampSec,
+    String? oralAudioUrl,
+    String? oralBookId,
+    String? oralKey,
+    String? transcript,
+    String? referenceLine,
+    Map<String, dynamic>? meta,
   }) async {
     final Response<dynamic> response = await _dio.post(
       Endpoints.communityPosts,
@@ -2278,10 +2297,58 @@ class AcquireApiClient {
           'embed_word': embedWord.trim(),
         if (embedTimestampSec != null)
           'embed_timestamp_sec': embedTimestampSec,
+        if (oralAudioUrl != null && oralAudioUrl.trim().isNotEmpty)
+          'oral_audio_url': oralAudioUrl.trim(),
+        if (oralBookId != null && oralBookId.trim().isNotEmpty)
+          'oral_book_id': oralBookId.trim(),
+        if (oralKey != null && oralKey.trim().isNotEmpty)
+          'oral_key': oralKey.trim(),
+        if (transcript != null && transcript.trim().isNotEmpty)
+          'transcript': transcript.trim(),
+        if (referenceLine != null && referenceLine.trim().isNotEmpty)
+          'reference_line': referenceLine.trim(),
+        if (meta != null && meta.isNotEmpty) 'meta': meta,
       },
       options: _noCache,
     );
     return CommunityPostDto.fromJson(response.data as Map<String, dynamic>);
+  }
+
+  Future<CommunityPostDto> transcribeCommunityPost(int postId) async {
+    final Response<dynamic> response = await _dio.post(
+      Endpoints.communityPostTranscribe(postId),
+      options: Options(
+        extra: _noCache.extra,
+        receiveTimeout: const Duration(minutes: 3),
+      ),
+    );
+    return CommunityPostDto.fromJson(response.data as Map<String, dynamic>);
+  }
+
+  Future<Map<String, dynamic>> uploadContentMedia({
+    required List<int> bytes,
+    required String filename,
+    required String bookId,
+    required String key,
+    String namespace = 'oral',
+  }) async {
+    final FormData form = FormData.fromMap(<String, dynamic>{
+      'file': MultipartFile.fromBytes(bytes, filename: filename),
+      'book_id': bookId,
+      'key': key,
+      'namespace': namespace,
+    });
+    final Response<dynamic> response = await _dio.post(
+      Endpoints.contentMediaUpload,
+      data: form,
+      options: Options(
+        extra: _noCache.extra,
+        contentType: 'multipart/form-data',
+        receiveTimeout: const Duration(minutes: 2),
+        sendTimeout: const Duration(minutes: 2),
+      ),
+    );
+    return Map<String, dynamic>.from(response.data as Map);
   }
 
   Future<CommunityPostDto> likeCommunityPost(int postId) async {
@@ -2491,6 +2558,8 @@ class AcquireApiClient {
     String? cefr,
     String? topic,
     bool mine = false,
+    bool recommend = false,
+    String? learnerCefr,
   }) async {
     final Response<dynamic> response = await _dio.get(
       Endpoints.communityPacks,
@@ -2498,10 +2567,63 @@ class AcquireApiClient {
         if (cefr != null && cefr.isNotEmpty) 'cefr': cefr,
         if (topic != null && topic.isNotEmpty) 'topic': topic,
         if (mine) 'mine': true,
+        if (recommend) 'recommend': true,
+        if (learnerCefr != null && learnerCefr.isNotEmpty)
+          'learner_cefr': learnerCefr,
       },
       options: _noCache,
     );
     return (response.data as List<dynamic>).cast<Map<String, dynamic>>();
+  }
+
+  Future<List<Map<String, dynamic>>> listCommunityGroups({
+    bool mine = false,
+  }) async {
+    final Response<dynamic> response = await _dio.get(
+      Endpoints.communityGroups,
+      queryParameters: <String, dynamic>{if (mine) 'mine': true},
+      options: _noCache,
+    );
+    return (response.data as List<dynamic>).cast<Map<String, dynamic>>();
+  }
+
+  Future<Map<String, dynamic>> createCommunityGroup(
+    Map<String, dynamic> body,
+  ) async {
+    final Response<dynamic> response = await _dio.post(
+      Endpoints.communityGroups,
+      data: body,
+      options: _noCache,
+    );
+    return response.data as Map<String, dynamic>;
+  }
+
+  Future<Map<String, dynamic>> joinCommunityGroup(int groupId) async {
+    final Response<dynamic> response = await _dio.post(
+      '${Endpoints.communityGroups}/$groupId/join',
+      options: _noCache,
+    );
+    return response.data as Map<String, dynamic>;
+  }
+
+  Future<List<Map<String, dynamic>>> listCommunityGroupTasks(int groupId) async {
+    final Response<dynamic> response = await _dio.get(
+      '${Endpoints.communityGroups}/$groupId/tasks',
+      options: _noCache,
+    );
+    return (response.data as List<dynamic>).cast<Map<String, dynamic>>();
+  }
+
+  Future<Map<String, dynamic>> createCommunityGroupTask(
+    int groupId,
+    Map<String, dynamic> body,
+  ) async {
+    final Response<dynamic> response = await _dio.post(
+      '${Endpoints.communityGroups}/$groupId/tasks',
+      data: body,
+      options: _noCache,
+    );
+    return response.data as Map<String, dynamic>;
   }
 
   Future<Map<String, dynamic>> createCommunityPack(

@@ -996,7 +996,7 @@ class LearningModuleProgress(Base):
 
 
 class OralMatchQueue(Base):
-    """Waiting learners for 1:1 peer oral practice."""
+    """Waiting learners for 1:1 peer oral practice / language exchange."""
 
     __tablename__ = "oral_match_queue"
 
@@ -1006,6 +1006,68 @@ class OralMatchQueue(Base):
     display_name: Mapped[str] = mapped_column(String(64))
     enqueued_at: Mapped[float] = mapped_column(Float)
     heartbeat_at: Mapped[float] = mapped_column(Float)
+    # peer_oral | language_exchange
+    mode: Mapped[str] = mapped_column(String(32), default="peer_oral")
+    native_lang: Mapped[str] = mapped_column(String(16), default="")
+    target_lang: Mapped[str] = mapped_column(String(16), default="")
+    topic: Mapped[str] = mapped_column(String(64), default="")
+    cefr: Mapped[str] = mapped_column(String(8), default="")
+
+
+class CommunityStudyGroup(Base):
+    """Formal study group with shared weekly material tasks."""
+
+    __tablename__ = "community_study_groups"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    owner_id: Mapped[int] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), index=True
+    )
+    title: Mapped[str] = mapped_column(String(120), default="")
+    description: Mapped[str] = mapped_column(Text, default="")
+    topic: Mapped[str] = mapped_column(String(64), default="")
+    cefr: Mapped[str] = mapped_column(String(8), default="")
+    visibility: Mapped[str] = mapped_column(String(16), default="public", index=True)
+    member_count: Mapped[int] = mapped_column(Integer, default=1)
+    status: Mapped[str] = mapped_column(String(16), default="open", index=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+
+
+class CommunityStudyGroupMember(Base):
+    __tablename__ = "community_study_group_members"
+
+    group_id: Mapped[int] = mapped_column(
+        ForeignKey("community_study_groups.id", ondelete="CASCADE"), primary_key=True
+    )
+    user_id: Mapped[int] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), primary_key=True
+    )
+    role: Mapped[str] = mapped_column(String(16), default="member")
+    joined_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+
+
+class CommunityGroupTask(Base):
+    __tablename__ = "community_group_tasks"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    group_id: Mapped[int] = mapped_column(
+        ForeignKey("community_study_groups.id", ondelete="CASCADE"), index=True
+    )
+    week_id: Mapped[str] = mapped_column(String(16), index=True)
+    title: Mapped[str] = mapped_column(String(200), default="")
+    task_type: Mapped[str] = mapped_column(String(32), default="shadowing")
+    material_pack_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    link_url: Mapped[str | None] = mapped_column(String(1024), nullable=True)
+    created_by: Mapped[int] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), index=True
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
 
 
 class OralPeerRoom(Base):

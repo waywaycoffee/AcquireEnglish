@@ -1,10 +1,14 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:record/record.dart';
 
 import '../../../router/app_router.dart';
+import '../../authentication/presentation/auth_session.dart';
 import '../../import_course/presentation/bilibili_import_sheet.dart';
 import '../../shared/presentation/pad/app_design_tokens.dart';
 import '../../sync/data/acquire_api_client.dart';
@@ -62,7 +66,7 @@ class CommunityFeedTab extends ConsumerWidget {
                       title: emptyTitle,
                       meta: emptyMeta,
                       badge: '推荐',
-                      accent: AdventurePalette.pathAmber,
+                      accent: AppDesignTokens.brandGreen,
                       onPlay: () => context.push('/exam'),
                     ),
                     const SizedBox(height: 12),
@@ -149,7 +153,7 @@ class CommunityFeedTab extends ConsumerWidget {
                 width: 40,
                 height: 4,
                 decoration: BoxDecoration(
-                  color: AdventurePalette.pathAmber,
+                  color: AppDesignTokens.brandGreen,
                   borderRadius: BorderRadius.circular(99),
                 ),
               ),
@@ -168,7 +172,7 @@ class CommunityFeedTab extends ConsumerWidget {
                   'imitation',
                   '句子仿写',
                   '基于素材原句仿写，求用词点评',
-                  AdventurePalette.pathAmber,
+                  AppDesignTokens.brandGreen,
                 ),
                 (
                   'shadowing',
@@ -186,7 +190,7 @@ class CommunityFeedTab extends ConsumerWidget {
                   'learning_result',
                   '分享学习成果',
                   '精听 / 模考等通用成果卡',
-                  AdventurePalette.pathAmber,
+                  AppDesignTokens.brandGreen,
                 ),
                 (
                   'share_bilibili',
@@ -299,6 +303,8 @@ class CommunityPostCard extends ConsumerWidget {
       if ((post.embedWord ?? '').isNotEmpty) '词条 ${post.embedWord}',
       if (post.embedTimestampSec != null)
         '⏱ ${post.embedTimestampSec!.toStringAsFixed(1)}s',
+      if ((post.oralAudioUrl ?? '').isNotEmpty) '有跟读录音',
+      if ((post.transcript ?? '').isNotEmpty) '已转写',
     ].join(' · ');
     final String metaCore =
         '$_metaLine · ♥${post.likeCount} · 💬${post.commentCount}'
@@ -618,6 +624,12 @@ class _ComposeSheetState extends ConsumerState<_ComposeSheet> {
   final TextEditingController _embedWord = TextEditingController();
   final TextEditingController _embedTs = TextEditingController();
   bool _busy = false;
+  bool _recording = false;
+  String? _oralPath;
+  String? _oralAudioUrl;
+  String? _oralBookId;
+  String? _oralKey;
+  final AudioRecorder _recorder = AudioRecorder();
 
   @override
   void dispose() {
@@ -626,6 +638,7 @@ class _ComposeSheetState extends ConsumerState<_ComposeSheet> {
     _link.dispose();
     _embedWord.dispose();
     _embedTs.dispose();
+    unawaited(_recorder.dispose());
     super.dispose();
   }
 
@@ -731,7 +744,12 @@ class _ComposeSheetState extends ConsumerState<_ComposeSheet> {
     final double? embedTs = double.tryParse(_embedTs.text.trim());
     setState(() => _busy = true);
     try {
-      await ref
+      if (widget.kind == 'shadowing' &&
+          _oralAudioUrl == null &&
+          _oralPath != null) {
+        await _uploadOralIfNeeded();
+      }
+      final CommunityPostDto? created = await ref
           .read(communityFeedProvider.notifier)
           .createPost(
             kind: widget.kind,
@@ -745,7 +763,19 @@ class _ComposeSheetState extends ConsumerState<_ComposeSheet> {
                 : null,
             embedWord: _supportsEmbed ? _embedWord.text.trim() : null,
             embedTimestampSec: _supportsEmbed ? embedTs : null,
+            oralAudioUrl: _oralAudioUrl,
+            oralBookId: _oralBookId,
+            oralKey: _oralKey,
           );
+      if (widget.kind == 'shadowing' &&
+          created != null &&
+          (_oralAudioUrl ?? '').isNotEmpty) {
+        try {
+          await ref
+              .read(acquireApiClientProvider)
+              .transcribeCommunityPost(created.id);
+        } catch (_) {}
+      }
       if (!mounted) return;
       Navigator.of(context).pop();
       ScaffoldMessenger.of(
@@ -758,6 +788,71 @@ class _ComposeSheetState extends ConsumerState<_ComposeSheet> {
       ).showSnackBar(SnackBar(content: Text('发布失败：$e')));
     } finally {
       if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  Future<void> _uploadOralIfNeeded() async {
+    final String? path = _oralPath;
+    if (path == null || !File(path).existsSync()) return;
+    final String email = ref.read(authSessionProvider).email.trim();
+    final String bookId = email.isEmpty
+        ? 'user_guest'
+        : 'user_${email.hashCode.abs()}';
+    final String key =
+        'shadow_${DateTime.now().millisecondsSinceEpoch}';
+    final Map<String, dynamic> uploaded =
+        await ref.read(acquireApiClientProvider).uploadContentMedia(
+              bytes: await File(path).readAsBytes(),
+              filename: 'shadowing.m4a',
+              bookId: bookId,
+              key: key,
+              namespace: 'oral',
+            );
+    final Map<String, dynamic>? item =
+        uploaded['item'] as Map<String, dynamic>?;
+    final String? url = (item?['audio_url'] as String?)?.trim();
+    _oralAudioUrl = (url == null || url.isEmpty)
+        ? null
+        : url;
+    _oralBookId = bookId;
+    _oralKey = key;
+  }
+
+  Future<void> _toggleShadowingRecord() async {
+    try {
+      if (_recording) {
+        final String? path = await _recorder.stop();
+        setState(() {
+          _recording = false;
+          _oralPath = path ?? _oralPath;
+          _oralAudioUrl = null;
+        });
+        return;
+      }
+      if (!await _recorder.hasPermission()) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('需要麦克风权限才能录跟读')),
+        );
+        return;
+      }
+      final Directory dir = await getTemporaryDirectory();
+      final String path =
+          '${dir.path}/community-shadow-${DateTime.now().millisecondsSinceEpoch}.m4a';
+      await _recorder.start(
+        const RecordConfig(encoder: AudioEncoder.aacLc),
+        path: path,
+      );
+      setState(() {
+        _recording = true;
+        _oralPath = path;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('录音失败：$e')),
+      );
+      setState(() => _recording = false);
     }
   }
 
@@ -822,6 +917,26 @@ class _ComposeSheetState extends ConsumerState<_ComposeSheet> {
                   border: OutlineInputBorder(),
                 ),
               ),
+            ],
+            if (widget.kind == 'shadowing') ...<Widget>[
+              const SizedBox(height: 10),
+              OutlinedButton.icon(
+                onPressed: _busy ? null : () => unawaited(_toggleShadowingRecord()),
+                icon: Icon(_recording ? Icons.stop_rounded : Icons.mic_rounded),
+                label: Text(
+                  _recording
+                      ? '停止录音'
+                      : (_oralPath == null ? '录制跟读（上传 ECS）' : '已录好，可重录'),
+                ),
+              ),
+              if (_oralPath != null && !_recording)
+                Padding(
+                  padding: const EdgeInsets.only(top: 6),
+                  child: Text(
+                    '录音将上传到 ECS oral 命名空间，并可自动转写',
+                    style: Theme.of(context).textTheme.bodySmall,
+                  ),
+                ),
             ],
             if (_supportsEmbed) ...<Widget>[
               const SizedBox(height: 10),

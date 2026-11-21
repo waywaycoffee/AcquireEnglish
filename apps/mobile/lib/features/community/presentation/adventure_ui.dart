@@ -5,16 +5,16 @@ import 'package:flutter/material.dart';
 import '../../avatar/presentation/avatar_preview.dart';
 import '../../shared/presentation/pad/app_design_tokens.dart';
 
-/// Game-flavored surfaces for the community adventure loop.
-/// Visual language: brand green / amber path / chunky CTAs (not purple glass).
+/// Shared community card accents (adventure/cafe narrative retired).
+/// Kept name for compatibility; colors follow brand green, not cafe amber.
 class AdventurePalette {
   AdventurePalette._();
 
-  static const Color pathAmber = Color(0xFFFFC800);
-  static const Color pathAmberDeep = Color(0xFFE6A800);
-  static const Color nightInk = Color(0xFF1A1520);
-  static const Color cafeWarm = Color(0xFF2A2118);
-  static const Color cafeGlow = Color(0xFFFFE4B8);
+  static const Color pathAmber = AppDesignTokens.brandGreen;
+  static const Color pathAmberDeep = AppDesignTokens.brandGreenDark;
+  static const Color nightInk = Color(0xFF1A1F28);
+  static const Color cafeWarm = Color(0xFF2A3140);
+  static const Color cafeGlow = Color(0xFFDDF2FF);
   static const Color locked = Color(0xFF4A4F5C);
 }
 

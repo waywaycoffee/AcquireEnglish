@@ -743,6 +743,49 @@ class DailyReviewNotifier extends Notifier<DailyReviewState> {
     }
   }
 
+  /// One-click import of community pack vocab into favorites + FSRS queue.
+  Future<({int enrolled, int skipped})> importPackVocab(
+    List<Map<String, dynamic>> vocab, {
+    String packTitle = '',
+  }) async {
+    final WordBookNotifier book = ref.read(wordBookProvider.notifier);
+    final String source = packTitle.trim().isEmpty ? '社区素材包' : packTitle.trim();
+    int enrolled = 0;
+    int skipped = 0;
+    for (final Map<String, dynamic> row in vocab) {
+      final String word = '${row['word'] ?? row['lemma'] ?? ''}'.trim();
+      if (word.isEmpty) {
+        skipped += 1;
+        continue;
+      }
+      final String gloss =
+          '${row['gloss'] ?? row['chinese'] ?? row['definition'] ?? ''}'.trim();
+      final bool added = book.addFavoriteWord(
+        rawWord: word,
+        episodeId: 'community-pack',
+        course: source,
+        episode: '词表',
+        time: '00:00',
+        lineKey: 'pack-$word',
+        sentence: gloss.isEmpty ? word : gloss,
+        chinese: gloss,
+        generatedDefinition: gloss.isEmpty ? null : gloss,
+      );
+      final bool enrolledOk = book.enrollForReview(word);
+      if (added || enrolledOk) {
+        enrolled += 1;
+      } else {
+        skipped += 1;
+      }
+    }
+    final DateTime now = ref.read(reviewClockProvider)();
+    await _transaction((DailyReviewState current) {
+      return current.synchronize(ref.read(reviewSourcesProvider), now);
+    });
+    scheduleCloudBackup();
+    return (enrolled: enrolled, skipped: skipped);
+  }
+
   /// After importing / activating a 词书: mark 熟词 learned + queue one-shot retest.
   Future<SyllabusImportOverlap> applySyllabusImportOverlap(
     SyllabusBook book,

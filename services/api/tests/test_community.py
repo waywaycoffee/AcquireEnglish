@@ -394,3 +394,31 @@ async def test_guest_feed_hot_and_material_pack_fork():
         me = await client.get("/api/community/me", headers=author)
         assert me.status_code == 200
         assert me.json()["credit_score"] >= 5
+
+        group = await client.post(
+            "/api/community/groups",
+            headers=author,
+            json={
+                "title": "B1 精听小组",
+                "topic": "news",
+                "cefr": "B1",
+                "visibility": "public",
+            },
+        )
+        assert group.status_code == 201, group.text
+        group_id = group.json()["id"]
+        task = await client.post(
+            f"/api/community/groups/{group_id}/tasks",
+            headers=author,
+            json={"title": "本周跟读", "task_type": "shadowing"},
+        )
+        assert task.status_code == 201, task.text
+        guest_groups = await client.get("/api/community/groups")
+        assert guest_groups.status_code == 200
+        assert any(row["id"] == group_id for row in guest_groups.json())
+
+        packs_iplus = await client.get(
+            "/api/community/packs",
+            params={"recommend": True, "learner_cefr": "A2"},
+        )
+        assert packs_iplus.status_code == 200

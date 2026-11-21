@@ -6,6 +6,7 @@ import json
 import re
 from collections import Counter, defaultdict
 from datetime import date, datetime, timedelta, timezone
+from pathlib import Path
 from typing import Any, Literal
 from urllib.parse import urlparse
 
@@ -223,6 +224,8 @@ class CommunityPostOut(BaseModel):
     english_level: str | None = None
     embed_word: str | None = None
     embed_timestamp_sec: float | None = None
+    oral_audio_url: str | None = None
+    transcript: str | None = None
     like_count: int
     comment_count: int = 0
     liked_by_me: bool = False
@@ -234,6 +237,7 @@ class CommunityPostOut(BaseModel):
     bilibili_open_url: str | None = None
     challenge_opens: int = 0
     challenge_completes: int = 0
+    meta: dict[str, Any] = Field(default_factory=dict)
 
 
 class CommunityPostCreate(BaseModel):
@@ -245,6 +249,12 @@ class CommunityPostCreate(BaseModel):
     link_cover: str | None = Field(default=None, max_length=1024)
     embed_word: str | None = Field(default=None, max_length=64)
     embed_timestamp_sec: float | None = Field(default=None, ge=0, le=86400)
+    oral_audio_url: str | None = Field(default=None, max_length=1024)
+    oral_book_id: str | None = Field(default=None, max_length=64)
+    oral_key: str | None = Field(default=None, max_length=128)
+    transcript: str | None = Field(default=None, max_length=8000)
+    reference_line: str | None = Field(default=None, max_length=500)
+    meta: dict[str, Any] = Field(default_factory=dict)
 
 
 class CommunityCommentOut(BaseModel):
@@ -312,13 +322,39 @@ def _build_meta_json(
     *,
     embed_word: str | None,
     embed_timestamp_sec: float | None,
+    oral_audio_url: str | None = None,
+    oral_book_id: str | None = None,
+    oral_key: str | None = None,
+    transcript: str | None = None,
+    reference_line: str | None = None,
+    extra: dict[str, Any] | None = None,
 ) -> str:
     meta: dict[str, Any] = {}
+    if isinstance(extra, dict):
+        for key, value in extra.items():
+            if value is None:
+                continue
+            meta[str(key)[:64]] = value
     word = (embed_word or "").strip().lower()
     if word:
         meta["embed_word"] = word[:64]
     if embed_timestamp_sec is not None:
         meta["embed_timestamp_sec"] = float(embed_timestamp_sec)
+    audio = (oral_audio_url or "").strip()
+    if audio.startswith("http://") or audio.startswith("https://") or audio.startswith("/media/"):
+        meta["oral_audio_url"] = audio[:1024]
+    book = (oral_book_id or "").strip()
+    if book:
+        meta["oral_book_id"] = book[:64]
+    key = (oral_key or "").strip()
+    if key:
+        meta["oral_key"] = key[:128]
+    text = (transcript or "").strip()
+    if text:
+        meta["transcript"] = text[:8000]
+    ref = (reference_line or "").strip()
+    if ref:
+        meta["reference_line"] = ref[:500]
     return json.dumps(meta, ensure_ascii=False)
 
 
@@ -341,6 +377,8 @@ def _serialize_post(
         embed_timestamp = float(embed_ts) if embed_ts is not None else None
     except (TypeError, ValueError):
         embed_timestamp = None
+    oral_audio = str(meta.get("oral_audio_url") or "").strip() or None
+    transcript = str(meta.get("transcript") or "").strip() or None
     return CommunityPostOut(
         id=post.id,
         kind=kind,
@@ -354,6 +392,8 @@ def _serialize_post(
         english_level=post.english_level,
         embed_word=embed_word,
         embed_timestamp_sec=embed_timestamp,
+        oral_audio_url=oral_audio,
+        transcript=transcript,
         like_count=int(post.like_count or 0),
         comment_count=int(post.comment_count or 0),
         liked_by_me=liked_by_me,
@@ -365,6 +405,7 @@ def _serialize_post(
         bilibili_open_url=_bilibili_open_url(bvid, post.link_url),
         challenge_opens=challenge_opens,
         challenge_completes=challenge_completes,
+        meta=meta,
     )
 
 
@@ -729,6 +770,12 @@ async def create_post(
         meta_json=_build_meta_json(
             embed_word=payload.embed_word,
             embed_timestamp_sec=payload.embed_timestamp_sec,
+            oral_audio_url=payload.oral_audio_url,
+            oral_book_id=payload.oral_book_id,
+            oral_key=payload.oral_key,
+            transcript=payload.transcript,
+            reference_line=payload.reference_line,
+            extra=payload.meta,
         ),
     )
     db.add(post)
@@ -742,6 +789,101 @@ async def create_post(
     return _serialize_post(
         post,
         author=user,
+        author_level=pref.level if pref else None,
+        liked_by_me=False,
+    )
+
+
+def _resolve_oral_audio_path(meta: dict[str, Any]) -> Path | None:
+    from app.services import content_media as cm
+
+    book_id = str(meta.get("oral_book_id") or "").strip()
+    key = str(meta.get("oral_key") or "").strip()
+    if book_id and key:
+        root = cm.namespace_root("oral")
+        bid = cm.sanitize_segment(book_id, fallback="book")
+        kid = cm.sanitize_segment(key, fallback="item")
+        for ext in (".wav", ".m4a", ".mp3", ".aac", ".ogg", ".opus"):
+            candidate = root / bid / f"{kid}{ext}"
+            if candidate.is_file():
+                return candidate
+    url = str(meta.get("oral_audio_url") or "").strip()
+    marker = "/media/oral/"
+    if marker in url:
+        rel = url.split(marker, 1)[1].split("?", 1)[0]
+        candidate = cm.media_cache_root() / "oral" / rel
+        if candidate.is_file():
+            return candidate
+    return None
+
+
+@router.post("/posts/{post_id}/transcribe", response_model=CommunityPostOut)
+async def transcribe_post(
+    post_id: int,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(get_current_user),
+) -> CommunityPostOut:
+    """Server ASR for shadowing / oral posts stored under ECS oral namespace."""
+    post = (
+        await db.execute(select(CommunityPost).where(CommunityPost.id == post_id))
+    ).scalar_one_or_none()
+    if post is None or post.status != "visible":
+        raise HTTPException(status_code=404, detail="post not found")
+    if post.user_id != user.id:
+        raise HTTPException(status_code=403, detail="只能转写自己的跟读投稿")
+    meta = _post_meta(post)
+    if str(meta.get("transcript") or "").strip():
+        author = (
+            await db.execute(select(User).where(User.id == post.user_id))
+        ).scalar_one_or_none()
+        pref = (
+            await db.execute(
+                select(UserPreference).where(UserPreference.user_id == post.user_id)
+            )
+        ).scalar_one_or_none()
+        return _serialize_post(
+            post,
+            author=author,
+            author_level=pref.level if pref else None,
+            liked_by_me=False,
+        )
+    audio_path = _resolve_oral_audio_path(meta)
+    if audio_path is None:
+        raise HTTPException(400, "帖子没有可转写的 ECS 跟读音频")
+    api_key = (settings.dashscope_api_key or "").strip()
+    if not api_key:
+        raise HTTPException(503, "服务端未配置 DASHSCOPE_API_KEY，无法转写")
+    from app.asr_dashscope import transcribe_file_to_srt
+
+    try:
+        srt = await transcribe_file_to_srt(audio_path, api_key=api_key)
+    except Exception as exc:  # noqa: BLE001
+        raise HTTPException(502, f"转写失败：{exc}") from exc
+    # Flatten SRT cues into plain transcript for learners.
+    lines: list[str] = []
+    for block in srt.split("\n\n"):
+        parts = [ln.strip() for ln in block.splitlines() if ln.strip()]
+        if len(parts) >= 3:
+            lines.append(" ".join(parts[2:]))
+        elif len(parts) == 1 and "-->" not in parts[0] and not parts[0].isdigit():
+            lines.append(parts[0])
+    transcript = " ".join(lines).strip() or srt.strip()
+    meta["transcript"] = transcript[:8000]
+    meta["transcript_srt"] = srt[:12000]
+    post.meta_json = json.dumps(meta, ensure_ascii=False)
+    await db.commit()
+    await db.refresh(post)
+    author = (
+        await db.execute(select(User).where(User.id == post.user_id))
+    ).scalar_one_or_none()
+    pref = (
+        await db.execute(
+            select(UserPreference).where(UserPreference.user_id == post.user_id)
+        )
+    ).scalar_one_or_none()
+    return _serialize_post(
+        post,
+        author=author,
         author_level=pref.level if pref else None,
         liked_by_me=False,
     )

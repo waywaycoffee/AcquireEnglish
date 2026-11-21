@@ -7,6 +7,7 @@ import '../../avatar/presentation/avatar_shop_screen.dart';
 import '../../shared/presentation/pad/app_design_tokens.dart';
 import '../data/community_models.dart';
 import 'adventure_ui.dart';
+import 'community_groups_tab.dart';
 import 'community_leaderboard_tab.dart';
 import 'community_provider.dart';
 import 'community_social_screen.dart';
@@ -96,6 +97,22 @@ class CommunityMeTab extends ConsumerWidget {
         ),
         const SizedBox(height: 14),
         QuestFeedCard(
+          title: '学习小组 / 语言交换',
+          meta: '正式小组、周任务、语伴匹配',
+          badge: '小组',
+          accent: AppDesignTokens.brandGreen,
+          showPlayChevron: false,
+          onPlay: () => Navigator.of(context).push<void>(
+            MaterialPageRoute<void>(
+              builder: (_) => Scaffold(
+                appBar: AppBar(title: const Text('学习小组')),
+                body: const CommunityGroupsTab(),
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(height: 12),
+        QuestFeedCard(
           title: '我的分享与关注',
           meta: '收藏素材、关注流、消息与管理',
           badge: '社交',
@@ -127,7 +144,7 @@ class CommunityMeTab extends ConsumerWidget {
           title: '作品集',
           meta: '仿写、跟读、造句与分享按类型汇总',
           badge: '练习',
-          accent: AdventurePalette.pathAmber,
+          accent: AppDesignTokens.brandGreen,
           showPlayChevron: false,
           onPlay: () => Navigator.of(context).push<void>(
             MaterialPageRoute<void>(

@@ -6,6 +6,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../../router/app_router.dart';
 import '../../authentication/presentation/auth_session.dart';
+import '../../daily_review/presentation/daily_review_provider.dart';
 import '../../import_course/presentation/bilibili_import_sheet.dart';
 import '../../shared/presentation/pad/app_design_tokens.dart';
 import '../../sync/data/acquire_api_client.dart';
@@ -39,7 +40,12 @@ class _CommunityHotTabState extends ConsumerState<CommunityHotTab> {
     setState(() => _packsLoading = true);
     try {
       final AcquireApiClient api = ref.read(acquireApiClientProvider);
-      final List<Map<String, dynamic>> packs = await api.listCommunityPacks();
+      final String learnerCefr =
+          ref.read(learningPreferencesProvider).level.trim();
+      final List<Map<String, dynamic>> packs = await api.listCommunityPacks(
+        recommend: true,
+        learnerCefr: learnerCefr.isEmpty ? null : learnerCefr,
+      );
       List<CommunityPostDto> following = const <CommunityPostDto>[];
       if (ref.read(authSessionProvider).isLoggedIn) {
         try {
@@ -116,9 +122,9 @@ class _CommunityHotTabState extends ConsumerState<CommunityHotTab> {
               else if (_packs.isEmpty)
                 QuestFeedCard(
                   title: '还没有公开素材包',
-                  meta: '发布含 CEFR / 题材的包，或先分享 B 站链接',
+                  meta: '发布含 CEFR / 题材 / 词表的包，或先分享 B 站链接',
                   badge: '等你来发',
-                  accent: AdventurePalette.pathAmber,
+                  accent: AppDesignTokens.brandGreen,
                   onPlay: loggedIn
                       ? () => unawaited(_createPack(context))
                       : () {},
@@ -130,6 +136,7 @@ class _CommunityHotTabState extends ConsumerState<CommunityHotTab> {
                         ? pack['title'] as String
                         : '未命名素材包',
                     meta: <String>[
+                      'i+1 推荐',
                       if ((pack['cefr'] as String?)?.isNotEmpty == true)
                         pack['cefr'] as String,
                       if ((pack['topic'] as String?)?.isNotEmpty == true)
@@ -138,8 +145,8 @@ class _CommunityHotTabState extends ConsumerState<CommunityHotTab> {
                       if (pack['has_subtitles'] == true) '字幕',
                       if (pack['has_vocab'] == true) '词表',
                     ].join(' · '),
-                    badge: '可 fork',
-                    accent: const Color(0xFF5B8DEF),
+                    badge: pack['has_vocab'] == true ? '词表可导入' : '可 fork',
+                    accent: AppDesignTokens.brandGreen,
                     onPlay: () => unawaited(_openPack(context, pack)),
                   ),
                   const SizedBox(height: 12),
@@ -214,7 +221,7 @@ class _CommunityHotTabState extends ConsumerState<CommunityHotTab> {
                   title: '还没有人分享学习素材',
                   meta: '去「练习」发一条 B 站链接，或上方发布素材包',
                   badge: '等你来发',
-                  accent: AdventurePalette.pathAmber,
+                  accent: AppDesignTokens.brandGreen,
                   onPlay: () {},
                 )
               else
@@ -277,11 +284,39 @@ class _CommunityHotTabState extends ConsumerState<CommunityHotTab> {
     );
   }
 
+  List<Map<String, dynamic>> _parseVocabLines(String raw) {
+    final List<Map<String, dynamic>> out = <Map<String, dynamic>>[];
+    final Set<String> seen = <String>{};
+    for (final String line in raw.split(RegExp(r'[\n,;]+'))) {
+      final String text = line.trim();
+      if (text.isEmpty) continue;
+      String word = text;
+      String gloss = '';
+      for (final String sep in <String>['\t', '|', '：', ':']) {
+        final int idx = text.indexOf(sep);
+        if (idx > 0) {
+          word = text.substring(0, idx).trim();
+          gloss = text.substring(idx + sep.length).trim();
+          break;
+        }
+      }
+      final String key = word.toLowerCase();
+      if (key.length < 2 || !seen.add(key)) continue;
+      out.add(<String, dynamic>{
+        'word': word,
+        if (gloss.isNotEmpty) 'gloss': gloss,
+      });
+      if (out.length >= 200) break;
+    }
+    return out;
+  }
+
   Future<void> _createPack(BuildContext context) async {
     final TextEditingController title = TextEditingController();
     final TextEditingController url = TextEditingController();
     final TextEditingController cefr = TextEditingController(text: 'B1');
     final TextEditingController topic = TextEditingController(text: 'daily');
+    final TextEditingController vocab = TextEditingController();
     final bool? ok = await showDialog<bool>(
       context: context,
       builder: (BuildContext ctx) => AlertDialog(
@@ -291,7 +326,7 @@ class _CommunityHotTabState extends ConsumerState<CommunityHotTab> {
             mainAxisSize: MainAxisSize.min,
             children: <Widget>[
               const Text(
-                '不上传视频文件；只保存来源链接与学习元信息。',
+                '不上传视频文件；只保存来源链接、学习元信息与可选词表。',
                 style: TextStyle(fontSize: 12),
               ),
               TextField(
@@ -309,6 +344,15 @@ class _CommunityHotTabState extends ConsumerState<CommunityHotTab> {
               TextField(
                 controller: topic,
                 decoration: const InputDecoration(labelText: '题材'),
+              ),
+              TextField(
+                controller: vocab,
+                minLines: 3,
+                maxLines: 6,
+                decoration: const InputDecoration(
+                  labelText: '词表（可选，一行一词）',
+                  hintText: 'apple:苹果\norder|点单',
+                ),
               ),
             ],
           ),
@@ -332,6 +376,8 @@ class _CommunityHotTabState extends ConsumerState<CommunityHotTab> {
       );
       return;
     }
+    final List<Map<String, dynamic>> vocabRows =
+        _parseVocabLines(vocab.text);
     try {
       await ref.read(acquireApiClientProvider).createCommunityPack(
         <String, dynamic>{
@@ -340,8 +386,10 @@ class _CommunityHotTabState extends ConsumerState<CommunityHotTab> {
           if (cefr.text.trim().isNotEmpty) 'cefr': cefr.text.trim(),
           if (topic.text.trim().isNotEmpty) 'topic': topic.text.trim(),
           'has_subtitles': false,
-          'has_vocab': false,
+          'has_vocab': vocabRows.isNotEmpty,
           'visibility': 'public',
+          if (vocabRows.isNotEmpty)
+            'meta': <String, dynamic>{'vocab': vocabRows},
         },
       );
       await _loadExtras();
@@ -442,15 +490,56 @@ class _CommunityHotTabState extends ConsumerState<CommunityHotTab> {
                   ),
               ],
               TextButton(
-                onPressed: () {
-                  Navigator.pop(ctx);
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('词表导入 FSRS：请先在播放器中收藏生词'),
-                    ),
-                  );
+                onPressed: () async {
+                  final Object? metaRaw = pack['meta'];
+                  final Map<String, dynamic> meta = metaRaw is Map
+                      ? Map<String, dynamic>.from(metaRaw)
+                      : <String, dynamic>{};
+                  final Object? vocabRaw = meta['vocab'];
+                  final List<Map<String, dynamic>> vocab = vocabRaw is List
+                      ? vocabRaw
+                          .whereType<Map>()
+                          .map(
+                            (Map row) =>
+                                Map<String, dynamic>.from(row),
+                          )
+                          .toList(growable: false)
+                      : const <Map<String, dynamic>>[];
+                  if (vocab.isEmpty) {
+                    if (ctx.mounted) Navigator.pop(ctx);
+                    if (!mounted) return;
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('该素材包还没有词表；发布时可粘贴词表'),
+                      ),
+                    );
+                    return;
+                  }
+                  try {
+                    final ({int enrolled, int skipped}) result = await ref
+                        .read(dailyReviewProvider.notifier)
+                        .importPackVocab(
+                          vocab,
+                          packTitle: (pack['title'] as String?) ?? '社区素材包',
+                        );
+                    if (ctx.mounted) Navigator.pop(ctx);
+                    if (!mounted) return;
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text(
+                          '已导入 ${result.enrolled} 词到 FSRS'
+                          '${result.skipped > 0 ? '（跳过 ${result.skipped}）' : ''}',
+                        ),
+                      ),
+                    );
+                  } catch (e) {
+                    if (!context.mounted) return;
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text('导入失败：$e')),
+                    );
+                  }
                 },
-                child: const Text('导入词表到 FSRS（占位）'),
+                child: const Text('导入词表到 FSRS'),
               ),
             ],
           ),

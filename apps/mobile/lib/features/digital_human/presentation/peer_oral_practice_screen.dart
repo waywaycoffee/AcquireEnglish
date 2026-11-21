@@ -31,6 +31,10 @@ enum _PeerPhase { matching, chat, diagnose, resay, ended }
 
 class _PeerOralPracticeScreenState
     extends ConsumerState<PeerOralPracticeScreen> {
+  bool _languageExchange = false;
+  String _nativeLang = 'zh';
+  String _targetLang = 'en';
+  String _exchangeTopic = 'daily life';
   static const int _maxRecordingBytes =
       Pcm16MonoAudio.expectedSampleRate * 2 * 45;
 
@@ -45,7 +49,7 @@ class _PeerOralPracticeScreenState
   StreamSubscription<Uint8List>? _recordingSubscription;
   Timer? _recordingLimitTimer;
 
-  _PeerPhase _phase = _PeerPhase.matching;
+  _PeerPhase _phase = _PeerPhase.ended;
   bool _busy = false;
   bool _recording = false;
   bool _saved = false;
@@ -53,7 +57,7 @@ class _PeerOralPracticeScreenState
   bool _voiceConnected = false;
   bool _peerVoicePresent = false;
   bool _peerOnline = true;
-  String _status = '正在匹配口语搭子…';
+  String _status = '选择模式后开始匹配';
   String? _error;
   OralCoachSession? _session;
   OralExpressionDiagnosis? _pending;
@@ -81,7 +85,6 @@ class _PeerOralPracticeScreenState
       if (!mounted) return;
       setState(() => _peerVoicePresent = peerConnected);
     };
-    unawaited(_bootstrapMatch());
   }
 
   @override
@@ -129,7 +132,12 @@ class _PeerOralPracticeScreenState
     });
     try {
       final AcquireApiClient api = ref.read(acquireApiClientProvider);
-      final OralMatchStatus status = await api.enqueueOralMatch();
+      final OralMatchStatus status = await api.enqueueOralMatch(
+        mode: _languageExchange ? 'language_exchange' : 'peer_oral',
+        nativeLang: _languageExchange ? _nativeLang : '',
+        targetLang: _languageExchange ? _targetLang : '',
+        topic: _languageExchange ? _exchangeTopic : '',
+      );
       if (!mounted) return;
       if (status.isMatched) {
         await _onMatched(status);
@@ -141,7 +149,9 @@ class _PeerOralPracticeScreenState
       });
       setState(() {
         _status = status.queuePosition == null
-            ? '排队中，等待另一位学习者…'
+            ? (_languageExchange
+                ? '语言交换排队中，等待互补母语搭子…'
+                : '排队中，等待另一位学习者…')
             : '排队中（第 ${status.queuePosition} 位）…';
       });
     } catch (error) {
@@ -173,7 +183,12 @@ class _PeerOralPracticeScreenState
         });
         return;
       }
-      await ref.read(acquireApiClientProvider).enqueueOralMatch();
+      await ref.read(acquireApiClientProvider).enqueueOralMatch(
+            mode: _languageExchange ? 'language_exchange' : 'peer_oral',
+            nativeLang: _languageExchange ? _nativeLang : '',
+            targetLang: _languageExchange ? _targetLang : '',
+            topic: _languageExchange ? _exchangeTopic : '',
+          );
     } catch (_) {}
   }
 
@@ -768,14 +783,48 @@ class _PeerOralPracticeScreenState
             if (_phase == _PeerPhase.ended)
               Padding(
                 padding: const EdgeInsets.fromLTRB(14, 12, 14, 0),
-                child: FilledButton(
-                  onPressed: () => unawaited(_bootstrapMatch()),
-                  child: const Text('重新匹配'),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: <Widget>[
+                    SwitchListTile(
+                      contentPadding: EdgeInsets.zero,
+                      title: const Text('语言交换模式'),
+                      subtitle: Text(
+                        _languageExchange
+                            ? '母语 $_nativeLang ↔ 目标语 $_targetLang · $_exchangeTopic'
+                            : '关闭时按普通口语搭子匹配',
+                      ),
+                      value: _languageExchange,
+                      onChanged: (bool v) =>
+                          setState(() => _languageExchange = v),
+                    ),
+                    FilledButton(
+                      onPressed: () => unawaited(_bootstrapMatch()),
+                      child: Text(
+                        _roomId == null ? '开始匹配' : '重新匹配',
+                      ),
+                    ),
+                  ],
                 ),
               ),
             Expanded(
               child: _phase == _PeerPhase.matching
-                  ? const Center(child: CircularProgressIndicator())
+                  ? Center(
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: <Widget>[
+                          const CircularProgressIndicator(),
+                          const SizedBox(height: 12),
+                          Text(_status),
+                          TextButton(
+                            onPressed: () => unawaited(_endSession()),
+                            child: const Text('取消'),
+                          ),
+                        ],
+                      ),
+                    )
+                  : _phase == _PeerPhase.ended
+                  ? const SizedBox.shrink()
                   : ListView.builder(
                       padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
                       itemCount: _bubbles.length,

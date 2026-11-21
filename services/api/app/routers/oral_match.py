@@ -119,6 +119,14 @@ def _room_payload(room: OralPeerRoom, me: int, *, now: float | None = None) -> d
     }
 
 
+class EnqueueIn(BaseModel):
+    mode: str = Field(default="peer_oral", max_length=32)
+    native_lang: str = Field(default="", max_length=16)
+    target_lang: str = Field(default="", max_length=16)
+    topic: str = Field(default="", max_length=64)
+    cefr: str = Field(default="", max_length=8)
+
+
 class EnqueueOut(BaseModel):
     status: str
     room_id: str | None = None
@@ -127,6 +135,8 @@ class EnqueueOut(BaseModel):
     queue_position: int | None = None
     peer_online: bool | None = None
     voice_ready: bool | None = None
+    mode: str | None = None
+    topic: str | None = None
 
 
 class MessageIn(BaseModel):
@@ -147,13 +157,50 @@ class ReportIn(BaseModel):
     reason: str = Field(min_length=2, max_length=500)
 
 
+def _norm_lang(value: str) -> str:
+    return (value or "").strip().lower()[:16]
+
+
+def _compatible_partner(mine: dict[str, str], other: OralMatchQueue) -> bool:
+    mode = (mine.get("mode") or "peer_oral").strip() or "peer_oral"
+    other_mode = (getattr(other, "mode", None) or "peer_oral").strip() or "peer_oral"
+    if mode != other_mode:
+        return False
+    if mode != "language_exchange":
+        return True
+    my_native = _norm_lang(mine.get("native_lang", ""))
+    my_target = _norm_lang(mine.get("target_lang", ""))
+    their_native = _norm_lang(getattr(other, "native_lang", "") or "")
+    their_target = _norm_lang(getattr(other, "target_lang", "") or "")
+    if not my_native or not my_target or not their_native or not their_target:
+        return False
+    # Complementary: I speak their target; they speak my target.
+    return my_native == their_target and my_target == their_native
+
+
 @router.post("/enqueue", response_model=EnqueueOut)
 async def enqueue_match(
+    payload: EnqueueIn = EnqueueIn(),
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> EnqueueOut:
+    body = payload
     now = time.time()
     name = _display_name(user)
+    mode = (body.mode or "peer_oral").strip() or "peer_oral"
+    if mode not in {"peer_oral", "language_exchange"}:
+        mode = "peer_oral"
+    prefs = {
+        "mode": mode,
+        "native_lang": _norm_lang(body.native_lang),
+        "target_lang": _norm_lang(body.target_lang),
+        "topic": (body.topic or "").strip()[:64],
+        "cefr": (body.cefr or "").strip().upper()[:8],
+    }
+    if mode == "language_exchange" and (
+        not prefs["native_lang"] or not prefs["target_lang"]
+    ):
+        raise HTTPException(400, "语言交换需填写母语与目标语")
     async with _PAIR_LOCK:
         await _purge(db, now)
         existing = await _active_room_for(db, user.id)
@@ -163,16 +210,20 @@ async def enqueue_match(
             else:
                 existing.heartbeat_b = now
             await db.commit()
-            return EnqueueOut(**_room_payload(existing, user.id, now=now))
+            out = EnqueueOut(**_room_payload(existing, user.id, now=now))
+            out.mode = mode
+            out.topic = prefs["topic"] or None
+            return out
 
-        waiting = (
+        candidates = (
             await db.execute(
                 select(OralMatchQueue)
                 .where(OralMatchQueue.user_id != user.id)
                 .order_by(OralMatchQueue.enqueued_at.asc())
-                .limit(1)
+                .limit(20)
             )
-        ).scalar_one_or_none()
+        ).scalars().all()
+        waiting = next((row for row in candidates if _compatible_partner(prefs, row)), None)
 
         mine = await db.get(OralMatchQueue, user.id)
         if waiting is None:
@@ -183,22 +234,41 @@ async def enqueue_match(
                         display_name=name,
                         enqueued_at=now,
                         heartbeat_at=now,
+                        mode=mode,
+                        native_lang=prefs["native_lang"],
+                        target_lang=prefs["target_lang"],
+                        topic=prefs["topic"],
+                        cefr=prefs["cefr"],
                     )
                 )
             else:
                 mine.display_name = name
                 mine.heartbeat_at = now
+                mine.mode = mode
+                mine.native_lang = prefs["native_lang"]
+                mine.target_lang = prefs["target_lang"]
+                mine.topic = prefs["topic"]
+                mine.cefr = prefs["cefr"]
             await db.commit()
             position = (
-                await db.execute(select(OralMatchQueue).order_by(OralMatchQueue.enqueued_at.asc()))
+                await db.execute(
+                    select(OralMatchQueue)
+                    .where(OralMatchQueue.mode == mode)
+                    .order_by(OralMatchQueue.enqueued_at.asc())
+                )
             ).scalars().all()
             idx = next(
                 (i for i, row in enumerate(position) if row.user_id == user.id),
                 0,
             )
-            return EnqueueOut(status="waiting", queue_position=idx + 1)
+            return EnqueueOut(
+                status="waiting",
+                queue_position=idx + 1,
+                mode=mode,
+                topic=prefs["topic"] or None,
+            )
 
-        # Pair with oldest waiter.
+        # Pair with oldest compatible waiter.
         partner = waiting
         room_id = uuid.uuid4().hex[:12]
         room = OralPeerRoom(
@@ -215,20 +285,30 @@ async def enqueue_match(
         await db.execute(delete(OralMatchQueue).where(OralMatchQueue.user_id == partner.user_id))
         if mine is not None:
             await db.delete(mine)
+        topic = prefs["topic"] or (getattr(partner, "topic", "") or "")
+        intro = (
+            f"Language exchange matched"
+            f"{(' · ' + topic) if topic else ''}. Take turns in each language."
+            if mode == "language_exchange"
+            else "Matched. You can talk live and also hold-to-talk for AI rewrite."
+        )
         db.add(
             OralPeerMessage(
                 id=uuid.uuid4().hex[:10],
                 room_id=room_id,
                 sender_user_id=0,
                 sender_name="system",
-                text="Matched. You can talk live and also hold-to-talk for AI rewrite.",
+                text=intro,
                 created_at=now,
                 kind="system",
             )
         )
         await db.commit()
         await db.refresh(room)
-        return EnqueueOut(**_room_payload(room, user.id, now=now))
+        out = EnqueueOut(**_room_payload(room, user.id, now=now))
+        out.mode = mode
+        out.topic = topic or None
+        return out
 
 
 @router.get("/status", response_model=EnqueueOut)

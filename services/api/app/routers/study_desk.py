@@ -70,18 +70,19 @@ class LibraryIn(BaseModel):
 
 
 class WeeklyQuestIn(BaseModel):
-    chapter: str = Field(default="cafe", max_length=32)
+    chapter: str = Field(default="desk", max_length=32)
     level: int = Field(ge=0, le=31)
 
 
 class RetestIn(BaseModel):
-    chapter: str = Field(default="cafe", max_length=32)
+    chapter: str = Field(default="desk", max_length=32)
     level: int = Field(ge=0, le=31)
     passed: bool = True
 
 
 WEEKLY_TARGET = 3
-_ALLOWED_CHAPTERS = frozenset({"cafe"})
+# desk = study desk weekly co-op; cafe kept for legacy rows.
+_ALLOWED_CHAPTERS = frozenset({"desk", "cafe", "general"})
 
 
 def week_id(moment: datetime | None = None) -> str:

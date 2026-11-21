@@ -57,6 +57,9 @@ class Endpoints {
       'api/community/reclassify-requests';
   static const String communityExamAssets = 'api/community/exam-assets';
   static const String communityPacks = 'api/community/packs';
+  static const String communityGroups = 'api/community/groups';
+  static String communityPostTranscribe(int postId) =>
+      'api/community/posts/$postId/transcribe';
   static const String writingGrade = 'api/writing/grade';
   static const String usageEvents = 'api/usage/events';
   static const String examPacks = 'api/exam/packs';

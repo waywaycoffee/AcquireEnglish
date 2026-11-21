@@ -131,11 +131,53 @@ def _normalize_source_url(url: str | None) -> tuple[str | None, str | None]:
     return text, extract_bvid(text)
 
 
+_CEFR_RANK = {
+    "A0": 0,
+    "A1": 1,
+    "A2": 2,
+    "B1": 3,
+    "B2": 4,
+    "C1": 5,
+    "C2": 6,
+}
+
+
+def _cefr_rank(value: str | None) -> int | None:
+    if not value:
+        return None
+    key = value.strip().upper()
+    if key in _CEFR_RANK:
+        return _CEFR_RANK[key]
+    if len(key) >= 2 and key[:2] in _CEFR_RANK:
+        return _CEFR_RANK[key[:2]]
+    return None
+
+
+def _iplus1_score(pack_cefr: str | None, learner_cefr: str | None) -> float:
+    """Prefer packs slightly above learner level (i+1), then same level."""
+    learner = _cefr_rank(learner_cefr)
+    pack = _cefr_rank(pack_cefr)
+    if learner is None or pack is None:
+        return 0.0
+    delta = pack - learner
+    if delta == 1:
+        return 1.0
+    if delta == 0:
+        return 0.85
+    if delta == 2:
+        return 0.55
+    if delta == -1:
+        return 0.35
+    return max(0.0, 0.2 - 0.05 * abs(delta))
+
+
 @router.get("", response_model=list[MaterialPackOut])
 async def list_packs(
     cefr: str | None = None,
     topic: str | None = None,
     mine: bool = False,
+    learner_cefr: str | None = None,
+    recommend: bool = False,
     limit: int = Query(default=40, ge=1, le=100),
     db: AsyncSession = Depends(get_db),
     user: User | None = Depends(get_current_user_optional),
@@ -146,7 +188,7 @@ async def list_packs(
         select(CommunityMaterialPack)
         .where(CommunityMaterialPack.status == "visible")
         .order_by(CommunityMaterialPack.id.desc())
-        .limit(limit)
+        .limit(limit if not recommend else min(100, max(limit, 40)))
     )
     if mine:
         assert user is not None
@@ -166,7 +208,27 @@ async def list_packs(
             await db.execute(select(User).where(User.id.in_({p.owner_id for p in packs})))
         ).scalars().all()
     }
-    return [_serialize(p, owner=owners.get(p.owner_id)) for p in packs]
+    out = [_serialize(p, owner=owners.get(p.owner_id)) for p in packs]
+    if recommend:
+        level = (learner_cefr or "").strip()
+        if not level and user is not None:
+            from app.models import UserPreference
+
+            pref = (
+                await db.execute(
+                    select(UserPreference).where(UserPreference.user_id == user.id)
+                )
+            ).scalar_one_or_none()
+            level = (pref.level if pref else "") or ""
+        out.sort(
+            key=lambda row: (
+                -_iplus1_score(row.cefr, level or None),
+                0 if row.has_vocab else 1,
+                -row.id,
+            )
+        )
+        out = out[:limit]
+    return out
 
 
 @router.post("", response_model=MaterialPackOut, status_code=201)

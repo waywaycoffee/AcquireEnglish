@@ -8,8 +8,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:hive_ce/hive.dart';
 
-import '../../../settings/presentation/settings_provider.dart';
+import '../../../authentication/presentation/auth_session.dart';
+import '../../../community/data/community_models.dart';
 import '../../../settings/data/pronunciation_credentials.dart';
+import '../../../settings/presentation/settings_provider.dart';
+import '../../../sync/data/acquire_api_client.dart';
 import '../../data/dub_session_store.dart';
 import '../../data/local_shadow_scorer.dart';
 import '../../data/pronunciation_audio_extractor.dart';
@@ -168,6 +171,7 @@ class _StudyShadowingTabState extends ConsumerState<StudyShadowingTab> {
   final VoicePracticeClient _voiceClient = VoicePracticeClient();
   final LocalShadowScorer _localScorer = const LocalShadowScorer();
   bool _voiceBusy = false;
+  bool _communityPublishBusy = false;
   VoiceShadowResult? _voiceResult;
   PronunciationAssessmentResult? _assessment;
   ShadowPromptMode _promptMode = ShadowPromptMode.look;
@@ -623,6 +627,65 @@ class _StudyShadowingTabState extends ConsumerState<StudyShadowingTab> {
       final File file = File(path);
       if (await file.exists()) await file.delete();
     } catch (_) {}
+  }
+
+  Future<void> _publishToCommunity() async {
+    final String? path = _recordingPath;
+    if (path == null || !File(path).existsSync()) return;
+    if (!ref.read(authSessionProvider).isLoggedIn) {
+      if (!mounted) return;
+      setState(() => _message = '请先登录后再发布跟读到社区');
+      return;
+    }
+    setState(() {
+      _communityPublishBusy = true;
+      _message = '正在上传跟读到 ECS…';
+    });
+    try {
+      final AcquireApiClient api = ref.read(acquireApiClientProvider);
+      final String email = ref.read(authSessionProvider).email.trim();
+      final String bookId =
+          email.isEmpty ? 'user_guest' : 'user_${email.hashCode.abs()}';
+      final String key =
+          'shadow_${DateTime.now().millisecondsSinceEpoch}';
+      final Map<String, dynamic> uploaded = await api.uploadContentMedia(
+        bytes: await File(path).readAsBytes(),
+        filename: path.endsWith('.wav') ? 'shadowing.wav' : 'shadowing.m4a',
+        bookId: bookId,
+        key: key,
+        namespace: 'oral',
+      );
+      final Map<String, dynamic>? item =
+          uploaded['item'] as Map<String, dynamic>?;
+      final String audioUrl = (item?['audio_url'] as String?)?.trim() ?? '';
+      if (audioUrl.isEmpty) {
+        throw StateError('上传成功但未返回音频地址');
+      }
+      final String line = widget.line.english.trim();
+      final CommunityPostDto post = await api.createCommunityPost(
+        kind: 'shadowing',
+        title: '跟读投稿',
+        body: line.isEmpty ? '跟读练习' : line,
+        oralAudioUrl: audioUrl,
+        oralBookId: bookId,
+        oralKey: key,
+        referenceLine: line,
+      );
+      try {
+        await api.transcribeCommunityPost(post.id);
+      } catch (_) {}
+      if (!mounted || _resourcesReleased) return;
+      setState(() {
+        _message = '已发布到社区练习流（含 ECS 录音）';
+        _communityPublishBusy = false;
+      });
+    } catch (e) {
+      if (!mounted || _resourcesReleased) return;
+      setState(() {
+        _message = '发布失败：$e';
+        _communityPublishBusy = false;
+      });
+    }
   }
 
   Future<void> _releaseSessionFiles() async {
@@ -1279,11 +1342,28 @@ class _StudyShadowingTabState extends ConsumerState<StudyShadowingTab> {
                         onPressed: widget.onOpenFullDialog,
                         child: const Text('腾讯云精评'),
                       ),
+                    OutlinedButton.icon(
+                      onPressed: _recordingPath == null ||
+                              _recordingActive ||
+                              _communityPublishBusy
+                          ? null
+                          : () => unawaited(_publishToCommunity()),
+                      icon: _communityPublishBusy
+                          ? const SizedBox(
+                              width: 16,
+                              height: 16,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : const Icon(Icons.cloud_upload_outlined, size: 18),
+                      label: Text(
+                        _communityPublishBusy ? '上传中' : '发布跟读到社区',
+                      ),
+                    ),
                   ],
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  '配音回放会压低对白窗原声并叠你的录音；伴奏轨可用时尽量保留背景声。',
+                  '配音回放会压低对白窗原声并叠你的录音；伴奏轨可用时尽量保留背景声。跟读可上传 ECS 并自动转写。',
                   textAlign: TextAlign.center,
                   style: TextStyle(fontSize: 11, color: shell.textMuted),
                 ),

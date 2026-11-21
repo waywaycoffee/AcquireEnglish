@@ -56,7 +56,8 @@ async def cafe_challenge_landing(stage: int) -> HTMLResponse:
     ability = html.escape(level["ability"], quote=True)
     prompt = html.escape(level["prompt"], quote=True)
     hint = html.escape(level["hint"], quote=True)
-    app_link = html.escape(f"acquireenglish://app/explore/cafe/{stage}", quote=True)
+    # Cafe adventure deep links are retired; send learners to exam prep.
+    app_link = html.escape("acquireenglish://app/exam", quote=True)
     web_fallback = html.escape(
         f"{_base()}/api/public/challenges/cafe/{stage}", quote=True
     )

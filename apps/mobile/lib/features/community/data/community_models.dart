@@ -49,14 +49,21 @@ class CommunityPostDto {
     this.bilibiliOpenUrl,
     this.embedWord,
     this.embedTimestampSec,
+    this.oralAudioUrl,
+    this.transcript,
     this.challengeOpens = 0,
     this.challengeCompletes = 0,
+    this.meta = const <String, dynamic>{},
   });
 
   factory CommunityPostDto.fromJson(Map<String, dynamic> json) {
     String kind = (json['kind'] as String?) ?? 'feedback';
     if (kind == 'share_link') kind = 'share_bilibili';
     if (kind == 'podcast_placeholder') kind = 'feedback';
+    final Map<String, dynamic> meta =
+        (json['meta'] as Map<String, dynamic>?) ?? <String, dynamic>{};
+    final String? oralFromMeta = (meta['oral_audio_url'] as String?)?.trim();
+    final String? transcriptFromMeta = (meta['transcript'] as String?)?.trim();
     return CommunityPostDto(
       id: json['id'] as int,
       kind: kind,
@@ -70,6 +77,12 @@ class CommunityPostDto {
       englishLevel: json['english_level'] as String?,
       embedWord: (json['embed_word'] as String?)?.trim(),
       embedTimestampSec: (json['embed_timestamp_sec'] as num?)?.toDouble(),
+      oralAudioUrl: ((json['oral_audio_url'] as String?)?.trim().isNotEmpty == true
+              ? (json['oral_audio_url'] as String).trim()
+              : oralFromMeta),
+      transcript: ((json['transcript'] as String?)?.trim().isNotEmpty == true
+              ? (json['transcript'] as String).trim()
+              : transcriptFromMeta),
       likeCount: (json['like_count'] as num?)?.toInt() ?? 0,
       commentCount: (json['comment_count'] as num?)?.toInt() ?? 0,
       likedByMe: json['liked_by_me'] == true,
@@ -82,6 +95,7 @@ class CommunityPostDto {
           DateTime.fromMillisecondsSinceEpoch(0),
       challengeOpens: (json['challenge_opens'] as num?)?.toInt() ?? 0,
       challengeCompletes: (json['challenge_completes'] as num?)?.toInt() ?? 0,
+      meta: meta,
     );
   }
 
@@ -97,6 +111,8 @@ class CommunityPostDto {
   final String? englishLevel;
   final String? embedWord;
   final double? embedTimestampSec;
+  final String? oralAudioUrl;
+  final String? transcript;
   final int likeCount;
   final int commentCount;
   final bool likedByMe;
@@ -108,6 +124,7 @@ class CommunityPostDto {
   final DateTime createdAt;
   final int challengeOpens;
   final int challengeCompletes;
+  final Map<String, dynamic> meta;
 
   bool get isShareBilibili => kind == 'share_bilibili';
   bool get isTeamInvite => kind == 'team_invite';
