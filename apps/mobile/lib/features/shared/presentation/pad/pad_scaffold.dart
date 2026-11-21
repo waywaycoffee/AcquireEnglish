@@ -41,11 +41,16 @@ class PadScaffold extends StatelessWidget {
     if (showNavigation && useBottomNavigation && useBottomTabWhenPortrait) {
       return Scaffold(
         backgroundColor: AppDesignTokens.softWhite,
+        extendBody: true,
         floatingActionButton: showContinueLearning
             ? const ContinueLearningButton()
             : null,
         body: SafeArea(top: false, bottom: false, child: content),
-        bottomNavigationBar: FloatingBottomNav(current: currentDestination),
+        bottomNavigationBar: SafeArea(
+          top: false,
+          minimum: const EdgeInsets.only(bottom: 4),
+          child: FloatingBottomNav(current: currentDestination),
+        ),
       );
     }
 

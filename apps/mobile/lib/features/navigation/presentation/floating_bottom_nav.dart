@@ -43,18 +43,14 @@ class FloatingBottomNav extends StatelessWidget {
         ? _primaryDestinations
         : destinations;
 
-    // Edge-to-edge: padding.bottom==0 and we must clear the gesture/nav bar.
-    // Non-edge-to-edge: Scaffold already inset us — adding padding again
-    // overflows the bottom bar by ~74px and blocks tab taps.
-    final MediaQueryData media = MediaQuery.of(context);
-    final double bottomInset =
-        media.padding.bottom == 0 ? media.viewPadding.bottom : 0;
+    // Keep the floating pill compact. System inset is owned by Scaffold /
+    // SafeArea around the page body — padding here was the ~74px overflow.
     return Padding(
       padding: EdgeInsets.fromLTRB(
         compact ? 10 : 16,
         compact ? 6 : 10,
         compact ? 10 : 16,
-        (compact ? 8 : 12) + bottomInset,
+        compact ? 8 : 12,
       ),
       child: ClipRRect(
         borderRadius: BorderRadius.circular(compact ? 22 : 28),

@@ -208,69 +208,68 @@ class _DigitalHumanPickerState extends ConsumerState<DigitalHumanPicker> {
           ],
         ),
         const SizedBox(height: 8),
-        RawScrollbar(
-          controller: _personas,
-          thumbVisibility: true,
-          trackVisibility: true,
-          interactive: true,
-          scrollbarOrientation: ScrollbarOrientation.bottom,
-          thickness: 8,
-          radius: const Radius.circular(8),
-          thumbColor: AppDesignTokens.brandGreenDark,
-          trackColor: AppDesignTokens.borderGray,
-          child: SizedBox(
-            height: _PersonaCard.cardHeight + 8,
-            child: ListView.separated(
-              controller: _personas,
-              primary: false,
-              padding: EdgeInsets.zero,
-              scrollDirection: Axis.horizontal,
-              itemCount: visible.length,
-              separatorBuilder: (_, __) => const SizedBox(width: 12),
-              itemBuilder: (BuildContext context, int index) {
-                final DigitalHumanPersona persona = visible[index];
-                final bool active = persona.id == selected.id;
-                return _PersonaCard(
-                  persona: persona,
-                  selected: active,
-                  bilingual: isBilingualCoachVoice(
-                    _savedVoices[persona.id] ?? persona.recommendedVoiceId,
-                  ),
-                  playing: _previewing == persona.id,
-                  loading: _previewing == persona.id && _loadingPreview,
-                  onPreview: () => unawaited(_preview(persona)),
-                  onTap: () {
-                    final ValueChanged<DigitalHumanPersona>? onSelect =
-                        widget.onSelect;
-                    if (onSelect != null) {
-                      onSelect(persona);
-                      return;
-                    }
-                    ref
-                        .read(learningSettingsProvider.notifier)
-                        .setDigitalHumanId(persona.id);
-                  },
-                );
-              },
-            ),
+        SizedBox(
+          height: _PersonaCard.cardHeight,
+          child: ListView.separated(
+            controller: _personas,
+            primary: false,
+            padding: EdgeInsets.zero,
+            scrollDirection: Axis.horizontal,
+            itemCount: visible.length,
+            separatorBuilder: (_, __) => const SizedBox(width: 12),
+            itemBuilder: (BuildContext context, int index) {
+              final DigitalHumanPersona persona = visible[index];
+              final bool active = persona.id == selected.id;
+              return _PersonaCard(
+                persona: persona,
+                selected: active,
+                bilingual: isBilingualCoachVoice(
+                  _savedVoices[persona.id] ?? persona.recommendedVoiceId,
+                ),
+                playing: _previewing == persona.id,
+                loading: _previewing == persona.id && _loadingPreview,
+                onPreview: () => unawaited(_preview(persona)),
+                onTap: () {
+                  final ValueChanged<DigitalHumanPersona>? onSelect =
+                      widget.onSelect;
+                  if (onSelect != null) {
+                    onSelect(persona);
+                    return;
+                  }
+                  ref
+                      .read(learningSettingsProvider.notifier)
+                      .setDigitalHumanId(persona.id);
+                },
+              );
+            },
           ),
         ),
-        if (widget.onSelect == null)
+        if (widget.onSelect == null) ...<Widget>[
+          const SizedBox(height: 10),
           Row(
             children: <Widget>[
               Expanded(
                 child: FilledButton.tonalIcon(
+                  style: FilledButton.styleFrom(
+                    visualDensity: VisualDensity.compact,
+                    minimumSize: const Size(0, 40),
+                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  ),
                   onPressed: () async {
                     await _stopPreview();
                     if (!context.mounted) return;
                     await context.push('/digital-human');
                     if (mounted) await _refreshVoices();
                   },
-                  icon: const Icon(Icons.record_voice_over_rounded),
+                  icon: const Icon(Icons.record_voice_over_rounded, size: 18),
                   label: const Text('开始情景口语'),
                 ),
               ),
               TextButton(
+                style: TextButton.styleFrom(
+                  visualDensity: VisualDensity.compact,
+                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                ),
                 onPressed: () {
                   if (_personas.hasClients) {
                     _personas.animateTo(
@@ -284,6 +283,7 @@ class _DigitalHumanPickerState extends ConsumerState<DigitalHumanPicker> {
               ),
             ],
           ),
+        ],
       ],
     );
   }
