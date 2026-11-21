@@ -52,11 +52,11 @@ enum AppNavDestination {
   ),
   review(
     route: '/review',
-    label: '背诵',
-    title: '背诵',
+    label: '背单词',
+    title: '背单词',
     subtitle: 'FSRS 背单词、短语、词书与错词本，统一记忆计划。',
-    icon: Icons.psychology_outlined,
-    activeIcon: Icons.psychology_rounded,
+    icon: Icons.style_outlined,
+    activeIcon: Icons.style_rounded,
   ),
   phrases(
     route: '/phrases',

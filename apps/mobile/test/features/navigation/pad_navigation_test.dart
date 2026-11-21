@@ -95,7 +95,7 @@ void main() {
       findsOneWidget,
     );
 
-    await tester.tap(find.text('背诵'));
+    await tester.tap(find.text('背单词'));
     await tester.pumpAndSettle();
     expect(find.text('recite page'), findsOneWidget);
 
@@ -188,7 +188,7 @@ void main() {
     expect(find.text('视频'), findsOneWidget);
     expect(find.text('阅读'), findsOneWidget);
     expect(find.text('学习'), findsOneWidget);
-    expect(find.text('背诵'), findsOneWidget);
+    expect(find.text('背单词'), findsOneWidget);
     expect(find.text('口语'), findsOneWidget);
     expect(find.text('更多'), findsOneWidget);
     expect(find.text('社区'), findsNothing);

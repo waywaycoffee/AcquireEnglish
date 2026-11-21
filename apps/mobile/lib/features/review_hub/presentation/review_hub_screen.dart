@@ -122,7 +122,7 @@ class _ReviewHubScreenState extends ConsumerState<ReviewHubScreen> {
       currentDestination: AppNavDestination.review,
       showContinueLearning: false,
       topBar: PadTopBar(
-        title: '背诵',
+        title: '背单词',
         description: 'FSRS 背单词 · 短语 · 词书 · 错词本',
         actions: <Widget>[
           IconButton(
