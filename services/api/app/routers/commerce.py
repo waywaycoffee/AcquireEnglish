@@ -49,7 +49,7 @@ async def _is_paid_user(db: AsyncSession, user_id: int) -> bool:
 
 @router.get("/catalog")
 async def commerce_catalog() -> dict:
-    """Public module / combo / efficiency SKU catalog (PRD pricing)."""
+    """Public catalog: 4 modules × (月卡 + 年卡) only."""
     return public_commerce_catalog()
 
 

@@ -564,8 +564,10 @@ async def create_order(
     if coupon_id is not None:
         from app.models import MembershipCoupon
         from sqlalchemy import update
-        if len(items) != 1 or items[0][0].kind != "membership" or items[0][1] != 1:
-            raise ValueError("抵扣券仅限单张会员卡")
+        # Cash coupons apply to a single Pro or module 月/年卡 order.
+        ok_kinds = {"membership", "module"}
+        if len(items) != 1 or items[0][0].kind not in ok_kinds or items[0][1] != 1:
+            raise ValueError("抵扣券仅限单张会员卡或模块月/年卡")
         coupon = await db.get(MembershipCoupon, coupon_id)
         if coupon is None or coupon.user_id != user.id or coupon.kind != "cash" or coupon.used:
             raise ValueError("优惠券不可用")

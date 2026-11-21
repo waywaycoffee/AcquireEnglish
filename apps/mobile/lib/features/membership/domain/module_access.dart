@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../router/app_router.dart';
+import '../../reading/data/reading_catalog.dart';
 
 /// Codes aligned with `services/api/.../commerce/catalog.py` MODULE_DEFS.
 const Map<String, String> kModuleTitlesZh = <String, String>{
@@ -15,6 +16,11 @@ const Map<String, String> kModuleTitlesZh = <String, String>{
   'acquire_reading': '阅读模块',
   'acquire_listening': '视频模块',
 };
+
+/// Public starter readings stay available before a module purchase.
+bool isFreeReadingPreviewDocId(String docId) =>
+    docId.startsWith('starter-') ||
+    docId == kDefaultWizardOfOzEntry.stableDocId;
 
 /// Legacy entitlement refs → current product buckets.
 const Map<String, List<String>> kLegacyModuleAliases = <String, List<String>>{

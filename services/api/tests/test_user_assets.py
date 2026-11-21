@@ -15,6 +15,7 @@ from httpx import ASGITransport, AsyncClient
 import app.models  # noqa: F401
 from app.database import Base, SessionLocal, engine
 from app.main import app as fastapi_app
+from app.services.commerce.catalog import ensure_commerce_skus
 from app.services.user_assets import ensure_default_skus
 
 
@@ -25,6 +26,7 @@ async def _prepare_db():
         await conn.run_sync(Base.metadata.create_all)
     async with SessionLocal() as session:
         await ensure_default_skus(session)
+        await ensure_commerce_skus(session)
     yield
 
 
@@ -59,8 +61,10 @@ async def test_assets_summary_and_grant():
         skus = await client.get("/api/assets/skus", headers=headers)
         assert skus.status_code == 200
         codes = {row["sku_code"] for row in skus.json()}
-        assert "membership.pro.monthly" in codes
-        assert "dh.minutes.30" in codes
+        assert "module.video.monthly" in codes
+        assert "module.exam.yearly" in codes
+        assert "membership.pro.monthly" not in codes
+        assert "dh.minutes.30" not in codes
 
         grant = await client.post(
             "/api/assets/entitlements/grant",
@@ -95,15 +99,15 @@ async def test_order_mark_paid_grants_minutes_and_credits():
             json={
                 "provider": "mock",
                 "items": [
-                    {"sku_code": "dh.minutes.30", "quantity": 1},
-                    {"sku_code": "credits.100", "quantity": 2},
+                    {"sku_code": "module.video.monthly", "quantity": 1},
+                    {"sku_code": "module.reading.yearly", "quantity": 1},
                 ],
             },
         )
         assert created.status_code == 201, created.text
         order = created.json()
         assert order["status"] == "pending"
-        assert order["amount_cents"] == 1500 + 1000 * 2
+        assert order["amount_cents"] == 1290 + 9900
 
         paid = await client.post(
             f"/api/assets/orders/{order['id']}/mark-paid",
@@ -115,14 +119,12 @@ async def test_order_mark_paid_grants_minutes_and_credits():
         assets = await client.get("/api/assets", headers=headers)
         assert assets.status_code == 200
         body = assets.json()
-        # 50 trial credits + 200 from paid credits.100 x2
-        assert body["wallet"]["balance_credits"] == 250
-        dh = [
-            e
+        module_refs = {
+            e["asset_ref"]
             for e in body["entitlements"]
-            if e["asset_kind"] == "digital_human_quota"
-        ]
-        assert dh and dh[0]["quantity"] == 30
+            if e["asset_kind"] == "module" and e["status"] == "active"
+        }
+        assert {"video", "reading"} <= module_refs
 
 
 @pytest.mark.asyncio
@@ -132,13 +134,13 @@ async def test_order_history_is_owned_and_authenticated():
         owner = {"Authorization": f"Bearer {await _sms_token(client, '13900006666')}"}
         other = {"Authorization": f"Bearer {await _sms_token(client, '13900007777')}"}
         created = await client.post("/api/assets/orders", headers=owner, json={
-            "provider": "wechat", "items": [{"sku_code": "membership.pro.monthly", "quantity": 1}],
+            "provider": "mock", "items": [{"sku_code": "module.exam.monthly", "quantity": 1}],
         })
         assert created.status_code == 201
         history = await client.get("/api/assets/orders", headers=owner)
         assert history.status_code == 200
         assert history.json()[0]["id"] == created.json()["id"]
-        assert history.json()[0]["amount_cents"] == 2800
+        assert history.json()[0]["amount_cents"] == 1290
         assert (await client.get("/api/assets/orders", headers=other)).json() == []
 
 
@@ -162,11 +164,17 @@ async def test_payment_callback_rejects_wrong_amount(monkeypatch):
     from app.routers import assets
     from app.services.wechat_pay import build_out_trade_no
     from app.models import Order
+    monkeypatch.setattr(
+        type(settings),
+        "wechat_pay_configured",
+        property(lambda self: True),
+    )
     async with AsyncClient(transport=ASGITransport(app=fastapi_app), base_url="http://test") as client:
         headers = {"Authorization": f"Bearer {await _sms_token(client)}"}
         created = await client.post("/api/assets/orders", headers=headers, json={
-            "provider": "wechat", "items": [{"sku_code": "membership.pro.monthly", "quantity": 1}],
+            "provider": "wechat", "items": [{"sku_code": "module.course.monthly", "quantity": 1}],
         })
+        assert created.status_code == 201, created.text
         order_id = created.json()["id"]
         trade_no = build_out_trade_no(order_id)
         async with SessionLocal() as db:
@@ -200,10 +208,15 @@ async def test_learning_coupons_and_discount():
         assert claim.status_code == 200, claim.text
         coupon_id = claim.json()['id']
         assert (await client.post('/api/assets/membership-rewards/study300/claim', headers=headers)).status_code == 409
-        payload = {'provider': 'wechat', 'coupon_id': coupon_id, 'items': [{'sku_code': 'membership.pro.monthly', 'quantity': 1}]}
+        # Cash coupon on module yearly (≥¥10): exam yearly 12900 - 500 = 12400.
+        payload = {
+            'provider': 'mock',
+            'coupon_id': coupon_id,
+            'items': [{'sku_code': 'module.exam.yearly', 'quantity': 1}],
+        }
         order = await client.post('/api/assets/orders', headers=headers, json=payload)
         assert order.status_code == 201, order.text
-        assert order.json()['amount_cents'] == 2300
+        assert order.json()['amount_cents'] == 12400
         assert (await client.post('/api/assets/orders', headers=headers, json=payload)).status_code == 400
         days = await client.post('/api/assets/membership-rewards/study60/claim', headers=headers)
         assert days.status_code == 200
@@ -211,4 +224,10 @@ async def test_learning_coupons_and_discount():
         assert (await client.post(url, headers=headers)).status_code == 200
         assert (await client.post(url, headers=headers)).status_code == 409
         skus = (await client.get('/api/assets/skus', headers=headers)).json()
-        assert {'membership.pro.daily', 'membership.pro.monthly', 'membership.pro.yearly'} <= {s['sku_code'] for s in skus}
+        assert {
+            'module.video.monthly',
+            'module.reading.yearly',
+            'module.exam.monthly',
+            'module.course.yearly',
+        } <= {s['sku_code'] for s in skus}
+        assert 'membership.pro.monthly' not in {s['sku_code'] for s in skus}

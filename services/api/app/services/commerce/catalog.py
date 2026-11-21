@@ -1,4 +1,4 @@
-"""Four product-module catalog + combo SKUs (PRD P0 pricing)."""
+"""Four product-module catalog: monthly + yearly only (storefront)."""
 
 from __future__ import annotations
 
@@ -72,7 +72,8 @@ LEGACY_MODULE_ALIASES: dict[str, list[str]] = {
 MODULE_CODES: set[str] = {str(m["code"]) for m in MODULE_DEFS}
 LEGACY_MODULE_CODES: set[str] = set(LEGACY_MODULE_ALIASES.keys())
 
-COMBO_SKUS: list[dict] = [
+# Retired storefront SKUs: keep rows + grant_from_sku for existing buyers; active=0.
+RETIRED_COMBO_SKUS: list[dict] = [
     {
         "sku_code": "module.combo.any2.monthly",
         "kind": "module_combo",
@@ -84,6 +85,7 @@ COMBO_SKUS: list[dict] = [
             "list_price_cents": 6990,
             "pick": 2,
             "modules": [m["code"] for m in MODULE_DEFS],
+            "retired": True,
         },
     },
     {
@@ -96,6 +98,7 @@ COMBO_SKUS: list[dict] = [
         "meta": {
             "list_price_cents": 9990,
             "modules": [m["code"] for m in MODULE_DEFS],
+            "retired": True,
         },
     },
     {
@@ -108,11 +111,12 @@ COMBO_SKUS: list[dict] = [
         "meta": {
             "list_price_cents": 99900,
             "modules": [m["code"] for m in MODULE_DEFS],
+            "retired": True,
         },
     },
 ]
 
-EFFICIENCY_SKUS: list[dict] = [
+RETIRED_EFFICIENCY_SKUS: list[dict] = [
     {
         "sku_code": "boost.double_points.7d",
         "kind": "efficiency",
@@ -120,7 +124,7 @@ EFFICIENCY_SKUS: list[dict] = [
         "ref_id": "double_points",
         "price_cents": 990,
         "duration_days": 7,
-        "meta": {"list_price_cents": 1990},
+        "meta": {"list_price_cents": 1990, "retired": True},
     },
     {
         "sku_code": "boost.arena.extra.5",
@@ -130,9 +134,19 @@ EFFICIENCY_SKUS: list[dict] = [
         "price_cents": 600,
         "grant_quantity": 5,
         "duration_days": 30,
-        "meta": {"list_price_cents": 1200},
+        "meta": {"list_price_cents": 1200, "retired": True},
     },
 ]
+
+# Non-module store packs retired with the four-module × 月/年 catalog.
+RETIRED_DEFAULT_SKU_CODES: tuple[str, ...] = (
+    "membership.pro.daily",
+    "membership.pro.monthly",
+    "membership.pro.yearly",
+    "coach.minutes.60",
+    "dh.minutes.30",
+    "credits.100",
+)
 
 
 def entitlement_refs_for_module(module_code: str) -> set[str]:
@@ -177,7 +191,8 @@ def normalize_module_code(module_code: str) -> str | None:
     return None
 
 
-def _module_skus() -> list[dict]:
+def _active_module_skus() -> list[dict]:
+    """Storefront SKUs: exactly 月卡 + 年卡 per module."""
     rows: list[dict] = []
     for mod in MODULE_DEFS:
         code = mod["code"]
@@ -215,6 +230,13 @@ def _module_skus() -> list[dict]:
                 },
             }
         )
+    return rows
+
+
+def _retired_permanent_skus() -> list[dict]:
+    rows: list[dict] = []
+    for mod in MODULE_DEFS:
+        code = mod["code"]
         rows.append(
             {
                 "sku_code": f"module.{code}.permanent",
@@ -226,6 +248,7 @@ def _module_skus() -> list[dict]:
                 "meta": {
                     "list_price_cents": 3990,
                     "blurb": "不随订阅到期失效",
+                    "retired": True,
                 },
             }
         )
@@ -242,9 +265,11 @@ def _legacy_module_sku_codes() -> list[str]:
 
 
 async def ensure_commerce_skus(db: AsyncSession) -> int:
-    """Upsert commerce SKUs (idempotent). Returns number inserted."""
+    """Upsert commerce SKUs. Active storefront = 4 modules × (月卡+年卡) only."""
     inserted = 0
-    for spec in (*_module_skus(), *COMBO_SKUS, *EFFICIENCY_SKUS):
+
+    async def _apply(spec: dict, *, active: int) -> None:
+        nonlocal inserted
         existing = await db.execute(
             select(ProductSku).where(ProductSku.sku_code == spec["sku_code"])
         )
@@ -262,7 +287,7 @@ async def ensure_commerce_skus(db: AsyncSession) -> int:
                     grant_quantity=spec.get("grant_quantity"),
                     duration_days=spec.get("duration_days"),
                     meta_json=meta,
-                    active=1,
+                    active=active,
                 )
             )
             inserted += 1
@@ -274,15 +299,27 @@ async def ensure_commerce_skus(db: AsyncSession) -> int:
             row.grant_quantity = spec.get("grant_quantity")
             row.duration_days = spec.get("duration_days")
             row.meta_json = meta
-            row.active = 1
-    # Hide retired content×capability SKUs from storefront; keep rows for history.
-    for sku_code in _legacy_module_sku_codes():
+            row.active = active
+
+    for spec in _active_module_skus():
+        await _apply(spec, active=1)
+
+    for spec in (
+        *_retired_permanent_skus(),
+        *RETIRED_COMBO_SKUS,
+        *RETIRED_EFFICIENCY_SKUS,
+    ):
+        await _apply(spec, active=0)
+
+    # Hide retired content×capability + legacy Pro/consumable packs from storefront.
+    for sku_code in (*_legacy_module_sku_codes(), *RETIRED_DEFAULT_SKU_CODES):
         existing = await db.execute(
             select(ProductSku).where(ProductSku.sku_code == sku_code)
         )
         row = existing.scalar_one_or_none()
         if row is not None:
             row.active = 0
+
     await db.commit()
     return inserted
 
@@ -301,45 +338,19 @@ def public_module_catalog() -> list[dict]:
             "quota": m["quota"],
             "sku_monthly": f"module.{m['code']}.monthly",
             "sku_yearly": f"module.{m['code']}.yearly",
-            "sku_permanent": f"module.{m['code']}.permanent",
         }
         for m in MODULE_DEFS
-    ]
-
-
-def public_combo_catalog() -> list[dict]:
-    return [
-        {
-            "sku_code": c["sku_code"],
-            "title": c["title"],
-            "ref_id": c["ref_id"],
-            "price_cents": c["price_cents"],
-            "duration_days": c["duration_days"],
-            "list_price_cents": (c.get("meta") or {}).get("list_price_cents"),
-            "pick": (c.get("meta") or {}).get("pick"),
-            "modules": (c.get("meta") or {}).get("modules"),
-        }
-        for c in COMBO_SKUS
     ]
 
 
 def public_commerce_catalog() -> dict:
     return {
         "modules": public_module_catalog(),
-        "combos": public_combo_catalog(),
-        "efficiency": [
-            {
-                "sku_code": e["sku_code"],
-                "title": e["title"],
-                "ref_id": e["ref_id"],
-                "price_cents": e["price_cents"],
-                "duration_days": e.get("duration_days"),
-                "grant_quantity": e.get("grant_quantity"),
-                "list_price_cents": (e.get("meta") or {}).get("list_price_cents"),
-            }
-            for e in EFFICIENCY_SKUS
-        ],
+        # Combos / efficiency retired from storefront; empty lists keep API shape.
+        "combos": [],
+        "efficiency": [],
         "legacy_aliases": {
             legacy: list(news) for legacy, news in LEGACY_MODULE_ALIASES.items()
         },
+        "plans": ["monthly", "yearly"],
     }

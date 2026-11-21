@@ -21,9 +21,11 @@ Legacy aliases (existing entitlements still unlock):
 | `acquire_reading` | `reading` + `course` |
 | `acquire_listening` | `video` |
 
-Combos: `module.combo.any2.monthly` (pick 2), `module.combo.all4.monthly` / `.yearly`. Permanent unlocks: `module.{code}.permanent`. Retired legacy SKUs are deactivated on `ensure_commerce_skus`.
+Storefront SKUs (only): `module.{video|reading|exam|course}.{monthly|yearly}` — 月卡 / 年卡 per module. No permanent, combo, weekly, credit-pack, or all-in-one plans on sale.
 
-SKUs are upserted on API startup via `ensure_commerce_skus` (after `ensure_default_skus`). Entitlements use `asset_kind=module` and `asset_ref=<code>`. Combo orders may pass `selected_modules` on create-order for any2.
+Retired SKUs (`module.*.permanent`, `module.combo.*`, efficiency boosts, legacy Pro/consumable packs) stay in DB with `active=0` so historical grants / entitlement mapping still work; `ensure_commerce_skus` deactivates them on startup.
+
+SKUs are upserted on API startup via `ensure_commerce_skus` (after `ensure_default_skus`). Entitlements use `asset_kind=module` and `asset_ref=<code>`.
 
 ## Trial
 
@@ -46,7 +48,7 @@ Balance lives on `wallet_accounts`; audit rows in `points_ledger`. Monthly earn 
 
 | Method | Path | Auth | Notes |
 |--------|------|------|--------|
-| GET | `/catalog` | no | modules + combos + efficiency |
+| GET | `/catalog` | no | 4 modules × 月/年 (+ empty combos/efficiency for shape) |
 | GET | `/trial/status` | yes | days left, login streak, claim eligibility |
 | POST | `/trial/claim-extend` | yes | issue `trial_extend_7` coupon |
 | GET | `/points` | yes | balance + rules |
@@ -57,7 +59,7 @@ Related: `/api/assets/membership-coupons/{id}/redeem` honors `trial_extend_7` fu
 
 ## App
 
-Membership screen shows trial banner (days left / login streak / claim), module/combo purchase (any2 uses `selected_modules`), points balance + spend catalog, and module catalog cards; client methods live on `AcquireApiClient` (`commerce*`).
+Membership screen shows trial banner (days left / login streak / claim), per-module 月卡/年卡 purchase, points balance + spend catalog; client methods live on `AcquireApiClient` (`commerce*`).
 
 Module entry gates (`ModuleGate`): `video` / `reading` / `exam` / `course`. Access = active Pro (incl. full trial) **or** matching module entitlement (incl. legacy aliases). API: `GET /api/commerce/modules/{code}/access` (accepts legacy codes).
 
