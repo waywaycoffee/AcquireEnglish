@@ -49,29 +49,33 @@ class ReadingBookshelf extends StatelessWidget {
 
         return DecoratedBox(
           decoration: BoxDecoration(
-            color: theme.woodOuter,
-            borderRadius: BorderRadius.circular(6),
+            borderRadius: BorderRadius.circular(10),
             boxShadow: const <BoxShadow>[
               BoxShadow(
-                color: Color(0x294A2E1A),
-                blurRadius: 14,
-                offset: Offset(0, 6),
+                color: Color(0x3D3A2410),
+                blurRadius: 22,
+                offset: Offset(0, 12),
+              ),
+              BoxShadow(
+                color: Color(0x223A2410),
+                blurRadius: 6,
+                offset: Offset(0, 2),
               ),
             ],
           ),
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(10, 8, 10, 0),
-            child: ClipRRect(
-              borderRadius: const BorderRadius.vertical(
-                top: Radius.circular(3),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(10),
+            child: CustomPaint(
+              painter: _OakCabinetPainter(
+                outer: theme.woodOuter,
+                inner: theme.woodInner,
+                ledge: theme.ledge,
               ),
-              child: CustomPaint(
-                painter: _OakPanelPainter(
-                  base: theme.woodInner,
-                  grain: theme.woodOuter,
-                ),
+              child: Padding(
+                // Side walls + top rail leave a recessed bay for the books.
+                padding: const EdgeInsets.fromLTRB(18, 16, 18, 10),
                 child: ListView.builder(
-                  padding: const EdgeInsets.fromLTRB(12, 14, 12, 0),
+                  padding: EdgeInsets.zero,
                   itemCount: rows.length,
                   itemBuilder: (BuildContext context, int index) {
                     return _ShelfRow(
@@ -403,37 +407,61 @@ class _ShelfRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.only(bottom: 6),
+      padding: const EdgeInsets.only(bottom: 2),
       child: Column(
         children: <Widget>[
           SizedBox(
-            height: 176,
-            child: slots.isEmpty
-                ? Center(
-                    child: Text(
-                      emptyHint ?? '',
-                      style: TextStyle(
-                        fontFamily: 'Georgia',
-                        fontSize: 13,
-                        color: theme.emptyHint,
+            height: 188,
+            child: Stack(
+              children: <Widget>[
+                // Soft recession shadow along the backboard under the books.
+                Positioned(
+                  left: 0,
+                  right: 0,
+                  bottom: 0,
+                  height: 28,
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                        colors: <Color>[
+                          Colors.transparent,
+                          theme.woodOuter.withValues(alpha: 0.22),
+                          const Color(0x33201008),
+                        ],
                       ),
                     ),
-                  )
-                : Row(
-                    crossAxisAlignment: CrossAxisAlignment.end,
-                    children: <Widget>[
-                      for (int i = 0; i < columns; i++) ...<Widget>[
-                        if (i > 0) const SizedBox(width: 14),
-                        Expanded(
-                          child: i < slots.length
-                              ? _slotWidget(slots[i], i)
-                              : const SizedBox.shrink(),
-                        ),
-                      ],
-                    ],
                   ),
+                ),
+                slots.isEmpty
+                    ? Center(
+                        child: Text(
+                          emptyHint ?? '',
+                          style: TextStyle(
+                            fontFamily: 'Georgia',
+                            fontSize: 13,
+                            color: theme.emptyHint,
+                          ),
+                        ),
+                      )
+                    : Row(
+                        crossAxisAlignment: CrossAxisAlignment.end,
+                        children: <Widget>[
+                          for (int i = 0; i < columns; i++) ...<Widget>[
+                            if (i > 0) const SizedBox(width: 12),
+                            Expanded(
+                              child: i < slots.length
+                                  ? _slotWidget(slots[i], i)
+                                  : const SizedBox.shrink(),
+                            ),
+                          ],
+                        ],
+                      ),
+              ],
+            ),
           ),
-          _ShelfLedge(theme: theme),
+          _ShelfLedge3D(theme: theme),
         ],
       ),
     );
@@ -445,12 +473,12 @@ class _ShelfRow extends StatelessWidget {
     }
     final ReadingDoc doc = slot.doc!;
     // Slight height jitter so covers feel hand-placed.
-    final double heightFactor = 0.88 + (((rowIndex * 3 + column) % 5) * 0.025);
+    final double heightFactor = 0.90 + (((rowIndex * 3 + column) % 5) * 0.02);
     return Align(
       alignment: Alignment.bottomCenter,
       child: FractionallySizedBox(
-        heightFactor: heightFactor.clamp(0.86, 1.0),
-        widthFactor: 1,
+        heightFactor: heightFactor.clamp(0.88, 1.0),
+        widthFactor: 0.98,
         child: Material(
           color: Colors.transparent,
           child: InkWell(
@@ -471,46 +499,110 @@ class _ShelfRow extends StatelessWidget {
   }
 }
 
-class _ShelfLedge extends StatelessWidget {
-  const _ShelfLedge({required this.theme});
+/// Thick oak plank: top plane, front face, underside cast shadow.
+class _ShelfLedge3D extends StatelessWidget {
+  const _ShelfLedge3D({required this.theme});
 
   final ReadingBookshelfTheme theme;
 
   @override
   Widget build(BuildContext context) {
-    return Stack(
-      children: <Widget>[
-        Container(
-          height: 14,
-          decoration: BoxDecoration(
-            color: theme.ledge,
-            borderRadius: BorderRadius.circular(2),
-            boxShadow: const <BoxShadow>[
-              BoxShadow(
-                color: Color(0x404A2E1A),
-                blurRadius: 6,
-                offset: Offset(0, 3),
-              ),
-            ],
-          ),
+    return SizedBox(
+      height: 28,
+      width: double.infinity,
+      child: CustomPaint(
+        painter: _Ledge3DPainter(
+          top: theme.ledgeHighlight,
+          front: theme.ledge,
+          shade: Color.lerp(theme.ledge, const Color(0xFF5A3A1E), 0.45)!,
         ),
-        Positioned(
-          left: 0,
-          right: 0,
-          top: 0,
-          child: Container(
-            height: 5,
-            decoration: BoxDecoration(
-              color: theme.ledgeHighlight,
-              borderRadius: const BorderRadius.vertical(
-                top: Radius.circular(2),
-              ),
-            ),
-          ),
-        ),
-      ],
+      ),
     );
   }
+}
+
+class _Ledge3DPainter extends CustomPainter {
+  const _Ledge3DPainter({
+    required this.top,
+    required this.front,
+    required this.shade,
+  });
+
+  final Color top;
+  final Color front;
+  final Color shade;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    const double topH = 9;
+    final double frontH = size.height - topH - 4;
+
+    // Underside soft cast onto the bay below.
+    canvas.drawRect(
+      Rect.fromLTWH(0, size.height - 6, size.width, 6),
+      Paint()
+        ..shader = const LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: <Color>[Color(0x55301808), Color(0x00000000)],
+        ).createShader(Rect.fromLTWH(0, size.height - 6, size.width, 6)),
+    );
+
+    // Top walking surface (lighter).
+    final Path topPath = Path()
+      ..moveTo(0, 2)
+      ..lineTo(size.width, 2)
+      ..lineTo(size.width, topH)
+      ..lineTo(0, topH)
+      ..close();
+    canvas.drawPath(
+      topPath,
+      Paint()
+        ..shader = LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: <Color>[Color.lerp(top, Colors.white, 0.18)!, top, front],
+        ).createShader(Rect.fromLTWH(0, 0, size.width, topH)),
+    );
+
+    // Front thickness.
+    canvas.drawRect(
+      Rect.fromLTWH(0, topH, size.width, frontH),
+      Paint()
+        ..shader = LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: <Color>[front, shade],
+        ).createShader(Rect.fromLTWH(0, topH, size.width, frontH)),
+    );
+
+    // Nose highlight along the front edge.
+    canvas.drawLine(
+      Offset(0, topH + 0.8),
+      Offset(size.width, topH + 0.8),
+      Paint()
+        ..color = Colors.white.withValues(alpha: 0.28)
+        ..strokeWidth = 1.1,
+    );
+
+    // Grain ticks on the front face.
+    final math.Random rng = math.Random(11);
+    final Paint grain = Paint()..strokeWidth = 0.7;
+    for (double x = 4; x < size.width; x += 7 + rng.nextDouble() * 9) {
+      grain.color = shade.withValues(alpha: 0.18 + rng.nextDouble() * 0.12);
+      canvas.drawLine(
+        Offset(x, topH + 3),
+        Offset(x + rng.nextDouble() * 2, topH + frontH - 2),
+        grain,
+      );
+    }
+  }
+
+  @override
+  bool shouldRepaint(_Ledge3DPainter oldDelegate) =>
+      oldDelegate.top != top ||
+      oldDelegate.front != front ||
+      oldDelegate.shade != shade;
 }
 
 /// Dashed rounded import tile with a large download arrow.
@@ -540,6 +632,22 @@ class _ImportSlot extends StatelessWidget {
                 decoration: BoxDecoration(
                   color: theme.importFill,
                   borderRadius: BorderRadius.circular(8),
+                  boxShadow: const <BoxShadow>[
+                    BoxShadow(
+                      color: Color(0x33180800),
+                      blurRadius: 6,
+                      offset: Offset(0, 2),
+                    ),
+                  ],
+                  gradient: LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: <Color>[
+                      Color.lerp(theme.importFill, Colors.white, 0.35)!,
+                      theme.importFill,
+                      Color.lerp(theme.importFill, theme.woodOuter, 0.35)!,
+                    ],
+                  ),
                 ),
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
@@ -548,6 +656,13 @@ class _ImportSlot extends StatelessWidget {
                       Icons.file_download_outlined,
                       size: 44,
                       color: theme.importInk,
+                      shadows: const <Shadow>[
+                        Shadow(
+                          color: Color(0x33000000),
+                          blurRadius: 2,
+                          offset: Offset(0, 1),
+                        ),
+                      ],
                     ),
                     const SizedBox(height: 6),
                     Text(
@@ -602,65 +717,137 @@ class _DashedRRectPainter extends CustomPainter {
       oldDelegate.color != color;
 }
 
-/// Light oak back panel: vertical wash, faint horizontal grain, soft inner
-/// shadow along the top and sides.
-class _OakPanelPainter extends CustomPainter {
-  const _OakPanelPainter({required this.base, required this.grain});
+/// Full oak cabinet: outer frame, recessed bay, left/right side walls with
+/// thickness, top rail, and wood grain on the backboard.
+class _OakCabinetPainter extends CustomPainter {
+  const _OakCabinetPainter({
+    required this.outer,
+    required this.inner,
+    required this.ledge,
+  });
 
-  final Color base;
-  final Color grain;
+  final Color outer;
+  final Color inner;
+  final Color ledge;
 
   @override
   void paint(Canvas canvas, Size size) {
     final Rect rect = Offset.zero & size;
+
+    // Outer carcass.
     canvas.drawRect(
       rect,
+      Paint()
+        ..shader = LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: <Color>[
+            Color.lerp(outer, Colors.white, 0.12)!,
+            outer,
+            Color.lerp(outer, Colors.black, 0.12)!,
+          ],
+        ).createShader(rect),
+    );
+
+    // Recessed bay (backboard).
+    const double wall = 16;
+    const double topRail = 12;
+    final Rect bay = Rect.fromLTRB(
+      wall,
+      topRail,
+      size.width - wall,
+      size.height - 6,
+    );
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(bay, const Radius.circular(2)),
       Paint()
         ..shader = LinearGradient(
           begin: Alignment.topCenter,
           end: Alignment.bottomCenter,
           colors: <Color>[
-            Color.lerp(base, grain, 0.25)!,
-            base,
-            Color.lerp(base, Colors.white, 0.08)!,
+            Color.lerp(inner, Colors.black, 0.08)!,
+            inner,
+            Color.lerp(inner, Colors.white, 0.06)!,
           ],
-        ).createShader(rect),
+        ).createShader(bay),
     );
 
+    // Horizontal grain on backboard.
     final math.Random rng = math.Random(7);
-    final Paint line = Paint()..strokeWidth = 0.8;
-    for (double y = 2; y < size.height; y += 3 + rng.nextDouble() * 5) {
-      line.color = grain.withValues(alpha: 0.05 + rng.nextDouble() * 0.09);
-      final double x0 = rng.nextDouble() * size.width * 0.3;
-      final double x1 = size.width - rng.nextDouble() * size.width * 0.3;
+    final Paint line = Paint()..strokeWidth = 0.75;
+    for (double y = bay.top + 2; y < bay.bottom; y += 3 + rng.nextDouble() * 5) {
+      line.color = outer.withValues(alpha: 0.05 + rng.nextDouble() * 0.08);
+      final double x0 = bay.left + rng.nextDouble() * bay.width * 0.25;
+      final double x1 = bay.right - rng.nextDouble() * bay.width * 0.25;
       canvas.drawLine(Offset(x0, y), Offset(x1, y), line);
     }
 
-    const Color shadow = Color(0x334A2E1A);
-    canvas.drawRect(
-      Rect.fromLTWH(0, 0, size.width, 26),
-      Paint()
-        ..shader = const LinearGradient(
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-          colors: <Color>[shadow, Color(0x00000000)],
-        ).createShader(Rect.fromLTWH(0, 0, size.width, 26)),
-    );
+    // Left / right side walls — darker inner face, lighter outer edge.
     for (final bool left in <bool>[true, false]) {
-      final Rect side = Rect.fromLTWH(left ? 0 : size.width - 14, 0, 14, size.height);
+      final double x0 = left ? 0 : size.width - wall;
+      final Rect wallRect = Rect.fromLTWH(x0, 0, wall, size.height);
       canvas.drawRect(
-        side,
+        wallRect,
         Paint()
           ..shader = LinearGradient(
             begin: left ? Alignment.centerLeft : Alignment.centerRight,
             end: left ? Alignment.centerRight : Alignment.centerLeft,
-            colors: const <Color>[shadow, Color(0x00000000)],
-          ).createShader(side),
+            colors: <Color>[
+              Color.lerp(outer, Colors.white, 0.1)!,
+              Color.lerp(outer, Colors.black, 0.18)!,
+              Color.lerp(inner, Colors.black, 0.28)!,
+            ],
+            stops: const <double>[0, 0.55, 1],
+          ).createShader(wallRect),
+      );
+      // Inner corner shadow into the bay.
+      final Rect crease = Rect.fromLTWH(
+        left ? wall : size.width - wall - 10,
+        topRail,
+        10,
+        size.height - topRail,
+      );
+      canvas.drawRect(
+        crease,
+        Paint()
+          ..shader = LinearGradient(
+            begin: left ? Alignment.centerLeft : Alignment.centerRight,
+            end: left ? Alignment.centerRight : Alignment.centerLeft,
+            colors: const <Color>[Color(0x44301808), Color(0x00000000)],
+          ).createShader(crease),
       );
     }
+
+    // Top rail thickness.
+    canvas.drawRect(
+      Rect.fromLTWH(0, 0, size.width, topRail),
+      Paint()
+        ..shader = LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: <Color>[
+            Color.lerp(ledge, Colors.white, 0.2)!,
+            ledge,
+            Color.lerp(outer, Colors.black, 0.15)!,
+          ],
+        ).createShader(Rect.fromLTWH(0, 0, size.width, topRail)),
+    );
+
+    // Soft top lip shadow into the first bay.
+    canvas.drawRect(
+      Rect.fromLTWH(wall, topRail, size.width - wall * 2, 22),
+      Paint()
+        ..shader = const LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: <Color>[Color(0x44301808), Color(0x00000000)],
+        ).createShader(Rect.fromLTWH(wall, topRail, size.width - wall * 2, 22)),
+    );
   }
 
   @override
-  bool shouldRepaint(_OakPanelPainter oldDelegate) =>
-      oldDelegate.base != base || oldDelegate.grain != grain;
+  bool shouldRepaint(_OakCabinetPainter oldDelegate) =>
+      oldDelegate.outer != outer ||
+      oldDelegate.inner != inner ||
+      oldDelegate.ledge != ledge;
 }
