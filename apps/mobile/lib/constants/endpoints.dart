@@ -73,6 +73,7 @@ class Endpoints {
   static const String assetsConsume = 'api/assets/entitlements/consume';
   static const String learningTasks = 'api/learning/tasks';
   static const String learningSessions = 'api/learning/sessions';
+  static const String learningSceneRecognize = 'api/learning/scene-recognize';
   static const String learningWrongItems = 'api/learning/wrong-items';
   static const String learningReviews = 'api/learning/reviews';
   static const String learningReviewsDue = 'api/learning/reviews/due';

@@ -1806,7 +1806,7 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
       _busy = false;
       _sceneImagePath = imagePath;
       _sceneLabels = labels;
-      _status = labels.isEmpty ? '未识别到清晰物品' : '已识别 ${labels.length} 个词';
+      _status = labels.isEmpty ? '未识别到清晰物品' : '端上已识别 ${labels.length} 个词';
     });
     await showModalBottomSheet<void>(
       context: context,
@@ -1815,16 +1815,24 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
       builder: (BuildContext context) {
         return SizedBox(
           height: MediaQuery.sizeOf(context).height * 0.88,
-          child: ScenePhotoSheet(
+          child: _ScenePhotoRecognizeHost(
             imagePath: imagePath,
-            labels: labels,
+            initialLabels: labels,
             savedWords: _sceneSavedWords,
-            busy: _sceneSharing,
+            autoRefine: true,
             onAddWord: _addSceneWordToBook,
-            onShareWithCoach: () => _shareSceneWithCoach(
+            onShareWithCoach: (List<SceneWordLabel> current) =>
+                _shareSceneWithCoach(
               imagePath: imagePath,
-              labels: labels,
+              labels: current,
             ),
+            onLabelsChanged: (List<SceneWordLabel> current) {
+              if (!mounted) return;
+              setState(() {
+                _sceneLabels = current;
+                _sceneImagePath = imagePath;
+              });
+            },
             onRetake: () {
               Navigator.of(context).maybePop();
               unawaited(_openSceneCapture());
@@ -2928,6 +2936,109 @@ class _BubbleAction extends StatelessWidget {
           color: Colors.white.withValues(alpha: 0.55),
         ),
       ),
+    );
+  }
+}
+
+/// Owns local→cloud refine lifecycle for one photo sheet session.
+class _ScenePhotoRecognizeHost extends ConsumerStatefulWidget {
+  const _ScenePhotoRecognizeHost({
+    required this.imagePath,
+    required this.initialLabels,
+    required this.savedWords,
+    required this.onAddWord,
+    required this.onShareWithCoach,
+    required this.onRetake,
+    required this.onLabelsChanged,
+    this.autoRefine = true,
+  });
+
+  final String imagePath;
+  final List<SceneWordLabel> initialLabels;
+  final Set<String> savedWords;
+  final Future<void> Function(SceneWordLabel label) onAddWord;
+  final Future<void> Function(List<SceneWordLabel> labels) onShareWithCoach;
+  final VoidCallback onRetake;
+  final ValueChanged<List<SceneWordLabel>> onLabelsChanged;
+  final bool autoRefine;
+
+  @override
+  ConsumerState<_ScenePhotoRecognizeHost> createState() =>
+      _ScenePhotoRecognizeHostState();
+}
+
+class _ScenePhotoRecognizeHostState
+    extends ConsumerState<_ScenePhotoRecognizeHost> {
+  late List<SceneWordLabel> _labels = List<SceneWordLabel>.of(
+    widget.initialLabels,
+  );
+  bool _refining = false;
+  bool _refined = false;
+  String _hint = '';
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.autoRefine) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        unawaited(_refine(force: false));
+      });
+    }
+  }
+
+  Future<void> _refine({required bool force}) async {
+    if (_refining) return;
+    if (_refined && !force) return;
+    if (!ref.read(authSessionProvider).isLoggedIn) {
+      setState(() {
+        _hint = '登录后可云端精修；当前为端上快标。';
+      });
+      return;
+    }
+    setState(() {
+      _refining = true;
+      _hint = '云端精修中（Qwen-VL）…';
+    });
+    try {
+      final LearningSettingsState settings = ref.read(learningSettingsProvider);
+      final List<SceneWordLabel> refined =
+          await ref.read(sceneWordRecognizerProvider).refineWithCloud(
+                widget.imagePath,
+                settings: settings,
+                seed: _labels,
+              );
+      if (!mounted) return;
+      setState(() {
+        _labels = refined;
+        _refined = true;
+        _refining = false;
+        _hint = refined.isEmpty
+            ? '云端未识别到清晰物品，可重拍。'
+            : '已云端精修 ${refined.length} 个词。';
+      });
+      widget.onLabelsChanged(refined);
+    } catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _refining = false;
+        _hint = '云端精修失败，仍可用端上结果。${error.toString()}';
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return ScenePhotoSheet(
+      imagePath: widget.imagePath,
+      labels: _labels,
+      savedWords: widget.savedWords,
+      refining: _refining,
+      refined: _refined,
+      statusHint: _hint,
+      onAddWord: widget.onAddWord,
+      onShareWithCoach: () => widget.onShareWithCoach(_labels),
+      onRetake: widget.onRetake,
+      onRefine: () => _refine(force: true),
     );
   }
 }

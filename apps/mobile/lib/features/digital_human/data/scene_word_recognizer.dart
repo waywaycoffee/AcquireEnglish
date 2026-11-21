@@ -1,12 +1,19 @@
+import 'dart:convert';
 import 'dart:io';
+import 'dart:math' as math;
+import 'dart:typed_data';
 
+import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_mlkit_image_labeling/google_mlkit_image_labeling.dart';
 import 'package:google_mlkit_text_recognition/google_mlkit_text_recognition.dart';
+import 'package:image/image.dart' as img;
 
+import '../../../constants/endpoints.dart';
 import '../../settings/presentation/settings_provider.dart';
 import '../../shared/data/word_lookup_service.dart';
 import '../../shared/domain/word_lookup_entry.dart';
+import '../../sync/data/acquire_api_client.dart';
 import '../../words/data/offline_word_dictionary.dart';
 import '../domain/scene_word_label.dart';
 
@@ -14,18 +21,22 @@ final Provider<SceneWordRecognizer> sceneWordRecognizerProvider =
     Provider<SceneWordRecognizer>((Ref ref) {
       return SceneWordRecognizer(
         lookup: ref.read(wordLookupServiceProvider),
+        api: ref.read(acquireApiClientProvider),
       );
     });
 
-/// On-device image labeling + OCR, enriched with IPA/Chinese for coach chips.
+/// On-device image labeling + OCR, optionally refined by cloud Qwen-VL.
 class SceneWordRecognizer {
   SceneWordRecognizer({
     required WordLookupService lookup,
+    required AcquireApiClient api,
     OfflineWordDictionary? offline,
   }) : _lookup = lookup,
+       _api = api,
        _offline = offline ?? OfflineWordDictionary();
 
   final WordLookupService _lookup;
+  final AcquireApiClient _api;
   final OfflineWordDictionary _offline;
 
   static const Map<String, String> _commonZh = <String, String>{
@@ -68,6 +79,7 @@ class SceneWordRecognizer {
 
   static final RegExp _wordRe = RegExp(r"^[A-Za-z][A-Za-z'-]{1,24}$");
 
+  /// Fast on-device pass (ML Kit labels + Latin OCR).
   Future<List<SceneWordLabel>> recognize(
     String imagePath, {
     required LearningSettingsState settings,
@@ -79,11 +91,9 @@ class SceneWordRecognizer {
     }
     final InputImage input = InputImage.fromFilePath(imagePath);
     final ImageLabeler labeler = ImageLabeler(
-      options: ImageLabelerOptions(confidenceThreshold: 0.45),
+      options: ImageLabelerOptions(confidenceThreshold: 0.48),
     );
-    final TextRecognizer ocr = TextRecognizer(
-      script: TextRecognitionScript.latin,
-    );
+    final TextRecognizer ocr = TextRecognizer();
     try {
       final List<ImageLabel> rawLabels = await labeler.processImage(input);
       final RecognizedText text = await ocr.processImage(input);
@@ -101,7 +111,7 @@ class SceneWordRecognizer {
           if (word.isEmpty || word.length < 3) continue;
           candidates.add(
             _Candidate(word: word, confidence: 0.55, fromOcr: true),
-          );
+          ); // OCR tokens get a mid prior until VL refine.
         }
       }
       candidates.sort(
@@ -116,6 +126,7 @@ class SceneWordRecognizer {
           confidence: item.confidence,
           index: out.length,
           settings: settings,
+          source: 'local',
         );
         out.add(enriched);
         if (out.length >= limit) break;
@@ -127,14 +138,224 @@ class SceneWordRecognizer {
     }
   }
 
+  /// Cloud VL refine (Acquire API / DashScope Qwen-VL). Falls back to the
+  /// user's OpenAI-compatible vision model when the server is unavailable.
+  Future<List<SceneWordLabel>> refineWithCloud(
+    String imagePath, {
+    required LearningSettingsState settings,
+    List<SceneWordLabel> seed = const <SceneWordLabel>[],
+    int limit = 8,
+  }) async {
+    final ({String base64, String mime}) encoded =
+        await _encodeImageForUpload(imagePath);
+    List<SceneWordLabel> cloud = const <SceneWordLabel>[];
+    try {
+      cloud = await _api.recognizeSceneWords(
+        imageBase64: encoded.base64,
+        mime: encoded.mime,
+        seedLabels: seed,
+        limit: limit,
+      );
+    } catch (_) {
+      cloud = await _refineWithUserVision(
+        imageBase64: encoded.base64,
+        mime: encoded.mime,
+        settings: settings,
+        seed: seed,
+        limit: limit,
+      );
+    }
+    if (cloud.isEmpty) {
+      return seed;
+    }
+    final List<SceneWordLabel> out = <SceneWordLabel>[];
+    for (int i = 0; i < cloud.length; i++) {
+      final SceneWordLabel item = cloud[i];
+      out.add(
+        await _enrich(
+          word: item.word,
+          confidence: item.confidence,
+          index: i,
+          settings: settings,
+          source: 'cloud',
+          chineseHint: item.chinese,
+          anchorX: item.anchorX,
+          anchorY: item.anchorY,
+        ),
+      );
+    }
+    return out;
+  }
+
+  Future<List<SceneWordLabel>> _refineWithUserVision({
+    required String imageBase64,
+    required String mime,
+    required LearningSettingsState settings,
+    required List<SceneWordLabel> seed,
+    required int limit,
+  }) async {
+    if (!_canUseUserVision(settings)) {
+      return const <SceneWordLabel>[];
+    }
+    final String model = settings.translationModel.trim();
+    final String seedBrief = seed
+        .take(8)
+        .map((SceneWordLabel s) => '${s.word}:${s.chinese}')
+        .join(', ');
+    final Map<String, dynamic> body = <String, dynamic>{
+      'model': model,
+      'temperature': 0.1,
+      'messages': <Map<String, dynamic>>[
+        <String, dynamic>{
+          'role': 'system',
+          'content':
+              'Label photo objects for English learners. Return ONLY a JSON array: '
+              '[{"word":"apple","chinese":"苹果","confidence":0.9,"anchor_x":0.4,"anchor_y":0.5}]. '
+              'Concrete nouns only; max $limit items.',
+        },
+        <String, dynamic>{
+          'role': 'user',
+          'content': <Map<String, dynamic>>[
+            <String, dynamic>{
+              'type': 'image_url',
+              'image_url': <String, String>{
+                'url': 'data:$mime;base64,$imageBase64',
+              },
+            },
+            <String, dynamic>{
+              'type': 'text',
+              'text':
+                  'Refine seed labels and add clear missing objects. seed=[$seedBrief]',
+            },
+          ],
+        },
+      ],
+    };
+    final Response<dynamic> response = await Dio(
+      BaseOptions(
+        baseUrl: settings.translationBaseUrl.trim(),
+        headers: <String, String>{
+          'Authorization':
+              'Bearer ${settings.translationApiKey.trim().isEmpty ? 'ollama' : settings.translationApiKey.trim()}',
+          'Content-Type': 'application/json',
+        },
+        connectTimeout: const Duration(seconds: 20),
+        receiveTimeout: const Duration(seconds: 45),
+      ),
+    ).post<dynamic>('/chat/completions', data: body);
+    final Map<String, dynamic> data = response.data as Map<String, dynamic>;
+    final List<dynamic> choices =
+        (data['choices'] as List<dynamic>?) ?? const <dynamic>[];
+    if (choices.isEmpty) return const <SceneWordLabel>[];
+    final Map<String, dynamic> message =
+        (choices.first as Map<String, dynamic>)['message']
+            as Map<String, dynamic>;
+    final Object? content = message['content'];
+    final String text = content is String
+        ? content
+        : (content is List
+            ? content
+                .whereType<Map>()
+                .map((Map row) => '${row['text'] ?? ''}')
+                .join('\n')
+            : '');
+    return _parseCloudJson(text);
+  }
+
+  bool _canUseUserVision(LearningSettingsState settings) {
+    final String provider = settings.translationProvider.trim();
+    if (provider == 'Google 翻译' ||
+        provider == '百度翻译' ||
+        provider == '阿里云翻译') {
+      return false;
+    }
+    final String model = settings.translationModel.trim().toLowerCase();
+    if (model.isEmpty) return false;
+    return model.contains('gpt-4o') ||
+        model.contains('gpt-4.1') ||
+        model.contains('gpt-5') ||
+        model.contains('vision') ||
+        model.contains('-vl') ||
+        model.contains('qwen-vl') ||
+        model.contains('qwen2.5-vl') ||
+        model.contains('gemini') ||
+        model.contains('claude-3') ||
+        model.contains('claude-4');
+  }
+
+  List<SceneWordLabel> _parseCloudJson(String raw) {
+    String text = raw.trim();
+    if (text.startsWith('```')) {
+      text = text.replaceFirst(RegExp(r'^```(?:json)?\s*'), '');
+      text = text.replaceFirst(RegExp(r'\s*```$'), '');
+    }
+    Object? parsed;
+    try {
+      parsed = jsonDecode(text);
+    } catch (_) {
+      final Match? match = RegExp(r'\[[\s\S]*\]').firstMatch(text);
+      if (match == null) return const <SceneWordLabel>[];
+      try {
+        parsed = jsonDecode(match.group(0)!);
+      } catch (_) {
+        return const <SceneWordLabel>[];
+      }
+    }
+    if (parsed is! List) return const <SceneWordLabel>[];
+    final List<SceneWordLabel> out = <SceneWordLabel>[];
+    final Set<String> seen = <String>{};
+    for (final Object? row in parsed) {
+      if (row is! Map) continue;
+      final Map<String, dynamic> map = Map<String, dynamic>.from(row);
+      final SceneWordLabel label = SceneWordLabel.fromJson(map).copyWith(
+        source: 'cloud',
+      );
+      if (label.word.length < 2 || !seen.add(label.word)) continue;
+      out.add(label);
+      if (out.length >= 8) break;
+    }
+    return out;
+  }
+
+  Future<({String base64, String mime})> _encodeImageForUpload(
+    String imagePath,
+  ) async {
+    final File file = File(imagePath);
+    final Uint8List bytes = await file.readAsBytes();
+    img.Image? decoded = img.decodeImage(bytes);
+    if (decoded == null) {
+      return (base64: base64Encode(bytes), mime: 'image/jpeg');
+    }
+    const int maxEdge = 1280;
+    if (decoded.width > maxEdge || decoded.height > maxEdge) {
+      final double scale = maxEdge /
+          math.max(decoded.width, decoded.height).toDouble();
+      decoded = img.copyResize(
+        decoded,
+        width: (decoded.width * scale).round().clamp(1, maxEdge),
+        height: (decoded.height * scale).round().clamp(1, maxEdge),
+      );
+    }
+    final Uint8List jpeg = Uint8List.fromList(
+      img.encodeJpg(decoded, quality: 72),
+    );
+    return (base64: base64Encode(jpeg), mime: 'image/jpeg');
+  }
+
   Future<SceneWordLabel> _enrich({
     required String word,
     required double confidence,
     required int index,
     required LearningSettingsState settings,
+    required String source,
+    String chineseHint = '',
+    double? anchorX,
+    double? anchorY,
   }) async {
     String phonetic = '';
-    String chinese = _commonZh[word] ?? '';
+    String chinese = chineseHint.trim().isNotEmpty
+        ? chineseHint.trim()
+        : (_commonZh[word] ?? '');
     try {
       final OfflineWordDefinition? offline = await _offline.lookup(word);
       if (offline != null) {
@@ -161,9 +382,8 @@ class SceneWordRecognizer {
         }
       }
     } catch (_) {}
-    // Spread chips so they don't fully overlap.
-    final double ax = 0.28 + (index % 3) * 0.22;
-    final double ay = 0.32 + (index ~/ 3) * 0.22;
+    final double ax = anchorX ?? (0.28 + (index % 3) * 0.22);
+    final double ay = anchorY ?? (0.32 + (index ~/ 3) * 0.22);
     return SceneWordLabel(
       word: word,
       phonetic: phonetic.isEmpty
@@ -173,13 +393,15 @@ class SceneWordRecognizer {
       confidence: confidence,
       anchorX: ax.clamp(0.12, 0.88),
       anchorY: ay.clamp(0.18, 0.78),
+      source: source,
     );
   }
 
   String _normalizeWord(String raw) {
     final String text = raw.trim().toLowerCase().replaceAll('’', "'");
-    if (!_wordRe.hasMatch(text)) return '';
-    // Drop overly generic ML labels.
+    if (!_wordRe.hasMatch(text) && !text.contains(' ')) {
+      return '';
+    }
     const Set<String> skip = <String>{
       'dish',
       'cuisine',
@@ -194,10 +416,12 @@ class SceneWordRecognizer {
       'product',
       'object',
       'thing',
+      'food',
+      'fruit',
+      'vegetable',
     };
     if (skip.contains(text)) return '';
     if (text.contains(' ')) {
-      // Prefer single-token concrete nouns for the wordbook.
       final List<String> parts = text
           .split(RegExp(r'\s+'))
           .where((String p) => _wordRe.hasMatch(p) && p.length >= 3)
@@ -205,6 +429,7 @@ class SceneWordRecognizer {
       if (parts.isEmpty) return '';
       return parts.last;
     }
+    if (!_wordRe.hasMatch(text)) return '';
     return text;
   }
 
@@ -219,7 +444,11 @@ class SceneWordRecognizer {
           return '${item.word} (${item.chinese})';
         })
         .join(', ');
-    return 'The learner is showing a live real-world scene that likely includes: $nouns. '
+    final bool cloud = labels.any((SceneWordLabel l) => l.source == 'cloud');
+    final String quality = cloud
+        ? 'Cloud vision refined these nouns'
+        : 'On-device labels suggest these nouns';
+    return 'The learner is showing a live real-world scene. $quality: $nouns. '
         'Talk about what you see, teach useful words, and ask the learner to describe the scene in English.';
   }
 }

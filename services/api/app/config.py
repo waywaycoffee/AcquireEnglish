@@ -19,9 +19,11 @@ class Settings(BaseSettings):
     media_public_base: str = "https://acquireenglish.curlhairai.com"
     # Optional Bilibili cookie (e.g. "SESSDATA=xxx; bili_jct=yyy") for login-gated CC/AI subtitles.
     bilibili_cookie: str = ""
-    # Optional global DashScope / 百炼 API key for web AI subtitles.
+    # Optional global DashScope / 百炼 API key for web AI subtitles / scene VL.
     dashscope_api_key: str = ""
     asr_model: str = "qwen3-asr-flash-filetrans"
+    # Qwen-VL model for photo scene word refine (compatible-mode).
+    scene_vl_model: str = "qwen-vl-plus"
     # Cached seekable study audio/video for imported links (Web real <audio>/<video>).
     media_cache_dir: str = "./media"
     # Placeholder catalog (cdn.example.com). Off in production — users import real media.

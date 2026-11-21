@@ -33,6 +33,7 @@ from app.routers import (
     syllabus_books,
     imports,
     learning,
+    scene_recognize,
     livekit,
     oral_match,
     netdisk,
@@ -109,6 +110,7 @@ app.include_router(learning_cards.router, prefix="/api")
 app.include_router(public_challenges.router, prefix="/api")
 app.include_router(imports.router, prefix="/api")
 app.include_router(learning.router, prefix="/api")
+app.include_router(scene_recognize.router, prefix="/api")
 app.include_router(livekit.router, prefix="/api")
 app.include_router(oral_match.router, prefix="/api")
 app.include_router(pronunciation_assessment.router, prefix="/api")

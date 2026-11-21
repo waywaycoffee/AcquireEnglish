@@ -6,6 +6,7 @@ import '../../../data/repository/network_repository.dart';
 import '../../avatar/data/avatar_models.dart';
 import '../../community/data/community_models.dart';
 import '../../digital_human/domain/learning_scenario.dart';
+import '../../digital_human/domain/scene_word_label.dart';
 import '../../words/domain/foundation_media.dart';
 import '../../words/domain/server_syllabus_catalog.dart';
 import '../../words/domain/syllabus_book.dart';
@@ -1567,6 +1568,53 @@ class AcquireApiClient {
     return AcquireLiveKitToken.fromJson(
       response.data as Map<String, dynamic>,
     );
+  }
+
+  /// Cloud VL refine for photo scene nouns (DashScope Qwen-VL on API host).
+  Future<List<SceneWordLabel>> recognizeSceneWords({
+    required String imageBase64,
+    String mime = 'image/jpeg',
+    List<SceneWordLabel> seedLabels = const <SceneWordLabel>[],
+    int limit = 8,
+  }) async {
+    final Response<dynamic> response = await _dio.post(
+      Endpoints.learningSceneRecognize,
+      data: <String, dynamic>{
+        'image_base64': imageBase64,
+        'mime': mime,
+        'limit': limit,
+        'seed_labels': seedLabels
+            .map(
+              (SceneWordLabel item) => <String, dynamic>{
+                'word': item.word,
+                'chinese': item.chinese,
+                'confidence': item.confidence,
+                'anchor_x': item.anchorX,
+                'anchor_y': item.anchorY,
+              },
+            )
+            .toList(growable: false),
+      },
+      options: Options(
+        sendTimeout: const Duration(seconds: 30),
+        receiveTimeout: const Duration(seconds: 50),
+        extra: const <String, Object>{
+          'dio_cache_interceptor_force_refresh': true,
+        },
+      ),
+    );
+    final Map<String, dynamic> body =
+        Map<String, dynamic>.from(response.data as Map);
+    final List<dynamic> rows =
+        (body['labels'] as List<dynamic>?) ?? const <dynamic>[];
+    return rows
+        .whereType<Map>()
+        .map(
+          (Map row) => SceneWordLabel.fromJson(
+            Map<String, dynamic>.from(row),
+          ).copyWith(source: 'cloud'),
+        )
+        .toList(growable: false);
   }
 
   Future<OralMatchStatus> enqueueOralMatch() async {

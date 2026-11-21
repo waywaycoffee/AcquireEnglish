@@ -13,7 +13,11 @@ class ScenePhotoSheet extends StatefulWidget {
     required this.onAddWord,
     required this.onShareWithCoach,
     required this.onRetake,
+    required this.onRefine,
     this.busy = false,
+    this.refining = false,
+    this.refined = false,
+    this.statusHint = '',
     super.key,
   });
 
@@ -23,7 +27,11 @@ class ScenePhotoSheet extends StatefulWidget {
   final Future<void> Function(SceneWordLabel label) onAddWord;
   final Future<void> Function() onShareWithCoach;
   final VoidCallback onRetake;
+  final Future<void> Function() onRefine;
   final bool busy;
+  final bool refining;
+  final bool refined;
+  final String statusHint;
 
   @override
   State<ScenePhotoSheet> createState() => _ScenePhotoSheetState();
@@ -42,7 +50,29 @@ class _ScenePhotoSheetState extends State<ScenePhotoSheet> {
   }
 
   @override
+  void didUpdateWidget(covariant ScenePhotoSheet oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.savedWords != widget.savedWords) {
+      _saved = <String>{...widget.savedWords};
+    }
+  }
+
+  String get _footerHint {
+    if (widget.statusHint.trim().isNotEmpty) return widget.statusHint;
+    if (widget.refining) return '云端精修中（Qwen-VL）…';
+    if (widget.refined) {
+      return widget.labels.isEmpty
+          ? '云端也未识别到清晰物品，可重拍或仍交给数字人描述。'
+          : '已云端精修；点标注加入生词本，或点「聊这个场景」。';
+    }
+    return widget.labels.isEmpty
+        ? '端上暂无清晰物品，可点「再识别一次」走云端，或重拍。'
+        : '端上快标已出；云端精修可提高准确度。点标注可加入生词本。';
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final bool blocked = widget.busy || widget.refining;
     return SafeArea(
       child: Material(
         color: const Color(0xFF0F0A24),
@@ -52,14 +82,29 @@ class _ScenePhotoSheetState extends State<ScenePhotoSheet> {
               padding: const EdgeInsets.fromLTRB(12, 8, 8, 4),
               child: Row(
                 children: <Widget>[
-                  const Expanded(
-                    child: Text(
-                      '拍照识词',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 17,
-                        fontWeight: FontWeight.w800,
-                      ),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: <Widget>[
+                        const Text(
+                          '拍照识词',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 17,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                        Text(
+                          widget.refining
+                              ? '端上快标 · 云端精修中'
+                              : (widget.refined ? '云端精修完成' : '端上快标'),
+                          style: TextStyle(
+                            color: Colors.white.withValues(alpha: 0.65),
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                   IconButton(
@@ -94,7 +139,7 @@ class _ScenePhotoSheetState extends State<ScenePhotoSheet> {
                                   showPhonetic: _showPhonetic,
                                   saved: saved,
                                   saving: _savingWord == label.word,
-                                  onTap: widget.busy
+                                  onTap: blocked
                                       ? null
                                       : () async {
                                           setState(
@@ -118,11 +163,28 @@ class _ScenePhotoSheetState extends State<ScenePhotoSheet> {
                                 ),
                               );
                             }),
-                          if (widget.busy)
-                            const ColoredBox(
-                              color: Color(0x66000000),
+                          if (blocked)
+                            ColoredBox(
+                              color: const Color(0x66000000),
                               child: Center(
-                                child: CircularProgressIndicator(),
+                                child: Column(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: <Widget>[
+                                    const CircularProgressIndicator(),
+                                    if (widget.refining) ...<Widget>[
+                                      const SizedBox(height: 12),
+                                      Text(
+                                        '云端精修中…',
+                                        style: TextStyle(
+                                          color: Colors.white.withValues(
+                                            alpha: 0.9,
+                                          ),
+                                          fontWeight: FontWeight.w700,
+                                        ),
+                                      ),
+                                    ],
+                                  ],
+                                ),
                               ),
                             ),
                         ],
@@ -149,15 +211,17 @@ class _ScenePhotoSheetState extends State<ScenePhotoSheet> {
                     onTap: () => setState(() => _showPhonetic = !_showPhonetic),
                   ),
                   _ToolChip(
+                    label: widget.refined ? '再识别一次' : '云端精修',
+                    onTap: blocked ? null : () => widget.onRefine(),
+                  ),
+                  _ToolChip(
                     label: '重拍',
-                    onTap: widget.onRetake,
+                    onTap: blocked ? null : widget.onRetake,
                   ),
                   _ToolChip(
                     label: '聊这个场景',
                     emphasized: true,
-                    onTap: widget.busy
-                        ? null
-                        : () => widget.onShareWithCoach(),
+                    onTap: blocked ? null : () => widget.onShareWithCoach(),
                   ),
                 ],
               ),
@@ -166,9 +230,7 @@ class _ScenePhotoSheetState extends State<ScenePhotoSheet> {
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 0, 16, 14),
               child: Text(
-                widget.labels.isEmpty
-                    ? '未识别到清晰物品，可重拍或仍把照片交给数字人描述。'
-                    : '点标注可加入生词本；点「聊这个场景」让数字人围绕眼前事物开口。',
+                _footerHint,
                 textAlign: TextAlign.center,
                 style: TextStyle(
                   color: Colors.white.withValues(alpha: 0.72),
