@@ -11,12 +11,17 @@ import '../../navigation/presentation/navigation_destination.dart';
 import '../../shared/presentation/pad/app_design_tokens.dart';
 import '../../shared/presentation/pad/pad_scaffold.dart';
 import '../../shared/presentation/pad/pad_top_bar.dart';
+import '../../settings/presentation/settings_provider.dart';
 import '../data/reading_catalog.dart';
 import '../domain/reading_doc.dart';
 import 'reading_library_provider.dart';
 
 final Provider<ReadingCatalogClient> readingCatalogClientProvider =
-    Provider<ReadingCatalogClient>((Ref ref) => ReadingCatalogClient());
+    Provider<ReadingCatalogClient>(
+      (Ref ref) => ReadingCatalogClient(
+        apiBaseUrl: ref.watch(learningSettingsProvider).resolvedCloudApiBaseUrl,
+      ),
+    );
 
 class ReadingCatalogScreen extends ConsumerStatefulWidget {
   const ReadingCatalogScreen({super.key});
@@ -39,10 +44,7 @@ class _ReadingCatalogScreenState extends ConsumerState<ReadingCatalogScreen> {
     if (!source.downloadable) {
       final String? url = source.externalUrl;
       if (url != null) {
-        await launchUrl(
-          Uri.parse(url),
-          mode: LaunchMode.externalApplication,
-        );
+        await launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
       }
       return;
     }
@@ -141,17 +143,17 @@ class _ReadingCatalogScreenState extends ConsumerState<ReadingCatalogScreen> {
           .read(readingCatalogClientProvider)
           .importCefrCsv(bytes);
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('已缓存 $n 篇 CEFR 短文')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('已缓存 $n 篇 CEFR 短文')));
       if (_source?.kind == ReadingCatalogKind.cefr) {
         unawaited(_openSource(_source!));
       }
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('导入失败：$e')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('导入失败：$e')));
     }
   }
 
@@ -175,10 +177,9 @@ class _ReadingCatalogScreenState extends ConsumerState<ReadingCatalogScreen> {
       final ReadingDoc doc = await ref
           .read(readingCatalogClientProvider)
           .downloadEntry(kind: source.kind, entry: entry);
-      await ref.read(readingLibraryProvider.notifier).addDoc(
-            doc,
-            checkQuota: false,
-          );
+      await ref
+          .read(readingLibraryProvider.notifier)
+          .addDoc(doc, checkQuota: false);
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -193,9 +194,9 @@ class _ReadingCatalogScreenState extends ConsumerState<ReadingCatalogScreen> {
       );
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('下载失败：$e')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('下载失败：$e')));
     } finally {
       if (mounted) setState(() => _downloadingId = null);
     }

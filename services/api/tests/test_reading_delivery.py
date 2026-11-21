@@ -48,3 +48,14 @@ def test_reading_voices_lists_default_bilingual() -> None:
         assert data['labels']['longanfengyue']
 
     asyncio.run(run())
+
+
+def test_reading_source_limits_hosts_and_starters_have_text():
+    from app.routers.reading_source import allowed, starter
+    assert allowed('https://raw.githubusercontent.com/nishkalavallabhi/OneStopEnglishCorpus/master/a.txt')
+    assert not allowed('https://raw.githubusercontent.com/other/repo/a.txt')
+    assert not allowed('https://raw.githubusercontent.com/nishkalavallabhi/OneStopEnglishCorpus/%2e%2e/secret')
+    assert not allowed('http://127.0.0.1/secret')
+    data = asyncio.run(starter())
+    assert len(data['documents']) == 3
+    assert all(d['plainText'] for d in data['documents'])

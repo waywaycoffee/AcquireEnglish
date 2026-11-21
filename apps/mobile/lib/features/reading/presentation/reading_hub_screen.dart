@@ -24,6 +24,7 @@ import '../data/reading_vocab_lists.dart';
 import '../domain/reading_doc.dart';
 import 'reading_iplus1_provider.dart';
 import 'reading_library_provider.dart';
+import 'reading_cold_start.dart';
 import 'reading_book_cover.dart';
 import 'reading_vocab_lists_sheet.dart';
 
@@ -40,10 +41,7 @@ class _ReadingHubScreenState extends ConsumerState<ReadingHubScreen> {
   Future<void> _importFile(BuildContext context, WidgetRef ref) async {
     final XFile? file = await openFile(
       acceptedTypeGroups: const <XTypeGroup>[
-        XTypeGroup(
-          label: 'reading',
-          extensions: kReadingImportExtensions,
-        ),
+        XTypeGroup(label: 'reading', extensions: kReadingImportExtensions),
       ],
       confirmButtonText: '导入读物',
     );
@@ -121,18 +119,16 @@ class _ReadingHubScreenState extends ConsumerState<ReadingHubScreen> {
       Navigator.of(context, rootNavigator: true).pop();
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(
-            '已导入「${doc.title}」· 约 ${doc.wordCount} 词$sourceNote',
-          ),
+          content: Text('已导入「${doc.title}」· 约 ${doc.wordCount} 词$sourceNote'),
         ),
       );
       unawaited(context.push('/reading/${Uri.encodeComponent(doc.id)}'));
     } catch (e) {
       if (context.mounted) {
         unawaited(Navigator.of(context, rootNavigator: true).maybePop());
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('导入失败：$e')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('导入失败：$e')));
       }
     } finally {
       progress.dispose();
@@ -149,9 +145,9 @@ class _ReadingHubScreenState extends ConsumerState<ReadingHubScreen> {
             (course: course, episode: episode),
     ];
     if (candidates.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('没有带英文字幕的课集，请先在学习页导入课程')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('没有带英文字幕的课集，请先在学习页导入课程')));
       return;
     }
     final ({LibraryCourseData course, LibraryEpisodeItem episode})? picked =
@@ -168,7 +164,10 @@ class _ReadingHubScreenState extends ConsumerState<ReadingHubScreen> {
                 child: ListView.builder(
                   itemCount: candidates.length,
                   itemBuilder: (BuildContext context, int index) {
-                    final ({LibraryCourseData course, LibraryEpisodeItem episode})
+                    final ({
+                      LibraryCourseData course,
+                      LibraryEpisodeItem episode,
+                    })
                     item = candidates[index];
                     return ListTile(
                       title: Text(item.course.title),
@@ -205,34 +204,36 @@ class _ReadingHubScreenState extends ConsumerState<ReadingHubScreen> {
       if (context.mounted) Navigator.of(context, rootNavigator: true).pop();
       if (!context.mounted) return;
       if (saved.isEmpty) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('字幕几乎没有英文内容，未生成短文')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('字幕几乎没有英文内容，未生成短文')));
         return;
       }
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('已生成 ${saved.length} 篇短文')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('已生成 ${saved.length} 篇短文')));
       unawaited(
         context.push('/reading/${Uri.encodeComponent(saved.first.id)}'),
       );
     } catch (e) {
       if (context.mounted) {
         Navigator.of(context, rootNavigator: true).pop();
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('生成失败：$e')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('生成失败：$e')));
       }
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    final coldStart = ref.watch(readingColdStartProvider);
     final ReadingLibraryState state = ref.watch(readingLibraryProvider);
     final ReadingDoc? cont = state.continueDoc;
     final ReadingVocabLists lists = ref.watch(readingVocabListsProvider);
-    final AsyncValue<List<ReadingIPlus1Match>> iPlus1 =
-        ref.watch(readingIPlus1MatchesProvider);
+    final AsyncValue<List<ReadingIPlus1Match>> iPlus1 = ref.watch(
+      readingIPlus1MatchesProvider,
+    );
     return PadScaffold(
       currentDestination: AppNavDestination.reading,
       showContinueLearning: false,
@@ -291,10 +292,7 @@ class _ReadingHubScreenState extends ConsumerState<ReadingHubScreen> {
                             label: '约读词数',
                             value: '${stats.wordsReadEstimate}',
                           ),
-                          _StatChip(
-                            label: '已会词',
-                            value: '${lists.knownCount}',
-                          ),
+                          _StatChip(label: '已会词', value: '${lists.knownCount}'),
                           _StatChip(
                             label: '强制生词',
                             value: '${lists.focusCount}',
@@ -395,66 +393,112 @@ class _ReadingHubScreenState extends ConsumerState<ReadingHubScreen> {
                   ],
                 ),
                 const SizedBox(height: 16),
-                Builder(builder: (BuildContext context) {
-                  final List<ReadingDoc> books = <ReadingDoc>[
-                    ...state.userDocs.reversed,
-                    ...state.builtin,
-                  ].where((ReadingDoc doc) {
-                    final double percent = state.progressFor(doc.id)?.percent ?? 0;
-                    return _filter == 0 ||
-                        (_filter == 1 && percent > 0 && percent < 1) ||
-                        (_filter == 2 && percent >= 1);
-                  }).toList();
-                  if (books.isEmpty) {
-                    return const Padding(
-                      padding: EdgeInsets.all(24),
-                      child: Text('这里还没有读物'),
-                    );
-                  }
-                  return LayoutBuilder(builder: (BuildContext context, BoxConstraints size) {
-                    final int columns = (size.maxWidth / 145).floor().clamp(2, 6);
-                    final double width = (size.maxWidth - (columns - 1) * 18) / columns;
-                    return Wrap(
-                      spacing: 18,
-                      runSpacing: 24,
-                      children: <Widget>[
-                        for (final ReadingDoc doc in books)
-                          SizedBox(
-                            width: width,
-                            child: InkWell(
-                              onTap: () => context.push('/reading/${Uri.encodeComponent(doc.id)}'),
-                              onLongPress: doc.builtin ? null : () async {
-                                final bool? remove = await showDialog<bool>(
-                                  context: context,
-                                  builder: (BuildContext dialog) => AlertDialog(
-                                    title: Text('删除「${doc.title}」？'),
-                                    actions: <Widget>[
-                                      TextButton(onPressed: () => Navigator.pop(dialog), child: const Text('取消')),
-                                      TextButton(onPressed: () => Navigator.pop(dialog, true), child: const Text('删除')),
+                Builder(
+                  builder: (BuildContext context) {
+                    final List<ReadingDoc> books =
+                        <ReadingDoc>[
+                          ...state.userDocs.reversed,
+                          ...state.builtin,
+                        ].where((ReadingDoc doc) {
+                          final double percent =
+                              state.progressFor(doc.id)?.percent ?? 0;
+                          return _filter == 0 ||
+                              (_filter == 1 && percent > 0 && percent < 1) ||
+                              (_filter == 2 && percent >= 1);
+                        }).toList();
+                    if (books.isEmpty) {
+                      return const Padding(
+                        padding: EdgeInsets.all(24),
+                        child: Text('这里还没有读物'),
+                      );
+                    }
+                    return LayoutBuilder(
+                      builder: (BuildContext context, BoxConstraints size) {
+                        final int columns = (size.maxWidth / 145).floor().clamp(
+                          2,
+                          6,
+                        );
+                        final double width =
+                            (size.maxWidth - (columns - 1) * 18) / columns;
+                        return Wrap(
+                          spacing: 18,
+                          runSpacing: 24,
+                          children: <Widget>[
+                            for (final ReadingDoc doc in books)
+                              SizedBox(
+                                width: width,
+                                child: InkWell(
+                                  onTap: () => context.push(
+                                    '/reading/${Uri.encodeComponent(doc.id)}',
+                                  ),
+                                  onLongPress: doc.builtin
+                                      ? null
+                                      : () async {
+                                          final bool?
+                                          remove = await showDialog<bool>(
+                                            context: context,
+                                            builder: (BuildContext dialog) =>
+                                                AlertDialog(
+                                                  title: Text(
+                                                    '删除「${doc.title}」？',
+                                                  ),
+                                                  actions: <Widget>[
+                                                    TextButton(
+                                                      onPressed: () =>
+                                                          Navigator.pop(dialog),
+                                                      child: const Text('取消'),
+                                                    ),
+                                                    TextButton(
+                                                      onPressed: () =>
+                                                          Navigator.pop(
+                                                            dialog,
+                                                            true,
+                                                          ),
+                                                      child: const Text('删除'),
+                                                    ),
+                                                  ],
+                                                ),
+                                          );
+                                          if (remove == true) {
+                                            await ref
+                                                .read(
+                                                  readingLibraryProvider
+                                                      .notifier,
+                                                )
+                                                .removeDoc(doc.id);
+                                          }
+                                        },
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: <Widget>[
+                                      ReadingBookCover(
+                                        title: doc.title,
+                                        level: doc.level,
+                                      ),
+                                      const SizedBox(height: 10),
+                                      Text(
+                                        doc.title,
+                                        maxLines: 2,
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                      const SizedBox(height: 4),
+                                      Text(
+                                        '${doc.level} · 已读 ${((state.progressFor(doc.id)?.percent ?? 0) * 100).round()}%',
+                                        style: Theme.of(
+                                          context,
+                                        ).textTheme.bodySmall,
+                                      ),
                                     ],
                                   ),
-                                );
-                                if (remove == true) {
-                                  await ref.read(readingLibraryProvider.notifier).removeDoc(doc.id);
-                                }
-                              },
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: <Widget>[
-                                  ReadingBookCover(title: doc.title, level: doc.level),
-                                  const SizedBox(height: 10),
-                                  Text(doc.title, maxLines: 2, overflow: TextOverflow.ellipsis),
-                                  const SizedBox(height: 4),
-                                  Text('${doc.level} · 已读 ${((state.progressFor(doc.id)?.percent ?? 0) * 100).round()}%',
-                                    style: Theme.of(context).textTheme.bodySmall),
-                                ],
+                                ),
                               ),
-                            ),
-                          ),
-                      ],
+                          ],
+                        );
+                      },
                     );
-                  });
-                }),
+                  },
+                ),
               ],
             ),
     );
@@ -481,10 +525,7 @@ class _StatChip extends StatelessWidget {
         children: <Widget>[
           Text(
             value,
-            style: const TextStyle(
-              fontWeight: FontWeight.w900,
-              fontSize: 16,
-            ),
+            style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 16),
           ),
           Text(
             label,
@@ -567,7 +608,10 @@ class _DocTile extends StatelessWidget {
               Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: <Widget>[
-                  SizedBox(width: 92, child: ReadingBookCover(title: doc.title, level: doc.level)),
+                  SizedBox(
+                    width: 92,
+                    child: ReadingBookCover(title: doc.title, level: doc.level),
+                  ),
                   const SizedBox(width: 18),
                   Expanded(
                     child: Text(
