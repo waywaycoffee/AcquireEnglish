@@ -340,13 +340,9 @@ async def detailed_asset_report(db: AsyncSession, user_id: int) -> dict[str, Any
         for n in netdisk
     ]
 
-    # OCR/subtitle text lives in DB — fold approximate sizes into storage report.
-    ocr_db_bytes = sum(int(x["approx_bytes"]) for x in ocr_items)
-    sub_db_bytes = sum(int(x["approx_bytes"]) for x in sub_items)
+    # OCR/subtitle DB sizes are already included in batch_asset_summaries storage_bytes.
     storage_breakdown = dict(summary.get("storage_breakdown") or {})
-    storage_breakdown["ocr_db_bytes"] = ocr_db_bytes
-    storage_breakdown["subtitle_db_bytes"] = sub_db_bytes
-    storage_bytes = int(summary.get("storage_bytes") or 0) + ocr_db_bytes + sub_db_bytes
+    storage_bytes = int(summary.get("storage_bytes") or 0)
 
     return {
         **summary,
