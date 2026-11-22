@@ -16,6 +16,24 @@ class _FakeSharedApi extends AcquireApiClient {
 
   final SharedBilibiliSubtitlePack? pack;
   final bool enqueueSucceeds;
+  PersonalImportAsset? personalAsset;
+  String? personalEnglish;
+  final List<String> requests = <String>[];
+
+  @override
+  Future<List<PersonalImportAsset>> listPersonalImports() async => [
+    if (personalAsset != null) personalAsset!,
+  ];
+
+  @override
+  Future<String?> fetchPersonalImportSrt({
+    required int importId,
+    required String lang,
+  }) async {
+    requests.add('personal-$lang');
+    return personalEnglish;
+  }
+
   int getCalls = 0;
   int enqueueCalls = 0;
   String? lastEnqueuedBvid;
@@ -27,6 +45,7 @@ class _FakeSharedApi extends AcquireApiClient {
     int page = 1,
     int? cid,
   }) async {
+    requests.add('public');
     getCalls += 1;
     return pack;
   }
@@ -113,15 +132,66 @@ void main() {
     expect(ids.page, 2);
   });
 
-  test('download requests cloud subtitles without a local media file', () async {
-    final _FakeSharedApi api = _FakeSharedApi(null);
-    configureSharedBilibiliSubtitleApi(api);
-    await requestSharedSubtitlesForDownload(bvid: 'BV1CS4y1v7sQ', page: 151);
-    expect(api.getCalls, 1);
-    expect(api.enqueueCalls, 1);
-    expect(api.lastEnqueuedBvid, 'BV1CS4y1v7sQ');
-    expect(api.lastEnqueuedPage, 151);
-  });
+  test(
+    'download requests cloud subtitles without a local media file',
+    () async {
+      final _FakeSharedApi api = _FakeSharedApi(null);
+      configureSharedBilibiliSubtitleApi(api);
+      await requestSharedSubtitlesForDownload(bvid: 'BV1CS4y1v7sQ', page: 151);
+      expect(api.getCalls, 1);
+      expect(api.enqueueCalls, 1);
+      expect(api.lastEnqueuedBvid, 'BV1CS4y1v7sQ');
+      expect(api.lastEnqueuedPage, 151);
+    },
+  );
+
+  test(
+    'public lookup only fills tracks missing from the personal library',
+    () async {
+      const String bvid = 'BV1CS4y1v7sQ';
+      final String publicEn = buildSampleEnglishSrt(cues: 6);
+      final String publicZh = buildSampleChineseSrt(cues: 6);
+      final _FakeSharedApi api = _FakeSharedApi(
+        SharedBilibiliSubtitlePack(
+          bvid: bvid,
+          page: 2,
+          subtitleEnSrt: publicEn,
+          subtitleZhSrt: publicZh,
+          qualityScore: 0.9,
+          cueCount: 6,
+          hasZh: true,
+        ),
+      );
+      api.personalAsset = const PersonalImportAsset(
+        id: 1,
+        source: 'bilibili',
+        externalId: '$bvid-p02',
+        title: 'Part 2',
+        watchUrl: 'https://www.bilibili.com/video/$bvid?p=2',
+        durationSec: 60,
+        hasEn: true,
+        hasZh: false,
+        courseId: 'course',
+      );
+      final String personalEn = publicEn.replaceFirst(
+        RegExp(r'[^\n]+(?=\n\n)'),
+        'My corrected sentence.',
+      );
+      api.personalEnglish = personalEn;
+      final result = await tryApplySharedBilibiliSubtitles(
+        api: api,
+        ids: const BilibiliSharedSubtitleIds(
+          bvid: bvid,
+          page: 2,
+          idKey: '$bvid-p02',
+        ),
+        documentsDirectory: () async => docs,
+      );
+      expect(api.requests, ['personal-en', 'public']);
+      expect(await File(result!.enPath!).readAsString(), personalEn);
+      expect(await File(result.zhPath!).readAsString(), publicZh);
+    },
+  );
 
   test('download continues when the cloud API is not configured', () async {
     await requestSharedSubtitlesForDownload(bvid: 'BV1CS4y1v7sQ', page: 1);
@@ -238,9 +308,7 @@ void main() {
     final List<SubtitleCompletionJob> jobs = await queue.loadJobs();
     expect(jobs, isEmpty);
 
-    final File writtenEn = File(
-      '${docs.path}/bilibili/BV1SHAREDTEST01/en.srt',
-    );
+    final File writtenEn = File('${docs.path}/bilibili/BV1SHAREDTEST01/en.srt');
     expect(writtenEn.existsSync(), isTrue);
     expect(writtenEn.readAsStringSync(), contains('Hello world'));
   });

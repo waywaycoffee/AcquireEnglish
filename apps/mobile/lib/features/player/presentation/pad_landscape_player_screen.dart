@@ -37,6 +37,7 @@ import '../../shared/presentation/app_loading_overlay.dart';
 import '../../shared/presentation/pad/pad_scaffold.dart';
 import '../../sync/data/acquire_api_client.dart';
 import '../../daily_path/presentation/oral_core_series_provider.dart';
+import '../../subtitle_completion/shared_bilibili_subtitle_sync.dart';
 import '../../sync/data/personal_import_sync.dart';
 import '../../words/data/offline_word_dictionary.dart';
 import '../../words/data/vocab_card_enrichment_service.dart';
@@ -371,6 +372,25 @@ class PadLandscapePlayerScreenState
     }
     // needsResync only marks the cold-open once — do not force prepare when
     // local official EN already exists (合集分集 numberStr ≠ multi-P ?p=).
+    ({String? enPath, String? zhPath})? recoveredSubtitles;
+    if (enSub == null || zhSub == null) {
+      final ids = resolveBilibiliSharedSubtitleIds(
+        course: resource.course,
+        episode: resource.episode,
+        videoAsset: resource.videoAsset,
+      );
+      if (ids != null) {
+        recoveredSubtitles = await tryApplySharedBilibiliSubtitles(
+          api: ref.read(acquireApiClientProvider),
+          ids: ids,
+          existingEnPath: enSub,
+          existingZhPath: zhSub,
+        ).timeout(const Duration(seconds: 5), onTimeout: () => null);
+        if (!mounted) return;
+        enSub ??= recoveredSubtitles?.enPath;
+        zhSub ??= recoveredSubtitles?.zhPath;
+      }
+    }
     if (_needsBilibiliPrepare(resource)) {
       if (mounted) {
         setState(() {
@@ -385,10 +405,10 @@ class PadLandscapePlayerScreenState
         return;
       }
       if ((prepared.enSubtitlePath ?? '').isNotEmpty) {
-        enSub = prepared.enSubtitlePath;
+        enSub = recoveredSubtitles?.enPath ?? prepared.enSubtitlePath;
       }
       if ((prepared.zhSubtitlePath ?? '').isNotEmpty) {
-        zhSub = prepared.zhSubtitlePath;
+        zhSub = recoveredSubtitles?.zhPath ?? prepared.zhSubtitlePath;
       }
       if ((prepared.localVideoPath ?? '').isNotEmpty) {
         _videoAsset = prepared.localVideoPath;

@@ -248,9 +248,9 @@ Future<BilibiliEpisodePrepareResult> prepareBilibiliEpisode({
   // Skip network when both EN+ZH softsubs are already usable (local or cloud).
   // EN-only must still fetch so we pick up official ZH instead of EN→ZH compute.
   if (hasCloudPair) {
-    onProgress?.call('使用云端双语字幕');
+    onProgress?.call('有中文字幕，有英文字幕');
   } else if (hasLocalEnglish && hasLocalChinese && !forceOfficialRefresh) {
-    onProgress?.call('使用本地双语字幕');
+    onProgress?.call('有中文字幕，有英文字幕');
   } else {
     onProgress?.call(
       hasLocalEnglish && !hasLocalChinese

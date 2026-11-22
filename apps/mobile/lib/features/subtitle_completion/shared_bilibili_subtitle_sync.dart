@@ -6,6 +6,7 @@ import '../import_course/data/bilibili_episode_prepare.dart';
 import '../import_course/data/bilibili_multipage.dart';
 import '../import_course/domain/bilibili_import.dart';
 import '../library/presentation/library_mock_data.dart';
+import '../player/presentation/bilingual_subtitle_helpers.dart';
 import '../sync/data/acquire_api_client.dart';
 import 'shared_subtitle_api.dart';
 import 'shared_subtitle_quality.dart';
@@ -196,6 +197,8 @@ Future<({String? enPath, String? zhPath})?> tryApplySharedBilibiliSubtitles({
   required BilibiliSharedSubtitleIds ids,
   Future<Directory> Function()? documentsDirectory,
   bool requireBilingual = false,
+  String? existingEnPath,
+  String? existingZhPath,
 }) async {
   try {
     final String folder = (ids.idKey ?? ids.bvid).trim();
@@ -209,35 +212,64 @@ Future<({String? enPath, String? zhPath})?> tryApplySharedBilibiliSubtitles({
         );
     final bool localEn = isUsableSubtitlePath(local.enPath);
     final bool localZh = isUsableSubtitlePath(local.zhPath);
-    if (localEn && localZh) {
-      return local;
+    String? en = existingEnPath ?? (localEn ? local.enPath : null);
+    String? zh = existingZhPath ?? (localZh ? local.zhPath : null);
+    if (en != null && zh != null) return (enPath: en, zhPath: zh);
+
+    Future<String?> saveTrack(String lang, String? srt) async {
+      final bool valid = parseSrtCues(srt ?? '').isNotEmpty;
+      if (!valid) return null;
+      final Directory docs = await (documentsDirectory ?? getApplicationDocumentsDirectory)();
+      final Directory dir = await Directory('${docs.path}/bilibili/$folder').create(recursive: true);
+      final File file = File('${dir.path}/$lang.srt');
+      await file.writeAsString(srt!, flush: true);
+      return file.path;
     }
 
-    final SharedBilibiliSubtitlePack? pack = await api.getSharedBilibiliSubtitle(
-      bvid: ids.bvid,
-      page: ids.page,
-      cid: ids.cid,
-    );
-    if (pack == null) {
-      return null;
-    }
-    final bool packHasZh =
-        pack.hasZh || ((pack.subtitleZhSrt ?? '').trim().length >= 20);
-    if (requireBilingual && !packHasZh) {
-      // Caller wants ZH+EN; do not treat EN-only community packs as a hit.
-      return null;
-    }
-    final ({String? enPath, String? zhPath}) written =
-        await writeSharedBilibiliSubtitleFiles(
-          idKey: folder,
-          enSrt: pack.subtitleEnSrt,
-          zhSrt: pack.subtitleZhSrt,
-          documentsDirectory: documentsDirectory,
+    try {
+      final List<PersonalImportAsset> assets = await api.listPersonalImports();
+      final PersonalImportAsset? personal = assets.where((asset) {
+        if (asset.source != 'bilibili') return false;
+        if (asset.externalId == folder) return true;
+
+        final match = resolveBilibiliSharedSubtitleIds(
+          sourceKey: asset.externalId,
+          sourceUrl: asset.watchUrl,
         );
-    if (written.enPath == null) {
+        return match?.bvid == ids.bvid && match?.page == ids.page;
+      }).firstOrNull;
+      if (personal != null) {
+        Future<String?> personalTrack(String lang) async {
+          try {
+            return await saveTrack(lang, await api.fetchPersonalImportSrt(
+              importId: personal.id, lang: lang,
+            ));
+          } catch (_) {
+            return null;
+          }
+        }
+        if (en == null && personal.hasEn) en = await personalTrack('en');
+        if (zh == null && personal.hasZh) zh = await personalTrack('zh');
+      }
+    } catch (_) {
+      // Guests and offline clients can still use the public cache.
+    }
+
+    if (en == null || zh == null) {
+      try {
+        final SharedBilibiliSubtitlePack? pack = await api.getSharedBilibiliSubtitle(
+          bvid: ids.bvid, page: ids.page, cid: ids.cid,
+        );
+        if (pack != null) {
+          en ??= await saveTrack('en', pack.subtitleEnSrt);
+          zh ??= await saveTrack('zh', pack.subtitleZhSrt);
+        }
+      } catch (_) {}
+    }
+    if (en == null && zh == null || requireBilingual && (en == null || zh == null)) {
       return null;
     }
-    return written;
+    return (enPath: en, zhPath: zh);
   } catch (_) {
     return null;
   }
@@ -368,24 +400,22 @@ Future<void> tryUploadSharedBilibiliSubtitles({
         zhSrt = text;
       }
     }
-    SharedSubtitleQualityResult quality = evaluateSharedSubtitlePack(
+    final SharedSubtitleQualityResult quality = evaluateSharedSubtitlePack(
       enSrt: enSrt,
       zhSrt: zhSrt,
       durationSec: durationSec,
     );
-    // Client duration is often minutes*60 and fails the 70% coverage gate;
-    // retry without duration so good packs still reach the shared cache.
-    int? uploadDuration = durationSec;
-    if (!quality.passed && durationSec != null) {
-      quality = evaluateSharedSubtitlePack(
-        enSrt: enSrt,
-        zhSrt: zhSrt,
-        durationSec: null,
-      );
-      uploadDuration = null;
-    }
-    if (!quality.passed) {
-      return;
+    if (!quality.passed) return;
+    final enCues = parseSrtCues(enSrt);
+    final zhCues = parseSrtCues(zhSrt ?? '');
+    for (int sample = 0; sample < 5; sample++) {
+      final en = enCues[(enCues.length - 1) * sample ~/ 4];
+      if (en.endMs - en.startMs > 20000 || !looksEnglish(en.body)) return;
+      if (zhCues.isNotEmpty && !zhCues.any((zh) =>
+          looksChinese(zh.body) &&
+          zh.startMs < en.endMs && zh.endMs > en.startMs)) {
+        return;
+      }
     }
     final String resolvedTitle = (title ?? '').trim().isNotEmpty
         ? title!.trim()
@@ -394,7 +424,7 @@ Future<void> tryUploadSharedBilibiliSubtitles({
       bvid: ids.bvid,
       page: ids.page,
       cid: ids.cid,
-      durationSec: uploadDuration,
+      durationSec: durationSec,
       title: resolvedTitle.isEmpty ? null : resolvedTitle,
       subtitleEnSrt: enSrt,
       subtitleZhSrt: zhSrt,
