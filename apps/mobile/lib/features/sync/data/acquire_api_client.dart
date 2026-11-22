@@ -1989,12 +1989,14 @@ class AcquireApiClient {
   Future<Map<String, dynamic>> listNetdisk({
     required String provider,
     String path = '',
+    bool includeEpub = false,
   }) async {
     final Response<dynamic> response = await _dio.get(
       Endpoints.netdiskList,
       queryParameters: <String, dynamic>{
         'provider': provider,
         if (path.trim().isNotEmpty) 'path': path.trim(),
+        if (includeEpub) 'include_epub': true,
       },
     );
     return response.data as Map<String, dynamic>;

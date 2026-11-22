@@ -372,11 +372,14 @@ async def unbind_netdisk(
 async def list_netdisk(
     provider: Provider,
     path: str = "",
+    include_epub: bool = False,
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> NetdiskListOut:
     _require_openlist()
     row = await _binding_or_400(db, user.id, provider)
+    if any(part in (".", "..") for part in path.replace("\\", "/").split("/")):
+        raise HTTPException(400, "目录路径无效")
     full = join_mount(row.openlist_mount_path, path)
     try:
         content_rows = await OpenListClient().fs_list_all(full)
@@ -391,7 +394,8 @@ async def list_netdisk(
         is_dir = bool(item.get("is_dir"))
         child_path = f"{full.rstrip('/')}/{name}"
         is_video = (not is_dir) and is_video_name(name)
-        if not is_dir and not is_video:
+        is_epub = include_epub and name.lower().endswith(".epub")
+        if not is_dir and not is_video and not is_epub:
             continue
         size_raw = item.get("size")
         size = int(size_raw) if isinstance(size_raw, (int, float)) else None

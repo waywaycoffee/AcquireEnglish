@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../import_course/presentation/netdisk_import_sheet.dart';
+import '../../reading/presentation/reading_netdisk_import_sheet.dart';
 import '../data/community_models.dart';
 import '../data/netdisk_share_link.dart';
 
@@ -71,14 +72,19 @@ Future<void> showCommunityNetdiskShareSheet(
               onPressed: () async {
                 Navigator.of(sheet).pop();
                 if (!context.mounted) return;
-                await showNetdiskImportSheet(context, ref,
-                    initialProvider: provider.apiValue);
+                if (type == '电子书' && provider.apiValue == 'baidu') {
+                  await showReadingNetdiskImportSheet(context, ref);
+                } else {
+                  await showNetdiskImportSheet(context, ref,
+                      initialProvider: provider.apiValue);
+                }
               },
               icon: const Icon(Icons.folder_open_outlined),
-              label: const Text('我已转存 · 打开我的网盘'),
+              label: Text(type == '电子书' && provider.apiValue == 'baidu'
+                  ? '我已转存 · 选择 EPUB 目录' : '我已转存 · 打开我的网盘'),
             ),
             const SizedBox(height: 8),
-            const Text('转存由网盘完成，不会先下载到手机。当前网盘导入器可将已转存的视频加入课程库；电子书和音频的云端导入仍在开发中。',
+            const Text('转存由网盘完成。百度网盘 EPUB 可在 App 内选择目录并导入阅读书架；音频导入仍在开发中。',
                 style: TextStyle(fontSize: 12)),
           ],
         ),

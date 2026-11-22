@@ -25,7 +25,8 @@ class _ReadingNetdiskImportSheet extends ConsumerStatefulWidget {
 
 class _ReadingNetdiskImportSheetState extends ConsumerState<_ReadingNetdiskImportSheet> {
   String _mount = '';
-  String _folder = '';
+  final List<String> _folders = <String>[];
+  List<Map<String, dynamic>> _entries = const [];
   String? _message;
   bool _busy = false;
   List<Map<String, dynamic>> _books = const [];
@@ -43,16 +44,34 @@ class _ReadingNetdiskImportSheetState extends ConsumerState<_ReadingNetdiskImpor
       final baidu = providers.whereType<Map>().where((p) => p['provider'] == 'baidu' && p['bound'] == true).firstOrNull;
       if (!mounted) return;
       setState(() { _mount = '${baidu?['mount_path'] ?? ''}'; _message = _mount.isEmpty ? '请先绑定百度网盘' : null; });
+      if (_mount.isNotEmpty) await _loadFolder();
     } catch (error) {
       if (mounted) setState(() => _message = '$error');
+    }
+  }
+
+  Future<void> _loadFolder() async {
+    setState(() { _busy = true; _message = null; });
+    try {
+      final data = await ref.read(acquireApiClientProvider).listNetdisk(
+        provider: 'baidu', path: _folders.join('/'), includeEpub: true);
+      if (!mounted) return;
+      setState(() {
+        _entries = (data['entries'] as List<dynamic>? ?? [])
+            .map((row) => Map<String, dynamic>.from(row as Map)).toList();
+        _books = const [];
+      });
+    } catch (error) {
+      if (mounted) setState(() => _message = '打开目录失败：$error');
+    } finally {
+      if (mounted) setState(() => _busy = false);
     }
   }
 
   Future<void> _scan() async {
     setState(() { _busy = true; _message = null; });
     try {
-      final folder = _folder.trim().replaceAll('\\', '/').replaceAll(RegExp(r'^/+'), '');
-      if (folder.split('/').contains('..')) throw StateError('目录格式无效');
+      final folder = _folders.join('/');
       final path = folder.isEmpty ? _mount : '$_mount/$folder';
       final books = await ref.read(acquireApiClientProvider).scanNetdiskEpubs(provider: 'baidu', path: path);
       if (mounted) setState(() { _books = books; _message = books.isEmpty ? '此目录及子文件夹未找到 EPUB' : '找到 ${books.length} 本 EPUB'; });
@@ -95,19 +114,31 @@ class _ReadingNetdiskImportSheetState extends ConsumerState<_ReadingNetdiskImpor
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           const Text('从百度网盘导入 EPUB', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
           const SizedBox(height: 8),
-          const Text('先在百度网盘把分享文件夹转存到自己的网盘，再填写转存后的目录。会扫描子文件夹，同一版本只保留 EPUB。'),
+          const Text('先在百度网盘转存分享文件夹，再在这里打开目录。扫描会包含子文件夹，保留各版本的 EPUB。'),
           if (_mount.isEmpty) TextButton(onPressed: () async { await showNetdiskImportSheet(context, ref, initialProvider: 'baidu'); await _loadMount(); }, child: const Text('绑定百度网盘')),
           if (_mount.isNotEmpty) ...[
-            Text('网盘根目录：$_mount'),
-            TextField(onChanged: (value) => _folder = value, decoration: const InputDecoration(labelText: '转存后的文件夹路径', hintText: '例如：我的资源/哈利波特', border: OutlineInputBorder())),
+            Row(children: [
+              IconButton(onPressed: _busy || _folders.isEmpty ? null : () { _folders.removeLast(); unawaited(_loadFolder()); }, icon: const Icon(Icons.arrow_back), tooltip: '上一级'),
+              Expanded(child: Text(_folders.isEmpty ? '我的百度网盘' : _folders.join(' / '), maxLines: 1, overflow: TextOverflow.ellipsis)),
+              IconButton(onPressed: _busy ? null : _loadFolder, icon: const Icon(Icons.refresh), tooltip: '刷新目录'),
+            ]),
             const SizedBox(height: 8),
-            FilledButton(onPressed: _busy ? null : _scan, child: const Text('扫描 EPUB')),
+            FilledButton(onPressed: _busy ? null : _scan, child: const Text('扫描此目录及子文件夹中的 EPUB')),
           ],
           if (_message != null) Text(_message!),
-          Expanded(child: ListView.builder(itemCount: _books.length, itemBuilder: (context, index) {
-            final book = _books[index];
-            return ListTile(title: Text('${book['title']}'), subtitle: Text('${book['variant']} · EPUB'), trailing: TextButton(onPressed: _busy ? null : () => _import(book), child: const Text('导入')));
-          })),
+          Expanded(child: ListView(children: [
+            if (_busy) const LinearProgressIndicator(),
+            if (_books.isEmpty) ..._entries.where((row) => row['is_dir'] == true).map((row) => ListTile(
+              leading: const Icon(Icons.folder), title: Text('${row['name']}'),
+              trailing: const Icon(Icons.chevron_right),
+              onTap: _busy ? null : () { _folders.add('${row['name']}'); unawaited(_loadFolder()); },
+            )),
+            if (_books.isEmpty) ..._entries.where((row) => '${row['name']}'.toLowerCase().endsWith('.epub')).map((row) => ListTile(
+              leading: const Icon(Icons.menu_book), title: Text('${row['name']}'),
+              trailing: TextButton(onPressed: _busy ? null : () => _import({'path': row['path'], 'title': row['name'], 'variant': '未标注版本'}), child: const Text('导入')),
+            )),
+            ..._books.map((book) => ListTile(title: Text('${book['title']}'), subtitle: Text('${book['variant']} · EPUB'), trailing: TextButton(onPressed: _busy ? null : () => _import(book), child: const Text('导入')))),
+          ])),
         ]),
       ),
     ),
