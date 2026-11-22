@@ -67,6 +67,7 @@ import '../features/words/presentation/lilinji_catalog_screen.dart';
 import '../features/words/domain/syllabus_book.dart';
 import '../features/digital_human/presentation/digital_human_coach_screen.dart';
 import '../features/digital_human/presentation/peer_oral_practice_screen.dart';
+import '../features/drama/presentation/drama_hub_screen.dart';
 import '../features/words/presentation/server_syllabus_catalog_screen.dart';
 import '../features/words/presentation/syllabus_books_screen.dart';
 import '../features/words/presentation/favorite_word_book_screen.dart';
@@ -454,6 +455,12 @@ GoRouter goRouter(Ref ref) {
       },
     ).fade(),
     GoRoute(
+      path: '/drama',
+      name: 'drama',
+      builder: (BuildContext context, GoRouterState state) =>
+          const DramaHubScreen(),
+    ).fade(),
+    GoRoute(
       path: SGRoute.growth.route,
       builder: (BuildContext context, GoRouterState state) =>
           const GrowthScreen(),
@@ -714,6 +721,7 @@ GoRouter goRouter(Ref ref) {
           autoPlay: autoplayParam != '0',
           autoOpenFullscreen: state.uri.queryParameters['fullscreen'] == '1',
           initialLoopSentence: state.uri.queryParameters['loop'] == 'sentence',
+          dramaPlan: state.uri.queryParameters['plan'] == 'drama',
         );
       },
     ).fade(),

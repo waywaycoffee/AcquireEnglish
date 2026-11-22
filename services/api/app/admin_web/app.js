@@ -880,7 +880,7 @@
   }
 
   async function loadDashboard() {
-    const [users, learning, pnl, infra, feedbackPeek, pendingAssets, commerce] =
+    const [users, learning, pnl, infra, feedbackPeek, pendingAssets, commerce, dailyUsage] =
       await Promise.all([
         api("/analytics/users?days=90"),
         api("/analytics/learning"),
@@ -889,6 +889,7 @@
         api("/feedback?status=open&limit=1").catch(() => null),
         api("/exam-assets?status=pending&limit=200").catch(() => []),
         api("/commerce/overview").catch(() => null),
+        api("/usage/daily").catch(() => null),
       ]);
     const host = (infra && infra.host) || {};
     const mem = host.memory || {};
@@ -898,6 +899,9 @@
       : pendingAssets.items || [];
     const openFeedback = (feedbackPeek && feedbackPeek.open_count) || 0;
     const trial = (commerce && commerce.trial) || {};
+    const cloudTok = (dailyUsage && dailyUsage.cloud_tokens) || 0;
+    const cloudCny = (dailyUsage && dailyUsage.cloud_cost_cny) || 0;
+    const cloudAlert = !!(dailyUsage && dailyUsage.alert);
     const el = $("panel-dashboard");
     el.innerHTML = `
       <div class="kpi-row">
@@ -907,6 +911,15 @@
         <div class="stat"><span class="muted">30 日毛利</span><strong>${money(pnl.gross_cny)}</strong></div>
       </div>
       <div class="kpi-row">
+        <div class="stat ${cloudAlert ? "hot" : ""}"><span class="muted">今日云端 Token</span><strong>${num(
+          cloudTok
+        )}</strong>
+          <p class="muted" style="margin:4px 0 0">${
+            cloudAlert
+              ? escapeHtml((dailyUsage && dailyUsage.alert_reason) || "云端用量偏高")
+              : `估算 ${money(cloudCny)} · 政策：默认本机 GPU`
+          }</p>
+          <button type="button" class="btn ghost dash-jump" data-tab="usage">看明细</button></div>
         <div class="stat"><span class="muted">待处理优化建议</span><strong>${num(openFeedback)}</strong>
           <button type="button" class="btn ghost dash-jump" data-tab="feedback">去处理</button></div>
         <div class="stat"><span class="muted">待审考试资料</span><strong>${num(pendingList.length)}</strong>
@@ -915,9 +928,6 @@
           trial.extend_redeemed
         )} / ${num(trial.extend_coupons)}</strong>
           <button type="button" class="btn ghost dash-jump" data-tab="commerce">看订单</button></div>
-        <div class="stat"><span class="muted">积分流水行</span><strong>${num(
-          (commerce && commerce.points_ledger_rows) || 0
-        )}</strong></div>
       </div>
       ${
         infra

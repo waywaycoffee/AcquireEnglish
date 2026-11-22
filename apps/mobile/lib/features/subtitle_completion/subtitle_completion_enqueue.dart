@@ -592,7 +592,13 @@ Future<void> enqueueSubtitleCompletionForCourse({
       (course.spokenLanguage.trim().isEmpty
           ? null
           : spokenLanguageFromCode(course.spokenLanguage));
-  for (final LibraryEpisodeItem episode in course.episodes) {
+  // Guard mega 合集 (e.g. 100+ pages): scan at most 12 eps per course pass so
+  // ECS GPU queue + local Ollama are not flooded (cloud translate must stay off).
+  const int kMaxEpisodesPerCourseScan = 12;
+  final List<LibraryEpisodeItem> batch = course.episodes.length <= kMaxEpisodesPerCourseScan
+      ? course.episodes
+      : course.episodes.sublist(0, kMaxEpisodesPerCourseScan);
+  for (final LibraryEpisodeItem episode in batch) {
     await enqueueSubtitleCompletionForEpisode(
       episodeId: episode.id,
       videoPath: episode.videoAsset,

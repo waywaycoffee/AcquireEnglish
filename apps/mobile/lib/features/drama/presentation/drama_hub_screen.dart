@@ -1,0 +1,225 @@
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
+
+import '../../import_course/presentation/netdisk_import_sheet.dart';
+import '../../library/presentation/library_catalog_provider.dart';
+import '../../library/presentation/library_mock_data.dart';
+import '../../navigation/presentation/navigation_destination.dart';
+import '../../player/domain/episode_study_progress.dart';
+import '../../player/presentation/episode_study_progress_provider.dart';
+import '../../player/presentation/widgets/episode_stage_dots.dart';
+import '../../shared/presentation/pad/app_design_tokens.dart';
+import '../../shared/presentation/pad/pad_scaffold.dart';
+import '../../shared/presentation/pad/pad_top_bar.dart';
+
+bool looksLikeDramaCourse(LibraryCourseData course) {
+  final String blob =
+      '${course.title} ${course.description} ${course.tags.join(' ')}'
+          .toLowerCase();
+  if (course.id.startsWith('netdisk-series-')) return true;
+  return blob.contains('美剧') ||
+      blob.contains('drama') ||
+      blob.contains('series') ||
+      blob.contains('老友记') ||
+      blob.contains('friends') ||
+      blob.contains('s01') ||
+      blob.contains('season');
+}
+
+enum _DramaFilter { all, notStarted, firstStudy, srsReview, pendingReview }
+
+/// Dedicated US-drama shell: season/episode list + four-stage dots.
+class DramaHubScreen extends ConsumerStatefulWidget {
+  const DramaHubScreen({super.key});
+
+  @override
+  ConsumerState<DramaHubScreen> createState() => _DramaHubScreenState();
+}
+
+class _DramaHubScreenState extends ConsumerState<DramaHubScreen> {
+  _DramaFilter _filter = _DramaFilter.all;
+  String? _selectedCourseId;
+
+  @override
+  Widget build(BuildContext context) {
+    final LibraryCatalogState catalog = ref.watch(libraryCatalogProvider);
+    final Map<String, EpisodeStudyProgress> progressMap =
+        ref.watch(episodeStudyProgressProvider);
+    final List<LibraryCourseData> dramas =
+        catalog.courses.where(looksLikeDramaCourse).toList();
+
+    LibraryCourseData? selected;
+    if (dramas.isNotEmpty) {
+      selected = dramas.cast<LibraryCourseData?>().firstWhere(
+            (LibraryCourseData? c) => c?.id == _selectedCourseId,
+            orElse: () => dramas.first,
+          );
+    }
+
+    int masteredEps = 0;
+    int totalEps = 0;
+    for (final LibraryCourseData c in dramas) {
+      for (final LibraryEpisodeItem e in c.episodes) {
+        totalEps++;
+        if (episodeProgressOf(progressMap, e.id).stage ==
+            EpisodeStudyStage.mastered) {
+          masteredEps++;
+        }
+      }
+    }
+
+    return PadScaffold(
+      currentDestination: AppNavDestination.library,
+      showContinueLearning: false,
+      topBar: PadTopBar(
+        title: '美剧精学',
+        description: '网盘季集 + SRT · 看懂 → 精读 → 输出 → FSRS',
+        trailing: IconButton(
+          tooltip: '从网盘导入季集',
+          onPressed: () => showNetdiskImportSheet(context, ref),
+          icon: const Icon(Icons.cloud_download_outlined),
+        ),
+      ),
+      body: ListView(
+        padding: const EdgeInsets.fromLTRB(16, 12, 16, 32),
+        children: <Widget>[
+          Text(
+            '三步走：看剧情理解 → 逐句精学 → 听写/跟读输出；未达线句子进入统一 FSRS。'
+            '默认本机 GPU 补字幕，不静默打云端 Key。',
+            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                  color: AppDesignTokens.textSecondary,
+                  height: 1.4,
+                ),
+          ),
+          const SizedBox(height: 10),
+          const EpisodeStageLegend(),
+          const SizedBox(height: 8),
+          Text(
+            '完全掌握 $masteredEps / $totalEps 集'
+            '${totalEps == 0 ? '' : ' (${(masteredEps * 100 / totalEps).round()}%)'}',
+            style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                  fontWeight: FontWeight.w800,
+                ),
+          ),
+          const SizedBox(height: 12),
+          if (dramas.isEmpty)
+            Card(
+              child: Padding(
+                padding: const EdgeInsets.all(20),
+                child: Column(
+                  children: <Widget>[
+                    const Text('还没有美剧课。从网盘导入整季文件夹（含 .en.srt / .zh.srt）。'),
+                    const SizedBox(height: 12),
+                    FilledButton.icon(
+                      onPressed: () => showNetdiskImportSheet(context, ref),
+                      icon: const Icon(Icons.folder_open),
+                      label: const Text('网盘导入'),
+                    ),
+                    TextButton(
+                      onPressed: () => context.go('/library'),
+                      child: const Text('或去视频库查看全部'),
+                    ),
+                  ],
+                ),
+              ),
+            )
+          else ...<Widget>[
+            DropdownButtonFormField<String>(
+              value: selected?.id,
+              decoration: const InputDecoration(
+                labelText: '剧集 / 季',
+                border: OutlineInputBorder(),
+              ),
+              items: <DropdownMenuItem<String>>[
+                for (final LibraryCourseData c in dramas)
+                  DropdownMenuItem<String>(
+                    value: c.id,
+                    child: Text(
+                      libraryCourseDisplayTitle(c),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+              ],
+              onChanged: (String? id) {
+                if (id == null) return;
+                setState(() => _selectedCourseId = id);
+              },
+            ),
+            const SizedBox(height: 12),
+            SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Row(
+                children: <Widget>[
+                  for (final _DramaFilter f in _DramaFilter.values)
+                    Padding(
+                      padding: const EdgeInsets.only(right: 8),
+                      child: ChoiceChip(
+                        label: Text(_filterLabel(f)),
+                        selected: _filter == f,
+                        onSelected: (_) => setState(() => _filter = f),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 12),
+            if (selected != null)
+              ..._filteredEpisodes(selected, progressMap).map(
+                (LibraryEpisodeItem ep) {
+                  final EpisodeStudyProgress p =
+                      episodeProgressOf(progressMap, ep.id);
+                  return Card(
+                    margin: const EdgeInsets.only(bottom: 8),
+                    child: ListTile(
+                      title: Text(ep.title),
+                      subtitle: Padding(
+                        padding: const EdgeInsets.only(top: 8),
+                        child: EpisodeStageDots(stage: p.stage),
+                      ),
+                      trailing: const Icon(Icons.chevron_right),
+                      onTap: () {
+                        context.pushNamed(
+                          'player',
+                          pathParameters: <String, String>{
+                            'episodeId': ep.id,
+                          },
+                          queryParameters: const <String, String>{
+                            'plan': 'drama',
+                          },
+                        );
+                      },
+                    ),
+                  );
+                },
+              ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  String _filterLabel(_DramaFilter f) => switch (f) {
+        _DramaFilter.all => '全部',
+        _DramaFilter.notStarted => '未开始',
+        _DramaFilter.firstStudy => '第一次学习',
+        _DramaFilter.srsReview => '间隔复习',
+        _DramaFilter.pendingReview => '待复习',
+      };
+
+  List<LibraryEpisodeItem> _filteredEpisodes(
+    LibraryCourseData course,
+    Map<String, EpisodeStudyProgress> progressMap,
+  ) {
+    return course.episodes.where((LibraryEpisodeItem ep) {
+      final EpisodeStudyProgress p = episodeProgressOf(progressMap, ep.id);
+      return switch (_filter) {
+        _DramaFilter.all => true,
+        _DramaFilter.notStarted => p.stage == EpisodeStudyStage.notStarted,
+        _DramaFilter.firstStudy => p.stage == EpisodeStudyStage.firstStudy,
+        _DramaFilter.srsReview => p.stage == EpisodeStudyStage.srsReview,
+        _DramaFilter.pendingReview => p.dueClipCount > 0,
+      };
+    }).toList();
+  }
+}

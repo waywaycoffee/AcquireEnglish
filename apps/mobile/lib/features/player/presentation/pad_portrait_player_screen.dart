@@ -102,6 +102,7 @@ import 'widgets/study_bottom_controls.dart';
 import 'widgets/study_dictation_tab.dart';
 import 'widgets/study_loop_sheet.dart';
 import 'widgets/study_mode_tabs.dart';
+import 'widgets/study_plan_bar.dart';
 import 'widgets/study_practice_tab.dart';
 import '../../digital_human/presentation/study_oral_coach_tab.dart';
 import 'widgets/study_shadowing_tab.dart';
@@ -109,6 +110,7 @@ import 'widgets/study_shell_tokens.dart';
 import 'widgets/study_top_bar.dart';
 import 'widgets/player_video_options.dart';
 import 'widgets/study_word_cards_tab.dart';
+import 'episode_study_progress_provider.dart';
 
 /// Build a whole-episode English excerpt for oral-coach topic generation.
 ///
@@ -179,6 +181,7 @@ class PadPortraitPlayerScreen extends ConsumerStatefulWidget {
     this.autoPlay = true,
     this.autoOpenFullscreen = false,
     this.initialLoopSentence = false,
+    this.dramaPlan = false,
     super.key,
   });
 
@@ -193,6 +196,9 @@ class PadPortraitPlayerScreen extends ConsumerStatefulWidget {
 
   /// When opened from review “原片”，auto-enable single-sentence loop.
   final bool initialLoopSentence;
+
+  /// Drama hub: stricter study-plan guidance.
+  final bool dramaPlan;
 
   @override
   ConsumerState<PadPortraitPlayerScreen> createState() =>
@@ -274,6 +280,8 @@ class PadPortraitPlayerScreenState
       const <int, List<PlayerSubtitleLine>>{};
   bool _usingAsrSentences = false;
   StudyModeTab _studyTab = StudyModeTab.subtitles;
+  StudyPlanStep _studyPlanStep = StudyPlanStep.watch;
+  final Set<StudyPlanStep> _studyPlanDone = <StudyPlanStep>{};
   bool _dictationQueueMode = false;
   int _dictationQueueIndex = 0;
   bool _hardsubMosaicEnabled = false;
@@ -3264,6 +3272,40 @@ Future<void> _settleChineseFillIfAlreadyPresent() async {
                       ),
                     if (!bingeMode) ...<Widget>[
                       SizedBox(height: compactPlayer ? 4 : 8),
+                      StudyPlanBar(
+                        current: _studyPlanStep,
+                        completed: _studyPlanDone,
+                        strict: widget.dramaPlan,
+                        onSelect: (StudyPlanStep step) {
+                          setState(() {
+                            _studyPlanStep = step;
+                            switch (step) {
+                              case StudyPlanStep.watch:
+                              case StudyPlanStep.intensive:
+                                _studyTab = StudyModeTab.subtitles;
+                                break;
+                              case StudyPlanStep.output:
+                                _studyTab = StudyModeTab.dictation;
+                                _hardsubMosaicEnabled = true;
+                                break;
+                              case StudyPlanStep.review:
+                                _studyTab = StudyModeTab.wordCards;
+                                break;
+                            }
+                          });
+                          if (step == StudyPlanStep.watch) {
+                            unawaited(
+                              ref
+                                  .read(episodeStudyProgressProvider.notifier)
+                                  .markWatched(
+                                    widget.episodeId,
+                                    requireOutput: widget.dramaPlan,
+                                  ),
+                            );
+                            _studyPlanDone.add(StudyPlanStep.watch);
+                          }
+                        },
+                      ),
                       StudyModeTabs(
                         value: _studyTab,
                         onChanged: (StudyModeTab tab) {
@@ -3273,12 +3315,25 @@ Future<void> _settleChineseFillIfAlreadyPresent() async {
                           }
                           if (tab == StudyModeTab.shadowing) {
                             _enterShadowingMode();
+                            setState(() {
+                              _studyPlanStep = StudyPlanStep.output;
+                              _studyPlanDone.add(StudyPlanStep.intensive);
+                            });
                             return;
                           }
                           setState(() {
                             _studyTab = tab;
                             _hardsubMosaicEnabled =
                                 tab == StudyModeTab.dictation;
+                            if (tab == StudyModeTab.subtitles) {
+                              _studyPlanStep = StudyPlanStep.intensive;
+                            } else if (tab == StudyModeTab.dictation ||
+                                tab == StudyModeTab.practice) {
+                              _studyPlanStep = StudyPlanStep.output;
+                              _studyPlanDone.add(StudyPlanStep.intensive);
+                            } else if (tab == StudyModeTab.wordCards) {
+                              _studyPlanStep = StudyPlanStep.review;
+                            }
                           });
                         },
                       ),

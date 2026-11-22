@@ -257,7 +257,16 @@ async def enqueue_gpu_subtitles(
     from app.services.gpu_subtitle_queue import enqueue
     from app.shared_subtitle_store import fanout_gpu_pack_to_personal
 
-    job = enqueue(payload.bvid, payload.page, user_id=user.id)
+    try:
+        job = enqueue(payload.bvid, payload.page, user_id=user.id)
+    except ValueError as exc:
+        detail = str(exc)
+        code = (
+            status.HTTP_429_TOO_MANY_REQUESTS
+            if detail.startswith("bvid_page_cap:")
+            else status.HTTP_422_UNPROCESSABLE_ENTITY
+        )
+        raise HTTPException(status_code=code, detail=detail) from exc
     # Late joiners still get a private copy when the GPU job already finished.
     if job.get('state') == 'completed':
         shared = await get_shared_bilibili_pack(db, bvid=payload.bvid, page=payload.page)

@@ -465,6 +465,97 @@ async def usage_summary(db: AsyncSession, *, days: int | None = 30) -> dict[str,
     }
 
 
+_CLOUD_PROVIDERS = frozenset(
+    {
+        "deepseek",
+        "dashscope",
+        "openai",
+        "tencent",
+        "aliyun",
+        "qwen",
+        "bailian",
+        "openrouter",
+        "siliconflow",
+    }
+)
+
+
+async def usage_daily_monitor(db: AsyncSession) -> dict[str, Any]:
+    """Today (UTC day) cloud vs local spend for admin KPI / alerts."""
+    now = datetime.now(tz=timezone.utc)
+    start = now.replace(hour=0, minute=0, second=0, microsecond=0)
+    rows = (
+        await db.execute(
+            select(
+                ApiUsageEvent.provider,
+                ApiUsageEvent.module,
+                ApiUsageEvent.kind,
+                func.count(ApiUsageEvent.id),
+                func.coalesce(func.sum(ApiUsageEvent.prompt_tokens), 0),
+                func.coalesce(func.sum(ApiUsageEvent.completion_tokens), 0),
+                func.coalesce(func.sum(ApiUsageEvent.cost_cny), 0.0),
+                func.coalesce(func.sum(ApiUsageEvent.audio_seconds), 0.0),
+            )
+            .where(ApiUsageEvent.created_at >= start)
+            .group_by(
+                ApiUsageEvent.provider,
+                ApiUsageEvent.module,
+                ApiUsageEvent.kind,
+            )
+        )
+    ).all()
+    cloud_tokens = 0
+    cloud_cny = 0.0
+    cloud_events = 0
+    local_tokens = 0
+    by_module: list[dict[str, Any]] = []
+    for r in rows:
+        provider = (r[0] or "").strip().lower()
+        module = (r[1] or "") or "unknown"
+        kind = r[2] or ""
+        events = int(r[3] or 0)
+        tokens = int(r[4] or 0) + int(r[5] or 0)
+        cny = float(r[6] or 0)
+        audio = float(r[7] or 0)
+        is_cloud = provider in _CLOUD_PROVIDERS
+        if is_cloud:
+            cloud_tokens += tokens
+            cloud_cny += cny
+            cloud_events += events
+        elif is_gpu_provider(provider, ""):
+            local_tokens += tokens
+        by_module.append(
+            {
+                "provider": provider or "unknown",
+                "module": module,
+                "kind": kind,
+                "events": events,
+                "tokens": tokens,
+                "cost_cny": cny,
+                "audio_seconds": audio,
+                "cloud": is_cloud,
+            }
+        )
+    by_module.sort(key=lambda x: (0 if x["cloud"] else 1, -x["tokens"]))
+    # Soft alert thresholds (tokens / CNY) — ops can tune later.
+    alert = cloud_tokens >= 200_000 or cloud_cny >= 2.0
+    return {
+        "day_utc": start.date().isoformat(),
+        "cloud_events": cloud_events,
+        "cloud_tokens": cloud_tokens,
+        "cloud_cost_cny": round(cloud_cny, 4),
+        "local_tokens": local_tokens,
+        "alert": alert,
+        "alert_reason": (
+            "今日云端用量偏高，请核对字幕翻译/TTS 是否误走云 Key"
+            if alert
+            else ""
+        ),
+        "policy": "默认本机 5060 Ti；云端 API Key 仅显式开启时使用",
+        "items": by_module[:50],
+    }
+
+
 async def pnl_summary(db: AsyncSession, *, days: int | None = 30) -> dict[str, Any]:
     usage = await usage_summary(db, days=days)
     since = _since_days(days)

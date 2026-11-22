@@ -39,6 +39,19 @@ async def run(command: dict) -> dict | None:
         hit = rsc.lookup_url(text=text, voice=voice, language=language)
         if hit is not None:
             return hit
+        import os
+
+        allow_cloud = (os.environ.get("READING_ALLOW_CLOUD_TTS") or "").strip().lower() in (
+            "1",
+            "true",
+            "yes",
+            "on",
+        )
+        if not allow_cloud:
+            raise RuntimeError(
+                "cloud_tts_disabled: set READING_ALLOW_CLOUD_TTS=1 only when "
+                "local/GPU TTS is unavailable and cloud spend is accepted"
+            )
         if not (settings.dashscope_api_key or "").strip():
             raise RuntimeError("DASHSCOPE_API_KEY missing on ECS")
         tmp_path: str | None = None

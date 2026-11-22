@@ -15,6 +15,12 @@ from pathlib import Path
 from app.config import settings
 
 MAX_TRANSLATE_CUES = 4000
+# Cap new pages per BV while others are still in-flight (合集 flood guard).
+# Re-joining an existing row never hits this limit.
+MAX_ACTIVE_PAGES_PER_BVID = 12
+_ACTIVE_STATES = frozenset(
+    {"queued", "retry", "transcribing", "translating"}
+)
 
 
 @contextmanager
@@ -79,6 +85,14 @@ def _add_requester(db, job_id: str, user_id: int | None) -> None:
         )
 
 
+def _active_page_count(db, bvid: str) -> int:
+    rows = db.execute(
+        "SELECT state FROM jobs WHERE upper(bvid)=upper(?)",
+        (bvid,),
+    ).fetchall()
+    return sum(1 for r in rows if (r["state"] or "") in _ACTIVE_STATES)
+
+
 def enqueue(bvid, page, *, user_id: int | None = None):
     _check_identity(bvid, page)
     with connection() as db:
@@ -106,6 +120,11 @@ def enqueue(bvid, page, *, user_id: int | None = None):
                 ).fetchone()
             _add_requester(db, row['id'], user_id)
             return public(db.execute('SELECT * FROM jobs WHERE id=?', (row['id'],)).fetchone())
+        if _active_page_count(db, bvid) >= MAX_ACTIVE_PAGES_PER_BVID:
+            raise ValueError(
+                f"bvid_page_cap:{MAX_ACTIVE_PAGES_PER_BVID}:"
+                "合集同时排队分P过多；请等本机 GPU 消化后再补后续页"
+            )
         job_id = uuid.uuid4().hex
         db.execute('INSERT OR IGNORE INTO jobs(id,bvid,page,updated) VALUES(?,?,?,?)',
           (job_id,bvid,page,time.time()))
@@ -158,6 +177,11 @@ def enqueue_translate(
         db.execute('BEGIN IMMEDIATE')
         row=db.execute('SELECT * FROM jobs WHERE upper(bvid)=upper(?) AND page=?',(bvid,page)).fetchone()
         if row is None:
+            if _active_page_count(db, bvid) >= MAX_ACTIVE_PAGES_PER_BVID:
+                raise ValueError(
+                    f"bvid_page_cap:{MAX_ACTIVE_PAGES_PER_BVID}:"
+                    "合集同时排队分P过多；请等本机 GPU 消化后再补后续页"
+                )
             job_id = uuid.uuid4().hex
             db.execute("INSERT INTO jobs(id,bvid,page,kind,payload,updated) VALUES(?,?,?,'translate',?,?)",
               (job_id,bvid,page,payload,time.time()))

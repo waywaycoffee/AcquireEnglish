@@ -54,6 +54,15 @@ async def usage_summary(
     return await usage_svc.usage_summary(db, days=days or None)
 
 
+@router.get("/usage/daily")
+async def usage_daily(
+    _: str = Depends(require_admin_token),
+    db: AsyncSession = Depends(get_db),
+) -> dict[str, Any]:
+    """UTC-day cloud vs local usage monitor (ops: prefer 5060 Ti, cloud only when required)."""
+    return await usage_svc.usage_daily_monitor(db)
+
+
 @router.get("/usage/pnl")
 async def usage_pnl(
     days: int = Query(30, ge=0, le=365),

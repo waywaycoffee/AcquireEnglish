@@ -569,6 +569,24 @@ class _LearningHomeScreenState extends ConsumerState<LearningHomeScreen> {
                               ),
                             ],
                           ),
+                          const SizedBox(height: 12),
+                          Align(
+                            alignment: Alignment.centerLeft,
+                            child: TextButton.icon(
+                              onPressed: () => context.push('/drama'),
+                              icon: Icon(
+                                Icons.live_tv_outlined,
+                                color: accent,
+                                size: 18,
+                              ),
+                              label: text(
+                                '美剧精学 · 网盘季集 + 四阶段进度',
+                                13,
+                                color: accent,
+                                bold: true,
+                              ),
+                            ),
+                          ),
                         ],
                       ),
                     ),

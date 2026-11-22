@@ -5,6 +5,8 @@ import '../../../settings/presentation/settings_provider.dart';
 import '../../../shared/data/word_lookup_service.dart';
 import '../../../shared/domain/sentence_grammar_analysis.dart';
 import '../../../shared/presentation/pad/app_design_tokens.dart';
+import '../../domain/grammar_notebook.dart';
+import '../grammar_notebook_provider.dart';
 
 Future<void> showAiGrammarAnalysisSheet(
   BuildContext context, {
@@ -110,6 +112,42 @@ class _AiGrammarAnalysisSheetState
                       ),
                     ),
                   ),
+                  if (!_loading && _analysis != null && _analysis!.isAvailable)
+                    TextButton.icon(
+                      onPressed: () async {
+                        final SentenceGrammarAnalysis a = _analysis!;
+                        await ref.read(grammarNotebookProvider.notifier).add(
+                              GrammarNote(
+                                id:
+                                    '${DateTime.now().millisecondsSinceEpoch}_${a.sentence.hashCode}',
+                                sentence: a.sentence,
+                                episodeId: '',
+                                structure: a.structureCn,
+                                grammarPoints: a.grammarPoints
+                                    .map(
+                                      (SentenceGrammarPoint p) =>
+                                          '${p.title}: ${p.explanation}',
+                                    )
+                                    .toList(),
+                                keyPhrases: a.keyPhrases
+                                    .map(
+                                      (SentenceGrammarPhrase p) =>
+                                          '${p.phrase}: ${p.explanation}',
+                                    )
+                                    .toList(),
+                                translation: a.translationCn,
+                                createdAtMs:
+                                    DateTime.now().millisecondsSinceEpoch,
+                              ),
+                            );
+                        if (!context.mounted) return;
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('已写入语法本')),
+                        );
+                      },
+                      icon: const Icon(Icons.bookmark_add_outlined, size: 18),
+                      label: const Text('存语法本'),
+                    ),
                   if (!_loading)
                     IconButton(
                       tooltip: '重新解析',
