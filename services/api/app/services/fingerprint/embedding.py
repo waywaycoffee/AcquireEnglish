@@ -115,6 +115,7 @@ def search_vectors(
     query: list[float],
     *,
     source_type: str | None = None,
+    source_types: set[str] | None = None,
     limit: int = 20,
     score_min: float = 0.0,
 ) -> list[dict[str, Any]]:
@@ -128,6 +129,8 @@ def search_vectors(
             continue
         payload = data.get("payload") or {}
         if source_type and payload.get("source_type") and payload.get("source_type") != source_type:
+            continue
+        if source_types is not None and payload.get("source_type") not in source_types:
             continue
         vec = data.get("vector") or []
         if not isinstance(vec, list):

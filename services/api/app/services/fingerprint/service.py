@@ -24,6 +24,12 @@ from app.models import (
 )
 from app.services.fingerprint import embedding as emb
 from app.services.fingerprint import simhash as sh
+from app.services.fingerprint.canonical import (
+    CANONICAL_SOURCE_TYPE,
+    TEXT_SOURCE_TYPES,
+    compatible_source_types,
+    fingerprint_input,
+)
 from app.services.fingerprint.asset_store import (
     delete_asset_blobs,
     delete_upload_payload,
@@ -155,7 +161,7 @@ async def _band_recall(
                 .where(
                     SimhashBand.band_no == band_no,
                     SimhashBand.band_value == int(band_value),
-                    SimhashBand.source_type == source_type,
+                    SimhashBand.source_type.in_(compatible_source_types(source_type)),
                     SimhashBand.text_length >= lo,
                     SimhashBand.text_length <= hi,
                 )
@@ -177,8 +183,8 @@ async def search_fingerprint(
     skip_log: bool = False,
 ) -> FingerprintSearchResult:
     started = time.perf_counter()
-    text = (cleaned_text or "").strip()
     source_type = (source_type or "pdf_text").strip().lower()
+    text = fingerprint_input(cleaned_text, source_type)
 
     if not _feature_enabled():
         return FingerprintSearchResult(
@@ -237,13 +243,13 @@ async def search_fingerprint(
     if emb.vector_store_available():
         hits = emb.search_vectors(
             vector,
-            source_type=source_type,
+            source_types=compatible_source_types(source_type),
             limit=top_k,
             score_min=vec_min,
         )
         for h in hits:
             aid = (h.get("payload") or {}).get("asset_id")
-            if aid:
+            if aid and (h.get("payload") or {}).get("source_type") in compatible_source_types(source_type):
                 cand_b.add(str(aid))
     else:
         # 向量库不可用：仅 SimHash，命中降级为「疑似」不自动复用
@@ -314,6 +320,7 @@ async def search_fingerprint(
         await db.execute(
             select(FingerprintIndex).where(
                 FingerprintIndex.asset_id.in_(list(cand)),
+                FingerprintIndex.source_type.in_(compatible_source_types(source_type)),
                 FingerprintIndex.is_valid.is_(True),
             )
         )
@@ -446,10 +453,10 @@ async def register_decomposed_asset(
     upload_task_id: str | None = None,
 ) -> dict[str, Any]:
     """After GPU 解构成功：原子写入 asset_cache + fingerprint + vectors + bands."""
-    text = (cleaned_text or "").strip()
+    source_type = (source_type or "pdf_text").strip().lower()
+    text = fingerprint_input(cleaned_text, source_type)
     if len(text) < 80:
         raise ValueError("cleaned_text too short")
-    source_type = (source_type or "pdf_text").strip().lower()
     feats = await _compute_features(text)
     blocks: list[int] = feats["simhash_blocks"]
     vector: list[float] = feats["vector"]
@@ -482,7 +489,7 @@ async def register_decomposed_asset(
     fp = FingerprintIndex(
         id=fp_id,
         asset_id=asset_id,
-        source_type=source_type,
+        source_type=CANONICAL_SOURCE_TYPE if source_type in TEXT_SOURCE_TYPES else source_type,
         simhash_blocks_json=_dumps(sh.serialize_simhash_blocks(blocks)),
         vector_ref_id=vector_ref_id,
         text_length=length,
@@ -496,7 +503,7 @@ async def register_decomposed_asset(
         db,
         fingerprint_id=fp_id,
         asset_id=asset_id,
-        source_type=source_type,
+        source_type=CANONICAL_SOURCE_TYPE if source_type in TEXT_SOURCE_TYPES else source_type,
         text_length=length,
         simhash_blocks=blocks,
     )
@@ -505,7 +512,7 @@ async def register_decomposed_asset(
         vector,
         payload={
             "asset_id": asset_id,
-            "source_type": source_type,
+            "source_type": CANONICAL_SOURCE_TYPE if source_type in TEXT_SOURCE_TYPES else source_type,
             "text_length": length,
         },
     )
@@ -1344,7 +1351,7 @@ async def lru_evict_cold_assets(
     from datetime import timedelta
 
     cutoff = _now() - timedelta(days=idle)
-    # Do not evict assets referenced by many user copies.
+    # Any active user course must keep its referenced shared asset available.
     ref_counts = (
         await db.execute(
             select(
@@ -1355,7 +1362,7 @@ async def lru_evict_cold_assets(
             .group_by(UserCourseAsset.asset_cache_id)
         )
     ).all()
-    protected = {str(aid) for aid, n in ref_counts if aid and int(n) >= 5}
+    protected = {str(aid) for aid, n in ref_counts if aid and int(n) > 0}
 
     candidates = (
         await db.execute(

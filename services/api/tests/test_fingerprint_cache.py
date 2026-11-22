@@ -25,6 +25,7 @@ from app.security import create_access_token, hash_password
 from app.services.fingerprint import embedding as emb
 from app.services.fingerprint import service as fp_svc
 from app.services.fingerprint import simhash as sh
+from app.services.fingerprint.canonical import fingerprint_input
 from app.services import content_media as cm
 from sqlalchemy import select
 
@@ -47,6 +48,49 @@ SAMPLE_B = (
     "for centuries with camels carrying salt and gold. "
     "Modern travelers still marvel at oases where palm trees grow beside wells. "
 ) * 4
+
+
+@pytest.mark.asyncio
+async def test_cross_format_text_reuses_one_asset(db_session: AsyncSession) -> None:
+    reg = await fp_svc.register_decomposed_asset(
+        db_session,
+        cleaned_text=SAMPLE_A,
+        source_type="pdf_text",
+        asset_name="shared lesson",
+        lessons=[{"lesson_no": 1, "text_content": SAMPLE_A}],
+    )
+    words = sh.tokenize(SAMPLE_A)
+    halfway = len(words) // 2
+    subtitle = (
+        "1\n00:00:01,000 --> 00:00:08,000\n"
+        + " ".join(words[:halfway])
+        + "\n2\n00:00:09,000 --> 00:00:16,000\n"
+        + " ".join(words[halfway:])
+    )
+    assert fingerprint_input(subtitle, "srt") == fingerprint_input(SAMPLE_A, "pdf_text")
+    for source_type, text in (
+        ("epub", "\n".join(" ".join(words[i:i + 12]) for i in range(0, len(words), 12))),
+        ("srt", subtitle),
+        ("video_subtitle", subtitle),
+    ):
+        result = await fp_svc.search_fingerprint(
+            db_session, cleaned_text=text, source_type=source_type,
+        )
+        assert result.hit and result.asset_id == reg["asset_id"]
+
+
+@pytest.mark.asyncio
+async def test_lru_keeps_asset_with_one_user_reference(db_session: AsyncSession) -> None:
+    user = User(email="lru-one@example.com", hashed_password=hash_password("x"))
+    db_session.add(user)
+    await db_session.commit()
+    await db_session.refresh(user)
+    reg = await fp_svc.register_decomposed_asset(
+        db_session, cleaned_text=SAMPLE_A, source_type="pdf_text",
+        asset_name="referenced lesson", lessons=[], created_by=user.id,
+    )
+    removed = await fp_svc.lru_evict_cold_assets(db_session, min_hit_count=3, idle_days=0)
+    assert reg["asset_id"] not in removed
 
 
 def test_simhash_stable_and_bands() -> None:
