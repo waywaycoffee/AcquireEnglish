@@ -32,6 +32,7 @@ import 'reading_stats_row.dart';
 import 'reading_book_prep_provider.dart';
 import 'reading_cold_start.dart';
 import 'reading_book_cover.dart';
+import 'reading_cover_provider.dart';
 import 'reading_vocab_lists_sheet.dart';
 
 class ReadingHubScreen extends ConsumerStatefulWidget {
@@ -512,6 +513,7 @@ class _ReadingHubScreenState extends ConsumerState<ReadingHubScreen> {
 
   @override
   Widget build(BuildContext context) {
+    ref.watch(readingCoverSyncProvider);
     final coldStart = ref.watch(readingColdStartProvider);
     final ReadingLibraryState state = ref.watch(readingLibraryProvider);
     final ReadingDoc? cont = state.continueDoc;
@@ -844,6 +846,7 @@ class _CloudPrepShelfItem extends ConsumerWidget {
           ReadingBookCover(
             title: doc.displayTitle,
             level: doc.level,
+            coverUrl: doc.coverUrl,
           ),
           const SizedBox(height: 10),
           Text(
@@ -1026,6 +1029,7 @@ class _DocTile extends StatelessWidget {
                     child: ReadingBookCover(
                       title: doc.displayTitle,
                       level: doc.level,
+                      coverUrl: doc.coverUrl,
                     ),
                   ),
                   const SizedBox(width: 14),

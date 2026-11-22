@@ -6,8 +6,23 @@ from urllib.parse import urlparse,unquote
 import httpx
 from fastapi import APIRouter, HTTPException, Query
 from fastapi.responses import Response
+from pydantic import BaseModel, Field
 from app.config import settings
+from app.services import content_media as cm
+from app.services import reading_book_covers as covers_svc
 router=APIRouter(prefix='/reading',tags=['reading'])
+
+
+class CoverBookIn(BaseModel):
+    title: str = Field(..., min_length=1, max_length=300)
+    author: str = ""
+    doc_id: str = Field("", max_length=200)
+    force: bool = False
+
+
+class CoverEnsureIn(BaseModel):
+    books: list[CoverBookIn] = Field(default_factory=list, max_length=40)
+    seed_classics: bool = False
 
 def allowed(url):
     u=urlparse(url)
@@ -57,6 +72,69 @@ async def source(url:str=Query(max_length=2048)):
         raise HTTPException(502,'Too many source redirects')
     except HTTPException:raise
     except Exception:raise HTTPException(502,'书库源暂时不可用，请稍后重试')
+
+@router.get('/covers/resolve')
+async def resolve_cover(
+    title: str = Query(..., min_length=1, max_length=300),
+    author: str = Query('', max_length=200),
+    doc_id: str = Query('', max_length=200),
+    force: bool = Query(False),
+):
+    """Search Open Library for a cover and cache it under media/reading/covers/."""
+    return await covers_svc.resolve_cover(
+        title=title,
+        author=author,
+        doc_id=doc_id,
+        force=force,
+    )
+
+
+@router.post('/covers/ensure')
+async def ensure_covers(body: CoverEnsureIn):
+    """Resolve covers for a batch of books (App shelf / catalog background)."""
+    books = [item.model_dump() for item in body.books]
+    if body.seed_classics:
+        known = {
+            (b.get('doc_id') or '', (b.get('title') or '').lower())
+            for b in books
+        }
+        for classic in covers_svc.FEATURED_CLASSICS:
+            key = (classic['doc_id'], classic['title'].lower())
+            if key not in known:
+                books.append(dict(classic))
+    if not books:
+        return {'count': 0, 'found': 0, 'covers': []}
+    return await covers_svc.ensure_covers(books)
+
+
+@router.post('/covers/seed-classics')
+async def seed_classic_covers():
+    """Fill featured Standard Ebooks classics into ECS cover cache."""
+    result = await covers_svc.ensure_covers(list(covers_svc.FEATURED_CLASSICS))
+    return {'message': 'seeded', **result}
+
+
+@router.get('/covers/index')
+async def covers_index():
+    """List cached cover entries (ops / App prefetch)."""
+    index = covers_svc._load_index()
+    items = []
+    for key, entry in index.items():
+        if not isinstance(entry, dict):
+            continue
+        rel = str(entry.get('relative') or '')
+        items.append(
+            {
+                'key': key,
+                'title': entry.get('title') or '',
+                'author': entry.get('author') or '',
+                'doc_id': entry.get('doc_id'),
+                'cover_url': cm.public_url('reading', rel) if rel else None,
+                'source': entry.get('source') or 'cache',
+            }
+        )
+    return {'count': len(items), 'covers': items}
+
 
 @router.get('/starter')
 async def starter():

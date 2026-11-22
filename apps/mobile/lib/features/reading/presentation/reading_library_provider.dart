@@ -238,6 +238,30 @@ class ReadingLibraryNotifier extends Notifier<ReadingLibraryState> {
     return saved;
   }
 
+  Future<void> updateCoverUrl(String docId, String coverUrl) async {
+    final String url = coverUrl.trim();
+    if (docId.isEmpty || url.isEmpty) return;
+    ReadingDoc? target = state.docById(docId);
+    if (target == null || target.coverUrl == url) return;
+    final ReadingDoc updated = target.copyWith(coverUrl: url);
+    if (state.builtin.any((ReadingDoc d) => d.id == docId)) {
+      state = state.copyWith(
+        builtin: List<ReadingDoc>.unmodifiable(<ReadingDoc>[
+          for (final ReadingDoc d in state.builtin)
+            if (d.id == docId) updated else d,
+        ]),
+      );
+    } else {
+      state = state.copyWith(
+        userDocs: List<ReadingDoc>.unmodifiable(<ReadingDoc>[
+          for (final ReadingDoc d in state.userDocs)
+            if (d.id == docId) updated else d,
+        ]),
+      );
+    }
+    await _persistLibrary(scheduleSync: false);
+  }
+
   Future<void> removeDoc(String docId) async {
     if (state.builtin.any((ReadingDoc d) => d.id == docId)) return;
     final List<ReadingDoc> next = state.userDocs

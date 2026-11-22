@@ -3366,6 +3366,64 @@ class AcquireApiClient {
     }
   }
 
+  /// Resolve / cache classic book jackets via Open Library on ECS.
+  Future<Map<String, dynamic>?> ensureReadingCovers({
+    List<Map<String, dynamic>> books = const <Map<String, dynamic>>[],
+    bool seedClassics = false,
+  }) async {
+    try {
+      final Response<dynamic> response = await _dio.post(
+        Endpoints.readingCoversEnsure,
+        data: <String, dynamic>{
+          'books': books,
+          'seed_classics': seedClassics,
+        },
+        options: Options(
+          receiveTimeout: const Duration(seconds: 120),
+          sendTimeout: const Duration(seconds: 30),
+          extra: const <String, Object>{
+            'dio_cache_interceptor_force_refresh': true,
+          },
+        ),
+      );
+      final Object? data = response.data;
+      if (data is Map<String, dynamic>) return data;
+      if (data is Map) return Map<String, dynamic>.from(data);
+      return null;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Future<Map<String, dynamic>?> resolveReadingCover({
+    required String title,
+    String author = '',
+    String docId = '',
+  }) async {
+    try {
+      final Response<dynamic> response = await _dio.get(
+        Endpoints.readingCoversResolve,
+        queryParameters: <String, dynamic>{
+          'title': title.trim(),
+          if (author.trim().isNotEmpty) 'author': author.trim(),
+          if (docId.trim().isNotEmpty) 'doc_id': docId.trim(),
+        },
+        options: Options(
+          receiveTimeout: const Duration(seconds: 45),
+          extra: const <String, Object>{
+            'dio_cache_interceptor_force_refresh': true,
+          },
+        ),
+      );
+      final Object? data = response.data;
+      if (data is Map<String, dynamic>) return data;
+      if (data is Map) return Map<String, dynamic>.from(data);
+      return null;
+    } catch (_) {
+      return null;
+    }
+  }
+
   Future<FoundationMediaItem?> contentMediaLookup({
     required String bookId,
     required String key,

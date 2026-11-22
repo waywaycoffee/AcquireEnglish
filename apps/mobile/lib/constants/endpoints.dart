@@ -162,6 +162,10 @@ class Endpoints {
   static const String readingSpeechBookPregen = 'api/reading/speech/book-pregen';
   static const String readingSpeechBookPregenFallback =
       'api/reading/speech/book-pregen/fallback';
+  static const String readingCoversEnsure = 'api/reading/covers/ensure';
+  static const String readingCoversResolve = 'api/reading/covers/resolve';
+  static const String readingCoversSeedClassics =
+      'api/reading/covers/seed-classics';
   static const String pregenSentences = 'api/pregen/sentences';
   static String pregenVocab(String word) =>
       'api/pregen/vocab/${Uri.encodeComponent(word)}';

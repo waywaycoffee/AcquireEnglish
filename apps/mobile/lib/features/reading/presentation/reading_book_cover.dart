@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 
 /// Stable title-based cover for built-in and imported books.
+/// When [coverUrl] is set (ECS Open Library cache), show the real jacket
+/// and fall back to the cloth hardcover if the image fails.
 class ReadingBookCover extends StatelessWidget {
   const ReadingBookCover({
     required this.title,
@@ -8,6 +10,7 @@ class ReadingBookCover extends StatelessWidget {
     this.subtitle = '',
     this.standing = false,
     this.paletteIndex,
+    this.coverUrl = '',
     super.key,
   });
 
@@ -23,6 +26,9 @@ class ReadingBookCover extends StatelessWidget {
 
   /// When true, render the cloth hardcover standing on a shelf.
   final bool standing;
+
+  /// Optional ECS-hosted classic cover (`/media/reading/covers/...`).
+  final String coverUrl;
 
   /// Cloth colors from the reference shelf (green, rust, navy, mustard,
   /// burgundy, plum, then extras).
@@ -46,14 +52,17 @@ class ReadingBookCover extends StatelessWidget {
   Widget build(BuildContext context) {
     final int seed = seedOf(title);
     final Color color = palette[(paletteIndex ?? seed) % palette.length];
+    final String url = coverUrl.trim();
 
     if (standing) {
-      return _ClothHardcover(
+      final Widget cloth = _ClothHardcover(
         title: title,
         subtitle: subtitle,
         color: color,
         glyph: _glyphFor(title, seed),
       );
+      if (url.isEmpty) return cloth;
+      return _RemoteJacket(url: url, fallback: cloth);
     }
 
     final bool lightInk = color.computeLuminance() > 0.55;
@@ -188,6 +197,66 @@ const List<String> _serifFallback = <String>[
   'Noto Serif CJK SC',
   'Source Han Serif SC',
 ];
+
+class _RemoteJacket extends StatelessWidget {
+  const _RemoteJacket({required this.url, required this.fallback});
+
+  final String url;
+  final Widget fallback;
+
+  static const BorderRadius _radius = BorderRadius.only(
+    topLeft: Radius.circular(2),
+    bottomLeft: Radius.circular(2),
+    topRight: Radius.circular(4),
+    bottomRight: Radius.circular(4),
+  );
+
+  @override
+  Widget build(BuildContext context) {
+    return DecoratedBox(
+      decoration: const BoxDecoration(
+        borderRadius: _radius,
+        boxShadow: <BoxShadow>[
+          BoxShadow(
+            color: Color(0x99000000),
+            blurRadius: 14,
+            spreadRadius: -1,
+            offset: Offset(9, -2),
+          ),
+          BoxShadow(
+            color: Color(0x66000000),
+            blurRadius: 3,
+            offset: Offset(1.5, 1.5),
+          ),
+        ],
+      ),
+      child: ClipRRect(
+        borderRadius: _radius,
+        child: Image.network(
+          url,
+          fit: BoxFit.cover,
+          filterQuality: FilterQuality.medium,
+          errorBuilder: (BuildContext context, Object error, StackTrace? st) =>
+              fallback,
+          loadingBuilder: (
+            BuildContext context,
+            Widget child,
+            ImageChunkEvent? progress,
+          ) {
+            if (progress == null) return child;
+            return Stack(
+              fit: StackFit.expand,
+              children: <Widget>[
+                fallback,
+                const ColoredBox(color: Color(0x33000000)),
+              ],
+            );
+          },
+        ),
+      ),
+    );
+  }
+}
 
 /// Front-facing cloth hardcover: hinge strip with vertical spine title on the
 /// left, foil-stamped title / subtitle / emblem / imprint, and a deep cast

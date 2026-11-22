@@ -642,6 +642,7 @@ class _ShelfRow extends StatelessWidget {
               subtitle: _subtitleFor(doc),
               standing: true,
               paletteIndex: rowIndex * columns + i,
+              coverUrl: doc.coverUrl,
             ),
           ),
         ),

@@ -1,5 +1,18 @@
 # Reading TTS worker (5060 Ti → ECS)
 
+## Classic book covers
+
+Featured Standard Ebooks jackets are resolved via Open Library and stored on
+ECS under `media/reading/covers/`. Guangzhou ECS often cannot reach
+openlibrary.org — seed from this PC:
+
+```powershell
+python tools/reading/seed_book_covers.py --upload
+```
+
+App shelf calls `POST /api/reading/covers/ensure` in the background and shows
+the ECS URL (cloth hardcover fallback if missing).
+
 ## Long novels (绿野仙踪 class)
 
 App shelves the book → `POST /api/reading/speech/book-pregen` splits the whole

@@ -40,6 +40,7 @@ class ReadingDoc {
     this.courseTitle = '',
     this.episodeTitle = '',
     this.sourceLabel = '',
+    this.coverUrl = '',
     this.createdAt,
     this.builtin = false,
     this.contentHash,
@@ -59,11 +60,28 @@ class ReadingDoc {
   final String courseTitle;
   final String episodeTitle;
   final String sourceLabel;
+
+  /// ECS-cached classic cover (`/media/reading/covers/...`), optional.
+  final String coverUrl;
   final DateTime? createdAt;
   final bool builtin;
 
   /// sha256 of original plainText when body was stripped for cloud size limits.
   final String? contentHash;
+
+  /// Best-effort author for cover search (catalog stores it in [episodeTitle]).
+  String get authorHint {
+    final String fromEpisode = episodeTitle.trim();
+    if (fromEpisode.isNotEmpty &&
+        !fromEpisode.contains('http') &&
+        fromEpisode.length < 80) {
+      // "L. Frank Baum · 公版奇幻长篇" → author only
+      final int cut = fromEpisode.indexOf('·');
+      if (cut > 0) return fromEpisode.substring(0, cut).trim();
+      return fromEpisode;
+    }
+    return '';
+  }
 
   /// `The Wonderful Wizard of Oz（绿野仙踪）`
   String get displayTitle =>
@@ -91,6 +109,7 @@ class ReadingDoc {
     String? title,
     String? titleZh,
     List<ReadingSegment>? segments,
+    String? coverUrl,
     String? contentHash,
     bool clearContentHash = false,
   }) =>
@@ -107,6 +126,7 @@ class ReadingDoc {
         courseTitle: courseTitle,
         episodeTitle: episodeTitle,
         sourceLabel: sourceLabel,
+        coverUrl: coverUrl ?? this.coverUrl,
         createdAt: createdAt,
         builtin: builtin,
         contentHash: clearContentHash ? null : (contentHash ?? this.contentHash),
@@ -125,6 +145,7 @@ class ReadingDoc {
     'courseTitle': courseTitle,
     'episodeTitle': episodeTitle,
     'sourceLabel': sourceLabel,
+    if (coverUrl.trim().isNotEmpty) 'coverUrl': coverUrl,
     'createdAt': createdAt?.toIso8601String(),
     'builtin': builtin,
     if (contentHash != null && contentHash!.isNotEmpty) 'contentHash': contentHash,
@@ -164,6 +185,7 @@ class ReadingDoc {
       courseTitle: '${json['courseTitle'] ?? ''}'.trim(),
       episodeTitle: '${json['episodeTitle'] ?? ''}'.trim(),
       sourceLabel: '${json['sourceLabel'] ?? ''}'.trim(),
+      coverUrl: '${json['coverUrl'] ?? json['cover_url'] ?? ''}'.trim(),
       createdAt: DateTime.tryParse('${json['createdAt'] ?? ''}'),
       builtin: json['builtin'] as bool? ?? builtin,
       contentHash: (hash == null || hash.isEmpty) ? null : hash,
