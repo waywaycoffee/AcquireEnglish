@@ -24,6 +24,6 @@
 
 ## 实现要点
 
-- App：`kModuleFreePreviewCount`、`isGrandfatheredFreeReading`、`isFreeTrialBilibiliBvid`  
+- App：`kModuleFreePreviewCount`、`isFreeReadingPreviewDocId`、`isFreeTrialBilibiliBvid`  
 - API：`FREE_TIER_PROMISES`、`FREE_CAPS.upload_month=20`、`FREE_PERSONAL_LIBRARY_SLOTS=20`  
 - 阅读入门文：`GET /api/reading/starter`（5 篇短文，带分句）  
