@@ -4150,6 +4150,7 @@ Future<void> _settleChineseFillIfAlreadyPresent() async {
 
   Future<void> _handleGenerateAiSubtitles({
     bool forceRegenerate = false,
+    bool speechOnly = false,
   }) async {
     if (_generatingAiSubtitles) {
       return;
@@ -4195,7 +4196,7 @@ Future<void> _settleChineseFillIfAlreadyPresent() async {
     _aiSubtitleCancellationToken = cancellationToken;
     try {
       final List<PlayerSubtitleLine> referenceLines =
-          await _ensureOfficialReferenceSubtitles();
+          speechOnly ? const <PlayerSubtitleLine>[] : await _ensureOfficialReferenceSubtitles();
       final bool hasOfficialEnglish = usableReferenceSubtitles(
         referenceLines,
       ).isNotEmpty;
@@ -4649,8 +4650,12 @@ Future<void> _settleChineseFillIfAlreadyPresent() async {
       }
     }
 
-    _manualEnglishByStartMs.clear();
-    _manualChineseByStartMs.clear();
+    if (widget.episodeId.startsWith('oral_core_9000-') &&
+        side != SubtitleResetSide.chinese) {
+      await _handleGenerateAiSubtitles(forceRegenerate: true, speechOnly: true);
+      return;
+    }
+
     final PlayerCourseLookupResult resource = resolvePlayerCourseForEpisode(
       courses: ref.read(libraryCatalogProvider),
       episodeId: widget.episodeId,
@@ -4658,9 +4663,15 @@ Future<void> _settleChineseFillIfAlreadyPresent() async {
     final LibraryCourseData? course = resource.course;
     final LibraryEpisodeItem? episode = resource.episode;
     if (course == null || episode == null) {
-      _showMessage('找不到本集课程信息，无法重置字幕');
+      if (side == SubtitleResetSide.chinese) {
+        _showMessage('当前无法单独重译中文，请先重新识别英文字幕。');
+      } else {
+        await _handleGenerateAiSubtitles(forceRegenerate: true, speechOnly: true);
+      }
       return;
     }
+    _manualEnglishByStartMs.clear();
+    _manualChineseByStartMs.clear();
     final String cookie = ref
         .read(learningSettingsProvider)
         .resolvedBilibiliCookieHeader;

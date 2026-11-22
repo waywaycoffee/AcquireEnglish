@@ -54,6 +54,42 @@ void main() {
       ),
     ];
 
+    final LibraryCourseData demo = LibraryCourseData(
+      id: 'oral_core_9000',
+      title: 'Imported course',
+      description: '',
+      sourceLabel: '本地资源',
+      coverImage: '',
+      level: '自定义',
+      category: '自选课程',
+      progressPercent: 0,
+      totalWords: 0,
+      completedEpisodes: 0,
+      totalEpisodes: 1,
+      lastStudiedStr: '刚刚',
+      rating: 4.7,
+      episodes: <LibraryEpisodeItem>[
+        courses.single.episodes.single.copyWith(
+          enSubtitleAsset:
+              'https://example.com/media/course/oral_core_9000/01/en.srt',
+          subtitleTracks: const <LibrarySubtitleTrackItem>[
+            LibrarySubtitleTrackItem(
+              languageCode: 'zh',
+              languageLabel: '中文',
+              path: 'https://example.com/media/course/oral_core_9000/01/zh.srt',
+            ),
+          ],
+        ),
+      ],
+    );
+    final PlayerCourseLookupResult demoResult = resolvePlayerCourseForEpisode(
+      courses: <LibraryCourseData>[demo],
+      episodeId: 'course-1-ep01',
+    );
+    expect(demoResult.englishSubtitleAsset, isNull);
+    expect(demoResult.chineseSubtitleAsset, isNull);
+    expect(demoResult.subtitleTracks, isEmpty);
+
     final PlayerCourseLookupResult result = resolvePlayerCourseForEpisode(
       courses: courses,
       episodeId: 'course-1-ep01',
