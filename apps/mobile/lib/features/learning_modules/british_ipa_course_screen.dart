@@ -5,6 +5,8 @@ import 'package:go_router/go_router.dart';
 import '../library/presentation/library_catalog_provider.dart';
 import '../shared/presentation/pad/app_design_tokens.dart';
 import 'british_ipa_course.dart';
+import 'module_drill_entry_card.dart';
+import 'module_screen.dart';
 
 /// Home「国际音标」入口：BBC 英式音标跟读（BV127411n7nj，有字幕分集）。
 class BritishIpaCourseScreen extends ConsumerStatefulWidget {
@@ -66,7 +68,21 @@ class _BritishIpaCourseScreenState
                     style: const TextStyle(color: Colors.red),
                   ),
                 ],
-                const SizedBox(height: 20),
+                const SizedBox(height: 16),
+                ModuleDrillEntryCard(
+                  title: '基础练习 · 音素口型与测验',
+                  subtitle:
+                      '保留原有 ${moduleLessons['ipa']?.length ?? 0} 课 TTS 示范与选择题，'
+                      '适合先练口型再跟读视频。',
+                  route: '/learn/ipa',
+                ),
+                Text(
+                  '视频跟读',
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w700,
+                      ),
+                ),
+                const SizedBox(height: 10),
                 ...BritishIpaCourse.lessons.map((BritishIpaLesson lesson) {
                   final String leading = lesson.symbol.isNotEmpty
                       ? lesson.symbol

@@ -152,16 +152,6 @@ GoRouter goRouter(Ref ref) {
     ).fade(),
     GoRoute(
       path: '/learn/:kind',
-      redirect: (BuildContext context, GoRouterState state) {
-        final String? kind = state.pathParameters['kind'];
-        if (kind == 'ipa') {
-          return '/courses/british-ipa';
-        }
-        if (kind == 'phonics') {
-          return '/courses/phonics';
-        }
-        return null;
-      },
       builder: (context, state) {
         final String kind = moduleLessons.containsKey(state.pathParameters['kind'])
             ? state.pathParameters['kind']!

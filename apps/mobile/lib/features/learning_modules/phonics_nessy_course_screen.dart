@@ -4,6 +4,8 @@ import 'package:go_router/go_router.dart';
 
 import '../library/presentation/library_catalog_provider.dart';
 import '../shared/presentation/pad/app_design_tokens.dart';
+import 'module_drill_entry_card.dart';
+import 'module_screen.dart';
 import 'phonics_nessy_course.dart';
 
 /// Home「自然拼读」入口：Nessy 趣味拼读跟读（BV1Qg4mzKENh）。
@@ -66,7 +68,21 @@ class _PhonicsNessyCourseScreenState
                     style: const TextStyle(color: Colors.red),
                   ),
                 ],
-                const SizedBox(height: 20),
+                const SizedBox(height: 16),
+                ModuleDrillEntryCard(
+                  title: '基础练习 · 拼读规则与测验',
+                  subtitle:
+                      '保留原有 ${moduleLessons['phonics']?.length ?? 0} 课字母组合与示范词，'
+                      '适合先吃透规则再看 Nessy 动画。',
+                  route: '/learn/phonics',
+                ),
+                Text(
+                  '视频跟读',
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w700,
+                      ),
+                ),
+                const SizedBox(height: 10),
                 ...PhonicsNessyCourse.lessons.map((PhonicsNessyLesson lesson) {
                   return Card(
                     margin: const EdgeInsets.only(bottom: 10),
