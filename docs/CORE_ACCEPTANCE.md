@@ -16,16 +16,17 @@
 
 ### 侧载内测轮次（2026-11-22 · 1A+2A）
 
-- commit：`951d6a8`（相对 `origin/main` 含网盘书籍导入 + 测试对齐）
+- commit：闭环提交见 `main`（底栏溢出修复 + 网盘 EPUB 浏览 + 测试对齐）
 - APK：`apps/mobile/build/app/outputs/flutter-apk/app-prod-debug.apk` · flavor `prod` · `com.acquire.english`
+- 设备：Xiaomi 23127PN0CC (`b1481470`) · 覆盖安装 **Success** · `am start` 无 FATAL
 - 生产冒烟：health / 邮箱登录 / claim-welcome / free-trial-seeds / OpenList / coach ready / 微信支付 503「商户未配置」**PASS**
-- Android 真机：**未连接 adb 设备** — 安装与下表人工路径待插线后补填；此前曾有 debug 签名不一致无法覆盖安装的记录
+- 自动化：settings + F02 + growth/review provider 已绿；全量仍有 ~29 个 UI 文案/流程漂移失败（不阻断侧载）
 
 | 步骤 | 验收标准 | Android | iOS |
 |---|---|---|---|
-| 安装 | prod debug APK 覆盖安装成功（签名一致） | ⛔ 无设备 / 待重试 | N/A |
-| 登录 | 真实短信/微信成功，取消、错误与限流可恢复 | 待验收（API 邮箱登录已冒烟） | 待验收 |
-| 试用 | claim-welcome 后积分≥50 且有会员 | API PASS；App UI 待验收 | 待验收 |
+| 安装 | prod debug APK 覆盖安装成功（签名一致） | PASS（2026-11-22） | N/A |
+| 登录 | 真实短信/微信成功，取消、错误与限流可恢复 | 待人手点验（API 邮箱登录已冒烟；App 已冷启动） | 待验收 |
+| 试用 | claim-welcome 后积分≥50 且有会员 | API PASS；App UI 待人手点验 | 待验收 |
 | 导入 | 视频与字幕对应，失败可重试（含网盘文件夹） | 待验收 | 待验收 |
 | 字幕补齐 | 缺失轨补全，后台/取消无重复任务 | 待验收 | 待验收 |
 | 播放 | 字幕、时间轴、断点进度一致 | 待验收 | 待验收 |

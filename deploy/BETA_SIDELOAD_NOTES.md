@@ -25,6 +25,8 @@
 - coach `/coach/api/health` ready
 - 微信下单 503 明文商户提示
 
-## 真机闭环
+## 真机闭环（2026-11-22 更新）
 
-插线授权后按 [`docs/CORE_ACCEPTANCE.md`](../docs/CORE_ACCEPTANCE.md) 填表补全。
+- 设备 `23127PN0CC` 已覆盖安装成功并冷启动（无 FATAL）。
+- 请人手点验：登录 → 领取试用 → 导入/播放 → 收藏复习 → 会员页「商户未配置」提示。
+- 详见 [`docs/CORE_ACCEPTANCE.md`](../docs/CORE_ACCEPTANCE.md)。
