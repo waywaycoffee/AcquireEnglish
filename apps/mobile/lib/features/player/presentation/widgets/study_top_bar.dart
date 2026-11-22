@@ -11,6 +11,7 @@ class StudyTopBar extends StatelessWidget {
     this.lessonBadge,
     this.watchModeLabel,
     this.onToggleWatchMode,
+    this.onEnableCourseMode,
     super.key,
   });
 
@@ -23,6 +24,9 @@ class StudyTopBar extends StatelessWidget {
   /// `精听` / `追剧` chip; null hides the toggle.
   final String? watchModeLabel;
   final VoidCallback? onToggleWatchMode;
+
+  /// Opens「开启课程学习模式」sheet when set.
+  final VoidCallback? onEnableCourseMode;
 
   @override
   Widget build(BuildContext context) {
@@ -100,6 +104,16 @@ class StudyTopBar extends StatelessWidget {
                       ),
                     ),
                   ),
+                ),
+              ),
+            if (onEnableCourseMode != null)
+              IconButton(
+                tooltip: '开启课程学习模式',
+                onPressed: onEnableCourseMode,
+                icon: Icon(
+                  Icons.route_rounded,
+                  color: colors.textPrimary,
+                  size: 22,
                 ),
               ),
             IconButton(

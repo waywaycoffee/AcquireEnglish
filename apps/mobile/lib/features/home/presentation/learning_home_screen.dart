@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../daily_path/presentation/today_path_card.dart';
 import '../../digital_human/presentation/digital_human_picker.dart';
 import '../../exam/domain/exam_profile.dart';
 import '../../exam/presentation/exam_profile_provider.dart';
@@ -16,7 +17,6 @@ import '../../onboarding/presentation/onboarding_provider.dart';
 import '../../player/presentation/learning_resume_provider.dart';
 import '../../reading/domain/reading_doc.dart';
 import '../../reading/presentation/reading_library_provider.dart';
-import '../../review_hub/presentation/widgets/review_today_section.dart';
 import '../../shared/presentation/pad/pad_scaffold.dart';
 import '../../sync/presentation/cloud_catalog_sync.dart';
 import '../../sync/presentation/daily_feed_provider.dart';
@@ -246,6 +246,11 @@ class _LearningHomeScreenState extends ConsumerState<LearningHomeScreen> {
                       ),
                     ),
                     const SizedBox(height: 24),
+                    KeyedSubtree(
+                      key: _vocabKey,
+                      child: const TodayPathCard(),
+                    ),
+                    const SizedBox(height: 24),
                     if (examProfile.isExamMode &&
                         examProfile.family != null) ...<Widget>[
                       text(
@@ -346,11 +351,6 @@ class _LearningHomeScreenState extends ConsumerState<LearningHomeScreen> {
                       ),
                       const SizedBox(height: 20),
                     ],
-                    KeyedSubtree(
-                      key: _vocabKey,
-                      child: const ReviewTodaySection(),
-                    ),
-                    const SizedBox(height: 24),
                     text('继续学习', 17, bold: true),
                     const SizedBox(height: 12),
                     section(

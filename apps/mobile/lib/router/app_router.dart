@@ -12,6 +12,7 @@ import '../features/exam/presentation/exam_select_screen.dart';
 import '../features/exam/presentation/exam_session_screen.dart';
 import '../features/writing/presentation/writing_editor_screen.dart';
 import '../features/writing/presentation/writing_home_screen.dart';
+import '../features/daily_path/presentation/course_unit_session_screen.dart';
 import '../features/daily_review/domain/daily_review.dart';
 // ignore_for_file: prefer_function_declarations_over_variables
 
@@ -363,6 +364,19 @@ GoRouter goRouter(Ref ref) => GoRouter(
           practiceKind: ReviewKind.values
               .where((ReviewKind kind) => kind.name == kindName)
               .firstOrNull,
+        );
+      },
+    ).fade(),
+    GoRoute(
+      path: '/daily-path/unit',
+      builder: (BuildContext context, GoRouterState state) {
+        final String courseId = state.uri.queryParameters['courseId'] ?? '';
+        final String unitId = state.uri.queryParameters['unitId'] ?? '';
+        final String mode = state.uri.queryParameters['mode'] ?? 'new';
+        return CourseUnitSessionScreen(
+          courseId: courseId,
+          unitId: unitId,
+          mode: mode,
         );
       },
     ).fade(),

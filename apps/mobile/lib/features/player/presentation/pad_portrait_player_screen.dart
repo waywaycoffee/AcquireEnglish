@@ -13,6 +13,8 @@ import 'package:media_kit_video/media_kit_video.dart';
 
 import '../../../config/theme/theme_logic.dart';
 import '../../../router/app_router.dart';
+import '../../daily_path/domain/course_plan.dart';
+import '../../daily_path/presentation/enable_course_mode_sheet.dart';
 import '../../daily_review/presentation/daily_review_provider.dart';
 import '../../home/presentation/learning_dashboard_provider.dart';
 import '../../import_course/data/bilibili_episode_prepare.dart';
@@ -2961,6 +2963,20 @@ Future<void> _settleChineseFillIfAlreadyPresent() async {
               },
               isFavorite: _episodeFavorited,
               onFavorite: () => _handleToggleEpisodeFavorite(courseContext),
+              onEnableCourseMode: () {
+                unawaited(
+                  showEnableCourseModeSheet(
+                    context: context,
+                    ref: ref,
+                    type: CoursePlanType.video,
+                    sourceId: widget.episodeId,
+                    title: course?.title ??
+                        episode?.title ??
+                        '视频课程',
+                    subtitleLines: state.lines,
+                  ),
+                );
+              },
               watchModeLabel: settings.playerWatchMode,
               onToggleWatchMode: () {
                 final String next =

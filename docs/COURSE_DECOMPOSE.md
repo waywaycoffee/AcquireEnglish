@@ -18,7 +18,7 @@
 | 版权免责 | 上传需 `license_ack`；文案固定 | 用户自负；**无自动发布** |
 | 共享 OCR | `shared-ocr-books` | 私人解构流默认 **不上传** OCR（`share_ocr=false`） |
 | OpenMAIC 编排 | `OpenMaicSplitter` HTTP 客户端 | 已对接；见下方「OpenMAIC」 |
-| 每日课程 | lessons 结构兼容 `lesson_no` / `goal` / `cefr` | 后续日程编排消费同一 JSON |
+| 每日课程 | lessons 结构兼容 `lesson_no` / `goal` / `cefr` | App P0：`CoursePlan` + 首页「今日路径」已消费阅读/视频切分；私人课包 `finalize` → `CoursePlan` 为 P1 |
 | 社区分享 | `POST …/share` 仅 stub | **P2**；App P0 不暴露入口 |
 
 ## 数据流（P0）
@@ -97,7 +97,22 @@ App 选 PDF/EPUB
 - [x] OpenMAIC HTTP 对接（`OPENMAIC_URL` + soft-fallback）
 - 服务端 PDF/EPUB 直传抽取；扫描件 ASR/对齐走本机 5060 Ti
 - 口语跟读任务挂 oral_coach；TTS 走 ECS `reading` namespace
-- 「每日课程」日程消费私人课包
+- 「每日课程」：私人课包 `finalize` 后直接注册为 App `CoursePlan`（打通下方消费说明）
+
+## 每日课程消费（App P0）
+
+长视频 / 长阅读默认仍是浏览。素材页点「开启课程学习模式」后：
+
+1. 客户端切分写入本地 `CoursePlan`（Hive `course_plans_v1`），**全局仅 1 个 active**。
+2. 视频：字幕元数据切片（默认 10 分钟/节，对齐句起点 ≤5s）；无英文字幕禁止开启。
+3. 阅读：句末分句后按每日句数分块（默认 20）；短文 &lt;20 句为单次任务。
+4. 首页 `TodayPathCard` 由 `today_path_provider` 合成当日任务链，顺序写死：
+   **逾期课程单元 → 今日到期单元复习 → 今日新课单元 → 词书 FSRS 到期 → 词书新学额度**。
+5. `CourseUnitSessionScreen`（`/daily-path/unit`）完成本节后自动 `push` 下一项；完成态按日持久化（`today_path_done_v1:*`），杀进程可续。
+6. 单元复习间隔 `[1,3,7,14]` 天（`next_due`）；词内生词仍走既有 FSRS。
+7. 私人课包 `lessons[]` / `tasks[]` 形状与 `CoursePlan.units` 对齐，P1 `finalize` 可直接映射注册，无需第二套日程模型。
+
+相关代码：`apps/mobile/lib/features/daily_path/`。
 
 ## OpenMAIC（P1 已接线）
 

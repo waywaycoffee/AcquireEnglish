@@ -8,6 +8,8 @@ import 'package:media_kit/media_kit.dart';
 import '../../sync/data/acquire_api_client.dart';
 
 import '../../authentication/presentation/account_storage.dart';
+import '../../daily_path/domain/course_plan.dart';
+import '../../daily_path/presentation/enable_course_mode_sheet.dart';
 import '../../daily_review/data/word_encounter_store.dart';
 import '../../daily_review/presentation/foundation_media_video_sheet.dart';
 import '../../learning_modules/assessment_panel.dart';
@@ -1187,6 +1189,17 @@ class _ReadingReaderScreenState extends ConsumerState<ReadingReaderScreen> {
                       '/episodes/${Uri.encodeComponent(doc.episodeId!)}',
                     );
                   }
+                case 'course_mode':
+                  unawaited(
+                    showEnableCourseModeSheet(
+                      context: context,
+                      ref: ref,
+                      type: CoursePlanType.reading,
+                      sourceId: doc.id,
+                      title: doc.title,
+                      plainText: doc.plainText,
+                    ),
+                  );
               }
             },
             itemBuilder: (BuildContext context) => <PopupMenuEntry<String>>[
@@ -1238,6 +1251,11 @@ class _ReadingReaderScreenState extends ConsumerState<ReadingReaderScreen> {
                   value: 'episode',
                   child: Text('打开原集'),
                 ),
+              const PopupMenuDivider(),
+              const PopupMenuItem<String>(
+                value: 'course_mode',
+                child: Text('开启课程学习模式'),
+              ),
             ],
           ),
         ],
