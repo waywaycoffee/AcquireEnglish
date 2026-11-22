@@ -122,7 +122,7 @@ void main() {
       expect(requests.single, (
         'Hello! I have three projects to finish today.',
         '',
-        0.75,
+        1.0,
       ));
       expect(find.text('停止'), findsOneWidget);
       await tester.tap(button);

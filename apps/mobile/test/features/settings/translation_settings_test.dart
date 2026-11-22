@@ -274,7 +274,10 @@ void main() {
       final LearningSettingsNotifier notifier = container.read(
         learningSettingsProvider.notifier,
       );
-      expect(ttsRateOptions, <double>[0.5, 0.75, 1, 1.25, 1.5, 2, 2.5, 3]);
+      expect(
+        ttsRateOptions,
+        <double>[0.5, 0.6, 0.7, 0.75, 0.9, 1, 1.25, 1.5, 2, 2.5, 3],
+      );
       for (final double rate in ttsRateOptions) {
         notifier.setTtsRate(rate);
         expect(container.read(learningSettingsProvider).ttsRate, rate);
