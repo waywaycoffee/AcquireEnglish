@@ -5507,6 +5507,81 @@ Future<void> _settleChineseFillIfAlreadyPresent() async {
     } catch (_) {}
   }
 
+  bool _lineCoveredByDubTake(PlayerSubtitleLine line, List<DubTake> takes) {
+    final String lineId = '${line.startMs}-${line.endMs}';
+    for (final DubTake take in takes) {
+      if (!take.fileExists) continue;
+      if (take.lineId == lineId) return true;
+      if (take.startMs == line.startMs && take.endMs == line.endMs) {
+        return true;
+      }
+      // Tolerate slight cue drift between subtitle edits and saved takes.
+      final int startDelta = (take.startMs - line.startMs).abs();
+      final int endDelta = (take.endMs - line.endMs).abs();
+      if (startDelta <= 250 && endDelta <= 250) return true;
+    }
+    return false;
+  }
+
+  List<PlayerSubtitleLine> _dubbableSubtitleLines() {
+    return state.lines
+        .where((PlayerSubtitleLine line) => line.english.trim().isNotEmpty)
+        .toList(growable: false);
+  }
+
+  /// Blocks full-episode dub playback until every English cue has a take.
+  /// Returns true when the caller should abort.
+  Future<bool> _promptMissingDubTakes(List<DubTake> takes) async {
+    final List<PlayerSubtitleLine> lines = _dubbableSubtitleLines();
+    if (lines.isEmpty) {
+      _showMessage('当前没有可配音的英文字幕。');
+      return true;
+    }
+    final List<int> missingIndexes = <int>[];
+    for (int i = 0; i < state.lines.length; i++) {
+      final PlayerSubtitleLine line = state.lines[i];
+      if (line.english.trim().isEmpty) continue;
+      if (!_lineCoveredByDubTake(line, takes)) {
+        missingIndexes.add(i);
+      }
+    }
+    if (missingIndexes.isEmpty) return false;
+    if (!mounted) return true;
+    final int firstMissing = missingIndexes.first;
+    final PlayerSubtitleLine sample = state.lines[firstMissing];
+    final String preview = sample.english.trim().length > 42
+        ? '${sample.english.trim().substring(0, 42)}…'
+        : sample.english.trim();
+    final bool? goRecord = await showDialog<bool>(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text('还有句子未配音'),
+          content: Text(
+            '整段配音需要每句都有跟读录音。还差 ${missingIndexes.length} 句，'
+            '下一句：\n「$preview」',
+          ),
+          actions: <Widget>[
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(false),
+              child: const Text('稍后'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.of(context).pop(true),
+              child: const Text('去补录'),
+            ),
+          ],
+        );
+      },
+    );
+    if (!mounted) return true;
+    if (goRecord == true) {
+      _goToLine(firstMissing);
+      _showMessage('请为当前句录音后，再点「播放整段配音」。');
+    }
+    return true;
+  }
+
   Future<void> _handleDubPlayback({
     required int startMs,
     required int endMs,
@@ -5538,7 +5613,12 @@ Future<void> _settleChineseFillIfAlreadyPresent() async {
       ];
     }
     if (takes.isEmpty) {
-      _showMessage('还没有可回放的配音。');
+      _showMessage(
+        continuous ? '还没有配音。请先逐句跟读录音，再播放整段。' : '还没有可回放的配音。',
+      );
+      return;
+    }
+    if (continuous && await _promptMissingDubTakes(takes)) {
       return;
     }
 

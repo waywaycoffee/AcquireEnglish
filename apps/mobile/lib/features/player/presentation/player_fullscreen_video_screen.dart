@@ -217,11 +217,12 @@ class _PlayerFullscreenVideoScreenState
 
   double _resolvedSubtitlePanelWidth(BuildContext context) {
     final double screenWidth = MediaQuery.sizeOf(context).width;
-    // Keep video dominant (~60%+). Never force a 240px floor that starves
-    // phone-width layouts down to an unusable control dock.
-    final double ideal = screenWidth * 0.38;
-    final double maxPanel = (screenWidth * 0.42).clamp(0.0, _subtitlePanelWidth);
-    return ideal.clamp(0.0, maxPanel);
+    // Phone landscape: give the transcript enough width to avoid button overflow
+    // while keeping video clearly dominant.
+    final double ideal = screenWidth * 0.40;
+    final double maxPanel = (screenWidth * 0.44).clamp(0.0, _subtitlePanelWidth);
+    final double minPanel = screenWidth < 720 ? 280.0 : 300.0;
+    return ideal.clamp(minPanel, maxPanel);
   }
 
   @override
@@ -600,12 +601,23 @@ class _FullscreenSubtitlePanel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
+    // Side transcript is a light sheet beside the video — keep ink readable
+    // even when the app theme is dark (avoid washed-out / invisible text).
+    return Theme(
+      data: ThemeData(
+        brightness: Brightness.light,
+        colorScheme: ColorScheme.fromSeed(
+          seedColor: const Color(0xFF284F39),
+          brightness: Brightness.light,
+        ),
+        scaffoldBackgroundColor: const Color(0xFFF7F8FA),
+      ),
+      child: Container(
       width: width,
-      padding: const EdgeInsets.fromLTRB(12, 12, 12, 8),
-      decoration: BoxDecoration(
-        color: AppDesignTokens.softWhite,
-        border: Border(left: BorderSide(color: AppDesignTokens.borderGray)),
+      padding: const EdgeInsets.fromLTRB(10, 10, 10, 8),
+      decoration: const BoxDecoration(
+        color: Color(0xFFF7F8FA),
+        border: Border(left: BorderSide(color: Color(0xFFD5D8E0))),
       ),
       child: SafeArea(
         left: false,
@@ -649,6 +661,7 @@ class _FullscreenSubtitlePanel extends StatelessWidget {
           onTogglePlaying: onTogglePlaying,
           onPronounce: onPronounce,
         ),
+      ),
       ),
     );
   }

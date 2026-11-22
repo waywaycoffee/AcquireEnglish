@@ -20,8 +20,8 @@ import 'subtitle_chunk_highlight.dart';
 import 'subtitle_vocabulary_highlight.dart';
 import 'subtitle_word_highlight_style.dart';
 
-const double _activeEnglishFontSize = 22;
-const double _inactiveEnglishFontSize = 19;
+const double _activeEnglishFontSize = 20;
+const double _inactiveEnglishFontSize = 17;
 const double _activeChineseFontSize = 13.5;
 const double _inactiveChineseFontSize = 12.5;
 
@@ -1316,197 +1316,200 @@ class _PlayerSubtitleListState extends State<PlayerSubtitleList> {
                               ],
                             ),
                           ] else
-                            Row(
-                              children: <Widget>[
-                                FilledButton.tonal(
-                                  onPressed: active
-                                      ? widget.onTogglePlaying
-                                      : () => widget.onTapLine(originalIndex),
-                                  style: FilledButton.styleFrom(
-                                    backgroundColor: active
-                                        ? const Color(0xFFDFF8C8)
-                                        : AppDesignTokens.softWhite,
-                                    foregroundColor: active
-                                        ? AppDesignTokens.brandGreenDark
-                                        : AppDesignTokens.primaryBlueDark,
-                                    minimumSize: const Size(44, 44),
-                                    fixedSize: const Size(44, 44),
-                                    padding: EdgeInsets.zero,
-                                    tapTargetSize:
-                                        MaterialTapTargetSize.shrinkWrap,
-                                    shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(16),
+                            LayoutBuilder(
+                              builder:
+                                  (BuildContext context, BoxConstraints box) {
+                                final bool narrow = box.maxWidth < 340;
+                                final double btn = narrow ? 36.0 : 40.0;
+                                final Size btnSize = Size(btn, btn);
+                                ButtonStyle tonal({
+                                  required Color bg,
+                                  required Color fg,
+                                }) => FilledButton.styleFrom(
+                                  backgroundColor: bg,
+                                  foregroundColor: fg,
+                                  minimumSize: btnSize,
+                                  fixedSize: btnSize,
+                                  padding: EdgeInsets.zero,
+                                  tapTargetSize:
+                                      MaterialTapTargetSize.shrinkWrap,
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(14),
+                                  ),
+                                );
+                                final List<Widget> actions = <Widget>[
+                                  FilledButton.tonal(
+                                    onPressed: active
+                                        ? widget.onTogglePlaying
+                                        : () =>
+                                              widget.onTapLine(originalIndex),
+                                    style: tonal(
+                                      bg: active
+                                          ? const Color(0xFFDFF8C8)
+                                          : const Color(0xFFF3F4F7),
+                                      fg: active
+                                          ? AppDesignTokens.brandGreenDark
+                                          : const Color(0xFF1CB0F6),
+                                    ),
+                                    child: Icon(
+                                      active && widget.isPlaying
+                                          ? Icons.pause_rounded
+                                          : Icons.play_arrow_rounded,
+                                      size: narrow ? 18 : 22,
                                     ),
                                   ),
-                                  child: Icon(
-                                    active && widget.isPlaying
-                                        ? Icons.pause_rounded
-                                        : Icons.play_arrow_rounded,
-                                  ),
-                                ),
-                                const SizedBox(width: 6),
-                                Expanded(
-                                  child: Text(
-                                    line.startTime,
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                    style: TextStyle(
-                                      fontSize: 11,
-                                      fontWeight: FontWeight.w700,
-                                      color: active
-                                          ? const Color(0xFF7E8A82)
-                                          : inactiveStartTimeColor.withValues(
-                                              alpha: textOpacity,
-                                            ),
-                                    ),
-                                  ),
-                                ),
-                                if (widget.onAssessLine != null) ...<Widget>[
-                                  IconButton.filledTonal(
-                                    key: ValueKey<String>(
-                                      'subtitle-line-assess-$originalIndex',
-                                    ),
-                                    tooltip:
-                                        pronunciationUnavailableReason ??
-                                        '跟读录音',
-                                    onPressed:
-                                        pronunciationUnavailableReason == null
-                                        ? () => widget.onAssessLine!(
-                                            originalIndex,
-                                          )
-                                        : null,
-                                    icon: const Icon(
-                                      Icons.mic_rounded,
-                                      size: 20,
-                                    ),
-                                    style: IconButton.styleFrom(
-                                      foregroundColor:
-                                          AppDesignTokens.primaryBlueDark,
-                                      backgroundColor:
-                                          AppDesignTokens.softWhite,
-                                      minimumSize: const Size(44, 44),
-                                      fixedSize: const Size(44, 44),
-                                      padding: EdgeInsets.zero,
-                                      tapTargetSize:
-                                          MaterialTapTargetSize.shrinkWrap,
-                                      shape: RoundedRectangleBorder(
-                                        borderRadius: BorderRadius.circular(16),
+                                  if (widget.onAssessLine != null) ...<Widget>[
+                                    const SizedBox(width: 4),
+                                    IconButton.filledTonal(
+                                      key: ValueKey<String>(
+                                        'subtitle-line-assess-$originalIndex',
                                       ),
-                                    ),
-                                  ),
-                                  const SizedBox(width: 6),
-                                ],
-                                FilledButton.tonal(
-                                  key: ValueKey<String>(
-                                    'subtitle-line-loop-$originalIndex',
-                                  ),
-                                  onPressed: () =>
-                                      widget.onLoopFromLine(originalIndex),
-                                  style: FilledButton.styleFrom(
-                                    backgroundColor: isLooping
-                                        ? const Color(0xFFDFF8C8)
-                                        : AppDesignTokens.softWhite,
-                                    foregroundColor: isLooping
-                                        ? AppDesignTokens.brandGreenDark
-                                        : AppDesignTokens.textSecondary,
-                                    minimumSize: const Size(44, 44),
-                                    fixedSize: const Size(44, 44),
-                                    padding: EdgeInsets.zero,
-                                    tapTargetSize:
-                                        MaterialTapTargetSize.shrinkWrap,
-                                    shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(16),
-                                    ),
-                                  ),
-                                  child: const Icon(Icons.repeat_one_rounded),
-                                ),
-                                const SizedBox(width: 6),
-                                Builder(
-                                  builder: (BuildContext context) {
-                                    final bool bookmarked =
-                                        widget.isLineBookmarked?.call(
+                                      tooltip:
+                                          pronunciationUnavailableReason ??
+                                          '跟读录音',
+                                      onPressed:
+                                          pronunciationUnavailableReason ==
+                                              null
+                                          ? () => widget.onAssessLine!(
                                               originalIndex,
-                                            ) ??
-                                            false;
-                                    return FilledButton.tonal(
-                                      onPressed: () =>
-                                          widget.onBookmarkLine(originalIndex),
-                                      style: FilledButton.styleFrom(
-                                        backgroundColor: bookmarked
-                                            ? const Color(0xFFFFE0E0)
-                                            : const Color(0xFFFFF7D6),
-                                        foregroundColor: bookmarked
-                                            ? const Color(0xFFC62828)
-                                            : const Color(0xFFB58600),
-                                        minimumSize: const Size(44, 44),
-                                        fixedSize: const Size(44, 44),
-                                        padding: EdgeInsets.zero,
-                                        tapTargetSize:
-                                            MaterialTapTargetSize.shrinkWrap,
-                                        shape: RoundedRectangleBorder(
-                                          borderRadius: BorderRadius.circular(16),
+                                            )
+                                          : null,
+                                      icon: Icon(
+                                        Icons.mic_rounded,
+                                        size: narrow ? 18 : 20,
+                                      ),
+                                      style: IconButton.styleFrom(
+                                        foregroundColor: const Color(
+                                          0xFF1CB0F6,
                                         ),
-                                      ),
-                                      child: Icon(
-                                        bookmarked
-                                            ? Icons.favorite_rounded
-                                            : Icons.favorite_border_rounded,
-                                      ),
-                                    );
-                                  },
-                                ),
-                                const SizedBox(width: 6),
-                                if (widget.onEditSubtitleLine !=
-                                    null) ...<Widget>[
-                                  Tooltip(
-                                    message: '改这句字幕',
-                                    child: FilledButton.tonal(
-                                      onPressed: () =>
-                                          _beginInlineEdit(originalIndex, line),
-                                      style: FilledButton.styleFrom(
                                         backgroundColor: const Color(
-                                          0xFFE8F1FF,
+                                          0xFFF3F4F7,
                                         ),
-                                        foregroundColor:
-                                            AppDesignTokens.primaryBlueDark,
-                                        minimumSize: const Size(44, 44),
-                                        fixedSize: const Size(44, 44),
+                                        minimumSize: btnSize,
+                                        fixedSize: btnSize,
                                         padding: EdgeInsets.zero,
-                                        tapTargetSize:
-                                            MaterialTapTargetSize.shrinkWrap,
+                                        tapTargetSize: MaterialTapTargetSize
+                                            .shrinkWrap,
                                         shape: RoundedRectangleBorder(
                                           borderRadius: BorderRadius.circular(
-                                            16,
+                                            14,
                                           ),
                                         ),
                                       ),
-                                      child: const Icon(Icons.edit_rounded),
+                                    ),
+                                  ],
+                                  const SizedBox(width: 4),
+                                  FilledButton.tonal(
+                                    key: ValueKey<String>(
+                                      'subtitle-line-loop-$originalIndex',
+                                    ),
+                                    onPressed: () =>
+                                        widget.onLoopFromLine(originalIndex),
+                                    style: tonal(
+                                      bg: isLooping
+                                          ? const Color(0xFFDFF8C8)
+                                          : const Color(0xFFF3F4F7),
+                                      fg: isLooping
+                                          ? AppDesignTokens.brandGreenDark
+                                          : const Color(0xFF667085),
+                                    ),
+                                    child: Icon(
+                                      Icons.repeat_one_rounded,
+                                      size: narrow ? 18 : 22,
                                     ),
                                   ),
-                                  const SizedBox(width: 6),
-                                ],
-                                FilledButton.tonal(
-                                  onPressed: () => _openActions(
-                                    context,
-                                    line,
-                                    originalIndex,
+                                  const SizedBox(width: 4),
+                                  Builder(
+                                    builder: (BuildContext context) {
+                                      final bool bookmarked =
+                                          widget.isLineBookmarked?.call(
+                                                originalIndex,
+                                              ) ??
+                                              false;
+                                      return FilledButton.tonal(
+                                        onPressed: () => widget
+                                            .onBookmarkLine(originalIndex),
+                                        style: tonal(
+                                          bg: bookmarked
+                                              ? const Color(0xFFFFE0E0)
+                                              : const Color(0xFFFFF7D6),
+                                          fg: bookmarked
+                                              ? const Color(0xFFC62828)
+                                              : const Color(0xFFB58600),
+                                        ),
+                                        child: Icon(
+                                          bookmarked
+                                              ? Icons.favorite_rounded
+                                              : Icons.favorite_border_rounded,
+                                          size: narrow ? 18 : 22,
+                                        ),
+                                      );
+                                    },
                                   ),
-                                  style: FilledButton.styleFrom(
-                                    backgroundColor: AppDesignTokens.softWhite,
-                                    foregroundColor:
-                                        AppDesignTokens.textSecondary,
-                                    minimumSize: const Size(44, 44),
-                                    fixedSize: const Size(44, 44),
-                                    padding: EdgeInsets.zero,
-                                    tapTargetSize:
-                                        MaterialTapTargetSize.shrinkWrap,
-                                    shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(16),
+                                  if (!narrow &&
+                                      widget.onEditSubtitleLine !=
+                                          null) ...<Widget>[
+                                    const SizedBox(width: 4),
+                                    Tooltip(
+                                      message: '改这句字幕',
+                                      child: FilledButton.tonal(
+                                        onPressed: () => _beginInlineEdit(
+                                          originalIndex,
+                                          line,
+                                        ),
+                                        style: tonal(
+                                          bg: const Color(0xFFE8F1FF),
+                                          fg: const Color(0xFF1CB0F6),
+                                        ),
+                                        child: Icon(
+                                          Icons.edit_rounded,
+                                          size: narrow ? 18 : 22,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                  const SizedBox(width: 4),
+                                  FilledButton.tonal(
+                                    onPressed: () => _openActions(
+                                      context,
+                                      line,
+                                      originalIndex,
+                                    ),
+                                    style: tonal(
+                                      bg: const Color(0xFFF3F4F7),
+                                      fg: const Color(0xFF667085),
+                                    ),
+                                    child: Icon(
+                                      Icons.more_horiz_rounded,
+                                      size: narrow ? 18 : 22,
                                     ),
                                   ),
-                                  child: const Icon(Icons.more_horiz_rounded),
-                                ),
-                              ],
+                                ];
+                                return Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: <Widget>[
+                                    Text(
+                                      line.startTime,
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: TextStyle(
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.w700,
+                                        color: active
+                                            ? const Color(0xFF7E8A82)
+                                            : inactiveStartTimeColor.withValues(
+                                                alpha: textOpacity,
+                                              ),
+                                      ),
+                                    ),
+                                    const SizedBox(height: 6),
+                                    SingleChildScrollView(
+                                      scrollDirection: Axis.horizontal,
+                                      child: Row(children: actions),
+                                    ),
+                                  ],
+                                );
+                              },
                             ),
                           SizedBox(height: dark ? 4 : 8),
                           if (blindHidden) ...<Widget>[

@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 
-import '../../../shared/presentation/pad/app_design_tokens.dart';
 import '../player_mock_state.dart';
 import 'player_subtitle_list.dart';
 import 'subtitle_chunk_highlight.dart';
@@ -236,8 +235,11 @@ class _PanelHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Card is always mint/light — never inherit dark-theme ink (was near-invisible).
+    const Color titleInk = Color(0xFF143528);
+    const Color bodyInk = Color(0xFF3F5B4C);
     return Container(
-      padding: const EdgeInsets.fromLTRB(18, 16, 14, 16),
+      padding: const EdgeInsets.fromLTRB(14, 12, 10, 12),
       decoration: BoxDecoration(
         color: const Color(0xFFF0FDFA),
         borderRadius: BorderRadius.circular(18),
@@ -245,30 +247,34 @@ class _PanelHeader extends StatelessWidget {
       ),
       child: Row(
         children: <Widget>[
-          Expanded(
+          const Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: <Widget>[
                 Text(
                   '逐句精听',
                   style: TextStyle(
-                    color: AppDesignTokens.textPrimary,
-                    fontSize: 18,
+                    color: titleInk,
+                    fontSize: 16,
                     fontWeight: FontWeight.w800,
                   ),
                 ),
                 SizedBox(height: 4),
                 Text(
                   '点句子定位播放，点单词查看释义',
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
                   style: TextStyle(
-                    color: AppDesignTokens.textSecondary,
-                    fontSize: 12,
-                    fontWeight: FontWeight.w700,
+                    color: bodyInk,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600,
+                    height: 1.25,
                   ),
                 ),
               ],
             ),
           ),
+          const SizedBox(width: 8),
           _TranscriptViewSwitch(
             showCurrentOnly: showCurrentOnly,
             onChanged: onViewChanged,
@@ -290,22 +296,33 @@ class _TranscriptViewSwitch extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return SegmentedButton<bool>(
-      segments: const <ButtonSegment<bool>>[
-        ButtonSegment<bool>(value: true, label: Text('单句')),
-        ButtonSegment<bool>(value: false, label: Text('完整')),
-      ],
-      selected: <bool>{showCurrentOnly},
-      showSelectedIcon: false,
-      style: const ButtonStyle(
-        visualDensity: VisualDensity.compact,
-        textStyle: WidgetStatePropertyAll<TextStyle>(
-          TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
+    return FittedBox(
+      fit: BoxFit.scaleDown,
+      alignment: Alignment.centerRight,
+      child: SegmentedButton<bool>(
+        segments: const <ButtonSegment<bool>>[
+          ButtonSegment<bool>(value: true, label: Text('单句')),
+          ButtonSegment<bool>(value: false, label: Text('完整')),
+        ],
+        selected: <bool>{showCurrentOnly},
+        showSelectedIcon: false,
+        style: ButtonStyle(
+          visualDensity: VisualDensity.compact,
+          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+          foregroundColor: const WidgetStatePropertyAll<Color>(
+            Color(0xFF143528),
+          ),
+          textStyle: const WidgetStatePropertyAll<TextStyle>(
+            TextStyle(fontSize: 11, fontWeight: FontWeight.w700),
+          ),
+          padding: const WidgetStatePropertyAll<EdgeInsets>(
+            EdgeInsets.symmetric(horizontal: 8),
+          ),
         ),
+        onSelectionChanged: (Set<bool> selected) {
+          onChanged(selected.single);
+        },
       ),
-      onSelectionChanged: (Set<bool> selected) {
-        onChanged(selected.single);
-      },
     );
   }
 }

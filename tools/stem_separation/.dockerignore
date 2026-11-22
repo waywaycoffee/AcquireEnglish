@@ -1,0 +1,9 @@
+model-cache
+*.wav
+*.mp3
+*.mp4
+.git
+__pycache__
+*.pyc
+.env
+*.log
