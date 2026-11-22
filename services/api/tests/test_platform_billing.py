@@ -77,3 +77,77 @@ def test_collect_platform_usage_keyword_only(monkeypatch):
     assert out["billing_cycle"] == "2026-11"
     assert "gpu" in out
     assert "deepgram" in out
+
+
+def test_fetch_aliyun_bss_never_uses_sms_keys(monkeypatch, tmp_path: Path):
+    env_file = tmp_path / "api.env"
+    env_file.write_text(
+        "\n".join(
+            [
+                "ALIYUN_SMS_ACCESS_KEY_ID=LTAI5tSmsOnlyKeyXXXX",
+                "ALIYUN_SMS_ACCESS_KEY_SECRET=sms-secret-should-not-be-used",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(pb, "_ENV_CANDIDATES", (env_file,))
+    for name in (
+        "ALIYUN_BSS_ACCESS_KEY_ID",
+        "ALIYUN_BSS_ACCESS_KEY_SECRET",
+        "ALIYUN_ECS_ACCESS_KEY_ID",
+        "ALIYUN_ECS_ACCESS_KEY_SECRET",
+        "ALIYUN_ACCESS_KEY_ID",
+        "ALIYUN_ACCESS_KEY_SECRET",
+        "ALIYUN_SMS_ACCESS_KEY_ID",
+        "ALIYUN_SMS_ACCESS_KEY_SECRET",
+        "ALIYUN_BSS_QUERY_BALANCE",
+    ):
+        monkeypatch.delenv(name, raising=False)
+
+    called: list[str] = []
+
+    def _fake_call(action, params, *, ak, sk):  # noqa: ANN001
+        called.append(action)
+        return {"Success": True, "Data": {"AvailableAmount": "1"}}
+
+    monkeypatch.setattr(pb, "_aliyun_bss_call", _fake_call)
+    out = pb.fetch_aliyun_bss(month="2026-11")
+    assert out["ok"] is False
+    assert "短信" in out["error"] or "BSS" in out["error"]
+    assert called == []
+
+
+def test_fetch_aliyun_bss_skips_balance_by_default(monkeypatch, tmp_path: Path):
+    env_file = tmp_path / "api.env"
+    env_file.write_text(
+        "\n".join(
+            [
+                "ALIYUN_BSS_ACCESS_KEY_ID=LTAI5tBssOnlyKeyYYYY",
+                "ALIYUN_BSS_ACCESS_KEY_SECRET=bss-secret",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(pb, "_ENV_CANDIDATES", (env_file,))
+    for name in (
+        "ALIYUN_BSS_QUERY_BALANCE",
+        "ALIYUN_SMS_ACCESS_KEY_ID",
+        "ALIYUN_SMS_ACCESS_KEY_SECRET",
+    ):
+        monkeypatch.delenv(name, raising=False)
+
+    called: list[str] = []
+
+    def _fake_call(action, params, *, ak, sk):  # noqa: ANN001
+        called.append(action)
+        if action == "QueryBillOverview":
+            return {"Data": {"Items": {"Item": []}}}
+        if action == "DescribeInstanceBill":
+            return {"Data": {"Items": {"Item": []}}}
+        return {"Success": True, "Data": {}}
+
+    monkeypatch.setattr(pb, "_aliyun_bss_call", _fake_call)
+    out = pb.fetch_aliyun_bss(month="2026-11")
+    assert "QueryAccountBalance" not in called
+    assert out.get("balance_cny") is None
+    assert "balance_note" in out

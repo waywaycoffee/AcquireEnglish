@@ -36,7 +36,7 @@ curl -fsS https://acquireenglish.curlhairai.com/api/health
 
 1. 开通 [短信服务](https://dysmsapi.console.aliyun.com/)
 2. 申请签名（如「爱快英语」）与验证码模板，模板变量名必须为 `code`
-3. 创建 AccessKey（建议 RAM 子账号，仅 `AliyunDysmsFullAccess`）
+3. 创建 AccessKey（**必须** RAM 子账号，仅 `AliyunDysmsFullAccess`；不要用主账号 AK，也不要用同一把去拉 BSS 账单）
 4. 在 API 机 `/opt/acquireenglish/services/api/.env` 写入：
 
 ```bash
@@ -46,6 +46,10 @@ ALIYUN_SMS_ACCESS_KEY_SECRET=...
 ALIYUN_SMS_SIGN_NAME=爱快英语
 ALIYUN_SMS_TEMPLATE_CODE=SMS_xxxxxx
 ALIYUN_SMS_REGION=cn-hangzhou
+# 平台账单另配（可选，BSS 只读 RAM）；默认不查余额：
+# ALIYUN_BSS_ACCESS_KEY_ID=...
+# ALIYUN_BSS_ACCESS_KEY_SECRET=...
+# ALIYUN_BSS_QUERY_BALANCE=0
 ```
 
 5. 重启 API 服务，再测：

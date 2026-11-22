@@ -301,15 +301,17 @@ def _metadata() -> dict[str, Any]:
 
 
 def _aliyun_credentials() -> tuple[str, str]:
+    # Never fall back to SMS AccessKeys — those are Dysms-only and trigger
+    # Aliyun "suspicious sensitive API" alerts when reused for ECS/BSS.
     ak = (
         (settings.aliyun_ecs_access_key_id or "").strip()
+        or os.environ.get("ALIYUN_ECS_ACCESS_KEY_ID", "").strip()
         or os.environ.get("ALIYUN_ACCESS_KEY_ID", "").strip()
-        or (settings.aliyun_sms_access_key_id or "").strip()
     )
     sk = (
         (settings.aliyun_ecs_access_key_secret or "").strip()
+        or os.environ.get("ALIYUN_ECS_ACCESS_KEY_SECRET", "").strip()
         or os.environ.get("ALIYUN_ACCESS_KEY_SECRET", "").strip()
-        or (settings.aliyun_sms_access_key_secret or "").strip()
     )
     return ak, sk
 

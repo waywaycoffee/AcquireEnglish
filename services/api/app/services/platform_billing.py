@@ -151,22 +151,38 @@ def discover_keys() -> list[dict[str, Any]]:
             "billing": "aliyun_bss:dysms",
         },
         {
+            "id": "aliyun_bss",
+            "label": "阿里云 BSS 账单（专用 AK）",
+            "env": "ALIYUN_BSS_ACCESS_KEY_ID|ALIYUN_ECS_ACCESS_KEY_ID",
+            "value": val(
+                "ALIYUN_BSS_ACCESS_KEY_ID",
+                "ALIYUN_ECS_ACCESS_KEY_ID",
+                "ALIYUN_ACCESS_KEY_ID",
+                "aliyun_bss_access_key_id",
+                "aliyun_ecs_access_key_id",
+            ),
+            "source": src(
+                "ALIYUN_BSS_ACCESS_KEY_ID",
+                "ALIYUN_ECS_ACCESS_KEY_ID",
+                "ALIYUN_ACCESS_KEY_ID",
+            ),
+            "usage": "平台账单 / 余额（永不回落短信 AK）",
+            "billing": "aliyun_bss",
+        },
+        {
             "id": "aliyun_ecs",
-            "label": "阿里云 ECS / 云盘（复用 AK）",
-            "env": "ALIYUN_ECS_ACCESS_KEY_ID|ALIYUN_SMS_ACCESS_KEY_ID",
+            "label": "阿里云 ECS / 云盘",
+            "env": "ALIYUN_ECS_ACCESS_KEY_ID|ALIYUN_ACCESS_KEY_ID",
             "value": val(
                 "ALIYUN_ECS_ACCESS_KEY_ID",
                 "ALIYUN_ACCESS_KEY_ID",
-                "ALIYUN_SMS_ACCESS_KEY_ID",
                 "aliyun_ecs_access_key_id",
-                "aliyun_sms_access_key_id",
             ),
             "source": src(
                 "ALIYUN_ECS_ACCESS_KEY_ID",
                 "ALIYUN_ACCESS_KEY_ID",
-                "ALIYUN_SMS_ACCESS_KEY_ID",
             ),
-            "usage": "主机与云盘监控 / 账单",
+            "usage": "主机与云盘监控（不复用短信 AK）",
             "billing": "aliyun_bss:ecs",
         },
         {
@@ -338,22 +354,30 @@ def _bill_items(resp: dict[str, Any]) -> list[dict[str, Any]]:
     return [x for x in items if isinstance(x, dict)]
 
 
-def fetch_aliyun_bss(month: str | None = None) -> dict[str, Any]:
-    file_env = _merged_env_files()
+def _bss_credentials(file_env: dict[str, tuple[str, str]] | None = None) -> tuple[str, str]:
+    """Billing / BSS only — never fall back to SMS AccessKeys (Aliyun flags that)."""
     ak = _settings_or_env(
+        "ALIYUN_BSS_ACCESS_KEY_ID",
         "ALIYUN_ECS_ACCESS_KEY_ID",
         "ALIYUN_ACCESS_KEY_ID",
-        "ALIYUN_SMS_ACCESS_KEY_ID",
-        "aliyun_sms_access_key_id",
+        "aliyun_bss_access_key_id",
+        "aliyun_ecs_access_key_id",
         file_env=file_env,
     )
     sk = _settings_or_env(
+        "ALIYUN_BSS_ACCESS_KEY_SECRET",
         "ALIYUN_ECS_ACCESS_KEY_SECRET",
         "ALIYUN_ACCESS_KEY_SECRET",
-        "ALIYUN_SMS_ACCESS_KEY_SECRET",
-        "aliyun_sms_access_key_secret",
+        "aliyun_bss_access_key_secret",
+        "aliyun_ecs_access_key_secret",
         file_env=file_env,
     )
+    return ak, sk
+
+
+def fetch_aliyun_bss(month: str | None = None) -> dict[str, Any]:
+    file_env = _merged_env_files()
+    ak, sk = _bss_credentials(file_env)
     out: dict[str, Any] = {
         "ok": False,
         "provider": "aliyun_bss",
@@ -366,17 +390,30 @@ def fetch_aliyun_bss(month: str | None = None) -> dict[str, Any]:
         "error": "",
     }
     if not ak or not sk:
-        out["error"] = "未配置阿里云 AccessKey，无法拉取 BSS 账单"
+        out["error"] = (
+            "未配置 ALIYUN_BSS_ACCESS_KEY_ID（或 ALIYUN_ECS_ACCESS_KEY_ID）。"
+            "短信 AK 不再用于 BSS，避免触发阿里云敏感 API 风控。"
+        )
         return out
 
     cycle = out["billing_cycle"]
-    bal = _aliyun_bss_call("QueryAccountBalance", {}, ak=ak, sk=sk)
-    if bal.get("Success") or bal.get("Code") in ("200", "Success", 200):
-        data = bal.get("Data") or {}
-        try:
-            out["balance_cny"] = float(data.get("AvailableAmount") or 0)
-        except (TypeError, ValueError):
-            out["balance_cny"] = None
+    # QueryAccountBalance is the sensitive API Aliyun flagged. Opt-in only.
+    allow_balance = (
+        os.environ.get("ALIYUN_BSS_QUERY_BALANCE") or ""
+    ).strip().lower() in ("1", "true", "yes", "on")
+    if allow_balance:
+        bal = _aliyun_bss_call("QueryAccountBalance", {}, ak=ak, sk=sk)
+        if bal.get("Success") or bal.get("Code") in ("200", "Success", 200):
+            data = bal.get("Data") or {}
+            try:
+                out["balance_cny"] = float(data.get("AvailableAmount") or 0)
+            except (TypeError, ValueError):
+                out["balance_cny"] = None
+    else:
+        out["balance_note"] = (
+            "已跳过 QueryAccountBalance（默认关闭）。"
+            "需要余额时设置 ALIYUN_BSS_QUERY_BALANCE=1 并使用 BSS 专用 RAM。"
+        )
 
     overview = _aliyun_bss_call("QueryBillOverview", {"BillingCycle": cycle}, ak=ak, sk=sk)
     ov_items = _bill_items(overview)
