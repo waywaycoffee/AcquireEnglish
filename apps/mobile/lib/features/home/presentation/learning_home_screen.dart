@@ -16,6 +16,7 @@ import '../../library/presentation/library_catalog_provider.dart';
 import '../../library/presentation/library_mock_data.dart';
 import '../../membership/presentation/welcome_pro_claim_host.dart';
 import '../../navigation/presentation/navigation_destination.dart';
+import '../../onboarding/domain/learning_tracks.dart';
 import '../../onboarding/presentation/focus_recommendation.dart';
 import '../../onboarding/presentation/onboarding_provider.dart';
 import '../../player/presentation/learning_resume_provider.dart';
@@ -120,15 +121,24 @@ class _LearningHomeScreenState extends ConsumerState<LearningHomeScreen> {
       continueLearningTargetProvider,
     );
     final LearningDashboardStats stats = ref.watch(learningDashboardProvider);
-    final List<LibraryCourseData> recentCourses = ref
-        .watch(recentLearningCoursesProvider)
-        .where(
-          (LibraryCourseData course) =>
-              course.lastStudiedAtMs != null || course.progressPercent > 0,
-        )
-        .take(8)
-        .toList(growable: false);
+    final List<LibraryCourseData> recentCourses = () {
+      final List<LibraryCourseData> studied = ref
+          .watch(recentLearningCoursesProvider)
+          .where(
+            (LibraryCourseData course) =>
+                course.lastStudiedAtMs != null || course.progressPercent > 0,
+          )
+          .toList(growable: true);
+      // Always surface the resume target even if lastStudiedAtMs wasn't written.
+      if (video != null &&
+          !studied.any((LibraryCourseData c) => c.id == video.course.id)) {
+        studied.insert(0, video.course);
+      }
+      return studied.take(8).toList(growable: false);
+    }();
     final FocusRecommendation? focusRec = ref.watch(focusRecommendationProvider);
+    final AcquirePreferencesDto prefs = ref.watch(learningPreferencesProvider);
+    final Set<String> tracks = selectedLearningTracks(prefs.tags);
     final readingLibrary = ref.watch(readingLibraryProvider);
     final FocusRecommendation reading = buildFocusRecommendation(
       profile: ref.watch(onboardingProvider).copyWith(focusId: 'reading'),
@@ -286,6 +296,52 @@ class _LearningHomeScreenState extends ConsumerState<LearningHomeScreen> {
                       ),
                     ),
                     const SizedBox(height: 24),
+                    text('计划适合你', 17, bold: true),
+                    const SizedBox(height: 6),
+                    text(
+                      '勾选每日路径：视频 / 词书收藏 / 阅读，可多选。系统按统一 FSRS 复习，'
+                      '新学按 i+1 推荐。',
+                      12,
+                      color: muted,
+                    ),
+                    const SizedBox(height: 10),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: <Widget>[
+                        for (final ({String id, String label, String hint})
+                            track in kLearningTracks)
+                          FilterChip(
+                            label: Text(track.label),
+                            selected: tracks.contains(track.id),
+                            onSelected: (bool on) {
+                              final Set<String> next =
+                                  Set<String>.from(tracks);
+                              if (on) {
+                                next.add(track.id);
+                              } else {
+                                next.remove(track.id);
+                              }
+                              if (next.isEmpty) {
+                                next.add(track.id);
+                              }
+                              unawaited(
+                                ref
+                                    .read(learningPreferencesProvider.notifier)
+                                    .save(
+                                      prefs.copyWith(
+                                        tags: prefsTagsWithTracks(
+                                          keepTags: prefs.tags,
+                                          tracks: next,
+                                        ),
+                                      ),
+                                    ),
+                              );
+                            },
+                          ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
                     const TodayPathCard(),
                     const SizedBox(height: 16),
                     const HomeCoachCourseCard(),
@@ -537,25 +593,56 @@ class _LearningHomeScreenState extends ConsumerState<LearningHomeScreen> {
                       ),
                     ),
                     const SizedBox(height: 12),
-                    text('最近学习的课程', 16, bold: true),
+                    text('最近看过', 16, bold: true),
                     const SizedBox(height: 10),
-                    RecentCourses(
-                      courses: recentCourses,
-                      onTap: (LibraryCourseData course) => context.push(
-                        Uri(
-                          path: '/library',
-                          queryParameters: <String, String>{
-                            'courseId': course.id,
-                          },
-                        ).toString(),
+                    if (readingLibrary.continueDoc != null) ...<Widget>[
+                      Card(
+                        child: ListTile(
+                          leading: Icon(
+                            Icons.menu_book_rounded,
+                            color: accent,
+                          ),
+                          title: Text(
+                            readingLibrary.continueDoc!.displayTitle,
+                          ),
+                          subtitle: Text(
+                            '继续阅读 · 约 ${readingLibrary.continueDoc!.wordCount} 词',
+                          ),
+                          trailing: const Icon(Icons.chevron_right),
+                          onTap: () => context.push(
+                            '/reading/${Uri.encodeComponent(readingLibrary.continueDoc!.id)}',
+                          ),
+                        ),
                       ),
-                    ),
+                      const SizedBox(height: 8),
+                    ],
+                    if (recentCourses.isEmpty &&
+                        readingLibrary.continueDoc == null)
+                      section(
+                        text(
+                          '还没有最近记录。看完视频或打开文章后会出现在这里。',
+                          13,
+                          color: muted,
+                        ),
+                      )
+                    else if (recentCourses.isNotEmpty)
+                      RecentCourses(
+                        courses: recentCourses,
+                        onTap: (LibraryCourseData course) => context.push(
+                          Uri(
+                            path: '/library',
+                            queryParameters: <String, String>{
+                              'courseId': course.id,
+                            },
+                          ).toString(),
+                        ),
+                      ),
                     const SizedBox(height: 24),
                     text('推荐视频', 21, bold: true),
                     const SizedBox(height: 12),
                     const DailyRecommendSection(limit: 3),
                     const SizedBox(height: 24),
-                    text('推荐文章', 21, bold: true),
+                    text('推荐文章（i+1）', 21, bold: true),
                     const SizedBox(height: 12),
                     if (articles.isEmpty)
                       ListTile(
@@ -567,7 +654,7 @@ class _LearningHomeScreenState extends ConsumerState<LearningHomeScreen> {
                       Card(
                         child: ListTile(
                           leading: const Icon(Icons.auto_stories_outlined),
-                          title: Text(article.title),
+                          title: Text(article.displayTitle),
                           subtitle: Text(
                             '${article.level} · ${article.wordCount} 词',
                           ),

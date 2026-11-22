@@ -2,7 +2,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../daily_review/domain/daily_review.dart';
 import '../../daily_review/presentation/daily_review_provider.dart';
+import '../../onboarding/domain/learning_tracks.dart';
 import '../../reading/data/reading_gloss.dart';
+import '../../reading/presentation/reading_library_provider.dart';
+import '../../sync/presentation/daily_feed_provider.dart';
 import '../../words/domain/word_review_settings.dart';
 import '../../words/presentation/learner_level_provider.dart';
 import '../../words/presentation/word_review_settings_provider.dart';
@@ -28,10 +31,19 @@ class TodayPathNotifier extends Notifier<TodayPathState> {
     ref.watch(wordReviewSettingsProvider);
     ref.watch(adaptiveReadingFreqThresholdProvider);
     ref.watch(readingFrequencyLexiconProvider);
+    ref.watch(learningPreferencesProvider);
+    ref.watch(readingLibraryProvider);
     return _synthesize(DateTime.now());
   }
 
   TodayPathState _synthesize(DateTime now) {
+    final Set<String> tracks = selectedLearningTracks(
+      ref.read(learningPreferencesProvider).tags,
+    );
+    final bool wantVideo = tracks.contains(kTrackVideo);
+    final bool wantVocab = tracks.contains(kTrackVocab);
+    final bool wantReading = tracks.contains(kTrackReading);
+
     final CoursePlanCatalog catalog = ref.read(coursePlanProvider);
     final CoursePlan? plan = catalog.active;
     final String dayKey = todayPathDayKey(now);
@@ -42,7 +54,7 @@ class TodayPathNotifier extends Notifier<TodayPathState> {
     final List<TodayTask> dueReview = <TodayTask>[];
     final List<TodayTask> courseNew = <TodayTask>[];
 
-    if (plan != null) {
+    if (wantVideo && plan != null) {
       for (final CourseUnit unit in plan.units) {
         if (unit.isLearned && unit.nextDue != null) {
           final DateTime due = _dayOnly(unit.nextDue!);
@@ -117,13 +129,17 @@ class TodayPathNotifier extends Notifier<TodayPathState> {
       }
     }
 
-    final List<TodayTask> vocab = _vocabTasks(now, doneIds);
+    final List<TodayTask> vocab =
+        wantVocab ? _vocabTasks(now, doneIds) : const <TodayTask>[];
+    final List<TodayTask> reading =
+        wantReading ? _readingTasks(doneIds) : const <TodayTask>[];
 
     final List<TodayTask> merged = <TodayTask>[
       ...overdue,
       ...dueReview,
       ...courseNew,
       ...vocab,
+      ...reading,
     ];
 
     final TodayPathStatus status = _status(
@@ -163,8 +179,8 @@ class TodayPathNotifier extends Notifier<TodayPathState> {
         TodayTask(
           id: id,
           kind: TodayTaskKind.vocabDue,
-          title: '词书复习 · ${plan.due.length} 词',
-          subtitle: '到期优先',
+          title: '复习 · ${plan.due.length} 条',
+          subtitle: '收藏优先 · 统一 FSRS',
           route: '/review/session?due=1',
           doneToday: doneIds.contains(id) || plan.next == null,
         ),
@@ -176,14 +192,35 @@ class TodayPathNotifier extends Notifier<TodayPathState> {
         TodayTask(
           id: id,
           kind: TodayTaskKind.vocabNew,
-          title: '词书新学 · ${plan.newAvailable} 词',
-          subtitle: '今日额度内',
+          title: '新学 · ${plan.newAvailable} 词',
+          subtitle: 'i+1 · 今日额度内',
           route: '/review/session?learn=1',
           doneToday: doneIds.contains(id),
         ),
       );
     }
     return out;
+  }
+
+  List<TodayTask> _readingTasks(Set<String> doneIds) {
+    final reading = ref.read(readingLibraryProvider);
+    final String? contId = reading.continueDoc?.id;
+    final String route = contId == null
+        ? '/reading'
+        : '/reading/${Uri.encodeComponent(contId)}';
+    const String id = 'reading-continue';
+    return <TodayTask>[
+      TodayTask(
+        id: id,
+        kind: TodayTaskKind.courseNew,
+        title: contId == null ? '阅读 · 打开书库' : '继续阅读',
+        subtitle: contId == null
+            ? '按 i+1 选文'
+            : reading.continueDoc!.displayTitle,
+        route: route,
+        doneToday: doneIds.contains(id),
+      ),
+    ];
   }
 
   TodayPathStatus _status({

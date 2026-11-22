@@ -18,9 +18,11 @@ import '../../sync/data/acquire_api_client.dart';
 import '../../words/domain/syllabus_book.dart';
 import '../../words/domain/vocab_card_kind.dart';
 import '../../words/domain/vocab_entry.dart';
+import '../../words/domain/word_review_settings.dart';
 import '../../words/presentation/syllabus_books_provider.dart';
 import '../../words/presentation/vocabulary_placement_provider.dart';
 import '../../words/presentation/word_book_provider.dart';
+import '../../words/presentation/word_review_settings_provider.dart';
 import '../data/memory_item_store.dart';
 import '../data/missed_review_book.dart';
 import '../data/word_encounter_store.dart';
@@ -65,12 +67,30 @@ class ReviewRepository {
 
 final Provider<List<ReviewSource>>
 reviewSourcesProvider = Provider<List<ReviewSource>>((Ref ref) {
+  final List<WordPracticeMode> modes =
+      ref.watch(wordReviewSettingsProvider).orderedModes;
+  final List<WordEntry> words = ref
+      .watch(wordBookProvider)
+      .where((WordEntry word) => word.isSchedulable)
+      .toList();
+  final Set<String> favoriteLemmas = <String>{
+    for (final WordEntry word in words) normalizeWord(word.word),
+  }..remove('');
+  final List<PhraseEntry> phrases =
+      <PhraseEntry>[
+        ...ref.watch(phraseBookProvider).where(
+              (PhraseEntry p) => !p.archived,
+            ),
+      ]..sort(
+        (PhraseEntry a, PhraseEntry b) =>
+            (a.collectedAt ?? '').compareTo(b.collectedAt ?? ''),
+      );
   final SyllabusBooksState syllabus = ref.watch(syllabusBooksProvider);
   final ExamProfile examProfile = ref.watch(examProfileProvider);
   final SyllabusBook? activeBook = syllabus.activeBook;
   final Iterable<SyllabusBook> syllabusBooksForReview = () {
-    // Unified queue: active book joins favorites. Optional exam filter still
-    // applies when choosing which books can become active.
+    // Unified queue: favorites first, then active book lemmas not already
+    // covered. Optional exam filter still applies when choosing books.
     if (activeBook == null) return const <SyllabusBook>[];
     if (examProfile.isExamMode && examProfile.family != null) {
       final List<SyllabusBook> matched = filterSyllabusForExam(
@@ -81,9 +101,48 @@ reviewSourcesProvider = Provider<List<ReviewSource>>((Ref ref) {
     }
     return <SyllabusBook>[activeBook];
   }();
+  final Map<String, String> bookLabelByLemma = <String, String>{};
+  for (final SyllabusBook book in syllabusBooksForReview) {
+    final String label = '${book.title} · ${book.examTag}';
+    for (final SyllabusWord entry in book.words) {
+      bookLabelByLemma.putIfAbsent(normalizeWord(entry.word), () => label);
+    }
+  }
+  final List<ReviewSource> wordSources = <ReviewSource>[
+    for (final WordEntry word in words)
+      for (final WordPracticeMode mode in modes)
+        _wordReviewSource(
+          word,
+          mode,
+          bookLabel: bookLabelByLemma[normalizeWord(word.word)],
+        ),
+  ];
+  final List<ReviewSource> phraseSources = phrases
+      .map(
+        (PhraseEntry phrase) => ReviewSource(
+          key: 'phrase:${phrase.id}',
+          kind: reviewKindForPhraseEntry(phrase),
+          question: phrase.chinese.trim().isEmpty
+              ? '听原句，尝试用英语复述'
+              : phrase.chinese.replaceFirst(RegExp(r' \(生词: .*\)$'), ''),
+          answer: phrase.english,
+          english: phrase.english,
+          chinese: phrase.chinese,
+          sourceLabel: '${phrase.course} · ${phrase.episode}',
+          episodeId: phrase.episodeId,
+          time: phrase.time,
+          origin: 'favorite',
+          legacyLastReview: DateTime.tryParse(phrase.lastReviewedAt ?? ''),
+          legacyDue: _legacyDue(phrase, ref.read(reviewClockProvider)()),
+          legacyReviewCount: phrase.reviewCount,
+        ),
+      )
+      .toList();
+  // Book-only lemmas (not already covered by a favorite card).
   final List<ReviewSource> syllabusSources = <ReviewSource>[
     for (final SyllabusBook book in syllabusBooksForReview)
       for (final SyllabusWord entry in book.words)
+        if (!favoriteLemmas.contains(normalizeWord(entry.word)))
           ReviewSource(
             key: syllabusReviewKey(book.id, entry.word),
             kind: book.isPatternBook ? ReviewKind.sentence : ReviewKind.word,
@@ -105,7 +164,10 @@ reviewSourcesProvider = Provider<List<ReviewSource>>((Ref ref) {
       .map((MemoryItem item) => item.toSource())
       .toList(growable: false);
 
+  // Favorites first (word cards + phrase/sentence book), then book-only / memory.
   return List<ReviewSource>.unmodifiable(<ReviewSource>[
+    ...wordSources,
+    ...phraseSources,
     ...syllabusSources,
     ...memorySources,
     for (final PlacementRow row
@@ -117,6 +179,9 @@ reviewSourcesProvider = Provider<List<ReviewSource>>((Ref ref) {
                     as List<dynamic>? ??
                 const <dynamic>[])
             .cast<PlacementRow>())
+      if (!favoriteLemmas.contains(
+        normalizeWord('${row['word'] ?? ''}'),
+      ))
         ReviewSource(
           key: 'recommended:${row['word']}',
           kind: ReviewKind.word,
@@ -129,6 +194,98 @@ reviewSourcesProvider = Provider<List<ReviewSource>>((Ref ref) {
         ),
   ]);
 });
+
+ReviewSourceLink _linkFromOccurrence(WordOccurrence item) {
+  // Same episode/video: always bind the first (earliest) timeline hit.
+  final WordContext? ctx = item.earliestContext;
+  final List<String> parts = (ctx?.lineKey ?? '').split('-');
+  final String mediaKind = item.mediaKind;
+  return ReviewSourceLink(
+    label: '${item.course} · ${item.episode}',
+    episodeId: item.episodeId,
+    time: ctx?.time ?? item.time,
+    startMs: parts.isNotEmpty ? int.tryParse(parts.first) : null,
+    endMs: parts.length > 1 ? int.tryParse(parts[1]) : null,
+    english: ctx?.sentence ?? item.sentence,
+    chinese: ctx?.chinese ?? item.chinese,
+    mediaKind: mediaKind,
+  );
+}
+
+List<ReviewSourceLink> _distinctOccurrenceLinks(WordEntry word) {
+  final Set<String> seen = <String>{};
+  final List<ReviewSourceLink> links = <ReviewSourceLink>[];
+  for (final WordOccurrence item in word.occurrences) {
+    final String dedupeKey = item.episodeId.trim().isNotEmpty
+        ? item.episodeId.trim()
+        : '${item.course.trim()}|${item.episode.trim()}';
+    if (!seen.add(dedupeKey)) continue;
+    links.add(_linkFromOccurrence(item));
+  }
+  return links;
+}
+
+ReviewSource _wordReviewSource(
+  WordEntry word,
+  WordPracticeMode mode, {
+  String? bookLabel,
+}) {
+  final WordOccurrence? occurrence = word.occurrences.firstOrNull;
+  final WordContext? context = occurrence?.earliestContext;
+  final String lineKey = context?.lineKey ?? '';
+  final List<String> ms = lineKey.split('-');
+  final int? startMs = ms.isNotEmpty ? int.tryParse(ms.first) : null;
+  final int? endMs = ms.length > 1 ? int.tryParse(ms[1]) : null;
+  final List<ReviewSourceLink> related = <ReviewSourceLink>[
+    ..._distinctOccurrenceLinks(word),
+    if (bookLabel != null && bookLabel.trim().isNotEmpty)
+      ReviewSourceLink(label: bookLabel, mediaKind: '书籍'),
+  ];
+  final String mediaKind = occurrence?.mediaKind ?? '';
+  final String rawLabel = occurrence == null
+      ? (bookLabel == null || bookLabel.isEmpty ? '收藏生词' : bookLabel)
+      : '${occurrence.course} · ${occurrence.episode}';
+  return ReviewSource(
+    key: vocabFsrsKey(word.word, mode),
+    kind: switch (word.kind) {
+      VocabCardKind.word => ReviewKind.word,
+      VocabCardKind.phrase => ReviewKind.phrase,
+      VocabCardKind.pattern => ReviewKind.sentence,
+    },
+    question: word.word,
+    answer: word.primaryGloss.isNotEmpty
+        ? word.primaryGloss
+        : ((word.definitionCn?.trim().isNotEmpty ?? false)
+              ? word.definitionCn!
+              : word.offlineDefinitionCn ?? ''),
+    english: context?.sentence ?? occurrence?.sentence ?? '',
+    chinese:
+        context?.apiTranslationCn ??
+        context?.chinese ??
+        occurrence?.chinese ??
+        '',
+    sourceLabel: mediaKind.isEmpty || rawLabel == '收藏生词' || rawLabel == bookLabel
+        ? (bookLabel != null && occurrence == null
+              ? '收藏 · $rawLabel'
+              : rawLabel)
+        : '$mediaKind · $rawLabel',
+    cardType: mode.name,
+    relatedSources: related,
+    episodeId: occurrence?.episodeId,
+    time: context?.time ?? occurrence?.time,
+    startMs: startMs,
+    endMs: endMs,
+    origin: 'favorite',
+  );
+}
+
+// An explicit old review flag may bring a future date forward, but must never
+// discard an already overdue timestamp and its place in the queue.
+DateTime? _legacyDue(PhraseEntry phrase, DateTime now) {
+  final DateTime? due = DateTime.tryParse(phrase.nextReviewAt ?? '');
+  if (phrase.needsReview && (due == null || due.isAfter(now))) return now;
+  return due;
+}
 
 /// Video-linked lines stay as 句子; otherwise classify by English length
 /// so oral idiomatic full sentences enter 句子复习, not 短语.

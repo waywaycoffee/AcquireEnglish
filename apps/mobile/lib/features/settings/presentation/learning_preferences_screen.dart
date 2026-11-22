@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../discovery/presentation/english_level_screen.dart';
+import '../../onboarding/domain/learning_tracks.dart';
 import '../../onboarding/domain/onboarding_profile.dart';
 import '../../onboarding/presentation/onboarding_provider.dart';
 import '../../player/presentation/widgets/study_shell_tokens.dart';
@@ -60,7 +61,7 @@ class _LearningPreferencesScreenState
         padding: const EdgeInsets.all(16),
         children: <Widget>[
           const Text(
-            '学习重点',
+            '每日学习路径（可多选）',
             style: TextStyle(
               color: StudyShellTokens.textSecondary,
               fontWeight: FontWeight.w700,
@@ -68,7 +69,60 @@ class _LearningPreferencesScreenState
           ),
           const SizedBox(height: 6),
           const Text(
-            '决定首页优先推荐哪一节课；社区地图对所有重点开放。',
+            '勾选后生成今日路径：从头点到尾。复习走统一 FSRS（收藏优先，词书补新）；'
+            '新学按 i+1 推荐。',
+            style: TextStyle(
+              color: StudyShellTokens.textSecondary,
+              fontSize: 13,
+              height: 1.4,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: kLearningTracks.map((
+              ({String id, String label, String hint}) track,
+            ) {
+              final Set<String> selected = selectedLearningTracks(_draft.tags);
+              final bool on = selected.contains(track.id);
+              return FilterChip(
+                label: Text(track.label),
+                selected: on,
+                onSelected: (bool next) {
+                  final Set<String> updated = Set<String>.from(selected);
+                  if (next) {
+                    updated.add(track.id);
+                  } else {
+                    updated.remove(track.id);
+                  }
+                  if (updated.isEmpty) {
+                    // Keep at least one track.
+                    updated.add(track.id);
+                  }
+                  setState(() {
+                    _draft = _draft.copyWith(
+                      tags: prefsTagsWithTracks(
+                        keepTags: _draft.tags,
+                        tracks: updated,
+                      ),
+                    );
+                  });
+                },
+              );
+            }).toList(),
+          ),
+          const SizedBox(height: 20),
+          const Text(
+            '首页优先推荐',
+            style: TextStyle(
+              color: StudyShellTokens.textSecondary,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          const SizedBox(height: 6),
+          const Text(
+            '决定首页「今日优先」推哪一类；与上方每日路径可不同。',
             style: TextStyle(
               color: StudyShellTokens.textSecondary,
               fontSize: 13,
