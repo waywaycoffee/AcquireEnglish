@@ -4,10 +4,10 @@ import 'package:go_router/go_router.dart';
 
 import '../domain/course_plan.dart';
 import '../domain/oral_core_series.dart';
-import 'source_coach_lesson_preview.dart';
 import 'course_plan_provider.dart';
 import 'course_unit_quiz_screen.dart';
 import 'daily_path_runner.dart';
+import 'source_coach_lesson_preview.dart';
 
 String _formatClock(int ms) {
   final int totalSec = (ms / 1000).floor().clamp(0, 24 * 3600);
@@ -74,28 +74,32 @@ class CourseUnitSessionScreen extends ConsumerWidget {
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(isReview ? '复习 · ${unit.topic}' : '新课 · ${unit.topic}'),
+        title: Text(
+          isReview
+              ? '复习 · ${resolvedUnit.topic}'
+              : '新课 · ${resolvedUnit.topic}',
+        ),
       ),
       body: ListView(
         padding: const EdgeInsets.fromLTRB(20, 16, 20, 32),
         children: <Widget>[
           Text(
-            plan.title,
+            resolvedPlan.title,
             style: Theme.of(context).textTheme.labelLarge?.copyWith(
                   color: Theme.of(context).colorScheme.onSurfaceVariant,
                 ),
           ),
           const SizedBox(height: 6),
           Text(
-            unit.topic,
+            resolvedUnit.topic,
             style: Theme.of(context).textTheme.headlineSmall?.copyWith(
                   fontWeight: FontWeight.w700,
                 ),
           ),
-          if (unit.goal.isNotEmpty) ...<Widget>[
+          if (resolvedUnit.goal.isNotEmpty) ...<Widget>[
             const SizedBox(height: 8),
             Text(
-              unit.goal,
+              resolvedUnit.goal,
               style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                     color: Theme.of(context).colorScheme.onSurfaceVariant,
                   ),
@@ -108,7 +112,7 @@ class CourseUnitSessionScreen extends ConsumerWidget {
                 contentPadding: EdgeInsets.zero,
                 leading: const Icon(Icons.timelapse),
                 title: Text(
-                  '${_formatClock(unit.startMs ?? 0)} – ${_formatClock(unit.endMs ?? 0)}',
+                  '${_formatClock(resolvedUnit.startMs ?? 0)} – ${_formatClock(resolvedUnit.endMs ?? 0)}',
                 ),
                 subtitle: const Text('按字幕区间播放，不切半句'),
               ),
@@ -117,23 +121,24 @@ class CourseUnitSessionScreen extends ConsumerWidget {
                 contentPadding: EdgeInsets.zero,
                 leading: const Icon(Icons.videocam_outlined),
                 title: Text(
-                  'B站 · ${unit.episodeBvid ?? 'BV1CS4y1v7sQ'}'
-                  ' P${unit.episodePage ?? 1}',
+                  'B站 · ${resolvedUnit.episodeBvid ?? 'BV1CS4y1v7sQ'}'
+                  ' P${resolvedUnit.episodePage ?? 1}',
                 ),
                 subtitle: const Text('整集播放（官方课一集一课）'),
               ),
             FilledButton.icon(
-              onPressed: () => _openVideo(context, plan!, unit),
+              onPressed: () =>
+                  _openVideo(context, resolvedPlan, resolvedUnit),
               icon: const Icon(Icons.play_arrow),
               label: Text(isSeries ? '播放本集视频' : '播放本节区间'),
             ),
           ] else ...<Widget>[
             Text(
-              '阅读块 · ${unit.sentences.length} 句',
+              '阅读块 · ${resolvedUnit.sentences.length} 句',
               style: Theme.of(context).textTheme.titleMedium,
             ),
             const SizedBox(height: 8),
-            ...unit.sentences.map(
+            ...resolvedUnit.sentences.map(
               (String s) => Padding(
                 padding: const EdgeInsets.only(bottom: 10),
                 child: Text(s, style: const TextStyle(fontSize: 16, height: 1.5)),
@@ -142,7 +147,7 @@ class CourseUnitSessionScreen extends ConsumerWidget {
             OutlinedButton.icon(
               onPressed: () {
                 context.push(
-                  '/reading/${Uri.encodeComponent(plan!.sourceId)}',
+                  '/reading/${Uri.encodeComponent(resolvedPlan.sourceId)}',
                 );
               },
               icon: const Icon(Icons.menu_book_outlined),
@@ -178,17 +183,18 @@ class CourseUnitSessionScreen extends ConsumerWidget {
               ),
             ),
           ],
-          if (plan.params.practice.quiz) ...<Widget>[
+          if (resolvedPlan.params.practice.quiz) ...<Widget>[
             const SizedBox(height: 20),
             OutlinedButton.icon(
               onPressed: () {
-                final List<CourseQuizItem> quiz = unit.quiz.isNotEmpty
-                    ? unit.quiz
-                    : _fallbackQuiz(unit);
+                final List<CourseQuizItem> quiz =
+                    resolvedUnit.quiz.isNotEmpty
+                        ? resolvedUnit.quiz
+                        : _fallbackQuiz(resolvedUnit);
                 Navigator.of(context).push(
                   MaterialPageRoute<void>(
                     builder: (_) => CourseUnitQuizScreen(
-                      topic: unit.topic,
+                      topic: resolvedUnit.topic,
                       quiz: quiz,
                     ),
                   ),
@@ -196,23 +202,25 @@ class CourseUnitSessionScreen extends ConsumerWidget {
               },
               icon: const Icon(Icons.quiz_outlined),
               label: Text(
-                unit.quiz.isEmpty ? '练习题（规则题）' : 'AI / 预置练习题',
+                resolvedUnit.quiz.isEmpty
+                    ? '练习题（规则题）'
+                    : 'AI / 预置练习题',
               ),
             ),
           ],
-          if (plan.params.practice.oral) ...<Widget>[
+          if (resolvedPlan.params.practice.oral) ...<Widget>[
             const SizedBox(height: 12),
             OutlinedButton.icon(
               onPressed: () {
                 final List<String> sourceLines = <String>[
-                  ...unit.shadowLines,
-                  ...unit.sentences,
+                  ...resolvedUnit.shadowLines,
+                  ...resolvedUnit.sentences,
                 ].where((String s) => s.trim().isNotEmpty).toList();
                 Navigator.of(context).push(
                   MaterialPageRoute<void>(
                     builder: (_) => SourceCoachLessonPreview(
-                      sourceTitle: plan!.title,
-                      topic: unit.topic,
+                      sourceTitle: resolvedPlan.title,
+                      topic: resolvedUnit.topic,
                       sourceLines: sourceLines,
                       isVideo: isVideo,
                     ),
