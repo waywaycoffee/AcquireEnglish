@@ -369,7 +369,7 @@ class _CourseUnitSessionScreenState
             child: const Text('完成本节并返回'),
           ),
           if (!_canComplete(resolvedPlan, resolvedUnit, shadowLines))
-            const Text('完成本节内容与已开启的练习后，才能进入下一项。'),
+            const Text('打开本节学一会儿（不必看完/读完）后，即可进入下一项。'),
         ],
       ),
     );
@@ -380,27 +380,19 @@ class _CourseUnitSessionScreenState
     CourseUnit unit,
     List<String> shadowLines,
   ) {
-    final bool isReview = widget.mode == 'review';
-    final bool isVideo = plan.type == CoursePlanType.video ||
-        plan.type == CoursePlanType.videoSeries;
-    // Spaced review of an already-watched video unit: open the clip (or any
-    // shadow take) once, then allow finish — don't re-impose 80% + shadow≥60.
-    if (isReview && isVideo) {
-      return _progress.watchedMs > 0 || (_progress.shadowScore ?? 0) > 0;
+    // Daily path: any real engagement counts. Do not require finishing the
+    // video/reading unit, nor mandatory quiz/shadow/oral thresholds.
+    if (_progress.watchedMs > 0 ||
+        (_progress.shadowScore ?? 0) > 0 ||
+        (_progress.quizTotal ?? 0) > 0 ||
+        _progress.oralTurns > 0) {
+      return true;
     }
-    if (isVideo &&
-        unit.startMs != null &&
-        unit.endMs != null &&
-        unit.endMs! > unit.startMs!) {
-      final int duration = unit.endMs! - unit.startMs!;
-      if (_progress.watchedMs < duration * 0.8) return false;
+    // Reading-plan units may open without a timed watch window.
+    if (plan.type == CoursePlanType.reading) {
+      return true;
     }
-    if (shadowLines.isNotEmpty && (_progress.shadowScore ?? 0) < 60) return false;
-    if ((plan.type == CoursePlanType.reading || plan.params.practice.quiz) &&
-        (_progress.quizTotal == null || _progress.quizTotal == 0 ||
-         (_progress.quizCorrect ?? 0) / _progress.quizTotal! < 0.75)) return false;
-    if (plan.params.practice.oral && _progress.oralTurns < 2) return false;
-    return true;
+    return false;
   }
 
   Future<void> _openVideo(

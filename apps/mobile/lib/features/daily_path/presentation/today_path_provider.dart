@@ -247,7 +247,7 @@ class TodayPathNotifier extends Notifier<TodayPathState> {
           id: id,
           kind: TodayTaskKind.vocabDue,
           title: '复习 · ${plan.due.length} 条',
-          subtitle: '待复习优先 · 收藏优先 · 统一 FSRS',
+          subtitle: '学过都复习 · 看完收藏优先 · 按时长排序',
           count: plan.due.length,
           route: '/review/session?due=1',
           doneToday: doneIds.contains(id) || plan.next == null,
@@ -278,16 +278,19 @@ class TodayPathNotifier extends Notifier<TodayPathState> {
         ? '/reading'
         : '/reading/${Uri.encodeComponent(contId)}';
     const String id = 'reading-continue';
+    // Any reading activity today counts — do not require finishing the article.
+    final bool engagedToday =
+        ref.read(learningActivityProvider).today.readArticleKeys.isNotEmpty;
     return <TodayTask>[
       TodayTask(
         id: id,
         kind: TodayTaskKind.courseNew,
         title: contId == null ? '阅读 · 打开书库' : '继续阅读',
         subtitle: contId == null
-            ? '按 i+1 选文'
-            : reading.continueDoc!.displayTitle,
+            ? '按 i+1 选文 · 不必读完'
+            : '${reading.continueDoc!.displayTitle} · 打开即计学习',
         route: route,
-        doneToday: doneIds.contains(id),
+        doneToday: doneIds.contains(id) || engagedToday,
       ),
     ];
   }

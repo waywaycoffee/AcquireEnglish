@@ -6,8 +6,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hive_ce/hive.dart';
 
 import '../../authentication/presentation/account_storage.dart';
+import '../../daily_path/presentation/today_path_provider.dart';
 import '../../home/presentation/learning_dashboard_provider.dart';
 import '../../sync/data/schedule_device_cloud_sync.dart';
+import '../../words/presentation/word_book_provider.dart';
 import '../domain/reading_doc.dart';
 
 const String kReadingLibraryKey = 'reading_library_v1';
@@ -290,6 +292,8 @@ class ReadingLibraryNotifier extends Notifier<ReadingLibraryState> {
     if (state.docById(docId) == null) return;
     final ReadingProgress prev =
         state.progress[docId] ?? ReadingProgress(docId: docId);
+    final bool newlyCompleted = !(prev.completed || prev.percent >= 0.95) &&
+        (completed == true || percent >= 0.95);
     final ReadingProgress next = prev.copyWith(
       offsetChars: offsetChars.clamp(0, 1 << 30),
       percent: percent.clamp(0.0, 1.0),
@@ -302,6 +306,25 @@ class ReadingLibraryNotifier extends Notifier<ReadingLibraryState> {
     ref
         .read(learningActivityProvider.notifier)
         .recordArticleRead(articleKey: docId);
+    // Daily reading task: opening / any progress is enough (no need to finish).
+    try {
+      await ref.read(todayPathProvider.notifier).markDone('reading-continue');
+    } catch (_) {}
+    // Finished + favorited lemmas → ensure they are on the FSRS schedule.
+    if (newlyCompleted) {
+      try {
+        final WordBookNotifier book = ref.read(wordBookProvider.notifier);
+        for (final WordEntry w in ref.read(wordBookProvider)) {
+          if (!w.favorite) continue;
+          if (w.occurrences.any(
+            (WordOccurrence o) =>
+                o.episodeId == docId || o.course.contains(docId),
+          )) {
+            book.enrollForReview(w.word);
+          }
+        }
+      } catch (_) {}
+    }
     await _persistProgress();
   }
 

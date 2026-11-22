@@ -65,6 +65,7 @@ class ReviewSource {
     this.legacyLastReview,
     this.legacyDue,
     this.legacyReviewCount = 0,
+    this.engagementScore = 0,
   });
 
   final String key;
@@ -84,6 +85,8 @@ class ReviewSource {
   /// Word practice mode name when this source is a per-mode FSRS card.
   final String? cardType;
   final List<ReviewSourceLink> relatedSources;
+  /// Higher = more historical study time / focus; used to order due reviews.
+  final int engagementScore;
 
   ReviewSource forContext({String? label, String? episode}) {
     final ReviewSourceLink? link = relatedSources
@@ -118,6 +121,7 @@ class ReviewSource {
       legacyLastReview: legacyLastReview,
       legacyDue: legacyDue,
       legacyReviewCount: legacyReviewCount,
+      engagementScore: engagementScore,
     );
   }
 
@@ -395,6 +399,9 @@ class DailyReviewState {
         key.contains(':word:') ||
         key.contains(':phrase:') ||
         key.contains(':pattern:');
+    final Map<String, int> engagementByKey = <String, int>{
+      for (final ReviewSource s in sources) s.key: s.engagementScore,
+    };
     final List<ReviewRecord> due =
         active
             .where(
@@ -403,9 +410,14 @@ class DailyReviewState {
             )
             .toList()
           ..sort((ReviewRecord a, ReviewRecord b) {
+            // Finished+favorited / heavy study time first, then FSRS due.
             final bool aFav = favoriteFirst(a.key);
             final bool bFav = favoriteFirst(b.key);
             if (aFav != bFav) return aFav ? -1 : 1;
+            final int eng = (engagementByKey[b.key] ?? 0).compareTo(
+              engagementByKey[a.key] ?? 0,
+            );
+            if (eng != 0) return eng;
             final int byDue = a.card.due.compareTo(b.card.due);
             return byDue == 0 ? a.order.compareTo(b.order) : byDue;
           });

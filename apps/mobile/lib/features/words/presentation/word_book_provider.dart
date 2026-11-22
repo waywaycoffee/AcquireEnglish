@@ -352,10 +352,14 @@ class WordEntry {
 
   String get entryId => vocabEntryIdForLemma(word);
 
-  /// Pending favorites still join the daily queue (video/阅读收藏后应能复习);
-  /// only 斩掉/归档 leaves the schedule.
+  /// Favorites and anything already studied (occurrences / reviews) join the
+  /// daily FSRS queue; only 斩掉/归档 leaves the schedule.
   bool get isSchedulable =>
-      favorite && scheduleStatus != VocabScheduleStatus.archived;
+      scheduleStatus != VocabScheduleStatus.archived &&
+      (favorite ||
+          occurrences.isNotEmpty ||
+          repetitions > 0 ||
+          scheduleStatus == VocabScheduleStatus.active);
 
   bool get hasVideoContext => occurrences.any(
     (WordOccurrence o) => o.episodeId.trim().isNotEmpty,

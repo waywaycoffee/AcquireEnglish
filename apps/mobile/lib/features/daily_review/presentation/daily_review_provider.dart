@@ -13,7 +13,10 @@ import '../../avatar/presentation/avatar_provider.dart';
 import '../../exam/domain/exam_fsrs.dart';
 import '../../exam/domain/exam_profile.dart';
 import '../../exam/presentation/exam_profile_provider.dart';
+import '../../library/presentation/library_catalog_provider.dart';
+import '../../library/presentation/library_mock_data.dart';
 import '../../phrases/presentation/phrase_book_provider.dart';
+import '../../reading/presentation/reading_library_provider.dart';
 import '../../sync/data/acquire_api_client.dart';
 import '../../words/domain/sm2_scheduler.dart';
 import '../../words/domain/syllabus_book.dart';
@@ -71,6 +74,15 @@ reviewSourcesProvider = Provider<List<ReviewSource>>((Ref ref) {
   final List<WordPracticeMode> modes =
       ref.watch(wordReviewSettingsProvider).orderedModes;
   final List<WordEntry> allEntries = ref.watch(wordBookProvider);
+  final Set<String> completedEpisodeIds = <String>{
+    for (final course in ref.watch(libraryCatalogProvider))
+      for (final ep in course.episodes)
+        if (ep.completed && ep.id.trim().isNotEmpty) ep.id.trim(),
+  };
+  final Set<String> completedReadingIds = <String>{
+    for (final e in ref.watch(readingLibraryProvider).progress.entries)
+      if (e.value.completed || e.value.percent >= 0.95) e.key,
+  };
   final List<WordEntry> words = allEntries
       .where((WordEntry word) => word.isSchedulable)
       .toList();
@@ -79,6 +91,7 @@ reviewSourcesProvider = Provider<List<ReviewSource>>((Ref ref) {
   final Set<String> coveredLemmas = <String>{
     for (final WordEntry word in allEntries)
       if (word.favorite ||
+          word.occurrences.isNotEmpty ||
           word.scheduleStatus == VocabScheduleStatus.archived ||
           word.mastery == WordMastery.known ||
           word.mastery == WordMastery.mastered)
@@ -123,6 +136,8 @@ reviewSourcesProvider = Provider<List<ReviewSource>>((Ref ref) {
           word,
           mode,
           bookLabel: bookLabelByLemma[normalizeWord(word.word)],
+          completedEpisodeIds: completedEpisodeIds,
+          completedReadingIds: completedReadingIds,
         ),
   ];
   final List<ReviewSource> phraseSources = phrases
@@ -233,10 +248,42 @@ List<ReviewSourceLink> _distinctOccurrenceLinks(WordEntry word) {
   return links;
 }
 
+int _wordEngagementScore(
+  WordEntry word, {
+  required Set<String> completedEpisodeIds,
+  required Set<String> completedReadingIds,
+}) {
+  int score = word.occurrenceCount * 10 + word.repetitions * 5;
+  if (word.favorite) score += 1000;
+  bool fromFinished = false;
+  for (final WordOccurrence o in word.occurrences) {
+    final String ep = o.episodeId.trim();
+    if (ep.isNotEmpty && completedEpisodeIds.contains(ep)) {
+      fromFinished = true;
+      score += 40;
+    }
+  }
+  // Reading favorites tied to finished docs (doc id may appear as course/episode).
+  if (word.favorite) {
+    for (final WordOccurrence o in word.occurrences) {
+      if (completedReadingIds.contains(o.episodeId.trim()) ||
+          completedReadingIds.contains(o.course.trim())) {
+        fromFinished = true;
+        score += 40;
+      }
+    }
+  }
+  // Finished + favorited → strongest FSRS priority.
+  if (word.favorite && fromFinished) score += 2000;
+  return score;
+}
+
 ReviewSource _wordReviewSource(
   WordEntry word,
   WordPracticeMode mode, {
   String? bookLabel,
+  Set<String> completedEpisodeIds = const <String>{},
+  Set<String> completedReadingIds = const <String>{},
 }) {
   final WordOccurrence? occurrence = word.occurrences.firstOrNull;
   final WordContext? context = occurrence?.earliestContext;
@@ -253,6 +300,11 @@ ReviewSource _wordReviewSource(
   final String rawLabel = occurrence == null
       ? (bookLabel == null || bookLabel.isEmpty ? '收藏生词' : bookLabel)
       : '${occurrence.course} · ${occurrence.episode}';
+  final int engagement = _wordEngagementScore(
+    word,
+    completedEpisodeIds: completedEpisodeIds,
+    completedReadingIds: completedReadingIds,
+  );
   return ReviewSource(
     key: vocabFsrsKey(word.word, mode),
     kind: switch (word.kind) {
@@ -283,7 +335,8 @@ ReviewSource _wordReviewSource(
     time: context?.time ?? occurrence?.time,
     startMs: startMs,
     endMs: endMs,
-    origin: 'favorite',
+    origin: word.favorite ? 'favorite' : 'studied',
+    engagementScore: engagement,
   );
 }
 

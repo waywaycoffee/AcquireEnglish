@@ -11,6 +11,7 @@ import '../../daily_path/data/oral_core_library_mapper.dart';
 import '../../daily_path/domain/oral_core_series.dart';
 import '../../daily_path/domain/course_plan.dart';
 import '../../daily_path/presentation/course_plan_provider.dart';
+import '../../words/presentation/word_book_provider.dart';
 import '../../learning_modules/american_ipa_course.dart';
 import '../../learning_modules/british_ipa_course.dart';
 import '../../learning_modules/phonics_nessy_course.dart';
@@ -914,6 +915,20 @@ class LibraryCatalogNotifier extends Notifier<List<LibraryCourseData>> {
     if (changed) {
       state = updated;
       await _persistImportedCourses();
+      // Finished episode + favorited words from it → keep them on FSRS.
+      if (nextProgress == 100) {
+        try {
+          final WordBookNotifier book = ref.read(wordBookProvider.notifier);
+          for (final WordEntry w in ref.read(wordBookProvider)) {
+            if (!w.favorite) continue;
+            if (w.occurrences.any(
+              (WordOccurrence o) => o.episodeId == episodeId,
+            )) {
+              book.enrollForReview(w.word);
+            }
+          }
+        } catch (_) {}
+      }
     }
   }
 
