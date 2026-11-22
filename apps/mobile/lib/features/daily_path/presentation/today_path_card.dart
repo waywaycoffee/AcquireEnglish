@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 import '../domain/today_task.dart';
 import 'daily_path_runner.dart';
@@ -46,6 +47,8 @@ class TodayPathCard extends ConsumerWidget {
               const SizedBox(height: 12),
               _primaryButton(context, ref, path, accent, dark),
             ],
+            const SizedBox(height: 8),
+            _reviewShortcuts(context, accent, muted),
           ],
         ),
       );
@@ -144,8 +147,44 @@ class TodayPathCard extends ConsumerWidget {
             const SizedBox(height: 14),
             _taskPreview(context, ref, path, accent, ink, muted),
           ],
+          const SizedBox(height: 8),
+          _reviewShortcuts(context, accent, muted),
         ],
       ),
+    );
+  }
+
+  /// Legacy review hub entry points (FSRS session + syllabus bookshelf).
+  Widget _reviewShortcuts(BuildContext context, Color accent, Color muted) {
+    return Row(
+      children: <Widget>[
+        TextButton(
+          onPressed: () => context.push('/review/session?due=1'),
+          style: TextButton.styleFrom(
+            foregroundColor: accent,
+            padding: const EdgeInsets.symmetric(horizontal: 4),
+          ),
+          child: const Text('今日复习'),
+        ),
+        Text('·', style: TextStyle(color: muted)),
+        TextButton(
+          onPressed: () => context.push('/review/session?practice=1'),
+          style: TextButton.styleFrom(
+            foregroundColor: accent,
+            padding: const EdgeInsets.symmetric(horizontal: 4),
+          ),
+          child: const Text('自由练习'),
+        ),
+        Text('·', style: TextStyle(color: muted)),
+        TextButton(
+          onPressed: () => context.push('/words/syllabus'),
+          style: TextButton.styleFrom(
+            foregroundColor: accent,
+            padding: const EdgeInsets.symmetric(horizontal: 4),
+          ),
+          child: const Text('词书架'),
+        ),
+      ],
     );
   }
 
