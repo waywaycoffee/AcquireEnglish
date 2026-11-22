@@ -139,6 +139,39 @@ async def test_new_user_full_trial_and_module_access():
 
 
 @pytest.mark.asyncio
+async def test_active_pro_hides_welcome_claim():
+    """Owner/paid/legacy Pro must not keep showing welcome-claimable."""
+    from app.services.user_assets import grant_entitlement
+
+    transport = ASGITransport(app=fastapi_app)
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
+        token = await _sms_token(client, phone="13900004444")
+        headers = {"Authorization": f"Bearer {token}"}
+        me = await client.get("/api/auth/me", headers=headers)
+        user_id = int(me.json()["id"])
+
+        async with SessionLocal() as session:
+            await grant_entitlement(
+                session,
+                user_id,
+                asset_kind="membership",
+                asset_ref="pro",
+                source="system",
+                lifetime=True,
+                meta={"campaign": "default_owner_pro", "lifetime": True},
+            )
+
+        status = await client.get("/api/commerce/trial/status", headers=headers)
+        assert status.status_code == 200, status.text
+        body = status.json()
+        assert body["welcome_claimed"] is False
+        assert body["welcome_claimable"] is False
+
+        claim = await client.post("/api/commerce/trial/claim-welcome", headers=headers)
+        assert claim.status_code == 400
+
+
+@pytest.mark.asyncio
 async def test_claim_trial_extend_after_login_days():
     transport = ASGITransport(app=fastapi_app)
     async with AsyncClient(transport=transport, base_url="http://test") as client:

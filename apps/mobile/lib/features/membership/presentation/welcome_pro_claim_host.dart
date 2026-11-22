@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:hive_ce/hive.dart';
 import '../../authentication/presentation/auth_session.dart';
 import '../../shared/audio/success_sfx.dart';
 import '../../shared/presentation/pad/app_design_tokens.dart';
@@ -20,9 +21,36 @@ class WelcomeProClaimHost extends ConsumerStatefulWidget {
 }
 
 class _WelcomeProClaimHostState extends ConsumerState<WelcomeProClaimHost> {
+  static const String _dismissPrefix = 'welcomeProClaimDismissed:';
+
   bool _checking = false;
   bool _dialogOpen = false;
   bool _dismissedThisSession = false;
+
+  String? get _dismissStorageKey {
+    final String email =
+        ref.read(authSessionProvider).email.trim().toLowerCase();
+    if (email.isEmpty) {
+      return null;
+    }
+    return '$_dismissPrefix$email';
+  }
+
+  bool _isDismissedPersisted() {
+    final String? key = _dismissStorageKey;
+    if (key == null || !Hive.isBoxOpen('prefs')) {
+      return false;
+    }
+    return Hive.box<String>('prefs').get(key) == '1';
+  }
+
+  Future<void> _persistDismissed() async {
+    final String? key = _dismissStorageKey;
+    if (key == null || !Hive.isBoxOpen('prefs')) {
+      return;
+    }
+    await Hive.box<String>('prefs').put(key, '1');
+  }
 
   @override
   void initState() {
@@ -45,7 +73,9 @@ class _WelcomeProClaimHostState extends ConsumerState<WelcomeProClaimHost> {
       return;
     }
     final AuthSessionState auth = ref.read(authSessionProvider);
-    if (!auth.isLoggedIn || _dismissedThisSession) {
+    if (!auth.isLoggedIn ||
+        _dismissedThisSession ||
+        _isDismissedPersisted()) {
       return;
     }
     _checking = true;
@@ -93,9 +123,12 @@ class _WelcomeProClaimHostState extends ConsumerState<WelcomeProClaimHost> {
                   TextButton(
                     onPressed: busy
                         ? null
-                        : () {
+                        : () async {
                             _dismissedThisSession = true;
-                            Navigator.of(dialogContext).pop();
+                            await _persistDismissed();
+                            if (dialogContext.mounted) {
+                              Navigator.of(dialogContext).pop();
+                            }
                           },
                     child: const Text('稍后再说'),
                   ),
@@ -114,6 +147,7 @@ class _WelcomeProClaimHostState extends ConsumerState<WelcomeProClaimHost> {
                               playSuccessSfx(SuccessSfxKind.fanfare);
                               ref.invalidate(userAssetsProvider);
                               _dismissedThisSession = true;
+                              await _persistDismissed();
                               if (dialogContext.mounted) {
                                 Navigator.of(dialogContext).pop();
                               }

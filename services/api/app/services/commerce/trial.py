@@ -123,10 +123,20 @@ async def has_claimed_welcome_pro(db: AsyncSession, user_id: int) -> bool:
     return False
 
 
+async def _has_active_pro(db: AsyncSession, user_id: int) -> bool:
+    """True when the user already has an active Pro membership (any source)."""
+    rows = await list_active_entitlements(db, user_id)
+    return any(
+        row.asset_kind == "membership" and row.asset_ref == "pro" for row in rows
+    )
+
+
 async def claim_welcome_pro(db: AsyncSession, user_id: int) -> dict[str, object]:
     """Popup claim: each user may receive the welcome Pro month at most once."""
     if await has_claimed_welcome_pro(db, user_id):
         raise ValueError("已领取过 Pro 体验，不能重复领取")
+    if await _has_active_pro(db, user_id):
+        raise ValueError("当前已是 Pro 会员，无需重复领取")
     return await grant_full_feature_trial(db, user_id)
 
 
@@ -182,7 +192,12 @@ async def grant_full_feature_trial(db: AsyncSession, user_id: int) -> dict[str, 
 
 async def trial_status(db: AsyncSession, user_id: int) -> dict[str, object]:
     welcome_claimed = await has_claimed_welcome_pro(db, user_id)
-    welcome_claimable = not welcome_claimed
+    # Already-Pro accounts (owner lifetime, paid, legacy promo) must not be
+    # nudged to "claim welcome" every cold start — and claiming would overwrite
+    # lifetime ends_at via grant_entitlement(duration_days=30).
+    welcome_claimable = (not welcome_claimed) and (
+        not await _has_active_pro(db, user_id)
+    )
     trial = await _find_trial_membership(db, user_id)
     coupon = (
         await db.execute(
