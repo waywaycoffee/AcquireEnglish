@@ -18,4 +18,30 @@ void main() {
       <String>['Hello there', 'How are you', 'Nice to meet you'],
     );
   });
+
+  test('tutorUtteranceScore rewards overlapping content words', () {
+    expect(
+      tutorUtteranceScore(
+        'Hello and welcome to the first episode',
+        'Hello welcome first episode',
+      ),
+      greaterThan(50),
+    );
+    expect(tutorUtteranceScore('Hello world', ''), 0);
+  });
+
+  test('tutorKeyExpressions skips stop words', () {
+    expect(
+      tutorKeyExpressions(<String>[
+        'Hello and welcome to Minecraft learning',
+      ]),
+      contains('minecraft'),
+    );
+    expect(
+      tutorKeyExpressions(<String>[
+        'Hello and welcome to Minecraft learning',
+      ]),
+      isNot(contains('hello')),
+    );
+  });
 }

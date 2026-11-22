@@ -3,12 +3,13 @@ import 'dart:convert';
 import 'dart:io';
 import 'dart:math';
 
+import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_tts/flutter_tts.dart';
 import 'package:flutter_webrtc/flutter_webrtc.dart';
-import 'package:camera/camera.dart';
+import 'package:fsrs/fsrs.dart' as fsrs;
 import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:media_kit/media_kit.dart';
@@ -16,6 +17,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../authentication/presentation/auth_session.dart';
+import '../../daily_review/presentation/daily_review_provider.dart';
 import '../../phrases/presentation/phrase_book_provider.dart';
 import '../../player/data/pronunciation_providers.dart';
 import '../../player/domain/pronunciation_assessment.dart';
@@ -294,6 +296,12 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
   TutorLessonStep? _tutorStep;
   int _tutorShadowIndex = 0;
   int _tutorDialogueTurns = 0;
+  final List<int> _tutorStepScores = <int>[];
+  final List<String> _tutorCorrections = <String>[];
+  String _tutorFocusLine = '';
+  String _tutorCoachQuestion = '';
+  int? _tutorOverallScore;
+  bool _tutorFsrsWritten = false;
   final LiveSceneCamera _liveSceneCamera = LiveSceneCamera();
 
   bool get _isGuidedTutorLesson =>
@@ -1203,6 +1211,12 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
         _tutorStep = TutorLessonStep.intro;
         _tutorShadowIndex = 0;
         _tutorDialogueTurns = 0;
+        _tutorStepScores.clear();
+        _tutorCorrections.clear();
+        _tutorFocusLine = '';
+        _tutorCoachQuestion = '';
+        _tutorOverallScore = null;
+        _tutorFsrsWritten = false;
         _status = '六步外教课 · 开场';
       });
       _armSessionClock();
@@ -1790,6 +1804,17 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
       setState(() {
         _pendingResay = diagnosis;
         _pendingDiagnosisSaved = false;
+        if (_isGuidedTutorLesson) {
+          _tutorCorrections.add(
+            diagnosis.idiomaticEn.isNotEmpty
+                ? diagnosis.idiomaticEn
+                : diagnosis.literalEn,
+          );
+          _tutorFocusLine = diagnosis.idiomaticEn.isNotEmpty
+              ? diagnosis.idiomaticEn
+              : diagnosis.literalEn;
+          _tutorCoachQuestion = '按纠错再说一次地道英文';
+        }
         _bubbles.add(
           _ChatBubble(
             role: 'diagnosis',
@@ -1853,6 +1878,9 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
             hint: true,
           ),
         );
+        if (_isGuidedTutorLesson) {
+          _tutorCorrections.addAll(corrections);
+        }
       }
     });
     _scrollChatToEnd();
@@ -1872,7 +1900,7 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
         ttsUrl: speakText == rawSpeak ? turn.ttsUrl?.trim() : null,
       ).whenComplete(() {
         if (_isGuidedTutorLesson) {
-          unawaited(_onGuidedLearnerTurnDone());
+          unawaited(_onGuidedLearnerTurnDone(confirmed));
         }
       }),
     );
@@ -1912,7 +1940,15 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
     if (_isGuidedTutorLesson && _tutorStep == TutorLessonStep.shadow) {
       widget.onConfirmedLearnerTurn?.call(confirmed);
       _clearBusy('跟读完成');
-      await _onGuidedShadowCompleted();
+      await _onGuidedShadowCompleted(confirmed);
+      return;
+    }
+    if (_isGuidedTutorLesson &&
+        (_tutorStep == TutorLessonStep.substitute ||
+            _tutorStep == TutorLessonStep.dialogue)) {
+      widget.onConfirmedLearnerTurn?.call(confirmed);
+      _clearBusy('纠错跟读完成');
+      await _onGuidedLearnerTurnDone(confirmed);
       return;
     }
     _difficulty = turn.difficulty;
@@ -2159,10 +2195,13 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
         : lines.join(' / ');
     switch (step) {
       case TutorLessonStep.intro:
+        final List<String> keys = tutorKeyExpressions(lines);
         final String text =
-            'Welcome to today’s coach lesson. We will practise these lines: $linePreview. '
-            'Six steps: intro, demo, shadow, substitute, short dialogue, then a summary.';
+            'Today we learn from your material. Focus: ${keys.isEmpty ? linePreview : keys.take(5).join(', ')}. '
+            'We will go through six steps together.';
         setState(() {
+          _tutorFocusLine = linePreview;
+          _tutorCoachQuestion = '今天要学会这些表达';
           _bubbles.add(_ChatBubble(role: 'coach', text: text));
           _status = '六步外教课 · 开场';
         });
@@ -2174,8 +2213,10 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
       case TutorLessonStep.demo:
         final String demo = lines.isEmpty
             ? 'Listen carefully: ${widget.articleExcerpt.trim()}'
-            : 'Listen to the model. ${lines.map((String l) => '“$l”').join(' ')}';
+            : 'Listen. ${lines.map((String l) => '“$l”').join(' ')}';
         setState(() {
+          _tutorFocusLine = lines.isEmpty ? widget.articleExcerpt.trim() : lines.first;
+          _tutorCoachQuestion = '听示范，注意语音与节奏';
           _bubbles.add(_ChatBubble(role: 'coach', text: demo));
           _status = '六步外教课 · 示范';
         });
@@ -2188,20 +2229,17 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
         });
         await _runTutorStep();
       case TutorLessonStep.shadow:
-        if (lines.isEmpty) {
-          setState(() => _tutorStep = TutorLessonStep.substitute);
-          await _runTutorStep();
-          return;
-        }
-        if (_tutorShadowIndex >= lines.length) {
+        if (lines.isEmpty || _tutorShadowIndex >= lines.length) {
           setState(() => _tutorStep = TutorLessonStep.substitute);
           await _runTutorStep();
           return;
         }
         final String target = lines[_tutorShadowIndex];
         final String prompt =
-            'Step 3 — Shadow. Hold the mic and repeat: “$target”';
+            'Shadow ${_tutorShadowIndex + 1}/${lines.length}. Hold the mic and repeat: “$target”';
         setState(() {
+          _tutorFocusLine = target;
+          _tutorCoachQuestion = '跟读这一句';
           _pendingResay = OralExpressionDiagnosis.fallback(
             source: '跟读',
             literalEn: target,
@@ -2216,8 +2254,11 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
       case TutorLessonStep.substitute:
         final String base = lines.isNotEmpty ? lines.first : linePreview;
         final String prompt =
-            'Step 4 — Substitute. Change one word in “$base” and say your own sentence.';
+            'Substitute: change one word in “$base” and say your own sentence. '
+            'I will correct awkward phrasing.';
         setState(() {
+          _tutorFocusLine = base;
+          _tutorCoachQuestion = '换词造句，我会纠错';
           _pendingResay = null;
           _bubbles.add(_ChatBubble(role: 'coach', text: prompt));
           _status = '六步外教课 · 替换';
@@ -2225,42 +2266,80 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
         _scrollChatToEnd();
         await _speakCoach(prompt, settings);
       case TutorLessonStep.dialogue:
+        final String focus =
+            lines.isNotEmpty ? lines.first : linePreview;
+        final List<String> questions = <String>[
+          lines.isNotEmpty
+              ? 'Using ideas from “$focus”, why does this matter to you?'
+              : 'Tell me one thing you learned from this material.',
+          'Can you retell the idea in one short sentence of your own?',
+          'Ask me one question about this topic, then answer mine.',
+        ];
+        final String q =
+            questions[_tutorDialogueTurns.clamp(0, questions.length - 1)];
         final String prompt =
-            'Step 5 — Dialogue. Let’s talk about “$_topicLabel” for 2–3 short turns. '
-            'You can start with one sentence.';
+            'Dialogue turn ${_tutorDialogueTurns + 1}/3. Question: $q';
         setState(() {
-          _tutorDialogueTurns = 0;
+          _tutorCoachQuestion = q;
+          _tutorFocusLine = focus;
           _bubbles.add(_ChatBubble(role: 'coach', text: prompt));
           _status = '六步外教课 · 场景对话';
         });
         _scrollChatToEnd();
         await _speakCoach(prompt, settings);
       case TutorLessonStep.summary:
+        await _finalizeTutorLessonToFsrs();
+        if (!mounted) return;
         setState(() {
           _status = '六步外教课 · 小结';
+          _tutorCoachQuestion = '本课已写入复习循环';
         });
-        if (mounted) {
-          _showRoundSummary();
-        }
+        _showRoundSummary();
     }
   }
 
-  Future<void> _onGuidedShadowCompleted() async {
+  Future<void> _onGuidedShadowCompleted(String attempt) async {
     if (_tutorStep != TutorLessonStep.shadow) return;
-    setState(() => _tutorShadowIndex += 1);
+    final List<String> lines = _tutorLines;
+    final String target = (_tutorShadowIndex < lines.length)
+        ? lines[_tutorShadowIndex]
+        : _tutorFocusLine;
+    final int score = tutorUtteranceScore(target, attempt);
+    setState(() {
+      _tutorStepScores.add(score);
+      if (score < 70) {
+        _tutorCorrections.add('跟读偏弱（$score 分）：$target');
+      }
+      _tutorShadowIndex += 1;
+    });
     await _runTutorStep();
   }
 
-  Future<void> _onGuidedLearnerTurnDone() async {
+  Future<void> _onGuidedLearnerTurnDone(String attempt) async {
     if (!_isGuidedTutorLesson || _tutorStep == null) return;
     switch (_tutorStep!) {
       case TutorLessonStep.substitute:
-        setState(() => _tutorStep = TutorLessonStep.dialogue);
+        final int score = tutorUtteranceScore(_tutorFocusLine, attempt);
+        setState(() {
+          _tutorStepScores.add(score);
+          if (score < 70) {
+            _tutorCorrections.add('替换偏弱（$score 分）：$_tutorFocusLine');
+          }
+          _tutorStep = TutorLessonStep.dialogue;
+          _tutorDialogueTurns = 0;
+        });
         await _runTutorStep();
       case TutorLessonStep.dialogue:
-        setState(() => _tutorDialogueTurns += 1);
-        if (_tutorDialogueTurns >= 2) {
+        final int rawScore = tutorUtteranceScore(_tutorFocusLine, attempt);
+        final int score = rawScore < 40 ? 40 : rawScore;
+        setState(() {
+          _tutorStepScores.add(score);
+          _tutorDialogueTurns += 1;
+        });
+        if (_tutorDialogueTurns >= 3) {
           setState(() => _tutorStep = TutorLessonStep.summary);
+          await _runTutorStep();
+        } else {
           await _runTutorStep();
         }
       case TutorLessonStep.intro:
@@ -2269,6 +2348,110 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
       case TutorLessonStep.summary:
         break;
     }
+  }
+
+  Future<void> _finalizeTutorLessonToFsrs() async {
+    if (_tutorFsrsWritten) return;
+    _tutorFsrsWritten = true;
+    final int overall = _tutorStepScores.isEmpty
+        ? 70
+        : (_tutorStepScores.reduce((int a, int b) => a + b) /
+                  _tutorStepScores.length)
+              .round();
+    if (mounted) {
+      setState(() => _tutorOverallScore = overall);
+    }
+    final fsrs.Rating soft = overall < 60
+        ? fsrs.Rating.again
+        : overall < 75
+        ? fsrs.Rating.hard
+        : fsrs.Rating.good;
+    final DailyReviewNotifier review = ref.read(dailyReviewProvider.notifier);
+    final String episode = widget.episodeId?.trim().isNotEmpty == true
+        ? widget.episodeId!.trim()
+        : 'tutor:${widget.courseTitle.hashCode}';
+    int order = 0;
+    for (final String line in _tutorLines) {
+      order += 1;
+      try {
+        await review.ingestClip(
+          episodeId: episode,
+          english: line,
+          chinese: '外教课跟读',
+          startMs: order * 1000,
+          endMs: order * 1000 + 900,
+          startTime: '00:00',
+          courseTitle: widget.courseTitle.isNotEmpty
+              ? widget.courseTitle
+              : 'AI 外教课',
+          episodeTitle: widget.episodeTitle.isNotEmpty
+              ? widget.episodeTitle
+              : _topicLabel,
+          origin: 'ai_tutor',
+          softGrade: soft,
+        );
+      } catch (_) {}
+      ref.read(phraseBookProvider.notifier).addPhraseIfMissing(
+            english: line,
+            chinese: '外教课 · ${_topicLabel}',
+            course: widget.courseTitle.isNotEmpty ? widget.courseTitle : 'AI 外教课',
+            episode: widget.episodeTitle.isNotEmpty
+                ? widget.episodeTitle
+                : _topicLabel,
+            time: 'tutor_lesson',
+            needsReview: true,
+            today: true,
+            episodeId: episode,
+            note: 'AI 外教课小结 · $overall 分',
+          );
+    }
+    for (final String word in tutorKeyExpressions(_tutorLines)) {
+      try {
+        ref.read(wordBookProvider.notifier).addFavoriteWord(
+              rawWord: word,
+              episodeId: episode,
+              course: widget.courseTitle.isNotEmpty
+                  ? widget.courseTitle
+                  : 'AI 外教课',
+              episode: widget.episodeTitle.isNotEmpty
+                  ? widget.episodeTitle
+                  : _topicLabel,
+              time: DateTime.now().toIso8601String(),
+              lineKey: 'tutor:$word:${DateTime.now().millisecondsSinceEpoch}',
+              sentence: _tutorFocusLine.isNotEmpty
+                  ? _tutorFocusLine
+                  : widget.articleExcerpt,
+              chinese: '外教课关键词',
+            );
+      } catch (_) {}
+    }
+    try {
+      final AcquireApiClient api = ref.read(acquireApiClientProvider);
+      String? sid = _learningSessionId;
+      if (sid == null || sid.isEmpty) {
+        sid = await api.startLearningSession(
+          taskId: 'ai_tutor_lesson',
+          courseTitle: widget.courseTitle,
+          currentEnglish: widget.articleExcerpt,
+        );
+        _learningSessionId = sid;
+      }
+      await api.finalizeLearningFeedback(
+        sessionId: sid,
+        items: <Map<String, String>>[
+          <String, String>{
+            'quote': 'overall',
+            'suggestion': 'AI tutor score $overall',
+          },
+          ..._tutorCorrections.take(5).map(
+                (String c) => <String, String>{
+                  'quote': 'correction',
+                  'suggestion': c,
+                },
+              ),
+        ],
+      );
+    } catch (_) {}
   }
 
   Future<void> _ensureSelfCallCamera() async {
@@ -2694,16 +2877,29 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
         ? null
         : _roundPronScores.reduce((double a, double b) => a + b) /
             _roundPronScores.length;
+    final int? tutorScore = _tutorOverallScore ??
+        (_isGuidedTutorLesson && _tutorStepScores.isNotEmpty
+            ? (_tutorStepScores.reduce((int a, int b) => a + b) /
+                      _tutorStepScores.length)
+                  .round()
+            : null);
     unawaited(showDialog<void>(
       context: context,
       builder: (BuildContext context) => AlertDialog(
-        title: const Text('本轮练习报告'),
+        title: Text(_isGuidedTutorLesson ? '外教课小结' : '本轮练习报告'),
         content: SingleChildScrollView(
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: <Widget>[
               Text('$_topicLabel · 开口 $_lastRoundTurns 次'),
+              if (tutorScore != null) ...<Widget>[
+                Text('外教课得分 $tutorScore'),
+                if (_tutorFsrsWritten)
+                  const Text('已进入学习记录与 FSRS 复习'),
+                if (_tutorCorrections.isNotEmpty)
+                  Text('纠错 ${_tutorCorrections.length} 条'),
+              ],
               Text(
                 '今日目标 $_questUtterances/$_questTargetUtterances'
                 '${_questUtterances >= _questTargetUtterances ? '（已达成）' : ''}',
@@ -3549,6 +3745,9 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
 
   Widget _buildTutorLessonStrip() {
     final TutorLessonStep step = _tutorStep ?? TutorLessonStep.intro;
+    final String focus = _tutorFocusLine.trim().isNotEmpty
+        ? _tutorFocusLine.trim()
+        : step.detail;
     return Material(
       color: Colors.white.withValues(alpha: 0.06),
       child: InkWell(
@@ -3560,7 +3759,7 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
             builder: (BuildContext context) {
               return SafeArea(
                 child: SizedBox(
-                  height: MediaQuery.sizeOf(context).height * 0.55,
+                  height: MediaQuery.sizeOf(context).height * 0.62,
                   child: _buildTutorLessonPanel(),
                 ),
               );
@@ -3574,22 +3773,39 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
               const Icon(Icons.menu_book_rounded, color: Colors.white70, size: 18),
               const SizedBox(width: 8),
               Expanded(
-                child: Text(
-                  '第 ${step.index1}/6 步 · ${step.title}',
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontWeight: FontWeight.w800,
-                    fontSize: 13,
-                  ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: <Widget>[
+                    Text(
+                      '第 ${step.index1}/6 步 · ${step.title}',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w800,
+                        fontSize: 13,
+                      ),
+                    ),
+                    Text(
+                      focus,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(color: Colors.white70, fontSize: 11),
+                    ),
+                  ],
                 ),
               ),
-              Text(
-                step.detail,
-                style: const TextStyle(color: Colors.white70, fontSize: 11),
-              ),
-              const SizedBox(width: 4),
+              if (_tutorOverallScore != null)
+                Padding(
+                  padding: const EdgeInsets.only(right: 6),
+                  child: Text(
+                    '$_tutorOverallScore',
+                    style: const TextStyle(
+                      color: Color(0xFF34D399),
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                ),
               const Icon(Icons.expand_more_rounded, color: Colors.white54),
             ],
           ),
@@ -3604,6 +3820,8 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
         ? widget.courseTitle.trim()
         : 'AI 外教课';
     final TutorLessonStep current = _tutorStep ?? TutorLessonStep.intro;
+    final List<String> lines = _tutorLines;
+    final List<String> keys = tutorKeyExpressions(lines);
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
       child: Column(
@@ -3619,16 +3837,27 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
           ),
           const SizedBox(height: 6),
           Text(
-            _topicLabel,
+            '第 ${current.index1}/6 步 · ${current.title}',
             style: TextStyle(
               color: Colors.white.withValues(alpha: 0.78),
               fontSize: 14,
               fontWeight: FontWeight.w700,
             ),
           ),
+          if (_tutorCoachQuestion.trim().isNotEmpty) ...<Widget>[
+            const SizedBox(height: 4),
+            Text(
+              _tutorCoachQuestion,
+              style: TextStyle(
+                color: Colors.white.withValues(alpha: 0.62),
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ],
           const SizedBox(height: 12),
           Text(
-            '六步引导课',
+            '六步进度',
             style: TextStyle(
               color: Colors.white.withValues(alpha: 0.55),
               fontSize: 12,
@@ -3655,7 +3884,7 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
-                      '${step.index1}. ${step.title} · ${step.detail}',
+                      '${step.index1}. ${step.title}',
                       style: TextStyle(
                         color: step == current
                             ? Colors.white
@@ -3672,7 +3901,7 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
             ),
           const SizedBox(height: 10),
           Text(
-            '本课素材',
+            _tutorStepPanelHeading(current),
             style: TextStyle(
               color: Colors.white.withValues(alpha: 0.55),
               fontSize: 12,
@@ -3682,7 +3911,100 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
           const SizedBox(height: 8),
           Expanded(
             child: SingleChildScrollView(
-              child: Text(
+              child: _buildTutorStepBody(
+                current: current,
+                excerpt: excerpt,
+                lines: lines,
+                keys: keys,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  String _tutorStepPanelHeading(TutorLessonStep step) {
+    return switch (step) {
+      TutorLessonStep.intro => '今日表达',
+      TutorLessonStep.demo => '示范原句',
+      TutorLessonStep.shadow => '跟读目标',
+      TutorLessonStep.substitute => '替换练习',
+      TutorLessonStep.dialogue => '外教出题',
+      TutorLessonStep.summary => '小结与复习',
+    };
+  }
+
+  Widget _buildTutorStepBody({
+    required TutorLessonStep current,
+    required String excerpt,
+    required List<String> lines,
+    required List<String> keys,
+  }) {
+    switch (current) {
+      case TutorLessonStep.intro:
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: <Widget>[
+            Text(
+              excerpt.isEmpty ? '（无素材）' : excerpt,
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 15,
+                height: 1.45,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            if (keys.isNotEmpty) ...<Widget>[
+              const SizedBox(height: 12),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: keys
+                    .map(
+                      (String k) => Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 10,
+                          vertical: 6,
+                        ),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withValues(alpha: 0.08),
+                          borderRadius: BorderRadius.circular(999),
+                        ),
+                        child: Text(
+                          k,
+                          style: const TextStyle(
+                            color: Color(0xFFE9D5FF),
+                            fontWeight: FontWeight.w700,
+                            fontSize: 12,
+                          ),
+                        ),
+                      ),
+                    )
+                    .toList(growable: false),
+              ),
+            ],
+          ],
+        );
+      case TutorLessonStep.demo:
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: <Widget>[
+            for (int i = 0; i < lines.length; i++)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 10),
+                child: Text(
+                  '${i + 1}. ${lines[i]}',
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 15,
+                    height: 1.4,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+            if (lines.isEmpty)
+              Text(
                 excerpt.isEmpty ? '（无素材）' : excerpt,
                 style: const TextStyle(
                   color: Colors.white,
@@ -3691,11 +4013,243 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
                   fontWeight: FontWeight.w600,
                 ),
               ),
+          ],
+        );
+      case TutorLessonStep.shadow:
+        final String target = (_tutorShadowIndex < lines.length)
+            ? lines[_tutorShadowIndex]
+            : (_tutorFocusLine.isNotEmpty ? _tutorFocusLine : excerpt);
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: <Widget>[
+            Text(
+              lines.isEmpty
+                  ? '跟读完成'
+                  : '第 ${_tutorShadowIndex.clamp(0, lines.length - 1) + 1}/${lines.length} 句',
+              style: TextStyle(
+                color: Colors.white.withValues(alpha: 0.55),
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
+              ),
             ),
-          ),
-        ],
-      ),
-    );
+            const SizedBox(height: 8),
+            Text(
+              target.isEmpty ? '（无跟读句）' : target,
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 18,
+                height: 1.4,
+                fontWeight: FontWeight.w900,
+              ),
+            ),
+            const SizedBox(height: 12),
+            for (int i = 0; i < lines.length; i++)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 6),
+                child: Row(
+                  children: <Widget>[
+                    Icon(
+                      i < _tutorShadowIndex
+                          ? Icons.check_circle_rounded
+                          : i == _tutorShadowIndex
+                          ? Icons.mic_rounded
+                          : Icons.circle_outlined,
+                      size: 16,
+                      color: i < _tutorShadowIndex
+                          ? const Color(0xFF34D399)
+                          : i == _tutorShadowIndex
+                          ? const Color(0xFFA78BFA)
+                          : Colors.white38,
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        lines[i],
+                        style: TextStyle(
+                          color: i == _tutorShadowIndex
+                              ? Colors.white
+                              : Colors.white70,
+                          fontWeight: i == _tutorShadowIndex
+                              ? FontWeight.w800
+                              : FontWeight.w500,
+                          fontSize: 13,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+          ],
+        );
+      case TutorLessonStep.substitute:
+        final String base =
+            _tutorFocusLine.isNotEmpty
+                ? _tutorFocusLine
+                : (lines.isNotEmpty ? lines.first : excerpt);
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: <Widget>[
+            const Text(
+              '在原句上换一个词，说出你自己的句子。外教会纠错。',
+              style: TextStyle(color: Colors.white70, fontSize: 13, height: 1.4),
+            ),
+            const SizedBox(height: 10),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: 0.08),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Text(
+                base.isEmpty ? '（无底句）' : base,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 15,
+                  height: 1.4,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+            ),
+            if (_tutorCorrections.isNotEmpty) ...<Widget>[
+              const SizedBox(height: 12),
+              Text(
+                '纠错提示',
+                style: TextStyle(
+                  color: Colors.white.withValues(alpha: 0.55),
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              const SizedBox(height: 6),
+              for (final String c in _tutorCorrections.take(4))
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 4),
+                  child: Text(
+                    '· $c',
+                    style: const TextStyle(
+                      color: Color(0xFFFCA5A5),
+                      fontSize: 13,
+                      height: 1.35,
+                    ),
+                  ),
+                ),
+            ],
+          ],
+        );
+      case TutorLessonStep.dialogue:
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: <Widget>[
+            Text(
+              '第 ${_tutorDialogueTurns.clamp(0, 2) + 1}/3 轮',
+              style: TextStyle(
+                color: Colors.white.withValues(alpha: 0.55),
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              _tutorCoachQuestion.trim().isEmpty
+                  ? '用本课素材回答外教的问题'
+                  : _tutorCoachQuestion,
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 16,
+                height: 1.4,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+            const SizedBox(height: 12),
+            Text(
+              '素材提示',
+              style: TextStyle(
+                color: Colors.white.withValues(alpha: 0.55),
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              _tutorFocusLine.isNotEmpty
+                  ? _tutorFocusLine
+                  : (excerpt.isEmpty ? '（无素材）' : excerpt),
+              style: const TextStyle(
+                color: Colors.white70,
+                fontSize: 14,
+                height: 1.4,
+              ),
+            ),
+          ],
+        );
+      case TutorLessonStep.summary:
+        final int overall = _tutorOverallScore ??
+            (_tutorStepScores.isEmpty
+                ? 0
+                : (_tutorStepScores.reduce((int a, int b) => a + b) /
+                          _tutorStepScores.length)
+                      .round());
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: <Widget>[
+            Text(
+              '本课得分 $overall',
+              style: const TextStyle(
+                color: Color(0xFF34D399),
+                fontSize: 22,
+                fontWeight: FontWeight.w900,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              _tutorFsrsWritten
+                  ? '已写入学习记录与 FSRS 复习循环（句子 + 关键词）。'
+                  : '正在写入复习循环…',
+              style: const TextStyle(color: Colors.white70, fontSize: 13),
+            ),
+            if (_tutorStepScores.isNotEmpty) ...<Widget>[
+              const SizedBox(height: 12),
+              Text(
+                '分步得分：${_tutorStepScores.join(' · ')}',
+                style: const TextStyle(color: Colors.white60, fontSize: 12),
+              ),
+            ],
+            if (_tutorCorrections.isNotEmpty) ...<Widget>[
+              const SizedBox(height: 12),
+              const Text(
+                '本课纠错',
+                style: TextStyle(
+                  color: Colors.white70,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              const SizedBox(height: 6),
+              for (final String c in _tutorCorrections.take(6))
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 4),
+                  child: Text(
+                    '· $c',
+                    style: const TextStyle(
+                      color: Color(0xFFFCA5A5),
+                      fontSize: 13,
+                    ),
+                  ),
+                ),
+            ],
+            const SizedBox(height: 12),
+            Text(
+              excerpt.isEmpty ? '' : excerpt,
+              style: TextStyle(
+                color: Colors.white.withValues(alpha: 0.55),
+                fontSize: 13,
+                height: 1.4,
+              ),
+            ),
+          ],
+        );
+    }
   }
 
   Widget _buildNeedMaterialGate() {

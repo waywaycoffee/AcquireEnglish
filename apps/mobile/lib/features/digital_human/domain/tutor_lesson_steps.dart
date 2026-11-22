@@ -40,3 +40,58 @@ List<String> tutorSourceLines(String raw) {
       .take(4)
       .toList(growable: false);
 }
+
+/// Rough speaking score 0–100 from token overlap (guided shadow / substitute).
+int tutorUtteranceScore(String target, String attempt) {
+  final Set<String> want = RegExp(r"[A-Za-z']+")
+      .allMatches(target.toLowerCase())
+      .map((Match m) => m.group(0)!)
+      .where((String w) => w.length > 1)
+      .toSet();
+  if (want.isEmpty) return attempt.trim().isEmpty ? 0 : 70;
+  final Set<String> got = RegExp(r"[A-Za-z']+")
+      .allMatches(attempt.toLowerCase())
+      .map((Match m) => m.group(0)!)
+      .where((String w) => w.length > 1)
+      .toSet();
+  if (got.isEmpty) return 0;
+  final int hit = want.where(got.contains).length;
+  return ((hit / want.length) * 100).round().clamp(0, 100);
+}
+
+List<String> tutorKeyExpressions(List<String> lines) {
+  final List<String> out = <String>[];
+  for (final String line in lines) {
+    for (final Match m in RegExp(r"[A-Za-z][A-Za-z'-]{3,}").allMatches(line)) {
+      final String w = m.group(0)!.toLowerCase();
+      if (const <String>{
+        'this',
+        'that',
+        'with',
+        'from',
+        'have',
+        'been',
+        'were',
+        'what',
+        'when',
+        'your',
+        'they',
+        'them',
+        'there',
+        'about',
+        'hello',
+        'welcome',
+        'name',
+        'english',
+        'first',
+        'episode',
+        'learning',
+      }.contains(w)) {
+        continue;
+      }
+      if (!out.contains(w)) out.add(w);
+      if (out.length >= 8) return out;
+    }
+  }
+  return out;
+}
