@@ -1283,7 +1283,8 @@ class _PlayerVideoPanelState extends State<PlayerVideoPanel> {
                                     onPressed: () =>
                                         _handleControlTap(widget.onToggleLoop),
                                   ),
-                                  if (widget.isFullscreen && !tinyControls)
+                                  if (widget.isFullscreen &&
+                                      widget.onToggleSubtitlePanel != null)
                                     _RoundActionButton(
                                       icon: widget.isSubtitlePanelOpen
                                           ? Icons.subtitles_off_rounded
@@ -1294,12 +1295,9 @@ class _PlayerVideoPanelState extends State<PlayerVideoPanel> {
                                       compact: compactControls,
                                       tiny: tinyControls,
                                       fullscreen: widget.isFullscreen,
-                                      onPressed:
-                                          widget.onToggleSubtitlePanel == null
-                                          ? null
-                                          : () => _handleControlTap(
-                                              widget.onToggleSubtitlePanel!,
-                                            ),
+                                      onPressed: () => _handleControlTap(
+                                        widget.onToggleSubtitlePanel!,
+                                      ),
                                     ),
                                   if (widget.isFullscreen && !tinyControls)
                                     _RoundActionButton(

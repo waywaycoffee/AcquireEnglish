@@ -151,8 +151,10 @@ class _PlayerFullscreenVideoScreenState
   static const double _episodePanelWidth = 280;
 
   bool _showEpisodePanel = false;
-  /// Wide screens open the side transcript; phones start with video-only width.
-  late bool _showSubtitlePanel = false;
+  /// Landscape fullscreen keeps the transcript on the right of the video.
+  late bool _showSubtitlePanel = widget.playerState.hasLines;
+  /// When true, do not auto-reopen after the learner collapses the side list.
+  bool _userCollapsedSubtitlePanel = false;
   bool _showControls = true;
   Timer? _refreshTimer;
   late String _subtitleLetterCase = widget.subtitleLetterCase;
@@ -161,6 +163,19 @@ class _PlayerFullscreenVideoScreenState
   late String? _selectedEmbeddedSubtitleId = widget.selectedEmbeddedSubtitleId;
   late bool _isMuted = widget.isMuted;
   late double _volumeLevel = widget.volumeLevel;
+
+  void _ensureSubtitlePanelVisible({bool forceSetState = false}) {
+    if (_userCollapsedSubtitlePanel) {
+      return;
+    }
+    if (!widget.playerState.hasLines || _showSubtitlePanel) {
+      return;
+    }
+    _showSubtitlePanel = true;
+    if (forceSetState && mounted) {
+      setState(() {});
+    }
+  }
 
   @override
   void initState() {
@@ -171,18 +186,24 @@ class _PlayerFullscreenVideoScreenState
     _refreshTimer = Timer.periodic(widget.playerState.playbackTickDuration, (
       _,
     ) {
-      if (mounted && widget.playerState.isPlaying) {
-        setState(() {});
+      if (!mounted) {
+        return;
+      }
+      if (widget.playerState.isPlaying ||
+          (widget.playerState.hasLines &&
+              !_showSubtitlePanel &&
+              !_userCollapsedSubtitlePanel)) {
+        setState(() {
+          _ensureSubtitlePanelVisible();
+        });
       }
     });
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) {
         return;
       }
-      final double width = MediaQuery.sizeOf(context).width;
-      if (width >= 720 && widget.playerState.hasLines && !_showSubtitlePanel) {
-        setState(() => _showSubtitlePanel = true);
-      }
+      // Phone landscape must still show the right-side transcript by default.
+      _ensureSubtitlePanelVisible(forceSetState: true);
     });
   }
 
@@ -207,12 +228,8 @@ class _PlayerFullscreenVideoScreenState
         widget.selectedEmbeddedSubtitleId) {
       _selectedEmbeddedSubtitleId = widget.selectedEmbeddedSubtitleId;
     }
-    // Lines may arrive after open — keep the right-side transcript visible.
-    if (!oldWidget.playerState.hasLines &&
-        widget.playerState.hasLines &&
-        !_showSubtitlePanel) {
-      _showSubtitlePanel = true;
-    }
+    // Lines may arrive after open on the same state object — open the side list.
+    _ensureSubtitlePanelVisible();
   }
 
   @override
@@ -352,7 +369,10 @@ class _PlayerFullscreenVideoScreenState
                   : () {
                       setState(() {
                         _showEpisodePanel = !_showEpisodePanel;
-                        _showSubtitlePanel = false;
+                        if (_showEpisodePanel) {
+                          _showSubtitlePanel = false;
+                          _userCollapsedSubtitlePanel = true;
+                        }
                       });
                     },
               isEpisodePanelOpen: _showEpisodePanel,
@@ -360,7 +380,10 @@ class _PlayerFullscreenVideoScreenState
                   ? () {
                       setState(() {
                         _showSubtitlePanel = !_showSubtitlePanel;
-                        _showEpisodePanel = false;
+                        _userCollapsedSubtitlePanel = !_showSubtitlePanel;
+                        if (_showSubtitlePanel) {
+                          _showEpisodePanel = false;
+                        }
                       });
                     }
                   : null,
