@@ -84,7 +84,7 @@ class PadLandscapePlayerScreen extends ConsumerStatefulWidget {
   const PadLandscapePlayerScreen({
     required this.episodeId,
     this.initialStartTime,
-    this.autoPlay = false,
+    this.autoPlay = true,
     this.autoOpenFullscreen = false,
     super.key,
   });
@@ -165,6 +165,7 @@ class PadLandscapePlayerScreenState
     super.initState();
     _releaseGraphicsCache = PlayerGraphicsCache.acquire();
     state = PlayerMockState(initialStartTime: widget.initialStartTime);
+    state.isPlaying = widget.autoPlay;
     _syncSettingsToState(ref.read(learningSettingsProvider));
     ref.listenManual<String>(
       learningSettingsProvider.select(
@@ -1143,7 +1144,13 @@ class PadLandscapePlayerScreenState
       if (initialPositionMs > 0) {
         await player.seek(Duration(milliseconds: initialPositionMs));
       }
-      await player.pause();
+      final bool shouldPlay = widget.autoPlay || state.isPlaying;
+      if (shouldPlay) {
+        state.isPlaying = true;
+        await player.play();
+      } else {
+        await player.pause();
+      }
       _videoPosition = player.state.position;
       if (!mounted || !identical(_videoPlayer, player)) return;
       _attachVideoListeners(player);
@@ -1156,6 +1163,9 @@ class PadLandscapePlayerScreenState
         _videoReady = true;
         _videoLoading = false;
         _videoErrorText = null;
+        if (shouldPlay) {
+          state.isPlaying = true;
+        }
       });
       final bool hasEmbeddedEnglish = embeddedTracks.any(
         (SubtitleTrack track) =>
@@ -1167,7 +1177,7 @@ class PadLandscapePlayerScreenState
           !state.lines.any(
             (PlayerSubtitleLine line) => looksChinese(line.chinese),
           )) {
-        await _loadCachedAiSubtitles(validateReferenceSignature: false);
+        unawaited(_loadCachedAiSubtitles(validateReferenceSignature: false));
       }
       if (!mounted) return;
       _applyPlaybackMode();

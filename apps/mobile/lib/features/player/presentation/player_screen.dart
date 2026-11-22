@@ -8,7 +8,7 @@ class PlayerScreen extends StatelessWidget {
   const PlayerScreen({
     required this.episodeId,
     this.initialStartTime,
-    this.autoPlay = false,
+    this.autoPlay = true,
     this.autoOpenFullscreen = false,
     this.initialLoopSentence = false,
     super.key,

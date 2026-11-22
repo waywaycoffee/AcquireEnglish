@@ -163,7 +163,7 @@ class PadPortraitPlayerScreen extends ConsumerStatefulWidget {
   const PadPortraitPlayerScreen({
     required this.episodeId,
     this.initialStartTime,
-    this.autoPlay = false,
+    this.autoPlay = true,
     this.autoOpenFullscreen = false,
     this.initialLoopSentence = false,
     super.key,
@@ -271,6 +271,8 @@ class PadPortraitPlayerScreenState
     super.initState();
     _releaseGraphicsCache = PlayerGraphicsCache.acquire();
     state = PlayerMockState(initialStartTime: widget.initialStartTime);
+    // Intent to play as soon as the decoder is ready (avoids a paused first frame).
+    state.isPlaying = widget.autoPlay;
     _syncSettingsToState(ref.read(learningSettingsProvider));
     ref.listenManual<String>(
       learningSettingsProvider.select(
@@ -545,6 +547,17 @@ class PadPortraitPlayerScreenState
         episodeId: widget.episodeId,
       );
     }
+
+    // Open the decoder while subtitle files load — less blank wait before play.
+    final int resumeMs =
+        PlayerMockState.parseTimestampToMsPublic(initialStartTime) ?? 0;
+    if (resumeMs > 0) {
+      state.positionMs = resumeMs;
+    }
+    if (widget.autoPlay) {
+      state.isPlaying = true;
+    }
+    final Future<void> videoInitFuture = _initVideo();
 
     // Playing file is source of truth — drop CC that belongs to another BV/page.
     final String? playingKey = bilibiliIdKeyFromPath(
@@ -922,7 +935,10 @@ class PadPortraitPlayerScreenState
         ),
       );
     }
-    await _initVideo();
+    await videoInitFuture;
+    if (mounted) {
+      _applyPlaybackMode();
+    }
   }
 
   bool _needsBilibiliPrepare(PlayerCourseLookupResult resource) {
@@ -1286,7 +1302,14 @@ class PadPortraitPlayerScreenState
       if (initialPositionMs > 0) {
         await player.seek(Duration(milliseconds: initialPositionMs));
       }
-      await player.pause();
+      // Avoid pause→play stutter on open: start immediately when autoplay is on.
+      final bool shouldPlay = widget.autoPlay || state.isPlaying;
+      if (shouldPlay) {
+        state.isPlaying = true;
+        await player.play();
+      } else {
+        await player.pause();
+      }
       _videoPosition = player.state.position;
       if (!mounted || !identical(_videoPlayer, player)) return;
       _attachVideoListeners(player);
@@ -1299,6 +1322,9 @@ class PadPortraitPlayerScreenState
         _videoReady = true;
         _videoLoading = false;
         _videoErrorText = null;
+        if (shouldPlay) {
+          state.isPlaying = true;
+        }
       });
       final bool hasEmbeddedEnglish = embeddedTracks.any(
         (SubtitleTrack track) =>
@@ -1312,7 +1338,7 @@ class PadPortraitPlayerScreenState
           )) {
         // A timed Chinese track stays the subtitle. Do not replace it with
         // an OCR/ASR cache.
-        await _loadCachedAiSubtitles(validateReferenceSignature: false);
+        unawaited(_loadCachedAiSubtitles(validateReferenceSignature: false));
       }
       if (!mounted) return;
       _applyPlaybackMode();

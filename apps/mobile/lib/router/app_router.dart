@@ -528,10 +528,12 @@ GoRouter goRouter(Ref ref) => GoRouter(
       path: '/episodes/:episodeId',
       name: SGRoute.player.name,
       builder: (BuildContext context, GoRouterState state) {
+        // Default: start playback on open. Opt out with ?autoplay=0.
+        final String? autoplayParam = state.uri.queryParameters['autoplay'];
         return PlayerScreen(
           episodeId: state.pathParameters['episodeId']!,
           initialStartTime: state.uri.queryParameters['startTime'],
-          autoPlay: state.uri.queryParameters['autoplay'] == '1',
+          autoPlay: autoplayParam != '0',
           autoOpenFullscreen: state.uri.queryParameters['fullscreen'] == '1',
           initialLoopSentence: state.uri.queryParameters['loop'] == 'sentence',
         );
