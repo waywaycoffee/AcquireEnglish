@@ -17,6 +17,7 @@ import '../../onboarding/presentation/onboarding_provider.dart';
 import '../../player/presentation/learning_resume_provider.dart';
 import '../../reading/domain/reading_doc.dart';
 import '../../reading/presentation/reading_library_provider.dart';
+import '../../review_hub/presentation/widgets/review_today_section.dart';
 import '../../shared/presentation/pad/pad_scaffold.dart';
 import '../../sync/presentation/cloud_catalog_sync.dart';
 import '../../sync/presentation/daily_feed_provider.dart';
@@ -246,9 +247,11 @@ class _LearningHomeScreenState extends ConsumerState<LearningHomeScreen> {
                       ),
                     ),
                     const SizedBox(height: 24),
+                    const TodayPathCard(),
+                    const SizedBox(height: 24),
                     KeyedSubtree(
                       key: _vocabKey,
-                      child: const TodayPathCard(),
+                      child: const ReviewTodaySection(),
                     ),
                     const SizedBox(height: 24),
                     if (examProfile.isExamMode &&
