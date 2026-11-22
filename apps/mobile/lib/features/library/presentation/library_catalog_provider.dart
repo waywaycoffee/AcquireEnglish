@@ -7,6 +7,7 @@ import 'package:path_provider/path_provider.dart';
 
 import '../../daily_path/data/oral_core_library_mapper.dart';
 import '../../daily_path/domain/oral_core_series.dart';
+import '../../learning_modules/american_ipa_course.dart';
 import '../../import_course/data/bilibili_episode_prepare.dart';
 import '../../import_course/data/bilibili_multipage.dart';
 import '../../import_course/domain/bilibili_import.dart';
@@ -78,16 +79,16 @@ class LibraryCatalogNotifier extends Notifier<List<LibraryCourseData>> {
     return state
         .where(
           (LibraryCourseData c) =>
-              !_isFreeTrialCourse(c) && c.id != OralCoreSeries.kSeriesId,
+              !_isFreeTrialCourse(c) &&
+              c.id != OralCoreSeries.kSeriesId &&
+              c.id != AmericanIpaCourse.kSeriesId,
         )
         .length;
   }
 
-  /// Official oral_core_9000 series — always allowed, does not consume personal slots.
-  Future<void> ensureOralCoreCourse(OralCoreSeries series) async {
-    final LibraryCourseData course = oralCoreSeriesToLibraryCourse(series);
+  Future<void> _upsertOfficialCourse(LibraryCourseData course) async {
     final int existingIndex = state.indexWhere(
-      (LibraryCourseData item) => item.id == OralCoreSeries.kSeriesId,
+      (LibraryCourseData item) => item.id == course.id,
     );
     if (existingIndex < 0) {
       state = <LibraryCourseData>[course, ...state];
@@ -112,6 +113,16 @@ class LibraryCatalogNotifier extends Notifier<List<LibraryCourseData>> {
     next[existingIndex] = merged;
     state = next;
     await _persistImportedCourses();
+  }
+
+  /// Official american_ipa_20 — shadowing-only skill course.
+  Future<void> ensureAmericanIpaCourse() async {
+    await _upsertOfficialCourse(AmericanIpaCourse.toLibraryCourse());
+  }
+
+  /// Official oral_core_9000 series — always allowed, does not consume personal slots.
+  Future<void> ensureOralCoreCourse(OralCoreSeries series) async {
+    await _upsertOfficialCourse(oralCoreSeriesToLibraryCourse(series));
   }
 
   Future<bool> importCourse(LibraryCourseData course) async {

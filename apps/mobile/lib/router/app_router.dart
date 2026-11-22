@@ -15,6 +15,7 @@ import '../features/writing/presentation/writing_home_screen.dart';
 import '../features/daily_path/presentation/course_unit_session_screen.dart';
 import '../features/daily_path/presentation/oral_core_course_screen.dart';
 import '../features/daily_review/domain/daily_review.dart';
+import '../features/learning_modules/american_ipa_course_screen.dart';
 // ignore_for_file: prefer_function_declarations_over_variables
 
 import 'package:flutter/material.dart';
@@ -143,10 +144,16 @@ GoRouter goRouter(Ref ref) => GoRouter(
     ).fade(),
     GoRoute(
       path: '/learn/:kind',
+      redirect: (BuildContext context, GoRouterState state) {
+        if (state.pathParameters['kind'] == 'ipa') {
+          return '/courses/american-ipa';
+        }
+        return null;
+      },
       builder: (context, state) {
         final String kind = moduleLessons.containsKey(state.pathParameters['kind'])
             ? state.pathParameters['kind']!
-            : 'ipa';
+            : 'phonics';
         final Widget screen = ModuleScreen(
           key: ValueKey<String>(state.uri.toString()),
           initialLesson: int.tryParse(state.uri.queryParameters['lesson'] ?? ''),
@@ -385,6 +392,11 @@ GoRouter goRouter(Ref ref) => GoRouter(
       path: '/courses/oral-core-9000',
       builder: (BuildContext context, GoRouterState state) =>
           const OralCoreCourseScreen(),
+    ).fade(),
+    GoRoute(
+      path: '/courses/american-ipa',
+      builder: (BuildContext context, GoRouterState state) =>
+          const AmericanIpaCourseScreen(),
     ).fade(),
     GoRoute(
       path: SGRoute.sm2Review.route,
