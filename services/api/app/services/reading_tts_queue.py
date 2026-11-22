@@ -367,9 +367,13 @@ def claim(lease_seconds: float = 300) -> dict | None:
             "WHERE state='working' AND deadline IS NOT NULL AND deadline < ?",
             (now,),
         )
+        # Prefer emotional book-pair voices so long novels move first.
         row = db.execute(
             "SELECT * FROM jobs WHERE state='queued' "
-            "ORDER BY updated ASC LIMIT 1"
+            "ORDER BY CASE voice "
+            "WHEN 'longanfengyue' THEN 0 "
+            "WHEN 'longze_v3.1' THEN 1 "
+            "ELSE 2 END, updated ASC LIMIT 1"
         ).fetchone()
         return _claim_row(db, row, lease_seconds=lease_seconds)
 

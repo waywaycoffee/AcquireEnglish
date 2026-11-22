@@ -55,12 +55,12 @@ class ReadingBookPrepStatus {
   }
 
   String get progressLabel {
-    if (ready) return '男女声 AI 朗读已就绪';
-    if (state == 'missing') return '等待云端 AI 处理男女声…';
+    if (ready) return '当前音色 AI 朗读已就绪';
+    if (state == 'missing') return '等待云端 AI 配音…';
     if (pagesTotal > 0) {
-      return '男女声 AI $percent%（$pagesReady/$pagesTotal 节）';
+      return 'AI 配音 $percent%（$pagesReady/$pagesTotal 节）';
     }
-    return '男女声 AI $percent%';
+    return 'AI 配音 $percent%';
   }
 }
 
@@ -95,12 +95,12 @@ final readingBookPrepProvider = StreamProvider.autoDispose
   final AcquireApiClient api = ref.read(acquireApiClientProvider);
   final String voice = loadReadingTtsGender().aliyunVoiceId;
 
-  // Kick cloud queue once (5060 Ti preferred; no phone-side synth storm).
+  // Kick cloud queue + ECS CosyVoice drain (5060 Ti worker may also claim).
   Map<String, dynamic>? latest = await api.enqueueReadingBookPregen(
     docId: doc.id,
     text: doc.plainText,
     voice: voice,
-    processOnEcs: false,
+    processOnEcs: true,
   );
   DateTime progressAnchor = DateTime.now();
   int lastPercent = -1;
@@ -129,9 +129,9 @@ final readingBookPrepProvider = StreamProvider.autoDispose
       progressAnchor = DateTime.now();
     }
 
-    // GPU worker offline / stalled (~90s without progress) → ECS filler once.
+    // Stalled ~25s without progress → kick ECS filler again.
     final bool stalled =
-        DateTime.now().difference(progressAnchor) > const Duration(seconds: 90);
+        DateTime.now().difference(progressAnchor) > const Duration(seconds: 25);
     if (!fallbackTried && stalled) {
       fallbackTried = true;
       latest = await api.readingBookPregenFallback(

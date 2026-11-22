@@ -3,6 +3,9 @@
 from __future__ import annotations
 
 import asyncio
+import os
+import subprocess
+import sys
 from pathlib import Path
 from tempfile import NamedTemporaryFile
 
@@ -111,8 +114,9 @@ class BookPregenIn(BaseModel):
     text: str = Field(..., min_length=1, max_length=600_000)
     voice: str = ""
     language: str = "en"
-    ## Prefer 5060 Ti worker; set true only as ECS fallback filler.
-    process_on_ecs: bool = False
+    ## CosyVoice runs on DashScope either way; default ECS drain so Tailscale
+    ## SSH blips on the 5060 Ti worker cannot leave books stuck at 0%.
+    process_on_ecs: bool = True
 
 
 def _resolve_voice(raw: str) -> str:
@@ -124,6 +128,37 @@ def _resolve_voice(raw: str) -> str:
 
 def _configured() -> bool:
     return bool((settings.dashscope_api_key or "").strip())
+
+
+def _spawn_book_drain(*, doc_id: str, voice: str, user_id: int | None) -> None:
+    """Run long-novel CosyVoice fill in a detached process.
+
+    FastAPI BackgroundTasks would block uvicorn graceful shutdown for hours
+    while 100+ pages synthesize — keep drain out of the API process.
+    """
+    api_root = Path(__file__).resolve().parents[2]
+    log_path = Path("/tmp") / f"reading_tts_drain_{rtq.doc_segment(doc_id)}_{rsc.voice_segment(voice)}.log"
+    cmd = [
+        sys.executable,
+        "-m",
+        "app.services.reading_tts_drain_cli",
+        "--doc-id",
+        doc_id,
+        "--voice",
+        voice,
+    ]
+    if user_id is not None:
+        cmd.extend(["--user-id", str(user_id)])
+    log_path.parent.mkdir(parents=True, exist_ok=True)
+    with log_path.open("a", encoding="utf-8") as log:
+        subprocess.Popen(
+            cmd,
+            cwd=str(api_root),
+            stdout=log,
+            stderr=subprocess.STDOUT,
+            start_new_session=True,
+            env=os.environ.copy(),
+        )
 
 
 @voices_router.get("/voices")
@@ -424,7 +459,12 @@ async def get_speech_pack(
 
 
 def _aggregate_book_pair(statuses: list[dict], *, preferred: str) -> dict:
-    """Combine male+female pack progress; ready only when both voices are done."""
+    """Combine male+female pack progress.
+
+    Both voices are always queued onto ECS. Opening is gated on the *preferred*
+    voice (so a stalled secondary voice cannot keep the bar at 0%). Pair stats
+    stay in ``pair`` for UI / ops.
+    """
     if not statuses:
         return {
             "ready": False,
@@ -435,14 +475,17 @@ def _aggregate_book_pair(statuses: list[dict], *, preferred: str) -> dict:
             "voice": preferred,
             "voices": [],
             "pair": {},
+            "pair_ready": False,
             "long_novel": True,
             "processor": "shared-tts-queue",
         }
-    pages_total = sum(int(s.get("pages_total") or 0) for s in statuses)
-    pages_ready = sum(int(s.get("pages_ready") or 0) for s in statuses)
-    percent = 0 if pages_total <= 0 else int(round(100.0 * pages_ready / pages_total))
-    ready = all(bool(s.get("ready")) for s in statuses)
+    preferred_status = next(
+        (s for s in statuses if s.get("voice") == preferred),
+        statuses[0],
+    )
+    pair_ready = all(bool(s.get("ready")) for s in statuses)
     failed = all(s.get("state") == "failed" for s in statuses)
+    ready = bool(preferred_status.get("ready"))
     if ready:
         state = "ready"
     elif failed:
@@ -450,11 +493,7 @@ def _aggregate_book_pair(statuses: list[dict], *, preferred: str) -> dict:
     elif any(s.get("state") in ("working", "queued") for s in statuses):
         state = "working"
     else:
-        state = str(statuses[0].get("state") or "queued")
-    preferred_status = next(
-        (s for s in statuses if s.get("voice") == preferred),
-        statuses[0],
-    )
+        state = str(preferred_status.get("state") or "queued")
     return {
         **preferred_status,
         "voice": preferred,
@@ -470,10 +509,11 @@ def _aggregate_book_pair(statuses: list[dict], *, preferred: str) -> dict:
             }
             for s in statuses
         },
-        "pages_total": pages_total,
-        "pages_ready": pages_ready,
-        "percent": percent,
+        "pages_total": int(preferred_status.get("pages_total") or 0),
+        "pages_ready": int(preferred_status.get("pages_ready") or 0),
+        "percent": int(preferred_status.get("percent") or 0),
         "ready": ready,
+        "pair_ready": pair_ready,
         "state": state,
         "long_novel": True,
         "processor": "shared-tts-queue",
@@ -523,12 +563,12 @@ async def enqueue_book_pregen(
             )
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
+    del background  # book drain is detached; keep signature for FastAPI DI
     if body.process_on_ecs and _configured():
         for voice in voices:
             status = next((s for s in statuses if s.get("voice") == voice), None)
             if status and not status.get("ready"):
-                background.add_task(
-                    drain_book_pregen_ecs,
+                _spawn_book_drain(
                     doc_id=body.doc_id.strip(),
                     voice=voice,
                     user_id=user.id,
@@ -577,15 +617,15 @@ async def book_pregen_ecs_fallback(
             raise HTTPException(status_code=400, detail=str(exc)) from exc
     if not _configured():
         raise HTTPException(status_code=503, detail="阿里云配音尚未配置")
+    del background
     kicked = 0
     for voice in voices:
         job_ids = rtq.unfinished_page_job_ids(
             doc_id=body.doc_id.strip(), voice=voice
         )
         kicked += len(job_ids)
-        # One serial drainer per voice — avoid flooding CosyVoice.
-        background.add_task(
-            drain_book_pregen_ecs,
+        # Detached serial drainer per voice — avoid flooding CosyVoice / hanging uvicorn.
+        _spawn_book_drain(
             doc_id=body.doc_id.strip(),
             voice=voice,
             user_id=user.id,
