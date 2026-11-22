@@ -47,9 +47,9 @@ import 'library_browse.dart';
 import 'library_catalog_provider.dart';
 import 'library_mock_data.dart';
 import 'video_difficulty_provider.dart';
+import 'widgets/course_episode_tile.dart';
 import 'widgets/course_overview_card.dart';
 import 'widgets/course_resource_directory_dialog.dart';
-import 'widgets/episode_list_item.dart';
 import 'widgets/library_course_card.dart';
 import 'widgets/library_course_list_item.dart';
 import 'widgets/library_feed_card.dart';
@@ -443,14 +443,18 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
           : showDetail
           ? Stack(
               children: <Widget>[
-                ListView(
-                  padding: EdgeInsets.fromLTRB(
-                    pagePadding,
-                    compact ? 22 : 28,
-                    pagePadding,
-                    120,
-                  ),
-                  children: <Widget>[
+                CustomScrollView(
+                  slivers: <Widget>[
+                    SliverPadding(
+                      padding: EdgeInsets.fromLTRB(
+                        pagePadding,
+                        compact ? 22 : 28,
+                        pagePadding,
+                        0,
+                      ),
+                      sliver: SliverList(
+                        delegate: SliverChildListDelegate(
+                          <Widget>[
                     if (_pendingCollectionEpisodes(selectedCourse) > 0)
                       Consumer(
                         builder: (BuildContext context, WidgetRef ref, _) {
@@ -776,178 +780,292 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
                         ],
                       ),
                     ),
-                    SizedBox(height: compact ? 20 : 28),
-                    Container(
-                      padding: EdgeInsets.all(compact ? 18 : 20),
-                      decoration: BoxDecoration(
-                        color: AppDesignTokens.appWhite,
-                        borderRadius: BorderRadius.circular(28),
-                        boxShadow: AppDesignTokens.toyCardShadow,
+                          ],
+                        ),
                       ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: <Widget>[
-                          Row(
+                    ),
+                    // Virtualized episode list — avoid building 200+ rows in one scroll extent.
+                    SliverPadding(
+                      padding: EdgeInsets.fromLTRB(
+                        pagePadding,
+                        compact ? 20 : 28,
+                        pagePadding,
+                        0,
+                      ),
+                      sliver: SliverToBoxAdapter(
+                        child: Container(
+                          padding: EdgeInsets.fromLTRB(
+                            compact ? 18 : 20,
+                            compact ? 18 : 20,
+                            compact ? 18 : 20,
+                            compact ? 10 : 12,
+                          ),
+                          decoration: BoxDecoration(
+                            color: AppDesignTokens.appWhite,
+                            borderRadius: const BorderRadius.vertical(
+                              top: Radius.circular(28),
+                            ),
+                            boxShadow: AppDesignTokens.toyCardShadow,
+                          ),
+                          child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: <Widget>[
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: <Widget>[
-                                    Text(
-                                      '全部剧集',
+                              Row(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: <Widget>[
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: <Widget>[
+                                        Text(
+                                          '全部剧集',
+                                          style: TextStyle(
+                                            fontSize: compact ? 24 : 28,
+                                            fontWeight: FontWeight.w900,
+                                            color: AppDesignTokens.textPrimary,
+                                          ),
+                                        ),
+                                        const SizedBox(height: 6),
+                                        Text(
+                                          '挑一集继续练耳朵，保留当前排序和重排能力。',
+                                          style: TextStyle(
+                                            fontSize: compact ? 13 : 14,
+                                            fontWeight: FontWeight.w600,
+                                            color: AppDesignTokens.textSecondary,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                  const SizedBox(width: 16),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 12,
+                                      vertical: 8,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: AppDesignTokens.pinkLight,
+                                      borderRadius: BorderRadius.circular(999),
+                                    ),
+                                    child: Text(
+                                      '${visibleEpisodes.length} 集',
                                       style: TextStyle(
-                                        fontSize: compact ? 24 : 28,
-                                        fontWeight: FontWeight.w900,
+                                        fontSize: 13,
+                                        fontWeight: FontWeight.w800,
                                         color: AppDesignTokens.textPrimary,
                                       ),
                                     ),
-                                    const SizedBox(height: 6),
-                                    Text(
-                                      '挑一集继续练耳朵，保留当前排序和重排能力。',
-                                      style: TextStyle(
-                                        fontSize: compact ? 13 : 14,
-                                        fontWeight: FontWeight.w600,
-                                        color: AppDesignTokens.textSecondary,
+                                  ),
+                                ],
+                              ),
+                              SizedBox(height: compact ? 14 : 16),
+                              Wrap(
+                                spacing: 12,
+                                runSpacing: 12,
+                                crossAxisAlignment: WrapCrossAlignment.center,
+                                children: <Widget>[
+                                  _EpisodeSortChip(
+                                    value: episodeSort,
+                                    onChanged: (String? value) {
+                                      if (value == null) {
+                                        return;
+                                      }
+                                      setState(() {
+                                        episodeSort = value;
+                                      });
+                                    },
+                                  ),
+                                  OutlinedButton.icon(
+                                    onPressed: () {
+                                      setState(() {
+                                        episodeSort = '手动排序';
+                                        customEpisodeOrders.putIfAbsent(
+                                          selectedCourse.id,
+                                          () => selectedCourse.episodes
+                                              .map((LibraryEpisodeItem item) => item.id)
+                                              .toList(growable: false),
+                                        );
+                                      });
+                                    },
+                                    style: OutlinedButton.styleFrom(
+                                      side: BorderSide(
+                                        color: AppDesignTokens.borderGray,
+                                      ),
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 16,
+                                        vertical: 14,
+                                      ),
+                                      backgroundColor: AppDesignTokens.softWhite,
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(999),
                                       ),
                                     ),
-                                  ],
-                                ),
-                              ),
-                              const SizedBox(width: 16),
-                              Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 12,
-                                  vertical: 8,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: AppDesignTokens.pinkLight,
-                                  borderRadius: BorderRadius.circular(999),
-                                ),
-                                child: Text(
-                                  '${visibleEpisodes.length} 集',
-                                  style: TextStyle(
-                                    fontSize: 13,
-                                    fontWeight: FontWeight.w800,
-                                    color: AppDesignTokens.textPrimary,
+                                    icon: const Icon(
+                                      Icons.swap_vert_rounded,
+                                      size: 18,
+                                      color: AppDesignTokens.primaryBlueDark,
+                                    ),
+                                    label: Text(
+                                      '手动重排',
+                                      style: TextStyle(
+                                        fontWeight: FontWeight.w800,
+                                        color: AppDesignTokens.textPrimary,
+                                      ),
+                                    ),
                                   ),
-                                ),
+                                ],
                               ),
                             ],
                           ),
-                          SizedBox(height: compact ? 14 : 16),
-                          Wrap(
-                            spacing: 12,
-                            runSpacing: 12,
-                            crossAxisAlignment: WrapCrossAlignment.center,
-                            children: <Widget>[
-                              _EpisodeSortChip(
-                                value: episodeSort,
-                                onChanged: (String? value) {
-                                  if (value == null) {
-                                    return;
-                                  }
-                                  setState(() {
-                                    episodeSort = value;
-                                  });
-                                },
-                              ),
-                              OutlinedButton.icon(
-                                onPressed: () {
-                                  setState(() {
-                                    episodeSort = '手动排序';
-                                    customEpisodeOrders.putIfAbsent(
-                                      selectedCourse.id,
-                                      () => selectedCourse.episodes
-                                          .map((LibraryEpisodeItem item) => item.id)
-                                          .toList(growable: false),
-                                    );
-                                  });
-                                },
-                                style: OutlinedButton.styleFrom(
-                                  side: BorderSide(
-                                    color: AppDesignTokens.borderGray,
-                                  ),
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 16,
-                                    vertical: 14,
-                                  ),
-                                  backgroundColor: AppDesignTokens.softWhite,
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(999),
-                                  ),
-                                ),
-                                icon: const Icon(
-                                  Icons.swap_vert_rounded,
-                                  size: 18,
-                                  color: AppDesignTokens.primaryBlueDark,
-                                ),
-                                label: Text(
-                                  '手动重排',
-                                  style: TextStyle(
-                                    fontWeight: FontWeight.w800,
-                                    color: AppDesignTokens.textPrimary,
-                                  ),
-                                ),
-                              ),
-                            ],
+                        ),
+                      ),
+                    ),
+                    if (visibleEpisodes.isEmpty)
+                      SliverPadding(
+                        padding: EdgeInsets.symmetric(horizontal: pagePadding),
+                        sliver: SliverToBoxAdapter(
+                          child: ColoredBox(
+                            color: AppDesignTokens.appWhite,
+                            child: const Padding(
+                              padding: EdgeInsets.fromLTRB(18, 0, 18, 18),
+                              child: _EmptyEpisodesState(),
+                            ),
                           ),
-                          SizedBox(height: compact ? 14 : 18),
-                          if (visibleEpisodes.isEmpty)
-                            const _EmptyEpisodesState()
-                          else if (episodeSort == '手动排序')
-                            ReorderableListView.builder(
-                              shrinkWrap: true,
-                              buildDefaultDragHandles: false,
-                              physics: const NeverScrollableScrollPhysics(),
+                        ),
+                      )
+                    else if (episodeSort == '手动排序')
+                      SliverPadding(
+                        padding: EdgeInsets.fromLTRB(
+                          pagePadding,
+                          0,
+                          pagePadding,
+                          120,
+                        ),
+                        sliver: DecoratedSliver(
+                          decoration: const BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.vertical(
+                              bottom: Radius.circular(28),
+                            ),
+                          ),
+                          sliver: SliverPadding(
+                            padding: EdgeInsets.fromLTRB(
+                              compact ? 18 : 20,
+                              8,
+                              compact ? 18 : 20,
+                              compact ? 18 : 20,
+                            ),
+                            sliver: SliverReorderableList(
                               itemCount: visibleEpisodes.length,
-                              onReorderItem: _handleReorderEpisodes,
+                              onReorder: _handleReorderEpisodes,
                               itemBuilder: (BuildContext context, int index) {
                                 final LibraryEpisodeItem item =
                                     visibleEpisodes[index];
-                                return Padding(
+                                return CourseEpisodeTile(
                                   key: ValueKey<String>(item.id),
-                                  padding: EdgeInsets.only(
-                                    bottom: compact ? 12 : 16,
+                                  item: item,
+                                  selected: item.id == selectedEpisodeId,
+                                  fallbackCoverImage: selectedCourse.coverImage,
+                                  bottomPadding: compact ? 12 : 16,
+                                  onTap: () => _openEpisodeForLearning(
+                                    selectedCourse,
+                                    item,
                                   ),
-                                  child: Consumer(
-                                    builder:
-                                        (BuildContext context, WidgetRef ref, _) {
-                                      final SubtitleCompletionEpisodeUi?
-                                      fill = ref
-                                          .watch(
-                                            subtitleCompletionStatusProvider,
-                                          )
-                                          .forEpisode(item.id);
-                                      return EpisodeListItem(
+                                  onViewTranscript: () => _openTranscriptReader(
+                                    selectedCourse,
+                                    item,
+                                  ),
+                                  onRerecognizeEnglish: () {
+                                    unawaited(
+                                      _confirmResetEpisodeSubtitles(
+                                        selectedCourse,
+                                        item,
+                                        SubtitleResetSide.english,
+                                      ),
+                                    );
+                                  },
+                                  onRerecognizeChinese: () {
+                                    unawaited(
+                                      _confirmResetEpisodeSubtitles(
+                                        selectedCourse,
+                                        item,
+                                        SubtitleResetSide.chinese,
+                                      ),
+                                    );
+                                  },
+                                  onMissingEnglishTap: () {
+                                    unawaited(
+                                      _requestMissingSubtitleFill(
+                                        course: selectedCourse,
+                                        episode: item,
+                                        chip: SubtitleFillChip.english,
+                                      ),
+                                    );
+                                  },
+                                  onMissingChineseTap: () {
+                                    unawaited(
+                                      _requestMissingSubtitleFill(
+                                        course: selectedCourse,
+                                        episode: item,
+                                        chip: SubtitleFillChip.chinese,
+                                      ),
+                                    );
+                                  },
+                                  trailing: ReorderableDragStartListener(
+                                    index: index,
+                                    child: Icon(
+                                      Icons.drag_indicator_rounded,
+                                      color: AppDesignTokens.textSecondary,
+                                    ),
+                                  ),
+                                );
+                              },
+                            ),
+                          ),
+                        ),
+                      )
+                    else
+                      SliverPadding(
+                        padding: EdgeInsets.fromLTRB(
+                          pagePadding,
+                          0,
+                          pagePadding,
+                          120,
+                        ),
+                        sliver: DecoratedSliver(
+                          decoration: const BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.vertical(
+                              bottom: Radius.circular(28),
+                            ),
+                          ),
+                          sliver: SliverPadding(
+                            padding: EdgeInsets.fromLTRB(
+                              compact ? 18 : 20,
+                              8,
+                              compact ? 18 : 20,
+                              compact ? 18 : 20,
+                            ),
+                            sliver: SliverList(
+                              delegate: SliverChildBuilderDelegate(
+                                (BuildContext context, int index) {
+                                  final LibraryEpisodeItem item =
+                                      visibleEpisodes[index];
+                                  return CourseEpisodeTile(
                                     item: item,
                                     selected: item.id == selectedEpisodeId,
                                     fallbackCoverImage:
                                         selectedCourse.coverImage,
-                                    englishFillLabel:
-                                        fill?.englishChipProgressLabel,
-                                    chineseFillLabel:
-                                        fill?.chineseChipProgressLabel,
-                                    englishFillFailed:
-                                        fill != null &&
-                                        fill.isFailed &&
-                                        fill.needEnglish,
-                                    chineseFillFailed:
-                                        fill != null &&
-                                        fill.isFailed &&
-                                        fill.needChinese,
-                                    subtitleFillActive:
-                                        fill != null && fill.isActive,
-                                    subtitleFillProgress: fill?.progressFraction,
+                                    bottomPadding: compact ? 12 : 16,
                                     onTap: () => _openEpisodeForLearning(
                                       selectedCourse,
                                       item,
                                     ),
                                     onViewTranscript: () =>
                                         _openTranscriptReader(
-                                          selectedCourse,
-                                          item,
-                                        ),
+                                      selectedCourse,
+                                      item,
+                                    ),
                                     onRerecognizeEnglish: () {
                                       unawaited(
                                         _confirmResetEpisodeSubtitles(
@@ -984,150 +1102,19 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
                                         ),
                                       );
                                     },
-                                    trailing: Row(
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: <Widget>[
-                                        if (_pendingCollectionEpisodes(
-                                              selectedCourse,
-                                            ) >
-                                            0)
-                                          IconButton(
-                                            tooltip: '下载合集全部未下视频',
-                                            onPressed: () => unawaited(
-                                              _confirmCollectionDownload(
-                                                selectedCourse,
-                                              ),
-                                            ),
-                                            icon: const Icon(
-                                              Icons.download_rounded,
-                                            ),
-                                          ),
-                                        ReorderableDragStartListener(
-                                          index: index,
-                                          child: Icon(
-                                            Icons.drag_indicator_rounded,
-                                            color:
-                                                AppDesignTokens.textSecondary,
-                                          ),
-                                        ),
-                                      ],
-                                    ),
                                   );
-                                    },
-                                  ),
-                                );
-                              },
-                            )
-                          else
-                            ...List<Widget>.generate(visibleEpisodes.length, (
-                              int index,
-                            ) {
-                              final LibraryEpisodeItem item =
-                                  visibleEpisodes[index];
-                              return Padding(
-                                padding: EdgeInsets.only(
-                                  bottom: compact ? 12 : 16,
-                                ),
-                                child: Consumer(
-                                  builder:
-                                      (BuildContext context, WidgetRef ref, _) {
-                                    final SubtitleCompletionEpisodeUi? fill = ref
-                                        .watch(
-                                          subtitleCompletionStatusProvider,
-                                        )
-                                        .forEpisode(item.id);
-                                    return EpisodeListItem(
-                                      item: item,
-                                      selected: item.id == selectedEpisodeId,
-                                      fallbackCoverImage:
-                                          selectedCourse.coverImage,
-                                      englishFillLabel:
-                                          fill?.englishChipProgressLabel,
-                                      chineseFillLabel:
-                                          fill?.chineseChipProgressLabel,
-                                      englishFillFailed:
-                                          fill != null &&
-                                          fill.isFailed &&
-                                          fill.needEnglish,
-                                      chineseFillFailed:
-                                          fill != null &&
-                                          fill.isFailed &&
-                                          fill.needChinese,
-                                      subtitleFillActive:
-                                          fill != null && fill.isActive,
-                                      subtitleFillProgress:
-                                          fill?.progressFraction,
-                                      onTap: () => _openEpisodeForLearning(
-                                        selectedCourse,
-                                        item,
-                                      ),
-                                      onViewTranscript: () =>
-                                          _openTranscriptReader(
-                                            selectedCourse,
-                                            item,
-                                          ),
-                                      onRerecognizeEnglish: () {
-                                        unawaited(
-                                          _confirmResetEpisodeSubtitles(
-                                            selectedCourse,
-                                            item,
-                                            SubtitleResetSide.english,
-                                          ),
-                                        );
-                                      },
-                                      onRerecognizeChinese: () {
-                                        unawaited(
-                                          _confirmResetEpisodeSubtitles(
-                                            selectedCourse,
-                                            item,
-                                            SubtitleResetSide.chinese,
-                                          ),
-                                        );
-                                      },
-                                      onMissingEnglishTap: () {
-                                        unawaited(
-                                          _requestMissingSubtitleFill(
-                                            course: selectedCourse,
-                                            episode: item,
-                                            chip: SubtitleFillChip.english,
-                                          ),
-                                        );
-                                      },
-                                      onMissingChineseTap: () {
-                                        unawaited(
-                                          _requestMissingSubtitleFill(
-                                            course: selectedCourse,
-                                            episode: item,
-                                            chip: SubtitleFillChip.chinese,
-                                          ),
-                                        );
-                                      },
-                                      trailing: _pendingCollectionEpisodes(
-                                                selectedCourse,
-                                              ) >
-                                              0
-                                          ? IconButton(
-                                              tooltip: '下载合集全部未下视频',
-                                              onPressed: () => unawaited(
-                                                _confirmCollectionDownload(
-                                                  selectedCourse,
-                                                ),
-                                              ),
-                                              icon: const Icon(
-                                                Icons.download_rounded,
-                                              ),
-                                            )
-                                          : null,
-                                    );
-                                  },
-                                ),
-                              );
-                            }),
-                        ],
+                                },
+                                childCount: visibleEpisodes.length,
+                                addAutomaticKeepAlives: false,
+                                addRepaintBoundaries: true,
+                              ),
+                            ),
+                          ),
+                        ),
                       ),
-                    ),
                   ],
                 ),
+
               ],
             )
           : LayoutBuilder(

@@ -132,8 +132,8 @@ class _PlayerEpisodeStripState extends State<PlayerEpisodeStrip> {
           title: const Text('选择剧集'),
           content: SizedBox(
             width: 420,
+            height: 420,
             child: ListView.separated(
-              shrinkWrap: true,
               itemCount: widget.episodes.length,
               itemBuilder: (BuildContext context, int index) {
                 final LibraryEpisodeItem episode = widget.episodes[index];

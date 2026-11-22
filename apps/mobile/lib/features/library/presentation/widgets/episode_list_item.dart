@@ -6,6 +6,8 @@ import '../../../shared/presentation/pad/app_design_tokens.dart';
 import '../library_mock_data.dart';
 import 'library_course_poster.dart';
 
+final Map<String, bool> _displayableCoverPathCache = <String, bool>{};
+
 bool _isDisplayableCoverPath(String raw) {
   final String value = raw.trim();
   if (value.isEmpty || value.startsWith('assets/')) {
@@ -16,11 +18,18 @@ bool _isDisplayableCoverPath(String raw) {
       value.startsWith('//')) {
     return true;
   }
-  try {
-    return File(value).existsSync();
-  } catch (_) {
-    return false;
+  final bool? cached = _displayableCoverPathCache[value];
+  if (cached != null) {
+    return cached;
   }
+  bool exists = false;
+  try {
+    exists = File(value).existsSync();
+  } catch (_) {
+    exists = false;
+  }
+  _displayableCoverPathCache[value] = exists;
+  return exists;
 }
 
 class EpisodeListItem extends StatelessWidget {
