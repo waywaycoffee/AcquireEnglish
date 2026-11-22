@@ -54,3 +54,15 @@ curl -X POST "$API/api/content/media/upload" \
 ## 与阅读书库的关系
 
 在线书库只拉取**文本**（OneStop / CEFR / Magic 文案 / Standard Ebooks EPUB）。配套朗读须运营上传到 `reading` 命名空间；客户端用 `readingContentMediaProvider` 查找，不从 GitHub 拉音频进包。
+
+## 阅读页 TTS 预生成（手机不扛合成）
+
+打开读物后，App 调用 `POST /api/reading/speech/pregen`，把**当前页**排队。ECS 后台或 5060 Ti worker（`tools/reading/tts_worker.py`）逐句合成，写入：
+
+| 位置 | 用途 |
+|---|---|
+| `reading/tts/{voice}/{hash}.mp3` | 内容寻址共享缓存（全站复用） |
+| `reading/packs/{doc}/{voice}/page-{n}.json` | 共享库：页→句→URL |
+| `reading/personal/{user_id}/packs/...` | 个人库：该用户已就绪页指针 |
+
+下次打开同一页可直接播缓存 URL，避免手机端整本切句 + 现合成导致闪退。

@@ -152,6 +152,8 @@ class Endpoints {
   static const String readingVoices = 'api/reading/voices';
   static const String readingSpeech = 'api/reading/speech';
   static const String readingSpeechLookup = 'api/reading/speech/lookup';
+  static const String readingSpeechPregen = 'api/reading/speech/pregen';
+  static const String readingSpeechPack = 'api/reading/speech/pack';
   static const String pregenSentences = 'api/pregen/sentences';
   static String pregenVocab(String word) =>
       'api/pregen/vocab/${Uri.encodeComponent(word)}';

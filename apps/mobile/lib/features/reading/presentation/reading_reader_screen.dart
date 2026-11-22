@@ -253,20 +253,58 @@ class _ReadingReaderScreenState extends ConsumerState<ReadingReaderScreen> {
     });
   }
 
+  /// Ask ECS / 5060 Ti to pre-generate this page into shared+personal packs.
+  Future<void> _enqueuePageSpeechPregen(ReadingDoc doc) async {
+    final String page = _pageText.trim();
+    if (page.isEmpty) return;
+    try {
+      await ref.read(acquireApiClientProvider).enqueueReadingSpeechPregen(
+            docId: doc.id,
+            text: page,
+            voice: _ttsGender.aliyunVoiceId,
+            pageIndex: _pageIndex,
+          );
+      // Warm the next page in the background too.
+      final int next = _pageIndex + 1;
+      if (next < _pages.length) {
+        final String nextText = _pages[next].trim();
+        if (nextText.isNotEmpty) {
+          unawaited(
+            ref.read(acquireApiClientProvider).enqueueReadingSpeechPregen(
+                  docId: doc.id,
+                  text: nextText,
+                  voice: _ttsGender.aliyunVoiceId,
+                  pageIndex: next,
+                ),
+          );
+        }
+      }
+    } catch (_) {
+      // Prefetch is best-effort; playback can still synth on demand.
+    }
+  }
+
   Future<void> _playContinuous(ReadingDoc doc) async {
     if (_continuousPlaying) {
       await _stopContinuous();
       return;
     }
     final int generation = ++_continuousGeneration;
-    final List<ReadingSpeakUnit> units = splitReadingSpeakUnits(doc.plainText);
+    // Never tokenize / synth the whole novel — page-scoped only (crash fix).
+    _ensurePages(doc);
+    final List<ReadingSpeakUnit> units = splitReadingSpeakUnits(_pageText);
     if (units.isEmpty) return;
     setState(() => _continuousPlaying = true);
+    unawaited(_enqueuePageSpeechPregen(doc));
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('正在生成朗读音频…首句稍候，后续句会预取'),
-          duration: Duration(seconds: 2),
+        SnackBar(
+          content: Text(
+            _pages.length > 1
+                ? '朗读本节（${_pageIndex + 1}/${_pages.length}）· 后台预生成到服务器'
+                : '正在准备朗读…已缓存句可直接播',
+          ),
+          duration: const Duration(seconds: 2),
         ),
       );
     }
@@ -300,6 +338,7 @@ class _ReadingReaderScreenState extends ConsumerState<ReadingReaderScreen> {
         final errors = player.stream.error.listen((error) {
           if (!done.isCompleted) done.completeError(StateError(error));
         });
+        final int pageWordBase = unit.firstWordIndex;
         final position = player.stream.position.listen((position) {
           if (!mounted || generation != _continuousGeneration) {
             if (!done.isCompleted) done.complete();
@@ -311,7 +350,7 @@ class _ReadingReaderScreenState extends ConsumerState<ReadingReaderScreen> {
           final local = (position.inMilliseconds / duration * unit.wordCount)
               .floor()
               .clamp(0, unit.wordCount - 1);
-          setState(() => _highlightWordIndex = unit.firstWordIndex + local);
+          setState(() => _highlightWordIndex = pageWordBase + local);
         });
         try {
           await player.open(Media(url));
@@ -328,11 +367,13 @@ class _ReadingReaderScreenState extends ConsumerState<ReadingReaderScreen> {
       if (mounted && generation == _continuousGeneration) {
         ScaffoldMessenger.of(
           context,
-        ).showSnackBar(const SnackBar(content: Text('阿里云朗读暂不可用，请检查网络后重试')));
+        ).showSnackBar(const SnackBar(content: Text('朗读暂不可用，已改为后台生成，稍后再点播放')));
       }
     } finally {
       if (identical(_readingAudio, player)) _readingAudio = null;
-      await player.dispose();
+      try {
+        await player.dispose();
+      } catch (_) {}
       if (mounted && generation == _continuousGeneration) {
         setState(() {
           _continuousPlaying = false;
@@ -536,6 +577,7 @@ class _ReadingReaderScreenState extends ConsumerState<ReadingReaderScreen> {
     final int page = _pageIndex;
     if (_interactiveReady && _interactivePage == page) return;
     _ensurePages(doc);
+    unawaited(_enqueuePageSpeechPregen(doc));
     await _ensureGlosses(doc);
     if (!mounted || gen != _prepareGeneration || _pageIndex != page) return;
     // Yield so the plain-text frame can paint before heavy span build.

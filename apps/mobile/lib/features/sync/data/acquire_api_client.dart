@@ -3048,6 +3048,44 @@ class AcquireApiClient {
     return work;
   }
 
+  /// Fire-and-forget: queue current page TTS on ECS / 5060 Ti → shared packs.
+  Future<Map<String, dynamic>?> enqueueReadingSpeechPregen({
+    required String docId,
+    required String text,
+    required String voice,
+    int pageIndex = 0,
+  }) async {
+    final String spoken = text.trim();
+    final String id = docId.trim();
+    if (spoken.isEmpty || id.isEmpty) return null;
+    try {
+      final Response<dynamic> response = await _dio.post(
+        Endpoints.readingSpeechPregen,
+        data: <String, dynamic>{
+          'doc_id': id,
+          'text': spoken,
+          'voice': voice.trim(),
+          'page_index': pageIndex,
+          'language': 'en',
+          'process_on_ecs': true,
+        },
+        options: Options(
+          receiveTimeout: const Duration(seconds: 20),
+          sendTimeout: const Duration(seconds: 20),
+          extra: const <String, Object>{
+            'dio_cache_interceptor_force_refresh': true,
+          },
+        ),
+      );
+      final Object? data = response.data;
+      if (data is Map<String, dynamic>) return data;
+      if (data is Map) return Map<String, dynamic>.from(data);
+      return null;
+    } catch (_) {
+      return null;
+    }
+  }
+
   Future<FoundationMediaItem?> contentMediaLookup({
     required String bookId,
     required String key,
