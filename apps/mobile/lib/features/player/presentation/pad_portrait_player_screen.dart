@@ -5542,8 +5542,12 @@ Future<void> _settleChineseFillIfAlreadyPresent() async {
       return;
     }
 
-    final int playStart = continuous ? takes.first.startMs : startMs;
-    final int playEnd = continuous ? takes.last.endMs : endMs;
+    final int playStart = continuous ? 0 : startMs;
+    final int playEnd = continuous ? _videoDuration.inMilliseconds : endMs;
+    if (playEnd <= playStart) {
+      _showMessage('视频时长尚未读取，请稍后重试。');
+      return;
+    }
     final String? videoPath = _localPlayableVideoPath();
     if (videoPath == null) {
       _showMessage('请先下载视频，再生成环境音配音。');
@@ -5556,10 +5560,6 @@ Future<void> _settleChineseFillIfAlreadyPresent() async {
             episodeId: widget.episodeId,
             videoSource: videoPath,
           );
-      if (accompaniment == null) {
-        _showMessage('环境音分离不可用，请配置人声分离服务后重试。');
-        return;
-      }
       final DubExportResult mix = await _dubExportService.export(
         episodeId: widget.episodeId,
         videoSource: videoPath,
@@ -5598,11 +5598,25 @@ Future<void> _settleChineseFillIfAlreadyPresent() async {
       await audio.play();
       await player.play();
       if (mounted) setState(() => state.isPlaying = true);
-      _showMessage('正在播放环境音＋我的配音');
+      final String playbackLabel = accompaniment == null
+          ? '正在播放配音，配音处原声已压低'
+          : '正在播放环境音＋我的配音';
+      _showMessage('$playbackLabel${_dubScoreLabel(takes)}');
     } catch (error) {
       await _stopDubPlayback();
       _showMessage('配音合成失败，请检查分离服务或设备混音支持。');
     }
+  }
+
+  String _dubScoreLabel(Iterable<DubTake> takes) {
+    final List<int> scores = [
+      for (final DubTake take in takes)
+        if (take.professionalScore && take.scorePercent != null)
+          take.scorePercent!,
+    ];
+    if (scores.isEmpty) return '';
+    final int average = (scores.reduce((a, b) => a + b) / scores.length).round();
+    return ' · 已评分 ${scores.length} 句，平均 $average 分';
   }
 
   Future<void> _handleDubExportShare({required bool fullEpisode}) async {
@@ -5627,8 +5641,15 @@ Future<void> _settleChineseFillIfAlreadyPresent() async {
       );
     } catch (_) {}
 
-    final int? rangeStart = fullEpisode ? null : state.activeLine.startMs;
-    final int? rangeEnd = fullEpisode ? null : state.activeLine.endMs;
+    final int rangeStart = fullEpisode ? 0 : state.activeLine.startMs;
+    final int rangeEnd = fullEpisode ? _videoDuration.inMilliseconds : state.activeLine.endMs;
+    if (rangeEnd <= rangeStart) {
+      _showMessage('视频时长尚未读取，请稍后重试。');
+      return;
+    }
+    final String scoreLabel = _dubScoreLabel(
+      takes.where((take) => take.endMs > rangeStart && take.startMs < rangeEnd),
+    );
     try {
       final DubExportResult exported = await _dubExportService.export(
         episodeId: widget.episodeId,
@@ -5640,7 +5661,7 @@ Future<void> _settleChineseFillIfAlreadyPresent() async {
       );
       final WechatShareOutcome share = await WechatShareHelper.shareVideoFile(
         filePath: exported.outputPath,
-        title: fullEpisode ? '整段配音练习' : '本句配音练习',
+        title: '${fullEpisode ? '整段配音练习' : '本句配音练习'}$scoreLabel',
       );
       if (!mounted) {
         return;

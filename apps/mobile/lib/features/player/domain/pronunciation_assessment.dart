@@ -91,6 +91,14 @@ class PronunciationWordResult {
   final String word;
   final String referenceWord;
   final int matchTag;
+
+  String get shadowingFeedback => switch (matchTag) {
+    1 => '多读',
+    2 => '漏读',
+    3 => '错读',
+    4 => '未录入',
+    _ => accuracy != null && accuracy! < 60 ? '发音需练习' : '',
+  };
   final double? accuracy;
 }
 
@@ -108,6 +116,13 @@ class PronunciationAssessmentResult {
   final double? fluency;
   final double? completion;
   final List<PronunciationWordResult> words;
+
+  int? get shadowingScore {
+    final double? score = suggestedScore ?? accuracy;
+    if (score == null) return null;
+    final double? coverage = completion;
+    return (coverage == null ? score : score.clamp(0, coverage * 100)).round();
+  }
 
   static PronunciationAssessmentResult? tryParse(Object? raw) {
     if (raw is! Map) return null;

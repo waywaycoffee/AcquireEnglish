@@ -17,7 +17,6 @@ import '../../../settings/data/pronunciation_credentials.dart';
 import '../../../settings/presentation/settings_provider.dart';
 import '../../../sync/data/acquire_api_client.dart';
 import '../../data/dub_session_store.dart';
-import '../../data/local_shadow_scorer.dart';
 import '../../data/pronunciation_audio_extractor.dart';
 import '../../data/pronunciation_providers.dart';
 import '../../data/voice_practice_client.dart';
@@ -186,7 +185,6 @@ class _StudyShadowingTabState extends ConsumerState<StudyShadowingTab> {
   Future<void> Function()? _cancelExtraction;
   String? _boundTargetKey;
   final VoicePracticeClient _voiceClient = VoicePracticeClient();
-  final LocalShadowScorer _localScorer = const LocalShadowScorer();
   bool _voiceBusy = false;
   bool _communityPublishBusy = false;
   VoiceShadowResult? _voiceResult;
@@ -808,7 +806,7 @@ class _StudyShadowingTabState extends ConsumerState<StudyShadowingTab> {
         .replaceFirst(RegExp(r'^Exception:\s*'), '');
   }
 
-  /// Cloud SOE → optional device keys → Voice sidecar → duration heuristic.
+  /// Cloud SOE → optional device keys → Voice sidecar.
   Future<void> _scoreAfterRecording({
     required String path,
     required Pcm16MonoAudio audio,
@@ -851,7 +849,7 @@ class _StudyShadowingTabState extends ConsumerState<StudyShadowingTab> {
             return;
           }
           final int? score =
-              (assessment.suggestedScore ?? assessment.accuracy)?.round();
+              assessment.shadowingScore;
           setState(() {
             _assessment = assessment;
             _message = score == null ? '发音评测完成' : '发音评分 $score 分';
@@ -889,7 +887,7 @@ class _StudyShadowingTabState extends ConsumerState<StudyShadowingTab> {
             return;
           }
           final int? score =
-              (assessment.suggestedScore ?? assessment.accuracy)?.round();
+              assessment.shadowingScore;
           setState(() {
             _assessment = assessment;
             _message = score == null ? '发音评测完成' : '发音评分 $score 分';
@@ -923,28 +921,16 @@ class _StudyShadowingTabState extends ConsumerState<StudyShadowingTab> {
         }
       }
 
-      // 4) Always surface a score so 跟读 never ends blank.
-      result ??= _localScorer.durationHeuristic(
-        referenceText: reference,
-        referenceMs: _reference?.audio.durationMs ??
-            (widget.line.endMs - widget.line.startMs).clamp(500, 60000),
-        recordingMs: audio.durationMs,
-      );
-
-      if (!mounted || _resourcesReleased) {
-        return;
+      if (!mounted || _resourcesReleased || scoringKey != _boundTargetKey) return;
+      final VoiceShadowResult? feedback = result;
+      if (feedback == null || feedback.mock) {
+        setState(() => _message = '录音已保存 · 暂未取得评分，可点重新评分。');
+      } else {
+        setState(() {
+          _voiceResult = feedback;
+          _message = '文本匹配度 ${feedback.scorePercentLabel}';
+        });
       }
-      if (scoringKey != _boundTargetKey) return;
-      setState(() {
-        _voiceResult = result;
-        final String scoreLabel = result!.scorePercentLabel;
-        if (result.mock) {
-          _message = '跟读完成 · 参考分 $scoreLabel';
-        } else {
-          _message = '跟读反馈 · $scoreLabel';
-        }
-      });
-      widget.onScoreForReview?.call((result.overlap.score * 100).round());
       unawaited(_persistDubTake(path));
     } finally {
       if (mounted && !_resourcesReleased) {
@@ -1000,7 +986,7 @@ class _StudyShadowingTabState extends ConsumerState<StudyShadowingTab> {
           createdAt: _takeCreatedAt ??= DateTime.now(),
           professionalScore: _assessment != null,
           scorePercent: _assessment != null
-              ? (_assessment!.suggestedScore ?? _assessment!.accuracy)?.round()
+              ? _assessment!.shadowingScore
               : _voiceResult == null || _voiceResult!.mock
               ? null
               : (_voiceResult!.overlap.score * 100).round(),
@@ -1131,6 +1117,36 @@ class _StudyShadowingTabState extends ConsumerState<StudyShadowingTab> {
                 ),
                 const SizedBox(height: 10),
               ],
+              if (widget.episodeId != null &&
+                  (widget.onDubPlaybackRequested != null ||
+                   widget.onExportShareRequested != null))
+                Wrap(
+                  spacing: 8,
+                  children: [
+                    if (widget.onDubPlaybackRequested != null)
+                      OutlinedButton.icon(
+                        key: const ValueKey<String>('study-shadowing-dub-play-all'),
+                        onPressed: _recordingActive ? null : () => unawaited(
+                          widget.onDubPlaybackRequested!(
+                            startMs: widget.line.startMs,
+                            endMs: widget.line.endMs,
+                            userWavPath: '',
+                            continuous: true,
+                          ),
+                        ),
+                        icon: const Icon(Icons.playlist_play_rounded),
+                        label: const Text('整段配音回放'),
+                      ),
+                    if (widget.onExportShareRequested != null)
+                      TextButton(
+                        key: const ValueKey<String>('study-shadowing-share-full'),
+                        onPressed: _recordingActive ? null : () => unawaited(
+                          widget.onExportShareRequested!(fullEpisode: true),
+                        ),
+                        child: const Text('分享整段配音'),
+                      ),
+                  ],
+                ),
               if (_practiceCount > 0)
                 Padding(
                   padding: const EdgeInsets.only(bottom: 8),
@@ -1312,22 +1328,23 @@ class _StudyShadowingTabState extends ConsumerState<StudyShadowingTab> {
                 ),
               ],
               if (_assessment != null) ...<Widget>[
-                Text('发音评分：${_assessment!.suggestedScore?.round() ?? "—"}分'),
-                Text(
-                  '准确度 ${_assessment!.accuracy?.round() ?? "—"} · 流利度 ${_assessment!.fluency?.round() ?? "—"} · 完整度 ${_assessment!.completion?.round() ?? "—"}',
-                ),
+                Text('发音评分：${_assessment!.shadowingScore ?? "—"}分'),
+                if (_assessment!.words.isEmpty)
+                  const Text('本次评测未返回逐词结果。'),
                 Wrap(
                   spacing: 8,
+                  runSpacing: 4,
                   children: <Widget>[
-                    for (final PronunciationWordResult word
-                        in _assessment!.words)
-                      Text(
-                        '${word.referenceWord}: ${word.accuracy?.round() ?? "—"}',
-                        style: TextStyle(
-                          color: (word.accuracy ?? 0) < 60
-                              ? Colors.orange
-                              : Colors.green,
-                        ),
+                    for (final PronunciationWordResult word in _assessment!.words)
+                      Chip(
+                        label: Text([
+                          word.referenceWord.isEmpty ? word.word : word.referenceWord,
+                          word.shadowingFeedback,
+                          if (word.accuracy != null) '${word.accuracy!.round()}',
+                        ].join(' · ')),
+                        backgroundColor: word.shadowingFeedback.isEmpty
+                            ? null
+                            : Colors.deepOrange.withValues(alpha: 0.22),
                       ),
                   ],
                 ),
@@ -1346,8 +1363,7 @@ class _StudyShadowingTabState extends ConsumerState<StudyShadowingTab> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: <Widget>[
                       Text(
-                        '重叠 ${_voiceResult!.scorePercentLabel}'
-                        '${_voiceResult!.mock ? ' · 粗评' : ''}',
+                        '文本匹配度 ${_voiceResult!.scorePercentLabel}',
                         style: TextStyle(
                           fontSize: 14,
                           fontWeight: FontWeight.w700,
@@ -1414,25 +1430,6 @@ class _StudyShadowingTabState extends ConsumerState<StudyShadowingTab> {
                       icon: const Icon(Icons.movie_filter_rounded, size: 18),
                       label: const Text('配音回放'),
                     ),
-                    if (widget.onDubPlaybackRequested != null &&
-                        widget.episodeId != null)
-                      OutlinedButton.icon(
-                        key: const ValueKey<String>(
-                          'study-shadowing-dub-play-all',
-                        ),
-                        onPressed: _recordingPath == null
-                            ? null
-                            : () => unawaited(
-                                widget.onDubPlaybackRequested!(
-                                  startMs: widget.line.startMs,
-                                  endMs: widget.line.endMs,
-                                  userWavPath: _recordingPath!,
-                                  continuous: true,
-                                ),
-                              ),
-                        icon: const Icon(Icons.playlist_play_rounded, size: 18),
-                        label: const Text('连续回放'),
-                      ),
                     OutlinedButton.icon(
                       onPressed: _recordingPath == null
                           ? null
@@ -1473,16 +1470,6 @@ class _StudyShadowingTabState extends ConsumerState<StudyShadowingTab> {
                               ),
                         icon: const Icon(Icons.share_rounded, size: 18),
                         label: const Text('分享本句'),
-                      ),
-                    if (widget.onExportShareRequested != null)
-                      TextButton(
-                        key: const ValueKey<String>(
-                          'study-shadowing-share-full',
-                        ),
-                        onPressed: () => unawaited(
-                          widget.onExportShareRequested!(fullEpisode: true),
-                        ),
-                        child: const Text('分享整段配音'),
                       ),
                     if (widget.onOpenFullDialog != null)
                       TextButton(

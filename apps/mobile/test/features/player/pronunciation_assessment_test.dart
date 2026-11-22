@@ -6,6 +6,24 @@ import 'package:common_learn_english/features/player/presentation/pronunciation_
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
+  test('shadowing score accounts for omitted words and labels word errors', () {
+    final result = PronunciationAssessmentResult.tryParse({
+      'score': 96,
+      'completion': 0.5,
+      'words': [
+        {'reference_word': 'get', 'match_tag': 2},
+        {'reference_word': 'up', 'match_tag': 3},
+        {'word': 'now', 'match_tag': 1},
+      ],
+    })!;
+    expect(result.shadowingScore, 50);
+    expect(result.words.map((word) => word.shadowingFeedback), [
+      '漏读',
+      '错读',
+      '多读',
+    ]);
+  });
+
   test(
     'sound alignment removes leading silence and clicks, preserves pauses',
     () {
