@@ -42,13 +42,8 @@ class TodayPathCard extends ConsumerWidget {
             ),
             const SizedBox(height: 8),
             Text(
-              '可开启官方「核心口语 9000 句」，或在视频/阅读页点「开启课程学习模式」。',
+              '在下方技能模块点「核心口语9000句」，或在视频/阅读页开启课程学习模式。',
               style: TextStyle(fontSize: 13, color: muted, height: 1.4),
-            ),
-            const SizedBox(height: 12),
-            OutlinedButton(
-              onPressed: () => context.push('/courses/oral-core-9000'),
-              child: const Text('打开官方课 · 核心口语 9000 句'),
             ),
             if (path.tasks.isNotEmpty) ...<Widget>[
               const SizedBox(height: 12),

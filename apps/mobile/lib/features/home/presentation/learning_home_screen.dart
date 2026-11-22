@@ -568,6 +568,32 @@ class _LearningHomeScreenState extends ConsumerState<LearningHomeScreen> {
                     ),
                     const SizedBox(height: 14),
                     InkWell(
+                      onTap: () => context.push('/courses/oral-core-9000'),
+                      child: section(
+                        Row(
+                          children: <Widget>[
+                            Icon(Icons.school_outlined, size: 28, color: accent),
+                            const SizedBox(width: 14),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: <Widget>[
+                                  text('核心口语9000句', 16, bold: true),
+                                  text(
+                                    '151 情景课 · 跟读 · 练习 · AI 讨论',
+                                    11,
+                                    color: muted,
+                                  ),
+                                ],
+                              ),
+                            ),
+                            Icon(Icons.chevron_right, color: accent),
+                          ],
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 14),
+                    InkWell(
                       onTap: () => context.push('/learn/listening'),
                       child: section(
                         Row(
