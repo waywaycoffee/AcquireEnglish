@@ -7,6 +7,7 @@ import 'package:hive_ce/hive.dart';
 
 import '../../../constants/endpoints.dart';
 import '../domain/reading_doc.dart';
+import '../domain/reading_title_zh.dart';
 import 'reading_ingest.dart';
 
 enum ReadingCatalogKind {
@@ -92,6 +93,7 @@ class ReadingCatalogEntry {
     required this.id,
     required this.title,
     required this.kind,
+    this.titleZh = '',
     this.subtitle = '',
     this.level = '',
     this.path = '',
@@ -102,6 +104,7 @@ class ReadingCatalogEntry {
 
   final String id;
   final String title;
+  final String titleZh;
   final ReadingCatalogEntryKind kind;
   final String subtitle;
   final String level;
@@ -110,6 +113,9 @@ class ReadingCatalogEntry {
   final String? externalUrl;
   final int sizeBytes;
 
+  String get displayTitle =>
+      readingDisplayTitle(title, titleZh: titleZh);
+
   String get stableDocId {
     final Digest digest = sha1.convert(utf8.encode(id));
     return 'catalog_${digest.toString().substring(0, 16)}';
@@ -117,57 +123,73 @@ class ReadingCatalogEntry {
 }
 
 /// Featured Standard Ebooks classics (direct EPUB, no OPDS auth).
-const List<({String path, String title, String author})>
-kStandardEbooksFeatured = <({String path, String title, String author})>[
+const List<({String path, String title, String titleZh, String author})>
+kStandardEbooksFeatured =
+    <({String path, String title, String titleZh, String author})>[
   (
     path: 'l-frank-baum/the-wonderful-wizard-of-oz',
     title: 'The Wonderful Wizard of Oz',
+    titleZh: '绿野仙踪',
     author: 'L. Frank Baum',
   ),
   (
     path: 'jane-austen/pride-and-prejudice',
     title: 'Pride and Prejudice',
+    titleZh: '傲慢与偏见',
     author: 'Jane Austen',
   ),
   (
     path: 'mary-shelley/frankenstein',
     title: 'Frankenstein',
+    titleZh: '弗兰肯斯坦',
     author: 'Mary Shelley',
   ),
-  (path: 'bram-stoker/dracula', title: 'Dracula', author: 'Bram Stoker'),
+  (
+    path: 'bram-stoker/dracula',
+    title: 'Dracula',
+    titleZh: '德古拉',
+    author: 'Bram Stoker',
+  ),
   (
     path: 'lewis-carroll/alices-adventures-in-wonderland',
     title: 'Alice’s Adventures in Wonderland',
+    titleZh: '爱丽丝漫游奇境',
     author: 'Lewis Carroll',
   ),
   (
     path: 'arthur-conan-doyle/the-adventures-of-sherlock-holmes',
     title: 'The Adventures of Sherlock Holmes',
+    titleZh: '福尔摩斯探案集',
     author: 'Arthur Conan Doyle',
   ),
   (
     path: 'charles-dickens/a-christmas-carol',
     title: 'A Christmas Carol',
+    titleZh: '圣诞颂歌',
     author: 'Charles Dickens',
   ),
   (
     path: 'robert-louis-stevenson/treasure-island',
     title: 'Treasure Island',
+    titleZh: '金银岛',
     author: 'Robert Louis Stevenson',
   ),
   (
     path: 'jonathan-swift/gullivers-travels',
     title: 'Gulliver’s Travels',
+    titleZh: '格列佛游记',
     author: 'Jonathan Swift',
   ),
   (
     path: 'mark-twain/the-adventures-of-huckleberry-finn',
     title: 'Adventures of Huckleberry Finn',
+    titleZh: '哈克贝利·费恩历险记',
     author: 'Mark Twain',
   ),
   (
     path: 'herman-melville/moby-dick',
     title: 'Moby Dick',
+    titleZh: '白鲸',
     author: 'Herman Melville',
   ),
 ];
@@ -175,6 +197,7 @@ kStandardEbooksFeatured = <({String path, String title, String author})>[
 const ReadingCatalogEntry kDefaultWizardOfOzEntry = ReadingCatalogEntry(
   id: 'se:l-frank-baum/the-wonderful-wizard-of-oz',
   title: 'The Wonderful Wizard of Oz',
+  titleZh: '绿野仙踪',
   kind: ReadingCatalogEntryKind.ebook,
   subtitle: 'L. Frank Baum · 公版奇幻长篇',
   level: 'B1',
@@ -539,11 +562,12 @@ class ReadingCatalogClient {
 
   List<ReadingCatalogEntry> _listStandardEbooksFeatured() {
     return <ReadingCatalogEntry>[
-      for (final ({String path, String title, String author}) book
+      for (final ({String path, String title, String titleZh, String author}) book
           in kStandardEbooksFeatured)
         ReadingCatalogEntry(
           id: 'se:${book.path}',
           title: book.title,
+          titleZh: book.titleZh,
           kind: ReadingCatalogEntryKind.ebook,
           subtitle: book.author,
           path: book.path,
@@ -572,6 +596,7 @@ class ReadingCatalogClient {
         ReadingCatalogEntry(
           id: 'se-new:$path',
           title: title,
+          titleZh: readingTitleZhFor(title) ?? '',
           kind: ReadingCatalogEntryKind.ebook,
           path: path,
           downloadUrl: epub.split('?').first,
@@ -595,9 +620,11 @@ class ReadingCatalogClient {
         'https://raw.githubusercontent.com/nishkalavallabhi/OneStopEnglishCorpus/master/${entry.path.split('/').map(Uri.encodeComponent).join('/')}';
     final String text = (await _getString(url)).trim();
     if (text.isEmpty) throw StateError('正文为空');
+    final String zh = readingTitleZhFor(entry.title, titleZh: entry.titleZh) ?? '';
     return ReadingDoc(
       id: entry.stableDocId,
-      title: entry.title,
+      title: readingDisplayTitle(entry.title, titleZh: zh),
+      titleZh: zh,
       sourceType: ReadingSourceType.catalog,
       level: entry.level,
       plainText: text,
@@ -626,9 +653,11 @@ class ReadingCatalogClient {
           .trim();
     }
     if (text.isEmpty) throw StateError('故事正文为空');
+    final String zh = readingTitleZhFor(entry.title, titleZh: entry.titleZh) ?? '';
     return ReadingDoc(
       id: entry.stableDocId,
-      title: entry.title,
+      title: readingDisplayTitle(entry.title, titleZh: zh),
+      titleZh: zh,
       sourceType: ReadingSourceType.catalog,
       level: entry.level,
       plainText: text,
@@ -649,9 +678,12 @@ class ReadingCatalogClient {
     if (hit == null || (hit['text'] ?? '').trim().isEmpty) {
       throw StateError('请先导入 cefr_leveled_texts.csv');
     }
+    final String rawTitle = hit['title'] ?? entry.title;
+    final String zh = readingTitleZhFor(rawTitle, titleZh: entry.titleZh) ?? '';
     return ReadingDoc(
       id: entry.stableDocId,
-      title: hit['title'] ?? entry.title,
+      title: readingDisplayTitle(rawTitle, titleZh: zh),
+      titleZh: zh,
       sourceType: ReadingSourceType.catalog,
       level: hit['level'] ?? entry.level,
       plainText: hit['text']!.trim(),
@@ -676,9 +708,11 @@ class ReadingCatalogClient {
     if (data == null || data.isEmpty) throw StateError('EPUB 下载失败');
     final String text = parseEpubImport(Uint8List.fromList(data));
     if (text.trim().isEmpty) throw StateError('未能从 EPUB 提取正文');
+    final String zh = readingTitleZhFor(entry.title, titleZh: entry.titleZh) ?? '';
     return ReadingDoc(
       id: entry.stableDocId,
-      title: entry.title,
+      title: readingDisplayTitle(entry.title, titleZh: zh),
+      titleZh: zh,
       sourceType: ReadingSourceType.catalog,
       level: entry.level,
       plainText: text,
@@ -718,9 +752,12 @@ class ReadingCatalogClient {
         if (text.trim().isEmpty) {
           throw StateError('未能从源码包提取正文');
         }
+        final String zh =
+            readingTitleZhFor(entry.title, titleZh: entry.titleZh) ?? '';
         return ReadingDoc(
           id: entry.stableDocId,
-          title: entry.title,
+          title: readingDisplayTitle(entry.title, titleZh: zh),
+          titleZh: zh,
           sourceType: ReadingSourceType.catalog,
           level: entry.level,
           plainText: text,

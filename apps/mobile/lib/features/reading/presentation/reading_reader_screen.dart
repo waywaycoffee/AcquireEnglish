@@ -76,8 +76,16 @@ class _ReadingReaderScreenState extends ConsumerState<ReadingReaderScreen> {
   String? _glossDocId;
   int _glossThreshold = -1;
   int _glossListsSig = -1;
+  int _glossPageIndex = -1;
   Map<String, String> _hardGlosses = const <String, String>{};
+  final Map<int, Map<String, String>> _glossByPage =
+      <int, Map<String, String>>{};
   bool _glossLoading = false;
+  /// False until current page has interactive spans (plain Text first).
+  bool _interactiveReady = false;
+  int _interactivePage = -1;
+  int _prepareGeneration = 0;
+  bool _prepareScheduled = false;
   double? _unknownRate;
   String _focusedSentence = '';
   int _pageIndex = 0;
@@ -88,6 +96,12 @@ class _ReadingReaderScreenState extends ConsumerState<ReadingReaderScreen> {
   void initState() {
     super.initState();
     _loadPrefs();
+    // Warm ECDICT off the critical first paint.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      unawaited(
+        ref.read(offlineWordDictionaryProvider).ensureLoaded(),
+      );
+    });
   }
 
   void _ensurePages(ReadingDoc doc) {
@@ -377,18 +391,71 @@ class _ReadingReaderScreenState extends ConsumerState<ReadingReaderScreen> {
     );
   }
 
+  void _invalidateGlosses({bool clearCache = false}) {
+    _glossDocId = null;
+    _glossPageIndex = -1;
+    _interactiveReady = false;
+    _interactivePage = -1;
+    if (clearCache) {
+      _glossByPage.clear();
+      _hardGlosses = const <String, String>{};
+    }
+  }
+
+  Future<Map<String, String>> _buildPageGlosses({
+    required ReadingDoc doc,
+    required int pageIndex,
+    required ReadingFrequencyLexicon lexicon,
+    required OfflineWordDictionary dictionary,
+    required ReadingVocabLists lists,
+    required Set<String> known,
+  }) async {
+    if (pageIndex < 0 || pageIndex >= _pages.length) {
+      return const <String, String>{};
+    }
+    final Map<String, String>? cached = _glossByPage[pageIndex];
+    if (cached != null &&
+        _glossDocId == doc.id &&
+        _glossThreshold == _freqThreshold) {
+      return cached;
+    }
+    final List<String> tokens = extractReadingWordTokens(_pages[pageIndex]);
+    final Map<String, String> glosses = await buildHardWordGlosses(
+      words: tokens.toSet(),
+      lexicon: lexicon,
+      dictionary: dictionary,
+      threshold: _freqThreshold,
+      known: known,
+      focus: lists.focus,
+    );
+    _glossByPage[pageIndex] = glosses;
+    return glosses;
+  }
+
   Future<void> _ensureGlosses(ReadingDoc doc) async {
     final ReadingVocabLists lists = ref.read(readingVocabListsProvider);
     final Set<String> learned = ref.read(learnedVocabularyProvider);
     final int listsSig = _listsSignature(lists, learned);
+    _ensurePages(doc);
+    final int page = _pageIndex;
     if (_glossDocId == doc.id &&
         _glossThreshold == _freqThreshold &&
-        _glossListsSig == listsSig) {
+        _glossListsSig == listsSig &&
+        _glossPageIndex == page &&
+        _glossByPage.containsKey(page)) {
+      _hardGlosses = _glossByPage[page]!;
       return;
+    }
+    final bool settingsChanged = _glossDocId != doc.id ||
+        _glossThreshold != _freqThreshold ||
+        _glossListsSig != listsSig;
+    if (settingsChanged) {
+      _glossByPage.clear();
     }
     _glossDocId = doc.id;
     _glossThreshold = _freqThreshold;
     _glossListsSig = listsSig;
+    _glossPageIndex = page;
     if (mounted) setState(() => _glossLoading = true);
     try {
       final ReadingFrequencyLexicon lexicon = await ref.read(
@@ -397,20 +464,21 @@ class _ReadingReaderScreenState extends ConsumerState<ReadingReaderScreen> {
       final OfflineWordDictionary dictionary = ref.read(
         offlineWordDictionaryProvider,
       );
+      await dictionary.ensureLoaded();
       final Set<String> known = effectiveKnownWords(
         lists: lists,
         learned: learned,
       );
-      // Gloss against the visible page only — full novels are too large.
-      _ensurePages(doc);
-      final List<String> tokens = extractReadingWordTokens(_pageText);
-      final Map<String, String> glosses = await buildHardWordGlosses(
-        words: tokens.toSet(),
+      final Map<String, String> glosses = await _buildPageGlosses(
+        doc: doc,
+        pageIndex: page,
         lexicon: lexicon,
         dictionary: dictionary,
-        threshold: _freqThreshold,
+        lists: lists,
         known: known,
-        focus: lists.focus,
+      );
+      final List<String> tokens = extractReadingWordTokens(
+        page < _pages.length ? _pages[page] : '',
       );
       final double rate = unknownWordRate(
         words: tokens,
@@ -419,12 +487,26 @@ class _ReadingReaderScreenState extends ConsumerState<ReadingReaderScreen> {
         known: known,
         focus: lists.focus,
       );
-      if (!mounted || _glossDocId != doc.id) return;
+      if (!mounted || _glossDocId != doc.id || _pageIndex != page) return;
       setState(() {
         _hardGlosses = glosses;
         _unknownRate = rate;
         _glossLoading = false;
       });
+      // Prefetch the next page while the user reads.
+      final int next = page + 1;
+      if (next < _pages.length && !_glossByPage.containsKey(next)) {
+        unawaited(
+          _buildPageGlosses(
+            doc: doc,
+            pageIndex: next,
+            lexicon: lexicon,
+            dictionary: dictionary,
+            lists: lists,
+            known: known,
+          ),
+        );
+      }
     } catch (_) {
       if (!mounted || _glossDocId != doc.id) return;
       setState(() {
@@ -433,6 +515,34 @@ class _ReadingReaderScreenState extends ConsumerState<ReadingReaderScreen> {
         _glossLoading = false;
       });
     }
+  }
+
+  void _schedulePrepareInteractive(ReadingDoc doc) {
+    if (_prepareScheduled) return;
+    if (_interactiveReady && _interactivePage == _pageIndex) return;
+    _prepareScheduled = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _prepareScheduled = false;
+      if (!mounted) return;
+      unawaited(_prepareInteractivePage(doc));
+    });
+  }
+
+  /// Plain text first; then enable per-word WidgetSpans + glosses.
+  Future<void> _prepareInteractivePage(ReadingDoc doc) async {
+    final int gen = ++_prepareGeneration;
+    final int page = _pageIndex;
+    if (_interactiveReady && _interactivePage == page) return;
+    _ensurePages(doc);
+    await _ensureGlosses(doc);
+    if (!mounted || gen != _prepareGeneration || _pageIndex != page) return;
+    // Yield so the plain-text frame can paint before heavy span build.
+    await Future<void>.delayed(Duration.zero);
+    if (!mounted || gen != _prepareGeneration || _pageIndex != page) return;
+    setState(() {
+      _interactiveReady = true;
+      _interactivePage = page;
+    });
   }
 
   Future<void> _playRemoteAudio(FoundationMediaItem item) async {
@@ -910,7 +1020,7 @@ class _ReadingReaderScreenState extends ConsumerState<ReadingReaderScreen> {
                             setModal(() => _freqThreshold = band);
                             setState(() {
                               _freqThreshold = band;
-                              _glossDocId = null;
+                              _invalidateGlosses(clearCache: true);
                             });
                             unawaited(_persistPrefs());
                           },
@@ -960,9 +1070,11 @@ class _ReadingReaderScreenState extends ConsumerState<ReadingReaderScreen> {
         }
       });
     }
-    unawaited(_ensureGlosses(doc));
+    _schedulePrepareInteractive(doc);
 
     final bool showChinese = _mode.showInlineChinese;
+    final bool useInteractive =
+        _interactiveReady && _interactivePage == _pageIndex;
     final Color bg = readingBackgroundColor(_dark);
     final Color fg = readingForegroundColor(_dark);
     final AsyncValue<FoundationMediaManifest> mediaAsync = ref.watch(
@@ -989,11 +1101,13 @@ class _ReadingReaderScreenState extends ConsumerState<ReadingReaderScreen> {
       showContinueLearning: false,
       showNavigation: false,
       topBar: PadTopBar(
-        title: doc.title,
+        title: doc.displayTitle,
         trailing: const SizedBox.shrink(),
-        description: _mode == ReadingStudyMode.immersion
-            ? '沉浸 · ${_ttsGender.labelCn} · 连续朗读${_slowMode ? ' · 慢读' : ''}$rateLabel'
-            : '精读 · ${_ttsGender.labelCn} · 难词(>$_freqThreshold)${_slowMode ? ' · 慢读' : ''}$rateLabel',
+        description: !useInteractive
+            ? '正在打开 · 可先阅读，标注稍后出现'
+            : (_mode == ReadingStudyMode.immersion
+                ? '沉浸 · ${_ttsGender.labelCn} · 连续朗读${_slowMode ? ' · 慢读' : ''}$rateLabel'
+                : '精读 · ${_ttsGender.labelCn} · 难词(>$_freqThreshold)${_slowMode ? ' · 慢读' : ''}$rateLabel'),
         leading: PadBackButton(onPressed: () => context.pop()),
         actions: <Widget>[
           IconButton(
@@ -1147,7 +1261,7 @@ class _ReadingReaderScreenState extends ConsumerState<ReadingReaderScreen> {
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: <Widget>[
                   Text(
-                    doc.title,
+                    doc.displayTitle,
                     textAlign: TextAlign.center,
                     style: TextStyle(
                       fontSize: 26,
@@ -1225,12 +1339,19 @@ class _ReadingReaderScreenState extends ConsumerState<ReadingReaderScreen> {
                                 : () {
                                     setState(() {
                                       _pageIndex -= 1;
-                                      _glossDocId = null;
+                                      _interactiveReady = false;
+                                      _interactivePage = -1;
+                                      _glossPageIndex = -1;
+                                      final Map<String, String>? cached =
+                                          _glossByPage[_pageIndex];
+                                      if (cached != null) {
+                                        _hardGlosses = cached;
+                                      }
                                     });
                                     if (_scroll.hasClients) {
                                       _scroll.jumpTo(0);
                                     }
-                                    unawaited(_ensureGlosses(doc));
+                                    unawaited(_prepareInteractivePage(doc));
                                     unawaited(
                                       ref
                                           .read(readingLibraryProvider.notifier)
@@ -1262,12 +1383,19 @@ class _ReadingReaderScreenState extends ConsumerState<ReadingReaderScreen> {
                                 : () {
                                     setState(() {
                                       _pageIndex += 1;
-                                      _glossDocId = null;
+                                      _interactiveReady = false;
+                                      _interactivePage = -1;
+                                      _glossPageIndex = -1;
+                                      final Map<String, String>? cached =
+                                          _glossByPage[_pageIndex];
+                                      if (cached != null) {
+                                        _hardGlosses = cached;
+                                      }
                                     });
                                     if (_scroll.hasClients) {
                                       _scroll.jumpTo(0);
                                     }
-                                    unawaited(_ensureGlosses(doc));
+                                    unawaited(_prepareInteractivePage(doc));
                                     unawaited(
                                       ref
                                           .read(readingLibraryProvider.notifier)
@@ -1284,6 +1412,17 @@ class _ReadingReaderScreenState extends ConsumerState<ReadingReaderScreen> {
                         ],
                       ),
                     ),
+                  if (!useInteractive)
+                    Text(
+                      _pageText,
+                      style: TextStyle(
+                        color: fg,
+                        fontSize: _fontSize,
+                        height: _lineHeight,
+                        fontFamily: 'Georgia',
+                      ),
+                    )
+                  else
                   Text.rich(
                     TextSpan(
                       children: buildReadingTextSpans(

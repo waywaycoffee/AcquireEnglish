@@ -195,7 +195,7 @@ class _ReadingCatalogScreenState extends ConsumerState<ReadingCatalogScreen> {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('已加入书架「${doc.title}」· ${doc.wordCount} 词'),
+          content: Text('已加入书架「${doc.displayTitle}」· ${doc.wordCount} 词'),
           action: SnackBarAction(
             label: '阅读',
             onPressed: () {
@@ -361,7 +361,7 @@ class _ReadingCatalogScreenState extends ConsumerState<ReadingCatalogScreen> {
                       color: AppDesignTokens.brandGreenDark,
                     ),
                     title: Text(
-                      entry.title,
+                      entry.displayTitle,
                       style: TextStyle(
                         fontWeight: FontWeight.w700,
                         color: AppDesignTokens.textPrimary,

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/services.dart';
@@ -113,12 +114,29 @@ class ReadingLibraryNotifier extends Notifier<ReadingLibraryState> {
     final List<ReadingDoc> userDocs = _loadUserDocs();
     final Map<String, ReadingProgress> progress = _loadProgress();
     if (!ref.mounted) return;
+    final List<ReadingDoc> enrichedUser = <ReadingDoc>[
+      for (final ReadingDoc d in userDocs) d.withEnrichedTitle(),
+    ];
+    final List<ReadingDoc> enrichedBuiltin = <ReadingDoc>[
+      for (final ReadingDoc d in builtin) d.withEnrichedTitle(),
+    ];
+    bool titlesChanged = false;
+    for (int i = 0; i < enrichedUser.length; i++) {
+      if (enrichedUser[i].title != userDocs[i].title ||
+          enrichedUser[i].titleZh != userDocs[i].titleZh) {
+        titlesChanged = true;
+        break;
+      }
+    }
     state = ReadingLibraryState(
-      builtin: List<ReadingDoc>.unmodifiable(builtin),
-      userDocs: List<ReadingDoc>.unmodifiable(userDocs),
+      builtin: List<ReadingDoc>.unmodifiable(enrichedBuiltin),
+      userDocs: List<ReadingDoc>.unmodifiable(enrichedUser),
       progress: progress,
       ready: true,
     );
+    if (titlesChanged) {
+      unawaited(_persistLibrary(scheduleSync: false));
+    }
   }
 
   List<ReadingDoc> _loadUserDocs() {

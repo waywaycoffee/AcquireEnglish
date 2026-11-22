@@ -90,8 +90,10 @@ Future<Map<String, String>> buildHardWordGlosses({
   Set<String> known = const <String>{},
   Set<String> focus = const <String>{},
 }) async {
+  await dictionary.ensureLoaded();
   final Map<String, String> out = <String, String>{};
   final Set<String> seen = <String>{};
+  int yielded = 0;
   for (final String raw in words) {
     final String word = raw.trim().toLowerCase().replaceAll('’', "'");
     if (word.length < 2 || !seen.add(word)) continue;
@@ -104,10 +106,15 @@ Future<Map<String, String>> buildHardWordGlosses({
     )) {
       continue;
     }
-    final OfflineWordDefinition? def = await dictionary.lookup(word);
+    final OfflineWordDefinition? def = dictionary.lookupSync(word);
     final String gloss = shortReadingGloss(def?.translation ?? '');
     if (gloss.isEmpty) continue;
     out[word] = gloss;
+    // Keep the UI responsive while annotating a long page.
+    yielded += 1;
+    if (yielded % 40 == 0) {
+      await Future<void>.delayed(Duration.zero);
+    }
   }
   return out;
 }

@@ -16,8 +16,10 @@ import '../../shared/presentation/pad/app_design_tokens.dart';
 import '../../shared/presentation/pad/pad_scaffold.dart';
 import '../../shared/presentation/pad/pad_top_bar.dart';
 import '../../sync/data/acquire_api_client.dart';
+import '../../words/data/offline_word_dictionary.dart';
 import '../data/reading_catalog.dart';
 import '../data/reading_fingerprint.dart';
+import '../data/reading_gloss.dart';
 import '../data/reading_iplus1.dart';
 import '../data/reading_ingest.dart';
 import '../data/reading_pdf_import.dart';
@@ -40,6 +42,16 @@ class ReadingHubScreen extends ConsumerStatefulWidget {
 
 class _ReadingHubScreenState extends ConsumerState<ReadingHubScreen> {
   int _filter = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      // Warm ECDICT + frequency lexicon before the user opens a book.
+      unawaited(ref.read(offlineWordDictionaryProvider).ensureLoaded());
+      unawaited(ref.read(readingFrequencyLexiconProvider.future));
+    });
+  }
 
   Future<void> _importFile(BuildContext context, WidgetRef ref) async {
     final XFile? file = await openFile(
@@ -263,7 +275,7 @@ class _ReadingHubScreenState extends ConsumerState<ReadingHubScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
-            '已导入「${doc.title}」· 约 ${doc.wordCount} 词$sourceNote$fingerprintNote',
+            '已导入「${doc.displayTitle}」· 约 ${doc.wordCount} 词$sourceNote$fingerprintNote',
           ),
         ),
       );
@@ -717,7 +729,7 @@ class _ReadingHubScreenState extends ConsumerState<ReadingHubScreen> {
                                             builder: (BuildContext dialog) =>
                                                 AlertDialog(
                                                   title: Text(
-                                                    '删除「${doc.title}」？',
+                                                    '删除「${doc.displayTitle}」？',
                                                   ),
                                                   actions: <Widget>[
                                                     TextButton(
@@ -750,12 +762,12 @@ class _ReadingHubScreenState extends ConsumerState<ReadingHubScreen> {
                                         CrossAxisAlignment.start,
                                     children: <Widget>[
                                       ReadingBookCover(
-                                        title: doc.title,
+                                        title: doc.displayTitle,
                                         level: doc.level,
                                       ),
                                       const SizedBox(height: 10),
                                       Text(
-                                        doc.title,
+                                        doc.displayTitle,
                                         maxLines: 2,
                                         overflow: TextOverflow.ellipsis,
                                       ),
@@ -855,7 +867,10 @@ class _DocTile extends StatelessWidget {
                 children: <Widget>[
                   SizedBox(
                     width: 76,
-                    child: ReadingBookCover(title: doc.title, level: doc.level),
+                    child: ReadingBookCover(
+                      title: doc.displayTitle,
+                      level: doc.level,
+                    ),
                   ),
                   const SizedBox(width: 14),
                   Expanded(
@@ -863,7 +878,7 @@ class _DocTile extends StatelessWidget {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: <Widget>[
                         Text(
-                          doc.title,
+                          doc.displayTitle,
                           maxLines: 2,
                           overflow: TextOverflow.ellipsis,
                           style: TextStyle(

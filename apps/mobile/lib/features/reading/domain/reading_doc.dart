@@ -1,3 +1,5 @@
+import 'reading_title_zh.dart';
+
 enum ReadingSourceType { import, builtin, video, catalog }
 
 class ReadingSegment {
@@ -30,6 +32,7 @@ class ReadingDoc {
     required this.title,
     required this.sourceType,
     required this.plainText,
+    this.titleZh = '',
     this.level = '',
     this.segments = const <ReadingSegment>[],
     this.courseId,
@@ -44,6 +47,9 @@ class ReadingDoc {
 
   final String id;
   final String title;
+
+  /// Optional Chinese title (e.g. 绿野仙踪). Display via [displayTitle].
+  final String titleZh;
   final ReadingSourceType sourceType;
   final String level;
   final String plainText;
@@ -59,6 +65,18 @@ class ReadingDoc {
   /// sha256 of original plainText when body was stripped for cloud size limits.
   final String? contentHash;
 
+  /// `The Wonderful Wizard of Oz（绿野仙踪）`
+  String get displayTitle =>
+      readingDisplayTitle(title, titleZh: titleZh);
+
+  /// Fill missing Chinese titles for already-saved library docs.
+  ReadingDoc withEnrichedTitle() {
+    final String zh = readingTitleZhFor(title, titleZh: titleZh) ?? '';
+    final String display = readingDisplayTitle(title, titleZh: zh);
+    if (zh == titleZh.trim() && display == title.trim()) return this;
+    return copyWith(title: display, titleZh: zh);
+  }
+
   bool get hasBody => plainText.trim().isNotEmpty;
 
   int get wordCount {
@@ -70,13 +88,16 @@ class ReadingDoc {
 
   ReadingDoc copyWith({
     String? plainText,
+    String? title,
+    String? titleZh,
     List<ReadingSegment>? segments,
     String? contentHash,
     bool clearContentHash = false,
   }) =>
       ReadingDoc(
         id: id,
-        title: title,
+        title: title ?? this.title,
+        titleZh: titleZh ?? this.titleZh,
         sourceType: sourceType,
         level: level,
         plainText: plainText ?? this.plainText,
@@ -94,6 +115,7 @@ class ReadingDoc {
   Map<String, Object?> toJson() => <String, Object?>{
     'id': id,
     'title': title,
+    if (titleZh.trim().isNotEmpty) 'titleZh': titleZh,
     'sourceType': sourceType.name,
     'level': level,
     'plainText': plainText,
@@ -132,6 +154,7 @@ class ReadingDoc {
     return ReadingDoc(
       id: '${json['id'] ?? ''}'.trim(),
       title: '${json['title'] ?? ''}'.trim(),
+      titleZh: '${json['titleZh'] ?? ''}'.trim(),
       sourceType: sourceType,
       level: '${json['level'] ?? ''}'.trim(),
       plainText: '${json['plainText'] ?? ''}',

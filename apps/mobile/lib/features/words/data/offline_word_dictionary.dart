@@ -23,12 +23,22 @@ class OfflineWordDefinition {
 
 class OfflineWordDictionary {
   Future<Map<String, OfflineWordDefinition>>? _entriesFuture;
+  Map<String, OfflineWordDefinition>? _entries;
 
-  Future<OfflineWordDefinition?> lookup(String rawWord) async {
+  /// Warm the ECDICT blob off the critical open path (call from reading hub).
+  Future<void> ensureLoaded() async {
+    _entries ??= await (_entriesFuture ??= _load());
+  }
+
+  OfflineWordDefinition? lookupSync(String rawWord) {
     final String word = rawWord.trim().toLowerCase().replaceAll('’', "'");
     if (word.isEmpty) return null;
-    return (await (_entriesFuture ??= _load()))
-        .cast<String, OfflineWordDefinition>()[word];
+    return _entries?[word];
+  }
+
+  Future<OfflineWordDefinition?> lookup(String rawWord) async {
+    await ensureLoaded();
+    return lookupSync(rawWord);
   }
 
   Future<Map<String, OfflineWordDefinition>> _load() async {
@@ -40,7 +50,8 @@ class OfflineWordDictionary {
         jsonDecode(utf8.decode(jsonBytes)) as Map<String, dynamic>;
     final Map<String, dynamic> rawEntries =
         decoded['entries'] as Map<String, dynamic>;
-    return rawEntries.map((String word, dynamic value) {
+    final Map<String, OfflineWordDefinition> mapped =
+        rawEntries.map((String word, dynamic value) {
       final List<dynamic> fields = value as List<dynamic>;
       return MapEntry<String, OfflineWordDefinition>(
         word,
@@ -51,5 +62,7 @@ class OfflineWordDictionary {
         ),
       );
     });
+    _entries = mapped;
+    return mapped;
   }
 }

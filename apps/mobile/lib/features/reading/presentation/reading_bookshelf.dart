@@ -637,7 +637,7 @@ class _ShelfRow extends StatelessWidget {
             onLongPress:
                 onLongPressBook == null ? null : () => onLongPressBook!(doc),
             child: ReadingBookCover(
-              title: doc.title,
+              title: doc.displayTitle,
               level: doc.level,
               subtitle: _subtitleFor(doc),
               standing: true,
