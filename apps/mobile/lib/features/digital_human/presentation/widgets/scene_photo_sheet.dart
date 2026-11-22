@@ -42,6 +42,7 @@ class _ScenePhotoSheetState extends State<ScenePhotoSheet> {
   bool _showPhonetic = true;
   String? _savingWord;
   late Set<String> _saved;
+  final Map<String, Offset> _labelPositions = <String, Offset>{};
 
   @override
   void initState() {
@@ -52,12 +53,31 @@ class _ScenePhotoSheetState extends State<ScenePhotoSheet> {
   @override
   void didUpdateWidget(covariant ScenePhotoSheet oldWidget) {
     super.didUpdateWidget(oldWidget);
+    if (oldWidget.imagePath != widget.imagePath) _labelPositions.clear();
     if (oldWidget.savedWords != widget.savedWords) {
       _saved = <String>{...widget.savedWords};
     }
   }
 
+  void _moveLabel(SceneWordLabel label, Offset delta, Offset available) {
+    final Offset current =
+        _labelPositions[label.word] ?? Offset(label.anchorX, label.anchorY);
+    setState(() {
+      _labelPositions[label.word] = Offset(
+        available.dx > 0
+            ? (current.dx + delta.dx / available.dx).clamp(0.0, 1.0)
+            : current.dx,
+        available.dy > 0
+            ? (current.dy + delta.dy / available.dy).clamp(0.0, 1.0)
+            : current.dy,
+      );
+    });
+  }
+
   String get _footerHint {
+    if (!widget.refining && widget.labels.isNotEmpty) {
+      return '拖动标签调整位置，点标签收藏。';
+    }
     if (widget.statusHint.trim().isNotEmpty) return widget.statusHint;
     if (widget.refining) return '云端识别中（Qwen-VL）…';
     if (widget.refined) {
@@ -109,7 +129,10 @@ class _ScenePhotoSheetState extends State<ScenePhotoSheet> {
                   ),
                   IconButton(
                     onPressed: () => Navigator.of(context).maybePop(),
-                    icon: const Icon(Icons.close_rounded, color: Colors.white70),
+                    icon: const Icon(
+                      Icons.close_rounded,
+                      color: Colors.white70,
+                    ),
                   ),
                 ],
               ),
@@ -124,42 +147,74 @@ class _ScenePhotoSheetState extends State<ScenePhotoSheet> {
                       return Stack(
                         fit: StackFit.expand,
                         children: <Widget>[
-                          Image.file(
-                            File(widget.imagePath),
-                            fit: BoxFit.cover,
-                          ),
+                          Image.file(File(widget.imagePath), fit: BoxFit.cover),
                           if (_showLabels)
                             ...widget.labels.map((SceneWordLabel label) {
                               final bool saved = _saved.contains(label.word);
-                              return Positioned(
-                                left: constraints.maxWidth * label.anchorX - 72,
-                                top: constraints.maxHeight * label.anchorY - 28,
-                                child: _FloatingWordChip(
-                                  label: label,
-                                  showPhonetic: _showPhonetic,
-                                  saved: saved,
-                                  saving: _savingWord == label.word,
-                                  onTap: blocked
-                                      ? null
-                                      : () async {
-                                          setState(
-                                            () => _savingWord = label.word,
-                                          );
-                                          try {
-                                            await widget.onAddWord(label);
-                                            if (mounted) {
-                                              setState(
-                                                () => _saved.add(label.word),
-                                              );
-                                            }
-                                          } finally {
-                                            if (mounted) {
-                                              setState(
-                                                () => _savingWord = null,
-                                              );
-                                            }
-                                          }
-                                        },
+                              final Offset position =
+                                  _labelPositions[label.word] ??
+                                  Offset(label.anchorX, label.anchorY);
+                              return Align(
+                                key: ValueKey<String>(label.word),
+                                alignment: Alignment(
+                                  position.dx.clamp(0.0, 1.0) * 2 - 1,
+                                  position.dy.clamp(0.0, 1.0) * 2 - 1,
+                                ),
+                                child: Builder(
+                                  builder: (BuildContext chipContext) =>
+                                      GestureDetector(
+                                        onPanUpdate: blocked
+                                            ? null
+                                            : (DragUpdateDetails details) {
+                                                final Size chipSize =
+                                                    chipContext.size!;
+                                                _moveLabel(
+                                                  label,
+                                                  details.delta,
+                                                  Offset(
+                                                    constraints.maxWidth -
+                                                        chipSize.width,
+                                                    constraints.maxHeight -
+                                                        chipSize.height,
+                                                  ),
+                                                );
+                                              },
+                                        child: _FloatingWordChip(
+                                          label: label,
+                                          showPhonetic: _showPhonetic,
+                                          saved: saved,
+                                          saving: _savingWord == label.word,
+                                          onTap: blocked
+                                              ? null
+                                              : () async {
+                                                  setState(
+                                                    () => _savingWord =
+                                                        label.word,
+                                                  );
+                                                  try {
+                                                    await widget.onAddWord(
+                                                      label,
+                                                    );
+                                                    if (mounted) {
+                                                      setState(
+                                                        () => _saved.add(
+                                                          label.word,
+                                                        ),
+                                                      );
+                                                    }
+                                                  } catch (_) {
+                                                    // The caller reports save failures.
+                                                  } finally {
+                                                    if (mounted) {
+                                                      setState(
+                                                        () =>
+                                                            _savingWord = null,
+                                                      );
+                                                    }
+                                                  }
+                                                },
+                                        ),
+                                      ),
                                 ),
                               );
                             }),
@@ -358,7 +413,9 @@ class _ToolChip extends StatelessWidget {
   Widget build(BuildContext context) {
     final Color bg = emphasized
         ? const Color(0xFF6D28D9)
-        : (active ? const Color(0xFF4C1D95) : Colors.white.withValues(alpha: 0.12));
+        : (active
+              ? const Color(0xFF4C1D95)
+              : Colors.white.withValues(alpha: 0.12));
     return Padding(
       padding: const EdgeInsets.only(right: 8),
       child: Material(
@@ -372,7 +429,9 @@ class _ToolChip extends StatelessWidget {
             child: Text(
               label,
               style: TextStyle(
-                color: Colors.white.withValues(alpha: onTap == null ? 0.45 : 0.95),
+                color: Colors.white.withValues(
+                  alpha: onTap == null ? 0.45 : 0.95,
+                ),
                 fontWeight: FontWeight.w800,
                 fontSize: 13,
               ),

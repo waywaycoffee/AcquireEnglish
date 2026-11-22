@@ -1952,17 +1952,19 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
               ? null
               : '${label.phonetic.isEmpty ? '' : '${label.phonetic} · '}${label.chinese}',
         );
-    if (!mounted) return;
-    setState(() => _sceneSavedWords.add(word));
-    if (!added) {
+    if (!added ||
+        !ref.read(wordBookProvider.notifier).enrollForReview(word)) {
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('无法收藏：$word')),
       );
-      return;
+      throw StateError('无法将 $word 加入复习队列');
     }
+    if (!mounted) return;
+    setState(() => _sceneSavedWords.add(word));
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text(wasFavorite ? '已在生词本：$word' : '已收藏到生词本：$word'),
+        content: Text(wasFavorite ? '已加入复习：$word' : '已收藏并加入复习：$word'),
       ),
     );
   }
