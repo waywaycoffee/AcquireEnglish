@@ -155,6 +155,20 @@ class WordPronunciationService {
       final Completer<bool> result = Completer<bool>();
       _recordedCompletion = result;
       bool started = false;
+      bool finishing = false;
+      // Keep the player alive ~1s after the last sample so CosyVoice tails
+      // are not cut when media_kit signals completed/near-end early.
+      void scheduleFinish(bool ok) {
+        if (result.isCompleted || finishing) return;
+        finishing = true;
+        unawaited(() async {
+          await Future<void>.delayed(const Duration(seconds: 1));
+          if (!result.isCompleted) {
+            result.complete(ok);
+          }
+        }());
+      }
+
       playing = player.stream.playing.listen((bool value) {
         if (value) {
           started = true;
@@ -162,13 +176,13 @@ class WordPronunciationService {
         }
         // Only finish after playback actually started — media_kit can emit
         // completed/playing=false during open, which used to cut words short.
-        if (started && !result.isCompleted) {
-          result.complete(true);
+        if (started) {
+          scheduleFinish(true);
         }
       });
       completed = player.stream.completed.listen((bool value) {
-        if (value && started && !result.isCompleted) {
-          result.complete(true);
+        if (value && started) {
+          scheduleFinish(true);
         }
       });
       errors = player.stream.error.listen((String _) {
@@ -195,10 +209,10 @@ class WordPronunciationService {
                     p.inMilliseconds >= duration.inMilliseconds - 40,
               )
               .timeout(duration + const Duration(seconds: 3));
-          if (!result.isCompleted) result.complete(true);
+          scheduleFinish(true);
         } catch (_) {}
       }());
-      return await result.future.timeout(const Duration(seconds: 45));
+      return await result.future.timeout(const Duration(seconds: 60));
     } catch (_) {
       return false;
     } finally {
@@ -208,8 +222,6 @@ class WordPronunciationService {
       if (identical(_recordedPlayer, player)) {
         _recordedPlayer = null;
         _recordedCompletion = null;
-        // Brief grace so the last buffer drains before dispose.
-        await Future<void>.delayed(const Duration(milliseconds: 80));
         await player?.dispose();
       }
     }
