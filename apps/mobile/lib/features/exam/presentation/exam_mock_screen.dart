@@ -16,7 +16,7 @@ class ExamMockScreen extends ConsumerWidget {
     final ExamProfile profile = ref.watch(examProfileProvider);
     final AsyncValue<ExamPack?> packAsync = ref.watch(examPackProvider);
 
-    if (!profile.isExamMode || profile.family == null) {
+    if (profile.family == null) {
       return Scaffold(
         appBar: AppBar(title: const Text('全真模考')),
         body: Padding(
@@ -25,7 +25,7 @@ class ExamMockScreen extends ConsumerWidget {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: <Widget>[
               const Text(
-                '模考需先进入考试备考模式。',
+                '模考需先选择考试目标。',
                 style: TextStyle(fontWeight: FontWeight.w700),
               ),
               const SizedBox(height: 12),

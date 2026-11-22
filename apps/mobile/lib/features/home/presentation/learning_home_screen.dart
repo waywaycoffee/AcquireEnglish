@@ -10,7 +10,6 @@ import 'widgets/home_coach_course_card.dart';
 import '../../digital_human/presentation/digital_human_picker.dart';
 import '../../exam/domain/exam_profile.dart';
 import '../../exam/presentation/exam_profile_provider.dart';
-import '../../exam/presentation/study_mode_switch_sheet.dart';
 import '../../import_course/data/bilibili_cover_refresh.dart';
 import '../../library/presentation/library_catalog_provider.dart';
 import '../../library/presentation/library_mock_data.dart';
@@ -318,56 +317,6 @@ class _LearningHomeScreenState extends ConsumerState<LearningHomeScreen> {
                         ),
                       ),
                     ),
-                    const SizedBox(height: 12),
-                    Material(
-                      color: surface,
-                      borderRadius: BorderRadius.circular(16),
-                      child: InkWell(
-                        borderRadius: BorderRadius.circular(16),
-                        onTap: () => showStudyModeSwitchSheet(context, ref),
-                        child: Padding(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 14,
-                            vertical: 12,
-                          ),
-                          child: Row(
-                            children: <Widget>[
-                              Icon(
-                                examProfile.isExamMode
-                                    ? Icons.school_outlined
-                                    : Icons.auto_stories_outlined,
-                                color: accent,
-                                size: 22,
-                              ),
-                              const SizedBox(width: 10),
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: <Widget>[
-                                    text('学习模式', 12, color: muted),
-                                    const SizedBox(height: 2),
-                                    text(
-                                      examProfile.isExamMode
-                                          ? '考试备考'
-                                              '${examProfile.family == null ? '' : ' · ${examProfile.family!.label}'}'
-                                          : '日常习得',
-                                      15,
-                                      bold: true,
-                                    ),
-                                  ],
-                                ),
-                              ),
-                              text('切换', 13, color: accent, bold: true),
-                              Icon(
-                                Icons.chevron_right,
-                                color: accent,
-                                size: 20,
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ),
                     const SizedBox(height: 24),
                     text('计划适合你', 17, bold: true),
                     const SizedBox(height: 6),
@@ -422,10 +371,9 @@ class _LearningHomeScreenState extends ConsumerState<LearningHomeScreen> {
                     const SizedBox(height: 16),
                     const HomeCoachCourseCard(),
                     const SizedBox(height: 24),
-                    if (examProfile.isExamMode &&
-                        examProfile.family != null) ...<Widget>[
+                    if (examProfile.hasExamTarget) ...<Widget>[
                       text(
-                        '备考进度 · ${examProfile.family!.label}',
+                        '考试目标 · ${examProfile.family!.label}',
                         17,
                         bold: true,
                       ),
@@ -475,8 +423,8 @@ class _LearningHomeScreenState extends ConsumerState<LearningHomeScreen> {
                               alignment: Alignment.centerRight,
                               child: TextButton(
                                 onPressed: () =>
-                                    showStudyModeSwitchSheet(context, ref),
-                                child: const Text('切换学习模式'),
+                                    context.push('/exam/select'),
+                                child: const Text('更换考试目标'),
                               ),
                             ),
                           ],
@@ -494,28 +442,16 @@ class _LearningHomeScreenState extends ConsumerState<LearningHomeScreen> {
                             const SizedBox(height: 6),
                             text(focusRec.subtitle, 12, color: muted),
                             const SizedBox(height: 14),
-                            Row(
-                              children: <Widget>[
-                                Expanded(
-                                  child: FilledButton(
-                                    style: FilledButton.styleFrom(
-                                      backgroundColor: accent,
-                                      foregroundColor: dark
-                                          ? const Color(0xFF203A27)
-                                          : Colors.white,
-                                    ),
-                                    onPressed: () =>
-                                        context.push(focusRec.route),
-                                    child: Text(focusRec.startLabel),
-                                  ),
-                                ),
-                                const SizedBox(width: 10),
-                                OutlinedButton(
-                                  onPressed: () =>
-                                      showStudyModeSwitchSheet(context, ref),
-                                  child: const Text('切换模式'),
-                                ),
-                              ],
+                            FilledButton(
+                              style: FilledButton.styleFrom(
+                                backgroundColor: accent,
+                                foregroundColor: dark
+                                    ? const Color(0xFF203A27)
+                                    : Colors.white,
+                              ),
+                              onPressed: () =>
+                                  context.push(focusRec.route),
+                              child: Text(focusRec.startLabel),
                             ),
                           ],
                         ),

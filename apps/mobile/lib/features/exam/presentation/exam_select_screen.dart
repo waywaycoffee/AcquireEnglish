@@ -116,20 +116,20 @@ class _ExamSelectScreenState extends ConsumerState<ExamSelectScreen> {
                       context.go('/exam');
                     }
                   },
-            child: const Text('进入备考模式'),
+            child: const Text('保存考试目标'),
           ),
           const SizedBox(height: 10),
           OutlinedButton(
             onPressed: () async {
-              await ref.read(examProfileProvider.notifier).setAcquisition();
+              await ref.read(examProfileProvider.notifier).clearExamTarget();
               if (context.mounted) {
                 ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('已切回日常习得模式')),
+                  const SnackBar(content: Text('已清除考试目标')),
                 );
                 context.go('/home');
               }
             },
-            child: const Text('不备考，回到日常习得'),
+            child: const Text('清除考试目标'),
           ),
         ],
       ),

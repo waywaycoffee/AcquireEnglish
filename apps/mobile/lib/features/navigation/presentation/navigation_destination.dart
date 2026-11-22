@@ -73,7 +73,7 @@ enum AppNavDestination {
     route: '/exam',
     label: '备考',
     title: '考试备考',
-    subtitle: '专项、模考、错题本与社区真题；可随时切回日常习得。',
+    subtitle: '专项、模考、错题本与社区真题（统一在日常习得内）。',
     icon: Icons.school_outlined,
     activeIcon: Icons.school_rounded,
     showInNav: false,

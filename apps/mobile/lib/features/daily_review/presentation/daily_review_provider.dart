@@ -100,7 +100,7 @@ reviewSourcesProvider = Provider<List<ReviewSource>>((Ref ref) {
     // Unified queue: favorites first, then active book lemmas not already
     // covered. Optional exam filter still applies when choosing books.
     if (activeBook == null) return const <SyllabusBook>[];
-    if (examProfile.isExamMode && examProfile.family != null) {
+    if (examProfile.hasExamTarget) {
       final List<SyllabusBook> matched = filterSyllabusForExam(
         <SyllabusBook>[activeBook],
         examProfile.family,

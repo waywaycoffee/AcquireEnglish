@@ -22,7 +22,7 @@ class ExamPracticeScreen extends ConsumerWidget {
         ? const <String, int>{}
         : ref.watch(examProgressProvider).forFamily(family.id);
 
-    if (!profile.isExamMode || family == null) {
+    if (family == null) {
       return Scaffold(
         appBar: AppBar(title: const Text('专项训练')),
         body: Padding(
@@ -31,7 +31,7 @@ class ExamPracticeScreen extends ConsumerWidget {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: <Widget>[
               const Text(
-                '请先切换到考试备考模式并选择考试目标。',
+                '请先选择考试目标（日常习得内可选）。',
                 style: TextStyle(fontWeight: FontWeight.w700, height: 1.45),
               ),
               const SizedBox(height: 16),

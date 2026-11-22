@@ -12,7 +12,6 @@ import '../domain/exam_profile.dart';
 import '../domain/exam_registry.dart';
 import 'exam_pack_provider.dart';
 import 'exam_profile_provider.dart';
-import 'study_mode_switch_sheet.dart';
 
 class ExamHomeScreen extends ConsumerWidget {
   const ExamHomeScreen({super.key});
@@ -32,15 +31,15 @@ class ExamHomeScreen extends ConsumerWidget {
       topBar: PadTopBar(
         title: '考试备考',
         description: family == null
-            ? '选择考试族后查看专项、模考与错题本'
+            ? '选择考试目标后查看专项、模考与错题本（仍在日常习得里）'
             : '${family.label} · CEFR ${profile.resolvedCefr}',
       ),
       body: ListView(
         padding: const EdgeInsets.fromLTRB(16, 12, 16, 32),
         children: <Widget>[
-          if (!profile.isExamMode || family == null) ...<Widget>[
+          if (family == null) ...<Widget>[
             Text(
-              '当前为日常习得模式。选择考试后将切换到备考仪表盘。',
+              '学习统一在日常习得。可选一个考试目标，用于专项、模考与错题归集。',
               style: TextStyle(
                 fontWeight: FontWeight.w700,
                 color: AppDesignTokens.textSecondary,
@@ -137,8 +136,8 @@ class ExamHomeScreen extends ConsumerWidget {
             ),
             const SizedBox(height: 8),
             OutlinedButton(
-              onPressed: () => showStudyModeSwitchSheet(context, ref),
-              child: const Text('切换学习模式'),
+              onPressed: () => context.push('/exam/select'),
+              child: const Text('更换 / 清除考试目标'),
             ),
           ],
         ],

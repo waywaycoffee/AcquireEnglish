@@ -152,18 +152,17 @@ class _SyllabusBooksScreenState extends ConsumerState<SyllabusBooksScreen> {
     final SyllabusBooksState state = ref.watch(syllabusBooksProvider);
     final ExamProfile examProfile = ref.watch(examProfileProvider);
     final List<SyllabusBook> raw = state.booksOf(_kind);
-    final List<SyllabusBook> matched =
-        examProfile.isExamMode && examProfile.family != null
+    final List<SyllabusBook> matched = examProfile.hasExamTarget
         ? filterSyllabusForExam(raw, examProfile.family)
         : raw;
     final List<SyllabusBook> books =
-        matched.isEmpty && examProfile.isExamMode ? raw : matched;
+        matched.isEmpty && examProfile.hasExamTarget ? raw : matched;
     final bool isPattern = _kind == SyllabusBookKind.pattern;
     final bool isFoundation = _kind == SyllabusBookKind.foundation;
-    final String examHint = examProfile.isExamMode && examProfile.family != null
+    final String examHint = examProfile.hasExamTarget
         ? (matched.isEmpty
-            ? '备考「${examProfile.family!.label}」：暂无匹配标签，先显示全部。'
-            : '备考模式：已筛选「${examProfile.family!.label}」')
+            ? '考试目标「${examProfile.family!.label}」：暂无匹配标签，先显示全部。'
+            : '已按考试目标筛选「${examProfile.family!.label}」')
         : '';
 
     return PadScaffold(

@@ -10,8 +10,8 @@ import '../../../router/app_router.dart';
 import '../../../utils/url_utils.dart';
 import '../../authentication/presentation/account_hub_sheet.dart';
 import '../../authentication/presentation/auth_session.dart';
+import '../../exam/domain/exam_profile.dart';
 import '../../exam/presentation/exam_profile_provider.dart';
-import '../../exam/presentation/study_mode_switch_sheet.dart';
 import '../../navigation/presentation/navigation_destination.dart';
 import '../../shared/data/aliyun_speech_service.dart';
 import '../../shared/data/word_pronunciation_service.dart';
@@ -256,12 +256,15 @@ class SettingsScreen extends ConsumerWidget {
             icon: Icons.tune_rounded,
             children: <Widget>[
               _ActionRow(
-                title: '学习模式：日常习得 / 考试备考',
-                description: ref.watch(examProfileProvider).isExamMode
-                    ? '当前：备考 · ${ref.watch(examProfileProvider).family?.label ?? "未选考试"}（点此双向切换）'
-                    : '当前：日常习得（点此切换到考试备考）',
+                title: '考试目标（可选）',
+                description: () {
+                  final ExamProfile p = ref.watch(examProfileProvider);
+                  return p.hasExamTarget
+                      ? '当前：${p.family!.label} · 点此更换或清除'
+                      : '统一在日常习得；可选考试目标用于专项与模考';
+                }(),
                 icon: Icons.school_outlined,
-                onTap: () => showStudyModeSwitchSheet(context, ref),
+                onTap: () => context.push('/exam/select'),
               ),
               _ActionRow(
                 title: '学习偏好 / 每日课程',

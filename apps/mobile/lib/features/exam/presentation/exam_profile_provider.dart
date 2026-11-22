@@ -32,7 +32,8 @@ class ExamProfileNotifier extends Notifier<ExamProfile> {
   }
 
   Future<void> setMode(StudyMode mode) async {
-    await _persist(state.copyWith(mode: mode));
+    // Dual study-mode switch removed; always stay on acquisition.
+    await _persist(state.copyWith(mode: StudyMode.acquisition));
   }
 
   Future<void> setFamily(String familyId, {String? targetScore}) async {
@@ -40,7 +41,7 @@ class ExamProfileNotifier extends Notifier<ExamProfile> {
     if (family == null) return;
     await _persist(
       state.copyWith(
-        mode: StudyMode.exam,
+        mode: StudyMode.acquisition,
         familyId: familyId,
         targetScore: targetScore,
         clearTargetScore: targetScore == null,
@@ -48,6 +49,7 @@ class ExamProfileNotifier extends Notifier<ExamProfile> {
     );
   }
 
+  /// Clears the optional exam target; learning stays in acquisition.
   Future<void> setAcquisition() async {
     await _persist(
       state.copyWith(
@@ -57,6 +59,8 @@ class ExamProfileNotifier extends Notifier<ExamProfile> {
       ),
     );
   }
+
+  Future<void> clearExamTarget() => setAcquisition();
 
   Future<void> replaceFromCloud(ExamProfile profile) async {
     state = profile;

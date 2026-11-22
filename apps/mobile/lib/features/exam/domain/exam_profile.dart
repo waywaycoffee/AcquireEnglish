@@ -1,5 +1,7 @@
 import 'exam_registry.dart';
 
+/// Kept for persisted JSON compatibility. Product is unified under acquisition;
+/// exam tools use [hasExamTarget] (selected family), not a separate mode.
 enum StudyMode { acquisition, exam }
 
 class ExamProfile {
@@ -12,11 +14,9 @@ class ExamProfile {
 
   factory ExamProfile.fromJson(Map<String, dynamic>? json) {
     if (json == null) return const ExamProfile();
-    final String modeRaw = '${json['mode'] ?? 'acquisition'}';
     return ExamProfile(
-      mode: modeRaw == StudyMode.exam.name
-          ? StudyMode.exam
-          : StudyMode.acquisition,
+      // Always acquisition — dual study-mode switch was removed.
+      mode: StudyMode.acquisition,
       familyId: (json['familyId'] as String?)?.trim(),
       targetScore: (json['targetScore'] as String?)?.trim(),
       targetDateIso: (json['targetDateIso'] as String?)?.trim(),
@@ -28,7 +28,11 @@ class ExamProfile {
   final String? targetScore;
   final String? targetDateIso;
 
-  bool get isExamMode => mode == StudyMode.exam;
+  /// True when an exam family is selected (not a separate "exam mode").
+  bool get hasExamTarget => family != null;
+
+  /// Legacy alias for call sites that used mode switching.
+  bool get isExamMode => hasExamTarget;
 
   ExamFamily? get family => examFamilyById(familyId);
 
@@ -44,7 +48,7 @@ class ExamProfile {
   }
 
   Map<String, dynamic> toJson() => <String, dynamic>{
-    'mode': mode.name,
+    'mode': StudyMode.acquisition.name,
     if (familyId != null && familyId!.isNotEmpty) 'familyId': familyId,
     if (targetScore != null && targetScore!.isNotEmpty)
       'targetScore': targetScore,
@@ -61,7 +65,7 @@ class ExamProfile {
     String? targetDateIso,
     bool clearTargetDate = false,
   }) => ExamProfile(
-    mode: mode ?? this.mode,
+    mode: StudyMode.acquisition,
     familyId: clearFamily ? null : (familyId ?? this.familyId),
     targetScore: clearTargetScore ? null : (targetScore ?? this.targetScore),
     targetDateIso: clearTargetDate

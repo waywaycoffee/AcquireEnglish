@@ -42,9 +42,9 @@ class ExamErrorBookScreen extends ConsumerWidget {
           ? Padding(
               padding: const EdgeInsets.all(24),
               child: Text(
-                profile.isExamMode
+                profile.hasExamTarget
                     ? '暂无错题。完成模考或听力练习后，错题会出现在这里，并可一键加入 FSRS。'
-                    : '请先进入考试备考模式。错题会按考试族归集。',
+                    : '可先选择考试目标，错题会按考试族归集；未选目标时显示全部错题。',
                 style: const TextStyle(height: 1.5, fontWeight: FontWeight.w700),
               ),
             )
