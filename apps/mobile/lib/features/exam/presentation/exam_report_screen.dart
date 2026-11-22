@@ -10,7 +10,7 @@ import '../domain/exam_weakness.dart';
 import 'exam_profile_provider.dart';
 import 'exam_weakness_provider.dart';
 
-/// Learning report: weakness + counts + CTAs (CET prep assistant).
+/// Learning report: weakness + counts + CTAs (prep assistant).
 class ExamReportScreen extends ConsumerWidget {
   const ExamReportScreen({super.key});
 

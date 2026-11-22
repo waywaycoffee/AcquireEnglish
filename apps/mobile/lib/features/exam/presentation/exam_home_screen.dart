@@ -44,7 +44,7 @@ class ExamHomeScreen extends ConsumerWidget {
       topBar: PadTopBar(
         title: '考试备考',
         description: family == null
-            ? '选择四六级等目标后，今日备考接统一 FSRS'
+            ? 'K12 / 中高考 / 四六级等目标 → 今日备考接统一 FSRS'
             : '${family.label} · CEFR ${profile.resolvedCefr}',
       ),
       body: ListView(
@@ -52,7 +52,7 @@ class ExamHomeScreen extends ConsumerWidget {
         children: <Widget>[
           if (family == null) ...<Widget>[
             Text(
-              '学习仍在日常习得。选一个考试目标后，这里给出薄弱项与今日备考，错题回流统一复习。',
+              '学习仍在日常习得。可选中考、高考、K12 年级或四六级等目标；选定后这里给出薄弱项与今日备考，错题回流统一复习。',
               style: TextStyle(
                 fontWeight: FontWeight.w700,
                 color: AppDesignTokens.textSecondary,
@@ -63,6 +63,27 @@ class ExamHomeScreen extends ConsumerWidget {
             FilledButton(
               onPressed: () => context.push('/exam/select'),
               child: const Text('选择考试目标'),
+            ),
+            const SizedBox(height: 10),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: <Widget>[
+                for (final String id in kK12EntranceExamIds)
+                  if (examFamilyById(id) != null)
+                    OutlinedButton(
+                      onPressed: () async {
+                        await ref
+                            .read(examProfileProvider.notifier)
+                            .setFamily(id);
+                      },
+                      child: Text(examFamilyById(id)!.label),
+                    ),
+                OutlinedButton(
+                  onPressed: () => context.push('/exam/select'),
+                  child: const Text('更多年级 / 四六级…'),
+                ),
+              ],
             ),
           ] else ...<Widget>[
             _TargetCard(profile: profile, family: family),
@@ -94,6 +115,7 @@ class ExamHomeScreen extends ConsumerWidget {
             const SizedBox(height: 8),
             ..._todayTasks(
               context,
+              family: family,
               errorCount: errorCount,
               weakness: weakness,
             ),
@@ -221,6 +243,7 @@ class ExamHomeScreen extends ConsumerWidget {
 
   List<Widget> _todayTasks(
     BuildContext context, {
+    required ExamFamily family,
     required int errorCount,
     required ExamWeaknessReport? weakness,
   }) {
@@ -251,7 +274,7 @@ class ExamHomeScreen extends ConsumerWidget {
         _NavTile(
           icon: Icons.headphones_outlined,
           title: '听力热身',
-          subtitle: '四六级高频听读配速',
+          subtitle: examWarmUpSubtitle(family),
           onTap: () => context.push('/exam/listening'),
         ),
       );

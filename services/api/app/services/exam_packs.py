@@ -72,7 +72,7 @@ def resolve_pack_stem(family_id: str) -> str:
     direct = f"pack_{fam}"
     if (_packs_dir() / f"{direct}.json").is_file():
         return direct
-    # aliases
+    # Grade / alias → stage packs (中考/高考优先于通用 K12).
     aliases = {
         "ielts_gt": "pack_ielts_ac",
         "cet6": "pack_cet6",
@@ -80,9 +80,27 @@ def resolve_pack_stem(family_id: str) -> str:
         "zhongkao": "pack_zhongkao",
         "pet": "pack_ket",
         "race": "pack_race_middle",
+        "race_middle": "pack_race_middle",
+        "race_high": "pack_race_high",
         "cloth": "pack_cloth_cloze",
+        "cloth_cloze": "pack_cloth_cloze",
         "scques": "pack_scques_grammar",
+        "scques_grammar": "pack_scques_grammar",
         "cn_english": "pack_cn_english_taxonomy",
+        "cn_english_taxonomy": "pack_cn_english_taxonomy",
+        # 初中年级共用中考包；高中年级共用高考包；小学仍走通用包。
+        "k12_j1": "pack_zhongkao",
+        "k12_j2": "pack_zhongkao",
+        "k12_j3": "pack_zhongkao",
+        "k12_s1": "pack_gaokao",
+        "k12_s2": "pack_gaokao",
+        "k12_s3": "pack_gaokao",
+        "k12_g1": "pack_k12_general",
+        "k12_g2": "pack_k12_general",
+        "k12_g3": "pack_k12_general",
+        "k12_g4": "pack_k12_general",
+        "k12_g5": "pack_k12_general",
+        "k12_g6": "pack_k12_general",
     }
     if fam in aliases and (_packs_dir() / f"{aliases[fam]}.json").is_file():
         return aliases[fam]

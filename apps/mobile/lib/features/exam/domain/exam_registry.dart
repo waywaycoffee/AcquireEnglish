@@ -241,6 +241,84 @@ String examTrackLabel(ExamTrack track) => switch (track) {
   ExamTrack.ielts => '雅思',
 };
 
+/// Research / extended datasets — hide from main K12 grade chips.
+bool examFamilyIsResearch(ExamFamily f) =>
+    f.id == 'cn_english_taxonomy' ||
+    f.id == 'race_middle' ||
+    f.id == 'race_high' ||
+    f.id == 'cloth_cloze' ||
+    f.id == 'scques_grammar';
+
+/// Featured entrance exams shown first under K12.
+const List<String> kK12EntranceExamIds = <String>['zhongkao', 'gaokao'];
+
+List<ExamFamily> examFamiliesForTrack(
+  ExamTrack track, {
+  bool includeResearch = true,
+}) {
+  return kExamFamilies
+      .where(
+        (ExamFamily f) =>
+            f.track == track &&
+            (includeResearch || !examFamilyIsResearch(f)),
+      )
+      .toList(growable: false);
+}
+
+List<ExamFamily> k12FamiliesPrimary() => examFamiliesForTrack(
+      ExamTrack.k12,
+      includeResearch: false,
+    )
+        .where((ExamFamily f) => f.id.startsWith('k12_g'))
+        .toList(growable: false);
+
+List<ExamFamily> k12FamiliesJunior() => examFamiliesForTrack(
+      ExamTrack.k12,
+      includeResearch: false,
+    )
+        .where(
+          (ExamFamily f) =>
+              f.id.startsWith('k12_j') || f.id == 'zhongkao',
+        )
+        .toList(growable: false);
+
+List<ExamFamily> k12FamiliesSenior() => examFamiliesForTrack(
+      ExamTrack.k12,
+      includeResearch: false,
+    )
+        .where(
+          (ExamFamily f) => f.id.startsWith('k12_s') || f.id == 'gaokao',
+        )
+        .toList(growable: false);
+
+List<ExamFamily> k12FamiliesResearch() => kExamFamilies
+    .where((ExamFamily f) => f.track == ExamTrack.k12 && examFamilyIsResearch(f))
+    .toList(growable: false);
+
+String examWarmUpSubtitle(ExamFamily? family) {
+  if (family == null) return '听读配速热身';
+  switch (family.track) {
+    case ExamTrack.k12:
+      if (family.id == 'zhongkao' || family.id.startsWith('k12_j')) {
+        return '中考听读配速';
+      }
+      if (family.id == 'gaokao' || family.id.startsWith('k12_s')) {
+        return '高考听读配速';
+      }
+      return 'K12 听读配速';
+    case ExamTrack.cet:
+      return '四六级听读配速';
+    case ExamTrack.postgraduate:
+      return '考研听读配速';
+    case ExamTrack.cambridge:
+      return '剑桥听读配速';
+    case ExamTrack.toefl:
+      return '托福听读配速';
+    case ExamTrack.ielts:
+      return '雅思听读配速';
+  }
+}
+
 /// Map IELTS band string to coarse CEFR used by learning preferences.
 String cefrForIeltsBand(String band) {
   final double? n = double.tryParse(band);

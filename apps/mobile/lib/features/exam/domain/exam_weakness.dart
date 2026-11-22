@@ -1,6 +1,6 @@
 import '../data/exam_error_book_store.dart';
 
-/// Skills we diagnose for CET-style prep (objective + cloze).
+/// Skills we diagnose for prep assistant (K12 / 中高考 / CET objective + cloze).
 const List<String> kExamDiagnoseSkills = <String>[
   'listening',
   'reading',
