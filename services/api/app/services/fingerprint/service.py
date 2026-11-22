@@ -543,6 +543,7 @@ async def register_decomposed_asset(
             task.fingerprint_id = fp_id
             task.user_course_asset_id = user_course_id
             task.fail_reason = None
+            task.notify_pending = 1
             task.update_at = _now()
 
     # Clear miss negative cache for this text.
@@ -673,11 +674,13 @@ async def invalidate_fingerprint(
     return count
 
 
-async def load_asset_lessons(asset_id: str) -> list[dict[str, Any]]:
+def load_asset_lessons(asset_id: str) -> list[dict[str, Any]]:
     data = read_json_blob(asset_id, "lesson_structure.json")
     if isinstance(data, dict):
         lessons = data.get("lessons")
-        return lessons if isinstance(lessons, list) else []
+        if isinstance(lessons, list):
+            return [dict(x) for x in lessons if isinstance(x, dict)]
+        return []
     return []
 
 
@@ -919,6 +922,7 @@ async def register_private_user_course(
             task.status = "success"
             task.user_course_asset_id = course_id
             task.fail_reason = None
+            task.notify_pending = 1
             task.update_at = _now()
     await db.commit()
     await db.refresh(row)
@@ -1086,6 +1090,88 @@ async def patch_user_course_lessons(
     await db.commit()
     await db.refresh(row)
     return row, updated
+
+
+async def sync_user_course_from_public(
+    db: AsyncSession,
+    *,
+    user_id: int,
+    user_course_asset_id: str,
+) -> tuple[UserCourseAsset, list[dict[str, Any]]]:
+    """Drop private lesson overlay and re-read public asset_cache lessons."""
+    row = (
+        await db.execute(
+            select(UserCourseAsset).where(
+                UserCourseAsset.id == user_course_asset_id,
+                UserCourseAsset.user_id == user_id,
+            )
+        )
+    ).scalar_one_or_none()
+    if row is None:
+        raise ValueError("user course asset not found")
+    if not row.asset_cache_id:
+        raise ValueError("课程未关联公共缓存，无法同步公共版本")
+    public = load_asset_lessons(row.asset_cache_id)
+    if not public:
+        raise ValueError("公共课程资产为空或已下架")
+    patch = _patch_dict(row)
+    patch.pop("lessons", None)
+    patch["private_only"] = False
+    patch["synced_from_public_at"] = _now().isoformat()
+    patch["kept_private_edits"] = False
+    row.diff_patch_json = _dumps(patch) if patch else None
+    row.update_at = _now()
+    await db.commit()
+    await db.refresh(row)
+    return row, public
+
+
+async def list_pending_decompose_notifications(
+    db: AsyncSession, *, user_id: int, limit: int = 20
+) -> list[dict[str, Any]]:
+    rows = (
+        await db.execute(
+            select(UploadTask)
+            .where(
+                UploadTask.user_id == user_id,
+                UploadTask.notify_pending == 1,
+                UploadTask.status.in_(("success", "fingerprint_match")),
+            )
+            .order_by(UploadTask.update_at.desc())
+            .limit(max(1, min(50, limit)))
+        )
+    ).scalars().all()
+    out: list[dict[str, Any]] = []
+    for row in rows:
+        out.append(
+            {
+                "upload_task_id": row.id,
+                "status": row.status,
+                "file_name": row.file_name,
+                "user_course_asset_id": row.user_course_asset_id,
+                "message": "云端解析完成，已写入课程包",
+                "update_at": row.update_at.isoformat() if row.update_at else None,
+            }
+        )
+    return out
+
+
+async def ack_decompose_notifications(
+    db: AsyncSession, *, user_id: int, upload_task_ids: list[str] | None = None
+) -> int:
+    q = select(UploadTask).where(
+        UploadTask.user_id == user_id,
+        UploadTask.notify_pending == 1,
+    )
+    if upload_task_ids:
+        q = q.where(UploadTask.id.in_(upload_task_ids))
+    rows = (await db.execute(q)).scalars().all()
+    for row in rows:
+        row.notify_pending = 0
+        row.update_at = _now()
+    if rows:
+        await db.commit()
+    return len(rows)
 
 
 async def finalize_user_course(
@@ -1302,6 +1388,7 @@ async def admin_stats(db: AsyncSession, *, days: int = 30) -> dict[str, Any]:
         "miss_count": int(miss_n),
         "hit_rate": round(hit_rate, 4),
         "gpu_saved_minutes_est": gpu_saved_minutes,
+        "vector_backend": emb.vector_backend(),
         "asset_cache_total": int(asset_count),
         "fingerprint_valid_total": int(fp_count),
         "top_assets": [

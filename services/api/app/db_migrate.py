@@ -22,6 +22,7 @@ async def ensure_schema_columns(conn: AsyncConnection) -> None:
     await _ensure_shared_bilibili_identity_columns(conn)
     await _ensure_api_usage_module_column(conn)
     await _ensure_rank_state_columns(conn)
+    await _ensure_upload_task_notify_column(conn)
 
 
 async def ensure_user_auth_columns(conn: AsyncConnection) -> None:
@@ -351,3 +352,20 @@ async def _ensure_rank_state_columns(conn: AsyncConnection) -> None:
         alters.append("ALTER TABLE rank_state ADD COLUMN meta_json TEXT DEFAULT '{}'")
     for sql in alters:
         await conn.execute(text(sql))
+
+
+async def _ensure_upload_task_notify_column(conn: AsyncConnection) -> None:
+    existing = await _existing_columns(conn, "upload_task")
+    if existing is None or "notify_pending" in existing:
+        return
+    dialect = _dialect_name(conn)
+    if dialect == "sqlite":
+        await conn.execute(
+            text("ALTER TABLE upload_task ADD COLUMN notify_pending INTEGER DEFAULT 0")
+        )
+    else:
+        await conn.execute(
+            text(
+                "ALTER TABLE upload_task ADD COLUMN notify_pending INTEGER DEFAULT 0"
+            )
+        )

@@ -1498,6 +1498,8 @@ class UploadTask(Base):
     fingerprint_id: Mapped[str | None] = mapped_column(String(36), nullable=True)
     user_course_asset_id: Mapped[str | None] = mapped_column(String(36), nullable=True)
     fail_reason: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # 1 = success waiting for in-app notify; cleared after client ack.
+    notify_pending: Mapped[int] = mapped_column(Integer, default=0)
     create_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )

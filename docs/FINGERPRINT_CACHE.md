@@ -16,13 +16,19 @@
 1. 创建 `upload_task`，状态 `queue_gpu`
 2. 文本载荷写入 ECS `media/course/upload_task/{id}/payload.json`（仅清理后正文，无 PDF/音视频）
 3. API 进程内 `fingerprint.queue_worker` 认领 → `decompose_text_to_lessons` → `register`
-4. 任务 `success`；App 轮询 `GET /api/fingerprint-cache/upload-tasks/{id}`，就绪后拉取 asset 并加课
+4. 任务 `success` + `notify_pending=1`；App 首页拉取 `/notifications` 提示，或轮询 `GET /upload-tasks/{id}`
 
 ### Degraded（向量库不可用）
 
 - Search 返回 `degraded=true` + `candidates`
 - 任务 `pending_confirm`
 - App 弹窗确认后 `POST /api/fingerprint-cache/confirm-bind`
+
+### 同步公共版
+
+私有课若关联了 `asset_cache_id`，可在编辑页点「同步公共版」：
+
+`POST /api/fingerprint-cache/my-courses/{id}/sync-public` — 丢弃私有课时 overlay，恢复公共结构。
 
 ## 本机 Embedding（5060 Ti）
 
@@ -40,28 +46,51 @@ FINGERPRINT_EMBED_URL=http://100.115.252.55:8092/embed
 FINGERPRINT_EMBED_DIM=512
 ```
 
-URL 不可达时 API 回退 hashing-trick；此时命中会降级为需确认的 SimHash 候选。
+URL 不可达时 API 回退 hashing-trick。
+
+## 向量库（Qdrant 可选）
+
+```
+FINGERPRINT_QDRANT_URL=http://127.0.0.1:6333
+# FINGERPRINT_QDRANT_API_KEY=...
+```
+
+- 配置后写入/检索走 Qdrant collection `asset_embedding`，并仍镜像本地 JSON。
+- 未配置或 Qdrant 宕机：本地 JSON 暴力检索；`vector_store_available()==false` 时走 degraded 确认流。
+
+## 配置持久化
+
+Admin `PATCH /api/admin/fingerprint-cache/config` 写入  
+`media/misc/fingerprint_runtime_config.json`，API 启动时加载。
+
+后台 worker 按 `fingerprint_lru_interval_seconds`（默认 86400）自动 LRU。
+
+## 管理端
+
+Admin Web →「指纹缓存」页：命中率 / GPU 节省估算 / TOP / 下架 / 排空队列 / LRU / 阈值。
+
+## 验收脚本
+
+```bash
+cd services/api
+python tools/fingerprint_acceptance.py
+```
+
+判定：同源召回 ≥90%、误命中=0、P95 ≤200ms（本机空库 smoke）。
 
 ## 手动排空队列
 
-API 启动后后台会自动 drain。也可：
-
 ```bash
-# 管理端
 curl -X POST -H "X-Admin-Token: …” \
   "https://acquireenglish.curlhairai.com/api/admin/fingerprint-cache/drain-queue?limit=5"
-
-# 或本机 CLI（在 API 环境）
-cd services/api
-.venv/Scripts/python.exe -m app.services.fingerprint.cli_drain
 ```
 
 ## Share / audit
 
-- `POST /api/fingerprint-cache/my-courses/{id}/share` — 标记待审
-- `POST /api/admin/fingerprint-cache/share-audit/{id}` — 通过/拒绝 stub
+- `POST .../share` — 501 P2 stub
+- Admin share-audit — 状态翻转 stub
 
 ## 约束
 
 - 音视频只存 ECS，不进 APK
-- 解构优先走 `OPENMAIC_URL`（OpenMAIC / `tools/openmaic_mock`）；不可达时回退 CPU 启发式。详见 `docs/COURSE_DECOMPOSE.md`
+- 解构优先走 `OPENMAIC_URL`；不可达时回退 CPU 启发式。详见 `docs/COURSE_DECOMPOSE.md`

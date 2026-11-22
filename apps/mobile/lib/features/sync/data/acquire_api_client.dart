@@ -2513,6 +2513,64 @@ class AcquireApiClient {
     }
   }
 
+  Future<Map<String, dynamic>?> syncMyFingerprintCourseFromPublic(
+    String courseId,
+  ) async {
+    final String id = courseId.trim();
+    if (id.isEmpty) return null;
+    try {
+      final Response<dynamic> response = await _dio.post(
+        Endpoints.fingerprintCacheCourseSyncPublic(id),
+        options: Options(
+          receiveTimeout: const Duration(seconds: 20),
+          sendTimeout: const Duration(seconds: 20),
+        ),
+      );
+      if (response.data is! Map) return null;
+      return Map<String, dynamic>.from(response.data as Map);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Future<List<Map<String, dynamic>>> listFingerprintNotifications() async {
+    try {
+      final Response<dynamic> response = await _dio.get(
+        Endpoints.fingerprintCacheNotifications,
+        options: Options(
+          receiveTimeout: const Duration(seconds: 15),
+          sendTimeout: const Duration(seconds: 15),
+        ),
+      );
+      if (response.data is! Map) return const <Map<String, dynamic>>[];
+      final Object? items = (response.data as Map)['items'];
+      if (items is! List) return const <Map<String, dynamic>>[];
+      return <Map<String, dynamic>>[
+        for (final Object? item in items)
+          if (item is Map) Map<String, dynamic>.from(item),
+      ];
+    } catch (_) {
+      return const <Map<String, dynamic>>[];
+    }
+  }
+
+  Future<void> ackFingerprintNotifications({
+    List<String>? uploadTaskIds,
+  }) async {
+    try {
+      await _dio.post(
+        Endpoints.fingerprintCacheNotificationsAck,
+        data: <String, dynamic>{
+          if (uploadTaskIds != null) 'upload_task_ids': uploadTaskIds,
+        },
+        options: Options(
+          receiveTimeout: const Duration(seconds: 15),
+          sendTimeout: const Duration(seconds: 15),
+        ),
+      );
+    } catch (_) {}
+  }
+
   Future<FingerprintUploadTaskStatus?> getFingerprintUploadTask(
     String taskId,
   ) async {

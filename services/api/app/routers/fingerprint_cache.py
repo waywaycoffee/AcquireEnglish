@@ -160,6 +160,11 @@ class ConfigUpdateBody(BaseModel):
     vec_score_min: float | None = Field(default=None, ge=0.0, le=1.0)
     len_ratio_max: float | None = Field(default=None, ge=0.0, le=1.0)
     max_blocks: int | None = Field(default=None, ge=4, le=256)
+    block_chars: int | None = Field(default=None, ge=64, le=4096)
+    top_k: int | None = Field(default=None, ge=1, le=100)
+    lru_min_hits: int | None = Field(default=None, ge=0, le=10000)
+    lru_idle_days: int | None = Field(default=None, ge=1, le=3650)
+    gpu_save_minutes: int | None = Field(default=None, ge=1, le=120)
 
 
 class ConfirmBindBody(BaseModel):
@@ -484,6 +489,55 @@ async def finalize_my_course(
     return _user_course_out(row, include_lessons=True)
 
 
+@router.post("/my-courses/{course_id}/sync-public")
+async def sync_my_course_from_public(
+    course_id: str,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> dict[str, Any]:
+    """Discard private lesson overlay and restore public asset_cache lessons."""
+    try:
+        row, lessons = await fp_svc.sync_user_course_from_public(
+            db, user_id=user.id, user_course_asset_id=course_id
+        )
+    except ValueError as exc:
+        msg = str(exc)
+        code = 404 if "not found" in msg else 422
+        raise HTTPException(status_code=code, detail=msg) from exc
+    out = _user_course_out(row, include_lessons=True)
+    out["lessons"] = lessons
+    out["synced"] = True
+    return out
+
+
+class NotifyAckBody(BaseModel):
+    upload_task_ids: list[str] | None = None
+
+
+@router.get("/notifications")
+async def list_decompose_notifications(
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+    limit: int = Query(default=20, ge=1, le=50),
+) -> dict[str, Any]:
+    items = await fp_svc.list_pending_decompose_notifications(
+        db, user_id=user.id, limit=limit
+    )
+    return {"items": items, "count": len(items)}
+
+
+@router.post("/notifications/ack")
+async def ack_decompose_notifications(
+    body: NotifyAckBody,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> dict[str, Any]:
+    n = await fp_svc.ack_decompose_notifications(
+        db, user_id=user.id, upload_task_ids=body.upload_task_ids
+    )
+    return {"acked": n}
+
+
 @router.post("/confirm-bind")
 async def confirm_bind_candidate(
     body: ConfirmBindBody,
@@ -708,21 +762,9 @@ async def admin_share_audit(
 async def admin_get_config(
     _: str = Depends(require_admin_token),
 ) -> dict[str, Any]:
-    return {
-        "enabled": settings.fingerprint_cache_enabled,
-        "sim_hamming_max": settings.fingerprint_sim_hamming_max,
-        "min_similar_blocks": settings.fingerprint_min_similar_blocks,
-        "vec_score_min": settings.fingerprint_vec_score_min,
-        "len_ratio_max": settings.fingerprint_len_ratio_max,
-        "max_blocks": settings.fingerprint_max_blocks,
-        "block_chars": settings.fingerprint_block_chars,
-        "top_k": settings.fingerprint_top_k,
-        "lru_min_hits": settings.fingerprint_lru_min_hits,
-        "lru_idle_days": settings.fingerprint_lru_idle_days,
-        "gpu_save_minutes": settings.fingerprint_gpu_save_minutes,
-        "embed_url_configured": bool((settings.fingerprint_embed_url or "").strip()),
-        "embed_dim": int(settings.fingerprint_embed_dim),
-    }
+    from app.services.fingerprint.runtime_config import snapshot
+
+    return snapshot()
 
 
 @admin_router.patch("/config")
@@ -730,30 +772,8 @@ async def admin_patch_config(
     body: ConfigUpdateBody,
     _: str = Depends(require_admin_token),
 ) -> dict[str, Any]:
-    """运行时热更新（进程内；重启后回落到环境变量）。"""
-    if body.enabled is not None:
-        settings.fingerprint_cache_enabled = body.enabled
-    if body.sim_hamming_max is not None:
-        settings.fingerprint_sim_hamming_max = body.sim_hamming_max
-    if body.min_similar_blocks is not None:
-        settings.fingerprint_min_similar_blocks = body.min_similar_blocks
-    if body.vec_score_min is not None:
-        settings.fingerprint_vec_score_min = body.vec_score_min
-    if body.len_ratio_max is not None:
-        settings.fingerprint_len_ratio_max = body.len_ratio_max
-    if body.max_blocks is not None:
-        settings.fingerprint_max_blocks = body.max_blocks
-    return {
-        "enabled": settings.fingerprint_cache_enabled,
-        "sim_hamming_max": settings.fingerprint_sim_hamming_max,
-        "min_similar_blocks": settings.fingerprint_min_similar_blocks,
-        "vec_score_min": settings.fingerprint_vec_score_min,
-        "len_ratio_max": settings.fingerprint_len_ratio_max,
-        "max_blocks": settings.fingerprint_max_blocks,
-        "block_chars": settings.fingerprint_block_chars,
-        "top_k": settings.fingerprint_top_k,
-        "lru_min_hits": settings.fingerprint_lru_min_hits,
-        "lru_idle_days": settings.fingerprint_lru_idle_days,
-        "gpu_save_minutes": settings.fingerprint_gpu_save_minutes,
-        "embed_url_configured": bool((settings.fingerprint_embed_url or "").strip()),
-    }
+    """运行时热更新并持久化到 media/misc/fingerprint_runtime_config.json。"""
+    from app.services.fingerprint.runtime_config import apply_overrides
+
+    payload = body.model_dump(exclude_none=True)
+    return apply_overrides(payload)

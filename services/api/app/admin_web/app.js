@@ -48,6 +48,7 @@
     infra: "ECS / 云盘监控",
     usage: "用量 / 平台账单",
     resources: "公共资源库",
+    fingerprint: "指纹缓存",
     users: "用户与资产",
   };
   const feedbackState = { offset: 0, limit: 40, total: 0, status: "open", q: "" };
@@ -136,8 +137,176 @@
     document.querySelectorAll(".tab").forEach((btn) => {
       btn.classList.toggle("active", btn.dataset.tab === tab);
     });
-    ["dashboard", "feedback", "infra", "usage", "resources", "users"].forEach((id) => {
+    ["dashboard", "feedback", "infra", "usage", "resources", "fingerprint", "users"].forEach((id) => {
       $(`panel-${id}`).classList.toggle("hidden", id !== tab);
+    });
+  }
+
+  async function loadFingerprint() {
+    const el = $("panel-fingerprint");
+    el.innerHTML = `<p class="muted">加载指纹缓存…</p>`;
+    const [stats, cfg] = await Promise.all([
+      api("/fingerprint-cache/stats?days=30"),
+      api("/fingerprint-cache/config"),
+    ]);
+    const top = (stats.top_assets || [])
+      .map(
+        (a) => `<tr>
+          <td>${escapeHtml(a.asset_name || a.id)}</td>
+          <td>${escapeHtml(a.source_type || "")}</td>
+          <td>${num(a.hit_count)}</td>
+          <td>${escapeHtml(a.cefr_level || "—")}</td>
+          <td><button type="button" class="btn ghost fp-ban" data-id="${escapeAttr(
+            a.id
+          )}">下架</button></td>
+        </tr>`
+      )
+      .join("");
+    const banned = (stats.banned_assets || [])
+      .map(
+        (a) =>
+          `<li>${escapeHtml(a.asset_name || a.id)} · hits ${num(a.hit_count)}</li>`
+      )
+      .join("");
+    el.innerHTML = `
+      <div class="kpi-row">
+        <div class="stat"><span class="muted">命中</span><strong>${num(
+          stats.hit_count
+        )}</strong></div>
+        <div class="stat"><span class="muted">未命中</span><strong>${num(
+          stats.miss_count
+        )}</strong></div>
+        <div class="stat"><span class="muted">命中率</span><strong>${
+          stats.hit_rate == null ? "—" : (Number(stats.hit_rate) * 100).toFixed(1) + "%"
+        }</strong></div>
+        <div class="stat"><span class="muted">GPU 节省(估)</span><strong>${num(
+          stats.gpu_saved_minutes_est
+        )} 分</strong></div>
+      </div>
+      <div class="kpi-row">
+        <div class="stat"><span class="muted">公共资产</span><strong>${num(
+          stats.asset_cache_total
+        )}</strong></div>
+        <div class="stat"><span class="muted">有效指纹</span><strong>${num(
+          stats.fingerprint_valid_total
+        )}</strong></div>
+        <div class="stat"><span class="muted">向量后端</span><strong>${escapeHtml(
+          stats.vector_backend || "—"
+        )}</strong></div>
+        <div class="stat"><span class="muted">Embed URL</span><strong>${
+          cfg.embed_url_configured ? "已配" : "未配"
+        }</strong></div>
+      </div>
+      <div class="dash-grid">
+        <div class="dash-card full">
+          <h3>热门缓存 TOP</h3>
+          <div class="table-wrap"><table>
+            <thead><tr><th>教材</th><th>类型</th><th>命中</th><th>CEFR</th><th></th></tr></thead>
+            <tbody>${top || `<tr><td colspan="5" class="muted">暂无</td></tr>`}</tbody>
+          </table></div>
+        </div>
+        <div class="dash-card">
+          <h3>违规 / 已下架</h3>
+          <ul>${banned || `<li class="muted">无</li>`}</ul>
+        </div>
+        <div class="dash-card">
+          <h3>运维操作</h3>
+          <div class="actions" style="flex-direction:column;align-items:stretch;gap:8px">
+            <button type="button" class="btn primary" id="fpDrainBtn">排空 GPU 队列</button>
+            <button type="button" class="btn ghost" id="fpLruBtn">执行 LRU 淘汰</button>
+          </div>
+          <p class="muted">阈值改动会写入 media/misc/fingerprint_runtime_config.json，重启后仍生效。</p>
+        </div>
+        <div class="dash-card full">
+          <h3>阈值配置</h3>
+          <form id="fpConfigForm" class="grant-grid">
+            <label>开关
+              <select name="enabled">
+                <option value="true" ${cfg.enabled ? "selected" : ""}>开启</option>
+                <option value="false" ${!cfg.enabled ? "selected" : ""}>关闭</option>
+              </select>
+            </label>
+            <label>SimHash 汉明上限<input name="sim_hamming_max" type="number" value="${escapeAttr(
+              cfg.sim_hamming_max
+            )}" /></label>
+            <label>最少相似块<input name="min_similar_blocks" type="number" value="${escapeAttr(
+              cfg.min_similar_blocks
+            )}" /></label>
+            <label>向量分下限<input name="vec_score_min" type="number" step="0.01" value="${escapeAttr(
+              cfg.vec_score_min
+            )}" /></label>
+            <label>长度偏差<input name="len_ratio_max" type="number" step="0.01" value="${escapeAttr(
+              cfg.len_ratio_max
+            )}" /></label>
+            <label>最大块数<input name="max_blocks" type="number" value="${escapeAttr(
+              cfg.max_blocks
+            )}" /></label>
+            <label>LRU 最小命中<input name="lru_min_hits" type="number" value="${escapeAttr(
+              cfg.lru_min_hits
+            )}" /></label>
+            <label>LRU 空闲天<input name="lru_idle_days" type="number" value="${escapeAttr(
+              cfg.lru_idle_days
+            )}" /></label>
+            <button class="btn primary full" type="submit">保存配置</button>
+          </form>
+        </div>
+      </div>`;
+
+    el.querySelectorAll(".fp-ban").forEach((btn) => {
+      btn.addEventListener("click", async () => {
+        if (!confirm("确认下架该公共缓存资产？")) return;
+        try {
+          await api("/fingerprint-cache/invalidate", {
+            method: "POST",
+            body: JSON.stringify({ asset_id: btn.dataset.id, ban_asset: true }),
+          });
+          await loadFingerprint();
+        } catch (e) {
+          alert(e.message);
+        }
+      });
+    });
+    $("fpDrainBtn").addEventListener("click", async () => {
+      try {
+        const r = await api("/fingerprint-cache/drain-queue?limit=5", { method: "POST" });
+        alert(`已处理 ${r.processed || 0} 条`);
+        await loadFingerprint();
+      } catch (e) {
+        alert(e.message);
+      }
+    });
+    $("fpLruBtn").addEventListener("click", async () => {
+      try {
+        const r = await api("/fingerprint-cache/lru-evict?limit=20", { method: "POST" });
+        alert(`淘汰 ${Array.isArray(r.removed) ? r.removed.length : r.removed || 0} 条`);
+        await loadFingerprint();
+      } catch (e) {
+        alert(e.message);
+      }
+    });
+    $("fpConfigForm").addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const fd = new FormData(e.target);
+      const body = {
+        enabled: fd.get("enabled") === "true",
+        sim_hamming_max: Number(fd.get("sim_hamming_max")),
+        min_similar_blocks: Number(fd.get("min_similar_blocks")),
+        vec_score_min: Number(fd.get("vec_score_min")),
+        len_ratio_max: Number(fd.get("len_ratio_max")),
+        max_blocks: Number(fd.get("max_blocks")),
+        lru_min_hits: Number(fd.get("lru_min_hits")),
+        lru_idle_days: Number(fd.get("lru_idle_days")),
+      };
+      try {
+        await api("/fingerprint-cache/config", {
+          method: "PATCH",
+          body: JSON.stringify(body),
+        });
+        alert("已保存");
+        await loadFingerprint();
+      } catch (err) {
+        alert(err.message);
+      }
     });
   }
 
@@ -1463,6 +1632,7 @@
       if (btn.dataset.tab === "infra") loadInfra().catch((e) => alert(e.message));
       if (btn.dataset.tab === "usage") loadUsage().catch((e) => alert(e.message));
       if (btn.dataset.tab === "resources") loadResources().catch((e) => alert(e.message));
+      if (btn.dataset.tab === "fingerprint") loadFingerprint().catch((e) => alert(e.message));
     });
   });
   $("feedbackSearchForm").addEventListener("submit", (e) => {

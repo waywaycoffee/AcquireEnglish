@@ -74,6 +74,12 @@ async def lifespan(_: FastAPI):
     from app.services.user_assets import ensure_default_skus
 
     settings.validate_auth_configuration()
+    try:
+        from app.services.fingerprint.runtime_config import load_into_settings
+
+        load_into_settings()
+    except Exception:  # noqa: BLE001
+        pass
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
         await ensure_schema_columns(conn)

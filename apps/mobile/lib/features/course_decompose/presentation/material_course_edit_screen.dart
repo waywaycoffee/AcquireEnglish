@@ -192,10 +192,53 @@ class _MaterialCourseEditScreenState
     );
   }
 
+  Future<void> _syncPublic() async {
+    final bool? ok = await showDialog<bool>(
+      context: context,
+      builder: (BuildContext ctx) {
+        return AlertDialog(
+          title: const Text('同步公共版本？'),
+          content: const Text(
+            '将丢弃你对本课程的课时/生词修改，恢复为公共缓存中的最新结构。'
+            '此操作不可撤销。',
+          ),
+          actions: <Widget>[
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(false),
+              child: const Text('保留我的修改'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.of(ctx).pop(true),
+              child: const Text('同步公共版'),
+            ),
+          ],
+        );
+      },
+    );
+    if (ok != true) return;
+    final Map<String, dynamic>? updated = await ref
+        .read(acquireApiClientProvider)
+        .syncMyFingerprintCourseFromPublic(widget.courseId);
+    if (!mounted) return;
+    if (updated == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('同步失败（可能未关联公共缓存）')),
+      );
+      return;
+    }
+    await _reload();
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('已同步公共版本')),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final String title = '${_course?['asset_title'] ?? '教材课'}';
     final String status = '${_course?['status'] ?? ''}';
+    final bool hasPublicCache =
+        '${_course?['asset_cache_id'] ?? ''}'.trim().isNotEmpty;
     return PadScaffold(
       currentDestination: AppNavDestination.reading,
       showContinueLearning: false,
@@ -204,6 +247,11 @@ class _MaterialCourseEditScreenState
         description: '切课预览 · $status · 私人',
         leading: PadBackButton(onPressed: () => context.pop()),
         actions: <Widget>[
+          if (hasPublicCache)
+            TextButton(
+              onPressed: _loading ? null : () => unawaited(_syncPublic()),
+              child: const Text('同步公共版'),
+            ),
           TextButton(
             onPressed: _loading ? null : () => unawaited(_finalize()),
             child: const Text('确认入库'),

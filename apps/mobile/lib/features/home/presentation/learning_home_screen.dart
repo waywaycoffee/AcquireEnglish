@@ -1,7 +1,10 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../authentication/presentation/auth_session.dart';
 import '../../daily_path/presentation/today_path_card.dart';
 import 'widgets/home_coach_course_card.dart';
 import '../../digital_human/presentation/digital_human_picker.dart';
@@ -20,6 +23,7 @@ import '../../reading/domain/reading_doc.dart';
 import '../../reading/presentation/reading_library_provider.dart';
 import '../../review_hub/presentation/widgets/review_today_section.dart';
 import '../../shared/presentation/pad/pad_scaffold.dart';
+import '../../sync/data/acquire_api_client.dart';
 import '../../sync/presentation/cloud_catalog_sync.dart';
 import '../../sync/presentation/daily_feed_provider.dart';
 import 'learning_dashboard_provider.dart';
@@ -48,6 +52,38 @@ class _LearningHomeScreenState extends ConsumerState<LearningHomeScreen> {
     if (widget.focusVocab) {
       WidgetsBinding.instance.addPostFrameCallback((_) => _scrollToVocab());
     }
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      unawaited(_pollFingerprintNotifications());
+    });
+  }
+
+  Future<void> _pollFingerprintNotifications() async {
+    final AuthSessionState auth = ref.read(authSessionProvider);
+    if (!auth.isLoggedIn || !mounted) return;
+    final List<Map<String, dynamic>> items =
+        await ref.read(acquireApiClientProvider).listFingerprintNotifications();
+    if (!mounted || items.isEmpty) return;
+    final List<String> ids = <String>[
+      for (final Map<String, dynamic> item in items)
+        if ('${item['upload_task_id'] ?? ''}'.isNotEmpty)
+          '${item['upload_task_id']}',
+    ];
+    final String title = items.length == 1
+        ? '${items.first['message'] ?? '云端解析完成'}'
+        : '有 ${items.length} 个教材解析已完成';
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(title),
+        duration: const Duration(seconds: 5),
+        action: SnackBarAction(
+          label: '查看',
+          onPressed: () => context.push('/material-courses'),
+        ),
+      ),
+    );
+    await ref.read(acquireApiClientProvider).ackFingerprintNotifications(
+          uploadTaskIds: ids,
+        );
   }
 
   @override

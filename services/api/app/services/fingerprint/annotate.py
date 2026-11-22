@@ -318,6 +318,23 @@ def annotate_lesson(lesson: dict[str, Any]) -> dict[str, Any]:
     out["tasks"] = build_lesson_tasks(
         targets, oral_outline=oral_list, shadow_lines=shadow_list
     )
+    # PRD lesson_structure aliases (tutor_script / sentence_list / word_rate).
+    if oral_list and not str(out.get("tutor_script") or "").strip():
+        out["tutor_script"] = "\n".join(oral_list)
+    if shadow_list and not out.get("sentence_list"):
+        out["sentence_list"] = list(shadow_list)
+    elif not out.get("sentence_list") and text:
+        # Fallback: first few non-empty sentences for shadowing.
+        parts = [p.strip() for p in text.replace("!", ".").replace("?", ".").split(".")]
+        sentences = [p for p in parts if len(p.split()) >= 4][:8]
+        if sentences:
+            out["sentence_list"] = sentences
+    if out.get("word_rate") is None and text:
+        words = [w for w in text.split() if w.isalpha()]
+        rare = sum(1 for tw in targets if str(tw.get("word") or ""))
+        out["word_rate"] = round(rare / max(1, len(words)), 4)
+    if not str(out.get("ai_goal") or "").strip():
+        out["ai_goal"] = str(out.get("goal") or "")
     return out
 
 

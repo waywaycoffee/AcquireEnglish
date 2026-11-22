@@ -420,3 +420,88 @@ async def test_private_only_no_public_asset(db_session: AsyncSession) -> None:
     patch = json.loads(fin.diff_patch_json or "{}")
     assert patch.get("status") == "ready"
     assert len(ready) >= 1
+
+
+@pytest.mark.asyncio
+async def test_sync_from_public_clears_private_overlay(
+    db_session: AsyncSession,
+) -> None:
+    user = User(
+        email="fp-sync@example.com",
+        hashed_password=hash_password("x"),
+        display_name="sync",
+    )
+    db_session.add(user)
+    await db_session.commit()
+    await db_session.refresh(user)
+    reg = await fp_svc.register_decomposed_asset(
+        db_session,
+        cleaned_text=SAMPLE_A,
+        source_type="pdf_text",
+        asset_name="sync-base",
+        lessons=[
+            {
+                "lesson_no": 1,
+                "title": "Public title",
+                "text_content": SAMPLE_A,
+            }
+        ],
+        created_by=user.id,
+        upload_task_id=None,
+    )
+    course = await fp_svc.create_user_course_from_cache(
+        db_session,
+        user_id=user.id,
+        asset_cache_id=reg["asset_id"],
+        asset_title="My copy",
+    )
+    await fp_svc.patch_user_course_lessons(
+        db_session,
+        user_id=user.id,
+        user_course_asset_id=course.id,
+        action="edit",
+        lesson_nos=[1],
+        lesson_edit={"title": "Private edit"},
+    )
+    overlay = fp_svc.resolve_user_course_lessons_sync(
+        (
+            await db_session.execute(
+                select(UserCourseAsset).where(UserCourseAsset.id == course.id)
+            )
+        ).scalar_one()
+    )
+    assert overlay[0]["title"] == "Private edit"
+    _row, restored = await fp_svc.sync_user_course_from_public(
+        db_session, user_id=user.id, user_course_asset_id=course.id
+    )
+    assert restored[0]["title"] == "Public title"
+
+
+def test_runtime_config_persist(tmp_path, monkeypatch) -> None:
+    from app.services.fingerprint import runtime_config as rc
+
+    monkeypatch.setattr(rc, "media_cache_root", lambda: tmp_path / "media")
+    monkeypatch.setattr(settings, "fingerprint_sim_hamming_max", 9)
+    snap = rc.apply_overrides({"sim_hamming_max": 7, "enabled": True})
+    assert snap["sim_hamming_max"] == 7
+    assert (tmp_path / "media" / "misc" / "fingerprint_runtime_config.json").is_file()
+    monkeypatch.setattr(settings, "fingerprint_sim_hamming_max", 9)
+    assert rc.load_into_settings() is True
+    assert settings.fingerprint_sim_hamming_max == 7
+
+
+def test_annotate_prd_aliases() -> None:
+    from app.services.fingerprint.annotate import annotate_lesson
+
+    lesson = annotate_lesson(
+        {
+            "title": "L1",
+            "text_content": SAMPLE_A,
+            "oral_outline": ["How was the play?", "Was it private?"],
+            "shadow_lines": ["I got very angry."],
+        }
+    )
+    assert "tutor_script" in lesson and "play" in lesson["tutor_script"].lower()
+    assert lesson.get("sentence_list")
+    assert lesson.get("ai_goal")
+    assert lesson.get("word_rate") is not None

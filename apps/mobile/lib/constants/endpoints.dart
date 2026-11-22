@@ -185,8 +185,14 @@ class Endpoints {
       'api/fingerprint-cache/my-courses/${Uri.encodeComponent(courseId)}/lessons';
   static String fingerprintCacheCourseFinalize(String courseId) =>
       'api/fingerprint-cache/my-courses/${Uri.encodeComponent(courseId)}/finalize';
+  static String fingerprintCacheCourseSyncPublic(String courseId) =>
+      'api/fingerprint-cache/my-courses/${Uri.encodeComponent(courseId)}/sync-public';
   static String fingerprintCacheCourseShare(String courseId) =>
       'api/fingerprint-cache/my-courses/${Uri.encodeComponent(courseId)}/share';
+  static const String fingerprintCacheNotifications =
+      'api/fingerprint-cache/notifications';
+  static const String fingerprintCacheNotificationsAck =
+      'api/fingerprint-cache/notifications/ack';
 
   /// Kept for Dio header compatibility; AcquireEnglish API ignores it.
   static const String apiKey = '';

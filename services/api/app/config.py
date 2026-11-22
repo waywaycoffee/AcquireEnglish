@@ -119,9 +119,14 @@ class Settings(BaseSettings):
     # Optional 5060Ti embed HTTP endpoint; empty → local hashing-trick embed.
     # Example: http://100.115.252.55:8092/embed
     fingerprint_embed_url: str = ""
+    # Optional Qdrant HTTP base, e.g. http://127.0.0.1:6333 — empty → local JSON.
+    fingerprint_qdrant_url: str = ""
+    fingerprint_qdrant_api_key: str = ""
     fingerprint_lru_min_hits: int = 3
     fingerprint_lru_idle_days: int = 180
     fingerprint_gpu_save_minutes: int = 8
+    # Background LRU tick interval (seconds). 0 disables scheduled eviction.
+    fingerprint_lru_interval_seconds: int = 86400
 
     # OpenMAIC textbook decompose (P1). Empty URL → HeuristicSplitter only.
     # Prefer Tailscale GPU-box mock/real: http://100.115.252.55:8093
