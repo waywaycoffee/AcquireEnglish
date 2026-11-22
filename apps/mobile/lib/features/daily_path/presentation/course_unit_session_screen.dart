@@ -48,26 +48,29 @@ class CourseUnitSessionScreen extends ConsumerWidget {
       );
     }
 
+    final CoursePlan resolvedPlan = plan;
+    final CourseUnit resolvedUnit = unit;
     final bool isReview = mode == 'review';
-    final bool isVideo = plan.type == CoursePlanType.video ||
-        plan.type == CoursePlanType.videoSeries;
-    final bool isSeries = plan.type == CoursePlanType.videoSeries;
+    final bool isVideo = resolvedPlan.type == CoursePlanType.video ||
+        resolvedPlan.type == CoursePlanType.videoSeries;
+    final bool isSeries = resolvedPlan.type == CoursePlanType.videoSeries;
     final String taskId = isReview
-        ? 'course-review:${plan.courseId}:${unit.unitId}'
-        : 'course-new:${plan.courseId}:${unit.unitId}';
+        ? 'course-review:${resolvedPlan.courseId}:${resolvedUnit.unitId}'
+        : 'course-new:${resolvedPlan.courseId}:${resolvedUnit.unitId}';
 
-    final List<String> shadowSource =
-        unit.shadowLines.isNotEmpty ? unit.shadowLines : unit.sentences;
-    final List<String> shadowLines = plan.params.practice.shadow
+    final List<String> shadowSource = resolvedUnit.shadowLines.isNotEmpty
+        ? resolvedUnit.shadowLines
+        : resolvedUnit.sentences;
+    final List<String> shadowLines = resolvedPlan.params.practice.shadow
         ? shadowSource
             .where((String s) => s.trim().isNotEmpty)
             .take(isVideo ? 10 : 6)
             .toList(growable: false)
         : const <String>[];
 
-    final List<String> phrases = unit.targetPhrases.isNotEmpty
-        ? unit.targetPhrases
-        : unit.wordIds;
+    final List<String> phrases = resolvedUnit.targetPhrases.isNotEmpty
+        ? resolvedUnit.targetPhrases
+        : resolvedUnit.wordIds;
 
     return Scaffold(
       appBar: AppBar(
@@ -208,7 +211,7 @@ class CourseUnitSessionScreen extends ConsumerWidget {
                 Navigator.of(context).push(
                   MaterialPageRoute<void>(
                     builder: (_) => SourceCoachLessonPreview(
-                      sourceTitle: plan.title,
+                      sourceTitle: plan!.title,
                       topic: unit.topic,
                       sourceLines: sourceLines,
                       isVideo: isVideo,
@@ -217,7 +220,7 @@ class CourseUnitSessionScreen extends ConsumerWidget {
                 );
               },
               icon: const Icon(Icons.record_voice_over_outlined),
-              label: const Text('AI 情景讨论'),
+              label: const Text('生成外教课'),
             ),
           ],
           const SizedBox(height: 28),
