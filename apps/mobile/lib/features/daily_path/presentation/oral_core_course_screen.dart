@@ -1,8 +1,15 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../import_course/data/bilibili_collection_download.dart';
+import '../../import_course/data/bilibili_episode_prepare.dart';
+import '../../import_course/data/bilibili_import_service.dart';
 import '../../library/presentation/library_catalog_provider.dart';
+import '../../library/presentation/library_mock_data.dart';
+import '../../settings/presentation/settings_provider.dart';
 import '../domain/course_plan.dart';
 import '../domain/oral_core_series.dart';
 import 'course_plan_provider.dart';
@@ -30,8 +37,12 @@ class _OralCoreCourseScreenState extends ConsumerState<OralCoreCourseScreen> {
 
   Future<void> _ensureCatalog() async {
     try {
-      final OralCoreSeries series = await ref.read(oralCoreSeriesProvider.future);
-      await ref.read(libraryCatalogProvider.notifier).ensureOralCoreCourse(series);
+      final OralCoreSeries series = await ref.read(
+        oralCoreSeriesProvider.future,
+      );
+      await ref
+          .read(libraryCatalogProvider.notifier)
+          .ensureOralCoreCourse(series);
     } catch (_) {
       // Episode open still falls back to watch URL; catalog refresh is best-effort.
     } finally {
@@ -41,10 +52,32 @@ class _OralCoreCourseScreenState extends ConsumerState<OralCoreCourseScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final AsyncValue<OralCoreSeries> seriesAsync =
-        ref.watch(oralCoreSeriesProvider);
+    final AsyncValue<OralCoreSeries> seriesAsync = ref.watch(
+      oralCoreSeriesProvider,
+    );
     final CoursePlan? active = ref.watch(coursePlanProvider).active;
     final bool isActive = active?.courseId == OralCoreSeries.kSeriesId;
+    final BilibiliCollectionDownloadProgress? downloadProgress = ref.watch(
+      bilibiliCollectionDownloadProgressProvider,
+    );
+    final LibraryCourseData? catalogCourse = ref
+        .watch(libraryCatalogProvider)
+        .where(
+          (LibraryCourseData course) => course.id == OralCoreSeries.kSeriesId,
+        )
+        .firstOrNull;
+    final int pendingDownloads =
+        catalogCourse?.episodes
+            .where(
+              (LibraryEpisodeItem episode) =>
+                  episode.videoMissing ||
+                  !isUsableLocalVideoPath(episode.videoAsset),
+            )
+            .length ??
+        0;
+    final bool downloading =
+        downloadProgress?.courseId == OralCoreSeries.kSeriesId &&
+        downloadProgress?.done == false;
 
     return Scaffold(
       appBar: AppBar(title: const Text('核心口语 9000 句')),
@@ -58,8 +91,8 @@ class _OralCoreCourseScreenState extends ConsumerState<OralCoreCourseScreen> {
               Text(
                 series.title,
                 style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                      fontWeight: FontWeight.w700,
-                    ),
+                  fontWeight: FontWeight.w700,
+                ),
               ),
               const SizedBox(height: 8),
               Text(
@@ -68,6 +101,35 @@ class _OralCoreCourseScreenState extends ConsumerState<OralCoreCourseScreen> {
                 style: Theme.of(context).textTheme.bodyMedium,
               ),
               const SizedBox(height: 20),
+              OutlinedButton.icon(
+                onPressed: !_catalogReady || pendingDownloads == 0
+                    ? null
+                    : downloading
+                    ? () => requestCancelBilibiliCollectionDownload(
+                        OralCoreSeries.kSeriesId,
+                      )
+                    : () => unawaited(
+                        _downloadCollection(series, pendingDownloads),
+                      ),
+                icon: Icon(
+                  downloading
+                      ? Icons.stop_circle_outlined
+                      : Icons.download_outlined,
+                ),
+                label: Text(
+                  downloading
+                      ? '停止下载合集'
+                      : pendingDownloads == 0
+                      ? '合集已下载'
+                      : '下载合集（剩余 $pendingDownloads 集）',
+                ),
+              ),
+              if (downloading) ...<Widget>[
+                const SizedBox(height: 6),
+                Text(downloadProgress!.message),
+                LinearProgressIndicator(value: downloadProgress.progress),
+              ],
+              const SizedBox(height: 12),
               Text('今日学几节', style: Theme.of(context).textTheme.titleMedium),
               const SizedBox(height: 8),
               Wrap(
@@ -84,9 +146,7 @@ class _OralCoreCourseScreenState extends ConsumerState<OralCoreCourseScreen> {
               ),
               const SizedBox(height: 20),
               FilledButton(
-                onPressed: _busy
-                    ? null
-                    : () => _activate(context, series),
+                onPressed: _busy ? null : () => _activate(context, series),
                 child: Text(isActive ? '更新今日节数并继续' : '设为今日课程'),
               ),
               if (isActive) ...<Widget>[
@@ -107,29 +167,31 @@ class _OralCoreCourseScreenState extends ConsumerState<OralCoreCourseScreen> {
                   padding: EdgeInsets.only(bottom: 12),
                   child: LinearProgressIndicator(),
                 ),
-              ...series.lessons.take(20).map(
-                (OralCoreLesson l) => ListTile(
-                  contentPadding: EdgeInsets.zero,
-                  leading: Text(
-                    l.lessonNo.toString().padLeft(2, '0'),
-                    style: const TextStyle(fontWeight: FontWeight.w700),
+              ...series.lessons
+                  .take(20)
+                  .map(
+                    (OralCoreLesson l) => ListTile(
+                      contentPadding: EdgeInsets.zero,
+                      leading: Text(
+                        l.lessonNo.toString().padLeft(2, '0'),
+                        style: const TextStyle(fontWeight: FontWeight.w700),
+                      ),
+                      title: Text(l.title),
+                      subtitle: Text(
+                        l.pack.quiz.isNotEmpty ? '含样例题包' : '题包待生产管线补齐',
+                      ),
+                      onTap: !_catalogReady
+                          ? null
+                          : () {
+                              final String epId =
+                                  '${OralCoreSeries.kSeriesId}-${l.page.toString().padLeft(2, '0')}';
+                              context.push(
+                                '/episodes/${Uri.encodeComponent(epId)}'
+                                '?autoplay=1',
+                              );
+                            },
+                    ),
                   ),
-                  title: Text(l.title),
-                  subtitle: Text(
-                    l.pack.quiz.isNotEmpty ? '含样例题包' : '题包待生产管线补齐',
-                  ),
-                  onTap: !_catalogReady
-                      ? null
-                      : () {
-                          final String epId =
-                              '${OralCoreSeries.kSeriesId}-${l.page.toString().padLeft(2, '0')}';
-                          context.push(
-                            '/episodes/${Uri.encodeComponent(epId)}'
-                            '?autoplay=1',
-                          );
-                        },
-                ),
-              ),
               if (series.lessons.length > 20)
                 Text('… 共 ${series.lessons.length} 课'),
             ],
@@ -145,27 +207,62 @@ class _OralCoreCourseScreenState extends ConsumerState<OralCoreCourseScreen> {
       await ref
           .read(libraryCatalogProvider.notifier)
           .ensureOralCoreCourse(series);
-      await ref.read(coursePlanProvider.notifier).activateOralCoreSeries(
-            series,
-            dailyLessons: _dailyLessons,
-          );
+      await ref
+          .read(coursePlanProvider.notifier)
+          .activateOralCoreSeries(series, dailyLessons: _dailyLessons);
       if (!context.mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            '已设为今日课程 · 每日 $_dailyLessons 节',
-          ),
-        ),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('已设为今日课程 · 每日 $_dailyLessons 节')));
       context.go('/home');
     } catch (e) {
       if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('激活失败：$e')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('激活失败：$e')));
       }
     } finally {
       if (mounted) setState(() => _busy = false);
     }
+  }
+
+  Future<void> _downloadCollection(OralCoreSeries series, int count) async {
+    final bool? confirmed = await showDialog<bool>(
+      context: context,
+      builder: (BuildContext dialogContext) => AlertDialog(
+        title: const Text('下载合集到本机？'),
+        content: Text('将按集下载剩余 $count 集，已下载的集不会重复下载。可随时停止；请预留网络流量与存储空间。'),
+        actions: <Widget>[
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: const Text('取消'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            child: const Text('下载合集'),
+          ),
+        ],
+      ),
+    );
+    if (!mounted || confirmed != true) return;
+    await ref
+        .read(libraryCatalogProvider.notifier)
+        .ensureOralCoreCourse(series);
+    if (!mounted) return;
+    final ProviderContainer container = ProviderScope.containerOf(context);
+    final String cookie = ref
+        .read(learningSettingsProvider)
+        .resolvedBilibiliCookieHeader;
+    unawaited(
+      downloadRemainingBilibiliEpisodes(
+        catalog: container.read(libraryCatalogProvider.notifier),
+        readCourses: () => container.read(libraryCatalogProvider),
+        courseId: OralCoreSeries.kSeriesId,
+        service: BilibiliImportService.withCookie(cookie),
+        progressNotifier: container.read(
+          bilibiliCollectionDownloadProgressProvider.notifier,
+        ),
+      ),
+    );
   }
 }

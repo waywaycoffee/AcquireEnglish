@@ -58,13 +58,19 @@ bilibiliCollectionDownloadProgressProvider =
       BilibiliCollectionDownloadProgress?
     >(BilibiliCollectionDownloadProgressNotifier.new);
 
-bool _isMultiEpisodeBilibili(LibraryCourseData course) {
+bool isMultiEpisodeBilibiliCourse(LibraryCourseData course) {
   if (course.episodes.length <= 1) {
     return false;
   }
   return course.category == 'bilibili' ||
       course.sourceLabel.toLowerCase().contains('bilibili') ||
-      course.id.startsWith('bilibili-');
+      course.id.startsWith('bilibili-') ||
+      course.episodes.any((LibraryEpisodeItem episode) =>
+          bilibiliSourceForEpisode(
+            course: course,
+            episode: episode,
+            videoAsset: episode.videoAsset,
+          ) != null);
 }
 
 bool isBilibiliCollectionDownloadInFlight(String courseId) {
@@ -110,7 +116,7 @@ Future<void> downloadRemainingBilibiliEpisodes({
         break;
       }
     }
-    if (target == null || !_isMultiEpisodeBilibili(target)) {
+    if (target == null || !isMultiEpisodeBilibiliCourse(target)) {
       return;
     }
 

@@ -11,6 +11,7 @@ import '../../import_course/data/bilibili_collection_download.dart';
 import '../../import_course/data/bilibili_cover_refresh.dart';
 import '../../import_course/data/bilibili_episode_cover_backfill.dart';
 import '../../import_course/data/bilibili_import_service.dart';
+import '../../import_course/data/direct_video_collection_download.dart';
 import '../../import_course/data/netdisk_local_download.dart';
 import '../../import_course/domain/bilibili_import.dart';
 import '../../membership/domain/free_trial_seeds.dart';
@@ -455,7 +456,8 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
                       sliver: SliverList(
                         delegate: SliverChildListDelegate(
                           <Widget>[
-                    if (_pendingCollectionEpisodes(selectedCourse) > 0)
+                    if (selectedCourse.episodes.length > 1 &&
+                        isMultiEpisodeBilibiliCourse(selectedCourse))
                       Consumer(
                         builder: (BuildContext context, WidgetRef ref, _) {
                           final BilibiliCollectionDownloadProgress? progress =
@@ -465,7 +467,9 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
                           return Align(
                             alignment: Alignment.centerLeft,
                             child: OutlinedButton.icon(
-                              onPressed: downloading
+                              onPressed: _pendingCollectionEpisodes(selectedCourse) == 0
+                                  ? null
+                                  : downloading
                                   ? () {
                                       requestCancelBilibiliCollectionDownload(
                                         selectedCourse.id,
@@ -489,13 +493,16 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
                               label: Text(
                                 downloading
                                     ? '停止下载'
-                                    : '下载剩余各集（${_pendingCollectionEpisodes(selectedCourse)}）',
+                                    : _pendingCollectionEpisodes(selectedCourse) == 0
+                                        ? '合集已下载'
+                                        : '下载合集（剩余 ${_pendingCollectionEpisodes(selectedCourse)} 集）',
                               ),
                             ),
                           );
                         },
                       ),
-                    if (pendingNetdiskEpisodes(selectedCourse) > 0)
+                    if (selectedCourse.episodes.length > 1 &&
+                        isNetdiskCourse(selectedCourse))
                       Consumer(
                         builder: (BuildContext context, WidgetRef ref, _) {
                           final NetdiskDownloadProgress? progress =
@@ -508,7 +515,8 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
                             child: Align(
                               alignment: Alignment.centerLeft,
                               child: OutlinedButton.icon(
-                                onPressed: downloading
+                                onPressed: downloading ||
+                                        pendingNetdiskEpisodes(selectedCourse) == 0
                                     ? null
                                     : () => unawaited(
                                           _confirmNetdiskDownload(selectedCourse),
@@ -516,13 +524,71 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
                                 icon: const Icon(Icons.download_for_offline_outlined),
                                 label: Text(
                                   downloading
-                                      ? '正在下载到本机'
-                                      : '下载到本机（在线慢时可离线播）',
+                                      ? '正在下载合集'
+                                      : pendingNetdiskEpisodes(selectedCourse) == 0
+                                          ? '合集已下载'
+                                          : '下载合集（剩余 ${pendingNetdiskEpisodes(selectedCourse)} 集）',
                                 ),
                               ),
                             ),
                           );
                         },
+                      ),
+                    if (selectedCourse.episodes.length > 1 &&
+                        !isNetdiskCourse(selectedCourse) &&
+                        !isMultiEpisodeBilibiliCourse(selectedCourse) &&
+                        isDirectVideoCollection(selectedCourse))
+                      Consumer(
+                        builder: (BuildContext context, WidgetRef ref, _) {
+                          final DirectVideoCollectionProgress? progress =
+                              ref.watch(directVideoCollectionProgressProvider);
+                          final bool downloading =
+                              progress?.courseId == selectedCourse.id &&
+                              progress?.done == false;
+                          final int pending =
+                              pendingDirectVideoEpisodes(selectedCourse);
+                          return Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: <Widget>[
+                              OutlinedButton.icon(
+                                onPressed: pending == 0
+                                    ? null
+                                    : downloading
+                                        ? () => cancelDirectVideoCollectionDownload(
+                                              selectedCourse.id,
+                                            )
+                                        : () => unawaited(
+                                              _confirmDirectCollectionDownload(
+                                                selectedCourse,
+                                              ),
+                                            ),
+                                icon: Icon(downloading
+                                    ? Icons.stop_circle_outlined
+                                    : Icons.download_outlined),
+                                label: Text(downloading
+                                    ? '停止下载合集'
+                                    : pending == 0
+                                        ? '合集已下载'
+                                        : '下载合集（剩余 $pending 集）'),
+                              ),
+                              if (downloading) ...<Widget>[
+                                Text(progress!.message),
+                                LinearProgressIndicator(value: progress.progress),
+                              ],
+                            ],
+                          );
+                        },
+                      ),
+                    if (selectedCourse.episodes.length > 1 &&
+                        !isNetdiskCourse(selectedCourse) &&
+                        !isMultiEpisodeBilibiliCourse(selectedCourse) &&
+                        !isDirectVideoCollection(selectedCourse) &&
+                        selectedCourse.episodes.every((LibraryEpisodeItem e) =>
+                            isUsableLocalVideoPath(e.videoAsset)))
+                      OutlinedButton.icon(
+                        onPressed: null,
+                        icon: Icon(Icons.download_done_outlined),
+                        label: Text('合集已在本机'),
                       ),
                     // Course-level download / 补字幕 progress stays at the very top.
                     Consumer(
@@ -1758,10 +1824,7 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
   }
 
   int _pendingCollectionEpisodes(LibraryCourseData course) {
-    final bool isBili = course.category == 'bilibili' ||
-        course.sourceLabel.toLowerCase().contains('bilibili') ||
-        course.id.startsWith('bilibili-');
-    if (!isBili || course.episodes.length <= 1) return 0;
+    if (!isMultiEpisodeBilibiliCourse(course)) return 0;
     return course.episodes.where((LibraryEpisodeItem item) =>
         item.videoMissing || !isUsableLocalVideoPath(item.videoAsset)).length;
   }
@@ -1772,8 +1835,8 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
     final bool? confirmed = await showDialog<bool>(
       context: context,
       builder: (BuildContext dialogContext) => AlertDialog(
-        title: const Text('下载合集全部未下视频？'),
-        content: Text('还有 $count 集未下载到本地。确认后会在后台拉取整部合集。'),
+        title: const Text('下载合集到本机？'),
+        content: Text('还有 $count 集未下载。将按集依次下载，已下载的集不会重复下载。可随时停止，下载需要足够的网络流量与存储空间。'),
         actions: <Widget>[
           TextButton(
             onPressed: () => Navigator.of(dialogContext).pop(false),
@@ -1856,6 +1919,39 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
         );
       }),
     );
+  }
+
+  Future<void> _confirmDirectCollectionDownload(
+    LibraryCourseData course,
+  ) async {
+    final int count = pendingDirectVideoEpisodes(course);
+    if (count == 0) return;
+    final bool? confirmed = await showDialog<bool>(
+      context: context,
+      builder: (BuildContext dialogContext) => AlertDialog(
+        title: const Text('下载合集到本机？'),
+        content: Text('将依次下载剩余 $count 集。可随时停止，下载需要足够的网络流量与存储空间。'),
+        actions: <Widget>[
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: const Text('取消'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            child: const Text('下载合集'),
+          ),
+        ],
+      ),
+    );
+    if (!mounted || confirmed != true) return;
+    final ProviderContainer container = ProviderScope.containerOf(context);
+    unawaited(downloadDirectVideoCollection(
+      catalog: container.read(libraryCatalogProvider.notifier),
+      readCourses: () => container.read(libraryCatalogProvider),
+      courseId: course.id,
+      progressNotifier:
+          container.read(directVideoCollectionProgressProvider.notifier),
+    ));
   }
 
   void _handleCourseTap(LibraryCourseData course) {
