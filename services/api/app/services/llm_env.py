@@ -1,4 +1,4 @@
-"""Resolve DeepSeek / OpenAI-compatible credentials from process env + sidecar .env files."""
+"""Resolve DeepSeek / OpenAI-compatible API settings from process env + sidecar .env files."""
 
 from __future__ import annotations
 

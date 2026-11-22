@@ -14,7 +14,7 @@ from pydantic import BaseModel, Field
 from app.config import settings
 from app.deps import get_current_user
 from app.models import User
-from app.services.llm_credentials import resolve_deepseek
+from app.services.llm_env import resolve_deepseek
 
 router = APIRouter(prefix="/course/quiz", tags=["course-quiz"])
 
