@@ -201,6 +201,8 @@ class PadPortraitPlayerScreenState
   bool _isMuted = false;
   double _volumeLevel = 1;
   final LayerLink _shadowToolbarLink = LayerLink();
+  /// Bound by [StudyShadowingTab] — mirrors the toolbar volume / 播放原声 action.
+  VoidCallback? _shadowingPlayOriginal;
   bool _dubPlaybackActive = false;
   Player? _dubMixPlayer;
   StreamSubscription<Duration>? _dubPositionSubscription;
@@ -2596,10 +2598,14 @@ Future<void> _settleChineseFillIfAlreadyPresent() async {
     unawaited(_videoPlayer?.pause());
   }
 
+  /// Prefer catalog-local media so Android MediaExtractor can cut a WAV.
+  String? _assessmentVideoSource() =>
+      _localPlayableVideoPath() ?? _videoAsset;
+
   PronunciationTargetSelection _selectPronunciationForLine(int index) =>
       selectPronunciationTarget(
         state: state,
-        videoSource: _videoAsset,
+        videoSource: _assessmentVideoSource(),
         videoReady: _videoReady,
         videoDuration: _videoDuration,
         subtitleIndex: index,
@@ -2624,7 +2630,7 @@ Future<void> _settleChineseFillIfAlreadyPresent() async {
   void _handleAssessVisibleLine() {
     final PronunciationTargetSelection selection = selectPronunciationTarget(
       state: state,
-      videoSource: _videoAsset,
+      videoSource: _assessmentVideoSource(),
       videoReady: _videoReady,
       videoDuration: _videoDuration,
     );
@@ -2865,7 +2871,7 @@ Future<void> _settleChineseFillIfAlreadyPresent() async {
     final PronunciationTargetSelection visibleAssessment =
         selectPronunciationTarget(
           state: state,
-          videoSource: _videoAsset,
+          videoSource: _assessmentVideoSource(),
           videoReady: _videoReady,
           videoDuration: _videoDuration,
         );
@@ -3129,7 +3135,7 @@ Future<void> _settleChineseFillIfAlreadyPresent() async {
                 onSpeedSelected: _handleSpeedSelected,
                 onOpenSpeedSheet: _handleOpenSpeedSheet,
                 onOpenQualitySheet: _handleOpenQualitySheet,
-              onTogglePlaying: _handleTogglePlaying,
+              onTogglePlaying: _effectiveTogglePlaying,
                 onOpenLoopSheet: _handleOpenLoopSheet,
               onSeek: _handleSeek,
               onToggleFullscreen: () => _handleOpenFullscreen(
@@ -3370,6 +3376,9 @@ Future<void> _settleChineseFillIfAlreadyPresent() async {
           onPreviousSentence: state.hasLines ? _handlePreviousLine : null,
           onNextSentence: state.hasLines ? _handleNextLine : null,
           onReplaySentence: state.hasLines ? _handleReplayLine : null,
+          onPlayOriginalBound: (VoidCallback playOriginal) {
+            _shadowingPlayOriginal = playOriginal;
+          },
           unavailableReason: shadowAssessment.unavailableReason,
           onOpenFullDialog: shadowAssessment.target == null
               ? null
@@ -3680,6 +3689,32 @@ Future<void> _settleChineseFillIfAlreadyPresent() async {
       _recordCurrentLineWords();
     }
   }
+
+  /// On the 跟读 tab, bottom play matches the toolbar volume button.
+  void _handleShadowingTogglePlaying() {
+    if (_pronunciationDialogActive) return;
+    _pausedForLookup = false;
+    if (state.isPlaying) {
+      setState(() => state.isPlaying = false);
+      _applyPlaybackMode();
+      return;
+    }
+    final VoidCallback? playOriginal = _shadowingPlayOriginal;
+    if (playOriginal != null) {
+      playOriginal();
+      return;
+    }
+    if (state.hasLines) {
+      _handleReplayLine();
+      return;
+    }
+    _handleTogglePlaying();
+  }
+
+  VoidCallback get _effectiveTogglePlaying =>
+      _studyTab == StudyModeTab.shadowing
+      ? _handleShadowingTogglePlaying
+      : _handleTogglePlaying;
 
   void _handleSystemPlay() {
     if (!_oralCoachOpen && !state.isPlaying) {

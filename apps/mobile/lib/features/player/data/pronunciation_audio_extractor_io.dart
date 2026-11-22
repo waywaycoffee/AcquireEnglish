@@ -177,7 +177,10 @@ class PronunciationAudioExtractor {
     } on PronunciationAudioExtractionException {
       rethrow;
     } on PlatformException {
-      throw const PronunciationAudioExtractionException('提取视频原声失败，请检查视频编码。');
+      // Soft message — UI falls back to playing the sentence from video.
+      throw const PronunciationAudioExtractionException(
+        '无法切出独立原声，请改用视频本句播放。',
+      );
     } on TimeoutException {
       throw const PronunciationAudioExtractionException('提取视频原声超时。');
     } catch (_) {

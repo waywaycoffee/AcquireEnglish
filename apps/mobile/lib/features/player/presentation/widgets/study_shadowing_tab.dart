@@ -83,6 +83,7 @@ class StudyShadowingTab extends ConsumerStatefulWidget {
     this.onPreviousSentence,
     this.onNextSentence,
     this.onReplaySentence,
+    this.onPlayOriginalBound,
     this.unavailableReason,
     this.onOpenFullDialog,
     this.onRecordingStarted,
@@ -104,6 +105,9 @@ class StudyShadowingTab extends ConsumerStatefulWidget {
   final VoidCallback? onPreviousSentence;
   final VoidCallback? onNextSentence;
   final VoidCallback? onReplaySentence;
+
+  /// Parent binds bottom-bar play to the same action as the volume button.
+  final ValueChanged<VoidCallback>? onPlayOriginalBound;
   final String? unavailableReason;
   final VoidCallback? onOpenFullDialog;
 
@@ -182,6 +186,9 @@ class _StudyShadowingTabState extends ConsumerState<StudyShadowingTab> {
   bool _dubTakeSaved = false;
   DateTime? _takeCreatedAt;
   static const Duration _scoreTimeout = Duration(seconds: 8);
+  static const String _micCoachPrefsKey = 'shadowing_mic_coach_v1';
+  final GlobalKey _micCoachKey = GlobalKey(debugLabel: 'shadowing-mic');
+  bool _micCoachVisible = false;
 
   @override
   void initState() {
@@ -193,12 +200,149 @@ class _StudyShadowingTabState extends ConsumerState<StudyShadowingTab> {
         setState(() => _previewPositionMs = position.inMilliseconds);
       }
     });
+    _bindPlayOriginalCallback();
     unawaited(_bindTarget(force: true));
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      unawaited(_maybeShowMicCoach());
+    });
+  }
+
+  void _bindPlayOriginalCallback() {
+    widget.onPlayOriginalBound?.call(_playOriginalAudio);
+  }
+
+  /// Same action as the toolbar volume button (extracted WAV or sentence replay).
+  void _playOriginalAudio() {
+    if (_recordingActive || _finishingRecording || _resourcesReleased) {
+      return;
+    }
+    if (_reference != null) {
+      unawaited(_playLocalFile(_reference!.path));
+    } else {
+      widget.onReplaySentence?.call();
+    }
+  }
+
+  Future<void> _maybeShowMicCoach() async {
+    if (!mounted || _resourcesReleased || !widget.hasLine) return;
+    if (!Hive.isBoxOpen('prefs')) return;
+    if (Hive.box<String>('prefs').get(_micCoachPrefsKey) == '1') return;
+    await Future<void>.delayed(const Duration(milliseconds: 420));
+    if (!mounted || _resourcesReleased || _micCoachVisible) return;
+    _micCoachVisible = true;
+    try {
+      await showGeneralDialog<void>(
+        context: context,
+        barrierDismissible: true,
+        barrierLabel: '关闭跟读提示',
+        barrierColor: Colors.black.withValues(alpha: 0.55),
+        transitionDuration: const Duration(milliseconds: 180),
+        pageBuilder: (
+          BuildContext dialogContext,
+          Animation<double> animation,
+          Animation<double> secondaryAnimation,
+        ) {
+          final Size size = MediaQuery.sizeOf(dialogContext);
+          final double tipTop = (size.height * 0.20).clamp(88.0, 240.0);
+          return SafeArea(
+            child: Stack(
+              children: <Widget>[
+                Positioned.fill(
+                  child: GestureDetector(
+                    behavior: HitTestBehavior.opaque,
+                    onTap: () => Navigator.of(dialogContext).pop(),
+                  ),
+                ),
+                Positioned(
+                  top: tipTop,
+                  left: 24,
+                  right: 24,
+                  child: FadeTransition(
+                    opacity: animation,
+                    child: Material(
+                      color: Colors.transparent,
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: <Widget>[
+                          const Icon(
+                            Icons.arrow_upward_rounded,
+                            color: Colors.white,
+                            size: 42,
+                          ),
+                          const SizedBox(height: 8),
+                          Container(
+                            width: double.infinity,
+                            padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF111827),
+                              borderRadius: BorderRadius.circular(14),
+                              border: Border.all(
+                                color: const Color(0xFF3B82F6),
+                              ),
+                            ),
+                            child: const Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: <Widget>[
+                                Text(
+                                  '跟读在这里',
+                                  style: TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.w800,
+                                  ),
+                                ),
+                                SizedBox(height: 8),
+                                Text(
+                                  '视频底部中间的麦克风开始录音；喇叭或下方大播放键听本句原声。',
+                                  style: TextStyle(
+                                    color: Color(0xFFE5E7EB),
+                                    fontSize: 13,
+                                    height: 1.4,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(height: 12),
+                          FilledButton(
+                            onPressed: () =>
+                                Navigator.of(dialogContext).pop(),
+                            child: const Text('知道了'),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          );
+        },
+      );
+    } finally {
+      if (Hive.isBoxOpen('prefs')) {
+        try {
+          await Hive.box<String>('prefs').put(_micCoachPrefsKey, '1');
+        } catch (_) {}
+      }
+      _micCoachVisible = false;
+    }
+  }
+
+  Future<void> _dismissMicCoach() async {
+    if (!_micCoachVisible) return;
+    final NavigatorState? nav = Navigator.maybeOf(context);
+    if (nav != null && nav.canPop()) {
+      nav.pop();
+    }
   }
 
   @override
   void didUpdateWidget(covariant StudyShadowingTab oldWidget) {
     super.didUpdateWidget(oldWidget);
+    if (oldWidget.onPlayOriginalBound != widget.onPlayOriginalBound) {
+      _bindPlayOriginalCallback();
+    }
     if (oldWidget.line.english != widget.line.english ||
         oldWidget.line.startMs != widget.line.startMs) {
       _peekHiddenSentence = false;
@@ -272,71 +416,105 @@ class _StudyShadowingTabState extends ConsumerState<StudyShadowingTab> {
       }
       return;
     }
-    try {
-      final PronunciationAudioSegment segment = await ref
-          .read(pronunciationAudioExtractorProvider)
-          .extract(
-            source: target.videoSource,
-            startMs: target.startMs,
-            endMs: target.endMs,
-            videoDuration: target.videoDuration,
-            onCancelAvailable: (Future<void> Function() cancel) {
-              _cancelExtraction = cancel;
-            },
-          );
-      _cancelExtraction = null;
-      if (!mounted ||
-          _resourcesReleased ||
-          _targetKey(target) != _boundTargetKey) {
-        await _deleteTemporaryPath(segment.path);
-        return;
-      }
-      final Pcm16MonoAudio aligned = segment.audio.trimLeadingSilence();
-      try {
-        if (aligned.bytes.isEmpty) {
-          throw const PronunciationAudioExtractionException('这段原声未检测到有效声音。');
-        }
-        if (aligned.waveform.isEmpty) {
-          throw const PronunciationAudioExtractionException('原声波形为空，请重试。');
-        }
-        if (!identical(aligned, segment.audio)) {
-          await File(segment.path).writeAsBytes(aligned.toWav(), flush: true);
-        }
-      } catch (_) {
-        await _deleteTemporaryPath(segment.path);
-        rethrow;
-      }
-      if (!mounted || _resourcesReleased) {
-        await _deleteTemporaryPath(segment.path);
-        return;
-      }
-      setState(() {
-        _referenceWaveform = aligned.waveform;
-        _reference = PronunciationAudioSegment(
-          path: segment.path,
-          audio: aligned,
-        );
-        _loadingReference = false;
-        _referenceError = null;
-      });
-    } on PronunciationAudioExtractionException catch (error) {
-      if (!mounted || _resourcesReleased) return;
-      setState(() {
-        _loadingReference = false;
-        _referenceError = error.message;
-        _referenceWaveform = const <double>[];
-        _reference = null;
-      });
-    } catch (_) {
-      if (!mounted || _resourcesReleased) return;
-      setState(() {
-        _loadingReference = false;
-        _referenceError = '原声暂不可用。';
-        _referenceWaveform = const <double>[];
-        _reference = null;
-      });
+    // Prefer the parent's local playable file (catalog cache) over a remote
+    // or DASH path that MediaExtractor cannot decode.
+    final List<String> sources = <String>[];
+    final String? localHint = widget.videoSource?.trim();
+    final String targetSource = target.videoSource.trim();
+    if (localHint != null &&
+        localHint.isNotEmpty &&
+        !localHint.startsWith('http://') &&
+        !localHint.startsWith('https://')) {
+      sources.add(localHint);
     }
+    if (targetSource.isNotEmpty && !sources.contains(targetSource)) {
+      sources.add(targetSource);
+    }
+    if (sources.isEmpty) {
+      if (mounted) {
+        setState(() {
+          _loadingReference = false;
+          _referenceError = _softReferenceFallbackMessage;
+          _referenceWaveform = const <double>[];
+          _reference = null;
+        });
+      }
+      return;
+    }
+
+    Object? lastError;
+    for (final String source in sources) {
+      try {
+        final PronunciationAudioSegment segment = await ref
+            .read(pronunciationAudioExtractorProvider)
+            .extract(
+              source: source,
+              startMs: target.startMs,
+              endMs: target.endMs,
+              videoDuration: target.videoDuration,
+              onCancelAvailable: (Future<void> Function() cancel) {
+                _cancelExtraction = cancel;
+              },
+            );
+        _cancelExtraction = null;
+        if (!mounted ||
+            _resourcesReleased ||
+            _targetKey(target) != _boundTargetKey) {
+          await _deleteTemporaryPath(segment.path);
+          return;
+        }
+        final Pcm16MonoAudio aligned = segment.audio.trimLeadingSilence();
+        try {
+          if (aligned.bytes.isEmpty) {
+            throw const PronunciationAudioExtractionException(
+              '这段原声未检测到有效声音。',
+            );
+          }
+          if (aligned.waveform.isEmpty) {
+            throw const PronunciationAudioExtractionException('原声波形为空，请重试。');
+          }
+          if (!identical(aligned, segment.audio)) {
+            await File(segment.path).writeAsBytes(aligned.toWav(), flush: true);
+          }
+        } catch (_) {
+          await _deleteTemporaryPath(segment.path);
+          rethrow;
+        }
+        if (!mounted || _resourcesReleased) {
+          await _deleteTemporaryPath(segment.path);
+          return;
+        }
+        setState(() {
+          _referenceWaveform = aligned.waveform;
+          _reference = PronunciationAudioSegment(
+            path: segment.path,
+            audio: aligned,
+          );
+          _loadingReference = false;
+          _referenceError = null;
+        });
+        return;
+      } on PronunciationAudioExtractionException catch (error) {
+        lastError = error;
+        _cancelExtraction = null;
+      } catch (error) {
+        lastError = error;
+        _cancelExtraction = null;
+      }
+    }
+    if (!mounted || _resourcesReleased) return;
+    // Soft-fail: volume / bottom play still replay the sentence from video.
+    debugPrint('Shadowing reference extract failed: $lastError');
+    setState(() {
+      _loadingReference = false;
+      _referenceError = _softReferenceFallbackMessage;
+      _referenceWaveform = const <double>[];
+      _reference = null;
+    });
   }
+
+  static const String _softReferenceFallbackMessage =
+      '独立原声暂不可用，点喇叭或下方播放可听本句视频原声。';
 
   Pcm16MonoAudio? get _liveRecording {
     if (!_recordingActive || _recordingBytesWritten < 2) return null;
@@ -932,6 +1110,7 @@ class _StudyShadowingTabState extends ConsumerState<StudyShadowingTab> {
 
   Widget _micButton(StudyShellColors shell, bool canRecord) {
     return Semantics(
+      key: _micCoachKey,
       button: true,
       label: _recordingActive ? '停止录音' : '开始跟读录音',
       child: Material(
@@ -947,9 +1126,12 @@ class _StudyShadowingTabState extends ConsumerState<StudyShadowingTab> {
           customBorder: const CircleBorder(),
           onTap: !canRecord || _finishingRecording
               ? null
-              : () => unawaited(
-                  _recordingActive ? _stopRecording() : _startRecording(),
-                ),
+              : () {
+                  unawaited(_dismissMicCoach());
+                  unawaited(
+                    _recordingActive ? _stopRecording() : _startRecording(),
+                  );
+                },
           child: SizedBox(
             width: 44,
             height: 44,
@@ -1437,11 +1619,9 @@ class _StudyShadowingTabState extends ConsumerState<StudyShadowingTab> {
                   ),
                   IconButton(
                     key: const ValueKey<String>('study-shadowing-original'),
-                    tooltip: '播放原声', icon: const Icon(Icons.volume_up_rounded),
-                    onPressed: _recordingActive ? null : () {
-                      if (_reference != null) { unawaited(_playLocalFile(_reference!.path)); }
-                      else { widget.onReplaySentence?.call(); }
-                    },
+                    tooltip: '播放原声',
+                    icon: const Icon(Icons.volume_up_rounded),
+                    onPressed: _recordingActive ? null : _playOriginalAudio,
                   ),
                   _sideNavButton(icon: Icons.chevron_left_rounded,
                     semanticLabel: '上一句', onPressed: widget.onPreviousSentence, shell: shell),
@@ -1490,32 +1670,48 @@ class _ShadowToolbarPortalState extends State<_ShadowToolbarPortal> {
     if (link == null) return widget.child;
     return OverlayPortal(
       controller: _controller,
-      overlayChildBuilder: (BuildContext context) => Positioned(
-        left: 0, top: 0,
-        child: CompositedTransformFollower(
-          link: link, showWhenUnlinked: false,
+      overlayChildBuilder: (BuildContext context) {
+        // Only the toolbar row should receive hits — avoid a full-screen
+        // Positioned layer swallowing taps on the bottom play button.
+        final double width =
+            link.leaderSize?.width ?? MediaQuery.sizeOf(context).width;
+        return CompositedTransformFollower(
+          link: link,
+          showWhenUnlinked: false,
           targetAnchor: Alignment.bottomCenter,
           followerAnchor: Alignment.bottomCenter,
           child: SizedBox(
-            width: link.leaderSize?.width ?? MediaQuery.sizeOf(context).width,
+            width: width,
             child: Material(
               key: const ValueKey<String>('study-shadowing-overlay-background'),
               color: const Color(0xFFE5E7EB).withValues(alpha: 0.65),
               borderRadius: BorderRadius.circular(18),
               clipBehavior: Clip.antiAlias,
               child: IconButtonTheme(
-                data: IconButtonThemeData(style: IconButton.styleFrom(
-                  backgroundColor: Colors.black.withValues(alpha: 0.5),
-                  disabledBackgroundColor: Colors.black.withValues(alpha: 0.3),
-                  foregroundColor: Colors.white,
-                  disabledForegroundColor: Colors.white38,
-                  shape: const CircleBorder(),
-                )),
-                child: IconTheme(data: const IconThemeData(color: Colors.white,
-                  shadows: <Shadow>[Shadow(color: Colors.black54, blurRadius: 3)]), child: widget.child))),
+                data: IconButtonThemeData(
+                  style: IconButton.styleFrom(
+                    backgroundColor: Colors.black.withValues(alpha: 0.5),
+                    disabledBackgroundColor:
+                        Colors.black.withValues(alpha: 0.3),
+                    foregroundColor: Colors.white,
+                    disabledForegroundColor: Colors.white38,
+                    shape: const CircleBorder(),
+                  ),
+                ),
+                child: IconTheme(
+                  data: const IconThemeData(
+                    color: Colors.white,
+                    shadows: <Shadow>[
+                      Shadow(color: Colors.black54, blurRadius: 3),
+                    ],
+                  ),
+                  child: widget.child,
+                ),
+              ),
+            ),
           ),
-        ),
-      ),
+        );
+      },
       child: const SizedBox.shrink(),
     );
   }
