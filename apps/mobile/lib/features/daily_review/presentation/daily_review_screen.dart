@@ -1761,7 +1761,7 @@ class _DailyReviewScreenState extends ConsumerState<DailyReviewScreen>
                         ),
                         PopupMenuItem<String>(
                           value: 'archive',
-                          child: Text('归档'),
+                          child: Text('斩掉（熟悉）'),
                         ),
                       ],
                 ),
@@ -1864,6 +1864,13 @@ class _DailyReviewScreenState extends ConsumerState<DailyReviewScreen>
                   icon: const Icon(Icons.visibility_outlined),
                   label: const Text('显示单词与释义'),
                 ),
+                const SizedBox(height: 8),
+                OutlinedButton.icon(
+                  key: const Key('daily-review-slash-listen'),
+                  onPressed: _saving ? null : () => _slashFamiliar(source),
+                  icon: const Icon(Icons.content_cut_rounded, size: 18),
+                  label: const Text('熟悉，直接斩掉'),
+                ),
               ] else if (choiceMode)
                 for (final String choice in choices)
                   OutlinedButton(
@@ -1896,6 +1903,15 @@ class _DailyReviewScreenState extends ConsumerState<DailyReviewScreen>
                   onPressed: () => setState(() => _revealed = true),
                   style: ReviewRecallTheme.primaryButton,
                   child: Text(useCloze ? '显示答案与原词' : '显示答案'),
+                ),
+                const SizedBox(height: 8),
+                OutlinedButton.icon(
+                  key: const Key('daily-review-slash'),
+                  onPressed: _saving
+                      ? null
+                      : () => _slashFamiliar(source),
+                  icon: const Icon(Icons.content_cut_rounded, size: 18),
+                  label: const Text('熟悉，直接斩掉'),
                 ),
               ],
               if (word && (record.isNew || choiceMode))
@@ -2009,28 +2025,28 @@ class _DailyReviewScreenState extends ConsumerState<DailyReviewScreen>
                   !_retryWord &&
                   !choiceMode &&
                   !widget.practice) ...<Widget>[
-                const SizedBox(height: 26),
+                const SizedBox(height: 16),
                 const Text(
                   '按真实回忆情况选择',
                   style: TextStyle(
                     fontSize: 13,
-                    height: 1.6,
+                    height: 1.4,
                     fontWeight: FontWeight.w700,
                     color: ReviewRecallTheme.textSecondary,
                   ),
                 ),
-                const SizedBox(height: 12),
+                const SizedBox(height: 10),
                 _ratingButtons(
                   source: source,
                   record: record,
                   now: now,
                   practice: false,
                 ),
-                const SizedBox(height: 8),
+                const SizedBox(height: 6),
                 const Text(
-                  '点击一个评分即保存并进入下一条。',
+                  '点一下即保存并进入下一条。',
                   style: TextStyle(
-                    fontSize: 12,
+                    fontSize: 11,
                     color: ReviewRecallTheme.textMuted,
                   ),
                 ),
@@ -2301,78 +2317,80 @@ class _DailyReviewScreenState extends ConsumerState<DailyReviewScreen>
       (
         fsrs.Rating.again,
         speakHints ? '跟读困难' : '忘记',
-        speakHints ? '读不准或读不出' : '没想起来，需要重新学',
+        speakHints ? '读不准或读不出' : '没想起来',
         ReviewRecallTheme.rateAgain,
       ),
       (
         fsrs.Rating.hard,
         speakHints ? '勉强过关' : '吃力',
-        speakHints ? '能读但吃力' : '想了很久，才想起来',
+        speakHints ? '能读但吃力' : '想了很久',
         ReviewRecallTheme.rateHard,
       ),
       (
         fsrs.Rating.good,
         speakHints ? '跟读顺利' : '记得',
-        speakHints ? '基本正确' : '能独立回忆出来',
+        speakHints ? '基本正确' : '能独立回忆',
         ReviewRecallTheme.rateGood,
       ),
       (
         fsrs.Rating.easy,
         speakHints ? '很流利' : '很轻松',
-        speakHints ? '发音清晰自信' : '立刻答对，几乎不费力',
+        speakHints ? '发音清晰' : '几乎不费力',
         ReviewRecallTheme.rateEasy,
       ),
     ];
-    return Column(
-      children: <Widget>[
-        for (final (fsrs.Rating rating, String label, String hint, Color color)
-            in options) ...<Widget>[
-          SizedBox(
-            width: double.infinity,
-            child: FilledButton(
-              key: Key('daily-review-rate-${rating.name}'),
-              style: FilledButton.styleFrom(
-                backgroundColor: color,
-                foregroundColor: ReviewRecallTheme.textPrimary,
-                disabledBackgroundColor: color.withValues(alpha: 0.45),
-                minimumSize: const Size(0, 64),
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 16,
-                  vertical: 12,
-                ),
-                alignment: Alignment.centerLeft,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(14),
-                ),
-              ),
-              onPressed: _saving ? null : () => _grade(source, record, rating),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: <Widget>[
-                  Text(
-                    '$label  ·  $hint',
-                    style: const TextStyle(
-                      fontSize: 15,
-                      fontWeight: FontWeight.w800,
-                    ),
-                  ),
-                  if (!practice && !speakHints) ...<Widget>[
-                    const SizedBox(height: 4),
-                    Text(
-                      '下一次：${_formatReviewDelay(record.scheduledCard(rating, now).due, now)}',
-                      style: const TextStyle(
-                        fontSize: 12,
-                        color: ReviewRecallTheme.textSecondary,
+    return LayoutBuilder(
+      builder: (BuildContext context, BoxConstraints constraints) {
+        final double gap = 8;
+        final double width = ((constraints.maxWidth - gap) / 2).clamp(0.0, 240.0);
+        return Wrap(
+          spacing: gap,
+          runSpacing: gap,
+          children: <Widget>[
+            for (final (
+                  fsrs.Rating rating,
+                  String label,
+                  String hint,
+                  Color color,
+                )
+                in options)
+              SizedBox(
+                width: width,
+                child: Tooltip(
+                  message: practice || speakHints
+                      ? hint
+                      : '$hint · 下次 ${_formatReviewDelay(record.scheduledCard(rating, now).due, now)}',
+                  child: FilledButton(
+                    key: Key('daily-review-rate-${rating.name}'),
+                    style: FilledButton.styleFrom(
+                      backgroundColor: color,
+                      foregroundColor: ReviewRecallTheme.textPrimary,
+                      disabledBackgroundColor: color.withValues(alpha: 0.45),
+                      minimumSize: const Size(0, 44),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 10,
+                      ),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
                       ),
                     ),
-                  ],
-                ],
+                    onPressed:
+                        _saving ? null : () => _grade(source, record, rating),
+                    child: Text(
+                      label,
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                  ),
+                ),
               ),
-            ),
-          ),
-          const SizedBox(height: 8),
-        ],
-      ],
+          ],
+        );
+      },
     );
   }
 
@@ -2715,6 +2733,15 @@ class _DailyReviewScreenState extends ConsumerState<DailyReviewScreen>
       ref.read(phraseBookProvider.notifier).archivePhrase(id);
     }
     _advanceCard(source.key);
+  }
+
+  /// Familiar card: drop from the daily queue without revealing the answer.
+  void _slashFamiliar(ReviewSource source) {
+    _archiveFromSession(source);
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('已斩掉：保留在词书，不再进入今日复习')),
+    );
   }
 
   Future<void> _finishGrade(
