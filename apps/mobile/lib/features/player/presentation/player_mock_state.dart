@@ -100,6 +100,14 @@ class PlayerMockState {
     switch (speed) {
       case '0.5×':
         return 0.5;
+      case '0.6×':
+        return 0.6;
+      case '0.7×':
+        return 0.7;
+      case '0.8×':
+        return 0.8;
+      case '0.9×':
+        return 0.9;
       case '1.0×':
       case '1×':
         return 1;
@@ -110,7 +118,10 @@ class PlayerMockState {
       case '2.0×':
         return 2;
       default:
-        return 0.8;
+        final double? parsed = double.tryParse(
+          speed.replaceAll('×', '').replaceAll('x', '').trim(),
+        );
+        return parsed ?? 0.8;
     }
   }
 

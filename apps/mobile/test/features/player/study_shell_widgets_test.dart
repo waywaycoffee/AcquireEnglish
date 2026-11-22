@@ -115,7 +115,8 @@ void main() {
   });
 
   test('StudyBottomControls.nextSpeed cycles options', () {
-    expect(StudyBottomControls.nextSpeed('0.5×'), '0.8×');
+    expect(StudyBottomControls.nextSpeed('0.5×'), '0.6×');
+    expect(StudyBottomControls.nextSpeed('0.8×'), '0.9×');
     expect(StudyBottomControls.nextSpeed('2.0×'), '0.5×');
     expect(StudyBottomControls.nextSpeed('unknown'), '0.5×');
   });

@@ -185,7 +185,10 @@ class PlayerVideoPanel extends StatefulWidget {
 
   static const List<String> kSpeedOptions = <String>[
     '0.5×',
+    '0.6×',
+    '0.7×',
     '0.8×',
+    '0.9×',
     '1.0×',
     '1.25×',
     '1.5×',
