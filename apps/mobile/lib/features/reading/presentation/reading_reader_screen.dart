@@ -1470,7 +1470,7 @@ class _ReadingReaderScreenState extends ConsumerState<ReadingReaderScreen> {
           ref.watch(readingBookPrepProvider(doc.id));
       final ReadingBookPrepStatus? prep = prepAsync.asData?.value;
       if (prep == null || !prep.ready) {
-        final String label = prep?.progressLabel ?? '云端 AI 排队中…';
+        final String label = prep?.progressLabel ?? '正在确认 AI 朗读状态…';
         final double? bar = prep == null ? null : prep.percent / 100.0;
         return Scaffold(
           appBar: AppBar(
@@ -1488,7 +1488,9 @@ class _ReadingReaderScreenState extends ConsumerState<ReadingReaderScreen> {
                 const Icon(Icons.cloud_sync_rounded, size: 48),
                 const SizedBox(height: 16),
                 Text(
-                  '长篇小说需先在云端完成 AI 朗读预处理',
+                  prep == null
+                      ? '正在打开长篇…'
+                      : '长篇小说需先在云端完成 AI 朗读预处理',
                   textAlign: TextAlign.center,
                   style: Theme.of(context).textTheme.titleMedium,
                 ),

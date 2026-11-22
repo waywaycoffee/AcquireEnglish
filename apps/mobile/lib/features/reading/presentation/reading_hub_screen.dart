@@ -826,18 +826,23 @@ class _CloudPrepShelfItem extends ConsumerWidget {
     final ReadingBookPrepStatus? prep = needsPrep
         ? ref.watch(readingBookPrepProvider(doc.id)).asData?.value
         : null;
-    final bool blocked = needsPrep && (prep == null || !prep.ready);
+    // Only block when we know prep is unfinished. While status is still
+    // loading, open the reader — it waits / opens once ready (avoids
+    // "processing…" snack then instant ready requiring a second tap).
+    final bool blocked = needsPrep && prep != null && !prep.ready;
+    final bool checking = needsPrep && prep == null;
     final String subtitle = blocked
-        ? (prep?.progressLabel ?? '云端 AI 排队中…')
-        : '${doc.level} · 已读 ${(readPercent * 100).round()}%';
+        ? prep!.progressLabel
+        : checking
+            ? '正在确认 AI 朗读…'
+            : '${doc.level} · 已读 ${(readPercent * 100).round()}%';
     return InkWell(
       onTap: () {
         if (blocked) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Text(
-                '长篇需等云端 AI 处理完才能打开：'
-                '${prep?.progressLabel ?? '排队中'}',
+                '长篇需等云端 AI 处理完才能打开：${prep!.progressLabel}',
               ),
             ),
           );
@@ -866,15 +871,17 @@ class _CloudPrepShelfItem extends ConsumerWidget {
             maxLines: 2,
             overflow: TextOverflow.ellipsis,
             style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: blocked ? const Color(0xFF2563EB) : null,
+                  color: (blocked || checking)
+                      ? const Color(0xFF2563EB)
+                      : null,
                 ),
           ),
-          if (blocked) ...<Widget>[
+          if (blocked || checking) ...<Widget>[
             const SizedBox(height: 6),
             ClipRRect(
               borderRadius: BorderRadius.circular(99),
               child: LinearProgressIndicator(
-                value: prep == null ? null : prep.percent / 100.0,
+                value: checking ? null : prep!.percent / 100.0,
                 minHeight: 4,
                 backgroundColor: const Color(0xFFE8E8E8),
                 color: const Color(0xFF2563EB),
@@ -920,50 +927,50 @@ class _CloudPrepDocTile extends ConsumerWidget {
     }
     final AsyncValue<ReadingBookPrepStatus> prepAsync =
         ref.watch(readingBookPrepProvider(doc.id));
-    return prepAsync.when(
-      data: (ReadingBookPrepStatus prep) {
-        return _DocTile(
-          doc: doc,
-          progress: progress,
-          badge: _mergeBadge(prep.ready ? 'AI 已就绪' : prep.progressLabel),
-          aiPercent: prep.ready ? null : prep.percent / 100.0,
-          onOpen: () {
-            if (!prep.ready) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text(
-                    '长篇需等云端 AI 处理完才能打开：${prep.progressLabel}',
-                  ),
-                ),
-              );
-              return;
-            }
-            context.push('/reading/${Uri.encodeComponent(doc.id)}');
-          },
-        );
-      },
-      loading: () => _DocTile(
+    void openReader() {
+      context.push('/reading/${Uri.encodeComponent(doc.id)}');
+    }
+
+    // Prefer last known value while reloading so a ready book never flashes
+    // as "processing" and eats the first tap.
+    final ReadingBookPrepStatus? known = prepAsync.asData?.value;
+    if (known != null) {
+      return _DocTile(
         doc: doc,
         progress: progress,
-        badge: _mergeBadge('云端 AI 排队中…'),
-        aiPercent: 0,
+        badge: _mergeBadge(known.ready ? 'AI 已就绪' : known.progressLabel),
+        aiPercent: known.ready ? null : known.percent / 100.0,
         onOpen: () {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('长篇正在云端处理，完成后即可打开')),
-          );
+          if (!known.ready) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(
+                  '长篇需等云端 AI 处理完才能打开：${known.progressLabel}',
+                ),
+              ),
+            );
+            return;
+          }
+          openReader();
         },
-      ),
-      error: (_, __) => _DocTile(
+      );
+    }
+    if (prepAsync.hasError) {
+      return _DocTile(
         doc: doc,
         progress: progress,
         badge: _mergeBadge('AI 状态获取失败 · 点按重试'),
         onOpen: () {
           ref.invalidate(readingBookPrepProvider(doc.id));
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('已重新请求云端 AI 处理')),
-          );
+          openReader();
         },
-      ),
+      );
+    }
+    return _DocTile(
+      doc: doc,
+      progress: progress,
+      badge: _mergeBadge('正在确认 AI 朗读…'),
+      onOpen: openReader,
     );
   }
 }
