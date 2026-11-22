@@ -139,98 +139,120 @@ class CommunityFeedTab extends ConsumerWidget {
   Future<void> _showComposer(BuildContext context, WidgetRef ref) async {
     final String? choice = await showModalBottomSheet<String>(
       context: context,
+      isScrollControlled: true,
       backgroundColor: const Color(0xFFF7F1E8),
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(22)),
       ),
-      builder: (BuildContext ctx) => SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: <Widget>[
-              Container(
-                width: 40,
-                height: 4,
-                decoration: BoxDecoration(
-                  color: AppDesignTokens.brandGreen,
-                  borderRadius: BorderRadius.circular(99),
-                ),
-              ),
-              const SizedBox(height: 12),
-              const Align(
-                alignment: Alignment.centerLeft,
-                child: Text(
-                  '分享今天的练习成果',
-                  style: TextStyle(fontWeight: FontWeight.w900, fontSize: 17),
-                ),
-              ),
-              const SizedBox(height: 12),
-              for (final (String id, String title, String meta, Color accent)
-                  in <(String, String, String, Color)>[
-                (
-                  'imitation',
-                  '句子仿写',
-                  '基于素材原句仿写，求用词点评',
-                  AppDesignTokens.brandGreen,
-                ),
-                (
-                  'shadowing',
-                  '跟读投稿',
-                  '一句 / 一段，求重音与连读反馈',
-                  const Color(0xFF5B8DEF),
-                ),
-                (
-                  'sentence_make',
-                  '选词造句',
-                  '用复习词造句，可绑 FSRS',
-                  const Color(0xFF8E44AD),
-                ),
-                (
-                  'learning_result',
-                  '分享学习成果',
-                  '精听 / 模考等通用成果卡',
-                  AppDesignTokens.brandGreen,
-                ),
-                (
-                  'share_bilibili',
-                  '分享 B 站视频',
-                  '推荐精听片子',
-                  AppDesignTokens.brandGreen,
-                ),
-                (
-                  'method',
-                  '分享学习方法',
-                  '把有效练法写成任务卡',
-                  const Color(0xFF5B8DEF),
-                ),
-                (
-                  'question',
-                  '学习问答',
-                  '卡住的地方喊人一起想',
-                  const Color(0xFFE67E22),
-                ),
-                (
-                  'team_invite',
-                  '组队邀请',
-                  '找搭子一起练',
-                  AppDesignTokens.brandGreen,
-                ),
-              ])
-                Padding(
-                  padding: const EdgeInsets.only(bottom: 8),
-                  child: QuestFeedCard(
-                    title: title,
-                    meta: meta,
-                    badge: '发帖',
-                    accent: accent,
-                    onPlay: () => Navigator.pop(ctx, id),
+      builder: (BuildContext ctx) {
+        final double maxHeight = MediaQuery.sizeOf(ctx).height * 0.85;
+        return SafeArea(
+          child: ConstrainedBox(
+            constraints: BoxConstraints(maxHeight: maxHeight),
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: <Widget>[
+                  Container(
+                    width: 40,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: AppDesignTokens.brandGreen,
+                      borderRadius: BorderRadius.circular(99),
+                    ),
                   ),
-                ),
-            ],
+                  const SizedBox(height: 12),
+                  const Align(
+                    alignment: Alignment.centerLeft,
+                    child: Text(
+                      '分享今天的练习成果',
+                      style: TextStyle(
+                        fontWeight: FontWeight.w900,
+                        fontSize: 17,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  Flexible(
+                    child: ListView(
+                      shrinkWrap: true,
+                      children: <Widget>[
+                        for (final (
+                              String id,
+                              String title,
+                              String meta,
+                              Color accent,
+                            )
+                            in <(String, String, String, Color)>[
+                          (
+                            'imitation',
+                            '句子仿写',
+                            '基于素材原句仿写，求用词点评',
+                            AppDesignTokens.brandGreen,
+                          ),
+                          (
+                            'shadowing',
+                            '跟读投稿',
+                            '一句 / 一段，求重音与连读反馈',
+                            const Color(0xFF5B8DEF),
+                          ),
+                          (
+                            'sentence_make',
+                            '选词造句',
+                            '用复习词造句，可绑 FSRS',
+                            const Color(0xFF8E44AD),
+                          ),
+                          (
+                            'learning_result',
+                            '分享学习成果',
+                            '精听 / 模考等通用成果卡',
+                            AppDesignTokens.brandGreen,
+                          ),
+                          (
+                            'share_bilibili',
+                            '分享 B 站视频',
+                            '推荐精听片子',
+                            AppDesignTokens.brandGreen,
+                          ),
+                          (
+                            'method',
+                            '分享学习方法',
+                            '把有效练法写成任务卡',
+                            const Color(0xFF5B8DEF),
+                          ),
+                          (
+                            'question',
+                            '学习问答',
+                            '卡住的地方喊人一起想',
+                            const Color(0xFFE67E22),
+                          ),
+                          (
+                            'team_invite',
+                            '组队邀请',
+                            '找搭子一起练',
+                            AppDesignTokens.brandGreen,
+                          ),
+                        ])
+                          Padding(
+                            padding: const EdgeInsets.only(bottom: 8),
+                            child: QuestFeedCard(
+                              title: title,
+                              meta: meta,
+                              badge: '发帖',
+                              accent: accent,
+                              onPlay: () => Navigator.pop(ctx, id),
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
           ),
-        ),
-      ),
+        );
+      },
     );
     if (!context.mounted || choice == null) return;
     await showModalBottomSheet<void>(
