@@ -65,6 +65,42 @@ void main() {
     });
 
     test(
+      'renamed video and fetched cover survive reopening the catalog',
+      () async {
+        final ProviderContainer container = ProviderContainer();
+        addTearDown(container.dispose);
+        final LibraryCatalogNotifier catalog = container.read(
+          libraryCatalogProvider.notifier,
+        );
+        await catalog.importCourseFromMatches(
+          rows: <ImportMatchRow>[
+            _makeRow(videoPath: '/tmp/video1.mp4', videoFile: 'video1.mp4'),
+            _makeRow(videoPath: '/tmp/video2.mp4', videoFile: 'video2.mp4'),
+          ],
+          videoFolder: '/tmp/videos',
+          subtitleFolder: '/tmp/subtitles',
+        );
+        final original = container.read(libraryCatalogProvider).first;
+        final first = original.episodes.first;
+        await catalog.updateEpisodeDisplay(
+          courseId: original.id,
+          episodeId: first.id,
+          title: '新视频标题',
+          cover: '/tmp/new-cover.jpg',
+        );
+        final ProviderContainer reopened = ProviderContainer();
+        addTearDown(reopened.dispose);
+        final saved = reopened
+            .read(libraryCatalogProvider)
+            .firstWhere((course) => course.id == original.id);
+        expect(saved.title, original.title);
+        expect(saved.episodes.first.title, '新视频标题');
+        expect(saved.episodes.first.coverImage, '/tmp/new-cover.jpg');
+        expect(saved.episodes.last.title, original.episodes.last.title);
+      },
+    );
+
+    test(
       'imported course skips all cover extraction and uses placeholder art',
       () async {
         final _FakeVideoCoverExtractor extractor = _FakeVideoCoverExtractor(

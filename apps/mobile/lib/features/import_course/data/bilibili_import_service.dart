@@ -827,7 +827,7 @@ class BilibiliImportService {
   }
 
   /// Resolve and download cover for an already-imported Bilibili course.
-  Future<String?> resolveCoverImage(String rawInput) async {
+  Future<String?> resolveCoverImage(String rawInput, {bool refresh = false}) async {
     // Season course ids (bilibili-season-6058486-01) → pick archive BV then cover.
     final ({String seasonId, int? episodeIndex})? seasonHint =
         parseBilibiliSeasonHint(rawInput);
@@ -842,7 +842,7 @@ class BilibiliImportService {
               ? match.bvid
               : (match.aid.isNotEmpty ? 'av${match.aid}' : '');
           if (key.isNotEmpty) {
-            return resolveCoverImage(key);
+            return resolveCoverImage(key, refresh: refresh);
           }
         }
       } catch (_) {}
@@ -894,7 +894,19 @@ class BilibiliImportService {
     final String idKey = bvid.isNotEmpty
         ? bvid
         : (aid == null ? 'unknown' : 'av$aid');
-    final String? coverUrl = _normalizeCoverUrl(data['pic'] as String?);
+    final int page = BilibiliImport.extractPage(rawInput) ?? 1;
+    final Object? parts = data['pages'];
+    String? partCover;
+    if (page > 1 && parts is List) {
+      for (final Object? part in parts) {
+        if (part is Map && part['page'] == page) {
+          partCover = part['first_frame'] as String?;
+          break;
+        }
+      }
+    }
+    final String? coverUrl = _normalizeCoverUrl(partCover) ??
+        _normalizeCoverUrl(data['pic'] as String?);
     if (coverUrl == null) {
       return null;
     }
@@ -903,7 +915,8 @@ class BilibiliImportService {
     try {
       final String? local = await _downloadCoverImage(
         coverUrl: coverUrl,
-        idKey: idKey,
+        idKey: partCover == null ? idKey : BilibiliImport.mediaIdKey(bvidOrAv: idKey, page: page, pageCount: page),
+        refresh: refresh,
       );
       if (local != null && local.isNotEmpty) {
         return local;
@@ -935,6 +948,7 @@ class BilibiliImportService {
   Future<String?> _downloadCoverImage({
     required String coverUrl,
     required String idKey,
+    bool refresh = false,
   }) async {
     final Directory docs = await getApplicationDocumentsDirectory();
     final Directory dir = Directory('${docs.path}/bilibili/$idKey');
@@ -943,7 +957,8 @@ class BilibiliImportService {
     }
     final Uri uri = Uri.parse(coverUrl);
     final String ext = _coverExtension(uri.path);
-    final File out = File('${dir.path}/cover$ext');
+    final String name = refresh ? 'cover-${DateTime.now().microsecondsSinceEpoch}' : 'cover';
+    final File out = File('${dir.path}/$name$ext');
     if (out.existsSync() && out.lengthSync() > 1024) {
       return out.path;
     }

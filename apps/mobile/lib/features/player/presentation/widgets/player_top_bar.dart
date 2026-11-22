@@ -15,6 +15,7 @@ class PlayerTopBar extends StatelessWidget {
     this.onTranscriptPressed,
     this.onLearningGuidePressed,
     this.onStatsPressed,
+    this.videoOptions,
     super.key,
   });
 
@@ -22,6 +23,7 @@ class PlayerTopBar extends StatelessWidget {
   final String episodeTitle;
   final String? episodeName;
   final String streakText;
+  final Widget? videoOptions;
   final VoidCallback onBack;
   final VoidCallback? onTranscriptPressed;
   final VoidCallback? onLearningGuidePressed;
@@ -132,6 +134,7 @@ class PlayerTopBar extends StatelessWidget {
               ),
             ),
           ),
+          if (videoOptions != null) videoOptions!,
           _PlayerTopStatus(
             episodeName: episodeName,
             streakText: streakText,

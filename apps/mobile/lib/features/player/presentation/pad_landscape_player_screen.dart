@@ -75,6 +75,7 @@ import 'widgets/ai_subtitle_generation_progress_dialog.dart';
 import 'widgets/player_episode_strip.dart';
 import 'widgets/player_subtitle_list.dart';
 import 'widgets/player_top_bar.dart';
+import 'widgets/player_video_options.dart';
 import 'widgets/player_transcript_panel.dart';
 import 'widgets/player_video_panel.dart';
 import 'widgets/pronunciation_assessment_dialog.dart';
@@ -2699,7 +2700,17 @@ Future<void> _settleChineseFillIfAlreadyPresent() async {
       currentDestination: AppNavDestination.library,
       showNavigation: false,
       topBar: PlayerTopBar(
-        courseTitle: course?.title ?? '课程名称',
+              videoOptions: course == null || episode == null
+                  ? null
+                  : PlayerVideoOptions(
+                      key: ValueKey<String>(episode.id),
+                      catalog: ref.read(libraryCatalogProvider.notifier),
+                      course: course,
+                      episode: episode,
+                      player: _videoPlayer,
+                      cookie: settings.resolvedBilibiliCookieHeader,
+                    ),
+        courseTitle: episode?.customTitle == true ? episode!.title : (course?.title ?? '课程名称'),
         episodeTitle: episode == null ? '第 01 集' : '第 ${episode.numberStr} 集',
         episodeName: episode?.title,
         streakText: '${dashboard.streakDays} Day Streak',

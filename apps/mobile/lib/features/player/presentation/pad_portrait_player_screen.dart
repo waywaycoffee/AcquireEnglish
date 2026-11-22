@@ -107,6 +107,7 @@ import '../../digital_human/presentation/study_oral_coach_tab.dart';
 import 'widgets/study_shadowing_tab.dart';
 import 'widgets/study_shell_tokens.dart';
 import 'widgets/study_top_bar.dart';
+import 'widgets/player_video_options.dart';
 import 'widgets/study_word_cards_tab.dart';
 
 /// Build a whole-episode English excerpt for oral-coach topic generation.
@@ -3074,7 +3075,17 @@ Future<void> _settleChineseFillIfAlreadyPresent() async {
         child: Column(
           children: <Widget>[
             StudyTopBar(
-              title: course?.title ?? episode?.title ?? '爱快英语',
+              videoOptions: course == null || episode == null
+                  ? null
+                  : PlayerVideoOptions(
+                      key: ValueKey<String>(episode.id),
+                      catalog: ref.read(libraryCatalogProvider.notifier),
+                      course: course,
+                      episode: episode,
+                      player: _videoPlayer,
+                      cookie: settings.resolvedBilibiliCookieHeader,
+                    ),
+              title: episode?.customTitle == true ? episode!.title : (course?.title ?? episode?.title ?? '爱快英语'),
               lessonBadge: course == null || episode == null
                   ? null
                   : '${episode.numberStr}/${course.totalEpisodes}',

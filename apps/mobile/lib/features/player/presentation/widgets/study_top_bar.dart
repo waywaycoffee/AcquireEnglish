@@ -12,10 +12,12 @@ class StudyTopBar extends StatelessWidget {
     this.watchModeLabel,
     this.onToggleWatchMode,
     this.onEnableCourseMode,
+    this.videoOptions,
     super.key,
   });
 
   final String title;
+  final Widget? videoOptions;
   final VoidCallback onBack;
   final VoidCallback? onFavorite;
   final bool isFavorite;
@@ -116,6 +118,7 @@ class StudyTopBar extends StatelessWidget {
                   size: 22,
                 ),
               ),
+            if (videoOptions != null) videoOptions!,
             IconButton(
               tooltip: '收藏',
               onPressed: onFavorite,

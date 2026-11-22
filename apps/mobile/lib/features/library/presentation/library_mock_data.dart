@@ -21,6 +21,8 @@ class LibraryEpisodeItem {
     required this.completed,
     required this.progressPercent,
     required this.coverImage,
+    this.customTitle = false,
+    this.customCover = false,
     this.lastWatchedStr,
     this.progressTimeStr,
     this.totalTimeStr,
@@ -35,6 +37,8 @@ class LibraryEpisodeItem {
   final String id;
   final String numberStr;
   final String title;
+  final bool customTitle;
+  final bool customCover;
   final int durationMinutes;
   final bool hasChineseSubtitles;
   final bool hasEnglishSubtitles;
@@ -54,6 +58,9 @@ class LibraryEpisodeItem {
   final List<LibrarySubtitleTrackItem> subtitleTracks;
 
   LibraryEpisodeItem copyWith({
+    String? title,
+    bool? customTitle,
+    bool? customCover,
     String? videoAsset,
     Object? sourceUrl = _unset,
     Object? enSubtitleAsset = _unset,
@@ -72,7 +79,9 @@ class LibraryEpisodeItem {
     return LibraryEpisodeItem(
       id: id,
       numberStr: numberStr,
-      title: title,
+      title: title ?? this.title,
+      customTitle: customTitle ?? this.customTitle,
+      customCover: customCover ?? this.customCover,
       durationMinutes: durationMinutes,
       hasChineseSubtitles: hasChineseSubtitles ?? this.hasChineseSubtitles,
       hasEnglishSubtitles: hasEnglishSubtitles ?? this.hasEnglishSubtitles,

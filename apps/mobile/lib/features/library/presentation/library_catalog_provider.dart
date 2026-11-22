@@ -63,7 +63,41 @@ class LibraryCatalogNotifier extends Notifier<List<LibraryCourseData>> {
       return baseCatalog;
     }
 
-    return <LibraryCourseData>[...baseCatalog, ..._decodeCourses(stored)];
+    final List<LibraryCourseData> saved = _decodeCourses(stored);
+    return <LibraryCourseData>[
+      for (final LibraryCourseData course in baseCatalog)
+        _withBuiltInDisplayOverrides(
+          course,
+          saved.where((item) => item.id == course.id).firstOrNull,
+        ),
+      ...saved.where((item) => !baseCatalog.any((base) => base.id == item.id)),
+    ];
+  }
+
+  LibraryCourseData _withBuiltInDisplayOverrides(
+    LibraryCourseData course,
+    LibraryCourseData? stored,
+  ) {
+    if (stored == null) return course;
+    final List<LibraryEpisodeItem> episodes = [
+      for (final LibraryEpisodeItem episode in course.episodes)
+        _restoreEpisodeDisplay(episode, _findMatchingEpisode(stored.episodes, episode)),
+    ];
+    return course.copyWith(
+      title: episodes.length == 1 && episodes.single.customTitle ? episodes.single.title : null,
+      coverImage: episodes.length == 1 && episodes.single.customCover ? episodes.single.coverImage : null,
+      episodes: episodes,
+    );
+  }
+
+  LibraryEpisodeItem _restoreEpisodeDisplay(LibraryEpisodeItem episode, LibraryEpisodeItem? stored) {
+    if (stored == null) return episode;
+    return episode.copyWith(
+      title: stored.customTitle ? stored.title : null,
+      coverImage: stored.customCover ? stored.coverImage : null,
+      customTitle: stored.customTitle,
+      customCover: stored.customCover,
+    );
   }
 
   bool _isFreeTrialCourse(LibraryCourseData course) {
@@ -101,6 +135,10 @@ class LibraryCatalogNotifier extends Notifier<List<LibraryCourseData>> {
     }
     final LibraryCourseData previous = state[existingIndex];
     final LibraryCourseData merged = course.copyWith(
+      title: previous.episodes.length == 1 && previous.episodes.single.customTitle
+          ? previous.title : null,
+      coverImage: previous.episodes.length == 1 && previous.episodes.single.customCover
+          ? previous.coverImage : null,
       progressPercent: previous.progressPercent,
       completedEpisodes: previous.completedEpisodes,
       lastStudiedStr: previous.lastStudiedStr,
@@ -161,6 +199,10 @@ class LibraryCatalogNotifier extends Notifier<List<LibraryCourseData>> {
       // paths (local download + cover) while keeping learning progress.
       final LibraryCourseData previous = state[existingIndex];
       final LibraryCourseData merged = course.copyWith(
+        title: previous.episodes.length == 1 && previous.episodes.single.customTitle
+            ? previous.title : null,
+        coverImage: previous.episodes.length == 1 && previous.episodes.single.customCover
+            ? previous.coverImage : null,
         progressPercent: previous.progressPercent,
         completedEpisodes: previous.completedEpisodes,
         lastStudiedStr: previous.lastStudiedStr,
@@ -304,6 +346,40 @@ class LibraryCatalogNotifier extends Notifier<List<LibraryCourseData>> {
           );
         })
         .toList(growable: false);
+    await _persistImportedCourses();
+  }
+
+  Future<void> updateEpisodeDisplay({
+    required String courseId,
+    required String episodeId,
+    String? title,
+    String? cover,
+  }) async {
+    final String? name = title?.trim();
+    final String? image = cover?.trim();
+    if (name == '' || image == '') return;
+    state = [
+      for (final LibraryCourseData course in state)
+        if (course.id == courseId && course.episodes.any((ep) => ep.id == episodeId))
+          course.copyWith(
+            title: course.episodes.length == 1 ? name : null,
+            coverImage: course.episodes.length == 1 ? image : null,
+            episodes: [
+              for (final LibraryEpisodeItem ep in course.episodes)
+                if (ep.id == episodeId)
+                  ep.copyWith(
+                    title: name,
+                    coverImage: image,
+                    customTitle: name != null ? true : null,
+                    customCover: image != null ? true : null,
+                  )
+                else
+                  ep,
+            ],
+          )
+        else
+          course,
+    ];
     await _persistImportedCourses();
   }
 
@@ -487,7 +563,7 @@ class LibraryCatalogNotifier extends Notifier<List<LibraryCourseData>> {
           cnSubtitleAsset: nextZh,
           hasEnglishSubtitles: isUsableSubtitlePath(nextEn),
           hasChineseSubtitles: isUsableSubtitlePath(nextZh),
-          coverImage: (coverImage ?? '').trim().isNotEmpty
+          coverImage: !episode.customCover && (coverImage ?? '').trim().isNotEmpty
               ? coverImage!.trim()
               : episode.coverImage,
           subtitleTracks: tracks.isNotEmpty
@@ -911,9 +987,9 @@ class LibraryCatalogNotifier extends Notifier<List<LibraryCourseData>> {
 
     final List<Map<String, Object?>> importedCourses = state
         .where(
-          (LibraryCourseData course) => !libraryCourses.any(
-            (LibraryCourseData base) => base.id == course.id,
-          ),
+          (LibraryCourseData course) =>
+              course.episodes.any((episode) => episode.customTitle || episode.customCover) ||
+              !libraryCourses.any((LibraryCourseData base) => base.id == course.id),
         )
         .map(_serializeCourse)
         .toList(growable: false);
@@ -953,6 +1029,8 @@ class LibraryCatalogNotifier extends Notifier<List<LibraryCourseData>> {
               'id': item.id,
               'numberStr': item.numberStr,
               'title': item.title,
+              if (item.customTitle) 'customTitle': true,
+              if (item.customCover) 'customCover': true,
               'durationMinutes': item.durationMinutes,
               'hasChineseSubtitles': item.hasChineseSubtitles,
               'hasEnglishSubtitles': item.hasEnglishSubtitles,
@@ -1067,6 +1145,8 @@ class LibraryCatalogNotifier extends Notifier<List<LibraryCourseData>> {
       videoMissing: json['videoMissing'] as bool? ?? false,
       numberStr: json['numberStr']! as String,
       title: json['title']! as String,
+      customTitle: json['customTitle'] == true,
+      customCover: json['customCover'] == true,
       durationMinutes: json['durationMinutes']! as int,
       hasChineseSubtitles: json['hasChineseSubtitles']! as bool,
       hasEnglishSubtitles: json['hasEnglishSubtitles']! as bool,
@@ -1127,6 +1207,7 @@ class LibraryCatalogNotifier extends Notifier<List<LibraryCourseData>> {
   }
 
   bool _shouldKeepStoredEpisode(Map<String, Object?> json) {
+    if (json['customTitle'] == true || json['customCover'] == true) return true;
     final String videoPath = json['videoAsset'] as String? ?? '';
     if (!ImportMatcher.isImportablePath(videoPath)) {
       return false;
@@ -1258,6 +1339,9 @@ class LibraryCatalogNotifier extends Notifier<List<LibraryCourseData>> {
               : next.cnSubtitleAsset);
     final bool hasLocalVideo = isUsableLocalVideoPath(mergedVideo);
     return next.copyWith(
+      title: previous.customTitle ? previous.title : null,
+      customTitle: previous.customTitle,
+      customCover: previous.customCover,
       completed: previous.completed,
       progressPercent: previous.progressPercent,
       lastWatchedStr: previous.lastWatchedStr,
@@ -1273,7 +1357,7 @@ class LibraryCatalogNotifier extends Notifier<List<LibraryCourseData>> {
       subtitleTracks: next.subtitleTracks.isNotEmpty
           ? next.subtitleTracks
           : previous.subtitleTracks,
-      coverImage: next.coverImage.trim().isNotEmpty
+      coverImage: !previous.customCover && next.coverImage.trim().isNotEmpty
           ? next.coverImage
           : previous.coverImage,
     );
