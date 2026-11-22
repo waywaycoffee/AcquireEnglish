@@ -77,12 +77,42 @@ class ExamPracticeScreen extends ConsumerWidget {
             onTap: () => context.push('/exam/session?skill=vocab'),
           ),
           _SkillTile(
+            icon: Icons.rule_folder_outlined,
+            title: '语法选择',
+            subtitle: pack == null
+                ? '考点分类 · 语法拆分'
+                : '${pack.grammar.length} 题 · 可按考点练',
+            onTap: () => context.push('/exam/grammar'),
+          ),
+          _SkillTile(
             icon: Icons.headphones_outlined,
             title: '听力专项',
             subtitle: pack == null
-                ? '脚本精听 + 选择题'
-                : '${pack.listening.length} 篇 · 可配社区音频',
+                ? '先听后做 · 限次重听'
+                : '${pack.listening.length} 篇 · 音频/朗读',
             onTap: () => context.push('/exam/session?skill=listening'),
+          ),
+          _SkillTile(
+            icon: Icons.timer_outlined,
+            title: '听力限时模考',
+            subtitle: '隐藏脚本 · 计时作答',
+            onTap: () => context.push(
+              '/exam/session?skill=listening&timed=900&hideScript=1',
+            ),
+          ),
+          _SkillTile(
+            icon: Icons.space_dashboard_outlined,
+            title: '完形填空',
+            subtitle: pack == null
+                ? '一篇一局 · 技巧模式'
+                : '${pack.cloze.length} 篇',
+            onTap: () => context.push('/exam/cloze'),
+          ),
+          _SkillTile(
+            icon: Icons.tips_and_updates_outlined,
+            title: '完形技巧模式',
+            subtitle: '先通读再回填',
+            onTap: () => context.push('/exam/cloze?tips=1'),
           ),
           _SkillTile(
             icon: Icons.menu_book_outlined,

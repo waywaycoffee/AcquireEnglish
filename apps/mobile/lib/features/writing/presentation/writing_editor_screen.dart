@@ -11,6 +11,7 @@ import '../../daily_review/presentation/daily_review_provider.dart';
 import '../../exam/presentation/exam_profile_provider.dart';
 import '../../shared/presentation/pad/app_design_tokens.dart';
 import '../../sync/data/acquire_api_client.dart';
+import '../../shared/presentation/grammar_split_button.dart';
 import '../data/writing_draft_store.dart';
 import '../domain/writing_models.dart';
 import '../domain/writing_tracks.dart';
@@ -274,10 +275,35 @@ class _WritingEditorScreenState extends ConsumerState<WritingEditorScreen> {
             ),
           ),
           const SizedBox(height: 12),
-          FilledButton.icon(
-            onPressed: _busy ? null : () => unawaited(_gradeEssay()),
-            icon: const Icon(Icons.rate_review_outlined),
-            label: Text(_busy ? '批改中…' : '开始批改'),
+          Row(
+            children: <Widget>[
+              Expanded(
+                child: FilledButton.icon(
+                  onPressed: _busy ? null : () => unawaited(_gradeEssay()),
+                  icon: const Icon(Icons.rate_review_outlined),
+                  label: Text(_busy ? '批改中…' : '开始批改'),
+                ),
+              ),
+              const SizedBox(width: 8),
+              GrammarSplitButton(
+                english: _body.selection.isValid &&
+                        !_body.selection.isCollapsed
+                    ? _body.text.substring(
+                        _body.selection.start,
+                        _body.selection.end,
+                      )
+                    : (_body.text.trim().isEmpty
+                        ? _prompt.text
+                        : _body.text
+                            .split(RegExp(r'(?<=[.!?])\s+'))
+                            .firstWhere(
+                              (String s) => s.trim().isNotEmpty,
+                              orElse: () => _body.text,
+                            )),
+                compact: true,
+                label: '语法拆分',
+              ),
+            ],
           ),
           if (_grade != null) ...<Widget>[
             const SizedBox(height: 20),

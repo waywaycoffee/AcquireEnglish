@@ -12,25 +12,35 @@ import '../../membership/domain/free_trial_seeds.dart';
 import '../../membership/domain/module_access.dart';
 import '../../shared/presentation/pad/app_design_tokens.dart';
 import '../../sync/data/acquire_api_client.dart';
+import '../../shared/presentation/grammar_split_button.dart';
 import '../data/exam_error_book_store.dart';
 import '../data/exam_progress_store.dart';
 import '../domain/exam_fsrs.dart';
 import '../domain/exam_pack.dart';
 import '../domain/exam_profile.dart';
+import 'exam_listening_audio_bar.dart';
 import 'exam_pack_provider.dart';
 import 'exam_profile_provider.dart';
 
-/// Unified objective practice: vocab / listening / reading / mock sections.
+/// Unified objective practice: vocab / grammar / listening / reading / mock.
 class ExamSessionScreen extends ConsumerStatefulWidget {
   const ExamSessionScreen({
     super.key,
     required this.skill,
     this.mock = false,
+    this.grammarTag,
+    this.listeningHideScript = true,
+    this.timedListeningSeconds = 0,
   });
 
-  /// vocab | listening | reading | mock
+  /// vocab | grammar | listening | reading | mock
   final String skill;
   final bool mock;
+  final String? grammarTag;
+  /// When true (default), listening script stays hidden until user expands.
+  final bool listeningHideScript;
+  /// P1 listening mock: overall countdown (0 = off).
+  final int timedListeningSeconds;
 
   @override
   ConsumerState<ExamSessionScreen> createState() => _ExamSessionScreenState();
@@ -45,6 +55,8 @@ class _SessionQ {
     this.contextText = '',
     this.explain = '',
     this.skill = 'vocab',
+    this.audioUrl = '',
+    this.grammarTag = '',
   });
 
   final String id;
@@ -54,6 +66,8 @@ class _SessionQ {
   final String contextText;
   final String explain;
   final String skill;
+  final String audioUrl;
+  final String grammarTag;
 }
 
 class _ExamSessionScreenState extends ConsumerState<ExamSessionScreen> {
@@ -121,6 +135,31 @@ class _ExamSessionScreenState extends ConsumerState<ExamSessionScreen> {
             ),
           );
         }
+      } else if (skill == 'grammar') {
+        List<ExamMcq> items = pack.grammar;
+        final String? tag = widget.grammarTag;
+        if (tag != null && tag.isNotEmpty) {
+          items = items
+              .where((ExamMcq q) => grammarTagForPrompt(q.prompt) == tag)
+              .toList(growable: false);
+          if (items.isEmpty) items = pack.grammar;
+        }
+        if (previewOnly) {
+          items = items.take(kModuleFreePreviewCount).toList(growable: false);
+        }
+        for (final ExamMcq q in items) {
+          built.add(
+            _SessionQ(
+              id: q.id,
+              prompt: q.prompt,
+              options: q.options,
+              answer: q.answer,
+              explain: q.explain,
+              skill: 'grammar',
+              grammarTag: grammarTagForPrompt(q.prompt),
+            ),
+          );
+        }
       } else if (skill == 'listening') {
         final List<ExamListeningItem> items = previewOnly
             ? _seedExamListening(pack)
@@ -134,7 +173,8 @@ class _ExamSessionScreenState extends ConsumerState<ExamSessionScreen> {
                 options: q.options,
                 answer: q.answer,
                 explain: q.explain,
-                contextText: '${item.title}\n\n${item.script}',
+                contextText: item.script,
+                audioUrl: item.audioUrl,
                 skill: 'listening',
               ),
             );
@@ -170,14 +210,19 @@ class _ExamSessionScreenState extends ConsumerState<ExamSessionScreen> {
           : previewOnly
               ? '${pack.title} · ${widget.skill} · 免费体验'
               : '${pack.title} · ${widget.skill}';
-      _secondsLeft = widget.mock ? pack.mockMinutes * 60 : 0;
+      _secondsLeft = widget.mock
+          ? pack.mockMinutes * 60
+          : (widget.timedListeningSeconds > 0
+              ? widget.timedListeningSeconds
+              : 0);
     });
 
     if (previewOnly &&
         mounted &&
         (widget.skill == 'listening' ||
             widget.skill == 'reading' ||
-            widget.skill == 'vocab')) {
+            widget.skill == 'vocab' ||
+            widget.skill == 'grammar')) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
@@ -192,7 +237,8 @@ class _ExamSessionScreenState extends ConsumerState<ExamSessionScreen> {
         ),
       );
     }
-    if (widget.mock && _secondsLeft > 0) {
+    if ((widget.mock || widget.timedListeningSeconds > 0) &&
+        _secondsLeft > 0) {
       _timer = Timer.periodic(const Duration(seconds: 1), (Timer t) {
         if (!mounted) return;
         if (_secondsLeft <= 1) {
@@ -347,7 +393,11 @@ class _ExamSessionScreenState extends ConsumerState<ExamSessionScreen> {
       appBar: AppBar(
         title: Text('${_index + 1}/${_qs.length} · ${q.skill}'),
         actions: <Widget>[
-          if (widget.mock)
+          GrammarSplitButton(
+            english: q.prompt,
+            iconOnly: true,
+          ),
+          if (widget.mock || widget.timedListeningSeconds > 0)
             Center(
               child: Padding(
                 padding: const EdgeInsets.only(right: 16),
@@ -360,7 +410,21 @@ class _ExamSessionScreenState extends ConsumerState<ExamSessionScreen> {
         padding: const EdgeInsets.all(16),
         children: <Widget>[
           Text(_title, style: const TextStyle(fontWeight: FontWeight.w800)),
-          if (q.contextText.isNotEmpty) ...<Widget>[
+          if (q.grammarTag.isNotEmpty) ...<Widget>[
+            const SizedBox(height: 8),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: Chip(label: Text(q.grammarTag)),
+            ),
+          ],
+          if (q.skill == 'listening') ...<Widget>[
+            const SizedBox(height: 10),
+            ExamListeningAudioBar(
+              script: q.contextText,
+              audioUrl: q.audioUrl,
+              hideScript: widget.listeningHideScript,
+            ),
+          ] else if (q.contextText.isNotEmpty) ...<Widget>[
             const SizedBox(height: 10),
             Container(
               width: double.infinity,
@@ -402,6 +466,21 @@ class _ExamSessionScreenState extends ConsumerState<ExamSessionScreen> {
                 ),
               ),
             ),
+          if (_selected != null) ...<Widget>[
+            GrammarSplitButton(
+              english: q.prompt,
+              chinese: '正确答案：${q.answer}',
+              compact: true,
+            ),
+            if (q.skill == 'grammar')
+              TextButton(
+                onPressed: () => context.push(
+                  '/writing?prompt=${Uri.encodeComponent("请用正确语法改写：${q.prompt}")}'
+                  '&rubric=gaokao&title=${Uri.encodeComponent("语法联动写作")}',
+                ),
+                child: const Text('用写作巩固这个考点'),
+              ),
+          ],
           Text(
             '已对 $_correct · 已错 $_wrong',
             style: TextStyle(
@@ -409,7 +488,7 @@ class _ExamSessionScreenState extends ConsumerState<ExamSessionScreen> {
               color: AppDesignTokens.textSecondary,
             ),
           ),
-          if (widget.mock)
+          if (widget.mock || widget.timedListeningSeconds > 0)
             TextButton(
               onPressed: _finished ? null : () => unawaited(_finish()),
               child: const Text('提前交卷'),

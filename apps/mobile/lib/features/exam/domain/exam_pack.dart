@@ -117,6 +117,20 @@ class ExamSpeakingPrompt {
   final String tips;
 }
 
+class ExamClozePassage {
+  const ExamClozePassage({
+    required this.id,
+    required this.title,
+    required this.passage,
+    required this.questions,
+  });
+
+  final String id;
+  final String title;
+  final String passage;
+  final List<ExamMcq> questions;
+}
+
 class ExamPack {
   const ExamPack({
     required this.familyId,
@@ -129,6 +143,8 @@ class ExamPack {
     required this.speaking,
     required this.mockSections,
     required this.mockMinutes,
+    this.grammar = const <ExamMcq>[],
+    this.cloze = const <ExamClozePassage>[],
     this.resolvedFrom = '',
     this.missing = false,
   });
@@ -146,23 +162,48 @@ class ExamPack {
             .map((Map e) => Map<String, dynamic>.from(e))
             .toList(growable: false);
 
+    final List<ExamMcq> vocab =
+        asMaps('vocab').map(ExamMcq.fromJson).toList(growable: false);
+    final List<ExamReadingItem> reading = asMaps(
+      'reading',
+    ).map(ExamReadingItem.fromJson).toList(growable: false);
+    final List<ExamMcq> grammarRaw =
+        asMaps('grammar').map(ExamMcq.fromJson).toList(growable: false);
+    final List<ExamClozePassage> clozeRaw = asMaps('cloze')
+        .map(
+          (Map<String, dynamic> e) => ExamClozePassage(
+            id: '${e['id'] ?? ''}',
+            title: '${e['title'] ?? 'Cloze'}',
+            passage: '${e['passage'] ?? ''}',
+            questions: (e['questions'] as List<dynamic>? ?? const <dynamic>[])
+                .whereType<Map>()
+                .map(
+                  (Map q) => ExamMcq.fromJson(Map<String, dynamic>.from(q)),
+                )
+                .toList(growable: false),
+          ),
+        )
+        .toList(growable: false);
+
     return ExamPack(
       familyId: '${json['family_id'] ?? json['requested_family_id'] ?? ''}',
       title: '${json['title'] ?? ''}',
       cefr: '${json['cefr'] ?? ''}',
-      vocab: asMaps('vocab').map(ExamMcq.fromJson).toList(growable: false),
+      vocab: vocab,
       listening: asMaps(
         'listening',
       ).map(ExamListeningItem.fromJson).toList(growable: false),
-      reading: asMaps(
-        'reading',
-      ).map(ExamReadingItem.fromJson).toList(growable: false),
+      reading: reading,
       writing: asMaps(
         'writing',
       ).map(ExamWritingPrompt.fromJson).toList(growable: false),
       speaking: asMaps(
         'speaking',
       ).map(ExamSpeakingPrompt.fromJson).toList(growable: false),
+      grammar: grammarRaw.isNotEmpty
+          ? grammarRaw
+          : _deriveGrammar(vocab),
+      cloze: clozeRaw.isNotEmpty ? clozeRaw : _deriveCloze(reading),
       mockSections: (mock['sections'] as List<dynamic>? ?? const <dynamic>[])
           .map((dynamic e) => '$e')
           .toList(growable: false),
@@ -176,12 +217,80 @@ class ExamPack {
   final String title;
   final String cefr;
   final List<ExamMcq> vocab;
+  final List<ExamMcq> grammar;
   final List<ExamListeningItem> listening;
   final List<ExamReadingItem> reading;
+  final List<ExamClozePassage> cloze;
   final List<ExamWritingPrompt> writing;
   final List<ExamSpeakingPrompt> speaking;
   final List<String> mockSections;
   final int mockMinutes;
   final String resolvedFrom;
   final bool missing;
+}
+
+bool _looksLikeGrammarMcq(ExamMcq q) {
+  final String p = q.prompt.toLowerCase();
+  if (p.contains('___') || p.contains('____') || p.contains('（  ）')) {
+    return true;
+  }
+  return RegExp(
+    r'\b(tense|grammar|which of the following|is closest|fill in|choose the best)\b',
+    caseSensitive: false,
+  ).hasMatch(q.prompt);
+}
+
+List<ExamMcq> _deriveGrammar(List<ExamMcq> vocab) {
+  final List<ExamMcq> hit =
+      vocab.where(_looksLikeGrammarMcq).toList(growable: false);
+  if (hit.length >= 8) return hit;
+  // Fallback: take a slice so grammar skill is never empty when vocab exists.
+  return vocab.take(40).toList(growable: false);
+}
+
+List<ExamClozePassage> _deriveCloze(List<ExamReadingItem> reading) {
+  final List<ExamClozePassage> out = <ExamClozePassage>[];
+  for (final ExamReadingItem item in reading) {
+    final bool blanksInPassage =
+        item.passage.contains('_') || item.passage.contains('____');
+    final bool blankPrompts = item.questions.any(
+      (ExamMcq q) =>
+          q.prompt.toLowerCase().contains('blank') ||
+          RegExp(r'第?\s*\d+\s*空').hasMatch(q.prompt),
+    );
+    if (blanksInPassage || blankPrompts) {
+      out.add(
+        ExamClozePassage(
+          id: item.id,
+          title: item.title,
+          passage: item.passage,
+          questions: item.questions,
+        ),
+      );
+    }
+  }
+  return out;
+}
+
+String grammarTagForPrompt(String prompt) {
+  final String p = prompt.toLowerCase();
+  if (RegExp(
+    r'\b(was|were|been|had|will|would|tense|ago|yesterday|tomorrow|since|for\s+\d)\b',
+  ).hasMatch(p)) {
+    return '时态';
+  }
+  if (RegExp(r'\b(who|which|that|whom|whose)\b').hasMatch(p)) {
+    return '从句';
+  }
+  if (RegExp(r'\b(to\s+\w+ing|non-?finite|infinitive|gerund)\b').hasMatch(p) ||
+      (p.contains('___') && RegExp(r'\b(doing|to do|done)\b').hasMatch(p))) {
+    return '非谓语';
+  }
+  if (p.contains('___') && RegExp(r'\b(a|an|the)\b').hasMatch(p)) {
+    return '冠词';
+  }
+  if (RegExp(r'\b(is|are|am)\b').hasMatch(p) && p.contains('___')) {
+    return '主谓一致';
+  }
+  return '综合语法';
 }

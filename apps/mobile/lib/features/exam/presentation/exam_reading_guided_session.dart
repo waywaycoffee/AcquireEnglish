@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../shared/presentation/grammar_split_button.dart';
 import '../data/exam_error_book_store.dart';
 import '../data/exam_reading_paper_store.dart';
 import '../domain/exam_profile.dart';
@@ -133,6 +134,9 @@ class _ExamReadingGuidedSessionState
         title: Text(
           '${paper.title} · ${_qIndex + 1}/${paper.questions.length}',
         ),
+        actions: <Widget>[
+          GrammarSplitButton(english: q.stem, iconOnly: true),
+        ],
       ),
       body: ListView(
         padding: const EdgeInsets.fromLTRB(16, 12, 16, 28),

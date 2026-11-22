@@ -39,6 +39,8 @@ async def pack_section(
     items = packs.section_items(family_id, skill, limit=limit)
     if not items and skill not in {
         "vocab",
+        "grammar",
+        "cloze",
         "listening",
         "reading",
         "writing",

@@ -76,7 +76,7 @@ class ExamHomeScreen extends ConsumerWidget {
             _NavTile(
               icon: Icons.fitness_center_rounded,
               title: '专项训练',
-              subtitle: '词汇 / 听力 / 阅读 / 写作 / 口语',
+              subtitle: '词汇 / 语法 / 完形 / 听力 / 阅读 / 写作 / 口语',
               onTap: () => context.push('/exam/practice'),
             ),
             _NavTile(
@@ -88,6 +88,12 @@ class ExamHomeScreen extends ConsumerWidget {
               onTap: () => context.push('/exam/mock'),
             ),
             _NavTile(
+              icon: Icons.insights_outlined,
+              title: '学习报告',
+              subtitle: '正确率与错题题型趋势',
+              onTap: () => context.push('/exam/report'),
+            ),
+            _NavTile(
               icon: Icons.bookmark_border_rounded,
               title: '错题本',
               subtitle: '错题回流 FSRS 复习',
@@ -96,19 +102,31 @@ class ExamHomeScreen extends ConsumerWidget {
             _NavTile(
               icon: Icons.headphones_outlined,
               title: '听力专项',
-              subtitle: '社区真题音频与脚本',
+              subtitle: '先听后做 · 社区音频',
               onTap: () => context.push('/exam/listening'),
+            ),
+            _NavTile(
+              icon: Icons.space_dashboard_outlined,
+              title: '完形填空',
+              subtitle: '一篇一局 · 可导入',
+              onTap: () => context.push('/exam/cloze'),
+            ),
+            _NavTile(
+              icon: Icons.rule_folder_outlined,
+              title: '语法选择',
+              subtitle: '考点专项 · 语法拆分',
+              onTap: () => context.push('/exam/grammar'),
             ),
             _NavTile(
               icon: Icons.menu_book_outlined,
               title: '阅读专项',
-              subtitle: '脚本精读 / 爱快阅读',
+              subtitle: '三步走技巧 / 爱快阅读',
               onTap: () => context.push('/exam/reading'),
             ),
             _NavTile(
               icon: Icons.edit_note_outlined,
               title: '写作训练',
-              subtitle: '通用英语作文批改',
+              subtitle: '中考 / 高考 / 雅思三级',
               onTap: () => context.push('/writing'),
             ),
             _NavTile(

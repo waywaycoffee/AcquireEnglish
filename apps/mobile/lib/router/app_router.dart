@@ -2,7 +2,10 @@ import '../features/learning_modules/module_screen.dart';
 import '../features/community/presentation/public_learning_card_screen.dart';
 import '../features/community/presentation/community_screen.dart';
 import '../features/community/presentation/study_pk_screen.dart';
+import '../features/exam/presentation/exam_cloze_import_screen.dart';
+import '../features/exam/presentation/exam_cloze_session.dart';
 import '../features/exam/presentation/exam_errorbook_screen.dart';
+import '../features/exam/presentation/exam_grammar_hub_screen.dart';
 import '../features/exam/presentation/exam_home_screen.dart';
 import '../features/exam/presentation/exam_listening_screen.dart';
 import '../features/exam/presentation/exam_mock_screen.dart';
@@ -15,6 +18,7 @@ import '../features/exam/presentation/exam_reading_paper_detail_screen.dart';
 import '../features/exam/presentation/exam_reading_screen.dart';
 import '../features/exam/presentation/exam_reading_skill_course_screen.dart';
 import '../features/exam/presentation/exam_reading_type_drill_screen.dart';
+import '../features/exam/presentation/exam_report_screen.dart';
 import '../features/exam/presentation/exam_select_screen.dart';
 import '../features/exam/presentation/exam_session_screen.dart';
 import '../features/ear_grind/presentation/ear_grind_hub_screen.dart';
@@ -230,6 +234,34 @@ GoRouter goRouter(Ref ref) {
           const ExamListeningScreen(),
     ),
     GoRoute(
+      path: '/exam/grammar',
+      builder: (BuildContext context, GoRouterState state) =>
+          const ExamGrammarHubScreen(),
+    ),
+    GoRoute(
+      path: '/exam/cloze',
+      builder: (BuildContext context, GoRouterState state) {
+        final bool tips = state.uri.queryParameters['tips'] == '1';
+        final String? passageId = state.uri.queryParameters['passageId'];
+        return ModuleGate(
+          moduleCode: 'exam',
+          title: '考试模块',
+          softBrowse: true,
+          child: ExamClozeSession(tipsMode: tips, passageId: passageId),
+        );
+      },
+    ),
+    GoRoute(
+      path: '/exam/cloze/import',
+      builder: (BuildContext context, GoRouterState state) =>
+          const ExamClozeImportScreen(),
+    ),
+    GoRoute(
+      path: '/exam/report',
+      builder: (BuildContext context, GoRouterState state) =>
+          const ExamReportScreen(),
+    ),
+    GoRoute(
       path: '/exam/reading',
       builder: (BuildContext context, GoRouterState state) =>
           const ExamReadingScreen(),
@@ -292,11 +324,23 @@ GoRouter goRouter(Ref ref) {
         final String skill = state.uri.queryParameters['skill'] ?? 'vocab';
         final bool mock =
             state.uri.queryParameters['mock'] == '1' || skill == 'mock';
+        final String? tag = state.uri.queryParameters['tag'];
+        final int timed =
+            int.tryParse(state.uri.queryParameters['timed'] ?? '') ?? 0;
+        final bool hideScript =
+            state.uri.queryParameters['hideScript'] != '0';
         final Widget session = ExamSessionScreen(
           skill: mock ? 'mock' : skill,
           mock: mock,
+          grammarTag: tag,
+          listeningHideScript: hideScript,
+          timedListeningSeconds: timed,
         );
-        if (!mock && (skill == 'reading' || skill == 'listening')) {
+        if (!mock &&
+            (skill == 'reading' ||
+                skill == 'listening' ||
+                skill == 'grammar' ||
+                skill == 'cloze')) {
           // First N passages free; session truncates when not entitled.
           return ModuleGate(
             moduleCode: 'exam',

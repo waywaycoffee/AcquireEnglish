@@ -25,6 +25,7 @@ import '../../reading/data/reading_gloss.dart';
 import '../../reading/data/reading_vocab_lists.dart';
 import '../../reading/presentation/reading_iplus1_provider.dart';
 import '../../settings/presentation/settings_provider.dart';
+import '../../shared/presentation/grammar_split_button.dart';
 import '../../sync/data/acquire_api_client.dart';
 import '../../sync/data/user_assets_service.dart';
 import '../../words/presentation/learned_vocabulary_provider.dart';
@@ -4245,6 +4246,29 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
                 ),
               ),
             ),
+            if (current != TutorLessonStep.summary &&
+                q.prompt.trim().isNotEmpty &&
+                !RegExp(r'^\d+\s*分$').hasMatch(q.prompt.trim()))
+              Align(
+                alignment: Alignment.center,
+                child: TextButton.icon(
+                  onPressed: () => unawaited(
+                    showGrammarSplitForText(context, english: q.prompt),
+                  ),
+                  icon: const Icon(
+                    Icons.auto_awesome_outlined,
+                    color: Color(0xFFC4B5FD),
+                    size: 18,
+                  ),
+                  label: Text(
+                    '语法拆分',
+                    style: _tutorCartoonStyle(
+                      size: 14,
+                      color: const Color(0xFFC4B5FD),
+                    ),
+                  ),
+                ),
+              ),
             const SizedBox(height: 10),
             Text(
               q.hint,
