@@ -58,7 +58,20 @@ async def run(command):
                 and all(isinstance(t,str) and any('\u4e00'<=ch<='\u9fff' for ch in t) for t in local_zh)):
             # Translated on the 5060 Ti; no cloud LLM call.
             return await _store(job,cues,local_zh)
-        # Fallback: the configured coach LLM; only text leaves the GPU.
+        # Default: do NOT burn cloud LLMs. Worker must send local `zh`.
+        # Opt-in only: SUBTITLE_ALLOW_CLOUD_TRANSLATE=1 on ECS.
+        import os
+        allow_cloud = (os.environ.get('SUBTITLE_ALLOW_CLOUD_TRANSLATE') or '').strip().lower() in (
+            '1', 'true', 'yes', 'on',
+        )
+        if not allow_cloud:
+            queue.update(job, 'retry', 'local_zh_missing_no_cloud_fallback')
+            return {
+                'error': 'local_zh_missing_no_cloud_fallback',
+                'hint': 'Run tools/subtitle/gpu_worker.py with Ollama qwen2.5:3b; '
+                        'set SUBTITLE_ALLOW_CLOUD_TRANSLATE=1 only if you accept cloud cost.',
+            }
+        # Opt-in fallback: the configured coach LLM; only text leaves the GPU.
         from dotenv import dotenv_values
         values=dotenv_values('/opt/acquireenglish/tools/oral_coach/.env')
         key=values.get('DEEPSEEK_API_KEY') or values.get('OPENAI_API_KEY')

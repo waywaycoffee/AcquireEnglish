@@ -14,6 +14,8 @@ CUDA 12/cuDNN DLL 安装在隔离环境中，无须修改系统 CUDA。首次运
 
 POST /api/shared-subtitles/jobs（登录）提交 {bvid,page}，重复视频分集复用同一任务；GET /api/shared-subtitles/jobs/{id} 查询 queued/transcribing/translating/completed/failed。每 120 秒续租，20 分钟租约超时可接管，最多尝试 4 次。本机关机时任务保留，worker 恢复后继续领取。临时音频转写结束即清理。
 
+**EN→ZH 必须本机跑**：`SUBTITLE_LLM_MODEL` 默认 `qwen2.5:3b`（与 `deploy/gpu-box-ollama` 一致）。ECS 默认**禁止** DeepSeek/云端翻译回退；仅当显式设置 `SUBTITLE_ALLOW_CLOUD_TRANSLATE=1` 才允许。
+
 当前可直接运行 worker 命令持续监听。未配置开机自动启动；电脑重启后需重新运行该命令。
 
 验收应同时核对队列 completed 和公共库中英文字幕，避免仅以进程退出判断成功。该流程仍依赖 B 站可获取的音轨与合法访问权限；无音轨的任务会重试后失败。
