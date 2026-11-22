@@ -3145,6 +3145,8 @@ Future<void> _settleChineseFillIfAlreadyPresent() async {
                       ),
                       child: CompositedTransformTarget(
                         link: _shadowToolbarLink,
+                        // clipBehavior none so the follower can paint on the
+                        // video edge; actual toolbar is in a root OverlayEntry.
                         child: PlayerVideoPanel(
                         episodeId: widget.episodeId,
                         showSceneHeader: false,

@@ -1690,6 +1690,10 @@ class _StudyShadowingTabState extends ConsumerState<StudyShadowingTab> {
 }
 
 /// Keeps recording state in the study tab while painting controls over video.
+///
+/// Uses a root [OverlayEntry] + [CompositedTransformFollower] so the mic row
+/// sits on the video bottom edge (as in the reference 跟读 layout) and is not
+/// clipped by the tab [Expanded]/[ListView].
 class _ShadowToolbarPortal extends StatefulWidget {
   const _ShadowToolbarPortal({required this.link, required this.child});
 
@@ -1701,70 +1705,114 @@ class _ShadowToolbarPortal extends StatefulWidget {
 }
 
 class _ShadowToolbarPortalState extends State<_ShadowToolbarPortal> {
-  final OverlayPortalController _controller = OverlayPortalController();
+  OverlayEntry? _entry;
 
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted && widget.link != null) {
-        _controller.show();
-      }
-    });
+    WidgetsBinding.instance.addPostFrameCallback((_) => _ensureMounted());
+  }
+
+  @override
+  void didUpdateWidget(covariant _ShadowToolbarPortal oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.link == null) {
+      _removeEntry();
+      return;
+    }
+    if (oldWidget.link == null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) => _ensureMounted());
+    } else {
+      _entry?.markNeedsBuild();
+    }
+  }
+
+  @override
+  void dispose() {
+    _removeEntry();
+    super.dispose();
+  }
+
+  void _removeEntry() {
+    _entry?.remove();
+    _entry = null;
+  }
+
+  void _ensureMounted() {
+    if (!mounted || widget.link == null || _entry != null) {
+      return;
+    }
+    final OverlayState? overlay = Overlay.maybeOf(context, rootOverlay: true);
+    if (overlay == null) {
+      return;
+    }
+    _entry = OverlayEntry(builder: _buildOverlay);
+    overlay.insert(_entry!);
+  }
+
+  Widget _buildOverlay(BuildContext context) {
+    final LayerLink link = widget.link!;
+    final double width =
+        link.leaderSize?.width ?? MediaQuery.sizeOf(context).width;
+    // Positioned(left/top) only — sizes to the toolbar. The follower transform
+    // moves paint/hit-test to the video bottom without covering bottom chrome.
+    return Positioned(
+      left: 0,
+      top: 0,
+      child: CompositedTransformFollower(
+        link: link,
+        showWhenUnlinked: false,
+        targetAnchor: Alignment.bottomCenter,
+        followerAnchor: Alignment.bottomCenter,
+        child: SizedBox(
+          width: width,
+          child: Material(
+            key: const ValueKey<String>('study-shadowing-overlay-background'),
+            color: const Color(0xFFE5E7EB).withValues(alpha: 0.65),
+            borderRadius: BorderRadius.circular(18),
+            clipBehavior: Clip.antiAlias,
+            child: IconButtonTheme(
+              data: IconButtonThemeData(
+                style: IconButton.styleFrom(
+                  backgroundColor: Colors.black.withValues(alpha: 0.5),
+                  disabledBackgroundColor: Colors.black.withValues(alpha: 0.3),
+                  foregroundColor: Colors.white,
+                  disabledForegroundColor: Colors.white38,
+                  shape: const CircleBorder(),
+                ),
+              ),
+              child: IconTheme(
+                data: const IconThemeData(
+                  color: Colors.white,
+                  shadows: <Shadow>[
+                    Shadow(color: Colors.black54, blurRadius: 3),
+                  ],
+                ),
+                child: widget.child,
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
-    final LayerLink? link = widget.link;
-    if (link == null) {
+    if (widget.link == null) {
       return widget.child;
     }
-    return OverlayPortal(
-      controller: _controller,
-      overlayChildBuilder: (BuildContext context) {
-        // Only the toolbar row should receive hits — avoid a full-screen
-        // Positioned layer swallowing taps on the bottom play button.
-        final double width =
-            link.leaderSize?.width ?? MediaQuery.sizeOf(context).width;
-        return CompositedTransformFollower(
-          link: link,
-          showWhenUnlinked: false,
-          targetAnchor: Alignment.bottomCenter,
-          followerAnchor: Alignment.bottomCenter,
-          child: SizedBox(
-            width: width,
-            child: Material(
-              key: const ValueKey<String>('study-shadowing-overlay-background'),
-              color: const Color(0xFFE5E7EB).withValues(alpha: 0.65),
-              borderRadius: BorderRadius.circular(18),
-              clipBehavior: Clip.antiAlias,
-              child: IconButtonTheme(
-                data: IconButtonThemeData(
-                  style: IconButton.styleFrom(
-                    backgroundColor: Colors.black.withValues(alpha: 0.5),
-                    disabledBackgroundColor: Colors.black.withValues(
-                      alpha: 0.3,
-                    ),
-                    foregroundColor: Colors.white,
-                    disabledForegroundColor: Colors.white38,
-                    shape: const CircleBorder(),
-                  ),
-                ),
-                child: IconTheme(
-                  data: const IconThemeData(
-                    color: Colors.white,
-                    shadows: <Shadow>[
-                      Shadow(color: Colors.black54, blurRadius: 3),
-                    ],
-                  ),
-                  child: widget.child,
-                ),
-              ),
-            ),
-          ),
-        );
-      },
-      child: const SizedBox.shrink(),
-    );
+    // Keep overlay in sync with recording / mode state on every rebuild.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) {
+        return;
+      }
+      if (_entry == null) {
+        _ensureMounted();
+      } else {
+        _entry!.markNeedsBuild();
+      }
+    });
+    return const SizedBox.shrink();
   }
 }
