@@ -70,7 +70,7 @@ class DubAccompanimentService {
     final Directory work = await temp.createTemp('acq-stem-');
     final File file = File('${work.path}/instrumental.wav');
     try {
-      await body.stream.pipe(file.openWrite());
+      await body.stream.cast<List<int>>().pipe(file.openWrite());
       if (await file.length() < 44) return null;
       final RandomAccessFile input = await file.open();
       final List<int> header;
