@@ -3866,6 +3866,34 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
     }
   }
 
+  static const String _tutorCartoonFont = 'ZCOOLKuaiLe';
+  static const String _tutorCartoonLatin = 'Fredoka';
+
+  TextStyle _tutorCartoonStyle({
+    required double size,
+    required Color color,
+    FontWeight weight = FontWeight.w400,
+    double height = 1.35,
+    double letterSpacing = 0.4,
+  }) {
+    return TextStyle(
+      fontFamily: _tutorCartoonFont,
+      fontFamilyFallback: const <String>[_tutorCartoonLatin, 'Nunito'],
+      fontSize: size,
+      color: color,
+      fontWeight: weight,
+      height: height,
+      letterSpacing: letterSpacing,
+      shadows: <Shadow>[
+        Shadow(
+          color: Colors.black.withValues(alpha: 0.28),
+          offset: const Offset(0, 2),
+          blurRadius: 6,
+        ),
+      ],
+    );
+  }
+
   Widget _buildTutorLessonPanel() {
     final TutorLessonStep current = _tutorStep ?? TutorLessonStep.intro;
     final ({String title, String prompt, String hint}) q = _tutorOneQuestion();
@@ -3904,10 +3932,9 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
             const SizedBox(height: 14),
             Text(
               '第 ${current.index1}/6 步 · ${q.title}',
-              style: TextStyle(
-                color: Colors.white.withValues(alpha: 0.72),
-                fontSize: 15,
-                fontWeight: FontWeight.w800,
+              style: _tutorCartoonStyle(
+                size: 16,
+                color: Colors.white.withValues(alpha: 0.78),
               ),
             ),
             const SizedBox(height: 12),
@@ -3917,13 +3944,13 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
                   child: Text(
                     q.prompt,
                     textAlign: TextAlign.center,
-                    style: TextStyle(
+                    style: _tutorCartoonStyle(
+                      size: current == TutorLessonStep.summary ? 44 : 30,
                       color: current == TutorLessonStep.summary
                           ? const Color(0xFF34D399)
                           : Colors.white,
-                      fontSize: current == TutorLessonStep.summary ? 42 : 28,
-                      height: 1.35,
-                      fontWeight: FontWeight.w900,
+                      letterSpacing: 0.6,
+                      height: 1.4,
                     ),
                   ),
                 ),
@@ -3933,11 +3960,10 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
             Text(
               q.hint,
               textAlign: TextAlign.center,
-              style: TextStyle(
-                color: Colors.white.withValues(alpha: 0.7),
-                fontSize: 16,
-                height: 1.35,
-                fontWeight: FontWeight.w600,
+              style: _tutorCartoonStyle(
+                size: 17,
+                color: Colors.white.withValues(alpha: 0.75),
+                letterSpacing: 0.3,
               ),
             ),
           ],
