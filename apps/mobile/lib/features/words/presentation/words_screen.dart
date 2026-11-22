@@ -16,6 +16,7 @@ import '../../daily_review/domain/review_week_stats.dart';
 import '../../daily_review/domain/vocab_unified_queue.dart';
 import '../../daily_review/presentation/daily_review_provider.dart';
 import '../../daily_review/presentation/fsrs_word_status.dart';
+import '../../daily_review/presentation/syllabus_overlap_dialog.dart';
 import '../../navigation/presentation/navigation_destination.dart';
 import '../../shared/presentation/lexicon_pronounce_button.dart';
 import '../../shared/presentation/pad/app_design_tokens.dart';
@@ -54,16 +55,14 @@ class _WordsScreenState extends ConsumerState<WordsScreen> {
       await ref.read(dailyReviewProvider.notifier).setDailyNewLimit(newLimit);
     }
     if (!mounted) return;
-    // Unified queue: favorites + active 词书 (word cards only, no phrases).
-    final String? bookId =
+    // Active 词书 → new-learn session; otherwise due review for word cards.
+    final String bookId =
         ref.read(syllabusBooksProvider).activeBookId.trim();
-    if (bookId != null && bookId.isNotEmpty) {
-      context.push(
-        '${SGRoute.reviewSession.route}?deck=syllabus&book=${Uri.encodeComponent(bookId)}',
-      );
+    if (bookId.isNotEmpty) {
+      context.push(syllabusBookSessionRoute(bookId));
       return;
     }
-    context.push('${SGRoute.reviewSession.route}?kind=word');
+    context.push('${SGRoute.reviewSession.route}?due=1&kind=word');
   }
 
   String _query = '';

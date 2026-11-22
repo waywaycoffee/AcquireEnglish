@@ -115,29 +115,13 @@ class _SyllabusBooksScreenState extends ConsumerState<SyllabusBooksScreen> {
       );
       return;
     }
-    final SyllabusImportOverlap? overlap =
-        await activateBookWithOverlap(ref, book);
     if (!context.mounted) return;
-    if (overlap != null) {
-      await showSyllabusOverlapDialog(context, book, overlap);
-    }
+    await startSyllabusBookSession(ref, context, book);
   }
 
-  Future<void> _selectBook(SyllabusBook book) async {
-    final SyllabusImportOverlap? overlap =
-        await activateBookWithOverlap(ref, book);
-    if (!mounted) return;
-    if (overlap != null) {
-      await showSyllabusOverlapDialog(context, book, overlap);
-    }
-  }
-
-  void _startBook(BuildContext context, SyllabusBook book) {
-    unawaited(_selectBook(book).then((_) {
-      if (context.mounted) {
-        context.push(syllabusBookSessionRoute(book.id));
-      }
-    }));
+  /// Cover tap = start memorizing this book immediately (new learn).
+  Future<void> _startBook(SyllabusBook book) async {
+    await startSyllabusBookSession(ref, context, book);
   }
 
   Future<void> _confirmDelete(SyllabusBook book) async {
@@ -305,9 +289,9 @@ class _SyllabusBooksScreenState extends ConsumerState<SyllabusBooksScreen> {
                             ? '本地暂无零基础书'
                             : '本地暂无词书，去开源词库挑一本',
                         onOpen: (SyllabusBook book) =>
-                            unawaited(_selectBook(book)),
+                            unawaited(_startBook(book)),
                         onStart: (SyllabusBook book) =>
-                            _startBook(context, book),
+                            unawaited(_startBook(book)),
                         onDelete: (SyllabusBook book) =>
                             unawaited(_confirmDelete(book)),
                       ),
@@ -535,7 +519,7 @@ class _MyShelf extends StatelessWidget {
           Text(
             books.isEmpty
                 ? '书架空着 · 从下方开源词库或云端下载'
-                : '${books.length} 本 · 点封面继续背',
+                : '${books.length} 本 · 点封面开始背词',
             style: TextStyle(color: theme.chip, fontSize: 11),
           ),
         ],
@@ -593,7 +577,7 @@ class _ShelfBook extends StatelessWidget {
                 fontWeight: FontWeight.w800,
               ),
             ),
-            child: Text(remaining == 0 ? '再练' : '开始'),
+            child: Text(remaining == 0 ? '再背' : '背词'),
           ),
         ),
         if (onDelete != null)

@@ -348,6 +348,8 @@ GoRouter goRouter(Ref ref) => GoRouter(
         return DailyReviewScreen(
           session: true,
           practice: state.uri.queryParameters['practice'] == '1',
+          learnNewOnly: state.uri.queryParameters['learn'] == '1',
+          dueOnly: state.uri.queryParameters['due'] == '1',
           expressions: kindName == 'expressions',
           recommended: deck == 'recommended',
           missedOnly: deck == 'missed',

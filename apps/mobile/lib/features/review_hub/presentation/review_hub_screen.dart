@@ -76,22 +76,22 @@ class ReviewHubScreen extends ConsumerWidget {
         ref.watch(syllabusBooksProvider).activeBook?.title ?? '';
 
     final String headline = empty
-        ? '从喜欢的内容开始'
+        ? '先背词，再来复习'
         : done
             ? '今天暂时没有到期内容'
             : '把学过的，真正记住';
     final String subtitle = empty
-        ? '还没有可复习内容。去导入一本词书，或在播放器收藏单词。'
+        ? '去词书架点封面开始背新词；背过之后会出现在这里按计划复习。'
         : done
             ? (plan.nextDue == null
-                ? '可以自由练习已学内容，也可以继续学新内容。'
-                : '下次到期：${_formatNextDue(plan.nextDue!, now)}。可以自由练习，也可以继续学新内容。')
+                ? '可以自由练习已学内容，或去词书架继续背新词。'
+                : '下次到期：${_formatNextDue(plan.nextDue!, now)}。也可以去词书架继续背新词。')
             : activeBookTitle.isEmpty
-                ? '今天优先巩固到期内容，再认识一点新表达。'
-                : '收藏与词书「$activeBookTitle」同一队列：先复习到期，再按额度学新词。';
+                ? '这里只复习已学过的词；新词请去词书架点封面开背。'
+                : '复习已学内容；新词请点词书「$activeBookTitle」封面继续背。';
 
     final String ctaLabel = empty
-        ? '去发现一段好内容'
+        ? '去词书架背新词'
         : done
             ? '自由练习已学内容'
             : hasDraft
@@ -102,11 +102,12 @@ class ReviewHubScreen extends ConsumerWidget {
 
     VoidCallback? onCta;
     if (empty) {
-      onCta = () => context.go(AppNavDestination.library.route);
+      onCta = () => context.push('/words/syllabus');
     } else if (done) {
       onCta = () => context.push('${SGRoute.reviewSession.route}?practice=1');
     } else {
-      onCta = () => context.push(SGRoute.reviewSession.route);
+      onCta = () =>
+          context.push('${SGRoute.reviewSession.route}?due=1');
     }
 
     return PadScaffold(
@@ -159,7 +160,7 @@ class ReviewHubScreen extends ConsumerWidget {
             ctaLabel: ctaLabel,
             onCta: onCta,
             footer: empty
-                ? '词书下载后会进入统一复习计划，也可先收藏再背。'
+                ? '点词书封面开背；背过的词到期后在这里复习。'
                 : done
                     ? '自由练习不改动到期时间，也不消耗新学额度。'
                     : '先回忆，再核对答案。每条评分后立即保存。',

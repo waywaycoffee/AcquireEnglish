@@ -60,6 +60,8 @@ class DailyReviewScreen extends ConsumerStatefulWidget {
     this.session = false,
     this.practice = false,
     this.practiceKind,
+    this.learnNewOnly = false,
+    this.dueOnly = false,
     this.expressions = false,
     this.recommended = false,
     this.missedOnly = false,
@@ -75,6 +77,12 @@ class DailyReviewScreen extends ConsumerStatefulWidget {
   final bool practice;
   final bool expressions;
   final ReviewKind? practiceKind;
+
+  /// New-learn only (词书封面开背): waiting cards within today's new quota.
+  final bool learnNewOnly;
+
+  /// Due reviews only (复习 tab): skip introducing new book words.
+  final bool dueOnly;
 
   /// Only cards currently in the missed-word book.
   final bool missedOnly;
@@ -319,7 +327,11 @@ class _DailyReviewScreenState extends ConsumerState<DailyReviewScreen>
                   : (_revealed ? '核对与评分' : '主动回忆'))
             : '每日复习',
         description: widget.session
-            ? (widget.syllabusOnly
+            ? (widget.learnNewOnly
+                  ? '点词书封面开背 · 背过的词会进入复习'
+                  : widget.dueOnly
+                  ? '复习已学过的词 · 新词请去词书架点封面'
+                  : widget.syllabusOnly
                   ? '自建考纲核心词 / 导入词书，走同一套 FSRS。'
                   : widget.missedOnly
                   ? '优先重练标记为「忘记」的词。'
@@ -427,6 +439,8 @@ class _DailyReviewScreenState extends ConsumerState<DailyReviewScreen>
       widget.sourceEpisodeId,
       widget.syllabusOnly,
       widget.syllabusBookId,
+      widget.learnNewOnly,
+      widget.dueOnly,
     ]),
   );
 
@@ -633,6 +647,19 @@ class _DailyReviewScreenState extends ConsumerState<DailyReviewScreen>
     final List<ReviewRecord> fresh = plan.waiting
         .take(plan.newAvailable)
         .toList();
+
+    // Product split: 词书封面 = 新学；复习页 = 到期复习。
+    if (widget.learnNewOnly) {
+      _deckKeys = fresh.map((ReviewRecord r) => r.key).toList(growable: false);
+      _currentKey = _deckKeys!.firstOrNull;
+      return;
+    }
+    if (widget.dueOnly) {
+      _deckKeys = due.map((ReviewRecord r) => r.key).toList(growable: false);
+      _currentKey = _deckKeys!.firstOrNull;
+      return;
+    }
+
     final List<String> keys = <String>[];
     int credit = ref.read(dailyReviewProvider).dueReviewsSinceNew;
     int dueIndex = 0;

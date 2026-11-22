@@ -9,9 +9,12 @@ import '../../words/presentation/word_review_settings_provider.dart';
 import '../domain/vocab_unified_queue.dart';
 import 'daily_review_provider.dart';
 
-/// Session route that studies [bookId] (book cards + overlapping favorites).
+/// Session route that **learns new words** from [bookId] (cover-tap flow).
+///
+/// Due reviews stay on the 复习 tab (`due=1`); book covers open new-learn only.
 String syllabusBookSessionRoute(String bookId) {
-  return '${SGRoute.reviewSession.route}?deck=syllabus&book=${Uri.encodeComponent(bookId)}';
+  return '${SGRoute.reviewSession.route}'
+      '?deck=syllabus&book=${Uri.encodeComponent(bookId)}&learn=1';
 }
 
 /// Activate [book] for the unified 背单词 queue and ingest FSRS cards.
