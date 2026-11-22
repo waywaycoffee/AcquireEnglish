@@ -138,7 +138,7 @@ class _LearningHomeScreenState extends ConsumerState<LearningHomeScreen> {
         <(String, String, IconData, String)>[
           ('国际音标', 'BBC · 英式跟读', Icons.graphic_eq, '/courses/british-ipa'),
           ('美式音标', '慢速跟读 · 20 音', Icons.record_voice_over_outlined, '/courses/american-ipa'),
-          ('自然拼读', '从字母音到单词', Icons.spellcheck, '/learn/phonics'),
+          ('自然拼读', 'Nessy · 趣味跟读', Icons.spellcheck, '/courses/phonics'),
           ('应用语块', '整句学，直接用', Icons.chat_bubble_outline, '/learn/chunks'),
           ('场景对话', '在情境里开口', Icons.forum_outlined, '/learn/dialogue'),
           (
