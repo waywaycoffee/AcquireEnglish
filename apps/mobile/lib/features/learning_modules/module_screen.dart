@@ -10,7 +10,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:hive_ce/hive.dart';
 import '../authentication/presentation/account_storage.dart';
-import 'package:media_kit/media_kit.dart';
 import '../digital_human/data/oral_coach_pipeline_client.dart';
 import '../membership/domain/module_access.dart';
 import '../onboarding/presentation/onboarding_provider.dart';
@@ -178,43 +177,36 @@ class _ModuleScreenState extends ConsumerState<ModuleScreen>
   final expression = TextEditingController();
   final scroll = ScrollController();
   double speed = 0.75;
-  Player? streamed;
 
-  Future<void> _playRemoteUrl(String url, int generation) async {
-    final Player player = Player();
-    streamed = player;
-    try {
-      final Future<bool> done = player.stream.completed.firstWhere((bool v) => v);
-      await player.open(Media(url), play: true);
-      // speed slider is 0.3–1.0 with 0.75 as “normal” CosyVoice pacing.
-      final double rate = (speed / 0.75).clamp(0.5, 1.6);
-      if ((rate - 1.0).abs() > 0.02) {
-        await player.setRate(rate);
-      }
-      if (!mounted || generation != sequence) return;
-      await done.timeout(const Duration(seconds: 60));
-    } finally {
-      if (identical(streamed, player)) streamed = null;
-      await player.dispose();
-    }
-  }
-
-  /// Demo audio: ECS Aliyun CosyVoice first (durable `/media/reading/tts`),
-  /// then oral-coach pipeline, then on-device TTS. Coach cache URLs often 404.
+  /// Demo audio via [WordPronunciationService] so end-of-playback waits until
+  /// audio actually started (media_kit can emit `completed` during open).
   Future<void> remoteSpeech(String text) async {
     final int generation = sequence;
     final String spoken = text.trim();
     if (spoken.isEmpty) return;
 
+    final WordPronunciationService pronunciation =
+        ref.read(wordPronunciationServiceProvider);
+    // Cloud CosyVoice: keep near-native rate (slowing MP3 caused early cutoffs).
+    final double cloudRate = (speed / 0.75).clamp(0.85, 1.25);
     Object? lastError;
+
+    Future<void> playUrl(String url) async {
+      if (!mounted || generation != sequence) return;
+      await pronunciation.speak(
+        spoken,
+        recordedUrl: url,
+        rate: cloudRate,
+        allowSynthesisFallback: false,
+      );
+    }
 
     try {
       final String voice = loadReadingTtsGender().aliyunVoiceId;
       final String url = await ref
           .read(acquireApiClientProvider)
           .readingSpeech(spoken, voice);
-      if (!mounted || generation != sequence) return;
-      await _playRemoteUrl(url, generation);
+      await playUrl(url);
       return;
     } catch (e) {
       lastError = e;
@@ -229,10 +221,8 @@ class _ModuleScreenState extends ConsumerState<ModuleScreen>
             ? 'en-GB-SoniaNeural'
             : null,
       );
-      if (!mounted || generation != sequence) return;
       if (url != null && url.isNotEmpty) {
-        // Probe would still 404 for some cache keys — play then fall through.
-        await _playRemoteUrl(url, generation);
+        await playUrl(url);
         return;
       }
     } catch (e) {
@@ -241,11 +231,11 @@ class _ModuleScreenState extends ConsumerState<ModuleScreen>
 
     if (!mounted || generation != sequence) return;
     try {
-      await ref.read(wordPronunciationServiceProvider).speak(
-            spoken,
-            rate: speed.clamp(0.5, 1.0),
-            allowSynthesisFallback: true,
-          );
+      await pronunciation.speak(
+        spoken,
+        rate: speed.clamp(0.5, 1.0),
+        allowSynthesisFallback: true,
+      );
       return;
     } catch (e) {
       lastError = e;
@@ -408,7 +398,6 @@ class _ModuleScreenState extends ConsumerState<ModuleScreen>
   void stop() {
     sequence++;
     sleep?.cancel();
-    unawaited(streamed?.stop());
     unawaited(ref.read(wordPronunciationServiceProvider).stop());
     if (mounted) setState(() => playing = false);
   }
@@ -422,7 +411,6 @@ class _ModuleScreenState extends ConsumerState<ModuleScreen>
   void dispose() {
     sequence++;
     sleep?.cancel();
-    unawaited(streamed?.stop());
     // Avoid ref.read in dispose — Riverpod forbids it after unmount.
     expression.dispose();
     scroll.dispose();
