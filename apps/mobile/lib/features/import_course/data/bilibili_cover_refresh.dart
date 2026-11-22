@@ -40,7 +40,7 @@ bool isDisplayableCover(String cover) {
   return File(value).existsSync();
 }
 
-/// Prefer episode poster, then course; skip app-icon placeholders.
+/// Prefer given episode, then any episode with a real poster, then course.
 String displayCoverForCourse({
   required LibraryCourseData course,
   LibraryEpisodeItem? episode,
@@ -48,6 +48,12 @@ String displayCoverForCourse({
   final String episodeCover = episode?.coverImage.trim() ?? '';
   if (isDisplayableCover(episodeCover)) {
     return episodeCover;
+  }
+  for (final LibraryEpisodeItem ep in course.episodes) {
+    final String cover = ep.coverImage.trim();
+    if (isDisplayableCover(cover)) {
+      return cover;
+    }
   }
   final String courseCover = course.coverImage.trim();
   if (isDisplayableCover(courseCover)) {

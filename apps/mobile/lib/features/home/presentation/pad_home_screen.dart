@@ -10,7 +10,7 @@ import '../../import_course/data/bilibili_cover_refresh.dart';
 import '../../import_course/data/bilibili_open_or_import.dart';
 import '../../library/presentation/library_catalog_provider.dart';
 import '../../library/presentation/library_mock_data.dart';
-import '../../library/presentation/widgets/library_course_poster.dart';
+import '../../library/presentation/widgets/ensuring_course_poster.dart';
 import '../../navigation/presentation/navigation_destination.dart';
 import '../../player/presentation/learning_resume_provider.dart';
 import '../../settings/presentation/learning_preferences_screen.dart';
@@ -849,9 +849,8 @@ class _RecentCourseCard extends StatelessWidget {
         child: Stack(
           fit: StackFit.expand,
           children: <Widget>[
-            LibraryCoursePoster(
-              title: course.title,
-              path: displayCoverForCourse(course: course),
+            EnsuringCoursePoster(
+              course: course,
               borderRadius: BorderRadius.circular(24),
             ),
             const DecoratedBox(
