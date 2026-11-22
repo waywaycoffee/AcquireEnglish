@@ -39,6 +39,7 @@ import '../domain/oral_expression_diagnosis.dart';
 import '../domain/scene_word_label.dart';
 import 'digital_human_picker.dart';
 import 'widgets/coach_avatar_stage.dart';
+import 'widgets/oral_call_stage.dart';
 import 'widgets/oral_diagnosis_card.dart';
 import 'widgets/scene_photo_sheet.dart';
 
@@ -287,6 +288,8 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
   final Set<String> _sceneSavedWords = <String>{};
   bool _sceneSharing = false;
   bool _liveSceneOn = false;
+  bool _selfCallCamOn = false;
+  bool _callMicMuted = false;
   final LiveSceneCamera _liveSceneCamera = LiveSceneCamera();
   Timer? _liveSceneTimer;
 
@@ -1201,6 +1204,9 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
     if (_wantsLiveTalking(settings)) {
       unawaited(_ensureLiveTalking(settings).catchError((Object _) {}));
     }
+    if (widget.standalone) {
+      unawaited(_ensureSelfCallCamera());
+    }
     if (settings.usesLiveKit) {
       unawaited(
         _ensureLiveKitDuplex(settings, openingToSpeak: opening).catchError((
@@ -2092,6 +2098,37 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
     }
   }
 
+  Future<void> _ensureSelfCallCamera() async {
+    if (!widget.standalone) return;
+    try {
+      await _liveSceneCamera.start(prefer: CameraLensDirection.front);
+      if (!mounted) {
+        await _liveSceneCamera.stop();
+        return;
+      }
+      setState(() {
+        _selfCallCamOn = true;
+        _liveSceneOn = false;
+      });
+    } catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _selfCallCamOn = false;
+        _error = '无法打开前置摄像头：$error';
+      });
+    }
+  }
+
+  Future<void> _toggleSelfCallCamera() async {
+    if (_selfCallCamOn) {
+      await _liveSceneCamera.stop();
+      if (!mounted) return;
+      setState(() => _selfCallCamOn = false);
+      return;
+    }
+    await _ensureSelfCallCamera();
+  }
+
   Future<void> _startLiveSceneShare() async {
     try {
       setState(() {
@@ -2099,12 +2136,13 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
         _status = '正在打开摄像头…';
         _error = null;
       });
-      await _liveSceneCamera.start();
+      await _liveSceneCamera.start(prefer: CameraLensDirection.back);
       if (!mounted) {
         await _liveSceneCamera.stop();
         return;
       }
       setState(() {
+        _selfCallCamOn = false;
         _liveSceneOn = true;
         _busy = false;
         _status = '场景直播中 · 数字人会跟着眼前物品聊';
@@ -2135,6 +2173,9 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
       _liveSceneOn = false;
       _status = _sceneDescription.isEmpty ? '你可以开始说' : '场景直播已关闭';
     });
+    if (widget.standalone) {
+      unawaited(_ensureSelfCallCamera());
+    }
   }
 
   Future<List<SceneWordLabel>> _filterSceneLabels(
@@ -2378,6 +2419,11 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
   Future<void> _onHoldStart() async {
     _holdPressed = true;
     if (_busy || _recordingActive) {
+      return;
+    }
+    if (widget.standalone && _callMicMuted) {
+      setState(() => _error = '请先取消静音再说话');
+      _holdPressed = false;
       return;
     }
     if (_coachSpeaking) {
@@ -2728,157 +2774,175 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
           )
         : null;
 
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(22),
-      child: DecoratedBox(
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: <Color>[
-              Color(0xFF14102A),
-              Color(0xFF2A1B4A),
-              Color(0xFF1A1240),
-              Color(0xFF0E0A22),
+    final Widget stage = widget.standalone
+        ? Padding(
+            padding: const EdgeInsets.fromLTRB(10, 10, 10, 0),
+            child: OralCallStage(
+              pulse: _orbPulse,
+              speaking: _coachSpeaking,
+              listening: _recordingActive,
+              statusLabel: stageLabel,
+              displayName: persona.displayName,
+              imageAsset: persona.assetPath,
+              liveVideo: liveVideo,
+              selfCamOn: _selfCallCamOn || _liveSceneOn,
+              selfPreview:
+                  (_selfCallCamOn || _liveSceneOn) &&
+                      _liveSceneCamera.controller != null
+                  ? CameraPreview(_liveSceneCamera.controller!)
+                  : (_sceneImagePath != null &&
+                        File(_sceneImagePath!).existsSync())
+                  ? Image.file(File(_sceneImagePath!), fit: BoxFit.cover)
+                  : null,
+              micMuted: _callMicMuted,
+              micEnabled: !_busy,
+              swapCoachEnabled: !_busy && !_recordingActive && !_coachSpeaking,
+              onHangUp: () => unawaited(_hangUp()),
+              onSwapCoach: () => unawaited(_chooseCoach()),
+              onToggleMic: () {
+                setState(() => _callMicMuted = !_callMicMuted);
+              },
+              onToggleSelfCam: () => unawaited(_toggleSelfCallCamera()),
+            ),
+          )
+        : Stack(
+            fit: StackFit.expand,
+            children: <Widget>[
+              CoachAvatarStage(
+                pulse: _orbPulse,
+                speaking: _coachSpeaking,
+                listening: _recordingActive,
+                label: stageLabel,
+                imageAsset: persona.assetPath,
+                displayName: persona.displayName,
+                liveVideo: liveVideo,
+              ),
+              const DecoratedBox(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: <Color>[
+                      Color(0x33000000),
+                      Color(0x00000000),
+                      Color(0xCC14102A),
+                    ],
+                    stops: <double>[0, 0.45, 1],
+                  ),
+                ),
+              ),
+              Positioned(
+                left: 0,
+                right: 0,
+                bottom: 8,
+                child: Text(
+                  _sceneDescription.isNotEmpty
+                      ? '正在看你的真实场景 · $_topicLabel'
+                      : '内容由 AI 生成 · $_topicLabel',
+                  textAlign: TextAlign.center,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: Colors.white.withValues(alpha: 0.55),
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+              Positioned(
+                left: 12,
+                top: 12,
+                child: ActionChip(
+                  avatar: const Icon(Icons.swap_horiz_rounded, size: 18),
+                  label: const Text('换教练'),
+                  onPressed: _busy || _recordingActive || _coachSpeaking
+                      ? null
+                      : () => unawaited(_chooseCoach()),
+                ),
+              ),
+              if (_liveSceneOn ||
+                  (_sceneImagePath != null &&
+                      File(_sceneImagePath!).existsSync()))
+                Positioned(
+                  right: 12,
+                  top: 12,
+                  child: GestureDetector(
+                    onTap: () {
+                      if (_liveSceneOn) {
+                        unawaited(_stopLiveSceneShare());
+                        return;
+                      }
+                      final String? path = _sceneImagePath;
+                      if (path != null) {
+                        unawaited(_presentScenePhoto(path));
+                      }
+                    },
+                    child: Container(
+                      width: 78,
+                      height: 104,
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: _liveSceneOn
+                              ? const Color(0xFF34D399)
+                              : Colors.white.withValues(alpha: 0.7),
+                          width: 2,
+                        ),
+                        boxShadow: const <BoxShadow>[
+                          BoxShadow(
+                            color: Color(0x66000000),
+                            blurRadius: 10,
+                          ),
+                        ],
+                      ),
+                      clipBehavior: Clip.antiAlias,
+                      child: Stack(
+                        fit: StackFit.expand,
+                        children: <Widget>[
+                          if (_liveSceneOn &&
+                              _liveSceneCamera.controller != null)
+                            CameraPreview(_liveSceneCamera.controller!)
+                          else if (_sceneImagePath != null)
+                            Image.file(
+                              File(_sceneImagePath!),
+                              fit: BoxFit.cover,
+                            ),
+                          Align(
+                            alignment: Alignment.bottomCenter,
+                            child: Container(
+                              width: double.infinity,
+                              color: const Color(0xAA111827),
+                              padding: const EdgeInsets.symmetric(
+                                vertical: 3,
+                              ),
+                              child: Text(
+                                _liveSceneOn
+                                    ? '直播中'
+                                    : (_sceneLabels.isEmpty
+                                          ? '场景'
+                                          : '${_sceneLabels.length}词'),
+                                textAlign: TextAlign.center,
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w800,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
             ],
-          ),
-        ),
-        child: Column(
+          );
+
+    final Widget coachColumn = Column(
           children: <Widget>[
             Expanded(
               flex: 3,
-              child: Stack(
-                fit: StackFit.expand,
-                children: <Widget>[
-                  CoachAvatarStage(
-                    pulse: _orbPulse,
-                    speaking: _coachSpeaking,
-                    listening: _recordingActive,
-                    label: stageLabel,
-                    imageAsset: persona.assetPath,
-                    displayName: persona.displayName,
-                    liveVideo: liveVideo,
-                  ),
-                  const DecoratedBox(
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        begin: Alignment.topCenter,
-                        end: Alignment.bottomCenter,
-                        colors: <Color>[
-                          Color(0x33000000),
-                          Color(0x00000000),
-                          Color(0xCC14102A),
-                        ],
-                        stops: <double>[0, 0.45, 1],
-                      ),
-                    ),
-                  ),
-                  Positioned(
-                    left: 0,
-                    right: 0,
-                    bottom: 8,
-                    child: Text(
-                      _sceneDescription.isNotEmpty
-                          ? '正在看你的真实场景 · $_topicLabel'
-                          : '内容由 AI 生成 · $_topicLabel',
-                      textAlign: TextAlign.center,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        color: Colors.white.withValues(alpha: 0.55),
-                        fontSize: 11,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ),
-                  Positioned(
-                    left: 12,
-                    top: 12,
-                    child: ActionChip(
-                      avatar: const Icon(Icons.swap_horiz_rounded, size: 18),
-                      label: const Text('换教练'),
-                      onPressed: _busy || _recordingActive || _coachSpeaking
-                          ? null
-                          : () => unawaited(_chooseCoach()),
-                    ),
-                  ),
-                  if (_liveSceneOn ||
-                      (_sceneImagePath != null &&
-                          File(_sceneImagePath!).existsSync()))
-                    Positioned(
-                      right: 12,
-                      top: 12,
-                      child: GestureDetector(
-                        onTap: () {
-                          if (_liveSceneOn) {
-                            unawaited(_stopLiveSceneShare());
-                            return;
-                          }
-                          final String? path = _sceneImagePath;
-                          if (path != null) {
-                            unawaited(_presentScenePhoto(path));
-                          }
-                        },
-                        child: Container(
-                          width: 78,
-                          height: 104,
-                          decoration: BoxDecoration(
-                            borderRadius: BorderRadius.circular(12),
-                            border: Border.all(
-                              color: _liveSceneOn
-                                  ? const Color(0xFF34D399)
-                                  : Colors.white.withValues(alpha: 0.7),
-                              width: 2,
-                            ),
-                            boxShadow: const <BoxShadow>[
-                              BoxShadow(
-                                color: Color(0x66000000),
-                                blurRadius: 10,
-                              ),
-                            ],
-                          ),
-                          clipBehavior: Clip.antiAlias,
-                          child: Stack(
-                            fit: StackFit.expand,
-                            children: <Widget>[
-                              if (_liveSceneOn &&
-                                  _liveSceneCamera.controller != null)
-                                CameraPreview(_liveSceneCamera.controller!)
-                              else if (_sceneImagePath != null)
-                                Image.file(
-                                  File(_sceneImagePath!),
-                                  fit: BoxFit.cover,
-                                ),
-                              Align(
-                                alignment: Alignment.bottomCenter,
-                                child: Container(
-                                  width: double.infinity,
-                                  color: const Color(0xAA111827),
-                                  padding: const EdgeInsets.symmetric(
-                                    vertical: 3,
-                                  ),
-                                  child: Text(
-                                    _liveSceneOn
-                                        ? '直播中'
-                                        : (_sceneLabels.isEmpty
-                                              ? '场景'
-                                              : '${_sceneLabels.length}词'),
-                                    textAlign: TextAlign.center,
-                                    style: const TextStyle(
-                                      color: Colors.white,
-                                      fontSize: 10,
-                                      fontWeight: FontWeight.w800,
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ),
-                ],
-              ),
+              child: stage,
             ),
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
@@ -3244,7 +3308,181 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
               ),
             ),
           ],
+    );
+
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(22),
+      child: DecoratedBox(
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: <Color>[
+              Color(0xFF14102A),
+              Color(0xFF2A1B4A),
+              Color(0xFF1A1240),
+              Color(0xFF0E0A22),
+            ],
+          ),
         ),
+        child: widget.standalone
+            ? LayoutBuilder(
+                builder: (BuildContext context, BoxConstraints constraints) {
+                  if (constraints.maxWidth < 600) {
+                    return Column(
+                      children: <Widget>[
+                        _buildTutorLessonStrip(),
+                        Expanded(child: coachColumn),
+                      ],
+                    );
+                  }
+                  return Row(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: <Widget>[
+                      SizedBox(
+                        width: constraints.maxWidth * 0.4,
+                        child: _buildTutorLessonPanel(),
+                      ),
+                      Expanded(child: coachColumn),
+                    ],
+                  );
+                },
+              )
+            : coachColumn,
+      ),
+    );
+  }
+
+  Widget _buildTutorLessonStrip() {
+    return Material(
+      color: Colors.white.withValues(alpha: 0.06),
+      child: InkWell(
+        onTap: () {
+          showModalBottomSheet<void>(
+            context: context,
+            backgroundColor: const Color(0xFF1A1240),
+            isScrollControlled: true,
+            builder: (BuildContext context) {
+              return SafeArea(
+                child: SizedBox(
+                  height: MediaQuery.sizeOf(context).height * 0.55,
+                  child: _buildTutorLessonPanel(),
+                ),
+              );
+            },
+          );
+        },
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(14, 10, 14, 10),
+          child: Row(
+            children: <Widget>[
+              const Icon(Icons.menu_book_rounded, color: Colors.white70, size: 18),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  _activeScenario?.title.isNotEmpty == true
+                      ? _activeScenario!.title
+                      : _topicLabel,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w800,
+                    fontSize: 13,
+                  ),
+                ),
+              ),
+              Text(
+                '$_questUtterances/$_questTargetUtterances',
+                style: const TextStyle(color: Colors.white70, fontSize: 12),
+              ),
+              const SizedBox(width: 4),
+              const Icon(Icons.expand_more_rounded, color: Colors.white54),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildTutorLessonPanel() {
+    final String excerpt = widget.articleExcerpt.trim().isNotEmpty
+        ? widget.articleExcerpt.trim()
+        : (_activeScenario?.prompt.trim().isNotEmpty == true
+              ? _activeScenario!.prompt.trim()
+              : '自由情景对话：用英语聊今天的主题，外教会引导你多开口。');
+    final String title = widget.courseTitle.trim().isNotEmpty
+        ? widget.courseTitle.trim()
+        : 'AI 外教课';
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          Text(
+            title,
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 20,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            _activeScenario?.title.isNotEmpty == true
+                ? _activeScenario!.title
+                : _topicLabel,
+            style: TextStyle(
+              color: Colors.white.withValues(alpha: 0.78),
+              fontSize: 14,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          const SizedBox(height: 12),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+            decoration: BoxDecoration(
+              color: const Color(0xFF5B3FD4).withValues(alpha: 0.35),
+              borderRadius: BorderRadius.circular(999),
+            ),
+            child: Text(
+              '开口目标 $_questUtterances / $_questTargetUtterances',
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 12,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+          ),
+          const SizedBox(height: 14),
+          Text(
+            '本课文稿',
+            style: TextStyle(
+              color: Colors.white.withValues(alpha: 0.55),
+              fontSize: 12,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Expanded(
+            child: SingleChildScrollView(
+              child: Text(
+                excerpt,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 15,
+                  height: 1.45,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+          ),
+          TextButton.icon(
+            onPressed: _showSceneSheet,
+            icon: const Icon(Icons.grid_view_rounded, color: Colors.white70),
+            label: const Text('换情景', style: TextStyle(color: Colors.white70)),
+          ),
+        ],
       ),
     );
   }

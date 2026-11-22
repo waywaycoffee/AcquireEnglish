@@ -14,18 +14,25 @@ class LiveSceneCamera {
   bool get isReady =>
       _controller != null && (_controller?.value.isInitialized ?? false);
 
-  Future<void> start() async {
-    if (isReady) return;
+  Future<void> start({
+    CameraLensDirection prefer = CameraLensDirection.back,
+  }) async {
+    if (isReady) {
+      final CameraLensDirection? current =
+          _controller?.description.lensDirection;
+      if (current == prefer) return;
+      await stop();
+    }
     final List<CameraDescription> cameras = await availableCameras();
     if (cameras.isEmpty) {
       throw StateError('没有可用摄像头');
     }
-    final CameraDescription rear = cameras.firstWhere(
-      (CameraDescription c) => c.lensDirection == CameraLensDirection.back,
+    final CameraDescription chosen = cameras.firstWhere(
+      (CameraDescription c) => c.lensDirection == prefer,
       orElse: () => cameras.first,
     );
     final CameraController next = CameraController(
-      rear,
+      chosen,
       ResolutionPreset.medium,
       enableAudio: false,
       imageFormatGroup: ImageFormatGroup.jpeg,
