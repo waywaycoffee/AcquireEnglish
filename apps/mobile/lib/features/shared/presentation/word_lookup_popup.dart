@@ -27,6 +27,11 @@ class WordLookupPopupCard extends ConsumerStatefulWidget {
     this.showSide = false,
     this.showRight = false,
     this.maxHeight,
+    /// When false, never fall back to on-device / ad-hoc CosyVoice synthesis.
+    /// Reading books (绿野仙踪等) must stay on server book-voice packs only.
+    this.allowSynthesisFallback = true,
+    /// Optional host override (e.g. reading uses Aliyun book voice).
+    this.pronounceOverride,
     super.key,
   });
 
@@ -47,6 +52,8 @@ class WordLookupPopupCard extends ConsumerStatefulWidget {
   final bool showSide;
   final bool showRight;
   final double? maxHeight;
+  final bool allowSynthesisFallback;
+  final Future<void> Function(String text, {String language})? pronounceOverride;
 
   @override
   ConsumerState<WordLookupPopupCard> createState() =>
@@ -163,18 +170,26 @@ class _WordLookupPopupCardState extends ConsumerState<WordLookupPopupCard> {
     widget.onPronounce?.call();
 
     try {
-      final WordPronunciationService pronunciation = ref.read(
-        wordPronunciationServiceProvider,
-      );
-      await pronunciation.stop();
-      await pronunciation.speak(
-        text,
-        language: language,
-        recordedUrl:
-            language == 'en-US' && text.trim().toLowerCase() == entry?.word
-            ? entry?.audioUrl
-            : null,
-      );
+      final Future<void> Function(String text, {String language})? overrideSpeak =
+          widget.pronounceOverride;
+      if (overrideSpeak != null) {
+        await overrideSpeak(text, language: language);
+      } else {
+        final WordPronunciationService pronunciation = ref.read(
+          wordPronunciationServiceProvider,
+        );
+        await pronunciation.stop();
+        await pronunciation.speak(
+          text,
+          language: language,
+          recordedUrl:
+              language == 'en-US' && text.trim().toLowerCase() == entry?.word
+              ? entry?.audioUrl
+              : null,
+          allowSynthesisFallback: widget.allowSynthesisFallback,
+          forceCloud: !widget.allowSynthesisFallback,
+        );
+      }
     } on WordPronunciationException catch (error) {
       if (mounted) {
         _showMessage(error.message);

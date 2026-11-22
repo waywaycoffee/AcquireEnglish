@@ -1144,13 +1144,20 @@ class _ReadingReaderScreenState extends ConsumerState<ReadingReaderScreen> {
                   episodeId: doc.episodeId ?? 'reading:${doc.id}',
                   fallbackDefinitionCn: fallback.isEmpty ? null : fallback,
                   maxHeight: maxH,
+                  // Never let device/Edge/CosyVoice “偷跑”; reading uses book voice only.
+                  allowSynthesisFallback: false,
                   onClose: () => Navigator.pop(ctx),
-                  // Side-effect only: card already speaks via WordPronunciationService.
-                  // Calling _speakReading here doubled audio (CosyVoice + dictionary TTS).
                   onPronounce: () {
                     unawaited(
                       ref.read(wordPronunciationServiceProvider).stop(),
                     );
+                  },
+                  pronounceOverride: (String text, {String language = 'en-US'}) async {
+                    if (language.toLowerCase().startsWith('zh')) {
+                      // Chinese gloss: stay silent rather than OEM TTS.
+                      return;
+                    }
+                    await _speakReading(text);
                   },
                   onFavorite: (String? definitionCn) {
                     Navigator.pop(ctx);
@@ -1203,16 +1210,8 @@ class _ReadingReaderScreenState extends ConsumerState<ReadingReaderScreen> {
     }
     if (!mounted) return;
 
-    // Auto-speak when long-pressing a sentence.
-    unawaited(() async {
-      if (!mounted) return;
-      setState(() => _speakingSentence = true);
-      try {
-        await _speakReading(sentence);
-      } finally {
-        if (mounted) setState(() => _speakingSentence = false);
-      }
-    }());
+    // Do not auto-speak on long-press — that felt like “AI 语音偷跑”.
+    // User explicitly taps「朗读」below when they want audio.
 
     await showModalBottomSheet<void>(
       context: context,

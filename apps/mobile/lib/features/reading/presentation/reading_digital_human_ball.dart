@@ -194,6 +194,8 @@ class _ReadingCoachAskSheetState extends ConsumerState<ReadingCoachAskSheet> {
   bool _recordingActive = false;
   bool _busy = false;
   bool _greeted = false;
+  /// Default off: opening the sheet must not auto-play AI/TTS voice.
+  bool _coachVoiceEnabled = false;
   String _status = '按住麦克风提问';
   String? _error;
 
@@ -269,7 +271,10 @@ class _ReadingCoachAskSheetState extends ConsumerState<ReadingCoachAskSheet> {
         _greeted = true;
       });
       _scrollToEnd();
-      await _speakCoach(greet, settings);
+      // Never auto-play greeting voice (绿野仙踪等长篇打开伴读时最易“偷跑”).
+      if (_coachVoiceEnabled) {
+        await _speakCoach(greet, settings);
+      }
     } catch (error) {
       if (!mounted) return;
       setState(() {
@@ -282,7 +287,7 @@ class _ReadingCoachAskSheetState extends ConsumerState<ReadingCoachAskSheet> {
 
   Future<void> _speakCoach(String text, LearningSettingsState settings) async {
     final String spoken = text.trim();
-    if (spoken.isEmpty) return;
+    if (spoken.isEmpty || !_coachVoiceEnabled) return;
     final DigitalHumanPersona persona = settings.selectedDigitalHuman;
     try {
       final String? url = await _pipeline.synthesizeSpeech(
@@ -297,12 +302,12 @@ class _ReadingCoachAskSheetState extends ConsumerState<ReadingCoachAskSheet> {
         await ref.read(wordPronunciationServiceProvider).speak(
               spoken,
               recordedUrl: url,
+              allowSynthesisFallback: false,
             );
         return;
       }
     } catch (_) {}
-    if (!mounted) return;
-    await ref.read(wordPronunciationServiceProvider).speak(spoken);
+    // No device/OEM fallback — avoids “AI 语音偷跑”.
   }
 
   Future<void> _onHoldStart() async {
@@ -565,11 +570,13 @@ class _ReadingCoachAskSheetState extends ConsumerState<ReadingCoachAskSheet> {
     });
     _scrollToEnd();
 
+    if (!_coachVoiceEnabled) return;
     if (turn.ttsUrl != null && turn.ttsUrl!.isNotEmpty) {
       try {
         await ref.read(wordPronunciationServiceProvider).speak(
               shown,
               recordedUrl: turn.ttsUrl,
+              allowSynthesisFallback: false,
             );
         return;
       } catch (_) {}
@@ -627,6 +634,35 @@ class _ReadingCoachAskSheetState extends ConsumerState<ReadingCoachAskSheet> {
                         ),
                       ],
                     ),
+                  ),
+                  Column(
+                    children: <Widget>[
+                      Icon(
+                        _coachVoiceEnabled
+                            ? Icons.volume_up_rounded
+                            : Icons.volume_off_rounded,
+                        size: 18,
+                        color: const Color(0xFF6B6B76),
+                      ),
+                      Switch(
+                        materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                        value: _coachVoiceEnabled,
+                        onChanged: (bool v) {
+                          setState(() => _coachVoiceEnabled = v);
+                          if (!v) {
+                            unawaited(
+                              ref
+                                  .read(wordPronunciationServiceProvider)
+                                  .stop(),
+                            );
+                          }
+                        },
+                      ),
+                      const Text(
+                        '语音',
+                        style: TextStyle(fontSize: 10, color: Color(0xFF6B6B76)),
+                      ),
+                    ],
                   ),
                 ],
               ),
