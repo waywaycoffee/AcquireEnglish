@@ -137,19 +137,16 @@ void main() {
     expect(backTaps, 1);
   });
 
-  testWidgets('shadow controls overlay video bottom and remain tappable', (WidgetTester tester) async {
-    final LayerLink link = LayerLink();
+  testWidgets('shadow controls stay visible and remain tappable', (WidgetTester tester) async {
     await tester.pumpWidget(ProviderScope(child: MaterialApp(home: Scaffold(body: Column(children: <Widget>[
-      CompositedTransformTarget(link: link, child: const SizedBox(key: ValueKey<String>('video-target'), width: 320, height: 180)),
-      Expanded(child: StudyShadowingTab(toolbarLink: link, hasLine: true,
+      const SizedBox(key: ValueKey<String>('video-target'), width: 320, height: 180),
+      Expanded(child: StudyShadowingTab(hasLine: true,
         line: const PlayerSubtitleLine(startTime: '00:00', english: 'Hello', chinese: '你好', startMs: 0, endMs: 1000))),
     ])))));
     await tester.pump();
-    final Rect video = tester.getRect(find.byKey(const ValueKey<String>('video-target')));
-    final Rect row = tester.getRect(find.byKey(const ValueKey<String>('study-shadowing-control-row')));
-    expect(row.bottom, lessThanOrEqualTo(video.bottom));
-    expect(row.top, greaterThanOrEqualTo(video.top));
-    expect(row.width, lessThanOrEqualTo(video.width));
+    expect(find.byKey(const ValueKey<String>('study-shadowing-control-row')), findsOneWidget);
+    expect(find.byKey(const ValueKey<String>('study-shadowing-assess')), findsOneWidget);
+    expect(find.byTooltip('播放原声'), findsOneWidget);
     await tester.tap(find.byTooltip('跟读模式：看句读'));
     await tester.pumpAndSettle();
     expect(find.text('藏句读'), findsOneWidget);

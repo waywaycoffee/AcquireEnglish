@@ -202,7 +202,6 @@ class PadPortraitPlayerScreenState
   StreamSubscription<Tracks>? _videoTracksSubscription;
   bool _isMuted = false;
   double _volumeLevel = 1;
-  final LayerLink _shadowToolbarLink = LayerLink();
   /// Bound by [StudyShadowingTab] — mirrors the toolbar volume / 播放原声 action.
   VoidCallback? _shadowingPlayOriginal;
   bool _dubPlaybackActive = false;
@@ -3007,9 +3006,7 @@ Future<void> _settleChineseFillIfAlreadyPresent() async {
                       padding: EdgeInsets.symmetric(
                         horizontal: playerHorizontalPadding,
                       ),
-                      child: CompositedTransformTarget(
-                        link: _shadowToolbarLink,
-                        child: PlayerVideoPanel(
+                      child: PlayerVideoPanel(
                         episodeId: widget.episodeId,
                         showSceneHeader: false,
                           hideOverlayControls: true,
@@ -3104,7 +3101,6 @@ Future<void> _settleChineseFillIfAlreadyPresent() async {
                         onGenerateAiSubtitles: _generatingAiSubtitles
                             ? null
                             : _handleGenerateAiSubtitles,
-                        ),
                       ),
                     ),
                     ),
@@ -3134,7 +3130,7 @@ Future<void> _settleChineseFillIfAlreadyPresent() async {
                             return;
                           }
                           if (tab == StudyModeTab.shadowing) {
-                            _enterShadowingMode(showToast: false);
+                            _enterShadowingMode();
                             return;
                           }
                           setState(() {
@@ -3406,7 +3402,6 @@ Future<void> _settleChineseFillIfAlreadyPresent() async {
             ? _selectPronunciationForLine(state.activeLineIndex)
             : visibleAssessment;
         return StudyShadowingTab(
-          toolbarLink: _shadowToolbarLink,
           // Pin the practice cue — never use visibleLine (null at sentence end).
           line: state.hasLines ? state.activeLine : activeLine,
           hasLine: state.hasLines,
@@ -3793,7 +3788,7 @@ Future<void> _settleChineseFillIfAlreadyPresent() async {
     _applyPlaybackMode();
   }
 
-  void _enterShadowingMode({bool showToast = true}) {
+  void _enterShadowingMode() {
     setState(() {
       state.isShadowing = true;
       if (!state.pauseAtSentenceEnd) {
@@ -3802,9 +3797,6 @@ Future<void> _settleChineseFillIfAlreadyPresent() async {
       _studyTab = StudyModeTab.shadowing;
       _hardsubMosaicEnabled = false;
     });
-    if (showToast) {
-      _showMessage('已进入跟读：句末暂停已开 · 停录后自动评分');
-    }
   }
 
   void _handleToggleShadowing() {
