@@ -2,9 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../digital_human/presentation/digital_human_coach_screen.dart';
 import '../domain/course_plan.dart';
 import '../domain/oral_core_series.dart';
+import 'source_coach_lesson_preview.dart';
 import 'course_plan_provider.dart';
 import 'course_unit_quiz_screen.dart';
 import 'daily_path_runner.dart';
@@ -201,21 +201,17 @@ class CourseUnitSessionScreen extends ConsumerWidget {
             const SizedBox(height: 12),
             OutlinedButton.icon(
               onPressed: () {
-                final String prompt = unit.discussPrompts.isNotEmpty
-                    ? unit.discussPrompts.first
-                    : '用本课句型聊一聊「${unit.topic}」。';
-                final String excerpt = <String>[
+                final List<String> sourceLines = <String>[
                   ...unit.shadowLines,
                   ...unit.sentences,
-                  ...unit.targetPhrases,
-                ].where((String s) => s.trim().isNotEmpty).take(12).join('\n');
+                ].where((String s) => s.trim().isNotEmpty).toList();
                 Navigator.of(context).push(
                   MaterialPageRoute<void>(
-                    builder: (_) => DigitalHumanCoachScreen(
-                      lessonTitle: unit.topic,
-                      lessonText: '$prompt\n\n$excerpt',
-                      practiceRole: 'learner',
-                      initialScenarioId: 'video_line',
+                    builder: (_) => SourceCoachLessonPreview(
+                      sourceTitle: plan.title,
+                      topic: unit.topic,
+                      sourceLines: sourceLines,
+                      isVideo: isVideo,
                     ),
                   ),
                 );
