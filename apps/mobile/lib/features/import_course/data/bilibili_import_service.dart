@@ -1213,7 +1213,10 @@ class BilibiliImportService {
     final bool secondaryPage = (page ?? 1) > 1 ||
         BilibiliImport.idKeyIsSecondaryPage(pathKey);
     final List<String> probes = <String>[];
-    if (pathKey != null && pathKey.isNotEmpty) {
+    // A watch URL with ?p=2 yields a bare BV from idKeyFromPath. Never probe
+    // that unscoped key before the page-specific cache entry.
+    if (pathKey != null && pathKey.isNotEmpty &&
+        (!secondaryPage || BilibiliImport.idKeyIsSecondaryPage(pathKey))) {
       probes.add(pathKey);
     }
     if (secondaryPage) {
