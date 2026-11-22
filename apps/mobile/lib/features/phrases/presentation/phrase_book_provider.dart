@@ -280,6 +280,32 @@ class PhraseBookNotifier extends Notifier<List<PhraseEntry>> {
     unawaited(ref.read(phraseSyncServiceProvider).pushEntry(created));
   }
 
+  /// Whether this subtitle cue is already in the phrase book.
+  bool containsLine({
+    required String english,
+    required String time,
+    String? episodeId,
+  }) {
+    final String en = english.trim().toLowerCase();
+    final String t = time.trim();
+    if (en.isEmpty || t.isEmpty) {
+      return false;
+    }
+    return state.any((PhraseEntry item) {
+      if (item.archived) {
+        return false;
+      }
+      if (episodeId != null &&
+          episodeId.isNotEmpty &&
+          (item.episodeId ?? '').isNotEmpty &&
+          item.episodeId != episodeId) {
+        return false;
+      }
+      final String itemTime = (item.startTime ?? item.time).trim();
+      return item.english.trim().toLowerCase() == en && itemTime == t;
+    });
+  }
+
   bool addPhraseIfMissing({
     required String english,
     required String chinese,

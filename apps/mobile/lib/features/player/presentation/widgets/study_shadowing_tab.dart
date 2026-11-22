@@ -97,6 +97,8 @@ class StudyShadowingTab extends ConsumerStatefulWidget {
     this.onDubPlaybackRequested,
     this.onExportShareRequested,
     this.onUpgradeToCoach,
+    this.isSentenceBookmarked = false,
+    this.onBookmarkSentence,
     super.key,
   });
 
@@ -117,6 +119,10 @@ class StudyShadowingTab extends ConsumerStatefulWidget {
 
   /// Promote the current line into AI oral-coach dialogue (P1).
   final VoidCallback? onUpgradeToCoach;
+
+  /// Favorite current sentence into the phrase book.
+  final bool isSentenceBookmarked;
+  final VoidCallback? onBookmarkSentence;
 
   /// Called when recording starts. [pauseVideo] is false for shadow mode
   /// (play reference while recording) and true for look/hide modes.
@@ -1157,26 +1163,55 @@ class _StudyShadowingTabState extends ConsumerState<StudyShadowingTab> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: <Widget>[
-                    if (_promptMode == ShadowPromptMode.hide)
-                      Align(
-                        alignment: Alignment.centerRight,
-                        child: TextButton(
-                          key: const ValueKey<String>('study-shadowing-peek'),
-                          style: TextButton.styleFrom(
-                            visualDensity: VisualDensity.compact,
-                            padding: EdgeInsets.zero,
-                          ),
-                          onPressed: () {
-                            setState(
-                              () => _peekHiddenSentence = !_peekHiddenSentence,
-                            );
-                          },
-                          child: Text(
-                            _peekHiddenSentence ? '重新隐藏' : '偷看一句',
-                            style: TextStyle(fontSize: 12, color: shell.accent),
-                          ),
+                    Row(
+                      children: <Widget>[
+                        Expanded(
+                          child: _promptMode == ShadowPromptMode.hide
+                              ? Align(
+                                  alignment: Alignment.centerRight,
+                                  child: TextButton(
+                                    key: const ValueKey<String>(
+                                      'study-shadowing-peek',
+                                    ),
+                                    style: TextButton.styleFrom(
+                                      visualDensity: VisualDensity.compact,
+                                      padding: EdgeInsets.zero,
+                                    ),
+                                    onPressed: () {
+                                      setState(
+                                        () => _peekHiddenSentence =
+                                            !_peekHiddenSentence,
+                                      );
+                                    },
+                                    child: Text(
+                                      _peekHiddenSentence ? '重新隐藏' : '偷看一句',
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        color: shell.accent,
+                                      ),
+                                    ),
+                                  ),
+                                )
+                              : const SizedBox.shrink(),
                         ),
-                      ),
+                        if (widget.onBookmarkSentence != null)
+                          IconButton(
+                            tooltip: widget.isSentenceBookmarked
+                                ? '已收藏句子'
+                                : '收藏句子',
+                            onPressed: widget.onBookmarkSentence,
+                            visualDensity: VisualDensity.compact,
+                            icon: Icon(
+                              widget.isSentenceBookmarked
+                                  ? Icons.favorite_rounded
+                                  : Icons.favorite_border_rounded,
+                              color: widget.isSentenceBookmarked
+                                  ? shell.favorite
+                                  : shell.textSecondary,
+                            ),
+                          ),
+                      ],
+                    ),
                     if (showEnglish)
                       Text(
                         widget.line.english,

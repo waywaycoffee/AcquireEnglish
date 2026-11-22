@@ -26,6 +26,7 @@ class PlayerTranscriptPanel extends StatefulWidget {
     this.onCollectWordAtTime,
     this.onFavoriteWord,
     required this.onBookmarkLine,
+    this.isLineBookmarked,
     required this.onLoopFromLine,
     required this.onDictationLine,
     required this.onAiExplain,
@@ -88,6 +89,7 @@ class PlayerTranscriptPanel extends StatefulWidget {
   final void Function(String word, String time)? onCollectWordAtTime;
   final void Function(String word, [String? definitionCn])? onFavoriteWord;
   final ValueChanged<int> onBookmarkLine;
+  final bool Function(int index)? isLineBookmarked;
   final ValueChanged<int> onLoopFromLine;
   final ValueChanged<int> onDictationLine;
   final ValueChanged<int> onAiExplain;
@@ -159,6 +161,7 @@ class _PlayerTranscriptPanelState extends State<PlayerTranscriptPanel> {
       onFavoriteWord: widget.onFavoriteWord,
       onTapLine: widget.onTapLine,
       onBookmarkLine: widget.onBookmarkLine,
+      isLineBookmarked: widget.isLineBookmarked,
       onLoopFromLine: widget.onLoopFromLine,
       onDictationLine: widget.onDictationLine,
       onAiExplain: widget.onAiExplain,

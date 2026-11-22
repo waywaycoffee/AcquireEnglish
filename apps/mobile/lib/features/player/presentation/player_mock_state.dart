@@ -403,12 +403,28 @@ class PlayerMockState {
     return true;
   }
 
+  /// Extra audio after subtitle endMs so the last word is not cut off.
+  static const int sentenceEndPauseGraceMs = 1000;
+
+  /// Pause point = subtitle end + grace, capped at the next line start.
+  int videoPauseAtMsForLine(int index) {
+    final int end = videoEndMsForLine(index);
+    final int withGrace = end + sentenceEndPauseGraceMs;
+    if (index + 1 < lines.length) {
+      final int nextStart = videoStartMsForLine(index + 1);
+      if (nextStart > end) {
+        return min(withGrace, nextStart);
+      }
+    }
+    return withGrace;
+  }
+
   /// Returns true when playback should pause at the current sentence end.
   bool shouldPauseAtSentenceEnd(int milliseconds) {
     if (!pauseAtSentenceEnd || isLooping || !hasLines) {
       return false;
     }
-    return milliseconds >= videoEndMsForLine(activeLineIndex);
+    return milliseconds >= videoPauseAtMsForLine(activeLineIndex);
   }
 
   void togglePauseAtSentenceEnd() {

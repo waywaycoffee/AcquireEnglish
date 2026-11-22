@@ -52,6 +52,7 @@ class PlayerFullscreenVideoScreen extends StatefulWidget {
     this.onCollectWordAtTime,
     this.onFavoriteWord,
     this.onBookmarkLine = _ignoreLine,
+    this.isLineBookmarked,
     this.onLoopFromLine = _ignoreLine,
     this.onDictationLine = _ignoreLine,
     this.onAiExplain = _ignoreLine,
@@ -113,6 +114,7 @@ class PlayerFullscreenVideoScreen extends StatefulWidget {
   final void Function(String word, String time)? onCollectWordAtTime;
   final void Function(String word, [String? definitionCn])? onFavoriteWord;
   final ValueChanged<int> onBookmarkLine;
+  final bool Function(int index)? isLineBookmarked;
   final ValueChanged<int> onLoopFromLine;
   final ValueChanged<int> onDictationLine;
   final ValueChanged<int> onAiExplain;
@@ -450,6 +452,7 @@ class _PlayerFullscreenVideoScreenState
               onCollectWordAtTime: widget.onCollectWordAtTime,
               onFavoriteWord: widget.onFavoriteWord,
               onBookmarkLine: widget.onBookmarkLine,
+              isLineBookmarked: widget.isLineBookmarked,
               onLoopFromLine: (int index) =>
                   _refresh(() => widget.onLoopFromLine(index)),
               onDictationLine: widget.onDictationLine,
@@ -512,6 +515,7 @@ class _FullscreenSubtitlePanel extends StatelessWidget {
     this.onCollectWordAtTime,
     this.onFavoriteWord,
     required this.onBookmarkLine,
+    this.isLineBookmarked,
     required this.onLoopFromLine,
     required this.onDictationLine,
     required this.onAiExplain,
@@ -544,6 +548,7 @@ class _FullscreenSubtitlePanel extends StatelessWidget {
   final void Function(String word, String time)? onCollectWordAtTime;
   final void Function(String word, [String? definitionCn])? onFavoriteWord;
   final ValueChanged<int> onBookmarkLine;
+  final bool Function(int index)? isLineBookmarked;
   final ValueChanged<int> onLoopFromLine;
   final ValueChanged<int> onDictationLine;
   final ValueChanged<int> onAiExplain;
@@ -592,6 +597,7 @@ class _FullscreenSubtitlePanel extends StatelessWidget {
           onCollectWordAtTime: onCollectWordAtTime,
           onFavoriteWord: onFavoriteWord,
           onBookmarkLine: onBookmarkLine,
+          isLineBookmarked: isLineBookmarked,
           onLoopFromLine: onLoopFromLine,
           onDictationLine: onDictationLine,
           onAiExplain: onAiExplain,

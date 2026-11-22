@@ -278,7 +278,6 @@ class PadPortraitPlayerScreenState
   HardsubMosaicBand _hardsubMosaicBand = const HardsubMosaicBand();
   bool _oralCoachOpen = false;
   bool _pausedForLookup = false;
-  bool _episodeFavorited = false;
   bool _blindListening = false;
   StudyLoopSettings _loopSettings = const StudyLoopSettings();
   int _loopCompleted = 0;
@@ -2513,24 +2512,24 @@ Future<void> _settleChineseFillIfAlreadyPresent() async {
       return;
     }
 
-    // 句末暂停 / 跟读：先卡在当前句，禁止 sync 跳到下一句（可能无英文）。
+    // 句末暂停 / 跟读：听完末词（含宽限）后停在句首，方便影子跟读再开口。
     if (wasPlaying &&
         state.pauseAtSentenceEnd &&
         state.hasLines &&
         !state.isLooping &&
-        position.inMilliseconds >=
-            state.videoEndMsForLine(state.activeLineIndex)) {
-      final Duration end = Duration(
-        milliseconds: state.videoEndMsForLine(state.activeLineIndex),
+        state.shouldPauseAtSentenceEnd(position.inMilliseconds)) {
+      final int lineIndex = state.activeLineIndex;
+      final Duration start = Duration(
+        milliseconds: state.videoStartMsForLine(lineIndex),
       );
       setState(() {
-        _videoPosition = end;
-        state.positionMs = end.inMilliseconds;
+        _videoPosition = start;
+        state.positionMs = start.inMilliseconds;
         state.isPlaying = false;
       });
       PlayerSystemMediaControls.updatePlaybackState(isPlaying: false);
       unawaited(_videoPlayer?.pause());
-      unawaited(_videoPlayer?.seek(end));
+      unawaited(_videoPlayer?.seek(start));
       return;
     }
 
@@ -3030,6 +3029,8 @@ Future<void> _settleChineseFillIfAlreadyPresent() async {
     final LibraryEpisodeItem? episode = courseContext.episode;
     final LearningSettingsState settings = ref.watch(learningSettingsProvider);
     final bool bingeMode = settings.isBingeWatchMode;
+    // Rebuild hearts when phrase book changes.
+    ref.watch(phraseBookProvider);
     final Set<String> savedVocabularyWords =
         SubtitleVocabularyHighlight.savedWordsFromBook(
           ref.watch(wordBookProvider),
@@ -3086,7 +3087,7 @@ Future<void> _settleChineseFillIfAlreadyPresent() async {
                 }
                 context.go(libraryDetailUri.toString());
               },
-              isFavorite: _episodeFavorited,
+              isFavorite: state.hasLines && _isLineBookmarked(state.activeLineIndex),
               onFavorite: () => _handleToggleEpisodeFavorite(courseContext),
               onEnableCourseMode: () {
                 unawaited(
@@ -3406,6 +3407,7 @@ Future<void> _settleChineseFillIfAlreadyPresent() async {
             onFavoriteWord: _handleFavoriteWord,
             onBookmarkLine: (int index) =>
                 _handleBookmarkLine(index, courseContext),
+            isLineBookmarked: _isLineBookmarked,
             onLoopFromLine: _handleLoopFromLine,
             onDictationLine: _handleDictationLine,
             onAiExplain: _handleAiExplain,
@@ -3549,6 +3551,11 @@ Future<void> _settleChineseFillIfAlreadyPresent() async {
           onUpgradeToCoach: () {
             setState(() => _studyTab = StudyModeTab.coach);
           },
+          isSentenceBookmarked:
+              state.hasLines && _isLineBookmarked(state.activeLineIndex),
+          onBookmarkSentence: state.hasLines
+              ? () => _handleBookmarkLine(state.activeLineIndex, courseContext)
+              : null,
           episodeId: widget.episodeId,
           videoSource: _localPlayableVideoPath(),
           onRecordingStarted: ({required bool pauseVideo}) {
@@ -3967,7 +3974,18 @@ Future<void> _settleChineseFillIfAlreadyPresent() async {
       return;
     }
     _handleBookmarkLine(state.activeLineIndex, courseContext);
-    setState(() => _episodeFavorited = true);
+  }
+
+  bool _isLineBookmarked(int index) {
+    if (!state.hasLines || index < 0 || index >= state.lines.length) {
+      return false;
+    }
+    final PlayerSubtitleLine line = state.lines[index];
+    return ref.read(phraseBookProvider.notifier).containsLine(
+          english: line.english,
+          time: line.startTime,
+          episodeId: widget.episodeId,
+        );
   }
 
   void _handleOpenSpeedSheet() {
@@ -5037,6 +5055,7 @@ Future<void> _settleChineseFillIfAlreadyPresent() async {
     final PlayerSubtitleLine line = state.lines[index];
     final LibraryCourseData? course = courseContext.course;
     final LibraryEpisodeItem? episode = courseContext.episode;
+    // Sentence favorite → phrase book only. Do not explode into word favorites.
     final bool addedPhrase = ref
         .read(phraseBookProvider.notifier)
         .addPhraseIfMissing(
@@ -5049,23 +5068,12 @@ Future<void> _settleChineseFillIfAlreadyPresent() async {
           episodeId: episode?.id,
           endTime: _formatTimestamp(line.endMs),
         );
-    // Also try 句型词卡 when the line is a short English pattern.
-    final bool addedCard = _favoriteLexemeToWordCard(
-      line.english,
-      line: line,
-      courseContext: courseContext,
-      cardKind: VocabCardKind.pattern,
-    );
-    if (addedPhrase || addedCard) {
+    if (addedPhrase) {
       ref.read(learningActivityProvider.notifier).recordSentenceSaved();
     }
-    if (addedCard) {
-      _showMessage('已收藏句型到单词本');
-    } else {
-      _showMessage(
-        addedPhrase ? '成功收藏当前句型到短语库！' : '该例句已经在您的短语库中！',
-      );
-    }
+    _showMessage(
+      addedPhrase ? '已收藏句子到短语库' : '该句子已在短语库中',
+    );
   }
 
   void _handleCollectWord(
@@ -5414,6 +5422,7 @@ Future<void> _settleChineseFillIfAlreadyPresent() async {
             onFavoriteWord: _handleFavoriteWord,
             onBookmarkLine: (int index) =>
                 _handleBookmarkLine(index, courseContext),
+            isLineBookmarked: _isLineBookmarked,
             onLoopFromLine: _handleLoopFromLine,
             onDictationLine: _handleDictationLine,
             onAiExplain: _handleAiExplain,

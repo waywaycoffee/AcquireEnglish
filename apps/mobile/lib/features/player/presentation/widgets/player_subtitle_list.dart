@@ -47,6 +47,7 @@ class PlayerSubtitleList extends StatefulWidget {
     this.onCollectWordAtTime,
     this.onFavoriteWord,
     required this.onBookmarkLine,
+    this.isLineBookmarked,
     required this.onLoopFromLine,
     required this.onDictationLine,
     required this.onAiExplain,
@@ -115,6 +116,7 @@ class PlayerSubtitleList extends StatefulWidget {
   final void Function(String word, String time)? onCollectWordAtTime;
   final void Function(String word, [String? definitionCn])? onFavoriteWord;
   final ValueChanged<int> onBookmarkLine;
+  final bool Function(int index)? isLineBookmarked;
   final ValueChanged<int> onLoopFromLine;
   final ValueChanged<int> onDictationLine;
   final ValueChanged<int> onAiExplain;
@@ -1282,20 +1284,34 @@ class _PlayerSubtitleListState extends State<PlayerSubtitleList> {
                                       size: 20,
                                     ),
                                   ),
-                                IconButton(
-                                  onPressed: () =>
-                                      widget.onBookmarkLine(originalIndex),
-                                  visualDensity: VisualDensity.compact,
-                                  padding: EdgeInsets.zero,
-                                  constraints: const BoxConstraints(
-                                    minWidth: 36,
-                                    minHeight: 36,
-                                  ),
-                                  icon: Icon(
-                                    Icons.favorite_border_rounded,
-                                    color: shell.textSecondary,
-                                    size: 20,
-                                  ),
+                                Builder(
+                                  builder: (BuildContext context) {
+                                    final bool bookmarked =
+                                        widget.isLineBookmarked?.call(
+                                              originalIndex,
+                                            ) ??
+                                            false;
+                                    return IconButton(
+                                      tooltip: bookmarked ? '已收藏句子' : '收藏句子',
+                                      onPressed: () =>
+                                          widget.onBookmarkLine(originalIndex),
+                                      visualDensity: VisualDensity.compact,
+                                      padding: EdgeInsets.zero,
+                                      constraints: const BoxConstraints(
+                                        minWidth: 36,
+                                        minHeight: 36,
+                                      ),
+                                      icon: Icon(
+                                        bookmarked
+                                            ? Icons.favorite_rounded
+                                            : Icons.favorite_border_rounded,
+                                        color: bookmarked
+                                            ? shell.favorite
+                                            : shell.textSecondary,
+                                        size: 20,
+                                      ),
+                                    );
+                                  },
                                 ),
                               ],
                             ),
@@ -1403,22 +1419,39 @@ class _PlayerSubtitleListState extends State<PlayerSubtitleList> {
                                   child: const Icon(Icons.repeat_one_rounded),
                                 ),
                                 const SizedBox(width: 6),
-                                FilledButton.tonal(
-                                  onPressed: () =>
-                                      widget.onBookmarkLine(originalIndex),
-                                  style: FilledButton.styleFrom(
-                                    backgroundColor: const Color(0xFFFFF7D6),
-                                    foregroundColor: const Color(0xFFB58600),
-                                    minimumSize: const Size(44, 44),
-                                    fixedSize: const Size(44, 44),
-                                    padding: EdgeInsets.zero,
-                                    tapTargetSize:
-                                        MaterialTapTargetSize.shrinkWrap,
-                                    shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(16),
-                                    ),
-                                  ),
-                                  child: const Icon(Icons.favorite_border_rounded),
+                                Builder(
+                                  builder: (BuildContext context) {
+                                    final bool bookmarked =
+                                        widget.isLineBookmarked?.call(
+                                              originalIndex,
+                                            ) ??
+                                            false;
+                                    return FilledButton.tonal(
+                                      onPressed: () =>
+                                          widget.onBookmarkLine(originalIndex),
+                                      style: FilledButton.styleFrom(
+                                        backgroundColor: bookmarked
+                                            ? const Color(0xFFFFE0E0)
+                                            : const Color(0xFFFFF7D6),
+                                        foregroundColor: bookmarked
+                                            ? const Color(0xFFC62828)
+                                            : const Color(0xFFB58600),
+                                        minimumSize: const Size(44, 44),
+                                        fixedSize: const Size(44, 44),
+                                        padding: EdgeInsets.zero,
+                                        tapTargetSize:
+                                            MaterialTapTargetSize.shrinkWrap,
+                                        shape: RoundedRectangleBorder(
+                                          borderRadius: BorderRadius.circular(16),
+                                        ),
+                                      ),
+                                      child: Icon(
+                                        bookmarked
+                                            ? Icons.favorite_rounded
+                                            : Icons.favorite_border_rounded,
+                                      ),
+                                    );
+                                  },
                                 ),
                                 const SizedBox(width: 6),
                                 if (widget.onEditSubtitleLine !=

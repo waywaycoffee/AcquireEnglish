@@ -9,12 +9,16 @@ enum SubtitleVocabMark { none, key, saved, learned }
 class SubtitleVocabularyHighlight {
   const SubtitleVocabularyHighlight._();
 
-  /// Only favorited words get inline tint — not every fresh/learning entry.
+  /// Only favorited **single words** get inline tint.
+  /// Phrase / pattern cards must not paint every token in the sentence.
   static Set<String> savedWordsFromBook(List<WordEntry> entries) {
     return entries
-        .where((WordEntry entry) => entry.favorite)
+        .where(
+          (WordEntry entry) =>
+              entry.favorite && entry.kind == VocabCardKind.word,
+        )
         .map((WordEntry entry) => normalizeWord(entry.word))
-        .where((String word) => word.length >= 2)
+        .where((String word) => word.length >= 2 && !word.contains(' '))
         .toSet();
   }
 
