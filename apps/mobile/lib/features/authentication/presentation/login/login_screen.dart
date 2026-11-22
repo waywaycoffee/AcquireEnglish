@@ -98,19 +98,6 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
         child: ListView(
           padding: const EdgeInsets.fromLTRB(24, 8, 24, 28),
           children: <Widget>[
-            Align(
-              alignment: Alignment.centerLeft,
-              child: IconButton(
-                onPressed: () => context.go(SGRoute.home.route),
-                style: IconButton.styleFrom(
-                  backgroundColor: AppDesignTokens.appWhite,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(14),
-                  ),
-                ),
-                icon: const Icon(Icons.close_rounded),
-              ),
-            ),
             const SizedBox(height: 8),
             Center(
               child: Image.asset(
@@ -277,18 +264,6 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   style: TextStyle(
                     color: AppDesignTokens.primaryBlueDark,
                     fontWeight: FontWeight.w800,
-                  ),
-                ),
-              ),
-            ),
-            Center(
-              child: TextButton(
-                onPressed: () => context.go(SGRoute.home.route),
-                child: Text(
-                  '先逛逛，稍后再登录',
-                  style: TextStyle(
-                    color: AppDesignTokens.textSecondary,
-                    fontWeight: FontWeight.w600,
                   ),
                 ),
               ),

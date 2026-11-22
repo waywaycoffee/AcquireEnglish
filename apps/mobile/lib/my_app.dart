@@ -11,12 +11,10 @@ import 'package:hive_ce/hive.dart';
 import 'config/theme/theme_logic.dart';
 import 'config/theme/theme_ui_model.dart';
 import 'features/authentication/presentation/auth_session.dart';
-import 'features/authentication/presentation/ensure_default_account.dart';
 import 'features/idle_jobs/idle_job_drain.dart';
 import 'features/idle_jobs/idle_job_queue.dart';
 import 'features/idle_jobs/idle_job_scheduler.dart';
 import 'features/import_course/data/bilibili_multipage.dart';
-import 'features/import_course/presentation/video_download_progress_host.dart';
 import 'features/import_course/presentation/video_download_progress_host.dart';
 import 'features/library/presentation/library_catalog_provider.dart';
 import 'features/library/presentation/library_mock_data.dart';
@@ -55,13 +53,9 @@ class _MyAppState extends ConsumerState<MyApp> with WidgetsBindingObserver {
     // Re-assert portrait after first frame — Xiaomi can ignore early boot calls.
     WidgetsBinding.instance.addPostFrameCallback((_) {
       ensureDefaultPortraitOrientation();
-      // Default to weiwei so personal watch-url + subtitle assets sync.
-      unawaited(() async {
-        final bool signedIn = await ensureDefaultAccountSignIn(ref);
-        if (!signedIn && ref.read(authSessionProvider).isLoggedIn) {
-          unawaited(syncCloudCatalogAndFeed(ref));
-        }
-      }());
+      if (ref.read(authSessionProvider).isLoggedIn) {
+        unawaited(syncCloudCatalogAndFeed(ref));
+      }
       // Prefetch ~3 default free-trial items per module into local cache.
       unawaited(ref.read(freeTrialSeedBootstrapProvider.future));
       // Touch status provider so library course UI can show fill progress.

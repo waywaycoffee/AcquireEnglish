@@ -25,6 +25,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
+import '../features/authentication/presentation/auth_session.dart';
 import '../features/authentication/presentation/legal/user_agreement_screen.dart';
 import '../features/authentication/presentation/login/login_screen.dart';
 import '../features/authentication/presentation/login/phone_login_screen.dart';
@@ -125,13 +126,18 @@ bool _isAuthOrLegalPath(String location) {
 }
 
 @riverpod
-GoRouter goRouter(Ref ref) => GoRouter(
-  initialLocation: readOnboardingCompletedSync()
-      ? SGRoute.home.route
-      : '/onboarding',
+GoRouter goRouter(Ref ref) {
+  final bool signedIn = ref.watch(authSessionProvider).isLoggedIn;
+  return GoRouter(
+  initialLocation: !signedIn
+      ? SGRoute.login.route
+      : (readOnboardingCompletedSync() ? SGRoute.home.route : '/onboarding'),
   redirect: (BuildContext context, GoRouterState state) {
     final bool done = readOnboardingCompletedSync();
     final String loc = state.matchedLocation;
+    if (!signedIn && !_isAuthOrLegalPath(loc)) {
+      return SGRoute.login.route;
+    }
     final bool onOnboarding = loc == '/onboarding';
     if (!done && !onOnboarding && !_isAuthOrLegalPath(loc)) {
       return '/onboarding';
@@ -589,7 +595,8 @@ GoRouter goRouter(Ref ref) => GoRouter(
       },
     ).fade(),
   ],
-);
+  );
+}
 
 LibraryScreenView _parseLibraryView(String value) {
   if (value == 'import') {
