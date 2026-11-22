@@ -22,6 +22,10 @@ from app.services import reading_speech_cache as rsc
 _DOC_SAFE = re.compile(r"[^a-zA-Z0-9_\-]+")
 MAX_SENTENCES = 120
 MAX_SENTENCE_CHARS = 1800
+# Keep in sync with apps/mobile kReadingInteractivePageChars.
+PAGE_CHARS = 1800
+# Long-novel gate (word forms) — short articles skip book prep.
+LONG_NOVEL_MIN_WORDS = 12000
 
 
 def _db_path() -> Path:
@@ -49,6 +53,18 @@ def connection():
       requesters TEXT NOT NULL DEFAULT '[]',
       updated REAL NOT NULL,
       UNIQUE(doc_id, voice, page_index)
+    )"""
+    )
+    db.execute(
+        """CREATE TABLE IF NOT EXISTS book_jobs (
+      doc_id TEXT NOT NULL,
+      voice TEXT NOT NULL,
+      pages_total INTEGER NOT NULL,
+      text_hash TEXT,
+      state TEXT NOT NULL DEFAULT 'queued',
+      error TEXT,
+      updated REAL NOT NULL,
+      PRIMARY KEY(doc_id, voice)
     )"""
     )
     try:
@@ -84,6 +100,78 @@ def split_sentences(text: str) -> list[str]:
         if len(out) >= MAX_SENTENCES:
             break
     return out
+
+
+def split_reading_pages(text: str, max_chars: int = PAGE_CHARS) -> list[str]:
+    """Mirror Flutter ``splitReadingPages`` so packs align with the reader."""
+    trimmed = (text or "").replace("\r\n", "\n").strip()
+    if not trimmed:
+        return [""]
+    if len(trimmed) <= max_chars:
+        return [trimmed]
+    by_heading = re.split(
+        r"\n(?=(?:Chapter|CHAPTER|Part|PART|第[一二三四五六七八九十百零〇两\d]+[章节回幕])\b)",
+        trimmed,
+    )
+    chunks: list[str] = []
+    buf: list[str] = []
+
+    def flush() -> None:
+        piece = "\n\n".join(buf).strip() if buf else ""
+        if piece:
+            chunks.append(piece)
+        buf.clear()
+
+    def append_block(block: str) -> None:
+        piece = (block or "").strip()
+        if not piece:
+            return
+        if not buf:
+            buf.append(piece)
+            return
+        current = "\n\n".join(buf)
+        if len(current) + 2 + len(piece) <= max_chars:
+            buf.append(piece)
+            return
+        flush()
+        if len(piece) <= max_chars:
+            buf.append(piece)
+            return
+        start = 0
+        while start < len(piece):
+            end = min(start + max_chars, len(piece))
+            if end < len(piece):
+                para = piece.rfind("\n\n", start, end)
+                sent = -1
+                for i in range(end - 1, start + max_chars // 3, -1):
+                    if piece[i] in ".!?。！？":
+                        sent = i + 1
+                        break
+                cut = (
+                    para
+                    if para > start + max_chars // 3
+                    else (sent if sent > start + max_chars // 3 else end)
+                )
+                end = cut
+            chunk = piece[start:end].strip()
+            if chunk:
+                chunks.append(chunk)
+            start = end
+            while start < len(piece) and piece[start] in "\n ":
+                start += 1
+
+    for block in by_heading:
+        append_block(block)
+    flush()
+    return chunks or [trimmed]
+
+
+def word_count(text: str) -> int:
+    return len(re.findall(r"[A-Za-z]+(?:['’-][A-Za-z]+)*", text or ""))
+
+
+def is_long_novel(text: str) -> bool:
+    return word_count(text) >= LONG_NOVEL_MIN_WORDS
 
 
 def _requesters(row) -> list[int]:
@@ -414,3 +502,147 @@ def load_shared_pack(*, doc_id: str, voice: str, page_index: int) -> dict | None
         return json.loads(path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError):
         return None
+
+
+def _page_ready(*, doc_id: str, voice: str, page_index: int) -> bool:
+    pack = load_shared_pack(doc_id=doc_id, voice=voice, page_index=page_index)
+    if pack is None:
+        return False
+    sentences = pack.get("sentences") if isinstance(pack, dict) else None
+    if not isinstance(sentences, list) or not sentences:
+        return False
+    return all(isinstance(s, dict) and s.get("ready") for s in sentences)
+
+
+def enqueue_book(
+    *,
+    doc_id: str,
+    voice: str,
+    text: str,
+    user_id: int | None = None,
+) -> dict:
+    """Split a long novel into pages and queue each for 5060 Ti / ECS TTS."""
+    doc = (doc_id or "").strip()
+    if not doc:
+        raise ValueError("doc_id required")
+    voice_id = (voice or "").strip() or "longanfengyue"
+    pages = split_reading_pages(text)
+    if not pages or (len(pages) == 1 and not pages[0].strip()):
+        raise ValueError("empty book text")
+    text_hash = rsc.speech_hash(text[:8000], voice=voice_id, language="en")
+    job_ids: list[str] = []
+    for index, page in enumerate(pages):
+        job = enqueue(
+            doc_id=doc,
+            voice=voice_id,
+            page_index=index,
+            text=page,
+            user_id=user_id,
+        )
+        job_ids.append(str(job.get("id") or ""))
+    now = time.time()
+    with connection() as db:
+        db.execute(
+            "INSERT INTO book_jobs(doc_id,voice,pages_total,text_hash,state,error,updated) "
+            "VALUES(?,?,?,?,?,?,?) "
+            "ON CONFLICT(doc_id,voice) DO UPDATE SET "
+            "pages_total=excluded.pages_total, text_hash=excluded.text_hash, "
+            "state='queued', error=NULL, updated=excluded.updated",
+            (doc, voice_id, len(pages), text_hash, "queued", None, now),
+        )
+    return book_status(doc_id=doc, voice=voice_id)
+
+
+def book_status(*, doc_id: str, voice: str) -> dict:
+    doc = (doc_id or "").strip()
+    voice_id = (voice or "").strip() or "longanfengyue"
+    with connection() as db:
+        book = db.execute(
+            "SELECT * FROM book_jobs WHERE doc_id=? AND voice=?",
+            (doc, voice_id),
+        ).fetchone()
+        page_rows = db.execute(
+            "SELECT page_index, state FROM jobs WHERE doc_id=? AND voice=? "
+            "ORDER BY page_index ASC",
+            (doc, voice_id),
+        ).fetchall()
+    pages_total = int(book["pages_total"]) if book is not None else len(page_rows)
+    if pages_total <= 0:
+        pages_total = len(page_rows)
+    ready = 0
+    working = 0
+    failed = 0
+    queued = 0
+    for row in page_rows:
+        idx = int(row["page_index"])
+        if _page_ready(doc_id=doc, voice=voice_id, page_index=idx) or row["state"] == "done":
+            ready += 1
+        elif row["state"] == "working":
+            working += 1
+        elif row["state"] == "failed":
+            failed += 1
+        else:
+            queued += 1
+    # Count pack files beyond job rows (re-opened books).
+    if book is not None:
+        for idx in range(pages_total):
+            if _page_ready(doc_id=doc, voice=voice_id, page_index=idx):
+                # already counted via jobs; ensure floor
+                pass
+        ready = sum(
+            1
+            for idx in range(pages_total)
+            if _page_ready(doc_id=doc, voice=voice_id, page_index=idx)
+        )
+    percent = 0 if pages_total <= 0 else int(round(100.0 * ready / pages_total))
+    is_ready = pages_total > 0 and ready >= pages_total
+    if is_ready:
+        state = "ready"
+    elif failed and ready == 0 and working == 0 and queued == 0:
+        state = "failed"
+    elif working or queued:
+        state = "working"
+    elif book is None and pages_total == 0:
+        state = "missing"
+    else:
+        state = "queued"
+    if book is not None and is_ready and book["state"] != "ready":
+        with connection() as db:
+            db.execute(
+                "UPDATE book_jobs SET state='ready', error=NULL, updated=? "
+                "WHERE doc_id=? AND voice=?",
+                (time.time(), doc, voice_id),
+            )
+    return {
+        "doc_id": doc,
+        "voice": voice_id,
+        "pages_total": pages_total,
+        "pages_ready": ready,
+        "pages_working": working,
+        "pages_queued": queued,
+        "pages_failed": failed,
+        "percent": percent,
+        "ready": is_ready,
+        "state": state,
+        "error": (book["error"] if book is not None else None),
+        "processor": "gpu-5060ti",
+        "long_novel": True,
+    }
+
+
+def unfinished_page_job_ids(*, doc_id: str, voice: str) -> list[str]:
+    doc = (doc_id or "").strip()
+    voice_id = (voice or "").strip() or "longanfengyue"
+    with connection() as db:
+        rows = db.execute(
+            "SELECT id, page_index, state FROM jobs WHERE doc_id=? AND voice=?",
+            (doc, voice_id),
+        ).fetchall()
+    out: list[str] = []
+    for row in rows:
+        if row["state"] == "done" and _page_ready(
+            doc_id=doc, voice=voice_id, page_index=int(row["page_index"])
+        ):
+            continue
+        out.append(str(row["id"]))
+    return out

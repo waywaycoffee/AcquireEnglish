@@ -3248,6 +3248,106 @@ class AcquireApiClient {
     }
   }
 
+  /// Queue a long novel for cloud TTS (5060 Ti preferred). Blocks open until ready.
+  Future<Map<String, dynamic>?> enqueueReadingBookPregen({
+    required String docId,
+    required String text,
+    required String voice,
+    bool processOnEcs = false,
+  }) async {
+    final String spoken = text.trim();
+    final String id = docId.trim();
+    if (spoken.isEmpty || id.isEmpty) return null;
+    try {
+      final Response<dynamic> response = await _dio.post(
+        Endpoints.readingSpeechBookPregen,
+        data: <String, dynamic>{
+          'doc_id': id,
+          'text': spoken,
+          'voice': voice.trim(),
+          'language': 'en',
+          'process_on_ecs': processOnEcs,
+        },
+        options: Options(
+          receiveTimeout: const Duration(seconds: 60),
+          sendTimeout: const Duration(seconds: 60),
+          extra: const <String, Object>{
+            'dio_cache_interceptor_force_refresh': true,
+          },
+        ),
+      );
+      final Object? data = response.data;
+      if (data is Map<String, dynamic>) return data;
+      if (data is Map) return Map<String, dynamic>.from(data);
+      return null;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Future<Map<String, dynamic>?> readingBookPregenStatus({
+    required String docId,
+    required String voice,
+  }) async {
+    final String id = docId.trim();
+    if (id.isEmpty) return null;
+    try {
+      final Response<dynamic> response = await _dio.get(
+        Endpoints.readingSpeechBookPregen,
+        queryParameters: <String, dynamic>{
+          'doc_id': id,
+          'voice': voice.trim(),
+        },
+        options: Options(
+          receiveTimeout: const Duration(seconds: 12),
+          extra: const <String, Object>{
+            'dio_cache_interceptor_force_refresh': true,
+          },
+        ),
+      );
+      final Object? data = response.data;
+      if (data is Map<String, dynamic>) return data;
+      if (data is Map) return Map<String, dynamic>.from(data);
+      return null;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Future<Map<String, dynamic>?> readingBookPregenFallback({
+    required String docId,
+    required String text,
+    required String voice,
+  }) async {
+    final String id = docId.trim();
+    if (id.isEmpty) return null;
+    try {
+      final Response<dynamic> response = await _dio.post(
+        Endpoints.readingSpeechBookPregenFallback,
+        data: <String, dynamic>{
+          'doc_id': id,
+          'text': text,
+          'voice': voice.trim(),
+          'language': 'en',
+          'process_on_ecs': true,
+        },
+        options: Options(
+          receiveTimeout: const Duration(seconds: 60),
+          sendTimeout: const Duration(seconds: 60),
+          extra: const <String, Object>{
+            'dio_cache_interceptor_force_refresh': true,
+          },
+        ),
+      );
+      final Object? data = response.data;
+      if (data is Map<String, dynamic>) return data;
+      if (data is Map) return Map<String, dynamic>.from(data);
+      return null;
+    } catch (_) {
+      return null;
+    }
+  }
+
   Future<FoundationMediaItem?> contentMediaLookup({
     required String bookId,
     required String key,

@@ -37,6 +37,7 @@ import '../data/reading_vocab_lists.dart';
 import '../domain/reading_doc.dart';
 import '../domain/reading_study_mode.dart';
 import 'content_media_provider.dart';
+import 'reading_book_prep_provider.dart';
 import 'reading_chunk_provider.dart';
 import 'reading_digital_human_ball.dart';
 import 'reading_library_provider.dart';
@@ -1137,6 +1138,54 @@ class _ReadingReaderScreenState extends ConsumerState<ReadingReaderScreen> {
         appBar: AppBar(title: const Text('阅读')),
         body: const Center(child: Text('找不到这篇读物')),
       );
+    }
+    if (readingDocNeedsCloudPrep(doc)) {
+      final AsyncValue<ReadingBookPrepStatus> prepAsync =
+          ref.watch(readingBookPrepProvider(doc.id));
+      final ReadingBookPrepStatus? prep = prepAsync.asData?.value;
+      if (prep == null || !prep.ready) {
+        final String label = prep?.progressLabel ?? '云端 AI 排队中…';
+        final double? bar = prep == null ? null : prep.percent / 100.0;
+        return Scaffold(
+          appBar: AppBar(
+            title: Text(doc.displayTitle),
+            leading: IconButton(
+              icon: const Icon(Icons.arrow_back),
+              onPressed: () => context.pop(),
+            ),
+          ),
+          body: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: <Widget>[
+                const Icon(Icons.cloud_sync_rounded, size: 48),
+                const SizedBox(height: 16),
+                Text(
+                  '长篇小说需先在云端（5060 Ti）完成 AI 朗读预处理',
+                  textAlign: TextAlign.center,
+                  style: Theme.of(context).textTheme.titleMedium,
+                ),
+                const SizedBox(height: 8),
+                Text(label, textAlign: TextAlign.center),
+                const SizedBox(height: 16),
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(99),
+                  child: LinearProgressIndicator(
+                    value: bar,
+                    minHeight: 6,
+                  ),
+                ),
+                const SizedBox(height: 24),
+                TextButton(
+                  onPressed: () => context.pop(),
+                  child: const Text('返回书架查看进度'),
+                ),
+              ],
+            ),
+          ),
+        );
+      }
     }
     _ensurePages(doc);
     if (!_opened) {

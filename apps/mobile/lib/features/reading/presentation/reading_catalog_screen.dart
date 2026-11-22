@@ -193,15 +193,28 @@ class _ReadingCatalogScreenState extends ConsumerState<ReadingCatalogScreen> {
           .read(readingLibraryProvider.notifier)
           .addDoc(doc, checkQuota: false);
       if (!mounted) return;
+      final bool needsPrep = doc.wordCount >= 12000 &&
+          doc.plainText.trim().length >= 20000;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('已加入书架「${doc.displayTitle}」· ${doc.wordCount} 词'),
-          action: SnackBarAction(
-            label: '阅读',
-            onPressed: () {
-              context.push('/reading/${Uri.encodeComponent(doc.id)}');
-            },
+          content: Text(
+            needsPrep
+                ? '已加入书架「${doc.displayTitle}」· ${doc.wordCount} 词 · 云端 AI 处理中，完成后打开'
+                : '已加入书架「${doc.displayTitle}」· ${doc.wordCount} 词',
           ),
+          action: needsPrep
+              ? SnackBarAction(
+                  label: '回书架',
+                  onPressed: () => context.go('/reading'),
+                )
+              : SnackBarAction(
+                  label: '阅读',
+                  onPressed: () {
+                    context.push(
+                      '/reading/${Uri.encodeComponent(doc.id)}',
+                    );
+                  },
+                ),
         ),
       );
     } catch (e) {

@@ -81,6 +81,15 @@ class PregenIn(BaseModel):
     process_on_ecs: bool = True
 
 
+class BookPregenIn(BaseModel):
+    doc_id: str = Field(..., min_length=1, max_length=200)
+    text: str = Field(..., min_length=1, max_length=600_000)
+    voice: str = ""
+    language: str = "en"
+    ## Prefer 5060 Ti worker; set true only as ECS fallback filler.
+    process_on_ecs: bool = False
+
+
 def _resolve_voice(raw: str) -> str:
     voice = (raw or "").strip()
     if voice in NAMES or voice in VOICES or voice in BILINGUAL_VOICES:
@@ -361,3 +370,86 @@ async def get_speech_pack(
     if pack is None:
         raise HTTPException(status_code=404, detail="pack not ready")
     return pack
+
+
+@router.post("/book-pregen")
+async def enqueue_book_pregen(
+    body: BookPregenIn,
+    background: BackgroundTasks,
+    user: User = Depends(get_current_user),
+) -> dict:
+    """Queue an entire long novel for cloud TTS (5060 Ti preferred)."""
+    voice = _resolve_voice(body.voice)
+    text = body.text.replace("\r\n", "\n")
+    if not rtq.is_long_novel(text):
+        # Short articles stay open-immediately; no book gate.
+        return {
+            "ready": True,
+            "state": "skipped",
+            "percent": 100,
+            "pages_total": 0,
+            "pages_ready": 0,
+            "long_novel": False,
+            "processor": "none",
+            "message": "short_article",
+        }
+    try:
+        status = rtq.enqueue_book(
+            doc_id=body.doc_id.strip(),
+            voice=voice,
+            text=text,
+            user_id=user.id,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    if body.process_on_ecs and _configured() and not status.get("ready"):
+        for job_id in rtq.unfinished_page_job_ids(
+            doc_id=body.doc_id.strip(), voice=voice
+        ):
+            background.add_task(process_pregen_job, job_id, user_id=user.id)
+    return {
+        **status,
+        "message": "ready" if status.get("ready") else "queued_for_gpu",
+    }
+
+
+@router.get("/book-pregen")
+async def book_pregen_status(
+    doc_id: str = Query(..., min_length=1),
+    voice: str = Query(""),
+    user: User = Depends(get_current_user),
+) -> dict:
+    del user
+    return rtq.book_status(doc_id=doc_id.strip(), voice=_resolve_voice(voice))
+
+
+@router.post("/book-pregen/fallback")
+async def book_pregen_ecs_fallback(
+    body: BookPregenIn,
+    background: BackgroundTasks,
+    user: User = Depends(get_current_user),
+) -> dict:
+    """Kick ECS filler for unfinished pages when the 5060 Ti worker is offline."""
+    voice = _resolve_voice(body.voice)
+    if body.text.strip():
+        try:
+            rtq.enqueue_book(
+                doc_id=body.doc_id.strip(),
+                voice=voice,
+                text=body.text,
+                user_id=user.id,
+            )
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+    if not _configured():
+        raise HTTPException(status_code=503, detail="阿里云配音尚未配置")
+    job_ids = rtq.unfinished_page_job_ids(doc_id=body.doc_id.strip(), voice=voice)
+    for job_id in job_ids:
+        background.add_task(process_pregen_job, job_id, user_id=user.id)
+    status = rtq.book_status(doc_id=body.doc_id.strip(), voice=voice)
+    return {
+        **status,
+        "fallback": "ecs",
+        "kicked": len(job_ids),
+        "message": "ecs_fallback_started",
+    }

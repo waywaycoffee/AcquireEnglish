@@ -29,6 +29,7 @@ import '../domain/reading_doc.dart';
 import 'reading_iplus1_provider.dart';
 import 'reading_library_provider.dart';
 import 'reading_stats_row.dart';
+import 'reading_book_prep_provider.dart';
 import 'reading_cold_start.dart';
 import 'reading_book_cover.dart';
 import 'reading_vocab_lists_sheet.dart';
@@ -166,7 +167,18 @@ class _ReadingHubScreenState extends ConsumerState<ReadingHubScreen> {
               ),
             ),
           );
-          unawaited(context.push('/reading/${Uri.encodeComponent(open.id)}'));
+          if (readingDocNeedsCloudPrep(open)) {
+            ref.invalidate(readingBookPrepProvider(open.id));
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('长篇已加入云端 AI 队列，处理完后可在书架打开'),
+              ),
+            );
+          } else {
+            unawaited(
+              context.push('/reading/${Uri.encodeComponent(open.id)}'),
+            );
+          }
           return;
         }
       }
@@ -231,9 +243,18 @@ class _ReadingHubScreenState extends ConsumerState<ReadingHubScreen> {
                   ),
                 ),
               );
-              unawaited(
-                context.push('/reading/${Uri.encodeComponent(open.id)}'),
-              );
+              if (readingDocNeedsCloudPrep(open)) {
+                ref.invalidate(readingBookPrepProvider(open.id));
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('长篇已加入云端 AI 队列，处理完后可在书架打开'),
+                  ),
+                );
+              } else {
+                unawaited(
+                  context.push('/reading/${Uri.encodeComponent(open.id)}'),
+                );
+              }
               return;
             }
           }
@@ -270,6 +291,19 @@ class _ReadingHubScreenState extends ConsumerState<ReadingHubScreen> {
         } else if (fp.message.trim().isNotEmpty) {
           fingerprintNote = ' · ${fp.message}';
         }
+      }
+
+      if (readingDocNeedsCloudPrep(doc)) {
+        ref.invalidate(readingBookPrepProvider(doc.id));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              '已导入「${doc.displayTitle}」· 约 ${doc.wordCount} 词'
+              ' · 正在云端 AI 处理，完成后可打开$sourceNote$fingerprintNote',
+            ),
+          ),
+        );
+        return;
       }
 
       ScaffoldMessenger.of(context).showSnackBar(
@@ -561,12 +595,9 @@ class _ReadingHubScreenState extends ConsumerState<ReadingHubScreen> {
                 ),
                 const _SectionTitle('免费经典 · 绿野仙踪'),
                 if (wizardOfOz != null)
-                  _DocTile(
+                  _CloudPrepDocTile(
                     doc: wizardOfOz,
                     progress: state.progressFor(wizardOfOz.id),
-                    onOpen: () => context.push(
-                      '/reading/${Uri.encodeComponent(wizardOfOz!.id)}',
-                    ),
                   )
                 else
                   Padding(
@@ -588,12 +619,9 @@ class _ReadingHubScreenState extends ConsumerState<ReadingHubScreen> {
                 const SizedBox(height: 16),
                 if (cont != null) ...<Widget>[
                   const _SectionTitle('继续阅读'),
-                  _DocTile(
+                  _CloudPrepDocTile(
                     doc: cont,
                     progress: state.progressFor(cont.id),
-                    onOpen: () => context.push(
-                      '/reading/${Uri.encodeComponent(cont.id)}',
-                    ),
                   ),
                   const SizedBox(height: 16),
                 ],
@@ -616,13 +644,10 @@ class _ReadingHubScreenState extends ConsumerState<ReadingHubScreen> {
                         ),
                         const SizedBox(height: 8),
                         for (final ReadingIPlus1Match m in matches) ...<Widget>[
-                          _DocTile(
+                          _CloudPrepDocTile(
                             doc: m.doc,
                             progress: state.progressFor(m.doc.id),
-                            badge: '${m.band.labelCn} · ${m.rateLabel}',
-                            onOpen: () => context.push(
-                              '/reading/${Uri.encodeComponent(m.doc.id)}',
-                            ),
+                            extraBadge: '${m.band.labelCn} · ${m.rateLabel}',
                           ),
                           const SizedBox(height: 8),
                         ],
@@ -717,70 +742,10 @@ class _ReadingHubScreenState extends ConsumerState<ReadingHubScreen> {
                             for (final ReadingDoc doc in books)
                               SizedBox(
                                 width: width,
-                                child: InkWell(
-                                  onTap: () => context.push(
-                                    '/reading/${Uri.encodeComponent(doc.id)}',
-                                  ),
-                                  onLongPress: doc.builtin
-                                      ? null
-                                      : () async {
-                                          final bool?
-                                          remove = await showDialog<bool>(
-                                            context: context,
-                                            builder: (BuildContext dialog) =>
-                                                AlertDialog(
-                                                  title: Text(
-                                                    '删除「${doc.displayTitle}」？',
-                                                  ),
-                                                  actions: <Widget>[
-                                                    TextButton(
-                                                      onPressed: () =>
-                                                          Navigator.pop(dialog),
-                                                      child: const Text('取消'),
-                                                    ),
-                                                    TextButton(
-                                                      onPressed: () =>
-                                                          Navigator.pop(
-                                                            dialog,
-                                                            true,
-                                                          ),
-                                                      child: const Text('删除'),
-                                                    ),
-                                                  ],
-                                                ),
-                                          );
-                                          if (remove == true) {
-                                            await ref
-                                                .read(
-                                                  readingLibraryProvider
-                                                      .notifier,
-                                                )
-                                                .removeDoc(doc.id);
-                                          }
-                                        },
-                                  child: Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: <Widget>[
-                                      ReadingBookCover(
-                                        title: doc.displayTitle,
-                                        level: doc.level,
-                                      ),
-                                      const SizedBox(height: 10),
-                                      Text(
-                                        doc.displayTitle,
-                                        maxLines: 2,
-                                        overflow: TextOverflow.ellipsis,
-                                      ),
-                                      const SizedBox(height: 4),
-                                      Text(
-                                        '${doc.level} · 已读 ${((state.progressFor(doc.id)?.percent ?? 0) * 100).round()}%',
-                                        style: Theme.of(
-                                          context,
-                                        ).textTheme.bodySmall,
-                                      ),
-                                    ],
-                                  ),
+                                child: _CloudPrepShelfItem(
+                                  doc: doc,
+                                  readPercent:
+                                      state.progressFor(doc.id)?.percent ?? 0,
                                 ),
                               ),
                           ],
@@ -815,6 +780,185 @@ class _SectionTitle extends StatelessWidget {
   }
 }
 
+class _CloudPrepShelfItem extends ConsumerWidget {
+  const _CloudPrepShelfItem({
+    required this.doc,
+    required this.readPercent,
+  });
+
+  final ReadingDoc doc;
+  final double readPercent;
+
+  Future<void> _confirmDelete(BuildContext context, WidgetRef ref) async {
+    if (doc.builtin) return;
+    final bool? remove = await showDialog<bool>(
+      context: context,
+      builder: (BuildContext dialog) => AlertDialog(
+        title: Text('删除「${doc.displayTitle}」？'),
+        actions: <Widget>[
+          TextButton(
+            onPressed: () => Navigator.pop(dialog),
+            child: const Text('取消'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(dialog, true),
+            child: const Text('删除'),
+          ),
+        ],
+      ),
+    );
+    if (remove == true) {
+      await ref.read(readingLibraryProvider.notifier).removeDoc(doc.id);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final bool needsPrep = readingDocNeedsCloudPrep(doc);
+    final ReadingBookPrepStatus? prep = needsPrep
+        ? ref.watch(readingBookPrepProvider(doc.id)).asData?.value
+        : null;
+    final bool blocked = needsPrep && (prep == null || !prep.ready);
+    final String subtitle = blocked
+        ? (prep?.progressLabel ?? '云端 AI 排队中…')
+        : '${doc.level} · 已读 ${(readPercent * 100).round()}%';
+    return InkWell(
+      onTap: () {
+        if (blocked) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                '长篇需等云端 AI（5060 Ti）处理完才能打开：'
+                '${prep?.progressLabel ?? '排队中'}',
+              ),
+            ),
+          );
+          return;
+        }
+        context.push('/reading/${Uri.encodeComponent(doc.id)}');
+      },
+      onLongPress: () => unawaited(_confirmDelete(context, ref)),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          ReadingBookCover(
+            title: doc.displayTitle,
+            level: doc.level,
+          ),
+          const SizedBox(height: 10),
+          Text(
+            doc.displayTitle,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+          ),
+          const SizedBox(height: 4),
+          Text(
+            subtitle,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: blocked ? const Color(0xFF2563EB) : null,
+                ),
+          ),
+          if (blocked) ...<Widget>[
+            const SizedBox(height: 6),
+            ClipRRect(
+              borderRadius: BorderRadius.circular(99),
+              child: LinearProgressIndicator(
+                value: prep == null ? null : prep.percent / 100.0,
+                minHeight: 4,
+                backgroundColor: const Color(0xFFE8E8E8),
+                color: const Color(0xFF2563EB),
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _CloudPrepDocTile extends ConsumerWidget {
+  const _CloudPrepDocTile({
+    required this.doc,
+    this.progress,
+    this.extraBadge,
+  });
+
+  final ReadingDoc doc;
+  final ReadingProgress? progress;
+  final String? extraBadge;
+
+  String _mergeBadge(String? ai) {
+    final String a = (extraBadge ?? '').trim();
+    final String b = (ai ?? '').trim();
+    if (a.isEmpty) return b;
+    if (b.isEmpty) return a;
+    return '$a · $b';
+  }
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    if (!readingDocNeedsCloudPrep(doc)) {
+      return _DocTile(
+        doc: doc,
+        progress: progress,
+        badge: extraBadge,
+        onOpen: () => context.push(
+          '/reading/${Uri.encodeComponent(doc.id)}',
+        ),
+      );
+    }
+    final AsyncValue<ReadingBookPrepStatus> prepAsync =
+        ref.watch(readingBookPrepProvider(doc.id));
+    return prepAsync.when(
+      data: (ReadingBookPrepStatus prep) {
+        return _DocTile(
+          doc: doc,
+          progress: progress,
+          badge: _mergeBadge(prep.ready ? 'AI 已就绪' : prep.progressLabel),
+          aiPercent: prep.ready ? null : prep.percent / 100.0,
+          onOpen: () {
+            if (!prep.ready) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text(
+                    '长篇需等云端 AI（5060 Ti）处理完才能打开：${prep.progressLabel}',
+                  ),
+                ),
+              );
+              return;
+            }
+            context.push('/reading/${Uri.encodeComponent(doc.id)}');
+          },
+        );
+      },
+      loading: () => _DocTile(
+        doc: doc,
+        progress: progress,
+        badge: _mergeBadge('云端 AI 排队中…'),
+        aiPercent: 0,
+        onOpen: () {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('长篇正在云端处理，完成后即可打开')),
+          );
+        },
+      ),
+      error: (_, __) => _DocTile(
+        doc: doc,
+        progress: progress,
+        badge: _mergeBadge('AI 状态获取失败 · 点按重试'),
+        onOpen: () {
+          ref.invalidate(readingBookPrepProvider(doc.id));
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('已重新请求云端 AI 处理')),
+          );
+        },
+      ),
+    );
+  }
+}
+
 class _DocTile extends StatelessWidget {
   const _DocTile({
     required this.doc,
@@ -822,6 +966,7 @@ class _DocTile extends StatelessWidget {
     this.progress,
     this.onDelete,
     this.badge,
+    this.aiPercent,
   });
 
   final ReadingDoc doc;
@@ -829,6 +974,7 @@ class _DocTile extends StatelessWidget {
   final VoidCallback onOpen;
   final VoidCallback? onDelete;
   final String? badge;
+  final double? aiPercent;
 
   String get _sourceLabel {
     switch (doc.sourceType) {
@@ -901,7 +1047,18 @@ class _DocTile extends StatelessWidget {
                             height: 1.35,
                           ),
                         ),
-                        if (pct > 0) ...<Widget>[
+                        if (aiPercent != null) ...<Widget>[
+                          const SizedBox(height: 10),
+                          ClipRRect(
+                            borderRadius: BorderRadius.circular(99),
+                            child: LinearProgressIndicator(
+                              value: aiPercent!.clamp(0.0, 1.0),
+                              minHeight: 5,
+                              backgroundColor: const Color(0xFFE8E8E8),
+                              color: const Color(0xFF2563EB),
+                            ),
+                          ),
+                        ] else if (pct > 0) ...<Widget>[
                           const SizedBox(height: 10),
                           ClipRRect(
                             borderRadius: BorderRadius.circular(99),
