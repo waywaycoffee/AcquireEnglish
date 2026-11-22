@@ -122,21 +122,7 @@ def split_reading_pages(text: str, max_chars: int = PAGE_CHARS) -> list[str]:
             chunks.append(piece)
         buf.clear()
 
-    def append_block(block: str) -> None:
-        piece = (block or "").strip()
-        if not piece:
-            return
-        if not buf:
-            buf.append(piece)
-            return
-        current = "\n\n".join(buf)
-        if len(current) + 2 + len(piece) <= max_chars:
-            buf.append(piece)
-            return
-        flush()
-        if len(piece) <= max_chars:
-            buf.append(piece)
-            return
+    def hard_cut(piece: str) -> None:
         start = 0
         while start < len(piece):
             end = min(start + max_chars, len(piece))
@@ -159,6 +145,26 @@ def split_reading_pages(text: str, max_chars: int = PAGE_CHARS) -> list[str]:
             start = end
             while start < len(piece) and piece[start] in "\n ":
                 start += 1
+
+    def append_block(block: str) -> None:
+        piece = (block or "").strip()
+        if not piece:
+            return
+        if not buf:
+            if len(piece) <= max_chars:
+                buf.append(piece)
+                return
+            hard_cut(piece)
+            return
+        current = "\n\n".join(buf)
+        if len(current) + 2 + len(piece) <= max_chars:
+            buf.append(piece)
+            return
+        flush()
+        if len(piece) <= max_chars:
+            buf.append(piece)
+            return
+        hard_cut(piece)
 
     for block in by_heading:
         append_block(block)

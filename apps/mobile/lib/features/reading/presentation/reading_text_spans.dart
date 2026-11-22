@@ -70,24 +70,8 @@ List<String> splitReadingPages(
     buf.clear();
   }
 
-  void appendBlock(String block) {
-    final String piece = block.trim();
-    if (piece.isEmpty) return;
-    if (buf.isEmpty) {
-      buf.write(piece);
-      return;
-    }
-    if (buf.length + 2 + piece.length <= maxChars) {
-      buf.write('\n\n');
-      buf.write(piece);
-      return;
-    }
-    flush();
-    if (piece.length <= maxChars) {
-      buf.write(piece);
-      return;
-    }
-    // Oversized chapter: cut on paragraph / sentence boundaries.
+  void hardCut(String piece) {
+    // Oversized chapter / novel body: cut on paragraph / sentence boundaries.
     int start = 0;
     while (start < piece.length) {
       int end = (start + maxChars).clamp(0, piece.length);
@@ -106,13 +90,38 @@ List<String> splitReadingPages(
             : (sent > start + maxChars ~/ 3 ? sent : end);
         end = cut;
       }
-      chunks.add(piece.substring(start, end).trim());
+      final String chunk = piece.substring(start, end).trim();
+      if (chunk.isNotEmpty) chunks.add(chunk);
       start = end;
       while (start < piece.length &&
           (piece[start] == '\n' || piece[start] == ' ')) {
         start++;
       }
     }
+  }
+
+  void appendBlock(String block) {
+    final String piece = block.trim();
+    if (piece.isEmpty) return;
+    if (buf.isEmpty) {
+      if (piece.length <= maxChars) {
+        buf.write(piece);
+        return;
+      }
+      hardCut(piece);
+      return;
+    }
+    if (buf.length + 2 + piece.length <= maxChars) {
+      buf.write('\n\n');
+      buf.write(piece);
+      return;
+    }
+    flush();
+    if (piece.length <= maxChars) {
+      buf.write(piece);
+      return;
+    }
+    hardCut(piece);
   }
 
   for (final String block in byHeading) {
