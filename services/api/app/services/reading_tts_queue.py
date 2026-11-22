@@ -554,6 +554,10 @@ def _page_ready(*, doc_id: str, voice: str, page_index: int) -> bool:
     return all(isinstance(s, dict) and s.get("ready") for s in sentences)
 
 
+# Emotional book packs only — never queue a third CosyVoice for long novels.
+BOOK_PACK_VOICES = frozenset({"longanfengyue", "longze_v3.1"})
+
+
 def enqueue_book(
     *,
     doc_id: str,
@@ -566,6 +570,10 @@ def enqueue_book(
     if not doc:
         raise ValueError("doc_id required")
     voice_id = (voice or "").strip() or "longanfengyue"
+    if voice_id not in BOOK_PACK_VOICES:
+        raise ValueError(
+            f"book pregen voice must be one of {sorted(BOOK_PACK_VOICES)}, got {voice_id}"
+        )
     pages = split_reading_pages(text)
     if not pages or (len(pages) == 1 and not pages[0].strip()):
         raise ValueError("empty book text")
