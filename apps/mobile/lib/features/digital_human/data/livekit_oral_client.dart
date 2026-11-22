@@ -53,6 +53,7 @@ class LiveKitOralClient {
       await room.localParticipant?.setMicrophoneEnabled(enableMicrophone);
     } catch (_) {}
 
+    _room = room;
     if (context != null && context.isNotEmpty) {
       await publishContext(context);
     }
@@ -92,13 +93,59 @@ class LiveKitOralClient {
         } catch (_) {}
       });
 
-    _room = room;
     onStatus?.call(
       enableMicrophone
           ? '全双工已接通 · ${creds.room}'
           : '已加入 LiveKit 房间 ${creds.room}（仅听）',
     );
     return room;
+  }
+
+  bool get hasRemoteParticipant {
+    final Room? room = _room;
+    if (room == null) return false;
+    return room.remoteParticipants.isNotEmpty;
+  }
+
+  /// Wait until a remote agent joins, or [timeout] elapses.
+  Future<bool> awaitRemoteParticipant({
+    Duration timeout = const Duration(seconds: 8),
+  }) async {
+    final Room? room = _room;
+    if (room == null) return false;
+    if (room.remoteParticipants.isNotEmpty) return true;
+
+    final Completer<bool> done = Completer<bool>();
+    Timer? timer;
+    EventsListener<RoomEvent>? waitListener;
+    void finish(bool value) {
+      if (done.isCompleted) return;
+      done.complete(value);
+      timer?.cancel();
+      final EventsListener<RoomEvent>? toDispose = waitListener;
+      waitListener = null;
+      if (toDispose != null) {
+        unawaited(
+          () async {
+            try {
+              await toDispose.dispose();
+            } catch (_) {}
+          }(),
+        );
+      }
+    }
+
+    waitListener = room.createListener()
+      ..on<ParticipantConnectedEvent>((_) => finish(true))
+      ..on<TrackSubscribedEvent>((_) => finish(true));
+    // Cover the race where the agent joined between the emptiness check and
+    // listener attachment.
+    if (room.remoteParticipants.isNotEmpty) {
+      finish(true);
+    } else {
+      timer = Timer(timeout, () => finish(false));
+    }
+    return done.future;
   }
 
   Future<void> setMicrophoneEnabled(bool enabled) async {

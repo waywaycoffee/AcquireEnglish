@@ -1158,9 +1158,12 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
       unawaited(_ensureLiveTalking(settings).catchError((Object _) {}));
     }
     if (settings.usesLiveKit) {
-      unawaited(_ensureLiveKitDuplex(settings).catchError((Object _) {}));
-    }
-    if (opening != null && !settings.usesLiveKit) {
+      unawaited(
+        _ensureLiveKitDuplex(settings, openingToSpeak: opening).catchError((
+          Object _,
+        ) {}),
+      );
+    } else if (opening != null) {
       unawaited(_speakCoach(opening, settings));
     }
   }
@@ -1180,7 +1183,10 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
     };
   }
 
-  Future<void> _ensureLiveKitDuplex(LearningSettingsState settings) async {
+  Future<void> _ensureLiveKitDuplex(
+    LearningSettingsState settings, {
+    String? openingToSpeak,
+  }) async {
     _liveKit
       ..onStatus = (String status) {
         if (!mounted) return;
@@ -1208,6 +1214,25 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
         context: _liveKitContextPayload(),
       );
       if (!mounted) return;
+      // Room join alone is not enough — without the GPU oral agent, duplex
+      // would mute hold-to-talk and leave the learner unable to converse.
+      final bool agentPresent = await _liveKit.awaitRemoteParticipant(
+        timeout: const Duration(seconds: 8),
+      );
+      if (!mounted) return;
+      if (!agentPresent) {
+        await _liveKit.disconnect();
+        if (!mounted) return;
+        setState(() {
+          _duplexLive = false;
+          _liveKitStatus = '外教 Agent 未进房';
+          _status = '全双工暂不可用，请按住麦克风说话';
+        });
+        if (openingToSpeak != null && openingToSpeak.trim().isNotEmpty) {
+          unawaited(_speakCoach(openingToSpeak, settings));
+        }
+        return;
+      }
       setState(() {
         _duplexLive = true;
         _status = '全双工已接通 · 直接说，可打断外教';
@@ -1217,8 +1242,11 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
       setState(() {
         _duplexLive = false;
         _liveKitStatus = '$error';
-        _status = '全双工暂不可用，已回退按住说话';
+        _status = '全双工暂不可用，请按住麦克风说话';
       });
+      if (openingToSpeak != null && openingToSpeak.trim().isNotEmpty) {
+        unawaited(_speakCoach(openingToSpeak, settings));
+      }
     }
   }
 
