@@ -1604,19 +1604,6 @@ class _ReadingReaderScreenState extends ConsumerState<ReadingReaderScreen> {
                   : null,
             ),
           ),
-          IconButton(
-            tooltip: _loadingPageQuiz ? '正在出题…' : 'AI伴读 · 本节理解题',
-            onPressed: _loadingPageQuiz
-                ? null
-                : () => unawaited(_launchPageComprehensionQuiz(doc)),
-            icon: _loadingPageQuiz
-                ? const SizedBox(
-                    width: 22,
-                    height: 22,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  )
-                : const Icon(Icons.quiz_outlined),
-          ),
           PopupMenuButton<String>(
             tooltip: '更多',
             onSelected: (String value) {
@@ -1656,8 +1643,6 @@ class _ReadingReaderScreenState extends ConsumerState<ReadingReaderScreen> {
                       '/episodes/${Uri.encodeComponent(doc.episodeId!)}',
                     );
                   }
-                case 'page_quiz':
-                  unawaited(_launchPageComprehensionQuiz(doc));
                 case 'course_mode':
                   unawaited(
                     showEnableCourseModeSheet(
@@ -1721,13 +1706,6 @@ class _ReadingReaderScreenState extends ConsumerState<ReadingReaderScreen> {
                   child: Text('打开原集'),
                 ),
               const PopupMenuDivider(),
-              PopupMenuItem<String>(
-                value: 'page_quiz',
-                enabled: !_loadingPageQuiz,
-                child: Text(
-                  _loadingPageQuiz ? 'AI伴读出题中…' : 'AI伴读 · 本节理解题',
-                ),
-              ),
               const PopupMenuItem<String>(
                 value: 'course_mode',
                 child: Text('开启课程学习模式'),
@@ -1739,6 +1717,7 @@ class _ReadingReaderScreenState extends ConsumerState<ReadingReaderScreen> {
       body: ReadingDigitalHumanBallHost(
         doc: doc,
         focusedSentence: _focusedSentence,
+        onPageQuiz: () => _launchPageComprehensionQuiz(doc),
         child: ColoredBox(
           color: bg,
           child: Stack(

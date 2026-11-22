@@ -30,12 +30,15 @@ class ReadingDigitalHumanBallHost extends ConsumerStatefulWidget {
     required this.doc,
     required this.child,
     this.focusedSentence = '',
+    this.onPageQuiz,
     super.key,
   });
 
   final ReadingDoc doc;
   final Widget child;
   final String focusedSentence;
+  /// Opens page ABCD quiz from the companion sheet button.
+  final Future<void> Function()? onPageQuiz;
 
   @override
   ConsumerState<ReadingDigitalHumanBallHost> createState() =>
@@ -57,6 +60,7 @@ class _ReadingDigitalHumanBallHostState
           return ReadingCoachAskSheet(
             doc: widget.doc,
             focusedSentence: widget.focusedSentence,
+            onPageQuiz: widget.onPageQuiz,
           );
         },
       ),
@@ -165,11 +169,13 @@ class ReadingCoachAskSheet extends ConsumerStatefulWidget {
   const ReadingCoachAskSheet({
     required this.doc,
     this.focusedSentence = '',
+    this.onPageQuiz,
     super.key,
   });
 
   final ReadingDoc doc;
   final String focusedSentence;
+  final Future<void> Function()? onPageQuiz;
 
   @override
   ConsumerState<ReadingCoachAskSheet> createState() =>
@@ -263,7 +269,8 @@ class _ReadingCoachAskSheetState extends ConsumerState<ReadingCoachAskSheet> {
       final DigitalHumanPersona persona = settings.selectedDigitalHuman;
       final String greet =
           '你好，我是 ${persona.displayName}。一起读《${widget.doc.title}》—— '
-          '有不懂的词或句子，按住麦克风直接问我。';
+          '有不懂的词或句子，按住麦克风问我；'
+          '也可以点下方「出阅读理解题」考考自己。';
       setState(() {
         _bubbles.add(_ChatBubble(role: 'coach', text: greet));
         _busy = false;
@@ -673,6 +680,23 @@ class _ReadingCoachAskSheetState extends ConsumerState<ReadingCoachAskSheet> {
                 child: Text(
                   _error!,
                   style: const TextStyle(color: Color(0xFFB42318), fontSize: 12),
+                ),
+              ),
+            if (widget.onPageQuiz != null)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+                child: SizedBox(
+                  width: double.infinity,
+                  child: FilledButton.tonalIcon(
+                    onPressed: _busy
+                        ? null
+                        : () async {
+                            Navigator.of(context).pop();
+                            await widget.onPageQuiz!();
+                          },
+                    icon: const Icon(Icons.quiz_outlined),
+                    label: const Text('AI 出本节阅读理解题'),
+                  ),
                 ),
               ),
             Expanded(
