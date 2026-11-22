@@ -401,10 +401,26 @@ class DailyReviewNotifier extends Notifier<DailyReviewState> {
         '${ReviewRepository.storageKey}:backup',
         repository.account,
       );
-      final List<String> checkpoint = (prefs.get(checkpointKey) ?? '').split(
-        ':',
+      final String checkpoint = prefs.get(checkpointKey) ?? '';
+      final Map<String, dynamic>? saved = checkpoint.startsWith('{')
+          ? jsonDecode(checkpoint) as Map<String, dynamic>
+          : null;
+      final List<String> legacy = checkpoint.split(':');
+      final int? lastRevision =
+          saved?['revision'] as int? ?? int.tryParse(legacy.first);
+      final String lastDigest = saved?['digest'] as String? ?? legacy.last;
+      Future<void> saveCheckpoint(
+        int revision,
+        String digest,
+        DailyReviewState baseline,
+      ) => prefs.put(
+        checkpointKey,
+        jsonEncode(<String, dynamic>{
+          'revision': revision,
+          'digest': digest,
+          'baseline': baseline.toJson(),
+        }),
       );
-      final int? lastRevision = int.tryParse(checkpoint.first);
       final String localDigest = _reviewDigest(state);
       final Map<String, dynamic> localState = state.toJson();
       final AcquireApiClient api = ref.read(acquireApiClientProvider);
@@ -414,10 +430,10 @@ class DailyReviewNotifier extends Notifier<DailyReviewState> {
           ? null
           : DailyReviewState.fromJson(cloud.state!);
       if (remote != null && _reviewDigest(remote) == localDigest) {
-        await prefs.put(checkpointKey, '${cloud.revision}:$localDigest');
+        await saveCheckpoint(cloud.revision, localDigest, remote);
         return '本机与云端复习进度一致。';
       }
-      final bool localUnchanged = checkpoint.last == localDigest;
+      final bool localUnchanged = lastDigest == localDigest;
       final bool localHasProgress =
           state.dailyNewLimit != const DailyReviewState().dailyNewLimit ||
           state.days.isNotEmpty ||
@@ -433,13 +449,39 @@ class DailyReviewNotifier extends Notifier<DailyReviewState> {
           );
         });
         if (!currentSession()) return '账号已切换，请重新同步。';
-        await prefs.put(
-          checkpointKey,
-          '${cloud.revision}:${_reviewDigest(state)}',
-        );
+        await saveCheckpoint(cloud.revision, _reviewDigest(state), remote);
         return '已恢复云端复习进度。';
       }
       if (cloud.revision != 0 && cloud.revision != lastRevision) {
+        final Object? baselineJson = saved?['baseline'];
+        if (remote != null && baselineJson is Map<String, dynamic>) {
+          final DailyReviewState? merged = _mergeReviewBackup(
+            DailyReviewState.fromJson(baselineJson),
+            DailyReviewState.fromJson(localState),
+            remote,
+          );
+          if (merged != null) {
+            await _transaction((DailyReviewState current) {
+              if (!currentSession() || _reviewDigest(current) != localDigest) {
+                throw StateError('复习进度已变化，请重新同步。');
+              }
+              return merged;
+            });
+            if (!currentSession()) return '账号已切换，请重新同步。';
+            final String digest = _reviewDigest(merged);
+            // The cloud revision is still the remote snapshot. Persist it as
+            // the common ancestor before attempting the conditional upload.
+            await saveCheckpoint(cloud.revision, lastDigest, remote);
+            final uploaded = await api.reviewBackup(
+              session.accessToken,
+              revision: cloud.revision,
+              state: merged.toJson(),
+            );
+            if (!currentSession()) return '账号已切换，请重新同步。';
+            await saveCheckpoint(uploaded.revision, digest, merged);
+            return '已合并本机和云端的复习进度。';
+          }
+        }
         return '本机和云端都有复习记录，已保留两份进度，等待合并。';
       }
       final uploaded = await api.reviewBackup(
@@ -448,16 +490,19 @@ class DailyReviewNotifier extends Notifier<DailyReviewState> {
         state: localState,
       );
       if (!currentSession()) return '账号已切换，请重新同步。';
-      await prefs.put(checkpointKey, '${uploaded.revision}:$localDigest');
+      await saveCheckpoint(
+        uploaded.revision,
+        localDigest,
+        DailyReviewState.fromJson(localState),
+      );
       return '已备份复习次数和下次复习时间。';
     } on DioException catch (error) {
       final int? status = error.response?.statusCode;
-      if (currentSession() && (status == null || status >= 500)) {
+      if (currentSession() &&
+          (status == null || status == 409 || status >= 500)) {
         scheduleCloudBackup(delay: const Duration(minutes: 1));
       }
-      return status == 409
-          ? '云端复习记录刚更新，请重新同步。'
-          : '暂时无法同步复习进度，本机记录已保留。';
+      return status == 409 ? '云端复习记录刚更新，请重新同步。' : '暂时无法同步复习进度，本机记录已保留。';
     } on StateError catch (error) {
       return error.message;
     } catch (_) {
@@ -981,4 +1026,67 @@ class DailyReviewNotifier extends Notifier<DailyReviewState> {
       clientEventId: 'daily_review_checkin:$day',
     );
   }
+}
+
+DailyReviewState? _mergeReviewBackup(
+  DailyReviewState base,
+  DailyReviewState local,
+  DailyReviewState remote,
+) {
+  if (local.dailyNewLimit != base.dailyNewLimit &&
+      remote.dailyNewLimit != base.dailyNewLimit &&
+      local.dailyNewLimit != remote.dailyNewLimit) {
+    return null;
+  }
+  final Map<String, ReviewRecord> records = <String, ReviewRecord>{};
+  final Set<int> usedOrders = <int>{};
+  int nextOrder = local.nextOrder > remote.nextOrder
+      ? local.nextOrder
+      : remote.nextOrder;
+  for (final String key in <String>{
+    ...base.records.keys,
+    ...remote.records.keys,
+    ...local.records.keys,
+  }) {
+    final ReviewRecord? before = base.records[key];
+    final ReviewRecord? here = local.records[key];
+    final ReviewRecord? there = remote.records[key];
+    final String baseline = jsonEncode(before?.toJson());
+    final bool localChanged = jsonEncode(here?.toJson()) != baseline;
+    final bool remoteChanged = jsonEncode(there?.toJson()) != baseline;
+    if (localChanged && remoteChanged) return null;
+    ReviewRecord? selected = localChanged ? here : there;
+    if (selected == null) continue;
+    if (!usedOrders.add(selected.order)) {
+      final Map<String, dynamic> json = selected.toJson();
+      json['order'] = nextOrder;
+      (json['card'] as Map<String, dynamic>)['cardId'] = nextOrder;
+      selected = ReviewRecord.fromJson(json);
+      usedOrders.add(nextOrder++);
+    }
+    records[key] = selected;
+  }
+  final Map<String, ReviewDay> days = <String, ReviewDay>{};
+  for (final String key in <String>{
+    ...base.days.keys,
+    ...remote.days.keys,
+    ...local.days.keys,
+  }) {
+    final ReviewDay before = base.days[key] ?? const ReviewDay();
+    final ReviewDay here = local.days[key] ?? const ReviewDay();
+    final ReviewDay there = remote.days[key] ?? const ReviewDay();
+    final int reviews = here.reviews + there.reviews - before.reviews;
+    final int learned = here.newLearned + there.newLearned - before.newLearned;
+    if (reviews < 0 || learned < 0) return null;
+    days[key] = ReviewDay(reviews: reviews, newLearned: learned);
+  }
+  return DailyReviewState(
+    records: records,
+    days: days,
+    dailyNewLimit: local.dailyNewLimit == base.dailyNewLimit
+        ? remote.dailyNewLimit
+        : local.dailyNewLimit,
+    nextOrder: nextOrder,
+    dueReviewsSinceNew: local.dueReviewsSinceNew,
+  );
 }

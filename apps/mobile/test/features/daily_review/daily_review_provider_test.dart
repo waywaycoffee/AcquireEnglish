@@ -169,6 +169,19 @@ void main() {
         second.read(dailyReviewProvider).records['entry:hello:recognize']!.reviews,
         1,
       );
+      await secondReview.setDailyNewLimit(6);
+      cloud = <String, dynamic>{
+        ...cloud!,
+        'days': <String, dynamic>{
+          ...cloud!['days'] as Map<String, dynamic>,
+          '2026-10-24': <String, int>{'newLearned': 0, 'reviews': 2},
+        },
+      };
+      revision++;
+      expect(await secondReview.syncCloudBackup(), contains('已合并'));
+      expect(second.read(dailyReviewProvider).dailyNewLimit, 6);
+      expect(second.read(dailyReviewProvider).days['2026-10-24']!.reviews, 2);
+      expect(await secondReview.syncCloudBackup(), contains('一致'));
       await secondReview.setDailyNewLimit(7);
       cloud = <String, dynamic>{...cloud!, 'dailyNewLimit': 9};
       revision++;
