@@ -1775,6 +1775,29 @@ class AcquireApiClient {
     return response.data as Map<String, dynamic>;
   }
 
+  /// Parse imported exam reading-comprehension paper text into passage + ABCD.
+  Future<Map<String, dynamic>> parseExamReadingPaper({
+    required String text,
+    String title = '导入试卷',
+  }) async {
+    final Response<dynamic> response = await _dio.post(
+      Endpoints.examReadingParse,
+      data: <String, dynamic>{
+        'text': text,
+        'title': title,
+      },
+    );
+    final Object? raw = response.data;
+    final Map<String, dynamic> body = raw is Map
+        ? Map<String, dynamic>.from(raw)
+        : const <String, dynamic>{};
+    final Object? paper = body['paper'];
+    if (paper is Map) {
+      return Map<String, dynamic>.from(paper);
+    }
+    return const <String, dynamic>{};
+  }
+
   /// AI reading comprehension: exactly 4 ABCD questions grounded in [sentences].
   Future<List<Map<String, dynamic>>> generateReadingQuiz({
     required List<String> sentences,

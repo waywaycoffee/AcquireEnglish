@@ -7,7 +7,14 @@ import '../features/exam/presentation/exam_home_screen.dart';
 import '../features/exam/presentation/exam_listening_screen.dart';
 import '../features/exam/presentation/exam_mock_screen.dart';
 import '../features/exam/presentation/exam_practice_screen.dart';
+import '../features/exam/domain/exam_reading_strategy.dart';
+import '../features/exam/presentation/exam_reading_guided_session.dart';
+import '../features/exam/presentation/exam_reading_import_screen.dart';
+import '../features/exam/presentation/exam_reading_mock_session.dart';
+import '../features/exam/presentation/exam_reading_paper_detail_screen.dart';
 import '../features/exam/presentation/exam_reading_screen.dart';
+import '../features/exam/presentation/exam_reading_skill_course_screen.dart';
+import '../features/exam/presentation/exam_reading_type_drill_screen.dart';
 import '../features/exam/presentation/exam_select_screen.dart';
 import '../features/exam/presentation/exam_session_screen.dart';
 import '../features/writing/presentation/writing_editor_screen.dart';
@@ -212,6 +219,58 @@ GoRouter goRouter(Ref ref) {
       path: '/exam/reading',
       builder: (BuildContext context, GoRouterState state) =>
           const ExamReadingScreen(),
+    ),
+    GoRoute(
+      path: '/exam/reading/skill',
+      builder: (BuildContext context, GoRouterState state) =>
+          const ExamReadingSkillCourseScreen(),
+    ),
+    GoRoute(
+      path: '/exam/reading/import',
+      builder: (BuildContext context, GoRouterState state) {
+        final String? editId = state.uri.queryParameters['editId'];
+        return ExamReadingImportScreen(editId: editId);
+      },
+    ),
+    GoRoute(
+      path: '/exam/reading/paper',
+      builder: (BuildContext context, GoRouterState state) {
+        final String paperId = state.uri.queryParameters['paperId'] ?? '';
+        return ExamReadingPaperDetailScreen(paperId: paperId);
+      },
+    ),
+    GoRoute(
+      path: '/exam/reading/guided',
+      builder: (BuildContext context, GoRouterState state) {
+        final String paperId = state.uri.queryParameters['paperId'] ?? '';
+        return ModuleGate(
+          moduleCode: 'exam',
+          title: '考试模块',
+          softBrowse: true,
+          child: ExamReadingGuidedSession(paperId: paperId),
+        );
+      },
+    ),
+    GoRoute(
+      path: '/exam/reading/mock',
+      builder: (BuildContext context, GoRouterState state) {
+        final String paperId = state.uri.queryParameters['paperId'] ?? '';
+        return ModuleGate(
+          moduleCode: 'exam',
+          title: '考试模块',
+          softBrowse: true,
+          child: ExamReadingMockSession(paperId: paperId),
+        );
+      },
+    ),
+    GoRoute(
+      path: '/exam/reading/type',
+      builder: (BuildContext context, GoRouterState state) {
+        final ExamRcQuestionType type = ExamRcQuestionTypeX.fromStorage(
+          state.uri.queryParameters['type'],
+        );
+        return ExamReadingTypeDrillScreen(type: type);
+      },
     ),
     GoRoute(
       path: '/exam/session',
