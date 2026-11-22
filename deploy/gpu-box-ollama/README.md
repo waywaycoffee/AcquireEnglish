@@ -6,7 +6,7 @@
 
 ```text
 手机 App (Tailscale)
-  ├─ 翻译 / 字幕补全 ──▶ Ollama :11434/v1   (qwen2.5:7b)
+  ├─ 翻译 / 字幕补全 ──▶ Ollama :11434/v1   (qwen2.5:3b)
   └─ 数字人陪练 ──────▶ LiveTalking :8010
          └── 同机、同卡，按需交错占用 VRAM
 ```
@@ -23,7 +23,7 @@
 
 ## 模型选择
 
-当前 GPU 箱默认 **`qwen2.5:7b`**（`Qwen/Qwen2.5-7B-Instruct`，4bit）。备选：`qwen3:8b` / `qwen3:4b`。不要上 14B/32B。已弃用 `qwen2.5:3b`。
+当前 GPU 箱默认 **`qwen2.5:3b`**（`Qwen/Qwen2.5-3B-Instruct`，4bit，省显存）。备选：`qwen2.5:7b` / `qwen3:4b`。不要上 14B/32B。
 
 ## 在 5060 Ti 上执行
 
@@ -37,7 +37,7 @@ powershell -ExecutionPolicy Bypass -File .\install_windows.ps1
 powershell -File .\verify_windows.ps1
 ```
 
-会拉取 `Qwen/Qwen2.5-7B-Instruct`，对外仍暴露 `http://0.0.0.0:11434/v1`，App 模型名 **`qwen2.5:7b`**。
+会拉取 `Qwen/Qwen2.5-3B-Instruct`，对外仍暴露 `http://0.0.0.0:11434/v1`，App 模型名 **`qwen2.5:3b`**。
 
 ### Linux（可选：官方 Ollama）
 
@@ -45,29 +45,29 @@ powershell -File .\verify_windows.ps1
 # 在 GPU 箱上，仓库已 clone 到例如 /opt/acquireenglish
 cd /opt/acquireenglish/deploy/gpu-box-ollama
 chmod +x install.sh verify.sh
-./install.sh          # 安装 Ollama、拉 qwen2.5:7b、写 systemd
-./verify.sh           # 健康检查 + 试翻一句
+OLLAMA_MODEL=qwen2.5:3b ./install.sh   # 安装 Ollama、拉 3b、写 systemd
+MODEL=qwen2.5:3b ./verify.sh           # 健康检查 + 试翻一句
 ```
 
 可选环境变量：
 
 | 变量 | 默认 | 说明 |
 |------|------|------|
-| `OLLAMA_MODEL` | `qwen2.5:7b` | 拉取并设为翻译模型 |
+| `OLLAMA_MODEL` | `qwen2.5:3b` | 拉取并设为翻译模型 |
 | `OLLAMA_HOST` | `0.0.0.0:11434` | 监听地址（需 Tailscale 可达） |
 | `LIVETALKING_PORT` | `8010` | 仅用于 verify 探测，不改 LiveTalking 本身 |
 
 ## App 侧
 
 1. 手机加入同一 Tailscale。
-2. 设置 → 翻译来源 → **本地 Ollama**（自动填 URL + `qwen2.5:7b`，无需真实 API Key）。
+2. 设置 → 翻译来源 → **本地 Ollama**（自动填 URL + `qwen2.5:3b`，无需真实 API Key）。
 3. 「拉取模型列表」可连 GPU 箱确认已安装的 tag。
 4. 字幕中文补全、查词、语法解析走同一 OpenAI 兼容接口，**无云端限流**。
 
 ## VRAM 与并发建议
 
-- 7B 4bit 大约 5–6GB VRAM；与 LiveTalking 同卡时先起陪练再测翻译余量。
-- 翻译请求短、并发低；陪练说话时若 OOM，可临时停翻译服务再测数字人。
+- 3B 4bit 大约 2–3GB VRAM，给 LiveTalking / 阅读 TTS worker 留余量。
+- 翻译请求短、并发低；陪练说话时若仍吃紧，再降并发或停非必要 worker。
 - Linux `install.sh` 使用官方 Ollama 时会设 `OLLAMA_KEEP_ALIVE=10m`。
 
 ## 安全

@@ -1,9 +1,9 @@
-﻿# Windows 5060 Ti: local qwen2.5:7b for EN→ZH (OpenAI-compatible :11434).
+﻿# Windows 5060 Ti: local qwen2.5:3b for EN→ZH (OpenAI-compatible :11434).
 # Uses LiveTalking CUDA venv + ModelScope + transformers 4-bit (no Ollama installer).
 #
 #   powershell -ExecutionPolicy Bypass -File .\install_windows.ps1
 param(
-  [string]$ModelId = "qwen2.5:7b",
+  [string]$ModelId = "qwen2.5:3b",
   [string]$ListenHost = "0.0.0.0",
   [int]$Port = 11434,
   [switch]$SkipDownload,
@@ -34,10 +34,10 @@ Write-Host "==> pip deps (Tsinghua)"
 
 New-Item -ItemType Directory -Force -Path $ModelDir | Out-Null
 if (-not $SkipDownload) {
-  Write-Host "==> ModelScope pull Qwen/Qwen2.5-7B-Instruct (~15GB first time, 4bit ~5GB VRAM)"
+  Write-Host "==> ModelScope pull Qwen/Qwen2.5-3B-Instruct (~6GB first time, 4bit ~2–3GB VRAM)"
   $dl = @"
 from modelscope import snapshot_download
-print(snapshot_download('Qwen/Qwen2.5-7B-Instruct', cache_dir=r'$ModelDir'))
+print(snapshot_download('Qwen/Qwen2.5-3B-Instruct', cache_dir=r'$ModelDir'))
 "@
   $tmp = Join-Path $Root "_download_instruct.py"
   Set-Content -Path $tmp -Value $dl -Encoding UTF8
@@ -50,7 +50,7 @@ print(snapshot_download('Qwen/Qwen2.5-7B-Instruct', cache_dir=r'$ModelDir'))
 `$env:OLLAMA_HOST = '$ListenHost'
 `$env:OLLAMA_PORT = '$Port'
 `$env:OLLAMA_MODEL_DIR = '$ModelDir'
-`$env:MODELSCOPE_MODEL = 'Qwen/Qwen2.5-7B-Instruct'
+`$env:MODELSCOPE_MODEL = 'Qwen/Qwen2.5-3B-Instruct'
 `$Py = '$VenvPy'
 `$Server = '$Server'
 Set-Location '$Root'

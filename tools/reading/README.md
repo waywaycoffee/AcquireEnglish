@@ -23,18 +23,27 @@ Next open / continuous play hits cached URLs — no phone-side synth storm.
 
 ## On the 5060 Ti box
 
+CosyVoice 是**云端 API**（DashScope），本机不装权重；本机跑的是 **worker 排队 + 代合成 + 写回 ECS 缓存**。
+
+一次性注册登录自启：
+
+```powershell
+cd D:\AcquireEnglish
+powershell -ExecutionPolicy Bypass -File .\tools\reading\install_tts_worker.ps1
+```
+
+前台调试：
+
 ```powershell
 cd D:\AcquireEnglish
 python tools\reading\tts_worker.py
 ```
 
-Optional local DashScope key:
+Optional local DashScope key（有则本机调 CosyVoice；无则走 ECS RPC，ECS 上已有 `DASHSCOPE_API_KEY`）：
 
 ```powershell
 $env:DASHSCOPE_API_KEY="sk-..."
 python tools\reading\tts_worker.py
 ```
 
-Without a local key, synthesize goes through ECS RPC (`DASHSCOPE_API_KEY` on ECS).
-
-SSH host defaults to `acquireenglish` (same as subtitle GPU worker).
+SSH host defaults to `acquireenglish`（与字幕 GPU worker 相同）。

@@ -168,7 +168,7 @@ const Set<String> legacyTailscaleOllamaBaseUrls = <String>{
 };
 
 /// Ollama tag currently installed on 5060 Ti (EN↔ZH).
-const String defaultOllamaTranslationModel = 'qwen2.5:7b';
+const String defaultOllamaTranslationModel = 'qwen2.5:3b';
 
 const String _learningSettingsStorageKey = 'learning_settings_v1';
 
@@ -881,13 +881,14 @@ class LearningSettingsNotifier extends Notifier<LearningSettingsState> {
       return settings;
     }
     final String model = settings.translationModel.trim();
-    final bool staleThreeB = model == 'qwen2.5:3b' || model.isEmpty;
+    // Prefer 3B on 5060 Ti (VRAM); migrate away from heavier 7B default.
+    final bool staleSevenB = model == 'qwen2.5:7b' || model.isEmpty;
     return settings.copyWith(
       translationProvider: ollama.name,
       translationBaseUrl: settings.useCustomTranslationEndpoint
           ? settings.translationBaseUrl
           : ollama.baseUrl,
-      translationModel: alreadyOllama && !staleThreeB
+      translationModel: alreadyOllama && !staleSevenB
           ? settings.translationModel
           : ollama.model,
       translationApiKey: key.isEmpty ? 'ollama' : settings.translationApiKey,
