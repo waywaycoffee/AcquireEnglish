@@ -16,6 +16,7 @@ import '../../exam/presentation/exam_profile_provider.dart';
 import '../../phrases/presentation/phrase_book_provider.dart';
 import '../../sync/data/acquire_api_client.dart';
 import '../../words/domain/syllabus_book.dart';
+import '../../words/domain/vocab_card_kind.dart';
 import '../../words/domain/vocab_entry.dart';
 import '../../words/domain/word_review_settings.dart';
 import '../../words/presentation/syllabus_books_provider.dart';
@@ -120,9 +121,7 @@ reviewSourcesProvider = Provider<List<ReviewSource>>((Ref ref) {
       .map(
         (PhraseEntry phrase) => ReviewSource(
           key: 'phrase:${phrase.id}',
-          kind: phrase.episodeId != null || phrase.courseId != null
-              ? ReviewKind.sentence
-              : ReviewKind.phrase,
+          kind: reviewKindForPhraseEntry(phrase),
           question: phrase.chinese.trim().isEmpty
               ? '听原句，尝试用英语复述'
               : phrase.chinese.replaceFirst(RegExp(r' \(生词: .*\)$'), ''),
@@ -286,6 +285,18 @@ DateTime? _legacyDue(PhraseEntry phrase, DateTime now) {
   final DateTime? due = DateTime.tryParse(phrase.nextReviewAt ?? '');
   if (phrase.needsReview && (due == null || due.isAfter(now))) return now;
   return due;
+}
+
+/// Video-linked lines stay as 句子; otherwise classify by English length
+/// so oral idiomatic full sentences enter 句子复习, not 短语.
+ReviewKind reviewKindForPhraseEntry(PhraseEntry phrase) {
+  if (phrase.episodeId != null || phrase.courseId != null) {
+    return ReviewKind.sentence;
+  }
+  return switch (vocabCardKindForLexeme(phrase.english)) {
+    VocabCardKind.pattern => ReviewKind.sentence,
+    VocabCardKind.phrase || VocabCardKind.word => ReviewKind.phrase,
+  };
 }
 
 final NotifierProvider<DailyReviewNotifier, DailyReviewState>

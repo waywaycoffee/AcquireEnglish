@@ -901,9 +901,16 @@ class _PeerOralPracticeScreenState
         );
     _saved = true;
     if (!notify || !mounted) return;
+    final bool asSentence =
+        english.trim().split(RegExp(r'\s+')).where((String w) => w.isNotEmpty).length >=
+        5;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text(added ? '已收藏地道表达到语言库' : '该表达已在语言库中'),
+        content: Text(
+          added
+              ? (asSentence ? '已收藏到句子复习' : '已收藏到短语复习')
+              : (asSentence ? '该句子已在复习队列中' : '该表达已在语言库中'),
+        ),
         duration: const Duration(seconds: 2),
       ),
     );
