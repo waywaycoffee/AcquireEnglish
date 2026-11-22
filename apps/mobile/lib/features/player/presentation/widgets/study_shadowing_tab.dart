@@ -1059,7 +1059,11 @@ class _StudyShadowingTabState extends ConsumerState<StudyShadowingTab> {
       onPressed: onPressed,
       tooltip: semanticLabel,
       iconSize: 28,
-      color: onPressed == null ? shell.textMuted : shell.textPrimary,
+      color: widget.toolbarLink != null
+          ? (onPressed == null ? Colors.white38 : Colors.white)
+          : onPressed == null
+          ? shell.textMuted
+          : shell.textPrimary,
       icon: Icon(icon),
     );
   }
@@ -1069,11 +1073,15 @@ class _StudyShadowingTabState extends ConsumerState<StudyShadowingTab> {
       button: true,
       label: _recordingActive ? '停止录音' : '开始跟读录音',
       child: Material(
-        color: !canRecord
+        color: widget.toolbarLink != null
+            ? (_recordingActive
+                  ? Colors.red.withValues(alpha: 0.8)
+                  : Colors.black.withValues(alpha: 0.5))
+            : !canRecord
             ? shell.accent.withValues(alpha: 0.35)
             : (_recordingActive ? const Color(0xFFB42318) : shell.accent),
         shape: const CircleBorder(),
-        elevation: 3,
+        elevation: widget.toolbarLink == null ? 3 : 0,
         child: InkWell(
           key: const ValueKey<String>('study-shadowing-assess'),
           customBorder: const CircleBorder(),
@@ -1598,72 +1606,165 @@ class _StudyShadowingTabState extends ConsumerState<StudyShadowingTab> {
             ],
           ),
         ),
-        // Always keep mic / original / nav in the tab body so they cannot
-        // vanish behind a video overlay or first-run tip dialog.
-        SafeArea(
-          top: false,
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-            child: SizedBox(
-              key: const ValueKey<String>('study-shadowing-control-row'),
-              height: 48,
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: <Widget>[
-                  PopupMenuButton<ShadowPromptMode>(
-                    tooltip: '跟读模式：${_promptMode.label}',
-                    icon: Icon(
-                      Icons.tune,
-                      color: shell.textSecondary,
-                      size: 22,
+        // Overlay onto the video bottom when [toolbarLink] is set so the
+        // study tab keeps room for the sentence / subtitles.
+        _ShadowToolbarPortal(
+          link: widget.toolbarLink,
+          child: SafeArea(
+            bottom: widget.toolbarLink == null,
+            top: false,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+              child: SizedBox(
+                key: const ValueKey<String>('study-shadowing-control-row'),
+                height: 48,
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: <Widget>[
+                    PopupMenuButton<ShadowPromptMode>(
+                      tooltip: '跟读模式：${_promptMode.label}',
+                      style: widget.toolbarLink == null
+                          ? null
+                          : IconButton.styleFrom(
+                              backgroundColor: Colors.black.withValues(
+                                alpha: 0.5,
+                              ),
+                            ),
+                      icon: Icon(
+                        Icons.tune,
+                        color: widget.toolbarLink != null
+                            ? Colors.white
+                            : shell.textSecondary,
+                        size: 22,
+                      ),
+                      onSelected: _setPromptMode,
+                      itemBuilder: (BuildContext context) =>
+                          <PopupMenuEntry<ShadowPromptMode>>[
+                        for (final ShadowPromptMode mode
+                            in ShadowPromptMode.values)
+                          PopupMenuItem<ShadowPromptMode>(
+                            value: mode,
+                            child: Text(mode.label),
+                          ),
+                      ],
                     ),
-                    onSelected: _setPromptMode,
-                    itemBuilder: (BuildContext context) =>
-                        <PopupMenuEntry<ShadowPromptMode>>[
-                      for (final ShadowPromptMode mode
-                          in ShadowPromptMode.values)
-                        PopupMenuItem<ShadowPromptMode>(
-                          value: mode,
-                          child: Text(mode.label),
-                        ),
-                    ],
-                  ),
-                  IconButton(
-                    key: const ValueKey<String>('study-shadowing-original'),
-                    tooltip: '播放原声',
-                    icon: const Icon(Icons.volume_up_rounded),
-                    onPressed: _recordingActive ? null : _playOriginalAudio,
-                  ),
-                  _sideNavButton(
-                    icon: Icons.chevron_left_rounded,
-                    semanticLabel: '上一句',
-                    onPressed: widget.onPreviousSentence,
-                    shell: shell,
-                  ),
-                  _micButton(shell, canRecord),
-                  IconButton(
-                    key: const ValueKey<String>('study-shadowing-own-replay'),
-                    tooltip: '播放我的录音',
-                    icon: const Icon(Icons.graphic_eq_rounded),
-                    color: _ownColor,
-                    onPressed: _recordingPath == null || _recordingActive
-                        ? null
-                        : () => unawaited(_playLocalFile(_recordingPath)),
-                  ),
-                  _sideNavButton(
-                    icon: Icons.chevron_right_rounded,
-                    semanticLabel: '下一句',
-                    onPressed: widget.onNextSentence == null
-                        ? null
-                        : () => unawaited(_goNextAfterPractice()),
-                    shell: shell,
-                  ),
-                ],
+                    IconButton(
+                      key: const ValueKey<String>('study-shadowing-original'),
+                      tooltip: '播放原声',
+                      icon: const Icon(Icons.volume_up_rounded),
+                      onPressed: _recordingActive ? null : _playOriginalAudio,
+                    ),
+                    _sideNavButton(
+                      icon: Icons.chevron_left_rounded,
+                      semanticLabel: '上一句',
+                      onPressed: widget.onPreviousSentence,
+                      shell: shell,
+                    ),
+                    _micButton(shell, canRecord),
+                    IconButton(
+                      key: const ValueKey<String>('study-shadowing-own-replay'),
+                      tooltip: '播放我的录音',
+                      icon: const Icon(Icons.graphic_eq_rounded),
+                      color: _ownColor,
+                      onPressed: _recordingPath == null || _recordingActive
+                          ? null
+                          : () => unawaited(_playLocalFile(_recordingPath)),
+                    ),
+                    _sideNavButton(
+                      icon: Icons.chevron_right_rounded,
+                      semanticLabel: '下一句',
+                      onPressed: widget.onNextSentence == null
+                          ? null
+                          : () => unawaited(_goNextAfterPractice()),
+                      shell: shell,
+                    ),
+                  ],
+                ),
               ),
             ),
           ),
         ),
       ],
+    );
+  }
+}
+
+/// Keeps recording state in the study tab while painting controls over video.
+class _ShadowToolbarPortal extends StatefulWidget {
+  const _ShadowToolbarPortal({required this.link, required this.child});
+
+  final LayerLink? link;
+  final Widget child;
+
+  @override
+  State<_ShadowToolbarPortal> createState() => _ShadowToolbarPortalState();
+}
+
+class _ShadowToolbarPortalState extends State<_ShadowToolbarPortal> {
+  final OverlayPortalController _controller = OverlayPortalController();
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted && widget.link != null) {
+        _controller.show();
+      }
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final LayerLink? link = widget.link;
+    if (link == null) {
+      return widget.child;
+    }
+    return OverlayPortal(
+      controller: _controller,
+      overlayChildBuilder: (BuildContext context) {
+        // Only the toolbar row should receive hits — avoid a full-screen
+        // Positioned layer swallowing taps on the bottom play button.
+        final double width =
+            link.leaderSize?.width ?? MediaQuery.sizeOf(context).width;
+        return CompositedTransformFollower(
+          link: link,
+          showWhenUnlinked: false,
+          targetAnchor: Alignment.bottomCenter,
+          followerAnchor: Alignment.bottomCenter,
+          child: SizedBox(
+            width: width,
+            child: Material(
+              key: const ValueKey<String>('study-shadowing-overlay-background'),
+              color: const Color(0xFFE5E7EB).withValues(alpha: 0.65),
+              borderRadius: BorderRadius.circular(18),
+              clipBehavior: Clip.antiAlias,
+              child: IconButtonTheme(
+                data: IconButtonThemeData(
+                  style: IconButton.styleFrom(
+                    backgroundColor: Colors.black.withValues(alpha: 0.5),
+                    disabledBackgroundColor: Colors.black.withValues(
+                      alpha: 0.3,
+                    ),
+                    foregroundColor: Colors.white,
+                    disabledForegroundColor: Colors.white38,
+                    shape: const CircleBorder(),
+                  ),
+                ),
+                child: IconTheme(
+                  data: const IconThemeData(
+                    color: Colors.white,
+                    shadows: <Shadow>[
+                      Shadow(color: Colors.black54, blurRadius: 3),
+                    ],
+                  ),
+                  child: widget.child,
+                ),
+              ),
+            ),
+          ),
+        );
+      },
+      child: const SizedBox.shrink(),
     );
   }
 }

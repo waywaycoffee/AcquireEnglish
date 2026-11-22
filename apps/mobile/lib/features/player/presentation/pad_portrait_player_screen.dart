@@ -217,6 +217,7 @@ class PadPortraitPlayerScreenState
   StreamSubscription<Tracks>? _videoTracksSubscription;
   bool _isMuted = false;
   double _volumeLevel = 1;
+  final LayerLink _shadowToolbarLink = LayerLink();
   /// Bound by [StudyShadowingTab] — mirrors the toolbar volume / 播放原声 action.
   VoidCallback? _shadowingPlayOriginal;
   bool _dubPlaybackActive = false;
@@ -3142,7 +3143,9 @@ Future<void> _settleChineseFillIfAlreadyPresent() async {
                       padding: EdgeInsets.symmetric(
                         horizontal: playerHorizontalPadding,
                       ),
-                      child: PlayerVideoPanel(
+                      child: CompositedTransformTarget(
+                        link: _shadowToolbarLink,
+                        child: PlayerVideoPanel(
                         episodeId: widget.episodeId,
                         showSceneHeader: false,
                           hideOverlayControls: true,
@@ -3237,6 +3240,7 @@ Future<void> _settleChineseFillIfAlreadyPresent() async {
                         onGenerateAiSubtitles: _generatingAiSubtitles
                             ? null
                             : _handleGenerateAiSubtitles,
+                        ),
                       ),
                     ),
                     ),
@@ -3539,6 +3543,7 @@ Future<void> _settleChineseFillIfAlreadyPresent() async {
             ? _selectPronunciationForLine(state.activeLineIndex)
             : visibleAssessment;
         return StudyShadowingTab(
+          toolbarLink: _shadowToolbarLink,
           // Pin the practice cue — never use visibleLine (null at sentence end).
           line: state.hasLines ? state.activeLine : activeLine,
           hasLine: state.hasLines,
