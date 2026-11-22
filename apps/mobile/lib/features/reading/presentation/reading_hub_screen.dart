@@ -828,7 +828,7 @@ class _CloudPrepShelfItem extends ConsumerWidget {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Text(
-                '长篇需等云端 AI（5060 Ti）处理完才能打开：'
+                '长篇需等云端 AI 处理完才能打开：'
                 '${prep?.progressLabel ?? '排队中'}',
               ),
             ),
@@ -923,7 +923,7 @@ class _CloudPrepDocTile extends ConsumerWidget {
               ScaffoldMessenger.of(context).showSnackBar(
                 SnackBar(
                   content: Text(
-                    '长篇需等云端 AI（5060 Ti）处理完才能打开：${prep.progressLabel}',
+                    '长篇需等云端 AI 处理完才能打开：${prep.progressLabel}',
                   ),
                 ),
               );
@@ -994,6 +994,15 @@ class _DocTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final double pct = progress?.percent ?? 0;
+    // While AI prep runs, never mix "已读进度" with "AI%" —
+    // that looked like "进度 2% · 处理中 28%".
+    final bool aiBusy = aiPercent != null;
+    final String readBit =
+        (!aiBusy && pct > 0) ? ' · 已读 ${(pct * 100).round()}%' : '';
+    final String badgeBit =
+        (badge ?? '').isNotEmpty ? ' · $badge' : '';
+    final String metaLine =
+        '$_sourceLabel · 约 ${doc.wordCount} 词$readBit$badgeBit';
     return Material(
       color: AppDesignTokens.appWhite,
       borderRadius: BorderRadius.circular(16),
@@ -1036,9 +1045,7 @@ class _DocTile extends StatelessWidget {
                         ),
                         const SizedBox(height: 6),
                         Text(
-                          '$_sourceLabel · 约 ${doc.wordCount} 词'
-                          '${pct > 0 ? ' · 进度 ${(pct * 100).round()}%' : ''}'
-                          '${(badge ?? '').isNotEmpty ? ' · $badge' : ''}',
+                          metaLine,
                           maxLines: 3,
                           overflow: TextOverflow.ellipsis,
                           style: const TextStyle(

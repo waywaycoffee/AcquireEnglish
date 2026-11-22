@@ -58,9 +58,9 @@ class ReadingBookPrepStatus {
     if (ready) return 'AI 已就绪';
     if (state == 'missing') return '等待云端 AI 处理…';
     if (pagesTotal > 0) {
-      return '云端 AI 处理中 $percent%（$pagesReady/$pagesTotal 节）';
+      return 'AI $percent%（$pagesReady/$pagesTotal 节）';
     }
-    return '云端 AI 处理中 $percent%';
+    return 'AI $percent%';
   }
 }
 

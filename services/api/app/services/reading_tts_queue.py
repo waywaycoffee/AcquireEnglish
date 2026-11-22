@@ -631,7 +631,9 @@ def book_status(*, doc_id: str, voice: str) -> dict:
         "ready": is_ready,
         "state": state,
         "error": (book["error"] if book is not None else None),
-        "processor": "gpu-5060ti",
+        # Jobs are claimed by tools/reading/tts_worker.py on the 5060 Ti when
+        # that process is online; otherwise ECS drain_book_pregen_ecs fills.
+        "processor": "shared-tts-queue",
         "long_novel": True,
     }
 

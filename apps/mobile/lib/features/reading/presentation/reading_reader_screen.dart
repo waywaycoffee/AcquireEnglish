@@ -1162,7 +1162,7 @@ class _ReadingReaderScreenState extends ConsumerState<ReadingReaderScreen> {
                 const Icon(Icons.cloud_sync_rounded, size: 48),
                 const SizedBox(height: 16),
                 Text(
-                  '长篇小说需先在云端（5060 Ti）完成 AI 朗读预处理',
+                  '长篇小说需先在云端完成 AI 朗读预处理',
                   textAlign: TextAlign.center,
                   style: Theme.of(context).textTheme.titleMedium,
                 ),
