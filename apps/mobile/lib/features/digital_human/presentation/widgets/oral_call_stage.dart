@@ -153,8 +153,8 @@ class _SelfPip extends StatelessWidget {
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        width: 112,
-        height: 148,
+        width: 148,
+        height: 198,
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(14),
           border: Border.all(

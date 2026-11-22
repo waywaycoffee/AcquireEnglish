@@ -334,6 +334,11 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
     _historyAccount = ref.read(authSessionProvider).email.trim().toLowerCase();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) unawaited(_bootstrapScenariosAndStart());
+      if (mounted &&
+          widget.standalone &&
+          widget.articleExcerpt.trim().isNotEmpty) {
+        unawaited(_ensureSelfCallCamera());
+      }
     });
   }
 
@@ -2211,22 +2216,47 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
         setState(() => _tutorStep = TutorLessonStep.demo);
         await _runTutorStep();
       case TutorLessonStep.demo:
-        final String demo = lines.isEmpty
-            ? 'Listen carefully: ${widget.articleExcerpt.trim()}'
-            : 'Listen. ${lines.map((String l) => '“$l”').join(' ')}';
+        if (lines.isEmpty) {
+          final String demo =
+              'Listen carefully: ${widget.articleExcerpt.trim()}';
+          setState(() {
+            _tutorFocusLine = widget.articleExcerpt.trim();
+            _tutorCoachQuestion = '听示范，注意语音与节奏';
+            _bubbles.add(_ChatBubble(role: 'coach', text: demo));
+            _status = '六步外教课 · 示范';
+          });
+          _scrollChatToEnd();
+          await _speakCoach(demo, settings);
+          if (!mounted) return;
+          setState(() {
+            _tutorStep = TutorLessonStep.shadow;
+            _tutorShadowIndex = 0;
+          });
+          await _runTutorStep();
+          return;
+        }
+        if (_tutorShadowIndex >= lines.length) {
+          setState(() {
+            _tutorStep = TutorLessonStep.shadow;
+            _tutorShadowIndex = 0;
+          });
+          await _runTutorStep();
+          return;
+        }
+        final String line = lines[_tutorShadowIndex];
+        final String demo =
+            'Demo ${_tutorShadowIndex + 1}/${lines.length}. Listen: “$line”';
         setState(() {
-          _tutorFocusLine = lines.isEmpty ? widget.articleExcerpt.trim() : lines.first;
-          _tutorCoachQuestion = '听示范，注意语音与节奏';
+          _tutorFocusLine = line;
+          _tutorCoachQuestion = '听这一句示范';
           _bubbles.add(_ChatBubble(role: 'coach', text: demo));
-          _status = '六步外教课 · 示范';
+          _status =
+              '六步外教课 · 示范 ${_tutorShadowIndex + 1}/${lines.length}';
         });
         _scrollChatToEnd();
         await _speakCoach(demo, settings);
         if (!mounted) return;
-        setState(() {
-          _tutorStep = TutorLessonStep.shadow;
-          _tutorShadowIndex = 0;
-        });
+        setState(() => _tutorShadowIndex += 1);
         await _runTutorStep();
       case TutorLessonStep.shadow:
         if (lines.isEmpty || _tutorShadowIndex >= lines.length) {
@@ -2473,6 +2503,27 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
         _error = '无法打开前置摄像头：$error';
       });
     }
+  }
+
+  Widget? _buildSelfCallPreview() {
+    final CameraController? cam = _liveSceneCamera.controller;
+    if ((_selfCallCamOn || _liveSceneOn) &&
+        cam != null &&
+        cam.value.isInitialized) {
+      Widget preview = CameraPreview(cam);
+      if (cam.description.lensDirection == CameraLensDirection.front) {
+        preview = Transform(
+          alignment: Alignment.center,
+          transform: Matrix4.diagonal3Values(-1, 1, 1),
+          child: preview,
+        );
+      }
+      return preview;
+    }
+    if (_sceneImagePath != null && File(_sceneImagePath!).existsSync()) {
+      return Image.file(File(_sceneImagePath!), fit: BoxFit.cover);
+    }
+    return null;
   }
 
   Future<void> _toggleSelfCallCamera() async {
@@ -3176,14 +3227,7 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
               imageAsset: persona.assetPath,
               liveVideo: liveVideo,
               selfCamOn: _selfCallCamOn || _liveSceneOn,
-              selfPreview:
-                  (_selfCallCamOn || _liveSceneOn) &&
-                      _liveSceneCamera.controller != null
-                  ? CameraPreview(_liveSceneCamera.controller!)
-                  : (_sceneImagePath != null &&
-                        File(_sceneImagePath!).existsSync())
-                  ? Image.file(File(_sceneImagePath!), fit: BoxFit.cover)
-                  : null,
+              selfPreview: _buildSelfCallPreview(),
               micMuted: _callMicMuted,
               micEnabled: !_busy,
               swapCoachEnabled: !_busy && !_recordingActive && !_coachSpeaking,
@@ -3721,7 +3765,11 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
                   if (constraints.maxWidth < 600) {
                     return Column(
                       children: <Widget>[
-                        _buildTutorLessonStrip(),
+                        SizedBox(
+                          height: (constraints.maxHeight * 0.38)
+                              .clamp(168.0, 280.0),
+                          child: _buildTutorLessonPanel(),
+                        ),
                         Expanded(child: coachColumn),
                       ],
                     );
@@ -3730,7 +3778,7 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: <Widget>[
                       SizedBox(
-                        width: constraints.maxWidth * 0.4,
+                        width: constraints.maxWidth * 0.42,
                         child: _buildTutorLessonPanel(),
                       ),
                       Expanded(child: coachColumn),
@@ -3743,445 +3791,63 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
     );
   }
 
-  Widget _buildTutorLessonStrip() {
-    final TutorLessonStep step = _tutorStep ?? TutorLessonStep.intro;
-    final String focus = _tutorFocusLine.trim().isNotEmpty
-        ? _tutorFocusLine.trim()
-        : step.detail;
-    return Material(
-      color: Colors.white.withValues(alpha: 0.06),
-      child: InkWell(
-        onTap: () {
-          showModalBottomSheet<void>(
-            context: context,
-            backgroundColor: const Color(0xFF1A1240),
-            isScrollControlled: true,
-            builder: (BuildContext context) {
-              return SafeArea(
-                child: SizedBox(
-                  height: MediaQuery.sizeOf(context).height * 0.62,
-                  child: _buildTutorLessonPanel(),
-                ),
-              );
-            },
-          );
-        },
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(14, 10, 14, 10),
-          child: Row(
-            children: <Widget>[
-              const Icon(Icons.menu_book_rounded, color: Colors.white70, size: 18),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: <Widget>[
-                    Text(
-                      '第 ${step.index1}/6 步 · ${step.title}',
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.w800,
-                        fontSize: 13,
-                      ),
-                    ),
-                    Text(
-                      focus,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(color: Colors.white70, fontSize: 11),
-                    ),
-                  ],
-                ),
-              ),
-              if (_tutorOverallScore != null)
-                Padding(
-                  padding: const EdgeInsets.only(right: 6),
-                  child: Text(
-                    '$_tutorOverallScore',
-                    style: const TextStyle(
-                      color: Color(0xFF34D399),
-                      fontWeight: FontWeight.w900,
-                    ),
-                  ),
-                ),
-              const Icon(Icons.expand_more_rounded, color: Colors.white54),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildTutorLessonPanel() {
-    final String excerpt = widget.articleExcerpt.trim();
-    final String title = widget.courseTitle.trim().isNotEmpty
-        ? widget.courseTitle.trim()
-        : 'AI 外教课';
+  /// One prompt only for the current tutor frame (left panel / phone card).
+  ({String title, String prompt, String hint}) _tutorOneQuestion() {
     final TutorLessonStep current = _tutorStep ?? TutorLessonStep.intro;
     final List<String> lines = _tutorLines;
-    final List<String> keys = tutorKeyExpressions(lines);
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: <Widget>[
-          Text(
-            title,
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: 20,
-              fontWeight: FontWeight.w900,
-            ),
-          ),
-          const SizedBox(height: 6),
-          Text(
-            '第 ${current.index1}/6 步 · ${current.title}',
-            style: TextStyle(
-              color: Colors.white.withValues(alpha: 0.78),
-              fontSize: 14,
-              fontWeight: FontWeight.w700,
-            ),
-          ),
-          if (_tutorCoachQuestion.trim().isNotEmpty) ...<Widget>[
-            const SizedBox(height: 4),
-            Text(
-              _tutorCoachQuestion,
-              style: TextStyle(
-                color: Colors.white.withValues(alpha: 0.62),
-                fontSize: 12,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ],
-          const SizedBox(height: 12),
-          Text(
-            '六步进度',
-            style: TextStyle(
-              color: Colors.white.withValues(alpha: 0.55),
-              fontSize: 12,
-              fontWeight: FontWeight.w700,
-            ),
-          ),
-          const SizedBox(height: 8),
-          for (final TutorLessonStep step in TutorLessonStepX.all)
-            Padding(
-              padding: const EdgeInsets.only(bottom: 6),
-              child: Row(
-                children: <Widget>[
-                  Icon(
-                    step.index <= current.index
-                        ? Icons.check_circle_rounded
-                        : Icons.radio_button_unchecked,
-                    size: 18,
-                    color: step == current
-                        ? const Color(0xFFA78BFA)
-                        : step.index < current.index
-                        ? const Color(0xFF34D399)
-                        : Colors.white38,
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      '${step.index1}. ${step.title}',
-                      style: TextStyle(
-                        color: step == current
-                            ? Colors.white
-                            : Colors.white.withValues(alpha: 0.7),
-                        fontWeight: step == current
-                            ? FontWeight.w800
-                            : FontWeight.w600,
-                        fontSize: 13,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          const SizedBox(height: 10),
-          Text(
-            _tutorStepPanelHeading(current),
-            style: TextStyle(
-              color: Colors.white.withValues(alpha: 0.55),
-              fontSize: 12,
-              fontWeight: FontWeight.w700,
-            ),
-          ),
-          const SizedBox(height: 8),
-          Expanded(
-            child: SingleChildScrollView(
-              child: _buildTutorStepBody(
-                current: current,
-                excerpt: excerpt,
-                lines: lines,
-                keys: keys,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  String _tutorStepPanelHeading(TutorLessonStep step) {
-    return switch (step) {
-      TutorLessonStep.intro => '今日表达',
-      TutorLessonStep.demo => '示范原句',
-      TutorLessonStep.shadow => '跟读目标',
-      TutorLessonStep.substitute => '替换练习',
-      TutorLessonStep.dialogue => '外教出题',
-      TutorLessonStep.summary => '小结与复习',
-    };
-  }
-
-  Widget _buildTutorStepBody({
-    required TutorLessonStep current,
-    required String excerpt,
-    required List<String> lines,
-    required List<String> keys,
-  }) {
+    final String excerpt = widget.articleExcerpt.trim();
+    final String focus = _tutorFocusLine.trim().isNotEmpty
+        ? _tutorFocusLine.trim()
+        : (lines.isNotEmpty ? lines.first : excerpt);
     switch (current) {
       case TutorLessonStep.intro:
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: <Widget>[
-            Text(
-              excerpt.isEmpty ? '（无素材）' : excerpt,
-              style: const TextStyle(
-                color: Colors.white,
-                fontSize: 15,
-                height: 1.45,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-            if (keys.isNotEmpty) ...<Widget>[
-              const SizedBox(height: 12),
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                children: keys
-                    .map(
-                      (String k) => Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 10,
-                          vertical: 6,
-                        ),
-                        decoration: BoxDecoration(
-                          color: Colors.white.withValues(alpha: 0.08),
-                          borderRadius: BorderRadius.circular(999),
-                        ),
-                        child: Text(
-                          k,
-                          style: const TextStyle(
-                            color: Color(0xFFE9D5FF),
-                            fontWeight: FontWeight.w700,
-                            fontSize: 12,
-                          ),
-                        ),
-                      ),
-                    )
-                    .toList(growable: false),
-              ),
-            ],
-          ],
+        final List<String> keys = tutorKeyExpressions(lines);
+        return (
+          title: '开场 · 今天学什么',
+          prompt: keys.isNotEmpty
+              ? keys.take(3).join(' · ')
+              : (focus.isEmpty ? '准备开始外教课' : focus),
+          hint: '听外教介绍，记住今天要练的表达',
         );
       case TutorLessonStep.demo:
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: <Widget>[
-            for (int i = 0; i < lines.length; i++)
-              Padding(
-                padding: const EdgeInsets.only(bottom: 10),
-                child: Text(
-                  '${i + 1}. ${lines[i]}',
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 15,
-                    height: 1.4,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-              ),
-            if (lines.isEmpty)
-              Text(
-                excerpt.isEmpty ? '（无素材）' : excerpt,
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 15,
-                  height: 1.45,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-          ],
+        final int n = lines.isEmpty ? 1 : lines.length;
+        final int i = lines.isEmpty
+            ? 1
+            : ((_tutorShadowIndex < n ? _tutorShadowIndex : n - 1) + 1);
+        return (
+          title: '示范 · 第 $i/$n 句',
+          prompt: focus.isEmpty ? excerpt : focus,
+          hint: '只看这一句，听清语音与节奏',
         );
       case TutorLessonStep.shadow:
         final String target = (_tutorShadowIndex < lines.length)
             ? lines[_tutorShadowIndex]
-            : (_tutorFocusLine.isNotEmpty ? _tutorFocusLine : excerpt);
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: <Widget>[
-            Text(
-              lines.isEmpty
-                  ? '跟读完成'
-                  : '第 ${_tutorShadowIndex.clamp(0, lines.length - 1) + 1}/${lines.length} 句',
-              style: TextStyle(
-                color: Colors.white.withValues(alpha: 0.55),
-                fontSize: 12,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              target.isEmpty ? '（无跟读句）' : target,
-              style: const TextStyle(
-                color: Colors.white,
-                fontSize: 18,
-                height: 1.4,
-                fontWeight: FontWeight.w900,
-              ),
-            ),
-            const SizedBox(height: 12),
-            for (int i = 0; i < lines.length; i++)
-              Padding(
-                padding: const EdgeInsets.only(bottom: 6),
-                child: Row(
-                  children: <Widget>[
-                    Icon(
-                      i < _tutorShadowIndex
-                          ? Icons.check_circle_rounded
-                          : i == _tutorShadowIndex
-                          ? Icons.mic_rounded
-                          : Icons.circle_outlined,
-                      size: 16,
-                      color: i < _tutorShadowIndex
-                          ? const Color(0xFF34D399)
-                          : i == _tutorShadowIndex
-                          ? const Color(0xFFA78BFA)
-                          : Colors.white38,
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        lines[i],
-                        style: TextStyle(
-                          color: i == _tutorShadowIndex
-                              ? Colors.white
-                              : Colors.white70,
-                          fontWeight: i == _tutorShadowIndex
-                              ? FontWeight.w800
-                              : FontWeight.w500,
-                          fontSize: 13,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-          ],
+            : focus;
+        final int n = lines.isEmpty ? 1 : lines.length;
+        final int i = lines.isEmpty
+            ? 1
+            : (_tutorShadowIndex.clamp(0, n - 1) + 1);
+        return (
+          title: '跟读 · 第 $i/$n 句',
+          prompt: target.isEmpty ? '（无跟读句）' : target,
+          hint: '按住麦克风，完整跟读这一句',
         );
       case TutorLessonStep.substitute:
-        final String base =
-            _tutorFocusLine.isNotEmpty
-                ? _tutorFocusLine
-                : (lines.isNotEmpty ? lines.first : excerpt);
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: <Widget>[
-            const Text(
-              '在原句上换一个词，说出你自己的句子。外教会纠错。',
-              style: TextStyle(color: Colors.white70, fontSize: 13, height: 1.4),
-            ),
-            const SizedBox(height: 10),
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha: 0.08),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Text(
-                base.isEmpty ? '（无底句）' : base,
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 15,
-                  height: 1.4,
-                  fontWeight: FontWeight.w800,
-                ),
-              ),
-            ),
-            if (_tutorCorrections.isNotEmpty) ...<Widget>[
-              const SizedBox(height: 12),
-              Text(
-                '纠错提示',
-                style: TextStyle(
-                  color: Colors.white.withValues(alpha: 0.55),
-                  fontSize: 12,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-              const SizedBox(height: 6),
-              for (final String c in _tutorCorrections.take(4))
-                Padding(
-                  padding: const EdgeInsets.only(bottom: 4),
-                  child: Text(
-                    '· $c',
-                    style: const TextStyle(
-                      color: Color(0xFFFCA5A5),
-                      fontSize: 13,
-                      height: 1.35,
-                    ),
-                  ),
-                ),
-            ],
-          ],
+        return (
+          title: '替换 · 换词造句',
+          prompt: focus.isEmpty ? excerpt : focus,
+          hint: _tutorCorrections.isNotEmpty
+              ? '纠错：${_tutorCorrections.last}'
+              : '换一个词说出你自己的句子',
         );
       case TutorLessonStep.dialogue:
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: <Widget>[
-            Text(
-              '第 ${_tutorDialogueTurns.clamp(0, 2) + 1}/3 轮',
-              style: TextStyle(
-                color: Colors.white.withValues(alpha: 0.55),
-                fontSize: 12,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              _tutorCoachQuestion.trim().isEmpty
-                  ? '用本课素材回答外教的问题'
-                  : _tutorCoachQuestion,
-              style: const TextStyle(
-                color: Colors.white,
-                fontSize: 16,
-                height: 1.4,
-                fontWeight: FontWeight.w800,
-              ),
-            ),
-            const SizedBox(height: 12),
-            Text(
-              '素材提示',
-              style: TextStyle(
-                color: Colors.white.withValues(alpha: 0.55),
-                fontSize: 12,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-            const SizedBox(height: 6),
-            Text(
-              _tutorFocusLine.isNotEmpty
-                  ? _tutorFocusLine
-                  : (excerpt.isEmpty ? '（无素材）' : excerpt),
-              style: const TextStyle(
-                color: Colors.white70,
-                fontSize: 14,
-                height: 1.4,
-              ),
-            ),
-          ],
+        final String q = _tutorCoachQuestion.trim().isNotEmpty
+            ? _tutorCoachQuestion.trim()
+            : '用本课素材回答外教的问题';
+        return (
+          title: '对话 · 第 ${_tutorDialogueTurns.clamp(0, 2) + 1}/3 题',
+          prompt: q,
+          hint: focus.isEmpty ? '开口回答外教' : '可用素材：$focus',
         );
       case TutorLessonStep.summary:
         final int overall = _tutorOverallScore ??
@@ -4190,66 +3856,94 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
                 : (_tutorStepScores.reduce((int a, int b) => a + b) /
                           _tutorStepScores.length)
                       .round());
-        return Column(
+        return (
+          title: '小结 · 本课得分',
+          prompt: '$overall 分',
+          hint: _tutorFsrsWritten
+              ? '已写入学习记录与 FSRS 复习'
+              : '正在写入复习循环…',
+        );
+    }
+  }
+
+  Widget _buildTutorLessonPanel() {
+    final TutorLessonStep current = _tutorStep ?? TutorLessonStep.intro;
+    final ({String title, String prompt, String hint}) q = _tutorOneQuestion();
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.05),
+        border: Border(
+          right: BorderSide(color: Colors.white.withValues(alpha: 0.08)),
+          bottom: BorderSide(color: Colors.white.withValues(alpha: 0.08)),
+        ),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(18, 16, 18, 14),
+        child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: <Widget>[
+            Row(
+              children: <Widget>[
+                for (final TutorLessonStep step in TutorLessonStepX.all)
+                  Expanded(
+                    child: Container(
+                      height: 4,
+                      margin: const EdgeInsets.only(right: 4),
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(999),
+                        color: step.index <= current.index
+                            ? (step == current
+                                ? const Color(0xFFA78BFA)
+                                : const Color(0xFF34D399))
+                            : Colors.white24,
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+            const SizedBox(height: 14),
             Text(
-              '本课得分 $overall',
-              style: const TextStyle(
-                color: Color(0xFF34D399),
-                fontSize: 22,
-                fontWeight: FontWeight.w900,
+              '第 ${current.index1}/6 步 · ${q.title}',
+              style: TextStyle(
+                color: Colors.white.withValues(alpha: 0.72),
+                fontSize: 15,
+                fontWeight: FontWeight.w800,
               ),
             ),
-            const SizedBox(height: 8),
-            Text(
-              _tutorFsrsWritten
-                  ? '已写入学习记录与 FSRS 复习循环（句子 + 关键词）。'
-                  : '正在写入复习循环…',
-              style: const TextStyle(color: Colors.white70, fontSize: 13),
-            ),
-            if (_tutorStepScores.isNotEmpty) ...<Widget>[
-              const SizedBox(height: 12),
-              Text(
-                '分步得分：${_tutorStepScores.join(' · ')}',
-                style: const TextStyle(color: Colors.white60, fontSize: 12),
-              ),
-            ],
-            if (_tutorCorrections.isNotEmpty) ...<Widget>[
-              const SizedBox(height: 12),
-              const Text(
-                '本课纠错',
-                style: TextStyle(
-                  color: Colors.white70,
-                  fontSize: 12,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-              const SizedBox(height: 6),
-              for (final String c in _tutorCorrections.take(6))
-                Padding(
-                  padding: const EdgeInsets.only(bottom: 4),
+            const SizedBox(height: 12),
+            Expanded(
+              child: Center(
+                child: SingleChildScrollView(
                   child: Text(
-                    '· $c',
-                    style: const TextStyle(
-                      color: Color(0xFFFCA5A5),
-                      fontSize: 13,
+                    q.prompt,
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      color: current == TutorLessonStep.summary
+                          ? const Color(0xFF34D399)
+                          : Colors.white,
+                      fontSize: current == TutorLessonStep.summary ? 42 : 28,
+                      height: 1.35,
+                      fontWeight: FontWeight.w900,
                     ),
                   ),
                 ),
-            ],
-            const SizedBox(height: 12),
+              ),
+            ),
+            const SizedBox(height: 10),
             Text(
-              excerpt.isEmpty ? '' : excerpt,
+              q.hint,
+              textAlign: TextAlign.center,
               style: TextStyle(
-                color: Colors.white.withValues(alpha: 0.55),
-                fontSize: 13,
-                height: 1.4,
+                color: Colors.white.withValues(alpha: 0.7),
+                fontSize: 16,
+                height: 1.35,
+                fontWeight: FontWeight.w600,
               ),
             ),
           ],
-        );
-    }
+        ),
+      ),
+    );
   }
 
   Widget _buildNeedMaterialGate() {
