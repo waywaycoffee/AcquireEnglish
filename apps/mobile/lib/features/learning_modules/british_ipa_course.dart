@@ -18,9 +18,9 @@ class BritishIpaCourse {
   static const String kBvid = 'BV127411n7nj';
   static const String kTitle = '国际音标 · BBC 跟读';
 
-  /// Pages 1–46: intro + 44 sounds with bilingual subs. 47–92 are no-sub duplicates.
+  /// Pages 2–46: overview + 44 sounds with bilingual subs (skip Introduction).
+  /// Pages 47–92 are no-sub duplicates and are omitted.
   static const List<BritishIpaLesson> lessons = <BritishIpaLesson>[
-    BritishIpaLesson(page: 1, title: 'Introduction'),
     BritishIpaLesson(page: 2, title: 'The sound of English'),
     BritishIpaLesson(page: 3, symbol: 'ɪ', title: '短元音 [ɪ]'),
     BritishIpaLesson(page: 4, symbol: 'iː', title: '长元音 [iː]'),
