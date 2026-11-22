@@ -23,9 +23,13 @@ import '../../player/presentation/learning_resume_provider.dart';
 import '../../reading/domain/reading_doc.dart';
 import '../../reading/presentation/reading_library_provider.dart';
 import '../../shared/presentation/pad/pad_scaffold.dart';
+import '../../../router/app_router.dart';
 import '../../sync/data/acquire_api_client.dart';
 import '../../sync/presentation/cloud_catalog_sync.dart';
 import '../../sync/presentation/daily_feed_provider.dart';
+import '../../words/presentation/estimated_vocabulary_provider.dart';
+import '../../words/presentation/learner_level_provider.dart';
+import '../../words/presentation/vocabulary_placement_provider.dart';
 import 'learning_dashboard_provider.dart';
 import 'pad_home_screen.dart' show DailyRecommendSection, RecentCourses;
 import 'product_feedback_sheet.dart';
@@ -137,6 +141,28 @@ class _LearningHomeScreenState extends ConsumerState<LearningHomeScreen> {
     }();
     final FocusRecommendation? focusRec = ref.watch(focusRecommendationProvider);
     final AcquirePreferencesDto prefs = ref.watch(learningPreferencesProvider);
+    final int? vocabulary = ref.watch(estimatedVocabularyProvider);
+    final int? placementEstimate = ref.watch(
+      vocabularyPlacementProvider.select(
+        (PlacementRow profile) => profile['estimate'] as int?,
+      ),
+    );
+    final String adaptiveCefr = ref.watch(adaptiveLearnerCefrProvider);
+    final String prefsLevel = prefs.level.trim();
+    final String levelLabel = () {
+      if (vocabulary != null && placementEstimate != null) {
+        return '$adaptiveCefr · 词汇量 ≈ $vocabulary';
+      }
+      if (vocabulary != null) {
+        final String band =
+            prefsLevel.isNotEmpty ? prefsLevel : adaptiveCefr;
+        return '$band · 已学约 $vocabulary 词';
+      }
+      if (prefsLevel.isNotEmpty) {
+        return '水平 $prefsLevel · 测词汇量';
+      }
+      return '测词汇量定水平';
+    }();
     final Set<String> tracks = selectedLearningTracks(prefs.tags);
     final readingLibrary = ref.watch(readingLibraryProvider);
     final FocusRecommendation reading = buildFocusRecommendation(
@@ -243,6 +269,54 @@ class _LearningHomeScreenState extends ConsumerState<LearningHomeScreen> {
                           icon: Icon(Icons.person_outline, color: accent),
                         ),
                       ],
+                    ),
+                    const SizedBox(height: 12),
+                    Material(
+                      key: const Key('home-vocabulary-estimate'),
+                      color: surface,
+                      borderRadius: BorderRadius.circular(16),
+                      child: InkWell(
+                        borderRadius: BorderRadius.circular(16),
+                        onTap: () =>
+                            context.push(SGRoute.vocabularyPlacement.route),
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 14,
+                            vertical: 12,
+                          ),
+                          child: Row(
+                            children: <Widget>[
+                              Icon(
+                                Icons.insights_outlined,
+                                color: accent,
+                                size: 22,
+                              ),
+                              const SizedBox(width: 10),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: <Widget>[
+                                    text('我的英语水平', 12, color: muted),
+                                    const SizedBox(height: 2),
+                                    text(levelLabel, 15, bold: true),
+                                  ],
+                                ),
+                              ),
+                              text(
+                                placementEstimate == null ? '去测评' : '更新',
+                                13,
+                                color: accent,
+                                bold: true,
+                              ),
+                              Icon(
+                                Icons.chevron_right,
+                                color: accent,
+                                size: 20,
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
                     ),
                     const SizedBox(height: 12),
                     Material(
