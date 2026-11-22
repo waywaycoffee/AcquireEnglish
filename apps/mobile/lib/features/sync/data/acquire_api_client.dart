@@ -3699,6 +3699,28 @@ class AcquireApiClient {
         .toList(growable: false);
   }
 
+  Future<List<ExamAssetDto>> listMyExamAssets({int limit = 40}) async {
+    final Response<dynamic> response = await _dio.get(
+      '${Endpoints.communityExamAssets}/mine',
+      queryParameters: <String, dynamic>{'limit': limit},
+      options: _noCache,
+    );
+    return (response.data as List<dynamic>)
+        .cast<Map<String, dynamic>>()
+        .map(ExamAssetDto.fromJson)
+        .toList(growable: false);
+  }
+
+  Future<ExamAssetUploadGuideDto> examAssetUploadGuide() async {
+    final Response<dynamic> response = await _dio.get(
+      '${Endpoints.communityExamAssets}/guide',
+      options: _noCache,
+    );
+    return ExamAssetUploadGuideDto.fromJson(
+      response.data as Map<String, dynamic>,
+    );
+  }
+
   Future<ExamAssetDto> uploadExamAsset({
     required List<int> bytes,
     required String filename,

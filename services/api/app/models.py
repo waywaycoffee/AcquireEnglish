@@ -1278,8 +1278,8 @@ class ExamAsset(Base):
     sha256: Mapped[str] = mapped_column(String(64), index=True)
     size_bytes: Mapped[int] = mapped_column(Integer, default=0)
     meta_json: Mapped[str] = mapped_column(Text, default="{}")
-    # visible | hidden | removed
-    status: Mapped[str] = mapped_column(String(16), default="visible", index=True)
+    # pending | visible | hidden | removed | rejected
+    status: Mapped[str] = mapped_column(String(16), default="pending", index=True)
     license_ack: Mapped[int] = mapped_column(Integer, default=0)
     report_count: Mapped[int] = mapped_column(Integer, default=0)
     created_at: Mapped[datetime] = mapped_column(

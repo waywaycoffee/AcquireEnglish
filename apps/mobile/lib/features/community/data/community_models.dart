@@ -332,6 +332,10 @@ class ExamAssetDto {
     this.meta = const <String, dynamic>{},
     this.status = 'visible',
     this.reportCount = 0,
+    this.rewardDays = 0,
+    this.rewardPreviewDays = 3,
+    this.review = const <String, dynamic>{},
+    this.duplicate = false,
   });
 
   factory ExamAssetDto.fromJson(Map<String, dynamic> json) => ExamAssetDto(
@@ -351,6 +355,13 @@ class ExamAssetDto {
             : const <String, dynamic>{},
         status: '${json['status'] ?? 'visible'}',
         reportCount: (json['report_count'] as num?)?.toInt() ?? 0,
+        rewardDays: (json['reward_days'] as num?)?.toInt() ?? 0,
+        rewardPreviewDays:
+            (json['reward_preview_days'] as num?)?.toInt() ?? 3,
+        review: json['review'] is Map
+            ? Map<String, dynamic>.from(json['review'] as Map)
+            : const <String, dynamic>{},
+        duplicate: json['duplicate'] == true,
       );
 
   final int id;
@@ -366,4 +377,65 @@ class ExamAssetDto {
   final Map<String, dynamic> meta;
   final String status;
   final int reportCount;
+  final int rewardDays;
+  final int rewardPreviewDays;
+  final Map<String, dynamic> review;
+  final bool duplicate;
+
+  bool get reviewApproved => review['approved'] == true;
+
+  int get grantedRewardDays {
+    final Object? reward = review['reward'];
+    if (reward is Map && reward['days'] is num) {
+      return (reward['days'] as num).toInt();
+    }
+    return rewardDays;
+  }
+}
+
+class ExamAssetUploadGuideDto {
+  const ExamAssetUploadGuideDto({
+    required this.title,
+    required this.headline,
+    required this.rewardDaysPerApproval,
+    required this.monthlyRewardCountCap,
+    required this.maxUploadMb,
+    required this.steps,
+    required this.formats,
+    required this.rules,
+  });
+
+  factory ExamAssetUploadGuideDto.fromJson(Map<String, dynamic> json) {
+    List<Map<String, dynamic>> asMaps(Object? raw) {
+      if (raw is! List) return const <Map<String, dynamic>>[];
+      return raw
+          .whereType<Map>()
+          .map((Map e) => Map<String, dynamic>.from(e))
+          .toList(growable: false);
+    }
+
+    return ExamAssetUploadGuideDto(
+      title: '${json['title'] ?? '社区上传资料'}',
+      headline: '${json['headline'] ?? ''}',
+      rewardDaysPerApproval:
+          (json['reward_days_per_approval'] as num?)?.toInt() ?? 3,
+      monthlyRewardCountCap:
+          (json['monthly_reward_count_cap'] as num?)?.toInt() ?? 2,
+      maxUploadMb: (json['max_upload_mb'] as num?)?.toInt() ?? 80,
+      steps: asMaps(json['steps']),
+      formats: asMaps(json['formats']),
+      rules: (json['rules'] is List)
+          ? (json['rules'] as List).map((e) => '$e').toList(growable: false)
+          : const <String>[],
+    );
+  }
+
+  final String title;
+  final String headline;
+  final int rewardDaysPerApproval;
+  final int monthlyRewardCountCap;
+  final int maxUploadMb;
+  final List<Map<String, dynamic>> steps;
+  final List<Map<String, dynamic>> formats;
+  final List<String> rules;
 }

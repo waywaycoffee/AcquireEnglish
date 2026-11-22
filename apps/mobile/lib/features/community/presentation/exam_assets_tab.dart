@@ -14,6 +14,7 @@ import '../../shared/presentation/pad/app_design_tokens.dart';
 import '../../shared/presentation/pad/hub_ui.dart';
 import '../../sync/data/acquire_api_client.dart';
 import '../data/community_models.dart';
+import 'exam_asset_upload_guide_sheet.dart';
 
 class ExamAssetsTab extends ConsumerStatefulWidget {
   const ExamAssetsTab({super.key});
@@ -24,6 +25,7 @@ class ExamAssetsTab extends ConsumerStatefulWidget {
 
 class _ExamAssetsTabState extends ConsumerState<ExamAssetsTab> {
   List<ExamAssetDto> _items = const <ExamAssetDto>[];
+  List<ExamAssetDto> _mine = const <ExamAssetDto>[];
   bool _loading = true;
   String? _error;
   String? _filterFamily;
@@ -43,6 +45,7 @@ class _ExamAssetsTabState extends ConsumerState<ExamAssetsTab> {
       if (!mounted) return;
       setState(() {
         _items = const <ExamAssetDto>[];
+        _mine = const <ExamAssetDto>[];
         _loading = false;
         _error = null;
       });
@@ -53,12 +56,19 @@ class _ExamAssetsTabState extends ConsumerState<ExamAssetsTab> {
       _error = null;
     });
     try {
-      final List<ExamAssetDto> items = await ref
-          .read(acquireApiClientProvider)
-          .listExamAssets(familyId: _filterFamily);
+      final AcquireApiClient api = ref.read(acquireApiClientProvider);
+      final List<ExamAssetDto> items =
+          await api.listExamAssets(familyId: _filterFamily);
+      List<ExamAssetDto> mine = const <ExamAssetDto>[];
+      try {
+        mine = await api.listMyExamAssets();
+      } catch (_) {
+        mine = const <ExamAssetDto>[];
+      }
       if (!mounted) return;
       setState(() {
         _items = items;
+        _mine = mine;
         _loading = false;
       });
     } catch (e) {
@@ -120,7 +130,8 @@ class _ExamAssetsTabState extends ConsumerState<ExamAssetsTab> {
             ),
             const SizedBox(height: 12),
             const Text(
-              '上传即确认：仅供个人学习，或已获权利人授权 / 合理使用。违规内容可被举报下架。',
+              '上传即确认：仅供个人学习，或已获权利人授权 / 合理使用。\n'
+              '审核通过后可获得 Pro 会员天数奖励；违规内容可被举报下架。',
               style: TextStyle(height: 1.4),
             ),
           ],
@@ -141,16 +152,17 @@ class _ExamAssetsTabState extends ConsumerState<ExamAssetsTab> {
 
     final List<int> bytes = await file.readAsBytes();
     try {
-      await ref.read(acquireApiClientProvider).uploadExamAsset(
-            bytes: bytes,
-            filename: file.name,
-            familyId: familyId,
-            title: title.text.trim().isEmpty ? file.name : title.text.trim(),
-            kind: kind,
-          );
+      final ExamAssetDto uploaded =
+          await ref.read(acquireApiClientProvider).uploadExamAsset(
+                bytes: bytes,
+                filename: file.name,
+                familyId: familyId,
+                title: title.text.trim().isEmpty ? file.name : title.text.trim(),
+                kind: kind,
+              );
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('已上传到云端，其他同学可下载')),
+        SnackBar(content: Text(_uploadResultMessage(uploaded))),
       );
       await _refresh();
     } catch (e) {
@@ -160,6 +172,38 @@ class _ExamAssetsTabState extends ConsumerState<ExamAssetsTab> {
       );
     } finally {
       title.dispose();
+    }
+  }
+
+  String _uploadResultMessage(ExamAssetDto uploaded) {
+    if (uploaded.duplicate) {
+      return '资料已存在（相同内容），未重复发奖';
+    }
+    if (uploaded.reviewApproved) {
+      final int days = uploaded.grantedRewardDays;
+      if (days > 0) {
+        return '审核已通过！已奖励 Pro 会员 $days 天，同学可下载学习';
+      }
+      return '审核已通过，已入库。本月上传奖励次数可能已达上限';
+    }
+    if (uploaded.status == 'pending') {
+      return '已提交审核。通过后将奖励会员天数，请在「我的上传」查看进度';
+    }
+    return '已上传，状态：${uploaded.status}';
+  }
+
+  String _statusLabel(String status) {
+    switch (status) {
+      case 'pending':
+        return '待审核';
+      case 'visible':
+        return '已通过';
+      case 'rejected':
+        return '未通过';
+      case 'hidden':
+        return '已下架';
+      default:
+        return status;
     }
   }
 
@@ -312,7 +356,8 @@ class _ExamAssetsTabState extends ConsumerState<ExamAssetsTab> {
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  '上传听力、脚本、解析与词表到云端（ECS exam 命名空间），其他同学可下载学习。',
+                  '主动上传听力、脚本、解析与词表：审核通过可获 Pro 会员天数，'
+                  '也帮助同考试族同学下载学习。',
                   style: TextStyle(
                     height: 1.45,
                     fontWeight: FontWeight.w600,
@@ -328,6 +373,13 @@ class _ExamAssetsTabState extends ConsumerState<ExamAssetsTab> {
                       onPressed: _upload,
                       icon: const Icon(Icons.upload_file_outlined),
                       label: const Text('上传资料'),
+                    ),
+                    OutlinedButton.icon(
+                      onPressed: () => unawaited(
+                        showExamAssetUploadGuideSheet(context, ref),
+                      ),
+                      icon: const Icon(Icons.menu_book_outlined),
+                      label: const Text('上传教程与格式'),
                     ),
                     OutlinedButton(
                       onPressed: () => context.push('/exam'),
@@ -359,6 +411,39 @@ class _ExamAssetsTabState extends ConsumerState<ExamAssetsTab> {
               ],
             ),
           ),
+          if (_mine.isNotEmpty) ...<Widget>[
+            const SizedBox(height: 12),
+            HubSurface(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: <Widget>[
+                  const Text(
+                    '我的上传',
+                    style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800),
+                  ),
+                  const SizedBox(height: 8),
+                  for (final ExamAssetDto item in _mine.take(8)) ...<Widget>[
+                    Text(
+                      '${_statusLabel(item.status)} · ${item.title}',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(fontWeight: FontWeight.w700),
+                    ),
+                    if (item.rewardDays > 0)
+                      Text(
+                        '已奖励会员 ${item.rewardDays} 天',
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: AppDesignTokens.textSecondary,
+                        ),
+                      ),
+                    const SizedBox(height: 6),
+                  ],
+                ],
+              ),
+            ),
+          ],
           const SizedBox(height: 12),
           if (_loading)
             const Padding(
@@ -374,13 +459,25 @@ class _ExamAssetsTabState extends ConsumerState<ExamAssetsTab> {
             )
           else if (_items.isEmpty)
             HubSurface(
-              child: Text(
-                '还没有资料。成为第一个上传者，帮助同考试族的同学。',
-                style: TextStyle(
-                  height: 1.45,
-                  fontWeight: FontWeight.w600,
-                  color: AppDesignTokens.textSecondary,
-                ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: <Widget>[
+                  Text(
+                    '还没有公开资料。成为第一个上传者，审核通过可拿会员天数。',
+                    style: TextStyle(
+                      height: 1.45,
+                      fontWeight: FontWeight.w600,
+                      color: AppDesignTokens.textSecondary,
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  TextButton(
+                    onPressed: () => unawaited(
+                      showExamAssetUploadGuideSheet(context, ref),
+                    ),
+                    child: const Text('查看上传步骤与格式要求'),
+                  ),
+                ],
               ),
             )
           else
