@@ -14,6 +14,7 @@ import '../../sync/presentation/daily_feed_provider.dart';
 import '../data/community_models.dart';
 import 'adventure_ui.dart';
 import 'community_provider.dart';
+import 'community_feed_tab.dart';
 import 'community_social_screen.dart';
 
 class CommunityHotTab extends ConsumerStatefulWidget {
@@ -75,6 +76,11 @@ class _CommunityHotTabState extends ConsumerState<CommunityHotTab> {
   Widget build(BuildContext context) {
     final AsyncValue<CommunityHotBundle> async =
         ref.watch(communityHotProvider);
+    final List<CommunityPostDto> netdiskPosts = ref
+        .watch(communityFeedProvider)
+        .asData?.value
+        .where((CommunityPostDto post) => post.kind == 'share_netdisk')
+        .toList(growable: false) ?? const <CommunityPostDto>[];
     final bool loggedIn = ref.watch(authSessionProvider).isLoggedIn;
 
     return RefreshIndicator(
@@ -91,6 +97,27 @@ class _CommunityHotTabState extends ConsumerState<CommunityHotTab> {
             physics: const AlwaysScrollableScrollPhysics(),
             padding: const EdgeInsets.fromLTRB(16, 12, 16, 32),
             children: <Widget>[
+              Row(children: <Widget>[
+                const Expanded(child: Text('网盘学习资源',
+                    style: TextStyle(fontWeight: FontWeight.w900, fontSize: 18))),
+                if (loggedIn)
+                  TextButton(
+                    onPressed: () async {
+                      await showCommunityNetdiskComposer(context);
+                      if (mounted) await ref.read(communityFeedProvider.notifier).refresh();
+                    },
+                    child: const Text('发布资源'),
+                  ),
+              ]),
+              const SizedBox(height: 6),
+              if (netdiskPosts.isEmpty)
+                const Text('还没有网盘资源帖。支持百度、夸克、阿里和 115 网盘分享链接。')
+              else
+                for (final CommunityPostDto post in netdiskPosts) ...<Widget>[
+                  CommunityPostCard(post: post),
+                  const SizedBox(height: 10),
+                ],
+              const SizedBox(height: 18),
               const Text(
                 '素材包',
                 style: TextStyle(fontWeight: FontWeight.w900, fontSize: 18),
@@ -217,13 +244,19 @@ class _CommunityHotTabState extends ConsumerState<CommunityHotTab> {
               ),
               const SizedBox(height: 14),
               if (data.shares.isEmpty)
-                QuestFeedCard(
-                  title: '还没有人分享学习素材',
-                  meta: '去「练习」发一条 B 站链接，或上方发布素材包',
-                  badge: '等你来发',
-                  accent: AppDesignTokens.brandGreen,
-                  onPlay: () {},
-                )
+                for (final (String title, String url) in const <(String, String)>[
+                  ('每日英语跟读 · 精选 01', 'https://www.bilibili.com/video/BV1CS4y1v7sQ/'),
+                  ('每日英语跟读 · 精选 02', 'https://www.bilibili.com/video/BV1Aw4m1k7qU/'),
+                ]) ...<Widget>[
+                  QuestFeedCard(
+                    title: title,
+                    meta: '编辑精选 · 点击后确认导入视频学习',
+                    badge: 'B站素材',
+                    accent: const Color(0xFFE67E22),
+                    onPlay: () => unawaited(_openShare(context, ref, url)),
+                  ),
+                  const SizedBox(height: 12),
+                ]
               else
                 for (final HotShareDto share in data.shares) ...<Widget>[
                   QuestFeedCard(

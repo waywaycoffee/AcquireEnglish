@@ -1102,13 +1102,13 @@ class SettingsScreen extends ConsumerWidget {
           ),
           SizedBox(height: compact ? 20 : 24),
           SettingsGroupCard(
-            title: '体验与空闲任务',
+            title: '调试 · 体验与空闲任务',
             icon: Icons.science_rounded,
             children: <Widget>[
               _ActionRow(
-                title: '注入演示数据',
+                title: '注入演示数据（仅调试）',
                 description:
-                    '填充单词收藏、短语、今日复习、成长连续天、推荐词与空闲队列样例，便于核对各模块。',
+                    '填充单词收藏、短语、今日复习、成长连续天、推荐词与空闲队列样例，便于内测核对各模块。',
                 icon: Icons.dataset_rounded,
                 onTap: () async {
                   final DemoSeedReport report = await injectDemoSeed(ref);

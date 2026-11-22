@@ -11,7 +11,8 @@ import '../../sync/data/acquire_api_client.dart';
 import '../../sync/presentation/cloud_catalog_sync.dart';
 import '../data/netdisk_local_download.dart';
 
-Future<void> showNetdiskImportSheet(BuildContext context, WidgetRef ref) {
+Future<void> showNetdiskImportSheet(BuildContext context, WidgetRef ref,
+    {String? initialProvider}) {
   return showModalBottomSheet<void>(
     context: context,
     isScrollControlled: true,
@@ -21,13 +22,15 @@ Future<void> showNetdiskImportSheet(BuildContext context, WidgetRef ref) {
       borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
     ),
     builder: (BuildContext sheetContext) {
-      return const _NetdiskImportSheet();
+      return _NetdiskImportSheet(initialProvider: initialProvider);
     },
   );
 }
 
 class _NetdiskImportSheet extends ConsumerStatefulWidget {
-  const _NetdiskImportSheet();
+  const _NetdiskImportSheet({this.initialProvider});
+
+  final String? initialProvider;
 
   @override
   ConsumerState<_NetdiskImportSheet> createState() =>
@@ -35,7 +38,7 @@ class _NetdiskImportSheet extends ConsumerStatefulWidget {
 }
 
 class _NetdiskImportSheetState extends ConsumerState<_NetdiskImportSheet> {
-  String _provider = 'baidu';
+  late String _provider;
   final TextEditingController _credential = TextEditingController();
   final List<String> _pathStack = <String>[];
   List<Map<String, dynamic>> _entries = const <Map<String, dynamic>>[];
@@ -60,6 +63,10 @@ class _NetdiskImportSheetState extends ConsumerState<_NetdiskImportSheet> {
   @override
   void initState() {
     super.initState();
+    _provider = const <String>{'baidu', 'quark', 'aliyun', 'pan115'}
+            .contains(widget.initialProvider)
+        ? widget.initialProvider!
+        : 'baidu';
     WidgetsBinding.instance.addPostFrameCallback((_) {
       unawaited(_reloadStatus());
     });

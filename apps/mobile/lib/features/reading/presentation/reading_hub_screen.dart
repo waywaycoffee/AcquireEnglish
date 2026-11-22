@@ -34,6 +34,7 @@ import 'reading_cold_start.dart';
 import 'reading_book_cover.dart';
 import 'reading_cover_provider.dart';
 import 'reading_vocab_lists_sheet.dart';
+import 'reading_netdisk_import_sheet.dart';
 
 class ReadingHubScreen extends ConsumerStatefulWidget {
   const ReadingHubScreen({super.key});
@@ -676,6 +677,11 @@ class _ReadingHubScreenState extends ConsumerState<ReadingHubScreen> {
                       onPressed: () => unawaited(_importFile(context, ref)),
                       icon: const Icon(Icons.upload_file_rounded),
                       label: const Text('导入 TXT / EPUB / PDF / MOBI'),
+                    ),
+                    FilledButton.tonalIcon(
+                      onPressed: () => unawaited(showReadingNetdiskImportSheet(context, ref)),
+                      icon: const Icon(Icons.cloud_download_outlined),
+                      label: const Text('从百度网盘导入 EPUB'),
                     ),
                     FilledButton.tonalIcon(
                       onPressed: () => context.push('/material-courses'),

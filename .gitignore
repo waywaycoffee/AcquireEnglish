@@ -77,6 +77,11 @@ deploy/gpu-box-ollama/aria2c.exe
 
 deploy/_probe_shared_subs.py
 services/api/media/
+/media/
+.tmp_*/
+.tmp_*.txt
+/tmp_*.py
+tools/subtitle/gpu_worker.log.err
 
 # Generated oral_core subtitle seeds (regenerate via seed_pack_subs.py)
 tools/oral_core_9000/subs/

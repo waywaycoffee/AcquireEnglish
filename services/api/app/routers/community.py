@@ -37,12 +37,14 @@ from app.models import (
 from app.routers.community_social import post_guard, blocked_ids, notice
 from app.services.bilibili_reply import post_video_reply
 from app.services.community_classify import classify_share_text, extract_bvid
+from app.services.netdisk_share_link import netdisk_share_provider
 
 router = APIRouter(prefix="/community", tags=["community"], dependencies=[Depends(post_guard)])
 
 PostKind = Literal[
     "team_invite",
     "share_bilibili",
+    "share_netdisk",
     "feedback",
     "learning_result",
     "method",
@@ -728,6 +730,24 @@ async def create_post(
         interest_tag, english_level = classify_share_text(
             title=title, body=body, link_title=link_title or ""
         )
+    elif kind == "share_netdisk":
+        provider = netdisk_share_provider(payload.link_url or "")
+        if provider is None:
+            raise HTTPException(400, "请填写支持的网盘 HTTPS 分享链接")
+        resource_type = str(payload.meta.get("resource_type") or "other")
+        if resource_type not in {"ebook", "audio", "video", "other"}:
+            raise HTTPException(400, "不支持的资源类型")
+        share_code = str(payload.meta.get("share_code") or urlparse(payload.link_url).query or "").strip()
+        if share_code.startswith("pwd="):
+            share_code = share_code[4:].split("&", 1)[0]
+        if len(share_code) > 32 or any(char.isspace() for char in share_code):
+            raise HTTPException(400, "提取码格式无效")
+        link_url = payload.link_url.strip()
+        title = title or "分享了一份英语学习资源"
+        link_title = link_title or title
+        interest_tag, english_level = classify_share_text(
+            title=title, body=body, link_title=link_title
+        )
     elif kind == "team_invite":
         if not title and not body:
             raise HTTPException(
@@ -778,7 +798,11 @@ async def create_post(
             oral_key=payload.oral_key,
             transcript=payload.transcript,
             reference_line=payload.reference_line,
-            extra=payload.meta,
+            extra={
+                "netdisk_provider": netdisk_share_provider(link_url or "") or "",
+                "resource_type": str(payload.meta.get("resource_type") or "other"),
+                "share_code": share_code,
+            } if kind == "share_netdisk" else payload.meta,
         ),
     )
     db.add(post)

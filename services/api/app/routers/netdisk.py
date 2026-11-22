@@ -19,6 +19,7 @@ from app.deps import get_current_user
 from app.models import User, UserLinkCourse, UserNetdiskBinding
 from app.schemas import CourseOut
 from app.services.netdisk_crypto import encrypt_credential
+from app.services.netdisk_books import scan_book_folder
 from app.services.netdisk_episode_sort import sort_video_paths
 from app.services.netdisk_play import signed_play_url, verify_play
 from app.services.netdisk_series import (
@@ -405,6 +406,68 @@ async def list_netdisk(
         )
     entries.sort(key=lambda e: (not e.is_dir, e.name.lower()))
     return NetdiskListOut(provider=provider, path=full, entries=entries)
+
+
+@router.get("/books/scan")
+async def scan_netdisk_books(
+    provider: Provider,
+    path: str,
+    epub_only: bool = True,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> dict[str, Any]:
+    """Recursively find books on the authenticated user's own drive."""
+    _require_openlist()
+    binding = await _binding_or_400(db, user.id, provider)
+    mount = binding.openlist_mount_path.rstrip("/")
+    root = path.rstrip("/")
+    if root != mount and not root.startswith(mount + "/"):
+        raise HTTPException(400, "文件夹不属于当前绑定网盘")
+    if any(part in (".", "..") for part in root.split("/")):
+        raise HTTPException(400, "文件夹路径无效")
+    try:
+        books = await scan_book_folder(OpenListClient(), root, epub_only=epub_only)
+    except ValueError as exc:
+        raise HTTPException(413, str(exc)) from exc
+    except OpenListError as exc:
+        raise HTTPException(502, f"扫描文件夹失败：{exc}") from exc
+    return {"count": len(books), "books": books}
+
+
+@router.get("/books/file")
+async def get_netdisk_epub(
+    provider: Provider,
+    path: str,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Stream one EPUB from the user's bound drive for personal reading import."""
+    import httpx
+    from fastapi.responses import Response
+
+    _require_openlist()
+    binding = await _binding_or_400(db, user.id, provider)
+    mount = binding.openlist_mount_path.rstrip("/")
+    if not path.startswith(mount + "/") or any(p in (".", "..") for p in path.split("/")) or not path.lower().endswith(".epub"):
+        raise HTTPException(400, "只能导入当前网盘内的 EPUB 文件")
+    try:
+        item = await OpenListClient().fs_get(path)
+        raw = str(item.get("raw_url") or "")
+        if not raw:
+            raise HTTPException(404, "网盘文件不可读取")
+        async with httpx.AsyncClient(follow_redirects=True, timeout=90) as client:
+            async with client.stream("GET", raw) as upstream:
+                upstream.raise_for_status()
+                chunks = []
+                size = 0
+                async for chunk in upstream.aiter_bytes():
+                    size += len(chunk)
+                    if size > 30 * 1024 * 1024:
+                        raise HTTPException(413, "EPUB 超过 30 MB，请使用本地导入")
+                    chunks.append(chunk)
+        return Response(content=b"".join(chunks), media_type="application/epub+zip")
+    except OpenListError as exc:
+        raise HTTPException(502, f"读取网盘失败：{exc}") from exc
 
 
 @router.post("/import", response_model=NetdiskImportOut)

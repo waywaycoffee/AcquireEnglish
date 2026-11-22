@@ -14,7 +14,9 @@ import '../../shared/presentation/pad/app_design_tokens.dart';
 import '../../sync/data/acquire_api_client.dart';
 import '../../sync/presentation/daily_feed_provider.dart';
 import '../data/community_models.dart';
+import '../data/netdisk_share_link.dart';
 import 'adventure_ui.dart';
+import 'community_netdisk_share_sheet.dart';
 import 'community_post_actions.dart';
 import 'community_provider.dart';
 
@@ -216,6 +218,12 @@ class CommunityFeedTab extends ConsumerWidget {
                             AppDesignTokens.brandGreen,
                           ),
                           (
+                            'share_netdisk',
+                            '分享网盘学习资源',
+                            '电子书 / 音频 / 视频分享链接',
+                            AppDesignTokens.brandGreen,
+                          ),
+                          (
                             'method',
                             '分享学习方法',
                             '把有效练法写成任务卡',
@@ -263,6 +271,13 @@ class CommunityFeedTab extends ConsumerWidget {
   }
 }
 
+Future<void> showCommunityNetdiskComposer(BuildContext context) =>
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      builder: (BuildContext ctx) => const _ComposeSheet(kind: 'share_netdisk'),
+    );
+
 class CommunityPostCard extends ConsumerWidget {
   const CommunityPostCard({required this.post});
 
@@ -274,6 +289,8 @@ class CommunityPostCard extends ConsumerWidget {
         return '组队';
       case 'share_bilibili':
         return '分享';
+      case 'share_netdisk':
+        return '网盘资源';
       case 'feedback':
         return '反馈';
       case 'learning_result':
@@ -349,6 +366,22 @@ class CommunityPostCard extends ConsumerWidget {
       );
     }
 
+    if (post.kind == 'share_netdisk') {
+      return QuestFeedCard(
+        title: '${post.authorName} · ${post.title}',
+        meta: metaCore,
+        badge: '网盘资源',
+        accent: const Color(0xFF5B8DEF),
+        authorAvatar: post.authorAvatar,
+        onPlay: () => unawaited(showCommunityNetdiskShareSheet(context, ref, post)),
+        onLongPress: openActions,
+        trailing: IconButton(
+          tooltip: '更多',
+          onPressed: openActions,
+          icon: const Icon(Icons.more_horiz_rounded),
+        ),
+      );
+    }
     if (post.isShareBilibili) {
       final String title = post.linkTitle?.trim().isNotEmpty == true
           ? post.linkTitle!.trim()
@@ -638,6 +671,8 @@ class _ComposeSheetState extends ConsumerState<_ComposeSheet> {
   final TextEditingController _title = TextEditingController();
   final TextEditingController _body = TextEditingController();
   final TextEditingController _link = TextEditingController();
+  final TextEditingController _shareCode = TextEditingController();
+  String _resourceType = 'ebook';
   final TextEditingController _embedWord = TextEditingController();
   final TextEditingController _embedTs = TextEditingController();
   bool _busy = false;
@@ -653,6 +688,7 @@ class _ComposeSheetState extends ConsumerState<_ComposeSheet> {
     _title.dispose();
     _body.dispose();
     _link.dispose();
+    _shareCode.dispose();
     _embedWord.dispose();
     _embedTs.dispose();
     unawaited(_recorder.dispose());
@@ -674,6 +710,8 @@ class _ComposeSheetState extends ConsumerState<_ComposeSheet> {
         return '组队邀请';
       case 'share_bilibili':
         return '分享你喜欢的 B 站视频';
+      case 'share_netdisk':
+        return '分享网盘学习资源';
       case 'imitation':
         return '句子仿写';
       case 'shadowing':
@@ -733,6 +771,12 @@ class _ComposeSheetState extends ConsumerState<_ComposeSheet> {
         return;
       }
     }
+    if (widget.kind == 'share_netdisk' &&
+        detectCommunityNetdiskProvider(_link.text.trim()) == null) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          content: Text('请填写百度、夸克、阿里或 115 网盘的 HTTPS 分享链接')));
+      return;
+    }
     final bool outputKind = const <String>{
       'learning_result',
       'imitation',
@@ -772,11 +816,19 @@ class _ComposeSheetState extends ConsumerState<_ComposeSheet> {
             kind: widget.kind,
             title: _title.text.trim(),
             body: _body.text.trim(),
-            linkUrl: widget.kind == 'share_bilibili'
+            linkUrl: widget.kind == 'share_bilibili' ||
+                    widget.kind == 'share_netdisk'
                 ? _link.text.trim()
                 : (outputKind && optionalLink.isNotEmpty ? optionalLink : null),
-            linkTitle: widget.kind == 'share_bilibili'
+            linkTitle: widget.kind == 'share_bilibili' ||
+                    widget.kind == 'share_netdisk'
                 ? _title.text.trim()
+                : null,
+            meta: widget.kind == 'share_netdisk'
+                ? <String, dynamic>{
+                    'resource_type': _resourceType,
+                    'share_code': _shareCode.text.trim(),
+                  }
                 : null,
             embedWord: _supportsEmbed ? _embedWord.text.trim() : null,
             embedTimestampSec: _supportsEmbed ? embedTs : null,
@@ -902,7 +954,40 @@ class _ComposeSheetState extends ConsumerState<_ComposeSheet> {
                 border: OutlineInputBorder(),
               ),
             ),
-            if (widget.kind == 'share_bilibili') ...<Widget>[
+            if (widget.kind == 'share_netdisk') ...<Widget>[
+              const SizedBox(height: 10),
+              DropdownButtonFormField<String>(
+                initialValue: _resourceType,
+                decoration: const InputDecoration(
+                    labelText: '资源类型', border: OutlineInputBorder()),
+                items: const <DropdownMenuItem<String>>[
+                  DropdownMenuItem(value: 'ebook', child: Text('电子书')),
+                  DropdownMenuItem(value: 'audio', child: Text('MP3 / 音频')),
+                  DropdownMenuItem(value: 'video', child: Text('视频')),
+                  DropdownMenuItem(value: 'other', child: Text('其他学习资料')),
+                ],
+                onChanged: (String? value) {
+                  if (value != null) setState(() => _resourceType = value);
+                },
+              ),
+              const SizedBox(height: 10),
+              TextField(
+                controller: _link,
+                decoration: const InputDecoration(
+                  labelText: '网盘分享链接',
+                  hintText: 'https://pan.quark.cn/s/…',
+                  border: OutlineInputBorder(),
+                ),
+              ),
+              const SizedBox(height: 10),
+              TextField(
+                controller: _shareCode,
+                decoration: const InputDecoration(
+                  labelText: '提取码（如有）', border: OutlineInputBorder()),
+              ),
+              const SizedBox(height: 8),
+              const Text('请确认你有权公开分享该资源。帖子只保存链接，不上传文件到社区。'),
+            ] else if (widget.kind == 'share_bilibili') ...<Widget>[
               const SizedBox(height: 10),
               Text(
                 '后台会自动归类兴趣领域与英语难度；若不准，其他同学可申请纠错。',

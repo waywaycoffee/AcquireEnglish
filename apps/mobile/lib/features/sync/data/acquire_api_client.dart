@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -1954,6 +1956,16 @@ class AcquireApiClient {
   Future<Map<String, dynamic>> netdiskStatus() async {
     final Response<dynamic> response = await _dio.get(Endpoints.netdiskStatus);
     return response.data as Map<String, dynamic>;
+  }
+
+  Future<List<Map<String, dynamic>>> scanNetdiskEpubs({required String provider, required String path}) async {
+    final Response<dynamic> response = await _dio.get('api/netdisk/books/scan', queryParameters: <String, dynamic>{'provider': provider, 'path': path, 'epub_only': true});
+    return ((response.data as Map<String, dynamic>)['books'] as List<dynamic>).map((dynamic row) => Map<String, dynamic>.from(row as Map)).toList();
+  }
+
+  Future<Uint8List> downloadNetdiskEpub({required String provider, required String path}) async {
+    final Response<List<int>> response = await _dio.get<List<int>>('api/netdisk/books/file', queryParameters: <String, dynamic>{'provider': provider, 'path': path}, options: Options(responseType: ResponseType.bytes));
+    return Uint8List.fromList(response.data ?? <int>[]);
   }
 
   Future<Map<String, dynamic>> bindNetdisk({
