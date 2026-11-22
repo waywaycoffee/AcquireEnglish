@@ -3029,8 +3029,6 @@ Future<void> _settleChineseFillIfAlreadyPresent() async {
     final LibraryEpisodeItem? episode = courseContext.episode;
     final LearningSettingsState settings = ref.watch(learningSettingsProvider);
     final bool bingeMode = settings.isBingeWatchMode;
-    // Rebuild hearts when phrase book changes.
-    ref.watch(phraseBookProvider);
     final Set<String> savedVocabularyWords =
         SubtitleVocabularyHighlight.savedWordsFromBook(
           ref.watch(wordBookProvider),
@@ -3981,9 +3979,9 @@ Future<void> _settleChineseFillIfAlreadyPresent() async {
       return false;
     }
     final PlayerSubtitleLine line = state.lines[index];
-    return ref.read(phraseBookProvider.notifier).containsLine(
+    return ref.read(wordBookProvider.notifier).containsFavoriteSentence(
           english: line.english,
-          time: line.startTime,
+          lineKey: '${line.startMs}-${line.endMs}',
           episodeId: widget.episodeId,
         );
   }
@@ -5053,27 +5051,27 @@ Future<void> _settleChineseFillIfAlreadyPresent() async {
 
   void _handleBookmarkLine(int index, PlayerCourseLookupResult courseContext) {
     final PlayerSubtitleLine line = state.lines[index];
-    final LibraryCourseData? course = courseContext.course;
-    final LibraryEpisodeItem? episode = courseContext.episode;
-    // Sentence favorite → phrase book only. Do not explode into word favorites.
-    final bool addedPhrase = ref
-        .read(phraseBookProvider.notifier)
-        .addPhraseIfMissing(
+    final String lineKey = '${line.startMs}-${line.endMs}';
+    if (ref.read(wordBookProvider.notifier).containsFavoriteSentence(
           english: line.english,
-          chinese: line.chinese,
-          course: course?.title ?? '课程',
-          episode: '第 ${episode?.numberStr ?? '01'} 集',
-          time: line.startTime,
-          courseId: course?.id,
-          episodeId: episode?.id,
-          endTime: _formatTimestamp(line.endMs),
-        );
-    if (addedPhrase) {
+          lineKey: lineKey,
+          episodeId: widget.episodeId,
+        )) {
+      _showMessage('该句子已在句子库中');
+      return;
+    }
+    // Sentence favorite → 句子库 (VocabCardKind.pattern). Never paint every word.
+    final bool added = _favoriteLexemeToWordCard(
+      line.english,
+      line: line,
+      courseContext: courseContext,
+      definitionCn: line.chinese.trim().isEmpty ? null : line.chinese.trim(),
+      cardKind: VocabCardKind.pattern,
+    );
+    if (added) {
       ref.read(learningActivityProvider.notifier).recordSentenceSaved();
     }
-    _showMessage(
-      addedPhrase ? '已收藏句子到短语库' : '该句子已在短语库中',
-    );
+    _showMessage(added ? '已收藏到句子库' : '未能收藏该句子');
   }
 
   void _handleCollectWord(

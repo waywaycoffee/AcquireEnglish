@@ -120,7 +120,7 @@ class StudyShadowingTab extends ConsumerStatefulWidget {
   /// Promote the current line into AI oral-coach dialogue (P1).
   final VoidCallback? onUpgradeToCoach;
 
-  /// Favorite current sentence into the phrase book.
+  /// Favorite current sentence into the sentence library (pattern cards).
   final bool isSentenceBookmarked;
   final VoidCallback? onBookmarkSentence;
 

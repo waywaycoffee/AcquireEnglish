@@ -2100,7 +2100,7 @@ class _PlayerSubtitleListState extends State<PlayerSubtitleList> {
                 ListTile(
                   leading: const Icon(Icons.bookmark_add_outlined),
                   title: const Text('收藏句子'),
-                  subtitle: const Text('保存到短语库，便于复习'),
+                  subtitle: const Text('保存到句子库，便于复习'),
                   onTap: () => Navigator.of(context).pop('bookmark'),
                 ),
                 ListTile(

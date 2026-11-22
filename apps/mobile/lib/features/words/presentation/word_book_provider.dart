@@ -766,6 +766,36 @@ class WordBookNotifier extends Notifier<List<WordEntry>> {
     return true;
   }
 
+  /// True when this English line is already a favorited sentence card.
+  bool containsFavoriteSentence({
+    required String english,
+    String? lineKey,
+    String? episodeId,
+  }) {
+    final String en = normalizeLexeme(english);
+    if (en.isEmpty) {
+      return false;
+    }
+    final String key = (lineKey ?? '').trim();
+    final String ep = (episodeId ?? '').trim();
+    return state.any((WordEntry entry) {
+      if (!entry.favorite || entry.kind != VocabCardKind.pattern) {
+        return false;
+      }
+      if (entry.word != en) {
+        return false;
+      }
+      if (key.isEmpty && ep.isEmpty) {
+        return true;
+      }
+      return entry.occurrences.any((WordOccurrence o) {
+        final bool keyOk = key.isEmpty || o.lineKeys.contains(key);
+        final bool epOk = ep.isEmpty || o.episodeId == ep;
+        return keyOk && epOk;
+      });
+    });
+  }
+
   bool addFavoriteWord({
     required String rawWord,
     required String episodeId,
