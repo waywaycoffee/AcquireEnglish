@@ -1850,34 +1850,20 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
   }
 
   Future<void> _presentScenePhoto(String imagePath) async {
-    final LearningSettingsState settings = ref.read(learningSettingsProvider);
     setState(() {
       _busy = true;
       _status = '正在识别场景里的单词…';
       _error = null;
       _sceneSavedWords.addAll(_favoriteWordsSnapshot());
     });
-    List<SceneWordLabel> rawLabels = const <SceneWordLabel>[];
-    List<SceneWordLabel> labels = const <SceneWordLabel>[];
-    try {
-      rawLabels = await ref.read(sceneWordRecognizerProvider).recognize(
-            imagePath,
-            settings: settings,
-          );
-      labels = await _filterSceneLabels(rawLabels);
-    } catch (error) {
-      if (mounted) {
-        setState(() => _error = '识词失败：${_pretty(error)}');
-      }
-    }
+    // Cloud-first: do not flash wrong on-device labels (ML Kit often invents
+    // nail/helmet/etc.). Seeds stay empty so Qwen-VL only trusts the photo.
     if (!mounted) return;
     setState(() {
       _busy = false;
       _sceneImagePath = imagePath;
-      _sceneLabels = labels;
-      _status = labels.isEmpty
-          ? '没有可学词（已会词已隐藏），可等云端精修或重拍'
-          : '端上已识别 ${labels.length} 个词，正在云端精修…';
+      _sceneLabels = const <SceneWordLabel>[];
+      _status = '正在云端识别场景单词…';
     });
     await showModalBottomSheet<void>(
       context: context,
@@ -1888,10 +1874,8 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
           height: MediaQuery.sizeOf(context).height * 0.88,
           child: _ScenePhotoRecognizeHost(
             imagePath: imagePath,
-            initialLabels: labels,
-            // Pass unfiltered local labels so cloud VL is not poisoned by
-            // frequency-filtered leftovers (rare mislabels only).
-            cloudSeedLabels: rawLabels,
+            initialLabels: const <SceneWordLabel>[],
+            cloudSeedLabels: const <SceneWordLabel>[],
             savedWords: <String>{
               ..._sceneSavedWords,
               ..._favoriteWordsSnapshot(),
@@ -3088,13 +3072,12 @@ class _ScenePhotoRecognizeHostState
     }
     setState(() {
       _refining = true;
-      _hint = '云端精修中（Qwen-VL）…';
+      _hint = '云端识别中（Qwen-VL）…';
     });
     try {
       final LearningSettingsState settings = ref.read(learningSettingsProvider);
-      final List<SceneWordLabel> seed = widget.cloudSeedLabels.isNotEmpty
-          ? widget.cloudSeedLabels
-          : _labels;
+      // Prefer empty seeds: on-device mislabels previously forced VL off-track.
+      final List<SceneWordLabel> seed = widget.cloudSeedLabels;
       final List<SceneWordLabel> refinedRaw =
           await ref.read(sceneWordRecognizerProvider).refineWithCloud(
                 widget.imagePath,

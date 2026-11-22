@@ -114,19 +114,26 @@ async def refine_scene_labels(
     if not api_key:
         raise RuntimeError("dashscope_api_key not configured")
 
-    model = (getattr(settings, "scene_vl_model", None) or "qwen-vl-plus").strip()
-    seed = seed_labels or []
+    model = (getattr(settings, "scene_vl_model", None) or "qwen3-vl-plus").strip() or "qwen3-vl-plus"
+    # Bad on-device seeds (ML Kit mislabels) poison VL; only keep strong hints.
+    seed = [
+        x
+        for x in (seed_labels or [])
+        if str(x.get("word") or "").strip()
+        and float(x.get("confidence") or 0) >= 0.7
+    ][:3]
     seed_brief = [
         {
-            "word": str(x.get("word") or ""),
-            "chinese": str(x.get("chinese") or ""),
+            "word": str(x.get("word") or "").strip().lower(),
+            "chinese": str(x.get("chinese") or "").strip(),
         }
         for x in seed
-        if str(x.get("word") or "").strip()
-    ][:8]
+    ]
     user_text = (
-        f"Look at the image carefully. List up to {limit} concrete nouns that are "
-        "actually visible. Do not keep wrong seeds. "
+        f"Look at THIS photo only. List up to {limit} concrete nouns that are "
+        "actually visible (e.g. laptop, stool, kettlebell, sandal, chair, cable). "
+        "Never invent objects that are not in the image. "
+        "Ignore optional_seed_hints unless they clearly match the photo. "
         f"optional_seed_hints={json.dumps(seed_brief, ensure_ascii=False)}"
     )
     data_url = f"data:{mime};base64,{image_base64}"
@@ -146,17 +153,34 @@ async def refine_scene_labels(
     }
     url = "https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions"
     # Smaller payloads + temp=0 keep DashScope VL closer to ~10-20s.
-    async with httpx.AsyncClient(timeout=28.0) as client:
-        response = await client.post(
-            url,
-            headers={
-                "Authorization": f"Bearer {api_key}",
-                "Content-Type": "application/json",
-            },
-            json=payload,
-        )
-    if response.status_code >= 400:
-        raise RuntimeError(f"VL HTTP {response.status_code}: {response.text[:300]}")
+    # Fall back if the configured model id was retired (e.g. old qwen-vl-plus).
+    candidates = [model]
+    for alt in ("qwen3-vl-plus", "qwen-vl-ocr"):
+        if alt not in candidates:
+            candidates.append(alt)
+    response = None
+    last_error = ""
+    async with httpx.AsyncClient(timeout=35.0) as client:
+        for candidate in candidates:
+            payload["model"] = candidate
+            response = await client.post(
+                url,
+                headers={
+                    "Authorization": f"Bearer {api_key}",
+                    "Content-Type": "application/json",
+                },
+                json=payload,
+            )
+            if response.status_code < 400:
+                model = candidate
+                break
+            last_error = f"VL HTTP {response.status_code}: {response.text[:300]}"
+            # Only retry on missing/denied model ids.
+            if response.status_code not in {404, 403}:
+                raise RuntimeError(last_error)
+            response = None
+    if response is None:
+        raise RuntimeError(last_error or "VL request failed")
     body = response.json()
     choices = body.get("choices") or []
     if not choices:

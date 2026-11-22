@@ -6,7 +6,6 @@ import 'dart:typed_data';
 import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_mlkit_image_labeling/google_mlkit_image_labeling.dart';
-import 'package:google_mlkit_text_recognition/google_mlkit_text_recognition.dart';
 import 'package:image/image.dart' as img;
 
 import '../../../constants/endpoints.dart';
@@ -22,7 +21,7 @@ import '../../words/data/offline_word_dictionary.dart';
 import '../domain/scene_word_label.dart';
 
 /// Default cloud vision model for scene photo refine (DashScope compatible-mode).
-const String kSceneVlModel = 'qwen-vl-plus';
+const String kSceneVlModel = 'qwen3-vl-plus';
 const String kDashscopeCompatibleBase =
     'https://dashscope.aliyuncs.com/compatible-mode/v1';
 
@@ -88,7 +87,10 @@ class SceneWordRecognizer {
 
   static final RegExp _wordRe = RegExp(r"^[A-Za-z][A-Za-z'-]{1,24}$");
 
-  /// Fast on-device pass (ML Kit labels + Latin OCR).
+  /// Fast on-device pass (ML Kit image labels only).
+  ///
+  /// OCR is intentionally skipped for scene photos: floor/logo fragments and
+  /// random Latin scraps create fake nouns that poison cloud refine.
   Future<List<SceneWordLabel>> recognize(
     String imagePath, {
     required LearningSettingsState settings,
@@ -100,12 +102,10 @@ class SceneWordRecognizer {
     }
     final InputImage input = InputImage.fromFilePath(imagePath);
     final ImageLabeler labeler = ImageLabeler(
-      options: ImageLabelerOptions(confidenceThreshold: 0.58),
+      options: ImageLabelerOptions(confidenceThreshold: 0.62),
     );
-    final TextRecognizer ocr = TextRecognizer();
     try {
       final List<ImageLabel> rawLabels = await labeler.processImage(input);
-      final RecognizedText text = await ocr.processImage(input);
       final List<_Candidate> candidates = <_Candidate>[];
       for (final ImageLabel item in rawLabels) {
         final String word = _normalizeWord(item.label);
@@ -113,15 +113,6 @@ class SceneWordRecognizer {
         candidates.add(
           _Candidate(word: word, confidence: item.confidence, fromOcr: false),
         );
-      }
-      for (final TextBlock block in text.blocks) {
-        for (final String token in block.text.split(RegExp(r'[^A-Za-z]+'))) {
-          final String word = _normalizeWord(token);
-          if (word.isEmpty || word.length < 3) continue;
-          candidates.add(
-            _Candidate(word: word, confidence: 0.55, fromOcr: true),
-          ); // OCR tokens get a mid prior until VL refine.
-        }
       }
       candidates.sort(
         (_Candidate a, _Candidate b) => b.confidence.compareTo(a.confidence),
@@ -143,7 +134,6 @@ class SceneWordRecognizer {
       return out;
     } finally {
       await labeler.close();
-      await ocr.close();
     }
   }
 

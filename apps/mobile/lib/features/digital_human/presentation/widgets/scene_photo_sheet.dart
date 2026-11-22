@@ -59,7 +59,7 @@ class _ScenePhotoSheetState extends State<ScenePhotoSheet> {
 
   String get _footerHint {
     if (widget.statusHint.trim().isNotEmpty) return widget.statusHint;
-    if (widget.refining) return '云端精修中（qwen-vl-plus）…';
+    if (widget.refining) return '云端识别中（Qwen-VL）…';
     if (widget.refined) {
       return widget.labels.isEmpty
           ? '没有可学词（已会词已隐藏），可重拍或仍交给数字人描述。'

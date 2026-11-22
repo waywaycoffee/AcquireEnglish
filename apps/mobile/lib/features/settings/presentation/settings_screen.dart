@@ -936,8 +936,8 @@ class SettingsScreen extends ConsumerWidget {
                           _InputRow(
                             title: '百炼 API Key',
                             description: settings.asrApiKeyFromEnv
-                                ? '已从 apps/mobile/.env 的 BAILIAN_ASR_API_KEY 加载；此处可覆盖。同钥可用于拍照识物 qwen-vl-plus。'
-                                : '优先写在 apps/mobile/.env（BAILIAN_ASR_API_KEY）；也可在此临时填写。同钥可用于拍照识物 qwen-vl-plus。',
+                                ? '已从 apps/mobile/.env 的 BAILIAN_ASR_API_KEY 加载；此处可覆盖。同钥可用于拍照识物 Qwen-VL。'
+                                : '优先写在 apps/mobile/.env（BAILIAN_ASR_API_KEY）；也可在此临时填写。同钥可用于拍照识物 Qwen-VL。',
                             value: settings.asrApiKey,
                             hintText: settings.asrApiKeyFromEnv
                                 ? '（已使用 .env）'

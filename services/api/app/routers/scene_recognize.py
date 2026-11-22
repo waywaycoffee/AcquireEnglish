@@ -101,7 +101,7 @@ async def scene_recognize(
             status_code=status.HTTP_502_BAD_GATEWAY,
             detail=f"云端识物失败：{exc}",
         ) from exc
-    model = (settings.scene_vl_model or "qwen-vl-plus").strip()
+    model = (settings.scene_vl_model or "qwen3-vl-plus").strip() or "qwen3-vl-plus"
     return SceneRecognizeOut(
         labels=[
             SceneLabelOut(

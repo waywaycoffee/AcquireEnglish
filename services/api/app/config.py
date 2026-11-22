@@ -23,7 +23,8 @@ class Settings(BaseSettings):
     dashscope_api_key: str = ""
     asr_model: str = "qwen3-asr-flash-filetrans"
     # Qwen-VL model for photo scene word refine (compatible-mode).
-    scene_vl_model: str = "qwen-vl-plus"
+    # Note: older `qwen-vl-plus` is gone on DashScope; use qwen3-vl-plus.
+    scene_vl_model: str = "qwen3-vl-plus"
     # Cached seekable study audio/video for imported links (Web real <audio>/<video>).
     media_cache_dir: str = "./media"
     # Placeholder catalog (cdn.example.com). Off in production — users import real media.
