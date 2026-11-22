@@ -17,6 +17,7 @@ async def ensure_schema_columns(conn: AsyncConnection) -> None:
     await _ensure_link_course_series_columns(conn)
     await _ensure_community_post_columns(conn)
     await _ensure_oral_match_queue_columns(conn)
+    await _ensure_oral_peer_room_columns(conn)
     await _ensure_shared_bilibili_cid_bigint(conn)
     await _ensure_shared_bilibili_identity_columns(conn)
     await _ensure_api_usage_module_column(conn)
@@ -213,6 +214,50 @@ async def _ensure_oral_match_queue_columns(conn: AsyncConnection) -> None:
         ),
         ("topic", "ALTER TABLE oral_match_queue ADD COLUMN topic VARCHAR(64) DEFAULT ''"),
         ("cefr", "ALTER TABLE oral_match_queue ADD COLUMN cefr VARCHAR(8) DEFAULT ''"),
+        (
+            "content_kind",
+            "ALTER TABLE oral_match_queue ADD COLUMN content_kind VARCHAR(16) DEFAULT ''",
+        ),
+        (
+            "content_id",
+            "ALTER TABLE oral_match_queue ADD COLUMN content_id VARCHAR(128) DEFAULT ''",
+        ),
+        (
+            "content_title",
+            "ALTER TABLE oral_match_queue ADD COLUMN content_title VARCHAR(200) DEFAULT ''",
+        ),
+        (
+            "content_route",
+            "ALTER TABLE oral_match_queue ADD COLUMN content_route VARCHAR(512) DEFAULT ''",
+        ),
+    ]
+    for col, sql in alters:
+        if col not in existing:
+            await conn.execute(text(sql))
+
+
+async def _ensure_oral_peer_room_columns(conn: AsyncConnection) -> None:
+    existing = await _existing_columns(conn, "oral_peer_rooms")
+    if existing is None:
+        return
+    alters: list[tuple[str, str]] = [
+        ("topic", "ALTER TABLE oral_peer_rooms ADD COLUMN topic VARCHAR(64) DEFAULT ''"),
+        (
+            "content_kind",
+            "ALTER TABLE oral_peer_rooms ADD COLUMN content_kind VARCHAR(16) DEFAULT ''",
+        ),
+        (
+            "content_id",
+            "ALTER TABLE oral_peer_rooms ADD COLUMN content_id VARCHAR(128) DEFAULT ''",
+        ),
+        (
+            "content_title",
+            "ALTER TABLE oral_peer_rooms ADD COLUMN content_title VARCHAR(200) DEFAULT ''",
+        ),
+        (
+            "content_route",
+            "ALTER TABLE oral_peer_rooms ADD COLUMN content_route VARCHAR(512) DEFAULT ''",
+        ),
     ]
     for col, sql in alters:
         if col not in existing:

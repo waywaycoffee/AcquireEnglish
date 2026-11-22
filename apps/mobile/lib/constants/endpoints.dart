@@ -113,6 +113,11 @@ class Endpoints {
   static const String oralMatchStatus = 'api/oral-match/status';
   static const String oralMatchLeave = 'api/oral-match/leave';
   static const String oralMatchHeartbeat = 'api/oral-match/heartbeat';
+  static const String oralMatchInvites = 'api/oral-match/invites';
+  static String oralMatchInviteAccept(String inviteId) =>
+      'api/oral-match/invites/$inviteId/accept';
+  static String oralMatchInviteCancel(String inviteId) =>
+      'api/oral-match/invites/$inviteId/cancel';
   static String oralMatchMessages(String roomId) =>
       'api/oral-match/rooms/$roomId/messages';
   static String oralMatchReport(String roomId) =>

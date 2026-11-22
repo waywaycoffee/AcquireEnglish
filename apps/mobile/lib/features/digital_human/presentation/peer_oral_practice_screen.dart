@@ -5,12 +5,17 @@ import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:path_provider/path_provider.dart';
 
 import '../../authentication/presentation/auth_session.dart';
+import '../../library/presentation/library_catalog_provider.dart';
+import '../../library/presentation/library_mock_data.dart';
 import '../../phrases/presentation/phrase_book_provider.dart';
 import '../../player/data/pronunciation_providers.dart';
 import '../../player/domain/pronunciation_assessment.dart';
+import '../../reading/domain/reading_doc.dart';
+import '../../reading/presentation/reading_library_provider.dart';
 import '../../settings/presentation/settings_provider.dart';
 import '../../sync/data/acquire_api_client.dart';
 import '../data/livekit_peer_client.dart';
@@ -18,7 +23,7 @@ import '../data/oral_coach_pipeline_client.dart';
 import '../domain/oral_expression_diagnosis.dart';
 import 'widgets/oral_diagnosis_card.dart';
 
-/// Commercial peer oral: match → LiveKit voice + AI rewrite → phrase bank.
+/// Commercial peer oral: lobby → match/invite → LiveKit + AI rewrite → favorite.
 class PeerOralPracticeScreen extends ConsumerStatefulWidget {
   const PeerOralPracticeScreen({super.key});
 
@@ -27,14 +32,27 @@ class PeerOralPracticeScreen extends ConsumerStatefulWidget {
       _PeerOralPracticeScreenState();
 }
 
-enum _PeerPhase { matching, chat, diagnose, resay, ended }
+enum _PeerPhase { lobby, matching, waitingInvite, chat, diagnose, resay, ended }
+
+const List<String> _kPeerTopics = <String>[
+  '日常生活',
+  '旅行出行',
+  '工作职场',
+  '学习考试',
+  '影视娱乐',
+  '美食购物',
+  '兴趣爱好',
+  '自由闲聊',
+];
 
 class _PeerOralPracticeScreenState
     extends ConsumerState<PeerOralPracticeScreen> {
   bool _languageExchange = false;
   String _nativeLang = 'zh';
   String _targetLang = 'en';
-  String _exchangeTopic = 'daily life';
+  String _selectedTopic = '日常生活';
+  OralMatchContent _selectedContent = const OralMatchContent();
+  List<OralMatchStatus> _openInvites = const <OralMatchStatus>[];
   static const int _maxRecordingBytes =
       Pcm16MonoAudio.expectedSampleRate * 2 * 45;
 
@@ -49,7 +67,7 @@ class _PeerOralPracticeScreenState
   StreamSubscription<Uint8List>? _recordingSubscription;
   Timer? _recordingLimitTimer;
 
-  _PeerPhase _phase = _PeerPhase.ended;
+  _PeerPhase _phase = _PeerPhase.lobby;
   bool _busy = false;
   bool _recording = false;
   bool _saved = false;
@@ -57,12 +75,14 @@ class _PeerOralPracticeScreenState
   bool _voiceConnected = false;
   bool _peerVoicePresent = false;
   bool _peerOnline = true;
-  String _status = '选择模式后开始匹配';
+  String _status = '先选话题和素材，再匹配或发邀请';
   String? _error;
   OralCoachSession? _session;
   OralExpressionDiagnosis? _pending;
   String _peerName = '口语搭子';
   String? _roomId;
+  String? _inviteId;
+  OralMatchContent _roomContent = const OralMatchContent();
   String? _lastMessageId;
   String? _learningSessionId;
   Timer? _matchPoll;
@@ -85,6 +105,9 @@ class _PeerOralPracticeScreenState
       if (!mounted) return;
       setState(() => _peerVoicePresent = peerConnected);
     };
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      unawaited(_refreshOpenInvites());
+    });
   }
 
   @override
@@ -110,10 +133,22 @@ class _PeerOralPracticeScreenState
     } catch (_) {}
   }
 
+  OralMatchContent get _prefsContent {
+    final OralMatchContent base = _selectedContent;
+    final String topic = _languageExchange ? '语言交换' : _selectedTopic;
+    return OralMatchContent(
+      topic: topic,
+      kind: base.kind,
+      id: base.id,
+      title: base.title,
+      route: base.route,
+    );
+  }
+
   Future<void> _bootstrapMatch() async {
     if (!ref.read(authSessionProvider).isLoggedIn) {
       setState(() {
-        _phase = _PeerPhase.ended;
+        _phase = _PeerPhase.lobby;
         _error = '请先登录后再进行真人对练';
         _status = '未登录';
       });
@@ -125,6 +160,9 @@ class _PeerOralPracticeScreenState
       _error = null;
       _bubbles.clear();
       _roomId = null;
+      _inviteId = null;
+      _roomContent = _prefsContent;
+      _session = null;
       _voiceConnected = false;
       _peerVoicePresent = false;
       _peerOnline = true;
@@ -136,7 +174,8 @@ class _PeerOralPracticeScreenState
         mode: _languageExchange ? 'language_exchange' : 'peer_oral',
         nativeLang: _languageExchange ? _nativeLang : '',
         targetLang: _languageExchange ? _targetLang : '',
-        topic: _languageExchange ? _exchangeTopic : '',
+        topic: _prefsContent.topic,
+        content: _prefsContent,
       );
       if (!mounted) return;
       if (status.isMatched) {
@@ -151,21 +190,106 @@ class _PeerOralPracticeScreenState
         _status = status.queuePosition == null
             ? (_languageExchange
                 ? '语言交换排队中，等待互补母语搭子…'
-                : '排队中，等待另一位学习者…')
+                : '排队中，优先匹配同话题/同素材…')
             : '排队中（第 ${status.queuePosition} 位）…';
       });
     } catch (error) {
       if (!mounted) return;
       setState(() {
-        _phase = _PeerPhase.ended;
+        _phase = _PeerPhase.lobby;
         _error = '匹配失败：$error';
         _status = '请稍后重试';
       });
     }
   }
 
+  Future<void> _createInviteRoom() async {
+    if (!ref.read(authSessionProvider).isLoggedIn) {
+      setState(() {
+        _error = '请先登录后再发邀请';
+        _status = '未登录';
+      });
+      return;
+    }
+    setState(() {
+      _phase = _PeerPhase.waitingInvite;
+      _status = '房间已创建，等待他人接受邀请…';
+      _error = null;
+      _bubbles.clear();
+      _roomId = null;
+      _inviteId = null;
+      _roomContent = _prefsContent;
+      _session = null;
+      _leftSent = false;
+    });
+    try {
+      final OralMatchStatus status = await ref
+          .read(acquireApiClientProvider)
+          .createOralMatchInvite(content: _prefsContent);
+      if (!mounted) return;
+      if (status.isMatched) {
+        await _onMatched(status);
+        return;
+      }
+      _inviteId = status.inviteId;
+      _matchPoll?.cancel();
+      _matchPoll = Timer.periodic(const Duration(seconds: 2), (_) {
+        unawaited(_pollMatch());
+      });
+      setState(() {
+        _status = status.content.hasMaterial
+            ? '邀请已发出 · ${status.content.title}'
+            : '邀请已发出 · 话题 ${_prefsContent.topic}';
+      });
+    } catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _phase = _PeerPhase.lobby;
+        _error = '发邀请失败：$error';
+        _status = '请稍后重试';
+      });
+    }
+  }
+
+  Future<void> _refreshOpenInvites() async {
+    if (!ref.read(authSessionProvider).isLoggedIn) return;
+    try {
+      final List<OralMatchStatus> invites =
+          await ref.read(acquireApiClientProvider).listOralMatchInvites();
+      if (!mounted) return;
+      setState(() => _openInvites = invites);
+    } catch (_) {}
+  }
+
+  Future<void> _acceptInvite(OralMatchStatus invite) async {
+    final String? inviteId = invite.inviteId;
+    if (inviteId == null || inviteId.isEmpty) return;
+    setState(() {
+      _busy = true;
+      _error = null;
+      _status = '正在加入房间…';
+    });
+    try {
+      final OralMatchStatus status = await ref
+          .read(acquireApiClientProvider)
+          .acceptOralMatchInvite(inviteId);
+      if (!mounted) return;
+      await _onMatched(status);
+    } catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _busy = false;
+        _error = '接受邀请失败：$error';
+        _status = '请刷新邀请列表后重试';
+      });
+    }
+  }
+
   Future<void> _pollMatch() async {
-    if (!mounted || _phase != _PeerPhase.matching) return;
+    if (!mounted) return;
+    if (_phase != _PeerPhase.matching && _phase != _PeerPhase.waitingInvite) {
+      return;
+    }
     try {
       final OralMatchStatus status =
           await ref.read(acquireApiClientProvider).oralMatchStatus();
@@ -175,36 +299,68 @@ class _PeerOralPracticeScreenState
         await _onMatched(status);
         return;
       }
+      if (status.isWaitingInvite) {
+        setState(() {
+          _phase = _PeerPhase.waitingInvite;
+          _inviteId = status.inviteId;
+          _roomContent = status.content.hasTopic || status.content.hasMaterial
+              ? status.content
+              : _roomContent;
+          _status = '房间等待中 · 他人可在邀请列表接受';
+        });
+        return;
+      }
       if (status.status == 'waiting') {
         setState(() {
+          _phase = _PeerPhase.matching;
           _status = status.queuePosition == null
               ? '排队中，等待另一位学习者…'
               : '排队中（第 ${status.queuePosition} 位）…';
         });
         return;
       }
-      await ref.read(acquireApiClientProvider).enqueueOralMatch(
-            mode: _languageExchange ? 'language_exchange' : 'peer_oral',
-            nativeLang: _languageExchange ? _nativeLang : '',
-            targetLang: _languageExchange ? _targetLang : '',
-            topic: _languageExchange ? _exchangeTopic : '',
-          );
+      if (_phase == _PeerPhase.matching) {
+        await ref.read(acquireApiClientProvider).enqueueOralMatch(
+              mode: _languageExchange ? 'language_exchange' : 'peer_oral',
+              nativeLang: _languageExchange ? _nativeLang : '',
+              targetLang: _languageExchange ? _targetLang : '',
+              topic: _prefsContent.topic,
+              content: _prefsContent,
+            );
+      }
     } catch (_) {}
   }
 
   Future<void> _onMatched(OralMatchStatus status) async {
     _roomId = status.roomId;
+    _inviteId = null;
     _peerName = (status.peerDisplayName ?? '').isEmpty
         ? '口语搭子'
         : status.peerDisplayName!;
+    _roomContent = status.content.hasTopic || status.content.hasMaterial
+        ? status.content
+        : _prefsContent;
+    _session = null;
+    final String material = _roomContent.hasMaterial
+        ? (_roomContent.kind == 'article' ? '文章' : '视频') +
+            '「${_roomContent.title}」'
+        : '';
+    final String topicBit =
+        _roomContent.topic.isNotEmpty ? '话题：${_roomContent.topic}' : '';
     setState(() {
       _phase = _PeerPhase.chat;
+      _busy = false;
       _peerOnline = status.peerOnline ?? true;
       _status = '已匹配 $_peerName · 正在接通实时语音…';
       _bubbles.add(
         _PeerBubble(
           role: 'system',
-          text: '已匹配 $_peerName。可直接语音交流；需要时按住下方按钮做 AI 地道改写后再发文字。',
+          text: <String>[
+            '已匹配 $_peerName。',
+            if (topicBit.isNotEmpty) topicBit,
+            if (material.isNotEmpty) '围绕$material聊聊。',
+            '可直接语音；需要时按住下方按钮：系统改语法/中译英后，再跟读发送。觉得地道可点星收藏。',
+          ].join(' '),
         ),
       );
     });
@@ -269,7 +425,12 @@ class _PeerOralPracticeScreenState
   }
 
   Future<void> _sendHeartbeat() async {
-    if (!mounted || _roomId == null || _phase == _PeerPhase.ended) return;
+    if (!mounted ||
+        _roomId == null ||
+        _phase == _PeerPhase.lobby ||
+        _phase == _PeerPhase.ended) {
+      return;
+    }
     try {
       final OralMatchStatus status =
           await ref.read(acquireApiClientProvider).oralMatchHeartbeat();
@@ -294,7 +455,12 @@ class _PeerOralPracticeScreenState
 
   Future<void> _pullPeerMessages() async {
     final String? roomId = _roomId;
-    if (!mounted || roomId == null || _phase == _PeerPhase.ended) return;
+    if (!mounted ||
+        roomId == null ||
+        _phase == _PeerPhase.lobby ||
+        _phase == _PeerPhase.ended) {
+      return;
+    }
     try {
       final OralMatchInbox inbox =
           await ref.read(acquireApiClientProvider).fetchOralMatchInbox(
@@ -323,21 +489,24 @@ class _PeerOralPracticeScreenState
   }
 
   Future<void> _handlePeerLeft() async {
-    if (_phase == _PeerPhase.ended) return;
+    if (_phase == _PeerPhase.lobby || _phase == _PeerPhase.ended) return;
     _matchPoll?.cancel();
     _messagePoll?.cancel();
     _heartbeat?.cancel();
     await _voice.disconnect();
     if (!mounted) return;
     setState(() {
-      _phase = _PeerPhase.ended;
+      _phase = _PeerPhase.lobby;
       _peerOnline = false;
       _voiceConnected = false;
-      _status = '对方已离开';
+      _roomId = null;
+      _inviteId = null;
+      _status = '对方已离开，可重新匹配或发邀请';
       _bubbles.add(
         const _PeerBubble(role: 'system', text: '对方已结束本次对练。'),
       );
     });
+    unawaited(_refreshOpenInvites());
   }
 
   Future<void> _toggleMute() async {
@@ -400,15 +569,26 @@ class _PeerOralPracticeScreenState
     if (base.isEmpty) {
       throw StateError('请先在设置中填写口语陪练管线地址。');
     }
+    final OralMatchContent content = _roomContent;
+    final String topic =
+        content.topic.isNotEmpty ? content.topic : '日常口语';
+    final String materialTitle =
+        content.title.isNotEmpty ? content.title : 'peer practice';
+    final String kindLabel = content.kind == 'article'
+        ? 'article'
+        : (content.kind == 'video' ? 'video' : 'conversation');
     final OralCoachSession session = await _pipeline.createSession(
       rawBaseUrl: base,
-      context: const OralCoachVideoContext(
+      context: OralCoachVideoContext(
         courseTitle: '真人口语对练',
-        episodeTitle: 'Peer practice',
-        topicSummary: 'Casual peer oral practice with idiomatic rewrite',
+        episodeTitle: materialTitle,
+        topicSummary:
+            'Peer oral about "$topic"${content.hasMaterial ? ' using $kindLabel "$materialTitle"' : ''}.',
         articleExcerpt:
-            'Practice everyday spoken English with a matched partner. '
-            'When the learner mixes Chinese, rewrite into natural English.',
+            'Practice spoken English with a matched partner about "$topic". '
+            '${content.hasMaterial ? 'Shared $kindLabel: $materialTitle. ' : ''}'
+            'When the learner mixes Chinese, rewrite into natural idiomatic English. '
+            'Correct grammar gently and keep the meaning.',
         difficulty: 'B1',
       ),
     );
@@ -418,7 +598,12 @@ class _PeerOralPracticeScreenState
 
   Future<void> _holdStart() async {
     if (_busy || _recording) return;
-    if (_phase == _PeerPhase.matching || _phase == _PeerPhase.ended) return;
+    if (_phase == _PeerPhase.matching ||
+        _phase == _PeerPhase.waitingInvite ||
+        _phase == _PeerPhase.lobby ||
+        _phase == _PeerPhase.ended) {
+      return;
+    }
     final PronunciationMicrophone? microphone = _microphone;
     if (microphone == null) {
       setState(() => _error = '麦克风不可用');
@@ -578,11 +763,10 @@ class _PeerOralPracticeScreenState
       diagnosis = OralExpressionDiagnosis.fallback(source: confirmed);
     }
 
-    _saveToBank(diagnosis);
     unawaited(_recordLearningDiagnosis(source: confirmed, diagnosis: diagnosis));
     setState(() {
       _pending = diagnosis;
-      _saved = true;
+      _saved = false;
       _phase = _PeerPhase.diagnose;
       _bubbles.add(_PeerBubble(role: 'me', text: confirmed));
       _bubbles.add(
@@ -593,7 +777,7 @@ class _PeerOralPracticeScreenState
         ),
       );
       _busy = false;
-      _status = '按住再说一次，再说给对方听';
+      _status = '先跟读地道英文，再说给对方听；觉得好可点星收藏';
     });
   }
 
@@ -708,6 +892,25 @@ class _PeerOralPracticeScreenState
     _saved = added || _saved;
   }
 
+  Future<void> _cancelWaiting() async {
+    _matchPoll?.cancel();
+    final String? inviteId = _inviteId;
+    await _leaveQuietly();
+    if (inviteId != null && inviteId.isNotEmpty) {
+      try {
+        await ref.read(acquireApiClientProvider).cancelOralMatchInvite(inviteId);
+      } catch (_) {}
+    }
+    if (!mounted) return;
+    setState(() {
+      _phase = _PeerPhase.lobby;
+      _inviteId = null;
+      _roomId = null;
+      _status = '已取消，可重新选择话题或素材';
+    });
+    unawaited(_refreshOpenInvites());
+  }
+
   Future<void> _endSession() async {
     _matchPoll?.cancel();
     _messagePoll?.cancel();
@@ -715,7 +918,248 @@ class _PeerOralPracticeScreenState
     await _voice.disconnect();
     await _leaveQuietly();
     if (!mounted) return;
-    unawaited(Navigator.of(context).maybePop());
+    if (_phase == _PeerPhase.lobby) {
+      unawaited(Navigator.of(context).maybePop());
+      return;
+    }
+    setState(() {
+      _phase = _PeerPhase.lobby;
+      _roomId = null;
+      _inviteId = null;
+      _voiceConnected = false;
+      _status = '已结束，可重新匹配或发邀请';
+    });
+    unawaited(_refreshOpenInvites());
+  }
+
+  Future<void> _pickContent() async {
+    final List<LibraryCourseData> courses = ref.read(libraryCatalogProvider);
+    final List<ReadingDoc> articles =
+        ref.read(readingLibraryProvider).builtin.take(20).toList();
+    final OralMatchContent? picked = await showModalBottomSheet<OralMatchContent>(
+      context: context,
+      isScrollControlled: true,
+      builder: (BuildContext context) {
+        return SafeArea(
+          child: SizedBox(
+            height: MediaQuery.sizeOf(context).height * 0.72,
+            child: DefaultTabController(
+              length: 2,
+              child: Column(
+                children: <Widget>[
+                  const TabBar(
+                    tabs: <Widget>[
+                      Tab(text: '视频课程'),
+                      Tab(text: '文章阅读'),
+                    ],
+                  ),
+                  Expanded(
+                    child: TabBarView(
+                      children: <Widget>[
+                        ListView(
+                          children: <Widget>[
+                            ListTile(
+                              leading: const Icon(Icons.clear),
+                              title: const Text('不指定视频'),
+                              onTap: () => Navigator.pop(
+                                context,
+                                OralMatchContent(topic: _selectedTopic),
+                              ),
+                            ),
+                            for (final LibraryCourseData course
+                                in courses.take(30))
+                              ListTile(
+                                leading: const Icon(Icons.movie_outlined),
+                                title: Text(course.title),
+                                subtitle: Text(
+                                  course.episodes.isEmpty
+                                      ? '课程'
+                                      : '${course.episodes.length} 集',
+                                ),
+                                onTap: () => Navigator.pop(
+                                  context,
+                                  OralMatchContent(
+                                    topic: _selectedTopic,
+                                    kind: 'video',
+                                    id: course.id,
+                                    title: course.title,
+                                    route: Uri(
+                                      path: '/library',
+                                      queryParameters: <String, String>{
+                                        'courseId': course.id,
+                                      },
+                                    ).toString(),
+                                  ),
+                                ),
+                              ),
+                          ],
+                        ),
+                        ListView(
+                          children: <Widget>[
+                            ListTile(
+                              leading: const Icon(Icons.clear),
+                              title: const Text('不指定文章'),
+                              onTap: () => Navigator.pop(
+                                context,
+                                OralMatchContent(topic: _selectedTopic),
+                              ),
+                            ),
+                            for (final ReadingDoc doc in articles)
+                              ListTile(
+                                leading: const Icon(Icons.menu_book_outlined),
+                                title: Text(doc.displayTitle),
+                                subtitle: Text(
+                                  doc.level.isEmpty
+                                      ? '阅读'
+                                      : '${doc.level} · ${doc.wordCount} 词',
+                                ),
+                                onTap: () => Navigator.pop(
+                                  context,
+                                  OralMatchContent(
+                                    topic: _selectedTopic,
+                                    kind: 'article',
+                                    id: doc.id,
+                                    title: doc.displayTitle,
+                                    route:
+                                        '/reading/${Uri.encodeComponent(doc.id)}',
+                                  ),
+                                ),
+                              ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+    );
+    if (!mounted || picked == null) return;
+    setState(() => _selectedContent = picked);
+  }
+
+  Widget _buildLobby(BuildContext context) {
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(14, 12, 14, 24),
+      children: <Widget>[
+        const Text(
+          '选择感兴趣的话题',
+          style: TextStyle(fontWeight: FontWeight.w800, fontSize: 16),
+        ),
+        const SizedBox(height: 10),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: <Widget>[
+            for (final String topic in _kPeerTopics)
+              ChoiceChip(
+                label: Text(topic),
+                selected: _selectedTopic == topic && !_languageExchange,
+                onSelected: _languageExchange
+                    ? null
+                    : (bool selected) {
+                        if (!selected) return;
+                        setState(() => _selectedTopic = topic);
+                      },
+              ),
+          ],
+        ),
+        const SizedBox(height: 18),
+        const Text(
+          '选择视频或文章（可选）',
+          style: TextStyle(fontWeight: FontWeight.w800, fontSize: 16),
+        ),
+        const SizedBox(height: 8),
+        ListTile(
+          contentPadding: EdgeInsets.zero,
+          leading: Icon(
+            _selectedContent.kind == 'article'
+                ? Icons.menu_book_outlined
+                : Icons.movie_outlined,
+          ),
+          title: Text(
+            _selectedContent.hasMaterial
+                ? _selectedContent.title
+                : '不指定具体素材，只按话题聊',
+          ),
+          subtitle: Text(
+            _selectedContent.hasMaterial
+                ? (_selectedContent.kind == 'article' ? '文章' : '视频')
+                : '点这里从书库 / 阅读里挑',
+          ),
+          trailing: const Icon(Icons.chevron_right),
+          onTap: () => unawaited(_pickContent()),
+        ),
+        SwitchListTile(
+          contentPadding: EdgeInsets.zero,
+          title: const Text('语言交换模式'),
+          subtitle: Text(
+            _languageExchange
+                ? '母语 $_nativeLang ↔ 目标语 $_targetLang'
+                : '关闭时按普通口语搭子匹配',
+          ),
+          value: _languageExchange,
+          onChanged: (bool v) => setState(() => _languageExchange = v),
+        ),
+        const SizedBox(height: 8),
+        FilledButton(
+          onPressed: _busy ? null : () => unawaited(_bootstrapMatch()),
+          child: const Text('快速匹配同好'),
+        ),
+        const SizedBox(height: 8),
+        OutlinedButton(
+          onPressed: _busy ? null : () => unawaited(_createInviteRoom()),
+          child: const Text('创建房间并发邀请'),
+        ),
+        const SizedBox(height: 18),
+        Row(
+          children: <Widget>[
+            const Expanded(
+              child: Text(
+                '可接受的邀请',
+                style: TextStyle(fontWeight: FontWeight.w800, fontSize: 16),
+              ),
+            ),
+            TextButton(
+              onPressed: () => unawaited(_refreshOpenInvites()),
+              child: const Text('刷新'),
+            ),
+          ],
+        ),
+        if (_openInvites.isEmpty)
+          const Padding(
+            padding: EdgeInsets.symmetric(vertical: 12),
+            child: Text(
+              '暂时没有开放邀请，你可以先创建房间。',
+              style: TextStyle(color: Color(0xFF6B7280)),
+            ),
+          ),
+        for (final OralMatchStatus invite in _openInvites)
+          Card(
+            child: ListTile(
+              leading: const Icon(Icons.meeting_room_outlined),
+              title: Text(
+                invite.hostDisplayName?.isNotEmpty == true
+                    ? invite.hostDisplayName!
+                    : '口语搭子',
+              ),
+              subtitle: Text(
+                <String>[
+                  if (invite.content.topic.isNotEmpty) invite.content.topic,
+                  if (invite.content.hasMaterial) invite.content.title,
+                ].join(' · '),
+              ),
+              trailing: FilledButton(
+                onPressed: _busy ? null : () => unawaited(_acceptInvite(invite)),
+                child: const Text('接受'),
+              ),
+            ),
+          ),
+      ],
+    );
   }
 
   @override
@@ -726,44 +1170,63 @@ class _PeerOralPracticeScreenState
         _phase == _PeerPhase.chat ||
         _phase == _PeerPhase.diagnose ||
         _phase == _PeerPhase.resay;
+    final bool inRoom = _phase == _PeerPhase.chat ||
+        _phase == _PeerPhase.diagnose ||
+        _phase == _PeerPhase.resay;
     return Scaffold(
       backgroundColor: const Color(0xFFF3F0FF),
       appBar: AppBar(
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: <Widget>[
-            Text(_peerName),
+            Text(
+              _phase == _PeerPhase.lobby ? '真人口语' : _peerName,
+            ),
             Text(
               _phase == _PeerPhase.matching
                   ? '匹配中'
-                  : (_phase == _PeerPhase.ended
-                        ? '已结束'
-                        : (_voiceConnected
-                              ? (_peerVoicePresent
-                                    ? '实时语音已接通'
-                                    : '语音就绪 · 等待对方')
-                              : (_peerOnline ? '在线 · 文字对练' : '对方可能离线'))),
+                  : (_phase == _PeerPhase.waitingInvite
+                        ? '等待接受邀请'
+                        : (_phase == _PeerPhase.lobby
+                              ? '话题 · 素材 · 邀请'
+                              : (_voiceConnected
+                                    ? (_peerVoicePresent
+                                          ? '实时语音已接通'
+                                          : '语音就绪 · 等待对方')
+                                    : (_peerOnline
+                                          ? '在线 · 文字对练'
+                                          : '对方可能离线')))),
               style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500),
             ),
           ],
         ),
         actions: <Widget>[
-          if (_voiceConnected && _phase != _PeerPhase.ended)
+          if (_voiceConnected && inRoom)
             IconButton(
               tooltip: _micMuted ? '取消静音' : '静音',
               onPressed: () => unawaited(_toggleMute()),
               icon: Icon(_micMuted ? Icons.mic_off : Icons.mic),
             ),
-          if (_roomId != null && _phase != _PeerPhase.matching)
+          if (_roomId != null && inRoom)
             IconButton(
               tooltip: '举报',
               onPressed: () => unawaited(_reportPeer()),
               icon: const Icon(Icons.flag_outlined),
             ),
+          if (_roomContent.hasMaterial &&
+              _roomContent.route.isNotEmpty &&
+              inRoom)
+            IconButton(
+              tooltip: '打开素材',
+              onPressed: () => context.push(_roomContent.route),
+              icon: const Icon(Icons.open_in_new),
+            ),
           IconButton(
-            tooltip: '结束对练',
+            tooltip: _phase == _PeerPhase.lobby ? '关闭' : '结束',
             onPressed: () => unawaited(_endSession()),
-            icon: const Icon(Icons.call_end),
+            icon: Icon(
+              _phase == _PeerPhase.lobby ? Icons.close : Icons.call_end,
+            ),
           ),
         ],
       ),
@@ -780,51 +1243,72 @@ class _PeerOralPracticeScreenState
                   ),
                 ],
               ),
-            if (_phase == _PeerPhase.ended)
-              Padding(
-                padding: const EdgeInsets.fromLTRB(14, 12, 14, 0),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: <Widget>[
-                    SwitchListTile(
-                      contentPadding: EdgeInsets.zero,
-                      title: const Text('语言交换模式'),
-                      subtitle: Text(
-                        _languageExchange
-                            ? '母语 $_nativeLang ↔ 目标语 $_targetLang · $_exchangeTopic'
-                            : '关闭时按普通口语搭子匹配',
-                      ),
-                      value: _languageExchange,
-                      onChanged: (bool v) =>
-                          setState(() => _languageExchange = v),
-                    ),
-                    FilledButton(
-                      onPressed: () => unawaited(_bootstrapMatch()),
-                      child: Text(
-                        _roomId == null ? '开始匹配' : '重新匹配',
-                      ),
-                    ),
-                  ],
+            if (inRoom &&
+                (_roomContent.hasTopic || _roomContent.hasMaterial))
+              Material(
+                color: const Color(0xFFEDE7FF),
+                child: ListTile(
+                  dense: true,
+                  leading: Icon(
+                    _roomContent.kind == 'article'
+                        ? Icons.menu_book_outlined
+                        : Icons.forum_outlined,
+                  ),
+                  title: Text(
+                    _roomContent.hasMaterial
+                        ? _roomContent.title
+                        : _roomContent.topic,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(fontWeight: FontWeight.w700),
+                  ),
+                  subtitle: Text(
+                    <String>[
+                      if (_roomContent.topic.isNotEmpty) _roomContent.topic,
+                      if (_roomContent.kind == 'video') '视频话题',
+                      if (_roomContent.kind == 'article') '文章话题',
+                    ].join(' · '),
+                  ),
+                  trailing: _roomContent.route.isNotEmpty
+                      ? IconButton(
+                          icon: const Icon(Icons.chevron_right),
+                          onPressed: () => context.push(_roomContent.route),
+                        )
+                      : null,
                 ),
               ),
             Expanded(
-              child: _phase == _PeerPhase.matching
+              child: _phase == _PeerPhase.lobby
+                  ? _buildLobby(context)
+                  : (_phase == _PeerPhase.matching ||
+                          _phase == _PeerPhase.waitingInvite)
                   ? Center(
                       child: Column(
                         mainAxisSize: MainAxisSize.min,
                         children: <Widget>[
                           const CircularProgressIndicator(),
                           const SizedBox(height: 12),
-                          Text(_status),
+                          Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 24),
+                            child: Text(_status, textAlign: TextAlign.center),
+                          ),
+                          if (_roomContent.hasMaterial) ...<Widget>[
+                            const SizedBox(height: 8),
+                            Text(
+                              _roomContent.title,
+                              style: const TextStyle(
+                                color: Color(0xFF6B7280),
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ],
                           TextButton(
-                            onPressed: () => unawaited(_endSession()),
+                            onPressed: () => unawaited(_cancelWaiting()),
                             child: const Text('取消'),
                           ),
                         ],
                       ),
                     )
-                  : _phase == _PeerPhase.ended
-                  ? const SizedBox.shrink()
                   : ListView.builder(
                       padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
                       itemCount: _bubbles.length,

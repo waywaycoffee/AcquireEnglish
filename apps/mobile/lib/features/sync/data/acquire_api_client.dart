@@ -111,16 +111,56 @@ class AcquireLiveKitToken {
   final int expiresIn;
 }
 
+class OralMatchContent {
+  const OralMatchContent({
+    this.topic = '',
+    this.kind = '',
+    this.id = '',
+    this.title = '',
+    this.route = '',
+  });
+
+  factory OralMatchContent.fromJson(Map<String, dynamic> json) =>
+      OralMatchContent(
+        topic: '${json['topic'] ?? ''}'.trim(),
+        kind: '${json['content_kind'] ?? json['kind'] ?? ''}'.trim(),
+        id: '${json['content_id'] ?? json['id'] ?? ''}'.trim(),
+        title: '${json['content_title'] ?? json['title'] ?? ''}'.trim(),
+        route: '${json['content_route'] ?? json['route'] ?? ''}'.trim(),
+      );
+
+  final String topic;
+  final String kind; // video | article | ''
+  final String id;
+  final String title;
+  final String route;
+
+  bool get hasMaterial => id.isNotEmpty || title.isNotEmpty;
+  bool get hasTopic => topic.isNotEmpty;
+
+  Map<String, dynamic> toJson() => <String, dynamic>{
+        if (topic.isNotEmpty) 'topic': topic,
+        if (kind.isNotEmpty) 'content_kind': kind,
+        if (id.isNotEmpty) 'content_id': id,
+        if (title.isNotEmpty) 'content_title': title,
+        if (route.isNotEmpty) 'content_route': route,
+      };
+}
+
 class OralMatchStatus {
   const OralMatchStatus({
     required this.status,
     this.roomId,
+    this.inviteId,
     this.peerUserId,
     this.peerDisplayName,
+    this.hostUserId,
+    this.hostDisplayName,
     this.queuePosition,
     this.livekit,
     this.peerOnline,
     this.voiceReady,
+    this.content = const OralMatchContent(),
   });
 
   factory OralMatchStatus.fromJson(Map<String, dynamic> json) {
@@ -128,37 +168,57 @@ class OralMatchStatus {
     final Map<String, dynamic>? peerMap = peer is Map
         ? Map<String, dynamic>.from(peer)
         : null;
+    final Object? host = json['host'];
+    final Map<String, dynamic>? hostMap = host is Map
+        ? Map<String, dynamic>.from(host)
+        : null;
     final Object? livekit = json['livekit'];
     return OralMatchStatus(
       status: '${json['status'] ?? 'idle'}',
       roomId: '${json['room_id'] ?? ''}'.trim().isEmpty
           ? null
           : '${json['room_id']}'.trim(),
+      inviteId: '${json['invite_id'] ?? ''}'.trim().isEmpty
+          ? null
+          : '${json['invite_id']}'.trim(),
       peerUserId: peerMap == null
           ? null
           : int.tryParse('${peerMap['user_id'] ?? ''}'),
       peerDisplayName: peerMap == null
           ? null
           : '${peerMap['display_name'] ?? ''}'.trim(),
+      hostUserId: hostMap == null
+          ? null
+          : int.tryParse('${hostMap['user_id'] ?? ''}'),
+      hostDisplayName: hostMap == null
+          ? null
+          : '${hostMap['display_name'] ?? ''}'.trim(),
       queuePosition: (json['queue_position'] as num?)?.toInt(),
       livekit: livekit is Map
           ? AcquireLiveKitToken.fromJson(Map<String, dynamic>.from(livekit))
           : null,
       peerOnline: json['peer_online'] == true,
       voiceReady: json['voice_ready'] == true,
+      content: OralMatchContent.fromJson(json),
     );
   }
 
-  final String status; // idle | waiting | matched | peer_left
+  final String status; // idle | waiting | waiting_invite | matched | peer_left
   final String? roomId;
+  final String? inviteId;
   final int? peerUserId;
   final String? peerDisplayName;
+  final int? hostUserId;
+  final String? hostDisplayName;
   final int? queuePosition;
   final AcquireLiveKitToken? livekit;
   final bool? peerOnline;
   final bool? voiceReady;
+  final OralMatchContent content;
 
   bool get isMatched => status == 'matched' && (roomId ?? '').isNotEmpty;
+  bool get isWaitingInvite =>
+      status == 'waiting_invite' && (inviteId ?? '').isNotEmpty;
   bool get peerLeft => status == 'peer_left';
 }
 
@@ -2048,6 +2108,7 @@ class AcquireApiClient {
     String targetLang = '',
     String topic = '',
     String cefr = '',
+    OralMatchContent content = const OralMatchContent(),
   }) async {
     final Response<dynamic> response = await _dio.post(
       Endpoints.oralMatchEnqueue,
@@ -2057,11 +2118,54 @@ class AcquireApiClient {
         if (targetLang.trim().isNotEmpty) 'target_lang': targetLang.trim(),
         if (topic.trim().isNotEmpty) 'topic': topic.trim(),
         if (cefr.trim().isNotEmpty) 'cefr': cefr.trim(),
+        ...content.toJson(),
+        if (topic.trim().isEmpty && content.topic.isNotEmpty)
+          'topic': content.topic,
       },
     );
     return OralMatchStatus.fromJson(
       Map<String, dynamic>.from(response.data as Map),
     );
+  }
+
+  Future<OralMatchStatus> createOralMatchInvite({
+    OralMatchContent content = const OralMatchContent(),
+  }) async {
+    final Response<dynamic> response = await _dio.post(
+      Endpoints.oralMatchInvites,
+      data: content.toJson(),
+    );
+    return OralMatchStatus.fromJson(
+      Map<String, dynamic>.from(response.data as Map),
+    );
+  }
+
+  Future<List<OralMatchStatus>> listOralMatchInvites() async {
+    final Response<dynamic> response = await _dio.get(
+      Endpoints.oralMatchInvites,
+    );
+    final Object? raw = (response.data as Map)['invites'];
+    if (raw is! List) return const <OralMatchStatus>[];
+    return raw
+        .whereType<Map<dynamic, dynamic>>()
+        .map(
+          (Map<dynamic, dynamic> row) =>
+              OralMatchStatus.fromJson(Map<String, dynamic>.from(row)),
+        )
+        .toList(growable: false);
+  }
+
+  Future<OralMatchStatus> acceptOralMatchInvite(String inviteId) async {
+    final Response<dynamic> response = await _dio.post(
+      Endpoints.oralMatchInviteAccept(inviteId),
+    );
+    return OralMatchStatus.fromJson(
+      Map<String, dynamic>.from(response.data as Map),
+    );
+  }
+
+  Future<void> cancelOralMatchInvite(String inviteId) async {
+    await _dio.post(Endpoints.oralMatchInviteCancel(inviteId));
   }
 
   Future<OralMatchStatus> oralMatchStatus() async {

@@ -127,3 +127,47 @@ async def test_oral_match_rematch_after_leave_and_closed_messages():
         rematched = await client.post('/api/oral-match/enqueue', headers=c)
         assert rematched.json()['status'] == 'matched'
         assert rematched.json()['room_id'] != room_id
+
+
+@pytest.mark.asyncio
+async def test_oral_match_invite_accept_with_content():
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url='http://test') as client:
+        a = await account(client, '13900002031')
+        b = await account(client, '13900002032')
+
+        created = await client.post(
+            '/api/oral-match/invites',
+            headers=a,
+            json={
+                'topic': '旅行出行',
+                'content_kind': 'video',
+                'content_id': 'course-1',
+                'content_title': 'Travel English',
+                'content_route': '/library?courseId=course-1',
+            },
+        )
+        assert created.status_code == 200, created.text
+        body = created.json()
+        assert body['status'] == 'waiting_invite'
+        invite_id = body['invite_id']
+        assert invite_id
+
+        listed = await client.get('/api/oral-match/invites', headers=b)
+        assert listed.status_code == 200
+        invites = listed.json()['invites']
+        assert any(item['invite_id'] == invite_id for item in invites)
+
+        accepted = await client.post(
+            f'/api/oral-match/invites/{invite_id}/accept',
+            headers=b,
+        )
+        assert accepted.status_code == 200, accepted.text
+        matched = accepted.json()
+        assert matched['status'] == 'matched'
+        assert matched['content_title'] == 'Travel English'
+        assert matched['topic'] == '旅行出行'
+
+        host_status = await client.get('/api/oral-match/status', headers=a)
+        assert host_status.json()['status'] == 'matched'
+        assert host_status.json()['room_id'] == matched['room_id']

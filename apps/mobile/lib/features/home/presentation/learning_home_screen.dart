@@ -588,7 +588,7 @@ class _LearningHomeScreenState extends ConsumerState<LearningHomeScreen> {
                                 children: <Widget>[
                                   text('真人口语', 16, bold: true),
                                   text(
-                                    '匹配对练 · AI改写',
+                                    '话题房间 · 邀请 · AI改写',
                                     11,
                                     color: muted,
                                   ),

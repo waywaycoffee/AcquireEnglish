@@ -1,4 +1,4 @@
-"""Durable oral peer matching: DB queue → paired room → messages + heartbeat.
+"""Durable oral peer matching: DB queue → invite lobby → paired room.
 
 LiveKit tokens are minted when LIVEKIT_* is configured (agent_name=None).
 """
@@ -16,13 +16,21 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
 from app.deps import get_current_user
-from app.models import OralMatchQueue, OralPeerMessage, OralPeerReport, OralPeerRoom, User
+from app.models import (
+    OralInviteLobby,
+    OralMatchQueue,
+    OralPeerMessage,
+    OralPeerReport,
+    OralPeerRoom,
+    User,
+)
 from app.services.livekit_tokens import create_room_token, livekit_configured
 
 router = APIRouter(prefix="/oral-match", tags=["oral-match"])
 
 _PAIR_LOCK = asyncio.Lock()
 _QUEUE_TTL_SEC = 90
+_INVITE_TTL_SEC = 10 * 60
 _ROOM_TTL_SEC = 45 * 60
 _HEARTBEAT_ONLINE_SEC = 45
 
@@ -50,10 +58,39 @@ def _peer_heartbeat(room: OralPeerRoom, me: int) -> float:
     return room.heartbeat_b if me == room.user_a else room.heartbeat_a
 
 
+def _norm_lang(value: str) -> str:
+    return (value or "").strip().lower()[:16]
+
+
+def _norm_topic(value: str) -> str:
+    return (value or "").strip()[:64]
+
+
+def _norm_kind(value: str) -> str:
+    kind = (value or "").strip().lower()[:16]
+    return kind if kind in {"video", "article"} else ""
+
+
+def _content_fields(source: object) -> dict[str, str]:
+    return {
+        "topic": _norm_topic(getattr(source, "topic", "") or ""),
+        "content_kind": _norm_kind(getattr(source, "content_kind", "") or ""),
+        "content_id": (getattr(source, "content_id", "") or "").strip()[:128],
+        "content_title": (getattr(source, "content_title", "") or "").strip()[:200],
+        "content_route": (getattr(source, "content_route", "") or "").strip()[:512],
+    }
+
+
 async def _purge(db: AsyncSession, now: float | None = None) -> None:
     ts = now or time.time()
     await db.execute(
         delete(OralMatchQueue).where(OralMatchQueue.heartbeat_at < ts - _QUEUE_TTL_SEC)
+    )
+    await db.execute(
+        delete(OralInviteLobby).where(
+            OralInviteLobby.closed_at.is_(None),
+            OralInviteLobby.heartbeat_at < ts - _INVITE_TTL_SEC,
+        )
     )
     stale = (
         await db.execute(
@@ -82,6 +119,20 @@ async def _active_room_for(db: AsyncSession, user_id: int) -> OralPeerRoom | Non
         )
     ).scalar_one_or_none()
     return row
+
+
+async def _active_invite_for(db: AsyncSession, user_id: int) -> OralInviteLobby | None:
+    return (
+        await db.execute(
+            select(OralInviteLobby)
+            .where(
+                OralInviteLobby.host_user_id == user_id,
+                OralInviteLobby.closed_at.is_(None),
+            )
+            .order_by(OralInviteLobby.created_at.desc())
+            .limit(1)
+        )
+    ).scalar_one_or_none()
 
 
 def _livekit_payload(room: OralPeerRoom, me: int) -> dict | None:
@@ -116,6 +167,29 @@ def _room_payload(room: OralPeerRoom, me: int, *, now: float | None = None) -> d
         "peer_online": peer_online and room.closed_at is None,
         "voice_ready": livekit_configured(),
         "livekit": None if room.closed_at is not None else _livekit_payload(room, me),
+        "topic": room.topic or None,
+        "content_kind": room.content_kind or None,
+        "content_id": room.content_id or None,
+        "content_title": room.content_title or None,
+        "content_route": room.content_route or None,
+    }
+
+
+def _invite_payload(invite: OralInviteLobby) -> dict:
+    return {
+        "status": "waiting_invite",
+        "invite_id": invite.id,
+        "room_id": None,
+        "host": {
+            "user_id": invite.host_user_id,
+            "display_name": invite.host_name,
+        },
+        "topic": invite.topic or None,
+        "content_kind": invite.content_kind or None,
+        "content_id": invite.content_id or None,
+        "content_title": invite.content_title or None,
+        "content_route": invite.content_route or None,
+        "created_at": invite.created_at,
     }
 
 
@@ -125,18 +199,36 @@ class EnqueueIn(BaseModel):
     target_lang: str = Field(default="", max_length=16)
     topic: str = Field(default="", max_length=64)
     cefr: str = Field(default="", max_length=8)
+    content_kind: str = Field(default="", max_length=16)
+    content_id: str = Field(default="", max_length=128)
+    content_title: str = Field(default="", max_length=200)
+    content_route: str = Field(default="", max_length=512)
 
 
 class EnqueueOut(BaseModel):
     status: str
     room_id: str | None = None
+    invite_id: str | None = None
     peer: dict | None = None
+    host: dict | None = None
     livekit: dict | None = None
     queue_position: int | None = None
     peer_online: bool | None = None
     voice_ready: bool | None = None
     mode: str | None = None
     topic: str | None = None
+    content_kind: str | None = None
+    content_id: str | None = None
+    content_title: str | None = None
+    content_route: str | None = None
+
+
+class InviteCreateIn(BaseModel):
+    topic: str = Field(default="", max_length=64)
+    content_kind: str = Field(default="", max_length=16)
+    content_id: str = Field(default="", max_length=128)
+    content_title: str = Field(default="", max_length=200)
+    content_route: str = Field(default="", max_length=512)
 
 
 class MessageIn(BaseModel):
@@ -157,10 +249,6 @@ class ReportIn(BaseModel):
     reason: str = Field(min_length=2, max_length=500)
 
 
-def _norm_lang(value: str) -> str:
-    return (value or "").strip().lower()[:16]
-
-
 def _compatible_partner(mine: dict[str, str], other: OralMatchQueue) -> bool:
     mode = (mine.get("mode") or "peer_oral").strip() or "peer_oral"
     other_mode = (getattr(other, "mode", None) or "peer_oral").strip() or "peer_oral"
@@ -174,8 +262,93 @@ def _compatible_partner(mine: dict[str, str], other: OralMatchQueue) -> bool:
     their_target = _norm_lang(getattr(other, "target_lang", "") or "")
     if not my_native or not my_target or not their_native or not their_target:
         return False
-    # Complementary: I speak their target; they speak my target.
     return my_native == their_target and my_target == their_native
+
+
+def _partner_score(mine: dict[str, str], other: OralMatchQueue) -> int:
+    score = 0
+    my_topic = mine.get("topic") or ""
+    their_topic = (getattr(other, "topic", "") or "").strip()
+    if my_topic and their_topic and my_topic == their_topic:
+        score += 10
+    my_cid = mine.get("content_id") or ""
+    their_cid = (getattr(other, "content_id", "") or "").strip()
+    if my_cid and their_cid and my_cid == their_cid:
+        score += 20
+    my_kind = mine.get("content_kind") or ""
+    their_kind = _norm_kind(getattr(other, "content_kind", "") or "")
+    if my_kind and their_kind and my_kind == their_kind:
+        score += 3
+    return score
+
+
+def _pick_content(left: dict[str, str], right: dict[str, str]) -> dict[str, str]:
+    if left.get("content_id"):
+        return left
+    if right.get("content_id"):
+        return right
+    if left.get("topic"):
+        return left
+    return right
+
+
+async def _create_paired_room(
+    db: AsyncSession,
+    *,
+    user_a: int,
+    name_a: str,
+    user_b: int,
+    name_b: str,
+    content: dict[str, str],
+    mode: str,
+    now: float,
+) -> OralPeerRoom:
+    room_id = uuid.uuid4().hex[:12]
+    room = OralPeerRoom(
+        id=room_id,
+        user_a=user_a,
+        name_a=name_a,
+        user_b=user_b,
+        name_b=name_b,
+        created_at=now,
+        heartbeat_a=now,
+        heartbeat_b=now,
+        topic=content.get("topic", ""),
+        content_kind=content.get("content_kind", ""),
+        content_id=content.get("content_id", ""),
+        content_title=content.get("content_title", ""),
+        content_route=content.get("content_route", ""),
+    )
+    db.add(room)
+    topic = content.get("topic") or ""
+    title = content.get("content_title") or ""
+    kind = content.get("content_kind") or ""
+    bits = ["Matched."]
+    if topic:
+        bits.append(f"Topic: {topic}.")
+    if title:
+        label = "video" if kind == "video" else ("article" if kind == "article" else "material")
+        bits.append(f"Shared {label}: {title}.")
+    bits.append("Talk about it live, or hold-to-talk for AI rewrite then send.")
+    if mode == "language_exchange":
+        bits = [
+            f"Language exchange matched{(' · ' + topic) if topic else ''}.",
+            "Take turns in each language.",
+        ]
+        if title:
+            bits.append(f"Shared material: {title}.")
+    db.add(
+        OralPeerMessage(
+            id=uuid.uuid4().hex[:10],
+            room_id=room_id,
+            sender_user_id=0,
+            sender_name="system",
+            text=" ".join(bits),
+            created_at=now,
+            kind="system",
+        )
+    )
+    return room
 
 
 @router.post("/enqueue", response_model=EnqueueOut)
@@ -194,8 +367,12 @@ async def enqueue_match(
         "mode": mode,
         "native_lang": _norm_lang(body.native_lang),
         "target_lang": _norm_lang(body.target_lang),
-        "topic": (body.topic or "").strip()[:64],
+        "topic": _norm_topic(body.topic),
         "cefr": (body.cefr or "").strip().upper()[:8],
+        "content_kind": _norm_kind(body.content_kind),
+        "content_id": (body.content_id or "").strip()[:128],
+        "content_title": (body.content_title or "").strip()[:200],
+        "content_route": (body.content_route or "").strip()[:512],
     }
     if mode == "language_exchange" and (
         not prefs["native_lang"] or not prefs["target_lang"]
@@ -212,18 +389,26 @@ async def enqueue_match(
             await db.commit()
             out = EnqueueOut(**_room_payload(existing, user.id, now=now))
             out.mode = mode
-            out.topic = prefs["topic"] or None
             return out
+
+        invite = await _active_invite_for(db, user.id)
+        if invite is not None:
+            invite.heartbeat_at = now
+            await db.commit()
+            return EnqueueOut(**_invite_payload(invite), mode=mode)
 
         candidates = (
             await db.execute(
                 select(OralMatchQueue)
                 .where(OralMatchQueue.user_id != user.id)
                 .order_by(OralMatchQueue.enqueued_at.asc())
-                .limit(20)
+                .limit(40)
             )
         ).scalars().all()
-        waiting = next((row for row in candidates if _compatible_partner(prefs, row)), None)
+        compatible = [row for row in candidates if _compatible_partner(prefs, row)]
+        waiting = None
+        if compatible:
+            waiting = max(compatible, key=lambda row: _partner_score(prefs, row))
 
         mine = await db.get(OralMatchQueue, user.id)
         if waiting is None:
@@ -239,6 +424,10 @@ async def enqueue_match(
                         target_lang=prefs["target_lang"],
                         topic=prefs["topic"],
                         cefr=prefs["cefr"],
+                        content_kind=prefs["content_kind"],
+                        content_id=prefs["content_id"],
+                        content_title=prefs["content_title"],
+                        content_route=prefs["content_route"],
                     )
                 )
             else:
@@ -249,6 +438,10 @@ async def enqueue_match(
                 mine.target_lang = prefs["target_lang"]
                 mine.topic = prefs["topic"]
                 mine.cefr = prefs["cefr"]
+                mine.content_kind = prefs["content_kind"]
+                mine.content_id = prefs["content_id"]
+                mine.content_title = prefs["content_title"]
+                mine.content_route = prefs["content_route"]
             await db.commit()
             position = (
                 await db.execute(
@@ -266,49 +459,168 @@ async def enqueue_match(
                 queue_position=idx + 1,
                 mode=mode,
                 topic=prefs["topic"] or None,
+                content_kind=prefs["content_kind"] or None,
+                content_id=prefs["content_id"] or None,
+                content_title=prefs["content_title"] or None,
+                content_route=prefs["content_route"] or None,
             )
 
-        # Pair with oldest compatible waiter.
         partner = waiting
-        room_id = uuid.uuid4().hex[:12]
-        room = OralPeerRoom(
-            id=room_id,
+        content = _pick_content(prefs, _content_fields(partner))
+        room = await _create_paired_room(
+            db,
             user_a=partner.user_id,
             name_a=partner.display_name,
             user_b=user.id,
             name_b=name,
-            created_at=now,
-            heartbeat_a=now,
-            heartbeat_b=now,
+            content=content,
+            mode=mode,
+            now=now,
         )
-        db.add(room)
-        await db.execute(delete(OralMatchQueue).where(OralMatchQueue.user_id == partner.user_id))
+        await db.execute(
+            delete(OralMatchQueue).where(OralMatchQueue.user_id == partner.user_id)
+        )
         if mine is not None:
             await db.delete(mine)
-        topic = prefs["topic"] or (getattr(partner, "topic", "") or "")
-        intro = (
-            f"Language exchange matched"
-            f"{(' · ' + topic) if topic else ''}. Take turns in each language."
-            if mode == "language_exchange"
-            else "Matched. You can talk live and also hold-to-talk for AI rewrite."
-        )
-        db.add(
-            OralPeerMessage(
-                id=uuid.uuid4().hex[:10],
-                room_id=room_id,
-                sender_user_id=0,
-                sender_name="system",
-                text=intro,
-                created_at=now,
-                kind="system",
-            )
-        )
         await db.commit()
         await db.refresh(room)
         out = EnqueueOut(**_room_payload(room, user.id, now=now))
         out.mode = mode
-        out.topic = topic or None
         return out
+
+
+@router.post("/invites", response_model=EnqueueOut)
+async def create_invite(
+    payload: InviteCreateIn = InviteCreateIn(),
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> EnqueueOut:
+    now = time.time()
+    name = _display_name(user)
+    content = {
+        "topic": _norm_topic(payload.topic),
+        "content_kind": _norm_kind(payload.content_kind),
+        "content_id": (payload.content_id or "").strip()[:128],
+        "content_title": (payload.content_title or "").strip()[:200],
+        "content_route": (payload.content_route or "").strip()[:512],
+    }
+    async with _PAIR_LOCK:
+        await _purge(db, now)
+        existing = await _active_room_for(db, user.id)
+        if existing is not None:
+            raise HTTPException(409, "已在对练房间中，请先结束后再发邀请")
+        invite = await _active_invite_for(db, user.id)
+        if invite is None:
+            invite = OralInviteLobby(
+                id=uuid.uuid4().hex[:12],
+                host_user_id=user.id,
+                host_name=name,
+                topic=content["topic"],
+                content_kind=content["content_kind"],
+                content_id=content["content_id"],
+                content_title=content["content_title"],
+                content_route=content["content_route"],
+                created_at=now,
+                heartbeat_at=now,
+            )
+            db.add(invite)
+        else:
+            invite.host_name = name
+            invite.heartbeat_at = now
+            invite.topic = content["topic"]
+            invite.content_kind = content["content_kind"]
+            invite.content_id = content["content_id"]
+            invite.content_title = content["content_title"]
+            invite.content_route = content["content_route"]
+        await db.execute(delete(OralMatchQueue).where(OralMatchQueue.user_id == user.id))
+        await db.commit()
+        await db.refresh(invite)
+        return EnqueueOut(**_invite_payload(invite))
+
+
+@router.get("/invites")
+async def list_invites(
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    now = time.time()
+    await _purge(db, now)
+    rows = (
+        await db.execute(
+            select(OralInviteLobby)
+            .where(
+                OralInviteLobby.closed_at.is_(None),
+                OralInviteLobby.host_user_id != user.id,
+                OralInviteLobby.heartbeat_at >= now - _INVITE_TTL_SEC,
+            )
+            .order_by(OralInviteLobby.created_at.desc())
+            .limit(40)
+        )
+    ).scalars().all()
+    return {"invites": [_invite_payload(row) for row in rows]}
+
+
+@router.post("/invites/{invite_id}/accept", response_model=EnqueueOut)
+async def accept_invite(
+    invite_id: str,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> EnqueueOut:
+    now = time.time()
+    name = _display_name(user)
+    async with _PAIR_LOCK:
+        await _purge(db, now)
+        if await _active_room_for(db, user.id) is not None:
+            raise HTTPException(409, "已在对练房间中")
+        invite = await db.get(OralInviteLobby, invite_id)
+        if invite is None or invite.closed_at is not None:
+            raise HTTPException(404, "邀请不存在或已失效")
+        if invite.host_user_id == user.id:
+            raise HTTPException(400, "不能接受自己的邀请")
+        if invite.heartbeat_at < now - _INVITE_TTL_SEC:
+            invite.closed_at = now
+            await db.commit()
+            raise HTTPException(410, "邀请已过期")
+
+        content = _content_fields(invite)
+        room = await _create_paired_room(
+            db,
+            user_a=invite.host_user_id,
+            name_a=invite.host_name,
+            user_b=user.id,
+            name_b=name,
+            content=content,
+            mode="peer_oral",
+            now=now,
+        )
+        invite.closed_at = now
+        await db.execute(
+            delete(OralMatchQueue).where(
+                OralMatchQueue.user_id.in_([invite.host_user_id, user.id])
+            )
+        )
+        host_invite = await _active_invite_for(db, user.id)
+        if host_invite is not None:
+            host_invite.closed_at = now
+        await db.commit()
+        await db.refresh(room)
+        return EnqueueOut(**_room_payload(room, user.id, now=now))
+
+
+@router.post("/invites/{invite_id}/cancel")
+async def cancel_invite(
+    invite_id: str,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> dict[str, str]:
+    now = time.time()
+    invite = await db.get(OralInviteLobby, invite_id)
+    if invite is None or invite.host_user_id != user.id:
+        raise HTTPException(404, "邀请不存在")
+    if invite.closed_at is None:
+        invite.closed_at = now
+        await db.commit()
+    return {"status": "cancelled"}
 
 
 @router.get("/status", response_model=EnqueueOut)
@@ -327,7 +639,12 @@ async def match_status(
         await db.commit()
         return EnqueueOut(**_room_payload(room, user.id, now=now))
 
-    # Closed room still visible briefly so client can show "peer left".
+    invite = await _active_invite_for(db, user.id)
+    if invite is not None:
+        invite.heartbeat_at = now
+        await db.commit()
+        return EnqueueOut(**_invite_payload(invite))
+
     closed = (
         await db.execute(
             select(OralPeerRoom)
@@ -355,7 +672,15 @@ async def match_status(
             await db.execute(select(OralMatchQueue).order_by(OralMatchQueue.enqueued_at.asc()))
         ).scalars().all()
         idx = next((i for i, row in enumerate(rows) if row.user_id == user.id), 0)
-        return EnqueueOut(status="waiting", queue_position=idx + 1)
+        return EnqueueOut(
+            status="waiting",
+            queue_position=idx + 1,
+            topic=mine.topic or None,
+            content_kind=mine.content_kind or None,
+            content_id=mine.content_id or None,
+            content_title=mine.content_title or None,
+            content_route=mine.content_route or None,
+        )
     return EnqueueOut(status="idle")
 
 
@@ -374,6 +699,9 @@ async def leave_match(
 ) -> dict[str, str]:
     now = time.time()
     await db.execute(delete(OralMatchQueue).where(OralMatchQueue.user_id == user.id))
+    invite = await _active_invite_for(db, user.id)
+    if invite is not None:
+        invite.closed_at = now
     room = await _active_room_for(db, user.id)
     if room is not None:
         room.closed_at = now
@@ -390,7 +718,6 @@ async def leave_match(
                 kind="system",
             )
         )
-        # Touch peer side so status poll notices quickly.
         if peer_id == room.user_a:
             room.heartbeat_a = room.heartbeat_a
         else:
@@ -429,7 +756,6 @@ async def post_message(
         kind="user",
     )
     db.add(msg)
-    # Cap retention per room.
     rows = (
         await db.execute(
             select(OralPeerMessage)
@@ -489,6 +815,11 @@ async def list_messages(
             room.closed_at is None
             and (time.time() - _peer_heartbeat(room, user.id)) <= _HEARTBEAT_ONLINE_SEC
         ),
+        "topic": room.topic or None,
+        "content_kind": room.content_kind or None,
+        "content_id": room.content_id or None,
+        "content_title": room.content_title or None,
+        "content_route": room.content_route or None,
     }
 
 

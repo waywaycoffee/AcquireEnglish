@@ -1120,6 +1120,31 @@ class OralMatchQueue(Base):
     target_lang: Mapped[str] = mapped_column(String(16), default="")
     topic: Mapped[str] = mapped_column(String(64), default="")
     cefr: Mapped[str] = mapped_column(String(8), default="")
+    # video | article | none
+    content_kind: Mapped[str] = mapped_column(String(16), default="")
+    content_id: Mapped[str] = mapped_column(String(128), default="")
+    content_title: Mapped[str] = mapped_column(String(200), default="")
+    content_route: Mapped[str] = mapped_column(String(512), default="")
+
+
+class OralInviteLobby(Base):
+    """Open invite room waiting for a peer to accept."""
+
+    __tablename__ = "oral_invite_lobbies"
+
+    id: Mapped[str] = mapped_column(String(24), primary_key=True)
+    host_user_id: Mapped[int] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), index=True
+    )
+    host_name: Mapped[str] = mapped_column(String(64))
+    topic: Mapped[str] = mapped_column(String(64), default="")
+    content_kind: Mapped[str] = mapped_column(String(16), default="")
+    content_id: Mapped[str] = mapped_column(String(128), default="")
+    content_title: Mapped[str] = mapped_column(String(200), default="")
+    content_route: Mapped[str] = mapped_column(String(512), default="")
+    created_at: Mapped[float] = mapped_column(Float)
+    heartbeat_at: Mapped[float] = mapped_column(Float)
+    closed_at: Mapped[float | None] = mapped_column(Float, nullable=True)
 
 
 class CommunityStudyGroup(Base):
@@ -1197,6 +1222,11 @@ class OralPeerRoom(Base):
     heartbeat_b: Mapped[float] = mapped_column(Float)
     closed_at: Mapped[float | None] = mapped_column(Float, nullable=True)
     left_by: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    topic: Mapped[str] = mapped_column(String(64), default="")
+    content_kind: Mapped[str] = mapped_column(String(16), default="")
+    content_id: Mapped[str] = mapped_column(String(128), default="")
+    content_title: Mapped[str] = mapped_column(String(200), default="")
+    content_route: Mapped[str] = mapped_column(String(512), default="")
 
 
 class OralPeerMessage(Base):
