@@ -77,6 +77,12 @@ class _ReadingReaderScreenState extends ConsumerState<ReadingReaderScreen> {
   int _continuousGeneration = 0;
   Player? _readingAudio;
   Completer<void>? _readingDone;
+  Duration _audioPos = Duration.zero;
+  Duration _audioDur = Duration.zero;
+  int _speakUnitIndex = 0;
+  int _speakUnitCount = 0;
+  double? _playbackRate;
+  bool _audioSeeking = false;
   String? _glossDocId;
   int _glossThreshold = -1;
   int _glossListsSig = -1;
@@ -256,8 +262,20 @@ class _ReadingReaderScreenState extends ConsumerState<ReadingReaderScreen> {
   }
 
   double get _effectiveRate {
-    final double base = ref.read(learningSettingsProvider).ttsRate;
-    return _slowMode ? (base * 0.55).clamp(0.5, 1.0) : base.clamp(0.5, 1.8);
+    final double base =
+        _playbackRate ?? ref.read(learningSettingsProvider).ttsRate;
+    return _slowMode ? (base * 0.55).clamp(0.5, 1.0) : base.clamp(0.5, 3.0);
+  }
+
+  String get _rateLabel {
+    final double rate = _effectiveRate;
+    final String raw = rate == rate.roundToDouble()
+        ? rate.toStringAsFixed(0)
+        : rate.toStringAsFixed(2).replaceFirst(RegExp(r'0+$'), '').replaceFirst(
+              RegExp(r'\.$'),
+              '',
+            );
+    return '${raw}×';
   }
 
   Future<void> _stopContinuous() async {
@@ -269,7 +287,90 @@ class _ReadingReaderScreenState extends ConsumerState<ReadingReaderScreen> {
     setState(() {
       _continuousPlaying = false;
       _highlightWordIndex = null;
+      _audioPos = Duration.zero;
+      _audioDur = Duration.zero;
+      _speakUnitIndex = 0;
+      _speakUnitCount = 0;
+      _audioSeeking = false;
     });
+  }
+
+  Future<void> _seekReadingAudio(double fraction) async {
+    final Player? player = _readingAudio;
+    if (player == null) return;
+    final Duration dur = player.state.duration;
+    if (dur <= Duration.zero) return;
+    final Duration target = Duration(
+      milliseconds: (dur.inMilliseconds * fraction.clamp(0.0, 1.0)).round(),
+    );
+    await player.seek(target);
+    if (!mounted) return;
+    setState(() {
+      _audioPos = target;
+      _audioDur = dur;
+      _audioSeeking = false;
+    });
+  }
+
+  Future<void> _applyPlaybackRate(double rate) async {
+    final double next = rate.clamp(ttsRateOptions.first, ttsRateOptions.last);
+    if (!mounted) return;
+    setState(() {
+      _playbackRate = next;
+      _slowMode = false;
+    });
+    ref.read(learningSettingsProvider.notifier).setTtsRate(next);
+    unawaited(_persistPrefs());
+    final Player? player = _readingAudio;
+    if (player != null) {
+      try {
+        await player.setRate(next);
+      } catch (_) {}
+    }
+  }
+
+  Future<void> _openReadingSpeedSheet() async {
+    final double current = _effectiveRate;
+    final double? picked = await showModalBottomSheet<double>(
+      context: context,
+      backgroundColor: _dark ? const Color(0xFF1C1C1E) : Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(18)),
+      ),
+      builder: (BuildContext ctx) {
+        return SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: <Widget>[
+              const SizedBox(height: 12),
+              Text(
+                '朗读语速',
+                style: TextStyle(
+                  fontWeight: FontWeight.w800,
+                  fontSize: 16,
+                  color: _dark ? Colors.white : const Color(0xFF1A1520),
+                ),
+              ),
+              const SizedBox(height: 8),
+              for (final double rate in ttsRateOptions)
+                ListTile(
+                  title: Text('${rate}×'),
+                  trailing: (current - rate).abs() < 0.01
+                      ? Icon(
+                          Icons.check_rounded,
+                          color: AppDesignTokens.brandGreenDark,
+                        )
+                      : null,
+                  onTap: () => Navigator.pop(ctx, rate),
+                ),
+              const SizedBox(height: 8),
+            ],
+          ),
+        );
+      },
+    );
+    if (picked == null || !mounted) return;
+    await _applyPlaybackRate(picked);
   }
 
   /// Ask ECS / 5060 Ti to pre-generate this page into shared+personal packs.
@@ -313,7 +414,14 @@ class _ReadingReaderScreenState extends ConsumerState<ReadingReaderScreen> {
     _ensurePages(doc);
     final List<ReadingSpeakUnit> units = splitReadingSpeakUnits(_pageText);
     if (units.isEmpty) return;
-    setState(() => _continuousPlaying = true);
+    setState(() {
+      _continuousPlaying = true;
+      _speakUnitIndex = 0;
+      _speakUnitCount = units.length;
+      _audioPos = Duration.zero;
+      _audioDur = Duration.zero;
+      _audioSeeking = false;
+    });
     unawaited(_enqueuePageSpeechPregen(doc));
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -327,7 +435,6 @@ class _ReadingReaderScreenState extends ConsumerState<ReadingReaderScreen> {
         ),
       );
     }
-    final double rate = _effectiveRate;
     final String voiceId = _ttsGender.aliyunVoiceId;
     final player = Player();
     _readingAudio = player;
@@ -336,6 +443,13 @@ class _ReadingReaderScreenState extends ConsumerState<ReadingReaderScreen> {
       for (int i = 0; i < units.length; i++) {
         if (!mounted || generation != _continuousGeneration) return;
         final ReadingSpeakUnit unit = units[i];
+        if (mounted) {
+          setState(() {
+            _speakUnitIndex = i;
+            _audioPos = Duration.zero;
+            _audioDur = Duration.zero;
+          });
+        }
         final Future<String> urlFuture =
             prefetch ??
             ref
@@ -365,17 +479,26 @@ class _ReadingReaderScreenState extends ConsumerState<ReadingReaderScreen> {
             if (!done.isCompleted) done.complete();
             return;
           }
-          final duration = player.state.duration.inMilliseconds;
-          if (duration <= 0) return;
+          final Duration total = player.state.duration;
+          final int durationMs = total.inMilliseconds;
+          if (durationMs <= 0) return;
           // Relative word positions are estimated within the real audio duration.
-          final local = (position.inMilliseconds / duration * unit.wordCount)
+          final local = (position.inMilliseconds / durationMs * unit.wordCount)
               .floor()
               .clamp(0, unit.wordCount - 1);
-          setState(() => _highlightWordIndex = pageWordBase + local);
+          if (_audioSeeking) {
+            setState(() => _highlightWordIndex = pageWordBase + local);
+            return;
+          }
+          setState(() {
+            _audioPos = position;
+            _audioDur = total;
+            _highlightWordIndex = pageWordBase + local;
+          });
         });
         try {
           await player.open(Media(url));
-          await player.setRate(rate);
+          await player.setRate(_effectiveRate);
           await done.future.timeout(const Duration(minutes: 3));
         } finally {
           if (identical(_readingDone, done)) _readingDone = null;
@@ -399,6 +522,11 @@ class _ReadingReaderScreenState extends ConsumerState<ReadingReaderScreen> {
         setState(() {
           _continuousPlaying = false;
           _highlightWordIndex = null;
+          _audioPos = Duration.zero;
+          _audioDur = Duration.zero;
+          _speakUnitIndex = 0;
+          _speakUnitCount = 0;
+          _audioSeeking = false;
         });
       }
     }
@@ -1294,6 +1422,10 @@ class _ReadingReaderScreenState extends ConsumerState<ReadingReaderScreen> {
                 case 'slow':
                   setState(() => _slowMode = !_slowMode);
                   unawaited(_persistPrefs());
+                  final Player? player = _readingAudio;
+                  if (player != null) {
+                    unawaited(player.setRate(_effectiveRate));
+                  }
                 case 'freq':
                   _openFreqSheet();
                 case 'hard':
@@ -1392,7 +1524,9 @@ class _ReadingReaderScreenState extends ConsumerState<ReadingReaderScreen> {
         focusedSentence: _focusedSentence,
         child: ColoredBox(
           color: bg,
-          child: NotificationListener<ScrollNotification>(
+          child: Stack(
+            children: <Widget>[
+              NotificationListener<ScrollNotification>(
             onNotification: (ScrollNotification n) {
               if (n is ScrollUpdateNotification || n is ScrollEndNotification) {
                 _scheduleProgressSave(doc);
@@ -1401,7 +1535,12 @@ class _ReadingReaderScreenState extends ConsumerState<ReadingReaderScreen> {
             },
             child: SingleChildScrollView(
               controller: _scroll,
-              padding: const EdgeInsets.fromLTRB(22, 12, 22, 40),
+              padding: EdgeInsets.fromLTRB(
+                22,
+                12,
+                22,
+                _continuousPlaying ? 132 : 40,
+              ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: <Widget>[
@@ -1634,6 +1773,181 @@ class _ReadingReaderScreenState extends ConsumerState<ReadingReaderScreen> {
                 ],
               ),
             ),
+          ),
+              if (_continuousPlaying)
+                Positioned(
+                  left: 0,
+                  right: 0,
+                  bottom: 0,
+                  child: _ReadingAudioBar(
+                    dark: _dark,
+                    position: _audioPos,
+                    duration: _audioDur,
+                    unitIndex: _speakUnitIndex,
+                    unitCount: _speakUnitCount,
+                    rateLabel: _rateLabel,
+                    onStop: () => unawaited(_stopContinuous()),
+                    onSeekChanged: (double value) {
+                      final Duration dur = _audioDur;
+                      if (dur <= Duration.zero) return;
+                      setState(() {
+                        _audioSeeking = true;
+                        _audioPos = Duration(
+                          milliseconds:
+                              (dur.inMilliseconds * value.clamp(0.0, 1.0))
+                                  .round(),
+                        );
+                      });
+                    },
+                    onSeekEnd: (double value) {
+                      unawaited(_seekReadingAudio(value));
+                    },
+                    onOpenSpeed: () => unawaited(_openReadingSpeedSheet()),
+                  ),
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+String _formatReadingClock(Duration value) {
+  final int total = value.inMilliseconds < 0 ? 0 : value.inSeconds;
+  final int m = total ~/ 60;
+  final int s = total % 60;
+  return '${m.toString().padLeft(2, '0')}:${s.toString().padLeft(2, '0')}';
+}
+
+class _ReadingAudioBar extends StatelessWidget {
+  const _ReadingAudioBar({
+    required this.dark,
+    required this.position,
+    required this.duration,
+    required this.unitIndex,
+    required this.unitCount,
+    required this.rateLabel,
+    required this.onStop,
+    required this.onSeekChanged,
+    required this.onSeekEnd,
+    required this.onOpenSpeed,
+  });
+
+  final bool dark;
+  final Duration position;
+  final Duration duration;
+  final int unitIndex;
+  final int unitCount;
+  final String rateLabel;
+  final VoidCallback onStop;
+  final ValueChanged<double> onSeekChanged;
+  final ValueChanged<double> onSeekEnd;
+  final VoidCallback onOpenSpeed;
+
+  @override
+  Widget build(BuildContext context) {
+    final Color surface = dark ? const Color(0xFF242428) : Colors.white;
+    final Color ink = dark ? const Color(0xFFF2F2F7) : const Color(0xFF1A1520);
+    final Color muted = dark ? const Color(0xFF9A9AA2) : const Color(0xFF6B6B76);
+    final double progress = duration.inMilliseconds <= 0
+        ? 0
+        : (position.inMilliseconds / duration.inMilliseconds).clamp(0.0, 1.0);
+    final String unitLabel = unitCount <= 0
+        ? '朗读中'
+        : '句 ${unitIndex + 1}/$unitCount';
+
+    return Material(
+      elevation: 10,
+      color: surface,
+      child: SafeArea(
+        top: false,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: <Widget>[
+              Row(
+                children: <Widget>[
+                  IconButton(
+                    tooltip: '停止朗读',
+                    onPressed: onStop,
+                    icon: Icon(
+                      Icons.stop_circle_outlined,
+                      color: AppDesignTokens.brandGreenDark,
+                    ),
+                  ),
+                  Expanded(
+                    child: Text(
+                      unitLabel,
+                      style: TextStyle(
+                        fontWeight: FontWeight.w700,
+                        color: ink,
+                        fontSize: 13,
+                      ),
+                    ),
+                  ),
+                  TextButton(
+                    onPressed: onOpenSpeed,
+                    style: TextButton.styleFrom(
+                      foregroundColor: AppDesignTokens.brandGreenDark,
+                      padding: const EdgeInsets.symmetric(horizontal: 10),
+                      minimumSize: const Size(0, 36),
+                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    ),
+                    child: Text(
+                      '语速 $rateLabel',
+                      style: const TextStyle(fontWeight: FontWeight.w700),
+                    ),
+                  ),
+                ],
+              ),
+              Row(
+                children: <Widget>[
+                  Text(
+                    _formatReadingClock(position),
+                    style: TextStyle(
+                      color: muted,
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  Expanded(
+                    child: SliderTheme(
+                      data: SliderTheme.of(context).copyWith(
+                        trackHeight: 2.5,
+                        thumbShape: const RoundSliderThumbShape(
+                          enabledThumbRadius: 6,
+                        ),
+                        overlayShape: const RoundSliderOverlayShape(
+                          overlayRadius: 12,
+                        ),
+                        activeTrackColor: AppDesignTokens.brandGreenDark,
+                        inactiveTrackColor: muted.withValues(alpha: 0.28),
+                        thumbColor: AppDesignTokens.brandGreenDark,
+                      ),
+                      child: Slider(
+                        value: progress,
+                        onChanged: duration.inMilliseconds <= 0
+                            ? null
+                            : onSeekChanged,
+                        onChangeEnd: duration.inMilliseconds <= 0
+                            ? null
+                            : onSeekEnd,
+                      ),
+                    ),
+                  ),
+                  Text(
+                    _formatReadingClock(duration),
+                    style: TextStyle(
+                      color: muted,
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+              ),
+            ],
           ),
         ),
       ),
