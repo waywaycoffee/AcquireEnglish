@@ -122,4 +122,7 @@ class _FakeWordPronunciationTtsClient extends WordPronunciationTtsClient {
     languages.add(language);
     spokenTexts.add(text);
   }
+
+  @override
+  Future<void> stop() async {}
 }

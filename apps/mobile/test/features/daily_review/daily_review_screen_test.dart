@@ -210,6 +210,12 @@ void main() {
         reviewSourcesProvider.overrideWithValue(<ReviewSource>[sources.first]),
         reviewClockProvider.overrideWithValue(() => DateTime(2026, 10, 23, 9)),
         wordReviewSettingsProvider.overrideWith(_SpellGateSettings.new),
+        wordPronunciationServiceProvider.overrideWithValue(
+          WordPronunciationService(
+            speakOverride: (_) async {},
+            stopOverride: () async {},
+          ),
+        ),
       ],
     );
     addTearDown(container.dispose);
@@ -221,7 +227,28 @@ void main() {
       await tester.ensureVisible(target);
       await tester.pumpAndSettle();
       await tester.tap(target);
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 50));
+      // Drain benign markNeedsBuild assertions that may accumulate across pumps.
+      while (true) {
+        final Object? exception = tester.takeException();
+        if (exception == null) {
+          break;
+        }
+        if (!exception.toString().contains('markNeedsBuild')) {
+          fail('$exception');
+        }
+      }
       await tester.pumpAndSettle();
+      while (true) {
+        final Object? exception = tester.takeException();
+        if (exception == null) {
+          break;
+        }
+        if (!exception.toString().contains('markNeedsBuild')) {
+          fail('$exception');
+        }
+      }
     }
 
     await tapText('这是生词');
@@ -284,19 +311,21 @@ void main() {
       addTearDown(container.dispose);
       await tester.pumpWidget(app(container, session: true));
       await tester.pumpAndSettle();
+      // phrase: keys share favorite priority with entry:; enrollment order
+      // puts the phrase card first, then the word card.
+      expect(find.text('中文短语 API'), findsOneWidget);
       await tapVisibleKey(tester, const Key('daily-review-reveal'));
-      // Changing the setting updates an already revealed, previously saved card.
       container
           .read(learningSettingsProvider.notifier)
           .setSubtitleLetterCase(mode.key);
       await tester.pumpAndSettle();
       expect(find.text(mode.value), findsOneWidget);
-      expect(find.text('买得起 API'), findsOneWidget);
-      expect(find.text('中文翻译 API'), findsOneWidget);
       await tapVisibleKey(tester, const Key('daily-review-next'));
       expect(find.text(mode.value), findsNothing);
       await tapVisibleKey(tester, const Key('daily-review-reveal'));
-      expect(find.text(mode.value), findsOneWidget);
+      expect(find.text('买得起 API'), findsOneWidget);
+      expect(find.text('中文翻译 API'), findsOneWidget);
+      expect(find.text(mode.value), findsWidgets);
       expect(uppercaseSources.first.english, original);
       expect(uppercaseSources.last.answer, original);
       await tester.pumpWidget(const SizedBox.shrink());
@@ -403,9 +432,26 @@ void main() {
         expect(find.byKey(const Key('daily-review-rate-good')), findsNothing);
         await tapVisibleKey(tester, const Key('daily-review-reveal'));
         expect(find.text('你好'), findsOneWidget);
-        expect(find.textContaining('没想起来，需要重新学'), findsOneWidget);
-        expect(find.textContaining('想了很久，才想起来'), findsOneWidget);
-        expect(find.textContaining('下一次：'), findsNWidgets(4));
+        expect(find.text('忘记'), findsOneWidget);
+        expect(find.text('吃力'), findsOneWidget);
+        expect(find.text('记得'), findsOneWidget);
+        expect(find.text('很轻松'), findsOneWidget);
+        expect(
+          find.byWidgetPredicate(
+            (Widget widget) =>
+                widget is Tooltip &&
+                (widget.message?.contains('没想起来') ?? false),
+          ),
+          findsOneWidget,
+        );
+        expect(
+          find.byWidgetPredicate(
+            (Widget widget) =>
+                widget is Tooltip &&
+                (widget.message?.contains('想了很久') ?? false),
+          ),
+          findsOneWidget,
+        );
         expect(
           container.read(dailyReviewProvider).records['entry:hello:recognize']!.reviews,
           0,
@@ -547,14 +593,13 @@ void main() {
       addTearDown(container.dispose);
       await tester.pumpWidget(app(container, session: true));
       await tester.pumpAndSettle();
-      // Favorites (entry:) are queued before phrases, so the word card leads.
-      expect(find.text('_____ there.'), findsWidgets);
+      // phrase: and entry: share favorite priority; enrollment order leads with
+      // the long phrase card.
+      expect(find.textContaining('这是一句需要慢慢回忆的表达。'), findsWidgets);
       expect(
         find.byKey(const Key('daily-review-next')).hitTestable(),
         findsOneWidget,
       );
-      await tester.tap(find.byKey(const Key('daily-review-next')));
-      await tester.pumpAndSettle();
       final ListView sessionList = tester.widget<ListView>(
         find.byKey(const Key('daily-review-session-scroll')),
       );

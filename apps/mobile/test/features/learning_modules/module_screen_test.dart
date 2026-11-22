@@ -39,26 +39,32 @@ void main() {
     );
   });
   testWidgets('completion requires a correct answer', (tester) async {
+    addTearDown(() async {
+      await tester.binding.setSurfaceSize(null);
+    });
+    await tester.binding.setSurfaceSize(const Size(1280, 900));
     await tester.pumpWidget(
       const ProviderScope(
         child: MaterialApp(home: ModuleScreen(kind: 'phonics')),
       ),
     );
-    await tester.pumpAndSettle();
-    await tester.scrollUntilVisible(
-      find.text('完成并保存进度'),
-      200,
-      scrollable: find.byType(Scrollable).first,
-    );
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 200));
     expect(
       tester
           .widget<FilledButton>(find.widgetWithText(FilledButton, '完成并保存进度'))
           .onPressed,
       isNull,
     );
-    await tester.ensureVisible(find.text('/æ/'));
-    await tester.tap(find.text('/æ/'));
-    await tester.pumpAndSettle();
+    final Finder choice = find.ancestor(
+      of: find.text('/æ/'),
+      matching: find.byType(RadioListTile<String>),
+    );
+    expect(choice, findsOneWidget);
+    await tester.ensureVisible(choice);
+    await tester.tap(choice, warnIfMissed: false);
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 200));
     expect(
       tester
           .widget<FilledButton>(find.widgetWithText(FilledButton, '完成并保存进度'))
@@ -67,16 +73,23 @@ void main() {
     );
   });
   testWidgets('listening hides subtitles until requested', (tester) async {
+    addTearDown(() async {
+      await tester.binding.setSurfaceSize(null);
+    });
+    await tester.binding.setSurfaceSize(const Size(1280, 900));
     await tester.pumpWidget(
       const ProviderScope(
         child: MaterialApp(home: ModuleScreen(kind: 'listening')),
       ),
     );
-    await tester.pumpAndSettle();
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 200));
     expect(find.text('I get up at seven.'), findsNothing);
+    expect(find.text('先听一遍，再展开字幕'), findsOneWidget);
     await tester.ensureVisible(find.text('展开提示'));
-    await tester.tap(find.text('展开提示'));
-    await tester.pumpAndSettle();
+    await tester.tap(find.text('展开提示'), warnIfMissed: false);
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 200));
     expect(find.text('I get up at seven.'), findsOneWidget);
   });
 }

@@ -197,6 +197,7 @@ class _StudyShadowingTabState extends ConsumerState<StudyShadowingTab> {
   /// Hide mode: only reveal after a new attempt in this hide session.
   bool _hideRevealThisRound = false;
   bool _dubTakeSaved = false;
+  bool? _hasSavedCurrentTake;
   DateTime? _takeCreatedAt;
   @override
   void initState() {
@@ -239,6 +240,7 @@ class _StudyShadowingTabState extends ConsumerState<StudyShadowingTab> {
       _peekHiddenSentence = false;
       _hideRevealThisRound = false;
       _dubTakeSaved = false;
+      _hasSavedCurrentTake = null;
     }
     final String? nextKey = _targetKey(widget.assessmentTarget);
     if (nextKey != _boundTargetKey) {
@@ -279,7 +281,9 @@ class _StudyShadowingTabState extends ConsumerState<StudyShadowingTab> {
       _playingPath = null;
       _hideRevealThisRound = false;
       _dubTakeSaved = false;
+      _hasSavedCurrentTake = null;
     });
+    unawaited(_refreshSavedCurrentTake());
     if (target == null) {
       if (mounted) {
         setState(() {
@@ -292,6 +296,22 @@ class _StudyShadowingTabState extends ConsumerState<StudyShadowingTab> {
       return;
     }
     await _loadReferenceAudio(target);
+  }
+
+  Future<void> _refreshSavedCurrentTake() async {
+    final String? episodeId = widget.episodeId;
+    final int startMs = widget.line.startMs;
+    final int endMs = widget.line.endMs;
+    if (episodeId == null || episodeId.isEmpty) {
+      if (mounted) setState(() => _hasSavedCurrentTake = false);
+      return;
+    }
+    final List<DubTake> takes = await DubSessionStore.instance.loadTakes(episodeId);
+    if (!mounted || widget.episodeId != episodeId ||
+        widget.line.startMs != startMs || widget.line.endMs != endMs) return;
+    setState(() => _hasSavedCurrentTake = takes.any(
+      (DubTake take) => take.startMs == startMs && take.endMs == endMs,
+    ));
   }
 
   Future<void> _loadReferenceAudio(PronunciationAssessmentTarget target) async {
@@ -1010,7 +1030,10 @@ class _StudyShadowingTabState extends ConsumerState<StudyShadowingTab> {
             sentenceKey: '$episodeId|$lineId',
           );
       if (mounted && !_resourcesReleased) {
-        setState(() => _dubTakeSaved = true);
+        setState(() {
+          _dubTakeSaved = true;
+          _hasSavedCurrentTake = true;
+        });
       }
     } catch (_) {
       // Persistence failure should not block scoring UX.
@@ -1285,6 +1308,25 @@ class _StudyShadowingTabState extends ConsumerState<StudyShadowingTab> {
                   _message!,
                   textAlign: TextAlign.center,
                   style: TextStyle(color: shell.textSecondary, fontSize: 13),
+                ),
+              ],
+              if (canRecord && _hasSavedCurrentTake == false &&
+                  _recordingPath == null && !_recordingActive &&
+                  !_finishingRecording) ...<Widget>[
+                const SizedBox(height: 10),
+                Card(
+                  child: Padding(
+                    padding: const EdgeInsets.all(12),
+                    child: Row(children: <Widget>[
+                      const Expanded(child: Text('当前句还没有配音，补录后会加入整段回放。')),
+                      TextButton.icon(
+                        key: const ValueKey<String>('study-shadowing-record-missing'),
+                        onPressed: () => unawaited(_startRecording()),
+                        icon: const Icon(Icons.mic_rounded),
+                        label: const Text('立即录音'),
+                      ),
+                    ]),
+                  ),
                 ),
               ],
               if (_recording != null ||

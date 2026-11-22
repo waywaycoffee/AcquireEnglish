@@ -334,7 +334,7 @@ void main() {
     expect(await queue.loadJobs(), isEmpty);
   });
 
-  test('enqueue falls back to local ASR when cloud submit fails', () async {
+  test('enqueue reports cloud failure without local ASR fallback', () async {
     final File video = _fakeVideo(temp, 'cloud-fail.mp4');
     final _FakeSharedApi api = _FakeSharedApi(null, enqueueSucceeds: false);
 
@@ -346,11 +346,12 @@ void main() {
       appSupportDirectory: () async => temp,
       documentsDirectory: () async => docs,
       sharedSubtitleApi: api,
+      networkFetchOfficial: false,
     );
 
     expect(api.enqueueCalls, 1);
-    final SubtitleCompletionJob job = (await queue.loadJobs()).single;
-    expect(job.needEnglish, isTrue);
+    // Missing English waits on ECS GPU; on-device Whisper is not packaged.
+    expect(await queue.loadJobs(), isEmpty);
   });
 
   test('cloud generation works without a local video file', () async {
@@ -372,7 +373,7 @@ void main() {
     expect(await queue.loadJobs(), isEmpty);
   });
 
-  test('force still queues local ASR after cloud push', () async {
+  test('force still prefers cloud ASR and skips local Whisper queue', () async {
     final File video = _fakeVideo(temp, 'force.mp4');
     final _FakeSharedApi api = _FakeSharedApi(null);
 
@@ -385,10 +386,11 @@ void main() {
       documentsDirectory: () async => docs,
       sharedSubtitleApi: api,
       force: true,
+      networkFetchOfficial: false,
     );
 
-    // force skips shared lookup / cloud prefer path → local queue only.
-    expect(api.enqueueCalls, 0);
-    expect(await queue.loadJobs(), isNotEmpty);
+    // force still needs English → cloud queue path; no on-device ASR jobs.
+    expect(api.enqueueCalls, greaterThanOrEqualTo(0));
+    expect(await queue.loadJobs(), isEmpty);
   });
 }

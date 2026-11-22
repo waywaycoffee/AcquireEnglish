@@ -322,10 +322,12 @@ void main() {
       findsOneWidget,
     );
     final ScrollableState scrollable = tester.state<ScrollableState>(
-      find.descendant(
-        of: find.byType(ListView),
-        matching: find.byType(Scrollable),
-      ),
+      find
+          .descendant(
+            of: find.byType(ListView),
+            matching: find.byType(Scrollable),
+          )
+          .first,
     );
     final double scrollOffsetBefore = scrollable.position.pixels;
 

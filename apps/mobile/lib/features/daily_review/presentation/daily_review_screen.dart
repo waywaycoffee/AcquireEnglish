@@ -302,8 +302,9 @@ class _DailyReviewScreenState extends ConsumerState<DailyReviewScreen>
       }
     });
     final DailyReviewState state = ref.watch(dailyReviewProvider);
-    // Prefetch remote real-person demo media for foundation / phonics books.
-    ref.watch(foundationMediaManifestProvider);
+    // Prefetch without watching: a watch here can markNeedsBuild when an
+    // overlay flips TickerMode and resumes paused Riverpod subscriptions.
+    ref.read(foundationMediaManifestProvider);
     final List<ReviewSource> sources = _filteredSources();
     final DateTime now = ref.read(reviewClockProvider)();
     if (widget.session) _restoreWordPasses(now);
@@ -505,7 +506,8 @@ class _DailyReviewScreenState extends ConsumerState<DailyReviewScreen>
     if (context.canPop()) {
       context.pop();
     } else {
-      context.go('${SGRoute.home.route}?focus=vocab');
+      // Deep-linked session has no stack; return to the review overview.
+      context.go(SGRoute.review.route);
     }
   }
 
@@ -2470,18 +2472,22 @@ class _DailyReviewScreenState extends ConsumerState<DailyReviewScreen>
     _stopSpeech();
     final bool preferListen =
         source.answer.trim().isEmpty && source.english.trim().isNotEmpty;
-    return Navigator.of(context).push<SpellStageResult>(
-      MaterialPageRoute<SpellStageResult>(
-        builder: (_) => ReviewSpellingScreen(
-          word: source.question,
-          meaning: source.answer,
-          prompt: preferListen
-              ? SpellPromptKind.listen
-              : SpellPromptKind.meaning,
-          onListen: () => unawaited(_playWord(source, silent: true)),
-        ),
-      ),
-    );
+    final SpellStageResult? result = await Navigator.of(context)
+        .push<SpellStageResult>(
+          MaterialPageRoute<SpellStageResult>(
+            builder: (_) => ReviewSpellingScreen(
+              word: source.question,
+              meaning: source.answer,
+              prompt: preferListen
+                  ? SpellPromptKind.listen
+                  : SpellPromptKind.meaning,
+              onListen: () => unawaited(_playWord(source, silent: true)),
+            ),
+          ),
+        );
+    // Let the spelling route overlay finish disposing before Riverpod rebuilds.
+    await Future<void>.delayed(Duration.zero);
+    return result;
   }
 
   Future<void> _openSpeakAssessment(

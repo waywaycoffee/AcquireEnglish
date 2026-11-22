@@ -16,9 +16,14 @@ void main() {
 
     final Directory videoFolder = Directory('${root.path}/videos')..createSync();
     final Directory subtitleFolder = Directory('${root.path}/subs')..createSync();
-    File('${videoFolder.path}/lesson1.mp4').writeAsStringSync('video1');
-    File('${subtitleFolder.path}/lesson1.srt').writeAsStringSync('subtitle1');
-    File('${subtitleFolder.path}/lesson1.zh.srt').writeAsStringSync('字幕1');
+    File('${videoFolder.path}/lesson1.mp4')
+        .writeAsBytesSync(List<int>.filled(65 * 1024, 1));
+    File('${subtitleFolder.path}/lesson1.srt').writeAsStringSync(
+      '1\n00:00:00,000 --> 00:00:01,000\nHello\n',
+    );
+    File('${subtitleFolder.path}/lesson1.zh.srt').writeAsStringSync(
+      '1\n00:00:00,000 --> 00:00:01,000\n你好\n',
+    );
 
     tester.view.physicalSize = const Size(1366, 1024);
     tester.view.devicePixelRatio = 1;
@@ -45,10 +50,10 @@ void main() {
 
     expect(find.text('导入影视'), findsOneWidget);
     expect(find.text('把本地视频和字幕整理成新的学习片库。'), findsOneWidget);
-    expect(find.textContaining('选择视频文件'), findsWidgets);
+    expect(find.textContaining('选择视频文件夹'), findsWidgets);
     expect(find.text('确认导入并建立课程'), findsNothing);
 
-    await tester.tap(find.textContaining('选择视频文件').last);
+    await tester.tap(find.textContaining('选择视频文件夹').last);
     await tester.pumpAndSettle();
 
     expect(find.text('选择字幕文件夹并开始解析'), findsOneWidget);
@@ -67,8 +72,7 @@ void main() {
     expect(find.byTooltip('返回上一步'), findsOneWidget);
 
     await tester.tap(find.widgetWithText(FilledButton, '确认导入并建立课程'));
-    await tester.pump();
-    await tester.pumpAndSettle();
+    await _waitForImportSuccess(tester);
 
     expect(find.textContaining('导入成功：'), findsOneWidget);
   });
@@ -81,8 +85,11 @@ void main() {
 
     final Directory videoFolder = Directory('${root.path}/videos')..createSync();
     final Directory subtitleFolder = Directory('${root.path}/subs')..createSync();
-    File('${videoFolder.path}/lesson1.mp4').writeAsStringSync('video1');
-    File('${subtitleFolder.path}/lesson1.srt').writeAsStringSync('subtitle1');
+    File('${videoFolder.path}/lesson1.mp4')
+        .writeAsBytesSync(List<int>.filled(65 * 1024, 1));
+    File('${subtitleFolder.path}/lesson1.srt').writeAsStringSync(
+      '1\n00:00:00,000 --> 00:00:01,000\nHello\n',
+    );
 
     tester.view.physicalSize = const Size(1366, 1024);
     tester.view.devicePixelRatio = 1;
@@ -104,7 +111,7 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    await tester.tap(find.textContaining('选择视频文件').last);
+    await tester.tap(find.textContaining('选择视频文件夹').last);
     await tester.pumpAndSettle();
     await tester.tap(find.widgetWithText(FilledButton, '选择字幕文件夹'));
     await tester.pumpAndSettle();
@@ -112,10 +119,9 @@ void main() {
     await _waitForParsing(tester);
 
     await tester.tap(find.widgetWithText(FilledButton, '确认导入并建立课程'));
-    await tester.pump();
+    await _waitForImportSuccess(tester);
 
     expect(find.textContaining('正在生成封面'), findsNothing);
-    await tester.pumpAndSettle();
   });
 
   testWidgets('android import uses picked folder name instead of first episode name', (
@@ -124,8 +130,10 @@ void main() {
     final Directory root = Directory.systemTemp.createTempSync('import-course-android-');
     addTearDown(() => root.deleteSync(recursive: true));
 
-    final File video = File('${root.path}/01.mp4')..writeAsStringSync('video1');
-    final File subtitle = File('${root.path}/01.srt')..writeAsStringSync('subtitle1');
+    final File video = File('${root.path}/01.mp4')
+      ..writeAsBytesSync(List<int>.filled(65 * 1024, 1));
+    final File subtitle = File('${root.path}/01.srt')
+      ..writeAsStringSync('1\n00:00:00,000 --> 00:00:01,000\nHello\n');
 
     tester.view.physicalSize = const Size(1366, 1024);
     tester.view.devicePixelRatio = 1;
@@ -160,14 +168,14 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    await tester.tap(find.textContaining('选择视频文件').last);
+    await tester.tap(find.textContaining('选择视频文件夹').last);
     await tester.pumpAndSettle();
     await tester.tap(find.widgetWithText(FilledButton, '选择字幕文件夹'));
     await tester.pumpAndSettle();
     await tester.tap(find.widgetWithText(FilledButton, '开始解析'));
     await _waitForParsing(tester);
     await tester.tap(find.widgetWithText(FilledButton, '确认导入并建立课程'));
-    await tester.pumpAndSettle();
+    await _waitForImportSuccess(tester);
 
     expect(container.read(libraryCatalogProvider).first.title, 'Friends');
   });
@@ -185,5 +193,20 @@ Future<void> _waitForParsing(WidgetTester tester) async {
     );
     await tester.pump();
   }
-  await tester.pumpAndSettle();
+  await tester.pump(const Duration(milliseconds: 100));
+}
+
+Future<void> _waitForImportSuccess(WidgetTester tester) async {
+  final Stopwatch timeout = Stopwatch()..start();
+  while (find.textContaining('导入成功').evaluate().isEmpty &&
+      find.textContaining('该课程已导入').evaluate().isEmpty) {
+    if (timeout.elapsed > const Duration(seconds: 15)) {
+      fail('Import did not finish');
+    }
+    await tester.runAsync(
+      () => Future<void>.delayed(const Duration(milliseconds: 20)),
+    );
+    await tester.pump(const Duration(milliseconds: 50));
+  }
+  await tester.pump(const Duration(milliseconds: 100));
 }

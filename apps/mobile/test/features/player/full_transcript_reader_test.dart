@@ -430,10 +430,12 @@ void main() {
         findsOneWidget,
       );
 
-      await tester.pump(const Duration(milliseconds: 2200));
+      // Word follow-along for a 2s / 4-word line ≈ 2s; inter-line pause ≈ 0.4s.
+      // Stay under that budget so the second line has not started yet.
+      await tester.pump(const Duration(milliseconds: 1400));
       expect(spokenLines, <String>['Guess what I bought?']);
 
-      await tester.pump(const Duration(milliseconds: 200));
+      await tester.pump(const Duration(milliseconds: 800));
       expect(spokenLines, <String>[
         'Guess what I bought?',
         'This is the next sentence.',

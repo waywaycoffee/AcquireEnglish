@@ -9,16 +9,25 @@ void main() {
     );
     expect(
       ReadingTtsGender.male.aliyunVoiceId,
-      'longshu_v3.1',
+      'longze_v3.1',
     );
+    // ryan shares the male CosyVoice id; book-pair UI only exposes female/male.
     expect(
       ReadingTtsGender.values.map((v) => v.aliyunVoiceId).toSet(),
-      hasLength(8),
+      hasLength(7),
+    );
+    expect(
+      ReadingTtsGenderX.selectableBookVoices.map((v) => v.aliyunVoiceId).toSet(),
+      <String>{'longanfengyue', 'longze_v3.1'},
     );
     for (final voice in ReadingTtsGender.values) {
-      expect(ReadingTtsGenderX.fromStorage(voice.storageValue), voice);
+      expect(
+        ReadingTtsGenderX.fromStorage(voice.storageValue),
+        voice.asBookPairVoice,
+      );
     }
     expect(ReadingTtsGenderX.fromStorage('male'), ReadingTtsGender.male);
+    expect(ReadingTtsGenderX.fromStorage('luna'), ReadingTtsGender.female);
     expect(ReadingTtsGenderX.fromStorage(null), ReadingTtsGender.female);
   });
 }

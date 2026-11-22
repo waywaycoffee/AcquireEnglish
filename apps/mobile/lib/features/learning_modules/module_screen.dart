@@ -944,13 +944,16 @@ class _ModuleScreenState extends ConsumerState<ModuleScreen>
                   ),
                   const SizedBox(height: 4),
                   for (final option in choices)
-                    RadioListTile<String>(
-                      contentPadding: EdgeInsets.zero,
-                      dense: true,
-                      title: Text(option),
-                      value: option,
-                      groupValue: selected,
-                      onChanged: (v) => setState(() => selected = v),
+                    Material(
+                      color: Colors.transparent,
+                      child: RadioListTile<String>(
+                        contentPadding: EdgeInsets.zero,
+                        dense: true,
+                        title: Text(option),
+                        value: option,
+                        groupValue: selected,
+                        onChanged: (v) => setState(() => selected = v),
+                      ),
                     ),
                   if (selected != null)
                     Padding(

@@ -74,7 +74,9 @@ void main() {
           .icon,
       Icons.mic_rounded,
     );
+    await tester.ensureVisible(assess);
     await tester.tap(assess);
+    await tester.pump();
     expect(assessedIndex, 1);
     expect(tester.takeException(), isNull);
   });

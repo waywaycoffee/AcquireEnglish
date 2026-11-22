@@ -152,7 +152,8 @@ class _PlayerFullscreenVideoScreenState
 
   bool _showEpisodePanel = false;
   /// Landscape fullscreen keeps the transcript on the right of the video.
-  late bool _showSubtitlePanel = widget.playerState.hasLines;
+  /// Opened in the first frame only when the video column stays usable.
+  bool _showSubtitlePanel = false;
   /// When true, do not auto-reopen after the learner collapses the side list.
   bool _userCollapsedSubtitlePanel = false;
   bool _showControls = true;
@@ -170,6 +171,13 @@ class _PlayerFullscreenVideoScreenState
     }
     if (!widget.playerState.hasLines || _showSubtitlePanel) {
       return;
+    }
+    // Side transcript needs a usable video column; skip auto-open on phones.
+    if (mounted) {
+      final double width = MediaQuery.sizeOf(context).width;
+      if (width - _resolvedSubtitlePanelWidth(context) < 280) {
+        return;
+      }
     }
     _showSubtitlePanel = true;
     if (forceSetState && mounted) {
@@ -209,8 +217,11 @@ class _PlayerFullscreenVideoScreenState
 
   double _resolvedSubtitlePanelWidth(BuildContext context) {
     final double screenWidth = MediaQuery.sizeOf(context).width;
-    // Keep video dominant; clamp so phones still leave ~60% for the picture.
-    return (screenWidth * 0.38).clamp(240.0, _subtitlePanelWidth);
+    // Keep video dominant (~60%+). Never force a 240px floor that starves
+    // phone-width layouts down to an unusable control dock.
+    final double ideal = screenWidth * 0.38;
+    final double maxPanel = (screenWidth * 0.42).clamp(0.0, _subtitlePanelWidth);
+    return ideal.clamp(0.0, maxPanel);
   }
 
   @override

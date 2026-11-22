@@ -30,10 +30,18 @@ void main() {
     }
   });
 
-  test('missing EN with ZH enqueues needEnglish', () async {
+  test('missing EN with ZH detects needEnglish (cloud ASR, no local queue)', () async {
     final File video = _fakeVideo(temp, 'a.mp4');
     final File zh = File('${temp.path}/zh.srt')
       ..writeAsStringSync('1\n00:00:00,000 --> 00:00:01,000\n你好\n');
+    final SubtitleCompletionNeed need = await detectSubtitleCompletionNeed(
+      episodeId: 'ep-1',
+      zhSubtitlePath: zh.path,
+      enSubtitlePath: null,
+      appSupportDirectory: () async => temp,
+    );
+    expect(need.needEnglish, isTrue);
+    expect(need.needChinese, isFalse);
     await enqueueSubtitleCompletionForEpisode(
       episodeId: 'ep-1',
       videoPath: video.path,
@@ -41,11 +49,10 @@ void main() {
       enSubtitlePath: null,
       queue: queue,
       appSupportDirectory: () async => temp,
+      skipSharedLookup: true,
+      networkFetchOfficial: false,
     );
-    final SubtitleCompletionJob job = (await queue.loadJobs()).single;
-    expect(job.needEnglish, isTrue);
-    expect(job.needChinese, isFalse);
-    expect(job.zhPath, zh.path);
+    expect(await queue.loadJobs(), isEmpty);
   });
 
   test('reliable EN without ZH enqueues needChinese only', () async {
@@ -60,6 +67,8 @@ void main() {
       enSubtitlePath: en.path,
       queue: queue,
       appSupportDirectory: () async => temp,
+      skipSharedLookup: true,
+      networkFetchOfficial: false,
     );
     final SubtitleCompletionJob job = (await queue.loadJobs()).single;
     expect(job.needEnglish, isFalse);
@@ -111,13 +120,15 @@ void main() {
       enSubtitlePath: en.path,
       queue: queue,
       appSupportDirectory: () async => temp,
+      skipSharedLookup: true,
+      networkFetchOfficial: false,
     );
     final SubtitleCompletionJob job = (await queue.loadJobs()).single;
     expect(job.needEnglish, isFalse);
     expect(job.needChinese, isTrue);
   });
 
-  test('Chinese text saved as en.srt still enqueues needEnglish', () async {
+  test('Chinese text saved as en.srt still needs English (cloud, no local queue)', () async {
     final File video = _fakeVideo(temp, 'zh-as-en.mp4');
     final File en = File('${temp.path}/official/en.srt')
       ..createSync(recursive: true)
@@ -125,6 +136,14 @@ void main() {
     final File zh = File('${temp.path}/official/zh.srt')
       ..createSync(recursive: true)
       ..writeAsStringSync('1\n00:00:00,000 --> 00:00:01,000\n你好世界\n');
+    final SubtitleCompletionNeed need = await detectSubtitleCompletionNeed(
+      episodeId: 'ep-zh-as-en',
+      zhSubtitlePath: zh.path,
+      enSubtitlePath: en.path,
+      appSupportDirectory: () async => temp,
+    );
+    expect(need.needEnglish, isTrue);
+    expect(need.needChinese, isFalse);
     await enqueueSubtitleCompletionForEpisode(
       episodeId: 'ep-zh-as-en',
       videoPath: video.path,
@@ -132,10 +151,10 @@ void main() {
       enSubtitlePath: en.path,
       queue: queue,
       appSupportDirectory: () async => temp,
+      skipSharedLookup: true,
+      networkFetchOfficial: false,
     );
-    final SubtitleCompletionJob job = (await queue.loadJobs()).single;
-    expect(job.needEnglish, isTrue);
-    expect(job.needChinese, isFalse);
+    expect(await queue.loadJobs(), isEmpty);
   });
 
   test('complete asr-sentences bilingual skips enqueue', () async {

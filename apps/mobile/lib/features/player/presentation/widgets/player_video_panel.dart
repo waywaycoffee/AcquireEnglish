@@ -1821,14 +1821,14 @@ class _ControlDock extends StatelessWidget {
               Text(
                 currentLabel,
                 style: TextStyle(
-                  fontSize: 11,
+                  fontSize: tiny ? 10 : 11,
                   fontWeight: FontWeight.w800,
                   color: fullscreen
                       ? Colors.white
                       : AppDesignTokens.textPrimary,
                 ),
               ),
-              SizedBox(width: tiny ? 8 : 12),
+              SizedBox(width: tiny ? 6 : 12),
               Expanded(
                 child: LayoutBuilder(
                   builder: (BuildContext context, BoxConstraints constraints) {
@@ -1885,19 +1885,15 @@ class _ControlDock extends StatelessWidget {
           ),
           SizedBox(height: tiny ? 8 : 10),
           if (compact)
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: <Widget>[
-                Row(children: leadingButtons),
-                Flexible(
-                  child: Wrap(
-                    alignment: WrapAlignment.end,
-                    runSpacing: 6,
-                    children: trailingButtons,
-                  ),
-                ),
-              ],
+            SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Row(
+                children: <Widget>[
+                  ...leadingButtons,
+                  const SizedBox(width: 8),
+                  ...trailingButtons,
+                ],
+              ),
             )
           else
             Row(
@@ -1994,42 +1990,48 @@ class _MiniPillAction extends StatelessWidget {
         color: fullscreen ? const Color(0x33101827) : Colors.white,
         borderRadius: BorderRadius.circular(24),
       ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: <Widget>[
-          if (iconText != null)
-            Text(
-              iconText!,
-              style: TextStyle(
-                fontSize: tiny ? 12 : 14,
-                fontWeight: FontWeight.w800,
+      child: FittedBox(
+        fit: BoxFit.scaleDown,
+      child: FittedBox(
+        fit: BoxFit.scaleDown,
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: <Widget>[
+            if (iconText != null)
+              Text(
+                iconText!,
+                style: TextStyle(
+                  fontSize: tiny ? 12 : 14,
+                  fontWeight: FontWeight.w800,
+                  color: fullscreen
+                      ? Colors.white
+                      : AppDesignTokens.primaryBlueDark,
+                ),
+              )
+            else
+              Icon(
+                icon,
+                size: tiny ? 16 : (label == null ? 18 : 20),
                 color: fullscreen
                     ? Colors.white
                     : AppDesignTokens.primaryBlueDark,
               ),
-            )
-          else
-            Icon(
-              icon,
-              size: tiny ? 16 : (label == null ? 18 : 20),
-              color: fullscreen
-                  ? Colors.white
-                  : AppDesignTokens.primaryBlueDark,
-            ),
-          if (label != null) ...<Widget>[
-            SizedBox(width: tiny ? 4 : 6),
-            Text(
-              label!,
-              style: TextStyle(
-                fontSize: tiny ? 11 : 12,
-                fontWeight: FontWeight.w800,
-                color: fullscreen
-                    ? Colors.white
-                    : AppDesignTokens.primaryBlueDark,
+            if (label != null) ...<Widget>[
+              SizedBox(width: tiny ? 4 : 6),
+              Text(
+                label!,
+                style: TextStyle(
+                  fontSize: tiny ? 11 : 12,
+                  fontWeight: FontWeight.w800,
+                  color: fullscreen
+                      ? Colors.white
+                      : AppDesignTokens.primaryBlueDark,
+                ),
               ),
-            ),
+            ],
           ],
-        ],
+        ),
+      ),
       ),
     );
   }

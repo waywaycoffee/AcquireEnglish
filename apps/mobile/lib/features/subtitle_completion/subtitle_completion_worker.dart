@@ -444,7 +444,20 @@ class SubtitleCompletionWorker {
       zhPath: officialZh ?? job.zhPath,
     );
     final bool hasOfficialEn = await _officialEnglishCoversEpisode(officialEn);
-    final bool hasOfficialZh = await _officialChineseCoversEpisode(officialZh);
+    // A 1-cue zh.srt can "cover" itself; when English exists, require timeline
+    // coverage so short/dirty ZH does not skip EN→ZH for a longer EN track.
+    final String? enForZhCoverage = (officialEn ?? linked.enPath)?.trim();
+    final bool hasOfficialZh;
+    if (isUsableSubtitlePath(enForZhCoverage)) {
+      final List<PlayerSubtitleLine> enLines =
+          await loadSubtitleLines(enForZhCoverage!);
+      hasOfficialZh = await _officialChineseCoversEnglishTimeline(
+        officialZh,
+        englishLines: enLines,
+      );
+    } else {
+      hasOfficialZh = await _officialChineseCoversEpisode(officialZh);
+    }
     bool needEnglish = linked.needEnglish && !hasOfficialEn;
     bool needChinese = linked.needChinese && (!hasOfficialZh || needEnglish);
     if (!needEnglish && !needChinese) {
@@ -942,14 +955,27 @@ class SubtitleCompletionWorker {
       videoFingerprint: videoFileFingerprint(job.videoPath),
       appSupportDirectory: _appSupportDirectory,
     );
-    // Official ZH softsub on disk is authoritative — never wipe / retranslate.
+    // Official ZH softsub on disk is authoritative when it covers the English
+    // timeline. A 1-cue dirty zh.srt must not skip EN→ZH for a longer EN track.
     final String? officialZhEarly = isUsableSubtitlePath(job.zhPath)
         ? job.zhPath
         : await existingOfficialBilibiliSubtitle(
             idKey: job.sourceKey,
             fileName: 'zh.srt',
           );
-    if (await _officialChineseCoversEpisode(officialZhEarly)) {
+    final String? enEarly = isUsableSubtitlePath(job.enPath)
+        ? job.enPath!.trim()
+        : null;
+    if (enEarly != null) {
+      final List<PlayerSubtitleLine> enLines = await loadSubtitleLines(enEarly);
+      if (await _officialChineseCoversEnglishTimeline(
+        officialZhEarly,
+        englishLines: enLines,
+      )) {
+        onProgress?.call(job.episodeId, '中文字幕已就绪（官方软字幕）');
+        return;
+      }
+    } else if (await _officialChineseCoversEpisode(officialZhEarly)) {
       onProgress?.call(job.episodeId, '中文字幕已就绪（官方软字幕）');
       return;
     }

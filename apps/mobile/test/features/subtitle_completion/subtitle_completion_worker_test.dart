@@ -126,19 +126,27 @@ Hello there
     );
   });
 
-  test('ASR job fills remaining Chinese when ZH track is partial', () async {
+  test('Chinese fill translates full English when ZH track is missing', () async {
     final File video = _fakeVideo(temp, 'partial.mp4');
-    final File zh = File('${temp.path}/partial-zh.srt')
+    final File en = File('${temp.path}/partial-en.srt')
       ..writeAsStringSync('''
 1
 00:00:00,000 --> 00:00:01,000
-你好
+Hello there.
+
+2
+00:00:03,000 --> 00:00:04,000
+How are you?
+
+3
+00:00:05,000 --> 00:00:06,000
+See you later.
 ''');
     await queue.enqueue(
       episodeId: 'ep-partial-zh',
       videoPath: video.path,
-      zhPath: zh.path,
-      needEnglish: true,
+      enPath: en.path,
+      needEnglish: false,
       needChinese: true,
     );
 
@@ -147,15 +155,6 @@ Hello there
     final SubtitleCompletionWorker worker = SubtitleCompletionWorker(
       queue: queue,
       appSupportDirectory: () async => temp,
-      externalFill: _FakeExternalFill('''
-1
-00:00:00,000 --> 00:00:01,000
-Hello there.
-
-2
-00:00:03,000 --> 00:00:04,000
-How are you?
-'''),
       translateChinese:
           ({
             required List<String> sentences,
@@ -181,9 +180,11 @@ How are you?
     // Short official zh.srt must not block EN→ZH for the longer English track.
     expect(translated, contains('How are you?'));
     expect(translated, contains('Hello there.'));
+    expect(translated, contains('See you later.'));
     final String zhSrt = await File(attachedZh!).readAsString();
     expect(zhSrt, contains('译:How are you?'));
     expect(zhSrt, contains('译:Hello there.'));
+    expect(zhSrt, contains('译:See you later.'));
     expect(
       (await queue.loadJobs()).single.status,
       SubtitleCompletionStatus.done,

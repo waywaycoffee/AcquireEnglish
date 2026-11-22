@@ -571,14 +571,6 @@ class _ImportCourseFlowState extends ConsumerState<ImportCourseFlow> {
           .where((ImportMatchRow row) => row.matched)
           .length;
 
-      if (imported) {
-        // Import-time bilingual check + ASR/translate — not deferred to player open.
-        // Course.spokenLanguage (set above) drives Chinese / mixed Whisper path.
-        await enqueuePendingSubtitleCompletionsForCatalog(
-          courses: ref.read(libraryCatalogProvider),
-        );
-        SubtitleCompletionScheduler.instance.kick(delay: Duration.zero);
-      }
       if (!mounted) {
         return;
       }
@@ -594,6 +586,19 @@ class _ImportCourseFlowState extends ConsumerState<ImportCourseFlow> {
           ),
         );
       widget.onImportCompleted();
+      if (imported) {
+        // Import-time bilingual check + ASR/translate — not deferred to player open.
+        // Do not await: enqueue I/O must not block the success snackbar.
+        final List<LibraryCourseData> catalog = ref.read(libraryCatalogProvider);
+        unawaited(() async {
+          try {
+            await enqueuePendingSubtitleCompletionsForCatalog(courses: catalog);
+            SubtitleCompletionScheduler.instance.kick(delay: Duration.zero);
+          } catch (error, stackTrace) {
+            debugPrint('Subtitle enqueue after import failed: $error\n$stackTrace');
+          }
+        }());
+      }
     } catch (error) {
       if (!mounted) {
         return;

@@ -263,6 +263,10 @@ class WordPronunciationService {
       await stopOverride!();
       return;
     }
+    // speakOverride is used by widget tests / mocks; skip real TTS channels.
+    if (speakOverride != null) {
+      return;
+    }
     final Player? player = _recordedPlayer;
     _recordedPlayer = null;
     final Completer<bool>? playback = _recordedCompletion;

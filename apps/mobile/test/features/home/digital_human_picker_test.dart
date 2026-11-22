@@ -25,7 +25,8 @@ void main() {
     expect(find.byTooltip('试听 Mia'), findsOneWidget);
     // Asian home personas (Mia / Leo / Arun) wire bilingual TTS by default.
     expect(find.text('中英同音色'), findsWidgets);
-    expect(find.text('中文另用音色'), findsOneWidget); // Emma only
+    // Emma / Arun (and any English-only voice) show a separate Chinese voice chip.
+    expect(find.text('中文另用音色'), findsWidgets);
     final Iterable<Image> photos = tester.widgetList<Image>(find.byType(Image));
     expect(
       photos.any(
