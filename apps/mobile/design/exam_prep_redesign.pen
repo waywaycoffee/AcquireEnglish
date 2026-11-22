@@ -1,0 +1,1109 @@
+{
+  "version": "2.22",
+  "children": [
+    {
+      "type": "frame",
+      "id": "exam-home",
+      "name": "01 考试首页 · 有目标",
+      "x": 0,
+      "y": 0,
+      "width": 390,
+      "height": 844,
+      "layout": "none",
+      "fill": "#F3F4F7",
+      "children": [
+        {
+          "type": "text",
+          "id": "eh-eyebrow",
+          "x": 24,
+          "y": 28,
+          "content": "ACQUIRE · EXAM",
+          "fontFamily": "Inter",
+          "fontSize": 11,
+          "fill": "#1CB0F6"
+        },
+        {
+          "type": "text",
+          "id": "eh-title",
+          "x": 24,
+          "y": 48,
+          "content": "考试备考",
+          "fontFamily": "Noto Sans SC",
+          "fontSize": 28,
+          "fontWeight": "bold",
+          "fill": "#12141A"
+        },
+        {
+          "type": "text",
+          "id": "eh-sub",
+          "x": 24,
+          "y": 86,
+          "content": "高考 · CEFR B2 · 距考 86 天",
+          "fontFamily": "Noto Sans SC",
+          "fontSize": 13,
+          "fill": "#667085"
+        },
+        {
+          "type": "frame",
+          "id": "eh-hero",
+          "x": 20,
+          "y": 118,
+          "width": 350,
+          "height": 132,
+          "fill": "#1A2332",
+          "cornerRadius": 22,
+          "children": [
+            {
+              "type": "text",
+              "id": "eh-hero-kicker",
+              "x": 20,
+              "y": 18,
+              "content": "当前目标",
+              "fontFamily": "Noto Sans SC",
+              "fontSize": 12,
+              "fill": "#9AA0AE"
+            },
+            {
+              "type": "text",
+              "id": "eh-hero-name",
+              "x": 20,
+              "y": 42,
+              "content": "高考英语",
+              "fontFamily": "Noto Sans SC",
+              "fontSize": 26,
+              "fontWeight": "bold",
+              "fill": "#FFFFFF"
+            },
+            {
+              "type": "text",
+              "id": "eh-hero-meta",
+              "x": 20,
+              "y": 82,
+              "content": "练习 128 · 错题 14 · 正确率 72%",
+              "fontFamily": "Noto Sans SC",
+              "fontSize": 12,
+              "fill": "#B8BECB"
+            },
+            {
+              "type": "frame",
+              "id": "eh-hero-chip",
+              "x": 248,
+              "y": 44,
+              "width": 82,
+              "height": 36,
+              "fill": "#58CC02",
+              "cornerRadius": 18,
+              "children": [
+                {
+                  "type": "text",
+                  "id": "eh-hero-chip-t",
+                  "x": 14,
+                  "y": 9,
+                  "content": "更换",
+                  "fontFamily": "Noto Sans SC",
+                  "fontSize": 14,
+                  "fontWeight": "bold",
+                  "fill": "#FFFFFF"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "type": "text",
+          "id": "eh-today-h",
+          "x": 24,
+          "y": 270,
+          "content": "今日备考",
+          "fontFamily": "Noto Sans SC",
+          "fontSize": 18,
+          "fontWeight": "bold",
+          "fill": "#12141A"
+        },
+        {
+          "type": "frame",
+          "id": "eh-task-a",
+          "x": 20,
+          "y": 304,
+          "width": 168,
+          "height": 110,
+          "fill": "#FFFFFF",
+          "cornerRadius": 18,
+          "children": [
+            {
+              "type": "text",
+              "id": "eh-ta-i",
+              "x": 16,
+              "y": 16,
+              "content": "↺",
+              "fontSize": 22,
+              "fill": "#FF9600"
+            },
+            {
+              "type": "text",
+              "id": "eh-ta-t",
+              "x": 16,
+              "y": 52,
+              "content": "错题复习",
+              "fontFamily": "Noto Sans SC",
+              "fontSize": 16,
+              "fontWeight": "bold",
+              "fill": "#12141A"
+            },
+            {
+              "type": "text",
+              "id": "eh-ta-s",
+              "x": 16,
+              "y": 78,
+              "content": "14 条 · FSRS",
+              "fontFamily": "Noto Sans SC",
+              "fontSize": 12,
+              "fill": "#667085"
+            }
+          ]
+        },
+        {
+          "type": "frame",
+          "id": "eh-task-b",
+          "x": 202,
+          "y": 304,
+          "width": 168,
+          "height": 110,
+          "fill": "#FFFFFF",
+          "cornerRadius": 18,
+          "children": [
+            {
+              "type": "text",
+              "id": "eh-tb-i",
+              "x": 16,
+              "y": 16,
+              "content": "⚡",
+              "fontSize": 20,
+              "fill": "#1CB0F6"
+            },
+            {
+              "type": "text",
+              "id": "eh-tb-t",
+              "x": 16,
+              "y": 52,
+              "content": "薄弱 · 听力",
+              "fontFamily": "Noto Sans SC",
+              "fontSize": 16,
+              "fontWeight": "bold",
+              "fill": "#12141A"
+            },
+            {
+              "type": "text",
+              "id": "eh-tb-s",
+              "x": 16,
+              "y": 78,
+              "content": "专项摸底",
+              "fontFamily": "Noto Sans SC",
+              "fontSize": 12,
+              "fill": "#667085"
+            }
+          ]
+        },
+        {
+          "type": "text",
+          "id": "eh-weak-h",
+          "x": 24,
+          "y": 436,
+          "content": "薄弱项",
+          "fontFamily": "Noto Sans SC",
+          "fontSize": 18,
+          "fontWeight": "bold",
+          "fill": "#12141A"
+        },
+        {
+          "type": "frame",
+          "id": "eh-weak-card",
+          "x": 20,
+          "y": 470,
+          "width": 350,
+          "height": 118,
+          "fill": "#FFFFFF",
+          "cornerRadius": 18,
+          "children": [
+            {
+              "type": "text",
+              "id": "eh-w1",
+              "x": 16,
+              "y": 16,
+              "content": "听力  ████████░░  68%",
+              "fontFamily": "Inter",
+              "fontSize": 13,
+              "fill": "#FF9600"
+            },
+            {
+              "type": "text",
+              "id": "eh-w2",
+              "x": 16,
+              "y": 48,
+              "content": "完形  ██████░░░░  52%",
+              "fontFamily": "Inter",
+              "fontSize": 13,
+              "fill": "#1CB0F6"
+            },
+            {
+              "type": "text",
+              "id": "eh-w3",
+              "x": 16,
+              "y": 80,
+              "content": "阅读  ████░░░░░░  41%",
+              "fontFamily": "Inter",
+              "fontSize": 13,
+              "fill": "#667085"
+            }
+          ]
+        },
+        {
+          "type": "text",
+          "id": "eh-grid-h",
+          "x": 24,
+          "y": 610,
+          "content": "专项与模考",
+          "fontFamily": "Noto Sans SC",
+          "fontSize": 18,
+          "fontWeight": "bold",
+          "fill": "#12141A"
+        },
+        {
+          "type": "frame",
+          "id": "eh-g1",
+          "x": 20,
+          "y": 644,
+          "width": 168,
+          "height": 72,
+          "fill": "#FFFFFF",
+          "cornerRadius": 16,
+          "children": [
+            {
+              "type": "text",
+              "id": "eh-g1t",
+              "x": 16,
+              "y": 16,
+              "content": "专项训练",
+              "fontFamily": "Noto Sans SC",
+              "fontSize": 15,
+              "fontWeight": "bold",
+              "fill": "#12141A"
+            },
+            {
+              "type": "text",
+              "id": "eh-g1s",
+              "x": 16,
+              "y": 42,
+              "content": "听 / 读 / 词 / 语法",
+              "fontFamily": "Noto Sans SC",
+              "fontSize": 11,
+              "fill": "#667085"
+            }
+          ]
+        },
+        {
+          "type": "frame",
+          "id": "eh-g2",
+          "x": 202,
+          "y": 644,
+          "width": 168,
+          "height": 72,
+          "fill": "#FFFFFF",
+          "cornerRadius": 16,
+          "children": [
+            {
+              "type": "text",
+              "id": "eh-g2t",
+              "x": 16,
+              "y": 16,
+              "content": "限时客观卷",
+              "fontFamily": "Noto Sans SC",
+              "fontSize": 15,
+              "fontWeight": "bold",
+              "fill": "#12141A"
+            },
+            {
+              "type": "text",
+              "id": "eh-g2s",
+              "x": 16,
+              "y": 42,
+              "content": "90 分钟 · 听读词",
+              "fontFamily": "Noto Sans SC",
+              "fontSize": 11,
+              "fill": "#667085"
+            }
+          ]
+        },
+        {
+          "type": "frame",
+          "id": "eh-g3",
+          "x": 20,
+          "y": 728,
+          "width": 168,
+          "height": 72,
+          "fill": "#FFFFFF",
+          "cornerRadius": 16,
+          "children": [
+            {
+              "type": "text",
+              "id": "eh-g3t",
+              "x": 16,
+              "y": 16,
+              "content": "错题本",
+              "fontFamily": "Noto Sans SC",
+              "fontSize": 15,
+              "fontWeight": "bold",
+              "fill": "#12141A"
+            },
+            {
+              "type": "text",
+              "id": "eh-g3s",
+              "x": 16,
+              "y": 42,
+              "content": "筛选 · 再练",
+              "fontFamily": "Noto Sans SC",
+              "fontSize": 11,
+              "fill": "#667085"
+            }
+          ]
+        },
+        {
+          "type": "frame",
+          "id": "eh-g4",
+          "x": 202,
+          "y": 728,
+          "width": 168,
+          "height": 72,
+          "fill": "#FFFFFF",
+          "cornerRadius": 16,
+          "children": [
+            {
+              "type": "text",
+              "id": "eh-g4t",
+              "x": 16,
+              "y": 16,
+              "content": "学习报告",
+              "fontFamily": "Noto Sans SC",
+              "fontSize": 15,
+              "fontWeight": "bold",
+              "fill": "#12141A"
+            },
+            {
+              "type": "text",
+              "id": "eh-g4s",
+              "x": 16,
+              "y": 42,
+              "content": "正确率 · 薄弱",
+              "fontFamily": "Noto Sans SC",
+              "fontSize": 11,
+              "fill": "#667085"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "frame",
+      "id": "exam-empty",
+      "name": "02 考试首页 · 未选目标",
+      "x": 430,
+      "y": 0,
+      "width": 390,
+      "height": 844,
+      "layout": "none",
+      "fill": "#F3F4F7",
+      "children": [
+        {
+          "type": "text",
+          "id": "ee-eyebrow",
+          "x": 24,
+          "y": 28,
+          "content": "ACQUIRE · EXAM",
+          "fontFamily": "Inter",
+          "fontSize": 11,
+          "fill": "#1CB0F6"
+        },
+        {
+          "type": "text",
+          "id": "ee-title",
+          "x": 24,
+          "y": 48,
+          "content": "考试备考",
+          "fontFamily": "Noto Sans SC",
+          "fontSize": 28,
+          "fontWeight": "bold",
+          "fill": "#12141A"
+        },
+        {
+          "type": "text",
+          "id": "ee-lead",
+          "x": 24,
+          "y": 96,
+          "content": "先选目标，再给今日备考\n与薄弱诊断。日常习得不变。",
+          "fontFamily": "Noto Sans SC",
+          "fontSize": 15,
+          "fill": "#667085"
+        },
+        {
+          "type": "frame",
+          "id": "ee-zk",
+          "x": 20,
+          "y": 180,
+          "width": 350,
+          "height": 120,
+          "fill": "#FFFFFF",
+          "cornerRadius": 22,
+          "children": [
+            {
+              "type": "text",
+              "id": "ee-zk-k",
+              "x": 20,
+              "y": 22,
+              "content": "K12 · 初中",
+              "fontFamily": "Inter",
+              "fontSize": 12,
+              "fill": "#58CC02"
+            },
+            {
+              "type": "text",
+              "id": "ee-zk-t",
+              "x": 20,
+              "y": 48,
+              "content": "中考英语",
+              "fontFamily": "Noto Sans SC",
+              "fontSize": 24,
+              "fontWeight": "bold",
+              "fill": "#12141A"
+            },
+            {
+              "type": "text",
+              "id": "ee-zk-s",
+              "x": 20,
+              "y": 86,
+              "content": "地区卷备考 · 听读词语法",
+              "fontFamily": "Noto Sans SC",
+              "fontSize": 12,
+              "fill": "#667085"
+            }
+          ]
+        },
+        {
+          "type": "frame",
+          "id": "ee-gk",
+          "x": 20,
+          "y": 316,
+          "width": 350,
+          "height": 120,
+          "fill": "#1A2332",
+          "cornerRadius": 22,
+          "children": [
+            {
+              "type": "text",
+              "id": "ee-gk-k",
+              "x": 20,
+              "y": 22,
+              "content": "K12 · 高中",
+              "fontFamily": "Inter",
+              "fontSize": 12,
+              "fill": "#58CC02"
+            },
+            {
+              "type": "text",
+              "id": "ee-gk-t",
+              "x": 20,
+              "y": 48,
+              "content": "高考英语",
+              "fontFamily": "Noto Sans SC",
+              "fontSize": 24,
+              "fontWeight": "bold",
+              "fill": "#FFFFFF"
+            },
+            {
+              "type": "text",
+              "id": "ee-gk-s",
+              "x": 20,
+              "y": 86,
+              "content": "估分档次 · 限时客观卷",
+              "fontFamily": "Noto Sans SC",
+              "fontSize": 12,
+              "fill": "#B8BECB"
+            }
+          ]
+        },
+        {
+          "type": "text",
+          "id": "ee-more-h",
+          "x": 24,
+          "y": 460,
+          "content": "更多目标",
+          "fontFamily": "Noto Sans SC",
+          "fontSize": 16,
+          "fontWeight": "bold",
+          "fill": "#12141A"
+        },
+        {
+          "type": "frame",
+          "id": "ee-m1",
+          "x": 20,
+          "y": 496,
+          "width": 108,
+          "height": 64,
+          "fill": "#FFFFFF",
+          "cornerRadius": 14,
+          "children": [
+            {
+              "type": "text",
+              "id": "ee-m1t",
+              "x": 16,
+              "y": 22,
+              "content": "小学",
+              "fontFamily": "Noto Sans SC",
+              "fontSize": 15,
+              "fontWeight": "bold",
+              "fill": "#12141A"
+            }
+          ]
+        },
+        {
+          "type": "frame",
+          "id": "ee-m2",
+          "x": 140,
+          "y": 496,
+          "width": 108,
+          "height": 64,
+          "fill": "#FFFFFF",
+          "cornerRadius": 14,
+          "children": [
+            {
+              "type": "text",
+              "id": "ee-m2t",
+              "x": 16,
+              "y": 22,
+              "content": "四六级",
+              "fontFamily": "Noto Sans SC",
+              "fontSize": 15,
+              "fontWeight": "bold",
+              "fill": "#12141A"
+            }
+          ]
+        },
+        {
+          "type": "frame",
+          "id": "ee-m3",
+          "x": 260,
+          "y": 496,
+          "width": 108,
+          "height": 64,
+          "fill": "#FFFFFF",
+          "cornerRadius": 14,
+          "children": [
+            {
+              "type": "text",
+              "id": "ee-m3t",
+              "x": 16,
+              "y": 22,
+              "content": "考研+",
+              "fontFamily": "Noto Sans SC",
+              "fontSize": 15,
+              "fontWeight": "bold",
+              "fill": "#12141A"
+            }
+          ]
+        },
+        {
+          "type": "frame",
+          "id": "ee-cta",
+          "x": 20,
+          "y": 590,
+          "width": 350,
+          "height": 54,
+          "fill": "#58CC02",
+          "cornerRadius": 16,
+          "children": [
+            {
+              "type": "text",
+              "id": "ee-cta-t",
+              "x": 108,
+              "y": 16,
+              "content": "打开完整选题",
+              "fontFamily": "Noto Sans SC",
+              "fontSize": 16,
+              "fontWeight": "bold",
+              "fill": "#FFFFFF"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "frame",
+      "id": "exam-select",
+      "name": "03 选择考试目标 · K12",
+      "x": 860,
+      "y": 0,
+      "width": 390,
+      "height": 844,
+      "layout": "none",
+      "fill": "#F3F4F7",
+      "children": [
+        {
+          "type": "text",
+          "id": "es-back",
+          "x": 20,
+          "y": 28,
+          "content": "‹",
+          "fontSize": 28,
+          "fill": "#1CB0F6"
+        },
+        {
+          "type": "text",
+          "id": "es-title",
+          "x": 52,
+          "y": 34,
+          "content": "选择考试目标",
+          "fontFamily": "Noto Sans SC",
+          "fontSize": 22,
+          "fontWeight": "bold",
+          "fill": "#12141A"
+        },
+        {
+          "type": "text",
+          "id": "es-track-h",
+          "x": 24,
+          "y": 88,
+          "content": "考试轨",
+          "fontFamily": "Noto Sans SC",
+          "fontSize": 13,
+          "fontWeight": "bold",
+          "fill": "#667085"
+        },
+        {
+          "type": "frame",
+          "id": "es-chip1",
+          "x": 20,
+          "y": 116,
+          "width": 118,
+          "height": 36,
+          "fill": "#58CC02",
+          "cornerRadius": 18,
+          "children": [
+            {
+              "type": "text",
+              "id": "es-c1t",
+              "x": 12,
+              "y": 9,
+              "content": "K12 / 中高考",
+              "fontFamily": "Noto Sans SC",
+              "fontSize": 12,
+              "fontWeight": "bold",
+              "fill": "#FFFFFF"
+            }
+          ]
+        },
+        {
+          "type": "frame",
+          "id": "es-chip2",
+          "x": 146,
+          "y": 116,
+          "width": 72,
+          "height": 36,
+          "fill": "#FFFFFF",
+          "cornerRadius": 18,
+          "children": [
+            {
+              "type": "text",
+              "id": "es-c2t",
+              "x": 16,
+              "y": 9,
+              "content": "四六级",
+              "fontFamily": "Noto Sans SC",
+              "fontSize": 12,
+              "fill": "#12141A"
+            }
+          ]
+        },
+        {
+          "type": "frame",
+          "id": "es-chip3",
+          "x": 226,
+          "y": 116,
+          "width": 56,
+          "height": 36,
+          "fill": "#FFFFFF",
+          "cornerRadius": 18,
+          "children": [
+            {
+              "type": "text",
+              "id": "es-c3t",
+              "x": 14,
+              "y": 9,
+              "content": "考研",
+              "fontFamily": "Noto Sans SC",
+              "fontSize": 12,
+              "fill": "#12141A"
+            }
+          ]
+        },
+        {
+          "type": "text",
+          "id": "es-ent-h",
+          "x": 24,
+          "y": 174,
+          "content": "中考 / 高考",
+          "fontFamily": "Noto Sans SC",
+          "fontSize": 15,
+          "fontWeight": "bold",
+          "fill": "#12141A"
+        },
+        {
+          "type": "frame",
+          "id": "es-zk",
+          "x": 20,
+          "y": 204,
+          "width": 168,
+          "height": 88,
+          "fill": "#FFFFFF",
+          "cornerRadius": 18,
+          "children": [
+            {
+              "type": "text",
+              "id": "es-zk-t",
+              "x": 16,
+              "y": 22,
+              "content": "中考",
+              "fontFamily": "Noto Sans SC",
+              "fontSize": 20,
+              "fontWeight": "bold",
+              "fill": "#12141A"
+            },
+            {
+              "type": "text",
+              "id": "es-zk-s",
+              "x": 16,
+              "y": 54,
+              "content": "按地区卷",
+              "fontFamily": "Noto Sans SC",
+              "fontSize": 12,
+              "fill": "#667085"
+            }
+          ]
+        },
+        {
+          "type": "frame",
+          "id": "es-gk",
+          "x": 202,
+          "y": 204,
+          "width": 168,
+          "height": 88,
+          "fill": "#1A2332",
+          "cornerRadius": 18,
+          "children": [
+            {
+              "type": "text",
+              "id": "es-gk-t",
+              "x": 16,
+              "y": 22,
+              "content": "高考 ✓",
+              "fontFamily": "Noto Sans SC",
+              "fontSize": 20,
+              "fontWeight": "bold",
+              "fill": "#FFFFFF"
+            },
+            {
+              "type": "text",
+              "id": "es-gk-s",
+              "x": 16,
+              "y": 54,
+              "content": "估分 / 档次",
+              "fontFamily": "Noto Sans SC",
+              "fontSize": 12,
+              "fill": "#B8BECB"
+            }
+          ]
+        },
+        {
+          "type": "text",
+          "id": "es-pri-h",
+          "x": 24,
+          "y": 316,
+          "content": "小学",
+          "fontFamily": "Noto Sans SC",
+          "fontSize": 13,
+          "fontWeight": "bold",
+          "fill": "#667085"
+        },
+        {
+          "type": "text",
+          "id": "es-pri-chips",
+          "x": 24,
+          "y": 344,
+          "content": "一  二  三  四  五  六",
+          "fontFamily": "Noto Sans SC",
+          "fontSize": 14,
+          "fill": "#12141A"
+        },
+        {
+          "type": "text",
+          "id": "es-jun-h",
+          "x": 24,
+          "y": 388,
+          "content": "初中",
+          "fontFamily": "Noto Sans SC",
+          "fontSize": 13,
+          "fontWeight": "bold",
+          "fill": "#667085"
+        },
+        {
+          "type": "text",
+          "id": "es-jun-chips",
+          "x": 24,
+          "y": 416,
+          "content": "初一  初二  初三",
+          "fontFamily": "Noto Sans SC",
+          "fontSize": 14,
+          "fill": "#12141A"
+        },
+        {
+          "type": "text",
+          "id": "es-sen-h",
+          "x": 24,
+          "y": 460,
+          "content": "高中",
+          "fontFamily": "Noto Sans SC",
+          "fontSize": 13,
+          "fontWeight": "bold",
+          "fill": "#667085"
+        },
+        {
+          "type": "text",
+          "id": "es-sen-chips",
+          "x": 24,
+          "y": 488,
+          "content": "高一  高二  高三",
+          "fontFamily": "Noto Sans SC",
+          "fontSize": 14,
+          "fill": "#12141A"
+        },
+        {
+          "type": "frame",
+          "id": "es-save",
+          "x": 20,
+          "y": 740,
+          "width": 350,
+          "height": 54,
+          "fill": "#58CC02",
+          "cornerRadius": 16,
+          "children": [
+            {
+              "type": "text",
+              "id": "es-save-t",
+              "x": 118,
+              "y": 16,
+              "content": "保存考试目标",
+              "fontFamily": "Noto Sans SC",
+              "fontSize": 16,
+              "fontWeight": "bold",
+              "fill": "#FFFFFF"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "frame",
+      "id": "exam-report",
+      "name": "04 学习报告",
+      "x": 1290,
+      "y": 0,
+      "width": 390,
+      "height": 844,
+      "layout": "none",
+      "fill": "#F3F4F7",
+      "children": [
+        {
+          "type": "text",
+          "id": "er-back",
+          "x": 20,
+          "y": 28,
+          "content": "‹",
+          "fontSize": 28,
+          "fill": "#1CB0F6"
+        },
+        {
+          "type": "text",
+          "id": "er-title",
+          "x": 52,
+          "y": 34,
+          "content": "学习报告",
+          "fontFamily": "Noto Sans SC",
+          "fontSize": 22,
+          "fontWeight": "bold",
+          "fill": "#12141A"
+        },
+        {
+          "type": "frame",
+          "id": "er-acc",
+          "x": 20,
+          "y": 96,
+          "width": 350,
+          "height": 140,
+          "fill": "#1A2332",
+          "cornerRadius": 22,
+          "children": [
+            {
+              "type": "text",
+              "id": "er-acc-k",
+              "x": 20,
+              "y": 24,
+              "content": "高考 · 近况",
+              "fontFamily": "Noto Sans SC",
+              "fontSize": 12,
+              "fill": "#9AA0AE"
+            },
+            {
+              "type": "text",
+              "id": "er-acc-n",
+              "x": 20,
+              "y": 52,
+              "content": "72%",
+              "fontFamily": "Inter",
+              "fontSize": 40,
+              "fontWeight": "bold",
+              "fill": "#58CC02"
+            },
+            {
+              "type": "text",
+              "id": "er-acc-s",
+              "x": 20,
+              "y": 104,
+              "content": "正确率 · 练习 128 · 错题 14",
+              "fontFamily": "Noto Sans SC",
+              "fontSize": 12,
+              "fill": "#B8BECB"
+            }
+          ]
+        },
+        {
+          "type": "text",
+          "id": "er-weak-h",
+          "x": 24,
+          "y": 260,
+          "content": "薄弱分布",
+          "fontFamily": "Noto Sans SC",
+          "fontSize": 18,
+          "fontWeight": "bold",
+          "fill": "#12141A"
+        },
+        {
+          "type": "frame",
+          "id": "er-wcard",
+          "x": 20,
+          "y": 296,
+          "width": 350,
+          "height": 160,
+          "fill": "#FFFFFF",
+          "cornerRadius": 18,
+          "children": [
+            {
+              "type": "text",
+              "id": "er-w1",
+              "x": 16,
+              "y": 20,
+              "content": "听力   薄弱 68% · 5 错",
+              "fontFamily": "Noto Sans SC",
+              "fontSize": 14,
+              "fill": "#FF9600"
+            },
+            {
+              "type": "text",
+              "id": "er-w2",
+              "x": 16,
+              "y": 56,
+              "content": "完形   薄弱 52% · 3 错",
+              "fontFamily": "Noto Sans SC",
+              "fontSize": 14,
+              "fill": "#1CB0F6"
+            },
+            {
+              "type": "text",
+              "id": "er-w3",
+              "x": 16,
+              "y": 92,
+              "content": "阅读   薄弱 41% · 2 错",
+              "fontFamily": "Noto Sans SC",
+              "fontSize": 14,
+              "fill": "#667085"
+            },
+            {
+              "type": "text",
+              "id": "er-w4",
+              "x": 16,
+              "y": 128,
+              "content": "词汇   薄弱 28% · 1 错",
+              "fontFamily": "Noto Sans SC",
+              "fontSize": 14,
+              "fill": "#9AA0AE"
+            }
+          ]
+        },
+        {
+          "type": "text",
+          "id": "er-cta-h",
+          "x": 24,
+          "y": 484,
+          "content": "下一步",
+          "fontFamily": "Noto Sans SC",
+          "fontSize": 18,
+          "fontWeight": "bold",
+          "fill": "#12141A"
+        },
+        {
+          "type": "frame",
+          "id": "er-cta1",
+          "x": 20,
+          "y": 520,
+          "width": 350,
+          "height": 56,
+          "fill": "#58CC02",
+          "cornerRadius": 16,
+          "children": [
+            {
+              "type": "text",
+              "id": "er-cta1t",
+              "x": 108,
+              "y": 17,
+              "content": "突破薄弱 · 听力",
+              "fontFamily": "Noto Sans SC",
+              "fontSize": 16,
+              "fontWeight": "bold",
+              "fill": "#FFFFFF"
+            }
+          ]
+        },
+        {
+          "type": "frame",
+          "id": "er-cta2",
+          "x": 20,
+          "y": 592,
+          "width": 350,
+          "height": 56,
+          "fill": "#FFFFFF",
+          "cornerRadius": 16,
+          "children": [
+            {
+              "type": "text",
+              "id": "er-cta2t",
+              "x": 118,
+              "y": 17,
+              "content": "打开错题本",
+              "fontFamily": "Noto Sans SC",
+              "fontSize": 16,
+              "fontWeight": "bold",
+              "fill": "#12141A"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

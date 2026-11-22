@@ -6,6 +6,8 @@ import '../../shared/presentation/pad/app_design_tokens.dart';
 import '../domain/exam_registry.dart';
 import 'exam_profile_provider.dart';
 
+const Color _kExamHeroDark = Color(0xFF1A2332);
+
 class ExamSelectScreen extends ConsumerStatefulWidget {
   const ExamSelectScreen({super.key});
 
@@ -14,7 +16,6 @@ class ExamSelectScreen extends ConsumerStatefulWidget {
 }
 
 class _ExamSelectScreenState extends ConsumerState<ExamSelectScreen> {
-  /// Default to K12 / 中高考 — product priority alongside CET.
   ExamTrack? _track = ExamTrack.k12;
   String? _familyId;
   String? _ieltsBand;
@@ -26,9 +27,13 @@ class _ExamSelectScreenState extends ConsumerState<ExamSelectScreen> {
         : examFamiliesForTrack(_track!);
 
     return Scaffold(
-      appBar: AppBar(title: const Text('选择考试目标')),
+      backgroundColor: AppDesignTokens.softWhite,
+      appBar: AppBar(
+        title: const Text('选择考试目标'),
+        backgroundColor: AppDesignTokens.softWhite,
+      ),
       body: ListView(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.fromLTRB(16, 8, 16, 28),
         children: <Widget>[
           Text(
             '考试轨',
@@ -37,16 +42,16 @@ class _ExamSelectScreenState extends ConsumerState<ExamSelectScreen> {
               color: AppDesignTokens.textSecondary,
             ),
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 10),
           Wrap(
             spacing: 8,
             runSpacing: 8,
             children: <Widget>[
               for (final ExamTrack track in ExamTrack.values)
-                ChoiceChip(
-                  label: Text(examTrackLabel(track)),
+                _TrackChip(
+                  label: examTrackLabel(track),
                   selected: _track == track,
-                  onSelected: (_) => setState(() {
+                  onTap: () => setState(() {
                     _track = track;
                     _familyId = null;
                     _ieltsBand = null;
@@ -55,38 +60,36 @@ class _ExamSelectScreenState extends ConsumerState<ExamSelectScreen> {
             ],
           ),
           if (_track == ExamTrack.k12) ...<Widget>[
-            const SizedBox(height: 20),
-            Text(
+            const SizedBox(height: 22),
+            const Text(
               '中考 / 高考',
-              style: TextStyle(
-                fontWeight: FontWeight.w800,
-                color: AppDesignTokens.textSecondary,
-              ),
+              style: TextStyle(fontWeight: FontWeight.w900, fontSize: 15),
             ),
-            const SizedBox(height: 4),
-            Text(
-              '备考助手优先入口；年级目标会映射到对应阶段题包。',
-              style: TextStyle(
-                fontWeight: FontWeight.w600,
-                color: AppDesignTokens.textSecondary,
-                height: 1.35,
-              ),
-            ),
-            const SizedBox(height: 8),
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
+            const SizedBox(height: 10),
+            Row(
               children: <Widget>[
-                for (final String id in kK12EntranceExamIds)
-                  if (examFamilyById(id) != null)
-                    ChoiceChip(
-                      label: Text(examFamilyById(id)!.label),
-                      selected: _familyId == id,
-                      onSelected: (_) => setState(() => _familyId = id),
-                    ),
+                Expanded(
+                  child: _EntranceCard(
+                    title: '中考',
+                    subtitle: '按地区卷',
+                    selected: _familyId == 'zhongkao',
+                    dark: false,
+                    onTap: () => setState(() => _familyId = 'zhongkao'),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: _EntranceCard(
+                    title: '高考',
+                    subtitle: '估分 / 档次',
+                    selected: _familyId == 'gaokao',
+                    dark: true,
+                    onTap: () => setState(() => _familyId = 'gaokao'),
+                  ),
+                ),
               ],
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 18),
             _K12Section(
               title: '小学',
               families: k12FamiliesPrimary(),
@@ -137,7 +140,7 @@ class _ExamSelectScreenState extends ConsumerState<ExamSelectScreen> {
               ],
             ),
           ] else if (families.isNotEmpty) ...<Widget>[
-            const SizedBox(height: 20),
+            const SizedBox(height: 22),
             Text(
               '具体考试',
               style: TextStyle(
@@ -145,7 +148,7 @@ class _ExamSelectScreenState extends ConsumerState<ExamSelectScreen> {
                 color: AppDesignTokens.textSecondary,
               ),
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: 10),
             Wrap(
               spacing: 8,
               runSpacing: 8,
@@ -183,21 +186,34 @@ class _ExamSelectScreenState extends ConsumerState<ExamSelectScreen> {
             ),
           ],
           const SizedBox(height: 28),
-          FilledButton(
-            onPressed: _familyId == null
-                ? null
-                : () async {
-                    await ref
-                        .read(examProfileProvider.notifier)
-                        .setFamily(
-                          _familyId!,
-                          targetScore: _ieltsBand,
-                        );
-                    if (context.mounted) {
-                      context.go('/exam');
-                    }
-                  },
-            child: const Text('保存考试目标'),
+          SizedBox(
+            width: double.infinity,
+            height: 54,
+            child: FilledButton(
+              style: FilledButton.styleFrom(
+                backgroundColor: AppDesignTokens.brandGreen,
+                foregroundColor: Colors.white,
+                disabledBackgroundColor: AppDesignTokens.softGray,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16),
+                ),
+              ),
+              onPressed: _familyId == null
+                  ? null
+                  : () async {
+                      await ref.read(examProfileProvider.notifier).setFamily(
+                            _familyId!,
+                            targetScore: _ieltsBand,
+                          );
+                      if (context.mounted) {
+                        context.go('/exam');
+                      }
+                    },
+              child: const Text(
+                '保存考试目标',
+                style: TextStyle(fontWeight: FontWeight.w800, fontSize: 16),
+              ),
+            ),
           ),
           const SizedBox(height: 10),
           OutlinedButton(
@@ -213,6 +229,106 @@ class _ExamSelectScreenState extends ConsumerState<ExamSelectScreen> {
             child: const Text('清除考试目标'),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _TrackChip extends StatelessWidget {
+  const _TrackChip({
+    required this.label,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: selected ? AppDesignTokens.brandGreen : AppDesignTokens.appWhite,
+      borderRadius: BorderRadius.circular(18),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(18),
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+          child: Text(
+            label,
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w800,
+              color: selected ? Colors.white : AppDesignTokens.textPrimary,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _EntranceCard extends StatelessWidget {
+  const _EntranceCard({
+    required this.title,
+    required this.subtitle,
+    required this.selected,
+    required this.dark,
+    required this.onTap,
+  });
+
+  final String title;
+  final String subtitle;
+  final bool selected;
+  final bool dark;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final bool emphasize = dark || selected;
+    return Material(
+      color: emphasize ? _kExamHeroDark : AppDesignTokens.appWhite,
+      borderRadius: BorderRadius.circular(18),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(18),
+        onTap: onTap,
+        child: Container(
+          height: 88,
+          padding: const EdgeInsets.fromLTRB(16, 18, 16, 14),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(18),
+            border: selected && !emphasize
+                ? Border.all(color: AppDesignTokens.brandGreen, width: 2)
+                : selected
+                    ? Border.all(color: AppDesignTokens.brandGreen, width: 2)
+                    : null,
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: <Widget>[
+              Text(
+                selected ? '$title ✓' : title,
+                style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.w900,
+                  color: emphasize ? Colors.white : AppDesignTokens.textPrimary,
+                ),
+              ),
+              const Spacer(),
+              Text(
+                subtitle,
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  color: emphasize
+                      ? const Color(0xFFB8BECB)
+                      : AppDesignTokens.textSecondary,
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -235,7 +351,7 @@ class _K12Section extends StatelessWidget {
   Widget build(BuildContext context) {
     if (families.isEmpty) return const SizedBox.shrink();
     return Padding(
-      padding: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.only(bottom: 14),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
@@ -252,10 +368,30 @@ class _K12Section extends StatelessWidget {
             runSpacing: 8,
             children: <Widget>[
               for (final ExamFamily f in families)
-                ChoiceChip(
-                  label: Text(f.label),
-                  selected: selectedId == f.id,
-                  onSelected: (_) => onSelect(f.id),
+                Material(
+                  color: selectedId == f.id
+                      ? AppDesignTokens.brandGreen
+                      : AppDesignTokens.appWhite,
+                  borderRadius: BorderRadius.circular(12),
+                  child: InkWell(
+                    borderRadius: BorderRadius.circular(12),
+                    onTap: () => onSelect(f.id),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 14,
+                        vertical: 10,
+                      ),
+                      child: Text(
+                        f.label,
+                        style: TextStyle(
+                          fontWeight: FontWeight.w700,
+                          color: selectedId == f.id
+                              ? Colors.white
+                              : AppDesignTokens.textPrimary,
+                        ),
+                      ),
+                    ),
+                  ),
                 ),
             ],
           ),
