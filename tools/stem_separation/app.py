@@ -1,11 +1,8 @@
-"""Lightweight stem / accompaniment helper for 趣配音.
-
-Prefer Demucs/UVR when installed on the GPU box. Falls back to ffmpeg
-center-channel attenuation so clients always get a `no_vocals`-like WAV.
-"""
+"""Private Demucs worker that returns an instrumental WAV."""
 
 from __future__ import annotations
 
+import asyncio
 import os
 import shutil
 import subprocess
@@ -15,6 +12,7 @@ from pathlib import Path
 
 from fastapi import FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.responses import FileResponse
+from starlette.background import BackgroundTask
 
 app = FastAPI(title="AcquireEnglish stem separation", version="0.1.0")
 
@@ -37,6 +35,9 @@ def _separate_with_demucs(src: Path, out_wav: Path) -> bool:
                 "-n",
                 os.environ.get("DEMUCS_MODEL", "htdemucs"),
                 "--two-stems=vocals",
+                "--shifts", "0",
+                "--segment", "4",
+                "-d", "cpu",
                 "-o",
                 str(work),
                 str(src),
@@ -49,31 +50,6 @@ def _separate_with_demucs(src: Path, out_wav: Path) -> bool:
         return True
     except Exception:  # noqa: BLE001
         return False
-
-
-def _separate_with_ffmpeg(src: Path, out_wav: Path) -> None:
-    ffmpeg = shutil.which("ffmpeg")
-    if not ffmpeg:
-        raise RuntimeError("ffmpeg not found")
-    _run(
-        [
-            ffmpeg,
-            "-hide_banner",
-            "-loglevel",
-            "error",
-            "-y",
-            "-i",
-            str(src),
-            "-vn",
-            "-af",
-            "pan=stereo|c0=0.5*c0+-0.5*c1|c1=-0.5*c0+0.5*c1,aformat=sample_fmts=s16:sample_rates=16000:channel_layouts=mono",
-            "-ac",
-            "1",
-            "-ar",
-            "16000",
-            str(out_wav),
-        ]
-    )
 
 
 @app.get("/health")
@@ -95,18 +71,28 @@ async def separate(
     src = work / f"src-{uuid.uuid4().hex}{suffix}"
     out = work / f"no_vocals-{uuid.uuid4().hex}.wav"
     try:
-        src.write_bytes(await file.read())
-        if not _separate_with_demucs(src, out):
+        with src.open("wb") as target:
+            while chunk := await file.read(1024 * 1024):
+                target.write(chunk)
+        audio = work / "input.wav"
+        await asyncio.to_thread(_run, [
+            "ffmpeg", "-v", "error", "-protocol_whitelist", "file,pipe",
+            "-i", str(src), "-vn",
+            "-ac", "2", "-ar", "44100", str(audio),
+        ])
+        if not await asyncio.to_thread(_separate_with_demucs, audio, out):
             raise HTTPException(status_code=503, detail="Demucs unavailable or separation failed")
         if not out.exists() or out.stat().st_size <= 0:
             raise HTTPException(status_code=500, detail="separation produced empty output")
-        # Caller downloads the wav; temp dir cleanup is left to OS tmp scrubbers.
         return FileResponse(
             path=out,
             media_type="audio/wav",
             filename=f"no_vocals-{episode_id or 'clip'}.wav",
+            background=BackgroundTask(shutil.rmtree, work, ignore_errors=True),
         )
     except HTTPException:
+        shutil.rmtree(work, ignore_errors=True)
         raise
     except Exception as exc:  # noqa: BLE001
+        shutil.rmtree(work, ignore_errors=True)
         raise HTTPException(status_code=500, detail=str(exc)) from exc

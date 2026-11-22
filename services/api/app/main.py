@@ -36,6 +36,7 @@ from app.routers import (
     content_courses,
     content_media,
     foundation_media,
+    stem_separation,
     syllabus_books,
     imports,
     learning,
@@ -162,6 +163,7 @@ app.include_router(app_settings_backup.router, prefix="/api")
 app.include_router(sync_status.router, prefix="/api")
 app.include_router(learning_module_progress.router, prefix="/api")
 app.include_router(foundation_media.router, prefix="/api")
+app.include_router(stem_separation.router, prefix="/api")
 app.include_router(content_media.router, prefix="/api")
 app.include_router(content_courses.router, prefix="/api")
 app.include_router(syllabus_books.router, prefix="/api")

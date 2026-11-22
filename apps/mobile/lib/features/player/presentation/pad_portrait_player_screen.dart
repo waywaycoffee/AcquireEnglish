@@ -5559,9 +5559,11 @@ Future<void> _settleChineseFillIfAlreadyPresent() async {
           .ensureAccompaniment(
             episodeId: widget.episodeId,
             videoSource: videoPath,
+            accessToken: ref.read(authSessionProvider).accessToken,
           );
+      if (!mounted) return;
       if (accompaniment == null) {
-        _showMessage('环境音分离不可用，请配置人声分离服务后重试。');
+        _showMessage('请登录后重试人声分离。');
         return;
       }
       final DubExportResult mix = await _dubExportService.export(
@@ -5623,13 +5625,22 @@ Future<void> _settleChineseFillIfAlreadyPresent() async {
     }
 
     _showMessage('正在准备配音视频…');
-    String? accompaniment;
+    final String? accompaniment;
     try {
       accompaniment = await _dubAccompanimentService.ensureAccompaniment(
         episodeId: widget.episodeId,
         videoSource: videoPath,
+        accessToken: ref.read(authSessionProvider).accessToken,
       );
-    } catch (_) {}
+    } catch (_) {
+      _showMessage('人声分离暂未成功，请稍后重试。');
+      return;
+    }
+    if (!mounted) return;
+    if (accompaniment == null) {
+      _showMessage('请登录后重试人声分离。');
+      return;
+    }
 
     if (fullEpisode && _videoDuration.inMilliseconds <= 0) {
       _showMessage('视频时长尚未就绪，请稍后再分享整段配音。');

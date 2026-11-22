@@ -8,7 +8,6 @@ import java.io.File
 import java.io.RandomAccessFile
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
-import kotlin.math.max
 import kotlin.math.min
 
 /**
@@ -48,7 +47,7 @@ object DubVideoExporter {
         val bed = FloatArray((durationMs / 1000.0 * sampleRate).toInt().coerceAtLeast(sampleRate / 10))
 
         if (!accompanimentPath.isNullOrBlank() && File(accompanimentPath).exists()) {
-            overlayWav(bed, accompanimentPath, sampleRate, 0, 1f)
+            overlayWav(bed, accompanimentPath, sampleRate, 0, 1f, sourceStartMs = startMs)
         } else {
             // Silence bed with light tone so AAC isn't empty; ducking path
             // primarily relies on user takes. Video keeps picture.
@@ -210,6 +209,7 @@ object DubVideoExporter {
         sampleRate: Int,
         delayMs: Int,
         gain: Float,
+        sourceStartMs: Int = 0,
     ) {
         val file = File(wavPath)
         if (!file.exists()) return
@@ -244,19 +244,30 @@ object DubVideoExporter {
                 }
             }
             if (dataSize <= 0) return
-            val bytes = ByteArray(dataSize.coerceAtMost((raf.length() - raf.filePointer).toInt()))
-            raf.readFully(bytes)
-            val shorts = ShortArray(bytes.size / 2)
-            ByteBuffer.wrap(bytes).order(ByteOrder.LITTLE_ENDIAN).asShortBuffer().get(shorts)
+            if (channels <= 0 || wavRate <= 0) return
+            val dataOffset = raf.filePointer
+            val frameBytes = channels * 2
+            val frameCount = min(dataSize.toLong(), raf.length() - dataOffset) / frameBytes
             val start = (delayMs / 1000.0 * sampleRate).toInt()
-            val step = max(1.0, wavRate.toDouble() / sampleRate)
-            var src = 0.0
+            val step = wavRate.toDouble() / sampleRate
+            val buffer = ByteArray((65536 / frameBytes).coerceAtLeast(1) * frameBytes)
+            val pcm = ByteBuffer.wrap(buffer).order(ByteOrder.LITTLE_ENDIAN)
+            var bufferFrame = -1L
+            var bufferFrames = 0
+            var src = sourceStartMs / 1000.0 * wavRate
             var dst = start
-            while (dst < bed.size && src.toInt() * channels < shorts.size) {
+            while (dst < bed.size && src.toLong() < frameCount) {
+                val frame = src.toLong()
+                if (frame < bufferFrame || frame >= bufferFrame + bufferFrames) {
+                    bufferFrame = frame
+                    bufferFrames = min(frameCount - frame, (buffer.size / frameBytes).toLong()).toInt()
+                    raf.seek(dataOffset + frame * frameBytes)
+                    raf.readFully(buffer, 0, bufferFrames * frameBytes)
+                }
+                val offset = (frame - bufferFrame).toInt() * frameBytes
                 var sample = 0
                 for (c in 0 until channels) {
-                    val idx = src.toInt() * channels + c
-                    if (idx < shorts.size) sample += shorts[idx]
+                    sample += pcm.getShort(offset + c * 2).toInt()
                 }
                 sample /= channels
                 bed[dst] = (bed[dst] + (sample / 32768f) * gain).coerceIn(-1f, 1f)
