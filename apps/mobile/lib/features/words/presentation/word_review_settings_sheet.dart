@@ -17,63 +17,32 @@ Future<void> showWordReviewSettingsSheet(BuildContext context) {
   );
 }
 
-class WordReviewSettingsSheet extends ConsumerStatefulWidget {
+class WordReviewSettingsSheet extends ConsumerWidget {
   const WordReviewSettingsSheet({super.key});
 
-  @override
-  ConsumerState<WordReviewSettingsSheet> createState() =>
-      _WordReviewSettingsSheetState();
-}
+  static const List<int> _newPresets = <int>[0, 5, 10, 20];
+  static const List<int> _reviewPresets = <int>[20, 50, 100, 200];
 
-class _WordReviewSettingsSheetState
-    extends ConsumerState<WordReviewSettingsSheet> {
-  late final TextEditingController _newController;
-  late final TextEditingController _reviewController;
-
-  @override
-  void initState() {
-    super.initState();
+  Future<void> _applyNewLimit(WidgetRef ref, int newLimit) async {
     final WordReviewSettings settings = ref.read(wordReviewSettingsProvider);
-    _newController = TextEditingController(text: '${settings.dailyNewLimit}');
-    _reviewController = TextEditingController(
-      text: '${settings.dailyReviewLimit}',
-    );
-  }
-
-  @override
-  void dispose() {
-    _newController.dispose();
-    _reviewController.dispose();
-    super.dispose();
-  }
-
-  Future<void> _saveLimits() async {
-    final int? newLimit = int.tryParse(_newController.text.trim());
-    final int? reviewLimit = int.tryParse(_reviewController.text.trim());
-    if (newLimit == null || reviewLimit == null) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('请输入有效的数字')));
-      return;
-    }
+    final int clamped = newLimit.clamp(0, 100);
     await ref
         .read(wordReviewSettingsProvider.notifier)
-        .update(
-          ref
-              .read(wordReviewSettingsProvider)
-              .copyWith(dailyNewLimit: newLimit, dailyReviewLimit: reviewLimit),
-        );
-    // Keep FSRS daily-new quota in sync with the words-plan setting.
-    if (ref.read(dailyReviewProvider).dailyNewLimit != newLimit) {
-      await ref.read(dailyReviewProvider.notifier).setDailyNewLimit(newLimit);
-    }
-    if (mounted) {
-      Navigator.of(context).pop();
+        .update(settings.copyWith(dailyNewLimit: clamped));
+    if (ref.read(dailyReviewProvider).dailyNewLimit != clamped) {
+      await ref.read(dailyReviewProvider.notifier).setDailyNewLimit(clamped);
     }
   }
 
+  Future<void> _applyReviewLimit(WidgetRef ref, int reviewLimit) async {
+    final WordReviewSettings settings = ref.read(wordReviewSettingsProvider);
+    await ref.read(wordReviewSettingsProvider.notifier).update(
+          settings.copyWith(dailyReviewLimit: reviewLimit.clamp(1, 500)),
+        );
+  }
+
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final WordReviewSettings settings = ref.watch(wordReviewSettingsProvider);
     final EdgeInsets padding = MediaQuery.viewInsetsOf(context);
 
@@ -96,7 +65,7 @@ class _WordReviewSettingsSheetState
             ),
             const SizedBox(height: 16),
             const Text(
-              '背单词计划设置',
+              '让计划适合你',
               style: TextStyle(
                 color: Colors.white,
                 fontSize: 20,
@@ -105,7 +74,7 @@ class _WordReviewSettingsSheetState
             ),
             const SizedBox(height: 6),
             const Text(
-              '每种卡片类型独立计入 FSRS（认记 / 听音 / 拼写 / 跟读互不影响）。',
+              '点选即生效，无需保存。',
               style: TextStyle(color: Color(0xFF94A3B8), height: 1.4),
             ),
             const SizedBox(height: 18),
@@ -114,41 +83,66 @@ class _WordReviewSettingsSheetState
             _WordModeOptions(settings: settings),
             const SizedBox(height: 12),
             const Text(
-              '每日配额',
+              '每日新学',
               style: TextStyle(
                 color: Colors.white,
                 fontWeight: FontWeight.w800,
               ),
             ),
-            const SizedBox(height: 10),
-            Row(
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
               children: <Widget>[
-                Expanded(
-                  child: _NumberField(
-                    label: '新学单词',
-                    controller: _newController,
+                for (final int n in _newPresets)
+                  ChoiceChip(
+                    label: Text(n == 0 ? '暂停新学' : '$n 条'),
+                    selected: settings.dailyNewLimit == n,
+                    onSelected: (_) => _applyNewLimit(ref, n),
+                    selectedColor: const Color(0xFF22C55E),
+                    labelStyle: TextStyle(
+                      color: settings.dailyNewLimit == n
+                          ? Colors.black
+                          : Colors.white,
+                      fontWeight: FontWeight.w800,
+                    ),
+                    backgroundColor: const Color(0xFF0F172A),
                   ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: _NumberField(
-                    label: '复习单词',
-                    controller: _reviewController,
-                  ),
-                ),
               ],
             ),
-            const SizedBox(height: 12),
-            FilledButton(
-              onPressed: _saveLimits,
-              style: FilledButton.styleFrom(
-                backgroundColor: const Color(0xFF22C55E),
-                padding: const EdgeInsets.symmetric(vertical: 14),
+            const SizedBox(height: 14),
+            const Text(
+              '每日复习上限',
+              style: TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.w800,
               ),
-              child: const Text(
-                '保存计划',
-                style: TextStyle(fontWeight: FontWeight.w800),
-              ),
+            ),
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: <Widget>[
+                for (final int n in _reviewPresets)
+                  ChoiceChip(
+                    label: Text('$n'),
+                    selected: settings.dailyReviewLimit == n,
+                    onSelected: (_) => _applyReviewLimit(ref, n),
+                    selectedColor: const Color(0xFF22C55E),
+                    labelStyle: TextStyle(
+                      color: settings.dailyReviewLimit == n
+                          ? Colors.black
+                          : Colors.white,
+                      fontWeight: FontWeight.w800,
+                    ),
+                    backgroundColor: const Color(0xFF0F172A),
+                  ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            const Text(
+              '仅限制新内容；到期复习仍按计划安排。关卡改动立即生效。',
+              style: TextStyle(color: Color(0xFF94A3B8), fontSize: 12),
             ),
           ],
         ),
@@ -236,47 +230,6 @@ class _WordModeOptions extends ConsumerWidget {
                 : (bool value) =>
                       notifier.setModeEnabled(mode, enabled: value),
           ),
-      ],
-    );
-  }
-}
-
-class _NumberField extends StatelessWidget {
-  const _NumberField({required this.label, required this.controller});
-
-  final String label;
-  final TextEditingController controller;
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: <Widget>[
-        Text(
-          label,
-          style: const TextStyle(
-            color: Color(0xFF94A3B8),
-            fontWeight: FontWeight.w700,
-          ),
-        ),
-        const SizedBox(height: 6),
-        TextField(
-          controller: controller,
-          keyboardType: TextInputType.number,
-          style: const TextStyle(color: Colors.white),
-          decoration: InputDecoration(
-            filled: true,
-            fillColor: const Color(0xFF0F172A),
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-              borderSide: const BorderSide(color: Color(0xFF334155)),
-            ),
-            enabledBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-              borderSide: const BorderSide(color: Color(0xFF334155)),
-            ),
-          ),
-        ),
       ],
     );
   }
