@@ -226,7 +226,9 @@ GoRouter goRouter(Ref ref) {
     GoRoute(
       path: '/exam/errorbook',
       builder: (BuildContext context, GoRouterState state) =>
-          const ExamErrorBookScreen(),
+          ExamErrorBookScreen(
+            initialSkill: state.uri.queryParameters['skill'],
+          ),
     ),
     GoRoute(
       path: '/exam/listening',

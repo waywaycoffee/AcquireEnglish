@@ -5,6 +5,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../daily_review/data/memory_item_store.dart';
 import '../../daily_review/domain/daily_review.dart';
 import '../../daily_review/presentation/daily_review_provider.dart';
+import '../../exam/data/exam_error_book_store.dart';
+import '../../exam/presentation/exam_profile_provider.dart';
+import '../../exam/presentation/exam_weakness_provider.dart';
+import '../../exam/domain/exam_weakness.dart';
 import '../../home/presentation/learning_dashboard_provider.dart';
 import '../../onboarding/domain/learning_tracks.dart';
 import '../../player/domain/episode_clip_due.dart';
@@ -41,6 +45,9 @@ class TodayPathNotifier extends Notifier<TodayPathState> {
     ref.watch(learningPreferencesProvider);
     ref.watch(readingLibraryProvider);
     ref.watch(learningActivityProvider);
+    ref.watch(examProfileProvider);
+    ref.watch(examErrorBookProvider);
+    ref.watch(examWeaknessProvider);
     // Persist player-studied video units into the course plan so「开始」opens
     // Minecraft 复习 instead of unrelated 词书新学.
     Future<void>.microtask(_reconcileStudiedVideoUnits);
@@ -204,10 +211,12 @@ class TodayPathNotifier extends Notifier<TodayPathState> {
         wantReading ? _readingTasks(doneIds) : const <TodayTask>[];
     final List<TodayTask> clipDue =
         wantVideo ? _clipDueTasks(now, doneIds) : const <TodayTask>[];
+    final List<TodayTask> examTasks = _examTasks(doneIds);
 
     final List<TodayTask> merged = <TodayTask>[
       ...overdue,
       ...dueReview,
+      ...examTasks,
       ...clipDue,
       ...vocab.where((TodayTask t) => t.kind == TodayTaskKind.vocabDue),
       ...courseNew,
@@ -227,6 +236,51 @@ class TodayPathNotifier extends Notifier<TodayPathState> {
       hasActiveCourse: plan != null,
       status: status,
     );
+  }
+
+  List<TodayTask> _examTasks(Set<String> doneIds) {
+    final String? familyId = ref.read(examProfileProvider).familyId;
+    if (familyId == null || familyId.isEmpty) {
+      return const <TodayTask>[];
+    }
+    final List<TodayTask> out = <TodayTask>[];
+    final int errors = ref
+        .read(examErrorBookProvider)
+        .where(
+          (ExamErrorItem e) =>
+              e.familyId == familyId || e.familyId.isEmpty,
+        )
+        .length;
+    if (errors > 0) {
+      const String id = 'exam-error-due';
+      out.add(
+        TodayTask(
+          id: id,
+          kind: TodayTaskKind.examDue,
+          title: '考试错题 · $errors',
+          subtitle: '回流统一 FSRS · 优先清错',
+          count: errors,
+          route: '/exam/errorbook',
+          doneToday: doneIds.contains(id),
+        ),
+      );
+    }
+    final ExamSkillWeakness? weak = ref.read(examWeaknessProvider)?.topWeak;
+    if (weak != null && weak.weakScore >= 0.35) {
+      final String id = 'exam-weak-${weak.skill}';
+      out.add(
+        TodayTask(
+          id: id,
+          kind: TodayTaskKind.examDrill,
+          title: '薄弱·${weak.label}',
+          subtitle: '考试备考助手推荐',
+          count: weak.errorCount,
+          route: weak.route,
+          doneToday: doneIds.contains(id),
+        ),
+      );
+    }
+    return out;
   }
 
   List<TodayTask> _clipDueTasks(DateTime now, Set<String> doneIds) {

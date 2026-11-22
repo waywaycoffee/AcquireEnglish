@@ -18,14 +18,14 @@ class ExamMockScreen extends ConsumerWidget {
 
     if (profile.family == null) {
       return Scaffold(
-        appBar: AppBar(title: const Text('全真模考')),
+        appBar: AppBar(title: const Text('限时客观卷')),
         body: Padding(
           padding: const EdgeInsets.all(24),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: <Widget>[
               const Text(
-                '模考需先选择考试目标。',
+                '限时客观卷需先选择考试目标。',
                 style: TextStyle(fontWeight: FontWeight.w700),
               ),
               const SizedBox(height: 12),
@@ -47,21 +47,22 @@ class ExamMockScreen extends ConsumerWidget {
             .join(' → ');
 
     return Scaffold(
-      appBar: AppBar(title: const Text('全真模考')),
+      appBar: AppBar(title: const Text('限时客观卷')),
       body: Padding(
         padding: const EdgeInsets.all(24),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: <Widget>[
             Text(
-              '${profile.family!.label} · 计时模考',
+              '${profile.family!.label} · 限时客观卷',
               style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
             ),
             const SizedBox(height: 10),
             Text(
               pack == null
-                  ? '加载题包后将按官方薄包组卷（词汇 / 听力 / 阅读客观题）。写作请在专项中单独完成。'
-                  : '${pack.title}\n时长约 $minutes 分钟\n科目：$sections\n错题自动进入错题本并回流 FSRS。',
+                  ? '加载题包后组卷：词汇 / 听力 / 阅读等客观题。写作与口语不在本卷内，请用专项。'
+                  : '${pack.title}\n时长约 $minutes 分钟\n科目：$sections\n'
+                      '这不是完整真题卷；写/说请去专项。错题进错题本并回流统一 FSRS。',
               style: TextStyle(
                 height: 1.5,
                 fontWeight: FontWeight.w600,
@@ -73,12 +74,16 @@ class ExamMockScreen extends ConsumerWidget {
               onPressed: pack == null
                   ? null
                   : () => context.push('/exam/session?skill=mock&mock=1'),
-              child: Text(pack == null ? '题包加载中…' : '开始计时模考'),
+              child: Text(pack == null ? '题包加载中…' : '开始限时客观卷'),
             ),
             const SizedBox(height: 8),
             OutlinedButton(
               onPressed: () => context.push('/writing'),
-              child: const Text('模考后去写作专项'),
+              child: const Text('去做写作专项'),
+            ),
+            OutlinedButton(
+              onPressed: () => context.push('/digital-human'),
+              child: const Text('去做口语专项'),
             ),
           ],
         ),

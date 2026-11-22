@@ -1,4 +1,12 @@
-enum TodayTaskKind { courseNew, courseReview, vocabDue, vocabNew, clipDue }
+enum TodayTaskKind {
+  courseNew,
+  courseReview,
+  vocabDue,
+  vocabNew,
+  clipDue,
+  examDue,
+  examDrill,
+}
 
 enum TodayPathStatus {
   idle,
