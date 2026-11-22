@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../daily_path/presentation/today_path_card.dart';
+import 'widgets/home_coach_course_card.dart';
 import '../../digital_human/presentation/digital_human_picker.dart';
 import '../../exam/domain/exam_profile.dart';
 import '../../exam/presentation/exam_profile_provider.dart';
@@ -135,7 +136,8 @@ class _LearningHomeScreenState extends ConsumerState<LearningHomeScreen> {
         );
     final List<(String, String, IconData, String)> modules =
         <(String, String, IconData, String)>[
-          ('美式音标', '慢速跟读 · 20 音', Icons.graphic_eq, '/courses/american-ipa'),
+          ('国际音标', 'BBC · 英式跟读', Icons.graphic_eq, '/courses/british-ipa'),
+          ('美式音标', '慢速跟读 · 20 音', Icons.record_voice_over_outlined, '/courses/american-ipa'),
           ('自然拼读', '从字母音到单词', Icons.spellcheck, '/learn/phonics'),
           ('应用语块', '整句学，直接用', Icons.chat_bubble_outline, '/learn/chunks'),
           ('场景对话', '在情境里开口', Icons.forum_outlined, '/learn/dialogue'),
@@ -248,6 +250,8 @@ class _LearningHomeScreenState extends ConsumerState<LearningHomeScreen> {
                     ),
                     const SizedBox(height: 24),
                     const TodayPathCard(),
+                    const SizedBox(height: 16),
+                    const HomeCoachCourseCard(),
                     const SizedBox(height: 24),
                     KeyedSubtree(
                       key: _vocabKey,

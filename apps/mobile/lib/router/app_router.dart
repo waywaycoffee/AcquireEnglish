@@ -16,6 +16,7 @@ import '../features/daily_path/presentation/course_unit_session_screen.dart';
 import '../features/daily_path/presentation/oral_core_course_screen.dart';
 import '../features/daily_review/domain/daily_review.dart';
 import '../features/learning_modules/american_ipa_course_screen.dart';
+import '../features/learning_modules/british_ipa_course_screen.dart';
 // ignore_for_file: prefer_function_declarations_over_variables
 
 import 'package:flutter/material.dart';
@@ -146,7 +147,7 @@ GoRouter goRouter(Ref ref) => GoRouter(
       path: '/learn/:kind',
       redirect: (BuildContext context, GoRouterState state) {
         if (state.pathParameters['kind'] == 'ipa') {
-          return '/courses/american-ipa';
+          return '/courses/british-ipa';
         }
         return null;
       },
@@ -397,6 +398,11 @@ GoRouter goRouter(Ref ref) => GoRouter(
       path: '/courses/american-ipa',
       builder: (BuildContext context, GoRouterState state) =>
           const AmericanIpaCourseScreen(),
+    ).fade(),
+    GoRoute(
+      path: '/courses/british-ipa',
+      builder: (BuildContext context, GoRouterState state) =>
+          const BritishIpaCourseScreen(),
     ).fade(),
     GoRoute(
       path: SGRoute.sm2Review.route,
