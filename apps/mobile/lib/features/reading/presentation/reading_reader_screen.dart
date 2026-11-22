@@ -234,31 +234,46 @@ class _ReadingReaderScreenState extends ConsumerState<ReadingReaderScreen> {
   }
 
   Future<void> _toggleTtsGender() async {
+    final ReadingTtsGender current = _ttsGender.asBookPairVoice;
     final selected = await showModalBottomSheet<ReadingTtsGender>(
       context: context,
-      builder: (context) => SafeArea(
-        child: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              for (final voice in ReadingTtsGender.values)
-                ListTile(
-                  title: Text(voice.labelCn),
-                  trailing: voice == _ttsGender
-                      ? const Icon(Icons.check)
-                      : null,
-                  onTap: () => Navigator.pop(context, voice),
+      builder: (BuildContext context) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: <Widget>[
+            const Padding(
+              padding: EdgeInsets.fromLTRB(16, 14, 16, 6),
+              child: Align(
+                alignment: Alignment.centerLeft,
+                child: Text(
+                  '朗读音色',
+                  style: TextStyle(fontWeight: FontWeight.w800, fontSize: 16),
                 ),
-            ],
-          ),
+              ),
+            ),
+            for (final ReadingTtsGender voice
+                in ReadingTtsGenderX.selectableBookVoices)
+              ListTile(
+                title: Text(voice.labelCn),
+                trailing: voice == current
+                    ? Icon(
+                        Icons.check_rounded,
+                        color: AppDesignTokens.brandGreenDark,
+                      )
+                    : null,
+                onTap: () => Navigator.pop(context, voice),
+              ),
+            const SizedBox(height: 8),
+          ],
         ),
       ),
     );
     if (selected == null || !mounted) return;
+    final ReadingTtsGender next = selected.asBookPairVoice;
     await _stopContinuous();
     if (!mounted) return;
-    setState(() => _ttsGender = selected);
-    await saveReadingTtsGender(selected);
+    setState(() => _ttsGender = next);
+    await saveReadingTtsGender(next);
   }
 
   double get _effectiveRate {
@@ -1383,10 +1398,7 @@ class _ReadingReaderScreenState extends ConsumerState<ReadingReaderScreen> {
             tooltip: '选择朗读音色（当前：${_ttsGender.labelCn}）',
             onPressed: () => unawaited(_toggleTtsGender()),
             icon: Icon(
-              _ttsGender == ReadingTtsGender.female ||
-                      _ttsGender == ReadingTtsGender.luna ||
-                      _ttsGender == ReadingTtsGender.nora ||
-                      _ttsGender == ReadingTtsGender.ivy
+              _ttsGender.asBookPairVoice == ReadingTtsGender.female
                   ? Icons.woman_rounded
                   : Icons.man_rounded,
               color: AppDesignTokens.brandGreenDark,

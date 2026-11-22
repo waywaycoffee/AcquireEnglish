@@ -43,8 +43,34 @@ extension ReadingTtsGenderX on ReadingTtsGender {
   bool get isBookPairVoice =>
       this == ReadingTtsGender.female || this == ReadingTtsGender.male;
 
-  static ReadingTtsGender fromStorage(String? raw) => ReadingTtsGender.values
-      .firstWhere((v) => v.name == raw, orElse: () => ReadingTtsGender.female);
+  /// Only the emotional book-pair voices are offered in the reading UI.
+  static const List<ReadingTtsGender> selectableBookVoices =
+      <ReadingTtsGender>[
+        ReadingTtsGender.female,
+        ReadingTtsGender.male,
+      ];
+
+  /// Map legacy CosyVoice picks onto the book pair (female / male only).
+  ReadingTtsGender get asBookPairVoice => switch (this) {
+        ReadingTtsGender.female ||
+        ReadingTtsGender.luna ||
+        ReadingTtsGender.nora ||
+        ReadingTtsGender.ivy =>
+          ReadingTtsGender.female,
+        ReadingTtsGender.male ||
+        ReadingTtsGender.alexander ||
+        ReadingTtsGender.james ||
+        ReadingTtsGender.ryan =>
+          ReadingTtsGender.male,
+      };
+
+  static ReadingTtsGender fromStorage(String? raw) {
+    final ReadingTtsGender hit = ReadingTtsGender.values.firstWhere(
+      (ReadingTtsGender v) => v.name == raw,
+      orElse: () => ReadingTtsGender.female,
+    );
+    return hit.asBookPairVoice;
+  }
 }
 
 ReadingTtsGender loadReadingTtsGender() {
@@ -58,7 +84,7 @@ Future<void> saveReadingTtsGender(ReadingTtsGender gender) async {
   if (!Hive.isBoxOpen('prefs')) return;
   await Hive.box<String>(
     'prefs',
-  ).put(kReadingTtsGenderKey, gender.storageValue);
+  ).put(kReadingTtsGenderKey, gender.asBookPairVoice.storageValue);
 }
 
 /// Kick off ECS TTS without awaiting playback (continuous / prefetch).
@@ -71,7 +97,8 @@ Future<String> prefetchReadingSpeechUrl(
   if (spoken.isEmpty) {
     return Future<String>.error(StateError('empty speech text'));
   }
-  final ReadingTtsGender voice = gender ?? loadReadingTtsGender();
+  final ReadingTtsGender voice =
+      (gender ?? loadReadingTtsGender()).asBookPairVoice;
   return ref
       .read(acquireApiClientProvider)
       .readingSpeech(spoken, voice.aliyunVoiceId);
@@ -87,7 +114,8 @@ Future<void> speakReadingText(
 }) async {
   final String spoken = text.trim();
   if (spoken.isEmpty) return;
-  final ReadingTtsGender voice = gender ?? loadReadingTtsGender();
+  final ReadingTtsGender voice =
+      (gender ?? loadReadingTtsGender()).asBookPairVoice;
   final String url = await ref
       .read(acquireApiClientProvider)
       .readingSpeech(spoken, voice.aliyunVoiceId);
