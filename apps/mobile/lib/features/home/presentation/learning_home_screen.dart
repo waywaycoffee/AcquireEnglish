@@ -22,7 +22,6 @@ import '../../onboarding/presentation/onboarding_provider.dart';
 import '../../player/presentation/learning_resume_provider.dart';
 import '../../reading/domain/reading_doc.dart';
 import '../../reading/presentation/reading_library_provider.dart';
-import '../../review_hub/presentation/widgets/review_today_section.dart';
 import '../../shared/presentation/pad/pad_scaffold.dart';
 import '../../sync/data/acquire_api_client.dart';
 import '../../sync/presentation/cloud_catalog_sync.dart';
@@ -342,14 +341,12 @@ class _LearningHomeScreenState extends ConsumerState<LearningHomeScreen> {
                       ],
                     ),
                     const SizedBox(height: 12),
-                    const TodayPathCard(),
-                    const SizedBox(height: 16),
-                    const HomeCoachCourseCard(),
-                    const SizedBox(height: 24),
                     KeyedSubtree(
                       key: _vocabKey,
-                      child: const ReviewTodaySection(),
+                      child: const TodayPathCard(),
                     ),
+                    const SizedBox(height: 16),
+                    const HomeCoachCourseCard(),
                     const SizedBox(height: 24),
                     if (examProfile.isExamMode &&
                         examProfile.family != null) ...<Widget>[

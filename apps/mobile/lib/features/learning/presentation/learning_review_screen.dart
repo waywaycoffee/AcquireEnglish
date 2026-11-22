@@ -147,7 +147,7 @@ class _LearningReviewScreenState extends ConsumerState<LearningReviewScreen> {
               padding: const EdgeInsets.fromLTRB(20, 8, 20, 32),
               children: <Widget>[
                 Text(
-                  '到期复习 ${_due.length}',
+                  '待复习 ${_due.length}',
                   style: TextStyle(
                     fontWeight: FontWeight.w900,
                     fontSize: 18,
@@ -157,7 +157,7 @@ class _LearningReviewScreenState extends ConsumerState<LearningReviewScreen> {
                 const SizedBox(height: 8),
                 if (_due.isEmpty)
                   Text(
-                    '暂无到期表达',
+                    '暂无待复习表达',
                     style: TextStyle(color: AppDesignTokens.textSecondary),
                   )
                 else

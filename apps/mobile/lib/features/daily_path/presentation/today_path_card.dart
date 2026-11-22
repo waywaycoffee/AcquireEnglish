@@ -15,6 +15,12 @@ class TodayPathCard extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final TodayPathState path = ref.watch(todayPathProvider);
+    final int dueWords = path.tasks
+        .where((TodayTask task) => task.kind == TodayTaskKind.vocabDue)
+        .fold(0, (int total, TodayTask task) => total + task.count);
+    final int newWords = path.tasks
+        .where((TodayTask task) => task.kind == TodayTaskKind.vocabNew)
+        .fold(0, (int total, TodayTask task) => total + task.count);
     final CoursePlan? active = ref.watch(coursePlanProvider).active;
     final bool dark = Theme.of(context).brightness == Brightness.dark;
     final Color accent = dark ? const Color(0xFFB7D894) : const Color(0xFF284F39);
@@ -46,6 +52,8 @@ class TodayPathCard extends ConsumerWidget {
               style: TextStyle(fontSize: 13, color: muted, height: 1.4),
             ),
             if (path.tasks.isNotEmpty) ...<Widget>[
+              Text('单词：$dueWords 条待复习 · $newWords 条可新学',
+                  style: TextStyle(fontSize: 12, color: muted)),
               const SizedBox(height: 12),
               _taskPreview(context, ref, path, accent, ink, muted),
               const SizedBox(height: 12),
@@ -124,6 +132,11 @@ class TodayPathCard extends ConsumerWidget {
                 : '今日共 ${path.total} 项 · 已完成 ${path.doneCount}',
             style: TextStyle(fontSize: 13, color: muted),
           ),
+          if (dueWords > 0 || newWords > 0) ...<Widget>[
+            const SizedBox(height: 4),
+            Text('单词：$dueWords 条待复习 · $newWords 条可新学',
+                style: TextStyle(fontSize: 12, color: muted)),
+          ],
           if (active != null &&
               active.courseId == OralCoreSeries.kSeriesId) ...<Widget>[
             const SizedBox(height: 10),
@@ -185,15 +198,6 @@ class TodayPathCard extends ConsumerWidget {
   Widget _reviewShortcuts(BuildContext context, Color accent, Color muted) {
     return Row(
       children: <Widget>[
-        TextButton(
-          onPressed: () => context.push('/review/session?due=1'),
-          style: TextButton.styleFrom(
-            foregroundColor: accent,
-            padding: const EdgeInsets.symmetric(horizontal: 4),
-          ),
-          child: const Text('今日复习'),
-        ),
-        Text('·', style: TextStyle(color: muted)),
         TextButton(
           onPressed: () => context.push('/review/session?practice=1'),
           style: TextButton.styleFrom(

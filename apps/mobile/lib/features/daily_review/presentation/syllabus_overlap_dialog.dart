@@ -67,7 +67,7 @@ Future<void> showSyllabusOverlapDialog(
       content: Text(
         '「${book.title}」共 ${overlap.total} 词。\n'
         '· 与收藏生词重复 ${overlap.freshFavoriteCount} 个（优先背收藏卡，不重复建卡）\n'
-        '· 与已掌握熟词重复 ${overlap.knownCount} 个（已标为学过，到期抽查一次）\n'
+        '· 与已掌握熟词重复 ${overlap.knownCount} 个（已标为学过，稍后安排一次复习）\n'
         '· 新词 ${overlap.newCount} 个将进入今日新学队列',
       ),
       actions: <Widget>[

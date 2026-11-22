@@ -1163,7 +1163,7 @@ class _DailyReviewScreenState extends ConsumerState<DailyReviewScreen>
               (
                 Icons.style_outlined,
                 '开始后怎么学？',
-                '计划复习时，先回忆、显示答案核对，再如实评分，系统会安排下次复习时间。一天可以多次复习；暂时没有到期内容时，也可以用“再次复习”自由练习已学内容，不改变计划或新学额度。',
+                '计划复习时，先回忆、显示答案核对，再如实评分，系统会安排下次复习时间。一天可以多次复习；暂时没有待复习内容时，也可以用“再次复习”自由练习已学内容，不改变计划或新学额度。',
               ),
               (
                 Icons.checklist_rounded,
@@ -1235,7 +1235,7 @@ class _DailyReviewScreenState extends ConsumerState<DailyReviewScreen>
     final String title = empty
         ? '把想记住的表达带到这里'
         : done
-        ? '今天暂时没有到期内容'
+        ? '今天暂时没有待复习内容'
         : plan.today.reviews > 0
         ? '继续今天的记忆练习'
         : '把学过的，真正记住';
@@ -1281,7 +1281,7 @@ class _DailyReviewScreenState extends ConsumerState<DailyReviewScreen>
             spacing: 28,
             runSpacing: 20,
             children: <Widget>[
-              _ReviewMetric(label: '到期复习', value: '${plan.due.length}'),
+              _ReviewMetric(label: '待复习', value: '${plan.due.length}'),
               _ReviewMetric(label: '今日可新学', value: '${plan.newAvailable}'),
               _ReviewMetric(label: '今天已练习', value: '${plan.today.reviews} 次'),
             ],
@@ -1318,7 +1318,7 @@ class _DailyReviewScreenState extends ConsumerState<DailyReviewScreen>
             ),
             const SizedBox(height: 10),
             Text(
-              '当前没有到期内容，可以自由练习已学内容，不改变复习计划或新学额度。',
+              '当前没有待复习内容，可以自由练习已学内容，不改变复习计划或新学额度。',
               style: TextStyle(
                 fontSize: 13,
                 height: 1.6,
@@ -1502,8 +1502,8 @@ class _DailyReviewScreenState extends ConsumerState<DailyReviewScreen>
         : '还有 ${plan.waiting.length} 条待学内容，收藏优先，其余按 i+1（贴近你当前水平）安排。';
     final String next = plan.nextDue == null
         ? ''
-        : '下一条到期：${_formatDue(plan.nextDue!, now)}。';
-    if (limit == 0) return '新学已暂停，到期复习会继续安排。$waiting$next';
+        : '下一条待复习：${_formatDue(plan.nextDue!, now)}。';
+    if (limit == 0) return '新学已暂停，待复习内容会继续安排。$waiting$next';
     return '当前没有需要立即复习的内容。$waiting$next';
   }
 
@@ -1616,7 +1616,7 @@ class _DailyReviewScreenState extends ConsumerState<DailyReviewScreen>
                         ? '自由练习'
                         : record.isNew
                         ? '首次学习'
-                        : '到期复习'}$stageLabel',
+                        : '待复习'}$stageLabel',
                     style: const TextStyle(
                       color: ReviewRecallTheme.lime,
                       fontSize: 13,
@@ -2012,7 +2012,7 @@ class _DailyReviewScreenState extends ConsumerState<DailyReviewScreen>
                 ),
                 const SizedBox(height: 10),
                 Text(
-                  '自由练习不评分，不改变下次到期时间或新学额度。',
+                  '自由练习不评分，不改变下次复习时间或新学额度。',
                   textAlign: TextAlign.center,
                   style: TextStyle(
                     fontSize: 12,
@@ -2409,7 +2409,7 @@ class _DailyReviewScreenState extends ConsumerState<DailyReviewScreen>
         ),
         const SizedBox(height: 8),
         Text(
-          '到期内容按等待时间优先复习；每完成 4 次到期复习，穿插 1 条新学。新内容按入队顺序轮到，未完成的会保留。',
+          '待复习内容按等待时间优先；每完成 4 条待复习内容，穿插 1 条新学。新内容按入队顺序轮到，未完成的会保留。',
           style: TextStyle(fontSize: 13, height: 1.7, color: Color(0xFF626262)),
         ),
         if (plan.waiting.length > limit && limit > 0) ...<Widget>[
@@ -3100,7 +3100,7 @@ class _DailyReviewScreenState extends ConsumerState<DailyReviewScreen>
                 ),
                 const SizedBox(height: 18),
                 Text(
-                  '更改设置不会清空收藏或已有进度。到期复习不受新学数量限制。',
+                  '更改设置不会清空收藏或已有进度。待复习内容不受新学数量限制。',
                   style: TextStyle(height: 1.6, color: Color(0xFF626262)),
                 ),
                 const SizedBox(height: 20),

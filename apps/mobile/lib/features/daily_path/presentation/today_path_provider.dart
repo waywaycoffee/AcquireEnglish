@@ -137,8 +137,9 @@ class TodayPathNotifier extends Notifier<TodayPathState> {
     final List<TodayTask> merged = <TodayTask>[
       ...overdue,
       ...dueReview,
+      ...vocab.where((TodayTask t) => t.kind == TodayTaskKind.vocabDue),
       ...courseNew,
-      ...vocab,
+      ...vocab.where((TodayTask t) => t.kind == TodayTaskKind.vocabNew),
       ...reading,
     ];
 
@@ -180,7 +181,8 @@ class TodayPathNotifier extends Notifier<TodayPathState> {
           id: id,
           kind: TodayTaskKind.vocabDue,
           title: '复习 · ${plan.due.length} 条',
-          subtitle: '收藏优先 · 统一 FSRS',
+          subtitle: '待复习优先 · 收藏优先 · 统一 FSRS',
+          count: plan.due.length,
           route: '/review/session?due=1',
           doneToday: doneIds.contains(id) || plan.next == null,
         ),
@@ -194,6 +196,7 @@ class TodayPathNotifier extends Notifier<TodayPathState> {
           kind: TodayTaskKind.vocabNew,
           title: '新学 · ${plan.newAvailable} 词',
           subtitle: 'i+1 · 今日额度内',
+          count: plan.newAvailable,
           route: '/review/session?learn=1',
           doneToday: doneIds.contains(id),
         ),

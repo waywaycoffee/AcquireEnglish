@@ -20,6 +20,7 @@ class TodayTask {
     this.doneToday = false,
     this.courseId,
     this.unitId,
+    this.count = 0,
   });
 
   final String id;
@@ -31,6 +32,7 @@ class TodayTask {
   final bool doneToday;
   final String? courseId;
   final String? unitId;
+  final int count;
 
   TodayTask copyWith({bool? doneToday}) => TodayTask(
         id: id,
@@ -42,6 +44,7 @@ class TodayTask {
         doneToday: doneToday ?? this.doneToday,
         courseId: courseId,
         unitId: unitId,
+        count: count,
       );
 }
 

@@ -103,22 +103,24 @@ class ReviewTodaySection extends ConsumerWidget {
     final String headline = empty
         ? '先背词，再来复习'
         : done
-            ? '今天暂时没有到期内容'
+            ? '今天暂时没有待复习内容'
             : '把学过的，真正记住';
     final String subtitle = empty
         ? '去词书架选一本词书，开始学新词。'
         : done
             ? (plan.nextDue == null
                 ? '可以自由练习已学内容，或去词书架继续背新词。'
-                : '下次到期：${_formatNextDue(plan.nextDue!, now)}。')
+                : '下次待复习：${_formatNextDue(plan.nextDue!, now)}。')
             : activeBookTitle.isEmpty
-                ? '有到期内容可复习，也可以去词书架学新词。'
-                : '先完成到期内容。学新词请点词书「$activeBookTitle」封面继续背。';
+                ? '有待复习内容，也可以去词书架学新词。'
+                : '先完成待复习内容。学新词请点词书「$activeBookTitle」封面继续背。';
 
     final String ctaLabel = empty
         ? '去词书架背新词'
         : done
             ? '自由练习已学内容'
+            : plan.due.isEmpty
+                ? '去词书架背新词'
             : hasDraft
                 ? '继续复习 →'
                 : plan.today.reviews > 0
@@ -130,6 +132,8 @@ class ReviewTodaySection extends ConsumerWidget {
       onCta = () => context.push('/words/syllabus');
     } else if (done) {
       onCta = () => context.push('${SGRoute.reviewSession.route}?practice=1');
+    } else if (plan.due.isEmpty) {
+      onCta = () => context.push('/words/syllabus');
     } else {
       onCta = () =>
           context.push('${SGRoute.reviewSession.route}?due=1');
@@ -166,9 +170,9 @@ class ReviewTodaySection extends ConsumerWidget {
           ctaLabel: ctaLabel,
           onCta: onCta,
           footer: empty
-              ? '点词书封面开背；背过的词到期后在这里复习。'
+              ? '点词书封面开背；背过的词会在这里安排复习。'
               : done
-                  ? '自由练习不改动到期时间，也不消耗新学额度。'
+                  ? '自由练习不改动复习时间，也不消耗新学额度。'
                   : '先回忆，再核对答案。每条评分后立即保存。',
         ),
         const SizedBox(height: 14),
@@ -253,7 +257,7 @@ class ReviewTodaySection extends ConsumerWidget {
       } else if (source.sourceLabel.trim().isNotEmpty) {
         meta = '${source.kind.label} · 来自《${source.sourceLabel.trim()}》';
       } else {
-        meta = '${source.kind.label} · 到期复习';
+        meta = '${source.kind.label} · 待复习';
       }
       out.add(_PreviewItem(title: source.question, meta: meta));
       if (out.length >= 3) break;
@@ -330,8 +334,8 @@ class _TodayPlanCard extends StatelessWidget {
             empty
                 ? '从一段好内容开始收藏'
                 : done
-                    ? '暂无到期 · 可自由练习'
-                    : '$due 条到期 · $newCount 条新学',
+                    ? '暂无待复习 · 可自由练习'
+                    : '$due 条待复习 · $newCount 条可新学',
             style: const TextStyle(
               fontSize: 24,
               height: 1.25,

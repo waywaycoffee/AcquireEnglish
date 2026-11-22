@@ -1158,7 +1158,7 @@ class _VocabDashboard extends StatelessWidget {
               _DashPill(label: '收藏 $total'),
               _DashPill(label: '待学习 $pending'),
               _DashPill(label: '复习中 $active'),
-              _DashPill(label: '今日到期 $due'),
+              _DashPill(label: '今日待复习 $due'),
               _DashPill(label: '可新学 $newToday'),
             ],
           ),

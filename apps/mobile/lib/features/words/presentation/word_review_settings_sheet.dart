@@ -141,7 +141,7 @@ class WordReviewSettingsSheet extends ConsumerWidget {
             ),
             const SizedBox(height: 8),
             const Text(
-              '仅限制新内容；到期复习仍按计划安排。关卡改动立即生效。',
+              '仅限制新内容；待复习内容仍按计划安排。关卡改动立即生效。',
               style: TextStyle(color: Color(0xFF94A3B8), fontSize: 12),
             ),
           ],

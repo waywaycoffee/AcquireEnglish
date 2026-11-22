@@ -440,7 +440,7 @@ class _TodayReviewBanner extends StatelessWidget {
       children: <Widget>[
         Text(
           reviewCount == 0
-              ? '今天没有到期短语'
+              ? '今天没有待复习短语'
               : phone
               ? '$reviewCount 条短语待复习'
               : '今日有 $reviewCount 条待复习',
