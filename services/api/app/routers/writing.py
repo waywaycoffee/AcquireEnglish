@@ -26,18 +26,51 @@ _RUBRIC_PROMPTS = {
         "rewrite_full, scores (object). Types: grammar|vocab|clarity|structure. "
         "Do not invent official exam bands unless rubric requests them."
     ),
+    "zhongkao": (
+        "You are a Zhongkao (中考) English writing teacher. Return ONLY JSON with keys: "
+        "summary, issues, rewrite_full, scores: "
+        "{points_coverage, grammar, structure, overall} as 0-15 integers. "
+        "Priority: (1) cover ALL prompt points (2) avoid basic grammar errors "
+        "(tense/agreement/plural). Complex sentences are a small bonus only — "
+        "do NOT heavily punish mostly-simple correct sentences. "
+        "Connectives and/but/so/besides are enough. Target ~80 words. "
+        "Use Chinese for summary and suggestions."
+    ),
+    "gaokao": (
+        "You are a Gaokao (高考全国卷) practical writing teacher. Return ONLY JSON "
+        "with keys: summary, issues, rewrite_full, scores: "
+        "{points_coverage, grammar, sentence_variety, lexical_range, overall} "
+        "as 0-15 integers. Require full points + few basic errors as baseline; "
+        "to score high, demand mixed sentence structures (relative/adverbial "
+        "clauses, non-finite verbs, inversion/emphasis) and synonym replacement "
+        "of basic words (think/important/many). All-simple-sentence essays stay "
+        "mid-band even if grammatically correct. Tone must fit the genre "
+        "(email/speech/invitation/advice). Target ~100 words. Chinese summary."
+    ),
+    "gaokao_continuation": (
+        "You are a Gaokao 读后续写 rater. Return ONLY JSON with keys: summary, "
+        "issues, rewrite_full, scores: "
+        "{plot_coherence, description, language, length_structure, overall} "
+        "0-25 style integers mapped into the score object (overall 0-25). "
+        "Judge: reasonable plot in two paragraphs, scene/action/psychology "
+        "description, language accuracy, >=150 words. Chinese summary."
+    ),
     "ielts_task2": (
         "You are an IELTS Academic Task 2 examiner. Return ONLY JSON with keys: "
         "summary, issues (array of {type, excerpt, suggestion, rewrite}), "
         "rewrite_full, scores: {TR, CC, LR, GRA, overall} as numbers 0-9 "
-        "(0.5 steps ok). Comment briefly on Task Response, Coherence & Cohesion, "
-        "Lexical Resource, Grammatical Range & Accuracy."
+        "(0.5 steps ok). Task Response first: every claim needs explanation + "
+        "development/example; punish undeveloped 'Gaokao-style' one-liners, "
+        "copied prompts, ignored qualifiers (all/always/only), and mechanical "
+        "template/connective stacking. Language is secondary to argument logic."
     ),
     "ielts_task1": (
         "You are an IELTS Academic Task 1 examiner. Return ONLY JSON with keys: "
         "summary, issues, rewrite_full, scores: {TR, CC, LR, GRA, overall}. "
-        "Focus on overview, key features, comparisons, and accurate data language."
+        "Focus on overview, key features, comparisons, and accurate data language. "
+        "Punish personal opinions or subjective evaluation of the data."
     ),
+    # Legacy alias → treated like gaokao in normalize, but keep prompt for old clients.
     "k12": (
         "You are a Chinese secondary-school English writing teacher. Return ONLY JSON "
         "with keys: summary, issues, rewrite_full, scores: "
@@ -61,14 +94,32 @@ class GradeIn(BaseModel):
 
 
 def _normalize_rubric(raw: str, family_id: str = "") -> str:
-    r = (raw or "generic").strip().lower()
-    if r in _RUBRIC_PROMPTS:
-        return r
+    r = (raw or "").strip().lower() or "generic"
     fam = (family_id or "").lower()
+    if r in {
+        "zhongkao",
+        "gaokao",
+        "gaokao_continuation",
+        "ielts_task2",
+        "ielts_task1",
+        "cet",
+    }:
+        return r
+    if r == "k12":
+        if fam == "zhongkao" or fam.startswith("k12_j") or fam.startswith("k12_g"):
+            return "zhongkao"
+        return "gaokao"
+    if r not in {"generic", ""} and r in _RUBRIC_PROMPTS:
+        return r
     if fam.startswith("ielts"):
         return "ielts_task2"
-    if fam.startswith("k12") or fam in {"gaokao", "zhongkao", "ket", "pet"}:
-        return "k12"
+    if fam == "zhongkao" or fam.startswith("k12_j") or fam.startswith("k12_g") or fam in {
+        "ket",
+        "pet",
+    }:
+        return "zhongkao"
+    if fam == "gaokao" or fam.startswith("k12_s") or fam.startswith("k12"):
+        return "gaokao"
     if fam in {"cet4", "cet6", "kaoyan", "toefl"}:
         return "cet"
     return "generic"
@@ -118,7 +169,8 @@ def _local_grade(text: str, prompt: str = "", rubric: str = "generic") -> dict[s
         )
 
     if rubric.startswith("ielts"):
-        base = 5.0 if words < 150 else 6.0 if words < 250 else 6.5
+        need = 150 if rubric == "ielts_task1" else 250
+        base = 5.0 if words < need * 0.6 else 6.0 if words < need else 6.5
         scores = {
             "TR": base,
             "CC": base,
@@ -127,15 +179,43 @@ def _local_grade(text: str, prompt: str = "", rubric: str = "generic") -> dict[s
             "overall": base,
         }
         summary = f"IELTS 启发式估分（非官方）：约 Band {base}。联网 LLM 可给出细项评语。"
-    elif rubric in {"k12", "cet"}:
-        overall = 9 if words < 80 else 11 if words < 120 else 12
+    elif rubric == "zhongkao":
+        overall = 8 if words < 60 else 11 if words < 90 else 13
         scores = {
-            "content": overall,
-            "language": max(8, overall - 1),
+            "points_coverage": overall,
+            "grammar": max(7, overall - 1),
             "structure": overall,
             "overall": overall,
         }
-        summary = f"考试启发式估分：约 {overall}/15。正式细评需 LLM。"
+        summary = f"中考启发式估分：约 {overall}/15（重要点与少错）。正式细评需 LLM。"
+    elif rubric == "gaokao_continuation":
+        overall = 12 if words < 120 else 16 if words < 150 else 18
+        scores = {
+            "plot_coherence": overall,
+            "description": max(10, overall - 2),
+            "language": max(10, overall - 1),
+            "length_structure": overall,
+            "overall": overall,
+        }
+        summary = f"读后续写启发式估分：约 {overall}/25。正式细评需 LLM。"
+    elif rubric in {"gaokao", "k12", "cet"}:
+        overall = 9 if words < 80 else 11 if words < 120 else 12
+        scores = {
+            "points_coverage": overall,
+            "grammar": max(8, overall - 1),
+            "sentence_variety": max(7, overall - 2),
+            "lexical_range": max(7, overall - 2),
+            "overall": overall,
+        }
+        if rubric == "cet":
+            scores = {
+                "content": overall,
+                "language": max(8, overall - 1),
+                "structure": overall,
+                "overall": overall,
+            }
+        label = "高考" if rubric in {"gaokao", "k12"} else "四六级"
+        summary = f"{label}启发式估分：约 {overall}/15。正式细评需 LLM。"
     else:
         scores = {"overall": 3 if words < 80 else 4}
         summary = "通用英语写作检查（本地规则）。"

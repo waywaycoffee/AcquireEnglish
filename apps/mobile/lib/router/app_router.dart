@@ -17,8 +17,10 @@ import '../features/exam/presentation/exam_reading_skill_course_screen.dart';
 import '../features/exam/presentation/exam_reading_type_drill_screen.dart';
 import '../features/exam/presentation/exam_select_screen.dart';
 import '../features/exam/presentation/exam_session_screen.dart';
+import '../features/writing/domain/writing_tracks.dart';
 import '../features/writing/presentation/writing_editor_screen.dart';
 import '../features/writing/presentation/writing_home_screen.dart';
+import '../features/writing/presentation/writing_track_screen.dart';
 import '../features/daily_path/presentation/course_unit_session_screen.dart';
 import '../features/daily_path/presentation/oral_core_course_screen.dart';
 import '../features/daily_review/domain/daily_review.dart';
@@ -300,6 +302,7 @@ GoRouter goRouter(Ref ref) {
         final String? prompt = state.uri.queryParameters['prompt'];
         final String? rubric = state.uri.queryParameters['rubric'];
         final String? title = state.uri.queryParameters['title'];
+        final String? track = state.uri.queryParameters['track'];
         if (prompt != null && prompt.isNotEmpty) {
           final String id = 'w_${DateTime.now().millisecondsSinceEpoch}';
           return WritingEditorScreen(
@@ -307,9 +310,19 @@ GoRouter goRouter(Ref ref) {
             initialPrompt: prompt,
             initialRubric: rubric ?? 'generic',
             initialTitle: title ?? '考试写作',
+            initialTrack: track,
           );
         }
         return const WritingHomeScreen();
+      },
+    ),
+    GoRoute(
+      path: '/writing/track/:trackId',
+      builder: (BuildContext context, GoRouterState state) {
+        final WritingTrackId id =
+            writingTrackFromRaw(state.pathParameters['trackId']) ??
+                WritingTrackId.gaokao;
+        return WritingTrackScreen(trackId: id);
       },
     ),
     GoRoute(
@@ -319,6 +332,7 @@ GoRouter goRouter(Ref ref) {
         initialPrompt: state.uri.queryParameters['prompt'],
         initialRubric: state.uri.queryParameters['rubric'],
         initialTitle: state.uri.queryParameters['title'],
+        initialTrack: state.uri.queryParameters['track'],
       ),
     ),
     // Legacy cafe adventure URLs → exam hub (cafe removed).

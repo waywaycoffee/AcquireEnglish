@@ -13,6 +13,7 @@ import '../../shared/presentation/pad/app_design_tokens.dart';
 import '../../sync/data/acquire_api_client.dart';
 import '../data/writing_draft_store.dart';
 import '../domain/writing_models.dart';
+import '../domain/writing_tracks.dart';
 
 class WritingEditorScreen extends ConsumerStatefulWidget {
   const WritingEditorScreen({
@@ -21,12 +22,14 @@ class WritingEditorScreen extends ConsumerStatefulWidget {
     this.initialPrompt,
     this.initialRubric,
     this.initialTitle,
+    this.initialTrack,
   });
 
   final String essayId;
   final String? initialPrompt;
   final String? initialRubric;
   final String? initialTitle;
+  final String? initialTrack;
 
   @override
   ConsumerState<WritingEditorScreen> createState() =>
@@ -58,7 +61,11 @@ class _WritingEditorScreenState extends ConsumerState<WritingEditorScreen> {
           : (widget.initialPrompt ?? ''),
     );
     _body = TextEditingController(text: existing?.body ?? '');
-    _rubric = widget.initialRubric ?? 'generic';
+    final WritingTrackId? track = writingTrackFromRaw(widget.initialTrack);
+    _rubric = resolveWritingRubric(
+      requested: widget.initialRubric ?? 'generic',
+      track: track,
+    );
     _title.addListener(_scheduleSave);
     _prompt.addListener(_scheduleSave);
     _body.addListener(_scheduleSave);
@@ -97,23 +104,12 @@ class _WritingEditorScreenState extends ConsumerState<WritingEditorScreen> {
     setState(() => _busy = true);
     await _save();
     final String familyId = ref.read(examProfileProvider).familyId ?? '';
-    String rubric = _rubric;
-    if (rubric == 'generic' && familyId.isNotEmpty) {
-      if (familyId.startsWith('ielts')) {
-        rubric = 'ielts_task2';
-      } else if (familyId.startsWith('k12') ||
-          familyId == 'gaokao' ||
-          familyId == 'zhongkao' ||
-          familyId == 'ket' ||
-          familyId == 'pet') {
-        rubric = 'k12';
-      } else if (familyId == 'cet4' ||
-          familyId == 'cet6' ||
-          familyId == 'kaoyan' ||
-          familyId == 'toefl') {
-        rubric = 'cet';
-      }
-    }
+    final WritingTrackId? track = writingTrackFromRaw(widget.initialTrack);
+    final String rubric = resolveWritingRubric(
+      requested: _rubric,
+      familyId: familyId,
+      track: track,
+    );
     WritingGradeResult result;
     try {
       result = await ref.read(acquireApiClientProvider).gradeWriting(
@@ -185,6 +181,40 @@ class _WritingEditorScreenState extends ConsumerState<WritingEditorScreen> {
     }
   }
 
+  String get _trackLabel {
+    switch (_rubric) {
+      case 'zhongkao':
+        return '中考轨';
+      case 'gaokao':
+        return '高考应用文';
+      case 'gaokao_continuation':
+        return '高考读后续写';
+      case 'ielts_task2':
+        return '雅思 Task 2';
+      case 'ielts_task1':
+        return '雅思 Task 1';
+      default:
+        return _rubric;
+    }
+  }
+
+  int get _targetWords {
+    switch (_rubric) {
+      case 'zhongkao':
+        return 80;
+      case 'gaokao':
+        return 100;
+      case 'gaokao_continuation':
+        return 150;
+      case 'ielts_task1':
+        return 150;
+      case 'ielts_task2':
+        return 250;
+      default:
+        return 100;
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final int words = RegExp(r"[A-Za-z']+").allMatches(_body.text).length +
@@ -202,6 +232,11 @@ class _WritingEditorScreenState extends ConsumerState<WritingEditorScreen> {
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: <Widget>[
+          Align(
+            alignment: Alignment.centerLeft,
+            child: Chip(label: Text('$_trackLabel · 目标约 $_targetWords 词')),
+          ),
+          const SizedBox(height: 8),
           TextField(
             controller: _title,
             decoration: const InputDecoration(
@@ -230,10 +265,12 @@ class _WritingEditorScreenState extends ConsumerState<WritingEditorScreen> {
           ),
           const SizedBox(height: 8),
           Text(
-            '$words 词 · 自动保存',
+            '$words / ~$_targetWords 词 · 自动保存',
             style: TextStyle(
               fontWeight: FontWeight.w700,
-              color: AppDesignTokens.textSecondary,
+              color: words < _targetWords * 0.8
+                  ? Colors.orange.shade800
+                  : AppDesignTokens.textSecondary,
             ),
           ),
           const SizedBox(height: 12),
