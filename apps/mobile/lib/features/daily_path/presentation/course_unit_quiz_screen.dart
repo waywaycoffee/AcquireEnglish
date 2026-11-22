@@ -58,7 +58,7 @@ class _CourseUnitQuizScreenState extends State<CourseUnitQuizScreen> {
                   context,
                   CourseQuizResult(_correct, widget.quiz.length),
                 ),
-                child: const Text('返回本课'),
+                child: const Text('完成'),
               ),
             ],
           ),
@@ -86,9 +86,26 @@ class _CourseUnitQuizScreenState extends State<CourseUnitQuizScreen> {
             } else if (_selected == i) {
               tileColor = Theme.of(context).colorScheme.primaryContainer;
             }
+            const List<String> labels = <String>['A', 'B', 'C', 'D'];
+            final String label = i < labels.length ? labels[i] : '${i + 1}';
             return Card(
               color: tileColor,
               child: ListTile(
+                leading: CircleAvatar(
+                  radius: 14,
+                  backgroundColor: _revealed && isAnswer
+                      ? Colors.green
+                      : (_revealed && _selected == i
+                          ? Colors.redAccent
+                          : Theme.of(context).colorScheme.primaryContainer),
+                  child: Text(
+                    label,
+                    style: const TextStyle(
+                      fontWeight: FontWeight.w800,
+                      fontSize: 13,
+                    ),
+                  ),
+                ),
                 title: Text(item.options[i]),
                 onTap: _revealed ? null : () => setState(() => _selected = i),
               ),

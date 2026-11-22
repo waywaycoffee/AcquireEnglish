@@ -1775,6 +1775,33 @@ class AcquireApiClient {
     return response.data as Map<String, dynamic>;
   }
 
+  /// AI reading comprehension: exactly 4 ABCD questions grounded in [sentences].
+  Future<List<Map<String, dynamic>>> generateReadingQuiz({
+    required List<String> sentences,
+    List<String> targetWords = const <String>[],
+  }) async {
+    final Response<dynamic> response = await _dio.post(
+      Endpoints.courseQuizReading,
+      data: <String, dynamic>{
+        'sentences': sentences,
+        'target_words': targetWords.take(20).toList(growable: false),
+      },
+    );
+    final Object? raw = response.data;
+    final Map<String, dynamic> body = raw is Map
+        ? Map<String, dynamic>.from(raw)
+        : const <String, dynamic>{};
+    final List<dynamic> quiz = body['quiz'] is List
+        ? body['quiz'] as List<dynamic>
+        : const <dynamic>[];
+    return quiz
+        .whereType<Map<dynamic, dynamic>>()
+        .map(
+          (Map<dynamic, dynamic> item) => Map<String, dynamic>.from(item),
+        )
+        .toList(growable: false);
+  }
+
   Future<Map<String, dynamic>> commerceEarnPoints({
     required String reason,
     int? amount,

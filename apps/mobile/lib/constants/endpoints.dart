@@ -29,6 +29,7 @@ class Endpoints {
   static const String wechatLogin = 'api/auth/wechat/login';
   static const String me = 'api/auth/me';
   static const String courses = 'api/courses';
+  static const String courseQuizReading = 'api/course/quiz/reading';
   static const String progress = 'api/progress';
   static const String vocab = 'api/vocab';
   static const String reviewBackup = 'api/review-backup';

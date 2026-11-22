@@ -8,7 +8,10 @@ import 'package:media_kit/media_kit.dart';
 import '../../sync/data/acquire_api_client.dart';
 
 import '../../authentication/presentation/account_storage.dart';
+import '../../authentication/presentation/auth_session.dart';
 import '../../daily_path/domain/course_plan.dart';
+import '../../daily_path/domain/reading_course_splitter.dart';
+import '../../daily_path/presentation/course_unit_quiz_screen.dart';
 import '../../daily_path/presentation/enable_course_mode_sheet.dart';
 import '../../daily_review/data/word_encounter_store.dart';
 import '../../daily_review/presentation/foundation_media_video_sheet.dart';
@@ -101,6 +104,7 @@ class _ReadingReaderScreenState extends ConsumerState<ReadingReaderScreen> {
   int _pageIndex = 0;
   String? _pagedDocId;
   List<String> _pages = const <String>[];
+  bool _loadingPageQuiz = false;
 
   @override
   void initState() {
@@ -877,6 +881,126 @@ class _ReadingReaderScreenState extends ConsumerState<ReadingReaderScreen> {
     }
   }
 
+  List<String> _sentencesForPageQuiz() {
+    String raw = _pageText.trim();
+    List<String> sentences = splitReadingSentences(raw)
+        .map((String s) => s.trim())
+        .where((String s) => s.isNotEmpty)
+        .take(30)
+        .toList(growable: false);
+    if (sentences.length < 2 &&
+        _pageIndex + 1 < _pages.length &&
+        _pages[_pageIndex + 1].trim().isNotEmpty) {
+      raw = '$raw\n${_pages[_pageIndex + 1].trim()}';
+      sentences = splitReadingSentences(raw)
+          .map((String s) => s.trim())
+          .where((String s) => s.isNotEmpty)
+          .take(30)
+          .toList(growable: false);
+    }
+    return sentences;
+  }
+
+  List<String> _targetWordsForPageQuiz() {
+    final List<String> out = <String>[];
+    final Set<String> seen = <String>{};
+    void add(String raw) {
+      final String key = normalizeWord(raw);
+      if (key.length < 2 || !seen.add(key)) return;
+      out.add(key);
+    }
+
+    for (final String w in ref.read(readingVocabListsProvider).focus) {
+      add(w);
+      if (out.length >= 20) return out;
+    }
+    for (final String w in _hardGlosses.keys) {
+      add(w);
+      if (out.length >= 20) return out;
+    }
+    return out;
+  }
+
+  Future<void> _launchPageComprehensionQuiz(ReadingDoc doc) async {
+    if (_loadingPageQuiz) return;
+    if (!ref.read(authSessionProvider).isLoggedIn) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('请先登录后再使用 AI 伴读出题')),
+      );
+      return;
+    }
+    final List<String> sentences = _sentencesForPageQuiz();
+    if (sentences.length < 2) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('本节内容太短，翻到内容更完整的一页再试')),
+      );
+      return;
+    }
+    await _pauseReadingForLookup();
+    if (!mounted) return;
+    setState(() => _loadingPageQuiz = true);
+    try {
+      final List<Map<String, dynamic>> raw = await ref
+          .read(acquireApiClientProvider)
+          .generateReadingQuiz(
+            sentences: sentences,
+            targetWords: _targetWordsForPageQuiz(),
+          );
+      final List<CourseQuizItem> quiz = raw
+          .map(CourseQuizItem.fromJson)
+          .where((CourseQuizItem item) => item.options.length == 4)
+          .toList(growable: false);
+      if (!mounted) return;
+      if (quiz.isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('暂时无法生成本节理解题，请稍后重试')),
+        );
+        return;
+      }
+      final CourseQuizResult? result = await Navigator.of(context).push(
+        MaterialPageRoute<CourseQuizResult>(
+          builder: (_) => CourseUnitQuizScreen(
+            topic: '${doc.displayTitle} · 第 ${_pageIndex + 1} 节',
+            quiz: quiz,
+            sentences: sentences,
+          ),
+        ),
+      );
+      if (!mounted || result == null) return;
+      final double accuracy =
+          result.total <= 0 ? 0 : result.correct / result.total;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            '本节理解题 ${result.correct}/${result.total}'
+            '${accuracy >= 0.75 ? ' · 很棒' : ''}',
+          ),
+        ),
+      );
+      if (accuracy >= 0.7) {
+        try {
+          await ref.read(acquireApiClientProvider).commerceEarnPoints(
+                reason: 'reading_quiz_pass',
+                meta: <String, dynamic>{
+                  'accuracy': accuracy,
+                  'content_id': '${doc.id}:p$_pageIndex',
+                  'duration_ratio': 1.0,
+                },
+              );
+        } catch (_) {}
+      }
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('AI 伴读出题失败，请检查网络后重试')),
+      );
+    } finally {
+      if (mounted) setState(() => _loadingPageQuiz = false);
+    }
+  }
+
   Future<void> _refreshReadingGlosses(ReadingDoc doc) async {
     _invalidateGlosses(clearCache: true, dropInteractive: false);
     if (mounted) setState(() {});
@@ -1481,6 +1605,19 @@ class _ReadingReaderScreenState extends ConsumerState<ReadingReaderScreen> {
                   : null,
             ),
           ),
+          IconButton(
+            tooltip: _loadingPageQuiz ? '正在出题…' : 'AI伴读 · 本节理解题',
+            onPressed: _loadingPageQuiz
+                ? null
+                : () => unawaited(_launchPageComprehensionQuiz(doc)),
+            icon: _loadingPageQuiz
+                ? const SizedBox(
+                    width: 22,
+                    height: 22,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : const Icon(Icons.quiz_outlined),
+          ),
           PopupMenuButton<String>(
             tooltip: '更多',
             onSelected: (String value) {
@@ -1520,6 +1657,8 @@ class _ReadingReaderScreenState extends ConsumerState<ReadingReaderScreen> {
                       '/episodes/${Uri.encodeComponent(doc.episodeId!)}',
                     );
                   }
+                case 'page_quiz':
+                  unawaited(_launchPageComprehensionQuiz(doc));
                 case 'course_mode':
                   unawaited(
                     showEnableCourseModeSheet(
@@ -1583,6 +1722,13 @@ class _ReadingReaderScreenState extends ConsumerState<ReadingReaderScreen> {
                   child: Text('打开原集'),
                 ),
               const PopupMenuDivider(),
+              PopupMenuItem<String>(
+                value: 'page_quiz',
+                enabled: !_loadingPageQuiz,
+                child: Text(
+                  _loadingPageQuiz ? 'AI伴读出题中…' : 'AI伴读 · 本节理解题',
+                ),
+              ),
               const PopupMenuItem<String>(
                 value: 'course_mode',
                 child: Text('开启课程学习模式'),
