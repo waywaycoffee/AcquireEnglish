@@ -380,7 +380,15 @@ class _CourseUnitSessionScreenState
     CourseUnit unit,
     List<String> shadowLines,
   ) {
-    if ((plan.type == CoursePlanType.video || plan.type == CoursePlanType.videoSeries) &&
+    final bool isReview = widget.mode == 'review';
+    final bool isVideo = plan.type == CoursePlanType.video ||
+        plan.type == CoursePlanType.videoSeries;
+    // Spaced review of an already-watched video unit: open the clip (or any
+    // shadow take) once, then allow finish — don't re-impose 80% + shadow≥60.
+    if (isReview && isVideo) {
+      return _progress.watchedMs > 0 || (_progress.shadowScore ?? 0) > 0;
+    }
+    if (isVideo &&
         unit.startMs != null &&
         unit.endMs != null &&
         unit.endMs! > unit.startMs!) {

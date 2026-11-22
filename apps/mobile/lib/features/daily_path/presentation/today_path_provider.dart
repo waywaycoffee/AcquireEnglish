@@ -1,7 +1,10 @@
+import 'dart:async';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../daily_review/domain/daily_review.dart';
 import '../../daily_review/presentation/daily_review_provider.dart';
+import '../../home/presentation/learning_dashboard_provider.dart';
 import '../../onboarding/domain/learning_tracks.dart';
 import '../../reading/data/reading_gloss.dart';
 import '../../reading/presentation/reading_library_provider.dart';
@@ -12,6 +15,7 @@ import '../../words/presentation/word_review_settings_provider.dart';
 import '../data/course_plan_store.dart';
 import '../domain/course_plan.dart';
 import '../domain/today_task.dart';
+import '../domain/video_unit_study_match.dart';
 import 'course_plan_provider.dart';
 
 String todayPathDayKey([DateTime? now]) {
@@ -33,7 +37,51 @@ class TodayPathNotifier extends Notifier<TodayPathState> {
     ref.watch(readingFrequencyLexiconProvider);
     ref.watch(learningPreferencesProvider);
     ref.watch(readingLibraryProvider);
+    ref.watch(learningActivityProvider);
+    // Persist player-studied video units into the course plan so「开始」opens
+    // Minecraft 复习 instead of unrelated 词书新学.
+    Future<void>.microtask(_reconcileStudiedVideoUnits);
     return _synthesize(DateTime.now());
+  }
+
+  Future<void> _reconcileStudiedVideoUnits() async {
+    final CoursePlan? plan = ref.read(coursePlanProvider).active;
+    if (plan == null) return;
+    if (plan.type != CoursePlanType.video &&
+        plan.type != CoursePlanType.videoSeries) {
+      return;
+    }
+    final Set<String> learned = allLearnedSentenceKeys(
+      ref.read(learningActivityProvider),
+    );
+    if (learned.isEmpty) return;
+    final DateTime today = _dayOnly(DateTime.now());
+    final List<String> toMark = <String>[];
+    for (final CourseUnit unit in plan.units) {
+      if (unit.isLearned) continue;
+      if (videoUnitStudiedInActivity(
+        plan: plan,
+        unit: unit,
+        learnedKeys: learned,
+      )) {
+        toMark.add(unit.unitId);
+      }
+    }
+    if (toMark.isEmpty) return;
+    await ref.read(coursePlanProvider.notifier).updateActive((CoursePlan p) {
+      final List<CourseUnit> units = p.units.map((CourseUnit u) {
+        if (!toMark.contains(u.unitId) || u.isLearned) return u;
+        // Already studied in the player → due for review today.
+        return u.copyWith(
+          firstLearnedAt: today.subtract(const Duration(days: 1)),
+          nextDue: today,
+          reviewStage: 0,
+        );
+      }).toList(growable: false);
+      return p.copyWith(units: units);
+    });
+    if (!ref.mounted) return;
+    state = _synthesize(DateTime.now());
   }
 
   TodayPathState _synthesize(DateTime now) {
@@ -49,6 +97,9 @@ class TodayPathNotifier extends Notifier<TodayPathState> {
     final String dayKey = todayPathDayKey(now);
     final Set<String> doneIds = _store.loadDoneTaskIds(dayKey);
     final DateTime today = _dayOnly(now);
+    final Set<String> learnedKeys = allLearnedSentenceKeys(
+      ref.read(learningActivityProvider),
+    );
 
     final List<TodayTask> overdue = <TodayTask>[];
     final List<TodayTask> dueReview = <TodayTask>[];
@@ -56,30 +107,39 @@ class TodayPathNotifier extends Notifier<TodayPathState> {
 
     if (wantVideo && plan != null) {
       for (final CourseUnit unit in plan.units) {
-        if (unit.isLearned && unit.nextDue != null) {
-          final DateTime due = _dayOnly(unit.nextDue!);
-          final bool isOverdue = due.isBefore(today);
-          final bool isDueToday = due == today;
-          if (isOverdue || isDueToday) {
-            final TodayTask task = TodayTask(
-              id: 'course-review:${plan.courseId}:${unit.unitId}',
-              kind: TodayTaskKind.courseReview,
-              title: isOverdue ? '逾期复习 · ${unit.topic}' : '复习 · ${unit.topic}',
-              subtitle: plan.title,
-              route:
-                  '/daily-path/unit?courseId=${Uri.encodeComponent(plan.courseId)}&unitId=${Uri.encodeComponent(unit.unitId)}&mode=review',
-              overdue: isOverdue,
-              doneToday: doneIds.contains(
-                'course-review:${plan.courseId}:${unit.unitId}',
-              ),
-              courseId: plan.courseId,
-              unitId: unit.unitId,
+        final bool studiedOffline = !unit.isLearned &&
+            videoUnitStudiedInActivity(
+              plan: plan,
+              unit: unit,
+              learnedKeys: learnedKeys,
             );
-            if (isOverdue) {
-              overdue.add(task);
-            } else {
-              dueReview.add(task);
-            }
+        final DateTime? effectiveDue = unit.isLearned
+            ? unit.nextDue
+            : (studiedOffline ? today : null);
+        if (effectiveDue == null) continue;
+        if (!unit.isLearned && !studiedOffline) continue;
+        final DateTime due = _dayOnly(effectiveDue);
+        final bool isOverdue = due.isBefore(today);
+        final bool isDueToday = due == today;
+        if (isOverdue || isDueToday) {
+          final TodayTask task = TodayTask(
+            id: 'course-review:${plan.courseId}:${unit.unitId}',
+            kind: TodayTaskKind.courseReview,
+            title: isOverdue ? '逾期复习 · ${unit.topic}' : '复习 · ${unit.topic}',
+            subtitle: plan.title,
+            route:
+                '/daily-path/unit?courseId=${Uri.encodeComponent(plan.courseId)}&unitId=${Uri.encodeComponent(unit.unitId)}&mode=review',
+            overdue: isOverdue,
+            doneToday: doneIds.contains(
+              'course-review:${plan.courseId}:${unit.unitId}',
+            ),
+            courseId: plan.courseId,
+            unitId: unit.unitId,
+          );
+          if (isOverdue) {
+            overdue.add(task);
+          } else {
+            dueReview.add(task);
           }
         }
       }
@@ -89,7 +149,13 @@ class TodayPathNotifier extends Notifier<TodayPathState> {
         final int quota = plan.params.dailyLessons.clamp(1, 10);
         int added = 0;
         for (final CourseUnit unit in plan.units) {
-          if (unit.isLearned) continue;
+          final bool studiedOffline = videoUnitStudiedInActivity(
+            plan: plan,
+            unit: unit,
+            learnedKeys: learnedKeys,
+          );
+          // Already covered by player study → review task above, not 新课.
+          if (unit.isLearned || studiedOffline) continue;
           final String id = 'course-new:${plan.courseId}:${unit.unitId}';
           // Skip units already completed today when counting quota slots.
           if (doneIds.contains(id)) {

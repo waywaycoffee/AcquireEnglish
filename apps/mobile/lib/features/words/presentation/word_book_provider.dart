@@ -352,8 +352,10 @@ class WordEntry {
 
   String get entryId => vocabEntryIdForLemma(word);
 
+  /// Pending favorites still join the daily queue (video/阅读收藏后应能复习);
+  /// only 斩掉/归档 leaves the schedule.
   bool get isSchedulable =>
-      favorite && scheduleStatus == VocabScheduleStatus.active;
+      favorite && scheduleStatus != VocabScheduleStatus.archived;
 
   bool get hasVideoContext => occurrences.any(
     (WordOccurrence o) => o.episodeId.trim().isNotEmpty,
@@ -686,7 +688,7 @@ class WordBookNotifier extends Notifier<List<WordEntry>> {
       collectedAtMs: becomingFavorite ? now : null,
       updatedAtMs: now,
       scheduleStatus: becomingFavorite
-          ? VocabScheduleStatus.pending
+          ? VocabScheduleStatus.active
           : VocabScheduleStatus.archived,
     );
     state = next;
@@ -861,8 +863,8 @@ class WordBookNotifier extends Notifier<List<WordEntry>> {
           kind: kind,
           definitionCn: validDefinition,
           enrichmentStatus: VocabEnrichmentStatus.pending,
-          // New collects stay pending until preview enroll.
-          scheduleStatus: VocabScheduleStatus.pending,
+          // Collecting from video/阅读 immediately joins the daily review queue.
+          scheduleStatus: VocabScheduleStatus.active,
           tags: sourceTag.isEmpty
               ? const <String>[]
               : <String>[sourceTag],
@@ -928,10 +930,10 @@ class WordBookNotifier extends Notifier<List<WordEntry>> {
       next[entryIndex] = entry.copyWith(
         favorite: true,
         collectedAtMs: entry.favorite ? entry.collectedAtMs : collectedAt,
-        // Keep existing schedule status; only brand-new words start pending.
+        // Keep existing schedule status; first-time favorite enrolls immediately.
         scheduleStatus: entry.favorite
             ? entry.scheduleStatus
-            : VocabScheduleStatus.pending,
+            : VocabScheduleStatus.active,
         kind: entry.kind == VocabCardKind.word ? kind : entry.kind,
         occurrences: occurrences,
         tags: tags,
