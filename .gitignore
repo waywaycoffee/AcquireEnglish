@@ -78,6 +78,11 @@ deploy/gpu-box-ollama/aria2c.exe
 deploy/_probe_shared_subs.py
 services/api/media/
 
+# Generated oral_core subtitle seeds (regenerate via seed_pack_subs.py)
+tools/oral_core_9000/subs/
+tools/oral_core_9000/oral_core_subs.tgz
+
+
 tools/reading_samples/*.epub
 tools/reading_samples/*.zip
 

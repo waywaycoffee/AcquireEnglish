@@ -133,11 +133,33 @@ Future<String?> existingOfficialBilibiliSubtitle({
   return null;
 }
 
+bool isRemoteSubtitlePath(String? path) {
+  final String value = path?.trim() ?? '';
+  if (value.isEmpty) {
+    return false;
+  }
+  return value.startsWith('http://') ||
+      value.startsWith('https://') ||
+      value.startsWith('/media/');
+}
+
+/// Local file **or** cloud `/media` / http(s) subtitle URL usable by the player.
 bool isUsableSubtitlePath(String? path) {
   final String value = path?.trim() ?? '';
-  if (value.isEmpty ||
-      value.startsWith('http://') ||
-      value.startsWith('https://')) {
+  if (value.isEmpty) {
+    return false;
+  }
+  if (isRemoteSubtitlePath(value)) {
+    return true;
+  }
+  final File file = File(value);
+  return file.existsSync() && file.lengthSync() > 16;
+}
+
+/// On-disk subtitle only (ASR / offline tools must not treat URLs as files).
+bool isUsableLocalSubtitlePath(String? path) {
+  final String value = path?.trim() ?? '';
+  if (value.isEmpty || isRemoteSubtitlePath(value)) {
     return false;
   }
   final File file = File(value);
@@ -209,17 +231,25 @@ Future<BilibiliEpisodePrepareResult> prepareBilibiliEpisode({
       bilibiliIdKeyIsSecondaryPage(expectedKey) ||
       pathLooksForeign;
   if (forceOfficialRefresh) {
-    // Ignore misaligned paths for this prepare, but do not delete softsub
-    // files on disk — user can regenerate if the re-pull is still wrong.
-    enPath = null;
-    zhPath = null;
+    // Ignore misaligned *local* paths for this prepare, but keep cloud
+    // `/media` / http(s) tracks (official series like oral_core_9000).
+    if (!isRemoteSubtitlePath(enPath)) {
+      enPath = null;
+    }
+    if (!isRemoteSubtitlePath(zhPath)) {
+      zhPath = null;
+    }
   }
   final bool hasLocalEnglish = enPath != null && enPath.isNotEmpty;
   final bool hasLocalChinese = zhPath != null && zhPath.isNotEmpty;
+  final bool hasCloudPair =
+      isRemoteSubtitlePath(enPath) && isRemoteSubtitlePath(zhPath);
 
-  // Skip network only when both EN+ZH softsubs are already local. EN-only
-  // must still fetch so we pick up official ZH instead of EN→ZH compute.
-  if (hasLocalEnglish && hasLocalChinese && !forceOfficialRefresh) {
+  // Skip network when both EN+ZH softsubs are already usable (local or cloud).
+  // EN-only must still fetch so we pick up official ZH instead of EN→ZH compute.
+  if (hasCloudPair) {
+    onProgress?.call('使用云端双语字幕');
+  } else if (hasLocalEnglish && hasLocalChinese && !forceOfficialRefresh) {
     onProgress?.call('使用本地双语字幕');
   } else {
     onProgress?.call(

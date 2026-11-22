@@ -974,6 +974,17 @@ class PadPortraitPlayerScreenState
     final bool hasLocalVideo = isUsableLocalVideoPath(resource.videoAsset);
     final bool hasEnglish = isUsableSubtitlePath(resource.englishSubtitleAsset);
     final bool hasChinese = isUsableSubtitlePath(resource.chineseSubtitleAsset);
+    // Official series with ECS softsubs: stream B站 + load cloud SRT, no local
+    // MP4 / B站官方字幕预拉（否则会误报「没有字幕」并卡下载）.
+    final String courseId = resource.course?.id ?? '';
+    final String episodeId = resource.episode?.id ?? widget.episodeId;
+    final bool officialCloudSubs =
+        (courseId == 'oral_core_9000' ||
+            episodeId.startsWith('oral_core_9000-')) &&
+        (hasEnglish || hasChinese);
+    if (officialCloudSubs) {
+      return false;
+    }
     // Local + real English: open immediately. Local + Chinese-only still
     // prepare once so official EN can be pulled before falling back to translate.
     if (hasLocalVideo && hasEnglish) {

@@ -35,6 +35,7 @@ ALLOWED_NAMESPACES = frozenset(
 
 _AUDIO_EXT = {".mp3", ".m4a", ".aac", ".wav", ".ogg", ".opus"}
 _VIDEO_EXT = {".mp4", ".webm", ".mov", ".m4v"}
+_SUBTITLE_EXT = {".srt", ".vtt"}
 _SAFE = re.compile(r"[^a-zA-Z0-9_\-\u4e00-\u9fff]+")
 
 
@@ -174,30 +175,51 @@ def save_upload(
 ) -> dict[str, Any]:
     if not data:
         raise ValueError("empty upload")
-    ext = Path(filename or "").suffix.lower()
-    if ext not in _AUDIO_EXT and ext not in _VIDEO_EXT:
+    ext = Path(filename or key or "").suffix.lower()
+    if (
+        ext not in _AUDIO_EXT
+        and ext not in _VIDEO_EXT
+        and ext not in _SUBTITLE_EXT
+    ):
         raise ValueError(f"unsupported media type: {ext or '(none)'}")
     bid = sanitize_segment(book_id, fallback="book")
-    kid = sanitize_segment(key, fallback="item")
-    dest_dir = namespace_root(namespace) / bid
-    dest_dir.mkdir(parents=True, exist_ok=True)
-    dest = dest_dir / f"{kid}{ext}"
+    # Nested keys (e.g. "01/en.srt") → oral_core_9000/01/en.srt
+    raw_key = (key or Path(filename or "item").stem).replace("\\", "/").strip("/")
+    parts = [sanitize_segment(p, fallback="item") for p in raw_key.split("/") if p]
+    if not parts:
+        parts = ["item"]
+    # If last segment has no extension, append upload ext.
+    last = parts[-1]
+    if not Path(last).suffix:
+        last = f"{last}{ext}"
+        parts[-1] = last
+    dest = namespace_root(namespace) / bid
+    for segment in parts[:-1]:
+        dest = dest / segment
+    dest.mkdir(parents=True, exist_ok=True)
+    dest = dest / parts[-1]
     dest.write_bytes(data)
-    manifest = rebuild_manifest(namespace)
-    item = next(
-        (
-            x
-            for x in manifest["items"]
-            if x["book_id"] == bid and x["key"] == kid
-        ),
-        None,
-    )
+    # Audio/video rebuild book/key manifest; subtitle files are served via /media.
+    if ext in _AUDIO_EXT or ext in _VIDEO_EXT:
+        manifest = rebuild_manifest(namespace)
+        item = next(
+            (
+                x
+                for x in manifest["items"]
+                if x["book_id"] == bid and x["key"] == Path(parts[-1]).stem
+            ),
+            None,
+        )
+        manifest_count = manifest["count"]
+    else:
+        item = None
+        manifest_count = load_manifest(namespace).get("count", 0)
     return {
         "namespace": assert_namespace(namespace),
         "book_id": bid,
-        "key": kid,
+        "key": "/".join(parts),
         "path": str(dest.relative_to(media_cache_root())),
         "size": len(data),
         "item": item,
-        "manifest_count": manifest["count"],
+        "manifest_count": manifest_count,
     }

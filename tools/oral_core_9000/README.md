@@ -14,8 +14,12 @@
 cd D:\AcquireEnglish\tools\oral_core_9000
 python build_packs.py --pages 1-5          # 先验证前 5 课
 python build_packs.py --pages 1-151        # 全量（需 GPU ASR 时缺 CC）
-python upload_to_ecs.py                    # 上传 srt + 刷新 API 侧 manifest
+python seed_pack_subs.py                   # 用课包句生成可跟读临时 SRT（无 Whisper 时）
+python upload_to_ecs.py --scp              # 上传到 ECS media/course/oral_core_9000
 ```
+
+部署 API 清单：`services/api/data/oral_core_9000/manifest.json` + `content_courses` 路由。
+App 打开官方课时会把 ECS `/media/course/oral_core_9000/{nn}/en.srt|zh.srt` 挂到分集。
 
 `build_packs.py` 默认：
 

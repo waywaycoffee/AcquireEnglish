@@ -20,6 +20,24 @@ class OralCoreCourseScreen extends ConsumerStatefulWidget {
 class _OralCoreCourseScreenState extends ConsumerState<OralCoreCourseScreen> {
   int _dailyLessons = 1;
   bool _busy = false;
+  bool _catalogReady = false;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _ensureCatalog());
+  }
+
+  Future<void> _ensureCatalog() async {
+    try {
+      final OralCoreSeries series = await ref.read(oralCoreSeriesProvider.future);
+      await ref.read(libraryCatalogProvider.notifier).ensureOralCoreCourse(series);
+    } catch (_) {
+      // Episode open still falls back to watch URL; catalog refresh is best-effort.
+    } finally {
+      if (mounted) setState(() => _catalogReady = true);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -84,6 +102,11 @@ class _OralCoreCourseScreenState extends ConsumerState<OralCoreCourseScreen> {
                 style: Theme.of(context).textTheme.titleMedium,
               ),
               const SizedBox(height: 8),
+              if (!_catalogReady)
+                const Padding(
+                  padding: EdgeInsets.only(bottom: 12),
+                  child: LinearProgressIndicator(),
+                ),
               ...series.lessons.take(20).map(
                 (OralCoreLesson l) => ListTile(
                   contentPadding: EdgeInsets.zero,
@@ -95,13 +118,16 @@ class _OralCoreCourseScreenState extends ConsumerState<OralCoreCourseScreen> {
                   subtitle: Text(
                     l.pack.quiz.isNotEmpty ? '含样例题包' : '题包待生产管线补齐',
                   ),
-                  onTap: () {
-                    final String epId =
-                        '${OralCoreSeries.kSeriesId}-${l.page.toString().padLeft(2, '0')}';
-                    context.push(
-                      '/episodes/${Uri.encodeComponent(epId)}?autoplay=0',
-                    );
-                  },
+                  onTap: !_catalogReady
+                      ? null
+                      : () {
+                          final String epId =
+                              '${OralCoreSeries.kSeriesId}-${l.page.toString().padLeft(2, '0')}';
+                          context.push(
+                            '/episodes/${Uri.encodeComponent(epId)}'
+                            '?autoplay=1',
+                          );
+                        },
                 ),
               ),
               if (series.lessons.length > 20)
