@@ -19,13 +19,13 @@ const MethodChannel _audioToolsChannel = MethodChannel(
 /// Null when ASR (+ optional bilingual translation) settings are ready.
 String? describeAsrConfigurationError(LearningSettingsState settings) {
   if (settings.asrProvider == '本地 Whisper') {
-    return LocalWhisperAsr.removedMessage;
+    return '本地识别暂不可用，请改用云端识别或等待云端字幕。';
   }
   if (settings.resolvedAsrApiKey.isEmpty) {
     final String field = settings.asrProvider == '腾讯云'
         ? '腾讯云 SecretId / SecretKey'
-        : '阿里云百炼 API Key（设置页或 apps/mobile/.env 的 BAILIAN_ASR_API_KEY）';
-    return '未配置 ASR 密钥。请填写 $field。导入缺字幕时优先走云端共享包 / GPU 队列。';
+        : '阿里云百炼 API Key';
+    return '未配置语音识别密钥，请填写 $field。导入缺字幕时会优先匹配云端字幕。';
   }
   if (settings.asrProvider == '腾讯云') {
     final String trimmed = settings.resolvedAsrApiKey;
@@ -63,11 +63,12 @@ String humanizeAsrSubtitleError(Object error) {
       lower.contains('invalid api key') ||
       lower.contains('incorrect api key') ||
       (lower.contains('unauthorized') && lower.contains('key'))) {
-    return '未配置或无效的 API Key。请到「更多 → 设置 → AI生成字幕」填写百炼/腾讯云密钥。'
-        '导入缺字幕时也可等待云端共享包 / GPU 生成。开启双语时还需填写「翻译」API Key。';
+    return '字幕服务暂不可用，请稍后重试或检查网络。';
   }
-  if (text.contains('本机 Whisper') || lower.contains('whisper asr 已从')) {
-    return LocalWhisperAsr.removedMessage;
+  if (text.contains('本地识别暂不可用') ||
+      text.contains('本机 Whisper') ||
+      lower.contains('whisper asr')) {
+    return '字幕正在云端生成，请稍候后重试。';
   }
   if (lower.contains('already has an active transcription') ||
       lower.contains('reserved by an active transcription') ||
@@ -196,7 +197,7 @@ class AsrSubtitleProgress {
       case AsrSubtitlePhase.downloadingModel:
         return (preview != null && preview.isNotEmpty)
             ? preview
-            : '语音识别：正在准备 Whisper 模型…';
+            : '语音识别：正在准备识别引擎…';
       case AsrSubtitlePhase.repairing:
         return (preview != null && preview.isNotEmpty)
             ? preview

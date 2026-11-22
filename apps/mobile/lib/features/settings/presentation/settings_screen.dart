@@ -862,9 +862,8 @@ class SettingsScreen extends ConsumerWidget {
                       Padding(
                         padding: const EdgeInsets.fromLTRB(16, 4, 16, 12),
                         child: Text(
-                          '导入缺字幕时：先下云端共享中英包，未命中则推送 ECS GPU 生成。'
-                          '本机不再打包 Whisper 模型。下方百炼/腾讯云仅用于手工云端识别。'
-                          '有可靠官方英文字幕时优先用官方、跳过识别。',
+                          '导入视频缺字幕时，会自动匹配云端字幕包；未命中时由云端生成。'
+                          '有官方英文字幕时优先使用官方字幕。',
                           style: Theme.of(context).textTheme.bodySmall?.copyWith(
                             color: Theme.of(
                               context,
@@ -884,8 +883,8 @@ class SettingsScreen extends ConsumerWidget {
                         },
                       ),
                       _SelectRow(
-                        title: 'ASR 来源',
-                        description: '可选云端 ASR（手工重新识别）；导入补全走共享包 / GPU 队列。',
+                        title: '语音识别来源',
+                        description: '用于手工重新识别；导入补全默认走云端字幕。',
                         value: settings.asrProvider,
                         options: asrProviderOptions,
                         onChanged: (String? value) {

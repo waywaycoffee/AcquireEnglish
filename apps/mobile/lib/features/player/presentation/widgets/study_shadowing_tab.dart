@@ -1,12 +1,14 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
 import 'dart:math';
 import 'dart:typed_data';
 
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:path_provider/path_provider.dart';
 import 'package:hive_ce/hive.dart';
+import 'package:path_provider/path_provider.dart';
 
 import '../../../authentication/presentation/auth_session.dart';
 import '../../../community/data/community_models.dart';
@@ -185,7 +187,6 @@ class _StudyShadowingTabState extends ConsumerState<StudyShadowingTab> {
   bool _hideRevealThisRound = false;
   bool _dubTakeSaved = false;
   DateTime? _takeCreatedAt;
-  static const Duration _scoreTimeout = Duration(seconds: 8);
   static const String _micCoachPrefsKey = 'shadowing_mic_coach_v1';
   final GlobalKey _micCoachKey = GlobalKey(debugLabel: 'shadowing-mic');
   bool _micCoachVisible = false;
@@ -917,7 +918,7 @@ class _StudyShadowingTabState extends ConsumerState<StudyShadowingTab> {
         .replaceFirst(RegExp(r'^Exception:\s*'), '');
   }
 
-  /// Prefer Tencent assessment → Voice sidecar → duration heuristic.
+  /// Cloud SOE → optional device keys → Voice sidecar → duration heuristic.
   Future<void> _scoreAfterRecording({
     required String path,
     required Pcm16MonoAudio audio,
@@ -943,85 +944,102 @@ class _StudyShadowingTabState extends ConsumerState<StudyShadowingTab> {
     });
 
     VoiceShadowResult? result;
-    String? lastError;
 
     try {
-      PronunciationCredentials credentials = const PronunciationCredentials();
+      // 1) Commercial path: ECS /api/pronunciation/evaluate (server SOE keys).
       try {
-        credentials = await ref.read(pronunciationCredentialsProvider.future).timeout(const Duration(seconds: 5));
+        final Map<String, dynamic> cloud = await ref
+            .read(acquireApiClientProvider)
+            .evaluateRecording(reference, base64Encode(audio.bytes))
+            .timeout(const Duration(seconds: 45));
+        final PronunciationAssessmentResult? assessment =
+            PronunciationAssessmentResult.tryParse(cloud);
+        if (assessment != null) {
+          if (!mounted ||
+              _resourcesReleased ||
+              scoringKey != _boundTargetKey) {
+            return;
+          }
+          final int? score =
+              (assessment.suggestedScore ?? assessment.accuracy)?.round();
+          setState(() {
+            _assessment = assessment;
+            _message = score == null ? '发音评测完成' : '发音评分 $score 分';
+          });
+          if (score != null) {
+            widget.onScoreForReview?.call(score);
+          }
+          await _persistDubTake(path);
+          return;
+        }
       } catch (error) {
-        lastError = _prettyError(error);
+        debugPrint('Shadowing cloud score: ${_learnerFacingScoreError(error)}');
       }
 
+      // 2) Optional on-device Tencent keys (settings / env inject).
+      PronunciationCredentials credentials = const PronunciationCredentials();
+      try {
+        credentials = await ref
+            .read(pronunciationCredentialsProvider.future)
+            .timeout(const Duration(seconds: 5));
+      } catch (_) {}
       if (credentials.isComplete && target != null) {
         try {
           final PronunciationAssessmentResult assessment = await ref
               .read(tencentPronunciationServiceProvider)
-              .evaluate(credentials: credentials, target: target, audio: audio).timeout(const Duration(seconds: 20));
-          if (!mounted || _resourcesReleased || scoringKey != _boundTargetKey)
+              .evaluate(
+                credentials: credentials,
+                target: target,
+                audio: audio,
+              )
+              .timeout(const Duration(seconds: 20));
+          if (!mounted ||
+              _resourcesReleased ||
+              scoringKey != _boundTargetKey) {
             return;
-          setState(() {
-            _assessment = assessment;
-            _message = '发音评测完成';
-          });
+          }
           final int? score =
               (assessment.suggestedScore ?? assessment.accuracy)?.round();
+          setState(() {
+            _assessment = assessment;
+            _message = score == null ? '发音评测完成' : '发音评分 $score 分';
+          });
           if (score != null) {
             widget.onScoreForReview?.call(score);
           }
           await _persistDubTake(path);
           return;
         } catch (error) {
-          lastError = _prettyError(error);
+          debugPrint(
+            'Shadowing device SOE score: ${_learnerFacingScoreError(error)}',
+          );
         }
       }
-      try {
-        result = await _localScorer
-            .score(
-              settings: settings,
-              referenceText: reference,
-              audioPath: path,
-              onProgress: (double? _, String message) {
-                if (mounted &&
-                    !_resourcesReleased &&
-                    scoringKey == _boundTargetKey) {
-                  setState(() => _message = message);
-                }
-              },
-            )
-            .timeout(_scoreTimeout);
-      } catch (error) {
-        lastError = error is TimeoutException ? '本地评分超时' : _prettyError(error);
-      }
 
-      if (result == null && settings.usesVoicePractice) {
+      // 3) Optional LAN Voice sidecar (dev / advanced). Skip removed on-device Whisper.
+      if (settings.usesVoicePractice) {
         try {
-          if (mounted) {
-            setState(() => _message = '本地识别不可用，改用 Voice 服务…');
-          }
           result = await _voiceClient
               .shadowSentence(
                 rawBaseUrl: settings.voicePracticeServerUrl,
                 referenceText: reference,
                 audioPath: path,
               )
-              .timeout(_scoreTimeout);
-          lastError = null;
+              .timeout(const Duration(seconds: 20));
         } catch (error) {
-          lastError = error is TimeoutException
-              ? 'Voice 评分超时'
-              : _prettyError(error);
+          debugPrint(
+            'Shadowing voice score: ${_learnerFacingScoreError(error)}',
+          );
         }
       }
 
-      if (result == null) {
-        if (mounted && !_resourcesReleased) {
-          setState(
-            () => _message = '录音已保存 · 暂未评分（${lastError ?? "识别不可用"}），可重试',
-          );
-        }
-        return;
-      }
+      // 4) Always surface a score so 跟读 never ends blank.
+      result ??= _localScorer.durationHeuristic(
+        referenceText: reference,
+        referenceMs: _reference?.audio.durationMs ??
+            (widget.line.endMs - widget.line.startMs).clamp(500, 60000),
+        recordingMs: audio.durationMs,
+      );
 
       if (!mounted || _resourcesReleased) {
         return;
@@ -1029,20 +1047,14 @@ class _StudyShadowingTabState extends ConsumerState<StudyShadowingTab> {
       if (scoringKey != _boundTargetKey) return;
       setState(() {
         _voiceResult = result;
-        if (result!.mock && result.transcript.isEmpty) {
-          _message = lastError == null
-              ? '已录音 · ${result.label} · ${result.scorePercentLabel}'
-              : '已录音 · 评分受限（$lastError）· ${result.scorePercentLabel}';
+        final String scoreLabel = result!.scorePercentLabel;
+        if (result.mock) {
+          _message = '跟读完成 · 参考分 $scoreLabel';
         } else {
-          _message = result.mock
-              ? 'MOCK 反馈 · 重叠 ${result.scorePercentLabel}'
-              : '跟读反馈 · 重叠 ${result.scorePercentLabel} · 可点「配音回放」';
+          _message = '跟读反馈 · $scoreLabel';
         }
       });
-      if (!result.mock) {
-        widget.onScoreForReview
-            ?.call((result.overlap.score * 100).round());
-      }
+      widget.onScoreForReview?.call((result.overlap.score * 100).round());
       unawaited(_persistDubTake(path));
     } finally {
       if (mounted && !_resourcesReleased) {
@@ -1051,6 +1063,33 @@ class _StudyShadowingTabState extends ConsumerState<StudyShadowingTab> {
         _voiceBusy = false;
       }
     }
+  }
+
+  String _learnerFacingScoreError(Object error) {
+    if (error is DioException) {
+      final Object? detail = error.response?.data is Map
+          ? (error.response!.data as Map)['detail']
+          : null;
+      final String raw = '$detail'.trim();
+      if (raw.contains('尚未配置') || error.response?.statusCode == 503) {
+        return '评测服务暂未开通';
+      }
+      if (error.response?.statusCode == 401) {
+        return '请先登录后再评分';
+      }
+      if (error.response?.statusCode == 429) {
+        return '评分太频繁，请稍后再试';
+      }
+      if (raw.isNotEmpty && !raw.contains('腾讯云') && !raw.contains('SOE')) {
+        return raw;
+      }
+      return '评测暂时不可用';
+    }
+    final String text = _prettyError(error);
+    if (text.contains('本地识别') || text.contains('Whisper')) {
+      return '评测暂时不可用';
+    }
+    return text;
   }
 
   Future<void> _persistDubTake(String wavPath) async {
@@ -1168,8 +1207,6 @@ class _StudyShadowingTabState extends ConsumerState<StudyShadowingTab> {
 
     final bool canRecord = _hasEnglishLine;
     final bool hasReferenceTrack = widget.assessmentTarget != null;
-    final LearningSettingsState settings = ref.watch(learningSettingsProvider);
-    final bool voiceConfigured = settings.usesVoicePractice;
     final Pcm16MonoAudio? own = _recordingActive ? _liveRecording : _recording;
     final int referenceMs = _reference?.audio.durationMs ?? 0;
     final int ownMs = own?.durationMs ?? 0;
@@ -1522,7 +1559,7 @@ class _StudyShadowingTabState extends ConsumerState<StudyShadowingTab> {
                     if (widget.onOpenFullDialog != null)
                       TextButton(
                         onPressed: widget.onOpenFullDialog,
-                        child: const Text('腾讯云精评'),
+                        child: const Text('详细评测'),
                       ),
                     OutlinedButton.icon(
                       onPressed: _recordingPath == null ||
@@ -1545,7 +1582,7 @@ class _StudyShadowingTabState extends ConsumerState<StudyShadowingTab> {
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  '配音回放会压低对白窗原声并叠你的录音；伴奏轨可用时尽量保留背景声。跟读可上传 ECS 并自动转写。',
+                  '配音回放会压低原声并叠你的录音；可分享到社区练习流。',
                   textAlign: TextAlign.center,
                   style: TextStyle(fontSize: 11, color: shell.textMuted),
                 ),
@@ -1586,8 +1623,7 @@ class _StudyShadowingTabState extends ConsumerState<StudyShadowingTab> {
               ],
               const SizedBox(height: 4),
               Text(
-                '停录后自动评分'
-                '${voiceConfigured ? ' · Voice 可用' : ''}',
+                '停录后自动评分',
                 textAlign: TextAlign.center,
                 style: TextStyle(color: shell.textMuted, fontSize: 11),
               ),

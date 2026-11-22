@@ -109,7 +109,7 @@ class SubtitleCompletionWorker {
       onProgress?.call(job.episodeId, kSubtitleCloudGenerationQueuedLabel);
       await queue.markDeferred(
         job.episodeId,
-        '等待云端字幕生成（本机 ASR 已移除）',
+        '正在等待云端生成字幕',
       );
       return true;
     }
@@ -691,7 +691,7 @@ class SubtitleCompletionWorker {
     }
     if (LocalWhisperAsr.isLocalProvider(settings) &&
         !settings.enableChineseSpeechAsr) {
-      throw StateError('未开启中文语音识别。请到「设置 → AI生成字幕」开启，并下载多语言 Whisper 模型。');
+      throw StateError('中文语音识别未开启，请到设置中开启后重试。');
     }
 
     onProgress?.call(job.episodeId, '正在用语音生成中文字幕…');
@@ -799,7 +799,7 @@ class SubtitleCompletionWorker {
     }
     if (LocalWhisperAsr.isLocalProvider(settings) &&
         !settings.enableChineseSpeechAsr) {
-      throw StateError('未开启中文语音识别。请到「设置 → AI生成字幕」开启，并下载多语言 Whisper 模型。');
+      throw StateError('中文语音识别未开启，请到设置中开启后重试。');
     }
 
     onProgress?.call(job.episodeId, '正在识别中英混合口播…');

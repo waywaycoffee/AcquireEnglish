@@ -50,11 +50,11 @@ class LocalShadowScorer {
         referenceWords: overlap.referenceWords,
         hypothesisWords: overlap.hypothesisWords,
       ),
-      label: '本地 Whisper · 词重叠反馈（非官方发音分）',
+      label: '词重叠反馈',
     );
   }
 
-  /// Soft fallback when ASR / cloud scoring is unavailable.
+  /// Soft fallback when cloud scoring is unavailable.
   VoiceShadowResult durationHeuristic({
     required String referenceText,
     required int referenceMs,
@@ -90,7 +90,7 @@ class LocalShadowScorer {
         referenceWords: refWords.length,
         hypothesisWords: 0,
       ),
-      label: '时长粗评（未识别内容）· 请配置 Voice 服务或腾讯云评测',
+      label: '参考分',
     );
   }
 

@@ -124,25 +124,45 @@ class PronunciationAssessmentResult {
       return parsed;
     }
 
-    final double? score = number(value['SuggestedScore'], max: 100);
-    final double? accuracy = number(value['PronAccuracy'], max: 100);
-    final double? fluency = number(value['PronFluency'], max: 1);
-    final double? completion = number(value['PronCompletion'], max: 1);
+    // Client SOE payload uses SuggestedScore; ECS /api/pronunciation/evaluate
+    // returns lowercase score / accuracy / fluency / completion.
+    final double? score = number(
+      value['SuggestedScore'] ?? value['score'],
+      max: 100,
+    );
+    final double? accuracy = number(
+      value['PronAccuracy'] ?? value['accuracy'],
+      max: 100,
+    );
+    final double? fluency = number(
+      value['PronFluency'] ?? value['fluency'],
+      max: 1,
+    );
+    final double? completion = number(
+      value['PronCompletion'] ?? value['completion'],
+      max: 1,
+    );
     final List<PronunciationWordResult> words = <PronunciationWordResult>[];
-    final Object? rawWords = value['Words'];
+    final Object? rawWords = value['Words'] ?? value['words'];
     if (rawWords is List) {
       for (final Object? item in rawWords) {
         if (item is! Map) continue;
-        final Object? rawTag = item['MatchTag'];
+        final Object? rawTag = item['MatchTag'] ?? item['match_tag'];
         final int tag = rawTag is num ? rawTag.toInt() : -1;
-        final Object? rawWord = item['Word'];
-        final Object? rawReference = item['ReferenceWord'];
+        final Object? rawWord = item['Word'] ?? item['word'];
+        final Object? rawReference =
+            item['ReferenceWord'] ?? item['reference_word'] ?? rawWord;
         words.add(
           PronunciationWordResult(
-            word: rawWord is String ? rawWord : '',
-            referenceWord: rawReference is String ? rawReference : '',
+            word: rawWord is String ? rawWord : '$rawWord'.trim(),
+            referenceWord: rawReference is String
+                ? rawReference
+                : '$rawReference'.trim(),
             matchTag: tag,
-            accuracy: number(item['PronAccuracy'], max: 100),
+            accuracy: number(
+              item['PronAccuracy'] ?? item['accuracy'],
+              max: 100,
+            ),
           ),
         );
       }

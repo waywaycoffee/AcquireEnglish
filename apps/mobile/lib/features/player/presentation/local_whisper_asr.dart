@@ -25,8 +25,8 @@ class LocalWhisperAsr {
   static const String defaultModel = 'base.en';
   static const String defaultMultilingualModel = 'base';
 
-  static const String removedMessage =
-      '本机 Whisper ASR 已从 App 移除。字幕请使用云端共享包或推送 ECS GPU 生成。';
+  /// Internal failure for residual call sites — never show this as product copy.
+  static const String removedMessage = '本地识别暂不可用';
 
   static bool isLocalProvider(LearningSettingsState settings) {
     return settings.asrProvider == providerName;
