@@ -16,6 +16,8 @@ import '../membership/domain/module_access.dart';
 import '../onboarding/presentation/onboarding_provider.dart';
 import '../settings/presentation/settings_provider.dart';
 import '../phrases/presentation/phrase_book_provider.dart';
+import '../reading/data/reading_tts.dart';
+import '../shared/data/word_pronunciation_service.dart';
 import '../shared/presentation/pad/app_design_tokens.dart';
 
 part 'module_curriculum.dart';
@@ -177,29 +179,78 @@ class _ModuleScreenState extends ConsumerState<ModuleScreen>
   final scroll = ScrollController();
   double speed = 0.75;
   Player? streamed;
-  Future<void> remoteSpeech(String text) async {
-    final generation = sequence;
-    final url = await OralCoachPipelineClient().synthesizeSpeech(
-      rawBaseUrl: ref.read(learningSettingsProvider).oralCoachPipelineUrl,
-      text: text,
-      digitalHumanId: 'mia',
-      ttsVoice: widget.kind == 'ipa' || widget.kind == 'phonics'
-          ? 'en-GB-SoniaNeural'
-          : null,
-    );
-    if (!mounted || generation != sequence) return;
-    if (url == null) throw StateError('语音暂不可用');
-    final player = Player();
+
+  Future<void> _playRemoteUrl(String url, int generation) async {
+    final Player player = Player();
     streamed = player;
     try {
-      final done = player.stream.completed.firstWhere((v) => v);
-      await player.open(Media(url));
-      await player.setRate(speed / .75);
+      final Future<bool> done = player.stream.completed.firstWhere((bool v) => v);
+      await player.open(Media(url), play: true);
+      // speed slider is 0.3–1.0 with 0.75 as “normal” CosyVoice pacing.
+      final double rate = (speed / 0.75).clamp(0.5, 1.6);
+      if ((rate - 1.0).abs() > 0.02) {
+        await player.setRate(rate);
+      }
+      if (!mounted || generation != sequence) return;
       await done.timeout(const Duration(seconds: 60));
     } finally {
       if (identical(streamed, player)) streamed = null;
       await player.dispose();
     }
+  }
+
+  /// Demo audio: ECS Aliyun CosyVoice first (durable `/media/reading/tts`),
+  /// then oral-coach pipeline, then on-device TTS. Coach cache URLs often 404.
+  Future<void> remoteSpeech(String text) async {
+    final int generation = sequence;
+    final String spoken = text.trim();
+    if (spoken.isEmpty) return;
+
+    Object? lastError;
+
+    try {
+      final String voice = loadReadingTtsGender().aliyunVoiceId;
+      final String url = await ref
+          .read(acquireApiClientProvider)
+          .readingSpeech(spoken, voice);
+      if (!mounted || generation != sequence) return;
+      await _playRemoteUrl(url, generation);
+      return;
+    } catch (e) {
+      lastError = e;
+    }
+
+    try {
+      final String? url = await OralCoachPipelineClient().synthesizeSpeech(
+        rawBaseUrl: ref.read(learningSettingsProvider).oralCoachPipelineUrl,
+        text: spoken,
+        digitalHumanId: 'mia',
+        ttsVoice: widget.kind == 'ipa' || widget.kind == 'phonics'
+            ? 'en-GB-SoniaNeural'
+            : null,
+      );
+      if (!mounted || generation != sequence) return;
+      if (url != null && url.isNotEmpty) {
+        // Probe would still 404 for some cache keys — play then fall through.
+        await _playRemoteUrl(url, generation);
+        return;
+      }
+    } catch (e) {
+      lastError = e;
+    }
+
+    if (!mounted || generation != sequence) return;
+    try {
+      await ref.read(wordPronunciationServiceProvider).speak(
+            spoken,
+            rate: speed.clamp(0.5, 1.0),
+            allowSynthesisFallback: true,
+          );
+      return;
+    } catch (e) {
+      lastError = e;
+    }
+    throw StateError('语音暂不可用: $lastError');
   }
 
   List<ModuleLesson> get lessons => moduleLessons[widget.kind] ?? const [];
@@ -358,6 +409,7 @@ class _ModuleScreenState extends ConsumerState<ModuleScreen>
     sequence++;
     sleep?.cancel();
     unawaited(streamed?.stop());
+    unawaited(ref.read(wordPronunciationServiceProvider).stop());
     if (mounted) setState(() => playing = false);
   }
 
@@ -371,6 +423,7 @@ class _ModuleScreenState extends ConsumerState<ModuleScreen>
     sequence++;
     sleep?.cancel();
     unawaited(streamed?.stop());
+    // Avoid ref.read in dispose — Riverpod forbids it after unmount.
     expression.dispose();
     scroll.dispose();
     WidgetsBinding.instance.removeObserver(this);
@@ -956,7 +1009,7 @@ class _ModuleScreenState extends ConsumerState<ModuleScreen>
           ],
           const SizedBox(height: 8),
           Text(
-            '示范语音由服务器合成并在线播放。',
+            '示范语音优先用服务器阿里云配音；不可用时再用本机朗读。',
             style: theme.textTheme.bodySmall?.copyWith(
               color: AppDesignTokens.textSecondary,
             ),
