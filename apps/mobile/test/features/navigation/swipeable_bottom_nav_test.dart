@@ -14,7 +14,6 @@ void main() {
         '学习',
         '视频',
         '阅读',
-        '单词',
         '口语',
         '社区',
         '对战',
@@ -27,7 +26,7 @@ void main() {
       AppNavDestination.moreMenuDestinations.map(
         (AppNavDestination d) => d.label,
       ),
-      containsAll(<String>['成长', '怎么学', '设置']),
+      containsAll(<String>['复习', '成长', '怎么学', '设置']),
     );
   });
 
@@ -53,10 +52,10 @@ void main() {
     expect(find.text('学习'), findsOneWidget);
     expect(find.text('视频'), findsOneWidget);
     expect(find.text('阅读'), findsOneWidget);
-    expect(find.text('单词'), findsOneWidget);
     expect(find.text('口语'), findsOneWidget);
+    expect(find.text('社区'), findsOneWidget);
     // Off-screen items still exist in the scrollable list.
-    expect(find.text('社区', skipOffstage: false), findsOneWidget);
+    expect(find.text('单词'), findsNothing);
     expect(find.text('对战', skipOffstage: false), findsOneWidget);
     expect(find.text('备考', skipOffstage: false), findsOneWidget);
     expect(find.text('词书', skipOffstage: false), findsOneWidget);

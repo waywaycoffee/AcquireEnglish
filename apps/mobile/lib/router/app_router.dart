@@ -39,7 +39,6 @@ import '../features/reading/presentation/reading_catalog_screen.dart';
 import '../features/reading/presentation/reading_hub_screen.dart';
 import '../features/reading/presentation/reading_library_provider.dart';
 import '../features/reading/presentation/reading_reader_screen.dart';
-import '../features/review_hub/presentation/review_hub_screen.dart';
 import '../features/settings/presentation/settings_screen.dart';
 import '../features/learning/presentation/learning_review_screen.dart';
 import '../features/words/presentation/sm2_daily_session_screen.dart';
@@ -298,7 +297,9 @@ GoRouter goRouter(Ref ref) => GoRouter(
     GoRoute(
       path: SGRoute.home.route,
       builder: (BuildContext context, GoRouterState state) =>
-          const LearningHomeScreen(),
+          LearningHomeScreen(
+            focusVocab: state.uri.queryParameters['focus'] == 'vocab',
+          ),
     ).fade(),
     GoRoute(
       path: SGRoute.library.route,
@@ -331,9 +332,9 @@ GoRouter goRouter(Ref ref) => GoRouter(
     GoRoute(
       path: SGRoute.review.route,
       name: SGRoute.review.name,
-      builder: (BuildContext context, GoRouterState state) =>
-          const ReviewHubScreen(),
-    ).fade(),
+      redirect: (BuildContext context, GoRouterState state) =>
+          '${SGRoute.home.route}?focus=vocab',
+    ),
     GoRoute(
       path: SGRoute.vocabularyPlacement.route,
       builder: (BuildContext context, GoRouterState state) =>

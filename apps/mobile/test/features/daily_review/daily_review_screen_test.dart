@@ -362,13 +362,17 @@ void main() {
     await tester.pumpWidget(const SizedBox.shrink());
   });
 
-  test('navigation keeps review after discovery in primary IA', () {
-    const List<AppNavDestination> nav = AppNavDestination.values;
+  test('vocab review hub is folded into home bottom IA', () {
     expect(
-      nav.indexOf(AppNavDestination.review),
-      greaterThan(nav.indexOf(AppNavDestination.discover)),
+      AppNavDestination.bottomBarDestinations,
+      isNot(contains(AppNavDestination.review)),
     );
+    expect(AppNavDestination.review.showInBottomNav, isFalse);
     expect(AppNavDestination.phrases.showInBottomNav, isFalse);
+    expect(
+      AppNavDestination.moreMenuDestinations,
+      contains(AppNavDestination.review),
+    );
   });
 
   for (final Size size in <Size>[const Size(390, 844), const Size(1366, 900)]) {

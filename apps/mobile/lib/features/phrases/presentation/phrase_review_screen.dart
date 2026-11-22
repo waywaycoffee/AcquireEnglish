@@ -17,7 +17,7 @@ class PhraseReviewScreen extends StatelessWidget {
       context.go('${SGRoute.reviewSession.route}?kind=phrase');
     });
     return PadScaffold(
-      currentDestination: AppNavDestination.review,
+      currentDestination: AppNavDestination.home,
       showContinueLearning: false,
       topBar: const PadTopBar(
         title: '短语复习',

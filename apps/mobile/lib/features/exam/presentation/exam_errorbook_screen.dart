@@ -33,7 +33,7 @@ class ExamErrorBookScreen extends ConsumerWidget {
         title: const Text('错题本'),
         actions: <Widget>[
           TextButton(
-            onPressed: () => context.push('/review'),
+            onPressed: () => context.go('/home?focus=vocab'),
             child: const Text('去复习'),
           ),
         ],

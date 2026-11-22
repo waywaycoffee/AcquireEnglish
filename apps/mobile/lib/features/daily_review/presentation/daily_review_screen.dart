@@ -308,7 +308,7 @@ class _DailyReviewScreenState extends ConsumerState<DailyReviewScreen>
     final ReviewPlan plan = state.plan(sources, now);
     final bool recallChrome = widget.session;
     return PadScaffold(
-      currentDestination: AppNavDestination.review,
+      currentDestination: AppNavDestination.home,
       showContinueLearning: false,
       showNavigation: !widget.session,
       backgroundColor: recallChrome ? ReviewRecallTheme.bg : null,
@@ -497,7 +497,7 @@ class _DailyReviewScreenState extends ConsumerState<DailyReviewScreen>
     if (context.canPop()) {
       context.pop();
     } else {
-      context.go(SGRoute.review.route);
+      context.go('${SGRoute.home.route}?focus=vocab');
     }
   }
 

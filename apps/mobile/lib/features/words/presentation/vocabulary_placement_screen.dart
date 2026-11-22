@@ -130,7 +130,9 @@ class _VocabularyPlacementScreenState
                           onPressed: _saving
                               ? null
                               : _estimate != null
-                              ? () => context.go(SGRoute.review.route)
+                              ? () => context.go(
+                                  '${SGRoute.home.route}?focus=vocab',
+                                )
                               : () => _save(estimate),
                           child: Text(
                             _saving

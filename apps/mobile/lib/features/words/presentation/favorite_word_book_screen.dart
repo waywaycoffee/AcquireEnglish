@@ -64,7 +64,7 @@ class _FavoriteWordBookScreenState
       dark: Theme.of(context).brightness == Brightness.dark,
     );
     return PadScaffold(
-      currentDestination: AppNavDestination.review,
+      currentDestination: AppNavDestination.home,
       topBar: PadTopBar(
         title: '收藏词本',
         description: '原样保留收藏的生词 · 共 ${allSaved.length} 词',
