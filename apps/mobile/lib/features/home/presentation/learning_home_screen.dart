@@ -142,10 +142,10 @@ class _LearningHomeScreenState extends ConsumerState<LearningHomeScreen> {
           ('应用语块', '整句学，直接用', Icons.chat_bubble_outline, '/learn/chunks'),
           ('场景对话', '在情境里开口', Icons.forum_outlined, '/learn/dialogue'),
           (
-            '真人口语',
-            '匹配对练 · AI改写',
-            Icons.record_voice_over_outlined,
-            '/peer-oral',
+            '核心口语9000句',
+            '151 情景课 · 跟读练习',
+            Icons.school_outlined,
+            '/courses/oral-core-9000',
           ),
         ];
 
@@ -572,19 +572,23 @@ class _LearningHomeScreenState extends ConsumerState<LearningHomeScreen> {
                     ),
                     const SizedBox(height: 14),
                     InkWell(
-                      onTap: () => context.push('/courses/oral-core-9000'),
+                      onTap: () => context.push('/peer-oral'),
                       child: section(
                         Row(
                           children: <Widget>[
-                            Icon(Icons.school_outlined, size: 28, color: accent),
+                            Icon(
+                              Icons.record_voice_over_outlined,
+                              size: 28,
+                              color: accent,
+                            ),
                             const SizedBox(width: 14),
                             Expanded(
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: <Widget>[
-                                  text('核心口语9000句', 16, bold: true),
+                                  text('真人口语', 16, bold: true),
                                   text(
-                                    '151 情景课 · 跟读 · 练习 · AI 讨论',
+                                    '匹配对练 · AI改写',
                                     11,
                                     color: muted,
                                   ),
