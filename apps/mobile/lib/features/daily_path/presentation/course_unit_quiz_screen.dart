@@ -7,13 +7,21 @@ class CourseUnitQuizScreen extends StatefulWidget {
     super.key,
     required this.topic,
     required this.quiz,
+    this.sentences = const <String>[],
   });
 
   final String topic;
   final List<CourseQuizItem> quiz;
+  final List<String> sentences;
 
   @override
   State<CourseUnitQuizScreen> createState() => _CourseUnitQuizScreenState();
+}
+
+class CourseQuizResult {
+  const CourseQuizResult(this.correct, this.total);
+  final int correct;
+  final int total;
 }
 
 class _CourseUnitQuizScreenState extends State<CourseUnitQuizScreen> {
@@ -46,7 +54,10 @@ class _CourseUnitQuizScreenState extends State<CourseUnitQuizScreen> {
               ),
               const SizedBox(height: 16),
               FilledButton(
-                onPressed: () => Navigator.pop(context, true),
+                onPressed: () => Navigator.pop(
+                  context,
+                  CourseQuizResult(_correct, widget.quiz.length),
+                ),
                 child: const Text('返回本课'),
               ),
             ],
@@ -57,9 +68,7 @@ class _CourseUnitQuizScreenState extends State<CourseUnitQuizScreen> {
 
     final CourseQuizItem item = widget.quiz[_index];
     return Scaffold(
-      appBar: AppBar(
-        title: Text('练习 ${_index + 1}/${widget.quiz.length}'),
-      ),
+      appBar: AppBar(title: Text('练习 ${_index + 1}/${widget.quiz.length}')),
       body: ListView(
         padding: const EdgeInsets.all(20),
         children: <Widget>[
@@ -81,12 +90,18 @@ class _CourseUnitQuizScreenState extends State<CourseUnitQuizScreen> {
               color: tileColor,
               child: ListTile(
                 title: Text(item.options[i]),
-                onTap: _revealed
-                    ? null
-                    : () => setState(() => _selected = i),
+                onTap: _revealed ? null : () => setState(() => _selected = i),
               ),
             );
           }),
+          if (_revealed && item.explanation != null) ...<Widget>[
+            const SizedBox(height: 12),
+            Text(item.explanation!),
+            if (item.evidenceSentenceIndex != null &&
+                item.evidenceSentenceIndex! >= 0 &&
+                item.evidenceSentenceIndex! < widget.sentences.length)
+              Text('原文：${widget.sentences[item.evidenceSentenceIndex!]}'),
+          ],
           const SizedBox(height: 20),
           if (!_revealed)
             FilledButton(
@@ -113,9 +128,7 @@ class _CourseUnitQuizScreenState extends State<CourseUnitQuizScreen> {
                   _revealed = false;
                 });
               },
-              child: Text(
-                _index + 1 >= widget.quiz.length ? '查看结果' : '下一题',
-              ),
+              child: Text(_index + 1 >= widget.quiz.length ? '查看结果' : '下一题'),
             ),
         ],
       ),

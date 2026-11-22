@@ -578,6 +578,10 @@ GoRouter goRouter(Ref ref) {
         return PlayerScreen(
           episodeId: state.pathParameters['episodeId']!,
           initialStartTime: state.uri.queryParameters['startTime'],
+          courseId: state.uri.queryParameters['courseId'],
+          unitId: state.uri.queryParameters['unitId'],
+          courseStartMs: int.tryParse(state.uri.queryParameters['courseStartMs'] ?? ''),
+          courseEndMs: int.tryParse(state.uri.queryParameters['courseEndMs'] ?? ''),
           autoPlay: autoplayParam != '0',
           autoOpenFullscreen: state.uri.queryParameters['fullscreen'] == '1',
           initialLoopSentence: state.uri.queryParameters['loop'] == 'sentence',

@@ -100,6 +100,8 @@ class CourseQuizItem {
     required this.stem,
     required this.options,
     required this.answer,
+    this.explanation,
+    this.evidenceSentenceIndex,
   });
 
   factory CourseQuizItem.fromJson(Map<String, dynamic> json) => CourseQuizItem(
@@ -109,18 +111,25 @@ class CourseQuizItem {
             .map((dynamic e) => '$e')
             .toList(growable: false),
         answer: (json['answer'] as num?)?.toInt() ?? 0,
+        explanation: json['explanation'] as String?,
+        evidenceSentenceIndex: (json['evidence_sentence_index'] as num?)?.toInt(),
       );
 
   final String type;
   final String stem;
   final List<String> options;
   final int answer;
+  final String? explanation;
+  final int? evidenceSentenceIndex;
 
   Map<String, dynamic> toJson() => <String, dynamic>{
         'type': type,
         'stem': stem,
         'options': options,
         'answer': answer,
+        if (explanation != null) 'explanation': explanation,
+        if (evidenceSentenceIndex != null)
+          'evidence_sentence_index': evidenceSentenceIndex,
       };
 }
 

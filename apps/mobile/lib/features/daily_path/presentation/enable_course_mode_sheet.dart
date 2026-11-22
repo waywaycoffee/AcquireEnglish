@@ -177,6 +177,12 @@ class _EnableCourseModeSheetState extends State<_EnableCourseModeSheet> {
   bool _oral = false;
 
   @override
+  void initState() {
+    super.initState();
+    _quiz = widget.type == CoursePlanType.reading;
+  }
+
+  @override
   Widget build(BuildContext context) {
     final bool isVideo = widget.type == CoursePlanType.video;
     return Padding(

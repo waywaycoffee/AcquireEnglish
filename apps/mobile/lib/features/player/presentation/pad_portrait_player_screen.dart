@@ -14,6 +14,7 @@ import 'package:media_kit_video/media_kit_video.dart';
 import '../../../config/theme/theme_logic.dart';
 import '../../../router/app_router.dart';
 import '../../daily_path/domain/course_plan.dart';
+import '../../daily_path/data/course_unit_progress.dart';
 import '../../daily_path/presentation/enable_course_mode_sheet.dart';
 import '../../daily_review/presentation/daily_review_provider.dart';
 import '../../home/presentation/learning_dashboard_provider.dart';
@@ -169,6 +170,10 @@ class PadPortraitPlayerScreen extends ConsumerStatefulWidget {
   const PadPortraitPlayerScreen({
     required this.episodeId,
     this.initialStartTime,
+    this.courseId,
+    this.unitId,
+    this.courseStartMs,
+    this.courseEndMs,
     this.autoPlay = true,
     this.autoOpenFullscreen = false,
     this.initialLoopSentence = false,
@@ -177,6 +182,10 @@ class PadPortraitPlayerScreen extends ConsumerStatefulWidget {
 
   final String episodeId;
   final String? initialStartTime;
+  final String? courseId;
+  final String? unitId;
+  final int? courseStartMs;
+  final int? courseEndMs;
   final bool autoPlay;
   final bool autoOpenFullscreen;
 
@@ -228,6 +237,9 @@ class PadPortraitPlayerScreenState
   String? _videoAsset;
   double _videoAspectRatio = 16 / 9;
   Duration _lastTrackedVideoPosition = Duration.zero;
+  int _courseWatchedMs = 0;
+  int? _courseLastPositionMs;
+  int _courseLastSavedMs = 0;
   bool _didAutoOpenFullscreen = false;
   bool _isFullscreenOpen = false;
   bool _pronunciationDialogActive = false;
@@ -589,8 +601,18 @@ class PadPortraitPlayerScreenState
     }
 
     // Open the decoder while subtitle files load — less blank wait before play.
-    final int resumeMs =
+    int resumeMs =
         PlayerMockState.parseTimestampToMsPublic(initialStartTime) ?? 0;
+    if (widget.courseId != null && widget.unitId != null) {
+      final CourseUnitProgress progress = await CourseUnitProgress.load(
+        widget.courseId!, widget.unitId!);
+      _courseWatchedMs = progress.watchedMs;
+      final int start = widget.courseStartMs ?? 0;
+      final int end = widget.courseEndMs ?? 0;
+      if (progress.positionMs >= start && progress.positionMs < end) {
+        resumeMs = progress.positionMs;
+      }
+    }
     if (resumeMs > 0) {
       state.positionMs = resumeMs;
     }
@@ -2430,10 +2452,53 @@ Future<void> _settleChineseFillIfAlreadyPresent() async {
     return false;
   }
 
+  void _saveCoursePosition(int positionMs, {bool force = false}) {
+    final String? courseId = widget.courseId;
+    final String? unitId = widget.unitId;
+    if (courseId == null || unitId == null) return;
+    final int start = widget.courseStartMs ?? 0;
+    final int end = widget.courseEndMs ?? 0;
+    if (end <= start || positionMs < start || positionMs > end) return;
+    final int? last = _courseLastPositionMs;
+    if (_videoIsPlaying && last != null) {
+      final int delta = positionMs - last;
+      if (delta > 0 && delta <= 1500) _courseWatchedMs += delta;
+    }
+    _courseLastPositionMs = positionMs;
+    if (force || (positionMs - _courseLastSavedMs).abs() >= 2000) {
+      _courseLastSavedMs = positionMs;
+      unawaited(CourseUnitProgress.save(courseId, unitId,
+          CourseUnitProgress(positionMs: positionMs, watchedMs: _courseWatchedMs)));
+    }
+  }
+
   void _onVideoProgress(Duration position) {
     if (!mounted || _ignoreStaleScrubPosition(position)) {
       return;
     }
+
+    final int? courseEnd = widget.courseEndMs;
+    final int? courseStart = widget.courseStartMs;
+    if (courseEnd != null && courseStart != null &&
+        courseEnd > courseStart && position.inMilliseconds >= courseEnd) {
+      if (_videoIsPlaying) {
+        _saveCoursePosition(courseEnd, force: true);
+        unawaited(_videoPlayer?.pause());
+        unawaited(_videoPlayer?.seek(Duration(milliseconds: courseEnd)));
+        setState(() {
+          _videoPosition = Duration(milliseconds: courseEnd);
+          state.positionMs = courseEnd;
+          state.isPlaying = false;
+        });
+      }
+      return;
+    }
+    if (courseStart != null && position.inMilliseconds < courseStart - 400 &&
+        _videoReady) {
+      unawaited(_videoPlayer?.seek(Duration(milliseconds: courseStart)));
+      return;
+    }
+    _saveCoursePosition(position.inMilliseconds);
 
     final bool wasPlaying = _videoIsPlaying;
     bool lineChanged = false;
