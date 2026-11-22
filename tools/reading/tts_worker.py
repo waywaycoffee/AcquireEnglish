@@ -83,6 +83,8 @@ def synthesize_local(text: str, voice: str, out_path: Path) -> bool:
 def fill_job(job: dict) -> None:
     job_id = job["id"]
     lease = job.get("lease") or ""
+    # Voice id comes from the job (Aliyun CosyVoice). Book pregen queues
+    # longanfengyue (emotional female) + longze_v3.1 (emotional male).
     voice = job.get("voice") or "longanfengyue"
     payload = job.get("payload") or {}
     sentences = list(payload.get("sentences") or [])

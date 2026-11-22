@@ -1334,16 +1334,16 @@ class _ReadingReaderScreenState extends ConsumerState<ReadingReaderScreen> {
                 value: 'voice_female',
                 child: Text(
                   _ttsGender == ReadingTtsGender.female
-                      ? '女声 · 龙安风悦（当前）'
-                      : '女声 · 龙安风悦',
+                      ? '女声 · 龙安风悦有感情（当前）'
+                      : '女声 · 龙安风悦有感情',
                 ),
               ),
               PopupMenuItem<String>(
                 value: 'voice_male',
                 child: Text(
                   _ttsGender == ReadingTtsGender.male
-                      ? '男声 · 龙书（当前）'
-                      : '男声 · 龙书',
+                      ? '男声 · 龙泽有感情（当前）'
+                      : '男声 · 龙泽有感情',
                 ),
               ),
               const PopupMenuDivider(),

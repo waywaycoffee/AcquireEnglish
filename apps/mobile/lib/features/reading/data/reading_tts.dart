@@ -7,14 +7,19 @@ import '../../sync/data/acquire_api_client.dart';
 const String kReadingTtsGenderKey = 'reading_tts_gender_v1';
 
 /// Reading uses expressive Aliyun CosyVoice narrators via ECS `/api/reading/speech`.
+/// Long novels always pregen the [female]/[male] pair onto ECS.
 enum ReadingTtsGender { female, male, luna, nora, ivy, alexander, james, ryan }
+
+/// Canonical emotional pair saved per long novel on ECS.
+const String kReadingBookFemaleVoiceId = 'longanfengyue';
+const String kReadingBookMaleVoiceId = 'longze_v3.1';
 
 extension ReadingTtsGenderX on ReadingTtsGender {
   String get storageValue => name;
 
   String get labelCn => switch (this) {
-    ReadingTtsGender.female => '龙安风悦 · 温暖有感染力（推荐）',
-    ReadingTtsGender.male => '龙书 · 朗读书卷感',
+    ReadingTtsGender.female => '女声 · 龙安风悦（温暖有感情）',
+    ReadingTtsGender.male => '男声 · 龙泽（磁性有感情）',
     ReadingTtsGender.luna => '龙安小昕 · 亲切活泼',
     ReadingTtsGender.nora => '龙安灵希 · 甜美轻快',
     ReadingTtsGender.ivy => '龙安欢 · 元气感染力',
@@ -25,15 +30,18 @@ extension ReadingTtsGenderX on ReadingTtsGender {
 
   /// CosyVoice bilingual ids — richer prosody than flat English-native loong voices.
   String get aliyunVoiceId => switch (this) {
-    ReadingTtsGender.female => 'longanfengyue',
-    ReadingTtsGender.male => 'longshu_v3.1',
+    ReadingTtsGender.female => kReadingBookFemaleVoiceId,
+    ReadingTtsGender.male => kReadingBookMaleVoiceId,
     ReadingTtsGender.luna => 'longanxiaoxin',
     ReadingTtsGender.nora => 'longanlingxi',
     ReadingTtsGender.ivy => 'longanhuan_v3.6',
     ReadingTtsGender.alexander => 'longxiaocheng_v3.1',
     ReadingTtsGender.james => 'libai_v3.1',
-    ReadingTtsGender.ryan => 'longze_v3.1',
+    ReadingTtsGender.ryan => kReadingBookMaleVoiceId,
   };
+
+  bool get isBookPairVoice =>
+      this == ReadingTtsGender.female || this == ReadingTtsGender.male;
 
   static ReadingTtsGender fromStorage(String? raw) => ReadingTtsGender.values
       .firstWhere((v) => v.name == raw, orElse: () => ReadingTtsGender.female);

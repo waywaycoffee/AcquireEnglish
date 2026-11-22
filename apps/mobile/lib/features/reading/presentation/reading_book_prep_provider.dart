@@ -55,12 +55,12 @@ class ReadingBookPrepStatus {
   }
 
   String get progressLabel {
-    if (ready) return 'AI 已就绪';
-    if (state == 'missing') return '等待云端 AI 处理…';
+    if (ready) return '男女声 AI 朗读已就绪';
+    if (state == 'missing') return '等待云端 AI 处理男女声…';
     if (pagesTotal > 0) {
-      return 'AI $percent%（$pagesReady/$pagesTotal 节）';
+      return '男女声 AI $percent%（$pagesReady/$pagesTotal 节）';
     }
-    return 'AI $percent%';
+    return '男女声 AI $percent%';
   }
 }
 

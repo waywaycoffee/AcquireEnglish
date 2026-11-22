@@ -65,4 +65,6 @@ curl -X POST "$API/api/content/media/upload" \
 | `reading/packs/{doc}/{voice}/page-{n}.json` | 共享库：页→句→URL |
 | `reading/personal/{user_id}/packs/...` | 个人库：该用户已就绪页指针 |
 
+长篇小说 `book-pregen` **固定排队两套有感情音色**：女声 `longanfengyue`、男声 `longze_v3.1`，各自落到 `packs/{doc}/{voice}/`。`GET /api/reading/voices` 返回 `default_female` / `default_male` / `book_pair`。
+
 下次打开同一页可直接播缓存 URL，避免手机端整本切句 + 现合成导致闪退。

@@ -25,14 +25,14 @@ voices_router = APIRouter(prefix="/reading", tags=["reading-speech"])
 # Published voice catalog for settings + vocab pronunciation.
 # CosyVoice bilingual narrators first — richer prosody for reading aloud.
 VOICE_LABELS: dict[str, str] = {
-    "longanfengyue": "龙安风悦 · 温暖有感染力（推荐）",
-    "longshu_v3.1": "龙书 · 朗读书卷感",
+    "longanfengyue": "龙安风悦 · 温暖有感染力（推荐女声）",
+    "longanhuan_v3.6": "龙安欢 · 元气感染力",
     "longanxiaoxin": "龙安小昕 · 亲切活泼",
     "longanlingxi": "龙安灵希 · 甜美轻快",
-    "longanhuan_v3.6": "龙安欢 · 元气感染力",
+    "longze_v3.1": "龙泽 · 磁性有感情（推荐男声）",
     "longxiaocheng_v3.1": "龙小诚 · 沉稳男声",
+    "longshu_v3.1": "龙书 · 朗读书卷感",
     "libai_v3.1": "李白 · 文气旁白",
-    "longze_v3.1": "龙泽 · 磁性男声",
     "longanyang_v3.1": "龙安洋 · 中英双语",
     "longsanshu_v3.1": "龙三叔 · 中英双语",
     "longanlufeng": "龙安鲁风 · 中英双语",
@@ -46,8 +46,33 @@ VOICE_LABELS: dict[str, str] = {
     "qwen-audio-3.0-tts-flash-loongryanma": "Ryan Ma · 英音男声",
 }
 NAMES = frozenset(VOICE_LABELS)
-# Expressive CosyVoice default for reading / vocab cards.
-DEFAULT_VOICE = "longanfengyue"
+# Expressive CosyVoice defaults — one emotional female + one emotional male.
+# Long novels always pregen both packs onto ECS.
+BOOK_FEMALE_VOICE = "longanfengyue"
+BOOK_MALE_VOICE = "longze_v3.1"
+DEFAULT_VOICE = BOOK_FEMALE_VOICE
+BOOK_VOICE_PAIR: tuple[str, str] = (BOOK_FEMALE_VOICE, BOOK_MALE_VOICE)
+VOICE_GENDER: dict[str, str] = {
+    "longanfengyue": "female",
+    "longanhuan_v3.6": "female",
+    "longanxiaoxin": "female",
+    "longanlingxi": "female",
+    "longanlufeng": "male",
+    "longanyang_v3.1": "male",
+    "longsanshu_v3.1": "male",
+    "longze_v3.1": "male",
+    "longxiaocheng_v3.1": "male",
+    "longshu_v3.1": "male",
+    "libai_v3.1": "male",
+    "qwen-audio-3.0-tts-flash-loongolivialin": "female",
+    "qwen-audio-3.0-tts-flash-loonglunawang": "female",
+    "qwen-audio-3.0-tts-flash-loongnorahu": "female",
+    "qwen-audio-3.0-tts-flash-loongivyhu": "female",
+    "qwen-audio-3.0-tts-flash-loongadriangao": "male",
+    "qwen-audio-3.0-tts-flash-loongalexanderhu": "male",
+    "qwen-audio-3.0-tts-flash-loongjameszhao": "male",
+    "qwen-audio-3.0-tts-flash-loongryanma": "male",
+}
 
 
 class SpeechLookupOut(BaseModel):
@@ -106,9 +131,23 @@ async def list_voices() -> dict:
     return {
         "voices": list(VOICE_LABELS.keys()),
         "labels": VOICE_LABELS,
+        "gender": VOICE_GENDER,
         "default": DEFAULT_VOICE,
+        "default_female": BOOK_FEMALE_VOICE,
+        "default_male": BOOK_MALE_VOICE,
+        "book_pair": list(BOOK_VOICE_PAIR),
         "configured": _configured(),
     }
+
+
+def _book_voices_for_request(preferred: str) -> list[str]:
+    """Always cover the emotional male/female pair; keep preferred first."""
+    preferred_id = _resolve_voice(preferred)
+    ordered: list[str] = []
+    for voice in (preferred_id, *BOOK_VOICE_PAIR):
+        if voice not in ordered:
+            ordered.append(voice)
+    return ordered
 
 
 @router.post("")
@@ -384,14 +423,77 @@ async def get_speech_pack(
     return pack
 
 
+def _aggregate_book_pair(statuses: list[dict], *, preferred: str) -> dict:
+    """Combine male+female pack progress; ready only when both voices are done."""
+    if not statuses:
+        return {
+            "ready": False,
+            "state": "missing",
+            "percent": 0,
+            "pages_total": 0,
+            "pages_ready": 0,
+            "voice": preferred,
+            "voices": [],
+            "pair": {},
+            "long_novel": True,
+            "processor": "shared-tts-queue",
+        }
+    pages_total = sum(int(s.get("pages_total") or 0) for s in statuses)
+    pages_ready = sum(int(s.get("pages_ready") or 0) for s in statuses)
+    percent = 0 if pages_total <= 0 else int(round(100.0 * pages_ready / pages_total))
+    ready = all(bool(s.get("ready")) for s in statuses)
+    failed = all(s.get("state") == "failed" for s in statuses)
+    if ready:
+        state = "ready"
+    elif failed:
+        state = "failed"
+    elif any(s.get("state") in ("working", "queued") for s in statuses):
+        state = "working"
+    else:
+        state = str(statuses[0].get("state") or "queued")
+    preferred_status = next(
+        (s for s in statuses if s.get("voice") == preferred),
+        statuses[0],
+    )
+    return {
+        **preferred_status,
+        "voice": preferred,
+        "voices": [str(s.get("voice") or "") for s in statuses],
+        "pair": {
+            str(s.get("voice") or ""): {
+                "ready": bool(s.get("ready")),
+                "percent": int(s.get("percent") or 0),
+                "pages_ready": int(s.get("pages_ready") or 0),
+                "pages_total": int(s.get("pages_total") or 0),
+                "state": s.get("state"),
+                "gender": VOICE_GENDER.get(str(s.get("voice") or ""), ""),
+            }
+            for s in statuses
+        },
+        "pages_total": pages_total,
+        "pages_ready": pages_ready,
+        "percent": percent,
+        "ready": ready,
+        "state": state,
+        "long_novel": True,
+        "processor": "shared-tts-queue",
+        "book_pair": list(BOOK_VOICE_PAIR),
+    }
+
+
 @router.post("/book-pregen")
 async def enqueue_book_pregen(
     body: BookPregenIn,
     background: BackgroundTasks,
     user: User = Depends(get_current_user),
 ) -> dict:
-    """Queue an entire long novel for cloud TTS (5060 Ti preferred)."""
-    voice = _resolve_voice(body.voice)
+    """Queue an entire long novel for cloud TTS (5060 Ti preferred).
+
+    Always synthesizes the emotional female + male pair so each book keeps
+    both voice packs on ECS; clients may still pass a preferred voice.
+    """
+    preferred = _resolve_voice(body.voice)
+    voices = _book_voices_for_request(body.voice)
     text = body.text.replace("\r\n", "\n")
     if not rtq.is_long_novel(text):
         # Short articles stay open-immediately; no book gate.
@@ -404,26 +506,37 @@ async def enqueue_book_pregen(
             "long_novel": False,
             "processor": "none",
             "message": "short_article",
+            "voice": preferred,
+            "voices": voices,
+            "book_pair": list(BOOK_VOICE_PAIR),
         }
+    statuses: list[dict] = []
     try:
-        status = rtq.enqueue_book(
-            doc_id=body.doc_id.strip(),
-            voice=voice,
-            text=text,
-            user_id=user.id,
-        )
+        for voice in voices:
+            statuses.append(
+                rtq.enqueue_book(
+                    doc_id=body.doc_id.strip(),
+                    voice=voice,
+                    text=text,
+                    user_id=user.id,
+                )
+            )
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
-    if body.process_on_ecs and _configured() and not status.get("ready"):
-        background.add_task(
-            drain_book_pregen_ecs,
-            doc_id=body.doc_id.strip(),
-            voice=voice,
-            user_id=user.id,
-        )
+    if body.process_on_ecs and _configured():
+        for voice in voices:
+            status = next((s for s in statuses if s.get("voice") == voice), None)
+            if status and not status.get("ready"):
+                background.add_task(
+                    drain_book_pregen_ecs,
+                    doc_id=body.doc_id.strip(),
+                    voice=voice,
+                    user_id=user.id,
+                )
+    aggregated = _aggregate_book_pair(statuses, preferred=preferred)
     return {
-        **status,
-        "message": "ready" if status.get("ready") else "queued_for_gpu",
+        **aggregated,
+        "message": "ready" if aggregated.get("ready") else "queued_for_gpu",
     }
 
 
@@ -434,7 +547,12 @@ async def book_pregen_status(
     user: User = Depends(get_current_user),
 ) -> dict:
     del user
-    return rtq.book_status(doc_id=doc_id.strip(), voice=_resolve_voice(voice))
+    preferred = _resolve_voice(voice)
+    voices = _book_voices_for_request(voice)
+    statuses = [
+        rtq.book_status(doc_id=doc_id.strip(), voice=item) for item in voices
+    ]
+    return _aggregate_book_pair(statuses, preferred=preferred)
 
 
 @router.post("/book-pregen/fallback")
@@ -444,31 +562,41 @@ async def book_pregen_ecs_fallback(
     user: User = Depends(get_current_user),
 ) -> dict:
     """Kick ECS filler for unfinished pages when the 5060 Ti worker is offline."""
-    voice = _resolve_voice(body.voice)
+    preferred = _resolve_voice(body.voice)
+    voices = _book_voices_for_request(body.voice)
     if body.text.strip():
         try:
-            rtq.enqueue_book(
-                doc_id=body.doc_id.strip(),
-                voice=voice,
-                text=body.text,
-                user_id=user.id,
-            )
+            for voice in voices:
+                rtq.enqueue_book(
+                    doc_id=body.doc_id.strip(),
+                    voice=voice,
+                    text=body.text,
+                    user_id=user.id,
+                )
         except ValueError as exc:
             raise HTTPException(status_code=400, detail=str(exc)) from exc
     if not _configured():
         raise HTTPException(status_code=503, detail="阿里云配音尚未配置")
-    job_ids = rtq.unfinished_page_job_ids(doc_id=body.doc_id.strip(), voice=voice)
-    # One serial drainer — avoid spawning hundreds of concurrent synth tasks.
-    background.add_task(
-        drain_book_pregen_ecs,
-        doc_id=body.doc_id.strip(),
-        voice=voice,
-        user_id=user.id,
-    )
-    status = rtq.book_status(doc_id=body.doc_id.strip(), voice=voice)
+    kicked = 0
+    for voice in voices:
+        job_ids = rtq.unfinished_page_job_ids(
+            doc_id=body.doc_id.strip(), voice=voice
+        )
+        kicked += len(job_ids)
+        # One serial drainer per voice — avoid flooding CosyVoice.
+        background.add_task(
+            drain_book_pregen_ecs,
+            doc_id=body.doc_id.strip(),
+            voice=voice,
+            user_id=user.id,
+        )
+    statuses = [
+        rtq.book_status(doc_id=body.doc_id.strip(), voice=item) for item in voices
+    ]
+    aggregated = _aggregate_book_pair(statuses, preferred=preferred)
     return {
-        **status,
+        **aggregated,
         "fallback": "ecs",
-        "kicked": len(job_ids),
+        "kicked": kicked,
         "message": "ecs_fallback_started",
     }
