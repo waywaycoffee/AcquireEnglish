@@ -1,0 +1,3421 @@
+{
+  "series_id": "oral_core_9000",
+  "title": "英语核心口语句型9000句",
+  "source": {
+    "bvid": "BV1CS4y1v7sQ",
+    "page_count": 151
+  },
+  "lessons": [
+    {
+      "lesson_no": 1,
+      "title": "起床",
+      "bvid": "BV1CS4y1v7sQ",
+      "page": 1,
+      "duration_ms": 600000,
+      "topic": "起床",
+      "goal": "能用本课句型谈论「起床」相关情景",
+      "media": {
+        "subtitle_en": "/media/course/oral_core_9000/01/en.srt",
+        "subtitle_zh": "/media/course/oral_core_9000/01/zh.srt"
+      },
+      "pack": {
+        "target_phrases": [
+          "get up",
+          "wake up",
+          "make the bed",
+          "brush my teeth",
+          "have breakfast"
+        ],
+        "shadow_lines": [
+          "I usually get up at seven.",
+          "It is hard for me to wake up early.",
+          "Please make the bed after you get up.",
+          "I brush my teeth every morning.",
+          "Let us have breakfast together.",
+          "I am still sleepy."
+        ],
+        "quiz": [
+          {
+            "type": "mcq",
+            "stem": "「我通常七点起床」怎么说？",
+            "options": [
+              "I usually get up at seven.",
+              "I usually sleep at seven.",
+              "I usually go out at seven.",
+              "I usually cook at seven."
+            ],
+            "answer": 0
+          },
+          {
+            "type": "cloze",
+            "stem": "It is hard for me to ____ early.",
+            "options": [
+              "wake up",
+              "give up",
+              "look up",
+              "pick up"
+            ],
+            "answer": 0
+          },
+          {
+            "type": "mcq",
+            "stem": "Which phrase means 铺床？",
+            "options": [
+              "make the bed",
+              "make a cake",
+              "make money",
+              "make friends"
+            ],
+            "answer": 0
+          }
+        ],
+        "discuss_prompts": [
+          "你通常几点起床？用本课至少两句回答。",
+          "早上起床后你先做什么？"
+        ]
+      }
+    },
+    {
+      "lesson_no": 2,
+      "title": "睡觉",
+      "bvid": "BV1CS4y1v7sQ",
+      "page": 2,
+      "duration_ms": 600000,
+      "topic": "睡觉",
+      "goal": "能用本课句型谈论「睡觉」相关情景",
+      "media": {
+        "subtitle_en": "/media/course/oral_core_9000/02/en.srt",
+        "subtitle_zh": "/media/course/oral_core_9000/02/zh.srt"
+      },
+      "pack": {
+        "target_phrases": [
+          "go to bed",
+          "fall asleep",
+          "set an alarm",
+          "stay up late",
+          "have a good night"
+        ],
+        "shadow_lines": [
+          "I go to bed around eleven.",
+          "I cannot fall asleep quickly.",
+          "Please set an alarm for six.",
+          "Do not stay up late tonight.",
+          "Have a good night.",
+          "I need more sleep."
+        ],
+        "quiz": [
+          {
+            "type": "mcq",
+            "stem": "「我十一点左右睡觉」？",
+            "options": [
+              "I go to bed around eleven.",
+              "I get up around eleven.",
+              "I cook around eleven.",
+              "I work around eleven."
+            ],
+            "answer": 0
+          },
+          {
+            "type": "cloze",
+            "stem": "Do not ____ late tonight.",
+            "options": [
+              "stay up",
+              "get up",
+              "look up",
+              "make up"
+            ],
+            "answer": 0
+          },
+          {
+            "type": "mcq",
+            "stem": "set an alarm 意思是？",
+            "options": [
+              "定闹钟",
+              "关灯",
+              "洗碗",
+              "洗碗"
+            ],
+            "answer": 0
+          }
+        ],
+        "discuss_prompts": [
+          "你一般几点睡觉？为什么？",
+          "熬夜对你有什么影响？用本课句型说。"
+        ]
+      }
+    },
+    {
+      "lesson_no": 3,
+      "title": "租房",
+      "bvid": "BV1CS4y1v7sQ",
+      "page": 3,
+      "duration_ms": 600000,
+      "topic": "租房",
+      "goal": "能用本课句型谈论「租房」相关情景",
+      "media": {
+        "subtitle_en": "/media/course/oral_core_9000/03/en.srt",
+        "subtitle_zh": "/media/course/oral_core_9000/03/zh.srt"
+      },
+      "pack": {
+        "target_phrases": [
+          "rent an apartment",
+          "sign a lease",
+          "pay the deposit",
+          "utilities included",
+          "look for a place"
+        ],
+        "shadow_lines": [
+          "I want to rent an apartment near school.",
+          "We need to sign a lease today.",
+          "How much is the deposit?",
+          "Are the utilities included?",
+          "I am looking for a place downtown.",
+          "The rent is too high for me."
+        ],
+        "quiz": [
+          {
+            "type": "mcq",
+            "stem": "deposit 在租房语境常指？",
+            "options": [
+              "押金",
+              "工资",
+              "小费",
+              "罚单"
+            ],
+            "answer": 0
+          },
+          {
+            "type": "cloze",
+            "stem": "Are the ____ included?",
+            "options": [
+              "utilities",
+              "umbrellas",
+              "uniforms",
+              "universities"
+            ],
+            "answer": 0
+          },
+          {
+            "type": "mcq",
+            "stem": "sign a lease 是？",
+            "options": [
+              "签租约",
+              "签快递",
+              "签到",
+              "签合同买车"
+            ],
+            "answer": 0
+          }
+        ],
+        "discuss_prompts": [
+          "你理想的租房条件是什么？",
+          "和房东谈押金时你会怎么说？"
+        ]
+      }
+    },
+    {
+      "lesson_no": 4,
+      "title": "买房",
+      "bvid": "BV1CS4y1v7sQ",
+      "page": 4,
+      "duration_ms": 600000,
+      "topic": "买房",
+      "goal": "能用本课句型谈论「买房」相关情景",
+      "media": {
+        "subtitle_en": "/media/course/oral_core_9000/04/en.srt",
+        "subtitle_zh": "/media/course/oral_core_9000/04/zh.srt"
+      },
+      "pack": {
+        "target_phrases": [
+          "buy a house",
+          "mortgage",
+          "down payment",
+          "real estate agent",
+          "property"
+        ],
+        "shadow_lines": [
+          "We plan to buy a house next year.",
+          "The mortgage rate is rising.",
+          "We paid a down payment last month.",
+          "The real estate agent showed us three houses.",
+          "This property is in a quiet neighborhood.",
+          "Can we afford this house?"
+        ],
+        "quiz": [
+          {
+            "type": "mcq",
+            "stem": "mortgage 是？",
+            "options": [
+              "房贷",
+              "房租",
+              "水费",
+              "装修费"
+            ],
+            "answer": 0
+          },
+          {
+            "type": "cloze",
+            "stem": "We paid a ____ last month.",
+            "options": [
+              "down payment",
+              "down elevator",
+              "down street",
+              "down town only"
+            ],
+            "answer": 0
+          },
+          {
+            "type": "mcq",
+            "stem": "real estate agent 是？",
+            "options": [
+              "房产中介",
+              "银行柜员",
+              "装修工",
+              "律师"
+            ],
+            "answer": 0
+          }
+        ],
+        "discuss_prompts": [
+          "买房和租房你更倾向哪个？为什么？",
+          "你会问中介哪些问题？"
+        ]
+      }
+    },
+    {
+      "lesson_no": 5,
+      "title": "装修",
+      "bvid": "BV1CS4y1v7sQ",
+      "page": 5,
+      "duration_ms": 600000,
+      "topic": "装修",
+      "goal": "能用本课句型谈论「装修」相关情景",
+      "media": {
+        "subtitle_en": "/media/course/oral_core_9000/05/en.srt",
+        "subtitle_zh": "/media/course/oral_core_9000/05/zh.srt"
+      },
+      "pack": {
+        "target_phrases": [
+          "renovate",
+          "decoration",
+          "hire a contractor",
+          "paint the walls",
+          "furniture"
+        ],
+        "shadow_lines": [
+          "We are going to renovate the kitchen.",
+          "The decoration style is modern.",
+          "We hired a contractor last week.",
+          "Please paint the walls white.",
+          "We need new furniture.",
+          "The renovation will take two months."
+        ],
+        "quiz": [
+          {
+            "type": "mcq",
+            "stem": "renovate 意思接近？",
+            "options": [
+              "翻新装修",
+              "搬家",
+              "退租",
+              "卖房"
+            ],
+            "answer": 0
+          },
+          {
+            "type": "cloze",
+            "stem": "Please ____ the walls white.",
+            "options": [
+              "paint",
+              "pay",
+              "pack",
+              "park"
+            ],
+            "answer": 0
+          },
+          {
+            "type": "mcq",
+            "stem": "hire a contractor 是？",
+            "options": [
+              "雇承包商",
+              "雇司机",
+              "雇厨师",
+              "雇保安"
+            ],
+            "answer": 0
+          }
+        ],
+        "discuss_prompts": [
+          "如果装修房间，你最想先改哪一块？",
+          "用本课句子描述你喜欢的装修风格。"
+        ]
+      }
+    },
+    {
+      "lesson_no": 6,
+      "title": "搬家",
+      "bvid": "BV1CS4y1v7sQ",
+      "page": 6,
+      "duration_ms": 600000,
+      "topic": "搬家",
+      "goal": "能用本课句型谈论「搬家」相关情景",
+      "media": {
+        "subtitle_en": "/media/course/oral_core_9000/06/en.srt",
+        "subtitle_zh": "/media/course/oral_core_9000/06/zh.srt"
+      },
+      "pack": {
+        "target_phrases": [],
+        "shadow_lines": [],
+        "quiz": [],
+        "discuss_prompts": [
+          "用本课句型聊一聊「搬家」。"
+        ]
+      }
+    },
+    {
+      "lesson_no": 7,
+      "title": "养生保健",
+      "bvid": "BV1CS4y1v7sQ",
+      "page": 7,
+      "duration_ms": 600000,
+      "topic": "养生保健",
+      "goal": "能用本课句型谈论「养生保健」相关情景",
+      "media": {
+        "subtitle_en": "/media/course/oral_core_9000/07/en.srt",
+        "subtitle_zh": "/media/course/oral_core_9000/07/zh.srt"
+      },
+      "pack": {
+        "target_phrases": [],
+        "shadow_lines": [],
+        "quiz": [],
+        "discuss_prompts": [
+          "用本课句型聊一聊「养生保健」。"
+        ]
+      }
+    },
+    {
+      "lesson_no": 8,
+      "title": "防盗防火防电",
+      "bvid": "BV1CS4y1v7sQ",
+      "page": 8,
+      "duration_ms": 600000,
+      "topic": "防盗防火防电",
+      "goal": "能用本课句型谈论「防盗防火防电」相关情景",
+      "media": {
+        "subtitle_en": "/media/course/oral_core_9000/08/en.srt",
+        "subtitle_zh": "/media/course/oral_core_9000/08/zh.srt"
+      },
+      "pack": {
+        "target_phrases": [],
+        "shadow_lines": [],
+        "quiz": [],
+        "discuss_prompts": [
+          "用本课句型聊一聊「防盗防火防电」。"
+        ]
+      }
+    },
+    {
+      "lesson_no": 9,
+      "title": "水电修理",
+      "bvid": "BV1CS4y1v7sQ",
+      "page": 9,
+      "duration_ms": 600000,
+      "topic": "水电修理",
+      "goal": "能用本课句型谈论「水电修理」相关情景",
+      "media": {
+        "subtitle_en": "/media/course/oral_core_9000/09/en.srt",
+        "subtitle_zh": "/media/course/oral_core_9000/09/zh.srt"
+      },
+      "pack": {
+        "target_phrases": [],
+        "shadow_lines": [],
+        "quiz": [],
+        "discuss_prompts": [
+          "用本课句型聊一聊「水电修理」。"
+        ]
+      }
+    },
+    {
+      "lesson_no": 10,
+      "title": "收入挣钱",
+      "bvid": "BV1CS4y1v7sQ",
+      "page": 10,
+      "duration_ms": 600000,
+      "topic": "收入挣钱",
+      "goal": "能用本课句型谈论「收入挣钱」相关情景",
+      "media": {
+        "subtitle_en": "/media/course/oral_core_9000/10/en.srt",
+        "subtitle_zh": "/media/course/oral_core_9000/10/zh.srt"
+      },
+      "pack": {
+        "target_phrases": [],
+        "shadow_lines": [],
+        "quiz": [],
+        "discuss_prompts": [
+          "用本课句型聊一聊「收入挣钱」。"
+        ]
+      }
+    },
+    {
+      "lesson_no": 11,
+      "title": "消费开支",
+      "bvid": "BV1CS4y1v7sQ",
+      "page": 11,
+      "duration_ms": 600000,
+      "topic": "消费开支",
+      "goal": "能用本课句型谈论「消费开支」相关情景",
+      "media": {
+        "subtitle_en": "/media/course/oral_core_9000/11/en.srt",
+        "subtitle_zh": "/media/course/oral_core_9000/11/zh.srt"
+      },
+      "pack": {
+        "target_phrases": [],
+        "shadow_lines": [],
+        "quiz": [],
+        "discuss_prompts": [
+          "用本课句型聊一聊「消费开支」。"
+        ]
+      }
+    },
+    {
+      "lesson_no": 12,
+      "title": "保险",
+      "bvid": "BV1CS4y1v7sQ",
+      "page": 12,
+      "duration_ms": 600000,
+      "topic": "保险",
+      "goal": "能用本课句型谈论「保险」相关情景",
+      "media": {
+        "subtitle_en": "/media/course/oral_core_9000/12/en.srt",
+        "subtitle_zh": "/media/course/oral_core_9000/12/zh.srt"
+      },
+      "pack": {
+        "target_phrases": [],
+        "shadow_lines": [],
+        "quiz": [],
+        "discuss_prompts": [
+          "用本课句型聊一聊「保险」。"
+        ]
+      }
+    },
+    {
+      "lesson_no": 13,
+      "title": "股票",
+      "bvid": "BV1CS4y1v7sQ",
+      "page": 13,
+      "duration_ms": 600000,
+      "topic": "股票",
+      "goal": "能用本课句型谈论「股票」相关情景",
+      "media": {
+        "subtitle_en": "/media/course/oral_core_9000/13/en.srt",
+        "subtitle_zh": "/media/course/oral_core_9000/13/zh.srt"
+      },
+      "pack": {
+        "target_phrases": [],
+        "shadow_lines": [],
+        "quiz": [],
+        "discuss_prompts": [
+          "用本课句型聊一聊「股票」。"
+        ]
+      }
+    },
+    {
+      "lesson_no": 14,
+      "title": "投资",
+      "bvid": "BV1CS4y1v7sQ",
+      "page": 14,
+      "duration_ms": 600000,
+      "topic": "投资",
+      "goal": "能用本课句型谈论「投资」相关情景",
+      "media": {
+        "subtitle_en": "/media/course/oral_core_9000/14/en.srt",
+        "subtitle_zh": "/media/course/oral_core_9000/14/zh.srt"
+      },
+      "pack": {
+        "target_phrases": [],
+        "shadow_lines": [],
+        "quiz": [],
+        "discuss_prompts": [
+          "用本课句型聊一聊「投资」。"
+        ]
+      }
+    },
+    {
+      "lesson_no": 15,
+      "title": "金钱观",
+      "bvid": "BV1CS4y1v7sQ",
+      "page": 15,
+      "duration_ms": 600000,
+      "topic": "金钱观",
+      "goal": "能用本课句型谈论「金钱观」相关情景",
+      "media": {
+        "subtitle_en": "/media/course/oral_core_9000/15/en.srt",
+        "subtitle_zh": "/media/course/oral_core_9000/15/zh.srt"
+      },
+      "pack": {
+        "target_phrases": [],
+        "shadow_lines": [],
+        "quiz": [],
+        "discuss_prompts": [
+          "用本课句型聊一聊「金钱观」。"
+        ]
+      }
+    },
+    {
+      "lesson_no": 16,
+      "title": "资金花销管理",
+      "bvid": "BV1CS4y1v7sQ",
+      "page": 16,
+      "duration_ms": 600000,
+      "topic": "资金花销管理",
+      "goal": "能用本课句型谈论「资金花销管理」相关情景",
+      "media": {
+        "subtitle_en": "/media/course/oral_core_9000/16/en.srt",
+        "subtitle_zh": "/media/course/oral_core_9000/16/zh.srt"
+      },
+      "pack": {
+        "target_phrases": [],
+        "shadow_lines": [],
+        "quiz": [],
+        "discuss_prompts": [
+          "用本课句型聊一聊「资金花销管理」。"
+        ]
+      }
+    },
+    {
+      "lesson_no": 17,
+      "title": "同学师生",
+      "bvid": "BV1CS4y1v7sQ",
+      "page": 17,
+      "duration_ms": 600000,
+      "topic": "同学师生",
+      "goal": "能用本课句型谈论「同学师生」相关情景",
+      "media": {
+        "subtitle_en": "/media/course/oral_core_9000/17/en.srt",
+        "subtitle_zh": "/media/course/oral_core_9000/17/zh.srt"
+      },
+      "pack": {
+        "target_phrases": [],
+        "shadow_lines": [],
+        "quiz": [],
+        "discuss_prompts": [
+          "用本课句型聊一聊「同学师生」。"
+        ]
+      }
+    },
+    {
+      "lesson_no": 18,
+      "title": "课外活动",
+      "bvid": "BV1CS4y1v7sQ",
+      "page": 18,
+      "duration_ms": 600000,
+      "topic": "课外活动",
+      "goal": "能用本课句型谈论「课外活动」相关情景",
+      "media": {
+        "subtitle_en": "/media/course/oral_core_9000/18/en.srt",
+        "subtitle_zh": "/media/course/oral_core_9000/18/zh.srt"
+      },
+      "pack": {
+        "target_phrases": [],
+        "shadow_lines": [],
+        "quiz": [],
+        "discuss_prompts": [
+          "用本课句型聊一聊「课外活动」。"
+        ]
+      }
+    },
+    {
+      "lesson_no": 19,
+      "title": "考试",
+      "bvid": "BV1CS4y1v7sQ",
+      "page": 19,
+      "duration_ms": 600000,
+      "topic": "考试",
+      "goal": "能用本课句型谈论「考试」相关情景",
+      "media": {
+        "subtitle_en": "/media/course/oral_core_9000/19/en.srt",
+        "subtitle_zh": "/media/course/oral_core_9000/19/zh.srt"
+      },
+      "pack": {
+        "target_phrases": [],
+        "shadow_lines": [],
+        "quiz": [],
+        "discuss_prompts": [
+          "用本课句型聊一聊「考试」。"
+        ]
+      }
+    },
+    {
+      "lesson_no": 20,
+      "title": "外语学习",
+      "bvid": "BV1CS4y1v7sQ",
+      "page": 20,
+      "duration_ms": 600000,
+      "topic": "外语学习",
+      "goal": "能用本课句型谈论「外语学习」相关情景",
+      "media": {
+        "subtitle_en": "/media/course/oral_core_9000/20/en.srt",
+        "subtitle_zh": "/media/course/oral_core_9000/20/zh.srt"
+      },
+      "pack": {
+        "target_phrases": [],
+        "shadow_lines": [],
+        "quiz": [],
+        "discuss_prompts": [
+          "用本课句型聊一聊「外语学习」。"
+        ]
+      }
+    },
+    {
+      "lesson_no": 21,
+      "title": "高考升学",
+      "bvid": "BV1CS4y1v7sQ",
+      "page": 21,
+      "duration_ms": 600000,
+      "topic": "高考升学",
+      "goal": "能用本课句型谈论「高考升学」相关情景",
+      "media": {
+        "subtitle_en": "/media/course/oral_core_9000/21/en.srt",
+        "subtitle_zh": "/media/course/oral_core_9000/21/zh.srt"
+      },
+      "pack": {
+        "target_phrases": [],
+        "shadow_lines": [],
+        "quiz": [],
+        "discuss_prompts": [
+          "用本课句型聊一聊「高考升学」。"
+        ]
+      }
+    },
+    {
+      "lesson_no": 22,
+      "title": "论文要求",
+      "bvid": "BV1CS4y1v7sQ",
+      "page": 22,
+      "duration_ms": 600000,
+      "topic": "论文要求",
+      "goal": "能用本课句型谈论「论文要求」相关情景",
+      "media": {
+        "subtitle_en": "/media/course/oral_core_9000/22/en.srt",
+        "subtitle_zh": "/media/course/oral_core_9000/22/zh.srt"
+      },
+      "pack": {
+        "target_phrases": [],
+        "shadow_lines": [],
+        "quiz": [],
+        "discuss_prompts": [
+          "用本课句型聊一聊「论文要求」。"
+        ]
+      }
+    },
+    {
+      "lesson_no": 23,
+      "title": "培训",
+      "bvid": "BV1CS4y1v7sQ",
+      "page": 23,
+      "duration_ms": 600000,
+      "topic": "培训",
+      "goal": "能用本课句型谈论「培训」相关情景",
+      "media": {
+        "subtitle_en": "/media/course/oral_core_9000/23/en.srt",
+        "subtitle_zh": "/media/course/oral_core_9000/23/zh.srt"
+      },
+      "pack": {
+        "target_phrases": [],
+        "shadow_lines": [],
+        "quiz": [],
+        "discuss_prompts": [
+          "用本课句型聊一聊「培训」。"
+        ]
+      }
+    },
+    {
+      "lesson_no": 24,
+      "title": "家长会",
+      "bvid": "BV1CS4y1v7sQ",
+      "page": 24,
+      "duration_ms": 600000,
+      "topic": "家长会",
+      "goal": "能用本课句型谈论「家长会」相关情景",
+      "media": {
+        "subtitle_en": "/media/course/oral_core_9000/24/en.srt",
+        "subtitle_zh": "/media/course/oral_core_9000/24/zh.srt"
+      },
+      "pack": {
+        "target_phrases": [],
+        "shadow_lines": [],
+        "quiz": [],
+        "discuss_prompts": [
+          "用本课句型聊一聊「家长会」。"
+        ]
+      }
+    },
+    {
+      "lesson_no": 25,
+      "title": "毕业祝福典礼",
+      "bvid": "BV1CS4y1v7sQ",
+      "page": 25,
+      "duration_ms": 600000,
+      "topic": "毕业祝福典礼",
+      "goal": "能用本课句型谈论「毕业祝福典礼」相关情景",
+      "media": {
+        "subtitle_en": "/media/course/oral_core_9000/25/en.srt",
+        "subtitle_zh": "/media/course/oral_core_9000/25/zh.srt"
+      },
+      "pack": {
+        "target_phrases": [],
+        "shadow_lines": [],
+        "quiz": [],
+        "discuss_prompts": [
+          "用本课句型聊一聊「毕业祝福典礼」。"
+        ]
+      }
+    },
+    {
+      "lesson_no": 26,
+      "title": "问路",
+      "bvid": "BV1CS4y1v7sQ",
+      "page": 26,
+      "duration_ms": 600000,
+      "topic": "问路",
+      "goal": "能用本课句型谈论「问路」相关情景",
+      "media": {
+        "subtitle_en": "/media/course/oral_core_9000/26/en.srt",
+        "subtitle_zh": "/media/course/oral_core_9000/26/zh.srt"
+      },
+      "pack": {
+        "target_phrases": [],
+        "shadow_lines": [],
+        "quiz": [],
+        "discuss_prompts": [
+          "用本课句型聊一聊「问路」。"
+        ]
+      }
+    },
+    {
+      "lesson_no": 27,
+      "title": "坐公交",
+      "bvid": "BV1CS4y1v7sQ",
+      "page": 27,
+      "duration_ms": 600000,
+      "topic": "坐公交",
+      "goal": "能用本课句型谈论「坐公交」相关情景",
+      "media": {
+        "subtitle_en": "/media/course/oral_core_9000/27/en.srt",
+        "subtitle_zh": "/media/course/oral_core_9000/27/zh.srt"
+      },
+      "pack": {
+        "target_phrases": [],
+        "shadow_lines": [],
+        "quiz": [],
+        "discuss_prompts": [
+          "用本课句型聊一聊「坐公交」。"
+        ]
+      }
+    },
+    {
+      "lesson_no": 28,
+      "title": "出租车",
+      "bvid": "BV1CS4y1v7sQ",
+      "page": 28,
+      "duration_ms": 600000,
+      "topic": "出租车",
+      "goal": "能用本课句型谈论「出租车」相关情景",
+      "media": {
+        "subtitle_en": "/media/course/oral_core_9000/28/en.srt",
+        "subtitle_zh": "/media/course/oral_core_9000/28/zh.srt"
+      },
+      "pack": {
+        "target_phrases": [],
+        "shadow_lines": [],
+        "quiz": [],
+        "discuss_prompts": [
+          "用本课句型聊一聊「出租车」。"
+        ]
+      }
+    },
+    {
+      "lesson_no": 29,
+      "title": "租车",
+      "bvid": "BV1CS4y1v7sQ",
+      "page": 29,
+      "duration_ms": 600000,
+      "topic": "租车",
+      "goal": "能用本课句型谈论「租车」相关情景",
+      "media": {
+        "subtitle_en": "/media/course/oral_core_9000/29/en.srt",
+        "subtitle_zh": "/media/course/oral_core_9000/29/zh.srt"
+      },
+      "pack": {
+        "target_phrases": [],
+        "shadow_lines": [],
+        "quiz": [],
+        "discuss_prompts": [
+          "用本课句型聊一聊「租车」。"
+        ]
+      }
+    },
+    {
+      "lesson_no": 30,
+      "title": "坐火车",
+      "bvid": "BV1CS4y1v7sQ",
+      "page": 30,
+      "duration_ms": 600000,
+      "topic": "坐火车",
+      "goal": "能用本课句型谈论「坐火车」相关情景",
+      "media": {
+        "subtitle_en": "/media/course/oral_core_9000/30/en.srt",
+        "subtitle_zh": "/media/course/oral_core_9000/30/zh.srt"
+      },
+      "pack": {
+        "target_phrases": [],
+        "shadow_lines": [],
+        "quiz": [],
+        "discuss_prompts": [
+          "用本课句型聊一聊「坐火车」。"
+        ]
+      }
+    },
+    {
+      "lesson_no": 31,
+      "title": "坐船",
+      "bvid": "BV1CS4y1v7sQ",
+      "page": 31,
+      "duration_ms": 600000,
+      "topic": "坐船",
+      "goal": "能用本课句型谈论「坐船」相关情景",
+      "media": {
+        "subtitle_en": "/media/course/oral_core_9000/31/en.srt",
+        "subtitle_zh": "/media/course/oral_core_9000/31/zh.srt"
+      },
+      "pack": {
+        "target_phrases": [],
+        "shadow_lines": [],
+        "quiz": [],
+        "discuss_prompts": [
+          "用本课句型聊一聊「坐船」。"
+        ]
+      }
+    },
+    {
+      "lesson_no": 32,
+      "title": "坐飞机",
+      "bvid": "BV1CS4y1v7sQ",
+      "page": 32,
+      "duration_ms": 600000,
+      "topic": "坐飞机",
+      "goal": "能用本课句型谈论「坐飞机」相关情景",
+      "media": {
+        "subtitle_en": "/media/course/oral_core_9000/32/en.srt",
+        "subtitle_zh": "/media/course/oral_core_9000/32/zh.srt"
+      },
+      "pack": {
+        "target_phrases": [],
+        "shadow_lines": [],
+        "quiz": [],
+        "discuss_prompts": [
+          "用本课句型聊一聊「坐飞机」。"
+        ]
+      }
+    },
+    {
+      "lesson_no": 33,
+      "title": "堵车",
+      "bvid": "BV1CS4y1v7sQ",
+      "page": 33,
+      "duration_ms": 600000,
+      "topic": "堵车",
+      "goal": "能用本课句型谈论「堵车」相关情景",
+      "media": {
+        "subtitle_en": "/media/course/oral_core_9000/33/en.srt",
+        "subtitle_zh": "/media/course/oral_core_9000/33/zh.srt"
+      },
+      "pack": {
+        "target_phrases": [],
+        "shadow_lines": [],
+        "quiz": [],
+        "discuss_prompts": [
+          "用本课句型聊一聊「堵车」。"
+        ]
+      }
+    },
+    {
+      "lesson_no": 34,
+      "title": "交通事故",
+      "bvid": "BV1CS4y1v7sQ",
+      "page": 34,
+      "duration_ms": 600000,
+      "topic": "交通事故",
+      "goal": "能用本课句型谈论「交通事故」相关情景",
+      "media": {
+        "subtitle_en": "/media/course/oral_core_9000/34/en.srt",
+        "subtitle_zh": "/media/course/oral_core_9000/34/zh.srt"
+      },
+      "pack": {
+        "target_phrases": [],
+        "shadow_lines": [],
+        "quiz": [],
+        "discuss_prompts": [
+          "用本课句型聊一聊「交通事故」。"
+        ]
+      }
+    },
+    {
+      "lesson_no": 35,
+      "title": "假期旅游",
+      "bvid": "BV1CS4y1v7sQ",
+      "page": 35,
+      "duration_ms": 600000,
+      "topic": "假期旅游",
+      "goal": "能用本课句型谈论「假期旅游」相关情景",
+      "media": {
+        "subtitle_en": "/media/course/oral_core_9000/35/en.srt",
+        "subtitle_zh": "/media/course/oral_core_9000/35/zh.srt"
+      },
+      "pack": {
+        "target_phrases": [],
+        "shadow_lines": [],
+        "quiz": [],
+        "discuss_prompts": [
+          "用本课句型聊一聊「假期旅游」。"
+        ]
+      }
+    },
+    {
+      "lesson_no": 36,
+      "title": "旅行社",
+      "bvid": "BV1CS4y1v7sQ",
+      "page": 36,
+      "duration_ms": 600000,
+      "topic": "旅行社",
+      "goal": "能用本课句型谈论「旅行社」相关情景",
+      "media": {
+        "subtitle_en": "/media/course/oral_core_9000/36/en.srt",
+        "subtitle_zh": "/media/course/oral_core_9000/36/zh.srt"
+      },
+      "pack": {
+        "target_phrases": [],
+        "shadow_lines": [],
+        "quiz": [],
+        "discuss_prompts": [
+          "用本课句型聊一聊「旅行社」。"
+        ]
+      }
+    },
+    {
+      "lesson_no": 37,
+      "title": "旅行准备",
+      "bvid": "BV1CS4y1v7sQ",
+      "page": 37,
+      "duration_ms": 600000,
+      "topic": "旅行准备",
+      "goal": "能用本课句型谈论「旅行准备」相关情景",
+      "media": {
+        "subtitle_en": "/media/course/oral_core_9000/37/en.srt",
+        "subtitle_zh": "/media/course/oral_core_9000/37/zh.srt"
+      },
+      "pack": {
+        "target_phrases": [],
+        "shadow_lines": [],
+        "quiz": [],
+        "discuss_prompts": [
+          "用本课句型聊一聊「旅行准备」。"
+        ]
+      }
+    },
+    {
+      "lesson_no": 38,
+      "title": "飞机时刻",
+      "bvid": "BV1CS4y1v7sQ",
+      "page": 38,
+      "duration_ms": 600000,
+      "topic": "飞机时刻",
+      "goal": "能用本课句型谈论「飞机时刻」相关情景",
+      "media": {
+        "subtitle_en": "/media/course/oral_core_9000/38/en.srt",
+        "subtitle_zh": "/media/course/oral_core_9000/38/zh.srt"
+      },
+      "pack": {
+        "target_phrases": [],
+        "shadow_lines": [],
+        "quiz": [],
+        "discuss_prompts": [
+          "用本课句型聊一聊「飞机时刻」。"
+        ]
+      }
+    },
+    {
+      "lesson_no": 39,
+      "title": "托运行李",
+      "bvid": "BV1CS4y1v7sQ",
+      "page": 39,
+      "duration_ms": 600000,
+      "topic": "托运行李",
+      "goal": "能用本课句型谈论「托运行李」相关情景",
+      "media": {
+        "subtitle_en": "/media/course/oral_core_9000/39/en.srt",
+        "subtitle_zh": "/media/course/oral_core_9000/39/zh.srt"
+      },
+      "pack": {
+        "target_phrases": [],
+        "shadow_lines": [],
+        "quiz": [],
+        "discuss_prompts": [
+          "用本课句型聊一聊「托运行李」。"
+        ]
+      }
+    },
+    {
+      "lesson_no": 40,
+      "title": "文物美景小吃文化",
+      "bvid": "BV1CS4y1v7sQ",
+      "page": 40,
+      "duration_ms": 600000,
+      "topic": "文物美景小吃文化",
+      "goal": "能用本课句型谈论「文物美景小吃文化」相关情景",
+      "media": {
+        "subtitle_en": "/media/course/oral_core_9000/40/en.srt",
+        "subtitle_zh": "/media/course/oral_core_9000/40/zh.srt"
+      },
+      "pack": {
+        "target_phrases": [],
+        "shadow_lines": [],
+        "quiz": [],
+        "discuss_prompts": [
+          "用本课句型聊一聊「文物美景小吃文化」。"
+        ]
+      }
+    },
+    {
+      "lesson_no": 41,
+      "title": "时差晕车行李",
+      "bvid": "BV1CS4y1v7sQ",
+      "page": 41,
+      "duration_ms": 600000,
+      "topic": "时差晕车行李",
+      "goal": "能用本课句型谈论「时差晕车行李」相关情景",
+      "media": {
+        "subtitle_en": "/media/course/oral_core_9000/41/en.srt",
+        "subtitle_zh": "/media/course/oral_core_9000/41/zh.srt"
+      },
+      "pack": {
+        "target_phrases": [],
+        "shadow_lines": [],
+        "quiz": [],
+        "discuss_prompts": [
+          "用本课句型聊一聊「时差晕车行李」。"
+        ]
+      }
+    },
+    {
+      "lesson_no": 42,
+      "title": "买机票",
+      "bvid": "BV1CS4y1v7sQ",
+      "page": 42,
+      "duration_ms": 600000,
+      "topic": "买机票",
+      "goal": "能用本课句型谈论「买机票」相关情景",
+      "media": {
+        "subtitle_en": "/media/course/oral_core_9000/42/en.srt",
+        "subtitle_zh": "/media/course/oral_core_9000/42/zh.srt"
+      },
+      "pack": {
+        "target_phrases": [],
+        "shadow_lines": [],
+        "quiz": [],
+        "discuss_prompts": [
+          "用本课句型聊一聊「买机票」。"
+        ]
+      }
+    },
+    {
+      "lesson_no": 43,
+      "title": "改签退票",
+      "bvid": "BV1CS4y1v7sQ",
+      "page": 43,
+      "duration_ms": 600000,
+      "topic": "改签退票",
+      "goal": "能用本课句型谈论「改签退票」相关情景",
+      "media": {
+        "subtitle_en": "/media/course/oral_core_9000/43/en.srt",
+        "subtitle_zh": "/media/course/oral_core_9000/43/zh.srt"
+      },
+      "pack": {
+        "target_phrases": [],
+        "shadow_lines": [],
+        "quiz": [],
+        "discuss_prompts": [
+          "用本课句型聊一聊「改签退票」。"
+        ]
+      }
+    },
+    {
+      "lesson_no": 44,
+      "title": "过关",
+      "bvid": "BV1CS4y1v7sQ",
+      "page": 44,
+      "duration_ms": 600000,
+      "topic": "过关",
+      "goal": "能用本课句型谈论「过关」相关情景",
+      "media": {
+        "subtitle_en": "/media/course/oral_core_9000/44/en.srt",
+        "subtitle_zh": "/media/course/oral_core_9000/44/zh.srt"
+      },
+      "pack": {
+        "target_phrases": [],
+        "shadow_lines": [],
+        "quiz": [],
+        "discuss_prompts": [
+          "用本课句型聊一聊「过关」。"
+        ]
+      }
+    },
+    {
+      "lesson_no": 45,
+      "title": "登机",
+      "bvid": "BV1CS4y1v7sQ",
+      "page": 45,
+      "duration_ms": 600000,
+      "topic": "登机",
+      "goal": "能用本课句型谈论「登机」相关情景",
+      "media": {
+        "subtitle_en": "/media/course/oral_core_9000/45/en.srt",
+        "subtitle_zh": "/media/course/oral_core_9000/45/zh.srt"
+      },
+      "pack": {
+        "target_phrases": [],
+        "shadow_lines": [],
+        "quiz": [],
+        "discuss_prompts": [
+          "用本课句型聊一聊「登机」。"
+        ]
+      }
+    },
+    {
+      "lesson_no": 46,
+      "title": "购物打算",
+      "bvid": "BV1CS4y1v7sQ",
+      "page": 46,
+      "duration_ms": 600000,
+      "topic": "购物打算",
+      "goal": "能用本课句型谈论「购物打算」相关情景",
+      "media": {
+        "subtitle_en": "/media/course/oral_core_9000/46/en.srt",
+        "subtitle_zh": "/media/course/oral_core_9000/46/zh.srt"
+      },
+      "pack": {
+        "target_phrases": [],
+        "shadow_lines": [],
+        "quiz": [],
+        "discuss_prompts": [
+          "用本课句型聊一聊「购物打算」。"
+        ]
+      }
+    },
+    {
+      "lesson_no": 47,
+      "title": "购物清单",
+      "bvid": "BV1CS4y1v7sQ",
+      "page": 47,
+      "duration_ms": 600000,
+      "topic": "购物清单",
+      "goal": "能用本课句型谈论「购物清单」相关情景",
+      "media": {
+        "subtitle_en": "/media/course/oral_core_9000/47/en.srt",
+        "subtitle_zh": "/media/course/oral_core_9000/47/zh.srt"
+      },
+      "pack": {
+        "target_phrases": [],
+        "shadow_lines": [],
+        "quiz": [],
+        "discuss_prompts": [
+          "用本课句型聊一聊「购物清单」。"
+        ]
+      }
+    },
+    {
+      "lesson_no": 48,
+      "title": "存包购物车购物专区",
+      "bvid": "BV1CS4y1v7sQ",
+      "page": 48,
+      "duration_ms": 600000,
+      "topic": "存包购物车购物专区",
+      "goal": "能用本课句型谈论「存包购物车购物专区」相关情景",
+      "media": {
+        "subtitle_en": "/media/course/oral_core_9000/48/en.srt",
+        "subtitle_zh": "/media/course/oral_core_9000/48/zh.srt"
+      },
+      "pack": {
+        "target_phrases": [],
+        "shadow_lines": [],
+        "quiz": [],
+        "discuss_prompts": [
+          "用本课句型聊一聊「存包购物车购物专区」。"
+        ]
+      }
+    },
+    {
+      "lesson_no": 49,
+      "title": "推销促销",
+      "bvid": "BV1CS4y1v7sQ",
+      "page": 49,
+      "duration_ms": 600000,
+      "topic": "推销促销",
+      "goal": "能用本课句型谈论「推销促销」相关情景",
+      "media": {
+        "subtitle_en": "/media/course/oral_core_9000/49/en.srt",
+        "subtitle_zh": "/media/course/oral_core_9000/49/zh.srt"
+      },
+      "pack": {
+        "target_phrases": [],
+        "shadow_lines": [],
+        "quiz": [],
+        "discuss_prompts": [
+          "用本课句型聊一聊「推销促销」。"
+        ]
+      }
+    },
+    {
+      "lesson_no": 50,
+      "title": "试穿",
+      "bvid": "BV1CS4y1v7sQ",
+      "page": 50,
+      "duration_ms": 600000,
+      "topic": "试穿",
+      "goal": "能用本课句型谈论「试穿」相关情景",
+      "media": {
+        "subtitle_en": "/media/course/oral_core_9000/50/en.srt",
+        "subtitle_zh": "/media/course/oral_core_9000/50/zh.srt"
+      },
+      "pack": {
+        "target_phrases": [],
+        "shadow_lines": [],
+        "quiz": [],
+        "discuss_prompts": [
+          "用本课句型聊一聊「试穿」。"
+        ]
+      }
+    },
+    {
+      "lesson_no": 51,
+      "title": "问价讨价还价",
+      "bvid": "BV1CS4y1v7sQ",
+      "page": 51,
+      "duration_ms": 600000,
+      "topic": "问价讨价还价",
+      "goal": "能用本课句型谈论「问价讨价还价」相关情景",
+      "media": {
+        "subtitle_en": "/media/course/oral_core_9000/51/en.srt",
+        "subtitle_zh": "/media/course/oral_core_9000/51/zh.srt"
+      },
+      "pack": {
+        "target_phrases": [],
+        "shadow_lines": [],
+        "quiz": [],
+        "discuss_prompts": [
+          "用本课句型聊一聊「问价讨价还价」。"
+        ]
+      }
+    },
+    {
+      "lesson_no": 52,
+      "title": "结账",
+      "bvid": "BV1CS4y1v7sQ",
+      "page": 52,
+      "duration_ms": 600000,
+      "topic": "结账",
+      "goal": "能用本课句型谈论「结账」相关情景",
+      "media": {
+        "subtitle_en": "/media/course/oral_core_9000/52/en.srt",
+        "subtitle_zh": "/media/course/oral_core_9000/52/zh.srt"
+      },
+      "pack": {
+        "target_phrases": [],
+        "shadow_lines": [],
+        "quiz": [],
+        "discuss_prompts": [
+          "用本课句型聊一聊「结账」。"
+        ]
+      }
+    },
+    {
+      "lesson_no": 53,
+      "title": "会员卡",
+      "bvid": "BV1CS4y1v7sQ",
+      "page": 53,
+      "duration_ms": 600000,
+      "topic": "会员卡",
+      "goal": "能用本课句型谈论「会员卡」相关情景",
+      "media": {
+        "subtitle_en": "/media/course/oral_core_9000/53/en.srt",
+        "subtitle_zh": "/media/course/oral_core_9000/53/zh.srt"
+      },
+      "pack": {
+        "target_phrases": [],
+        "shadow_lines": [],
+        "quiz": [],
+        "discuss_prompts": [
+          "用本课句型聊一聊「会员卡」。"
+        ]
+      }
+    },
+    {
+      "lesson_no": 54,
+      "title": "优惠券",
+      "bvid": "BV1CS4y1v7sQ",
+      "page": 54,
+      "duration_ms": 600000,
+      "topic": "优惠券",
+      "goal": "能用本课句型谈论「优惠券」相关情景",
+      "media": {
+        "subtitle_en": "/media/course/oral_core_9000/54/en.srt",
+        "subtitle_zh": "/media/course/oral_core_9000/54/zh.srt"
+      },
+      "pack": {
+        "target_phrases": [],
+        "shadow_lines": [],
+        "quiz": [],
+        "discuss_prompts": [
+          "用本课句型聊一聊「优惠券」。"
+        ]
+      }
+    },
+    {
+      "lesson_no": 55,
+      "title": "送货服务",
+      "bvid": "BV1CS4y1v7sQ",
+      "page": 55,
+      "duration_ms": 600000,
+      "topic": "送货服务",
+      "goal": "能用本课句型谈论「送货服务」相关情景",
+      "media": {
+        "subtitle_en": "/media/course/oral_core_9000/55/en.srt",
+        "subtitle_zh": "/media/course/oral_core_9000/55/zh.srt"
+      },
+      "pack": {
+        "target_phrases": [],
+        "shadow_lines": [],
+        "quiz": [],
+        "discuss_prompts": [
+          "用本课句型聊一聊「送货服务」。"
+        ]
+      }
+    },
+    {
+      "lesson_no": 56,
+      "title": "退换货",
+      "bvid": "BV1CS4y1v7sQ",
+      "page": 56,
+      "duration_ms": 600000,
+      "topic": "退换货",
+      "goal": "能用本课句型谈论「退换货」相关情景",
+      "media": {
+        "subtitle_en": "/media/course/oral_core_9000/56/en.srt",
+        "subtitle_zh": "/media/course/oral_core_9000/56/zh.srt"
+      },
+      "pack": {
+        "target_phrases": [],
+        "shadow_lines": [],
+        "quiz": [],
+        "discuss_prompts": [
+          "用本课句型聊一聊「退换货」。"
+        ]
+      }
+    },
+    {
+      "lesson_no": 57,
+      "title": "售后服务",
+      "bvid": "BV1CS4y1v7sQ",
+      "page": 57,
+      "duration_ms": 600000,
+      "topic": "售后服务",
+      "goal": "能用本课句型谈论「售后服务」相关情景",
+      "media": {
+        "subtitle_en": "/media/course/oral_core_9000/57/en.srt",
+        "subtitle_zh": "/media/course/oral_core_9000/57/zh.srt"
+      },
+      "pack": {
+        "target_phrases": [],
+        "shadow_lines": [],
+        "quiz": [],
+        "discuss_prompts": [
+          "用本课句型聊一聊「售后服务」。"
+        ]
+      }
+    },
+    {
+      "lesson_no": 58,
+      "title": "打招呼",
+      "bvid": "BV1CS4y1v7sQ",
+      "page": 58,
+      "duration_ms": 600000,
+      "topic": "打招呼",
+      "goal": "能用本课句型谈论「打招呼」相关情景",
+      "media": {
+        "subtitle_en": "/media/course/oral_core_9000/58/en.srt",
+        "subtitle_zh": "/media/course/oral_core_9000/58/zh.srt"
+      },
+      "pack": {
+        "target_phrases": [],
+        "shadow_lines": [],
+        "quiz": [],
+        "discuss_prompts": [
+          "用本课句型聊一聊「打招呼」。"
+        ]
+      }
+    },
+    {
+      "lesson_no": 59,
+      "title": "介绍",
+      "bvid": "BV1CS4y1v7sQ",
+      "page": 59,
+      "duration_ms": 600000,
+      "topic": "介绍",
+      "goal": "能用本课句型谈论「介绍」相关情景",
+      "media": {
+        "subtitle_en": "/media/course/oral_core_9000/59/en.srt",
+        "subtitle_zh": "/media/course/oral_core_9000/59/zh.srt"
+      },
+      "pack": {
+        "target_phrases": [],
+        "shadow_lines": [],
+        "quiz": [],
+        "discuss_prompts": [
+          "用本课句型聊一聊「介绍」。"
+        ]
+      }
+    },
+    {
+      "lesson_no": 60,
+      "title": "道别",
+      "bvid": "BV1CS4y1v7sQ",
+      "page": 60,
+      "duration_ms": 600000,
+      "topic": "道别",
+      "goal": "能用本课句型谈论「道别」相关情景",
+      "media": {
+        "subtitle_en": "/media/course/oral_core_9000/60/en.srt",
+        "subtitle_zh": "/media/course/oral_core_9000/60/zh.srt"
+      },
+      "pack": {
+        "target_phrases": [],
+        "shadow_lines": [],
+        "quiz": [],
+        "discuss_prompts": [
+          "用本课句型聊一聊「道别」。"
+        ]
+      }
+    },
+    {
+      "lesson_no": 61,
+      "title": "保持联系",
+      "bvid": "BV1CS4y1v7sQ",
+      "page": 61,
+      "duration_ms": 600000,
+      "topic": "保持联系",
+      "goal": "能用本课句型谈论「保持联系」相关情景",
+      "media": {
+        "subtitle_en": "/media/course/oral_core_9000/61/en.srt",
+        "subtitle_zh": "/media/course/oral_core_9000/61/zh.srt"
+      },
+      "pack": {
+        "target_phrases": [],
+        "shadow_lines": [],
+        "quiz": [],
+        "discuss_prompts": [
+          "用本课句型聊一聊「保持联系」。"
+        ]
+      }
+    },
+    {
+      "lesson_no": 62,
+      "title": "吵架",
+      "bvid": "BV1CS4y1v7sQ",
+      "page": 62,
+      "duration_ms": 600000,
+      "topic": "吵架",
+      "goal": "能用本课句型谈论「吵架」相关情景",
+      "media": {
+        "subtitle_en": "/media/course/oral_core_9000/62/en.srt",
+        "subtitle_zh": "/media/course/oral_core_9000/62/zh.srt"
+      },
+      "pack": {
+        "target_phrases": [],
+        "shadow_lines": [],
+        "quiz": [],
+        "discuss_prompts": [
+          "用本课句型聊一聊「吵架」。"
+        ]
+      }
+    },
+    {
+      "lesson_no": 63,
+      "title": "道歉",
+      "bvid": "BV1CS4y1v7sQ",
+      "page": 63,
+      "duration_ms": 600000,
+      "topic": "道歉",
+      "goal": "能用本课句型谈论「道歉」相关情景",
+      "media": {
+        "subtitle_en": "/media/course/oral_core_9000/63/en.srt",
+        "subtitle_zh": "/media/course/oral_core_9000/63/zh.srt"
+      },
+      "pack": {
+        "target_phrases": [],
+        "shadow_lines": [],
+        "quiz": [],
+        "discuss_prompts": [
+          "用本课句型聊一聊「道歉」。"
+        ]
+      }
+    },
+    {
+      "lesson_no": 64,
+      "title": "约会",
+      "bvid": "BV1CS4y1v7sQ",
+      "page": 64,
+      "duration_ms": 600000,
+      "topic": "约会",
+      "goal": "能用本课句型谈论「约会」相关情景",
+      "media": {
+        "subtitle_en": "/media/course/oral_core_9000/64/en.srt",
+        "subtitle_zh": "/media/course/oral_core_9000/64/zh.srt"
+      },
+      "pack": {
+        "target_phrases": [],
+        "shadow_lines": [],
+        "quiz": [],
+        "discuss_prompts": [
+          "用本课句型聊一聊「约会」。"
+        ]
+      }
+    },
+    {
+      "lesson_no": 65,
+      "title": "致谢",
+      "bvid": "BV1CS4y1v7sQ",
+      "page": 65,
+      "duration_ms": 600000,
+      "topic": "致谢",
+      "goal": "能用本课句型谈论「致谢」相关情景",
+      "media": {
+        "subtitle_en": "/media/course/oral_core_9000/65/en.srt",
+        "subtitle_zh": "/media/course/oral_core_9000/65/zh.srt"
+      },
+      "pack": {
+        "target_phrases": [],
+        "shadow_lines": [],
+        "quiz": [],
+        "discuss_prompts": [
+          "用本课句型聊一聊「致谢」。"
+        ]
+      }
+    },
+    {
+      "lesson_no": 66,
+      "title": "家庭母爱",
+      "bvid": "BV1CS4y1v7sQ",
+      "page": 66,
+      "duration_ms": 600000,
+      "topic": "家庭母爱",
+      "goal": "能用本课句型谈论「家庭母爱」相关情景",
+      "media": {
+        "subtitle_en": "/media/course/oral_core_9000/66/en.srt",
+        "subtitle_zh": "/media/course/oral_core_9000/66/zh.srt"
+      },
+      "pack": {
+        "target_phrases": [],
+        "shadow_lines": [],
+        "quiz": [],
+        "discuss_prompts": [
+          "用本课句型聊一聊「家庭母爱」。"
+        ]
+      }
+    },
+    {
+      "lesson_no": 67,
+      "title": "友情",
+      "bvid": "BV1CS4y1v7sQ",
+      "page": 67,
+      "duration_ms": 600000,
+      "topic": "友情",
+      "goal": "能用本课句型谈论「友情」相关情景",
+      "media": {
+        "subtitle_en": "/media/course/oral_core_9000/67/en.srt",
+        "subtitle_zh": "/media/course/oral_core_9000/67/zh.srt"
+      },
+      "pack": {
+        "target_phrases": [],
+        "shadow_lines": [],
+        "quiz": [],
+        "discuss_prompts": [
+          "用本课句型聊一聊「友情」。"
+        ]
+      }
+    },
+    {
+      "lesson_no": 68,
+      "title": "求助",
+      "bvid": "BV1CS4y1v7sQ",
+      "page": 68,
+      "duration_ms": 600000,
+      "topic": "求助",
+      "goal": "能用本课句型谈论「求助」相关情景",
+      "media": {
+        "subtitle_en": "/media/course/oral_core_9000/68/en.srt",
+        "subtitle_zh": "/media/course/oral_core_9000/68/zh.srt"
+      },
+      "pack": {
+        "target_phrases": [],
+        "shadow_lines": [],
+        "quiz": [],
+        "discuss_prompts": [
+          "用本课句型聊一聊「求助」。"
+        ]
+      }
+    },
+    {
+      "lesson_no": 69,
+      "title": "求爱",
+      "bvid": "BV1CS4y1v7sQ",
+      "page": 69,
+      "duration_ms": 600000,
+      "topic": "求爱",
+      "goal": "能用本课句型谈论「求爱」相关情景",
+      "media": {
+        "subtitle_en": "/media/course/oral_core_9000/69/en.srt",
+        "subtitle_zh": "/media/course/oral_core_9000/69/zh.srt"
+      },
+      "pack": {
+        "target_phrases": [],
+        "shadow_lines": [],
+        "quiz": [],
+        "discuss_prompts": [
+          "用本课句型聊一聊「求爱」。"
+        ]
+      }
+    },
+    {
+      "lesson_no": 70,
+      "title": "表白",
+      "bvid": "BV1CS4y1v7sQ",
+      "page": 70,
+      "duration_ms": 600000,
+      "topic": "表白",
+      "goal": "能用本课句型谈论「表白」相关情景",
+      "media": {
+        "subtitle_en": "/media/course/oral_core_9000/70/en.srt",
+        "subtitle_zh": "/media/course/oral_core_9000/70/zh.srt"
+      },
+      "pack": {
+        "target_phrases": [],
+        "shadow_lines": [],
+        "quiz": [],
+        "discuss_prompts": [
+          "用本课句型聊一聊「表白」。"
+        ]
+      }
+    },
+    {
+      "lesson_no": 71,
+      "title": "分手失恋",
+      "bvid": "BV1CS4y1v7sQ",
+      "page": 71,
+      "duration_ms": 600000,
+      "topic": "分手失恋",
+      "goal": "能用本课句型谈论「分手失恋」相关情景",
+      "media": {
+        "subtitle_en": "/media/course/oral_core_9000/71/en.srt",
+        "subtitle_zh": "/media/course/oral_core_9000/71/zh.srt"
+      },
+      "pack": {
+        "target_phrases": [],
+        "shadow_lines": [],
+        "quiz": [],
+        "discuss_prompts": [
+          "用本课句型聊一聊「分手失恋」。"
+        ]
+      }
+    },
+    {
+      "lesson_no": 72,
+      "title": "爱情",
+      "bvid": "BV1CS4y1v7sQ",
+      "page": 72,
+      "duration_ms": 600000,
+      "topic": "爱情",
+      "goal": "能用本课句型谈论「爱情」相关情景",
+      "media": {
+        "subtitle_en": "/media/course/oral_core_9000/72/en.srt",
+        "subtitle_zh": "/media/course/oral_core_9000/72/zh.srt"
+      },
+      "pack": {
+        "target_phrases": [],
+        "shadow_lines": [],
+        "quiz": [],
+        "discuss_prompts": [
+          "用本课句型聊一聊「爱情」。"
+        ]
+      }
+    },
+    {
+      "lesson_no": 73,
+      "title": "求婚订婚",
+      "bvid": "BV1CS4y1v7sQ",
+      "page": 73,
+      "duration_ms": 600000,
+      "topic": "求婚订婚",
+      "goal": "能用本课句型谈论「求婚订婚」相关情景",
+      "media": {
+        "subtitle_en": "/media/course/oral_core_9000/73/en.srt",
+        "subtitle_zh": "/media/course/oral_core_9000/73/zh.srt"
+      },
+      "pack": {
+        "target_phrases": [],
+        "shadow_lines": [],
+        "quiz": [],
+        "discuss_prompts": [
+          "用本课句型聊一聊「求婚订婚」。"
+        ]
+      }
+    },
+    {
+      "lesson_no": 74,
+      "title": "相信怀疑",
+      "bvid": "BV1CS4y1v7sQ",
+      "page": 74,
+      "duration_ms": 600000,
+      "topic": "相信怀疑",
+      "goal": "能用本课句型谈论「相信怀疑」相关情景",
+      "media": {
+        "subtitle_en": "/media/course/oral_core_9000/74/en.srt",
+        "subtitle_zh": "/media/course/oral_core_9000/74/zh.srt"
+      },
+      "pack": {
+        "target_phrases": [],
+        "shadow_lines": [],
+        "quiz": [],
+        "discuss_prompts": [
+          "用本课句型聊一聊「相信怀疑」。"
+        ]
+      }
+    },
+    {
+      "lesson_no": 75,
+      "title": "同情安慰",
+      "bvid": "BV1CS4y1v7sQ",
+      "page": 75,
+      "duration_ms": 600000,
+      "topic": "同情安慰",
+      "goal": "能用本课句型谈论「同情安慰」相关情景",
+      "media": {
+        "subtitle_en": "/media/course/oral_core_9000/75/en.srt",
+        "subtitle_zh": "/media/course/oral_core_9000/75/zh.srt"
+      },
+      "pack": {
+        "target_phrases": [],
+        "shadow_lines": [],
+        "quiz": [],
+        "discuss_prompts": [
+          "用本课句型聊一聊「同情安慰」。"
+        ]
+      }
+    },
+    {
+      "lesson_no": 76,
+      "title": "责任",
+      "bvid": "BV1CS4y1v7sQ",
+      "page": 76,
+      "duration_ms": 600000,
+      "topic": "责任",
+      "goal": "能用本课句型谈论「责任」相关情景",
+      "media": {
+        "subtitle_en": "/media/course/oral_core_9000/76/en.srt",
+        "subtitle_zh": "/media/course/oral_core_9000/76/zh.srt"
+      },
+      "pack": {
+        "target_phrases": [],
+        "shadow_lines": [],
+        "quiz": [],
+        "discuss_prompts": [
+          "用本课句型聊一聊「责任」。"
+        ]
+      }
+    },
+    {
+      "lesson_no": 77,
+      "title": "告诫制止",
+      "bvid": "BV1CS4y1v7sQ",
+      "page": 77,
+      "duration_ms": 600000,
+      "topic": "告诫制止",
+      "goal": "能用本课句型谈论「告诫制止」相关情景",
+      "media": {
+        "subtitle_en": "/media/course/oral_core_9000/77/en.srt",
+        "subtitle_zh": "/media/course/oral_core_9000/77/zh.srt"
+      },
+      "pack": {
+        "target_phrases": [],
+        "shadow_lines": [],
+        "quiz": [],
+        "discuss_prompts": [
+          "用本课句型聊一聊「告诫制止」。"
+        ]
+      }
+    },
+    {
+      "lesson_no": 78,
+      "title": "后悔犹豫",
+      "bvid": "BV1CS4y1v7sQ",
+      "page": 78,
+      "duration_ms": 600000,
+      "topic": "后悔犹豫",
+      "goal": "能用本课句型谈论「后悔犹豫」相关情景",
+      "media": {
+        "subtitle_en": "/media/course/oral_core_9000/78/en.srt",
+        "subtitle_zh": "/media/course/oral_core_9000/78/zh.srt"
+      },
+      "pack": {
+        "target_phrases": [],
+        "shadow_lines": [],
+        "quiz": [],
+        "discuss_prompts": [
+          "用本课句型聊一聊「后悔犹豫」。"
+        ]
+      }
+    },
+    {
+      "lesson_no": 79,
+      "title": "讨厌欣赏",
+      "bvid": "BV1CS4y1v7sQ",
+      "page": 79,
+      "duration_ms": 600000,
+      "topic": "讨厌欣赏",
+      "goal": "能用本课句型谈论「讨厌欣赏」相关情景",
+      "media": {
+        "subtitle_en": "/media/course/oral_core_9000/79/en.srt",
+        "subtitle_zh": "/media/course/oral_core_9000/79/zh.srt"
+      },
+      "pack": {
+        "target_phrases": [],
+        "shadow_lines": [],
+        "quiz": [],
+        "discuss_prompts": [
+          "用本课句型聊一聊「讨厌欣赏」。"
+        ]
+      }
+    },
+    {
+      "lesson_no": 80,
+      "title": "失望绝望",
+      "bvid": "BV1CS4y1v7sQ",
+      "page": 80,
+      "duration_ms": 600000,
+      "topic": "失望绝望",
+      "goal": "能用本课句型谈论「失望绝望」相关情景",
+      "media": {
+        "subtitle_en": "/media/course/oral_core_9000/80/en.srt",
+        "subtitle_zh": "/media/course/oral_core_9000/80/zh.srt"
+      },
+      "pack": {
+        "target_phrases": [],
+        "shadow_lines": [],
+        "quiz": [],
+        "discuss_prompts": [
+          "用本课句型聊一聊「失望绝望」。"
+        ]
+      }
+    },
+    {
+      "lesson_no": 81,
+      "title": "赞扬责备",
+      "bvid": "BV1CS4y1v7sQ",
+      "page": 81,
+      "duration_ms": 600000,
+      "topic": "赞扬责备",
+      "goal": "能用本课句型谈论「赞扬责备」相关情景",
+      "media": {
+        "subtitle_en": "/media/course/oral_core_9000/81/en.srt",
+        "subtitle_zh": "/media/course/oral_core_9000/81/zh.srt"
+      },
+      "pack": {
+        "target_phrases": [],
+        "shadow_lines": [],
+        "quiz": [],
+        "discuss_prompts": [
+          "用本课句型聊一聊「赞扬责备」。"
+        ]
+      }
+    },
+    {
+      "lesson_no": 82,
+      "title": "高兴悲伤",
+      "bvid": "BV1CS4y1v7sQ",
+      "page": 82,
+      "duration_ms": 600000,
+      "topic": "高兴悲伤",
+      "goal": "能用本课句型谈论「高兴悲伤」相关情景",
+      "media": {
+        "subtitle_en": "/media/course/oral_core_9000/82/en.srt",
+        "subtitle_zh": "/media/course/oral_core_9000/82/zh.srt"
+      },
+      "pack": {
+        "target_phrases": [],
+        "shadow_lines": [],
+        "quiz": [],
+        "discuss_prompts": [
+          "用本课句型聊一聊「高兴悲伤」。"
+        ]
+      }
+    },
+    {
+      "lesson_no": 83,
+      "title": "寂寞忧郁",
+      "bvid": "BV1CS4y1v7sQ",
+      "page": 83,
+      "duration_ms": 600000,
+      "topic": "寂寞忧郁",
+      "goal": "能用本课句型谈论「寂寞忧郁」相关情景",
+      "media": {
+        "subtitle_en": "/media/course/oral_core_9000/83/en.srt",
+        "subtitle_zh": "/media/course/oral_core_9000/83/zh.srt"
+      },
+      "pack": {
+        "target_phrases": [],
+        "shadow_lines": [],
+        "quiz": [],
+        "discuss_prompts": [
+          "用本课句型聊一聊「寂寞忧郁」。"
+        ]
+      }
+    },
+    {
+      "lesson_no": 84,
+      "title": "跳舞",
+      "bvid": "BV1CS4y1v7sQ",
+      "page": 84,
+      "duration_ms": 600000,
+      "topic": "跳舞",
+      "goal": "能用本课句型谈论「跳舞」相关情景",
+      "media": {
+        "subtitle_en": "/media/course/oral_core_9000/84/en.srt",
+        "subtitle_zh": "/media/course/oral_core_9000/84/zh.srt"
+      },
+      "pack": {
+        "target_phrases": [],
+        "shadow_lines": [],
+        "quiz": [],
+        "discuss_prompts": [
+          "用本课句型聊一聊「跳舞」。"
+        ]
+      }
+    },
+    {
+      "lesson_no": 85,
+      "title": "玩牌下棋",
+      "bvid": "BV1CS4y1v7sQ",
+      "page": 85,
+      "duration_ms": 600000,
+      "topic": "玩牌下棋",
+      "goal": "能用本课句型谈论「玩牌下棋」相关情景",
+      "media": {
+        "subtitle_en": "/media/course/oral_core_9000/85/en.srt",
+        "subtitle_zh": "/media/course/oral_core_9000/85/zh.srt"
+      },
+      "pack": {
+        "target_phrases": [],
+        "shadow_lines": [],
+        "quiz": [],
+        "discuss_prompts": [
+          "用本课句型聊一聊「玩牌下棋」。"
+        ]
+      }
+    },
+    {
+      "lesson_no": 86,
+      "title": "饮酒",
+      "bvid": "BV1CS4y1v7sQ",
+      "page": 86,
+      "duration_ms": 600000,
+      "topic": "饮酒",
+      "goal": "能用本课句型谈论「饮酒」相关情景",
+      "media": {
+        "subtitle_en": "/media/course/oral_core_9000/86/en.srt",
+        "subtitle_zh": "/media/course/oral_core_9000/86/zh.srt"
+      },
+      "pack": {
+        "target_phrases": [],
+        "shadow_lines": [],
+        "quiz": [],
+        "discuss_prompts": [
+          "用本课句型聊一聊「饮酒」。"
+        ]
+      }
+    },
+    {
+      "lesson_no": 87,
+      "title": "KTV唱歌",
+      "bvid": "BV1CS4y1v7sQ",
+      "page": 87,
+      "duration_ms": 600000,
+      "topic": "KTV唱歌",
+      "goal": "能用本课句型谈论「KTV唱歌」相关情景",
+      "media": {
+        "subtitle_en": "/media/course/oral_core_9000/87/en.srt",
+        "subtitle_zh": "/media/course/oral_core_9000/87/zh.srt"
+      },
+      "pack": {
+        "target_phrases": [],
+        "shadow_lines": [],
+        "quiz": [],
+        "discuss_prompts": [
+          "用本课句型聊一聊「KTV唱歌」。"
+        ]
+      }
+    },
+    {
+      "lesson_no": 88,
+      "title": "看电影",
+      "bvid": "BV1CS4y1v7sQ",
+      "page": 88,
+      "duration_ms": 600000,
+      "topic": "看电影",
+      "goal": "能用本课句型谈论「看电影」相关情景",
+      "media": {
+        "subtitle_en": "/media/course/oral_core_9000/88/en.srt",
+        "subtitle_zh": "/media/course/oral_core_9000/88/zh.srt"
+      },
+      "pack": {
+        "target_phrases": [],
+        "shadow_lines": [],
+        "quiz": [],
+        "discuss_prompts": [
+          "用本课句型聊一聊「看电影」。"
+        ]
+      }
+    },
+    {
+      "lesson_no": 89,
+      "title": "看电视",
+      "bvid": "BV1CS4y1v7sQ",
+      "page": 89,
+      "duration_ms": 600000,
+      "topic": "看电视",
+      "goal": "能用本课句型谈论「看电视」相关情景",
+      "media": {
+        "subtitle_en": "/media/course/oral_core_9000/89/en.srt",
+        "subtitle_zh": "/media/course/oral_core_9000/89/zh.srt"
+      },
+      "pack": {
+        "target_phrases": [],
+        "shadow_lines": [],
+        "quiz": [],
+        "discuss_prompts": [
+          "用本课句型聊一聊「看电视」。"
+        ]
+      }
+    },
+    {
+      "lesson_no": 90,
+      "title": "听音乐",
+      "bvid": "BV1CS4y1v7sQ",
+      "page": 90,
+      "duration_ms": 600000,
+      "topic": "听音乐",
+      "goal": "能用本课句型谈论「听音乐」相关情景",
+      "media": {
+        "subtitle_en": "/media/course/oral_core_9000/90/en.srt",
+        "subtitle_zh": "/media/course/oral_core_9000/90/zh.srt"
+      },
+      "pack": {
+        "target_phrases": [],
+        "shadow_lines": [],
+        "quiz": [],
+        "discuss_prompts": [
+          "用本课句型聊一聊「听音乐」。"
+        ]
+      }
+    },
+    {
+      "lesson_no": 91,
+      "title": "绘画",
+      "bvid": "BV1CS4y1v7sQ",
+      "page": 91,
+      "duration_ms": 600000,
+      "topic": "绘画",
+      "goal": "能用本课句型谈论「绘画」相关情景",
+      "media": {
+        "subtitle_en": "/media/course/oral_core_9000/91/en.srt",
+        "subtitle_zh": "/media/course/oral_core_9000/91/zh.srt"
+      },
+      "pack": {
+        "target_phrases": [],
+        "shadow_lines": [],
+        "quiz": [],
+        "discuss_prompts": [
+          "用本课句型聊一聊「绘画」。"
+        ]
+      }
+    },
+    {
+      "lesson_no": 92,
+      "title": "散步",
+      "bvid": "BV1CS4y1v7sQ",
+      "page": 92,
+      "duration_ms": 600000,
+      "topic": "散步",
+      "goal": "能用本课句型谈论「散步」相关情景",
+      "media": {
+        "subtitle_en": "/media/course/oral_core_9000/92/en.srt",
+        "subtitle_zh": "/media/course/oral_core_9000/92/zh.srt"
+      },
+      "pack": {
+        "target_phrases": [],
+        "shadow_lines": [],
+        "quiz": [],
+        "discuss_prompts": [
+          "用本课句型聊一聊「散步」。"
+        ]
+      }
+    },
+    {
+      "lesson_no": 93,
+      "title": "跑步",
+      "bvid": "BV1CS4y1v7sQ",
+      "page": 93,
+      "duration_ms": 600000,
+      "topic": "跑步",
+      "goal": "能用本课句型谈论「跑步」相关情景",
+      "media": {
+        "subtitle_en": "/media/course/oral_core_9000/93/en.srt",
+        "subtitle_zh": "/media/course/oral_core_9000/93/zh.srt"
+      },
+      "pack": {
+        "target_phrases": [],
+        "shadow_lines": [],
+        "quiz": [],
+        "discuss_prompts": [
+          "用本课句型聊一聊「跑步」。"
+        ]
+      }
+    },
+    {
+      "lesson_no": 94,
+      "title": "球类",
+      "bvid": "BV1CS4y1v7sQ",
+      "page": 94,
+      "duration_ms": 600000,
+      "topic": "球类",
+      "goal": "能用本课句型谈论「球类」相关情景",
+      "media": {
+        "subtitle_en": "/media/course/oral_core_9000/94/en.srt",
+        "subtitle_zh": "/media/course/oral_core_9000/94/zh.srt"
+      },
+      "pack": {
+        "target_phrases": [],
+        "shadow_lines": [],
+        "quiz": [],
+        "discuss_prompts": [
+          "用本课句型聊一聊「球类」。"
+        ]
+      }
+    },
+    {
+      "lesson_no": 95,
+      "title": "骑自行车",
+      "bvid": "BV1CS4y1v7sQ",
+      "page": 95,
+      "duration_ms": 600000,
+      "topic": "骑自行车",
+      "goal": "能用本课句型谈论「骑自行车」相关情景",
+      "media": {
+        "subtitle_en": "/media/course/oral_core_9000/95/en.srt",
+        "subtitle_zh": "/media/course/oral_core_9000/95/zh.srt"
+      },
+      "pack": {
+        "target_phrases": [],
+        "shadow_lines": [],
+        "quiz": [],
+        "discuss_prompts": [
+          "用本课句型聊一聊「骑自行车」。"
+        ]
+      }
+    },
+    {
+      "lesson_no": 96,
+      "title": "工作职位",
+      "bvid": "BV1CS4y1v7sQ",
+      "page": 96,
+      "duration_ms": 600000,
+      "topic": "工作职位",
+      "goal": "能用本课句型谈论「工作职位」相关情景",
+      "media": {
+        "subtitle_en": "/media/course/oral_core_9000/96/en.srt",
+        "subtitle_zh": "/media/course/oral_core_9000/96/zh.srt"
+      },
+      "pack": {
+        "target_phrases": [],
+        "shadow_lines": [],
+        "quiz": [],
+        "discuss_prompts": [
+          "用本课句型聊一聊「工作职位」。"
+        ]
+      }
+    },
+    {
+      "lesson_no": 97,
+      "title": "面试准备",
+      "bvid": "BV1CS4y1v7sQ",
+      "page": 97,
+      "duration_ms": 600000,
+      "topic": "面试准备",
+      "goal": "能用本课句型谈论「面试准备」相关情景",
+      "media": {
+        "subtitle_en": "/media/course/oral_core_9000/97/en.srt",
+        "subtitle_zh": "/media/course/oral_core_9000/97/zh.srt"
+      },
+      "pack": {
+        "target_phrases": [],
+        "shadow_lines": [],
+        "quiz": [],
+        "discuss_prompts": [
+          "用本课句型聊一聊「面试准备」。"
+        ]
+      }
+    },
+    {
+      "lesson_no": 98,
+      "title": "面试过程",
+      "bvid": "BV1CS4y1v7sQ",
+      "page": 98,
+      "duration_ms": 600000,
+      "topic": "面试过程",
+      "goal": "能用本课句型谈论「面试过程」相关情景",
+      "media": {
+        "subtitle_en": "/media/course/oral_core_9000/98/en.srt",
+        "subtitle_zh": "/media/course/oral_core_9000/98/zh.srt"
+      },
+      "pack": {
+        "target_phrases": [],
+        "shadow_lines": [],
+        "quiz": [],
+        "discuss_prompts": [
+          "用本课句型聊一聊「面试过程」。"
+        ]
+      }
+    },
+    {
+      "lesson_no": 99,
+      "title": "面试结果",
+      "bvid": "BV1CS4y1v7sQ",
+      "page": 99,
+      "duration_ms": 600000,
+      "topic": "面试结果",
+      "goal": "能用本课句型谈论「面试结果」相关情景",
+      "media": {
+        "subtitle_en": "/media/course/oral_core_9000/99/en.srt",
+        "subtitle_zh": "/media/course/oral_core_9000/99/zh.srt"
+      },
+      "pack": {
+        "target_phrases": [],
+        "shadow_lines": [],
+        "quiz": [],
+        "discuss_prompts": [
+          "用本课句型聊一聊「面试结果」。"
+        ]
+      }
+    },
+    {
+      "lesson_no": 100,
+      "title": "新工作报道",
+      "bvid": "BV1CS4y1v7sQ",
+      "page": 100,
+      "duration_ms": 600000,
+      "topic": "新工作报道",
+      "goal": "能用本课句型谈论「新工作报道」相关情景",
+      "media": {
+        "subtitle_en": "/media/course/oral_core_9000/100/en.srt",
+        "subtitle_zh": "/media/course/oral_core_9000/100/zh.srt"
+      },
+      "pack": {
+        "target_phrases": [],
+        "shadow_lines": [],
+        "quiz": [],
+        "discuss_prompts": [
+          "用本课句型聊一聊「新工作报道」。"
+        ]
+      }
+    },
+    {
+      "lesson_no": 101,
+      "title": "试用入职劳动协议",
+      "bvid": "BV1CS4y1v7sQ",
+      "page": 101,
+      "duration_ms": 600000,
+      "topic": "试用入职劳动协议",
+      "goal": "能用本课句型谈论「试用入职劳动协议」相关情景",
+      "media": {
+        "subtitle_en": "/media/course/oral_core_9000/101/en.srt",
+        "subtitle_zh": "/media/course/oral_core_9000/101/zh.srt"
+      },
+      "pack": {
+        "target_phrases": [],
+        "shadow_lines": [],
+        "quiz": [],
+        "discuss_prompts": [
+          "用本课句型聊一聊「试用入职劳动协议」。"
+        ]
+      }
+    },
+    {
+      "lesson_no": 102,
+      "title": "同事之间",
+      "bvid": "BV1CS4y1v7sQ",
+      "page": 102,
+      "duration_ms": 600000,
+      "topic": "同事之间",
+      "goal": "能用本课句型谈论「同事之间」相关情景",
+      "media": {
+        "subtitle_en": "/media/course/oral_core_9000/102/en.srt",
+        "subtitle_zh": "/media/course/oral_core_9000/102/zh.srt"
+      },
+      "pack": {
+        "target_phrases": [],
+        "shadow_lines": [],
+        "quiz": [],
+        "discuss_prompts": [
+          "用本课句型聊一聊「同事之间」。"
+        ]
+      }
+    },
+    {
+      "lesson_no": 103,
+      "title": "上下班",
+      "bvid": "BV1CS4y1v7sQ",
+      "page": 103,
+      "duration_ms": 600000,
+      "topic": "上下班",
+      "goal": "能用本课句型谈论「上下班」相关情景",
+      "media": {
+        "subtitle_en": "/media/course/oral_core_9000/103/en.srt",
+        "subtitle_zh": "/media/course/oral_core_9000/103/zh.srt"
+      },
+      "pack": {
+        "target_phrases": [],
+        "shadow_lines": [],
+        "quiz": [],
+        "discuss_prompts": [
+          "用本课句型聊一聊「上下班」。"
+        ]
+      }
+    },
+    {
+      "lesson_no": 104,
+      "title": "请假",
+      "bvid": "BV1CS4y1v7sQ",
+      "page": 104,
+      "duration_ms": 600000,
+      "topic": "请假",
+      "goal": "能用本课句型谈论「请假」相关情景",
+      "media": {
+        "subtitle_en": "/media/course/oral_core_9000/104/en.srt",
+        "subtitle_zh": "/media/course/oral_core_9000/104/zh.srt"
+      },
+      "pack": {
+        "target_phrases": [],
+        "shadow_lines": [],
+        "quiz": [],
+        "discuss_prompts": [
+          "用本课句型聊一聊「请假」。"
+        ]
+      }
+    },
+    {
+      "lesson_no": 105,
+      "title": "加班",
+      "bvid": "BV1CS4y1v7sQ",
+      "page": 105,
+      "duration_ms": 600000,
+      "topic": "加班",
+      "goal": "能用本课句型谈论「加班」相关情景",
+      "media": {
+        "subtitle_en": "/media/course/oral_core_9000/105/en.srt",
+        "subtitle_zh": "/media/course/oral_core_9000/105/zh.srt"
+      },
+      "pack": {
+        "target_phrases": [],
+        "shadow_lines": [],
+        "quiz": [],
+        "discuss_prompts": [
+          "用本课句型聊一聊「加班」。"
+        ]
+      }
+    },
+    {
+      "lesson_no": 106,
+      "title": "换班调休",
+      "bvid": "BV1CS4y1v7sQ",
+      "page": 106,
+      "duration_ms": 600000,
+      "topic": "换班调休",
+      "goal": "能用本课句型谈论「换班调休」相关情景",
+      "media": {
+        "subtitle_en": "/media/course/oral_core_9000/106/en.srt",
+        "subtitle_zh": "/media/course/oral_core_9000/106/zh.srt"
+      },
+      "pack": {
+        "target_phrases": [],
+        "shadow_lines": [],
+        "quiz": [],
+        "discuss_prompts": [
+          "用本课句型聊一聊「换班调休」。"
+        ]
+      }
+    },
+    {
+      "lesson_no": 107,
+      "title": "出差",
+      "bvid": "BV1CS4y1v7sQ",
+      "page": 107,
+      "duration_ms": 600000,
+      "topic": "出差",
+      "goal": "能用本课句型谈论「出差」相关情景",
+      "media": {
+        "subtitle_en": "/media/course/oral_core_9000/107/en.srt",
+        "subtitle_zh": "/media/course/oral_core_9000/107/zh.srt"
+      },
+      "pack": {
+        "target_phrases": [],
+        "shadow_lines": [],
+        "quiz": [],
+        "discuss_prompts": [
+          "用本课句型聊一聊「出差」。"
+        ]
+      }
+    },
+    {
+      "lesson_no": 108,
+      "title": "奖金假期福利",
+      "bvid": "BV1CS4y1v7sQ",
+      "page": 108,
+      "duration_ms": 600000,
+      "topic": "奖金假期福利",
+      "goal": "能用本课句型谈论「奖金假期福利」相关情景",
+      "media": {
+        "subtitle_en": "/media/course/oral_core_9000/108/en.srt",
+        "subtitle_zh": "/media/course/oral_core_9000/108/zh.srt"
+      },
+      "pack": {
+        "target_phrases": [],
+        "shadow_lines": [],
+        "quiz": [],
+        "discuss_prompts": [
+          "用本课句型聊一聊「奖金假期福利」。"
+        ]
+      }
+    },
+    {
+      "lesson_no": 109,
+      "title": "调任",
+      "bvid": "BV1CS4y1v7sQ",
+      "page": 109,
+      "duration_ms": 600000,
+      "topic": "调任",
+      "goal": "能用本课句型谈论「调任」相关情景",
+      "media": {
+        "subtitle_en": "/media/course/oral_core_9000/109/en.srt",
+        "subtitle_zh": "/media/course/oral_core_9000/109/zh.srt"
+      },
+      "pack": {
+        "target_phrases": [],
+        "shadow_lines": [],
+        "quiz": [],
+        "discuss_prompts": [
+          "用本课句型聊一聊「调任」。"
+        ]
+      }
+    },
+    {
+      "lesson_no": 110,
+      "title": "升职",
+      "bvid": "BV1CS4y1v7sQ",
+      "page": 110,
+      "duration_ms": 600000,
+      "topic": "升职",
+      "goal": "能用本课句型谈论「升职」相关情景",
+      "media": {
+        "subtitle_en": "/media/course/oral_core_9000/110/en.srt",
+        "subtitle_zh": "/media/course/oral_core_9000/110/zh.srt"
+      },
+      "pack": {
+        "target_phrases": [],
+        "shadow_lines": [],
+        "quiz": [],
+        "discuss_prompts": [
+          "用本课句型聊一聊「升职」。"
+        ]
+      }
+    },
+    {
+      "lesson_no": 111,
+      "title": "加薪",
+      "bvid": "BV1CS4y1v7sQ",
+      "page": 111,
+      "duration_ms": 600000,
+      "topic": "加薪",
+      "goal": "能用本课句型谈论「加薪」相关情景",
+      "media": {
+        "subtitle_en": "/media/course/oral_core_9000/111/en.srt",
+        "subtitle_zh": "/media/course/oral_core_9000/111/zh.srt"
+      },
+      "pack": {
+        "target_phrases": [],
+        "shadow_lines": [],
+        "quiz": [],
+        "discuss_prompts": [
+          "用本课句型聊一聊「加薪」。"
+        ]
+      }
+    },
+    {
+      "lesson_no": 112,
+      "title": "辞职",
+      "bvid": "BV1CS4y1v7sQ",
+      "page": 112,
+      "duration_ms": 600000,
+      "topic": "辞职",
+      "goal": "能用本课句型谈论「辞职」相关情景",
+      "media": {
+        "subtitle_en": "/media/course/oral_core_9000/112/en.srt",
+        "subtitle_zh": "/media/course/oral_core_9000/112/zh.srt"
+      },
+      "pack": {
+        "target_phrases": [],
+        "shadow_lines": [],
+        "quiz": [],
+        "discuss_prompts": [
+          "用本课句型聊一聊「辞职」。"
+        ]
+      }
+    },
+    {
+      "lesson_no": 113,
+      "title": "解雇",
+      "bvid": "BV1CS4y1v7sQ",
+      "page": 113,
+      "duration_ms": 600000,
+      "topic": "解雇",
+      "goal": "能用本课句型谈论「解雇」相关情景",
+      "media": {
+        "subtitle_en": "/media/course/oral_core_9000/113/en.srt",
+        "subtitle_zh": "/media/course/oral_core_9000/113/zh.srt"
+      },
+      "pack": {
+        "target_phrases": [],
+        "shadow_lines": [],
+        "quiz": [],
+        "discuss_prompts": [
+          "用本课句型聊一聊「解雇」。"
+        ]
+      }
+    },
+    {
+      "lesson_no": 114,
+      "title": "调研",
+      "bvid": "BV1CS4y1v7sQ",
+      "page": 114,
+      "duration_ms": 600000,
+      "topic": "调研",
+      "goal": "能用本课句型谈论「调研」相关情景",
+      "media": {
+        "subtitle_en": "/media/course/oral_core_9000/114/en.srt",
+        "subtitle_zh": "/media/course/oral_core_9000/114/zh.srt"
+      },
+      "pack": {
+        "target_phrases": [],
+        "shadow_lines": [],
+        "quiz": [],
+        "discuss_prompts": [
+          "用本课句型聊一聊「调研」。"
+        ]
+      }
+    },
+    {
+      "lesson_no": 115,
+      "title": "展会",
+      "bvid": "BV1CS4y1v7sQ",
+      "page": 115,
+      "duration_ms": 600000,
+      "topic": "展会",
+      "goal": "能用本课句型谈论「展会」相关情景",
+      "media": {
+        "subtitle_en": "/media/course/oral_core_9000/115/en.srt",
+        "subtitle_zh": "/media/course/oral_core_9000/115/zh.srt"
+      },
+      "pack": {
+        "target_phrases": [],
+        "shadow_lines": [],
+        "quiz": [],
+        "discuss_prompts": [
+          "用本课句型聊一聊「展会」。"
+        ]
+      }
+    },
+    {
+      "lesson_no": 116,
+      "title": "营销促销",
+      "bvid": "BV1CS4y1v7sQ",
+      "page": 116,
+      "duration_ms": 600000,
+      "topic": "营销促销",
+      "goal": "能用本课句型谈论「营销促销」相关情景",
+      "media": {
+        "subtitle_en": "/media/course/oral_core_9000/116/en.srt",
+        "subtitle_zh": "/media/course/oral_core_9000/116/zh.srt"
+      },
+      "pack": {
+        "target_phrases": [],
+        "shadow_lines": [],
+        "quiz": [],
+        "discuss_prompts": [
+          "用本课句型聊一聊「营销促销」。"
+        ]
+      }
+    },
+    {
+      "lesson_no": 117,
+      "title": "代理商",
+      "bvid": "BV1CS4y1v7sQ",
+      "page": 117,
+      "duration_ms": 600000,
+      "topic": "代理商",
+      "goal": "能用本课句型谈论「代理商」相关情景",
+      "media": {
+        "subtitle_en": "/media/course/oral_core_9000/117/en.srt",
+        "subtitle_zh": "/media/course/oral_core_9000/117/zh.srt"
+      },
+      "pack": {
+        "target_phrases": [],
+        "shadow_lines": [],
+        "quiz": [],
+        "discuss_prompts": [
+          "用本课句型聊一聊「代理商」。"
+        ]
+      }
+    },
+    {
+      "lesson_no": 118,
+      "title": "约会商务",
+      "bvid": "BV1CS4y1v7sQ",
+      "page": 118,
+      "duration_ms": 600000,
+      "topic": "约会商务",
+      "goal": "能用本课句型谈论「约会商务」相关情景",
+      "media": {
+        "subtitle_en": "/media/course/oral_core_9000/118/en.srt",
+        "subtitle_zh": "/media/course/oral_core_9000/118/zh.srt"
+      },
+      "pack": {
+        "target_phrases": [],
+        "shadow_lines": [],
+        "quiz": [],
+        "discuss_prompts": [
+          "用本课句型聊一聊「约会商务」。"
+        ]
+      }
+    },
+    {
+      "lesson_no": 119,
+      "title": "接机会客洽谈",
+      "bvid": "BV1CS4y1v7sQ",
+      "page": 119,
+      "duration_ms": 600000,
+      "topic": "接机会客洽谈",
+      "goal": "能用本课句型谈论「接机会客洽谈」相关情景",
+      "media": {
+        "subtitle_en": "/media/course/oral_core_9000/119/en.srt",
+        "subtitle_zh": "/media/course/oral_core_9000/119/zh.srt"
+      },
+      "pack": {
+        "target_phrases": [],
+        "shadow_lines": [],
+        "quiz": [],
+        "discuss_prompts": [
+          "用本课句型聊一聊「接机会客洽谈」。"
+        ]
+      }
+    },
+    {
+      "lesson_no": 120,
+      "title": "参观公司工厂",
+      "bvid": "BV1CS4y1v7sQ",
+      "page": 120,
+      "duration_ms": 600000,
+      "topic": "参观公司工厂",
+      "goal": "能用本课句型谈论「参观公司工厂」相关情景",
+      "media": {
+        "subtitle_en": "/media/course/oral_core_9000/120/en.srt",
+        "subtitle_zh": "/media/course/oral_core_9000/120/zh.srt"
+      },
+      "pack": {
+        "target_phrases": [],
+        "shadow_lines": [],
+        "quiz": [],
+        "discuss_prompts": [
+          "用本课句型聊一聊「参观公司工厂」。"
+        ]
+      }
+    },
+    {
+      "lesson_no": 121,
+      "title": "观摩介绍产品",
+      "bvid": "BV1CS4y1v7sQ",
+      "page": 121,
+      "duration_ms": 600000,
+      "topic": "观摩介绍产品",
+      "goal": "能用本课句型谈论「观摩介绍产品」相关情景",
+      "media": {
+        "subtitle_en": "/media/course/oral_core_9000/121/en.srt",
+        "subtitle_zh": "/media/course/oral_core_9000/121/zh.srt"
+      },
+      "pack": {
+        "target_phrases": [],
+        "shadow_lines": [],
+        "quiz": [],
+        "discuss_prompts": [
+          "用本课句型聊一聊「观摩介绍产品」。"
+        ]
+      }
+    },
+    {
+      "lesson_no": 122,
+      "title": "宴请客户",
+      "bvid": "BV1CS4y1v7sQ",
+      "page": 122,
+      "duration_ms": 600000,
+      "topic": "宴请客户",
+      "goal": "能用本课句型谈论「宴请客户」相关情景",
+      "media": {
+        "subtitle_en": "/media/course/oral_core_9000/122/en.srt",
+        "subtitle_zh": "/media/course/oral_core_9000/122/zh.srt"
+      },
+      "pack": {
+        "target_phrases": [],
+        "shadow_lines": [],
+        "quiz": [],
+        "discuss_prompts": [
+          "用本课句型聊一聊「宴请客户」。"
+        ]
+      }
+    },
+    {
+      "lesson_no": 123,
+      "title": "观光游玩",
+      "bvid": "BV1CS4y1v7sQ",
+      "page": 123,
+      "duration_ms": 600000,
+      "topic": "观光游玩",
+      "goal": "能用本课句型谈论「观光游玩」相关情景",
+      "media": {
+        "subtitle_en": "/media/course/oral_core_9000/123/en.srt",
+        "subtitle_zh": "/media/course/oral_core_9000/123/zh.srt"
+      },
+      "pack": {
+        "target_phrases": [],
+        "shadow_lines": [],
+        "quiz": [],
+        "discuss_prompts": [
+          "用本课句型聊一聊「观光游玩」。"
+        ]
+      }
+    },
+    {
+      "lesson_no": 124,
+      "title": "离开送别",
+      "bvid": "BV1CS4y1v7sQ",
+      "page": 124,
+      "duration_ms": 600000,
+      "topic": "离开送别",
+      "goal": "能用本课句型谈论「离开送别」相关情景",
+      "media": {
+        "subtitle_en": "/media/course/oral_core_9000/124/en.srt",
+        "subtitle_zh": "/media/course/oral_core_9000/124/zh.srt"
+      },
+      "pack": {
+        "target_phrases": [],
+        "shadow_lines": [],
+        "quiz": [],
+        "discuss_prompts": [
+          "用本课句型聊一聊「离开送别」。"
+        ]
+      }
+    },
+    {
+      "lesson_no": 125,
+      "title": "挂号",
+      "bvid": "BV1CS4y1v7sQ",
+      "page": 125,
+      "duration_ms": 600000,
+      "topic": "挂号",
+      "goal": "能用本课句型谈论「挂号」相关情景",
+      "media": {
+        "subtitle_en": "/media/course/oral_core_9000/125/en.srt",
+        "subtitle_zh": "/media/course/oral_core_9000/125/zh.srt"
+      },
+      "pack": {
+        "target_phrases": [],
+        "shadow_lines": [],
+        "quiz": [],
+        "discuss_prompts": [
+          "用本课句型聊一聊「挂号」。"
+        ]
+      }
+    },
+    {
+      "lesson_no": 126,
+      "title": "医生诊断开方",
+      "bvid": "BV1CS4y1v7sQ",
+      "page": 126,
+      "duration_ms": 600000,
+      "topic": "医生诊断开方",
+      "goal": "能用本课句型谈论「医生诊断开方」相关情景",
+      "media": {
+        "subtitle_en": "/media/course/oral_core_9000/126/en.srt",
+        "subtitle_zh": "/media/course/oral_core_9000/126/zh.srt"
+      },
+      "pack": {
+        "target_phrases": [],
+        "shadow_lines": [],
+        "quiz": [],
+        "discuss_prompts": [
+          "用本课句型聊一聊「医生诊断开方」。"
+        ]
+      }
+    },
+    {
+      "lesson_no": 127,
+      "title": "买药吃药",
+      "bvid": "BV1CS4y1v7sQ",
+      "page": 127,
+      "duration_ms": 600000,
+      "topic": "买药吃药",
+      "goal": "能用本课句型谈论「买药吃药」相关情景",
+      "media": {
+        "subtitle_en": "/media/course/oral_core_9000/127/en.srt",
+        "subtitle_zh": "/media/course/oral_core_9000/127/zh.srt"
+      },
+      "pack": {
+        "target_phrases": [],
+        "shadow_lines": [],
+        "quiz": [],
+        "discuss_prompts": [
+          "用本课句型聊一聊「买药吃药」。"
+        ]
+      }
+    },
+    {
+      "lesson_no": 128,
+      "title": "病情咨询",
+      "bvid": "BV1CS4y1v7sQ",
+      "page": 128,
+      "duration_ms": 600000,
+      "topic": "病情咨询",
+      "goal": "能用本课句型谈论「病情咨询」相关情景",
+      "media": {
+        "subtitle_en": "/media/course/oral_core_9000/128/en.srt",
+        "subtitle_zh": "/media/course/oral_core_9000/128/zh.srt"
+      },
+      "pack": {
+        "target_phrases": [],
+        "shadow_lines": [],
+        "quiz": [],
+        "discuss_prompts": [
+          "用本课句型聊一聊「病情咨询」。"
+        ]
+      }
+    },
+    {
+      "lesson_no": 129,
+      "title": "突发紧急病情",
+      "bvid": "BV1CS4y1v7sQ",
+      "page": 129,
+      "duration_ms": 600000,
+      "topic": "突发紧急病情",
+      "goal": "能用本课句型谈论「突发紧急病情」相关情景",
+      "media": {
+        "subtitle_en": "/media/course/oral_core_9000/129/en.srt",
+        "subtitle_zh": "/media/course/oral_core_9000/129/zh.srt"
+      },
+      "pack": {
+        "target_phrases": [],
+        "shadow_lines": [],
+        "quiz": [],
+        "discuss_prompts": [
+          "用本课句型聊一聊「突发紧急病情」。"
+        ]
+      }
+    },
+    {
+      "lesson_no": 130,
+      "title": "手术",
+      "bvid": "BV1CS4y1v7sQ",
+      "page": 130,
+      "duration_ms": 600000,
+      "topic": "手术",
+      "goal": "能用本课句型谈论「手术」相关情景",
+      "media": {
+        "subtitle_en": "/media/course/oral_core_9000/130/en.srt",
+        "subtitle_zh": "/media/course/oral_core_9000/130/zh.srt"
+      },
+      "pack": {
+        "target_phrases": [],
+        "shadow_lines": [],
+        "quiz": [],
+        "discuss_prompts": [
+          "用本课句型聊一聊「手术」。"
+        ]
+      }
+    },
+    {
+      "lesson_no": 131,
+      "title": "住院",
+      "bvid": "BV1CS4y1v7sQ",
+      "page": 131,
+      "duration_ms": 600000,
+      "topic": "住院",
+      "goal": "能用本课句型谈论「住院」相关情景",
+      "media": {
+        "subtitle_en": "/media/course/oral_core_9000/131/en.srt",
+        "subtitle_zh": "/media/course/oral_core_9000/131/zh.srt"
+      },
+      "pack": {
+        "target_phrases": [],
+        "shadow_lines": [],
+        "quiz": [],
+        "discuss_prompts": [
+          "用本课句型聊一聊「住院」。"
+        ]
+      }
+    },
+    {
+      "lesson_no": 132,
+      "title": "探病",
+      "bvid": "BV1CS4y1v7sQ",
+      "page": 132,
+      "duration_ms": 600000,
+      "topic": "探病",
+      "goal": "能用本课句型谈论「探病」相关情景",
+      "media": {
+        "subtitle_en": "/media/course/oral_core_9000/132/en.srt",
+        "subtitle_zh": "/media/course/oral_core_9000/132/zh.srt"
+      },
+      "pack": {
+        "target_phrases": [],
+        "shadow_lines": [],
+        "quiz": [],
+        "discuss_prompts": [
+          "用本课句型聊一聊「探病」。"
+        ]
+      }
+    },
+    {
+      "lesson_no": 133,
+      "title": "出院",
+      "bvid": "BV1CS4y1v7sQ",
+      "page": 133,
+      "duration_ms": 600000,
+      "topic": "出院",
+      "goal": "能用本课句型谈论「出院」相关情景",
+      "media": {
+        "subtitle_en": "/media/course/oral_core_9000/133/en.srt",
+        "subtitle_zh": "/media/course/oral_core_9000/133/zh.srt"
+      },
+      "pack": {
+        "target_phrases": [],
+        "shadow_lines": [],
+        "quiz": [],
+        "discuss_prompts": [
+          "用本课句型聊一聊「出院」。"
+        ]
+      }
+    },
+    {
+      "lesson_no": 134,
+      "title": "邮票",
+      "bvid": "BV1CS4y1v7sQ",
+      "page": 134,
+      "duration_ms": 600000,
+      "topic": "邮票",
+      "goal": "能用本课句型谈论「邮票」相关情景",
+      "media": {
+        "subtitle_en": "/media/course/oral_core_9000/134/en.srt",
+        "subtitle_zh": "/media/course/oral_core_9000/134/zh.srt"
+      },
+      "pack": {
+        "target_phrases": [],
+        "shadow_lines": [],
+        "quiz": [],
+        "discuss_prompts": [
+          "用本课句型聊一聊「邮票」。"
+        ]
+      }
+    },
+    {
+      "lesson_no": 135,
+      "title": "明信片",
+      "bvid": "BV1CS4y1v7sQ",
+      "page": 135,
+      "duration_ms": 600000,
+      "topic": "明信片",
+      "goal": "能用本课句型谈论「明信片」相关情景",
+      "media": {
+        "subtitle_en": "/media/course/oral_core_9000/135/en.srt",
+        "subtitle_zh": "/media/course/oral_core_9000/135/zh.srt"
+      },
+      "pack": {
+        "target_phrases": [],
+        "shadow_lines": [],
+        "quiz": [],
+        "discuss_prompts": [
+          "用本课句型聊一聊「明信片」。"
+        ]
+      }
+    },
+    {
+      "lesson_no": 136,
+      "title": "寄信",
+      "bvid": "BV1CS4y1v7sQ",
+      "page": 136,
+      "duration_ms": 600000,
+      "topic": "寄信",
+      "goal": "能用本课句型谈论「寄信」相关情景",
+      "media": {
+        "subtitle_en": "/media/course/oral_core_9000/136/en.srt",
+        "subtitle_zh": "/media/course/oral_core_9000/136/zh.srt"
+      },
+      "pack": {
+        "target_phrases": [],
+        "shadow_lines": [],
+        "quiz": [],
+        "discuss_prompts": [
+          "用本课句型聊一聊「寄信」。"
+        ]
+      }
+    },
+    {
+      "lesson_no": 137,
+      "title": "邮寄包裹",
+      "bvid": "BV1CS4y1v7sQ",
+      "page": 137,
+      "duration_ms": 600000,
+      "topic": "邮寄包裹",
+      "goal": "能用本课句型谈论「邮寄包裹」相关情景",
+      "media": {
+        "subtitle_en": "/media/course/oral_core_9000/137/en.srt",
+        "subtitle_zh": "/media/course/oral_core_9000/137/zh.srt"
+      },
+      "pack": {
+        "target_phrases": [],
+        "shadow_lines": [],
+        "quiz": [],
+        "discuss_prompts": [
+          "用本课句型聊一聊「邮寄包裹」。"
+        ]
+      }
+    },
+    {
+      "lesson_no": 138,
+      "title": "储蓄",
+      "bvid": "BV1CS4y1v7sQ",
+      "page": 138,
+      "duration_ms": 600000,
+      "topic": "储蓄",
+      "goal": "能用本课句型谈论「储蓄」相关情景",
+      "media": {
+        "subtitle_en": "/media/course/oral_core_9000/138/en.srt",
+        "subtitle_zh": "/media/course/oral_core_9000/138/zh.srt"
+      },
+      "pack": {
+        "target_phrases": [],
+        "shadow_lines": [],
+        "quiz": [],
+        "discuss_prompts": [
+          "用本课句型聊一聊「储蓄」。"
+        ]
+      }
+    },
+    {
+      "lesson_no": 139,
+      "title": "物流",
+      "bvid": "BV1CS4y1v7sQ",
+      "page": 139,
+      "duration_ms": 600000,
+      "topic": "物流",
+      "goal": "能用本课句型谈论「物流」相关情景",
+      "media": {
+        "subtitle_en": "/media/course/oral_core_9000/139/en.srt",
+        "subtitle_zh": "/media/course/oral_core_9000/139/zh.srt"
+      },
+      "pack": {
+        "target_phrases": [],
+        "shadow_lines": [],
+        "quiz": [],
+        "discuss_prompts": [
+          "用本课句型聊一聊「物流」。"
+        ]
+      }
+    },
+    {
+      "lesson_no": 140,
+      "title": "洗衣店",
+      "bvid": "BV1CS4y1v7sQ",
+      "page": 140,
+      "duration_ms": 600000,
+      "topic": "洗衣店",
+      "goal": "能用本课句型谈论「洗衣店」相关情景",
+      "media": {
+        "subtitle_en": "/media/course/oral_core_9000/140/en.srt",
+        "subtitle_zh": "/media/course/oral_core_9000/140/zh.srt"
+      },
+      "pack": {
+        "target_phrases": [],
+        "shadow_lines": [],
+        "quiz": [],
+        "discuss_prompts": [
+          "用本课句型聊一聊「洗衣店」。"
+        ]
+      }
+    },
+    {
+      "lesson_no": 141,
+      "title": "洗浴按摩",
+      "bvid": "BV1CS4y1v7sQ",
+      "page": 141,
+      "duration_ms": 600000,
+      "topic": "洗浴按摩",
+      "goal": "能用本课句型谈论「洗浴按摩」相关情景",
+      "media": {
+        "subtitle_en": "/media/course/oral_core_9000/141/en.srt",
+        "subtitle_zh": "/media/course/oral_core_9000/141/zh.srt"
+      },
+      "pack": {
+        "target_phrases": [],
+        "shadow_lines": [],
+        "quiz": [],
+        "discuss_prompts": [
+          "用本课句型聊一聊「洗浴按摩」。"
+        ]
+      }
+    },
+    {
+      "lesson_no": 142,
+      "title": "修表",
+      "bvid": "BV1CS4y1v7sQ",
+      "page": 142,
+      "duration_ms": 600000,
+      "topic": "修表",
+      "goal": "能用本课句型谈论「修表」相关情景",
+      "media": {
+        "subtitle_en": "/media/course/oral_core_9000/142/en.srt",
+        "subtitle_zh": "/media/course/oral_core_9000/142/zh.srt"
+      },
+      "pack": {
+        "target_phrases": [],
+        "shadow_lines": [],
+        "quiz": [],
+        "discuss_prompts": [
+          "用本课句型聊一聊「修表」。"
+        ]
+      }
+    },
+    {
+      "lesson_no": 143,
+      "title": "照相",
+      "bvid": "BV1CS4y1v7sQ",
+      "page": 143,
+      "duration_ms": 600000,
+      "topic": "照相",
+      "goal": "能用本课句型谈论「照相」相关情景",
+      "media": {
+        "subtitle_en": "/media/course/oral_core_9000/143/en.srt",
+        "subtitle_zh": "/media/course/oral_core_9000/143/zh.srt"
+      },
+      "pack": {
+        "target_phrases": [],
+        "shadow_lines": [],
+        "quiz": [],
+        "discuss_prompts": [
+          "用本课句型聊一聊「照相」。"
+        ]
+      }
+    },
+    {
+      "lesson_no": 144,
+      "title": "爱好",
+      "bvid": "BV1CS4y1v7sQ",
+      "page": 144,
+      "duration_ms": 600000,
+      "topic": "爱好",
+      "goal": "能用本课句型谈论「爱好」相关情景",
+      "media": {
+        "subtitle_en": "/media/course/oral_core_9000/144/en.srt",
+        "subtitle_zh": "/media/course/oral_core_9000/144/zh.srt"
+      },
+      "pack": {
+        "target_phrases": [],
+        "shadow_lines": [],
+        "quiz": [],
+        "discuss_prompts": [
+          "用本课句型聊一聊「爱好」。"
+        ]
+      }
+    },
+    {
+      "lesson_no": 145,
+      "title": "工作压力",
+      "bvid": "BV1CS4y1v7sQ",
+      "page": 145,
+      "duration_ms": 600000,
+      "topic": "工作压力",
+      "goal": "能用本课句型谈论「工作压力」相关情景",
+      "media": {
+        "subtitle_en": "/media/course/oral_core_9000/145/en.srt",
+        "subtitle_zh": "/media/course/oral_core_9000/145/zh.srt"
+      },
+      "pack": {
+        "target_phrases": [],
+        "shadow_lines": [],
+        "quiz": [],
+        "discuss_prompts": [
+          "用本课句型聊一聊「工作压力」。"
+        ]
+      }
+    },
+    {
+      "lesson_no": 146,
+      "title": "梦想",
+      "bvid": "BV1CS4y1v7sQ",
+      "page": 146,
+      "duration_ms": 600000,
+      "topic": "梦想",
+      "goal": "能用本课句型谈论「梦想」相关情景",
+      "media": {
+        "subtitle_en": "/media/course/oral_core_9000/146/en.srt",
+        "subtitle_zh": "/media/course/oral_core_9000/146/zh.srt"
+      },
+      "pack": {
+        "target_phrases": [],
+        "shadow_lines": [],
+        "quiz": [],
+        "discuss_prompts": [
+          "用本课句型聊一聊「梦想」。"
+        ]
+      }
+    },
+    {
+      "lesson_no": 147,
+      "title": "天气",
+      "bvid": "BV1CS4y1v7sQ",
+      "page": 147,
+      "duration_ms": 600000,
+      "topic": "天气",
+      "goal": "能用本课句型谈论「天气」相关情景",
+      "media": {
+        "subtitle_en": "/media/course/oral_core_9000/147/en.srt",
+        "subtitle_zh": "/media/course/oral_core_9000/147/zh.srt"
+      },
+      "pack": {
+        "target_phrases": [],
+        "shadow_lines": [],
+        "quiz": [],
+        "discuss_prompts": [
+          "用本课句型聊一聊「天气」。"
+        ]
+      }
+    },
+    {
+      "lesson_no": 148,
+      "title": "自然灾害",
+      "bvid": "BV1CS4y1v7sQ",
+      "page": 148,
+      "duration_ms": 600000,
+      "topic": "自然灾害",
+      "goal": "能用本课句型谈论「自然灾害」相关情景",
+      "media": {
+        "subtitle_en": "/media/course/oral_core_9000/148/en.srt",
+        "subtitle_zh": "/media/course/oral_core_9000/148/zh.srt"
+      },
+      "pack": {
+        "target_phrases": [],
+        "shadow_lines": [],
+        "quiz": [],
+        "discuss_prompts": [
+          "用本课句型聊一聊「自然灾害」。"
+        ]
+      }
+    },
+    {
+      "lesson_no": 149,
+      "title": "污染",
+      "bvid": "BV1CS4y1v7sQ",
+      "page": 149,
+      "duration_ms": 600000,
+      "topic": "污染",
+      "goal": "能用本课句型谈论「污染」相关情景",
+      "media": {
+        "subtitle_en": "/media/course/oral_core_9000/149/en.srt",
+        "subtitle_zh": "/media/course/oral_core_9000/149/zh.srt"
+      },
+      "pack": {
+        "target_phrases": [],
+        "shadow_lines": [],
+        "quiz": [],
+        "discuss_prompts": [
+          "用本课句型聊一聊「污染」。"
+        ]
+      }
+    },
+    {
+      "lesson_no": 150,
+      "title": "抽烟",
+      "bvid": "BV1CS4y1v7sQ",
+      "page": 150,
+      "duration_ms": 600000,
+      "topic": "抽烟",
+      "goal": "能用本课句型谈论「抽烟」相关情景",
+      "media": {
+        "subtitle_en": "/media/course/oral_core_9000/150/en.srt",
+        "subtitle_zh": "/media/course/oral_core_9000/150/zh.srt"
+      },
+      "pack": {
+        "target_phrases": [],
+        "shadow_lines": [],
+        "quiz": [],
+        "discuss_prompts": [
+          "用本课句型聊一聊「抽烟」。"
+        ]
+      }
+    },
+    {
+      "lesson_no": 151,
+      "title": "成功失败",
+      "bvid": "BV1CS4y1v7sQ",
+      "page": 151,
+      "duration_ms": 600000,
+      "topic": "成功失败",
+      "goal": "能用本课句型谈论「成功失败」相关情景",
+      "media": {
+        "subtitle_en": "/media/course/oral_core_9000/151/en.srt",
+        "subtitle_zh": "/media/course/oral_core_9000/151/zh.srt"
+      },
+      "pack": {
+        "target_phrases": [],
+        "shadow_lines": [],
+        "quiz": [],
+        "discuss_prompts": [
+          "用本课句型聊一聊「成功失败」。"
+        ]
+      }
+    }
+  ]
+}

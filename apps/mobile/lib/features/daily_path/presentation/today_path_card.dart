@@ -2,7 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../domain/course_plan.dart';
+import '../domain/oral_core_series.dart';
 import '../domain/today_task.dart';
+import 'course_plan_provider.dart';
 import 'daily_path_runner.dart';
 import 'today_path_provider.dart';
 
@@ -12,6 +15,7 @@ class TodayPathCard extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final TodayPathState path = ref.watch(todayPathProvider);
+    final CoursePlan? active = ref.watch(coursePlanProvider).active;
     final bool dark = Theme.of(context).brightness == Brightness.dark;
     final Color accent = dark ? const Color(0xFFB7D894) : const Color(0xFF284F39);
     final Color ink = dark ? const Color(0xFFEEEEEE) : const Color(0xFF292929);
@@ -38,8 +42,13 @@ class TodayPathCard extends ConsumerWidget {
             ),
             const SizedBox(height: 8),
             Text(
-              '在视频或阅读页点「开启课程学习模式」，会把长素材拆成每日单元，并与词书复习合成一条任务链。',
+              '可开启官方「核心口语 9000 句」，或在视频/阅读页点「开启课程学习模式」。',
               style: TextStyle(fontSize: 13, color: muted, height: 1.4),
+            ),
+            const SizedBox(height: 12),
+            OutlinedButton(
+              onPressed: () => context.push('/courses/oral-core-9000'),
+              child: const Text('打开官方课 · 核心口语 9000 句'),
             ),
             if (path.tasks.isNotEmpty) ...<Widget>[
               const SizedBox(height: 12),
@@ -120,6 +129,29 @@ class TodayPathCard extends ConsumerWidget {
                 : '今日共 ${path.total} 项 · 已完成 ${path.doneCount}',
             style: TextStyle(fontSize: 13, color: muted),
           ),
+          if (active != null &&
+              active.courseId == OralCoreSeries.kSeriesId) ...<Widget>[
+            const SizedBox(height: 10),
+            Text('今日新课节数', style: TextStyle(fontSize: 12, color: muted)),
+            const SizedBox(height: 6),
+            Wrap(
+              spacing: 8,
+              children: <int>[1, 2, 3, 5]
+                  .map(
+                    (int n) => ChoiceChip(
+                      label: Text('$n'),
+                      selected: active.params.dailyLessons == n,
+                      onSelected: (_) async {
+                        await ref
+                            .read(coursePlanProvider.notifier)
+                            .setDailyLessons(n);
+                        ref.read(todayPathProvider.notifier).refresh();
+                      },
+                    ),
+                  )
+                  .toList(),
+            ),
+          ],
           if (path.total > 0) ...<Widget>[
             const SizedBox(height: 10),
             ClipRRect(

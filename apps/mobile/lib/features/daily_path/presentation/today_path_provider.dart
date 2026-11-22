@@ -69,30 +69,46 @@ class TodayPathNotifier extends Notifier<TodayPathState> {
       }
 
       if (!plan.stoppedAdding) {
-        // One new unit per day: first unlearned not already done.
-        CourseUnit? nextNew;
+        // User-configurable N new units/day (default 1).
+        final int quota = plan.params.dailyLessons.clamp(1, 10);
+        int added = 0;
         for (final CourseUnit unit in plan.units) {
-          if (!unit.isLearned) {
-            nextNew = unit;
-            break;
+          if (unit.isLearned) continue;
+          final String id = 'course-new:${plan.courseId}:${unit.unitId}';
+          // Skip units already completed today when counting quota slots.
+          if (doneIds.contains(id)) {
+            courseNew.add(
+              TodayTask(
+                id: id,
+                kind: TodayTaskKind.courseNew,
+                title: '新课 · ${unit.topic}',
+                subtitle: plan.title,
+                route:
+                    '/daily-path/unit?courseId=${Uri.encodeComponent(plan.courseId)}&unitId=${Uri.encodeComponent(unit.unitId)}&mode=new',
+                doneToday: true,
+                courseId: plan.courseId,
+                unitId: unit.unitId,
+              ),
+            );
+            added += 1;
+            if (added >= quota) break;
+            continue;
           }
-        }
-        if (nextNew != null) {
-          final String id =
-              'course-new:${plan.courseId}:${nextNew.unitId}';
           courseNew.add(
             TodayTask(
               id: id,
               kind: TodayTaskKind.courseNew,
-              title: '新课 · ${nextNew.topic}',
+              title: '新课 · ${unit.topic}',
               subtitle: plan.title,
               route:
-                  '/daily-path/unit?courseId=${Uri.encodeComponent(plan.courseId)}&unitId=${Uri.encodeComponent(nextNew.unitId)}&mode=new',
-              doneToday: doneIds.contains(id),
+                  '/daily-path/unit?courseId=${Uri.encodeComponent(plan.courseId)}&unitId=${Uri.encodeComponent(unit.unitId)}&mode=new',
+              doneToday: false,
               courseId: plan.courseId,
-              unitId: nextNew.unitId,
+              unitId: unit.unitId,
             ),
           );
+          added += 1;
+          if (added >= quota) break;
         }
       }
     }

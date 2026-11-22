@@ -2,8 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../digital_human/presentation/digital_human_coach_screen.dart';
 import '../domain/course_plan.dart';
+import '../domain/oral_core_series.dart';
 import 'course_plan_provider.dart';
+import 'course_unit_quiz_screen.dart';
 import 'daily_path_runner.dart';
 
 String _formatClock(int ms) {
@@ -46,21 +49,29 @@ class CourseUnitSessionScreen extends ConsumerWidget {
     }
 
     final bool isReview = mode == 'review';
-    final bool isVideo = plan.type == CoursePlanType.video;
+    final bool isVideo = plan.type == CoursePlanType.video ||
+        plan.type == CoursePlanType.videoSeries;
+    final bool isSeries = plan.type == CoursePlanType.videoSeries;
     final String taskId = isReview
         ? 'course-review:${plan.courseId}:${unit.unitId}'
         : 'course-new:${plan.courseId}:${unit.unitId}';
 
+    final List<String> shadowSource =
+        unit.shadowLines.isNotEmpty ? unit.shadowLines : unit.sentences;
     final List<String> shadowLines = plan.params.practice.shadow
-        ? unit.sentences
+        ? shadowSource
             .where((String s) => s.trim().isNotEmpty)
-            .take(isVideo ? 8 : 6)
+            .take(isVideo ? 10 : 6)
             .toList(growable: false)
         : const <String>[];
 
+    final List<String> phrases = unit.targetPhrases.isNotEmpty
+        ? unit.targetPhrases
+        : unit.wordIds;
+
     return Scaffold(
       appBar: AppBar(
-        title: Text(isReview ? '复习 · ${unit.unitId}' : '新课 · ${unit.unitId}'),
+        title: Text(isReview ? '复习 · ${unit.topic}' : '新课 · ${unit.topic}'),
       ),
       body: ListView(
         padding: const EdgeInsets.fromLTRB(20, 16, 20, 32),
@@ -78,27 +89,40 @@ class CourseUnitSessionScreen extends ConsumerWidget {
                   fontWeight: FontWeight.w700,
                 ),
           ),
+          if (unit.goal.isNotEmpty) ...<Widget>[
+            const SizedBox(height: 8),
+            Text(
+              unit.goal,
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  ),
+            ),
+          ],
           const SizedBox(height: 16),
           if (isVideo) ...<Widget>[
-            ListTile(
-              contentPadding: EdgeInsets.zero,
-              leading: const Icon(Icons.timelapse),
-              title: Text(
-                '${_formatClock(unit.startMs ?? 0)} – ${_formatClock(unit.endMs ?? 0)}',
+            if (!isSeries)
+              ListTile(
+                contentPadding: EdgeInsets.zero,
+                leading: const Icon(Icons.timelapse),
+                title: Text(
+                  '${_formatClock(unit.startMs ?? 0)} – ${_formatClock(unit.endMs ?? 0)}',
+                ),
+                subtitle: const Text('按字幕区间播放，不切半句'),
               ),
-              subtitle: const Text('按字幕区间播放，不切半句'),
-            ),
+            if (isSeries)
+              ListTile(
+                contentPadding: EdgeInsets.zero,
+                leading: const Icon(Icons.videocam_outlined),
+                title: Text(
+                  'B站 · ${unit.episodeBvid ?? 'BV1CS4y1v7sQ'}'
+                  ' P${unit.episodePage ?? 1}',
+                ),
+                subtitle: const Text('整集播放（官方课一集一课）'),
+              ),
             FilledButton.icon(
-              onPressed: () {
-                final String start =
-                    _formatClock(unit.startMs ?? 0);
-                context.push(
-                  '/episodes/${Uri.encodeComponent(plan!.sourceId)}'
-                  '?startTime=${Uri.encodeComponent(start)}&autoplay=1',
-                );
-              },
+              onPressed: () => _openVideo(context, plan!, unit),
               icon: const Icon(Icons.play_arrow),
-              label: const Text('播放本节区间'),
+              label: Text(isSeries ? '播放本集视频' : '播放本节区间'),
             ),
           ] else ...<Widget>[
             Text(
@@ -122,16 +146,15 @@ class CourseUnitSessionScreen extends ConsumerWidget {
               label: const Text('在阅读器中打开全文'),
             ),
           ],
-          if (unit.wordIds.isNotEmpty) ...<Widget>[
+          if (phrases.isNotEmpty) ...<Widget>[
             const SizedBox(height: 20),
-            Text('本节生词', style: Theme.of(context).textTheme.titleMedium),
+            Text('本节句型', style: Theme.of(context).textTheme.titleMedium),
             const SizedBox(height: 8),
             Wrap(
               spacing: 8,
               runSpacing: 8,
-              children: unit.wordIds
-                  .map((String w) => Chip(label: Text(w)))
-                  .toList(),
+              children:
+                  phrases.map((String w) => Chip(label: Text(w))).toList(),
             ),
           ],
           if (shadowLines.isNotEmpty) ...<Widget>[
@@ -143,10 +166,62 @@ class CourseUnitSessionScreen extends ConsumerWidget {
                 contentPadding: EdgeInsets.zero,
                 leading: CircleAvatar(
                   radius: 12,
-                  child: Text('${e.key + 1}', style: const TextStyle(fontSize: 11)),
+                  child: Text(
+                    '${e.key + 1}',
+                    style: const TextStyle(fontSize: 11),
+                  ),
                 ),
                 title: Text(e.value, style: const TextStyle(height: 1.35)),
               ),
+            ),
+          ],
+          if (plan.params.practice.quiz) ...<Widget>[
+            const SizedBox(height: 20),
+            OutlinedButton.icon(
+              onPressed: () {
+                final List<CourseQuizItem> quiz = unit.quiz.isNotEmpty
+                    ? unit.quiz
+                    : _fallbackQuiz(unit);
+                Navigator.of(context).push(
+                  MaterialPageRoute<void>(
+                    builder: (_) => CourseUnitQuizScreen(
+                      topic: unit.topic,
+                      quiz: quiz,
+                    ),
+                  ),
+                );
+              },
+              icon: const Icon(Icons.quiz_outlined),
+              label: Text(
+                unit.quiz.isEmpty ? '练习题（规则题）' : 'AI / 预置练习题',
+              ),
+            ),
+          ],
+          if (plan.params.practice.oral) ...<Widget>[
+            const SizedBox(height: 12),
+            OutlinedButton.icon(
+              onPressed: () {
+                final String prompt = unit.discussPrompts.isNotEmpty
+                    ? unit.discussPrompts.first
+                    : '用本课句型聊一聊「${unit.topic}」。';
+                final String excerpt = <String>[
+                  ...unit.shadowLines,
+                  ...unit.sentences,
+                  ...unit.targetPhrases,
+                ].where((String s) => s.trim().isNotEmpty).take(12).join('\n');
+                Navigator.of(context).push(
+                  MaterialPageRoute<void>(
+                    builder: (_) => DigitalHumanCoachScreen(
+                      lessonTitle: unit.topic,
+                      lessonText: '$prompt\n\n$excerpt',
+                      practiceRole: 'learner',
+                      initialScenarioId: 'video_line',
+                    ),
+                  ),
+                );
+              },
+              icon: const Icon(Icons.record_voice_over_outlined),
+              label: const Text('AI 情景讨论'),
             ),
           ],
           const SizedBox(height: 28),
@@ -171,5 +246,53 @@ class CourseUnitSessionScreen extends ConsumerWidget {
         ],
       ),
     );
+  }
+
+  void _openVideo(BuildContext context, CoursePlan plan, CourseUnit unit) {
+    if (plan.type == CoursePlanType.videoSeries) {
+      final int page = unit.episodePage ?? 1;
+      final String episodeId =
+          '${OralCoreSeries.kSeriesId}-${page.toString().padLeft(2, '0')}';
+      context.push(
+        '/episodes/${Uri.encodeComponent(episodeId)}?autoplay=1',
+      );
+      return;
+    }
+    final String start = _formatClock(unit.startMs ?? 0);
+    context.push(
+      '/episodes/${Uri.encodeComponent(plan.sourceId)}'
+      '?startTime=${Uri.encodeComponent(start)}&autoplay=1',
+    );
+  }
+
+  List<CourseQuizItem> _fallbackQuiz(CourseUnit unit) {
+    final String phrase = unit.targetPhrases.isNotEmpty
+        ? unit.targetPhrases.first
+        : (unit.sentences.isNotEmpty ? unit.sentences.first : unit.topic);
+    return <CourseQuizItem>[
+      CourseQuizItem(
+        type: 'mcq',
+        stem: '本课主题是？',
+        options: <String>[unit.topic, '无关主题 A', '无关主题 B', '无关主题 C'],
+        answer: 0,
+      ),
+      CourseQuizItem(
+        type: 'mcq',
+        stem: '下列哪一句更贴近本课？',
+        options: <String>[phrase, 'Hello, goodbye.', 'See you never.', 'Ok.'],
+        answer: 0,
+      ),
+      CourseQuizItem(
+        type: 'mcq',
+        stem: '学习目标更接近？',
+        options: <String>[
+          unit.goal.isNotEmpty ? unit.goal : '掌握本课情景句型',
+          '只背单词表',
+          '只看中文翻译',
+          '不开口',
+        ],
+        answer: 0,
+      ),
+    ];
   }
 }

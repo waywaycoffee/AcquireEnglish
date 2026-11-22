@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../data/course_plan_store.dart';
 import '../domain/course_plan.dart';
+import '../domain/oral_core_series.dart';
 
 class CoursePlanCatalog {
   const CoursePlanCatalog({
@@ -155,6 +156,49 @@ class CoursePlanNotifier extends Notifier<CoursePlanCatalog> {
   Future<void> deactivate() async {
     await updateActive((CoursePlan p) => p.copyWith(active: false));
     await _persist(state.copyWith(clearActive: true));
+  }
+
+  Future<void> activateOralCoreSeries(
+    OralCoreSeries series, {
+    int dailyLessons = 1,
+  }) async {
+    final CoursePlan? existing = state.plans
+        .where((CoursePlan p) => p.courseId == OralCoreSeries.kSeriesId)
+        .firstOrNull;
+    final CoursePlan fresh = series.toCoursePlan(dailyLessons: dailyLessons);
+    if (existing == null) {
+      await activatePlan(fresh);
+      return;
+    }
+    final Map<String, CourseUnit> learned = <String, CourseUnit>{
+      for (final CourseUnit u in existing.units)
+        if (u.isLearned) u.unitId: u,
+    };
+    final List<CourseUnit> merged = fresh.units.map((CourseUnit u) {
+      final CourseUnit? prev = learned[u.unitId];
+      if (prev == null) return u;
+      return u.copyWith(
+        firstLearnedAt: prev.firstLearnedAt,
+        nextDue: prev.nextDue,
+        reviewStage: prev.reviewStage,
+      );
+    }).toList(growable: false);
+    await activatePlan(
+      fresh.copyWith(
+        units: merged,
+        params: fresh.params.copyWith(dailyLessons: dailyLessons),
+      ),
+    );
+  }
+
+  Future<void> setDailyLessons(int n) async {
+    final int clamped = n.clamp(1, 10);
+    await updateActive(
+      (CoursePlan p) => p.copyWith(
+        params: p.params.copyWith(dailyLessons: clamped),
+        unitSize: clamped,
+      ),
+    );
   }
 }
 

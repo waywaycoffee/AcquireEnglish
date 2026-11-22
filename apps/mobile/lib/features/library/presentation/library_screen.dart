@@ -1292,6 +1292,47 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
                 CourseImportActionButtons(enabled: !editMode),
                 if (!editMode) ...<Widget>[
                   const SizedBox(height: 18),
+                  Material(
+                    color: AppDesignTokens.brandGreenDark.withValues(alpha: 0.08),
+                    borderRadius: BorderRadius.circular(16),
+                    child: InkWell(
+                      borderRadius: BorderRadius.circular(16),
+                      onTap: () => context.push('/courses/oral-core-9000'),
+                      child: Padding(
+                        padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
+                        child: Row(
+                          children: <Widget>[
+                            Icon(
+                              Icons.school_outlined,
+                              color: AppDesignTokens.brandGreenDark,
+                            ),
+                            const SizedBox(width: 12),
+                            const Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: <Widget>[
+                                  Text(
+                                    '官方课 · 核心口语 9000 句',
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.w800,
+                                      fontSize: 15,
+                                    ),
+                                  ),
+                                  SizedBox(height: 4),
+                                  Text(
+                                    '151 课情景句型 · 跟读 / 练习 / AI 讨论',
+                                    style: TextStyle(fontSize: 12),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            const Icon(Icons.chevron_right),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 18),
                   const RecommendedBilibiliSection(),
                 ],
                 if (hasActiveQuery) ...<Widget>[

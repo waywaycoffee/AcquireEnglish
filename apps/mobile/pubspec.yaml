@@ -155,6 +155,7 @@ flutter:
     - assets/syllabus/
     - assets/player/
     - assets/reading/
+    - assets/courses/
     - assets/translations/
     - assets/img/
     - assets/img/bookshelf/

@@ -5,6 +5,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hive_ce/hive.dart';
 import 'package:path_provider/path_provider.dart';
 
+import '../../daily_path/data/oral_core_library_mapper.dart';
+import '../../daily_path/domain/oral_core_series.dart';
 import '../../import_course/data/bilibili_episode_prepare.dart';
 import '../../import_course/data/bilibili_multipage.dart';
 import '../../import_course/domain/bilibili_import.dart';
@@ -73,7 +75,43 @@ class LibraryCatalogNotifier extends Notifier<List<LibraryCourseData>> {
   }
 
   int get personalVideoCourseCount {
-    return state.where((LibraryCourseData c) => !_isFreeTrialCourse(c)).length;
+    return state
+        .where(
+          (LibraryCourseData c) =>
+              !_isFreeTrialCourse(c) && c.id != OralCoreSeries.kSeriesId,
+        )
+        .length;
+  }
+
+  /// Official oral_core_9000 series — always allowed, does not consume personal slots.
+  Future<void> ensureOralCoreCourse(OralCoreSeries series) async {
+    final LibraryCourseData course = oralCoreSeriesToLibraryCourse(series);
+    final int existingIndex = state.indexWhere(
+      (LibraryCourseData item) => item.id == OralCoreSeries.kSeriesId,
+    );
+    if (existingIndex < 0) {
+      state = <LibraryCourseData>[course, ...state];
+      await _persistImportedCourses();
+      return;
+    }
+    final LibraryCourseData previous = state[existingIndex];
+    final LibraryCourseData merged = course.copyWith(
+      progressPercent: previous.progressPercent,
+      completedEpisodes: previous.completedEpisodes,
+      lastStudiedStr: previous.lastStudiedStr,
+      lastStudiedAtMs: previous.lastStudiedAtMs,
+      episodes: <LibraryEpisodeItem>[
+        for (final LibraryEpisodeItem episode in course.episodes)
+          _mergeImportedEpisode(
+            next: episode,
+            previous: _findMatchingEpisode(previous.episodes, episode),
+          ),
+      ],
+    );
+    final List<LibraryCourseData> next = <LibraryCourseData>[...state];
+    next[existingIndex] = merged;
+    state = next;
+    await _persistImportedCourses();
   }
 
   Future<bool> importCourse(LibraryCourseData course) async {

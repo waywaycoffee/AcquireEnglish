@@ -1,6 +1,6 @@
 /// Local course plan for PRD Ch7「当日课程化」(client-side scheduling).
 
-enum CoursePlanType { video, reading }
+enum CoursePlanType { video, reading, videoSeries }
 
 class CoursePracticeParams {
   const CoursePracticeParams({
@@ -33,6 +33,7 @@ class CoursePlanParams {
   const CoursePlanParams({
     this.dailyMinutes = 10,
     this.dailySentences = 20,
+    this.dailyLessons = 1,
     this.practice = const CoursePracticeParams(),
   });
 
@@ -41,6 +42,7 @@ class CoursePlanParams {
     return CoursePlanParams(
       dailyMinutes: (json['dailyMinutes'] as num?)?.toInt() ?? 10,
       dailySentences: (json['dailySentences'] as num?)?.toInt() ?? 20,
+      dailyLessons: ((json['dailyLessons'] as num?)?.toInt() ?? 1).clamp(1, 10),
       practice: CoursePracticeParams.fromJson(
         json['practice'] is Map
             ? Map<String, dynamic>.from(json['practice'] as Map)
@@ -51,13 +53,30 @@ class CoursePlanParams {
 
   final int dailyMinutes;
   final int dailySentences;
+
+  /// How many new course units to schedule today (user-configurable).
+  final int dailyLessons;
   final CoursePracticeParams practice;
 
   Map<String, dynamic> toJson() => <String, dynamic>{
         'dailyMinutes': dailyMinutes,
         'dailySentences': dailySentences,
+        'dailyLessons': dailyLessons,
         'practice': practice.toJson(),
       };
+
+  CoursePlanParams copyWith({
+    int? dailyMinutes,
+    int? dailySentences,
+    int? dailyLessons,
+    CoursePracticeParams? practice,
+  }) =>
+      CoursePlanParams(
+        dailyMinutes: dailyMinutes ?? this.dailyMinutes,
+        dailySentences: dailySentences ?? this.dailySentences,
+        dailyLessons: dailyLessons ?? this.dailyLessons,
+        practice: practice ?? this.practice,
+      );
 }
 
 /// Inclusive sentence index range [start, endExclusive) stored as [start, end].
@@ -75,6 +94,36 @@ class SentenceRange {
   }
 }
 
+class CourseQuizItem {
+  const CourseQuizItem({
+    required this.type,
+    required this.stem,
+    required this.options,
+    required this.answer,
+  });
+
+  factory CourseQuizItem.fromJson(Map<String, dynamic> json) => CourseQuizItem(
+        type: '${json['type'] ?? 'mcq'}',
+        stem: '${json['stem'] ?? ''}',
+        options: (json['options'] as List<dynamic>? ?? const <dynamic>[])
+            .map((dynamic e) => '$e')
+            .toList(growable: false),
+        answer: (json['answer'] as num?)?.toInt() ?? 0,
+      );
+
+  final String type;
+  final String stem;
+  final List<String> options;
+  final int answer;
+
+  Map<String, dynamic> toJson() => <String, dynamic>{
+        'type': type,
+        'stem': stem,
+        'options': options,
+        'answer': answer,
+      };
+}
+
 class CourseUnit {
   const CourseUnit({
     required this.unitId,
@@ -88,9 +137,21 @@ class CourseUnit {
     this.firstLearnedAt,
     this.nextDue,
     this.reviewStage = 0,
+    this.episodeBvid,
+    this.episodePage,
+    this.goal = '',
+    this.quiz = const <CourseQuizItem>[],
+    this.discussPrompts = const <String>[],
+    this.shadowLines = const <String>[],
+    this.targetPhrases = const <String>[],
   });
 
   factory CourseUnit.fromJson(Map<String, dynamic> json) {
+    final Map<String, dynamic>? ep = json['episode_ref'] is Map
+        ? Map<String, dynamic>.from(json['episode_ref'] as Map)
+        : (json['episodeRef'] is Map
+            ? Map<String, dynamic>.from(json['episodeRef'] as Map)
+            : null);
     return CourseUnit(
       unitId: '${json['unit_id'] ?? json['unitId'] ?? ''}',
       startMs: (json['start_ms'] as num?)?.toInt() ??
@@ -121,6 +182,35 @@ class CourseUnit {
       reviewStage: (json['review_stage'] as num?)?.toInt() ??
           (json['reviewStage'] as num?)?.toInt() ??
           0,
+      episodeBvid: ep == null
+          ? (json['episode_bvid'] as String? ?? json['episodeBvid'] as String?)
+          : '${ep['bvid'] ?? ''}',
+      episodePage: ep == null
+          ? ((json['episode_page'] as num?)?.toInt() ??
+              (json['episodePage'] as num?)?.toInt())
+          : (ep['page'] as num?)?.toInt(),
+      goal: '${json['goal'] ?? ''}',
+      quiz: (json['quiz'] as List<dynamic>? ?? const <dynamic>[])
+          .map(
+            (dynamic e) =>
+                CourseQuizItem.fromJson(Map<String, dynamic>.from(e as Map)),
+          )
+          .toList(growable: false),
+      discussPrompts: (json['discuss_prompts'] as List<dynamic>? ??
+              json['discussPrompts'] as List<dynamic>? ??
+              const <dynamic>[])
+          .map((dynamic e) => '$e')
+          .toList(growable: false),
+      shadowLines: (json['shadow_lines'] as List<dynamic>? ??
+              json['shadowLines'] as List<dynamic>? ??
+              const <dynamic>[])
+          .map((dynamic e) => '$e')
+          .toList(growable: false),
+      targetPhrases: (json['target_phrases'] as List<dynamic>? ??
+              json['targetPhrases'] as List<dynamic>? ??
+              const <dynamic>[])
+          .map((dynamic e) => '$e')
+          .toList(growable: false),
     );
   }
 
@@ -135,6 +225,13 @@ class CourseUnit {
   final DateTime? firstLearnedAt;
   final DateTime? nextDue;
   final int reviewStage;
+  final String? episodeBvid;
+  final int? episodePage;
+  final String goal;
+  final List<CourseQuizItem> quiz;
+  final List<String> discussPrompts;
+  final List<String> shadowLines;
+  final List<String> targetPhrases;
 
   bool get isLearned => firstLearnedAt != null;
 
@@ -151,6 +248,16 @@ class CourseUnit {
         'first_learned_at': firstLearnedAt?.toIso8601String(),
         'next_due': nextDue?.toIso8601String(),
         'review_stage': reviewStage,
+        if (episodeBvid != null || episodePage != null)
+          'episode_ref': <String, Object?>{
+            if (episodeBvid != null) 'bvid': episodeBvid,
+            if (episodePage != null) 'page': episodePage,
+          },
+        'goal': goal,
+        'quiz': quiz.map((CourseQuizItem q) => q.toJson()).toList(),
+        'discuss_prompts': discussPrompts,
+        'shadow_lines': shadowLines,
+        'target_phrases': targetPhrases,
       };
 
   CourseUnit copyWith({
@@ -171,6 +278,13 @@ class CourseUnit {
         firstLearnedAt: firstLearnedAt ?? this.firstLearnedAt,
         nextDue: clearNextDue ? null : (nextDue ?? this.nextDue),
         reviewStage: reviewStage ?? this.reviewStage,
+        episodeBvid: episodeBvid,
+        episodePage: episodePage,
+        goal: goal,
+        quiz: quiz,
+        discussPrompts: discussPrompts,
+        shadowLines: shadowLines,
+        targetPhrases: targetPhrases,
       );
 
   static DateTime? _parseDate(Object? raw) {
@@ -179,6 +293,29 @@ class CourseUnit {
     final String s = '$raw'.trim();
     if (s.isEmpty) return null;
     return DateTime.tryParse(s);
+  }
+}
+
+CoursePlanType _parsePlanType(String raw) {
+  switch (raw) {
+    case 'video':
+      return CoursePlanType.video;
+    case 'video_series':
+    case 'videoSeries':
+      return CoursePlanType.videoSeries;
+    default:
+      return CoursePlanType.reading;
+  }
+}
+
+String _planTypeToJson(CoursePlanType type) {
+  switch (type) {
+    case CoursePlanType.video:
+      return 'video';
+    case CoursePlanType.videoSeries:
+      return 'video_series';
+    case CoursePlanType.reading:
+      return 'reading';
   }
 }
 
@@ -200,7 +337,7 @@ class CoursePlan {
     final String typeRaw = '${json['type'] ?? 'reading'}';
     return CoursePlan(
       courseId: '${json['course_id'] ?? json['courseId'] ?? ''}',
-      type: typeRaw == 'video' ? CoursePlanType.video : CoursePlanType.reading,
+      type: _parsePlanType(typeRaw),
       sourceId: '${json['source_id'] ?? json['sourceId'] ?? ''}',
       title: '${json['title'] ?? ''}',
       unitSize: (json['unit_size'] as num?)?.toInt() ??
@@ -238,7 +375,7 @@ class CoursePlan {
 
   Map<String, dynamic> toJson() => <String, dynamic>{
         'course_id': courseId,
-        'type': type == CoursePlanType.video ? 'video' : 'reading',
+        'type': _planTypeToJson(type),
         'source_id': sourceId,
         'title': title,
         'unit_size': unitSize,
@@ -255,13 +392,14 @@ class CoursePlan {
     bool? stoppedAdding,
     CoursePlanParams? params,
     String? title,
+    int? unitSize,
   }) =>
       CoursePlan(
         courseId: courseId,
         type: type,
         sourceId: sourceId,
         title: title ?? this.title,
-        unitSize: unitSize,
+        unitSize: unitSize ?? this.unitSize,
         params: params ?? this.params,
         active: active ?? this.active,
         units: units ?? this.units,

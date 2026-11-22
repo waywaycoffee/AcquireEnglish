@@ -33,6 +33,7 @@ from app.routers import (
     feed,
     feedback,
     fingerprint_cache,
+    content_courses,
     content_media,
     foundation_media,
     syllabus_books,
@@ -154,6 +155,7 @@ app.include_router(sync_status.router, prefix="/api")
 app.include_router(learning_module_progress.router, prefix="/api")
 app.include_router(foundation_media.router, prefix="/api")
 app.include_router(content_media.router, prefix="/api")
+app.include_router(content_courses.router, prefix="/api")
 app.include_router(syllabus_books.router, prefix="/api")
 app.include_router(reading_speech.router, prefix="/api")
 app.include_router(reading_speech.voices_router, prefix="/api")
