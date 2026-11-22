@@ -5,6 +5,19 @@ import 'package:flutter_test/flutter_test.dart';
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
+  test('pronunciationEndGraceFor scales with word length', () {
+    expect(pronunciationEndGraceFor('a').inMilliseconds, 1000);
+    expect(pronunciationEndGraceFor('cat').inMilliseconds, greaterThan(1000));
+    expect(
+      pronunciationEndGraceFor('internationalization').inMilliseconds,
+      greaterThan(pronunciationEndGraceFor('cat').inMilliseconds),
+    );
+    expect(
+      pronunciationEndGraceFor('internationalization').inMilliseconds,
+      lessThanOrEqualTo(3500),
+    );
+  });
+
   test('uses native Android TTS channel before plugin fallback', () async {
     const MethodChannel channel = MethodChannel('test_native_tts');
     final List<MethodCall> calls = <MethodCall>[];

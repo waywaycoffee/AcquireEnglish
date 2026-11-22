@@ -46,6 +46,21 @@ const MethodChannel _nativeTtsChannel = MethodChannel(
   'com.shadowing.english/native_tts',
 );
 
+/// Hold playback after end-of-stream so OEM TTS / CosyVoice tails are audible.
+/// Short words ≈1s; longer spellings scale up (capped).
+Duration pronunciationEndGraceFor(String text) {
+  final int units = text
+      .trim()
+      .toLowerCase()
+      .replaceAll(RegExp(r"[^a-z']+"), ' ')
+      .split(RegExp(r'\s+'))
+      .where((String w) => w.isNotEmpty)
+      .fold<int>(0, (int sum, String w) => sum + w.length);
+  final int letters = units <= 0 ? 1 : units;
+  final int ms = (1000 + (letters - 1) * 120).clamp(1000, 3500);
+  return Duration(milliseconds: ms);
+}
+
 class WordPronunciationException implements Exception {
   const WordPronunciationException([this.message = '朗读失败，请检查设备 TTS。']);
 
@@ -104,7 +119,11 @@ class WordPronunciationService {
     final double effectiveRate = (rate ?? selectedRate).clamp(0.5, 1.8);
 
     if (recordedUrl != null &&
-        await _playRecording(recordedUrl, rate: effectiveRate)) {
+        await _playRecording(
+          recordedUrl,
+          rate: effectiveRate,
+          sourceText: normalizedText,
+        )) {
       return;
     }
 
@@ -115,7 +134,11 @@ class WordPronunciationService {
       if (cloudUrl != null &&
           cloudUrl.isNotEmpty &&
           // Keep natural CosyVoice pacing; rate only for on-device fallback.
-          await _playRecording(cloudUrl, rate: 1.0)) {
+          await _playRecording(
+            cloudUrl,
+            rate: 1.0,
+            sourceText: normalizedText,
+          )) {
         return;
       }
       // Prefer Aliyun, but keep learning moving if CDN/media path is briefly
@@ -142,9 +165,15 @@ class WordPronunciationService {
       voice: selectedVoice,
       rate: effectiveRate,
     );
+    // Xiaomi/OEM onDone often fires before the last syllable is audible.
+    await Future<void>.delayed(pronunciationEndGraceFor(normalizedText));
   }
 
-  Future<bool> _playRecording(String url, {double rate = 1.0}) async {
+  Future<bool> _playRecording(
+    String url, {
+    double rate = 1.0,
+    String sourceText = '',
+  }) async {
     Player? player;
     StreamSubscription<bool>? completed;
     StreamSubscription<bool>? playing;
@@ -156,13 +185,13 @@ class WordPronunciationService {
       _recordedCompletion = result;
       bool started = false;
       bool finishing = false;
-      // Keep the player alive ~1s after the last sample so CosyVoice tails
-      // are not cut when media_kit signals completed/near-end early.
+      final Duration endGrace = pronunciationEndGraceFor(sourceText);
+      // Keep the player alive after EOS so CosyVoice / long words are not cut.
       void scheduleFinish(bool ok) {
         if (result.isCompleted || finishing) return;
         finishing = true;
         unawaited(() async {
-          await Future<void>.delayed(const Duration(seconds: 1));
+          await Future<void>.delayed(endGrace);
           if (!result.isCompleted) {
             result.complete(ok);
           }
@@ -206,13 +235,15 @@ class WordPronunciationService {
               .firstWhere(
                 (Duration p) =>
                     duration.inMilliseconds > 0 &&
-                    p.inMilliseconds >= duration.inMilliseconds - 40,
+                    p.inMilliseconds >= duration.inMilliseconds - 20,
               )
-              .timeout(duration + const Duration(seconds: 3));
+              .timeout(duration + endGrace + const Duration(seconds: 3));
           scheduleFinish(true);
         } catch (_) {}
       }());
-      return await result.future.timeout(const Duration(seconds: 60));
+      return await result.future.timeout(
+        const Duration(seconds: 60) + endGrace,
+      );
     } catch (_) {
       return false;
     } finally {
