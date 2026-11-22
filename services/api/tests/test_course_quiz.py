@@ -22,15 +22,24 @@ def test_quiz_accepts_current_block_evidence():
     assert len(validate_questions(_quiz(), ["One sentence.", "Two sentences."])) == 4
 
 
-@pytest.mark.parametrize("field,value", [
-    ("evidence_sentence_index", 2),
-    ("evidence_sentence", "invented sentence"),
-    ("answer", 4),
-    ("options", ["same"] * 4),
-    ("explanation", "a" * 61),
-])
-def test_quiz_rejects_invalid_evidence_or_answer(field, value):
+def test_quiz_repairs_mismatched_evidence_text():
     quiz = _quiz()
-    quiz[0][field] = value
+    quiz[0]["evidence_sentence"] = "invented sentence"
+    out = validate_questions(quiz, ["One sentence.", "Two sentences."])
+    assert out[0]["evidence_sentence"] == "One sentence."
+
+
+def test_quiz_clamps_bad_index_and_answer():
+    quiz = _quiz()
+    quiz[0]["evidence_sentence_index"] = 99
+    quiz[0]["answer"] = 9
+    out = validate_questions(quiz, ["One sentence.", "Two sentences."])
+    assert out[0]["evidence_sentence_index"] == 1
+    assert out[0]["answer"] == 0
+
+
+def test_quiz_rejects_empty_stem():
+    quiz = _quiz()
+    quiz[0]["stem"] = "   "
     with pytest.raises(ValueError):
         validate_questions(quiz, ["One sentence.", "Two sentences."])

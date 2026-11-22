@@ -983,7 +983,7 @@ class _ReadingReaderScreenState extends ConsumerState<ReadingReaderScreen> {
     if (!mounted || bundle.quiz.isEmpty) return;
     if (bundle.fromFallback && mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('云端出题较慢，已先用本节原文生成练习题')),
+        const SnackBar(content: Text('DeepSeek 暂不可用，已用本节原文生成练习题')),
       );
     }
     final CourseQuizResult? result = await Navigator.of(context).push(
