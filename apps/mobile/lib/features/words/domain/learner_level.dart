@@ -6,7 +6,7 @@ import 'vocab_entry.dart';
 /// Gloss / highlight words rarer than this rank (1 = most common). The frontier
 /// tracks the learner so inline help and i+1 picks move with real level.
 int freqThresholdForVocabEstimate(int? estimate) {
-  final int e = (estimate ?? kReadingDefaultFreqThreshold).clamp(800, 30000);
+  final int e = (estimate ?? kReadingDefaultFreqThreshold).clamp(100, 60000);
   return nearestReadingFreqBand(e);
 }
 
@@ -27,7 +27,7 @@ int nearestReadingFreqBand(int rank) {
 
 String cefrForVocabEstimate(int? estimate) {
   final int e = estimate ?? 3000;
-  if (e < 800) return 'A1';
+  if (e < 1000) return 'A1';
   if (e < 1500) return 'A2';
   if (e < 3000) return 'B1';
   if (e < 6000) return 'B2';
@@ -49,7 +49,7 @@ double iPlus1LearnScore({
     // Outside top-20k: stretch material, not the first pick.
     return 0.28;
   }
-  final double t = threshold.toDouble().clamp(500, 30000);
+  final double t = threshold.toDouble().clamp(100, 60000);
   final double r = freqRank.toDouble();
   if (r <= t * 0.45) return 0.08; // far too easy
   if (r <= t * 0.85) return 0.32; // likely already known

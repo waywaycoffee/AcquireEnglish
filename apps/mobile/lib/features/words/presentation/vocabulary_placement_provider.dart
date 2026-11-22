@@ -6,6 +6,7 @@ import 'package:hive_ce/hive.dart';
 
 import '../../authentication/presentation/auth_session.dart';
 import '../../settings/presentation/settings_provider.dart';
+import '../domain/vocabulary_placement_estimate.dart';
 
 typedef PlacementRow = Map<String, dynamic>;
 
@@ -64,14 +65,21 @@ class VocabularyPlacement extends Notifier<PlacementRow> {
 
   Future<void> saveEstimate(int estimate) async {
     final String key = _key;
-    final int start = (estimate * 0.8).round().clamp(1, 20000);
+    final int safeEstimate = estimate.clamp(
+      kPlacementEstimateMin,
+      kPlacementEstimateMax,
+    );
+    final int start = (safeEstimate * 0.8).round().clamp(
+      1,
+      kPlacementEstimateMax - 1000,
+    );
     final List<PlacementRow> words = await _fetch(
       'recommendations',
       parameters: <String, dynamic>{'start': start},
     );
     if (words.isEmpty) throw StateError('推荐词库为空');
     final PlacementRow result = <String, dynamic>{
-      'estimate': estimate,
+      'estimate': safeEstimate,
       'testedAt': DateTime.now().toUtc().toIso8601String(),
       'start': start,
       'words': words,

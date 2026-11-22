@@ -33,12 +33,18 @@ const String kReadingSentenceTranslateKey = 'reading_sentence_translate_v1';
 const String kReadingFreqThresholdKey = 'reading_freq_threshold_v1';
 
 /// Frequency rank bands for the difficulty slider (1 = most common).
+/// Covers placement range ~100 → 20k+ so gloss / i+1 track real level.
 const List<int> kReadingFreqThresholdBands = <int>[
+  500,
+  1000,
+  1500,
   3000,
   5000,
   8000,
   12000,
   20000,
+  30000,
+  45000,
 ];
 
 const int kReadingDefaultFreqThreshold = 3000;

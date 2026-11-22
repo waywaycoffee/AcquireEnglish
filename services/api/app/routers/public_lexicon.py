@@ -23,9 +23,23 @@ def _connect():
     return db
 
 
-# Band widths estimate recognized word forms through rank 20,000.
-PLACEMENT_BANDS = ((1, 500), (501, 1500), (1501, 3500), (3501, 6500),
-                   (6501, 10000), (10001, 15000), (15001, 20000))
+# Band widths estimate recognized word forms from ~100 through 60k+.
+# Low bands resolve beginner levels; high bands unlock 20k+ ceilings.
+PLACEMENT_BANDS = (
+    (1, 100),
+    (101, 400),
+    (401, 1000),
+    (1001, 2500),
+    (2501, 5000),
+    (5001, 9000),
+    (9001, 14000),
+    (14001, 20000),
+    (20001, 32000),
+    (32001, 50000),
+)
+# Sum of band widths ≈ 50,000 recognized forms (reportable 100–60,000).
+PLACEMENT_ESTIMATE_MIN = 100
+PLACEMENT_ESTIMATE_MAX = 60000
 
 
 @router.get('/placement')
@@ -37,7 +51,7 @@ def placement():
                    WHERE rank BETWEEN ? AND ? AND length(word) >= 2
                      AND word NOT GLOB '*[^a-z]*'
                      AND display_word = word AND trim(definition_cn) <> ''
-                   ORDER BY random() LIMIT 4""", (lo, hi)
+                   ORDER BY random() LIMIT 3""", (lo, hi)
             )]}
             for lo, hi in PLACEMENT_BANDS
         ]

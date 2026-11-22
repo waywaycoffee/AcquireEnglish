@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../router/app_router.dart';
+import '../domain/vocabulary_placement_estimate.dart';
 import 'vocabulary_placement_provider.dart';
 
 class VocabularyPlacementScreen extends ConsumerStatefulWidget {
@@ -35,7 +36,7 @@ class _VocabularyPlacementScreenState
     for (final PlacementRow band in bands) {
       final List<PlacementRow> group = (band['items'] as List<dynamic>)
           .cast<PlacementRow>();
-      if (group.length < 4) continue;
+      if (group.length < 3) continue;
       for (final PlacementRow item in group) {
         final List<String> choices =
             group
@@ -114,7 +115,7 @@ class _VocabularyPlacementScreenState
                 }
                 final List<PlacementRow> items = snapshot.requireData;
                 if (_index == items.length) {
-                  final int estimate = (_score / 100).round() * 100;
+                  final int estimate = estimateVocabFromPlacementScore(_score);
                   return Padding(
                     padding: const EdgeInsets.all(24),
                     child: Column(
@@ -124,7 +125,12 @@ class _VocabularyPlacementScreenState
                           '估计词汇量约 $estimate 个词形',
                           style: Theme.of(context).textTheme.headlineSmall,
                         ),
-                        const Text('结果依据词频分层抽样，最高估算至 20,000。'),
+                        Text(
+                          '结果依据词频分层抽样，范围 '
+                          '$kPlacementEstimateMin–'
+                          '${_formatEstimateCap(kPlacementEstimateMax)}'
+                          '（含 20k 以上）。',
+                        ),
                         const SizedBox(height: 16),
                         FilledButton(
                           onPressed: _saving
@@ -180,4 +186,13 @@ class _VocabularyPlacementScreenState
       ),
     ),
   );
+}
+
+String _formatEstimateCap(int value) {
+  if (value >= 1000) {
+    final double k = value / 1000;
+    final String s = k == k.roundToDouble() ? '${k.toInt()}' : k.toStringAsFixed(1);
+    return '${s}k';
+  }
+  return '$value';
 }
