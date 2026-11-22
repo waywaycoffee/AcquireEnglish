@@ -1635,6 +1635,24 @@ class AcquireApiClient {
     );
   }
 
+  Future<Map<String, dynamic>?> closeLearningSession(String sessionId) async {
+    final String id = sessionId.trim();
+    if (id.isEmpty) return null;
+    try {
+      final Response<dynamic> response = await _dio.post(
+        '${Endpoints.learningSessions}/$id/close',
+        options: Options(
+          receiveTimeout: const Duration(seconds: 15),
+          sendTimeout: const Duration(seconds: 15),
+        ),
+      );
+      if (response.data is! Map) return null;
+      return Map<String, dynamic>.from(response.data as Map);
+    } catch (_) {
+      return null;
+    }
+  }
+
   Future<List<Map<String, dynamic>>> listDueLearningReviews() async {
     final Response<dynamic> response = await _dio.get(
       Endpoints.learningReviewsDue,

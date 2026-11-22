@@ -3478,6 +3478,9 @@ Future<void> _settleChineseFillIfAlreadyPresent() async {
           onOpenFullDialog: shadowAssessment.target == null
               ? null
               : () => _handleAssessLine(state.activeLineIndex),
+          onUpgradeToCoach: () {
+            setState(() => _studyTab = StudyModeTab.coach);
+          },
           episodeId: widget.episodeId,
           videoSource: _localPlayableVideoPath(),
           onRecordingStarted: ({required bool pauseVideo}) {

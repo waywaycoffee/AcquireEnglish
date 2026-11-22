@@ -10,10 +10,12 @@ class DigitalHumanCoachScreen extends StatelessWidget {
     this.lessonTitle,
     this.lessonText,
     this.practiceRole,
+    this.onConfirmedLearnerTurn,
   });
 
   final String? initialScenarioId;
   final String? lessonTitle, lessonText, practiceRole;
+  final ValueChanged<String>? onConfirmedLearnerTurn;
 
   @override
   Widget build(BuildContext context) {
@@ -34,6 +36,7 @@ class DigitalHumanCoachScreen extends StatelessWidget {
           courseTitle: '数字人口语',
           hasTranscript: lessonText?.isNotEmpty == true,
           standalone: true,
+          onConfirmedLearnerTurn: onConfirmedLearnerTurn,
           initialScenarioId: lessonText?.isNotEmpty == true
               ? 'video_line'
               : initialScenarioId ?? 'freechat',

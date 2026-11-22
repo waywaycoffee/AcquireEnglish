@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import os
 import sys
+from typing import Any
 
 
 INSTRUCTIONS = """You are a friendly English oral coach with a digital-human avatar.
@@ -86,10 +87,31 @@ async def entrypoint(ctx) -> None:
             super().__init__(**kwargs)
             self._learning_session_id: str | None = None
             self._room = None
+            self._context: dict[str, Any] = {}
+
+        def update_context(self, payload: dict[str, Any]) -> None:
+            self._context.update(payload)
+
+        def _reference(self, fallback: str) -> str:
+            for key in ('current_english', 'excerpt', 'prompt', 'scenario_prompt'):
+                value = str(self._context.get(key) or '').strip()
+                if value:
+                    return value
+            return os.getenv('ORAL_COACH_REFERENCE', fallback) or fallback
 
         async def on_enter(self):
+            scene = str(self._context.get('scenario_title') or '').strip()
+            line = str(self._context.get('current_english') or '').strip()
+            extra = ''
+            if scene:
+                extra += f' Scene: {scene}.'
+            if line:
+                extra += f' Video line: "{line[:180]}".'
             await self.session.generate_reply(
-                instructions='Greet the learner briefly and ask them to start speaking.',
+                instructions=(
+                    'Greet the learner briefly and ask them to start speaking.'
+                    f'{extra} Keep it under 2 sentences.'
+                ),
                 allow_interruptions=True,
             )
 
@@ -103,9 +125,13 @@ async def entrypoint(ctx) -> None:
                 return
             score = await score_pronunciation(
                 transcript=text,
-                reference_text=os.getenv('ORAL_COACH_REFERENCE', text),
+                reference_text=self._reference(text),
             )
             room = self._room
+            tip = ''
+            overall = (score.get('pronunciation') or {}).get('overall')
+            if isinstance(overall, (int, float)) and overall < 0.7:
+                tip = f'Pronunciation tip: aim a bit clearer (score {overall:.0%}).'
             if room is not None:
                 try:
                     await room.local_participant.publish_data(
@@ -114,25 +140,57 @@ async def entrypoint(ctx) -> None:
                     )
                 except Exception:  # noqa: BLE001
                     pass
-            tip = ''
-            overall = (score.get('pronunciation') or {}).get('overall')
-            if isinstance(overall, (int, float)) and overall < 0.7:
-                tip = f'Pronunciation tip: aim a bit clearer (score {overall:.0%}).'
+                if tip:
+                    try:
+                        import json as _json
+
+                        await room.local_participant.publish_data(
+                            _json.dumps(
+                                {'coach_text': tip, 'kind': 'pron_tip'},
+                                ensure_ascii=False,
+                            ).encode('utf-8'),
+                            topic='coach.text',
+                        )
+                    except Exception:  # noqa: BLE001
+                        pass
             self._learning_session_id = await persist_learning_turn(
                 learning_session_id=self._learning_session_id,
                 transcript=text,
                 coach_text=tip,
                 pronunciation=score.get('pronunciation') or {},
+                task_id=str(self._context.get('task_id') or 'livekit-oral'),
             )
+            ctx_bits = []
+            if self._context.get('current_english'):
+                ctx_bits.append(
+                    f'Stay on video line: "{str(self._context["current_english"])[:160]}".'
+                )
             if tip:
+                ctx_bits.append(tip)
+            if ctx_bits:
                 turn_ctx.add_instructions(
-                    f'The learner just said: "{text}". {tip} Keep coaching gently.'
+                    f'The learner just said: "{text}". ' + ' '.join(ctx_bits)
+                    + ' Keep coaching gently.'
                 )
 
     await ctx.connect(auto_subscribe=AutoSubscribe.AUDIO_ONLY)
     await ctx.wait_for_participant()
     agent = OralCoachAgent()
     agent._room = ctx.room
+
+    @ctx.room.on('data_received')
+    def _on_data(data: bytes, participant=None, kind=None, topic: str | None = None):  # noqa: ANN001
+        if topic not in (None, 'coach.context'):
+            return
+        try:
+            import json as _json
+
+            payload = _json.loads(data.decode('utf-8'))
+            if isinstance(payload, dict):
+                agent.update_context(payload)
+        except Exception:  # noqa: BLE001
+            pass
+
     session_kwargs: dict = {
         'vad': silero.VAD.load(),
         'llm': llm,

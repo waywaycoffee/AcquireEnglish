@@ -9,6 +9,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_tts/flutter_tts.dart';
 import 'package:flutter_webrtc/flutter_webrtc.dart';
 import 'package:camera/camera.dart';
+import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:media_kit/media_kit.dart';
 import 'package:path_provider/path_provider.dart';
@@ -29,6 +30,7 @@ import '../../words/presentation/word_book_provider.dart';
 import '../data/coach_english_voices.dart';
 import '../data/digital_human_catalog.dart';
 import '../data/live_scene_camera.dart';
+import '../data/livekit_oral_client.dart';
 import '../data/livetalking_client.dart';
 import '../data/oral_coach_pipeline_client.dart';
 import '../data/scene_word_recognizer.dart';
@@ -173,6 +175,7 @@ class StudyOralCoachTab extends ConsumerStatefulWidget {
     this.episodeId,
     this.initialScenarioId,
     this.standalone = false,
+    this.onConfirmedLearnerTurn,
     super.key,
   });
 
@@ -191,6 +194,7 @@ class StudyOralCoachTab extends ConsumerStatefulWidget {
 
   /// Opened outside the video player (module entry).
   final bool standalone;
+  final ValueChanged<String>? onConfirmedLearnerTurn;
 
   @override
   ConsumerState<StudyOralCoachTab> createState() => _StudyOralCoachTabState();
@@ -201,9 +205,11 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
   static const int _maxRecordingBytes =
       Pcm16MonoAudio.expectedSampleRate * 2 * 60;
   static const Duration _sessionBudget = Duration(minutes: 3);
+  static const int _questTargetUtterances = 10;
 
   final OralCoachPipelineClient _pipelineClient = OralCoachPipelineClient();
   final LiveTalkingClient _liveTalking = LiveTalkingClient();
+  final LiveKitOralClient _liveKit = LiveKitOralClient();
   final List<_ChatBubble> _bubbles = <_ChatBubble>[];
   final Set<int> _showZhIndexes = <int>{};
   final ScrollController _chatScroll = ScrollController();
@@ -229,6 +235,12 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
   int _roundStartBubble = 0;
   int _lastRoundTurns = 0;
   List<String> _lastRoundExpressions = const <String>[];
+  bool _duplexLive = false;
+  String _liveKitStatus = '';
+  int _questUtterances = 0;
+  final List<double> _roundPronScores = <double>[];
+  int _lastDueReviewCount = 0;
+  int _lastWrongItemCount = 0;
 
   String? get _historyKey {
     final String? episodeId = widget.episodeId;
@@ -343,7 +355,91 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
     final DigitalHumanPersona persona =
         ref.read(learningSettingsProvider).selectedDigitalHuman;
     await _loadVoiceFor(persona);
+    if (mounted && widget.standalone) {
+      await _maybeShowColdStartQuest();
+    }
     if (mounted) await _restoreHistoryAndStart();
+  }
+
+  Future<void> _maybeShowColdStartQuest() async {
+    if (_scenarios.isEmpty) return;
+    final LearningScenario? picked = await showModalBottomSheet<LearningScenario>(
+      context: context,
+      backgroundColor: const Color(0xFF1B1530),
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (BuildContext context) {
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(20, 16, 20, 28),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: <Widget>[
+                const Text(
+                  '3 分钟开口挑战',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 18,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+                const SizedBox(height: 6),
+                const Text(
+                  '选 1 个情景，开口 $_questTargetUtterances 句即可完成本日目标。',
+                  style: TextStyle(color: Colors.white70, fontSize: 13),
+                ),
+                const SizedBox(height: 14),
+                for (final LearningScenario scenario in _scenarios.take(6))
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 8),
+                    child: ListTile(
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(14),
+                        side: const BorderSide(color: Colors.white24),
+                      ),
+                      tileColor: Colors.white.withValues(alpha: 0.06),
+                      title: Text(
+                        scenario.title,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      subtitle: Text(
+                        scenario.goal,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          color: Colors.white60,
+                          fontSize: 12,
+                        ),
+                      ),
+                      trailing: Text(
+                        scenario.difficulty,
+                        style: const TextStyle(color: Colors.white54),
+                      ),
+                      onTap: () => Navigator.pop(context, scenario),
+                    ),
+                  ),
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text('跳过，稍后选', style: TextStyle(color: Colors.white54)),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+    if (picked != null && mounted) {
+      setState(() {
+        _activeScenario = picked;
+        _difficulty = picked.difficulty;
+      });
+    }
   }
 
   @override
@@ -354,6 +450,7 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
     unawaited(_cartoonTts.stop());
     unawaited(_speechPlayer?.stop());
     unawaited(_liveTalking.disconnect());
+    unawaited(_liveKit.disconnect());
     _orbPulse.dispose();
     _sessionTicker?.cancel();
     _chatScroll.dispose();
@@ -1042,8 +1139,10 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
       _roundStartBubble = _bubbles.length;
       _lastRoundTurns = 0;
       _lastRoundExpressions = const <String>[];
+      _questUtterances = 0;
+      _roundPronScores.clear();
       _error = null;
-      _status = '你可以开始说';
+      _status = settings.usesLiveKit ? '正在接通全双工外教…' : '你可以开始说';
       if (opening != null)
         _bubbles.add(_ChatBubble(role: 'coach', text: opening));
     });
@@ -1058,9 +1157,133 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
     if (_wantsLiveTalking(settings)) {
       unawaited(_ensureLiveTalking(settings).catchError((Object _) {}));
     }
-    if (opening != null) {
+    if (settings.usesLiveKit) {
+      unawaited(_ensureLiveKitDuplex(settings).catchError((Object _) {}));
+    }
+    if (opening != null && !settings.usesLiveKit) {
       unawaited(_speakCoach(opening, settings));
     }
+  }
+
+  Map<String, dynamic> _liveKitContextPayload() {
+    final LearningScenario? scenario = _activeScenario;
+    return <String, dynamic>{
+      'task_id': scenario?.id ?? (widget.hasTranscript ? 'video_line' : 'freechat'),
+      'scenario_title': scenario?.title ?? '',
+      'scenario_prompt': scenario?.prompt ?? '',
+      'current_english': widget.articleExcerpt.isNotEmpty
+          ? widget.articleExcerpt
+          : widget.topicSummary,
+      'excerpt': widget.articleExcerpt,
+      'course_title': widget.courseTitle,
+      'difficulty': _difficulty,
+    };
+  }
+
+  Future<void> _ensureLiveKitDuplex(LearningSettingsState settings) async {
+    _liveKit
+      ..onStatus = (String status) {
+        if (!mounted) return;
+        setState(() {
+          _liveKitStatus = status;
+          if (_duplexLive) _status = status;
+        });
+      }
+      ..onScore = (Map<String, dynamic> score) {
+        unawaited(_onLiveKitScore(score));
+      }
+      ..onAgentText = (String text) {
+        if (!mounted || text.trim().isEmpty) return;
+        setState(() {
+          _bubbles.add(_ChatBubble(role: 'coach', text: text.trim()));
+          _status = '外教实时回复中';
+        });
+        _scrollChatToEnd();
+      };
+    try {
+      await _liveKit.connect(
+        api: ref.read(acquireApiClientProvider),
+        preferredUrl: settings.liveKitUrl,
+        enableMicrophone: true,
+        context: _liveKitContextPayload(),
+      );
+      if (!mounted) return;
+      setState(() {
+        _duplexLive = true;
+        _status = '全双工已接通 · 直接说，可打断外教';
+      });
+    } catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _duplexLive = false;
+        _liveKitStatus = '$error';
+        _status = '全双工暂不可用，已回退按住说话';
+      });
+    }
+  }
+
+  Future<void> _onLiveKitScore(Map<String, dynamic> score) async {
+    if (!mounted) return;
+    final Object? pron = score['pronunciation'];
+    double? overall;
+    if (pron is Map && pron['overall'] is num) {
+      overall = (pron['overall'] as num).toDouble();
+    }
+    final String transcript =
+        '${score['transcript'] ?? score['text'] ?? ''}'.trim();
+    setState(() {
+      _questUtterances += 1;
+      if (overall != null) _roundPronScores.add(overall);
+      if (transcript.isNotEmpty) {
+        _bubbles.add(_ChatBubble(role: 'user', text: transcript));
+      }
+      if (overall != null && overall < 0.7) {
+        _bubbles.add(
+          _ChatBubble(
+            role: 'coach',
+            text:
+                'Pronunciation tip: aim a bit clearer (${(overall * 100).round()}%). Try that line once more.',
+            hint: true,
+          ),
+        );
+      }
+      _status =
+          '今日目标 $_questUtterances/$_questTargetUtterances${_questUtterances >= _questTargetUtterances ? ' · 已达成' : ''}';
+    });
+    _scrollChatToEnd();
+    if (transcript.isEmpty || !ref.read(authSessionProvider).isLoggedIn) {
+      return;
+    }
+    try {
+      final AcquireApiClient api = ref.read(acquireApiClientProvider);
+      String? sid = _learningSessionId;
+      if (sid == null || sid.isEmpty) {
+        sid = await api.startLearningSession(
+          taskId: _activeScenario?.id ?? 'livekit-oral',
+          courseTitle: widget.courseTitle,
+          currentEnglish: widget.articleExcerpt.isNotEmpty
+              ? widget.articleExcerpt
+              : widget.topicSummary,
+        );
+        _learningSessionId = sid;
+      }
+      await api.appendLearningTurn(
+        sessionId: sid,
+        role: 'user',
+        text: transcript,
+        machineTranscript: transcript,
+        scores: <String, dynamic>{
+          if (overall != null) 'overall': overall,
+          'source': 'livekit',
+        },
+      );
+      if (overall != null && overall < 0.85 && transcript.length >= 8) {
+        await api.saveReviewExpression(
+          expression: transcript,
+          sourceQuote: transcript,
+        );
+      }
+    } catch (_) {}
   }
 
   void _scheduleIdlePrompt() {
@@ -1163,6 +1386,12 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
 
   Future<void> _startRecording() async {
     if (_recordingActive || _busy || _coachSpeaking) {
+      return;
+    }
+    if (_duplexLive) {
+      setState(() {
+        _status = '全双工中：直接开口即可，无需按住麦克风';
+      });
       return;
     }
     if (!_started) {
@@ -1408,6 +1637,7 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
       textOnly: true,
     );
     if (!mounted || !identical(_session, session)) return;
+    widget.onConfirmedLearnerTurn?.call(confirmed);
     _difficulty = turn.difficulty;
     final OralExpressionDiagnosis? diagnosis =
         turn.diagnosis ??
@@ -1653,6 +1883,21 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
               )
               .toList(growable: false),
         );
+        for (final String suggestion in corrections.take(3)) {
+          try {
+            await api.saveReviewExpression(
+              expression: suggestion,
+              sourceQuote: turn.transcript,
+            );
+          } catch (_) {}
+        }
+      }
+      if (mounted) {
+        setState(() {
+          _questUtterances += 1;
+          final double? overall = turn.pronunciationOverall;
+          if (overall != null) _roundPronScores.add(overall);
+        });
       }
     } catch (_) {}
   }
@@ -2064,16 +2309,38 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
     _sessionStartedAt = null;
     _liveTalkingPreparation = null;
     await _liveTalking.disconnect();
+    await _liveKit.disconnect();
+    Map<String, dynamic>? closed;
+    final String? sid = _learningSessionId;
+    if (sid != null && sid.isNotEmpty) {
+      closed = await ref.read(acquireApiClientProvider).closeLearningSession(sid);
+    }
+    try {
+      final summary = await ref.read(acquireApiClientProvider).learningSummary();
+      _lastDueReviewCount = summary.dueReviewCount;
+      _lastWrongItemCount = summary.wrongItemCount;
+    } catch (_) {}
     final List<_ChatBubble> round = _bubbles.skip(_roundStartBubble).toList();
     final Set<String> expressions = <String>{
       for (final _ChatBubble bubble in round)
         if (bubble.diagnosis case final OralExpressionDiagnosis diagnosis)
           if (diagnosis.idiomaticEn.trim().isNotEmpty) diagnosis.idiomaticEn.trim(),
     };
+    final Object? closedCorrections = closed?['corrections'];
+    if (closedCorrections is List) {
+      for (final Object? item in closedCorrections) {
+        final String text = '$item'.trim();
+        if (text.isNotEmpty) expressions.add(text);
+      }
+    }
+    final int userTurns = round
+        .where((_ChatBubble bubble) => bubble.role == 'user')
+        .length;
     setState(() {
       _started = false;
-      _lastRoundTurns = round.where((_ChatBubble bubble) => bubble.role == 'user').length;
-      _lastRoundExpressions = expressions.take(3).toList(growable: false);
+      _duplexLive = false;
+      _lastRoundTurns = userTurns > 0 ? userTurns : _questUtterances;
+      _lastRoundExpressions = expressions.take(5).toList(growable: false);
       _session = null;
       _sessionPreparation = null;
       _liveRenderer = null;
@@ -2087,22 +2354,43 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
     _saveHistory();
     await _cartoonTts.stop();
     await _speechPlayer?.stop();
+    if (mounted) _showRoundSummary();
   }
 
   void _showRoundSummary() {
+    final double? avgPron = _roundPronScores.isEmpty
+        ? null
+        : _roundPronScores.reduce((double a, double b) => a + b) /
+            _roundPronScores.length;
     unawaited(showDialog<void>(
       context: context,
       builder: (BuildContext context) => AlertDialog(
-        title: const Text('本轮练习小结'),
+        title: const Text('本轮练习报告'),
         content: SingleChildScrollView(
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: <Widget>[
               Text('$_topicLabel · 开口 $_lastRoundTurns 次'),
+              Text(
+                '今日目标 $_questUtterances/$_questTargetUtterances'
+                '${_questUtterances >= _questTargetUtterances ? '（已达成）' : ''}',
+              ),
+              if (avgPron != null)
+                Text('发音均分 ${(avgPron * 100).round()}%'),
+              Text('待复习 $_lastDueReviewCount · 错题 $_lastWrongItemCount'),
+              if (_liveKitStatus.isNotEmpty) ...<Widget>[
+                const SizedBox(height: 6),
+                Text(
+                  _duplexLive || _liveKitStatus.contains('接通')
+                      ? '通话：$_liveKitStatus'
+                      : '通话回退：$_liveKitStatus',
+                  style: const TextStyle(fontSize: 12, color: Colors.black54),
+                ),
+              ],
               if (_lastRoundExpressions.isNotEmpty) ...<Widget>[
                 const SizedBox(height: 12),
-                const Text('可以再练的表达'),
+                const Text('明天可复习的表达'),
                 for (final String expression in _lastRoundExpressions)
                   Padding(
                     padding: const EdgeInsets.only(top: 6),
@@ -2122,6 +2410,13 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
           ),
         ),
         actions: <Widget>[
+          TextButton(
+            onPressed: () {
+              Navigator.pop(context);
+              context.push('/review/learning');
+            },
+            child: const Text('去复习'),
+          ),
           TextButton(
             onPressed: () => Navigator.pop(context),
             child: const Text('完成'),
@@ -2502,12 +2797,39 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
                 ],
               ),
             ),
+            if (_started)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(14, 4, 14, 0),
+                child: Row(
+                  children: <Widget>[
+                    Expanded(
+                      child: Text(
+                        _duplexLive
+                            ? '全双工 · 目标 $_questUtterances/$_questTargetUtterances'
+                            : '开口目标 $_questUtterances/$_questTargetUtterances',
+                        style: const TextStyle(
+                          color: Colors.white70,
+                          fontSize: 12,
+                        ),
+                      ),
+                    ),
+                    if (_duplexLive)
+                      TextButton(
+                        onPressed: () => unawaited(_hangUp()),
+                        child: const Text(
+                          '结束通话',
+                          style: TextStyle(color: Colors.white70, fontSize: 12),
+                        ),
+                      ),
+                  ],
+                ),
+              ),
             if (!_started && _lastRoundTurns > 0)
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
                 child: OutlinedButton.icon(
                   icon: const Icon(Icons.summarize_outlined),
-                  label: Text('本轮小结 · $_lastRoundTurns 次开口'),
+                  label: Text('本轮报告 · $_lastRoundTurns 次开口'),
                   onPressed: _showRoundSummary,
                 ),
               ),

@@ -96,6 +96,7 @@ class StudyShadowingTab extends ConsumerStatefulWidget {
     this.videoSource,
     this.onDubPlaybackRequested,
     this.onExportShareRequested,
+    this.onUpgradeToCoach,
     super.key,
   });
 
@@ -113,6 +114,9 @@ class StudyShadowingTab extends ConsumerStatefulWidget {
   final ValueChanged<VoidCallback>? onPlayOriginalBound;
   final String? unavailableReason;
   final VoidCallback? onOpenFullDialog;
+
+  /// Promote the current line into AI oral-coach dialogue (P1).
+  final VoidCallback? onUpgradeToCoach;
 
   /// Called when recording starts. [pauseVideo] is false for shadow mode
   /// (play reference while recording) and true for look/hide modes.
@@ -1131,6 +1135,15 @@ class _StudyShadowingTabState extends ConsumerState<StudyShadowingTab> {
                       fontWeight: FontWeight.w700,
                       color: shell.textSecondary,
                     ),
+                  ),
+                ),
+              if (widget.onUpgradeToCoach != null)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 10),
+                  child: OutlinedButton.icon(
+                    onPressed: widget.onUpgradeToCoach,
+                    icon: const Icon(Icons.record_voice_over_outlined, size: 18),
+                    label: const Text('跟读完成 · 升格对话'),
                   ),
                 ),
 

@@ -946,6 +946,19 @@ class _PeerOralPracticeScreenState
       unawaited(Navigator.of(context).maybePop());
       return;
     }
+    final List<String> expressions = <String>[
+      for (final _PeerBubble bubble in _bubbles)
+        if (bubble.diagnosis?.idiomaticEn.trim().isNotEmpty == true)
+          bubble.diagnosis!.idiomaticEn.trim(),
+    ];
+    final int myTurns =
+        _bubbles.where((_PeerBubble b) => b.role == 'me').length;
+    int due = 0;
+    try {
+      final summary = await ref.read(acquireApiClientProvider).learningSummary();
+      due = summary.dueReviewCount;
+    } catch (_) {}
+    if (!mounted) return;
     setState(() {
       _phase = _PeerPhase.lobby;
       _roomId = null;
@@ -954,6 +967,47 @@ class _PeerOralPracticeScreenState
       _status = '已结束，可重新匹配或发邀请';
     });
     unawaited(_refreshOpenInvites());
+    await showDialog<void>(
+      context: context,
+      builder: (BuildContext context) => AlertDialog(
+        title: const Text('对练复盘'),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: <Widget>[
+              Text('本轮你开口约 $myTurns 次'),
+              Text('待复习表达 $due 条（改写已入库）'),
+              if (expressions.isNotEmpty) ...<Widget>[
+                const SizedBox(height: 10),
+                const Text('建议明天再练：'),
+                for (final String e in expressions.take(5))
+                  Padding(
+                    padding: const EdgeInsets.only(top: 6),
+                    child: Text('· $e'),
+                  ),
+              ],
+            ],
+          ),
+        ),
+        actions: <Widget>[
+          TextButton(
+            onPressed: () {
+              Navigator.pop(context);
+              // Peer screen may not have go_router context for review; use named path.
+              Navigator.of(context).maybePop();
+            },
+            child: const Text('完成'),
+          ),
+          FilledButton(
+            onPressed: () {
+              Navigator.pop(context);
+            },
+            child: const Text('继续匹配'),
+          ),
+        ],
+      ),
+    );
   }
 
   Future<void> _pickContent() async {

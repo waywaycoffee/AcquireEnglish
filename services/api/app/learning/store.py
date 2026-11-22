@@ -410,3 +410,41 @@ class LearningStore:
                 (now, user_id),
             ).fetchone()
         return int(row['c'] if row else 0)
+
+    def close_session(self, session_id: str, *, user_id: int) -> dict:
+        """Mark session closed and return a compact end-of-session report."""
+        with self._connect() as conn:
+            row = self._require_session(conn, session_id, user_id)
+            turns = json.loads(row["turns_json"] or "[]")
+            feedback = json.loads(row["feedback_json"] or "[]") if row["feedback_json"] else []
+            conn.execute(
+                "UPDATE sessions SET status=? WHERE id=?",
+                ("closed", session_id),
+            )
+        user_turns = [
+            t for t in turns if t.get("role") == "user" and str(t.get("text") or "").strip()
+        ]
+        scores = []
+        for t in user_turns:
+            sc = t.get("scores") or {}
+            overall = sc.get("overall")
+            if isinstance(overall, (int, float)):
+                scores.append(float(overall))
+        avg_pron = round(sum(scores) / len(scores), 3) if scores else None
+        suggestions = []
+        if isinstance(feedback, list):
+            for item in feedback:
+                if isinstance(item, dict) and item.get("suggestion"):
+                    suggestions.append(str(item["suggestion"]))
+        return {
+            "session_id": session_id,
+            "status": "closed",
+            "user_turn_count": len(user_turns),
+            "assistant_turn_count": sum(
+                1 for t in turns if t.get("role") == "assistant"
+            ),
+            "avg_pronunciation": avg_pron,
+            "corrections": suggestions[:8],
+            "due_review_count": self.count_due_reviews(user_id=user_id),
+            "wrong_item_count": self.count_wrong_items(user_id=user_id),
+        }

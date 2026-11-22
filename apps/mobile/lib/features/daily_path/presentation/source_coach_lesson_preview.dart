@@ -8,6 +8,7 @@ class SourceCoachLessonPreview extends StatelessWidget {
     required this.topic,
     required this.sourceLines,
     required this.isVideo,
+    this.onConfirmedLearnerTurn,
     super.key,
   });
 
@@ -15,6 +16,7 @@ class SourceCoachLessonPreview extends StatelessWidget {
   final String topic;
   final List<String> sourceLines;
   final bool isVideo;
+  final ValueChanged<String>? onConfirmedLearnerTurn;
 
   @override
   Widget build(BuildContext context) {
@@ -88,6 +90,7 @@ class SourceCoachLessonPreview extends StatelessWidget {
                                 lessonTitle: topic,
                                 lessonText: lines.join('\n'),
                                 practiceRole: 'learner',
+                                onConfirmedLearnerTurn: onConfirmedLearnerTurn,
                               ),
                             ),
                           ),

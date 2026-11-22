@@ -145,6 +145,16 @@ async def learning_summary(user: User = Depends(get_current_user)) -> dict:
     }
 
 
+@router.post("/sessions/{session_id}/close")
+async def close_session(
+    session_id: str, user: User = Depends(get_current_user)
+) -> dict:
+    try:
+        return get_store().close_session(session_id, user_id=user.id)
+    except KeyError:
+        raise HTTPException(404, "session not found") from None
+
+
 @router.post("/reviews")
 async def save_review(
     body: ReviewSaveIn, user: User = Depends(get_current_user)
