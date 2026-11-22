@@ -37,8 +37,14 @@ WordEntry mergeWordEntry(WordEntry a, WordEntry b) {
     older = identical(newer, a) ? b : a;
   }
 
+  // Never OR favorites — that resurrected words the learner explicitly
+  // unfavorited once an older cloud snapshot still had favorite=true.
   return newer.copyWith(
-    favorite: a.favorite || b.favorite,
+    favorite: newer.favorite,
+    scheduleStatus: newer.scheduleStatus,
+    collectedAtMs: newer.favorite
+        ? (newer.collectedAtMs ?? older.collectedAtMs)
+        : null,
     occurrences: _mergeOccurrences(a.occurrences, b.occurrences),
     tags: <String>{...a.tags, ...b.tags}.toList(growable: false)..sort(),
     groupIds: <String>{
@@ -62,7 +68,6 @@ WordEntry mergeWordEntry(WordEntry a, WordEntry b) {
     aiExampleCn: _preferString(newer.aiExampleCn, older.aiExampleCn),
     senses: newer.senses.isNotEmpty ? newer.senses : older.senses,
     updatedAtMs: fa >= fb ? fa : fb,
-    collectedAtMs: newer.collectedAtMs ?? older.collectedAtMs,
   );
 }
 

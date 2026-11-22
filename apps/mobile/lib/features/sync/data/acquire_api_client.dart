@@ -1545,6 +1545,16 @@ class AcquireApiClient {
     return AcquireVocabDto.fromJson(response.data as Map<String, dynamic>);
   }
 
+  Future<void> deleteVocab({required String word, String? lessonId}) async {
+    await _dio.delete(
+      Endpoints.vocab,
+      queryParameters: <String, dynamic>{
+        'word': word,
+        if (lessonId != null) 'lesson_id': lessonId,
+      },
+    );
+  }
+
   Future<List<LearningScenario>> fetchLearningTasks() async {
     try {
       final Response<dynamic> response = await _dio.get(Endpoints.learningTasks);

@@ -680,19 +680,21 @@ class WordBookNotifier extends Notifier<List<WordEntry>> {
     final List<WordEntry> next = <WordEntry>[...state];
     final WordEntry current = next[index];
     final bool becomingFavorite = !current.favorite;
+    final int now = DateTime.now().millisecondsSinceEpoch;
     next[index] = current.copyWith(
       favorite: becomingFavorite,
-      collectedAtMs: becomingFavorite ? DateTime.now().millisecondsSinceEpoch : null,
+      collectedAtMs: becomingFavorite ? now : null,
+      updatedAtMs: now,
       scheduleStatus: becomingFavorite
           ? VocabScheduleStatus.pending
           : VocabScheduleStatus.archived,
     );
     state = next;
     unawaited(_persist());
-    final WordEntry updated = state[index];
-    if (updated.favorite) {
-      unawaited(ref.read(vocabSyncServiceProvider).pushEntry(updated));
-    }
+    final WordEntry updated = next[index];
+    // Always push — unfavorite must delete/clear the cloud vocab row, otherwise
+    // the next pull resurrected favorite=true from an older snapshot.
+    unawaited(ref.read(vocabSyncServiceProvider).pushEntry(updated));
     return updated.favorite;
   }
 
@@ -1405,6 +1407,11 @@ class WordBookNotifier extends Notifier<List<WordEntry>> {
     );
     if (index >= 0) {
       final WordEntry existing = state[index];
+      // Respect an explicit local unfavorite — do not resurrect from /api/vocab.
+      if (!existing.favorite &&
+          existing.scheduleStatus == VocabScheduleStatus.archived) {
+        return;
+      }
       final List<WordEntry> next = List<WordEntry>.from(state);
       final bool keepLocalSrs =
           favoriteOnly || existing.repetitions >= repetitions;

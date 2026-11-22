@@ -17,25 +17,25 @@ class VocabSyncService {
   final Ref _ref;
 
   Future<bool> pushEntry(WordEntry entry) async {
-    if (!entry.favorite) {
-      return false;
-    }
     try {
-      await _ref
-          .read(acquireApiClientProvider)
-          .upsertVocab(
-            word: entry.word,
-            context: entry.occurrences.isEmpty
-                ? null
-                : entry.occurrences.first.sentence,
-            mastery: entry.mastery.name,
-            ease: entry.ease,
-            intervalDays: entry.intervalDays,
-            repetitions: entry.repetitions,
-            dueAt: entry.dueAtMs == null
-                ? null
-                : DateTime.fromMillisecondsSinceEpoch(entry.dueAtMs!),
-          );
+      final AcquireApiClient api = _ref.read(acquireApiClientProvider);
+      if (!entry.favorite) {
+        await api.deleteVocab(word: entry.word);
+        return true;
+      }
+      await api.upsertVocab(
+        word: entry.word,
+        context: entry.occurrences.isEmpty
+            ? null
+            : entry.occurrences.first.sentence,
+        mastery: entry.mastery.name,
+        ease: entry.ease,
+        intervalDays: entry.intervalDays,
+        repetitions: entry.repetitions,
+        dueAt: entry.dueAtMs == null
+            ? null
+            : DateTime.fromMillisecondsSinceEpoch(entry.dueAtMs!),
+      );
       return true;
     } catch (_) {
       return false;

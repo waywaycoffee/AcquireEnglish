@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
@@ -5,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hive_ce/hive.dart';
 import 'package:path_provider/path_provider.dart';
 
+import '../../authentication/presentation/auth_session.dart';
 import '../../daily_path/data/oral_core_library_mapper.dart';
 import '../../daily_path/domain/oral_core_series.dart';
 import '../../learning_modules/american_ipa_course.dart';
@@ -16,6 +18,8 @@ import '../../import_course/domain/bilibili_import.dart';
 import '../../import_course/domain/import_match.dart';
 import '../../membership/domain/free_trial_seeds.dart';
 import '../../player/presentation/asr_subtitle_cache.dart';
+import '../../subtitle_completion/shared_bilibili_subtitle_sync.dart';
+import '../../sync/data/acquire_api_client.dart';
 import '../data/course_pack_mapper.dart';
 import 'course_directory_relink.dart';
 import 'library_mock_data.dart';
@@ -134,22 +138,9 @@ class LibraryCatalogNotifier extends Notifier<List<LibraryCourseData>> {
       return;
     }
     final LibraryCourseData previous = state[existingIndex];
-    final LibraryCourseData merged = course.copyWith(
-      title: previous.episodes.length == 1 && previous.episodes.single.customTitle
-          ? previous.title : null,
-      coverImage: previous.episodes.length == 1 && previous.episodes.single.customCover
-          ? previous.coverImage : null,
-      progressPercent: previous.progressPercent,
-      completedEpisodes: previous.completedEpisodes,
-      lastStudiedStr: previous.lastStudiedStr,
-      lastStudiedAtMs: previous.lastStudiedAtMs,
-      episodes: <LibraryEpisodeItem>[
-        for (final LibraryEpisodeItem episode in course.episodes)
-          _mergeImportedEpisode(
-            next: episode,
-            previous: _findMatchingEpisode(previous.episodes, episode),
-          ),
-      ],
+    final LibraryCourseData merged = _mergeImportedCourse(
+      previous: previous,
+      incoming: course,
     );
     final List<LibraryCourseData> next = <LibraryCourseData>[...state];
     next[existingIndex] = merged;
@@ -196,24 +187,12 @@ class LibraryCatalogNotifier extends Notifier<List<LibraryCourseData>> {
     }
     if (existingIndex >= 0) {
       // Re-importing the same Bilibili / online course should refresh media
-      // paths (local download + cover) while keeping learning progress.
+      // paths (local download + cover) while keeping learning progress +
+      // user-renamed titles/covers.
       final LibraryCourseData previous = state[existingIndex];
-      final LibraryCourseData merged = course.copyWith(
-        title: previous.episodes.length == 1 && previous.episodes.single.customTitle
-            ? previous.title : null,
-        coverImage: previous.episodes.length == 1 && previous.episodes.single.customCover
-            ? previous.coverImage : null,
-        progressPercent: previous.progressPercent,
-        completedEpisodes: previous.completedEpisodes,
-        lastStudiedStr: previous.lastStudiedStr,
-        lastStudiedAtMs: previous.lastStudiedAtMs,
-        episodes: <LibraryEpisodeItem>[
-          for (final LibraryEpisodeItem episode in course.episodes)
-            _mergeImportedEpisode(
-              next: episode,
-              previous: _findMatchingEpisode(previous.episodes, episode),
-            ),
-        ],
+      final LibraryCourseData merged = _mergeImportedCourse(
+        previous: previous,
+        incoming: course,
       );
       final List<LibraryCourseData> next = <LibraryCourseData>[...state];
       next[existingIndex] = merged;
@@ -358,29 +337,95 @@ class LibraryCatalogNotifier extends Notifier<List<LibraryCourseData>> {
     final String? name = title?.trim();
     final String? image = cover?.trim();
     if (name == '' || image == '') return;
+    LibraryCourseData? updatedCourse;
+    LibraryEpisodeItem? updatedEpisode;
     state = [
       for (final LibraryCourseData course in state)
         if (course.id == courseId && course.episodes.any((ep) => ep.id == episodeId))
-          course.copyWith(
-            title: course.episodes.length == 1 ? name : null,
-            coverImage: course.episodes.length == 1 ? image : null,
-            episodes: [
-              for (final LibraryEpisodeItem ep in course.episodes)
-                if (ep.id == episodeId)
-                  ep.copyWith(
-                    title: name,
-                    coverImage: image,
-                    customTitle: name != null ? true : null,
-                    customCover: image != null ? true : null,
-                  )
-                else
-                  ep,
-            ],
-          )
+          () {
+            final LibraryCourseData next = course.copyWith(
+              // Always mirror a renamed single-episode title onto the course
+              // card; for multi-episode 合集 keep the series title unless the
+              // renamed episode is the only one shown as the course face.
+              title: name != null &&
+                      (course.episodes.length == 1 ||
+                          course.title.trim() ==
+                              course.episodes
+                                  .firstWhere((ep) => ep.id == episodeId)
+                                  .title
+                                  .trim())
+                  ? name
+                  : null,
+              coverImage: course.episodes.length == 1 ? image : null,
+              episodes: [
+                for (final LibraryEpisodeItem ep in course.episodes)
+                  if (ep.id == episodeId)
+                    ep.copyWith(
+                      title: name,
+                      coverImage: image,
+                      customTitle: name != null ? true : null,
+                      customCover: image != null ? true : null,
+                    )
+                  else
+                    ep,
+              ],
+            );
+            updatedCourse = next;
+            updatedEpisode = next.episodes.firstWhere((ep) => ep.id == episodeId);
+            return next;
+          }()
         else
           course,
     ];
     await _persistImportedCourses();
+    final LibraryCourseData? course = updatedCourse;
+    final LibraryEpisodeItem? episode = updatedEpisode;
+    if (name != null && course != null && episode != null) {
+      // Push renamed title into personal-import cloud so restore/resync cannot
+      // put the Bilibili original title back.
+      unawaited(
+        _pushRenamedPersonalImportTitle(course: course, episode: episode),
+      );
+    }
+  }
+
+  Future<void> _pushRenamedPersonalImportTitle({
+    required LibraryCourseData course,
+    required LibraryEpisodeItem episode,
+  }) async {
+    try {
+      final AuthSessionState auth = ref.read(authSessionProvider);
+      if (!auth.isLoggedIn) return;
+      final AcquireApiClient api = ref.read(acquireApiClientProvider);
+      final String? sourceUrl = (episode.sourceUrl ?? '').trim().isNotEmpty
+          ? episode.sourceUrl!.trim()
+          : null;
+      final BilibiliSharedSubtitleIds? ids = resolveBilibiliSharedSubtitleIds(
+        sourceKey: bilibiliEpisodeCacheKey(
+          course: course,
+          episode: episode,
+          sourceUrl: sourceUrl,
+          videoAsset: episode.videoAsset,
+        ),
+        sourceUrl: sourceUrl,
+        course: course,
+        episode: episode,
+      );
+      if (ids == null) return;
+      final String watchUrl = (sourceUrl ?? '').trim().isNotEmpty
+          ? sourceUrl!.trim()
+          : BilibiliImport.watchUrl(bvid: ids.bvid, page: ids.page);
+      final String externalId = ids.page <= 1
+          ? ids.bvid
+          : '${ids.bvid}-p${ids.page.toString().padLeft(2, '0')}';
+      await api.upsertPersonalImport(
+        source: 'bilibili',
+        externalId: externalId,
+        title: episode.title.trim().isEmpty ? course.title.trim() : episode.title.trim(),
+        watchUrl: watchUrl,
+        durationSec: (episode.durationMinutes * 60).clamp(1, 86400),
+      );
+    } catch (_) {}
   }
 
   /// Update course poster; only fill placeholder episode covers.
@@ -1292,6 +1337,52 @@ class LibraryCatalogNotifier extends Notifier<List<LibraryCourseData>> {
       }
     }
     return null;
+  }
+
+  /// Re-import / expand must keep user-renamed titles and custom covers.
+  LibraryCourseData _mergeImportedCourse({
+    required LibraryCourseData previous,
+    required LibraryCourseData incoming,
+  }) {
+    final List<LibraryEpisodeItem> episodes = <LibraryEpisodeItem>[
+      for (final LibraryEpisodeItem episode in incoming.episodes)
+        _mergeImportedEpisode(
+          next: episode,
+          previous: _findMatchingEpisode(previous.episodes, episode),
+        ),
+    ];
+    final bool keepCustomTitle = previous.episodes.any(
+          (LibraryEpisodeItem e) => e.customTitle,
+        ) ||
+        episodes.any((LibraryEpisodeItem e) => e.customTitle);
+    final bool keepCustomCover = previous.episodes.any(
+          (LibraryEpisodeItem e) => e.customCover,
+        ) ||
+        episodes.any((LibraryEpisodeItem e) => e.customCover);
+    // Single-episode renames also rewrite course.title — keep that card title.
+    final String? preservedTitle = keepCustomTitle
+        ? (previous.episodes.length == 1 && previous.episodes.single.customTitle
+            ? previous.title
+            : (episodes.length == 1 && episodes.single.customTitle
+                ? episodes.single.title
+                : previous.title))
+        : null;
+    final String? preservedCover = keepCustomCover
+        ? (previous.episodes.length == 1 && previous.episodes.single.customCover
+            ? previous.coverImage
+            : (episodes.length == 1 && episodes.single.customCover
+                ? episodes.single.coverImage
+                : previous.coverImage))
+        : null;
+    return incoming.copyWith(
+      title: preservedTitle,
+      coverImage: preservedCover,
+      progressPercent: previous.progressPercent,
+      completedEpisodes: previous.completedEpisodes,
+      lastStudiedStr: previous.lastStudiedStr,
+      lastStudiedAtMs: previous.lastStudiedAtMs,
+      episodes: episodes,
+    );
   }
 
   /// Keep progress + already-downloaded local MP4/subs when a re-import only

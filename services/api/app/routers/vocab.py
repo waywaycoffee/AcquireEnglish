@@ -1,5 +1,5 @@
-from fastapi import APIRouter, Depends
-from sqlalchemy import select
+from fastapi import APIRouter, Depends, HTTPException, Query, status
+from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
@@ -17,6 +17,28 @@ async def list_vocab(
 ) -> list[VocabOut]:
     result = await db.execute(select(VocabItem).where(VocabItem.user_id == user.id))
     return [VocabOut.model_validate(item) for item in result.scalars().all()]
+
+
+@router.delete("")
+async def delete_vocab(
+    word: str = Query(..., min_length=1, max_length=120),
+    lesson_id: str | None = Query(default=None),
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    """Remove a cloud vocab row so local unfavorite is not resurrected on pull."""
+    cleaned = word.strip()
+    if not cleaned:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="word required")
+    stmt = delete(VocabItem).where(
+        VocabItem.user_id == user.id,
+        VocabItem.word == cleaned,
+    )
+    if lesson_id is not None:
+        stmt = stmt.where(VocabItem.lesson_id == lesson_id)
+    result = await db.execute(stmt)
+    await db.commit()
+    return {"ok": True, "deleted": int(result.rowcount or 0), "word": cleaned}
 
 
 @router.post("", response_model=VocabOut)
