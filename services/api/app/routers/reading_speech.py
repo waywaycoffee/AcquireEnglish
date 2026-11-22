@@ -175,14 +175,20 @@ async def list_voices() -> dict:
     }
 
 
+def _book_preferred_voice(preferred: str) -> str:
+    """Map any CosyVoice id onto the emotional book pair only."""
+    voice = _resolve_voice(preferred)
+    if voice in BOOK_VOICE_PAIR:
+        return voice
+    if VOICE_GENDER.get(voice) == "male":
+        return BOOK_MALE_VOICE
+    return BOOK_FEMALE_VOICE
+
+
 def _book_voices_for_request(preferred: str) -> list[str]:
-    """Always cover the emotional male/female pair; keep preferred first."""
-    preferred_id = _resolve_voice(preferred)
-    ordered: list[str] = []
-    for voice in (preferred_id, *BOOK_VOICE_PAIR):
-        if voice not in ordered:
-            ordered.append(voice)
-    return ordered
+    """Long-novel packs are only the emotional female/male pair — never extras."""
+    del preferred
+    return list(BOOK_VOICE_PAIR)
 
 
 @router.post("")
@@ -534,7 +540,7 @@ async def enqueue_book_pregen(
     Always synthesizes the emotional female + male pair so each book keeps
     both voice packs on ECS; clients may still pass a preferred voice.
     """
-    preferred = _resolve_voice(body.voice)
+    preferred = _book_preferred_voice(body.voice)
     voices = _book_voices_for_request(body.voice)
     text = body.text.replace("\r\n", "\n")
     if not rtq.is_long_novel(text):
@@ -589,7 +595,7 @@ async def book_pregen_status(
     user: User = Depends(get_current_user),
 ) -> dict:
     del user
-    preferred = _resolve_voice(voice)
+    preferred = _book_preferred_voice(voice)
     voices = _book_voices_for_request(voice)
     statuses = [
         rtq.book_status(doc_id=doc_id.strip(), voice=item) for item in voices
@@ -604,7 +610,7 @@ async def book_pregen_ecs_fallback(
     user: User = Depends(get_current_user),
 ) -> dict:
     """Kick ECS filler for unfinished pages when the 5060 Ti worker is offline."""
-    preferred = _resolve_voice(body.voice)
+    preferred = _book_preferred_voice(body.voice)
     voices = _book_voices_for_request(body.voice)
     if body.text.strip():
         try:
