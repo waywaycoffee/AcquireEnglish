@@ -102,7 +102,9 @@ final readingBookPrepProvider = StreamProvider.autoDispose
     voice: voice,
     processOnEcs: false,
   );
-  DateTime started = DateTime.now();
+  DateTime progressAnchor = DateTime.now();
+  int lastPercent = -1;
+  int lastPagesReady = -1;
   bool fallbackTried = false;
 
   while (true) {
@@ -121,17 +123,23 @@ final readingBookPrepProvider = StreamProvider.autoDispose
     yield status;
     if (status.ready) return;
 
-    // If GPU worker is offline for ~90s, fall back to ECS filler once.
-    if (!fallbackTried &&
-        DateTime.now().difference(started) > const Duration(seconds: 90) &&
-        status.percent == 0) {
+    if (status.percent != lastPercent || status.pagesReady != lastPagesReady) {
+      lastPercent = status.percent;
+      lastPagesReady = status.pagesReady;
+      progressAnchor = DateTime.now();
+    }
+
+    // GPU worker offline / stalled (~90s without progress) → ECS filler once.
+    final bool stalled =
+        DateTime.now().difference(progressAnchor) > const Duration(seconds: 90);
+    if (!fallbackTried && stalled) {
       fallbackTried = true;
       latest = await api.readingBookPregenFallback(
         docId: doc.id,
         text: doc.plainText,
         voice: voice,
       );
-      started = DateTime.now();
+      progressAnchor = DateTime.now();
       continue;
     }
 

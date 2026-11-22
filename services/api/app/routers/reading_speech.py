@@ -303,6 +303,18 @@ async def process_pregen_job(job_id: str, *, user_id: int | None = None) -> None
         rtq.fail(job_id, lease, str(exc))
 
 
+async def drain_book_pregen_ecs(
+    *,
+    doc_id: str,
+    voice: str,
+    user_id: int | None = None,
+) -> None:
+    """Serially fill unfinished pages so FastAPI is not flooded with tasks."""
+    for job_id in rtq.unfinished_page_job_ids(doc_id=doc_id, voice=voice):
+        await process_pregen_job(job_id, user_id=user_id)
+        await asyncio.sleep(0)
+
+
 @router.post("/pregen")
 async def enqueue_pregen(
     body: PregenIn,
@@ -403,10 +415,12 @@ async def enqueue_book_pregen(
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     if body.process_on_ecs and _configured() and not status.get("ready"):
-        for job_id in rtq.unfinished_page_job_ids(
-            doc_id=body.doc_id.strip(), voice=voice
-        ):
-            background.add_task(process_pregen_job, job_id, user_id=user.id)
+        background.add_task(
+            drain_book_pregen_ecs,
+            doc_id=body.doc_id.strip(),
+            voice=voice,
+            user_id=user.id,
+        )
     return {
         **status,
         "message": "ready" if status.get("ready") else "queued_for_gpu",
@@ -444,8 +458,13 @@ async def book_pregen_ecs_fallback(
     if not _configured():
         raise HTTPException(status_code=503, detail="阿里云配音尚未配置")
     job_ids = rtq.unfinished_page_job_ids(doc_id=body.doc_id.strip(), voice=voice)
-    for job_id in job_ids:
-        background.add_task(process_pregen_job, job_id, user_id=user.id)
+    # One serial drainer — avoid spawning hundreds of concurrent synth tasks.
+    background.add_task(
+        drain_book_pregen_ecs,
+        doc_id=body.doc_id.strip(),
+        voice=voice,
+        user_id=user.id,
+    )
     status = rtq.book_status(doc_id=body.doc_id.strip(), voice=voice)
     return {
         **status,
