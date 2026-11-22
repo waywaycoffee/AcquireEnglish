@@ -158,7 +158,12 @@ class _ContinueLearningButtonState
                   pathParameters: <String, String>{
                     'episodeId': target.episode.id,
                   },
-                  queryParameters: const <String, String>{'autoplay': '1'},
+                  queryParameters: <String, String>{
+                    'autoplay': '1',
+                    'courseId': target.course.id,
+                    if (prefersNetdiskLandscapePlayback(target.course))
+                      'fullscreen': '1',
+                  },
                 );
               } finally {
                 if (mounted) {

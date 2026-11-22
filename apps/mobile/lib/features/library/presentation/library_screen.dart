@@ -1671,9 +1671,12 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
     });
     if (!await _ensureVideoEpisodeAllowed(course, item)) return;
     if (!mounted) return;
-    final bool needDownload =
-        item.videoMissing || !isUsableLocalVideoPath(item.videoAsset);
-    if (needDownload && mounted) {
+    final bool remoteStream = isRemoteStreamVideoAsset(item.videoAsset) ||
+        isRemoteStreamVideoAsset(item.sourceUrl);
+    final bool netdiskStream = isNetdiskCourse(course) && remoteStream;
+    final bool needLocalDownload = !netdiskStream &&
+        (item.videoMissing || !isUsableLocalVideoPath(item.videoAsset));
+    if (needLocalDownload && mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
@@ -1682,10 +1685,26 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
           duration: const Duration(seconds: 2),
         ),
       );
+    } else if (netdiskStream && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            prefersNetdiskLandscapePlayback(course)
+                ? '正在横屏在线播放第 ${item.numberStr} 集（网盘直链，不先下载）'
+                : '正在在线播放第 ${item.numberStr} 集（网盘直链，不先下载）',
+          ),
+          duration: const Duration(seconds: 2),
+        ),
+      );
     }
     context.pushNamed(
       SGRoute.player.name,
       pathParameters: <String, String>{'episodeId': item.id},
+      queryParameters: <String, String>{
+        'courseId': course.id,
+        'autoplay': '1',
+        if (prefersNetdiskLandscapePlayback(course)) 'fullscreen': '1',
+      },
     );
   }
 

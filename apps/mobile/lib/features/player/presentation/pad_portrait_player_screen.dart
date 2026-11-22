@@ -21,6 +21,7 @@ import '../../home/presentation/learning_dashboard_provider.dart';
 import '../../import_course/data/bilibili_episode_prepare.dart';
 import '../../import_course/data/bilibili_import_service.dart';
 import '../../import_course/data/bilibili_multipage.dart';
+import '../../import_course/data/netdisk_local_download.dart';
 import '../../import_course/data/subtitle_source_policy.dart';
 import '../../import_course/domain/bilibili_import.dart';
 import 'hardsub_asr_repair.dart';
@@ -3042,7 +3043,9 @@ Future<void> _settleChineseFillIfAlreadyPresent() async {
         ?.value;
     final bool canGenerateAiSubtitles =
         (_videoAsset?.isNotEmpty ?? false) && !_usingAiSubtitles;
-    if (widget.autoOpenFullscreen &&
+    final bool landscapeFirst = widget.autoOpenFullscreen ||
+        prefersNetdiskLandscapePlayback(course);
+    if (landscapeFirst &&
         !_didAutoOpenFullscreen &&
         !_isBootstrapping) {
       _didAutoOpenFullscreen = true;
