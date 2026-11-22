@@ -17,6 +17,8 @@ import '../features/exam/presentation/exam_reading_skill_course_screen.dart';
 import '../features/exam/presentation/exam_reading_type_drill_screen.dart';
 import '../features/exam/presentation/exam_select_screen.dart';
 import '../features/exam/presentation/exam_session_screen.dart';
+import '../features/ear_grind/presentation/ear_grind_hub_screen.dart';
+import '../features/ear_grind/presentation/ear_grind_player_screen.dart';
 import '../features/writing/domain/writing_tracks.dart';
 import '../features/writing/presentation/writing_editor_screen.dart';
 import '../features/writing/presentation/writing_home_screen.dart';
@@ -159,6 +161,16 @@ GoRouter goRouter(Ref ref) {
       builder: (BuildContext context, GoRouterState state) =>
           const FirstOpenOnboardingScreen(),
     ).fade(),
+    GoRoute(
+      path: '/ear-grind',
+      builder: (BuildContext context, GoRouterState state) =>
+          const EarGrindHubScreen(),
+    ),
+    GoRoute(
+      path: '/ear-grind/play',
+      builder: (BuildContext context, GoRouterState state) =>
+          const EarGrindPlayerScreen(),
+    ),
     GoRoute(
       path: '/learn/:kind',
       builder: (context, state) {

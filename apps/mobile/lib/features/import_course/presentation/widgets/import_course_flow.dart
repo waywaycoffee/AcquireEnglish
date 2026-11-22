@@ -373,7 +373,19 @@ class _ImportCourseFlowState extends ConsumerState<ImportCourseFlow> {
           await (widget.pickAndroidVideoDirectory?.call() ??
               pickAndroidImportDirectory(
                 title: '选择视频文件夹',
-                extensions: const <String>['mp4', 'mkv', 'mov', 'webm', 'rm'],
+                extensions: const <String>[
+                  'mp4',
+                  'mkv',
+                  'mov',
+                  'webm',
+                  'rm',
+                  'mp3',
+                  'm4a',
+                  'aac',
+                  'wav',
+                  'flac',
+                  'ogg',
+                ],
                 copyFiles: false,
               ));
       if (!mounted) {
@@ -1207,8 +1219,8 @@ class _SourceSelectionStep extends StatelessWidget {
               mode: ImportSourceMode.local,
               current: mode,
               icon: Icons.video_library_outlined,
-              title: '导入本地影视',
-              body: '选择本地视频与字幕文件夹',
+              title: '导入本地影视/音频',
+              body: '选择本地视频、音频与字幕文件夹',
               onTap: onModeChanged,
             ),
             _SourceModeCard(

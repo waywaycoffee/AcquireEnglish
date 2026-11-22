@@ -804,7 +804,7 @@ class _LearningHomeScreenState extends ConsumerState<LearningHomeScreen> {
                     ),
                     const SizedBox(height: 14),
                     InkWell(
-                      onTap: () => context.push('/learn/listening'),
+                      onTap: () => context.push('/ear-grind'),
                       child: section(
                         Row(
                           children: <Widget>[
@@ -816,7 +816,7 @@ class _LearningHomeScreenState extends ConsumerState<LearningHomeScreen> {
                                 children: <Widget>[
                                   text('磨耳朵', 16, bold: true),
                                   text(
-                                    '分句听力 · 循环播放 · 理解练习',
+                                    '导入音视频 · 息屏续播 · 循环',
                                     11,
                                     color: muted,
                                   ),

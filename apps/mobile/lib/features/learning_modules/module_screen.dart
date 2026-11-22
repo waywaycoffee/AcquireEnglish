@@ -404,6 +404,8 @@ class _ModuleScreenState extends ConsumerState<ModuleScreen>
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
+    // 磨耳朵：息屏/锁屏继续播；其它模块仍在离开前台时停止。
+    if (widget.kind == 'listening') return;
     if (state != AppLifecycleState.resumed) stop();
   }
 

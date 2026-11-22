@@ -201,6 +201,14 @@ class ImportMatcher {
     '.webm',
     '.rm',
     '.ts',
+    // Audio allowed for 磨耳朵 / audio-only courses in the same import pipeline.
+    '.mp3',
+    '.m4a',
+    '.aac',
+    '.wav',
+    '.flac',
+    '.ogg',
+    '.opus',
   };
   static const Set<String> _subtitleExtensions = <String>{'.srt', '.vtt'};
 
