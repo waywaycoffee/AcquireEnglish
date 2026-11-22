@@ -15,6 +15,7 @@ import '../../exam/domain/exam_profile.dart';
 import '../../exam/presentation/exam_profile_provider.dart';
 import '../../phrases/presentation/phrase_book_provider.dart';
 import '../../sync/data/acquire_api_client.dart';
+import '../../words/domain/sm2_scheduler.dart';
 import '../../words/domain/syllabus_book.dart';
 import '../../words/domain/vocab_card_kind.dart';
 import '../../words/domain/vocab_entry.dart';
