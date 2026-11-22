@@ -3372,376 +3372,10 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
             ],
           );
 
-    final Widget coachColumn = Column(
-          children: <Widget>[
-            Expanded(
-              flex: 3,
-              child: stage,
-            ),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
-              child: Row(
-                children: <Widget>[
-                  const Expanded(
-                    child: Text('对话记录', style: TextStyle(color: Colors.white)),
-                  ),
-                  if (_coachMinutesLeft != null) ...<Widget>[
-                    _GlassChip(
-                      onTap: null,
-                      child: Text(
-                        '陪练 ${_coachMinutesLeft!} 分',
-                        style: const TextStyle(
-                          color: Colors.white70,
-                          fontSize: 11,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 6),
-                  ],
-                  _GlassChip(
-                    onTap: _showSceneSheet,
-                    child: Text(
-                      _started ? _sessionClockLabel : '已结束',
-                      style: const TextStyle(color: Colors.white, fontSize: 12),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            if (_started)
-              Padding(
-                padding: const EdgeInsets.fromLTRB(14, 4, 14, 0),
-                child: Row(
-                  children: <Widget>[
-                    Expanded(
-                      child: Text(
-                        _duplexLive
-                            ? '全双工 · 目标 $_questUtterances/$_questTargetUtterances'
-                            : '开口目标 $_questUtterances/$_questTargetUtterances',
-                        style: const TextStyle(
-                          color: Colors.white70,
-                          fontSize: 12,
-                        ),
-                      ),
-                    ),
-                    if (_duplexLive)
-                      TextButton(
-                        onPressed: () => unawaited(_hangUp()),
-                        child: const Text(
-                          '结束通话',
-                          style: TextStyle(color: Colors.white70, fontSize: 12),
-                        ),
-                      ),
-                  ],
-                ),
-              ),
-            if (!_started && _lastRoundTurns > 0)
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
-                child: OutlinedButton.icon(
-                  icon: const Icon(Icons.summarize_outlined),
-                  label: Text('本轮报告 · $_lastRoundTurns 次开口'),
-                  onPressed: _showRoundSummary,
-                ),
-              ),
-            if (_error != null)
-              Padding(
-                padding: const EdgeInsets.fromLTRB(16, 4, 16, 0),
-                child: Text(
-                  _error!,
-                  textAlign: TextAlign.center,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    color: Color(0xFFFFB4A8),
-                    fontSize: 11,
-                    height: 1.3,
-                  ),
-                ),
-              ),
-            Expanded(
-              flex: 4,
-              child: _bubbles.isEmpty
-                  ? Center(
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 28),
-                        child: Text(
-                          _activeScenario != null &&
-                                  _activeScenario!.isFreeChat
-                              ? '自由闲聊模式：随便用英语聊日常。点上方时钟可换情景；点相机可共享眼前场景。'
-                              : (_activeScenario != null &&
-                                      !_activeScenario!.isVideoGrounded
-                                  ? '数字人将主动教你「${_activeScenario!.title}」情景对话。点上方时钟可换场景。'
-                                  : (_talkTopics.isEmpty
-                                        ? 'Hi~ 我会先读字幕，再围绕“$_topicLabel”生成口语问答。'
-                                        : '已准备 ${_talkTopics.length} 个口语话题，点下方话题或直接说话。')),
-                          textAlign: TextAlign.center,
-                          style: TextStyle(
-                            color: Colors.white.withValues(alpha: 0.78),
-                            fontSize: 15,
-                            fontWeight: FontWeight.w600,
-                            height: 1.4,
-                          ),
-                        ),
-                      ),
-                    )
-                  : ListView.builder(
-                      controller: _chatScroll,
-                      reverse: true,
-                      padding: const EdgeInsets.fromLTRB(14, 8, 14, 4),
-                      itemCount: _bubbles.length,
-                      itemBuilder: (BuildContext context, int offset) {
-                        final int index = _bubbles.length - 1 - offset;
-                        final _ChatBubble bubble = _bubbles[index];
-                        final OralExpressionDiagnosis? diagnosis =
-                            bubble.diagnosis;
-                        if (bubble.role == 'diagnosis' && diagnosis != null) {
-                          return Padding(
-                            padding: const EdgeInsets.only(bottom: 10),
-                            child: OralDiagnosisCard(
-                              diagnosis: diagnosis,
-                              saved: _pendingDiagnosisSaved,
-                              onSpeakLiteral: () => unawaited(
-                                _replayBubble(
-                                  diagnosis.literalEn.isNotEmpty
-                                      ? diagnosis.literalEn
-                                      : diagnosis.idiomaticEn,
-                                ),
-                              ),
-                              onSpeakIdiomatic: () => unawaited(
-                                _replayBubble(
-                                  diagnosis.idiomaticEn.isNotEmpty
-                                      ? diagnosis.idiomaticEn
-                                      : diagnosis.literalEn,
-                                ),
-                              ),
-                              onSave: () {
-                                _saveDiagnosisToLanguageBank(
-                                  diagnosis,
-                                  notify: true,
-                                );
-                                setState(() => _pendingDiagnosisSaved = true);
-                              },
-                              onGrammar: () {
-                                final String tip = diagnosis.tip.isNotEmpty
-                                    ? diagnosis.tip
-                                    : '对比直译与地道说法，注意动词搭配与时态。';
-                                setState(() {
-                                  _bubbles.add(
-                                    _ChatBubble(
-                                      role: 'coach',
-                                      text: tip,
-                                      hint: true,
-                                    ),
-                                  );
-                                });
-                                _scrollChatToEnd();
-                              },
-                            ),
-                          );
-                        }
-                        return _ConversationBubble(
-                          bubble: bubble,
-                          showZh: _showZhIndexes.contains(index),
-                          coachAvatarAsset: persona.assetPath,
-                          onToggleZh: () => _toggleZh(index, bubble.zh),
-                          onCopy: () => unawaited(_copyBubble(bubble.text)),
-                          onSpeak: () => unawaited(_replayBubble(bubble.text)),
-                        );
-                      },
-                    ),
-            ),
-            if (_talkTopics.isNotEmpty)
-              SizedBox(
-                height: 40,
-                child: ListView.separated(
-                  scrollDirection: Axis.horizontal,
-                  padding: const EdgeInsets.fromLTRB(14, 0, 14, 8),
-                  itemCount: _talkTopics.length,
-                  separatorBuilder: (_, __) => const SizedBox(width: 8),
-                  itemBuilder: (BuildContext context, int index) {
-                    final String topic = _talkTopics[index];
-                    final bool active = index == _topicCursor;
-                    return ActionChip(
-                      label: Text(
-                        topic,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w700,
-                          color: active
-                              ? Colors.white
-                              : Colors.white.withValues(alpha: 0.88),
-                        ),
-                      ),
-                      backgroundColor: active
-                          ? const Color(0xFF5B3FD4)
-                          : Colors.white.withValues(alpha: 0.12),
-                      side: BorderSide(
-                        color: Colors.white.withValues(alpha: 0.18),
-                      ),
-                      onPressed: _busy
-                          ? null
-                          : () => unawaited(_askPreparedTopic(index)),
-                    );
-                  },
-                ),
-              ),
-            if (_pendingResay != null)
-              Padding(
-                padding: const EdgeInsets.fromLTRB(14, 0, 14, 8),
-                child: Material(
-                  color: const Color(0xFF6D28D9),
-                  borderRadius: BorderRadius.circular(16),
-                  child: InkWell(
-                    borderRadius: BorderRadius.circular(16),
-                    onTapDown: _busy
-                        ? null
-                        : (_) => unawaited(_onHoldStart()),
-                    onTapUp: _busy
-                        ? null
-                        : (_) => unawaited(_onHoldEnd()),
-                    onTapCancel: _busy
-                        ? null
-                        : () => unawaited(_onHoldEnd()),
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 16,
-                        vertical: 14,
-                      ),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: <Widget>[
-                          Icon(
-                            _recordingActive
-                                ? Icons.graphic_eq_rounded
-                                : Icons.mic_rounded,
-                            color: Colors.white,
-                          ),
-                          const SizedBox(width: 8),
-                          Text(
-                            _recordingActive ? '松开发送跟读' : '按住再说一次',
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 16,
-                              fontWeight: FontWeight.w800,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
-              )
-            else
-              Listener(
-                key: const ValueKey<String>('study-oral-coach-mic'),
-                behavior: HitTestBehavior.opaque,
-                onPointerDown: _busy
-                    ? null
-                    : (_) => unawaited(_onHoldStart()),
-                onPointerUp: _busy
-                    ? null
-                    : (_) => unawaited(_onHoldEnd()),
-                onPointerCancel: _busy
-                    ? null
-                    : (_) => unawaited(_onHoldEnd()),
-                child: AnimatedBuilder(
-                  animation: _orbPulse,
-                  builder: (BuildContext context, Widget? child) {
-                    final double t = _recordingActive
-                        ? 0.55 + _orbPulse.value * 0.45
-                        : 0.35 + _orbPulse.value * 0.25;
-                    return Container(
-                      width: 60,
-                      height: 60,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        gradient: RadialGradient(
-                          colors: <Color>[
-                            Color.lerp(
-                                  const Color(0xFF9B7CFF),
-                                  const Color(0xFFE8DEFF),
-                                  t,
-                                ) ??
-                                const Color(0xFFB9A6FF),
-                            const Color(0xFF5B3FD4),
-                            const Color(0xFF2A1B6A),
-                          ],
-                          stops: const <double>[0, 0.55, 1],
-                        ),
-                        boxShadow: <BoxShadow>[
-                          BoxShadow(
-                            color: const Color(
-                              0xFF8B6CFF,
-                            ).withValues(alpha: 0.25 + t * 0.35),
-                            blurRadius: 28 + t * 18,
-                            spreadRadius: 2,
-                          ),
-                        ],
-                      ),
-                      child: Icon(
-                        _recordingActive
-                            ? Icons.graphic_eq_rounded
-                            : Icons.mic_none_rounded,
-                        color: Colors.white.withValues(alpha: 0.92),
-                        size: 32,
-                      ),
-                    );
-                  },
-                ),
-              ),
-            const SizedBox(height: 6),
-            if (_voicePlaybackLabel case final String label)
-              Text(label, style: const TextStyle(color: Colors.white70, fontSize: 11)),
-            Text(
-              orbHint,
-              style: TextStyle(
-                color: Colors.white.withValues(alpha: 0.78),
-                fontSize: 13,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(28, 10, 28, 12),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: <Widget>[
-                  _DockRoundButton(
-                    label: '相机',
-                    icon: _liveSceneOn ? Icons.videocam_rounded : Icons.photo_camera_outlined,
-                    active: _liveSceneOn || _sceneDescription.isNotEmpty,
-                    onTap: _busy ? null : () => unawaited(_openSceneCapture()),
-                  ),
-                  _DockRoundButton(
-                    label: '场景',
-                    icon: Icons.grid_view_rounded,
-                    onTap: _showSceneSheet,
-                  ),
-                  _DockRoundButton(
-                    label: '音色',
-                    icon: Icons.record_voice_over_outlined,
-                    onTap: _busy ? null : _chooseEnglishVoice,
-                  ),
-                  _DockRoundButton(
-                    label: _recordingActive ? '停止' : '说话',
-                    icon: _recordingActive ? Icons.stop_rounded : Icons.mic_rounded,
-                    active: _recordingActive,
-                    onTap: _busy ? null : () => unawaited(
-                      _recordingActive ? _stopRecordingAndSend() : _onHoldStart(),
-                    ),
-                  ),
-                  _DockRoundButton(
-                    label: '结束',
-                    icon: Icons.call_end_rounded,
-                    danger: true,
-                    onTap: () => unawaited(_hangUp()),
-                  ),
-                ],
-              ),
-            ),
-          ],
+    final Widget coachColumn = _buildLegacyCoachColumn(
+      stage: stage,
+      persona: persona,
+      orbHint: orbHint,
     );
 
     return ClipRRect(
@@ -3762,32 +3396,687 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
         child: widget.standalone
             ? LayoutBuilder(
                 builder: (BuildContext context, BoxConstraints constraints) {
-                  if (constraints.maxWidth < 600) {
-                    return Column(
-                      children: <Widget>[
-                        SizedBox(
-                          height: (constraints.maxHeight * 0.38)
-                              .clamp(168.0, 280.0),
-                          child: _buildTutorLessonPanel(),
-                        ),
-                        Expanded(child: coachColumn),
-                      ],
-                    );
-                  }
-                  return Row(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: <Widget>[
-                      SizedBox(
-                        width: constraints.maxWidth * 0.42,
-                        child: _buildTutorLessonPanel(),
-                      ),
-                      Expanded(child: coachColumn),
-                    ],
+                  return _buildTutorClassroomLayout(
+                    constraints: constraints,
+                    stage: stage,
+                    persona: persona,
+                    orbHint: orbHint,
                   );
                 },
               )
             : coachColumn,
       ),
+    );
+  }
+
+  /// Left: courseware (top) + dialogue (bottom) · Right: call.
+  Widget _buildTutorClassroomLayout({
+    required BoxConstraints constraints,
+    required Widget stage,
+    required DigitalHumanPersona persona,
+    required String orbHint,
+  }) {
+    final bool narrow = constraints.maxWidth < 700;
+    final Widget callPane = stage;
+    final Widget contentPane = Column(
+      children: <Widget>[
+        Expanded(
+          flex: 7,
+          child: _buildTutorCoursewarePane(persona),
+        ),
+        Container(
+          height: 1,
+          color: Colors.white.withValues(alpha: 0.1),
+        ),
+        Expanded(
+          flex: 3,
+          child: _buildTutorDialoguePane(persona),
+        ),
+        _buildTutorMicDock(orbHint),
+      ],
+    );
+    if (narrow) {
+      return Column(
+        children: <Widget>[
+          Expanded(child: contentPane),
+          SizedBox(
+            height: (constraints.maxHeight * 0.28).clamp(150.0, 240.0),
+            child: callPane,
+          ),
+        ],
+      );
+    }
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: <Widget>[
+        Expanded(child: contentPane),
+        Container(
+          width: 1,
+          color: Colors.white.withValues(alpha: 0.1),
+        ),
+        SizedBox(
+          width: constraints.maxWidth * 0.38,
+          child: callPane,
+        ),
+      ],
+    );
+  }
+
+  Widget _buildTutorCoursewarePane(DigitalHumanPersona persona) {
+    final OralExpressionDiagnosis? pending = _pendingResay;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: <Widget>[
+        Expanded(child: _buildTutorLessonPanel()),
+        if (pending != null && pending.isUseful)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(12, 0, 12, 10),
+            child: OralDiagnosisCard(
+              diagnosis: pending,
+              saved: _pendingDiagnosisSaved,
+              onSpeakLiteral: () => unawaited(
+                _replayBubble(
+                  pending.literalEn.isNotEmpty
+                      ? pending.literalEn
+                      : pending.idiomaticEn,
+                ),
+              ),
+              onSpeakIdiomatic: () => unawaited(
+                _replayBubble(
+                  pending.idiomaticEn.isNotEmpty
+                      ? pending.idiomaticEn
+                      : pending.literalEn,
+                ),
+              ),
+              onSave: () {
+                _saveDiagnosisToLanguageBank(pending, notify: true);
+                setState(() => _pendingDiagnosisSaved = true);
+              },
+              onGrammar: () {
+                final String tip = pending.tip.isNotEmpty
+                    ? pending.tip
+                    : '对比直译与地道说法，注意动词搭配与时态。';
+                setState(() {
+                  _tutorCoachQuestion = tip;
+                });
+              },
+            ),
+          )
+        else if (_tutorCorrections.isNotEmpty)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+            child: Text(
+              '纠错：${_tutorCorrections.last}',
+              maxLines: 3,
+              overflow: TextOverflow.ellipsis,
+              style: _tutorCartoonStyle(
+                size: 15,
+                color: const Color(0xFFFCA5A5),
+              ),
+            ),
+          ),
+      ],
+    );
+  }
+
+  Widget _buildTutorDialoguePane(DigitalHumanPersona persona) {
+    final List<(int, _ChatBubble)> dialogue = <(int, _ChatBubble)>[];
+    for (int i = 0; i < _bubbles.length; i++) {
+      final _ChatBubble b = _bubbles[i];
+      if (b.role == 'user' || (b.role == 'coach' && !b.hint)) {
+        dialogue.add((i, b));
+      }
+    }
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: <Widget>[
+        Padding(
+          padding: const EdgeInsets.fromLTRB(14, 8, 14, 4),
+          child: Row(
+            children: <Widget>[
+              Text(
+                '对话',
+                style: _tutorCartoonStyle(
+                  size: 14,
+                  color: Colors.white.withValues(alpha: 0.72),
+                ),
+              ),
+              const Spacer(),
+              if (_started)
+                Text(
+                  _sessionClockLabel,
+                  style: const TextStyle(color: Colors.white54, fontSize: 11),
+                ),
+            ],
+          ),
+        ),
+        if (_error != null)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(14, 0, 14, 4),
+            child: Text(
+              _error!,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(color: Color(0xFFFFB4A8), fontSize: 11),
+            ),
+          ),
+        Expanded(
+          child: dialogue.isEmpty
+              ? Center(
+                  child: Text(
+                    '对话会出现在这里',
+                    style: TextStyle(
+                      color: Colors.white.withValues(alpha: 0.45),
+                      fontSize: 13,
+                    ),
+                  ),
+                )
+              : ListView.builder(
+                  controller: _chatScroll,
+                  reverse: true,
+                  padding: const EdgeInsets.fromLTRB(12, 4, 12, 8),
+                  itemCount: dialogue.length,
+                  itemBuilder: (BuildContext context, int offset) {
+                    final int pos = dialogue.length - 1 - offset;
+                    final (int index, _ChatBubble bubble) = dialogue[pos];
+                    return _ConversationBubble(
+                      bubble: bubble,
+                      showZh: _showZhIndexes.contains(index),
+                      coachAvatarAsset: persona.assetPath,
+                      onToggleZh: () => _toggleZh(index, bubble.zh),
+                      onCopy: () => unawaited(_copyBubble(bubble.text)),
+                      onSpeak: () => unawaited(_replayBubble(bubble.text)),
+                    );
+                  },
+                ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildTutorMicDock(String orbHint) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(10, 4, 10, 10),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: <Widget>[
+          if (_pendingResay != null)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: Material(
+                color: const Color(0xFF6D28D9),
+                borderRadius: BorderRadius.circular(14),
+                child: InkWell(
+                  borderRadius: BorderRadius.circular(14),
+                  onTapDown:
+                      _busy ? null : (_) => unawaited(_onHoldStart()),
+                  onTapUp: _busy ? null : (_) => unawaited(_onHoldEnd()),
+                  onTapCancel:
+                      _busy ? null : () => unawaited(_onHoldEnd()),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 14,
+                      vertical: 12,
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: <Widget>[
+                        Icon(
+                          _recordingActive
+                              ? Icons.graphic_eq_rounded
+                              : Icons.mic_rounded,
+                          color: Colors.white,
+                        ),
+                        const SizedBox(width: 8),
+                        Text(
+                          _recordingActive ? '松开发送跟读' : '按住再说一次',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 15,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            )
+          else
+            Listener(
+              key: const ValueKey<String>('study-oral-coach-mic'),
+              behavior: HitTestBehavior.opaque,
+              onPointerDown:
+                  _busy ? null : (_) => unawaited(_onHoldStart()),
+              onPointerUp: _busy ? null : (_) => unawaited(_onHoldEnd()),
+              onPointerCancel:
+                  _busy ? null : (_) => unawaited(_onHoldEnd()),
+              child: AnimatedBuilder(
+                animation: _orbPulse,
+                builder: (BuildContext context, Widget? child) {
+                  final double t = _recordingActive
+                      ? 0.55 + _orbPulse.value * 0.45
+                      : 0.35 + _orbPulse.value * 0.25;
+                  return Container(
+                    width: 54,
+                    height: 54,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      gradient: RadialGradient(
+                        colors: <Color>[
+                          Color.lerp(
+                                const Color(0xFF9B7CFF),
+                                const Color(0xFFE8DEFF),
+                                t,
+                              ) ??
+                              const Color(0xFFB9A6FF),
+                          const Color(0xFF5B3FD4),
+                          const Color(0xFF2A1B6A),
+                        ],
+                        stops: const <double>[0, 0.55, 1],
+                      ),
+                    ),
+                    child: Icon(
+                      _recordingActive
+                          ? Icons.graphic_eq_rounded
+                          : Icons.mic_none_rounded,
+                      color: Colors.white.withValues(alpha: 0.92),
+                      size: 28,
+                    ),
+                  );
+                },
+              ),
+            ),
+          const SizedBox(height: 4),
+          Text(
+            orbHint,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              color: Colors.white.withValues(alpha: 0.72),
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildLegacyCoachColumn({
+    required Widget stage,
+    required DigitalHumanPersona persona,
+    required String orbHint,
+  }) {
+    return Column(
+      children: <Widget>[
+        Expanded(
+          flex: 3,
+          child: stage,
+        ),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
+          child: Row(
+            children: <Widget>[
+              const Expanded(
+                child: Text('对话记录', style: TextStyle(color: Colors.white)),
+              ),
+              if (_coachMinutesLeft != null) ...<Widget>[
+                _GlassChip(
+                  onTap: null,
+                  child: Text(
+                    '陪练 ${_coachMinutesLeft!} 分',
+                    style: const TextStyle(
+                      color: Colors.white70,
+                      fontSize: 11,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 6),
+              ],
+              _GlassChip(
+                onTap: _showSceneSheet,
+                child: Text(
+                  _started ? _sessionClockLabel : '已结束',
+                  style: const TextStyle(color: Colors.white, fontSize: 12),
+                ),
+              ),
+            ],
+          ),
+        ),
+        if (_started)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(14, 4, 14, 0),
+            child: Row(
+              children: <Widget>[
+                Expanded(
+                  child: Text(
+                    _duplexLive
+                        ? '全双工 · 目标 $_questUtterances/$_questTargetUtterances'
+                        : '开口目标 $_questUtterances/$_questTargetUtterances',
+                    style: const TextStyle(
+                      color: Colors.white70,
+                      fontSize: 12,
+                    ),
+                  ),
+                ),
+                if (_duplexLive)
+                  TextButton(
+                    onPressed: () => unawaited(_hangUp()),
+                    child: const Text(
+                      '结束通话',
+                      style: TextStyle(color: Colors.white70, fontSize: 12),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        if (!_started && _lastRoundTurns > 0)
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+            child: OutlinedButton.icon(
+              icon: const Icon(Icons.summarize_outlined),
+              label: Text('本轮报告 · $_lastRoundTurns 次开口'),
+              onPressed: _showRoundSummary,
+            ),
+          ),
+        if (_error != null)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 4, 16, 0),
+            child: Text(
+              _error!,
+              textAlign: TextAlign.center,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                color: Color(0xFFFFB4A8),
+                fontSize: 11,
+                height: 1.3,
+              ),
+            ),
+          ),
+        Expanded(
+          flex: 4,
+          child: _bubbles.isEmpty
+              ? Center(
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 28),
+                    child: Text(
+                      _activeScenario != null &&
+                              _activeScenario!.isFreeChat
+                          ? '自由闲聊模式：随便用英语聊日常。点上方时钟可换情景；点相机可共享眼前场景。'
+                          : (_activeScenario != null &&
+                                  !_activeScenario!.isVideoGrounded
+                              ? '数字人将主动教你「${_activeScenario!.title}」情景对话。点上方时钟可换场景。'
+                              : (_talkTopics.isEmpty
+                                    ? 'Hi~ 我会先读字幕，再围绕“$_topicLabel”生成口语问答。'
+                                    : '已准备 ${_talkTopics.length} 个口语话题，点下方话题或直接说话。')),
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        color: Colors.white.withValues(alpha: 0.78),
+                        fontSize: 15,
+                        fontWeight: FontWeight.w600,
+                        height: 1.4,
+                      ),
+                    ),
+                  ),
+                )
+              : ListView.builder(
+                  controller: _chatScroll,
+                  reverse: true,
+                  padding: const EdgeInsets.fromLTRB(14, 8, 14, 4),
+                  itemCount: _bubbles.length,
+                  itemBuilder: (BuildContext context, int offset) {
+                    final int index = _bubbles.length - 1 - offset;
+                    final _ChatBubble bubble = _bubbles[index];
+                    final OralExpressionDiagnosis? diagnosis =
+                        bubble.diagnosis;
+                    if (bubble.role == 'diagnosis' && diagnosis != null) {
+                      return Padding(
+                        padding: const EdgeInsets.only(bottom: 10),
+                        child: OralDiagnosisCard(
+                          diagnosis: diagnosis,
+                          saved: _pendingDiagnosisSaved,
+                          onSpeakLiteral: () => unawaited(
+                            _replayBubble(
+                              diagnosis.literalEn.isNotEmpty
+                                  ? diagnosis.literalEn
+                                  : diagnosis.idiomaticEn,
+                            ),
+                          ),
+                          onSpeakIdiomatic: () => unawaited(
+                            _replayBubble(
+                              diagnosis.idiomaticEn.isNotEmpty
+                                  ? diagnosis.idiomaticEn
+                                  : diagnosis.literalEn,
+                            ),
+                          ),
+                          onSave: () {
+                            _saveDiagnosisToLanguageBank(
+                              diagnosis,
+                              notify: true,
+                            );
+                            setState(() => _pendingDiagnosisSaved = true);
+                          },
+                          onGrammar: () {
+                            final String tip = diagnosis.tip.isNotEmpty
+                                ? diagnosis.tip
+                                : '对比直译与地道说法，注意动词搭配与时态。';
+                            setState(() {
+                              _bubbles.add(
+                                _ChatBubble(
+                                  role: 'coach',
+                                  text: tip,
+                                  hint: true,
+                                ),
+                              );
+                            });
+                            _scrollChatToEnd();
+                          },
+                        ),
+                      );
+                    }
+                    return _ConversationBubble(
+                      bubble: bubble,
+                      showZh: _showZhIndexes.contains(index),
+                      coachAvatarAsset: persona.assetPath,
+                      onToggleZh: () => _toggleZh(index, bubble.zh),
+                      onCopy: () => unawaited(_copyBubble(bubble.text)),
+                      onSpeak: () => unawaited(_replayBubble(bubble.text)),
+                    );
+                  },
+                ),
+        ),
+        if (_talkTopics.isNotEmpty)
+          SizedBox(
+            height: 40,
+            child: ListView.separated(
+              scrollDirection: Axis.horizontal,
+              padding: const EdgeInsets.fromLTRB(14, 0, 14, 8),
+              itemCount: _talkTopics.length,
+              separatorBuilder: (_, __) => const SizedBox(width: 8),
+              itemBuilder: (BuildContext context, int index) {
+                final String topic = _talkTopics[index];
+                final bool active = index == _topicCursor;
+                return ActionChip(
+                  label: Text(
+                    topic,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                      color: active
+                          ? Colors.white
+                          : Colors.white.withValues(alpha: 0.88),
+                    ),
+                  ),
+                  backgroundColor: active
+                      ? const Color(0xFF5B3FD4)
+                      : Colors.white.withValues(alpha: 0.12),
+                  side: BorderSide(
+                    color: Colors.white.withValues(alpha: 0.18),
+                  ),
+                  onPressed: _busy
+                      ? null
+                      : () => unawaited(_askPreparedTopic(index)),
+                );
+              },
+            ),
+          ),
+        if (_pendingResay != null)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(14, 0, 14, 8),
+            child: Material(
+              color: const Color(0xFF6D28D9),
+              borderRadius: BorderRadius.circular(16),
+              child: InkWell(
+                borderRadius: BorderRadius.circular(16),
+                onTapDown: _busy ? null : (_) => unawaited(_onHoldStart()),
+                onTapUp: _busy ? null : (_) => unawaited(_onHoldEnd()),
+                onTapCancel: _busy ? null : () => unawaited(_onHoldEnd()),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 14,
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: <Widget>[
+                      Icon(
+                        _recordingActive
+                            ? Icons.graphic_eq_rounded
+                            : Icons.mic_rounded,
+                        color: Colors.white,
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        _recordingActive ? '松开发送跟读' : '按住再说一次',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 16,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          )
+        else
+          Listener(
+            key: const ValueKey<String>('study-oral-coach-mic-legacy'),
+            behavior: HitTestBehavior.opaque,
+            onPointerDown: _busy ? null : (_) => unawaited(_onHoldStart()),
+            onPointerUp: _busy ? null : (_) => unawaited(_onHoldEnd()),
+            onPointerCancel: _busy ? null : (_) => unawaited(_onHoldEnd()),
+            child: AnimatedBuilder(
+              animation: _orbPulse,
+              builder: (BuildContext context, Widget? child) {
+                final double t = _recordingActive
+                    ? 0.55 + _orbPulse.value * 0.45
+                    : 0.35 + _orbPulse.value * 0.25;
+                return Container(
+                  width: 60,
+                  height: 60,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    gradient: RadialGradient(
+                      colors: <Color>[
+                        Color.lerp(
+                              const Color(0xFF9B7CFF),
+                              const Color(0xFFE8DEFF),
+                              t,
+                            ) ??
+                            const Color(0xFFB9A6FF),
+                        const Color(0xFF5B3FD4),
+                        const Color(0xFF2A1B6A),
+                      ],
+                      stops: const <double>[0, 0.55, 1],
+                    ),
+                    boxShadow: <BoxShadow>[
+                      BoxShadow(
+                        color: const Color(
+                          0xFF8B6CFF,
+                        ).withValues(alpha: 0.25 + t * 0.35),
+                        blurRadius: 28 + t * 18,
+                        spreadRadius: 2,
+                      ),
+                    ],
+                  ),
+                  child: Icon(
+                    _recordingActive
+                        ? Icons.graphic_eq_rounded
+                        : Icons.mic_none_rounded,
+                    color: Colors.white.withValues(alpha: 0.92),
+                    size: 32,
+                  ),
+                );
+              },
+            ),
+          ),
+        const SizedBox(height: 6),
+        if (_voicePlaybackLabel case final String label)
+          Text(
+            label,
+            style: const TextStyle(color: Colors.white70, fontSize: 11),
+          ),
+        Text(
+          orbHint,
+          style: TextStyle(
+            color: Colors.white.withValues(alpha: 0.78),
+            fontSize: 13,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(28, 10, 28, 12),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: <Widget>[
+              _DockRoundButton(
+                label: '相机',
+                icon: _liveSceneOn
+                    ? Icons.videocam_rounded
+                    : Icons.photo_camera_outlined,
+                active: _liveSceneOn || _sceneDescription.isNotEmpty,
+                onTap: _busy ? null : () => unawaited(_openSceneCapture()),
+              ),
+              _DockRoundButton(
+                label: '场景',
+                icon: Icons.grid_view_rounded,
+                onTap: _showSceneSheet,
+              ),
+              _DockRoundButton(
+                label: '音色',
+                icon: Icons.record_voice_over_outlined,
+                onTap: _busy ? null : _chooseEnglishVoice,
+              ),
+              _DockRoundButton(
+                label: _recordingActive ? '停止' : '说话',
+                icon: _recordingActive
+                    ? Icons.stop_rounded
+                    : Icons.mic_rounded,
+                active: _recordingActive,
+                onTap: _busy
+                    ? null
+                    : () => unawaited(
+                          _recordingActive
+                              ? _stopRecordingAndSend()
+                              : _onHoldStart(),
+                        ),
+              ),
+              _DockRoundButton(
+                label: '结束',
+                icon: Icons.call_end_rounded,
+                danger: true,
+                onTap: () => unawaited(_hangUp()),
+              ),
+            ],
+          ),
+        ),
+      ],
     );
   }
 
