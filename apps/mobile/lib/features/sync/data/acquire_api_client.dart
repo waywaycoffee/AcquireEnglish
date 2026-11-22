@@ -1809,6 +1809,11 @@ class AcquireApiClient {
         'sentences': sentences,
         'target_words': targetWords.take(20).toList(growable: false),
       },
+      // Server LLM may take up to ~60s; default 15s receiveTimeout looks like "network fail".
+      options: Options(
+        sendTimeout: const Duration(seconds: 30),
+        receiveTimeout: const Duration(seconds: 90),
+      ),
     );
     final Object? raw = response.data;
     final Map<String, dynamic> body = raw is Map

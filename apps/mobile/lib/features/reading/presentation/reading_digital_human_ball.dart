@@ -16,6 +16,7 @@ import '../../shared/data/word_pronunciation_service.dart';
 import '../../shared/presentation/pad/app_design_tokens.dart';
 import '../data/reading_coach_context.dart';
 import '../domain/reading_doc.dart';
+import 'reading_page_quiz.dart';
 
 class _ChatBubble {
   const _ChatBubble({required this.role, required this.text});
@@ -30,15 +31,18 @@ class ReadingDigitalHumanBallHost extends ConsumerStatefulWidget {
     required this.doc,
     required this.child,
     this.focusedSentence = '',
-    this.onPageQuiz,
+    this.onPreparePageQuiz,
+    this.onOpenPageQuiz,
     super.key,
   });
 
   final ReadingDoc doc;
   final Widget child;
   final String focusedSentence;
-  /// Opens page ABCD quiz from the companion sheet button.
-  final Future<void> Function()? onPageQuiz;
+  /// Build quiz while the companion sheet stays open.
+  final Future<ReadingPageQuizBundle?> Function()? onPreparePageQuiz;
+  /// Called after the sheet closes with a ready quiz bundle.
+  final Future<void> Function(ReadingPageQuizBundle bundle)? onOpenPageQuiz;
 
   @override
   ConsumerState<ReadingDigitalHumanBallHost> createState() =>
@@ -49,22 +53,27 @@ class _ReadingDigitalHumanBallHostState
     extends ConsumerState<ReadingDigitalHumanBallHost> {
   Offset _offset = const Offset(18, 140);
 
-  void _openSheet() {
-    unawaited(
-      showModalBottomSheet<void>(
-        context: context,
-        isScrollControlled: true,
-        showDragHandle: true,
-        useSafeArea: true,
-        builder: (BuildContext ctx) {
-          return ReadingCoachAskSheet(
-            doc: widget.doc,
-            focusedSentence: widget.focusedSentence,
-            onPageQuiz: widget.onPageQuiz,
-          );
-        },
-      ),
+  Future<void> _openSheet() async {
+    final ReadingPageQuizBundle? bundle =
+        await showModalBottomSheet<ReadingPageQuizBundle>(
+      context: context,
+      isScrollControlled: true,
+      showDragHandle: true,
+      useSafeArea: true,
+      builder: (BuildContext ctx) {
+        return ReadingCoachAskSheet(
+          doc: widget.doc,
+          focusedSentence: widget.focusedSentence,
+          onPreparePageQuiz: widget.onPreparePageQuiz,
+        );
+      },
     );
+    if (!mounted || bundle == null) return;
+    final Future<void> Function(ReadingPageQuizBundle bundle)? open =
+        widget.onOpenPageQuiz;
+    if (open != null) {
+      await open(bundle);
+    }
   }
 
   @override
@@ -169,13 +178,13 @@ class ReadingCoachAskSheet extends ConsumerStatefulWidget {
   const ReadingCoachAskSheet({
     required this.doc,
     this.focusedSentence = '',
-    this.onPageQuiz,
+    this.onPreparePageQuiz,
     super.key,
   });
 
   final ReadingDoc doc;
   final String focusedSentence;
-  final Future<void> Function()? onPageQuiz;
+  final Future<ReadingPageQuizBundle?> Function()? onPreparePageQuiz;
 
   @override
   ConsumerState<ReadingCoachAskSheet> createState() =>
@@ -682,7 +691,7 @@ class _ReadingCoachAskSheetState extends ConsumerState<ReadingCoachAskSheet> {
                   style: const TextStyle(color: Color(0xFFB42318), fontSize: 12),
                 ),
               ),
-            if (widget.onPageQuiz != null)
+            if (widget.onPreparePageQuiz != null)
               Padding(
                 padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
                 child: SizedBox(
@@ -691,11 +700,46 @@ class _ReadingCoachAskSheetState extends ConsumerState<ReadingCoachAskSheet> {
                     onPressed: _busy
                         ? null
                         : () async {
-                            Navigator.of(context).pop();
-                            await widget.onPageQuiz!();
+                            setState(() {
+                              _busy = true;
+                              _error = null;
+                              _status = '正在出阅读理解题…';
+                            });
+                            try {
+                              final ReadingPageQuizBundle? bundle =
+                                  await widget.onPreparePageQuiz!();
+                              if (!mounted) return;
+                              if (bundle == null || bundle.quiz.isEmpty) {
+                                setState(() {
+                                  _error = '出题失败，请稍后重试或换一节内容更完整的页';
+                                  _status = '按住麦克风提问';
+                                });
+                                return;
+                              }
+                              Navigator.of(context).pop(bundle);
+                            } catch (error) {
+                              if (!mounted) return;
+                              final String message = error is StateError
+                                  ? error.message
+                                  : '出题失败，请检查登录与网络后重试';
+                              setState(() {
+                                _error = message;
+                                _status = '按住麦克风提问';
+                              });
+                            } finally {
+                              if (mounted) {
+                                setState(() => _busy = false);
+                              }
+                            }
                           },
-                    icon: const Icon(Icons.quiz_outlined),
-                    label: const Text('AI 出本节阅读理解题'),
+                    icon: _busy
+                        ? const SizedBox(
+                            width: 18,
+                            height: 18,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Icon(Icons.quiz_outlined),
+                    label: Text(_busy ? '正在出题…' : 'AI 出本节阅读理解题'),
                   ),
                 ),
               ),

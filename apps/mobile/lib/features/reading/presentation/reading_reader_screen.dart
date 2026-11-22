@@ -44,6 +44,7 @@ import 'reading_book_prep_provider.dart';
 import 'reading_chunk_provider.dart';
 import 'reading_digital_human_ball.dart';
 import 'reading_library_provider.dart';
+import 'reading_page_quiz.dart';
 import 'reading_text_spans.dart';
 import 'reading_vocab_lists_sheet.dart';
 
@@ -921,83 +922,101 @@ class _ReadingReaderScreenState extends ConsumerState<ReadingReaderScreen> {
     return out;
   }
 
-  Future<void> _launchPageComprehensionQuiz(ReadingDoc doc) async {
-    if (_loadingPageQuiz) return;
+  Future<ReadingPageQuizBundle?> _preparePageComprehensionQuiz(
+    ReadingDoc doc,
+  ) async {
+    if (_loadingPageQuiz) return null;
     if (!ref.read(authSessionProvider).isLoggedIn) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('请先登录后再使用 AI 伴读出题')),
-      );
-      return;
+      throw StateError('请先登录后再使用 AI 伴读出题');
     }
     final List<String> sentences = _sentencesForPageQuiz();
     if (sentences.length < 2) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('本节内容太短，翻到内容更完整的一页再试')),
-      );
-      return;
+      throw StateError('本节内容太短，翻到内容更完整的一页再试');
     }
+    final List<String> targetWords = _targetWordsForPageQuiz();
+    final String topic = '${doc.displayTitle} · 第 ${_pageIndex + 1} 节';
     await _pauseReadingForLookup();
-    if (!mounted) return;
+    if (!mounted) return null;
     setState(() => _loadingPageQuiz = true);
     try {
-      final List<Map<String, dynamic>> raw = await ref
-          .read(acquireApiClientProvider)
-          .generateReadingQuiz(
-            sentences: sentences,
-            targetWords: _targetWordsForPageQuiz(),
-          );
-      final List<CourseQuizItem> quiz = raw
-          .map(CourseQuizItem.fromJson)
-          .where((CourseQuizItem item) => item.options.length == 4)
-          .toList(growable: false);
-      if (!mounted) return;
-      if (quiz.isEmpty) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('暂时无法生成本节理解题，请稍后重试')),
-        );
-        return;
-      }
-      final CourseQuizResult? result = await Navigator.of(context).push(
-        MaterialPageRoute<CourseQuizResult>(
-          builder: (_) => CourseUnitQuizScreen(
-            topic: '${doc.displayTitle} · 第 ${_pageIndex + 1} 节',
+      try {
+        final List<Map<String, dynamic>> raw = await ref
+            .read(acquireApiClientProvider)
+            .generateReadingQuiz(
+              sentences: sentences,
+              targetWords: targetWords,
+            );
+        final List<CourseQuizItem> quiz = raw
+            .map(CourseQuizItem.fromJson)
+            .where((CourseQuizItem item) => item.options.length == 4)
+            .toList(growable: false);
+        if (quiz.isNotEmpty) {
+          return ReadingPageQuizBundle(
             quiz: quiz,
             sentences: sentences,
-          ),
-        ),
-      );
-      if (!mounted || result == null) return;
-      final double accuracy =
-          result.total <= 0 ? 0 : result.correct / result.total;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            '本节理解题 ${result.correct}/${result.total}'
-            '${accuracy >= 0.75 ? ' · 很棒' : ''}',
-          ),
-        ),
-      );
-      if (accuracy >= 0.7) {
-        try {
-          await ref.read(acquireApiClientProvider).commerceEarnPoints(
-                reason: 'reading_quiz_pass',
-                meta: <String, dynamic>{
-                  'accuracy': accuracy,
-                  'content_id': '${doc.id}:p$_pageIndex',
-                  'duration_ratio': 1.0,
-                },
-              );
-        } catch (_) {}
+            topic: topic,
+          );
+        }
+      } catch (_) {
+        // Fall through to local grounded items so伴读出题 still works offline/API-slow.
       }
-    } catch (_) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('AI 伴读出题失败，请检查网络后重试')),
+      final List<CourseQuizItem> fallback = buildReadingPageQuizFallback(
+        sentences: sentences,
+        targetWords: targetWords,
+      );
+      if (fallback.isEmpty) return null;
+      return ReadingPageQuizBundle(
+        quiz: fallback,
+        sentences: sentences,
+        topic: topic,
+        fromFallback: true,
       );
     } finally {
       if (mounted) setState(() => _loadingPageQuiz = false);
+    }
+  }
+
+  Future<void> _openPreparedPageQuiz(
+    ReadingDoc doc,
+    ReadingPageQuizBundle bundle,
+  ) async {
+    if (!mounted || bundle.quiz.isEmpty) return;
+    if (bundle.fromFallback && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('云端出题较慢，已先用本节原文生成练习题')),
+      );
+    }
+    final CourseQuizResult? result = await Navigator.of(context).push(
+      MaterialPageRoute<CourseQuizResult>(
+        builder: (_) => CourseUnitQuizScreen(
+          topic: bundle.topic,
+          quiz: bundle.quiz,
+          sentences: bundle.sentences,
+        ),
+      ),
+    );
+    if (!mounted || result == null) return;
+    final double accuracy =
+        result.total <= 0 ? 0 : result.correct / result.total;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          '本节理解题 ${result.correct}/${result.total}'
+          '${accuracy >= 0.75 ? ' · 很棒' : ''}',
+        ),
+      ),
+    );
+    if (accuracy >= 0.7) {
+      try {
+        await ref.read(acquireApiClientProvider).commerceEarnPoints(
+              reason: 'reading_quiz_pass',
+              meta: <String, dynamic>{
+                'accuracy': accuracy,
+                'content_id': '${doc.id}:p$_pageIndex',
+                'duration_ratio': 1.0,
+              },
+            );
+      } catch (_) {}
     }
   }
 
@@ -1719,7 +1738,9 @@ class _ReadingReaderScreenState extends ConsumerState<ReadingReaderScreen> {
       body: ReadingDigitalHumanBallHost(
         doc: doc,
         focusedSentence: _focusedSentence,
-        onPageQuiz: () => _launchPageComprehensionQuiz(doc),
+        onPreparePageQuiz: () => _preparePageComprehensionQuiz(doc),
+        onOpenPageQuiz: (ReadingPageQuizBundle bundle) =>
+            _openPreparedPageQuiz(doc, bundle),
         child: ColoredBox(
           color: bg,
           child: Stack(
