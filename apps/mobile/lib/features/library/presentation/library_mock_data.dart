@@ -196,6 +196,70 @@ class LibraryCourseData {
   }
 }
 
+/// Internal catalog ids must never be shown as human titles.
+bool looksLikeInternalLibraryId(String raw) {
+  final String value = raw.trim().toLowerCase();
+  if (value.isEmpty) return true;
+  return value.startsWith('bilibili-') ||
+      value.startsWith('youtube-') ||
+      value.startsWith('netdisk-') ||
+      value.startsWith('link-');
+}
+
+/// Prefer a user-renamed episode title, never raw `bilibili-season-*` ids.
+String libraryEpisodeDisplayTitle(
+  LibraryCourseData course,
+  LibraryEpisodeItem episode,
+) {
+  final String episodeTitle = episode.title.trim();
+  if (episode.customTitle &&
+      episodeTitle.isNotEmpty &&
+      !looksLikeInternalLibraryId(episodeTitle)) {
+    return episodeTitle;
+  }
+  if (episodeTitle.isNotEmpty && !looksLikeInternalLibraryId(episodeTitle)) {
+    return episodeTitle;
+  }
+  final String courseTitle = course.title.trim();
+  if (courseTitle.isNotEmpty && !looksLikeInternalLibraryId(courseTitle)) {
+    return courseTitle;
+  }
+  if (episode.numberStr.trim().isNotEmpty) {
+    return '第 ${episode.numberStr} 集';
+  }
+  return episodeTitle.isNotEmpty ? episodeTitle : '未命名视频';
+}
+
+String libraryCourseDisplayTitle(
+  LibraryCourseData course, {
+  LibraryEpisodeItem? focusEpisode,
+}) {
+  if (focusEpisode != null) {
+    return libraryEpisodeDisplayTitle(course, focusEpisode);
+  }
+  if (course.episodes.length == 1) {
+    return libraryEpisodeDisplayTitle(course, course.episodes.single);
+  }
+  for (final LibraryEpisodeItem episode in course.episodes) {
+    if (episode.customTitle &&
+        episode.title.trim().isNotEmpty &&
+        !looksLikeInternalLibraryId(episode.title)) {
+      return episode.title.trim();
+    }
+  }
+  final String courseTitle = course.title.trim();
+  if (courseTitle.isNotEmpty && !looksLikeInternalLibraryId(courseTitle)) {
+    return courseTitle;
+  }
+  for (final LibraryEpisodeItem episode in course.episodes) {
+    final String title = episode.title.trim();
+    if (title.isNotEmpty && !looksLikeInternalLibraryId(title)) {
+      return title;
+    }
+  }
+  return courseTitle.isNotEmpty ? courseTitle : '未命名课程';
+}
+
 const LibraryCourseData emptyLibraryCourse = LibraryCourseData(
   id: '',
   title: '',

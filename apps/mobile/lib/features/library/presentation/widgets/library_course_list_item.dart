@@ -58,7 +58,7 @@ class LibraryCourseListItem extends StatelessWidget {
                     children: <Widget>[
                       Positioned.fill(
                         child: LibraryCoursePoster(
-                          title: course.title,
+                          title: libraryCourseDisplayTitle(course),
                           path: course.coverImage,
                           borderRadius: BorderRadius.circular(24),
                         ),
@@ -211,7 +211,7 @@ class LibraryCourseListItem extends StatelessWidget {
                       ),
                       const SizedBox(height: 12),
                       Text(
-                        course.title,
+                        libraryCourseDisplayTitle(course),
                         style: TextStyle(
                           fontSize: 22,
                           fontWeight: FontWeight.w900,

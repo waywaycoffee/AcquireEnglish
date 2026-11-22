@@ -9,6 +9,8 @@ import 'package:path_provider/path_provider.dart';
 import '../../authentication/presentation/auth_session.dart';
 import '../../daily_path/data/oral_core_library_mapper.dart';
 import '../../daily_path/domain/oral_core_series.dart';
+import '../../daily_path/domain/course_plan.dart';
+import '../../daily_path/presentation/course_plan_provider.dart';
 import '../../learning_modules/american_ipa_course.dart';
 import '../../learning_modules/british_ipa_course.dart';
 import '../../learning_modules/phonics_nessy_course.dart';
@@ -67,7 +69,9 @@ class LibraryCatalogNotifier extends Notifier<List<LibraryCourseData>> {
       return baseCatalog;
     }
 
-    final List<LibraryCourseData> saved = _decodeCourses(stored);
+    final List<LibraryCourseData> saved = _decodeCourses(stored)
+        .map(_healInternalIdTitles)
+        .toList(growable: false);
     return <LibraryCourseData>[
       for (final LibraryCourseData course in baseCatalog)
         _withBuiltInDisplayOverrides(
@@ -76,6 +80,18 @@ class LibraryCatalogNotifier extends Notifier<List<LibraryCourseData>> {
         ),
       ...saved.where((item) => !baseCatalog.any((base) => base.id == item.id)),
     ];
+  }
+
+  /// Older builds sometimes persisted `bilibili-season-*` as the visible title.
+  LibraryCourseData _healInternalIdTitles(LibraryCourseData course) {
+    final String healed = libraryCourseDisplayTitle(course);
+    if (healed == course.title.trim()) {
+      return course;
+    }
+    if (!looksLikeInternalLibraryId(course.title) && course.title.trim().isNotEmpty) {
+      return course;
+    }
+    return course.copyWith(title: healed);
   }
 
   LibraryCourseData _withBuiltInDisplayOverrides(
@@ -344,18 +360,10 @@ class LibraryCatalogNotifier extends Notifier<List<LibraryCourseData>> {
         if (course.id == courseId && course.episodes.any((ep) => ep.id == episodeId))
           () {
             final LibraryCourseData next = course.copyWith(
-              // Always mirror a renamed single-episode title onto the course
-              // card; for multi-episode 合集 keep the series title unless the
-              // renamed episode is the only one shown as the course face.
-              title: name != null &&
-                      (course.episodes.length == 1 ||
-                          course.title.trim() ==
-                              course.episodes
-                                  .firstWhere((ep) => ep.id == episodeId)
-                                  .title
-                                  .trim())
-                  ? name
-                  : null,
+              // 「修改视频标题」must update the visible course card too — otherwise
+              // home/library keep showing bilibili-season-* while 复习计划 already
+              // has the renamed episode label.
+              title: name,
               coverImage: course.episodes.length == 1 ? image : null,
               episodes: [
                 for (final LibraryEpisodeItem ep in course.episodes)
@@ -381,12 +389,32 @@ class LibraryCatalogNotifier extends Notifier<List<LibraryCourseData>> {
     final LibraryCourseData? course = updatedCourse;
     final LibraryEpisodeItem? episode = updatedEpisode;
     if (name != null && course != null && episode != null) {
+      // Keep homepage 复习计划 title in sync with the renamed video.
+      unawaited(_syncCoursePlanTitle(course: course, episode: episode, title: name));
       // Push renamed title into personal-import cloud so restore/resync cannot
       // put the Bilibili original title back.
       unawaited(
         _pushRenamedPersonalImportTitle(course: course, episode: episode),
       );
     }
+  }
+
+  Future<void> _syncCoursePlanTitle({
+    required LibraryCourseData course,
+    required LibraryEpisodeItem episode,
+    required String title,
+  }) async {
+    try {
+      final CoursePlanNotifier plans = ref.read(coursePlanProvider.notifier);
+      final CoursePlan? active = ref.read(coursePlanProvider).active;
+      if (active == null) return;
+      final bool matches = active.sourceId == episode.id ||
+          active.sourceId == course.id ||
+          active.courseId == course.id ||
+          active.courseId == episode.id;
+      if (!matches) return;
+      await plans.updateActive((CoursePlan plan) => plan.copyWith(title: title));
+    } catch (_) {}
   }
 
   Future<void> _pushRenamedPersonalImportTitle({
@@ -1354,19 +1382,26 @@ class LibraryCatalogNotifier extends Notifier<List<LibraryCourseData>> {
     final bool keepCustomTitle = previous.episodes.any(
           (LibraryEpisodeItem e) => e.customTitle,
         ) ||
-        episodes.any((LibraryEpisodeItem e) => e.customTitle);
+        episodes.any((LibraryEpisodeItem e) => e.customTitle) ||
+        (!looksLikeInternalLibraryId(previous.title) &&
+            looksLikeInternalLibraryId(incoming.title));
     final bool keepCustomCover = previous.episodes.any(
           (LibraryEpisodeItem e) => e.customCover,
         ) ||
         episodes.any((LibraryEpisodeItem e) => e.customCover);
-    // Single-episode renames also rewrite course.title — keep that card title.
+    // Prefer previous human title over raw bilibili-season ids from re-import.
     final String? preservedTitle = keepCustomTitle
-        ? (previous.episodes.length == 1 && previous.episodes.single.customTitle
-            ? previous.title
-            : (episodes.length == 1 && episodes.single.customTitle
-                ? episodes.single.title
-                : previous.title))
-        : null;
+        ? libraryCourseDisplayTitle(
+            previous.copyWith(episodes: episodes.isEmpty ? previous.episodes : episodes),
+          )
+        : (looksLikeInternalLibraryId(incoming.title)
+            ? libraryCourseDisplayTitle(
+                incoming.copyWith(
+                  title: previous.title,
+                  episodes: episodes,
+                ),
+              )
+            : null);
     final String? preservedCover = keepCustomCover
         ? (previous.episodes.length == 1 && previous.episodes.single.customCover
             ? previous.coverImage

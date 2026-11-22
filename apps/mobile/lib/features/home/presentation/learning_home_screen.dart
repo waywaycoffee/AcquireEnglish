@@ -487,7 +487,12 @@ class _LearningHomeScreenState extends ConsumerState<LearningHomeScreen> {
                                     text('视频学习', 11, color: muted),
                                     const SizedBox(height: 5),
                                     text(
-                                      video?.course.title ?? '挑一部视频开始',
+                                      video == null
+                                          ? '挑一部视频开始'
+                                          : libraryCourseDisplayTitle(
+                                              video.course,
+                                              focusEpisode: video.episode,
+                                            ),
                                       17,
                                       bold: true,
                                     ),

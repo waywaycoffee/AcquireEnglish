@@ -2710,9 +2710,13 @@ Future<void> _settleChineseFillIfAlreadyPresent() async {
                       player: _videoPlayer,
                       cookie: settings.resolvedBilibiliCookieHeader,
                     ),
-        courseTitle: episode?.customTitle == true ? episode!.title : (course?.title ?? '课程名称'),
+        courseTitle: course == null || episode == null
+            ? '课程名称'
+            : libraryEpisodeDisplayTitle(course, episode),
         episodeTitle: episode == null ? '第 01 集' : '第 ${episode.numberStr} 集',
-        episodeName: episode?.title,
+        episodeName: course == null || episode == null
+            ? episode?.title
+            : libraryEpisodeDisplayTitle(course, episode),
         streakText: '${dashboard.streakDays} Day Streak',
         onTranscriptPressed: state.hasLines
             ? () => unawaited(

@@ -60,7 +60,7 @@ class LibraryCourseCard extends StatelessWidget {
                         top: Radius.circular(32),
                       ),
                       child: LibraryCoursePoster(
-                        title: course.title,
+                        title: libraryCourseDisplayTitle(course),
                         path: course.coverImage,
                         borderRadius: const BorderRadius.vertical(
                           top: Radius.circular(32),
@@ -243,7 +243,7 @@ class LibraryCourseCard extends StatelessWidget {
                   ),
                   const SizedBox(height: 10),
                   Text(
-                    course.title,
+                    libraryCourseDisplayTitle(course),
                     style: TextStyle(
                       fontSize: 20,
                       fontWeight: FontWeight.w900,

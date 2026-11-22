@@ -3085,7 +3085,9 @@ Future<void> _settleChineseFillIfAlreadyPresent() async {
                       player: _videoPlayer,
                       cookie: settings.resolvedBilibiliCookieHeader,
                     ),
-              title: episode?.customTitle == true ? episode!.title : (course?.title ?? episode?.title ?? '爱快英语'),
+              title: course == null || episode == null
+                  ? '爱快英语'
+                  : libraryEpisodeDisplayTitle(course, episode),
               lessonBadge: course == null || episode == null
                   ? null
                   : '${episode.numberStr}/${course.totalEpisodes}',
@@ -3105,9 +3107,9 @@ Future<void> _settleChineseFillIfAlreadyPresent() async {
                     ref: ref,
                     type: CoursePlanType.video,
                     sourceId: widget.episodeId,
-                    title: course?.title ??
-                        episode?.title ??
-                        '视频课程',
+                    title: course == null || episode == null
+                        ? '视频课程'
+                        : libraryEpisodeDisplayTitle(course, episode),
                     subtitleLines: state.lines,
                   ),
                 );

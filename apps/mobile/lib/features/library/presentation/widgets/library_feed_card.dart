@@ -90,7 +90,7 @@ class LibraryFeedCard extends StatelessWidget {
                     fit: StackFit.expand,
                     children: <Widget>[
                       LibraryCoursePoster(
-                        title: course.title,
+                        title: libraryCourseDisplayTitle(course),
                         path: course.coverImage,
                         borderRadius: BorderRadius.circular(16),
                       ),
@@ -166,7 +166,7 @@ class LibraryFeedCard extends StatelessWidget {
               ),
               const SizedBox(height: 4),
               Text(
-                course.title,
+                libraryCourseDisplayTitle(course),
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
                 style: TextStyle(

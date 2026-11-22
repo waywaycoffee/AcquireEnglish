@@ -44,7 +44,7 @@ class CourseOverviewCard extends StatelessWidget {
                 fit: StackFit.expand,
                 children: <Widget>[
                   LibraryCoursePoster(
-                    title: course.title,
+                    title: libraryCourseDisplayTitle(course),
                     path: course.coverImage,
                     borderRadius: BorderRadius.circular(24),
                   ),
@@ -145,7 +145,7 @@ class CourseOverviewCard extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: <Widget>[
               Text(
-                course.title,
+                libraryCourseDisplayTitle(course),
                 style: TextStyle(
                   fontSize: compact ? 30 : 34,
                   fontWeight: FontWeight.w900,

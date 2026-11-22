@@ -867,7 +867,7 @@ class _RecentCourseCard extends StatelessWidget {
               right: 16,
               bottom: 14,
               child: Text(
-                course.title,
+                libraryCourseDisplayTitle(course),
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
                 style: const TextStyle(
