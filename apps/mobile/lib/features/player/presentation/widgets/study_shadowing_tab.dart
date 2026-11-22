@@ -25,6 +25,7 @@ import '../../domain/pronunciation_assessment.dart';
 import '../player_mock_state.dart';
 import 'comparison_waveform_painter.dart';
 import 'shadow_hundred_stats_card.dart';
+import 'shadowing_word_legend.dart';
 import 'study_shell_tokens.dart';
 
 /// How the practice sentence is shown while shadowing.
@@ -1366,21 +1367,8 @@ class _StudyShadowingTabState extends ConsumerState<StudyShadowingTab> {
                 Text(
                   '准确度 ${_assessment!.accuracy?.round() ?? "—"} · 流利度 ${_assessment!.fluency?.round() ?? "—"} · 完整度 ${_assessment!.completion?.round() ?? "—"}',
                 ),
-                Wrap(
-                  spacing: 8,
-                  children: <Widget>[
-                    for (final PronunciationWordResult word
-                        in _assessment!.words)
-                      Text(
-                        '${word.referenceWord}: ${word.accuracy?.round() ?? "—"}',
-                        style: TextStyle(
-                          color: (word.accuracy ?? 0) < 60
-                              ? Colors.orange
-                              : Colors.green,
-                        ),
-                      ),
-                  ],
-                ),
+                const SizedBox(height: 8),
+                ShadowingWordChips(words: _assessment!.words),
               ],
               if (_voiceResult != null) ...<Widget>[
                 const SizedBox(height: 12),

@@ -1,4 +1,4 @@
-enum TodayTaskKind { courseNew, courseReview, vocabDue, vocabNew }
+enum TodayTaskKind { courseNew, courseReview, vocabDue, vocabNew, clipDue }
 
 enum TodayPathStatus {
   idle,

@@ -2,6 +2,8 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 
+import '../../../player/domain/episode_study_progress.dart';
+import '../../../player/presentation/widgets/episode_stage_dots.dart';
 import '../../../shared/presentation/pad/app_design_tokens.dart';
 import '../library_mock_data.dart';
 import 'library_course_poster.dart';
@@ -50,6 +52,7 @@ class EpisodeListItem extends StatelessWidget {
     this.chineseFillFailed = false,
     this.subtitleFillProgress,
     this.subtitleFillActive = false,
+    this.studyStage,
     super.key,
   });
 
@@ -75,6 +78,9 @@ class EpisodeListItem extends StatelessWidget {
   /// 0–1 fill progress drawn under the chips while补字幕 is running.
   final double? subtitleFillProgress;
   final bool subtitleFillActive;
+
+  /// Four-stage study dots (video / drama progress).
+  final EpisodeStudyStage? studyStage;
 
   @override
   Widget build(BuildContext context) {
@@ -235,6 +241,10 @@ class EpisodeListItem extends StatelessWidget {
                   ),
                 ),
               ),
+            ],
+            if (studyStage != null) ...<Widget>[
+              const SizedBox(height: 10),
+              EpisodeStageDots(stage: studyStage!, compact: true),
             ],
             const SizedBox(height: 12),
             ClipRRect(

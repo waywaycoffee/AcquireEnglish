@@ -12,6 +12,7 @@ Future<void> showAiGrammarAnalysisSheet(
   BuildContext context, {
   required String english,
   String chinese = '',
+  String episodeId = '',
 }) {
   return showModalBottomSheet<void>(
     context: context,
@@ -24,6 +25,7 @@ Future<void> showAiGrammarAnalysisSheet(
       return AiGrammarAnalysisSheet(
         english: english,
         chinese: chinese,
+        episodeId: episodeId,
       );
     },
   );
@@ -33,11 +35,13 @@ class AiGrammarAnalysisSheet extends ConsumerStatefulWidget {
   const AiGrammarAnalysisSheet({
     required this.english,
     this.chinese = '',
+    this.episodeId = '',
     super.key,
   });
 
   final String english;
   final String chinese;
+  final String episodeId;
 
   @override
   ConsumerState<AiGrammarAnalysisSheet> createState() =>
@@ -121,7 +125,7 @@ class _AiGrammarAnalysisSheetState
                                 id:
                                     '${DateTime.now().millisecondsSinceEpoch}_${a.sentence.hashCode}',
                                 sentence: a.sentence,
-                                episodeId: '',
+                                episodeId: widget.episodeId,
                                 structure: a.structureCn,
                                 grammarPoints: a.grammarPoints
                                     .map(

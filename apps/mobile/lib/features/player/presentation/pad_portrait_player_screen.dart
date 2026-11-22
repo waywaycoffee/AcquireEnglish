@@ -16,8 +16,10 @@ import '../../../router/app_router.dart';
 import '../../daily_path/domain/course_plan.dart';
 import '../../daily_path/data/course_unit_progress.dart';
 import '../../daily_path/presentation/enable_course_mode_sheet.dart';
+import '../../daily_review/data/memory_item_store.dart';
 import '../../daily_review/presentation/daily_review_provider.dart';
 import '../../home/presentation/learning_dashboard_provider.dart';
+import '../domain/episode_clip_due.dart';
 import '../../import_course/data/bilibili_episode_prepare.dart';
 import '../../import_course/data/bilibili_import_service.dart';
 import '../../import_course/data/bilibili_multipage.dart';
@@ -282,6 +284,8 @@ class PadPortraitPlayerScreenState
   StudyModeTab _studyTab = StudyModeTab.subtitles;
   StudyPlanStep _studyPlanStep = StudyPlanStep.watch;
   final Set<StudyPlanStep> _studyPlanDone = <StudyPlanStep>{};
+  final Set<int> _intensiveLineStarts = <int>{};
+  bool _didMarkWatched = false;
   bool _dictationQueueMode = false;
   int _dictationQueueIndex = 0;
   bool _hardsubMosaicEnabled = false;
@@ -971,6 +975,7 @@ class PadPortraitPlayerScreenState
         _bilingualShowAiComplete = false;
       }
     });
+    unawaited(_syncEpisodeDueClips());
     if (resource.episode != null) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (!mounted || ModalRoute.of(context)?.isCurrent == false) return;
@@ -3294,17 +3299,23 @@ Future<void> _settleChineseFillIfAlreadyPresent() async {
                             }
                           });
                           if (step == StudyPlanStep.watch) {
-                            unawaited(
-                              ref
-                                  .read(episodeStudyProgressProvider.notifier)
-                                  .markWatched(
-                                    widget.episodeId,
-                                    requireOutput: widget.dramaPlan,
-                                  ),
-                            );
+                            unawaited(_markEpisodeWatched());
                             _studyPlanDone.add(StudyPlanStep.watch);
                           }
                         },
+                      ),
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(16, 0, 16, 0),
+                        child: Align(
+                          alignment: Alignment.centerRight,
+                          child: TextButton.icon(
+                            onPressed: state.hasLines
+                                ? () => unawaited(_startEpisodeOutputTest())
+                                : null,
+                            icon: const Icon(Icons.quiz_outlined, size: 16),
+                            label: const Text('本集测试'),
+                          ),
+                        ),
                       ),
                       StudyModeTabs(
                         value: _studyTab,
@@ -3669,6 +3680,10 @@ Future<void> _settleChineseFillIfAlreadyPresent() async {
               courses: ref.read(libraryCatalogProvider),
               episodeId: widget.episodeId,
             );
+            if (scorePercent >= 75) {
+              unawaited(_markEpisodeOutputPassed());
+              return;
+            }
             unawaited(
               ref.read(dailyReviewProvider.notifier).ingestShadowingFail(
                     episodeId: widget.episodeId,
@@ -3684,6 +3699,7 @@ Future<void> _settleChineseFillIfAlreadyPresent() async {
                         : '第 ${ctx.episode!.numberStr} 集',
                   ),
             );
+            unawaited(_syncEpisodeDueClips());
           },
         );
       case StudyModeTab.coach:
@@ -4212,7 +4228,10 @@ Future<void> _settleChineseFillIfAlreadyPresent() async {
     PlayerCourseLookupResult courseContext,
     PlayerSubtitleLine line,
   ) {
-    if (result.exact) return;
+    if (result.exact) {
+      unawaited(_markEpisodeOutputPassed());
+      return;
+    }
     final LibraryCourseData? course = courseContext.course;
     final LibraryEpisodeItem? episode = courseContext.episode;
     unawaited(
@@ -4230,6 +4249,7 @@ Future<void> _settleChineseFillIfAlreadyPresent() async {
             softGrade: fsrs.Rating.again,
           ),
     );
+    unawaited(_syncEpisodeDueClips());
     int saved = 0;
     for (final String word in result.reviewWords) {
       final bool ok = ref.read(wordBookProvider.notifier).addFavoriteWord(
@@ -5291,6 +5311,112 @@ Future<void> _settleChineseFillIfAlreadyPresent() async {
     ref
         .read(learningActivityProvider.notifier)
         .recordSentenceStudy(sentenceKey: sentenceKey);
+    _intensiveLineStarts.add(line.startMs);
+    final int total = state.lines.length;
+    if (total > 0) {
+      final double coverage = _intensiveLineStarts.length / total;
+      unawaited(
+        ref.read(episodeStudyProgressProvider.notifier).setIntensiveCoverage(
+              widget.episodeId,
+              coverage,
+              requireOutput: widget.dramaPlan,
+            ),
+      );
+      if (coverage >= 0.05) {
+        _studyPlanDone.add(StudyPlanStep.intensive);
+      }
+    }
+  }
+
+  Future<void> _markEpisodeWatched() {
+    _didMarkWatched = true;
+    _studyPlanDone.add(StudyPlanStep.watch);
+    return ref.read(episodeStudyProgressProvider.notifier).markWatched(
+          widget.episodeId,
+          requireOutput: widget.dramaPlan,
+        );
+  }
+
+  Future<void> _markEpisodeOutputPassed() {
+    _studyPlanDone
+      ..add(StudyPlanStep.intensive)
+      ..add(StudyPlanStep.output);
+    return ref.read(episodeStudyProgressProvider.notifier).markOutputPassed(
+          widget.episodeId,
+          requireOutput: widget.dramaPlan,
+        );
+  }
+
+  Future<void> _syncEpisodeDueClips() {
+    final int due = countDueClips(
+      memoryItems: ref.read(memoryItemStoreProvider),
+      records: ref.read(dailyReviewProvider).records,
+      now: DateTime.now(),
+      episodeId: widget.episodeId,
+    );
+    return ref.read(episodeStudyProgressProvider.notifier).setDueClipCount(
+          widget.episodeId,
+          due,
+          requireOutput: widget.dramaPlan,
+        );
+  }
+
+  Future<void> _startEpisodeOutputTest() async {
+    if (!state.hasLines) return;
+    await _markEpisodeWatched();
+    final List<PlayerSubtitleLine> lines = state.lines;
+    final int sample = lines.length <= 8
+        ? lines.length
+        : 8;
+    final List<int> indexes = <int>[];
+    if (sample == lines.length) {
+      for (int i = 0; i < lines.length; i++) {
+        indexes.add(i);
+      }
+    } else {
+      for (int i = 0; i < sample; i++) {
+        indexes.add(((i * (lines.length - 1)) / (sample - 1)).round());
+      }
+    }
+    final PlayerCourseLookupResult courseContext =
+        resolvePlayerCourseForEpisode(
+      courses: ref.read(libraryCatalogProvider),
+      episodeId: widget.episodeId,
+    );
+    final LibraryCourseData? course = courseContext.course;
+    final LibraryEpisodeItem? episode = courseContext.episode;
+    for (final int index in indexes) {
+      final PlayerSubtitleLine line = lines[index];
+      final DictationQueueItem item = DictationQueueItem(
+        id: DictationQueueItem.buildId(
+          episodeId: widget.episodeId,
+          startMs: line.startMs,
+          endMs: line.endMs,
+          english: line.english,
+        ),
+        english: line.english,
+        chinese: line.chinese,
+        startMs: line.startMs,
+        endMs: line.endMs,
+        startTime: line.startTime,
+        episodeId: widget.episodeId,
+        courseTitle: course?.title,
+        episodeTitle: episode == null ? '本集' : '第 ${episode.numberStr} 集',
+        difficult: false,
+        addedAtMs: DateTime.now().millisecondsSinceEpoch,
+      );
+      await ref.read(dictationQueueProvider.notifier).addOrUpdate(item);
+    }
+    if (!mounted) return;
+    setState(() {
+      _studyPlanStep = StudyPlanStep.output;
+      _studyPlanDone.add(StudyPlanStep.intensive);
+      _studyTab = StudyModeTab.dictation;
+      _hardsubMosaicEnabled = true;
+      _dictationQueueMode = true;
+      _dictationQueueIndex = 0;
+    });
+    _showMessage('本集测试：已抽取 $sample 句听写，未达线自动进 FSRS');
   }
 
   void _recordCurrentLineWords() {
@@ -5324,6 +5450,9 @@ Future<void> _settleChineseFillIfAlreadyPresent() async {
         position.inMilliseconds - _lastTrackedVideoPosition.inMilliseconds;
     _lastTrackedVideoPosition = position;
     _recordPlayDuration(durationMs: diff);
+    if (!_didMarkWatched && position.inSeconds >= 20) {
+      unawaited(_markEpisodeWatched());
+    }
     final PlayerCourseLookupResult lookup = resolvePlayerCourseForEpisode(
       courses: ref.read(libraryCatalogProvider),
       episodeId: widget.episodeId,
@@ -5411,6 +5540,7 @@ Future<void> _settleChineseFillIfAlreadyPresent() async {
         context,
         english: line.english,
         chinese: line.chinese,
+        episodeId: widget.episodeId,
       ),
     );
   }

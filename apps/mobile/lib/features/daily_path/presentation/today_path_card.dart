@@ -21,6 +21,9 @@ class TodayPathCard extends ConsumerWidget {
     final int newWords = path.tasks
         .where((TodayTask task) => task.kind == TodayTaskKind.vocabNew)
         .fold(0, (int total, TodayTask task) => total + task.count);
+    final int dueClips = path.tasks
+        .where((TodayTask task) => task.kind == TodayTaskKind.clipDue)
+        .fold(0, (int total, TodayTask task) => total + task.count);
     final CoursePlan? active = ref.watch(coursePlanProvider).active;
     final bool dark = Theme.of(context).brightness == Brightness.dark;
     final Color accent = dark ? const Color(0xFFB7D894) : const Color(0xFF284F39);
@@ -52,7 +55,10 @@ class TodayPathCard extends ConsumerWidget {
               style: TextStyle(fontSize: 13, color: muted, height: 1.4),
             ),
             if (path.tasks.isNotEmpty) ...<Widget>[
-              Text('单词：$dueWords 条待复习 · $newWords 条可新学',
+              Text(
+                  dueClips > 0
+                      ? '单词：$dueWords 待复习 · $newWords 可新学 · 剧句 $dueClips'
+                      : '单词：$dueWords 条待复习 · $newWords 条可新学',
                   style: TextStyle(fontSize: 12, color: muted)),
               const SizedBox(height: 12),
               _taskPreview(context, ref, path, accent, ink, muted),

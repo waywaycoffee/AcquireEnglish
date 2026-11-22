@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../player/domain/episode_study_progress.dart';
+import '../../../player/presentation/episode_study_progress_provider.dart';
 import '../../../subtitle_completion/subtitle_completion_status_provider.dart';
 import '../library_mock_data.dart';
 import 'episode_list_item.dart';
@@ -65,6 +67,12 @@ class CourseEpisodeTile extends ConsumerWidget {
         );
       }),
     );
+    final EpisodeStudyStage studyStage = ref.watch(
+      episodeStudyProgressProvider.select(
+        (Map<String, EpisodeStudyProgress> map) =>
+            episodeProgressOf(map, item.id).stage,
+      ),
+    );
 
     return Padding(
       padding: EdgeInsets.only(bottom: bottomPadding),
@@ -78,6 +86,7 @@ class CourseEpisodeTile extends ConsumerWidget {
         chineseFillFailed: fill?.chineseFailed ?? false,
         subtitleFillActive: fill?.active ?? false,
         subtitleFillProgress: fill?.progress,
+        studyStage: studyStage,
         onTap: onTap,
         onViewTranscript: onViewTranscript,
         onRerecognizeEnglish: onRerecognizeEnglish,

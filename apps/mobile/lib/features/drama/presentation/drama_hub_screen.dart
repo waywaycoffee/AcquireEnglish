@@ -2,10 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../daily_review/data/memory_item_store.dart';
+import '../../daily_review/presentation/daily_review_provider.dart';
 import '../../import_course/presentation/netdisk_import_sheet.dart';
 import '../../library/presentation/library_catalog_provider.dart';
 import '../../library/presentation/library_mock_data.dart';
 import '../../navigation/presentation/navigation_destination.dart';
+import '../../player/domain/episode_clip_due.dart';
 import '../../player/domain/episode_study_progress.dart';
 import '../../player/presentation/episode_study_progress_provider.dart';
 import '../../player/presentation/widgets/episode_stage_dots.dart';
@@ -15,7 +18,7 @@ import '../../shared/presentation/pad/pad_top_bar.dart';
 
 bool looksLikeDramaCourse(LibraryCourseData course) {
   final String blob =
-      '${course.title} ${course.description} ${course.tags.join(' ')}'
+      '${course.title} ${course.description} ${course.category} ${course.sourceLabel}'
           .toLowerCase();
   if (course.id.startsWith('netdisk-series-')) return true;
   return blob.contains('美剧') ||
@@ -40,14 +43,21 @@ class DramaHubScreen extends ConsumerStatefulWidget {
 class _DramaHubScreenState extends ConsumerState<DramaHubScreen> {
   _DramaFilter _filter = _DramaFilter.all;
   String? _selectedCourseId;
+  bool _syncedDue = false;
 
   @override
   Widget build(BuildContext context) {
-    final LibraryCatalogState catalog = ref.watch(libraryCatalogProvider);
+    final List<LibraryCourseData> catalog = ref.watch(libraryCatalogProvider);
     final Map<String, EpisodeStudyProgress> progressMap =
         ref.watch(episodeStudyProgressProvider);
     final List<LibraryCourseData> dramas =
-        catalog.courses.where(looksLikeDramaCourse).toList();
+        catalog.where(looksLikeDramaCourse).toList();
+    if (!_syncedDue && dramas.isNotEmpty) {
+      _syncedDue = true;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _syncDueClipCounts(dramas);
+      });
+    }
 
     LibraryCourseData? selected;
     if (dramas.isNotEmpty) {
@@ -221,5 +231,27 @@ class _DramaHubScreenState extends ConsumerState<DramaHubScreen> {
         _DramaFilter.pendingReview => p.dueClipCount > 0,
       };
     }).toList();
+  }
+
+  Future<void> _syncDueClipCounts(List<LibraryCourseData> dramas) async {
+    final EpisodeStudyProgressNotifier notifier =
+        ref.read(episodeStudyProgressProvider.notifier);
+    final memory = ref.read(memoryItemStoreProvider);
+    final records = ref.read(dailyReviewProvider).records;
+    final DateTime now = DateTime.now();
+    for (final LibraryCourseData course in dramas) {
+      for (final LibraryEpisodeItem ep in course.episodes) {
+        final int due = countDueClips(
+          memoryItems: memory,
+          records: records,
+          now: now,
+          episodeId: ep.id,
+        );
+        final EpisodeStudyProgress cur = notifier.of(ep.id);
+        if (cur.dueClipCount != due) {
+          await notifier.setDueClipCount(ep.id, due, requireOutput: true);
+        }
+      }
+    }
   }
 }

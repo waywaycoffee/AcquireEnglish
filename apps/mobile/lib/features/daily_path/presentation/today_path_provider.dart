@@ -2,10 +2,12 @@ import 'dart:async';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../daily_review/data/memory_item_store.dart';
 import '../../daily_review/domain/daily_review.dart';
 import '../../daily_review/presentation/daily_review_provider.dart';
 import '../../home/presentation/learning_dashboard_provider.dart';
 import '../../onboarding/domain/learning_tracks.dart';
+import '../../player/domain/episode_clip_due.dart';
 import '../../reading/data/reading_gloss.dart';
 import '../../reading/presentation/reading_library_provider.dart';
 import '../../sync/presentation/daily_feed_provider.dart';
@@ -32,6 +34,7 @@ class TodayPathNotifier extends Notifier<TodayPathState> {
   TodayPathState build() {
     ref.watch(coursePlanProvider);
     ref.watch(dailyReviewProvider);
+    ref.watch(memoryItemStoreProvider);
     ref.watch(wordReviewSettingsProvider);
     ref.watch(adaptiveReadingFreqThresholdProvider);
     ref.watch(readingFrequencyLexiconProvider);
@@ -199,10 +202,13 @@ class TodayPathNotifier extends Notifier<TodayPathState> {
         wantVocab ? _vocabTasks(now, doneIds) : const <TodayTask>[];
     final List<TodayTask> reading =
         wantReading ? _readingTasks(doneIds) : const <TodayTask>[];
+    final List<TodayTask> clipDue =
+        wantVideo ? _clipDueTasks(now, doneIds) : const <TodayTask>[];
 
     final List<TodayTask> merged = <TodayTask>[
       ...overdue,
       ...dueReview,
+      ...clipDue,
       ...vocab.where((TodayTask t) => t.kind == TodayTaskKind.vocabDue),
       ...courseNew,
       ...vocab.where((TodayTask t) => t.kind == TodayTaskKind.vocabNew),
@@ -221,6 +227,27 @@ class TodayPathNotifier extends Notifier<TodayPathState> {
       hasActiveCourse: plan != null,
       status: status,
     );
+  }
+
+  List<TodayTask> _clipDueTasks(DateTime now, Set<String> doneIds) {
+    final int dueCount = countDueClips(
+      memoryItems: ref.read(memoryItemStoreProvider),
+      records: ref.read(dailyReviewProvider).records,
+      now: now,
+    );
+    if (dueCount <= 0) return const <TodayTask>[];
+    const String id = 'clip-due';
+    return <TodayTask>[
+      TodayTask(
+        id: id,
+        kind: TodayTaskKind.clipDue,
+        title: '剧句复习 · $dueCount 句',
+        subtitle: '听写/跟读未达线句子 · FSRS 到期',
+        count: dueCount,
+        route: '/review/session?due=1&kind=clip',
+        doneToday: doneIds.contains(id),
+      ),
+    ];
   }
 
   List<TodayTask> _vocabTasks(DateTime now, Set<String> doneIds) {
