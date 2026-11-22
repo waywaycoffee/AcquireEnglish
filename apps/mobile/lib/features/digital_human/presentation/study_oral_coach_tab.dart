@@ -674,9 +674,25 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
   bool _usesCloudVoice(DigitalHumanPersona persona) => !_preferChineseReply ||
       isBilingualCoachVoice(_englishVoiceId ?? persona.recommendedVoiceId);
 
-  String _coachVoice(DigitalHumanPersona persona) => _preferChineseReply && !_usesCloudVoice(persona)
-      ? persona.edgeVoice(chinese: true)
-      : _englishVoiceId ?? persona.recommendedVoiceId ?? persona.edgeVoice(chinese: false);
+  String _coachVoice(DigitalHumanPersona persona) {
+    // Chinese reply without a bilingual cloud voice → Edge zh.
+    if (_preferChineseReply && !_usesCloudVoice(persona)) {
+      return persona.edgeVoice(chinese: true);
+    }
+    final String? preferred =
+        _englishVoiceId ?? persona.recommendedVoiceId;
+    if (preferred != null && preferred.trim().isNotEmpty) {
+      return preferred.trim();
+    }
+    // Never send Edge Neural ids into the qwen-audio pipeline — that forces
+    // Edge TTS and the wrong "外教" timbre, then 404 cache playback stalls.
+    if (persona.isAsianAppearance) {
+      return bilingualVoiceIdForPersona(persona);
+    }
+    return persona.isFemaleVoice
+        ? 'qwen-audio-3.0-tts-flash-loongnorahu'
+        : 'qwen-audio-3.0-tts-flash-loongadriangao';
+  }
 
   Future<void> _loadVoiceFor(DigitalHumanPersona persona) async {
     String? selected;
@@ -821,11 +837,31 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
     final Player player = Player();
     _speechPlayer = player;
     try {
+      // Fail fast on dead coach cache URLs (historically 404 → ~45s silence).
+      bool started = false;
+      final StreamSubscription<bool> playingSub =
+          player.stream.playing.listen((bool value) {
+        if (value) started = true;
+      });
       final Future<bool> completed = player.stream.completed
           .firstWhere((bool value) => value)
-          .timeout(const Duration(seconds: 45), onTimeout: () => false);
+          .timeout(const Duration(seconds: 20), onTimeout: () => false);
       await player.open(Media(url), play: true);
-      return await completed;
+      // If nothing starts within a few seconds, treat as broken URL.
+      for (int i = 0; i < 12 && !started; i++) {
+        await Future<void>.delayed(const Duration(milliseconds: 250));
+        if (!mounted) {
+          await playingSub.cancel();
+          return false;
+        }
+      }
+      if (!started) {
+        await playingSub.cancel();
+        return false;
+      }
+      final bool ok = await completed;
+      await playingSub.cancel();
+      return ok;
     } catch (_) {
       return false;
     } finally {
