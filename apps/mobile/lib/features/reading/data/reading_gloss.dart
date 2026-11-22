@@ -82,6 +82,10 @@ String shortReadingGloss(String rawTranslation) {
   return text;
 }
 
+/// Cap inline glosses so a 3k-char novel page never builds thousands of
+/// WidgetSpans (that path freezes / OOMs on 绿野仙踪-class books).
+const int kReadingMaxGlossesPerPage = 64;
+
 Future<Map<String, String>> buildHardWordGlosses({
   required Iterable<String> words,
   required ReadingFrequencyLexicon lexicon,
@@ -89,11 +93,12 @@ Future<Map<String, String>> buildHardWordGlosses({
   int threshold = kReadingDefaultFreqThreshold,
   Set<String> known = const <String>{},
   Set<String> focus = const <String>{},
+  int maxGlosses = kReadingMaxGlossesPerPage,
 }) async {
   await dictionary.ensureLoaded();
-  final Map<String, String> out = <String, String>{};
   final Set<String> seen = <String>{};
-  int yielded = 0;
+  final List<({String word, int rank, bool focus})> hard =
+      <({String word, int rank, bool focus})>[];
   for (final String raw in words) {
     final String word = raw.trim().toLowerCase().replaceAll('’', "'");
     if (word.length < 2 || !seen.add(word)) continue;
@@ -106,13 +111,24 @@ Future<Map<String, String>> buildHardWordGlosses({
     )) {
       continue;
     }
-    final OfflineWordDefinition? def = dictionary.lookupSync(word);
+    final int rank = lexicon.rankOf(word) ?? 1 << 20;
+    hard.add((word: word, rank: rank, focus: focus.contains(word)));
+  }
+  // Focus first, then rarest within the page budget.
+  hard.sort((a, b) {
+    if (a.focus != b.focus) return a.focus ? -1 : 1;
+    return b.rank.compareTo(a.rank);
+  });
+  final Map<String, String> out = <String, String>{};
+  int yielded = 0;
+  for (final ({String word, int rank, bool focus}) item in hard) {
+    if (out.length >= maxGlosses) break;
+    final OfflineWordDefinition? def = dictionary.lookupSync(item.word);
     final String gloss = shortReadingGloss(def?.translation ?? '');
     if (gloss.isEmpty) continue;
-    out[word] = gloss;
-    // Keep the UI responsive while annotating a long page.
+    out[item.word] = gloss;
     yielded += 1;
-    if (yielded % 40 == 0) {
+    if (yielded % 24 == 0) {
       await Future<void>.delayed(Duration.zero);
     }
   }

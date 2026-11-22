@@ -33,10 +33,8 @@ const String kReadingSentenceTranslateKey = 'reading_sentence_translate_v1';
 const String kReadingFreqThresholdKey = 'reading_freq_threshold_v1';
 
 /// Frequency rank bands for the difficulty slider (1 = most common).
-/// Covers placement range ~100 → 20k+ so gloss / i+1 track real level.
+/// Floor at 1500 so long novels (绿野仙踪) do not gloss nearly every word and OOM.
 const List<int> kReadingFreqThresholdBands = <int>[
-  500,
-  1000,
   1500,
   3000,
   5000,
@@ -48,3 +46,6 @@ const List<int> kReadingFreqThresholdBands = <int>[
 ];
 
 const int kReadingDefaultFreqThreshold = 3000;
+
+/// Hard floor for adaptive gloss / i+1 frontier (below this freezes long books).
+const int kReadingGlossThresholdFloor = 1500;

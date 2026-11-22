@@ -111,11 +111,16 @@ class _ReadingReaderScreenState extends ConsumerState<ReadingReaderScreen> {
   void _ensurePages(ReadingDoc doc) {
     if (_pagedDocId == doc.id && _pages.isNotEmpty) return;
     _pagedDocId = doc.id;
+    // Sync split is fine for short texts; long novels are paged once and cached.
     _pages = splitReadingPages(doc.plainText);
+    _restorePageFromProgress(doc);
+  }
+
+  void _restorePageFromProgress(ReadingDoc doc) {
     final ReadingProgress? progress = ref
         .read(readingLibraryProvider)
         .progressFor(doc.id);
-    if (progress != null && doc.plainText.isNotEmpty) {
+    if (progress != null && doc.plainText.isNotEmpty && _pages.isNotEmpty) {
       final int offset = progress.offsetChars.clamp(0, doc.plainText.length);
       int acc = 0;
       int page = 0;
@@ -198,10 +203,11 @@ class _ReadingReaderScreenState extends ConsumerState<ReadingReaderScreen> {
     final int next = ref.read(adaptiveReadingFreqThresholdProvider);
     syncAdaptiveFreqThresholdToPrefs(next);
     if (!mounted || next == _freqThreshold) return;
-    setState(() {
-      _freqThreshold = next;
-      _invalidateGlosses(clearCache: true);
-    });
+    setState(() => _freqThreshold = next);
+    _invalidateGlosses(clearCache: true, dropInteractive: false);
+    final ReadingDoc? live =
+        ref.read(readingLibraryProvider).docById(widget.docId);
+    if (live != null) unawaited(_ensureGlosses(live));
   }
 
   Future<void> _speakReading(String text, {double? rate}) async {
@@ -333,12 +339,14 @@ class _ReadingReaderScreenState extends ConsumerState<ReadingReaderScreen> {
             prefetch ??
             ref
                 .read(acquireApiClientProvider)
-                .readingSpeech(unit.text, voiceId);
+                .readingSpeech(unit.text, voiceId)
+                .timeout(const Duration(seconds: 20));
         // Prefetch next sentence while this one plays (same-text requests coalesce).
         prefetch = i + 1 < units.length
             ? ref
                   .read(acquireApiClientProvider)
                   .readingSpeech(units[i + 1].text, voiceId)
+                  .timeout(const Duration(seconds: 20))
             : null;
         final String url = await urlFuture;
         if (!mounted || generation != _continuousGeneration) return;
@@ -446,11 +454,16 @@ class _ReadingReaderScreenState extends ConsumerState<ReadingReaderScreen> {
     );
   }
 
-  void _invalidateGlosses({bool clearCache = false}) {
+  void _invalidateGlosses({
+    bool clearCache = false,
+    bool dropInteractive = true,
+  }) {
     _glossDocId = null;
     _glossPageIndex = -1;
-    _interactiveReady = false;
-    _interactivePage = -1;
+    if (dropInteractive) {
+      _interactiveReady = false;
+      _interactivePage = -1;
+    }
     if (clearCache) {
       _glossByPage.clear();
       _hardGlosses = const <String, String>{};
@@ -583,15 +596,14 @@ class _ReadingReaderScreenState extends ConsumerState<ReadingReaderScreen> {
     });
   }
 
-  /// Plain text first; then enable per-word WidgetSpans + glosses.
+  /// Plain text first; enable taps ASAP. Glosses fill in without blocking open
+  /// (ECDICT + hard-word pass used to stall 绿野仙踪 on「正在打开」).
   Future<void> _prepareInteractivePage(ReadingDoc doc) async {
     final int gen = ++_prepareGeneration;
     final int page = _pageIndex;
     if (_interactiveReady && _interactivePage == page) return;
     _ensurePages(doc);
     unawaited(_enqueuePageSpeechPregen(doc));
-    await _ensureGlosses(doc);
-    if (!mounted || gen != _prepareGeneration || _pageIndex != page) return;
     // Yield so the plain-text frame can paint before heavy span build.
     await Future<void>.delayed(Duration.zero);
     if (!mounted || gen != _prepareGeneration || _pageIndex != page) return;
@@ -599,6 +611,7 @@ class _ReadingReaderScreenState extends ConsumerState<ReadingReaderScreen> {
       _interactiveReady = true;
       _interactivePage = page;
     });
+    unawaited(_ensureGlosses(doc));
   }
 
   Future<void> _playRemoteAudio(FoundationMediaItem item) async {
@@ -1108,10 +1121,11 @@ class _ReadingReaderScreenState extends ConsumerState<ReadingReaderScreen> {
       if (prev == next) return;
       syncAdaptiveFreqThresholdToPrefs(next);
       if (!mounted || next == _freqThreshold) return;
-      setState(() {
-        _freqThreshold = next;
-        _invalidateGlosses(clearCache: true);
-      });
+      setState(() => _freqThreshold = next);
+      // Keep the page interactive; only refresh glosses (avoid reopen loop).
+      _invalidateGlosses(clearCache: true, dropInteractive: false);
+      final ReadingDoc? live = ref.read(readingLibraryProvider).docById(widget.docId);
+      if (live != null) unawaited(_ensureGlosses(live));
     });
     final ReadingLibraryState library = ref.watch(readingLibraryProvider);
     final ReadingDoc? doc = library.docById(widget.docId);

@@ -5,8 +5,8 @@ void main() {
   group('freqThresholdForVocabEstimate', () {
     test('snaps to nearest reading band', () {
       expect(freqThresholdForVocabEstimate(null), 3000);
-      expect(freqThresholdForVocabEstimate(100), 500);
-      expect(freqThresholdForVocabEstimate(900), 1000);
+      expect(freqThresholdForVocabEstimate(100), 1500);
+      expect(freqThresholdForVocabEstimate(900), 1500);
       expect(freqThresholdForVocabEstimate(3200), 3000);
       expect(freqThresholdForVocabEstimate(4800), 5000);
       expect(freqThresholdForVocabEstimate(9000), 8000);

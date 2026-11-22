@@ -46,7 +46,9 @@ List<ReadingToken> tokenizeReadingText(String text) {
 /// Interactive word spans are expensive; long novels must be paged or the
 /// reader OOMs (looks like a crash when opening 绿野仙踪-classics).
 /// Keep pages modest so first interactive paint stays responsive.
-const int kReadingInteractivePageChars = 4500;
+/// Keep pages short: every word is a WidgetSpan when interactive, so 4.5k chars
+/// OOMs on phones when opening long classics like 绿野仙踪.
+const int kReadingInteractivePageChars = 1800;
 
 /// Split [text] into chapter-sized pages for the interactive reader.
 List<String> splitReadingPages(

@@ -6,7 +6,10 @@ import 'vocab_entry.dart';
 /// Gloss / highlight words rarer than this rank (1 = most common). The frontier
 /// tracks the learner so inline help and i+1 picks move with real level.
 int freqThresholdForVocabEstimate(int? estimate) {
-  final int e = (estimate ?? kReadingDefaultFreqThreshold).clamp(100, 60000);
+  final int e = (estimate ?? kReadingDefaultFreqThreshold).clamp(
+    kReadingGlossThresholdFloor,
+    60000,
+  );
   return nearestReadingFreqBand(e);
 }
 

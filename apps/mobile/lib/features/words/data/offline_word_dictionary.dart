@@ -1,6 +1,8 @@
 import 'dart:convert';
+import 'dart:typed_data';
 
 import 'package:archive/archive.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -19,6 +21,19 @@ class OfflineWordDefinition {
   final String translation;
   final String phonetic;
   final String partOfSpeech;
+}
+
+/// Decode gzip+JSON off the UI isolate (opening 绿野仙踪 used to hitch here).
+Map<String, List<String>> decodeEcdictGzipBytes(Uint8List packed) {
+  final List<int> jsonBytes = const GZipDecoder().decodeBytes(packed);
+  final Map<String, dynamic> decoded =
+      jsonDecode(utf8.decode(jsonBytes)) as Map<String, dynamic>;
+  final Map<String, dynamic> rawEntries =
+      decoded['entries'] as Map<String, dynamic>;
+  return <String, List<String>>{
+    for (final MapEntry<String, dynamic> e in rawEntries.entries)
+      e.key: (e.value as List<dynamic>).map((dynamic v) => '$v').toList(),
+  };
 }
 
 class OfflineWordDictionary {
@@ -43,25 +58,19 @@ class OfflineWordDictionary {
 
   Future<Map<String, OfflineWordDefinition>> _load() async {
     final ByteData packed = await rootBundle.load(_dictionaryAsset);
-    final List<int> jsonBytes = const GZipDecoder().decodeBytes(
+    final Map<String, List<String>> raw = await compute(
+      decodeEcdictGzipBytes,
       packed.buffer.asUint8List(),
     );
-    final Map<String, dynamic> decoded =
-        jsonDecode(utf8.decode(jsonBytes)) as Map<String, dynamic>;
-    final Map<String, dynamic> rawEntries =
-        decoded['entries'] as Map<String, dynamic>;
     final Map<String, OfflineWordDefinition> mapped =
-        rawEntries.map((String word, dynamic value) {
-      final List<dynamic> fields = value as List<dynamic>;
-      return MapEntry<String, OfflineWordDefinition>(
-        word,
-        OfflineWordDefinition(
-          translation: fields[0] as String,
-          phonetic: fields[1] as String,
-          partOfSpeech: fields[2] as String,
+        <String, OfflineWordDefinition>{
+      for (final MapEntry<String, List<String>> e in raw.entries)
+        e.key: OfflineWordDefinition(
+          translation: e.value.isNotEmpty ? e.value[0] : '',
+          phonetic: e.value.length > 1 ? e.value[1] : '',
+          partOfSpeech: e.value.length > 2 ? e.value[2] : '',
         ),
-      );
-    });
+    };
     _entries = mapped;
     return mapped;
   }
