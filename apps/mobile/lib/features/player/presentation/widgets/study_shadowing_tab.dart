@@ -12,6 +12,7 @@ import 'package:path_provider/path_provider.dart';
 
 import '../../../authentication/presentation/auth_session.dart';
 import '../../../community/data/community_models.dart';
+import '../../../home/presentation/learning_dashboard_provider.dart';
 import '../../../settings/data/pronunciation_credentials.dart';
 import '../../../settings/presentation/settings_provider.dart';
 import '../../../sync/data/acquire_api_client.dart';
@@ -976,11 +977,12 @@ class _StudyShadowingTabState extends ConsumerState<StudyShadowingTab> {
     if (episodeId == null || episodeId.isEmpty) {
       return;
     }
+    final String lineId = '${widget.line.startMs}-${widget.line.endMs}';
     try {
       await DubSessionStore.instance.saveTake(
         DubTake(
           episodeId: episodeId,
-          lineId: '${widget.line.startMs}-${widget.line.endMs}',
+          lineId: lineId,
           startMs: widget.line.startMs,
           endMs: widget.line.endMs,
           english: widget.line.english,
@@ -994,6 +996,9 @@ class _StudyShadowingTabState extends ConsumerState<StudyShadowingTab> {
               : (_voiceResult!.overlap.score * 100).round(),
         ),
       );
+      ref.read(learningActivityProvider.notifier).recordShadowAttempt(
+            sentenceKey: '$episodeId|$lineId',
+          );
       if (mounted && !_resourcesReleased) {
         setState(() => _dubTakeSaved = true);
       }

@@ -9,6 +9,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:path_provider/path_provider.dart';
 
 import '../../../../constants/feature_flags.dart';
+import '../../../home/presentation/learning_dashboard_provider.dart';
 import '../../../settings/data/pronunciation_credentials.dart';
 import '../../data/pronunciation_audio_extractor.dart';
 import '../../data/dub_session_store.dart';
@@ -375,16 +376,20 @@ class _PronunciationAssessmentDialogState
     final String? episode = widget.episodeId;
     final String? path = _recordingPath;
     if (episode == null || path == null) return;
+    final String lineId = '${widget.target.startMs}-${widget.target.endMs}';
     try {
       await DubSessionStore.instance.saveTake(DubTake(
         episodeId: episode,
-        lineId: '${widget.target.startMs}-${widget.target.endMs}',
+        lineId: lineId,
         startMs: widget.target.startMs, endMs: widget.target.endMs,
         english: widget.target.text, userWavPath: path,
         createdAt: _takeCreatedAt ??= DateTime.now(),
         scorePercent: (_result?.suggestedScore ?? _result?.accuracy)?.round(),
         professionalScore: _result != null,
       ));
+      ref.read(learningActivityProvider.notifier).recordShadowAttempt(
+            sentenceKey: '$episode|$lineId',
+          );
       if (mounted && !_resourcesReleased) setState(() => _message = '录音已保存，可在字幕句子中回听');
     } catch (_) {
       if (mounted && !_resourcesReleased) setState(() => _message = '录音保存失败，可先在此回听并重试');

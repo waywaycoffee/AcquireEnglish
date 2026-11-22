@@ -53,12 +53,35 @@ class ReviewTodaySection extends ConsumerWidget {
       now,
     );
     final List<WordEntry> wordBook = ref.watch(wordBookProvider);
-    final int phraseCount = ref.watch(phraseBookProvider).length;
-    final int wordFavorites =
-        wordBook.where((WordEntry e) => e.favorite).length;
-    final int sentenceCount = sources
-        .where((ReviewSource s) => s.kind == ReviewKind.sentence)
+    final List<PhraseEntry> phrases = ref.watch(phraseBookProvider);
+    final int phraseCount = phrases.length;
+    final int wordFavorites = wordBook
+        .where(
+          (WordEntry e) => e.favorite && e.kind == VocabCardKind.word,
+        )
         .length;
+    final int phraseFavorites = wordBook
+            .where(
+              (WordEntry e) => e.favorite && e.kind == VocabCardKind.phrase,
+            )
+            .length +
+        phrases
+            .where(
+              (PhraseEntry p) =>
+                  p.episodeId == null && p.courseId == null,
+            )
+            .length;
+    final int sentenceCount = wordBook
+            .where(
+              (WordEntry e) => e.favorite && e.kind == VocabCardKind.pattern,
+            )
+            .length +
+        phrases
+            .where(
+              (PhraseEntry p) =>
+                  p.episodeId != null || p.courseId != null,
+            )
+            .length;
     final bool empty = sources.isEmpty;
     final bool done = !empty && plan.next == null;
     final bool hasDraft = ReviewSessionDraftStore(
@@ -79,14 +102,14 @@ class ReviewTodaySection extends ConsumerWidget {
             ? '今天暂时没有到期内容'
             : '把学过的，真正记住';
     final String subtitle = empty
-        ? '去词书架点封面开始背新词；背过之后会出现在这里按计划复习。'
+        ? '收藏的单词、短语、句子会出现在这里；也可去词书架点封面背新词。'
         : done
             ? (plan.nextDue == null
-                ? '可以自由练习已学内容，或去词书架继续背新词。'
-                : '下次到期：${_formatNextDue(plan.nextDue!, now)}。也可以去词书架继续背新词。')
+                ? '可以自由练习已收藏与已学内容，或去词书架继续背新词。'
+                : '下次到期：${_formatNextDue(plan.nextDue!, now)}。收藏内容也会按计划回来。')
             : activeBookTitle.isEmpty
-                ? '这里只复习已学过的词；新词请去词书架点封面开背。'
-                : '复习已学内容；新词请点词书「$activeBookTitle」封面继续背。';
+                ? '优先复习收藏的单词、短语与句子；新词请去词书架点封面开背。'
+                : '优先复习收藏内容；新词请点词书「$activeBookTitle」封面继续背。';
 
     final String ctaLabel = empty
         ? '去词书架背新词'
@@ -156,7 +179,7 @@ class ReviewTodaySection extends ConsumerWidget {
             const SizedBox(width: 10),
             Expanded(
               child: _StatChip(
-                value: '$phraseCount',
+                value: '$phraseFavorites',
                 label: '收藏短语',
               ),
             ),

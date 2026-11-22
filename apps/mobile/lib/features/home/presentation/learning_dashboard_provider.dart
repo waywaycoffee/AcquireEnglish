@@ -36,21 +36,38 @@ final Provider<LearningDashboardStats> learningDashboardProvider =
           ? emptyLibraryCourse
           : courses.first;
 
+      final LearningDailyRecord today = activity.today;
+      final LearningDailyRecord yesterday = activity.yesterday;
       return LearningDashboardStats(
         streakDays: activity.streakDays,
         totalStudyDays: activity.totalStudyDays,
         totalStudyMinutes: activity.totalStudyMinutes,
         todayStudyMinutes: activity.todayStudyMinutes,
-        todaySentenceCount: activity.today.learnedSentenceKeys.length,
-        todayShadowingCount: activity.today.shadowingCount,
-        todaySavedPhrases: activity.today.savedPhraseCount,
-        todayProgressPercent: _buildTodayProgressPercent(activity.today),
-        checkedIn: activity.today.checkedIn,
+        todaySentenceCount: today.learnedSentenceKeys.length,
+        todayShadowingCount: today.shadowingCount,
+        todaySavedPhrases: today.savedPhraseCount,
+        todayVideoCount: today.watchedVideoKeys.length,
+        todayArticleCount: today.readArticleKeys.length,
+        todayShadowSentenceCount: today.shadowedSentenceKeys.length,
+        todayFavoriteCount: today.favoriteSaveCount,
+        deltaVideoCount:
+            today.watchedVideoKeys.length - yesterday.watchedVideoKeys.length,
+        deltaArticleCount:
+            today.readArticleKeys.length - yesterday.readArticleKeys.length,
+        deltaShadowingCount: today.shadowingCount - yesterday.shadowingCount,
+        deltaShadowSentenceCount: today.shadowedSentenceKeys.length -
+            yesterday.shadowedSentenceKeys.length,
+        deltaFavoriteCount:
+            today.favoriteSaveCount - yesterday.favoriteSaveCount,
+        todayProgressPercent: _buildTodayProgressPercent(today),
+        checkedIn: today.checkedIn,
         currentCourseTitle: currentCourse.title,
         currentCourseProgress: currentCourse.progressPercent,
         weeklyTrend: activity.buildTrend(days: 7, bucketDays: 1),
         monthlyTrend: activity.buildTrend(days: 30, bucketDays: 7),
         quarterlyTrend: activity.buildTrend(days: 90, bucketDays: 30),
+        weekSummary: activity.periodSummary(days: 7),
+        monthSummary: activity.periodSummary(days: 30),
       );
     });
 
@@ -163,6 +180,7 @@ class LearningActivityNotifier extends Notifier<LearningActivityState> {
     if (!enabled) {
       return;
     }
+    // Weak signal (entering 跟读 tab). Real takes use recordShadowAttempt.
     final DateTime at = occurredAt ?? DateTime.now();
     final String dayKey = _dayKey(at);
     _updateDay(at, (LearningDailyRecord record) {
@@ -176,7 +194,6 @@ class LearningActivityNotifier extends Notifier<LearningActivityState> {
         clientEventId: 'shadowing:$dayKey:$count',
       ),
     );
-    // Commerce points: batch every 3 shadow toggles (maps to shadow_batch rule).
     if (count > 0 && count % 3 == 0) {
       playSuccessSfx(SuccessSfxKind.reward);
       unawaited(
@@ -188,9 +205,108 @@ class LearningActivityNotifier extends Notifier<LearningActivityState> {
     }
   }
 
+  /// One completed shadow take (mic save). Always increments attempt count.
+  void recordShadowAttempt({
+    required String sentenceKey,
+    DateTime? occurredAt,
+    bool awardPoints = true,
+  }) {
+    final String key = sentenceKey.trim();
+    if (key.isEmpty) {
+      return;
+    }
+    final DateTime at = occurredAt ?? DateTime.now();
+    final String dayKey = _dayKey(at);
+    _updateDay(at, (LearningDailyRecord record) {
+      return record.copyWith(
+        shadowingCount: record.shadowingCount + 1,
+        shadowedSentenceKeys: <String>{
+          ...record.shadowedSentenceKeys,
+          key,
+        },
+      );
+    });
+    if (!awardPoints) {
+      return;
+    }
+    final int count = state.records[dayKey]?.shadowingCount ?? 0;
+    playSuccessSfx(SuccessSfxKind.nudge);
+    unawaited(
+      _earnPoints(
+        reason: 'shadowing',
+        clientEventId: 'shadowing:$dayKey:$count',
+      ),
+    );
+    if (count > 0 && count % 3 == 0) {
+      playSuccessSfx(SuccessSfxKind.reward);
+      unawaited(
+        _earnCommercePoints(
+          reason: 'shadow_batch',
+          clientEventId: 'shadow_batch:$dayKey:${count ~/ 3}',
+        ),
+      );
+    }
+  }
+
+  void recordVideoWatched({required String videoKey, DateTime? occurredAt}) {
+    final String key = videoKey.trim();
+    if (key.isEmpty) {
+      return;
+    }
+    final DateTime at = occurredAt ?? DateTime.now();
+    final String dayKey = _dayKey(at);
+    final LearningDailyRecord previous =
+        state.records[dayKey] ?? LearningDailyRecord.empty(dayKey);
+    if (previous.watchedVideoKeys.contains(key)) {
+      return;
+    }
+    _updateDay(at, (LearningDailyRecord record) {
+      if (record.watchedVideoKeys.contains(key)) {
+        return record;
+      }
+      return record.copyWith(
+        watchedVideoKeys: <String>{...record.watchedVideoKeys, key},
+      );
+    });
+  }
+
+  void recordArticleRead({required String articleKey, DateTime? occurredAt}) {
+    final String key = articleKey.trim();
+    if (key.isEmpty) {
+      return;
+    }
+    final DateTime at = occurredAt ?? DateTime.now();
+    final String dayKey = _dayKey(at);
+    final LearningDailyRecord previous =
+        state.records[dayKey] ?? LearningDailyRecord.empty(dayKey);
+    if (previous.readArticleKeys.contains(key)) {
+      return;
+    }
+    _updateDay(at, (LearningDailyRecord record) {
+      if (record.readArticleKeys.contains(key)) {
+        return record;
+      }
+      return record.copyWith(
+        readArticleKeys: <String>{...record.readArticleKeys, key},
+      );
+    });
+  }
+
+  void recordWordSaved({DateTime? occurredAt}) {
+    _updateDay(occurredAt ?? DateTime.now(), (LearningDailyRecord record) {
+      return record.copyWith(savedWordCount: record.savedWordCount + 1);
+    });
+  }
+
   void recordPhraseSaved({DateTime? occurredAt}) {
     _updateDay(occurredAt ?? DateTime.now(), (LearningDailyRecord record) {
       return record.copyWith(savedPhraseCount: record.savedPhraseCount + 1);
+    });
+  }
+
+  void recordSentenceSaved({DateTime? occurredAt}) {
+    _updateDay(occurredAt ?? DateTime.now(), (LearningDailyRecord record) {
+      return record.copyWith(savedSentenceCount: record.savedSentenceCount + 1);
     });
   }
 
@@ -206,8 +322,13 @@ class LearningActivityNotifier extends Notifier<LearningActivityState> {
         dayKey: dayKey,
         studyMilliseconds: const Duration(minutes: 22).inMilliseconds,
         learnedSentenceKeys: <String>{'demo_sentence_$i'},
+        watchedVideoKeys: <String>{'demo_video_$i'},
+        readArticleKeys: <String>{'demo_article_$i'},
+        shadowedSentenceKeys: <String>{'demo_shadow_$i'},
         shadowingCount: 2,
+        savedWordCount: 1,
         savedPhraseCount: 2,
+        savedSentenceCount: 1,
         checkedIn: true,
       );
     }
@@ -311,7 +432,9 @@ class LearningActivityNotifier extends Notifier<LearningActivityState> {
             const Duration(minutes: _checkInStudyMinuteTarget).inMilliseconds ||
         record.learnedSentenceKeys.length >= _checkInSentenceTarget ||
         record.shadowingCount >= _checkInShadowingTarget ||
-        record.savedPhraseCount >= _checkInPhraseTarget;
+        record.favoriteSaveCount >= _checkInPhraseTarget ||
+        record.watchedVideoKeys.isNotEmpty ||
+        record.readArticleKeys.isNotEmpty;
   }
 
   void _schedulePersist() {
@@ -421,7 +544,43 @@ class LearningActivityState {
       records[_dayKey(DateTime.now())] ??
       LearningDailyRecord.empty(_dayKey(DateTime.now()));
 
+  LearningDailyRecord get yesterday {
+    final DateTime day = DateTime.now().subtract(const Duration(days: 1));
+    return records[_dayKey(day)] ?? LearningDailyRecord.empty(_dayKey(day));
+  }
+
   int get todayStudyMinutes => today.studyMilliseconds ~/ 60000;
+
+  LearningPeriodSummary periodSummary({required int days}) {
+    final DateTime now = DateTime.now();
+    final DateTime today = DateTime(now.year, now.month, now.day);
+    int videos = 0;
+    int articles = 0;
+    int shadowAttempts = 0;
+    int shadowSentences = 0;
+    int favorites = 0;
+    int minutes = 0;
+    for (int i = 0; i < days; i++) {
+      final DateTime day = today.subtract(Duration(days: i));
+      final LearningDailyRecord record =
+          records[_dayKey(day)] ?? LearningDailyRecord.empty(_dayKey(day));
+      videos += record.watchedVideoKeys.length;
+      articles += record.readArticleKeys.length;
+      shadowAttempts += record.shadowingCount;
+      shadowSentences += record.shadowedSentenceKeys.length;
+      favorites += record.favoriteSaveCount;
+      minutes += record.studyMilliseconds ~/ 60000;
+    }
+    return LearningPeriodSummary(
+      days: days,
+      videoCount: videos,
+      articleCount: articles,
+      shadowAttemptCount: shadowAttempts,
+      shadowSentenceCount: shadowSentences,
+      favoriteCount: favorites,
+      studyMinutes: minutes,
+    );
+  }
 
   int get totalStudyDays => records.values
       .where((LearningDailyRecord record) => record.checkedIn)
@@ -501,8 +660,13 @@ class LearningDailyRecord {
     required this.dayKey,
     required this.studyMilliseconds,
     required this.learnedSentenceKeys,
+    required this.watchedVideoKeys,
+    required this.readArticleKeys,
+    required this.shadowedSentenceKeys,
     required this.shadowingCount,
+    required this.savedWordCount,
     required this.savedPhraseCount,
+    required this.savedSentenceCount,
     required this.checkedIn,
   });
 
@@ -517,58 +681,104 @@ class LearningDailyRecord {
           ((json['learnedSentenceKeys'] as List<Object?>?) ?? const <Object?>[])
               .cast<String>()
               .toSet(),
+      watchedVideoKeys:
+          ((json['watchedVideoKeys'] as List<Object?>?) ?? const <Object?>[])
+              .cast<String>()
+              .toSet(),
+      readArticleKeys:
+          ((json['readArticleKeys'] as List<Object?>?) ?? const <Object?>[])
+              .cast<String>()
+              .toSet(),
+      shadowedSentenceKeys:
+          ((json['shadowedSentenceKeys'] as List<Object?>?) ??
+                  const <Object?>[])
+              .cast<String>()
+              .toSet(),
       shadowingCount: json['shadowingCount'] as int? ?? 0,
+      savedWordCount: json['savedWordCount'] as int? ?? 0,
       savedPhraseCount: json['savedPhraseCount'] as int? ?? 0,
+      savedSentenceCount: json['savedSentenceCount'] as int? ?? 0,
       checkedIn: json['checkedIn'] as bool? ?? false,
     );
   }
 
   factory LearningDailyRecord.empty(String dayKey) => LearningDailyRecord(
-    dayKey: dayKey,
-    studyMilliseconds: 0,
-    learnedSentenceKeys: const <String>{},
-    shadowingCount: 0,
-    savedPhraseCount: 0,
-    checkedIn: false,
-  );
+        dayKey: dayKey,
+        studyMilliseconds: 0,
+        learnedSentenceKeys: const <String>{},
+        watchedVideoKeys: const <String>{},
+        readArticleKeys: const <String>{},
+        shadowedSentenceKeys: const <String>{},
+        shadowingCount: 0,
+        savedWordCount: 0,
+        savedPhraseCount: 0,
+        savedSentenceCount: 0,
+        checkedIn: false,
+      );
 
   final String dayKey;
   final int studyMilliseconds;
   final Set<String> learnedSentenceKeys;
+  final Set<String> watchedVideoKeys;
+  final Set<String> readArticleKeys;
+  final Set<String> shadowedSentenceKeys;
   final int shadowingCount;
+  final int savedWordCount;
   final int savedPhraseCount;
+  final int savedSentenceCount;
   final bool checkedIn;
+
+  int get favoriteSaveCount =>
+      savedWordCount + savedPhraseCount + savedSentenceCount;
 
   bool get hasActivity =>
       studyMilliseconds > 0 ||
       learnedSentenceKeys.isNotEmpty ||
+      watchedVideoKeys.isNotEmpty ||
+      readArticleKeys.isNotEmpty ||
+      shadowedSentenceKeys.isNotEmpty ||
       shadowingCount > 0 ||
-      savedPhraseCount > 0;
+      favoriteSaveCount > 0;
 
   LearningDailyRecord copyWith({
     int? studyMilliseconds,
     Set<String>? learnedSentenceKeys,
+    Set<String>? watchedVideoKeys,
+    Set<String>? readArticleKeys,
+    Set<String>? shadowedSentenceKeys,
     int? shadowingCount,
+    int? savedWordCount,
     int? savedPhraseCount,
+    int? savedSentenceCount,
     bool? checkedIn,
   }) {
     return LearningDailyRecord(
       dayKey: dayKey,
       studyMilliseconds: studyMilliseconds ?? this.studyMilliseconds,
       learnedSentenceKeys: learnedSentenceKeys ?? this.learnedSentenceKeys,
+      watchedVideoKeys: watchedVideoKeys ?? this.watchedVideoKeys,
+      readArticleKeys: readArticleKeys ?? this.readArticleKeys,
+      shadowedSentenceKeys: shadowedSentenceKeys ?? this.shadowedSentenceKeys,
       shadowingCount: shadowingCount ?? this.shadowingCount,
+      savedWordCount: savedWordCount ?? this.savedWordCount,
       savedPhraseCount: savedPhraseCount ?? this.savedPhraseCount,
+      savedSentenceCount: savedSentenceCount ?? this.savedSentenceCount,
       checkedIn: checkedIn ?? this.checkedIn,
     );
   }
 
   Map<String, Object?> toJson() => <String, Object?>{
-    'studyMilliseconds': studyMilliseconds,
-    'learnedSentenceKeys': learnedSentenceKeys.toList(growable: false),
-    'shadowingCount': shadowingCount,
-    'savedPhraseCount': savedPhraseCount,
-    'checkedIn': checkedIn,
-  };
+        'studyMilliseconds': studyMilliseconds,
+        'learnedSentenceKeys': learnedSentenceKeys.toList(growable: false),
+        'watchedVideoKeys': watchedVideoKeys.toList(growable: false),
+        'readArticleKeys': readArticleKeys.toList(growable: false),
+        'shadowedSentenceKeys': shadowedSentenceKeys.toList(growable: false),
+        'shadowingCount': shadowingCount,
+        'savedWordCount': savedWordCount,
+        'savedPhraseCount': savedPhraseCount,
+        'savedSentenceCount': savedSentenceCount,
+        'checkedIn': checkedIn,
+      };
 }
 
 class LearningTrendPoint {
@@ -583,6 +793,26 @@ class LearningTrendPoint {
   final int activeDays;
 }
 
+class LearningPeriodSummary {
+  const LearningPeriodSummary({
+    required this.days,
+    required this.videoCount,
+    required this.articleCount,
+    required this.shadowAttemptCount,
+    required this.shadowSentenceCount,
+    required this.favoriteCount,
+    required this.studyMinutes,
+  });
+
+  final int days;
+  final int videoCount;
+  final int articleCount;
+  final int shadowAttemptCount;
+  final int shadowSentenceCount;
+  final int favoriteCount;
+  final int studyMinutes;
+}
+
 class LearningDashboardStats {
   const LearningDashboardStats({
     required this.streakDays,
@@ -592,6 +822,15 @@ class LearningDashboardStats {
     required this.todaySentenceCount,
     required this.todayShadowingCount,
     required this.todaySavedPhrases,
+    required this.todayVideoCount,
+    required this.todayArticleCount,
+    required this.todayShadowSentenceCount,
+    required this.todayFavoriteCount,
+    required this.deltaVideoCount,
+    required this.deltaArticleCount,
+    required this.deltaShadowingCount,
+    required this.deltaShadowSentenceCount,
+    required this.deltaFavoriteCount,
     required this.todayProgressPercent,
     required this.checkedIn,
     required this.currentCourseTitle,
@@ -599,6 +838,8 @@ class LearningDashboardStats {
     required this.weeklyTrend,
     required this.monthlyTrend,
     required this.quarterlyTrend,
+    required this.weekSummary,
+    required this.monthSummary,
   });
 
   final int streakDays;
@@ -608,6 +849,15 @@ class LearningDashboardStats {
   final int todaySentenceCount;
   final int todayShadowingCount;
   final int todaySavedPhrases;
+  final int todayVideoCount;
+  final int todayArticleCount;
+  final int todayShadowSentenceCount;
+  final int todayFavoriteCount;
+  final int deltaVideoCount;
+  final int deltaArticleCount;
+  final int deltaShadowingCount;
+  final int deltaShadowSentenceCount;
+  final int deltaFavoriteCount;
   final int todayProgressPercent;
   final bool checkedIn;
   final String currentCourseTitle;
@@ -615,6 +865,8 @@ class LearningDashboardStats {
   final List<LearningTrendPoint> weeklyTrend;
   final List<LearningTrendPoint> monthlyTrend;
   final List<LearningTrendPoint> quarterlyTrend;
+  final LearningPeriodSummary weekSummary;
+  final LearningPeriodSummary monthSummary;
 
   int get remainingMinutesToCheckIn {
     final int left = _checkInStudyMinuteTarget - todayStudyMinutes;

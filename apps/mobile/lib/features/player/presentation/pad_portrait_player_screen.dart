@@ -904,6 +904,12 @@ class PadPortraitPlayerScreenState
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (!mounted || ModalRoute.of(context)?.isCurrent == false) return;
         ref.read(lastLearningEpisodeProvider.notifier).record(widget.episodeId);
+        final String videoKey = widget.episodeId.trim();
+        if (videoKey.isNotEmpty) {
+          ref
+              .read(learningActivityProvider.notifier)
+              .recordVideoWatched(videoKey: videoKey);
+        }
       });
     }
     // Empty / missing sides → import queue Whisper. Existing Chinese is kept.
@@ -4926,7 +4932,7 @@ Future<void> _settleChineseFillIfAlreadyPresent() async {
       cardKind: VocabCardKind.pattern,
     );
     if (addedPhrase || addedCard) {
-      ref.read(learningActivityProvider.notifier).recordPhraseSaved();
+      ref.read(learningActivityProvider.notifier).recordSentenceSaved();
     }
     if (addedCard) {
       _showMessage('已收藏句型到单词本');
@@ -4949,16 +4955,19 @@ Future<void> _settleChineseFillIfAlreadyPresent() async {
             orElse: () => state.activeLine,
           );
     // Primary: collect the lexeme onto 词卡 with AI enrichment.
+    final bool isPhrase = normalizeLexeme(word).contains(' ');
     final bool addedCard = _favoriteLexemeToWordCard(
       word,
       line: line,
       courseContext: courseContext,
-      cardKind: normalizeLexeme(word).contains(' ')
-          ? VocabCardKind.phrase
-          : null,
+      cardKind: isPhrase ? VocabCardKind.phrase : null,
     );
     if (addedCard) {
-      ref.read(learningActivityProvider.notifier).recordPhraseSaved();
+      if (isPhrase) {
+        ref.read(learningActivityProvider.notifier).recordPhraseSaved();
+      } else {
+        ref.read(learningActivityProvider.notifier).recordWordSaved();
+      }
       _showMessage('已收藏「${normalizeLexeme(word)}」到单词本');
       return;
     }
@@ -4978,7 +4987,7 @@ Future<void> _settleChineseFillIfAlreadyPresent() async {
           endTime: _formatTimestamp(line.endMs),
         );
     if (added) {
-      ref.read(learningActivityProvider.notifier).recordPhraseSaved();
+      ref.read(learningActivityProvider.notifier).recordSentenceSaved();
     }
     _showMessage(added ? '成功收藏例句到短语库！' : '该例句已经在您的短语库中！');
   }
@@ -4992,12 +5001,21 @@ Future<void> _settleChineseFillIfAlreadyPresent() async {
           episodeId: widget.episodeId,
         );
     final String lexeme = normalizeLexeme(word);
+    final bool isPhrase = lexeme.contains(' ');
     final bool added = _favoriteLexemeToWordCard(
       lexeme,
       line: line,
       courseContext: courseContext,
       definitionCn: definitionCn,
+      cardKind: isPhrase ? VocabCardKind.phrase : null,
     );
+    if (added) {
+      if (isPhrase) {
+        ref.read(learningActivityProvider.notifier).recordPhraseSaved();
+      } else {
+        ref.read(learningActivityProvider.notifier).recordWordSaved();
+      }
+    }
     _showMessage(
       added
           ? '已收藏到单词本「$lexeme」，正在生成 AI 解析 / 助记 / 例句…'

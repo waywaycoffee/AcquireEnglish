@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hive_ce/hive.dart';
 
 import '../../authentication/presentation/account_storage.dart';
+import '../../home/presentation/learning_dashboard_provider.dart';
 import '../../sync/data/schedule_device_cloud_sync.dart';
 import '../domain/reading_doc.dart';
 
@@ -274,6 +275,9 @@ class ReadingLibraryNotifier extends Notifier<ReadingLibraryState> {
     state = state.copyWith(
       progress: <String, ReadingProgress>{...state.progress, docId: next},
     );
+    ref
+        .read(learningActivityProvider.notifier)
+        .recordArticleRead(articleKey: docId);
     await _persistProgress();
   }
 
@@ -286,6 +290,9 @@ class ReadingLibraryNotifier extends Notifier<ReadingLibraryState> {
         docId: prev.copyWith(lastOpenedAt: DateTime.now()),
       },
     );
+    ref
+        .read(learningActivityProvider.notifier)
+        .recordArticleRead(articleKey: docId);
     await _persistProgress();
   }
 

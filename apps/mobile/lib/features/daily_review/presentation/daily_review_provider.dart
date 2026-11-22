@@ -132,6 +132,7 @@ reviewSourcesProvider = Provider<List<ReviewSource>>((Ref ref) {
           sourceLabel: '${phrase.course} · ${phrase.episode}',
           episodeId: phrase.episodeId,
           time: phrase.time,
+          origin: 'favorite',
           legacyLastReview: DateTime.tryParse(phrase.lastReviewedAt ?? ''),
           legacyDue: _legacyDue(phrase, ref.read(reviewClockProvider)()),
           legacyReviewCount: phrase.reviewCount,
@@ -164,11 +165,11 @@ reviewSourcesProvider = Provider<List<ReviewSource>>((Ref ref) {
       .map((MemoryItem item) => item.toSource())
       .toList(growable: false);
 
-  // Favorites first, then book-only, phrases, memory, optional placement pool.
+  // Favorites first (word cards + phrase/sentence book), then book-only / memory.
   return List<ReviewSource>.unmodifiable(<ReviewSource>[
     ...wordSources,
-    ...syllabusSources,
     ...phraseSources,
+    ...syllabusSources,
     ...memorySources,
     for (final PlacementRow row
         in (ref.watch(

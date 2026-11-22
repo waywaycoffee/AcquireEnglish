@@ -27,6 +27,7 @@ import '../../words/presentation/vocabulary_placement_provider.dart';
 import 'learning_dashboard_provider.dart';
 import '../../digital_human/presentation/digital_human_picker.dart';
 import 'widgets/home_membership_section.dart';
+import 'widgets/learning_activity_stats_card.dart';
 import 'widgets/pad_home_hero.dart';
 
 class PadHomeScreen extends ConsumerStatefulWidget {
@@ -162,6 +163,8 @@ class _PadHomeScreenState extends ConsumerState<PadHomeScreen> {
             _SectionTitle(title: '今日挑战', compact: compact),
             SizedBox(height: compact ? 12 : 14),
             _TodayMission(stats: stats),
+            SizedBox(height: compact ? 18 : 20),
+            const LearningActivityStatsCard(),
             SizedBox(height: compact ? 26 : 30),
             _SectionTitle(title: '英语成长', compact: compact),
             SizedBox(height: compact ? 12 : 14),

@@ -382,7 +382,13 @@ class DailyReviewState {
     final List<ReviewRecord> active = records.values
         .where((ReviewRecord record) => activeKeys.contains(record.key))
         .toList();
-    bool favoriteFirst(String key) => key.startsWith('entry:');
+    // Word-book favorites use entry:/vocab keys; phrase book uses phrase:.
+    bool favoriteFirst(String key) =>
+        key.startsWith('entry:') ||
+        key.startsWith('phrase:') ||
+        key.contains(':word:') ||
+        key.contains(':phrase:') ||
+        key.contains(':pattern:');
     final List<ReviewRecord> due =
         active
             .where(

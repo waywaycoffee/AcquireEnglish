@@ -26,6 +26,7 @@ import 'learning_dashboard_provider.dart';
 import 'pad_home_screen.dart' show DailyRecommendSection, RecentCourses;
 import 'product_feedback_sheet.dart';
 import 'widgets/continue_learning_poster.dart';
+import 'widgets/learning_activity_stats_card.dart';
 
 class LearningHomeScreen extends ConsumerStatefulWidget {
   const LearningHomeScreen({super.key, this.focusVocab = false});
@@ -489,6 +490,8 @@ class _LearningHomeScreenState extends ConsumerState<LearningHomeScreen> {
                     const DigitalHumanPicker(),
                     const SizedBox(height: 24),
                     text('学习记录', 21, bold: true),
+                    const SizedBox(height: 12),
+                    const LearningActivityStatsCard(),
                     const SizedBox(height: 12),
                     section(
                       text(
