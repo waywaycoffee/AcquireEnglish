@@ -12,7 +12,6 @@ import '../../library/presentation/library_catalog_provider.dart';
 import '../../library/presentation/library_mock_data.dart';
 import '../../library/presentation/widgets/library_course_poster.dart';
 import '../../navigation/presentation/navigation_destination.dart';
-import '../../phrases/presentation/phrase_book_provider.dart';
 import '../../player/presentation/learning_resume_provider.dart';
 import '../../settings/presentation/learning_preferences_screen.dart';
 import '../../shared/presentation/app_loading_overlay.dart';
@@ -52,7 +51,6 @@ class _PadHomeScreenState extends ConsumerState<PadHomeScreen> {
     final List<LibraryCourseData> courses = ref.watch(
       recentLearningCoursesProvider,
     );
-    final List<PhraseEntry> savedItems = ref.watch(phraseBookProvider);
     final ContinueLearningTarget? resumeTarget = ref.watch(
       continueLearningTargetProvider,
     );
@@ -173,8 +171,7 @@ class _PadHomeScreenState extends ConsumerState<PadHomeScreen> {
             _SectionTitle(title: '我的收藏', compact: compact),
             SizedBox(height: compact ? 12 : 14),
             _SavedCollectionCard(
-              items: savedItems,
-              onTap: () => context.go(AppNavDestination.phrases.route),
+              onTap: () => context.push('${AppNavDestination.words.route}?favorites=1'),
             ),
             SizedBox(height: compact ? 26 : 30),
             _SectionTitle(title: '最近学习的课程', compact: compact),
@@ -192,7 +189,6 @@ class _PadHomeScreenState extends ConsumerState<PadHomeScreen> {
             SizedBox(height: compact ? 14 : 18),
             _QuickAccessRow(
               onOpenLibrary: () => context.go(AppNavDestination.library.route),
-              onOpenPhrases: () => context.go(AppNavDestination.phrases.route),
               onOpenGuide: () => context.go(AppNavDestination.guide.route),
             ),
           ],
@@ -792,137 +788,20 @@ class _EnglishLevelCard extends StatelessWidget {
 }
 
 class _SavedCollectionCard extends StatelessWidget {
-  const _SavedCollectionCard({required this.items, required this.onTap});
+  const _SavedCollectionCard({required this.onTap});
 
-  final List<PhraseEntry> items;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    final int wordCount = items.fold<int>(
-      0,
-      (int total, PhraseEntry item) =>
-          total +
-          item.english
-              .split(RegExp(r'\s+'))
-              .where((String word) => word.isNotEmpty)
-              .length,
-    );
-    return Material(
-      color: AppDesignTokens.appWhite,
-      borderRadius: BorderRadius.circular(28),
-      clipBehavior: Clip.antiAlias,
-      child: InkWell(
+    return Card(
+      child: ListTile(
+        leading: const Icon(Icons.bookmark_outline),
+        title: const Text('收藏词本'),
+        subtitle: const Text('单词、短语和句子'),
+        trailing: const Icon(Icons.chevron_right),
         onTap: onTap,
-        child: Padding(
-          padding: const EdgeInsets.all(20),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: <Widget>[
-              Row(
-                children: <Widget>[
-                  Text(
-                    '最近收藏，随时温习',
-                    style: TextStyle(
-                      fontWeight: FontWeight.w800,
-                      color: AppDesignTokens.textSecondary,
-                    ),
-                  ),
-                  const Spacer(),
-                  TextButton.icon(
-                    onPressed: onTap,
-                    icon: const Icon(Icons.menu_book_rounded, size: 18),
-                    label: const Text('去复习'),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 10),
-              Row(
-                children: <Widget>[
-                  Expanded(
-                    child: _CollectionMetric(
-                      icon: Icons.format_quote_rounded,
-                      label: '句子',
-                      value: '${items.length} 个句子',
-                      color: AppDesignTokens.primaryBlueDark,
-                      background: AppDesignTokens.skyLight,
-                    ),
-                  ),
-                  Container(
-                    width: 1,
-                    height: 58,
-                    color: AppDesignTokens.borderGray,
-                  ),
-                  Expanded(
-                    child: _CollectionMetric(
-                      icon: Icons.abc_rounded,
-                      label: '单词',
-                      value: '$wordCount 个单词',
-                      color: const Color(0xFF8B5CF6),
-                      background: AppDesignTokens.purpleLight,
-                    ),
-                  ),
-                ],
-              ),
-            ],
-          ),
-        ),
       ),
-    );
-  }
-}
-
-class _CollectionMetric extends StatelessWidget {
-  const _CollectionMetric({
-    required this.icon,
-    required this.label,
-    required this.value,
-    required this.color,
-    required this.background,
-  });
-
-  final IconData icon;
-  final String label;
-  final String value;
-  final Color color;
-  final Color background;
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: <Widget>[
-        Container(
-          width: 46,
-          height: 46,
-          decoration: BoxDecoration(
-            color: background,
-            borderRadius: BorderRadius.circular(15),
-          ),
-          child: Icon(icon, color: color),
-        ),
-        const SizedBox(width: 12),
-        Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: <Widget>[
-            Text(
-              label,
-              style: TextStyle(
-                color: AppDesignTokens.textSecondary,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-            Text(
-              value,
-              style: TextStyle(
-                fontSize: 17,
-                color: AppDesignTokens.textPrimary,
-                fontWeight: FontWeight.w900,
-              ),
-            ),
-          ],
-        ),
-      ],
     );
   }
 }
@@ -1025,12 +904,10 @@ class _EmptyCourses extends StatelessWidget {
 class _QuickAccessRow extends StatelessWidget {
   const _QuickAccessRow({
     required this.onOpenLibrary,
-    required this.onOpenPhrases,
     required this.onOpenGuide,
   });
 
   final VoidCallback onOpenLibrary;
-  final VoidCallback onOpenPhrases;
   final VoidCallback onOpenGuide;
 
   @override
@@ -1043,12 +920,6 @@ class _QuickAccessRow extends StatelessWidget {
         onTap: onOpenLibrary,
       ),
       _QuickAccessCard(
-        icon: Icons.menu_book_outlined,
-        title: '复习我的短语',
-        body: '把保存的单词和句子再练一遍。',
-        onTap: onOpenPhrases,
-      ),
-      _QuickAccessCard(
         icon: Icons.school_outlined,
         title: '看看学习小妙招',
         body: '用简单方法，让听力进步更快。',
@@ -1059,7 +930,7 @@ class _QuickAccessRow extends StatelessWidget {
       builder: (BuildContext context, BoxConstraints constraints) {
         final bool oneRow = constraints.maxWidth >= 700;
         final double itemWidth = oneRow
-            ? (constraints.maxWidth - 36) / 3
+            ? (constraints.maxWidth - 18) / 2
             : double.infinity;
         return Wrap(
           spacing: 18,

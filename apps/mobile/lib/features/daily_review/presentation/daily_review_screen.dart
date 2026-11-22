@@ -849,7 +849,7 @@ class _DailyReviewScreenState extends ConsumerState<DailyReviewScreen>
                                   widget.practice
                                       ? '这轮练习不会改变复习计划或新学额度，想巩固时可以随时再练。'
                                       : sources.isEmpty
-                                      ? '在播放器收藏单词，或把表达加入短语库，它们就会进入统一的复习计划。'
+                                      ? '去词书架选择要学习的词书。'
                                       : '把一点点进步累积起来。剩下的交给时间。',
                                   textAlign: TextAlign.center,
                                   style: const TextStyle(
@@ -1153,7 +1153,7 @@ class _DailyReviewScreenState extends ConsumerState<DailyReviewScreen>
               (
                 Icons.bookmarks_outlined,
                 '内容从哪里来？',
-                '只复习你收藏的单词和短语库里的表达。自动记录但没有收藏的单词不会加入；取消收藏或删除后，也会停止安排。',
+                '复习内容来自词书、推荐学习计划和已添加的记忆练习。',
               ),
               (
                 Icons.event_repeat_rounded,

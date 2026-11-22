@@ -10,7 +10,6 @@ import '../../../authentication/presentation/account_storage.dart';
 import '../../../daily_review/data/review_session_draft.dart';
 import '../../../daily_review/domain/daily_review.dart';
 import '../../../daily_review/presentation/daily_review_provider.dart';
-import '../../../navigation/presentation/navigation_destination.dart';
 import '../../../phrases/presentation/phrase_book_provider.dart';
 import '../../../reading/data/reading_gloss.dart';
 import '../../../words/domain/word_review_settings.dart';
@@ -60,7 +59,6 @@ class ReviewTodaySection extends ConsumerWidget {
     );
     final List<WordEntry> wordBook = ref.watch(wordBookProvider);
     final List<PhraseEntry> phrases = ref.watch(phraseBookProvider);
-    final int phraseCount = phrases.length;
     final int wordFavorites = wordBook
         .where(
           (WordEntry e) => e.favorite && e.kind == VocabCardKind.word,
@@ -108,14 +106,14 @@ class ReviewTodaySection extends ConsumerWidget {
             ? '今天暂时没有到期内容'
             : '把学过的，真正记住';
     final String subtitle = empty
-        ? '收藏的单词、短语、句子会出现在这里；也可去词书架点封面背新词。'
+        ? '去词书架选一本词书，开始学新词。'
         : done
             ? (plan.nextDue == null
-                ? '可以自由练习已收藏与已学内容，或去词书架继续背新词。'
-                : '下次到期：${_formatNextDue(plan.nextDue!, now)}。收藏内容也会按计划回来。')
+                ? '可以自由练习已学内容，或去词书架继续背新词。'
+                : '下次到期：${_formatNextDue(plan.nextDue!, now)}。')
             : activeBookTitle.isEmpty
-                ? '优先复习收藏的单词、短语与句子；新词请去词书架点封面开背。'
-                : '优先复习收藏内容；新词请点词书「$activeBookTitle」封面继续背。';
+                ? '有到期内容可复习，也可以去词书架学新词。'
+                : '先完成到期内容。学新词请点词书「$activeBookTitle」封面继续背。';
 
     final String ctaLabel = empty
         ? '去词书架背新词'
@@ -225,7 +223,6 @@ class ReviewTodaySection extends ConsumerWidget {
         const SizedBox(height: 22),
         _MoreLinks(
           activeBookTitle: activeBookTitle,
-          phraseCount: phraseCount,
           newQuota: newQuota,
         ),
       ],
@@ -522,12 +519,10 @@ class _WeekTrace extends StatelessWidget {
 class _MoreLinks extends StatelessWidget {
   const _MoreLinks({
     required this.activeBookTitle,
-    required this.phraseCount,
     required this.newQuota,
   });
 
   final String activeBookTitle;
-  final int phraseCount;
   final int newQuota;
 
   @override
@@ -547,7 +542,7 @@ class _MoreLinks extends StatelessWidget {
           const Divider(height: 1, color: ReviewRecallTheme.border),
           _LinkRow(
             title: '收藏词本',
-            subtitle: '查看已收藏单词',
+            subtitle: '查看已收藏单词、短语和句子',
             onTap: () => context.push('${SGRoute.words.route}?favorites=1'),
           ),
           const Divider(height: 1, color: ReviewRecallTheme.border),
@@ -555,12 +550,6 @@ class _MoreLinks extends StatelessWidget {
             title: '导入词书',
             subtitle: activeBookTitle.isEmpty ? '未选词书' : '当前：$activeBookTitle',
             onTap: () => context.push('/words/syllabus'),
-          ),
-          const Divider(height: 1, color: ReviewRecallTheme.border),
-          _LinkRow(
-            title: '短语库',
-            subtitle: '$phraseCount 条',
-            onTap: () => context.go(AppNavDestination.phrases.route),
           ),
           const Divider(height: 1, color: ReviewRecallTheme.border),
           _LinkRow(

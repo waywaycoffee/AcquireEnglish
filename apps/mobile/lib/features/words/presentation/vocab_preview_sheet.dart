@@ -213,33 +213,12 @@ class _VocabPreviewSheetState extends ConsumerState<VocabPreviewSheet> {
                   ),
                 ],
                 const SizedBox(height: 16),
-                FilledButton(
-                  onPressed: () {
-                    ref
-                        .read(wordBookProvider.notifier)
-                        .enrollForReview(entry.word);
-                    Navigator.of(context).pop();
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text('已加入复习：${entry.word}')),
-                    );
-                  },
-                  style: FilledButton.styleFrom(
-                    backgroundColor: AppDesignTokens.brandGreen,
-                    foregroundColor: AppDesignTokens.onAccent,
-                    minimumSize: const Size.fromHeight(48),
-                  ),
-                  child: const Text(
-                    '加入复习',
-                    style: TextStyle(fontWeight: FontWeight.w800),
-                  ),
-                ),
-                const SizedBox(height: 8),
                 OutlinedButton(
                   onPressed: () => Navigator.of(context).pop(),
                   style: OutlinedButton.styleFrom(
                     minimumSize: const Size.fromHeight(44),
                   ),
-                  child: const Text('先留在词库'),
+                  child: const Text('关闭'),
                 ),
                 TextButton(
                   onPressed: () {

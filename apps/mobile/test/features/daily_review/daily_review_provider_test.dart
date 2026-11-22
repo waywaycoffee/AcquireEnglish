@@ -139,7 +139,13 @@ void main() {
       );
       online = false;
       expect(await firstReview.syncCloudBackup(), contains('本机记录已保留'));
-      expect(first.read(dailyReviewProvider).records['entry:hello:recognize']!.reviews, 1);
+      expect(
+        first
+            .read(dailyReviewProvider)
+            .records['entry:hello:recognize']!
+            .reviews,
+        1,
+      );
       online = true;
       expect(await firstReview.syncCloudBackup(), contains('已备份'));
       expect(revision, 1);
@@ -162,11 +168,18 @@ void main() {
       );
       expect(await secondReview.syncCloudBackup(), contains('已恢复'));
       expect(
-        second.read(dailyReviewProvider).records['entry:hello:recognize']!.card.due,
+        second
+            .read(dailyReviewProvider)
+            .records['entry:hello:recognize']!
+            .card
+            .due,
         due,
       );
       expect(
-        second.read(dailyReviewProvider).records['entry:hello:recognize']!.reviews,
+        second
+            .read(dailyReviewProvider)
+            .records['entry:hello:recognize']!
+            .reviews,
         1,
       );
       await secondReview.setDailyNewLimit(6);
@@ -202,11 +215,18 @@ void main() {
       await expectLater(
         container
             .read(dailyReviewProvider.notifier)
-            .grade('entry:hello:recognize', fsrs.Rating.good, expectedReviews: 0),
+            .grade(
+              'entry:hello:recognize',
+              fsrs.Rating.good,
+              expectedReviews: 0,
+            ),
         throwsStateError,
       );
       expect(
-        container.read(dailyReviewProvider).records['entry:hello:recognize']!.isNew,
+        container
+            .read(dailyReviewProvider)
+            .records['entry:hello:recognize']!
+            .isNew,
         isTrue,
       );
       expect(
@@ -218,7 +238,10 @@ void main() {
           .read(dailyReviewProvider.notifier)
           .grade('entry:hello:recognize', fsrs.Rating.good, expectedReviews: 0);
       expect(
-        container.read(dailyReviewProvider).records['entry:hello:recognize']!.reviews,
+        container
+            .read(dailyReviewProvider)
+            .records['entry:hello:recognize']!
+            .reviews,
         1,
       );
     },
@@ -256,257 +279,43 @@ void main() {
       expectedReviews: 0,
     );
     final Future<void> duplicate = expectLater(
-      notifier.grade('entry:hello:recognize', fsrs.Rating.good, expectedReviews: 0),
+      notifier.grade(
+        'entry:hello:recognize',
+        fsrs.Rating.good,
+        expectedReviews: 0,
+      ),
       throwsStateError,
     );
     await first;
     await duplicate;
     expect(
-      container.read(dailyReviewProvider).records['entry:hello:recognize']!.reviews,
+      container
+          .read(dailyReviewProvider)
+          .records['entry:hello:recognize']!
+          .reviews,
       1,
     );
   });
 
   test(
-    'legacy flagged phrases preserve past dates and cap future dates',
-    () async {
-      final DateTime past = now.subtract(const Duration(days: 8));
-      final DateTime future = now.add(const Duration(days: 8));
-      final ProviderContainer container = ProviderContainer(
-        // ignore: always_specify_types
-        overrides: [
-          wordBookProvider.overrideWith(TestWords.new),
-          phraseBookProvider.overrideWith(
-            () => SeededPhrases(<PhraseEntry>[
-              for (final DateTime due in <DateTime>[past, future])
-                PhraseEntry(
-                  id: due.toIso8601String(),
-                  english: 'Hello.',
-                  chinese: '你好',
-                  course: '课程',
-                  episode: '01',
-                  time: '00:01',
-                  rating: 1,
-                  needsReview: true,
-                  today: true,
-                  reviewCount: 2,
-                  lastReviewedAt: now
-                      .subtract(const Duration(days: 10))
-                      .toIso8601String(),
-                  nextReviewAt: due.toIso8601String(),
-                ),
-            ]),
-          ),
-          reviewClockProvider.overrideWithValue(() => now),
-        ],
-      );
-      addTearDown(container.dispose);
-      final List<ReviewSource> active = container.read(reviewSourcesProvider);
-      expect(
-        active
-            .where((ReviewSource s) => s.kind == ReviewKind.phrase)
-            .map((ReviewSource s) => s.legacyDue),
-        <DateTime>[past, now],
-      );
-      final ReviewPlan plan = container
-          .read(dailyReviewProvider)
-          .plan(active, now);
-      expect(plan.due.map((ReviewRecord r) => r.card.due), <DateTime>[
-        past.toUtc(),
-        now.toUtc(),
-      ]);
-      await container.read(dailyReviewProvider.notifier).setDailyNewLimit(5);
-    },
-  );
-
-  test(
-    'manual phrase review reaches FSRS queue and survives restart',
+    'saved words and expressions are excluded even if previously active',
     () async {
       final ProviderContainer container = ProviderContainer(
-        // ignore: always_specify_types
         overrides: [
           wordBookProvider.overrideWith(TestWords.new),
           phraseBookProvider.overrideWith(TestPhrases.new),
-          reviewClockProvider.overrideWithValue(() => now),
         ],
       );
       addTearDown(container.dispose);
-      final DailyReviewNotifier notifier = container.read(
-        dailyReviewProvider.notifier,
-      );
-      await notifier.grade('phrase:1', fsrs.Rating.easy, expectedReviews: 0);
-      final ReviewRecord graded = container
-          .read(dailyReviewProvider)
-          .records['phrase:1']!;
-      expect(graded.card.due.isAfter(now), isTrue);
-      expect(container.read(phraseBookProvider).single.isDue(now), isFalse);
-      await notifier.reviewToday('phrase:1');
-      final ReviewRecord scheduled = container
-          .read(dailyReviewProvider)
-          .records['phrase:1']!;
-      expect(scheduled.card.stability, graded.card.stability);
-      expect(scheduled.reviews, graded.reviews);
-      expect(scheduled.card.due, now.toUtc());
-      expect(container.read(phraseBookProvider).single.isDue(now), isTrue);
-      final DailyReviewState restored = ReviewRepository().load();
-      expect(
-        restored
-            .plan(container.read(reviewSourcesProvider), now)
-            .due
-            .single
-            .key,
-        'phrase:1',
-      );
-      expect(
-        restored
-            .plan(container.read(reviewSourcesProvider), now)
-            .today
-            .newLearned,
-        1,
+      expect(container.read(wordBookProvider).first.favorite, isTrue);
+      expect(container.read(phraseBookProvider).single.english, 'Hello.');
+      expect(container.read(reviewSourcesProvider), isEmpty);
+      await expectLater(
+        container.read(dailyReviewProvider.notifier).reviewToday('phrase:1'),
+        throwsStateError,
       );
     },
   );
-
-  test('only favorite words and saved phrases feed the shared queue', () async {
-    final ProviderContainer container = ProviderContainer(
-      // ignore: always_specify_types
-      overrides: [
-        wordBookProvider.overrideWith(TestWords.new),
-        phraseBookProvider.overrideWith(TestPhrases.new),
-      ],
-    );
-    addTearDown(container.dispose);
-    expect(
-      container
-          .read(reviewSourcesProvider)
-          .map((ReviewSource source) => source.key)
-          .toList(),
-      containsAll(<String>[
-        'entry:saved:recognize',
-        'entry:saved:listen',
-        'phrase:1',
-      ]),
-    );
-    expect(
-      container
-          .read(reviewSourcesProvider)
-          .any((ReviewSource s) => s.question == 'seen'),
-      isFalse,
-    );
-  });
-
-  test(
-    'word cards use earliest same-video hit and list distinct media sources',
-    () async {
-      final ProviderContainer container = ProviderContainer(
-        // ignore: always_specify_types
-        overrides: [
-          wordBookProvider.overrideWith(MultiSourceWords.new),
-          phraseBookProvider.overrideWith(TestPhrases.new),
-        ],
-      );
-      addTearDown(container.dispose);
-      final ReviewSource card = container
-          .read(reviewSourcesProvider)
-          .firstWhere(
-            (ReviewSource source) =>
-                source.key == 'entry:them:recognize',
-          );
-      expect(card.english, 'Both of them enjoy the meal.');
-      expect(card.startMs, 5000);
-      expect(card.sourceLabel, contains('视频'));
-      expect(card.relatedSources.map((ReviewSourceLink l) => l.mediaKind),
-          <String>['视频', '文章', '书籍']);
-      expect(
-        card.relatedSources.map((ReviewSourceLink l) => l.displayLabel),
-        containsAll(<String>[
-          '视频 · Show · Ep1',
-          '文章 · 阅读 · NYT · 精读',
-          '书籍 · 词书 · CET4 · Unit1',
-        ]),
-      );
-      final ReviewSource switched = card.forContext(episode: 'reading:nyt');
-      expect(switched.english, 'Look at them carefully.');
-      expect(switched.sourceLabel, startsWith('文章'));
-    },
-  );
-}
-
-class MultiSourceWords extends WordBookNotifier {
-  @override
-  List<WordEntry> build() => const <WordEntry>[
-    WordEntry(
-      word: 'them',
-      favorite: true,
-      scheduleStatus: VocabScheduleStatus.active,
-      occurrences: <WordOccurrence>[
-        WordOccurrence(
-          episodeId: 'show-ep1',
-          course: 'Show',
-          episode: 'Ep1',
-          time: '00:20',
-          sentence: 'I see them later.',
-          chinese: '后来',
-          count: 2,
-          lineKeys: <String>['20000-21000', '5000-6500'],
-          contexts: <WordContext>[
-            WordContext(
-              lineKey: '20000-21000',
-              time: '00:20',
-              sentence: 'I see them later.',
-              chinese: '后来',
-              count: 1,
-            ),
-            WordContext(
-              lineKey: '5000-6500',
-              time: '00:05',
-              sentence: 'Both of them enjoy the meal.',
-              chinese: '两人都喜欢这顿饭。',
-              count: 1,
-            ),
-          ],
-        ),
-        WordOccurrence(
-          episodeId: 'reading:nyt',
-          course: '阅读 · NYT',
-          episode: '精读',
-          time: '',
-          sentence: 'Look at them carefully.',
-          chinese: '仔细看他们。',
-          count: 1,
-          lineKeys: <String>['reading:nyt:them'],
-          contexts: <WordContext>[
-            WordContext(
-              lineKey: 'reading:nyt:them',
-              time: '',
-              sentence: 'Look at them carefully.',
-              chinese: '仔细看他们。',
-              count: 1,
-            ),
-          ],
-        ),
-        WordOccurrence(
-          episodeId: 'book:cet4',
-          course: '词书 · CET4',
-          episode: 'Unit1',
-          time: '',
-          sentence: 'Help them learn.',
-          chinese: '帮助他们学习。',
-          count: 1,
-          lineKeys: <String>['book:1'],
-          contexts: <WordContext>[
-            WordContext(
-              lineKey: 'book:1',
-              time: '',
-              sentence: 'Help them learn.',
-              chinese: '帮助他们学习。',
-              count: 1,
-            ),
-          ],
-        ),
-      ],
-    ),
-  ];
 }
 
 class FailingRepository extends ReviewRepository {
@@ -546,11 +355,4 @@ class TestPhrases extends PhraseBookNotifier {
       today: true,
     ),
   ];
-}
-
-class SeededPhrases extends PhraseBookNotifier {
-  SeededPhrases(this.entries);
-  final List<PhraseEntry> entries;
-  @override
-  List<PhraseEntry> build() => entries;
 }

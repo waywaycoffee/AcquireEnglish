@@ -10,6 +10,8 @@ import '../../daily_review/presentation/daily_review_provider.dart';
 import '../../daily_review/presentation/review_clip_player_sheet.dart';
 import '../../library/presentation/library_catalog_provider.dart';
 import '../../navigation/presentation/navigation_destination.dart';
+import '../../phrases/presentation/phrase_book_provider.dart';
+import '../domain/vocab_card_kind.dart';
 import '../../player/presentation/ocr_subtitle_sampler.dart';
 import '../../shared/presentation/pad/pad_scaffold.dart';
 import '../../shared/presentation/pad/pad_top_bar.dart';
@@ -43,174 +45,243 @@ class FavoriteWordBookScreen extends ConsumerStatefulWidget {
 
 class _FavoriteWordBookScreenState
     extends ConsumerState<FavoriteWordBookScreen> {
-  String query = '';
+  String _query = '';
+  String _sourceQuery = '';
+  String _kind = '全部';
+  String _scene = '全部场景';
+  DateTimeRange? _range;
+
+  bool _matches(String text, String query) => query
+      .trim()
+      .toLowerCase()
+      .split(RegExp(r'\s+'))
+      .every(text.toLowerCase().contains);
+
+  bool _matchesDate(DateTime? date) {
+    final DateTimeRange? range = _range;
+    if (range == null) return true;
+    if (date == null) return false;
+    final DateTime day = DateUtils.dateOnly(date.toLocal());
+    return !day.isBefore(range.start) && !day.isAfter(range.end);
+  }
+
+  bool _matchesSource(String scene, String title) =>
+      (_scene == '全部场景' || _scene == scene) && _matches(title, _sourceQuery);
+
+  Future<void> _pickDateRange() async {
+    final DateTimeRange? range = await showDateRangePicker(
+      context: context,
+      firstDate: DateTime(2000),
+      lastDate: DateTime.now(),
+      initialDateRange: _range,
+    );
+    if (mounted && range != null) setState(() => _range = range);
+  }
 
   @override
   Widget build(BuildContext context) {
-    final List<WordEntry> allSaved = ref
-        .watch(wordBookProvider)
-        .where((WordEntry word) => word.favorite)
-        .toList(growable: false);
-    final List<WordEntry> saved = allSaved
-        .where(
-          (WordEntry word) =>
-              word.word.toLowerCase().contains(query.trim().toLowerCase()),
-        )
-        .toList(growable: false);
-    final Map<String, ReviewRecord> records = ref
-        .watch(dailyReviewProvider)
-        .records;
-    final _FavoriteColors colors = _FavoriteColors(
-      dark: Theme.of(context).brightness == Brightness.dark,
+    final List<_SavedItem> items = <_SavedItem>[];
+    for (final WordEntry word in ref.watch(wordBookProvider)) {
+      if (!word.favorite) continue;
+      final String kind = switch (word.kind) {
+        VocabCardKind.word => '单词',
+        VocabCardKind.phrase => '短语',
+        VocabCardKind.pattern => '句子',
+      };
+      if (_kind != '全部' && _kind != kind) continue;
+      if (!_matches('${word.word} ${word.primaryGloss}', _query)) continue;
+      final DateTime? date = word.collectedAtMs == null
+          ? null
+          : DateTime.fromMillisecondsSinceEpoch(word.collectedAtMs!);
+      if (!_matchesDate(date)) continue;
+      final sources = word.occurrences.where(
+        (item) => _matchesSource(
+          item.mediaKind == '文章' ? '阅读' : item.mediaKind,
+          '${item.course} ${item.episode} ${item.videoFileName ?? ''}',
+        ),
+      );
+      final WordOccurrence? source = sources.firstOrNull;
+      if (source == null &&
+          (_scene != '全部场景' || _sourceQuery.trim().isNotEmpty))
+        continue;
+      items.add((
+        title: word.word,
+        translation: word.primaryGloss,
+        kind: kind,
+        source: source == null ? '' : '${source.course} · ${source.episode}',
+        date: date,
+        word: word.word,
+      ));
+    }
+    for (final PhraseEntry phrase in ref.watch(phraseBookProvider)) {
+      final String kind =
+          reviewKindForPhraseEntry(phrase) == ReviewKind.sentence ? '句子' : '短语';
+      if (_kind != '全部' && _kind != kind) continue;
+      if (!_matches('${phrase.english} ${phrase.chinese}', _query)) continue;
+      final String id = phrase.episodeId ?? '';
+      final String scene = id.startsWith('scene:') || phrase.course == '数字人识物'
+          ? '拍照'
+          : id.startsWith('reading:') || phrase.course.startsWith('阅读')
+          ? '阅读'
+          : id.isNotEmpty
+          ? '视频'
+          : '其他';
+      if (!_matchesSource(scene, '${phrase.course} ${phrase.episode}'))
+        continue;
+      final DateTime? date = DateTime.tryParse(phrase.collectedAt ?? '');
+      if (!_matchesDate(date)) continue;
+      items.add((
+        title: phrase.english,
+        translation: phrase.chinese,
+        kind: kind,
+        source: [
+          phrase.course,
+          phrase.episode,
+        ].where((name) => name.isNotEmpty).join(' · '),
+        date: date,
+        word: null,
+      ));
+    }
+    items.sort(
+      (a, b) => (b.date?.millisecondsSinceEpoch ?? 0).compareTo(
+        a.date?.millisecondsSinceEpoch ?? 0,
+      ),
     );
+
+    final MaterialLocalizations locale = MaterialLocalizations.of(context);
     return PadScaffold(
       currentDestination: AppNavDestination.home,
-      topBar: PadTopBar(
-        title: '收藏词本',
-        description: '原样保留收藏的生词 · 共 ${allSaved.length} 词',
-      ),
-      body: ColoredBox(
-        color: colors.background,
-        child: SafeArea(
-          child: Column(
-            children: <Widget>[
-              Padding(
-                padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
-                child: TextField(
-                  onChanged: (String value) => setState(() => query = value),
-                  decoration: InputDecoration(
-                    hintText: '搜索收藏的单词',
-                    prefixIcon: const Icon(Icons.search_rounded),
-                    filled: true,
-                    fillColor: colors.surface,
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(16),
-                      borderSide: BorderSide.none,
+      topBar: PadTopBar(title: '收藏词本', description: '单词、短语和句子'),
+      body: ListView.builder(
+        padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+        itemCount: items.isEmpty ? 2 : items.length + 1,
+        itemBuilder: (BuildContext context, int index) {
+          if (index == 0) {
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: <Widget>[
+                TextField(
+                  onChanged: (value) => setState(() => _query = value),
+                  decoration: const InputDecoration(
+                    labelText: '搜单词、短语或句子',
+                    prefixIcon: Icon(Icons.search),
+                  ),
+                ),
+                TextField(
+                  onChanged: (value) => setState(() => _sourceQuery = value),
+                  decoration: const InputDecoration(
+                    labelText: '按来源名称搜索',
+                    hintText: '输入部分视频名或文章名',
+                    prefixIcon: Icon(Icons.video_library_outlined),
+                  ),
+                ),
+                Wrap(
+                  spacing: 12,
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  children: <Widget>[
+                    DropdownButton<String>(
+                      value: _kind,
+                      onChanged: (value) => setState(() => _kind = value!),
+                      items: [
+                        for (final label in ['全部', '单词', '短语', '句子'])
+                          DropdownMenuItem(value: label, child: Text(label)),
+                      ],
                     ),
-                  ),
+                    DropdownButton<String>(
+                      value: _scene,
+                      onChanged: (value) => setState(() => _scene = value!),
+                      items: [
+                        for (final label in [
+                          '全部场景',
+                          '拍照',
+                          '视频',
+                          '阅读',
+                          '书籍',
+                          '其他',
+                        ])
+                          DropdownMenuItem(value: label, child: Text(label)),
+                      ],
+                    ),
+                    ActionChip(
+                      avatar: const Icon(Icons.date_range, size: 16),
+                      label: Text(
+                        _range == null
+                            ? '收藏时间'
+                            : '${locale.formatShortDate(_range!.start)} – ${locale.formatShortDate(_range!.end)}',
+                      ),
+                      onPressed: _pickDateRange,
+                    ),
+                    if (_range != null)
+                      IconButton(
+                        tooltip: '清除时间筛选',
+                        onPressed: () => setState(() => _range = null),
+                        icon: const Icon(Icons.close),
+                      ),
+                  ],
                 ),
+                Text('${items.length} 条收藏'),
+                const SizedBox(height: 8),
+              ],
+            );
+          }
+          if (items.isEmpty) return const ListTile(title: Text('没有匹配的收藏'));
+          final _SavedItem item = items[index - 1];
+          return Card(
+            child: ListTile(
+              title: Text(item.title),
+              subtitle: Text(
+                <String>[
+                  if (item.translation.isNotEmpty) item.translation,
+                  [
+                    if (item.source.isNotEmpty) item.source,
+                    if (item.date != null)
+                      locale.formatShortDate(item.date!.toLocal()),
+                  ].join(' · '),
+                ].where((line) => line.isNotEmpty).join('\n'),
               ),
-              Padding(
-                padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
-                child: Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: colors.accentSurface,
-                    borderRadius: BorderRadius.circular(18),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: <Widget>[
-                      Text(
-                        '${allSaved.length} 个收藏',
-                        style: TextStyle(
-                          color: colors.accent,
-                          fontSize: 16,
-                          fontWeight: FontWeight.w800,
+              trailing: Text(item.kind),
+              onTap: () {
+                if (item.word != null) {
+                  Navigator.of(context).push(
+                    MaterialPageRoute<void>(
+                      builder: (_) =>
+                          FavoriteWordDetailScreen(word: item.word!),
+                    ),
+                  );
+                } else {
+                  showDialog<void>(
+                    context: context,
+                    builder: (BuildContext context) => AlertDialog(
+                      title: Text(item.kind),
+                      content: SingleChildScrollView(
+                        child: SelectableText(
+                          [
+                            item.title,
+                            item.translation,
+                            item.source,
+                          ].where((line) => line.isNotEmpty).join('\n\n'),
                         ),
                       ),
-                      const SizedBox(height: 4),
-                      Text(
-                        '点词查看真实场景',
-                        style: TextStyle(color: colors.secondary),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-              Expanded(
-                child: saved.isEmpty
-                    ? Center(
-                        child: Text(
-                          query.isEmpty
-                              ? '还没有收藏生词，阅读或看视频时点收藏即可加入。'
-                              : '没有找到匹配的收藏词。',
-                        ),
-                      )
-                    : ListView.separated(
-                        padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
-                        itemCount: saved.length,
-                        separatorBuilder: (_, __) => const SizedBox(height: 10),
-                        itemBuilder: (BuildContext context, int index) {
-                          final WordEntry word = saved[index];
-                          final int reviews = favoriteWordReviewCount(
-                            word,
-                            records,
-                          );
-                          final int scenes = favoriteWordSceneCount(word);
-                          return Material(
-                            color: colors.surface,
-                            borderRadius: BorderRadius.circular(18),
-                            child: InkWell(
-                              borderRadius: BorderRadius.circular(18),
-                              onTap: () => Navigator.of(context).push(
-                                MaterialPageRoute<void>(
-                                  builder: (_) =>
-                                      FavoriteWordDetailScreen(word: word.word),
-                                ),
-                              ),
-                              child: Padding(
-                                padding: const EdgeInsets.all(16),
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: <Widget>[
-                                    Text(
-                                      word.word,
-                                      style: Theme.of(context)
-                                          .textTheme
-                                          .titleLarge
-                                          ?.copyWith(
-                                            fontWeight: FontWeight.w800,
-                                            color: colors.text,
-                                          ),
-                                    ),
-                                    const SizedBox(height: 4),
-                                    Text(
-                                      word.primaryGloss.isEmpty
-                                          ? '暂无释义'
-                                          : word.primaryGloss,
-                                      maxLines: 2,
-                                      overflow: TextOverflow.ellipsis,
-                                      style: TextStyle(color: colors.secondary),
-                                    ),
-                                    const SizedBox(height: 10),
-                                    Text(
-                                      '背诵 $reviews 次   ·   见过 $scenes 个场景',
-                                      style: TextStyle(
-                                        color: colors.accent,
-                                        fontWeight: FontWeight.w700,
-                                      ),
-                                    ),
-                                    if (word
-                                        .occurrences
-                                        .isNotEmpty) ...<Widget>[
-                                      const SizedBox(height: 6),
-                                      Text(
-                                        '${word.occurrences.first.course} · ${word.occurrences.first.earliestContext?.time ?? word.occurrences.first.time}',
-                                        maxLines: 1,
-                                        overflow: TextOverflow.ellipsis,
-                                        style: Theme.of(context)
-                                            .textTheme
-                                            .bodySmall
-                                            ?.copyWith(color: colors.secondary),
-                                      ),
-                                    ],
-                                  ],
-                                ),
-                              ),
-                            ),
-                          );
-                        },
-                      ),
-              ),
-            ],
-          ),
-        ),
+                    ),
+                  );
+                }
+              },
+            ),
+          );
+        },
       ),
     );
   }
 }
+
+typedef _SavedItem = ({
+  String title,
+  String translation,
+  String kind,
+  String source,
+  DateTime? date,
+  String? word,
+});
 
 int favoriteWordReviewCount(WordEntry word, Map<String, ReviewRecord> records) {
   final int current = WordPracticeMode.values.fold<int>(
@@ -274,10 +345,6 @@ class FavoriteWordDetailScreen extends ConsumerWidget {
         body: const Center(child: Text('这个词已从收藏词本移除。')),
       );
     }
-    final int reviews = favoriteWordReviewCount(
-      entry,
-      ref.watch(dailyReviewProvider).records,
-    );
     final int scenes = favoriteWordSceneCount(entry);
     return Scaffold(
       backgroundColor: colors.background,
@@ -310,7 +377,7 @@ class FavoriteWordDetailScreen extends ConsumerWidget {
             child: Padding(
               padding: const EdgeInsets.all(16),
               child: Text(
-                '背诵 $reviews 次     ·     见过 $scenes 个场景',
+                '见过 $scenes 个场景',
                 style: TextStyle(
                   fontWeight: FontWeight.w800,
                   color: colors.accent,

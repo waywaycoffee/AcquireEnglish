@@ -62,6 +62,7 @@ WordEntry mergeWordEntry(WordEntry a, WordEntry b) {
     aiExampleCn: _preferString(newer.aiExampleCn, older.aiExampleCn),
     senses: newer.senses.isNotEmpty ? newer.senses : older.senses,
     updatedAtMs: fa >= fb ? fa : fb,
+    collectedAtMs: newer.collectedAtMs ?? older.collectedAtMs,
   );
 }
 

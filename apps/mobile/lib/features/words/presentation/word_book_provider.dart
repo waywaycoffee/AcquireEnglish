@@ -85,6 +85,7 @@ class WordOccurrence {
   String get mediaKind {
     final String id = episodeId.trim();
     final String c = course.trim();
+    if (id.startsWith('scene:') || c == '数字人识物') return '拍照';
     if (id.startsWith('reading:') || c.startsWith('阅读')) {
       return '文章';
     }
@@ -251,6 +252,7 @@ class WordEntry {
     this.dueAtMs,
     this.mastery = WordMastery.fresh,
     this.updatedAtMs,
+    this.collectedAtMs,
   });
 
   factory WordEntry.fromJson(Map<String, Object?> json) {
@@ -311,6 +313,7 @@ class WordEntry {
       dueAtMs: (json['dueAtMs'] as num?)?.toInt(),
       mastery: Sm2Scheduler.masteryFromName(json['mastery'] as String?),
       updatedAtMs: (json['updatedAtMs'] as num?)?.toInt(),
+      collectedAtMs: (json['collectedAtMs'] as num?)?.toInt(),
     );
   }
 
@@ -345,6 +348,7 @@ class WordEntry {
 
   /// Client clock for cross-device LWW merge; optional for legacy rows.
   final int? updatedAtMs;
+  final int? collectedAtMs;
 
   String get entryId => vocabEntryIdForLemma(word);
 
@@ -444,6 +448,7 @@ class WordEntry {
     int? dueAtMs,
     WordMastery? mastery,
     int? updatedAtMs,
+    int? collectedAtMs,
   }) => WordEntry(
     word: word,
     favorite: favorite ?? this.favorite,
@@ -474,6 +479,7 @@ class WordEntry {
     dueAtMs: dueAtMs ?? this.dueAtMs,
     mastery: mastery ?? this.mastery,
     updatedAtMs: updatedAtMs ?? this.updatedAtMs,
+    collectedAtMs: collectedAtMs ?? this.collectedAtMs,
   );
 
   Map<String, Object?> toJson() => <String, Object?>{
@@ -508,6 +514,7 @@ class WordEntry {
     'dueAtMs': dueAtMs,
     'mastery': mastery.name,
     if (updatedAtMs != null) 'updatedAtMs': updatedAtMs,
+    if (collectedAtMs != null) 'collectedAtMs': collectedAtMs,
   };
 }
 
@@ -675,6 +682,7 @@ class WordBookNotifier extends Notifier<List<WordEntry>> {
     final bool becomingFavorite = !current.favorite;
     next[index] = current.copyWith(
       favorite: becomingFavorite,
+      collectedAtMs: becomingFavorite ? DateTime.now().millisecondsSinceEpoch : null,
       scheduleStatus: becomingFavorite
           ? VocabScheduleStatus.pending
           : VocabScheduleStatus.archived,
@@ -775,6 +783,7 @@ class WordBookNotifier extends Notifier<List<WordEntry>> {
     if (word.isEmpty || (cardKind == null && !_isFavoriteableLexeme(word))) {
       return false;
     }
+    final int collectedAt = DateTime.now().millisecondsSinceEpoch;
     final String? definition = generatedDefinition?.trim();
     final String? validDefinition = definition == null || definition.isEmpty
         ? null
@@ -810,6 +819,7 @@ class WordBookNotifier extends Notifier<List<WordEntry>> {
         WordEntry(
           word: word,
           favorite: true,
+          collectedAtMs: collectedAt,
           kind: kind,
           definitionCn: validDefinition,
           enrichmentStatus: VocabEnrichmentStatus.pending,
@@ -879,6 +889,7 @@ class WordBookNotifier extends Notifier<List<WordEntry>> {
       final List<WordEntry> next = <WordEntry>[...state];
       next[entryIndex] = entry.copyWith(
         favorite: true,
+        collectedAtMs: entry.favorite ? entry.collectedAtMs : collectedAt,
         // Keep existing schedule status; only brand-new words start pending.
         scheduleStatus: entry.favorite
             ? entry.scheduleStatus

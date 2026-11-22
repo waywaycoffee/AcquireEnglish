@@ -1,9 +1,37 @@
+import 'package:common_learn_english/features/phrases/presentation/phrase_book_provider.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:common_learn_english/features/daily_review/domain/daily_review.dart';
 import 'package:common_learn_english/features/words/presentation/favorite_word_book_screen.dart';
 import 'package:common_learn_english/features/words/presentation/word_book_provider.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
+  testWidgets(
+    'one collection shows words and saved sentences and searches Chinese source names',
+    (tester) async {
+      tester.view.physicalSize = const Size(390, 844);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            wordBookProvider.overrideWith(_SavedWords.new),
+            phraseBookProvider.overrideWith(_SavedExpressions.new),
+          ],
+          child: const MaterialApp(home: FavoriteWordBookScreen()),
+        ),
+      );
+      expect(find.text('fabric'), findsOneWidget);
+      expect(find.text('It is time to get up.'), findsOneWidget);
+      await tester.enterText(find.byType(TextField).at(1), '核心口语');
+      await tester.pump();
+      expect(find.text('fabric'), findsNothing);
+      expect(find.text('It is time to get up.'), findsOneWidget);
+    },
+  );
+
   test('saved word keeps its original scene contexts and review count', () {
     const WordEntry entry = WordEntry(
       word: 'cutlery',
@@ -39,10 +67,7 @@ void main() {
       ],
     );
 
-    expect(
-      favoriteWordReviewCount(entry, const <String, ReviewRecord>{}),
-      3,
-    );
+    expect(favoriteWordReviewCount(entry, const <String, ReviewRecord>{}), 3);
     // Same video with two timeline hits → one scene / one screenshot.
     expect(favoriteWordSceneCount(entry), 1);
     expect(favoriteWordDistinctScenes(entry), hasLength(1));
@@ -202,4 +227,29 @@ void main() {
     expect(favoriteSceneClipStartMs(900), 900);
     expect(favoriteSceneClipStartMs(-1), 0);
   });
+}
+
+class _SavedWords extends WordBookNotifier {
+  @override
+  List<WordEntry> build() => const [
+    WordEntry(word: 'fabric', favorite: true, occurrences: []),
+  ];
+}
+
+class _SavedExpressions extends PhraseBookNotifier {
+  @override
+  List<PhraseEntry> build() => const [
+    PhraseEntry(
+      id: 'sentence-1',
+      course: '英语核心口语句型',
+      episode: '起床',
+      episodeId: 'episode-1',
+      time: '00:07',
+      english: 'It is time to get up.',
+      chinese: '该起床了。',
+      rating: 1,
+      needsReview: false,
+      today: false,
+    ),
+  ];
 }

@@ -1385,7 +1385,7 @@ class _WordCard extends ConsumerWidget {
               if (entry.favorite &&
                   entry.scheduleStatus == VocabScheduleStatus.pending)
                 IconButton(
-                  tooltip: '预览并加入复习',
+                  tooltip: '预览收藏词',
                   onPressed: () => unawaited(
                     showVocabPreviewSheet(context, word: entry.word),
                   ),
