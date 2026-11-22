@@ -739,7 +739,7 @@ class _DailyReviewScreenState extends ConsumerState<DailyReviewScreen>
       _playedWord = visible!.key;
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted && _currentKey == visible.key) {
-          // Open card → speak immediately (Aliyun cloud TTS preferred).
+          // Prefetch Aliyun URL, then play — cuts the “wait then cut off” feel.
           unawaited(_playWord(visible));
         }
       });
@@ -2883,6 +2883,7 @@ class _DailyReviewScreenState extends ConsumerState<DailyReviewScreen>
           recordedUrl: foundationAudio,
           allowSynthesisFallback: true,
           forceCloud: true,
+          rate: 1.0,
         );
       } on WordPronunciationException catch (error) {
         if (mounted && sequence == _speechSequence && !silent) {
@@ -2995,12 +2996,12 @@ class _DailyReviewScreenState extends ConsumerState<DailyReviewScreen>
     setState(() => _speaking = true);
     try {
       _speech = ref.read(wordPronunciationServiceProvider);
-      // Prefer Aliyun English voices; fall back to on-device TTS if media CDN
-      // briefly 404s so the review session keeps moving.
+      // CosyVoice 龙安风悦 (default); fall back to on-device if CDN blips.
       await _speech!.speak(
         text,
         forceCloud: true,
         allowSynthesisFallback: true,
+        rate: 1.0,
       );
     } on WordPronunciationException catch (error) {
       if (mounted) _message(error.message);

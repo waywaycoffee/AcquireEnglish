@@ -114,7 +114,8 @@ class WordPronunciationService {
       final String? cloudUrl = await cloudAudioResolver!(normalizedText);
       if (cloudUrl != null &&
           cloudUrl.isNotEmpty &&
-          await _playRecording(cloudUrl, rate: effectiveRate)) {
+          // Keep natural CosyVoice pacing; rate only for on-device fallback.
+          await _playRecording(cloudUrl, rate: 1.0)) {
         return;
       }
       // Prefer Aliyun, but keep learning moving if CDN/media path is briefly
@@ -146,32 +147,69 @@ class WordPronunciationService {
   Future<bool> _playRecording(String url, {double rate = 1.0}) async {
     Player? player;
     StreamSubscription<bool>? completed;
+    StreamSubscription<bool>? playing;
     StreamSubscription<String>? errors;
     try {
       player = Player();
       _recordedPlayer = player;
       final Completer<bool> result = Completer<bool>();
       _recordedCompletion = result;
+      bool started = false;
+      playing = player.stream.playing.listen((bool value) {
+        if (value) {
+          started = true;
+          return;
+        }
+        // Only finish after playback actually started — media_kit can emit
+        // completed/playing=false during open, which used to cut words short.
+        if (started && !result.isCompleted) {
+          result.complete(true);
+        }
+      });
       completed = player.stream.completed.listen((bool value) {
-        if (value && !result.isCompleted) result.complete(true);
+        if (value && started && !result.isCompleted) {
+          result.complete(true);
+        }
       });
       errors = player.stream.error.listen((String _) {
         if (!result.isCompleted) result.complete(false);
       });
-      await player.open(Media(url)).timeout(const Duration(seconds: 8));
-      final double clamped = rate.clamp(0.5, 1.8);
-      if ((clamped - 1.0).abs() > 0.01) {
+      await player.open(Media(url), play: true).timeout(
+        const Duration(seconds: 20),
+      );
+      // Cloud MP3 already has natural pacing; don't slow it (caused choppy cutoffs).
+      final double clamped = rate.clamp(0.85, 1.8);
+      if ((clamped - 1.0).abs() > 0.02) {
         await player.setRate(clamped);
       }
-      return await result.future.timeout(const Duration(seconds: 30));
+      // Short clips: also watch duration/position as a safety net.
+      unawaited(() async {
+        try {
+          final Duration duration = await player!.stream.duration
+              .firstWhere((Duration d) => d > Duration.zero)
+              .timeout(const Duration(seconds: 5));
+          await player.stream.position
+              .firstWhere(
+                (Duration p) =>
+                    duration.inMilliseconds > 0 &&
+                    p.inMilliseconds >= duration.inMilliseconds - 40,
+              )
+              .timeout(duration + const Duration(seconds: 3));
+          if (!result.isCompleted) result.complete(true);
+        } catch (_) {}
+      }());
+      return await result.future.timeout(const Duration(seconds: 45));
     } catch (_) {
       return false;
     } finally {
       await completed?.cancel();
+      await playing?.cancel();
       await errors?.cancel();
       if (identical(_recordedPlayer, player)) {
         _recordedPlayer = null;
         _recordedCompletion = null;
+        // Brief grace so the last buffer drains before dispose.
+        await Future<void>.delayed(const Duration(milliseconds: 80));
         await player?.dispose();
       }
     }
