@@ -218,5 +218,30 @@ void main() {
       expect(lists.isKnown('apple'), isTrue);
       expect(lists.isFocus('apple'), isFalse);
     });
+
+    test('slash known word is no longer hard for inline Chinese', () {
+      final ReadingFrequencyLexicon lexicon = ReadingFrequencyLexicon(
+        const <String, int>{'the': 1},
+      );
+      expect(
+        isReadingHardWord(
+          word: 'serendipity',
+          lexicon: lexicon,
+          threshold: 3000,
+          focus: <String>{'serendipity'},
+        ),
+        isTrue,
+      );
+      expect(
+        isReadingHardWord(
+          word: 'serendipity',
+          lexicon: lexicon,
+          threshold: 3000,
+          known: <String>{'serendipity'},
+          focus: <String>{'serendipity'},
+        ),
+        isFalse,
+      );
+    });
   });
 }

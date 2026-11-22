@@ -877,6 +877,34 @@ class _ReadingReaderScreenState extends ConsumerState<ReadingReaderScreen> {
     }
   }
 
+  Future<void> _refreshReadingGlosses(ReadingDoc doc) async {
+    _invalidateGlosses(clearCache: true, dropInteractive: false);
+    if (mounted) setState(() {});
+    await _ensureGlosses(doc);
+  }
+
+  /// After lookup: keep Chinese under the word until the learner 斩掉 it.
+  Future<void> _markLookedUpWordForGloss({
+    required ReadingDoc doc,
+    required String lexeme,
+  }) async {
+    final ReadingVocabLists lists = ref.read(readingVocabListsProvider);
+    if (lists.isKnown(lexeme)) return;
+    await ref.read(readingVocabListsProvider.notifier).markFocus(lexeme);
+    if (!mounted) return;
+    await _refreshReadingGlosses(doc);
+  }
+
+  /// Manual 斩: hide inline Chinese for this word from now on.
+  Future<void> _slashWordTranslation({
+    required ReadingDoc doc,
+    required String lexeme,
+  }) async {
+    await ref.read(readingVocabListsProvider.notifier).markKnown(lexeme);
+    if (!mounted) return;
+    await _refreshReadingGlosses(doc);
+  }
+
   Future<void> _showLookupCard({
     required ReadingDoc doc,
     required String rawLexeme,
@@ -890,6 +918,7 @@ class _ReadingReaderScreenState extends ConsumerState<ReadingReaderScreen> {
       setState(() => _focusedSentence = sentence.trim());
     }
     unawaited(_recordLearnedContext(lexeme, sentence));
+    unawaited(_markLookedUpWordForGloss(doc: doc, lexeme: lexeme));
     if (!mounted) return;
     final String fallback =
         _hardGlosses[normalizeWord(lexeme)] ??
@@ -901,6 +930,8 @@ class _ReadingReaderScreenState extends ConsumerState<ReadingReaderScreen> {
       showDragHandle: true,
       builder: (BuildContext ctx) {
         final double maxH = MediaQuery.sizeOf(ctx).height * 0.62;
+        final bool alreadySlashed =
+            ref.read(readingVocabListsProvider).isKnown(lexeme);
         return SafeArea(
           child: Padding(
             padding: EdgeInsets.fromLTRB(
@@ -933,36 +964,53 @@ class _ReadingReaderScreenState extends ConsumerState<ReadingReaderScreen> {
                       label: const Text('口型'),
                     ),
                     TextButton.icon(
-                      onPressed: () {
-                        unawaited(
-                          ref
-                              .read(readingVocabListsProvider.notifier)
-                              .markKnown(lexeme),
-                        );
-                        setState(() => _glossDocId = null);
-                        Navigator.pop(ctx);
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(content: Text('已加入白名单：$lexeme')),
-                        );
-                      },
-                      icon: const Icon(Icons.check_circle_outline),
-                      label: const Text('已会'),
+                      onPressed: alreadySlashed
+                          ? null
+                          : () {
+                              Navigator.pop(ctx);
+                              unawaited(
+                                _slashWordTranslation(
+                                  doc: doc,
+                                  lexeme: lexeme,
+                                ).then((_) {
+                                  if (!mounted) return;
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(
+                                      content: Text(
+                                        '已斩掉：$lexeme · 不再显示中文',
+                                      ),
+                                    ),
+                                  );
+                                }),
+                              );
+                            },
+                      icon: Icon(
+                        alreadySlashed
+                            ? Icons.check_circle_rounded
+                            : Icons.content_cut_rounded,
+                      ),
+                      label: Text(alreadySlashed ? '已斩' : '斩掉'),
                     ),
                     TextButton.icon(
                       onPressed: () {
+                        Navigator.pop(ctx);
                         unawaited(
                           ref
                               .read(readingVocabListsProvider.notifier)
-                              .markFocus(lexeme),
-                        );
-                        setState(() => _glossDocId = null);
-                        Navigator.pop(ctx);
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(content: Text('已加入黑名单：$lexeme')),
+                              .markFocus(lexeme)
+                              .then((_) => _refreshReadingGlosses(doc))
+                              .then((_) {
+                                if (!mounted) return;
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: Text('继续显示中文：$lexeme'),
+                                  ),
+                                );
+                              }),
                         );
                       },
-                      icon: const Icon(Icons.flag_outlined),
-                      label: const Text('生词'),
+                      icon: const Icon(Icons.translate_rounded),
+                      label: const Text('显示中文'),
                     ),
                   ],
                 ),
@@ -1624,8 +1672,8 @@ class _ReadingReaderScreenState extends ConsumerState<ReadingReaderScreen> {
                             showChinese
                                 ? (_glossLoading
                                       ? '难词释义加载中…'
-                                      : '词下灰字 = 词频>$_freqThreshold · 双击语块 · 长按整句')
-                                : '沉浸模式 · 点词/双击语块/长按整句',
+                                      : '词下灰字 = 难词/查词 · 斩掉后不再显示 · 双击语块 · 长按整句')
+                                : '沉浸模式 · 查词仍可显示中文 · 斩掉后隐藏 · 点词查释义',
                             style: TextStyle(
                               fontSize: 12,
                               color: _dark
@@ -1743,6 +1791,8 @@ class _ReadingReaderScreenState extends ConsumerState<ReadingReaderScreen> {
                         showChunks: true,
                         learnedWords: learned,
                         hardGlosses: _hardGlosses,
+                        forceGlossWords:
+                            ref.watch(readingVocabListsProvider).focus,
                         chunkHighlighter: chunks,
                         onWordTap: (String word, int start, int end) {
                           final String sentence = sentenceBounds(

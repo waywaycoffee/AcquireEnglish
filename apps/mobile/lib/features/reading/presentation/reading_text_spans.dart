@@ -157,6 +157,8 @@ List<InlineSpan> buildReadingTextSpans({
   required bool showChunks,
   required Set<String> learnedWords,
   required Map<String, String> hardGlosses,
+  /// Looked-up / focus words keep Chinese gloss even in immersion mode.
+  Set<String> forceGlossWords = const <String>{},
   required SubtitleChunkHighlighter? chunkHighlighter,
   required ReadingRangeCallback onWordTap,
   required ReadingRangeCallback onWordLongPress,
@@ -259,7 +261,11 @@ List<InlineSpan> buildReadingTextSpans({
     }
 
     final String norm = normalizeWord(token.raw);
-    final String? gloss = showChinese ? hardGlosses[norm] : null;
+    final String? glossEntry = hardGlosses[norm];
+    final bool showGloss = glossEntry != null &&
+        glossEntry.isNotEmpty &&
+        (showChinese || forceGlossWords.contains(norm));
+    final String? gloss = showGloss ? glossEntry : null;
     final bool learned = learnedWords.contains(norm);
     final bool karaoke = highlightWordIndex != null && wordIdx == highlightWordIndex;
     final Color wordColor = karaoke
