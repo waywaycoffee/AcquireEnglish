@@ -2,6 +2,29 @@ import 'package:common_learn_english/features/growth/presentation/growth_provide
 import 'package:common_learn_english/features/home/presentation/learning_dashboard_provider.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+LearningDailyRecord _record({
+  required String dayKey,
+  int studyMilliseconds = 0,
+  Set<String> learnedSentenceKeys = const <String>{},
+  int shadowingCount = 0,
+  int savedPhraseCount = 0,
+  bool checkedIn = false,
+}) {
+  return LearningDailyRecord(
+    dayKey: dayKey,
+    studyMilliseconds: studyMilliseconds,
+    learnedSentenceKeys: learnedSentenceKeys,
+    watchedVideoKeys: const <String>{},
+    readArticleKeys: const <String>{},
+    shadowedSentenceKeys: const <String>{},
+    shadowingCount: shadowingCount,
+    savedWordCount: 0,
+    savedPhraseCount: savedPhraseCount,
+    savedSentenceCount: 0,
+    checkedIn: checkedIn,
+  );
+}
+
 void main() {
   test(
     'user growth is deterministically derived from real learning activity',
@@ -9,14 +32,13 @@ void main() {
       final DateTime now = DateTime.now();
       final String todayKey =
           '${now.year.toString().padLeft(4, '0')}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
-      final LearningDailyRecord today = LearningDailyRecord(
+      final LearningDailyRecord today = _record(
         dayKey: todayKey,
         studyMilliseconds: const Duration(minutes: 20).inMilliseconds,
         learnedSentenceKeys: const <String>{
           'episode-1:line-1',
           'episode-1:line-2',
         },
-        shadowingCount: 0,
         savedPhraseCount: 1,
         checkedIn: true,
       );
@@ -53,24 +75,17 @@ void main() {
     final Map<String, LearningDailyRecord> records =
         <String, LearningDailyRecord>{
           for (int index = 0; index < 140; index++)
-            'day-$index': LearningDailyRecord(
+            'day-$index': _record(
               dayKey: 'day-$index',
               studyMilliseconds: const Duration(minutes: 30).inMilliseconds,
-              learnedSentenceKeys: const <String>{},
-              shadowingCount: 0,
-              savedPhraseCount: 0,
-              checkedIn: false,
             ),
-          todayKey: LearningDailyRecord(
+          todayKey: _record(
             dayKey: todayKey,
             studyMilliseconds: const Duration(minutes: 30).inMilliseconds,
             learnedSentenceKeys: List<String>.generate(
               10,
               (int index) => 'sentence-$index',
             ).toSet(),
-            shadowingCount: 0,
-            savedPhraseCount: 0,
-            checkedIn: false,
           ),
         };
     final UserGrowth growth = UserGrowth.fromLearningActivity(
@@ -89,14 +104,13 @@ void main() {
   });
 
   test('daily growth values are capped to prevent one-session level jumps', () {
-    final LearningDailyRecord record = LearningDailyRecord(
+    final LearningDailyRecord record = _record(
       dayKey: '2026-07-11',
       studyMilliseconds: const Duration(minutes: 120).inMilliseconds,
       learnedSentenceKeys: List<String>.generate(
         100,
         (int index) => 'sentence-$index',
       ).toSet(),
-      shadowingCount: 0,
       savedPhraseCount: 50,
       checkedIn: true,
     );

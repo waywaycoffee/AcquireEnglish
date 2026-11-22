@@ -41,10 +41,11 @@ async def test_sms_login_auto_registers():
         assert data["is_new_user"] is True
         assert data["user"]["phone"] in {"+8613900001111", "13900001111"}
 
-        assets = await client.get(
-            "/api/assets",
-            headers={"Authorization": f"Bearer {data['access_token']}"},
-        )
+        headers = {"Authorization": f"Bearer {data['access_token']}"}
+        claim = await client.post("/api/commerce/trial/claim-welcome", headers=headers)
+        assert claim.status_code == 200, claim.text
+
+        assets = await client.get("/api/assets", headers=headers)
         assert assets.status_code == 200, assets.text
         body = assets.json()
         assert body["wallet"]["balance_credits"] >= 50
@@ -77,10 +78,11 @@ async def test_wechat_login_auto_registers():
         assert data["user"]["wechat_bound"] is True
         assert data["user"]["display_name"] == "测试微信"
 
-        assets = await client.get(
-            "/api/assets",
-            headers={"Authorization": f"Bearer {data['access_token']}"},
-        )
+        headers = {"Authorization": f"Bearer {data['access_token']}"}
+        claim = await client.post("/api/commerce/trial/claim-welcome", headers=headers)
+        assert claim.status_code == 200, claim.text
+
+        assets = await client.get("/api/assets", headers=headers)
         assert assets.status_code == 200
         assert assets.json()["wallet"]["balance_credits"] >= 50
 

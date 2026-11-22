@@ -112,6 +112,8 @@ async def test_points_spend_grants_coach_minutes():
     async with AsyncClient(transport=transport, base_url="http://test") as client:
         token = await _sms_token(client, "13900008882")
         headers = {"Authorization": f"Bearer {token}"}
+        claim = await client.post("/api/commerce/trial/claim-welcome", headers=headers)
+        assert claim.status_code == 200, claim.text
 
         # Boost wallet via earn enough times (trial user is paid for caps).
         for i in range(20):
