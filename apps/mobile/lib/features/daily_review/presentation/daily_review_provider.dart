@@ -69,12 +69,19 @@ final Provider<List<ReviewSource>>
 reviewSourcesProvider = Provider<List<ReviewSource>>((Ref ref) {
   final List<WordPracticeMode> modes =
       ref.watch(wordReviewSettingsProvider).orderedModes;
-  final List<WordEntry> words = ref
-      .watch(wordBookProvider)
+  final List<WordEntry> allEntries = ref.watch(wordBookProvider);
+  final List<WordEntry> words = allEntries
       .where((WordEntry word) => word.isSchedulable)
       .toList();
-  final Set<String> favoriteLemmas = <String>{
-    for (final WordEntry word in words) normalizeWord(word.word),
+  // Lemmas already claimed by the word book — including 斩掉/归档 favorites —
+  // must not re-enter as 词书「新学」cards.
+  final Set<String> coveredLemmas = <String>{
+    for (final WordEntry word in allEntries)
+      if (word.favorite ||
+          word.scheduleStatus == VocabScheduleStatus.archived ||
+          word.mastery == WordMastery.known ||
+          word.mastery == WordMastery.mastered)
+        normalizeWord(word.word),
   }..remove('');
   final List<PhraseEntry> phrases =
       <PhraseEntry>[
@@ -138,11 +145,11 @@ reviewSourcesProvider = Provider<List<ReviewSource>>((Ref ref) {
         ),
       )
       .toList();
-  // Book-only lemmas (not already covered by a favorite card).
+  // Book-only lemmas (not already covered by favorites / 斩掉归档).
   final List<ReviewSource> syllabusSources = <ReviewSource>[
     for (final SyllabusBook book in syllabusBooksForReview)
       for (final SyllabusWord entry in book.words)
-        if (!favoriteLemmas.contains(normalizeWord(entry.word)))
+        if (!coveredLemmas.contains(normalizeWord(entry.word)))
           ReviewSource(
             key: syllabusReviewKey(book.id, entry.word),
             kind: book.isPatternBook ? ReviewKind.sentence : ReviewKind.word,
@@ -179,7 +186,7 @@ reviewSourcesProvider = Provider<List<ReviewSource>>((Ref ref) {
                     as List<dynamic>? ??
                 const <dynamic>[])
             .cast<PlacementRow>())
-      if (!favoriteLemmas.contains(
+      if (!coveredLemmas.contains(
         normalizeWord('${row['word'] ?? ''}'),
       ))
         ReviewSource(

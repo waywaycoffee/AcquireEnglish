@@ -720,8 +720,14 @@ class WordBookNotifier extends Notifier<List<WordEntry>> {
     final int index = state.indexWhere((WordEntry item) => item.word == word);
     if (index < 0) return false;
     final List<WordEntry> next = <WordEntry>[...state];
+    final int now = DateTime.now().millisecondsSinceEpoch;
     next[index] = next[index].copyWith(
       scheduleStatus: VocabScheduleStatus.archived,
+      // Mark known so 词书/推荐不会把同一 lemma 再当「新学」塞回今日路径.
+      mastery: next[index].mastery.index >= WordMastery.known.index
+          ? next[index].mastery
+          : WordMastery.known,
+      updatedAtMs: now,
     );
     state = next;
     unawaited(_persist());
