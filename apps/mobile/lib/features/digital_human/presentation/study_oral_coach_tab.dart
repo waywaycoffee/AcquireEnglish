@@ -909,6 +909,7 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
 
   Future<void> _previewEnglishVoice(CoachEnglishVoice voice) async {
     if (_coachSpeaking || _busy || _recordingActive) return;
+    final int gen = ++_speakGen;
     setState(() => _coachSpeaking = true);
     try {
       final LearningSettingsState settings = ref.read(learningSettingsProvider);
@@ -921,7 +922,9 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
         digitalHumanId: settings.selectedDigitalHuman.id,
         ttsVoice: voice.id,
       );
-      if (url == null || !await _playRemoteTts(url)) throw StateError('无试听音频');
+      if (url == null || !await _playRemoteTts(url, gen: gen)) {
+        throw StateError('无试听音频');
+      }
     } catch (_) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -929,7 +932,9 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
         );
       }
     } finally {
-      if (mounted) setState(() => _coachSpeaking = false);
+      if (mounted && gen == _speakGen) {
+        setState(() => _coachSpeaking = false);
+      }
     }
   }
 
