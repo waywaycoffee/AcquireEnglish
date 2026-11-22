@@ -12,7 +12,9 @@ import '../../../daily_review/domain/daily_review.dart';
 import '../../../daily_review/presentation/daily_review_provider.dart';
 import '../../../navigation/presentation/navigation_destination.dart';
 import '../../../phrases/presentation/phrase_book_provider.dart';
+import '../../../reading/data/reading_gloss.dart';
 import '../../../words/domain/word_review_settings.dart';
+import '../../../words/presentation/learner_level_provider.dart';
 import '../../../words/presentation/syllabus_books_provider.dart';
 import '../../../words/presentation/word_book_provider.dart';
 import '../../../words/presentation/word_review_settings_provider.dart';
@@ -48,9 +50,13 @@ class ReviewTodaySection extends ConsumerWidget {
       ),
     );
     // Keep hub CTA / empty-vs-done aligned with the背单词新学额度 setting.
-    final ReviewPlan plan = review.withLimit(newQuota.clamp(0, 100)).plan(
-      sources,
-      now,
+    // Waiting new-learn cards are re-ranked by i+1 vs the adaptive frontier.
+    final ReviewPlan plan = reviewPlanForLearnerLevel(
+      state: review.withLimit(newQuota.clamp(0, 100)),
+      sources: sources,
+      now: now,
+      threshold: ref.watch(adaptiveReadingFreqThresholdProvider),
+      lexicon: ref.watch(readingFrequencyLexiconProvider).asData?.value,
     );
     final List<WordEntry> wordBook = ref.watch(wordBookProvider);
     final List<PhraseEntry> phrases = ref.watch(phraseBookProvider);

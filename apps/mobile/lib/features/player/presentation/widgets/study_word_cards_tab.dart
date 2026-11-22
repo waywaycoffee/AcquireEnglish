@@ -359,7 +359,7 @@ class _WordCardTile extends StatelessWidget {
                           _Tag(label: '已收藏', colors: colors, accent: true),
                         ] else if (card.source == 'suggested') ...<Widget>[
                           const SizedBox(width: 6),
-                          _Tag(label: '本集推荐', colors: colors),
+                          _Tag(label: 'i+1推荐', colors: colors),
                         ],
                       ],
                     ),

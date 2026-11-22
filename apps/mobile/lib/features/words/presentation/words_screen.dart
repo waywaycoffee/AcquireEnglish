@@ -25,6 +25,8 @@ import '../../shared/presentation/pad/pad_top_bar.dart';
 import '../../shared/presentation/pill_segmented_control.dart';
 import '../domain/vocab_entry.dart';
 import '../domain/word_review_settings.dart';
+import '../../reading/data/reading_gloss.dart';
+import 'learner_level_provider.dart';
 import 'syllabus_books_provider.dart';
 import 'vocab_preview_sheet.dart';
 import 'vocabulary_placement_provider.dart';
@@ -178,9 +180,13 @@ class _WordsScreenState extends ConsumerState<WordsScreen> {
         .toList(growable: false);
     final DateTime now = DateTime.now();
     final int newLimit = reviewSettings.dailyNewLimit.clamp(0, 100);
-    final ReviewPlan wordPlan = reviewState
-        .withLimit(newLimit)
-        .plan(wordSources, now);
+    final ReviewPlan wordPlan = reviewPlanForLearnerLevel(
+      state: reviewState.withLimit(newLimit),
+      sources: wordSources,
+      now: now,
+      threshold: ref.watch(adaptiveReadingFreqThresholdProvider),
+      lexicon: ref.watch(readingFrequencyLexiconProvider).asData?.value,
+    );
     final int planNew = wordPlan.newAvailable;
     final int planReview = wordPlan.due.length
         .clamp(0, reviewSettings.dailyReviewLimit)

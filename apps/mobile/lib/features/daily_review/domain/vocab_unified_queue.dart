@@ -1,5 +1,6 @@
 import 'package:fsrs/fsrs.dart' as fsrs;
 
+import '../../words/domain/learner_level.dart';
 import '../../words/domain/sm2_scheduler.dart';
 import '../../words/domain/syllabus_book.dart';
 import '../../words/domain/vocab_entry.dart';
@@ -227,6 +228,47 @@ int compareFavoriteFirst(ReviewRecord a, ReviewRecord b) {
   final bool bFav = isFavoriteReviewKey(b.key);
   if (aFav != bFav) return aFav ? -1 : 1;
   return a.order.compareTo(b.order);
+}
+
+/// New-learn queue: favorites first, then i+1 sweet-spot by frequency frontier.
+int compareWaitingByIPlus1Learn(
+  ReviewRecord a,
+  ReviewRecord b, {
+  required int threshold,
+  required int? Function(String lemma) freqRankOf,
+}) {
+  final bool aFav = isFavoriteReviewKey(a.key);
+  final bool bFav = isFavoriteReviewKey(b.key);
+  if (aFav != bFav) return aFav ? -1 : 1;
+  final String? lemmaA = lemmaFromAnyReviewKey(a.key);
+  final String? lemmaB = lemmaFromAnyReviewKey(b.key);
+  return compareByIPlus1LearnPriority(
+    rankA: lemmaA == null || lemmaA.isEmpty ? null : freqRankOf(lemmaA),
+    rankB: lemmaB == null || lemmaB.isEmpty ? null : freqRankOf(lemmaB),
+    threshold: threshold,
+    orderA: a.order,
+    orderB: b.order,
+  );
+}
+
+/// Builds today's plan with waiting new-learn cards ordered for i+1 efficiency.
+ReviewPlan planWithIPlus1LearnOrder(
+  DailyReviewState state,
+  List<ReviewSource> sources,
+  DateTime now, {
+  required int threshold,
+  required int? Function(String lemma) freqRankOf,
+}) {
+  return state.plan(
+    sources,
+    now,
+    waitingOrder: (ReviewRecord a, ReviewRecord b) => compareWaitingByIPlus1Learn(
+      a,
+      b,
+      threshold: threshold,
+      freqRankOf: freqRankOf,
+    ),
+  );
 }
 
 /// Estimated vocabulary = placement baseline + distinct learned lemmas.

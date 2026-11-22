@@ -1,4 +1,6 @@
 import '../../phrases/presentation/phrase_book_provider.dart';
+import '../../reading/domain/reading_study_mode.dart';
+import '../../words/domain/learner_level.dart';
 import '../../words/presentation/word_book_provider.dart';
 import '../presentation/player_mock_state.dart';
 
@@ -92,14 +94,17 @@ class EpisodeWordCard {
 
 /// Builds a Shadow Talk–like episode vocabulary deck.
 ///
-/// Priority: favorited words/phrases for [episodeId], then content-word
-/// suggestions mined from [lines] (capped) so empty favorites still show cards.
+/// Priority: favorited words/phrases for [episodeId], then i+1 content-word
+/// suggestions mined from [lines] (capped) so any episode still yields
+/// efficient new-learn targets for the learner's frequency frontier.
 List<EpisodeWordCard> buildEpisodeWordCards({
   required String episodeId,
   required List<PlayerSubtitleLine> lines,
   required List<WordEntry> words,
   required List<PhraseEntry> phrases,
   int maxSuggested = 18,
+  int? Function(String lemma)? freqRankOf,
+  int learnThreshold = kReadingDefaultFreqThreshold,
 }) {
   final Map<String, EpisodeWordCard> byKey = <String, EpisodeWordCard>{};
 
@@ -199,11 +204,13 @@ List<EpisodeWordCard> buildEpisodeWordCards({
     );
   }
 
-  if (byKey.length < 6 && lines.isNotEmpty) {
+  if (lines.isNotEmpty) {
     final List<EpisodeWordCard> suggested = _suggestFromLines(
       lines: lines,
       limit: maxSuggested,
       existing: byKey.keys.toSet(),
+      freqRankOf: freqRankOf,
+      learnThreshold: learnThreshold,
     );
     for (final EpisodeWordCard card in suggested) {
       put(card);
@@ -215,6 +222,14 @@ List<EpisodeWordCard> buildEpisodeWordCards({
     if (a.favorited != b.favorited) {
       return a.favorited ? -1 : 1;
     }
+    if (freqRankOf != null) {
+      final int byIPlus1 = compareByIPlus1LearnPriority(
+        rankA: _rankForCardText(a.text, freqRankOf),
+        rankB: _rankForCardText(b.text, freqRankOf),
+        threshold: learnThreshold,
+      );
+      if (byIPlus1 != 0) return byIPlus1;
+    }
     final int kindCmp = a.kind.index.compareTo(b.kind.index);
     if (kindCmp != 0) return kindCmp;
     final int aMs = a.startMs ?? 1 << 30;
@@ -223,6 +238,20 @@ List<EpisodeWordCard> buildEpisodeWordCards({
     return a.text.toLowerCase().compareTo(b.text.toLowerCase());
   });
   return result;
+}
+
+int? _rankForCardText(String text, int? Function(String lemma) freqRankOf) {
+  final List<String> tokens = _tokenize(text);
+  if (tokens.isEmpty) return null;
+  // Single lemma: direct rank. Multi-word: hardest content token drives i+1.
+  if (tokens.length == 1) return freqRankOf(tokens.first.toLowerCase());
+  int? hardest;
+  for (final String token in tokens) {
+    final int? rank = freqRankOf(token.toLowerCase());
+    if (rank == null) continue;
+    if (hardest == null || rank > hardest) hardest = rank;
+  }
+  return hardest;
 }
 
 EpisodeCardKind _kindForText(String raw) {
@@ -236,6 +265,8 @@ List<EpisodeWordCard> _suggestFromLines({
   required List<PlayerSubtitleLine> lines,
   required int limit,
   required Set<String> existing,
+  int? Function(String lemma)? freqRankOf,
+  int learnThreshold = kReadingDefaultFreqThreshold,
 }) {
   const Set<String> stop = <String>{
     'a',
@@ -388,6 +419,14 @@ List<EpisodeWordCard> _suggestFromLines({
 
   final List<_SuggestionHit> ranked = hits.values.toList()
     ..sort((_SuggestionHit a, _SuggestionHit b) {
+      if (freqRankOf != null) {
+        final int byIPlus1 = compareByIPlus1LearnPriority(
+          rankA: _rankForCardText(a.token, freqRankOf),
+          rankB: _rankForCardText(b.token, freqRankOf),
+          threshold: learnThreshold,
+        );
+        if (byIPlus1 != 0) return byIPlus1;
+      }
       if (a.count != b.count) return b.count.compareTo(a.count);
       return b.token.length.compareTo(a.token.length);
     });

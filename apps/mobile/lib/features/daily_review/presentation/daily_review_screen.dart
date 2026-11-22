@@ -36,6 +36,8 @@ import '../../words/domain/vocab_entry.dart';
 import '../../words/domain/word_morphology.dart';
 import '../../words/domain/word_review_settings.dart';
 import '../../words/presentation/foundation_media_provider.dart';
+import '../../reading/data/reading_gloss.dart';
+import '../../words/presentation/learner_level_provider.dart';
 import '../../words/presentation/syllabus_books_provider.dart';
 import '../../words/presentation/vocabulary_placement_provider.dart';
 import '../../words/presentation/widgets/phonics_syllable_blocks.dart';
@@ -305,7 +307,13 @@ class _DailyReviewScreenState extends ConsumerState<DailyReviewScreen>
     final List<ReviewSource> sources = _filteredSources();
     final DateTime now = ref.read(reviewClockProvider)();
     if (widget.session) _restoreWordPasses(now);
-    final ReviewPlan plan = state.plan(sources, now);
+    final ReviewPlan plan = reviewPlanForLearnerLevel(
+      state: state,
+      sources: sources,
+      now: now,
+      threshold: ref.watch(adaptiveReadingFreqThresholdProvider),
+      lexicon: ref.watch(readingFrequencyLexiconProvider).asData?.value,
+    );
     final bool recallChrome = widget.session;
     return PadScaffold(
       currentDestination: AppNavDestination.home,
@@ -1491,7 +1499,7 @@ class _DailyReviewScreenState extends ConsumerState<DailyReviewScreen>
   String _completionText(ReviewPlan plan, int limit, DateTime now) {
     final String waiting = plan.waiting.isEmpty
         ? ''
-        : '还有 ${plan.waiting.length} 条待学内容，会按收藏入队顺序逐步安排。';
+        : '还有 ${plan.waiting.length} 条待学内容，收藏优先，其余按 i+1（贴近你当前水平）安排。';
     final String next = plan.nextDue == null
         ? ''
         : '下一条到期：${_formatDue(plan.nextDue!, now)}。';

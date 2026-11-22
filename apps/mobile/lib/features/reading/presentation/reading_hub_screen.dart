@@ -605,7 +605,8 @@ class _ReadingHubScreenState extends ConsumerState<ReadingHubScreen> {
                       children: <Widget>[
                         const _SectionTitle('适合你（i+1）'),
                         Text(
-                          '按生词率约 2%–8% 排序；白名单与已复习词视为已会',
+                          '按当前水平（词频阈值随词汇量变化）选生词率约 2%–8% 的读物；'
+                          '白名单与已复习词视为已会',
                           style: TextStyle(
                             fontSize: 12,
                             color: AppDesignTokens.textPrimary.withValues(

@@ -375,7 +375,13 @@ class DailyReviewState {
     );
   }
 
-  ReviewPlan plan(List<ReviewSource> sources, DateTime now) {
+  /// [waitingOrder] overrides new-learn FIFO (e.g. i+1 efficiency by freq rank).
+  /// Favorites should still sort ahead of syllabus/book cards inside that comparator.
+  ReviewPlan plan(
+    List<ReviewSource> sources,
+    DateTime now, {
+    int Function(ReviewRecord a, ReviewRecord b)? waitingOrder,
+  }) {
     final Set<String> activeKeys = sources
         .map((ReviewSource source) => source.key)
         .toSet();
@@ -404,14 +410,16 @@ class DailyReviewState {
             return byDue == 0 ? a.order.compareTo(b.order) : byDue;
           });
     final List<ReviewRecord> waiting =
-        active.where((ReviewRecord record) => record.isNew).toList()..sort(
-          (ReviewRecord a, ReviewRecord b) {
-            final bool aFav = favoriteFirst(a.key);
-            final bool bFav = favoriteFirst(b.key);
-            if (aFav != bFav) return aFav ? -1 : 1;
-            return a.order.compareTo(b.order);
-          },
-        );
+        active.where((ReviewRecord record) => record.isNew).toList()
+          ..sort(
+            waitingOrder ??
+                (ReviewRecord a, ReviewRecord b) {
+                  final bool aFav = favoriteFirst(a.key);
+                  final bool bFav = favoriteFirst(b.key);
+                  if (aFav != bFav) return aFav ? -1 : 1;
+                  return a.order.compareTo(b.order);
+                },
+          );
     final ReviewDay today = days[reviewDayKey(now)] ?? const ReviewDay();
     final int available = math.min(
       waiting.length,

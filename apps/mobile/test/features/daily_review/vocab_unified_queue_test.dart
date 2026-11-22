@@ -196,4 +196,71 @@ void main() {
     );
     expect(plan.due.first.key, fav.key);
   });
+
+  test('waiting new-learn ranks by i+1 after favorites', () {
+    final ReviewRecord fav = ReviewRecord(
+      key: vocabFsrsKey('hello', WordPracticeMode.recognize),
+      order: 1,
+      addedAt: now,
+      card: fsrs.Card(cardId: 1, due: now.toUtc()),
+    );
+    final ReviewRecord easy = ReviewRecord(
+      key: syllabusReviewKey('b', 'the'),
+      order: 2,
+      addedAt: now,
+      card: fsrs.Card(cardId: 2, due: now.toUtc()),
+    );
+    final ReviewRecord sweet = ReviewRecord(
+      key: syllabusReviewKey('b', 'habitat'),
+      order: 3,
+      addedAt: now,
+      card: fsrs.Card(cardId: 3, due: now.toUtc()),
+    );
+    final ReviewRecord hard = ReviewRecord(
+      key: syllabusReviewKey('b', 'sesquipedalian'),
+      order: 4,
+      addedAt: now,
+      card: fsrs.Card(cardId: 4, due: now.toUtc()),
+    );
+    final DailyReviewState state = DailyReviewState(
+      records: <String, ReviewRecord>{
+        fav.key: fav,
+        easy.key: easy,
+        sweet.key: sweet,
+        hard.key: hard,
+      },
+      dailyNewLimit: 10,
+      nextOrder: 5,
+    );
+    final Map<String, int> ranks = <String, int>{
+      'hello': 500,
+      'the': 1,
+      'habitat': 8000,
+      'sesquipedalian': 45000,
+    };
+    final ReviewPlan plan = planWithIPlus1LearnOrder(
+      state,
+      <ReviewSource>[
+        for (final ReviewRecord r in <ReviewRecord>[fav, easy, sweet, hard])
+          ReviewSource(
+            key: r.key,
+            kind: ReviewKind.word,
+            question: lemmaFromAnyReviewKey(r.key) ?? '',
+            answer: '',
+            english: '',
+            chinese: '',
+            sourceLabel: isFavoriteReviewKey(r.key) ? '收藏' : '词书',
+          ),
+      ],
+      now,
+      threshold: 5000,
+      freqRankOf: (String lemma) => ranks[lemma],
+    );
+    expect(plan.waiting.map((ReviewRecord r) => r.key).toList(), <String>[
+      fav.key,
+      sweet.key,
+      hard.key,
+      easy.key,
+    ]);
+  });
 }

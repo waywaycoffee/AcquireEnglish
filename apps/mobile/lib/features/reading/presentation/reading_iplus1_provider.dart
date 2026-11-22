@@ -1,21 +1,14 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:hive_ce/hive.dart';
 
 import '../../words/presentation/learned_vocabulary_provider.dart';
+import '../../words/presentation/learner_level_provider.dart';
 import '../data/reading_gloss.dart';
 import '../data/reading_iplus1.dart';
 import '../data/reading_vocab_lists.dart';
-import '../domain/reading_study_mode.dart';
 import 'reading_library_provider.dart';
 
-int readingFreqThresholdFromPrefs() {
-  if (!Hive.isBoxOpen('prefs')) return kReadingDefaultFreqThreshold;
-  final int? thr = int.tryParse(
-    Hive.box<String>('prefs').get(kReadingFreqThresholdKey) ?? '',
-  );
-  if (thr != null && kReadingFreqThresholdBands.contains(thr)) return thr;
-  return kReadingDefaultFreqThreshold;
-}
+/// Hard-word frontier for gloss / i+1. Tracks estimated vocabulary when known.
+int readingFreqThresholdFromPrefs() => readingFreqThresholdResolved();
 
 /// Top i+1 matches from the current bookshelf (builtin + user).
 final FutureProvider<List<ReadingIPlus1Match>> readingIPlus1MatchesProvider =
@@ -29,7 +22,8 @@ final FutureProvider<List<ReadingIPlus1Match>> readingIPlus1MatchesProvider =
     lists: lists,
     learned: ref.watch(learnedVocabularyProvider),
   );
-  final int threshold = readingFreqThresholdFromPrefs();
+  final int threshold = ref.watch(adaptiveReadingFreqThresholdProvider);
+  syncAdaptiveFreqThresholdToPrefs(threshold);
   final Map<String, double> progress = <String, double>{
     for (final String id in library.progress.keys)
       id: library.progress[id]?.percent ?? 0,

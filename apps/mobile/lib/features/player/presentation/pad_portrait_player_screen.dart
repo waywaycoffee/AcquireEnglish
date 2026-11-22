@@ -46,7 +46,9 @@ import '../../sync/data/personal_import_sync.dart';
 import '../../sync/data/progress_sync_service.dart';
 import '../../words/data/offline_word_dictionary.dart';
 import '../../words/data/vocab_card_enrichment_service.dart';
+import '../../reading/data/reading_gloss.dart';
 import '../../words/presentation/learned_vocabulary_provider.dart';
+import '../../words/presentation/learner_level_provider.dart';
 import '../../words/presentation/word_book_provider.dart';
 import '../data/dictation_queue_provider.dart';
 import '../data/dub_accompaniment_service.dart';
@@ -3612,11 +3614,18 @@ Future<void> _settleChineseFillIfAlreadyPresent() async {
           onReplayLine: _handleReplayLine,
         );
       case StudyModeTab.wordCards:
+        final int learnThreshold =
+            ref.watch(adaptiveReadingFreqThresholdProvider);
+        syncAdaptiveFreqThresholdToPrefs(learnThreshold);
+        final ReadingFrequencyLexicon? lexicon =
+            ref.watch(readingFrequencyLexiconProvider).asData?.value;
         final List<EpisodeWordCard> cards = buildEpisodeWordCards(
           episodeId: widget.episodeId,
           lines: state.lines,
           words: ref.watch(wordBookProvider),
           phrases: ref.watch(phraseBookProvider),
+          learnThreshold: learnThreshold,
+          freqRankOf: lexicon?.rankOf,
         );
         return StudyWordCardsTab(
           cards: cards,

@@ -27,6 +27,7 @@ import '../../words/data/offline_word_dictionary.dart';
 import '../../words/domain/foundation_media.dart';
 import '../../words/presentation/foundation_media_provider.dart';
 import '../../words/presentation/learned_vocabulary_provider.dart';
+import '../../words/presentation/learner_level_provider.dart';
 import '../../words/presentation/vocab_preview_sheet.dart';
 import '../../words/presentation/word_book_provider.dart';
 import '../data/reading_continuous_tts.dart';
@@ -100,6 +101,7 @@ class _ReadingReaderScreenState extends ConsumerState<ReadingReaderScreen> {
     _loadPrefs();
     // Warm ECDICT off the critical first paint.
     WidgetsBinding.instance.addPostFrameCallback((_) {
+      _syncFreqThresholdFromLevel();
       unawaited(
         ref.read(offlineWordDictionaryProvider).ensureLoaded(),
       );
@@ -190,6 +192,16 @@ class _ReadingReaderScreenState extends ConsumerState<ReadingReaderScreen> {
     await prefs.put(kReadingSlowModeKey, _slowMode ? '1' : '0');
     await prefs.put(kReadingSoeEnabledKey, _soeEnabled ? '1' : '0');
     await prefs.put(kReadingTtsGenderKey, _ttsGender.storageValue);
+  }
+
+  void _syncFreqThresholdFromLevel() {
+    final int next = ref.read(adaptiveReadingFreqThresholdProvider);
+    syncAdaptiveFreqThresholdToPrefs(next);
+    if (!mounted || next == _freqThreshold) return;
+    setState(() {
+      _freqThreshold = next;
+      _invalidateGlosses(clearCache: true);
+    });
   }
 
   Future<void> _speakReading(String text, {double? rate}) async {
@@ -1026,12 +1038,13 @@ class _ReadingReaderScreenState extends ConsumerState<ReadingReaderScreen> {
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: <Widget>[
                   const Text(
-                    '自动生词阈值',
+                    '自动生词阈值（随水平）',
                     style: TextStyle(fontWeight: FontWeight.w800, fontSize: 16),
                   ),
                   const SizedBox(height: 6),
                   Text(
-                    '高亮 / 词下中文：词频排名 > $_freqThreshold',
+                    '按估计词汇量自动对齐 i+1：高亮 / 词下中文为词频 > $_freqThreshold。'
+                    '水平变化后会自动更新；也可临时拖动。',
                     style: const TextStyle(color: Color(0xFF626262)),
                   ),
                   Slider(
@@ -1091,6 +1104,15 @@ class _ReadingReaderScreenState extends ConsumerState<ReadingReaderScreen> {
 
   @override
   Widget build(BuildContext context) {
+    ref.listen<int>(adaptiveReadingFreqThresholdProvider, (int? prev, int next) {
+      if (prev == next) return;
+      syncAdaptiveFreqThresholdToPrefs(next);
+      if (!mounted || next == _freqThreshold) return;
+      setState(() {
+        _freqThreshold = next;
+        _invalidateGlosses(clearCache: true);
+      });
+    });
     final ReadingLibraryState library = ref.watch(readingLibraryProvider);
     final ReadingDoc? doc = library.docById(widget.docId);
     if (!library.ready) {

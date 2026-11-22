@@ -81,4 +81,44 @@ void main() {
       isTrue,
     );
   });
+
+  test('suggested cards prefer i+1 ranks near the frontier', () {
+    const List<PlayerSubtitleLine> lines = <PlayerSubtitleLine>[
+      PlayerSubtitleLine(
+        startTime: '00:00',
+        english: 'The habitat appears after the simple word again and again',
+        chinese: '',
+        startMs: 0,
+        endMs: 3000,
+      ),
+      PlayerSubtitleLine(
+        startTime: '00:04',
+        english: 'A sesquipedalian example also appears in this habitat scene',
+        chinese: '',
+        startMs: 4000,
+        endMs: 7000,
+      ),
+    ];
+    final Map<String, int> ranks = <String, int>{
+      'habitat': 8000,
+      'appears': 2000,
+      'simple': 1500,
+      'sesquipedalian': 45000,
+      'example': 1800,
+      'scene': 2500,
+    };
+    final List<EpisodeWordCard> cards = buildEpisodeWordCards(
+      episodeId: 'ep2',
+      lines: lines,
+      words: const <WordEntry>[],
+      phrases: const <PhraseEntry>[],
+      learnThreshold: 5000,
+      freqRankOf: (String lemma) => ranks[lemma],
+    );
+    final List<EpisodeWordCard> suggested = cards
+        .where((EpisodeWordCard c) => c.source == 'suggested')
+        .toList(growable: false);
+    expect(suggested, isNotEmpty);
+    expect(suggested.first.text.toLowerCase(), 'habitat');
+  });
 }

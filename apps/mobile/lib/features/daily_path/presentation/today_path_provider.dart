@@ -2,7 +2,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../daily_review/domain/daily_review.dart';
 import '../../daily_review/presentation/daily_review_provider.dart';
+import '../../reading/data/reading_gloss.dart';
 import '../../words/domain/word_review_settings.dart';
+import '../../words/presentation/learner_level_provider.dart';
 import '../../words/presentation/word_review_settings_provider.dart';
 import '../data/course_plan_store.dart';
 import '../domain/course_plan.dart';
@@ -24,6 +26,8 @@ class TodayPathNotifier extends Notifier<TodayPathState> {
     ref.watch(coursePlanProvider);
     ref.watch(dailyReviewProvider);
     ref.watch(wordReviewSettingsProvider);
+    ref.watch(adaptiveReadingFreqThresholdProvider);
+    ref.watch(readingFrequencyLexiconProvider);
     return _synthesize(DateTime.now());
   }
 
@@ -144,8 +148,13 @@ class TodayPathNotifier extends Notifier<TodayPathState> {
         (WordReviewSettings s) => s.dailyNewLimit,
       ),
     );
-    final ReviewPlan plan =
-        review.withLimit(newQuota.clamp(0, 100)).plan(sources, now);
+    final ReviewPlan plan = reviewPlanForLearnerLevel(
+      state: review.withLimit(newQuota.clamp(0, 100)),
+      sources: sources,
+      now: now,
+      threshold: ref.watch(adaptiveReadingFreqThresholdProvider),
+      lexicon: ref.watch(readingFrequencyLexiconProvider).asData?.value,
+    );
     final List<TodayTask> out = <TodayTask>[];
 
     if (plan.due.isNotEmpty) {
