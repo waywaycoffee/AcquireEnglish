@@ -50,8 +50,10 @@
     resources: "公共资源库",
     fingerprint: "指纹缓存",
     users: "用户与资产",
+    community: "社区帖子",
   };
   const feedbackState = { offset: 0, limit: 40, total: 0, status: "open", q: "" };
+  const communityState = { offset: 0, limit: 40, total: 0, q: "", status: "" };
 
   async function api(path, options = {}) {
     const headers = Object.assign(
@@ -137,7 +139,7 @@
     document.querySelectorAll(".tab").forEach((btn) => {
       btn.classList.toggle("active", btn.dataset.tab === tab);
     });
-    ["dashboard", "feedback", "infra", "usage", "resources", "fingerprint", "users"].forEach((id) => {
+    ["dashboard", "feedback", "infra", "usage", "resources", "fingerprint", "users", "community"].forEach((id) => {
       $(`panel-${id}`).classList.toggle("hidden", id !== tab);
     });
   }
@@ -504,6 +506,9 @@
     ]);
     if (state.tab === "resources") {
       loadResources().catch((e) => console.warn(e));
+    }
+    if (state.tab === "community") {
+      loadCommunityPosts().catch((e) => console.warn(e));
     }
     if (state.selectedId) await loadDetail(state.selectedId);
   }
@@ -1139,6 +1144,35 @@
       </div>`;
   }
 
+  async function loadCommunityPosts() {
+    const s = communityState;
+    const data = await api(`/community/posts?q=${encodeURIComponent(s.q)}&status=${s.status}&limit=${s.limit}&offset=${s.offset}`);
+    s.total = data.total || 0;
+    $("communityPostList").innerHTML = (data.items || []).map((p) => `
+      <section class="section" data-post-id="${p.id}">
+        <div class="muted">#${p.id} · ${escapeHtml(p.author_name)} · 用户 ${p.user_id} · ${escapeHtml(p.kind)} · ${escapeHtml(p.created_at || "")}</div>
+        <form class="communityEditForm" data-post-id="${p.id}">
+          <label>标题<input class="full" name="title" maxlength="200" value="${escapeAttr(p.title)}" required /></label>
+          <label>正文<textarea class="full" name="body" rows="3" maxlength="4000">${escapeHtml(p.body)}</textarea></label>
+          <label>链接<input class="full" name="link_url" value="${escapeAttr(p.link_url)}" /></label>
+          <label>状态<select name="status"><option value="visible" ${p.status === "visible" ? "selected" : ""}>公开</option><option value="hidden" ${p.status === "hidden" ? "selected" : ""}>隐藏</option></select></label>
+          <button class="btn primary" type="submit">保存修改</button>
+        </form>
+      </section>`).join("") || '<div class="empty">暂无帖子</div>';
+    $("communityPageInfo").textContent = `${Math.floor(s.offset / s.limit) + 1} / ${Math.max(1, Math.ceil(s.total / s.limit))} · 共 ${s.total}`;
+    $("communityPrev").disabled = s.offset <= 0;
+    $("communityNext").disabled = s.offset + s.limit >= s.total;
+    document.querySelectorAll(".communityEditForm").forEach((form) => form.addEventListener("submit", async (ev) => {
+      ev.preventDefault();
+      const fd = new FormData(form);
+      if (!confirm(`确认修改帖子 #${form.dataset.postId}？`)) return;
+      try {
+        await api(`/community/posts/${form.dataset.postId}`, { method: "PATCH", body: JSON.stringify(Object.fromEntries(fd)) });
+        await loadCommunityPosts();
+      } catch (e) { alert(e.message); }
+    }));
+  }
+
   // ---- users tab (existing) ----
   async function loadStats() {
     const s = await api("/stats");
@@ -1428,9 +1462,26 @@
           <input class="full" name="display_name" value="${escapeAttr(
             u.display_name || ""
           )}" placeholder="显示名" />
+          <input class="full" name="email" type="email" required value="${escapeAttr(u.email || "")}" placeholder="登录邮箱" />
+          <input class="full" name="phone" value="${escapeAttr(u.phone || "")}" placeholder="绑定手机号（留空解绑）" />
           <button class="btn primary full" type="submit">保存资料</button>
         </form>
       </div>
+      <section class="section">
+        <h3>账号安全与会员等级</h3>
+        <p class="muted">密码无法查看。重置后只显示一次新密码；修改邮箱会影响原邮箱登录。会员操作会覆盖当前 Pro 权益的有效期。</p>
+        <div class="actions">
+          <form id="passwordForm" class="inline-form" style="flex:1">
+            <input name="new_password" type="password" minlength="12" autocomplete="new-password" placeholder="自定新密码（至少12位，留空则生成）" />
+            <button class="btn danger full" type="submit">修改 / 重置密码</button>
+          </form>
+          <form id="membershipForm" class="inline-form" style="flex:1">
+            <select name="level"><option value="free" ${u.membership_level === "free" ? "selected" : ""}>免费</option><option value="pro" ${u.membership_level === "pro" ? "selected" : ""}>Pro 会员</option></select>
+            <input name="duration_days" type="number" min="1" max="3650" value="30" aria-label="Pro有效天数" />
+            <button class="btn primary full" type="submit">修改会员等级</button>
+          </form>
+        </div>
+      </section>
       ${renderAssetTables(data)}
       <section class="section">
         <h3>发放权益</h3>
@@ -1518,12 +1569,32 @@
       try {
         await api(`/users/${userId}`, {
           method: "PATCH",
-          body: JSON.stringify({ display_name: fd.get("display_name") }),
+          body: JSON.stringify({ display_name: fd.get("display_name"), email: fd.get("email"), phone: fd.get("phone") }),
         });
         await Promise.all([loadUsers(), loadDetail(userId), loadStats()]);
       } catch (e) {
         alert(e.message);
       }
+    });
+    $("passwordForm")?.addEventListener("submit", async (ev) => {
+      ev.preventDefault();
+      if (!confirm(`确认重置用户 #${userId} 的登录密码？`)) return;
+      const value = String(new FormData(ev.target).get("new_password") || "");
+      try {
+        const result = await api(`/users/${userId}/password/reset`, { method: "POST", body: JSON.stringify({ new_password: value || null }) });
+        ev.target.reset();
+        alert(result.temporary_password ? `新密码只显示这一次：${result.temporary_password}` : "密码已修改");
+      } catch (e) { alert(e.message); }
+    });
+    $("membershipForm")?.addEventListener("submit", async (ev) => {
+      ev.preventDefault();
+      const fd = new FormData(ev.target);
+      const level = String(fd.get("level"));
+      if (!confirm(`确认将用户 #${userId} 的会员设为 ${level}？现有 Pro 有效期会被覆盖。`)) return;
+      try {
+        await api(`/users/${userId}/membership`, { method: "PUT", body: JSON.stringify({ level, duration_days: Number(fd.get("duration_days")) }) });
+        await Promise.all([loadDetail(userId), loadStats()]);
+      } catch (e) { alert(e.message); }
     });
     $("grantForm")?.addEventListener("submit", async (ev) => {
       ev.preventDefault();
@@ -1633,7 +1704,23 @@
       if (btn.dataset.tab === "usage") loadUsage().catch((e) => alert(e.message));
       if (btn.dataset.tab === "resources") loadResources().catch((e) => alert(e.message));
       if (btn.dataset.tab === "fingerprint") loadFingerprint().catch((e) => alert(e.message));
+      if (btn.dataset.tab === "community") loadCommunityPosts().catch((e) => alert(e.message));
     });
+  });
+  $("communitySearchForm").addEventListener("submit", (e) => {
+    e.preventDefault();
+    communityState.q = $("communitySearchInput").value.trim();
+    communityState.status = $("communityStatus").value;
+    communityState.offset = 0;
+    loadCommunityPosts().catch((err) => alert(err.message));
+  });
+  $("communityPrev").addEventListener("click", () => {
+    communityState.offset = Math.max(0, communityState.offset - communityState.limit);
+    loadCommunityPosts().catch((err) => alert(err.message));
+  });
+  $("communityNext").addEventListener("click", () => {
+    communityState.offset += communityState.limit;
+    loadCommunityPosts().catch((err) => alert(err.message));
   });
   $("feedbackSearchForm").addEventListener("submit", (e) => {
     e.preventDefault();

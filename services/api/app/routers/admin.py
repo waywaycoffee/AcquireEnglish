@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import json
+import logging
+import secrets
 from datetime import datetime, timezone
 from typing import Any
 
@@ -20,6 +22,7 @@ from app.deps_admin import (
 )
 from app.models import (
     CommerceEvent,
+    CommunityPost,
     MembershipCoupon,
     Order,
     OrderItem,
@@ -35,8 +38,13 @@ from app.models import (
 )
 from app.services import admin_user_assets as admin_assets_svc
 from app.services import user_assets as assets_svc
+from app.security import hash_password
+from app.services.email_auth import normalize_email
+from app.services.netdisk_share_link import netdisk_share_provider
+from app.services.phone_auth import normalize_phone
 
 router = APIRouter(prefix="/admin", tags=["admin"])
+_audit_log = logging.getLogger("admin.actions")
 
 
 def _iso(value: datetime | None) -> str | None:
@@ -106,6 +114,24 @@ class PointsAdjustBody(BaseModel):
 
 class UserPatchBody(BaseModel):
     display_name: str | None = Field(default=None, max_length=120)
+    email: str | None = Field(default=None, max_length=255)
+    phone: str | None = Field(default=None, max_length=32)
+
+
+class PasswordResetBody(BaseModel):
+    new_password: str | None = Field(default=None, min_length=12, max_length=128)
+
+
+class MembershipBody(BaseModel):
+    level: str = Field(pattern="^(free|pro)$")
+    duration_days: int = Field(default=30, ge=1, le=3650)
+
+
+class PostPatchBody(BaseModel):
+    title: str | None = Field(default=None, max_length=200)
+    body: str | None = Field(default=None, max_length=4000)
+    link_url: str | None = Field(default=None, max_length=1024)
+    status: str | None = Field(default=None, pattern="^(visible|hidden)$")
 
 
 class AdminLoginBody(BaseModel):
@@ -285,6 +311,12 @@ async def get_user(
         {
             "asset_count": int(assets.get("asset_count") or 0),
             "storage_bytes": int(assets.get("storage_bytes") or 0),
+            "membership_level": "pro" if any(
+                e.asset_kind == "membership" and e.asset_ref == "pro"
+                and e.status == "active" and (e.ends_at is None or
+                (e.ends_at.replace(tzinfo=timezone.utc) if e.ends_at.tzinfo is None else e.ends_at) > datetime.now(timezone.utc))
+                for e in entitlements
+            ) else "free",
         }
     )
     return {
@@ -363,10 +395,148 @@ async def patch_user(
     if body.display_name is not None:
         name = body.display_name.strip()
         user.display_name = name or None
+    if body.email is not None:
+        try:
+            email = normalize_email(body.email)
+        except ValueError as exc:
+            raise HTTPException(400, str(exc)) from exc
+        other = (await db.execute(select(User.id).where(User.email == email, User.id != user_id))).scalar_one_or_none()
+        if other is not None:
+            raise HTTPException(409, "邮箱已被其他账号使用")
+        user.email = email
+    if body.phone is not None:
+        if not body.phone.strip():
+            user.phone = None
+        else:
+            try:
+                phone = normalize_phone(body.phone)
+            except ValueError as exc:
+                raise HTTPException(400, str(exc)) from exc
+            other = (await db.execute(select(User.id).where(User.phone == phone, User.id != user_id))).scalar_one_or_none()
+            if other is not None:
+                raise HTTPException(409, "手机号已被其他账号使用")
+            user.phone = phone
     await db.commit()
+    _audit_log.warning("admin user profile updated user_id=%s", user_id)
     await db.refresh(user)
     wallet = await assets_svc.get_or_create_wallet(db, user_id)
     return {"user": _user_brief(user, wallet=wallet)}
+
+
+@router.post("/users/{user_id}/password/reset")
+async def reset_user_password(
+    user_id: int,
+    body: PasswordResetBody,
+    _: str = Depends(require_admin_token),
+    db: AsyncSession = Depends(get_db),
+) -> dict[str, Any]:
+    user = await db.get(User, user_id)
+    if user is None:
+        raise HTTPException(404, "user not found")
+    generated = body.new_password is None
+    password = body.new_password or secrets.token_urlsafe(24)
+    user.hashed_password = hash_password(password)
+    await db.commit()
+    _audit_log.warning("admin password reset user_id=%s generated=%s", user_id, generated)
+    return {"ok": True, "temporary_password": password if generated else None}
+
+
+@router.put("/users/{user_id}/membership")
+async def set_user_membership(
+    user_id: int,
+    body: MembershipBody,
+    _: str = Depends(require_admin_token),
+    db: AsyncSession = Depends(get_db),
+) -> dict[str, Any]:
+    from datetime import timedelta
+
+    user = await db.get(User, user_id)
+    if user is None:
+        raise HTTPException(404, "user not found")
+    row = (await db.execute(select(UserEntitlement).where(
+        UserEntitlement.user_id == user_id,
+        UserEntitlement.asset_kind == "membership",
+        UserEntitlement.asset_ref == "pro",
+    ))).scalar_one_or_none()
+    if body.level == "free":
+        if row is not None:
+            row.status = "revoked"
+    else:
+        now = datetime.now(timezone.utc)
+        if row is None:
+            row = UserEntitlement(user_id=user_id, asset_kind="membership", asset_ref="pro")
+            db.add(row)
+        row.status = "active"
+        row.source = "grant"
+        row.starts_at = now
+        row.ends_at = now + timedelta(days=body.duration_days)
+        row.meta_json = json.dumps({"via": "admin_web", "admin_override": True})
+    await db.commit()
+    _audit_log.warning("admin membership changed user_id=%s level=%s", user_id, body.level)
+    if row is not None:
+        await db.refresh(row)
+    return {"level": body.level, "entitlement": _entitlement_out(row) if row else None}
+
+
+@router.get("/community/posts")
+async def admin_list_posts(
+    q: str = Query("", max_length=120),
+    status: str = Query("", pattern="^(|visible|hidden)$"),
+    limit: int = Query(40, ge=1, le=100),
+    offset: int = Query(0, ge=0),
+    _: str = Depends(require_admin_token),
+    db: AsyncSession = Depends(get_db),
+) -> dict[str, Any]:
+    stmt = select(CommunityPost, User.display_name, User.email).join(User, User.id == CommunityPost.user_id)
+    count = select(func.count()).select_from(CommunityPost)
+    if q.strip():
+        filt = or_(CommunityPost.title.ilike(f"%{q.strip()}%"), CommunityPost.body.ilike(f"%{q.strip()}%"))
+        stmt, count = stmt.where(filt), count.where(filt)
+    if status:
+        stmt, count = stmt.where(CommunityPost.status == status), count.where(CommunityPost.status == status)
+    total = int((await db.execute(count)).scalar() or 0)
+    rows = (await db.execute(stmt.order_by(CommunityPost.id.desc()).offset(offset).limit(limit))).all()
+    return {"total": total, "items": [{
+        "id": post.id, "user_id": post.user_id, "author_name": name or email,
+        "kind": post.kind, "title": post.title, "body": post.body,
+        "link_url": post.link_url or "", "status": post.status,
+        "created_at": _iso(post.created_at),
+    } for post, name, email in rows]}
+
+
+@router.patch("/community/posts/{post_id}")
+async def admin_patch_post(
+    post_id: int,
+    body: PostPatchBody,
+    _: str = Depends(require_admin_token),
+    db: AsyncSession = Depends(get_db),
+) -> dict[str, Any]:
+    post = await db.get(CommunityPost, post_id)
+    if post is None:
+        raise HTTPException(404, "post not found")
+    if body.title is not None:
+        post.title = body.title.strip()
+    if body.body is not None:
+        post.body = body.body.strip()
+    if body.link_url is not None:
+        link = body.link_url.strip()
+        if post.kind == "share_netdisk" and not netdisk_share_provider(link):
+            raise HTTPException(400, "请填写受支持的 HTTPS 网盘链接")
+        post.link_url = link or None
+        if post.kind == "share_netdisk":
+            from urllib.parse import parse_qs, urlparse
+            try:
+                meta = json.loads(post.meta_json or "{}")
+            except json.JSONDecodeError:
+                meta = {}
+            meta["netdisk_provider"] = netdisk_share_provider(link)
+            meta["share_code"] = parse_qs(urlparse(link).query).get("pwd", [""])[0]
+            post.meta_json = json.dumps(meta, ensure_ascii=False)
+    if body.status is not None:
+        post.status = body.status
+    await db.commit()
+    _audit_log.warning("admin community post updated post_id=%s status=%s", post_id, post.status)
+    return {"ok": True, "id": post.id, "status": post.status}
 
 
 @router.post("/users/{user_id}/entitlements/grant")

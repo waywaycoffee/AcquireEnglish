@@ -54,6 +54,7 @@
       <button type="button" data-tab="usage" class="tab">Token / 损益</button>
       <button type="button" data-tab="resources" class="tab">公共资源</button>
       <button type="button" data-tab="fingerprint" class="tab">指纹缓存</button>
+      <button type="button" data-tab="community" class="tab">社区帖子</button>
       <button type="button" data-tab="users" class="tab">用户资产</button>
     </nav>
 
@@ -86,6 +87,19 @@
     <section id="panel-infra" class="tab-panel hidden"></section>
     <section id="panel-usage" class="tab-panel hidden"></section>
     <section id="panel-resources" class="tab-panel hidden"></section>
+    <section id="panel-community" class="tab-panel hidden">
+      <div class="panel">
+        <div class="panel-head"><h2>社区帖子管理</h2>
+          <form id="communitySearchForm" class="search">
+            <input id="communitySearchInput" type="search" placeholder="搜索标题或正文" />
+            <select id="communityStatus"><option value="">全部</option><option value="visible">公开</option><option value="hidden">已隐藏</option></select>
+            <button class="btn primary" type="submit">搜索</button>
+          </form>
+        </div>
+        <div id="communityPostList"></div>
+        <div class="pager"><button id="communityPrev" class="btn ghost" type="button">上一页</button><span id="communityPageInfo"></span><button id="communityNext" class="btn ghost" type="button">下一页</button></div>
+      </div>
+    </section>
     <section id="panel-users" class="tab-panel hidden">
       <section id="statsRow" class="stats"></section>
       <div class="layout">
