@@ -298,7 +298,7 @@ void main() {
   });
 
   test(
-    'saved words and expressions are excluded even if previously active',
+    'favorite words and phrases enter the unified review source queue',
     () async {
       final ProviderContainer container = ProviderContainer(
         overrides: [
@@ -309,10 +309,15 @@ void main() {
       addTearDown(container.dispose);
       expect(container.read(wordBookProvider).first.favorite, isTrue);
       expect(container.read(phraseBookProvider).single.english, 'Hello.');
-      expect(container.read(reviewSourcesProvider), isEmpty);
-      await expectLater(
-        container.read(dailyReviewProvider.notifier).reviewToday('phrase:1'),
-        throwsStateError,
+      final List<ReviewSource> sources = container.read(reviewSourcesProvider);
+      expect(sources, isNotEmpty);
+      expect(
+        sources.any((ReviewSource source) => source.key.startsWith('entry:saved:')),
+        isTrue,
+      );
+      expect(
+        sources.any((ReviewSource source) => source.key == 'phrase:1'),
+        isTrue,
       );
     },
   );

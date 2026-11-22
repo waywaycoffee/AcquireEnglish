@@ -399,44 +399,47 @@ class _MoreNavItem extends StatelessWidget {
           borderRadius: BorderRadius.circular(compact ? 16 : 20),
           boxShadow: selected ? AppDesignTokens.toyButtonShadow : null,
         ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: <Widget>[
-            SizedBox(
-              width: compact ? 28 : 32,
-              height: compact ? 28 : 32,
-              child: selected
-                  ? DecoratedBox(
-                      decoration: BoxDecoration(
-                        color: AppDesignTokens.onAccent,
-                        borderRadius: BorderRadius.circular(14),
+        child: FittedBox(
+          fit: BoxFit.scaleDown,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: <Widget>[
+              SizedBox(
+                width: compact ? 24 : 32,
+                height: compact ? 24 : 32,
+                child: selected
+                    ? DecoratedBox(
+                        decoration: BoxDecoration(
+                          color: AppDesignTokens.onAccent,
+                          borderRadius: BorderRadius.circular(14),
+                        ),
+                        child: Icon(
+                          Icons.grid_view_rounded,
+                          size: compact ? 15 : 19,
+                          color: AppDesignTokens.brandGreenDark,
+                        ),
+                      )
+                    : Icon(
+                        Icons.grid_view_outlined,
+                        size: compact ? 15 : 19,
+                        color: AppDesignTokens.textSecondary,
                       ),
-                      child: Icon(
-                        Icons.grid_view_rounded,
-                        size: compact ? 17 : 19,
-                        color: AppDesignTokens.brandGreenDark,
-                      ),
-                    )
-                  : Icon(
-                      Icons.grid_view_outlined,
-                      size: compact ? 17 : 19,
-                      color: AppDesignTokens.textSecondary,
-                    ),
-            ),
-            SizedBox(height: compact ? 2 : 3),
-            Text(
-              '更多',
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(
-                color: selected
-                    ? AppDesignTokens.onAccent
-                    : AppDesignTokens.textSecondary,
-                fontSize: compact ? 10 : 11,
-                fontWeight: selected ? FontWeight.w800 : FontWeight.w700,
               ),
-            ),
-          ],
+              SizedBox(height: compact ? 1 : 3),
+              Text(
+                '更多',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  color: selected
+                      ? AppDesignTokens.onAccent
+                      : AppDesignTokens.textSecondary,
+                  fontSize: compact ? 10 : 11,
+                  fontWeight: selected ? FontWeight.w800 : FontWeight.w700,
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -511,44 +514,47 @@ class _NavItem extends StatelessWidget {
           borderRadius: BorderRadius.circular(compact ? 16 : 20),
           boxShadow: selected ? AppDesignTokens.toyButtonShadow : null,
         ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: <Widget>[
-            SizedBox(
-              width: compact ? 28 : 32,
-              height: compact ? 28 : 32,
-              child: selected
-                  ? DecoratedBox(
-                      decoration: BoxDecoration(
-                        color: AppDesignTokens.onAccent,
-                        borderRadius: BorderRadius.circular(14),
+        child: FittedBox(
+          fit: BoxFit.scaleDown,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: <Widget>[
+              SizedBox(
+                width: compact ? 24 : 32,
+                height: compact ? 24 : 32,
+                child: selected
+                    ? DecoratedBox(
+                        decoration: BoxDecoration(
+                          color: AppDesignTokens.onAccent,
+                          borderRadius: BorderRadius.circular(14),
+                        ),
+                        child: Icon(
+                          destination.activeIcon,
+                          size: compact ? 15 : 19,
+                          color: AppDesignTokens.brandGreenDark,
+                        ),
+                      )
+                    : Icon(
+                        destination.icon,
+                        size: compact ? 15 : 19,
+                        color: AppDesignTokens.textSecondary,
                       ),
-                      child: Icon(
-                        destination.activeIcon,
-                        size: compact ? 17 : 19,
-                        color: AppDesignTokens.brandGreenDark,
-                      ),
-                    )
-                  : Icon(
-                      destination.icon,
-                      size: compact ? 17 : 19,
-                      color: AppDesignTokens.textSecondary,
-                    ),
-            ),
-            SizedBox(height: compact ? 2 : 3),
-            Text(
-              destination.label,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(
-                color: selected
-                    ? AppDesignTokens.onAccent
-                    : AppDesignTokens.textSecondary,
-                fontSize: compact ? 10 : 11,
-                fontWeight: selected ? FontWeight.w800 : FontWeight.w700,
               ),
-            ),
-          ],
+              SizedBox(height: compact ? 1 : 3),
+              Text(
+                destination.label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  color: selected
+                      ? AppDesignTokens.onAccent
+                      : AppDesignTokens.textSecondary,
+                  fontSize: compact ? 10 : 11,
+                  fontWeight: selected ? FontWeight.w800 : FontWeight.w700,
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );

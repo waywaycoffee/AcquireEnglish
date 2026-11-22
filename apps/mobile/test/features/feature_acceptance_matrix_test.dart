@@ -58,25 +58,34 @@ void main() {
     });
 
     File fakeVideo(String name) {
+      // Local enqueue requires >64KB usable video for ZH-only translate jobs.
       final File video = File('${temp.path}/$name');
       video.writeAsBytesSync(List<int>.filled(65 * 1024, 1));
       return video;
     }
 
-    test('缺英文有中文 → 入队 needEnglish', () async {
+    test('缺英文有中文 → 检测 needEnglish，英文走云端不入本地队', () async {
       final File video = fakeVideo('a.mp4');
       final File zh = File('${temp.path}/zh.srt')
         ..writeAsStringSync('1\n00:00:00,000 --> 00:00:01,000\n你好\n');
+      final SubtitleCompletionNeed need = await detectSubtitleCompletionNeed(
+        episodeId: 'f02-en',
+        zhSubtitlePath: zh.path,
+        appSupportDirectory: () async => temp,
+      );
+      expect(need.needEnglish, isTrue);
+      expect(need.needChinese, isFalse);
       await enqueueSubtitleCompletionForEpisode(
         episodeId: 'f02-en',
         videoPath: video.path,
         zhSubtitlePath: zh.path,
         queue: queue,
         appSupportDirectory: () async => temp,
+        skipSharedLookup: true,
+        networkFetchOfficial: false,
       );
-      final SubtitleCompletionJob job = (await queue.loadJobs()).single;
-      expect(job.needEnglish, isTrue);
-      expect(job.needChinese, isFalse);
+      // Product: missing English waits on ECS GPU ASR, not on-device Whisper.
+      expect(await queue.loadJobs(), isEmpty);
     });
 
     test('缺中文有英文 → 入队 needChinese', () async {
@@ -90,24 +99,33 @@ void main() {
         enSubtitlePath: en.path,
         queue: queue,
         appSupportDirectory: () async => temp,
+        skipSharedLookup: true,
+        networkFetchOfficial: false,
       );
       final SubtitleCompletionJob job = (await queue.loadJobs()).single;
       expect(job.needEnglish, isFalse);
       expect(job.needChinese, isTrue);
     });
 
-    test('中英皆缺 → 两边同时入队', () async {
+    test('中英皆缺 → 英文云端优先，本地不入队 Whisper', () async {
       final File video = fakeVideo('c.mp4');
+      final SubtitleCompletionNeed need = await detectSubtitleCompletionNeed(
+        episodeId: 'f02-both',
+        force: true,
+        appSupportDirectory: () async => temp,
+      );
+      expect(need.needEnglish, isTrue);
+      expect(need.needChinese, isTrue);
       await enqueueSubtitleCompletionForEpisode(
         episodeId: 'f02-both',
         videoPath: video.path,
         force: true,
         queue: queue,
         appSupportDirectory: () async => temp,
+        skipSharedLookup: true,
+        networkFetchOfficial: false,
       );
-      final SubtitleCompletionJob job = (await queue.loadJobs()).single;
-      expect(job.needEnglish, isTrue);
-      expect(job.needChinese, isTrue);
+      expect(await queue.loadJobs(), isEmpty);
     });
 
     test('中英官方齐全 → 不自动覆盖官方字幕', () async {
