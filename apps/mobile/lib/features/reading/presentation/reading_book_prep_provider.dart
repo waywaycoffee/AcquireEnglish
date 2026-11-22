@@ -103,9 +103,9 @@ final readingBookPrepProvider = StreamProvider.autoDispose
     processOnEcs: true,
   );
   DateTime progressAnchor = DateTime.now();
+  DateTime lastFallbackAt = DateTime.fromMillisecondsSinceEpoch(0);
   int lastPercent = -1;
   int lastPagesReady = -1;
-  bool fallbackTried = false;
 
   while (true) {
     latest ??= await api.readingBookPregenStatus(docId: doc.id, voice: voice);
@@ -129,11 +129,15 @@ final readingBookPrepProvider = StreamProvider.autoDispose
       progressAnchor = DateTime.now();
     }
 
-    // Stalled ~25s without progress → kick ECS filler again.
+    // Stalled ~25s without progress → kick ECS filler again (repeatable).
+    // One-shot fallback left Oz frozen at 99% when a page lease went stale.
+    final DateTime now = DateTime.now();
     final bool stalled =
-        DateTime.now().difference(progressAnchor) > const Duration(seconds: 25);
-    if (!fallbackTried && stalled) {
-      fallbackTried = true;
+        now.difference(progressAnchor) > const Duration(seconds: 25);
+    final bool canFallback =
+        now.difference(lastFallbackAt) > const Duration(seconds: 45);
+    if (stalled && canFallback) {
+      lastFallbackAt = now;
       latest = await api.readingBookPregenFallback(
         docId: doc.id,
         text: doc.plainText,

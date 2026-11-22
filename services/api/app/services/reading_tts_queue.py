@@ -357,15 +357,37 @@ def _claim_row(db, row, *, lease_seconds: float) -> dict | None:
     return out
 
 
+def requeue_stale_working(*, older_than_seconds: float = 120) -> int:
+    """Return stuck ``working`` jobs to ``queued`` so drains can reclaim them.
+
+    Detached CosyVoice drains often exit while a page is still leased; without
+    this, ``claim_id`` keeps returning ``None`` and book progress freezes
+    (commonly seen as 99% with one page left).
+    """
+    now = time.time()
+    cutoff = now - max(30.0, float(older_than_seconds))
+    with connection() as db:
+        cur = db.execute(
+            "UPDATE jobs SET state='queued', lease=NULL, deadline=NULL, updated=? "
+            "WHERE state='working' AND ("
+            "deadline IS NULL OR deadline < ? OR updated IS NULL OR updated < ?"
+            ")",
+            (now, now, cutoff),
+        )
+        return int(cur.rowcount or 0)
+
+
 def claim(lease_seconds: float = 300) -> dict | None:
     now = time.time()
     with connection() as db:
         db.execute("BEGIN IMMEDIATE")
-        # Expire stale leases.
+        # Expire stale leases (deadline) and abandoned workers (no heartbeat).
         db.execute(
             "UPDATE jobs SET state='queued', lease=NULL, deadline=NULL "
-            "WHERE state='working' AND deadline IS NOT NULL AND deadline < ?",
-            (now,),
+            "WHERE state='working' AND ("
+            "deadline IS NULL OR deadline < ? OR updated IS NULL OR updated < ?"
+            ")",
+            (now, now - 120),
         )
         # Prefer emotional book-pair voices so long novels move first.
         row = db.execute(
@@ -385,8 +407,10 @@ def claim_id(job_id: str, lease_seconds: float = 600) -> dict | None:
         db.execute("BEGIN IMMEDIATE")
         db.execute(
             "UPDATE jobs SET state='queued', lease=NULL, deadline=NULL "
-            "WHERE state='working' AND deadline IS NOT NULL AND deadline < ?",
-            (now,),
+            "WHERE state='working' AND ("
+            "deadline IS NULL OR deadline < ? OR updated IS NULL OR updated < ?"
+            ")",
+            (now, now - 120),
         )
         row = db.execute(
             "SELECT * FROM jobs WHERE id=? AND state IN ('queued','working')",
@@ -394,7 +418,13 @@ def claim_id(job_id: str, lease_seconds: float = 600) -> dict | None:
         ).fetchone()
         if row is None:
             return None
-        if row["state"] == "working" and row["deadline"] and row["deadline"] > now:
+        if (
+            row["state"] == "working"
+            and row["deadline"]
+            and row["deadline"] > now
+            and row["updated"]
+            and row["updated"] > now - 120
+        ):
             return None
         return _claim_row(db, row, lease_seconds=lease_seconds)
 
@@ -643,6 +673,7 @@ def book_status(*, doc_id: str, voice: str) -> dict:
 
 
 def unfinished_page_job_ids(*, doc_id: str, voice: str) -> list[str]:
+    requeue_stale_working(older_than_seconds=120)
     doc = (doc_id or "").strip()
     voice_id = (voice or "").strip() or "longanfengyue"
     with connection() as db:

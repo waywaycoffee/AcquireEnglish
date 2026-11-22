@@ -106,3 +106,34 @@ def test_split_sentences_caps(tmp_path: Path, monkeypatch) -> None:
     text = " ".join(f"Sentence number {i}." for i in range(200))
     parts = rtq.split_sentences(text)
     assert len(parts) <= rtq.MAX_SENTENCES
+
+
+def test_requeue_stale_working_frees_abandoned_leases(
+    tmp_path: Path, monkeypatch
+) -> None:
+    monkeypatch.setenv("MEDIA_CACHE_DIR", str(tmp_path))
+    from app.config import settings
+
+    settings.media_cache_dir = str(tmp_path)
+    job = rtq.enqueue(
+        doc_id="catalog_wizard",
+        voice="longanfengyue",
+        page_index=2,
+        text="Toto barked. Dorothy laughed.",
+        user_id=1,
+    )
+    claimed = rtq.claim_id(job["id"], lease_seconds=600)
+    assert claimed is not None
+    # Simulate a dead worker: old updated + future deadline (lease not expired).
+    import time
+
+    with rtq.connection() as db:
+        db.execute(
+            "UPDATE jobs SET updated=?, deadline=? WHERE id=?",
+            (time.time() - 300, time.time() + 400, job["id"]),
+        )
+    freed = rtq.requeue_stale_working(older_than_seconds=120)
+    assert freed >= 1
+    again = rtq.claim_id(job["id"], lease_seconds=60)
+    assert again is not None
+    assert again["id"] == job["id"]

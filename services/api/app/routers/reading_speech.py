@@ -384,6 +384,8 @@ async def drain_book_pregen_ecs(
     user_id: int | None = None,
 ) -> None:
     """Serially fill unfinished pages so FastAPI is not flooded with tasks."""
+    # Abandoned CosyVoice workers leave pages leased forever; free them first.
+    rtq.requeue_stale_working(older_than_seconds=90)
     for job_id in rtq.unfinished_page_job_ids(doc_id=doc_id, voice=voice):
         await process_pregen_job(job_id, user_id=user_id)
         await asyncio.sleep(0)
