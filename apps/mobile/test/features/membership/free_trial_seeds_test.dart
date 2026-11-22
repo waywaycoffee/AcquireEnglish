@@ -15,22 +15,9 @@ void main() {
     }
   });
 
-  test('grandfather keeps labeled free shelf items open', () {
-    expect(
-      isGrandfatheredFreeReading(
-        docId: 'user-imported-1',
-        sourceLabel: '免费体验 · 入门推荐',
-      ),
-      isTrue,
-    );
-    expect(
-      isGrandfatheredFreeReading(
-        docId: 'catalog_other_book',
-        sourceLabel: '社区精选',
-      ),
-      isFalse,
-    );
+  test('starter reading preview ids stay free', () {
     expect(isFreeReadingPreviewDocId('starter-rainy-afternoon'), isTrue);
+    expect(isFreeReadingPreviewDocId('catalog_other_book'), isFalse);
   });
 
   test('personal upload floor is at least 15', () {

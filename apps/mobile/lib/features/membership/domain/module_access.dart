@@ -28,24 +28,12 @@ bool isFreePreviewIndex(int index) =>
     index >= 0 && index < kModuleFreePreviewCount;
 
 /// Public starter / default-seed readings stay available before a module purchase.
-/// Grandfather rule: ids / labels acquired as free remain free forever.
 bool isFreeReadingPreviewDocId(String docId) {
   final String id = docId.trim();
   if (id.isEmpty) return false;
   if (id.startsWith('starter-')) return true;
   if (id == kDefaultWizardOfOzEntry.stableDocId) return true;
   if (isFreeTrialCourseSeedId(id) || isFreeTrialSeedId(id)) return true;
-  return false;
-}
-
-/// True when a shelf item was acquired as free (seed / starter / labeled).
-bool isGrandfatheredFreeReading({
-  required String docId,
-  String sourceLabel = '',
-}) {
-  if (isFreeReadingPreviewDocId(docId)) return true;
-  final String label = sourceLabel.trim();
-  if (label.contains('免费体验') || label.contains('入门推荐')) return true;
   return false;
 }
 
@@ -150,9 +138,8 @@ Future<void> showModulePaywall(
               Text('开通「$title」', style: Theme.of(ctx).textTheme.titleLarge),
               const SizedBox(height: 8),
               Text(
-                '每个板块始终保留约 $kModuleFreePreviewCount 份永久免费入门内容，'
-                '已加入书架的免费资源不会变为付费；'
-                '继续解锁更多内容请开通本板块月卡或年卡。',
+                '每个板块约有 $kModuleFreePreviewCount 个免费体验内容；'
+                '继续学习请开通本板块月卡或年卡。',
               ),
               const SizedBox(height: 16),
               FilledButton(
