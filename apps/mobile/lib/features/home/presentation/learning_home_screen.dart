@@ -573,14 +573,15 @@ class _LearningHomeScreenState extends ConsumerState<LearningHomeScreen> {
                           Align(
                             alignment: Alignment.centerLeft,
                             child: TextButton.icon(
-                              onPressed: () => context.push('/drama'),
+                              onPressed: () =>
+                                  context.go('/library?tab=drama'),
                               icon: Icon(
                                 Icons.live_tv_outlined,
                                 color: accent,
                                 size: 18,
                               ),
                               label: text(
-                                '美剧精学 · 网盘季集 + 四阶段进度',
+                                '美剧 · 在视频库「美剧」Tab',
                                 13,
                                 color: accent,
                                 bold: true,

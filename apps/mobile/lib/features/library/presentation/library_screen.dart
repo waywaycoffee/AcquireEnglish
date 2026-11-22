@@ -14,6 +14,8 @@ import '../../import_course/data/bilibili_import_service.dart';
 import '../../import_course/data/direct_video_collection_download.dart';
 import '../../import_course/data/netdisk_local_download.dart';
 import '../../import_course/domain/bilibili_import.dart';
+import '../../drama/domain/drama_course.dart';
+import '../../drama/presentation/drama_hub_screen.dart';
 import '../../membership/domain/free_trial_seeds.dart';
 import '../../membership/domain/module_access.dart';
 import '../../import_course/presentation/course_import_entry.dart';
@@ -62,10 +64,13 @@ const String _libraryViewModePrefsKey = 'library_course_view_mode_v1';
 const String _librarySortPrefsKey = 'library_course_sort_v1';
 const String _libraryCefrFilterPrefsKey = 'library_course_cefr_filter_v1';
 
+enum LibraryShelfTab { videos, drama }
+
 class LibraryScreen extends ConsumerStatefulWidget {
   const LibraryScreen({
     super.key,
     this.initialView = LibraryScreenView.list,
+    this.initialShelfTab = LibraryShelfTab.videos,
     this.initialCourseId,
     this.initialEpisodeId,
     this.pickCoverImage,
@@ -73,6 +78,7 @@ class LibraryScreen extends ConsumerStatefulWidget {
   });
 
   final LibraryScreenView initialView;
+  final LibraryShelfTab initialShelfTab;
   final String? initialCourseId;
   final String? initialEpisodeId;
   final Future<String?> Function()? pickCoverImage;
@@ -91,6 +97,7 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
       TranscriptReaderSession();
   late bool showDetail;
   late bool showImport;
+  late LibraryShelfTab shelfTab;
   final ImportCourseFlowController importFlowController =
       ImportCourseFlowController();
   late final TextEditingController queryController;
@@ -114,6 +121,7 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
     super.initState();
     showImport = widget.initialView == LibraryScreenView.import;
     showDetail = widget.initialView == LibraryScreenView.detail;
+    shelfTab = widget.initialShelfTab;
     _restoreBrowsePrefs();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
@@ -310,8 +318,14 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
 
     final VideoDifficultyState difficultyState =
         ref.watch(videoDifficultyProvider);
+    final List<LibraryCourseData> shelfCourses = courses.where((
+      LibraryCourseData course,
+    ) {
+      final bool isDrama = looksLikeDramaCourse(course);
+      return shelfTab == LibraryShelfTab.drama ? isDrama : !isDrama;
+    }).toList(growable: false);
     final List<LibraryCourseMatch> browsedCourses = browseLibraryCourses(
-      courses: courses,
+      courses: shelfCourses,
       query: query,
       sort: courseSort,
       cefrFilter: cefrFilter,
@@ -344,19 +358,23 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
             ? '导入影视'
             : showDetail
             ? selectedCourse.title
-            : '影视库',
+            : shelfTab == LibraryShelfTab.drama
+                ? '美剧'
+                : '视频',
         subtitle: showImport
             ? '影视库'
             : showDetail
             ? activeEpisode == null
                   ? '暂无剧集'
                   : '第 ${activeEpisode.numberStr} 集'
-            : null,
+            : '影视库',
         description: showImport
             ? '把本地视频和字幕整理成新的学习片库。'
             : showDetail
             ? null
-            : '挑一部继续放映，去新的场景里练耳朵。',
+            : shelfTab == LibraryShelfTab.drama
+                ? '网盘季集 + SRT · 四阶段精学'
+                : 'B 站 / 本地 / 网盘短片 · 挑一部练耳朵',
         leading: showImport
             ? AnimatedBuilder(
                 animation: importFlowController,
@@ -1183,7 +1201,51 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
 
               ],
             )
-          : LayoutBuilder(
+          : Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: <Widget>[
+                Padding(
+                  padding: EdgeInsets.fromLTRB(
+                    pagePadding,
+                    compact ? 10 : 12,
+                    pagePadding,
+                    0,
+                  ),
+                  child: SegmentedButton<LibraryShelfTab>(
+                    segments: const <ButtonSegment<LibraryShelfTab>>[
+                      ButtonSegment<LibraryShelfTab>(
+                        value: LibraryShelfTab.videos,
+                        label: Text('视频'),
+                        icon: Icon(Icons.smart_display_outlined, size: 18),
+                      ),
+                      ButtonSegment<LibraryShelfTab>(
+                        value: LibraryShelfTab.drama,
+                        label: Text('美剧'),
+                        icon: Icon(Icons.live_tv_outlined, size: 18),
+                      ),
+                    ],
+                    selected: <LibraryShelfTab>{shelfTab},
+                    onSelectionChanged: (Set<LibraryShelfTab> next) {
+                      if (next.isEmpty) return;
+                      setState(() {
+                        shelfTab = next.first;
+                        editMode = false;
+                        selectedCourseIds.clear();
+                      });
+                    },
+                  ),
+                ),
+                Expanded(
+                  child: shelfTab == LibraryShelfTab.drama
+                      ? DramaHubScreen(
+                          embedded: true,
+                          onSwitchToVideos: () {
+                            setState(() {
+                              shelfTab = LibraryShelfTab.videos;
+                            });
+                          },
+                        )
+                      : LayoutBuilder(
               builder: (BuildContext context, BoxConstraints constraints) {
                 final double contentWidth = constraints.maxWidth - pagePadding * 2;
                 final bool useCompactGrid =
@@ -1536,6 +1598,9 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
                   ],
                 );
               },
+            ),
+                ),
+              ],
             ),
     );
   }
