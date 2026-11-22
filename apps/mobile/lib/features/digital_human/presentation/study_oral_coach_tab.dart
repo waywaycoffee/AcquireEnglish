@@ -260,12 +260,16 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
   String? _learningSessionId;
   bool _busy = false;
   bool _recordingActive = false;
+  /// True while the finger is down on hold-to-talk (survives async mic start).
+  bool _holdPressed = false;
   bool _started = false;
   String _status = '你可以开始说';
   String? _error;
   String _difficulty = 'B1';
   late final AnimationController _orbPulse;
   bool _coachSpeaking = false;
+  /// Bumped to cancel in-flight coach TTS when the learner barges in.
+  int _speakGen = 0;
   final FlutterTts _cartoonTts = FlutterTts();
 
   /// Default English. Flip only when the learner asks for Chinese.
@@ -929,8 +933,8 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
     }
   }
 
-  Future<bool> _playRemoteTts(String url) async {
-    if (!mounted) return false;
+  Future<bool> _playRemoteTts(String url, {required int gen}) async {
+    if (!mounted || gen != _speakGen) return false;
     final Player player = Player();
     _speechPlayer = player;
     try {
@@ -947,23 +951,48 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
       // If nothing starts within a few seconds, treat as broken URL.
       for (int i = 0; i < 12 && !started; i++) {
         await Future<void>.delayed(const Duration(milliseconds: 250));
-        if (!mounted) {
+        if (!mounted || gen != _speakGen) {
           await playingSub.cancel();
           return false;
         }
       }
-      if (!started) {
+      if (!started || gen != _speakGen) {
         await playingSub.cancel();
         return false;
       }
       final bool ok = await completed;
       await playingSub.cancel();
-      return ok;
+      return ok && gen == _speakGen;
     } catch (_) {
       return false;
     } finally {
-      _speechPlayer = null;
-      await player.dispose();
+      if (identical(_speechPlayer, player)) {
+        _speechPlayer = null;
+      }
+      try {
+        await player.dispose();
+      } catch (_) {}
+    }
+  }
+
+  Future<void> _interruptCoachSpeech() async {
+    _speakGen++;
+    final Player? player = _speechPlayer;
+    _speechPlayer = null;
+    try {
+      await player?.stop();
+    } catch (_) {}
+    try {
+      await player?.dispose();
+    } catch (_) {}
+    try {
+      await _cartoonTts.stop();
+    } catch (_) {}
+    try {
+      await _liveTalking.interruptTalk();
+    } catch (_) {}
+    if (mounted && _coachSpeaking) {
+      setState(() => _coachSpeaking = false);
     }
   }
 
@@ -973,8 +1002,9 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
     String? ttsUrl,
   }) async {
     final String speak = text.trim();
-    if (!mounted || !_started || _coachSpeaking || speak.isEmpty) return;
-    setState(() => _coachSpeaking = true);
+    if (!mounted || !_started || speak.isEmpty) return;
+    final int gen = ++_speakGen;
+    if (mounted) setState(() => _coachSpeaking = true);
     try {
       final bool usesCloudVoice = _usesCloudVoice(settings.selectedDigitalHuman);
       String? remote = ttsUrl;
@@ -988,44 +1018,53 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
             ttsVoice: _coachVoice(settings.selectedDigitalHuman),
             language: _preferChineseReply ? 'zh' : 'en',
           );
+          if (gen != _speakGen) return;
           remote = result?.url;
           provider = result?.provider ?? '';
         } catch (_) {
           // Use device TTS if the voice service is unavailable.
         }
       }
-      if (!mounted || !_started) return;
+      if (!mounted || !_started || gen != _speakGen) return;
       if (remote != null && remote.isNotEmpty) {
         setState(() => _voicePlaybackLabel = switch (provider) {
           'qwen-audio' => '阿里云陪练音色',
           'edge' => usesCloudVoice ? '备用音色 · Edge' : '中文音色 · Edge',
           _ => '在线音色',
         });
-        if (await _playRemoteTts(remote)) return;
+        if (await _playRemoteTts(remote, gen: gen)) return;
       }
+      if (gen != _speakGen) return;
       if (_wantsLiveTalking(settings)) {
         await _ensureLiveTalking(settings);
+        if (gen != _speakGen) return;
         if (_liveTalking.isConnected) {
           try {
             await _liveTalking.speak(speak, type: 'echo', interrupt: true);
             // Approximate lip-sync duration so mic unlocks after talk.
             final int waitMs = (speak.length * 55).clamp(1200, 12000);
-            await Future<void>.delayed(Duration(milliseconds: waitMs));
+            final int slices = (waitMs / 200).ceil();
+            for (int i = 0; i < slices; i++) {
+              if (gen != _speakGen || !mounted) return;
+              await Future<void>.delayed(const Duration(milliseconds: 200));
+            }
             return;
           } catch (_) {
             // Fall through to TTS.
           }
         }
       }
-      if (!mounted || !_started) return;
+      if (!mounted || !_started || gen != _speakGen) return;
       setState(() => _voicePlaybackLabel = '备用音色 · 本机');
       await _configureLocalPersonaVoice(settings.selectedDigitalHuman);
       await _cartoonTts.awaitSpeakCompletion(true);
-      if (!mounted || !_started) return;
+      if (!mounted || !_started || gen != _speakGen) return;
       await _cartoonTts.speak(speak).timeout(const Duration(seconds: 90));
     } catch (_) {
     } finally {
-      if (mounted) setState(() => _coachSpeaking = false);
+      if (mounted && gen == _speakGen) {
+        setState(() => _coachSpeaking = false);
+      }
     }
   }
 
@@ -1413,14 +1452,19 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
   }
 
   Future<void> _startRecording() async {
-    if (_recordingActive || _busy || _coachSpeaking) {
+    if (_recordingActive || _busy) {
       return;
     }
+    if (_coachSpeaking) {
+      await _interruptCoachSpeech();
+    }
     if (_duplexLive) {
+      // Prefer hold-to-talk over a silent duplex room with no agent.
       setState(() {
-        _status = '全双工中：直接开口即可，无需按住麦克风';
+        _duplexLive = false;
+        _status = '正在听你说…';
       });
-      return;
+      unawaited(_liveKit.disconnect());
     }
     if (!_started) {
       _startTopicConversation();
@@ -1441,7 +1485,7 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
       _recordingBuffer.fillRange(0, _recordingBytesWritten, 0);
       _recordingBytesWritten = 0;
       final bool allowed = await microphone.requestPermission();
-      if (!mounted) {
+      if (!mounted || !_holdPressed) {
         return;
       }
       if (!allowed) {
@@ -1449,7 +1493,7 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
         return;
       }
       final Stream<Uint8List> stream = await microphone.start();
-      if (!mounted) {
+      if (!mounted || !_holdPressed) {
         await microphone.cancel();
         return;
       }
@@ -1612,21 +1656,38 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
     }
   }
 
+  void _clearBusy(String status) {
+    if (!mounted) return;
+    setState(() {
+      _busy = false;
+      _status = status;
+    });
+  }
+
   Future<void> _runPipelineFreeTalk({
     required LearningSettingsState settings,
     required String audioPath,
   }) async {
     await _ensurePipelineSession(settings);
     final OralCoachSession? session = _session;
-    if (!mounted || !_started || session == null) return;
+    if (!mounted || !_started || session == null) {
+      _clearBusy('点麦克风继续说');
+      return;
+    }
     // Free talk: no subtitle-line reference — coach discusses the theme.
     final OralCoachDraftResult draft = await _pipelineClient.createDraft(
       session: session,
       audioPath: audioPath,
     );
-    if (!mounted || !identical(_session, session)) return;
+    if (!mounted || !identical(_session, session)) {
+      _clearBusy('点麦克风继续说');
+      return;
+    }
     final String confirmed = draft.transcript.trim();
-    if (!mounted || !_started || !identical(_session, session)) return;
+    if (!mounted || !_started || !identical(_session, session)) {
+      _clearBusy('点麦克风继续说');
+      return;
+    }
     if (confirmed.isEmpty || confirmed == '(empty)') {
       setState(() {
         _busy = false;
@@ -1700,7 +1761,8 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
                     topic: _topicLabel,
                   )
                 : 'Hold the mic and say it again in idiomatic English.');
-      await _speakCoach(tip, settings);
+      // Speak tip in background so hold-to-talk is immediately available.
+      unawaited(_speakCoach(tip, settings));
       return;
     }
 
@@ -1744,17 +1806,20 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
     _scrollChatToEnd();
 
     unawaited(_persistLearningTurn(turn));
-    await _speakCoach(
-      speakText,
-      settings,
-      ttsUrl: speakText == rawSpeak ? turn.ttsUrl?.trim() : null,
-    );
+    // Unlock mic before TTS so the learner can barge in / continue quickly.
     if (mounted && _started) {
       setState(() {
         _busy = false;
         _status = '你可以开始说';
       });
     }
+    unawaited(
+      _speakCoach(
+        speakText,
+        settings,
+        ttsUrl: speakText == rawSpeak ? turn.ttsUrl?.trim() : null,
+      ),
+    );
   }
 
   Future<void> _completePendingResay({
@@ -1784,7 +1849,10 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
       replyLanguage: _preferChineseReply ? 'zh' : 'en',
       textOnly: true,
     );
-    if (!mounted || !identical(_session, session)) return;
+    if (!mounted || !identical(_session, session)) {
+      _clearBusy('点麦克风继续说');
+      return;
+    }
     _difficulty = turn.difficulty;
     final String rawSpeak = turn.avatarText.trim().isNotEmpty
         ? turn.avatarText.trim()
@@ -1804,7 +1872,7 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
     });
     _scrollChatToEnd();
     unawaited(_persistLearningTurn(turn));
-    await _speakCoach(speakText, settings);
+    unawaited(_speakCoach(speakText, settings));
   }
 
   void _saveDiagnosisToLanguageBank(
@@ -2303,20 +2371,30 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
   }
 
   Future<void> _onHoldStart() async {
-    if (_busy || _recordingActive || _coachSpeaking) {
+    _holdPressed = true;
+    if (_busy || _recordingActive) {
       return;
+    }
+    if (_coachSpeaking) {
+      await _interruptCoachSpeech();
     }
     if (!_started) {
       _startTopicConversation();
       if (!mounted || !_started) {
+        _holdPressed = false;
         return;
       }
     }
     _idlePromptTimer?.cancel();
     await _startRecording();
+    // Finger already up while mic permission / start was pending.
+    if (!_holdPressed && _recordingActive) {
+      await _stopRecordingAndSend();
+    }
   }
 
   Future<void> _onHoldEnd() async {
+    _holdPressed = false;
     if (!_recordingActive) {
       return;
     }
@@ -2366,6 +2444,7 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
     setState(() {
       _started = false;
       _duplexLive = false;
+      _holdPressed = false;
       _lastRoundTurns = userTurns > 0 ? userTurns : _questUtterances;
       _lastRoundExpressions = expressions.take(5).toList(growable: false);
       _session = null;
@@ -2374,10 +2453,12 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
       _liveConnected = false;
       _quotaConsumed = false;
       _busy = false;
+      _coachSpeaking = false;
       _sessionLeft = _sessionBudget;
       _error = null;
       _status = '已结束 · 点麦克风重新开始';
     });
+    _speakGen++;
     _saveHistory();
     await _cartoonTts.stop();
     await _speechPlayer?.stop();
@@ -3051,20 +3132,18 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
                 ),
               )
             else
-              GestureDetector(
+              Listener(
                 key: const ValueKey<String>('study-oral-coach-mic'),
-                onLongPressStart:
-                    _busy ? null : (_) => unawaited(_onHoldStart()),
-                onLongPressEnd: _busy ? null : (_) => unawaited(_onHoldEnd()),
-                onLongPressCancel:
-                    _busy ? null : () => unawaited(_onHoldEnd()),
-                onTap: _busy
+                behavior: HitTestBehavior.opaque,
+                onPointerDown: _busy
                     ? null
-                    : () => unawaited(
-                        _recordingActive
-                            ? _stopRecordingAndSend()
-                            : _onHoldStart(),
-                      ),
+                    : (_) => unawaited(_onHoldStart()),
+                onPointerUp: _busy
+                    ? null
+                    : (_) => unawaited(_onHoldEnd()),
+                onPointerCancel: _busy
+                    ? null
+                    : (_) => unawaited(_onHoldEnd()),
                 child: AnimatedBuilder(
                   animation: _orbPulse,
                   builder: (BuildContext context, Widget? child) {
