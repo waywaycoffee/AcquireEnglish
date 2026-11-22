@@ -49,7 +49,9 @@
 
     <nav class="tabs" id="tabs">
       <button type="button" data-tab="dashboard" class="tab active">看板</button>
-      <button type="button" data-tab="feedback" class="tab">意见反馈</button>
+      <button type="button" data-tab="feedback" class="tab">优化建议</button>
+      <button type="button" data-tab="exam-assets" class="tab">考试资料审核</button>
+      <button type="button" data-tab="commerce" class="tab">订单 / 会员</button>
       <button type="button" data-tab="infra" class="tab">ECS / 云盘监控</button>
       <button type="button" data-tab="usage" class="tab">Token / 损益</button>
       <button type="button" data-tab="resources" class="tab">公共资源</button>
@@ -63,13 +65,23 @@
     <section id="panel-feedback" class="tab-panel hidden">
       <div class="panel">
         <div class="panel-head">
-          <h2>用户意见反馈 <span id="feedbackOpenBadge" class="muted"></span></h2>
+          <h2>软件优化建议 <span id="feedbackOpenBadge" class="muted"></span></h2>
           <form id="feedbackSearchForm" class="search">
             <select id="feedbackStatusFilter">
               <option value="">全部状态</option>
               <option value="open" selected>待处理</option>
               <option value="read">已读</option>
               <option value="done">已完成</option>
+            </select>
+            <select id="feedbackCategoryFilter">
+              <option value="">全部类型</option>
+              <option value="feature">软件优化 / 新功能</option>
+              <option value="ux">界面体验</option>
+              <option value="performance">卡顿 / 性能</option>
+              <option value="bug">功能缺陷</option>
+              <option value="content">内容与课程</option>
+              <option value="billing">会员 / 支付</option>
+              <option value="general">其他</option>
             </select>
             <input id="feedbackSearchInput" type="search" placeholder="搜索内容 / 用户" />
             <button class="btn primary" type="submit">筛选</button>
@@ -81,7 +93,51 @@
           <span id="feedbackPageInfo" class="muted"></span>
           <button id="feedbackNext" class="btn ghost" type="button">下一页</button>
         </div>
-        <p class="muted">反馈为私密通道：仅后台可见，不会出现在社区 Feed。</p>
+        <p class="muted">App「设置 → 软件优化建议」与首页「优化建议」提交；仅后台可见，不进社区。</p>
+      </div>
+    </section>
+    <section id="panel-exam-assets" class="tab-panel hidden">
+      <div class="panel">
+        <div class="panel-head">
+          <h2>社区考试资料审核 <span id="examAssetsBadge" class="muted"></span></h2>
+          <form id="examAssetsFilterForm" class="search">
+            <select id="examAssetsStatusFilter">
+              <option value="pending" selected>待审核</option>
+              <option value="visible">已通过</option>
+              <option value="rejected">已拒绝</option>
+              <option value="hidden">已隐藏</option>
+              <option value="">全部</option>
+            </select>
+            <button class="btn primary" type="submit">刷新</button>
+          </form>
+        </div>
+        <div id="examAssetsList" class="user-list"></div>
+        <p class="muted">通过后资料对社区可见，并按规则奖励上传者会员天数；拒绝需填写原因。</p>
+      </div>
+    </section>
+    <section id="panel-commerce" class="tab-panel hidden">
+      <div class="panel">
+        <div class="panel-head">
+          <h2>订单 / 会员概览</h2>
+          <form id="commerceOrdersForm" class="search">
+            <select id="commerceOrderStatus">
+              <option value="">全部状态</option>
+              <option value="paid" selected>已支付</option>
+              <option value="pending">待支付</option>
+              <option value="created">已创建</option>
+              <option value="failed">失败</option>
+            </select>
+            <select id="commerceOrderKind">
+              <option value="">全部商品类型</option>
+              <option value="membership">会员</option>
+              <option value="module">模块</option>
+              <option value="credits">学分 / 钱包</option>
+            </select>
+            <button class="btn primary" type="submit">筛选</button>
+          </form>
+        </div>
+        <div id="commerceOverview" class="kpi-row"></div>
+        <div id="commerceOrdersList" class="table-wrap"></div>
       </div>
     </section>
     <section id="panel-infra" class="tab-panel hidden"></section>

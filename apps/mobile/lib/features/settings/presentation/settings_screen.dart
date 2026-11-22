@@ -12,6 +12,7 @@ import '../../authentication/presentation/account_hub_sheet.dart';
 import '../../authentication/presentation/auth_session.dart';
 import '../../exam/domain/exam_profile.dart';
 import '../../exam/presentation/exam_profile_provider.dart';
+import '../../home/presentation/product_feedback_sheet.dart';
 import '../../navigation/presentation/navigation_destination.dart';
 import '../../shared/data/aliyun_speech_service.dart';
 import '../../shared/data/word_pronunciation_service.dart';
@@ -278,6 +279,12 @@ class SettingsScreen extends ConsumerWidget {
                     ),
                   );
                 },
+              ),
+              _ActionRow(
+                title: '软件优化建议',
+                description: '功能建议、体验优化、卡顿问题 → 仅运营可见',
+                icon: Icons.lightbulb_outline,
+                onTap: () => showProductFeedbackSheet(context, ref),
               ),
             ],
           ),

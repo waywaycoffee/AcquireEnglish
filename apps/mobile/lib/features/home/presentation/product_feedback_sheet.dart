@@ -8,25 +8,29 @@ import '../../authentication/presentation/auth_session.dart';
 import '../../sync/data/acquire_api_client.dart';
 
 const List<(String, String)> _kFeedbackCategories = <(String, String)>[
-  ('general', '综合建议'),
+  ('feature', '软件优化 / 新功能建议'),
+  ('ux', '界面体验优化'),
+  ('performance', '卡顿 / 性能优化'),
   ('bug', '功能缺陷'),
-  ('ux', '界面体验'),
   ('content', '内容与课程'),
-  ('performance', '卡顿 / 性能'),
   ('billing', '会员 / 支付'),
-  ('feature', '想要的新功能'),
+  ('general', '其他建议'),
 ];
 
+/// Product / software optimization suggestions (private → admin only).
 Future<void> showProductFeedbackSheet(
   BuildContext context,
-  WidgetRef ref,
-) async {
+  WidgetRef ref, {
+  String initialCategory = 'feature',
+}) async {
   if (!ref.read(authSessionProvider).isLoggedIn) {
     final bool? go = await showDialog<bool>(
       context: context,
       builder: (BuildContext ctx) => AlertDialog(
         title: const Text('需要登录'),
-        content: const Text('登录后可提交意见反馈。反馈仅运营可见，其他用户看不到。'),
+        content: const Text(
+          '登录后可提交软件优化建议。建议仅运营可见，其他用户看不到。',
+        ),
         actions: <Widget>[
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),
@@ -49,12 +53,17 @@ Future<void> showProductFeedbackSheet(
     context: context,
     isScrollControlled: true,
     showDragHandle: true,
-    builder: (BuildContext ctx) => const _ProductFeedbackSheet(),
+    useSafeArea: true,
+    builder: (BuildContext ctx) => _ProductFeedbackSheet(
+      initialCategory: initialCategory,
+    ),
   );
 }
 
 class _ProductFeedbackSheet extends ConsumerStatefulWidget {
-  const _ProductFeedbackSheet();
+  const _ProductFeedbackSheet({this.initialCategory = 'feature'});
+
+  final String initialCategory;
 
   @override
   ConsumerState<_ProductFeedbackSheet> createState() =>
@@ -65,9 +74,18 @@ class _ProductFeedbackSheetState extends ConsumerState<_ProductFeedbackSheet> {
   final TextEditingController _title = TextEditingController();
   final TextEditingController _body = TextEditingController();
   final TextEditingController _contact = TextEditingController();
-  String _category = 'general';
+  late String _category;
   bool _sending = false;
   String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    final bool ok = _kFeedbackCategories.any(
+      ((String, String) e) => e.$1 == widget.initialCategory,
+    );
+    _category = ok ? widget.initialCategory : 'feature';
+  }
 
   @override
   void dispose() {
@@ -93,9 +111,12 @@ class _ProductFeedbackSheetState extends ConsumerState<_ProductFeedbackSheet> {
         final PackageInfo info = await PackageInfo.fromPlatform();
         version = '${info.version}+${info.buildNumber}';
       } catch (_) {}
+      final String title = _title.text.trim().isEmpty
+          ? '软件优化建议'
+          : _title.text.trim();
       await ref.read(acquireApiClientProvider).submitProductFeedback(
             body: text,
-            title: _title.text.trim(),
+            title: title,
             category: _category,
             contact: _contact.text.trim(),
             appVersion: version,
@@ -104,7 +125,7 @@ class _ProductFeedbackSheetState extends ConsumerState<_ProductFeedbackSheet> {
       Navigator.pop(context);
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('已提交。仅运营后台可见，其他用户看不到你的反馈。'),
+          content: Text('优化建议已提交。仅运营后台可见，我们会尽快处理。'),
         ),
       );
     } catch (e) {
@@ -126,18 +147,25 @@ class _ProductFeedbackSheetState extends ConsumerState<_ProductFeedbackSheet> {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           mainAxisSize: MainAxisSize.min,
           children: <Widget>[
-            Text('意见反馈', style: Theme.of(context).textTheme.titleLarge),
+            Text(
+              '软件优化建议',
+              style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                    fontWeight: FontWeight.w900,
+                  ),
+            ),
             const SizedBox(height: 6),
             Text(
-              '直接发给运营后台，不会出现在社区，其他试用用户看不到。',
+              '直接发给运营后台：功能建议、体验优化、卡顿问题等。'
+              '不会出现在社区，其他用户看不到。',
               style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                     color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    height: 1.4,
                   ),
             ),
             const SizedBox(height: 14),
             InputDecorator(
               decoration: const InputDecoration(
-                labelText: '类型',
+                labelText: '建议类型',
                 border: OutlineInputBorder(),
               ),
               child: DropdownButtonHideUnderline(
@@ -163,6 +191,7 @@ class _ProductFeedbackSheetState extends ConsumerState<_ProductFeedbackSheet> {
               enabled: !_sending,
               decoration: const InputDecoration(
                 labelText: '标题（可选）',
+                hintText: '一句话概括，例如「阅读页字体可再大一点」',
                 border: OutlineInputBorder(),
               ),
               textInputAction: TextInputAction.next,
@@ -171,11 +200,13 @@ class _ProductFeedbackSheetState extends ConsumerState<_ProductFeedbackSheet> {
             TextField(
               controller: _body,
               enabled: !_sending,
-              minLines: 4,
-              maxLines: 8,
+              minLines: 5,
+              maxLines: 10,
               decoration: const InputDecoration(
-                labelText: '具体内容',
-                hintText: '例如：某页点不开、字幕不准、希望加某某功能…',
+                labelText: '具体建议',
+                hintText:
+                    '请尽量写清：在哪个页面、做什么操作、期望怎样更好。'
+                    '例如「社区考试上传后希望能看到审核进度」…',
                 border: OutlineInputBorder(),
                 alignLabelWithHint: true,
               ),
@@ -186,7 +217,7 @@ class _ProductFeedbackSheetState extends ConsumerState<_ProductFeedbackSheet> {
               enabled: !_sending,
               decoration: const InputDecoration(
                 labelText: '联系方式（可选）',
-                hintText: '微信 / 邮箱，方便回访',
+                hintText: '微信 / 邮箱，方便我们回访',
                 border: OutlineInputBorder(),
               ),
             ),
@@ -198,9 +229,16 @@ class _ProductFeedbackSheetState extends ConsumerState<_ProductFeedbackSheet> {
               ),
             ],
             const SizedBox(height: 16),
-            FilledButton(
+            FilledButton.icon(
               onPressed: _sending ? null : _submit,
-              child: Text(_sending ? '提交中…' : '提交给运营'),
+              icon: _sending
+                  ? const SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Icon(Icons.send_outlined),
+              label: Text(_sending ? '提交中…' : '提交优化建议'),
             ),
             const SizedBox(height: 8),
             TextButton(

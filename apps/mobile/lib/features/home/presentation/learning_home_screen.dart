@@ -253,11 +253,11 @@ class _LearningHomeScreenState extends ConsumerState<LearningHomeScreen> {
                           onPressed: () =>
                               showProductFeedbackSheet(context, ref),
                           icon: Icon(
-                            Icons.feedback_outlined,
+                            Icons.lightbulb_outline,
                             color: accent,
                             size: 20,
                           ),
-                          label: text('意见反馈', 13, color: accent, bold: true),
+                          label: text('优化建议', 13, color: accent, bold: true),
                           style: TextButton.styleFrom(
                             foregroundColor: accent,
                             padding: const EdgeInsets.symmetric(horizontal: 8),

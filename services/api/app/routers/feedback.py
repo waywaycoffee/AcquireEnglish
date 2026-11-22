@@ -42,7 +42,8 @@ class FeedbackCreateBody(BaseModel):
 
 class FeedbackStatusBody(BaseModel):
     status: FeedbackStatus
-    admin_note: str = Field(default="", max_length=4000)
+    # None = leave existing note unchanged (avoid wiping when only flipping status).
+    admin_note: str | None = Field(default=None, max_length=4000)
 
 
 def _utcnow() -> datetime:
@@ -79,7 +80,7 @@ async def submit_feedback(
         raise HTTPException(status_code=400, detail="请填写反馈内容")
     title = (body.title or "").strip()
     if not title:
-        title = "意见反馈"
+        title = "软件优化建议"
 
     day_key = _utcnow().date().isoformat()
     # Soft rate limit: count today's rows for this user.
@@ -158,6 +159,7 @@ async def my_feedback(
 @admin_router.get("")
 async def admin_list_feedback(
     status_filter: str | None = Query(None, alias="status"),
+    category: str | None = Query(None),
     q: str = Query("", max_length=120),
     limit: int = Query(50, ge=1, le=200),
     offset: int = Query(0, ge=0),
@@ -167,6 +169,16 @@ async def admin_list_feedback(
     filters = []
     if status_filter in ("open", "read", "done"):
         filters.append(ProductFeedback.status == status_filter)
+    if category in (
+        "bug",
+        "ux",
+        "content",
+        "performance",
+        "billing",
+        "feature",
+        "general",
+    ):
+        filters.append(ProductFeedback.category == category)
     needle = q.strip()
     stmt = select(ProductFeedback)
     count_stmt = select(func.count()).select_from(ProductFeedback)

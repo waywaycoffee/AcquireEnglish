@@ -44,7 +44,9 @@
   const loginError = $("loginError");
   const titles = {
     dashboard: "可视化看板",
-    feedback: "意见反馈",
+    feedback: "软件优化建议",
+    "exam-assets": "考试资料审核",
+    commerce: "订单 / 会员",
     infra: "ECS / 云盘监控",
     usage: "用量 / 平台账单",
     resources: "公共资源库",
@@ -52,7 +54,16 @@
     users: "用户与资产",
     community: "社区帖子",
   };
-  const feedbackState = { offset: 0, limit: 40, total: 0, status: "open", q: "" };
+  const feedbackState = {
+    offset: 0,
+    limit: 40,
+    total: 0,
+    status: "open",
+    category: "",
+    q: "",
+  };
+  const examAssetsState = { status: "pending" };
+  const commerceState = { status: "paid", kind: "", offset: 0, limit: 40 };
   const communityState = { offset: 0, limit: 40, total: 0, q: "", status: "" };
 
   async function api(path, options = {}) {
@@ -139,8 +150,20 @@
     document.querySelectorAll(".tab").forEach((btn) => {
       btn.classList.toggle("active", btn.dataset.tab === tab);
     });
-    ["dashboard", "feedback", "infra", "usage", "resources", "fingerprint", "users", "community"].forEach((id) => {
-      $(`panel-${id}`).classList.toggle("hidden", id !== tab);
+    [
+      "dashboard",
+      "feedback",
+      "exam-assets",
+      "commerce",
+      "infra",
+      "usage",
+      "resources",
+      "fingerprint",
+      "users",
+      "community",
+    ].forEach((id) => {
+      const panel = $(`panel-${id}`);
+      if (panel) panel.classList.toggle("hidden", id !== tab);
     });
   }
 
@@ -313,13 +336,13 @@
   }
 
   const FEEDBACK_CAT = {
-    bug: "缺陷",
-    ux: "体验",
-    content: "内容",
-    performance: "性能",
+    bug: "功能缺陷",
+    ux: "界面体验",
+    content: "内容与课程",
+    performance: "卡顿/性能",
     billing: "会员/支付",
-    feature: "功能建议",
-    general: "综合",
+    feature: "软件优化/新功能",
+    general: "其他",
   };
 
   async function loadFeedback() {
@@ -328,6 +351,7 @@
       offset: String(feedbackState.offset),
     });
     if (feedbackState.status) params.set("status", feedbackState.status);
+    if (feedbackState.category) params.set("category", feedbackState.category);
     if (feedbackState.q) params.set("q", feedbackState.q);
     const data = await api(`/feedback?${params.toString()}`);
     feedbackState.total = data.total || 0;
@@ -336,7 +360,7 @@
     const list = $("feedbackList");
     const items = data.items || [];
     if (!items.length) {
-      list.innerHTML = `<p class="empty">暂无反馈</p>`;
+      list.innerHTML = `<p class="empty">暂无优化建议</p>`;
     } else {
       list.innerHTML = items
         .map((item) => {
@@ -350,28 +374,51 @@
             : "";
           return `<article class="user-card" data-fid="${item.id}">
             <div class="user-card-top">
-              <strong>${escapeHtml(item.title || "意见反馈")}</strong>
+              <strong>${escapeHtml(item.title || "软件优化建议")}</strong>
               <span class="chip">${escapeHtml(item.status)}</span>
             </div>
             <p class="muted">${escapeHtml(FEEDBACK_CAT[item.category] || item.category)} · ${escapeHtml(who)} · ${escapeHtml(when)}</p>
             <p style="white-space:pre-wrap;margin:8px 0">${escapeHtml(item.body)}</p>
             ${item.contact ? `<p class="muted">联系：${escapeHtml(item.contact)}</p>` : ""}
             ${item.app_version ? `<p class="muted">版本：${escapeHtml(item.app_version)}</p>` : ""}
+            <label class="field" style="margin-top:8px">
+              <span>运营备注（仅后台）</span>
+              <textarea class="fb-note" data-id="${item.id}" rows="2" placeholder="处理进度、跟进结论…">${escapeHtml(item.admin_note || "")}</textarea>
+            </label>
             <div class="login-actions" style="margin-top:8px">
+              <button type="button" class="btn ghost fb-save-note" data-id="${item.id}" data-status="${escapeAttr(item.status)}">保存备注</button>
               <button type="button" class="btn ghost fb-status" data-id="${item.id}" data-status="read">标为已读</button>
               <button type="button" class="btn ghost fb-status" data-id="${item.id}" data-status="done">标为完成</button>
               <button type="button" class="btn ghost fb-status" data-id="${item.id}" data-status="open">重开</button>
             </div>
-            ${item.admin_note ? `<p class="muted">备注：${escapeHtml(item.admin_note)}</p>` : ""}
           </article>`;
         })
         .join("");
       list.querySelectorAll(".fb-status").forEach((btn) => {
         btn.addEventListener("click", async () => {
           try {
+            // Omit admin_note so existing notes are preserved.
             await api(`/feedback/${btn.dataset.id}`, {
               method: "PATCH",
-              body: JSON.stringify({ status: btn.dataset.status, admin_note: "" }),
+              body: JSON.stringify({ status: btn.dataset.status }),
+            });
+            await loadFeedback();
+          } catch (e) {
+            alert(e.message);
+          }
+        });
+      });
+      list.querySelectorAll(".fb-save-note").forEach((btn) => {
+        btn.addEventListener("click", async () => {
+          const card = btn.closest("[data-fid]");
+          const ta = card && card.querySelector(".fb-note");
+          try {
+            await api(`/feedback/${btn.dataset.id}`, {
+              method: "PATCH",
+              body: JSON.stringify({
+                status: btn.dataset.status || "open",
+                admin_note: ta ? ta.value : "",
+              }),
             });
             await loadFeedback();
           } catch (e) {
@@ -384,6 +431,155 @@
       feedbackState.offset + feedbackState.limit,
       feedbackState.total
     )} / ${feedbackState.total}`;
+  }
+
+  function formatBytes(n) {
+    const v = Number(n || 0);
+    if (v < 1024) return `${v} B`;
+    if (v < 1024 * 1024) return `${(v / 1024).toFixed(1)} KB`;
+    return `${(v / (1024 * 1024)).toFixed(1)} MB`;
+  }
+
+  async function loadExamAssets() {
+    const params = new URLSearchParams({ limit: "80" });
+    if (examAssetsState.status) params.set("status", examAssetsState.status);
+    const rows = await api(`/exam-assets?${params.toString()}`);
+    const items = Array.isArray(rows) ? rows : rows.items || [];
+    const badge = $("examAssetsBadge");
+    if (badge) {
+      badge.textContent =
+        examAssetsState.status === "pending"
+          ? `· 待审 ${items.length}`
+          : `· ${items.length} 条`;
+    }
+    const list = $("examAssetsList");
+    if (!items.length) {
+      list.innerHTML = `<p class="empty">当前筛选下没有资料</p>`;
+      return;
+    }
+    list.innerHTML = items
+      .map((item) => {
+        const when = item.created_at
+          ? new Date(item.created_at).toLocaleString("zh-CN")
+          : "";
+        const meta = item.meta || {};
+        return `<article class="user-card" data-aid="${item.id}">
+          <div class="user-card-top">
+            <strong>${escapeHtml(item.title || `资料 #${item.id}`)}</strong>
+            <span class="chip">${escapeHtml(item.status)}</span>
+          </div>
+          <p class="muted">${escapeHtml(item.family_id || "—")} · ${escapeHtml(
+          item.kind || "—"
+        )} · ${escapeHtml(item.uploader_name || `用户#${item.uploader_id}`)} · ${escapeHtml(
+          when
+        )}</p>
+          <p class="muted">大小 ${formatBytes(item.size_bytes)} · 举报 ${num(
+          item.report_count
+        )} · 奖励预览 ${num(item.reward_preview_days || item.reward_days || 0)} 天</p>
+          ${
+            meta.note
+              ? `<p class="muted">说明：${escapeHtml(meta.note)}</p>`
+              : ""
+          }
+          ${
+            item.download_url
+              ? `<p><a href="${escapeAttr(item.download_url)}" target="_blank" rel="noopener">打开文件</a></p>`
+              : ""
+          }
+          <div class="login-actions" style="margin-top:8px">
+            ${
+              item.status === "pending" || item.status === "rejected"
+                ? `<button type="button" class="btn primary ea-approve" data-id="${item.id}">通过并奖励</button>`
+                : ""
+            }
+            ${
+              item.status === "pending" || item.status === "visible"
+                ? `<button type="button" class="btn ghost ea-reject" data-id="${item.id}">拒绝</button>`
+                : ""
+            }
+          </div>
+        </article>`;
+      })
+      .join("");
+    list.querySelectorAll(".ea-approve").forEach((btn) => {
+      btn.addEventListener("click", async () => {
+        if (!confirm(`通过资料 #${btn.dataset.id}？将按规则奖励上传者会员天数。`)) return;
+        try {
+          await api(`/exam-assets/${btn.dataset.id}/review`, {
+            method: "POST",
+            body: JSON.stringify({ approve: true }),
+          });
+          await loadExamAssets();
+        } catch (e) {
+          alert(e.message);
+        }
+      });
+    });
+    list.querySelectorAll(".ea-reject").forEach((btn) => {
+      btn.addEventListener("click", async () => {
+        const note = prompt("拒绝原因（将写入审核记录）", "不符合规范或版权风险");
+        if (note == null) return;
+        try {
+          await api(`/exam-assets/${btn.dataset.id}/review`, {
+            method: "POST",
+            body: JSON.stringify({ approve: false, note: note.trim() }),
+          });
+          await loadExamAssets();
+        } catch (e) {
+          alert(e.message);
+        }
+      });
+    });
+  }
+
+  async function loadCommerce() {
+    const [overview, orders] = await Promise.all([
+      api("/commerce/overview"),
+      api(
+        `/commerce/orders?limit=${commerceState.limit}&offset=${commerceState.offset}` +
+          (commerceState.status ? `&status=${encodeURIComponent(commerceState.status)}` : "") +
+          (commerceState.kind ? `&kind=${encodeURIComponent(commerceState.kind)}` : "")
+      ),
+    ]);
+    const trial = overview.trial || {};
+    $("commerceOverview").innerHTML = `
+      <div class="stat"><span class="muted">SKU 种类</span><strong>${num(
+        Object.keys(overview.skus_by_kind || {}).length
+      )}</strong></div>
+      <div class="stat"><span class="muted">试用延展券</span><strong>${num(
+        trial.extend_coupons
+      )} / 已兑 ${num(trial.extend_redeemed)}</strong></div>
+      <div class="stat"><span class="muted">登录日记录</span><strong>${num(
+        trial.login_day_rows
+      )}</strong></div>
+      <div class="stat"><span class="muted">积分流水</span><strong>${num(
+        overview.points_ledger_rows
+      )}</strong></div>`;
+    const items = orders.items || [];
+    $("commerceOrdersList").innerHTML = `<table>
+      <thead><tr><th>ID</th><th>用户</th><th>状态</th><th>渠道</th><th>金额</th><th>SKU</th><th>时间</th></tr></thead>
+      <tbody>
+        ${
+          items
+            .map(
+              (o) => `<tr>
+            <td>${o.id}</td>
+            <td>#${o.user_id}</td>
+            <td><span class="chip">${escapeHtml(o.status)}</span></td>
+            <td>${escapeHtml(o.provider || "—")}</td>
+            <td>${money((o.amount_cents || 0) / 100)}</td>
+            <td>${escapeHtml((o.sku_codes || []).join(", ") || "—")}</td>
+            <td>${escapeHtml(
+              o.paid_at || o.created_at
+                ? new Date(o.paid_at || o.created_at).toLocaleString("zh-CN")
+                : ""
+            )}</td>
+          </tr>`
+            )
+            .join("") || `<tr><td colspan="7" class="muted">暂无订单</td></tr>`
+        }
+      </tbody>
+    </table>`;
   }
 
   function pctBar(pct, label) {
@@ -684,15 +880,24 @@
   }
 
   async function loadDashboard() {
-    const [users, learning, pnl, infra] = await Promise.all([
-      api("/analytics/users?days=90"),
-      api("/analytics/learning"),
-      api("/usage/pnl?days=30"),
-      api("/analytics/infra").catch(() => null),
-    ]);
+    const [users, learning, pnl, infra, feedbackPeek, pendingAssets, commerce] =
+      await Promise.all([
+        api("/analytics/users?days=90"),
+        api("/analytics/learning"),
+        api("/usage/pnl?days=30"),
+        api("/analytics/infra").catch(() => null),
+        api("/feedback?status=open&limit=1").catch(() => null),
+        api("/exam-assets?status=pending&limit=200").catch(() => []),
+        api("/commerce/overview").catch(() => null),
+      ]);
     const host = (infra && infra.host) || {};
     const mem = host.memory || {};
     const root = host.root_disk || {};
+    const pendingList = Array.isArray(pendingAssets)
+      ? pendingAssets
+      : pendingAssets.items || [];
+    const openFeedback = (feedbackPeek && feedbackPeek.open_count) || 0;
+    const trial = (commerce && commerce.trial) || {};
     const el = $("panel-dashboard");
     el.innerHTML = `
       <div class="kpi-row">
@@ -700,6 +905,19 @@
         <div class="stat"><span class="muted">近 ${users.days} 日新增</span><strong>${num(users.new_users)}</strong></div>
         <div class="stat"><span class="muted">30 日收入</span><strong>${money(pnl.revenue_cny)}</strong></div>
         <div class="stat"><span class="muted">30 日毛利</span><strong>${money(pnl.gross_cny)}</strong></div>
+      </div>
+      <div class="kpi-row">
+        <div class="stat"><span class="muted">待处理优化建议</span><strong>${num(openFeedback)}</strong>
+          <button type="button" class="btn ghost dash-jump" data-tab="feedback">去处理</button></div>
+        <div class="stat"><span class="muted">待审考试资料</span><strong>${num(pendingList.length)}</strong>
+          <button type="button" class="btn ghost dash-jump" data-tab="exam-assets">去审核</button></div>
+        <div class="stat"><span class="muted">试用延展已兑</span><strong>${num(
+          trial.extend_redeemed
+        )} / ${num(trial.extend_coupons)}</strong>
+          <button type="button" class="btn ghost dash-jump" data-tab="commerce">看订单</button></div>
+        <div class="stat"><span class="muted">积分流水行</span><strong>${num(
+          (commerce && commerce.points_ledger_rows) || 0
+        )}</strong></div>
       </div>
       ${
         infra
@@ -769,6 +987,13 @@
           <div class="note-box">${escapeHtml(learning.note || "")}</div>
         </div>
       </div>`;
+    el.querySelectorAll(".dash-jump").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const tab = btn.dataset.tab;
+        const tabBtn = document.querySelector(`.tab[data-tab="${tab}"]`);
+        if (tabBtn) tabBtn.click();
+      });
+    });
   }
 
   async function loadUsage() {
@@ -1700,6 +1925,8 @@
       setTab(btn.dataset.tab);
       if (btn.dataset.tab === "dashboard") loadDashboard().catch((e) => alert(e.message));
       if (btn.dataset.tab === "feedback") loadFeedback().catch((e) => alert(e.message));
+      if (btn.dataset.tab === "exam-assets") loadExamAssets().catch((e) => alert(e.message));
+      if (btn.dataset.tab === "commerce") loadCommerce().catch((e) => alert(e.message));
       if (btn.dataset.tab === "infra") loadInfra().catch((e) => alert(e.message));
       if (btn.dataset.tab === "usage") loadUsage().catch((e) => alert(e.message));
       if (btn.dataset.tab === "resources") loadResources().catch((e) => alert(e.message));
@@ -1725,6 +1952,7 @@
   $("feedbackSearchForm").addEventListener("submit", (e) => {
     e.preventDefault();
     feedbackState.status = $("feedbackStatusFilter").value;
+    feedbackState.category = $("feedbackCategoryFilter").value;
     feedbackState.q = $("feedbackSearchInput").value.trim();
     feedbackState.offset = 0;
     loadFeedback().catch((err) => alert(err.message));
@@ -1736,6 +1964,18 @@
   $("feedbackNext").addEventListener("click", () => {
     feedbackState.offset += feedbackState.limit;
     loadFeedback().catch((err) => alert(err.message));
+  });
+  $("examAssetsFilterForm").addEventListener("submit", (e) => {
+    e.preventDefault();
+    examAssetsState.status = $("examAssetsStatusFilter").value;
+    loadExamAssets().catch((err) => alert(err.message));
+  });
+  $("commerceOrdersForm").addEventListener("submit", (e) => {
+    e.preventDefault();
+    commerceState.status = $("commerceOrderStatus").value;
+    commerceState.kind = $("commerceOrderKind").value;
+    commerceState.offset = 0;
+    loadCommerce().catch((err) => alert(err.message));
   });
 
   // Always show login gate (username + password + token). Prefill account/token only.

@@ -66,13 +66,17 @@ h3 { margin: 0 0 10px; font-size: 15px; }
   border-radius: 6px;
 }
 .login-card .btn.primary { width: 100%; margin-top: 4px; }
-.field input, .grant-grid input, .grant-grid select, .inline-form input, .inline-form select {
+.field input, .field textarea, .grant-grid input, .grant-grid select, .inline-form input, .inline-form select {
   width: 100%;
   border: 1px solid var(--line);
   border-radius: 12px;
   padding: 12px 14px;
   font: inherit;
   background: #fff;
+}
+.field textarea {
+  resize: vertical;
+  min-height: 56px;
 }
 
 .btn {
