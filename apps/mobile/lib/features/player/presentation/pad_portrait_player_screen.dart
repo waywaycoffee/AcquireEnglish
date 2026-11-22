@@ -41,6 +41,7 @@ import '../../shared/presentation/app_loading_overlay.dart';
 import '../../authentication/data/wechat_share_helper.dart';
 import '../../authentication/presentation/auth_session.dart';
 import '../../sync/data/acquire_api_client.dart';
+import '../../daily_path/presentation/oral_core_series_provider.dart';
 import '../../sync/data/personal_import_sync.dart';
 import '../../sync/data/progress_sync_service.dart';
 import '../../words/data/offline_word_dictionary.dart';
@@ -414,6 +415,22 @@ class PadPortraitPlayerScreenState
       courses: courses,
       episodeId: widget.episodeId,
     );
+    if (!resource.hasEpisode && widget.episodeId.startsWith('oral_core_9000-')) {
+      final LibraryCatalogNotifier catalog = ref.read(libraryCatalogProvider.notifier);
+      try {
+        final series = await ref.read(oralCoreSeriesProvider.future);
+        if (!mounted) return;
+        await catalog.ensureOralCoreCourse(series);
+      } catch (_) {
+        // Existing playback fallbacks still apply if the course cannot load.
+      }
+      if (!mounted) return;
+      resource = resolvePlayerCourseForEpisode(
+        courses: ref.read(libraryCatalogProvider),
+        episodeId: widget.episodeId,
+      );
+    }
+
     String? initialStartTime =
         widget.initialStartTime ??
         ((resource.episode?.completed ?? false)
@@ -2585,7 +2602,9 @@ Future<void> _settleChineseFillIfAlreadyPresent() async {
     }
   }
 
-  Future<void> _syncManualSubtitlesToCloud(List<PlayerSubtitleLine> lines) async {
+  Future<void> _syncManualSubtitlesToCloud(List<PlayerSubtitleLine> lines, {
+    String sourceOrigin = 'mixed',
+  }) async {
     final AuthSessionState auth = ref.read(authSessionProvider);
     if (!auth.isLoggedIn) {
       return;
@@ -2600,13 +2619,13 @@ Future<void> _settleChineseFillIfAlreadyPresent() async {
       isLoggedIn: true,
       lines: lines,
       sourceKey: _episodeSourceKey(),
-      sourceUrl: hit?.episode.sourceUrl,
+      sourceUrl: hit?.episode.sourceUrl ?? _bilibiliRecoverSource(_videoAsset ?? ''),
       course: hit?.course,
       episode: hit?.episode,
       durationSec: (hit?.episode.durationMinutes ?? 0) > 0
           ? hit!.episode.durationMinutes * 60
           : null,
-      sourceOrigin: 'mixed',
+      sourceOrigin: sourceOrigin,
     );
   }
 
@@ -4267,6 +4286,12 @@ Future<void> _settleChineseFillIfAlreadyPresent() async {
         state.loadLines(lines, wordDefinitions: parseSubtitleGlossary(raw));
         _usingAiSubtitles = true;
       });
+      if (lines.isNotEmpty) {
+        await _persistCompletedBilingualSubtitles(lines);
+        if (!mounted) return;
+        await _syncManualSubtitlesToCloud(lines, sourceOrigin: 'asr');
+        if (!mounted) return;
+      }
       final SubtitleReferenceReview review = reviewGeneratedSubtitles(
         generated: lines,
         reference: referenceLines,
