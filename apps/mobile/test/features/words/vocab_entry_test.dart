@@ -15,6 +15,14 @@ void main() {
     expect(legacyWordFsrsKey('Hello'), 'word:hello');
     expect(lemmaFromReviewKey('entry:hello:recognize'), 'hello');
     expect(modeFromReviewKey('entry:hello:listen'), WordPracticeMode.listen);
+    expect(
+      lemmaFromReviewKey('syllabus:cet4-core:season'),
+      'season',
+    );
+    expect(
+      lemmaFromReviewKey('recommended:add'),
+      'add',
+    );
   });
 
   test('cefr bands from frequency rank', () {

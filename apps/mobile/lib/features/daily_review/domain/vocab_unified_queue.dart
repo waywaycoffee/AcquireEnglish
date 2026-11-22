@@ -35,20 +35,7 @@ bool isFavoriteReviewKey(String key) => key.startsWith('entry:');
 
 bool isSyllabusReviewKey(String key) => key.startsWith('syllabus:');
 
-String? lemmaFromAnyReviewKey(String key) {
-  final String? fromEntry = lemmaFromReviewKey(key);
-  if (fromEntry != null) return fromEntry;
-  if (key.startsWith('syllabus:')) {
-    final List<String> parts = key.split(':');
-    if (parts.length >= 3) {
-      return parts.sublist(2).join(':').trim().toLowerCase();
-    }
-  }
-  if (key.startsWith('recommended:')) {
-    return key.substring('recommended:'.length).trim().toLowerCase();
-  }
-  return null;
-}
+String? lemmaFromAnyReviewKey(String key) => lemmaFromReviewKey(key);
 
 /// Favorite lemmas that are still “生词” (not yet stable/known).
 Set<String> freshFavoriteLemmas({

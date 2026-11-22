@@ -717,12 +717,31 @@ class WordBookNotifier extends Notifier<List<WordEntry>> {
   }
 
   /// Keep the word in the book but drop it from the daily queue.
+  ///
+  /// Syllabus / recommended 「斩掉」often hits lemmas that were never favorited.
+  /// Upsert an archived+known row so coveredLemmas excludes them from 新学.
   bool archiveWord(String rawWord) {
     final String word = normalizeLexeme(rawWord);
+    if (word.isEmpty) return false;
     final int index = state.indexWhere((WordEntry item) => item.word == word);
-    if (index < 0) return false;
-    final List<WordEntry> next = <WordEntry>[...state];
     final int now = DateTime.now().millisecondsSinceEpoch;
+    if (index < 0) {
+      state = <WordEntry>[
+        ...state,
+        WordEntry(
+          word: word,
+          favorite: true,
+          occurrences: const <WordOccurrence>[],
+          scheduleStatus: VocabScheduleStatus.archived,
+          mastery: WordMastery.known,
+          updatedAtMs: now,
+          collectedAtMs: now,
+        ),
+      ];
+      unawaited(_persist());
+      return true;
+    }
+    final List<WordEntry> next = <WordEntry>[...state];
     next[index] = next[index].copyWith(
       scheduleStatus: VocabScheduleStatus.archived,
       // Mark known so 词书/推荐不会把同一 lemma 再当「新学」塞回今日路径.

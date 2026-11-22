@@ -77,7 +77,11 @@ String vocabFsrsKey(String lemma, WordPracticeMode mode) {
 
 String legacyWordFsrsKey(String lemma) => 'word:${vocabEntryIdForLemma(lemma)}';
 
-/// Parse lemma from `entry:foo:recognize` or `word:foo`.
+/// Parse lemma from review keys used in the daily queue.
+///
+/// Supports `entry:foo:recognize`, `word:foo`, `syllabus:{book}:foo`,
+/// and `recommended:foo`. Syllabus / recommended cards must resolve here so
+/// 「斩掉」can archive the lemma and stop re-queuing it as 新学.
 String? lemmaFromReviewKey(String key) {
   if (key.startsWith('entry:')) {
     final List<String> parts = key.split(':');
@@ -87,6 +91,15 @@ String? lemmaFromReviewKey(String key) {
   }
   if (key.startsWith('word:')) {
     return key.substring('word:'.length);
+  }
+  if (key.startsWith('syllabus:')) {
+    final List<String> parts = key.split(':');
+    if (parts.length >= 3) {
+      return parts.sublist(2).join(':').trim().toLowerCase();
+    }
+  }
+  if (key.startsWith('recommended:')) {
+    return key.substring('recommended:'.length).trim().toLowerCase();
   }
   return null;
 }
