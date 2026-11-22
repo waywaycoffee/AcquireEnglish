@@ -40,19 +40,26 @@ third_party/LiveTalking/.venv/Scripts/python.exe tools/livetalking/test_webrtc_e
 
 | Path | Current production behavior | Accept as |
 |------|-----------------------------|-----------|
-| SMS login (`/api/auth/sms/*`) | Dev mock code **123456**; prod target `auth_sms_provider=aliyun` | See [`AUTH_PRODUCTION.md`](AUTH_PRODUCTION.md) |
-| WeChat login (`/api/auth/wechat/login`) | Dev mock openid; prod needs AppID/Secret + App dart-define | See AUTH_PRODUCTION.md |
-| Email register/login | Real JWT against **Postgres** | Real |
-| New-user trial assets | Auto: 7d Pro + 10 coach min + 50 credits | Real after first register/login |
+| SMS login (`/api/auth/sms/*`) | **Prod real**: `auth_sms_mock=false` · `auth_sms_provider=aliyun` | See [`AUTH_PRODUCTION.md`](AUTH_PRODUCTION.md) |
+| WeChat login (`/api/auth/wechat/login`) | **Prod real**: `auth_wechat_mock=false` · `auth_wechat_configured=true` | See AUTH_PRODUCTION.md |
+| Email register/login | Real JWT + SMTP verification against **Postgres** | Real |
+| New-user trial assets | **Claim-once** via `POST /api/commerce/trial/claim-welcome`（30d Pro + modules + 120 coach + 50 credits） | Real after popup claim |
+| WeChat pay | **Defer (2A)**：`wechat_pay_configured=false`；下单 503「缺少 WECHAT_MCH_*」 | Defer — 不阻断侧载内测 |
 
 Confirm flags via health:
 
 ```bash
 curl -fsS https://acquireenglish.curlhairai.com/api/health
-# prod target: auth_sms_mock=false, auth_sms_provider=aliyun, auth_wechat_mock=false
+# prod: auth_sms_mock=false, auth_sms_provider=aliyun, auth_wechat_mock=false, wechat_pay_configured=false, openlist=configured
 ```
 
 CI/staging may still use mocks. Do **not** fail acceptance solely for mock SMS/WeChat on non-prod builds.
+
+### Sideload beta note (2026-11-22)
+
+- Netdisk: OpenList configured；`/api/netdisk/*` + series columns；reading EPUB scan/import + community `share_netdisk` posts shipped.
+- Web: `/app/netdisk` folder → series course.
+- Flutter full suite still has known widget/assert drift (~50 fails); API gate + analyze(errors=0) + web build used for this beta.
 
 ---
 
