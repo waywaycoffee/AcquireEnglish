@@ -195,7 +195,7 @@ class SettingsScreen extends ConsumerWidget {
                 ),
                 _ActionRow(
                   title: '口语错题 / 复习',
-                  description: '查看陪练纠错与到期表达复习。',
+                  description: '查看陪练纠错与待复习表达。',
                   icon: Icons.record_voice_over_rounded,
                   onTap: () => context.push(SGRoute.learningReview.route),
                 ),
