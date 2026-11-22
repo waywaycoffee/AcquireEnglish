@@ -333,38 +333,50 @@ class _ReadingReaderScreenState extends ConsumerState<ReadingReaderScreen> {
     final double current = _effectiveRate;
     final double? picked = await showModalBottomSheet<double>(
       context: context,
+      isScrollControlled: true,
       backgroundColor: _dark ? const Color(0xFF1C1C1E) : Colors.white,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(18)),
       ),
       builder: (BuildContext ctx) {
+        final double maxHeight = MediaQuery.sizeOf(ctx).height * 0.7;
         return SafeArea(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: <Widget>[
-              const SizedBox(height: 12),
-              Text(
-                '朗读语速',
-                style: TextStyle(
-                  fontWeight: FontWeight.w800,
-                  fontSize: 16,
-                  color: _dark ? Colors.white : const Color(0xFF1A1520),
+          child: ConstrainedBox(
+            constraints: BoxConstraints(maxHeight: maxHeight),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: <Widget>[
+                const SizedBox(height: 12),
+                Text(
+                  '朗读语速',
+                  style: TextStyle(
+                    fontWeight: FontWeight.w800,
+                    fontSize: 16,
+                    color: _dark ? Colors.white : const Color(0xFF1A1520),
+                  ),
                 ),
-              ),
-              const SizedBox(height: 8),
-              for (final double rate in ttsRateOptions)
-                ListTile(
-                  title: Text('${rate}×'),
-                  trailing: (current - rate).abs() < 0.01
-                      ? Icon(
-                          Icons.check_rounded,
-                          color: AppDesignTokens.brandGreenDark,
-                        )
-                      : null,
-                  onTap: () => Navigator.pop(ctx, rate),
+                const SizedBox(height: 8),
+                Flexible(
+                  child: ListView(
+                    shrinkWrap: true,
+                    children: <Widget>[
+                      for (final double rate in ttsRateOptions)
+                        ListTile(
+                          title: Text('${rate}×'),
+                          trailing: (current - rate).abs() < 0.01
+                              ? Icon(
+                                  Icons.check_rounded,
+                                  color: AppDesignTokens.brandGreenDark,
+                                )
+                              : null,
+                          onTap: () => Navigator.pop(ctx, rate),
+                        ),
+                      const SizedBox(height: 8),
+                    ],
+                  ),
                 ),
-              const SizedBox(height: 8),
-            ],
+              ],
+            ),
           ),
         );
       },
