@@ -15,11 +15,13 @@ _JSON_ARRAY_RE = re.compile(r"\[[\s\S]*\]")
 _SYSTEM = (
     "You label real-world photos for English learners. "
     "Return ONLY a JSON array, no markdown. Each item: "
-    '{"word":"apple","chinese":"苹果","confidence":0.9,"anchor_x":0.42,"anchor_y":0.55}. '
-    "Rules: concrete visible nouns only; English word lowercase (1-2 tokens); "
-    "chinese short Simplified Chinese; confidence 0-1; "
-    "anchor_x/y are approximate object centers in the image (0-1). "
-    "Prefer specific objects over abstract tags like food/plant/product. "
+    '{"word":"laptop","chinese":"笔记本电脑","confidence":0.9,"anchor_x":0.42,"anchor_y":0.55}. '
+    "Rules: ONLY nouns you can clearly see in THIS photo; never invent objects. "
+    "English word lowercase (1-2 tokens); chinese short Simplified Chinese; "
+    "confidence 0-1; anchor_x/y are approximate object centers (0-1). "
+    "Prefer the most salient specific objects (e.g. laptop, stool, kettlebell) "
+    "over abstract tags like food/plant/product/object. "
+    "If seed_labels disagree with the photo, IGNORE the seeds. "
     "Max 8 items."
 )
 
@@ -123,14 +125,14 @@ async def refine_scene_labels(
         if str(x.get("word") or "").strip()
     ][:8]
     user_text = (
-        f"Identify up to {limit} useful English vocabulary nouns in this photo. "
-        "Correct and refine any seed labels; drop wrong ones; add clear missing objects.\n"
-        f"seed_labels={json.dumps(seed_brief, ensure_ascii=False)}"
+        f"Look at the image carefully. List up to {limit} concrete nouns that are "
+        "actually visible. Do not keep wrong seeds. "
+        f"optional_seed_hints={json.dumps(seed_brief, ensure_ascii=False)}"
     )
     data_url = f"data:{mime};base64,{image_base64}"
     payload = {
         "model": model,
-        "temperature": 0.1,
+        "temperature": 0,
         "messages": [
             {"role": "system", "content": _SYSTEM},
             {
@@ -143,7 +145,8 @@ async def refine_scene_labels(
         ],
     }
     url = "https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions"
-    async with httpx.AsyncClient(timeout=45.0) as client:
+    # Smaller payloads + temp=0 keep DashScope VL closer to ~10-20s.
+    async with httpx.AsyncClient(timeout=28.0) as client:
         response = await client.post(
             url,
             headers={

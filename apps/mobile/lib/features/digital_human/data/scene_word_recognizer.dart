@@ -100,7 +100,7 @@ class SceneWordRecognizer {
     }
     final InputImage input = InputImage.fromFilePath(imagePath);
     final ImageLabeler labeler = ImageLabeler(
-      options: ImageLabelerOptions(confidenceThreshold: 0.48),
+      options: ImageLabelerOptions(confidenceThreshold: 0.58),
     );
     final TextRecognizer ocr = TextRecognizer();
     try {
@@ -148,6 +148,9 @@ class SceneWordRecognizer {
   }
 
   /// Cloud VL refine: Acquire API → direct DashScope `qwen-vl-plus` → user vision.
+  ///
+  /// Seeds are weak hints only. Prefer empty / high-confidence local seeds;
+  /// never pass frequency-filtered leftovers that already dropped true objects.
   Future<List<SceneWordLabel>> refineWithCloud(
     String imagePath, {
     required LearningSettingsState settings,
@@ -156,12 +159,20 @@ class SceneWordRecognizer {
   }) async {
     final ({String base64, String mime}) encoded =
         await _encodeImageForUpload(imagePath);
+    // Only keep high-confidence local seeds; bad seeds poison Qwen-VL.
+    final List<SceneWordLabel> safeSeed = seed
+        .where(
+          (SceneWordLabel item) =>
+              item.confidence >= 0.62 && item.word.trim().length >= 3,
+        )
+        .take(4)
+        .toList(growable: false);
     List<SceneWordLabel> cloud = const <SceneWordLabel>[];
     try {
       cloud = await _api.recognizeSceneWords(
         imageBase64: encoded.base64,
         mime: encoded.mime,
-        seedLabels: seed,
+        seedLabels: safeSeed,
         limit: limit,
       );
     } catch (_) {
@@ -169,7 +180,7 @@ class SceneWordRecognizer {
         imageBase64: encoded.base64,
         mime: encoded.mime,
         settings: settings,
-        seed: seed,
+        seed: safeSeed,
         limit: limit,
       );
       if (cloud.isEmpty) {
@@ -177,7 +188,7 @@ class SceneWordRecognizer {
           imageBase64: encoded.base64,
           mime: encoded.mime,
           settings: settings,
-          seed: seed,
+          seed: safeSeed,
           limit: limit,
         );
       }
@@ -185,22 +196,22 @@ class SceneWordRecognizer {
     if (cloud.isEmpty) {
       return seed;
     }
-    final List<SceneWordLabel> out = <SceneWordLabel>[];
-    for (int i = 0; i < cloud.length; i++) {
-      final SceneWordLabel item = cloud[i];
-      out.add(
-        await _enrich(
-          word: item.word,
-          confidence: item.confidence,
-          index: i,
-          settings: settings,
-          source: 'cloud',
-          chineseHint: item.chinese,
-          anchorX: item.anchorX,
-          anchorY: item.anchorY,
-        ),
-      );
-    }
+    final List<SceneWordLabel> out = await Future.wait(
+      <Future<SceneWordLabel>>[
+        for (int i = 0; i < cloud.length; i++)
+          _enrich(
+            word: cloud[i].word,
+            confidence: cloud[i].confidence,
+            index: i,
+            settings: settings,
+            source: 'cloud',
+            chineseHint: cloud[i].chinese,
+            anchorX: cloud[i].anchorX,
+            anchorY: cloud[i].anchorY,
+            skipNetworkLookup: cloud[i].chinese.trim().isNotEmpty,
+          ),
+      ],
+    );
     return out;
   }
 
@@ -300,9 +311,9 @@ class SceneWordRecognizer {
         <String, dynamic>{
           'role': 'system',
           'content':
-              'Label photo objects for English learners. Return ONLY a JSON array: '
-              '[{"word":"apple","chinese":"苹果","confidence":0.9,"anchor_x":0.4,"anchor_y":0.5}]. '
-              'Concrete nouns only; max $limit items.',
+              'Label ONLY objects clearly visible in the photo. Return ONLY JSON: '
+              '[{"word":"laptop","chinese":"笔记本电脑","confidence":0.9,"anchor_x":0.4,"anchor_y":0.5}]. '
+              'Ignore wrong seeds. Concrete nouns only; max $limit items.',
         },
         <String, dynamic>{
           'role': 'user',
@@ -316,7 +327,8 @@ class SceneWordRecognizer {
             <String, dynamic>{
               'type': 'text',
               'text':
-                  'Refine seed labels and add clear missing objects. seed=[$seedBrief]',
+                  'Identify visible nouns. Drop seeds that are not in the photo. '
+                  'optional_seeds=[$seedBrief]',
             },
           ],
         },
@@ -330,8 +342,8 @@ class SceneWordRecognizer {
           'Content-Type': 'application/json',
           ...acquireUsageHeaders(module: 'scene_vl'),
         },
-        connectTimeout: const Duration(seconds: 20),
-        receiveTimeout: const Duration(seconds: 45),
+        connectTimeout: const Duration(seconds: 12),
+        receiveTimeout: const Duration(seconds: 28),
       ),
     ).post<dynamic>('/chat/completions', data: body);
     final Map<String, dynamic> data = response.data as Map<String, dynamic>;
@@ -417,7 +429,8 @@ class SceneWordRecognizer {
     if (decoded == null) {
       return (base64: base64Encode(bytes), mime: 'image/jpeg');
     }
-    const int maxEdge = 1280;
+    // Keep uploads small so DashScope VL returns faster (~10-20s vs 40s+).
+    const int maxEdge = 768;
     if (decoded.width > maxEdge || decoded.height > maxEdge) {
       final double scale = maxEdge /
           math.max(decoded.width, decoded.height).toDouble();
@@ -428,7 +441,7 @@ class SceneWordRecognizer {
       );
     }
     final Uint8List jpeg = Uint8List.fromList(
-      img.encodeJpg(decoded, quality: 72),
+      img.encodeJpg(decoded, quality: 62),
     );
     return (base64: base64Encode(jpeg), mime: 'image/jpeg');
   }
@@ -442,6 +455,7 @@ class SceneWordRecognizer {
     String chineseHint = '',
     double? anchorX,
     double? anchorY,
+    bool skipNetworkLookup = false,
   }) async {
     String phonetic = '';
     String chinese = chineseHint.trim().isNotEmpty
@@ -454,25 +468,27 @@ class SceneWordRecognizer {
         if (chinese.isEmpty) chinese = offline.translation.trim();
       }
     } catch (_) {}
-    try {
-      final WordLookupEntry entry = await _lookup.lookupWord(
-        rawWord: word,
-        settings: settings,
-      );
-      if (phonetic.isEmpty) phonetic = entry.phonetic.trim();
-      if (chinese.isEmpty) {
-        chinese = (entry.contextMeaningCn ?? entry.definitionCn).trim();
-        if (chinese.contains('；')) {
-          chinese = chinese.split('；').first.trim();
+    if (!skipNetworkLookup || phonetic.isEmpty) {
+      try {
+        final WordLookupEntry entry = await _lookup.lookupWord(
+          rawWord: word,
+          settings: settings,
+        );
+        if (phonetic.isEmpty) phonetic = entry.phonetic.trim();
+        if (chinese.isEmpty) {
+          chinese = (entry.contextMeaningCn ?? entry.definitionCn).trim();
+          if (chinese.contains('；')) {
+            chinese = chinese.split('；').first.trim();
+          }
+          if (chinese.contains(';')) {
+            chinese = chinese.split(';').first.trim();
+          }
+          if (chinese.length > 12) {
+            chinese = chinese.substring(0, 12);
+          }
         }
-        if (chinese.contains(';')) {
-          chinese = chinese.split(';').first.trim();
-        }
-        if (chinese.length > 12) {
-          chinese = chinese.substring(0, 12);
-        }
-      }
-    } catch (_) {}
+      } catch (_) {}
+    }
     final double ax = anchorX ?? (0.28 + (index % 3) * 0.22);
     final double ay = anchorY ?? (0.32 + (index ~/ 3) * 0.22);
     return SceneWordLabel(
@@ -524,28 +540,36 @@ class SceneWordRecognizer {
     return text;
   }
 
-  /// Drop words the learner already knows: high frequency (≤ threshold) or
-  /// marked known / mastered. Focus-list words always keep.
+  /// Drop words the learner already knows.
+  ///
+  /// [scenePhoto]: keep common visible nouns (laptop, chair…). Frequency
+  /// filtering used to delete the true objects and leave rare mislabels.
   static List<SceneWordLabel> keepLearningTargets(
     List<SceneWordLabel> labels, {
     required ReadingFrequencyLexicon lexicon,
     required int freqThreshold,
     required Set<String> knownWords,
     Set<String> focusWords = const <String>{},
+    bool scenePhoto = false,
   }) {
     final List<SceneWordLabel> out = <SceneWordLabel>[];
     final Set<String> seen = <String>{};
     for (final SceneWordLabel label in labels) {
       final String word = label.word.trim().toLowerCase();
       if (word.length < 2 || !seen.add(word)) continue;
-      if (!isReadingHardWord(
-        word: word,
-        lexicon: lexicon,
-        threshold: freqThreshold,
-        known: knownWords,
-        focus: focusWords,
-      )) {
+      if (knownWords.contains(word) && !focusWords.contains(word)) {
         continue;
+      }
+      if (!scenePhoto) {
+        if (!isReadingHardWord(
+          word: word,
+          lexicon: lexicon,
+          threshold: freqThreshold,
+          known: knownWords,
+          focus: focusWords,
+        )) {
+          continue;
+        }
       }
       out.add(label);
     }

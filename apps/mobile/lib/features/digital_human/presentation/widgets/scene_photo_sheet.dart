@@ -62,12 +62,12 @@ class _ScenePhotoSheetState extends State<ScenePhotoSheet> {
     if (widget.refining) return '云端精修中（qwen-vl-plus）…';
     if (widget.refined) {
       return widget.labels.isEmpty
-          ? '没有需要学的新词（高频已会词已隐藏），可重拍或仍交给数字人描述。'
-          : '点标注收藏进生词本；qwen-vl-plus 精修后更准。已会的高频词不会显示。';
+          ? '没有可学词（已会词已隐藏），可重拍或仍交给数字人描述。'
+          : '点标注收藏进生词本；云端会按图识物，已会词不显示。';
     }
     return widget.labels.isEmpty
         ? '暂无待学新词，可点「再识别一次」或重拍。'
-        : '点标注可收藏；云端精修后更准。已会的高频词已隐藏。';
+        : '点标注可收藏；云端按图精修后更准。已会词已隐藏。';
   }
 
   @override

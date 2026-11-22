@@ -31,4 +31,30 @@ void main() {
       <String>['hand', 'watermelon', 'ladle'],
     );
   });
+
+  test('scenePhoto keeps common nouns and only drops known words', () {
+    final ReadingFrequencyLexicon lexicon = ReadingFrequencyLexicon(
+      <String, int>{
+        'laptop': 1200,
+        'stool': 8000,
+        'person': 50,
+      },
+    );
+    final List<SceneWordLabel> kept = SceneWordRecognizer.keepLearningTargets(
+      const <SceneWordLabel>[
+        SceneWordLabel(word: 'laptop'),
+        SceneWordLabel(word: 'stool'),
+        SceneWordLabel(word: 'person'),
+        SceneWordLabel(word: 'knownword'),
+      ],
+      lexicon: lexicon,
+      freqThreshold: 3000,
+      knownWords: <String>{'knownword', 'person'},
+      scenePhoto: true,
+    );
+    expect(
+      kept.map((SceneWordLabel e) => e.word).toList(),
+      <String>['laptop', 'stool'],
+    );
+  });
 }

@@ -2081,8 +2081,8 @@ class AcquireApiClient {
             .toList(growable: false),
       },
       options: Options(
-        sendTimeout: const Duration(seconds: 30),
-        receiveTimeout: const Duration(seconds: 50),
+        sendTimeout: const Duration(seconds: 20),
+        receiveTimeout: const Duration(seconds: 32),
         extra: const <String, Object>{
           'dio_cache_interceptor_force_refresh': true,
         },
@@ -2093,9 +2093,9 @@ class AcquireApiClient {
     final List<dynamic> rows =
         (body['labels'] as List<dynamic>?) ?? const <dynamic>[];
     return rows
-        .whereType<Map>()
+        .whereType<Map<dynamic, dynamic>>()
         .map(
-          (Map row) => SceneWordLabel.fromJson(
+          (Map<dynamic, dynamic> row) => SceneWordLabel.fromJson(
             Map<String, dynamic>.from(row),
           ).copyWith(source: 'cloud'),
         )

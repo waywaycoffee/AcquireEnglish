@@ -1741,12 +1741,15 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
       lists: lists,
       learned: ref.read(learnedVocabularyProvider),
     );
+    // Scene photos: only hide words already marked known — do NOT drop
+    // common nouns like laptop/chair by frequency (that left rare mislabels).
     return SceneWordRecognizer.keepLearningTargets(
       labels,
       lexicon: lexicon,
       freqThreshold: readingFreqThresholdFromPrefs(),
       knownWords: known,
       focusWords: lists.focus,
+      scenePhoto: true,
     );
   }
 
@@ -1818,14 +1821,14 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
       _error = null;
       _sceneSavedWords.addAll(_favoriteWordsSnapshot());
     });
+    List<SceneWordLabel> rawLabels = const <SceneWordLabel>[];
     List<SceneWordLabel> labels = const <SceneWordLabel>[];
     try {
-      final List<SceneWordLabel> raw =
-          await ref.read(sceneWordRecognizerProvider).recognize(
-                imagePath,
-                settings: settings,
-              );
-      labels = await _filterSceneLabels(raw);
+      rawLabels = await ref.read(sceneWordRecognizerProvider).recognize(
+            imagePath,
+            settings: settings,
+          );
+      labels = await _filterSceneLabels(rawLabels);
     } catch (error) {
       if (mounted) {
         setState(() => _error = '识词失败：${_pretty(error)}');
@@ -1837,8 +1840,8 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
       _sceneImagePath = imagePath;
       _sceneLabels = labels;
       _status = labels.isEmpty
-          ? '没有待学新词（高频已会词已隐藏）'
-          : '端上已识别 ${labels.length} 个待学词';
+          ? '没有可学词（已会词已隐藏），可等云端精修或重拍'
+          : '端上已识别 ${labels.length} 个词，正在云端精修…';
     });
     await showModalBottomSheet<void>(
       context: context,
@@ -1850,6 +1853,9 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
           child: _ScenePhotoRecognizeHost(
             imagePath: imagePath,
             initialLabels: labels,
+            // Pass unfiltered local labels so cloud VL is not poisoned by
+            // frequency-filtered leftovers (rare mislabels only).
+            cloudSeedLabels: rawLabels,
             savedWords: <String>{
               ..._sceneSavedWords,
               ..._favoriteWordsSnapshot(),
@@ -2994,11 +3000,14 @@ class _ScenePhotoRecognizeHost extends ConsumerStatefulWidget {
     required this.onRetake,
     required this.onLabelsChanged,
     required this.filterLabels,
+    this.cloudSeedLabels = const <SceneWordLabel>[],
     this.autoRefine = true,
   });
 
   final String imagePath;
   final List<SceneWordLabel> initialLabels;
+  /// Unfiltered on-device labels for VL hints (may include common nouns).
+  final List<SceneWordLabel> cloudSeedLabels;
   final Set<String> savedWords;
   final Future<void> Function(SceneWordLabel label) onAddWord;
   final Future<void> Function(List<SceneWordLabel> labels) onShareWithCoach;
@@ -3047,11 +3056,14 @@ class _ScenePhotoRecognizeHostState
     });
     try {
       final LearningSettingsState settings = ref.read(learningSettingsProvider);
+      final List<SceneWordLabel> seed = widget.cloudSeedLabels.isNotEmpty
+          ? widget.cloudSeedLabels
+          : _labels;
       final List<SceneWordLabel> refinedRaw =
           await ref.read(sceneWordRecognizerProvider).refineWithCloud(
                 widget.imagePath,
                 settings: settings,
-                seed: _labels,
+                seed: seed,
               );
       final List<SceneWordLabel> refined =
           await widget.filterLabels(refinedRaw);
@@ -3061,8 +3073,8 @@ class _ScenePhotoRecognizeHostState
         _refined = true;
         _refining = false;
         _hint = refined.isEmpty
-            ? '没有待学新词（高频已会词已隐藏），可重拍。'
-            : '已云端精修 ${refined.length} 个待学词；点标注可收藏。';
+            ? '没有可学词（已会词已隐藏），可重拍。'
+            : '已云端精修 ${refined.length} 个词；点标注可收藏。';
       });
       widget.onLabelsChanged(refined);
     } catch (error) {
