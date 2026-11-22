@@ -200,7 +200,7 @@ class _ActionRow extends StatelessWidget {
           icon: const Icon(Icons.volume_up_rounded, size: 20),
         ),
         IconButton(
-          tooltip: saved ? '已加入语言库' : '加入语言库',
+          tooltip: saved ? '已收藏到语言库' : '收藏地道表达',
           onPressed: onSave,
           visualDensity: VisualDensity.compact,
           icon: Icon(

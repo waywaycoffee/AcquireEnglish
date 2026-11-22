@@ -1415,11 +1415,10 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
             ? OralExpressionDiagnosis.fallback(source: confirmed)
             : null);
     if (diagnosis != null && diagnosis.isUseful) {
-      _saveDiagnosisToLanguageBank(diagnosis);
       if (!mounted) return;
       setState(() {
         _pendingResay = diagnosis;
-        _pendingDiagnosisSaved = true;
+        _pendingDiagnosisSaved = false;
         _bubbles.add(
           _ChatBubble(
             role: 'diagnosis',
@@ -1430,7 +1429,7 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
           ),
         );
         _busy = false;
-        _status = '按住再说一次地道英文';
+        _status = '按住再说一次地道英文；觉得好可点星收藏';
       });
       _scrollChatToEnd();
       unawaited(_persistLearningTurn(turn));
@@ -1550,11 +1549,21 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
     await _speakCoach(speakText, settings);
   }
 
-  void _saveDiagnosisToLanguageBank(OralExpressionDiagnosis diagnosis) {
+  void _saveDiagnosisToLanguageBank(
+    OralExpressionDiagnosis diagnosis, {
+    bool notify = false,
+  }) {
     final String english = diagnosis.idiomaticEn.isNotEmpty
         ? diagnosis.idiomaticEn
         : diagnosis.literalEn;
-    if (english.trim().isEmpty) return;
+    if (english.trim().isEmpty) {
+      if (notify && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('暂无可收藏的地道表达')),
+        );
+      }
+      return;
+    }
     final bool added = ref.read(phraseBookProvider.notifier).addPhraseIfMissing(
           english: english,
           chinese: diagnosis.source,
@@ -1562,7 +1571,8 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
           episode: widget.episodeTitle.isNotEmpty
               ? widget.episodeTitle
               : (_activeScenario?.title ?? '数字人对话'),
-          time: DateTime.now().toIso8601String(),
+          // Stable key so re-tapping the same idiomatic line does not duplicate.
+          time: 'oral_idiomatic',
           needsReview: true,
           today: true,
           note: diagnosis.tip.isNotEmpty
@@ -1572,7 +1582,14 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
                     ? '直译：${diagnosis.literalEn}'
                     : null),
         );
-    _pendingDiagnosisSaved = added || _pendingDiagnosisSaved;
+    _pendingDiagnosisSaved = true;
+    if (!notify || !mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(added ? '已收藏地道表达到语言库' : '该表达已在语言库中'),
+        duration: const Duration(seconds: 2),
+      ),
+    );
   }
 
   Future<void> _persistLearningTurn(OralCoachTurnResult turn) async {
@@ -2557,7 +2574,10 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
                                 ),
                               ),
                               onSave: () {
-                                _saveDiagnosisToLanguageBank(diagnosis);
+                                _saveDiagnosisToLanguageBank(
+                                  diagnosis,
+                                  notify: true,
+                                );
                                 setState(() => _pendingDiagnosisSaved = true);
                               },
                               onGrammar: () {

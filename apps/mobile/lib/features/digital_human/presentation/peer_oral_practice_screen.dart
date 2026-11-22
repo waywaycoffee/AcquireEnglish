@@ -874,22 +874,39 @@ class _PeerOralPracticeScreenState
     });
   }
 
-  void _saveToBank(OralExpressionDiagnosis diagnosis) {
+  void _saveToBank(
+    OralExpressionDiagnosis diagnosis, {
+    bool notify = false,
+  }) {
     final String english = diagnosis.idiomaticEn.isNotEmpty
         ? diagnosis.idiomaticEn
         : diagnosis.literalEn;
-    if (english.trim().isEmpty) return;
+    if (english.trim().isEmpty) {
+      if (notify && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('暂无可收藏的地道表达')),
+        );
+      }
+      return;
+    }
     final bool added = ref.read(phraseBookProvider.notifier).addPhraseIfMissing(
           english: english,
           chinese: diagnosis.source,
           course: '口语诊断',
           episode: '真人口语对练',
-          time: DateTime.now().toIso8601String(),
+          time: 'oral_idiomatic',
           needsReview: true,
           today: true,
           note: diagnosis.tip.isNotEmpty ? diagnosis.tip : 'peer_oral_diagnosis',
         );
-    _saved = added || _saved;
+    _saved = true;
+    if (!notify || !mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(added ? '已收藏地道表达到语言库' : '该表达已在语言库中'),
+        duration: const Duration(seconds: 2),
+      ),
+    );
   }
 
   Future<void> _cancelWaiting() async {
@@ -1322,7 +1339,7 @@ class _PeerOralPracticeScreenState
                               diagnosis: bubble.diagnosis!,
                               saved: _saved,
                               onSave: () {
-                                _saveToBank(bubble.diagnosis!);
+                                _saveToBank(bubble.diagnosis!, notify: true);
                                 setState(() => _saved = true);
                               },
                             ),
