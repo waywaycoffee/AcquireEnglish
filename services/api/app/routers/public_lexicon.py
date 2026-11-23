@@ -43,16 +43,26 @@ PLACEMENT_ESTIMATE_MAX = 60000
 
 
 @router.get('/placement')
-def placement():
+def placement(per_band: int = Query(default=12, ge=3, le=24)):
+    """Frequency-band samples for adaptive client-side placement tests."""
     with closing(_connect()) as db:
         return [
-            {'size': hi - lo + 1, 'items': [dict(row) for row in db.execute(
-                """SELECT word, rank, definition_cn FROM entries
-                   WHERE rank BETWEEN ? AND ? AND length(word) >= 2
-                     AND word NOT GLOB '*[^a-z]*'
-                     AND display_word = word AND trim(definition_cn) <> ''
-                   ORDER BY random() LIMIT 3""", (lo, hi)
-            )]}
+            {
+                'size': hi - lo + 1,
+                'lo': lo,
+                'hi': hi,
+                'items': [
+                    dict(row)
+                    for row in db.execute(
+                        """SELECT word, rank, definition_cn FROM entries
+                           WHERE rank BETWEEN ? AND ? AND length(word) >= 2
+                             AND word NOT GLOB '*[^a-z]*'
+                             AND display_word = word AND trim(definition_cn) <> ''
+                           ORDER BY random() LIMIT ?""",
+                        (lo, hi, per_band),
+                    )
+                ],
+            }
             for lo, hi in PLACEMENT_BANDS
         ]
 
