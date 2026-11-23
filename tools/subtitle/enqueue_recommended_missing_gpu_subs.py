@@ -95,10 +95,11 @@ async def amain(args: argparse.Namespace) -> int:
     ) as client:
         async with SessionLocal() as db:
             for bvid in bvids:
+                # Keep Bilibili case for view/playurl; DB lookups are CI-aware.
                 key = normalize_bvid(bvid)
                 if not key:
                     continue
-                page_filter = seed_pages_for_bvid(bvid)
+                page_filter = seed_pages_for_bvid(key)
                 try:
                     pages = await _view_pages(client, key)
                 except Exception as exc:  # noqa: BLE001

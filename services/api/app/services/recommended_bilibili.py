@@ -7,7 +7,7 @@ import json
 import time
 from pathlib import Path
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.bilibili_search import fetch_bilibili_creator_card
@@ -110,10 +110,13 @@ def curated_bvids() -> list[str]:
                 continue
             raw = str(video.get("bvid") or "").strip()
             key = normalize_bvid(raw)
-            if not key or key in seen:
+            if not key:
                 continue
-            seen.add(key)
-            out.append(raw)
+            folded = key.upper()
+            if folded in seen:
+                continue
+            seen.add(folded)
+            out.append(key)
     return out
 
 
@@ -128,11 +131,12 @@ def seed_pages_for_bvid(bvid: str) -> list[int] | None:
     want = normalize_bvid(bvid)
     if not want:
         return None
+    want_fold = want.upper()
     for item in load_catalog():
         for video in item.get("videos") or []:
             if not isinstance(video, dict):
                 continue
-            if normalize_bvid(str(video.get("bvid") or "")) != want:
+            if normalize_bvid(str(video.get("bvid") or "")).upper() != want_fold:
                 continue
             raw = video.get("seed_pages")
             if raw is None or raw == "" or raw == "all":
@@ -172,17 +176,18 @@ async def _shared_pages_by_bvid(
     keys = sorted({normalize_bvid(b) for b in bvids if normalize_bvid(b)})
     if not keys:
         return {}
+    folded = {key.upper(): key for key in keys}
     result = await db.execute(
         select(SharedBilibiliSubtitle.bvid, SharedBilibiliSubtitle.page).where(
-            SharedBilibiliSubtitle.bvid.in_(keys)
+            func.upper(SharedBilibiliSubtitle.bvid).in_(list(folded))
         )
     )
     out: dict[str, set[int]] = {key: set() for key in keys}
     for bvid, page in result.all():
-        key = normalize_bvid(str(bvid or ""))
-        if not key or page is None:
+        canon = folded.get(normalize_bvid(str(bvid or "")).upper())
+        if not canon or page is None:
             continue
-        out.setdefault(key, set()).add(int(page))
+        out.setdefault(canon, set()).add(int(page))
     return out
 
 

@@ -5,7 +5,7 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass
 
-from sqlalchemy import or_, select
+from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models import SharedBilibiliSubtitle, UserLinkCourse
@@ -22,7 +22,16 @@ class SharedUpsertResult:
 
 
 def normalize_bvid(raw: str) -> str:
-    value = (raw or "").strip().upper()
+    """Preserve Bilibili BV case.
+
+    The view/playurl APIs are case-sensitive; uppercasing can 404 or (worse)
+    resolve a different稿件. Only normalize the ``BV`` prefix.
+    """
+    value = (raw or "").strip()
+    if not value:
+        return ""
+    if len(value) >= 2 and value[:2].upper() == "BV":
+        return "BV" + value[2:]
     return value
 
 
@@ -31,7 +40,7 @@ def parse_bvid_page(external_id: str) -> tuple[str, int]:
     match = re.match(r"^(BV[0-9A-Za-z]+)(?:-p(\d+))?$", eid, re.I)
     if not match:
         return normalize_bvid(eid), 1
-    return match.group(1).upper(), int(match.group(2) or 1)
+    return normalize_bvid(match.group(1)), int(match.group(2) or 1)
 
 
 def personal_external_id(bvid: str, page: int = 1) -> str:
@@ -128,13 +137,27 @@ async def get_shared_bilibili_pack(
     key = normalize_bvid(bvid)
     if not key:
         return None
+    page_no = int(page or 1)
+    # Exact first (common path), then CI for legacy all-upper rows.
     result = await db.execute(
         select(SharedBilibiliSubtitle).where(
             SharedBilibiliSubtitle.bvid == key,
-            SharedBilibiliSubtitle.page == int(page or 1),
+            SharedBilibiliSubtitle.page == page_no,
         )
     )
-    return result.scalar_one_or_none()
+    row = result.scalar_one_or_none()
+    if row is not None:
+        return row
+    result = await db.execute(
+        select(SharedBilibiliSubtitle).where(
+            func.upper(SharedBilibiliSubtitle.bvid) == key.upper(),
+            SharedBilibiliSubtitle.page == page_no,
+        )
+    )
+    legacy = result.scalar_one_or_none()
+    if legacy is not None and legacy.bvid != key:
+        legacy.bvid = key
+    return legacy
 
 
 async def upsert_shared_bilibili_pack(
@@ -188,6 +211,16 @@ async def upsert_shared_bilibili_pack(
         )
     )
     existing = result.scalar_one_or_none()
+    if existing is None:
+        result = await db.execute(
+            select(SharedBilibiliSubtitle).where(
+                func.upper(SharedBilibiliSubtitle.bvid) == key.upper(),
+                SharedBilibiliSubtitle.page == page,
+            )
+        )
+        existing = result.scalar_one_or_none()
+        if existing is not None and existing.bvid != key:
+            existing.bvid = key
     new_has_zh = bool(zh)
 
     if existing is None:
