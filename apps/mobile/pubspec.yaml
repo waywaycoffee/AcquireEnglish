@@ -160,6 +160,7 @@ flutter:
     - assets/img/
     - assets/img/bookshelf/
     - assets/img/digital_human/
+    - assets/img/onboarding/
 
   fonts:
     - family: Nunito

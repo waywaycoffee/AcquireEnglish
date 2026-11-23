@@ -14,6 +14,8 @@ class Assets {
   static const String onboardingReading = 'assets/img/onboarding/reading.jpg';
   static const String onboardingReadingShelf =
       'assets/img/onboarding/reading_shelf.jpg';
+  static const String onboardingBookshelfOak =
+      'assets/img/onboarding/bookshelf_oak.jpg';
   static const String onboardingFavorites = 'assets/img/onboarding/favorites.jpg';
   static const String onboardingFsrs = 'assets/img/onboarding/fsrs.jpg';
   static const String onboardingCommunity = 'assets/img/onboarding/community.jpg';

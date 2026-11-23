@@ -592,7 +592,17 @@ class _FeatureRow extends StatelessWidget {
               height: 156,
               child: Transform.scale(
                 scale: 1.08 + math.sin(t * math.pi * 2) * 0.02,
-                child: Image.asset(asset, fit: BoxFit.cover),
+                child: Image.asset(
+                  asset,
+                  fit: BoxFit.cover,
+                  errorBuilder: (_, __, ___) => const ColoredBox(
+                    color: Color(0xFF1A2230),
+                    child: Center(
+                      child: Icon(Icons.image_not_supported_outlined,
+                          color: _muted),
+                    ),
+                  ),
+                ),
               ),
             ),
           ),
@@ -682,8 +692,8 @@ class _ReadingInputPage extends StatelessWidget {
                     top: 8 + bob,
                     child: Transform.rotate(
                       angle: -0.05,
-                      child: _PhoneFrame(
-                        asset: Assets.onboardingReadingShelf,
+                        child: _PhoneFrame(
+                        asset: Assets.onboardingBookshelfOak,
                         width: 150,
                         height: 300,
                         scale: 1.04 + math.sin(t * math.pi * 2) * 0.015,
@@ -1353,7 +1363,17 @@ class _LabeledShot extends StatelessWidget {
         children: <Widget>[
           Transform.scale(
             scale: 1.06 + math.sin(t * math.pi * 2) * 0.015,
-            child: Image.asset(asset, fit: BoxFit.cover),
+            child: Image.asset(
+              asset,
+              fit: BoxFit.cover,
+              errorBuilder: (_, __, ___) => const ColoredBox(
+                color: Color(0xFF1A2230),
+                child: Center(
+                  child: Icon(Icons.image_not_supported_outlined,
+                      color: _muted),
+                ),
+              ),
+            ),
           ),
           Positioned(
             left: 8,
@@ -1510,6 +1530,12 @@ class _PhoneFrame extends StatelessWidget {
             fit: BoxFit.cover,
             width: double.infinity,
             height: double.infinity,
+            errorBuilder: (_, __, ___) => const ColoredBox(
+              color: Color(0xFF1A2230),
+              child: Center(
+                child: Icon(Icons.image_not_supported_outlined, color: _muted),
+              ),
+            ),
           ),
         ),
       ),
