@@ -18,4 +18,23 @@ POST /api/shared-subtitles/jobs（登录）提交 {bvid,page}，重复视频分�
 
 当前可直接运行 worker 命令持续监听。未配置开机自动启动；电脑重启后需重新运行该命令。
 
+Worker 会通过 heartbeat 上报 `progress_pct` / `progress_message`（准备音频 → 识别 → 翻译 → 入库），App 轮询 `GET /api/shared-subtitles/jobs/{id}` 展示进度条与文案。
+
+## 批量补推荐片源公共字幕
+
+推荐列表里不少合集只有部分分 P 有共享字幕。可在 **ECS** 把缺 EN 的分 P 推进 GPU 队列，由本机 5060 Ti 消化后写入公共库：
+
+```bash
+# 先尽量灌官方软字幕（有官方轨就不用 GPU）
+cd /opt/acquireenglish/services/api
+.venv/bin/python /opt/acquireenglish/tools/subtitle/seed_recommended_bilibili_subs.py
+
+# 再把仍缺 EN 的推荐分 P 入队（默认最多 48 条；合集受每 BV 12 条在途上限）
+.venv/bin/python /opt/acquireenglish/tools/subtitle/enqueue_recommended_missing_gpu_subs.py
+.venv/bin/python /opt/acquireenglish/tools/subtitle/enqueue_recommended_missing_gpu_subs.py --dry-run
+.venv/bin/python /opt/acquireenglish/tools/subtitle/enqueue_recommended_missing_gpu_subs.py --bvid BV1fV4y1p7Ex
+```
+
+Windows 保持 `gpu_worker.py` 常开；队列消化完后可再跑一遍 enqueue，把大合集后续分 P 补齐。
+
 验收应同时核对队列 completed 和公共库中英文字幕，避免仅以进程退出判断成功。该流程仍依赖 B 站可获取的音轨与合法访问权限；无音轨的任务会重试后失败。

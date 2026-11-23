@@ -108,21 +108,46 @@ class Heartbeat:
         self.thread=threading.Thread(target=self._run,daemon=True)
         self.thread.start()
     def _run(self):
-        while not self.stopped.wait(120):
-            try: rpc({'action':'heartbeat','job':self.job,'state':self.job.get('_state','transcribing')})
-            except Exception: pass
+        while not self.stopped.wait(45):
+            try:
+                rpc({
+                    'action':'heartbeat',
+                    'job':{k:v for k,v in self.job.items() if not k.startswith('_')},
+                    'state':self.job.get('_state','transcribing'),
+                    'progress_pct':self.job.get('_progress_pct'),
+                    'progress_message':self.job.get('_progress_message'),
+                })
+            except Exception:
+                pass
+    def mark(self, state, *, pct=None, message=None):
+        self.job['_state']=state
+        if pct is not None:
+            self.job['_progress_pct']=max(0.0, min(1.0, float(pct)))
+        if message:
+            self.job['_progress_message']=str(message)[:120]
+        try:
+            rpc({
+                'action':'heartbeat',
+                'job':{k:v for k,v in self.job.items() if not k.startswith('_')},
+                'state':state,
+                'progress_pct':self.job.get('_progress_pct'),
+                'progress_message':self.job.get('_progress_message'),
+            })
+        except Exception:
+            pass
     def stop(self):
         self.stopped.set()
-        self.thread.join()
+        self.thread.join(timeout=5)
 
 
 def finalize(job, cues, beat):
     """Translate locally, then store on ECS. Runs on the background thread."""
     try:
-        job['_state']='translating'
+        beat.mark('translating', pct=0.72, message='云端正在翻译中文字幕…')
         started=time.time()
         zh=translate_local(cues)
         took=round(time.time()-started,1)
+        beat.mark('translating', pct=0.92, message='字幕入库中…')
         payload={'action':'complete','job':{k:v for k,v in job.items() if not k.startswith('_')},'cues':cues}
         if zh is not None:
             payload['zh']=zh
@@ -137,8 +162,10 @@ def finalize(job, cues, beat):
         except Exception: pass
 
 
-def transcribe(recognizer, job):
+def transcribe(recognizer, job, beat=None):
     import httpx
+    if beat is not None:
+        beat.mark('transcribing', pct=0.18, message='准备音频中…')
     with tempfile.TemporaryDirectory(prefix='acquire-gpu-') as folder:
         audio=Path(folder)/'source.m4a'
         with httpx.stream('GET',job['url'],headers={'User-Agent':'Mozilla/5.0',
@@ -146,9 +173,13 @@ def transcribe(recognizer, job):
             response.raise_for_status()
             with audio.open('wb') as output:
                 for chunk in response.iter_bytes(): output.write(chunk)
+        if beat is not None:
+            beat.mark('transcribing', pct=0.38, message='云端正在识别英文字幕…')
         segments,_=recognizer.transcribe(str(audio),language='en',vad_filter=True,beam_size=5)
         cues=[dict(start=s.start,end=s.end,text=s.text.strip()) for s in segments if s.text.strip()]
     if not cues: raise ValueError('Empty transcription')
+    if beat is not None:
+        beat.mark('transcribing', pct=0.62, message=f'识别完成 {len(cues)} 句，准备翻译…')
     return cues
 
 
@@ -175,8 +206,9 @@ def main(once=False,model='small.en'):
             if job.get('kind')=='translate':
                 cues=job.pop('cues',None) or []
                 if len(cues)<2: raise ValueError('Translate job has no cues')
+                beat.mark('translating', pct=0.7, message='云端正在翻译中文字幕…')
             else:
-                cues=transcribe(recognizer,job)
+                cues=transcribe(recognizer,job,beat=beat)
         except Exception as exc:
             beat.stop()
             print('Job failed',job['id'],type(exc).__name__,flush=True)

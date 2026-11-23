@@ -331,6 +331,8 @@ class SharedSubtitleGpuJob {
     required this.state,
     this.attempts = 0,
     this.error = '',
+    this.progressPct,
+    this.progressMessage,
   });
 
   factory SharedSubtitleGpuJob.fromJson(Map<String, dynamic> json) =>
@@ -341,6 +343,11 @@ class SharedSubtitleGpuJob {
         state: '${json['state'] ?? ''}',
         attempts: (json['attempts'] as num?)?.toInt() ?? 0,
         error: '${json['error'] ?? ''}',
+        progressPct: (json['progress_pct'] as num?)?.toDouble(),
+        progressMessage: (() {
+          final String raw = '${json['progress_message'] ?? ''}'.trim();
+          return raw.isEmpty ? null : raw;
+        })(),
       );
 
   final String id;
@@ -349,6 +356,10 @@ class SharedSubtitleGpuJob {
   final String state;
   final int attempts;
   final String error;
+  /// Optional 0–1 progress from the 5060 Ti worker heartbeat.
+  final double? progressPct;
+  /// Optional Chinese status line from the worker (e.g. 准备音频中…).
+  final String? progressMessage;
 
   bool get isTerminalFailure =>
       state == 'failed' || (error.trim().isNotEmpty && state == 'failed');

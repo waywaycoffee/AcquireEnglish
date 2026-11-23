@@ -586,7 +586,11 @@ class SubtitleCompletionStatusNotifier
         if (job == null) {
           continue;
         }
-        final String label = labelForGpuSubtitleJobState(job.state);
+        final String label = labelForGpuSubtitleJobState(
+          job.state,
+          progressMessage: job.progressMessage,
+          progressPct: job.progressPct,
+        );
         final String state = job.state.trim().toLowerCase();
         if (state == 'failed') {
           reportProgress(

@@ -90,8 +90,22 @@ const String kSubtitleSharedCacheLookupLabel = '正在检查校验字幕缓存�
 /// Local still missing after shared lookup — durable ECS GPU job accepted.
 const String kSubtitleCloudGenerationQueuedLabel = '云端排队生成字幕中…';
 
-/// Map ECS GPU job `state` to a user-visible progress label.
-String labelForGpuSubtitleJobState(String? state) {
+/// Map ECS GPU job `state` (+ optional worker message) to a user-visible label.
+String labelForGpuSubtitleJobState(
+  String? state, {
+  String? progressMessage,
+  double? progressPct,
+}) {
+  final String live = (progressMessage ?? '').trim();
+  if (live.isNotEmpty) {
+    if (progressPct != null && progressPct > 0 && progressPct < 1) {
+      final int pct = (progressPct * 100).round().clamp(1, 99);
+      if (!live.contains('%') && !live.contains('（')) {
+        return '$live（$pct%）';
+      }
+    }
+    return live;
+  }
   switch ((state ?? '').trim().toLowerCase()) {
     case 'transcribing':
       return '云端正在识别英文字幕…';
@@ -109,8 +123,14 @@ String labelForGpuSubtitleJobState(String? state) {
   }
 }
 
-/// Rough 0–1 progress for GPU job states (no percent from the worker yet).
-double progressFractionForGpuSubtitleJobState(String? state) {
+/// Prefer worker `progress_pct` when present; otherwise coarse state buckets.
+double progressFractionForGpuSubtitleJobState(
+  String? state, {
+  double? progressPct,
+}) {
+  if (progressPct != null && progressPct.isFinite) {
+    return progressPct.clamp(0.05, 0.99);
+  }
   switch ((state ?? '').trim().toLowerCase()) {
     case 'transcribing':
       return 0.42;

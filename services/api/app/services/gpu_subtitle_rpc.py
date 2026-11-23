@@ -45,7 +45,12 @@ async def run(command):
               'cid':page['cid'],'duration':page['duration'],'title':title}
     job=command['job']
     if action=='heartbeat':
-        queue.update(job,command.get('state','transcribing'))
+        queue.update(
+            job,
+            command.get('state','transcribing'),
+            progress_pct=command.get('progress_pct'),
+            progress_message=command.get('progress_message'),
+        )
         return {'ok':True}
     if action=='fail':
         queue.update(job,'retry','GPU worker failed')

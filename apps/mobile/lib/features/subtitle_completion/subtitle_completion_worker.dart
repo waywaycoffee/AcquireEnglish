@@ -167,7 +167,11 @@ class SubtitleCompletionWorker {
             ids: ids,
           );
           if (gpu != null) {
-            cloudLabel = labelForGpuSubtitleJobState(gpu.state);
+            cloudLabel = labelForGpuSubtitleJobState(
+              gpu.state,
+              progressMessage: gpu.progressMessage,
+              progressPct: gpu.progressPct,
+            );
             CloudSubtitleJobTracker.instance.track(
               episodeId: job.episodeId,
               jobId: gpu.id,

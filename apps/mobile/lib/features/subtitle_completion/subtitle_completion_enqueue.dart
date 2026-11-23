@@ -380,6 +380,9 @@ Future<void> enqueueSubtitleCompletionForEpisode({
               api: sharedApi,
               ids: sharedIds,
               documentsDirectory: documentsDirectory,
+              expectedDurationSec: episode != null && episode.durationMinutes > 0
+                  ? episode.durationMinutes * 60
+                  : null,
             );
         if (shared != null) {
           if (missingEn && isUsableSubtitlePath(shared.enPath)) {
@@ -497,7 +500,11 @@ Future<void> enqueueSubtitleCompletionForEpisode({
           cloudQueued = true;
           SubtitleCompletionStatusHub.instance.reportProgress(
             episodeId,
-            labelForGpuSubtitleJobState(gpuJob.state),
+            labelForGpuSubtitleJobState(
+              gpuJob.state,
+              progressMessage: gpuJob.progressMessage,
+              progressPct: gpuJob.progressPct,
+            ),
             status: SubtitleCompletionStatus.running,
             needEnglish: plan.needEnglish,
             needChinese: plan.needChinese,

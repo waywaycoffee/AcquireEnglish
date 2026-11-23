@@ -199,6 +199,9 @@ Future<({String? enPath, String? zhPath})?> tryApplySharedBilibiliSubtitles({
   bool requireBilingual = false,
   String? existingEnPath,
   String? existingZhPath,
+  /// When set, reject shared packs whose duration clearly mismatches this video
+  /// (合集/分P 串台防护 — wrong-page SRT under the same BV).
+  int? expectedDurationSec,
 }) async {
   try {
     final String folder = (ids.idKey ?? ids.bvid).trim();
@@ -261,6 +264,19 @@ Future<({String? enPath, String? zhPath})?> tryApplySharedBilibiliSubtitles({
           bvid: ids.bvid, page: ids.page, cid: ids.cid,
         );
         if (pack != null) {
+          final int? expected = expectedDurationSec;
+          final int? packDur = pack.durationSec;
+          if (expected != null &&
+              expected > 0 &&
+              packDur != null &&
+              packDur > 0 &&
+              subtitleTimelineMismatchesMedia(
+                subtitleEndMs: packDur * 1000,
+                mediaDurationMs: expected * 1000,
+              )) {
+            // Wrong-page / 合集串台 pack — do not write under this BV folder.
+            return null;
+          }
           en ??= await saveTrack('en', pack.subtitleEnSrt);
           zh ??= await saveTrack('zh', pack.subtitleZhSrt);
         }

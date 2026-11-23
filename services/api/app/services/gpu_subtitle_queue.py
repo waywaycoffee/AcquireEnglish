@@ -41,6 +41,10 @@ def connection():
         db.execute('ALTER TABLE jobs ADD COLUMN payload TEXT')
     if 'requesters' not in columns:
         db.execute("ALTER TABLE jobs ADD COLUMN requesters TEXT NOT NULL DEFAULT '[]'")
+    if 'progress_pct' not in columns:
+        db.execute('ALTER TABLE jobs ADD COLUMN progress_pct REAL')
+    if 'progress_message' not in columns:
+        db.execute('ALTER TABLE jobs ADD COLUMN progress_message TEXT')
     try:
         with db:
             yield db
@@ -201,6 +205,17 @@ def public(row):
     out={k:row[k] for k in ('id','bvid','page','state','attempts','error')}
     out['kind']=row['kind'] if 'kind' in row.keys() else 'asr'
     out['requesters']=_requesters(row)
+    keys = row.keys()
+    pct = row['progress_pct'] if 'progress_pct' in keys else None
+    msg = row['progress_message'] if 'progress_message' in keys else None
+    if pct is not None:
+        try:
+            out['progress_pct'] = max(0.0, min(1.0, float(pct)))
+        except (TypeError, ValueError):
+            out['progress_pct'] = None
+    else:
+        out['progress_pct'] = None
+    out['progress_message'] = (str(msg).strip() if msg else '') or None
     return out
 
 
@@ -226,8 +241,38 @@ def claim():
         return dict(db.execute('SELECT * FROM jobs WHERE id=?',(row['id'],)).fetchone())
 
 
-def update(job, state, error=None):
+def update(
+    job,
+    state,
+    error=None,
+    *,
+    progress_pct: float | None = None,
+    progress_message: str | None = None,
+):
+    """Advance job state and optional UI progress (0–1 + short Chinese label)."""
+    pct = None
+    if progress_pct is not None:
+        try:
+            pct = max(0.0, min(1.0, float(progress_pct)))
+        except (TypeError, ValueError):
+            pct = None
+    msg = (progress_message or '').strip()[:120] or None
     with connection() as db:
-        result=db.execute('UPDATE jobs SET state=?,error=?,deadline=?,updated=? WHERE id=? AND lease=?',
-          (state,error,time.time()+1200,time.time(),job['id'],job['lease']))
-        if result.rowcount!=1: raise ValueError('Expired job lease')
+        result = db.execute(
+            'UPDATE jobs SET state=?, error=?, deadline=?, updated=?, '
+            'progress_pct=COALESCE(?, progress_pct), '
+            'progress_message=COALESCE(?, progress_message) '
+            'WHERE id=? AND lease=?',
+            (
+                state,
+                error,
+                time.time() + 1200,
+                time.time(),
+                pct,
+                msg,
+                job['id'],
+                job['lease'],
+            ),
+        )
+        if result.rowcount != 1:
+            raise ValueError('Expired job lease')
