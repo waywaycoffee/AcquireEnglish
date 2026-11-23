@@ -90,6 +90,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     });
 
     final bool showPassword = authAsync.value?.showPassword ?? false;
+    // True only when App was built without WECHAT_APP_ID dart-define.
     final bool wechatMock = !WechatAuthHelper.isConfigured;
 
     return Scaffold(

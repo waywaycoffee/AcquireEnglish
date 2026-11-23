@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -165,19 +167,21 @@ class _WechatMockLoginScreenState extends ConsumerState<WechatMockLoginScreen> {
                           onPressed: () => Navigator.of(context).maybePop(),
                           style: IconButton.styleFrom(
                             backgroundColor: AppDesignTokens.appWhite,
+                            foregroundColor: AppDesignTokens.textPrimary,
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(14),
                             ),
                           ),
                           icon: const Icon(Icons.arrow_back_rounded),
                         ),
-                        const Expanded(
+                        Expanded(
                           child: Text(
                             '微信授权登录',
                             textAlign: TextAlign.center,
                             style: TextStyle(
                               fontSize: 17,
                               fontWeight: FontWeight.w800,
+                              color: AppDesignTokens.textPrimary,
                             ),
                           ),
                         ),
@@ -207,17 +211,43 @@ class _WechatMockLoginScreenState extends ConsumerState<WechatMockLoginScreen> {
                             width: double.infinity,
                             padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
                             decoration: BoxDecoration(
-                              color: const Color(0xFFFFF8E8),
+                              color: AppDesignTokens.isDark
+                                  ? const Color(0xFF3D2A1C)
+                                  : const Color(0xFFFFF8E8),
                               borderRadius: BorderRadius.circular(14),
                               border: Border.all(
-                                color: const Color(0xFFFFE0A3),
+                                color: AppDesignTokens.isDark
+                                    ? const Color(0xFF6B4A28)
+                                    : const Color(0xFFFFE0A3),
                               ),
                             ),
-                            child: const Text(
+                            child: Text(
                               '开发模拟：未配置 WECHAT_APP_ID 时不会跳转微信。'
                               '同意后用模拟身份完成登录/自动注册。',
                               style: TextStyle(
-                                color: Color(0xFF8A5A00),
+                                color: AppDesignTokens.isDark
+                                    ? const Color(0xFFFFD699)
+                                    : const Color(0xFF8A5A00),
+                                height: 1.4,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ),
+                        if (WechatAuthHelper.isConfigured)
+                          Container(
+                            width: double.infinity,
+                            padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+                            decoration: BoxDecoration(
+                              color: AppDesignTokens.infoSoft,
+                              borderRadius: BorderRadius.circular(14),
+                              border: Border.all(
+                                color: AppDesignTokens.borderGray,
+                              ),
+                            ),
+                            child: Text(
+                              '将打开微信完成授权。新用户会自动创建账号并发放试用权益。',
+                              style: TextStyle(
+                                color: AppDesignTokens.textPrimary,
                                 height: 1.4,
                                 fontWeight: FontWeight.w600,
                               ),
@@ -248,12 +278,12 @@ class _WechatMockLoginScreenState extends ConsumerState<WechatMockLoginScreen> {
                                 ),
                               ),
                               const SizedBox(height: 18),
-                              const Text(
+                              Text(
                                 '爱快英语 申请使用',
                                 style: TextStyle(
                                   fontSize: 22,
                                   fontWeight: FontWeight.w900,
-                                  color: Color(0xFF111111),
+                                  color: AppDesignTokens.textPrimary,
                                 ),
                               ),
                               const SizedBox(height: 8),
@@ -348,7 +378,23 @@ class _WechatMockLoginScreenState extends ConsumerState<WechatMockLoginScreen> {
                                 width: double.infinity,
                                 height: 50,
                                 child: FilledButton(
-                                  onPressed: _submitting ? null : _agreeMock,
+                                  onPressed: _submitting
+                                      ? null
+                                      : () {
+                                          if (WechatAuthHelper.isConfigured) {
+                                            if (!_agreedToTerms) {
+                                              setState(() {
+                                                _agreementError =
+                                                    '请先阅读并同意用户协议与版权声明';
+                                              });
+                                              _toast('请先勾选同意用户协议与版权声明');
+                                              return;
+                                            }
+                                            unawaited(_submitRealWechat());
+                                            return;
+                                          }
+                                          unawaited(_agreeMock());
+                                        },
                                   style: FilledButton.styleFrom(
                                     backgroundColor: _wechatGreen,
                                     foregroundColor: Colors.white,
@@ -365,9 +411,11 @@ class _WechatMockLoginScreenState extends ConsumerState<WechatMockLoginScreen> {
                                             color: Colors.white,
                                           ),
                                         )
-                                      : const Text(
-                                          '同意并继续',
-                                          style: TextStyle(
+                                      : Text(
+                                          WechatAuthHelper.isConfigured
+                                              ? '打开微信授权'
+                                              : '同意并继续',
+                                          style: const TextStyle(
                                             fontSize: 16,
                                             fontWeight: FontWeight.w900,
                                           ),
@@ -413,7 +461,7 @@ class _WechatMockLoginScreenState extends ConsumerState<WechatMockLoginScreen> {
                             child: Text(
                               '改用手机号登录',
                               style: TextStyle(
-                                color: AppDesignTokens.primaryBlueDark,
+                                color: AppDesignTokens.primaryBlue,
                                 fontWeight: FontWeight.w800,
                               ),
                             ),
@@ -444,10 +492,11 @@ class _PermissionRow extends StatelessWidget {
         Expanded(
           child: Text(
             text,
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 14,
-              color: Color(0xFF333333),
+              color: AppDesignTokens.textPrimary,
               height: 1.35,
+              fontWeight: FontWeight.w600,
             ),
           ),
         ),
