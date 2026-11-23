@@ -63,10 +63,20 @@ async def test_commerce_catalog_public():
             "video",
             "reading",
             "exam",
-            "course",
+            "vocab",
+            "digital_human",
         }
+        by_code = {m["code"]: m for m in body["modules"]}
+        assert by_code["reading"]["yearly_cents"] == 19900
+        assert by_code["video"]["yearly_cents"] == 29900
+        assert by_code["exam"]["yearly_cents"] == 19900
+        assert by_code["vocab"]["free"] is True
+        assert by_code["digital_human"]["monthly_cents"] == 2000
+        assert by_code["digital_human"]["sell"] == ["monthly"]
         assert body.get("legacy_aliases", {}).get("acquire_listening") == ["video"]
-        assert any(c["sku_code"] == "module.combo.any2.monthly" for c in body["combos"])
+        assert body.get("combos") == []
+        membership = {m["sku_code"] for m in body.get("membership", [])}
+        assert membership == {"membership.pro.7d"}
 
 
 @pytest.mark.asyncio

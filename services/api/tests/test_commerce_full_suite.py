@@ -54,14 +54,17 @@ async def test_catalog_includes_efficiency_and_direct():
         res = await client.get("/api/commerce/catalog")
         assert res.status_code == 200
         body = res.json()
-        eff = {e["sku_code"] for e in body["efficiency"]}
-        assert "boost.double_points.7d" in eff
-        assert "boost.arena.extra.5" in eff
-        direct = {d["sku_code"] for d in body["direct"]}
-        assert "pack.vocab.gaokao.basic" in direct
-        assert "pack.course.commute10" in direct
-        combos = {c["sku_code"] for c in body["combos"]}
-        assert "module.combo.any2.yearly" in combos
+        assert body.get("efficiency") == []
+        assert body.get("direct") == []
+        assert body.get("combos") == []
+        membership = {m["sku_code"] for m in body.get("membership", [])}
+        assert membership == {"membership.pro.7d"}
+        by_code = {m["code"]: m for m in body["modules"]}
+        assert by_code["reading"]["yearly_cents"] == 19900
+        assert by_code["video"]["yearly_cents"] == 29900
+        assert by_code["exam"]["yearly_cents"] == 19900
+        assert by_code["vocab"]["free"] is True
+        assert by_code["digital_human"]["sku_monthly"] == "module.digital_human.monthly"
 
 
 @pytest.mark.asyncio
@@ -154,7 +157,7 @@ async def test_points_spend_grants_coach_minutes():
 
 
 @pytest.mark.asyncio
-async def test_efficiency_sku_fulfill_double_points():
+async def test_pro_7d_and_digital_human_monthly_fulfill():
     transport = ASGITransport(app=fastapi_app)
     async with AsyncClient(transport=transport, base_url="http://test") as client:
         token = await _sms_token(client, "13900008883")
@@ -165,10 +168,11 @@ async def test_efficiency_sku_fulfill_double_points():
             headers=headers,
             json={
                 "provider": "mock",
-                "items": [{"sku_code": "boost.double_points.7d", "quantity": 1}],
+                "items": [{"sku_code": "membership.pro.7d", "quantity": 1}],
             },
         )
         assert order.status_code == 201, order.text
+        assert order.json()["amount_cents"] == 1990
         oid = order.json()["id"]
         paid = await client.post(
             f"/api/assets/orders/{oid}/mark-paid", headers=headers
@@ -176,44 +180,43 @@ async def test_efficiency_sku_fulfill_double_points():
         assert paid.status_code == 200, paid.text
 
         assets = await client.get("/api/assets", headers=headers)
-        kinds = {
-            (e["asset_kind"], e["asset_ref"])
-            for e in assets.json().get("entitlements") or []
-            if e.get("status") == "active"
-        }
-        assert ("efficiency", "double_points") in kinds
+        assert assets.json().get("active_membership") == "pro"
 
-        pts = await client.get("/api/commerce/points", headers=headers)
-        assert pts.json().get("double_points_active") is True
-
-
-@pytest.mark.asyncio
-async def test_direct_vocab_pack_purchase():
-    transport = ASGITransport(app=fastapi_app)
-    async with AsyncClient(transport=transport, base_url="http://test") as client:
-        token = await _sms_token(client, "13900008884")
-        headers = {"Authorization": f"Bearer {token}"}
-        order = await client.post(
+        dh = await client.post(
             "/api/assets/orders",
             headers=headers,
             json={
                 "provider": "mock",
-                "items": [{"sku_code": "pack.vocab.gaokao.basic", "quantity": 1}],
+                "items": [
+                    {"sku_code": "module.digital_human.monthly", "quantity": 1}
+                ],
             },
         )
-        assert order.status_code == 201, order.text
-        paid = await client.post(
-            f"/api/assets/orders/{order.json()['id']}/mark-paid",
-            headers=headers,
+        assert dh.status_code == 201, dh.text
+        assert dh.json()["amount_cents"] == 2000
+        paid_dh = await client.post(
+            f"/api/assets/orders/{dh.json()['id']}/mark-paid", headers=headers
         )
-        assert paid.status_code == 200
-        assets = await client.get("/api/assets", headers=headers)
-        refs = {
-            e["asset_ref"]
-            for e in assets.json().get("entitlements") or []
-            if e.get("asset_kind") == "vocab_pack"
-        }
-        assert "gaokao_basic" in refs
+        assert paid_dh.status_code == 200, paid_dh.text
+        access = await client.get(
+            "/api/commerce/modules/digital_human/access", headers=headers
+        )
+        assert access.status_code == 200
+        assert access.json()["allowed"] is True
+
+
+@pytest.mark.asyncio
+async def test_vocab_module_is_free():
+    transport = ASGITransport(app=fastapi_app)
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
+        token = await _sms_token(client, "13900008884")
+        headers = {"Authorization": f"Bearer {token}"}
+        access = await client.get(
+            "/api/commerce/modules/vocab/access", headers=headers
+        )
+        assert access.status_code == 200, access.text
+        assert access.json()["allowed"] is True
+        assert access.json()["paywall"] is False
 
 
 @pytest.mark.asyncio

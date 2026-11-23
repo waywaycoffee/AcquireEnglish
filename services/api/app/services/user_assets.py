@@ -20,46 +20,31 @@ from app.models import (
     WalletLedger,
 )
 
+# Storefront membership: only the 7-day Pro card (module yearlies live in commerce catalog).
 DEFAULT_SKUS: list[dict] = [
-    {"sku_code": "membership.pro.daily", "kind": "membership", "title": "Pro 日卡", "ref_id": "pro", "price_cents": 300, "duration_days": 1},
-    {"sku_code": "membership.pro.yearly", "kind": "membership", "title": "Pro 年卡", "ref_id": "pro", "price_cents": 19800, "duration_days": 365},
     {
-        "sku_code": "membership.pro.monthly",
+        "sku_code": "membership.pro.7d",
         "kind": "membership",
-        "title": "Pro 会员（月）",
+        "title": "Pro 全开 · 7 天卡",
         "ref_id": "pro",
-        "price_cents": 2800,
+        "price_cents": 1990,
         "grant_quantity": None,
-        "duration_days": 30,
-    },
-    {
-        "sku_code": "coach.minutes.60",
-        "kind": "coach_minutes",
-        "title": "口语陪练 60 分钟",
-        "ref_id": "coach",
-        "price_cents": 1800,
-        "grant_quantity": 60,
-        "duration_days": None,
-    },
-    {
-        "sku_code": "dh.minutes.30",
-        "kind": "digital_human_minutes",
-        "title": "数字人外教 30 分钟",
-        "ref_id": "digital_human",
-        "price_cents": 1500,
-        "grant_quantity": 30,
-        "duration_days": None,
-    },
-    {
-        "sku_code": "credits.100",
-        "kind": "credits",
-        "title": "学习积分 100",
-        "ref_id": "credits",
-        "price_cents": 1000,
-        "grant_quantity": 100,
-        "duration_days": None,
+        "duration_days": 7,
+        "active": 1,
     },
 ]
+
+# Legacy asset SKUs kept in DB but hidden from storefront.
+RETIRED_DEFAULT_SKU_CODES: frozenset[str] = frozenset(
+    {
+        "membership.pro.daily",
+        "membership.pro.monthly",
+        "membership.pro.yearly",
+        "coach.minutes.60",
+        "dh.minutes.30",
+        "credits.100",
+    }
+)
 
 
 def _utcnow() -> datetime:
@@ -99,22 +84,37 @@ async def ensure_default_skus(db: AsyncSession) -> None:
         existing = await db.execute(
             select(ProductSku).where(ProductSku.sku_code == spec["sku_code"])
         )
-        if existing.scalar_one_or_none() is not None:
-            continue
-        db.add(
-            ProductSku(
-                sku_code=spec["sku_code"],
-                kind=spec["kind"],
-                title=spec["title"],
-                ref_id=spec.get("ref_id"),
-                price_cents=int(spec.get("price_cents") or 0),
-                currency="CNY",
-                grant_quantity=spec.get("grant_quantity"),
-                duration_days=spec.get("duration_days"),
-                meta_json="{}",
-                active=1,
+        row = existing.scalar_one_or_none()
+        if row is None:
+            db.add(
+                ProductSku(
+                    sku_code=spec["sku_code"],
+                    kind=spec["kind"],
+                    title=spec["title"],
+                    ref_id=spec.get("ref_id"),
+                    price_cents=int(spec.get("price_cents") or 0),
+                    currency="CNY",
+                    grant_quantity=spec.get("grant_quantity"),
+                    duration_days=spec.get("duration_days"),
+                    meta_json="{}",
+                    active=int(spec.get("active", 1)),
+                )
             )
+        else:
+            row.title = spec["title"]
+            row.kind = spec["kind"]
+            row.ref_id = spec.get("ref_id")
+            row.price_cents = int(spec.get("price_cents") or 0)
+            row.grant_quantity = spec.get("grant_quantity")
+            row.duration_days = spec.get("duration_days")
+            row.active = int(spec.get("active", 1))
+    for sku_code in sorted(RETIRED_DEFAULT_SKU_CODES):
+        existing = await db.execute(
+            select(ProductSku).where(ProductSku.sku_code == sku_code)
         )
+        row = existing.scalar_one_or_none()
+        if row is not None:
+            row.active = 0
     await db.commit()
 
 
@@ -513,17 +513,24 @@ async def user_has_module_access(
     user_id: int,
     module_code: str,
 ) -> bool:
-    """True if Pro membership / full trial, or an active module entitlement.
+    """True if free module, Pro membership / full trial, or active module entitlement.
 
-    Accepts current product codes (video/reading/exam/course) and legacy
-    content×capability codes; legacy entitlements unlock their mapped buckets.
+    Accepts current product codes (video/reading/exam/vocab/digital_human/course)
+    and legacy content×capability codes; legacy entitlements unlock mapped buckets.
     """
-    from app.services.commerce.catalog import entitlement_refs_for_module
+    from app.services.commerce.catalog import (
+        entitlement_refs_for_module,
+        is_free_module,
+        normalize_module_code,
+    )
 
     code = (module_code or "").strip()
     if not code:
         return False
-    accepted = entitlement_refs_for_module(code)
+    if is_free_module(code):
+        return True
+    resolved = normalize_module_code(code) or code
+    accepted = entitlement_refs_for_module(resolved)
     if not accepted:
         return False
     rows = await list_active_entitlements(db, user_id)

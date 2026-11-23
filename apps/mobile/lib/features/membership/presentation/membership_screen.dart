@@ -93,17 +93,18 @@ class _MembershipScreenState extends ConsumerState<MembershipScreen> {
             .where(
               (s) =>
                   s['currency'] == 'CNY' &&
-                  (s['kind'] == 'membership' ||
-                      s['kind'] == 'module' ||
-                      s['kind'] == 'module_permanent' ||
-                      s['kind'] == 'module_combo' ||
-                      s['kind'] == 'efficiency' ||
-                      s['kind'] == 'course_pack' ||
-                      s['kind'] == 'vocab_pack'),
+                  (s['kind'] == 'membership' || s['kind'] == 'module'),
             )
             .toList();
         _orders = results[2] as List<Map<String, dynamic>>;
-        _selected ??= _skus.isEmpty ? null : _skus.first['sku_code'] as String;
+        if (_selected == null) {
+          final Iterable<Map<String, dynamic>> pro7 = _skus.where(
+            (s) => s['sku_code'] == 'membership.pro.7d',
+          );
+          _selected = pro7.isNotEmpty
+              ? pro7.first['sku_code'] as String
+              : (_skus.isEmpty ? null : _skus.first['sku_code'] as String);
+        }
       });
     } catch (_) {
       if (mounted) setState(() => _error = '暂时无法获取会员信息，请检查网络后重试。');
@@ -251,13 +252,15 @@ class _MembershipScreenState extends ConsumerState<MembershipScreen> {
   }
 
   Widget _moduleCatalog() {
-    if (_modules.isEmpty && _combos.isEmpty) return const SizedBox.shrink();
+    if (_modules.isEmpty) return const SizedBox.shrink();
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         const SizedBox(height: 16),
-        Text('付费板块', style: Theme.of(context).textTheme.titleLarge),
-        const Text('视频 / 阅读 / 考试 / 课程：点选月卡、年卡或永久解锁后微信支付；任选两板块需勾选两个。'),
+        Text('权益套餐', style: Theme.of(context).textTheme.titleLarge),
+        const Text(
+          'Pro 全开仅售 7 天卡；阅读 / 视频 / 考试售年卡；数字人售月卡；单词与词书免费。',
+        ),
         for (final mod in _modules) ...[
           Card(
             child: Column(
@@ -266,80 +269,46 @@ class _MembershipScreenState extends ConsumerState<MembershipScreen> {
                 ListTile(
                   title: Text('${mod['title']}'),
                   subtitle: Text('${mod['blurb'] ?? ''}'),
-                  trailing: _selectedNeedsAny2()
-                      ? Checkbox(
-                          value: _any2Picks.contains('${mod['code']}'),
-                          onChanged: _paying
-                              ? null
-                              : (_) => _toggleAny2('${mod['code']}'),
+                  trailing: mod['free'] == true
+                      ? const Text(
+                          '免费',
+                          style: TextStyle(fontWeight: FontWeight.w800),
                         )
                       : null,
                 ),
-                Wrap(
-                  spacing: 8,
-                  children: [
-                    TextButton(
-                      onPressed: _paying
-                          ? null
-                          : () => setState(
-                                () => _selected = '${mod['sku_monthly']}',
-                              ),
-                      child: Text(
-                        '月卡 ${_money(mod['monthly_cents'])}'
-                        '${_selected == mod['sku_monthly'] ? ' ✓' : ''}',
-                      ),
-                    ),
-                    TextButton(
-                      onPressed: _paying
-                          ? null
-                          : () => setState(
-                                () => _selected = '${mod['sku_yearly']}',
-                              ),
-                      child: Text(
-                        '年卡 ${_money(mod['yearly_cents'])}'
-                        '${_selected == mod['sku_yearly'] ? ' ✓' : ''}',
-                      ),
-                    ),
-                    TextButton(
-                      onPressed: _paying
-                          ? null
-                          : () => setState(
-                                () => _selected = '${mod['sku_permanent']}',
-                              ),
-                      child: Text(
-                        '永久 ${_money(1990)}'
-                        '${_selected == mod['sku_permanent'] ? ' ✓' : ''}',
-                      ),
-                    ),
-                  ],
-                ),
+                if (mod['free'] != true)
+                  Wrap(
+                    spacing: 8,
+                    children: [
+                      if (mod['sku_monthly'] != null)
+                        TextButton(
+                          onPressed: _paying
+                              ? null
+                              : () => setState(
+                                    () => _selected = '${mod['sku_monthly']}',
+                                  ),
+                          child: Text(
+                            '月卡 ${_money(mod['monthly_cents'])}'
+                            '${_selected == mod['sku_monthly'] ? ' ✓' : ''}',
+                          ),
+                        ),
+                      if (mod['sku_yearly'] != null)
+                        TextButton(
+                          onPressed: _paying
+                              ? null
+                              : () => setState(
+                                    () => _selected = '${mod['sku_yearly']}',
+                                  ),
+                          child: Text(
+                            '年卡 ${_money(mod['yearly_cents'])}'
+                            '${_selected == mod['sku_yearly'] ? ' ✓' : ''}',
+                          ),
+                        ),
+                    ],
+                  ),
               ],
             ),
           ),
-        ],
-        if (_combos.isNotEmpty) ...[
-          const SizedBox(height: 8),
-          Text('组合优惠', style: Theme.of(context).textTheme.titleMedium),
-          for (final combo in _combos)
-            Card(
-              child: ListTile(
-                selected: _selected == combo['sku_code'],
-                title: Text('${combo['title']}'),
-                subtitle: Text(
-                  '${combo['duration_days'] ?? ''} 天'
-                  '${combo['pick'] != null ? ' · 任选 ${combo['pick']} 板块（勾选上方板块）' : ''}',
-                ),
-                trailing: Text(
-                  _money(combo['price_cents']),
-                  style: Theme.of(context).textTheme.titleMedium,
-                ),
-                onTap: _paying
-                    ? null
-                    : () => setState(
-                          () => _selected = combo['sku_code'] as String,
-                        ),
-              ),
-            ),
         ],
       ],
     );
@@ -808,7 +777,9 @@ class _MembershipScreenState extends ConsumerState<MembershipScreen> {
                             '选择权益套餐',
                             style: Theme.of(context).textTheme.titleLarge,
                           ),
-                          const Text('含 Pro 会员与模块/组合 SKU；价格以当前列表为准。'),
+                          const Text(
+                            '含 Pro 7 天卡、模块年卡与数字人月卡；价格以当前列表为准。',
+                          ),
                           if (_loading) const LinearProgressIndicator(),
                           if (_error != null)
                             _card(

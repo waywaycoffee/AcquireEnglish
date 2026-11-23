@@ -49,10 +49,14 @@ async def test_assets_summary_and_grant():
         token = await _sms_token(client)
         headers = {"Authorization": f"Bearer {token}"}
 
+        claim = await client.post(
+            "/api/commerce/trial/claim-welcome", headers=headers
+        )
+        assert claim.status_code == 200, claim.text
         seeded = await client.get("/api/assets", headers=headers)
         assert seeded.status_code == 200, seeded.text
         body = seeded.json()
-        # New-user trial: 7d Pro + coach quota + 50 credits.
+        # Welcome Pro trial (claim-once): 7d Pro + coach quota + credits.
         assert body["wallet"]["balance_credits"] >= 50
         assert body["active_membership"] == "pro"
         assert any(e["asset_kind"] == "coach_quota" for e in body["entitlements"])
@@ -61,8 +65,11 @@ async def test_assets_summary_and_grant():
         skus = await client.get("/api/assets/skus", headers=headers)
         assert skus.status_code == 200
         codes = {row["sku_code"] for row in skus.json()}
-        assert "module.video.monthly" in codes
+        assert "membership.pro.7d" in codes
+        assert "module.video.yearly" in codes
         assert "module.exam.yearly" in codes
+        assert "module.digital_human.monthly" in codes
+        assert "module.video.monthly" not in codes
         assert "membership.pro.monthly" not in codes
         assert "dh.minutes.30" not in codes
 
@@ -99,7 +106,7 @@ async def test_order_mark_paid_grants_minutes_and_credits():
             json={
                 "provider": "mock",
                 "items": [
-                    {"sku_code": "module.video.monthly", "quantity": 1},
+                    {"sku_code": "module.video.yearly", "quantity": 1},
                     {"sku_code": "module.reading.yearly", "quantity": 1},
                 ],
             },
@@ -107,7 +114,7 @@ async def test_order_mark_paid_grants_minutes_and_credits():
         assert created.status_code == 201, created.text
         order = created.json()
         assert order["status"] == "pending"
-        assert order["amount_cents"] == 1290 + 9900
+        assert order["amount_cents"] == 29900 + 19900
 
         paid = await client.post(
             f"/api/assets/orders/{order['id']}/mark-paid",
@@ -134,13 +141,13 @@ async def test_order_history_is_owned_and_authenticated():
         owner = {"Authorization": f"Bearer {await _sms_token(client, '13900006666')}"}
         other = {"Authorization": f"Bearer {await _sms_token(client, '13900007777')}"}
         created = await client.post("/api/assets/orders", headers=owner, json={
-            "provider": "mock", "items": [{"sku_code": "module.exam.monthly", "quantity": 1}],
+            "provider": "mock", "items": [{"sku_code": "module.exam.yearly", "quantity": 1}],
         })
         assert created.status_code == 201
         history = await client.get("/api/assets/orders", headers=owner)
         assert history.status_code == 200
         assert history.json()[0]["id"] == created.json()["id"]
-        assert history.json()[0]["amount_cents"] == 1290
+        assert history.json()[0]["amount_cents"] == 19900
         assert (await client.get("/api/assets/orders", headers=other)).json() == []
 
 
@@ -172,7 +179,7 @@ async def test_payment_callback_rejects_wrong_amount(monkeypatch):
     async with AsyncClient(transport=ASGITransport(app=fastapi_app), base_url="http://test") as client:
         headers = {"Authorization": f"Bearer {await _sms_token(client)}"}
         created = await client.post("/api/assets/orders", headers=headers, json={
-            "provider": "wechat", "items": [{"sku_code": "module.course.monthly", "quantity": 1}],
+            "provider": "wechat", "items": [{"sku_code": "module.reading.yearly", "quantity": 1}],
         })
         assert created.status_code == 201, created.text
         order_id = created.json()["id"]
@@ -198,9 +205,11 @@ async def test_learning_coupons_and_discount():
     from sqlalchemy import select
     async with AsyncClient(transport=ASGITransport(app=fastapi_app), base_url="http://test") as client:
         headers = {"Authorization": f"Bearer {await _sms_token(client)}"}
+        assert (await client.post('/api/commerce/trial/claim-welcome', headers=headers)).status_code == 200
         assert (await client.post('/api/assets/membership-rewards/study300/claim', headers=headers)).status_code == 400
         async with SessionLocal() as db:
             trial = (await db.execute(select(UserEntitlement))).scalars().first()
+            assert trial is not None
             user_id = trial.user_id
             db.add(UserStudyStatsDaily(user_id=user_id, day='2026-11-20', study_seconds=18000))
             await db.commit()
@@ -208,15 +217,15 @@ async def test_learning_coupons_and_discount():
         assert claim.status_code == 200, claim.text
         coupon_id = claim.json()['id']
         assert (await client.post('/api/assets/membership-rewards/study300/claim', headers=headers)).status_code == 409
-        # Cash coupon on module yearly (≥¥10): exam yearly 12900 - 500 = 12400.
+        # Cash coupon only on single membership card (≥¥10): Pro 7d 1990 - 500 = 1490.
         payload = {
             'provider': 'mock',
             'coupon_id': coupon_id,
-            'items': [{'sku_code': 'module.exam.yearly', 'quantity': 1}],
+            'items': [{'sku_code': 'membership.pro.7d', 'quantity': 1}],
         }
         order = await client.post('/api/assets/orders', headers=headers, json=payload)
         assert order.status_code == 201, order.text
-        assert order.json()['amount_cents'] == 12400
+        assert order.json()['amount_cents'] == 1490
         assert (await client.post('/api/assets/orders', headers=headers, json=payload)).status_code == 400
         days = await client.post('/api/assets/membership-rewards/study60/claim', headers=headers)
         assert days.status_code == 200
@@ -225,9 +234,11 @@ async def test_learning_coupons_and_discount():
         assert (await client.post(url, headers=headers)).status_code == 409
         skus = (await client.get('/api/assets/skus', headers=headers)).json()
         assert {
-            'module.video.monthly',
+            'membership.pro.7d',
+            'module.video.yearly',
             'module.reading.yearly',
-            'module.exam.monthly',
-            'module.course.yearly',
+            'module.exam.yearly',
+            'module.digital_human.monthly',
         } <= {s['sku_code'] for s in skus}
         assert 'membership.pro.monthly' not in {s['sku_code'] for s in skus}
+        assert 'module.course.yearly' not in {s['sku_code'] for s in skus}

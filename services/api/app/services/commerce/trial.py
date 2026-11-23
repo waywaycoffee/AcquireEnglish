@@ -11,9 +11,9 @@ from app.models import MembershipCoupon, UserEntitlement, UserLoginDay
 from app.services.commerce.catalog import MODULE_DEFS
 from app.services.user_assets import credit_wallet, grant_entitlement, list_active_entitlements
 
-# Registration gift: one free Pro month (full feature unlock).
-TRIAL_DAYS = 30
-# Extra +7 days coupon after consecutive logins during the welcome month.
+# Registration gift: free Pro week (full feature unlock). Aligns with sold 7-day card.
+TRIAL_DAYS = 7
+# Extra +7 days coupon after consecutive logins during the welcome week.
 TRIAL_EXTEND_LOGIN_DAYS = 7
 TRIAL_EXTEND_DAYS = 7
 TRIAL_EXTEND_CODE = "trial_extend_7"

@@ -16,6 +16,8 @@ const Map<String, String> kModuleTitlesZh = <String, String>{
   'video': '视频模块',
   'reading': '阅读模块',
   'exam': '考试模块',
+  'vocab': '单词 / 词书',
+  'digital_human': '数字人模块',
   'course': '课程板块',
   // Legacy content×capability codes (older clients / cached catalogs).
   'exam_reading': '考试模块',
@@ -23,6 +25,9 @@ const Map<String, String> kModuleTitlesZh = <String, String>{
   'acquire_reading': '阅读模块',
   'acquire_listening': '视频模块',
 };
+
+/// Always unlocked without purchase (matches API FREE_MODULE_CODES).
+const Set<String> kFreeModuleCodes = <String>{'vocab', 'course'};
 
 bool isFreePreviewIndex(int index) =>
     index >= 0 && index < kModuleFreePreviewCount;
@@ -64,6 +69,8 @@ Set<String> entitlementRefsForModule(String moduleCode) {
 }
 
 bool assetsUnlockModule(Map<String, dynamic>? assets, String moduleCode) {
+  final String code = moduleCode.trim();
+  if (kFreeModuleCodes.contains(code)) return true;
   if (assets == null) return false;
   final String? membership = assets['active_membership'] as String?;
   if (membership == 'pro') return true;
@@ -89,8 +96,9 @@ bool assetsUnlockModule(Map<String, dynamic>? assets, String moduleCode) {
   return false;
 }
 
-/// Resolves full module unlock (Pro / trial / module 月卡·年卡).
+/// Resolves full module unlock (Pro / trial / module 年卡·月卡).
 Future<bool> resolveModuleUnlocked(WidgetRef ref, String moduleCode) async {
+  if (kFreeModuleCodes.contains(moduleCode.trim())) return true;
   if (!ref.read(authSessionProvider).isLoggedIn) return false;
   try {
     final Map<String, dynamic> assets =
@@ -139,7 +147,8 @@ Future<void> showModulePaywall(
               const SizedBox(height: 8),
               Text(
                 '每个板块约有 $kModuleFreePreviewCount 个免费体验内容；'
-                '继续学习请开通本板块月卡或年卡。',
+                '继续学习请开通本板块年卡，或购买 Pro 7 天卡。'
+                '单词 / 词书永久免费。',
               ),
               const SizedBox(height: 16),
               FilledButton(
@@ -147,7 +156,7 @@ Future<void> showModulePaywall(
                   Navigator.pop(ctx);
                   context.push(SGRoute.membership.route);
                 },
-                child: const Text('去开通月卡 / 年卡'),
+                child: const Text('去开通年卡 / 7 天卡'),
               ),
               TextButton(
                 onPressed: () => Navigator.pop(ctx),
