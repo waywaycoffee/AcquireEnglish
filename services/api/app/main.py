@@ -55,6 +55,7 @@ from app.routers import (
     course_quiz,
     exam_reading_parse,
     grammar_analyze,
+    podcast,
     review_sync,
     rewards,
     shared_ocr_books,
@@ -148,6 +149,7 @@ app.include_router(learning.router, prefix="/api")
 app.include_router(course_quiz.router, prefix="/api")
 app.include_router(exam_reading_parse.router, prefix="/api")
 app.include_router(grammar_analyze.router, prefix="/api")
+app.include_router(podcast.router, prefix="/api")
 app.include_router(scene_recognize.router, prefix="/api")
 app.include_router(livekit.router, prefix="/api")
 app.include_router(oral_match.router, prefix="/api")

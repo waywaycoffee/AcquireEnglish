@@ -241,6 +241,14 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
   int _lastRoundTurns = 0;
   List<String> _lastRoundExpressions = const <String>[];
   bool _duplexLive = false;
+  bool _podcastPlaying = false;
+  bool _podcastSingleHost = true;
+  bool _podcastPausedForQuestion = false;
+  int _podcastGeneration = 0;
+  int _podcastIndex = 0;
+  Duration _podcastOffset = Duration.zero;
+  List<String> _podcastLines = const <String>[];
+
   String _liveKitStatus = '';
   int _questUtterances = 0;
   final List<double> _roundPronScores = <double>[];
@@ -306,7 +314,7 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
   final LiveSceneCamera _liveSceneCamera = LiveSceneCamera();
 
   bool get _isGuidedTutorLesson =>
-      widget.standalone && widget.articleExcerpt.trim().isNotEmpty;
+      !_podcastPausedForQuestion && !_podcastPlaying && widget.standalone && widget.articleExcerpt.trim().isNotEmpty;
 
   List<String> get _tutorLines => tutorSourceLines(widget.articleExcerpt);
   Timer? _liveSceneTimer;
@@ -968,7 +976,11 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
     }
   }
 
-  Future<bool> _playRemoteTts(String url, {required int gen}) async {
+  Future<bool> _playRemoteTts(
+    String url, {
+    required int gen,
+    Duration startAt = Duration.zero,
+  }) async {
     if (!mounted || gen != _speakGen) return false;
     final Player player = Player();
     _speechPlayer = player;
@@ -982,7 +994,15 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
       final Future<bool> completed = player.stream.completed
           .firstWhere((bool value) => value)
           .timeout(const Duration(seconds: 20), onTimeout: () => false);
-      await player.open(Media(url), play: true);
+      await player.open(Media(url), play: startAt == Duration.zero);
+      if (startAt != Duration.zero) {
+        if (!mounted || gen != _speakGen) {
+          await playingSub.cancel();
+          return false;
+        }
+        await player.seek(startAt);
+        await player.play();
+      }
       // If nothing starts within a few seconds, treat as broken URL.
       for (int i = 0; i < 12 && !started; i++) {
         await Future<void>.delayed(const Duration(milliseconds: 250));
@@ -1008,6 +1028,145 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
         await player.dispose();
       } catch (_) {}
     }
+  }
+
+  Future<void> _openArticlePodcast() async {
+    if (_podcastPlaying) {
+      await _pauseArticlePodcast();
+      return;
+    }
+    if (_podcastIndex < _podcastLines.length) {
+      await _playArticlePodcast();
+      return;
+    }
+    final single = await showModalBottomSheet<bool>(
+      context: context,
+      builder: (sheetContext) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.person_outline),
+              title: const Text('单人讲解'),
+              subtitle: const Text('由当前数字人讲解文章'),
+              onTap: () => Navigator.pop(sheetContext, true),
+            ),
+            ListTile(
+              leading: const Icon(Icons.people_outline),
+              title: const Text('双人对谈'),
+              onTap: () => Navigator.pop(sheetContext, false),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (!mounted || single == null) return;
+    if (_podcastSingleHost != single) {
+      _podcastLines = const [];
+      _podcastOffset = Duration.zero;
+      _podcastIndex = 0;
+      _podcastSingleHost = single;
+    }
+    await _playArticlePodcast();
+  }
+
+  Future<void> _playArticlePodcast() async {
+    if (_podcastPlaying || _busy || _recordingActive) return;
+    final generation = ++_podcastGeneration;
+    setState(() {
+      _podcastPlaying = true;
+      _podcastPausedForQuestion = false;
+      _duplexLive = false;
+      _status = _podcastLines.isEmpty ? '正在准备文章播客…' : '正在播放文章播客。按住麦克风可提问';
+    });
+    _idlePromptTimer?.cancel();
+    await _liveKit.disconnect();
+    await _interruptCoachSpeech();
+    if (!mounted || generation != _podcastGeneration) return;
+
+    final settings = ref.read(learningSettingsProvider);
+    try {
+      if (_podcastLines.isEmpty) {
+        final excerpt = widget.articleExcerpt.trim();
+        List<String> generated = const [];
+        try {
+          generated = await ref.read(acquireApiClientProvider).generatePodcastScript(
+            excerpt.length > 6000 ? excerpt.substring(0, 6000) : excerpt,
+            singleHost: _podcastSingleHost,
+          );
+        } catch (_) {}
+        if (!mounted || generation != _podcastGeneration) return;
+        _podcastLines = generated.isNotEmpty ? generated : [
+          for (final passage in tutorSourceLines(excerpt).take(4)) ...[
+            'Here is a passage from the article.',
+            passage,
+          ],
+        ];
+      }
+      if (_podcastIndex == _podcastLines.length) _podcastIndex = 0;
+      setState(() => _status = '正在播放文章播客。按住麦克风可提问');
+      while (mounted && generation == _podcastGeneration &&
+          _podcastIndex < _podcastLines.length) {
+        final text = _podcastLines[_podcastIndex];
+        final host = _podcastIndex.isEven;
+        final persona = settings.selectedDigitalHuman;
+        final result = await _pipelineClient.synthesizeSpeechWithProvider(
+          rawBaseUrl: settings.oralCoachPipelineUrl,
+          text: text,
+          digitalHumanId: settings.selectedDigitalHuman.id,
+          ttsVoice: _podcastSingleHost
+              ? _coachVoice(persona)
+              : (host ? 'en-US-AriaNeural' : 'en-US-GuyNeural'),
+        );
+        if (!mounted || generation != _podcastGeneration) return;
+        if (result == null) throw StateError('播客音频暂不可用');
+        final played = await _playRemoteTts(
+          result.url,
+          gen: ++_speakGen,
+          startAt: _podcastOffset,
+        );
+        if (!mounted || generation != _podcastGeneration) return;
+        if (!played) throw StateError('播客音频暂不可用');
+        setState(() {
+          _bubbles.add(_ChatBubble(
+            role: 'coach',
+            text: '${_podcastSingleHost ? persona.displayName : (host ? '主持人' : '嘉宾')} · $text',
+          ));
+          _podcastIndex++;
+          _podcastOffset = Duration.zero;
+        });
+        _scrollChatToEnd();
+      }
+      if (mounted && generation == _podcastGeneration) {
+        setState(() => _status = '本段播客已播完');
+      }
+    } catch (_) {
+      if (mounted && generation == _podcastGeneration) {
+        setState(() => _status = '播客音频暂不可用，可从当前段重试');
+      }
+    } finally {
+      if (mounted && generation == _podcastGeneration) {
+        setState(() => _podcastPlaying = false);
+      }
+    }
+  }
+
+  Future<void> _pauseArticlePodcast({bool forQuestion = false}) async {
+    if (!_podcastPlaying) return;
+    _podcastOffset = _speechPlayer?.state.position ?? _podcastOffset;
+    _podcastGeneration++;
+    setState(() {
+      _podcastPlaying = false;
+      _podcastPausedForQuestion = forQuestion;
+      _status = '已暂停文章播客';
+    });
+    await _interruptCoachSpeech();
+  }
+
+  void _resumeArticlePodcast() {
+    if (!mounted || !_podcastPausedForQuestion || _holdPressed || _recordingActive || _busy) return;
+    _podcastPausedForQuestion = false;
+    unawaited(_playArticlePodcast());
   }
 
   Future<void> _interruptCoachSpeech() async {
@@ -1205,7 +1364,7 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
     if (_busy || _historyLoading || _started) return;
     final LearningSettingsState settings = ref.read(learningSettingsProvider);
     _preferChineseReply = false;
-    if (_isGuidedTutorLesson) {
+    if (_isGuidedTutorLesson && !_podcastPausedForQuestion && !_podcastPlaying) {
       setState(() {
         _started = true;
         _roundStartBubble = _bubbles.length;
@@ -1268,13 +1427,13 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
     if (widget.standalone) {
       unawaited(_ensureSelfCallCamera());
     }
-    if (settings.usesLiveKit) {
+    if (settings.usesLiveKit && !_podcastPausedForQuestion && !_podcastPlaying) {
       unawaited(
         _ensureLiveKitDuplex(settings, openingToSpeak: opening).catchError((
           Object _,
         ) {}),
       );
-    } else if (opening != null) {
+    } else if (opening != null && !_podcastPausedForQuestion && !_podcastPlaying) {
       unawaited(_speakCoach(opening, settings));
     }
   }
@@ -1446,7 +1605,7 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
 
   void _scheduleIdlePrompt() {
     _idlePromptTimer?.cancel();
-    if (!_started || _idlePromptCount >= 2) return;
+    if (!_started || _podcastPlaying || _podcastPausedForQuestion || _idlePromptCount >= 2) return;
     _idlePromptTimer = Timer(const Duration(seconds: 18), () async {
       if (!mounted || !_started || _busy || _recordingActive || _coachSpeaking) {
         if (mounted && _started) _scheduleIdlePrompt();
@@ -1546,16 +1705,18 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
     if (_recordingActive || _busy) {
       return;
     }
+    if (_podcastPlaying) await _pauseArticlePodcast(forQuestion: true);
     if (_coachSpeaking) {
       await _interruptCoachSpeech();
     }
-    if (_duplexLive) {
+    if (_liveKit.room != null || _duplexLive) {
       // Prefer hold-to-talk over a silent duplex room with no agent.
       setState(() {
         _duplexLive = false;
         _status = '正在听你说…';
       });
-      unawaited(_liveKit.disconnect());
+      await _liveKit.disconnect();
+      if (!mounted) return;
     }
     if (!_started) {
       _startTopicConversation();
@@ -1735,6 +1896,7 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
       _scrollChatToEnd();
     }
     await _speakCoach(reply, settings);
+    _resumeArticlePodcast();
   }
 
   void _updateReplyLanguageFromLearner(String transcript) {
@@ -1824,7 +1986,7 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
         (transcriptLooksChineseHeavy(confirmed)
             ? OralExpressionDiagnosis.fallback(source: confirmed)
             : null);
-    if (diagnosis != null && diagnosis.isUseful) {
+    if (!_podcastPausedForQuestion && diagnosis != null && diagnosis.isUseful) {
       if (!mounted) return;
       setState(() {
         _pendingResay = diagnosis;
@@ -1924,6 +2086,7 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
         settings,
         ttsUrl: speakText == rawSpeak ? turn.ttsUrl?.trim() : null,
       ).whenComplete(() {
+        _resumeArticlePodcast();
         if (_isGuidedTutorLesson) {
           unawaited(_onGuidedLearnerTurnDone(confirmed));
         }
@@ -2853,6 +3016,7 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
       _holdPressed = false;
       return;
     }
+    if (_podcastPlaying) await _pauseArticlePodcast(forQuestion: true);
     if (_coachSpeaking) {
       await _interruptCoachSpeech();
     }
@@ -2880,6 +3044,8 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
   }
 
   Future<void> _hangUp() async {
+    _podcastPausedForQuestion = false;
+    await _pauseArticlePodcast();
     _idlePromptTimer?.cancel();
     if (!_started) return;
     if (_recordingActive) {
@@ -3282,6 +3448,16 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
                   ),
                 ),
               ),
+              if (widget.articleExcerpt.trim().isNotEmpty)
+                Positioned(
+                  right: 12,
+                  bottom: 28,
+                  child: ActionChip(
+                    avatar: Icon(_podcastPlaying ? Icons.pause : Icons.headphones),
+                    label: Text(_podcastPlaying ? '暂停播客' : '文章播客'),
+                    onPressed: () => unawaited(_openArticlePodcast()),
+                  ),
+                ),
               Positioned(
                 left: 12,
                 top: 12,

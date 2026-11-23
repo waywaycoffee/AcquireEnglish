@@ -3800,6 +3800,21 @@ class AcquireApiClient {
     );
   }
 
+  Future<List<String>> generatePodcastScript(
+    String excerpt, {
+    required bool singleHost,
+  }) async {
+    final response = await _dio.post<dynamic>(
+      'api/podcast/script',
+      data: <String, dynamic>{'excerpt': excerpt, 'single_host': singleHost},
+      options: Options(receiveTimeout: const Duration(seconds: 18)),
+    );
+    final body = response.data;
+    final lines = body is Map ? body['lines'] : null;
+    if (lines is! List) return const [];
+    return lines.whereType<String>().take(10).toList(growable: false);
+  }
+
   /// Cloud DeepSeek grammar analysis (ECS-cached). Null when offline / unpaid path fails.
   Future<Map<String, dynamic>?> analyzeSentenceGrammar({
     required String sentence,
