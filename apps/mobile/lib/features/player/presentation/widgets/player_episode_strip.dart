@@ -64,10 +64,10 @@ class _PlayerEpisodeStripState extends State<PlayerEpisodeStrip> {
       children: <Widget>[
         Row(
           children: <Widget>[
-            const Text(
+            Text(
               '课程目录',
               style: TextStyle(
-                color: Color(0xFF172033),
+                color: AppDesignTokens.textPrimary,
                 fontSize: 16,
                 fontWeight: FontWeight.w800,
               ),
@@ -79,11 +79,16 @@ class _PlayerEpisodeStripState extends State<PlayerEpisodeStrip> {
                 padding: EdgeInsets.zero,
                 minimumSize: const Size(0, 28),
                 tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                foregroundColor: AppDesignTokens.isDark
+                    ? AppDesignTokens.brandGreen
+                    : AppDesignTokens.brandGreenDark,
               ),
-              child: const Text(
+              child: Text(
                 '查看全部',
                 style: TextStyle(
-                  color: Color(0xFF047857),
+                  color: AppDesignTokens.isDark
+                      ? AppDesignTokens.brandGreen
+                      : AppDesignTokens.brandGreenDark,
                   fontSize: 12,
                   fontWeight: FontWeight.w700,
                 ),
@@ -145,8 +150,8 @@ class _PlayerEpisodeStripState extends State<PlayerEpisodeStrip> {
                         ? Icons.play_circle_filled_rounded
                         : Icons.play_circle_outline_rounded,
                     color: active
-                        ? const Color(0xFF059669)
-                        : const Color(0xFF64748B),
+                        ? AppDesignTokens.brandGreen
+                        : AppDesignTokens.textSecondary,
                   ),
                   title: Text('第 ${episode.numberStr} 集'),
                   subtitle: Text(

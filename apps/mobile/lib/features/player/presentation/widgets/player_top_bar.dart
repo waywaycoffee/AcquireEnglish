@@ -91,10 +91,10 @@ class PlayerTopBar extends StatelessWidget {
                           phone ? episodeTitle : '英语学习空间',
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 11,
                             fontWeight: FontWeight.w800,
-                            color: Color(0xFF64748B),
+                            color: AppDesignTokens.textSecondary,
                           ),
                         ),
                         Text(
@@ -104,7 +104,7 @@ class PlayerTopBar extends StatelessWidget {
                           style: TextStyle(
                             fontSize: tiny ? 18 : (compact ? 20 : 24),
                             fontWeight: FontWeight.w900,
-                            color: const Color(0xFF172033),
+                            color: AppDesignTokens.textPrimary,
                           ),
                         ),
                       ],
@@ -207,10 +207,10 @@ class _PlayerTopStatus extends StatelessWidget {
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 textAlign: TextAlign.end,
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 13,
                   fontWeight: FontWeight.w600,
-                  color: Color(0xFF475569),
+                  color: AppDesignTokens.textSecondary,
                 ),
               ),
             ),
@@ -218,24 +218,28 @@ class _PlayerTopStatus extends StatelessWidget {
             const SizedBox(width: 14),
           Tooltip(
             message: streakText,
-            child: const Icon(
+            child: Icon(
               Icons.local_fire_department_outlined,
               size: 22,
-              color: Color(0xFF64748B),
+              color: AppDesignTokens.textSecondary,
             ),
           ),
           const SizedBox(width: 10),
           if (onTranscriptPressed != null)
             TextButton.icon(
               onPressed: onTranscriptPressed,
-              icon: const Icon(
+              icon: Icon(
                 Icons.menu_book_outlined,
                 size: 18,
-                color: AppDesignTokens.brandGreenDark,
+                color: AppDesignTokens.isDark
+                    ? AppDesignTokens.brandGreen
+                    : AppDesignTokens.brandGreenDark,
               ),
               label: const Text('全文阅读'),
               style: TextButton.styleFrom(
-                foregroundColor: AppDesignTokens.brandGreenDark,
+                foregroundColor: AppDesignTokens.isDark
+                    ? AppDesignTokens.brandGreen
+                    : AppDesignTokens.brandGreenDark,
                 visualDensity: VisualDensity.compact,
               ),
             ),
@@ -245,17 +249,19 @@ class _PlayerTopStatus extends StatelessWidget {
               icon: const Icon(Icons.school_outlined, size: 18),
               label: const Text('怎么学'),
               style: TextButton.styleFrom(
-                foregroundColor: AppDesignTokens.brandGreenDark,
+                foregroundColor: AppDesignTokens.isDark
+                    ? AppDesignTokens.brandGreen
+                    : AppDesignTokens.brandGreenDark,
                 visualDensity: VisualDensity.compact,
               ),
             ),
           IconButton(
             onPressed: onStatsPressed,
             tooltip: '查看学习统计',
-            icon: const Icon(
+            icon: Icon(
               Icons.timer_outlined,
               size: 22,
-              color: Color(0xFF64748B),
+              color: AppDesignTokens.textSecondary,
             ),
           ),
         ],

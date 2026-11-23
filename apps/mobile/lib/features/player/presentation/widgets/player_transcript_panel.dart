@@ -342,8 +342,10 @@ class _TranscriptViewSwitch extends StatelessWidget {
         style: ButtonStyle(
           visualDensity: VisualDensity.compact,
           tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-          foregroundColor: const WidgetStatePropertyAll<Color>(
-            Color(0xFF143528),
+          foregroundColor: WidgetStatePropertyAll<Color>(
+            AppDesignTokens.isDark
+                ? AppDesignTokens.textPrimary
+                : const Color(0xFF143528),
           ),
           textStyle: const WidgetStatePropertyAll<TextStyle>(
             TextStyle(fontSize: 11, fontWeight: FontWeight.w700),

@@ -117,6 +117,20 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
   final Map<String, List<String>> customEpisodeOrders =
       <String, List<String>>{};
 
+  ButtonStyle get _detailOutlinedStyle => OutlinedButton.styleFrom(
+    foregroundColor: AppDesignTokens.isDark
+        ? AppDesignTokens.brandGreen
+        : AppDesignTokens.brandGreenDark,
+    side: BorderSide(color: AppDesignTokens.borderGray),
+    backgroundColor: AppDesignTokens.appWhite,
+  );
+
+  ButtonStyle get _detailTextStyle => TextButton.styleFrom(
+    foregroundColor: AppDesignTokens.isDark
+        ? AppDesignTokens.brandGreen
+        : AppDesignTokens.brandGreenDark,
+  );
+
   @override
   void initState() {
     super.initState();
@@ -486,6 +500,7 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
                           return Align(
                             alignment: Alignment.centerLeft,
                             child: OutlinedButton.icon(
+                              style: _detailOutlinedStyle,
                               onPressed: _pendingCollectionEpisodes(selectedCourse) == 0
                                   ? null
                                   : downloading
@@ -534,6 +549,7 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
                             child: Align(
                               alignment: Alignment.centerLeft,
                               child: OutlinedButton.icon(
+                                style: _detailOutlinedStyle,
                                 onPressed: downloading ||
                                         pendingNetdiskEpisodes(selectedCourse) == 0
                                     ? null
@@ -570,6 +586,7 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: <Widget>[
                               OutlinedButton.icon(
+                                style: _detailOutlinedStyle,
                                 onPressed: pending == 0
                                     ? null
                                     : downloading
@@ -605,6 +622,7 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
                         selectedCourse.episodes.every((LibraryEpisodeItem e) =>
                             isUsableLocalVideoPath(e.videoAsset)))
                       OutlinedButton.icon(
+                        style: _detailOutlinedStyle,
                         onPressed: null,
                         icon: Icon(Icons.download_done_outlined),
                         label: Text('合集已在本机'),
@@ -828,6 +846,7 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
                       child: Align(
                         alignment: Alignment.centerLeft,
                         child: TextButton.icon(
+                          style: _detailTextStyle,
                           onPressed: () => unawaited(
                             _confirmReimportCourseSubtitles(selectedCourse),
                           ),
@@ -842,24 +861,30 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
                         spacing: 8,
                         children: <Widget>[
                           TextButton.icon(
+                            style: _detailTextStyle,
                             onPressed: () =>
                                 _showResourceDirectory(selectedCourse),
                             icon: const Icon(Icons.folder_open_outlined),
                             label: const Text('资源目录'),
                           ),
                           TextButton.icon(
+                            style: TextButton.styleFrom(
+                              foregroundColor: AppDesignTokens.dangerText,
+                            ),
                             onPressed: () => unawaited(
                               _confirmDeleteCollection(selectedCourse),
                             ),
-                            icon: const Icon(
+                            icon: Icon(
                               Icons.delete_outline_rounded,
-                              color: Color(0xFFC74A4A),
+                              color: AppDesignTokens.dangerText,
                             ),
                             label: Text(
                               _isCollectionCourse(selectedCourse)
                                   ? '删除合集'
                                   : '删除课程',
-                              style: const TextStyle(color: Color(0xFFC74A4A)),
+                              style: TextStyle(
+                                color: AppDesignTokens.dangerText,
+                              ),
                             ),
                           ),
                         ],
@@ -972,23 +997,33 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
                                         );
                                       });
                                     },
-                                    style: OutlinedButton.styleFrom(
-                                      side: BorderSide(
-                                        color: AppDesignTokens.borderGray,
+                                    style: _detailOutlinedStyle.copyWith(
+                                      padding: const WidgetStatePropertyAll<
+                                          EdgeInsets
+                                        >(
+                                        EdgeInsets.symmetric(
+                                          horizontal: 16,
+                                          vertical: 14,
+                                        ),
                                       ),
-                                      padding: const EdgeInsets.symmetric(
-                                        horizontal: 16,
-                                        vertical: 14,
+                                      backgroundColor:
+                                          WidgetStatePropertyAll<Color>(
+                                        AppDesignTokens.softWhite,
                                       ),
-                                      backgroundColor: AppDesignTokens.softWhite,
-                                      shape: RoundedRectangleBorder(
-                                        borderRadius: BorderRadius.circular(999),
+                                      shape: WidgetStatePropertyAll<
+                                          RoundedRectangleBorder
+                                        >(
+                                        RoundedRectangleBorder(
+                                          borderRadius: BorderRadius.circular(
+                                            999,
+                                          ),
+                                        ),
                                       ),
                                     ),
-                                    icon: const Icon(
+                                    icon: Icon(
                                       Icons.swap_vert_rounded,
                                       size: 18,
-                                      color: AppDesignTokens.primaryBlueDark,
+                                      color: AppDesignTokens.primaryBlue,
                                     ),
                                     label: Text(
                                       '手动重排',
@@ -1543,9 +1578,9 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
                   )
                 else
                   DecoratedBox(
-                    decoration: const BoxDecoration(
-                      color: Color(0xFF16181E),
-                      borderRadius: BorderRadius.all(Radius.circular(24)),
+                    decoration: BoxDecoration(
+                      color: AppDesignTokens.softWhite,
+                      borderRadius: const BorderRadius.all(Radius.circular(24)),
                     ),
                     child: Padding(
                       padding: const EdgeInsets.symmetric(vertical: 8),

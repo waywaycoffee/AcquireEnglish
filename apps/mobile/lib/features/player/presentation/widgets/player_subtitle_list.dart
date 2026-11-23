@@ -1380,6 +1380,23 @@ class _PlayerSubtitleListState extends State<PlayerSubtitleList> {
                                     borderRadius: BorderRadius.circular(14),
                                   ),
                                 );
+                                final Color chipIdleBg = dark
+                                    ? AppDesignTokens.softGray
+                                    : const Color(0xFFF3F4F7);
+                                final Color chipIdleFg = dark
+                                    ? AppDesignTokens.textSecondary
+                                    : const Color(0xFF667085);
+                                final Color chipActiveBg = dark
+                                    ? AppDesignTokens.successSoft
+                                    : const Color(0xFFDFF8C8);
+                                final Color chipActiveFg = dark
+                                    ? AppDesignTokens.brandGreen
+                                    : AppDesignTokens.brandGreenDark;
+                                final Color chipInfoBg = dark
+                                    ? AppDesignTokens.infoSoft
+                                    : const Color(0xFFE8F1FF);
+                                final Color chipInfoFg =
+                                    AppDesignTokens.primaryBlue;
                                 final List<Widget> actions = <Widget>[
                                   FilledButton.tonal(
                                     onPressed: active
@@ -1387,12 +1404,8 @@ class _PlayerSubtitleListState extends State<PlayerSubtitleList> {
                                         : () =>
                                               widget.onTapLine(originalIndex),
                                     style: tonal(
-                                      bg: active
-                                          ? const Color(0xFFDFF8C8)
-                                          : const Color(0xFFF3F4F7),
-                                      fg: active
-                                          ? AppDesignTokens.brandGreenDark
-                                          : const Color(0xFF1CB0F6),
+                                      bg: active ? chipActiveBg : chipIdleBg,
+                                      fg: active ? chipActiveFg : chipInfoFg,
                                     ),
                                     child: Icon(
                                       active && widget.isPlaying
@@ -1422,12 +1435,8 @@ class _PlayerSubtitleListState extends State<PlayerSubtitleList> {
                                         size: narrow ? 18 : 20,
                                       ),
                                       style: IconButton.styleFrom(
-                                        foregroundColor: const Color(
-                                          0xFF1CB0F6,
-                                        ),
-                                        backgroundColor: const Color(
-                                          0xFFF3F4F7,
-                                        ),
+                                        foregroundColor: chipInfoFg,
+                                        backgroundColor: chipIdleBg,
                                         minimumSize: btnSize,
                                         fixedSize: btnSize,
                                         padding: EdgeInsets.zero,
@@ -1449,12 +1458,8 @@ class _PlayerSubtitleListState extends State<PlayerSubtitleList> {
                                     onPressed: () =>
                                         widget.onLoopFromLine(originalIndex),
                                     style: tonal(
-                                      bg: isLooping
-                                          ? const Color(0xFFDFF8C8)
-                                          : const Color(0xFFF3F4F7),
-                                      fg: isLooping
-                                          ? AppDesignTokens.brandGreenDark
-                                          : const Color(0xFF667085),
+                                      bg: isLooping ? chipActiveBg : chipIdleBg,
+                                      fg: isLooping ? chipActiveFg : chipIdleFg,
                                     ),
                                     child: Icon(
                                       Icons.repeat_one_rounded,
@@ -1474,11 +1479,17 @@ class _PlayerSubtitleListState extends State<PlayerSubtitleList> {
                                             .onBookmarkLine(originalIndex),
                                         style: tonal(
                                           bg: bookmarked
-                                              ? const Color(0xFFFFE0E0)
-                                              : const Color(0xFFFFF7D6),
+                                              ? (dark
+                                                    ? AppDesignTokens.dangerSoft
+                                                    : const Color(0xFFFFE0E0))
+                                              : (dark
+                                                    ? const Color(0xFF3A3220)
+                                                    : const Color(0xFFFFF7D6)),
                                           fg: bookmarked
-                                              ? const Color(0xFFC62828)
-                                              : const Color(0xFFB58600),
+                                              ? AppDesignTokens.dangerText
+                                              : (dark
+                                                    ? const Color(0xFFFFD699)
+                                                    : const Color(0xFFB58600)),
                                         ),
                                         child: Icon(
                                           bookmarked
@@ -1501,8 +1512,8 @@ class _PlayerSubtitleListState extends State<PlayerSubtitleList> {
                                           line,
                                         ),
                                         style: tonal(
-                                          bg: const Color(0xFFE8F1FF),
-                                          fg: const Color(0xFF1CB0F6),
+                                          bg: chipInfoBg,
+                                          fg: chipInfoFg,
                                         ),
                                         child: Icon(
                                           Icons.edit_rounded,
@@ -1519,8 +1530,8 @@ class _PlayerSubtitleListState extends State<PlayerSubtitleList> {
                                       originalIndex,
                                     ),
                                     style: tonal(
-                                      bg: const Color(0xFFF3F4F7),
-                                      fg: const Color(0xFF667085),
+                                      bg: chipIdleBg,
+                                      fg: chipIdleFg,
                                     ),
                                     child: Icon(
                                       Icons.more_horiz_rounded,
@@ -1539,7 +1550,9 @@ class _PlayerSubtitleListState extends State<PlayerSubtitleList> {
                                         fontSize: 11,
                                         fontWeight: FontWeight.w700,
                                         color: active
-                                            ? const Color(0xFF7E8A82)
+                                            ? (dark
+                                                  ? AppDesignTokens.brandGreen
+                                                  : const Color(0xFF7E8A82))
                                             : inactiveStartTimeColor.withValues(
                                                 alpha: textOpacity,
                                               ),
