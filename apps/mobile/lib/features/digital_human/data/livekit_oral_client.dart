@@ -18,6 +18,18 @@ class LiveKitOralClient {
   bool _agentReady = false;
   String? _agentIdentity;
   Timer? _replyTimeout;
+  Timer? _reconnectTimeout;
+  int _connectionGeneration = 0;
+  bool _learnerSpeaking = false;
+  int _latestTurn = 0;
+
+  void _expectReply() {
+    _replyTimeout?.cancel();
+    _replyTimeout = Timer(const Duration(seconds: 15), () {
+      onUnavailable?.call();
+    });
+  }
+
   void Function()? onUnavailable;
   LiveKitAgentTextHandler? onUserText;
   EventsListener<RoomEvent>? _listener;
@@ -37,10 +49,15 @@ class LiveKitOralClient {
     bool enableMicrophone = true,
     Map<String, dynamic>? context,
   }) async {
-    await disconnect();
-    final AcquireLiveKitToken creds = await api.createLiveKitToken(
-      room: roomName,
-    );
+    final disconnecting = disconnect();
+    final generation = _connectionGeneration;
+    await disconnecting;
+    final AcquireLiveKitToken creds = await api
+        .createLiveKitToken(room: roomName)
+        .timeout(const Duration(seconds: 10));
+    if (generation != _connectionGeneration) {
+      throw StateError('语音连接已取消');
+    }
     final String fromApi = creds.url.trim();
     final String fromSettings = (preferredUrl ?? '').trim();
     final String url = fromApi.isNotEmpty ? fromApi : fromSettings;
@@ -56,6 +73,31 @@ class LiveKitOralClient {
     _listener = listener;
     listener
       ..on<RoomDisconnectedEvent>((_) => onUnavailable?.call())
+      ..on<RoomReconnectingEvent>((_) {
+        _replyTimeout?.cancel();
+        _reconnectTimeout?.cancel();
+        onStatus?.call('正在恢复实时语音…');
+        _reconnectTimeout = Timer(const Duration(seconds: 10), () {
+          onUnavailable?.call();
+        });
+      })
+      ..on<RoomReconnectedEvent>((_) {
+        _reconnectTimeout?.cancel();
+        _learnerSpeaking = false;
+        if (context != null) unawaited(publishContext(context));
+        onStatus?.call('实时语音已恢复，可以继续说');
+      })
+      ..on<ActiveSpeakersChangedEvent>((event) {
+        if (!_agentReady) return;
+        final local = room.localParticipant;
+        final speaking = local != null && event.speakers.contains(local);
+        if (_learnerSpeaking && !speaking) _expectReply();
+        _learnerSpeaking = speaking;
+        if (speaking ||
+            event.speakers.any((p) => p.identity == _agentIdentity)) {
+          _replyTimeout?.cancel();
+        }
+      })
       ..on<ParticipantDisconnectedEvent>((event) {
         if (event.participant.identity == _agentIdentity) {
           onUnavailable?.call();
@@ -79,10 +121,12 @@ class LiveKitOralClient {
           }
           if (participant.identity != _agentIdentity) return;
           if (topic == 'coach.turn') {
-            _replyTimeout?.cancel();
-            _replyTimeout = Timer(const Duration(seconds: 15), () {
-              onUnavailable?.call();
-            });
+            final turn = map['turn'];
+            if (turn is int) {
+              if (turn <= _latestTurn) return;
+              _latestTurn = turn;
+            }
+            _expectReply();
             final text = map['text'];
             if (text is String && text.trim().isNotEmpty)
               onUserText?.call(text);
@@ -93,7 +137,8 @@ class LiveKitOralClient {
             onScore?.call(map);
           }
           if (topic == 'coach.text' || map['coach_text'] is String) {
-            _replyTimeout?.cancel();
+            final turn = map['turn'];
+            if (turn is int && turn < _latestTurn) return;
             final String text = '${map['coach_text'] ?? map['text'] ?? ''}'
                 .trim();
             if (text.isNotEmpty) onAgentText?.call(text);
@@ -146,7 +191,11 @@ class LiveKitOralClient {
   }
 
   Future<void> disconnect() async {
+    _connectionGeneration++;
     _replyTimeout?.cancel();
+    _reconnectTimeout?.cancel();
+    _learnerSpeaking = false;
+    _latestTurn = 0;
     _agentReady = false;
     _agentIdentity = null;
     final Room? room = _room;
