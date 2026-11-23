@@ -453,7 +453,12 @@ bool bilibiliSubtitleBelongsToSource({
   }
   final String? subKey = bilibiliIdKeyFromPath(path);
   if (subKey == null || subKey.isEmpty) {
-    return true;
+    // Paths under bilibili/ without an extractable id cannot be trusted.
+    final bool underBilibili =
+        path.contains('${Platform.pathSeparator}bilibili${Platform.pathSeparator}') ||
+        path.contains('/bilibili/') ||
+        path.contains(r'\bilibili\');
+    return !underBilibili;
   }
   final String? expected = bilibiliEpisodeCacheKey(sourceUrl: source);
   if (expected == null || expected.isEmpty) {
@@ -466,7 +471,7 @@ bool bilibiliSubtitleBelongsToSource({
               ?.trim();
     }
     if (sourceKey == null || sourceKey.isEmpty) {
-      return true;
+      return false;
     }
     return subKey.toUpperCase() == sourceKey.toUpperCase();
   }

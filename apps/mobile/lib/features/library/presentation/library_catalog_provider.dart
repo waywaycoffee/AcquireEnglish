@@ -21,6 +21,7 @@ import '../../import_course/domain/bilibili_import.dart';
 import '../../import_course/domain/import_match.dart';
 import '../../membership/domain/free_trial_seeds.dart';
 import '../../player/presentation/asr_subtitle_cache.dart';
+import '../../player/presentation/subtitle_file_persist.dart';
 import '../../subtitle_completion/shared_bilibili_subtitle_sync.dart';
 import '../../sync/data/acquire_api_client.dart';
 import '../data/course_pack_mapper.dart';
@@ -574,51 +575,53 @@ class LibraryCatalogNotifier extends Notifier<List<LibraryCourseData>> {
                 BilibiliImport.looksLikeBilibiliInput(previousAsset))) {
           nextSource = previousAsset;
         }
-        // clearSubtitles must not drop usable ASR or official softsubs.
-        bool isProtectedSubtitlePath(String? path) {
+        // Explicit clear must drop bilibili/ + episode_subtitles poison links
+        // (串台). Only keep remote `/media` / http tracks and netdisk paths.
+        bool isRemoteOrNetdiskSubtitle(String? path) {
           final String value = (path ?? '').trim();
           if (value.isEmpty || !isUsableSubtitlePath(value)) {
             return false;
           }
-          final bool asr =
-              value.contains(
-                '${Platform.pathSeparator}episode_subtitles${Platform.pathSeparator}',
+          if (isRemoteSubtitlePath(value)) {
+            return true;
+          }
+          return value.contains(
+                '${Platform.pathSeparator}netdisk${Platform.pathSeparator}',
               ) ||
-              value.contains('/episode_subtitles/') ||
-              value.contains(r'\episode_subtitles\');
-          final bool official =
-              value.contains('${Platform.pathSeparator}bilibili${Platform.pathSeparator}') ||
-              value.contains('/bilibili/') ||
-              value.contains(r'\bilibili\');
-          final bool netdisk =
-              value.contains('${Platform.pathSeparator}netdisk${Platform.pathSeparator}') ||
               value.contains('/netdisk/') ||
               value.contains(r'\netdisk\');
-          return asr || official || netdisk;
+        }
+
+        String? acceptForEpisode(String? path) {
+          return acceptEpisodeSubtitlePath(
+            path: path,
+            sourceUrl: nextSource ?? episode.sourceUrl,
+            episode: episode,
+            videoAsset: (videoAsset ?? '').trim().isNotEmpty
+                ? videoAsset
+                : episode.videoAsset,
+          );
         }
 
         final String? nextEn;
         final String? nextZh;
         if (clearSubtitles) {
-          final String? keptEn = isProtectedSubtitlePath(episode.enSubtitleAsset)
-              ? episode.enSubtitleAsset
-              : (isProtectedSubtitlePath(enSubtitlePath)
-                    ? enSubtitlePath!.trim()
-                    : null);
-          final String? keptZh = isProtectedSubtitlePath(episode.cnSubtitleAsset)
-              ? episode.cnSubtitleAsset
-              : (isProtectedSubtitlePath(zhSubtitlePath)
-                    ? zhSubtitlePath!.trim()
-                    : null);
-          nextEn = keptEn;
-          nextZh = keptZh;
-        } else {
-          nextEn = isUsableSubtitlePath(enSubtitlePath)
+          // Intentional wipe (串台 / reset): do not preserve local bilibili CC.
+          nextEn = isRemoteOrNetdiskSubtitle(enSubtitlePath)
               ? enSubtitlePath!.trim()
-              : episode.enSubtitleAsset;
-          nextZh = isUsableSubtitlePath(zhSubtitlePath)
+              : (isRemoteOrNetdiskSubtitle(episode.enSubtitleAsset)
+                    ? episode.enSubtitleAsset
+                    : null);
+          nextZh = isRemoteOrNetdiskSubtitle(zhSubtitlePath)
               ? zhSubtitlePath!.trim()
-              : episode.cnSubtitleAsset;
+              : (isRemoteOrNetdiskSubtitle(episode.cnSubtitleAsset)
+                    ? episode.cnSubtitleAsset
+                    : null);
+        } else {
+          nextEn = acceptForEpisode(enSubtitlePath) ??
+              acceptForEpisode(episode.enSubtitleAsset);
+          nextZh = acceptForEpisode(zhSubtitlePath) ??
+              acceptForEpisode(episode.cnSubtitleAsset);
         }
         final List<LibrarySubtitleTrackItem> tracks =
             <LibrarySubtitleTrackItem>[
@@ -755,25 +758,70 @@ class LibraryCatalogNotifier extends Notifier<List<LibraryCourseData>> {
           sourceUrl: episode.sourceUrl,
           videoAsset: episode.videoAsset,
         );
-        // Official B站 softsubs win over ASR episode_subtitles when both exist.
-        final String? officialEn = await existingOfficialBilibiliSubtitle(
-          idKey: sourceKey,
-          fileName: 'en.srt',
+        final String? source = bilibiliSourceForEpisode(
+          course: course,
+          episode: episode,
+          videoAsset: episode.videoAsset,
         );
-        final String? officialZh = await existingOfficialBilibiliSubtitle(
-          idKey: sourceKey,
-          fileName: 'zh.srt',
+        // Official B站 softsubs win over ASR when both exist — but only if
+        // they belong to this BV/page (accept gate blocks 串台).
+        String? nextEn = acceptEpisodeSubtitlePath(
+          path: await existingOfficialBilibiliSubtitle(
+            idKey: sourceKey,
+            fileName: 'en.srt',
+          ),
+          sourceUrl: source ?? episode.sourceUrl,
+          course: course,
+          episode: episode,
+          videoAsset: episode.videoAsset,
+          sourceKey: sourceKey,
         );
-        String? nextEn = officialEn;
-        String? nextZh = officialZh;
-        if (nextEn == null && isUsableSubtitlePath(episode.enSubtitleAsset)) {
-          nextEn = episode.enSubtitleAsset;
+        String? nextZh = acceptEpisodeSubtitlePath(
+          path: await existingOfficialBilibiliSubtitle(
+            idKey: sourceKey,
+            fileName: 'zh.srt',
+          ),
+          sourceUrl: source ?? episode.sourceUrl,
+          course: course,
+          episode: episode,
+          videoAsset: episode.videoAsset,
+          sourceKey: sourceKey,
+        );
+        nextEn ??= acceptEpisodeSubtitlePath(
+          path: episode.enSubtitleAsset,
+          sourceUrl: source ?? episode.sourceUrl,
+          course: course,
+          episode: episode,
+          videoAsset: episode.videoAsset,
+          sourceKey: sourceKey,
+        );
+        nextZh ??= acceptEpisodeSubtitlePath(
+          path: episode.cnSubtitleAsset,
+          sourceUrl: source ?? episode.sourceUrl,
+          course: course,
+          episode: episode,
+          videoAsset: episode.videoAsset,
+          sourceKey: sourceKey,
+        );
+        // ASR episode_subtitles only when source.key fingerprint matches.
+        if (nextEn == null && hasAsrEn) {
+          final PersistedBilingualSubtitleFiles? located =
+              await locatePersistedBilingualSubtitleFiles(
+            episodeId: episode.id,
+            sourceKey: sourceKey,
+            videoFingerprint: videoFileFingerprint(episode.videoAsset),
+          );
+          nextEn = located?.englishPath;
         }
-        if (nextZh == null && isUsableSubtitlePath(episode.cnSubtitleAsset)) {
-          nextZh = episode.cnSubtitleAsset;
+        if (nextZh == null && hasAsrZh) {
+          final PersistedBilingualSubtitleFiles? located =
+              await locatePersistedBilingualSubtitleFiles(
+            episodeId: episode.id,
+            sourceKey: sourceKey,
+            videoFingerprint: videoFileFingerprint(episode.videoAsset),
+          );
+          nextZh = located?.chinesePath;
         }
-        nextEn ??= hasAsrEn ? disk.en : null;
-        nextZh ??= hasAsrZh ? disk.zh : null;
         final bool enFlag = isUsableSubtitlePath(nextEn);
         final bool zhFlag = isUsableSubtitlePath(nextZh);
         final bool tracksStale = episode.subtitleTracks.any(

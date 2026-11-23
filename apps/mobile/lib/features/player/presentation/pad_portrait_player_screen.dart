@@ -606,11 +606,17 @@ class PadPortraitPlayerScreenState
       if (!mounted) {
         return;
       }
+      // Prefer freshly prepared official tracks over recovered/shared packs
+      // (shared bare-BV packs were a 合集串台 vector).
       if ((prepared.enSubtitlePath ?? '').isNotEmpty) {
-        enSub = recoveredSubtitles?.enPath ?? prepared.enSubtitlePath;
+        enSub = prepared.enSubtitlePath;
+      } else {
+        enSub ??= recoveredSubtitles?.enPath;
       }
       if ((prepared.zhSubtitlePath ?? '').isNotEmpty) {
-        zhSub = recoveredSubtitles?.zhPath ?? prepared.zhSubtitlePath;
+        zhSub = prepared.zhSubtitlePath;
+      } else {
+        zhSub ??= recoveredSubtitles?.zhPath;
       }
       if ((prepared.localVideoPath ?? '').isNotEmpty) {
         _videoAsset = prepared.localVideoPath;
@@ -664,10 +670,7 @@ class PadPortraitPlayerScreenState
     }
     final Future<void> videoInitFuture = _initVideo();
 
-    // Playing file is source of truth — drop CC that belongs to another BV/page.
-    final String? playingKey = bilibiliIdKeyFromPath(
-      _videoAsset ?? resource.videoAsset,
-    );
+    // Page-aware expectKey is the source of truth (not bare playingKey alone).
     final String? expectKey =
         bilibiliEpisodeCacheKey(
           course: resource.course,
@@ -676,50 +679,56 @@ class PadPortraitPlayerScreenState
           sourceUrl: resource.episode?.sourceUrl,
         ) ??
         resyncKey;
-    final String? alignKey =
-        ((playingKey ?? '').isNotEmpty ? playingKey : expectKey);
-    if (isUsableSubtitlePath(enSub) &&
-        (alignKey ?? '').isNotEmpty &&
-        !bilibiliMediaKeysAligned(bilibiliIdKeyFromPath(enSub), alignKey)) {
-      // ignore: avoid_print
-      print('bilibili.episode drop en vs video en=$enSub align=$alignKey');
-      enSub = null;
-    }
-    if (isUsableSubtitlePath(zhSub) &&
-        (alignKey ?? '').isNotEmpty &&
-        !bilibiliMediaKeysAligned(bilibiliIdKeyFromPath(zhSub), alignKey)) {
-      // ignore: avoid_print
-      print('bilibili.episode drop zh vs video zh=$zhSub align=$alignKey');
-      zhSub = null;
-    }
+    final String? sourceForAccept = bilibiliSourceForEpisode(
+      course: resource.course,
+      episode: resource.episode,
+      videoAsset: _videoAsset ?? resource.videoAsset,
+    );
+    enSub = acceptEpisodeSubtitlePath(
+      path: enSub,
+      sourceUrl: sourceForAccept ?? resource.episode?.sourceUrl,
+      course: resource.course,
+      episode: resource.episode,
+      videoAsset: _videoAsset ?? resource.videoAsset,
+      sourceKey: expectKey,
+    );
+    zhSub = acceptEpisodeSubtitlePath(
+      path: zhSub,
+      sourceUrl: sourceForAccept ?? resource.episode?.sourceUrl,
+      course: resource.course,
+      episode: resource.episode,
+      videoAsset: _videoAsset ?? resource.videoAsset,
+      sourceKey: expectKey,
+    );
     List<PlayerSubtitleLine> resolvedLines = const <PlayerSubtitleLine>[];
     bool officialEnglish = false;
-    // episode_subtitles/* has no BV in the path — never load it as "official"
-    // without the source.key fingerprint (that was the 合集串台 vector).
-    final bool enIsScopedPersist = (enSub ?? '').contains(
-      '${Platform.pathSeparator}episode_subtitles${Platform.pathSeparator}',
-    );
-    final bool zhIsScopedPersist = (zhSub ?? '').contains(
-      '${Platform.pathSeparator}episode_subtitles${Platform.pathSeparator}',
-    );
-    if (enIsScopedPersist) {
-      enSub = null;
-    }
-    if (zhIsScopedPersist) {
-      zhSub = null;
-    }
-    // Rediscover on-disk official softsubs when catalog/tracks were stale.
-    final String? officialSourceKey = _episodeSourceKey(resource);
+    // Rediscover on-disk official softsubs when catalog/tracks were stale —
+    // then re-gate so a wrong-page rediscovery cannot reattach 串台 CC.
+    final String? officialSourceKey = _episodeSourceKey(resource) ?? expectKey;
     if (!isUsableSubtitlePath(enSub)) {
-      enSub = await existingOfficialBilibiliSubtitle(
-        idKey: officialSourceKey,
-        fileName: 'en.srt',
+      enSub = acceptEpisodeSubtitlePath(
+        path: await existingOfficialBilibiliSubtitle(
+          idKey: officialSourceKey,
+          fileName: 'en.srt',
+        ),
+        sourceUrl: sourceForAccept ?? resource.episode?.sourceUrl,
+        course: resource.course,
+        episode: resource.episode,
+        videoAsset: _videoAsset ?? resource.videoAsset,
+        sourceKey: officialSourceKey,
       );
     }
     if (!isUsableSubtitlePath(zhSub)) {
-      zhSub = await existingOfficialBilibiliSubtitle(
-        idKey: officialSourceKey,
-        fileName: 'zh.srt',
+      zhSub = acceptEpisodeSubtitlePath(
+        path: await existingOfficialBilibiliSubtitle(
+          idKey: officialSourceKey,
+          fileName: 'zh.srt',
+        ),
+        sourceUrl: sourceForAccept ?? resource.episode?.sourceUrl,
+        course: resource.course,
+        episode: resource.episode,
+        videoAsset: _videoAsset ?? resource.videoAsset,
+        sourceKey: officialSourceKey,
       );
     }
     if (isUsableSubtitlePath(enSub) || isUsableSubtitlePath(zhSub)) {

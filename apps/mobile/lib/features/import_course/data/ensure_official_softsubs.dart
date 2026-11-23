@@ -1,5 +1,6 @@
 import 'bilibili_episode_prepare.dart';
 import 'bilibili_import_service.dart';
+import 'bilibili_multipage.dart';
 
 /// Official softsub paths for one episode (disk and/or freshly fetched).
 class OfficialSoftsubs {
@@ -28,12 +29,18 @@ Future<OfficialSoftsubs> ensureOfficialSoftsubs({
   bool networkFetch = true,
   BilibiliImportService? service,
 }) async {
-  String? en = isUsableSubtitlePath(existingEnPath)
-      ? existingEnPath!.trim()
-      : null;
-  String? zh = isUsableSubtitlePath(existingZhPath)
-      ? existingZhPath!.trim()
-      : null;
+  // Strip foreign / unscoped existing paths so a poisoned catalog never
+  // skips the correct page fetch (合集串台 vector).
+  String? en = acceptEpisodeSubtitlePath(
+    path: existingEnPath,
+    sourceUrl: sourceUrl,
+    sourceKey: sourceKey,
+  );
+  String? zh = acceptEpisodeSubtitlePath(
+    path: existingZhPath,
+    sourceUrl: sourceUrl,
+    sourceKey: sourceKey,
+  );
   String? note;
 
   final String source = (sourceUrl ?? '').trim();
@@ -51,22 +58,36 @@ Future<OfficialSoftsubs> ensureOfficialSoftsubs({
       final String? fetchedEn = tracks['en'];
       final String? fetchedZh = tracks['zh'];
       note = tracks['note'];
-      if (isUsableSubtitlePath(fetchedEn)) {
-        en = fetchedEn!.trim();
-      }
-      if (isUsableSubtitlePath(fetchedZh)) {
-        zh = fetchedZh!.trim();
-      }
+      en = acceptEpisodeSubtitlePath(
+            path: fetchedEn,
+            sourceUrl: source,
+            sourceKey: sourceKey,
+          ) ??
+          en;
+      zh = acceptEpisodeSubtitlePath(
+            path: fetchedZh,
+            sourceUrl: source,
+            sourceKey: sourceKey,
+          ) ??
+          zh;
     } catch (_) {}
   }
 
-  en ??= await existingOfficialBilibiliSubtitle(
-    idKey: sourceKey,
-    fileName: 'en.srt',
+  en ??= acceptEpisodeSubtitlePath(
+    path: await existingOfficialBilibiliSubtitle(
+      idKey: sourceKey,
+      fileName: 'en.srt',
+    ),
+    sourceUrl: sourceUrl,
+    sourceKey: sourceKey,
   );
-  zh ??= await existingOfficialBilibiliSubtitle(
-    idKey: sourceKey,
-    fileName: 'zh.srt',
+  zh ??= acceptEpisodeSubtitlePath(
+    path: await existingOfficialBilibiliSubtitle(
+      idKey: sourceKey,
+      fileName: 'zh.srt',
+    ),
+    sourceUrl: sourceUrl,
+    sourceKey: sourceKey,
   );
 
   return OfficialSoftsubs(enPath: en, zhPath: zh, note: note);

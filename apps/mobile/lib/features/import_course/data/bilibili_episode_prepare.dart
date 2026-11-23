@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:dio/dio.dart';
 import 'package:path_provider/path_provider.dart';
 
+import '../../library/presentation/library_mock_data.dart';
 import '../domain/bilibili_import.dart';
 import 'bilibili_import_service.dart';
 import 'bilibili_multipage.dart';
@@ -154,6 +155,81 @@ bool isUsableSubtitlePath(String? path) {
   }
   final File file = File(value);
   return file.existsSync() && file.lengthSync() > 16;
+}
+
+/// Softsub path allowed for this episode's watch URL / BV-page.
+///
+/// Rejects:
+/// - unusable paths
+/// - `episode_subtitles/*` (ASR cache — load only via fingerprinted locate)
+/// - `bilibili/<other BV or page>/` softsubs (合集/分P 串台)
+String? acceptEpisodeSubtitlePath({
+  required String? path,
+  String? sourceUrl,
+  LibraryCourseData? course,
+  LibraryEpisodeItem? episode,
+  String? videoAsset,
+  String? sourceKey,
+}) {
+  if (!isUsableSubtitlePath(path)) {
+    return null;
+  }
+  final String p = path!.trim();
+  final bool scopedAsr =
+      p.contains(
+        '${Platform.pathSeparator}episode_subtitles${Platform.pathSeparator}',
+      ) ||
+      p.contains('/episode_subtitles/') ||
+      p.contains(r'\episode_subtitles\');
+  if (scopedAsr) {
+    // ASR cache is per episodeId folder — only accept when the path embeds
+    // this episode's id (never treat as cross-episode "official" softsub).
+    final String epId = (episode?.id ?? '').trim();
+    if (epId.isEmpty) {
+      return null;
+    }
+    final String safeId = epId.replaceAll(RegExp(r'[^\w\-.]'), '_');
+    if (p.contains(epId) || (safeId.isNotEmpty && p.contains(safeId))) {
+      return p;
+    }
+    return null;
+  }
+  // Remote `/media` / http tracks are server-scoped; keep them.
+  if (isRemoteSubtitlePath(p)) {
+    return p;
+  }
+  final String? source =
+      (sourceUrl ?? '').trim().isNotEmpty
+      ? sourceUrl!.trim()
+      : bilibiliSourceForEpisode(
+          course: course,
+          episode: episode,
+          videoAsset: videoAsset,
+        );
+  final String? expected =
+      (sourceKey ?? '').trim().isNotEmpty
+      ? sourceKey!.trim()
+      : bilibiliEpisodeCacheKey(
+          course: course,
+          episode: episode,
+          sourceUrl: source,
+          videoAsset: videoAsset,
+        );
+  final bool underBilibili =
+      p.contains('${Platform.pathSeparator}bilibili${Platform.pathSeparator}') ||
+      p.contains('/bilibili/') ||
+      p.contains(r'\bilibili\');
+  if (underBilibili) {
+    if ((source ?? '').isNotEmpty &&
+        !bilibiliSubtitleBelongsToSource(subtitlePath: p, source: source)) {
+      return null;
+    }
+    if ((expected ?? '').isNotEmpty &&
+        !bilibiliMediaKeysAligned(bilibiliIdKeyFromPath(p), expected)) {
+      return null;
+    }
+  }
+  return p;
 }
 
 /// On-disk subtitle only (ASR / offline tools must not treat URLs as files).

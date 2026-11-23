@@ -411,11 +411,16 @@ class PadLandscapePlayerScreenState
       if (!mounted) {
         return;
       }
+      // Prefer freshly prepared official tracks over recovered/shared packs.
       if ((prepared.enSubtitlePath ?? '').isNotEmpty) {
-        enSub = recoveredSubtitles?.enPath ?? prepared.enSubtitlePath;
+        enSub = prepared.enSubtitlePath;
+      } else {
+        enSub ??= recoveredSubtitles?.enPath;
       }
       if ((prepared.zhSubtitlePath ?? '').isNotEmpty) {
-        zhSub = recoveredSubtitles?.zhPath ?? prepared.zhSubtitlePath;
+        zhSub = prepared.zhSubtitlePath;
+      } else {
+        zhSub ??= recoveredSubtitles?.zhPath;
       }
       if ((prepared.localVideoPath ?? '').isNotEmpty) {
         _videoAsset = prepared.localVideoPath;
@@ -447,9 +452,6 @@ class PadLandscapePlayerScreenState
       );
     }
 
-    final String? playingKey = bilibiliIdKeyFromPath(
-      _videoAsset ?? resource.videoAsset,
-    );
     final String? expectKey =
         bilibiliEpisodeCacheKey(
           course: resource.course,
@@ -458,44 +460,55 @@ class PadLandscapePlayerScreenState
           sourceUrl: resource.episode?.sourceUrl,
         ) ??
         resyncKey;
-    final String? alignKey =
-        ((playingKey ?? '').isNotEmpty ? playingKey : expectKey);
-    if (isUsableSubtitlePath(enSub) &&
-        (alignKey ?? '').isNotEmpty &&
-        !bilibiliMediaKeysAligned(bilibiliIdKeyFromPath(enSub), alignKey)) {
-      enSub = null;
-    }
-    if (isUsableSubtitlePath(zhSub) &&
-        (alignKey ?? '').isNotEmpty &&
-        !bilibiliMediaKeysAligned(bilibiliIdKeyFromPath(zhSub), alignKey)) {
-      zhSub = null;
-    }
+    final String? sourceForAccept = bilibiliSourceForEpisode(
+      course: resource.course,
+      episode: resource.episode,
+      videoAsset: _videoAsset ?? resource.videoAsset,
+    );
+    enSub = acceptEpisodeSubtitlePath(
+      path: enSub,
+      sourceUrl: sourceForAccept ?? resource.episode?.sourceUrl,
+      course: resource.course,
+      episode: resource.episode,
+      videoAsset: _videoAsset ?? resource.videoAsset,
+      sourceKey: expectKey,
+    );
+    zhSub = acceptEpisodeSubtitlePath(
+      path: zhSub,
+      sourceUrl: sourceForAccept ?? resource.episode?.sourceUrl,
+      course: resource.course,
+      episode: resource.episode,
+      videoAsset: _videoAsset ?? resource.videoAsset,
+      sourceKey: expectKey,
+    );
 
     List<PlayerSubtitleLine> resolvedLines = const <PlayerSubtitleLine>[];
     bool officialEnglish = false;
-    final bool enIsScopedPersist = (enSub ?? '').contains(
-      '${Platform.pathSeparator}episode_subtitles${Platform.pathSeparator}',
-    );
-    final bool zhIsScopedPersist = (zhSub ?? '').contains(
-      '${Platform.pathSeparator}episode_subtitles${Platform.pathSeparator}',
-    );
-    if (enIsScopedPersist) {
-      enSub = null;
-    }
-    if (zhIsScopedPersist) {
-      zhSub = null;
-    }
-    final String? officialSourceKey = _episodeSourceKey(resource);
+    final String? officialSourceKey = _episodeSourceKey(resource) ?? expectKey;
     if (!isUsableSubtitlePath(enSub)) {
-      enSub = await existingOfficialBilibiliSubtitle(
-        idKey: officialSourceKey,
-        fileName: 'en.srt',
+      enSub = acceptEpisodeSubtitlePath(
+        path: await existingOfficialBilibiliSubtitle(
+          idKey: officialSourceKey,
+          fileName: 'en.srt',
+        ),
+        sourceUrl: sourceForAccept ?? resource.episode?.sourceUrl,
+        course: resource.course,
+        episode: resource.episode,
+        videoAsset: _videoAsset ?? resource.videoAsset,
+        sourceKey: officialSourceKey,
       );
     }
     if (!isUsableSubtitlePath(zhSub)) {
-      zhSub = await existingOfficialBilibiliSubtitle(
-        idKey: officialSourceKey,
-        fileName: 'zh.srt',
+      zhSub = acceptEpisodeSubtitlePath(
+        path: await existingOfficialBilibiliSubtitle(
+          idKey: officialSourceKey,
+          fileName: 'zh.srt',
+        ),
+        sourceUrl: sourceForAccept ?? resource.episode?.sourceUrl,
+        course: resource.course,
+        episode: resource.episode,
+        videoAsset: _videoAsset ?? resource.videoAsset,
+        sourceKey: officialSourceKey,
       );
     }
     if (isUsableSubtitlePath(enSub) || isUsableSubtitlePath(zhSub)) {
