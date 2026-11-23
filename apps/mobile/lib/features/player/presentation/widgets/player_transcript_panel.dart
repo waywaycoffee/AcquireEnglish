@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../../shared/presentation/pad/app_design_tokens.dart';
 import '../player_mock_state.dart';
 import 'player_subtitle_list.dart';
 import 'subtitle_chunk_highlight.dart';
@@ -261,19 +262,25 @@ class _PanelHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Card is always mint/light — never inherit dark-theme ink (was near-invisible).
-    const Color titleInk = Color(0xFF143528);
-    const Color bodyInk = Color(0xFF3F5B4C);
+    final bool dark = AppDesignTokens.isDark;
+    final Color titleInk =
+        dark ? AppDesignTokens.textPrimary : const Color(0xFF143528);
+    final Color bodyInk =
+        dark ? AppDesignTokens.textSecondary : const Color(0xFF3F5B4C);
     return Container(
       padding: const EdgeInsets.fromLTRB(14, 12, 10, 12),
       decoration: BoxDecoration(
-        color: const Color(0xFFF0FDFA),
+        color: dark
+            ? AppDesignTokens.selectedSurface
+            : const Color(0xFFF0FDFA),
         borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: const Color(0xFFCCFBF1)),
+        border: Border.all(
+          color: dark ? AppDesignTokens.borderGray : const Color(0xFFCCFBF1),
+        ),
       ),
       child: Row(
         children: <Widget>[
-          const Expanded(
+          Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: <Widget>[
@@ -285,7 +292,7 @@ class _PanelHeader extends StatelessWidget {
                     fontWeight: FontWeight.w800,
                   ),
                 ),
-                SizedBox(height: 4),
+                const SizedBox(height: 4),
                 Text(
                   '点句子定位播放，点单词查看释义',
                   maxLines: 2,

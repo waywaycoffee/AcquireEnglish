@@ -237,7 +237,7 @@ class EpisodeListItem extends StatelessWidget {
                 child: LinearProgressIndicator(
                   value: (subtitleFillProgress ?? 0.08).clamp(0.05, 1.0),
                   minHeight: 8,
-                  backgroundColor: const Color(0xFFDCE8FF),
+                  backgroundColor: AppDesignTokens.infoSoft,
                   valueColor: const AlwaysStoppedAnimation<Color>(
                     AppDesignTokens.primaryBlue,
                   ),

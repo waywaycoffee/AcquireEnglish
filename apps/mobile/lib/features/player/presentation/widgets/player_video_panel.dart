@@ -1946,12 +1946,14 @@ class _RoundActionButton extends StatelessWidget {
               padding: EdgeInsets.zero,
               backgroundColor: active
                   ? AppDesignTokens.brandGreen
-                  : (fullscreen ? const Color(0x33101827) : Colors.white),
+                  : (fullscreen
+                        ? const Color(0x33101827)
+                        : AppDesignTokens.appWhite),
               foregroundColor: active
                   ? Colors.white
                   : (fullscreen
                         ? Colors.white
-                        : AppDesignTokens.primaryBlueDark),
+                        : AppDesignTokens.primaryBlue),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(24),
               ),
@@ -1990,7 +1992,9 @@ class _MiniPillAction extends StatelessWidget {
         vertical: tiny ? 8 : (label == null ? 10 : 12),
       ),
       decoration: BoxDecoration(
-        color: fullscreen ? const Color(0x33101827) : Colors.white,
+        color: fullscreen
+            ? const Color(0x33101827)
+            : AppDesignTokens.appWhite,
         borderRadius: BorderRadius.circular(24),
       ),
       child: FittedBox(

@@ -1027,9 +1027,9 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
                           120,
                         ),
                         sliver: DecoratedSliver(
-                          decoration: const BoxDecoration(
-                            color: Colors.white,
-                            borderRadius: BorderRadius.vertical(
+                          decoration: BoxDecoration(
+                            color: AppDesignTokens.appWhite,
+                            borderRadius: const BorderRadius.vertical(
                               bottom: Radius.circular(28),
                             ),
                           ),
@@ -1118,9 +1118,9 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
                           120,
                         ),
                         sliver: DecoratedSliver(
-                          decoration: const BoxDecoration(
-                            color: Colors.white,
-                            borderRadius: BorderRadius.vertical(
+                          decoration: BoxDecoration(
+                            color: AppDesignTokens.appWhite,
+                            borderRadius: const BorderRadius.vertical(
                               bottom: Radius.circular(28),
                             ),
                           ),
@@ -3218,20 +3218,24 @@ class _EpisodeSortChip extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 2),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: AppDesignTokens.appWhite,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFFDCE4DA)),
+        border: Border.all(color: AppDesignTokens.borderGray),
       ),
       child: DropdownButtonHideUnderline(
         child: DropdownButton<String>(
           value: value,
           borderRadius: BorderRadius.circular(16),
           onChanged: onChanged,
-          icon: const Icon(Icons.keyboard_arrow_down_rounded),
-          style: const TextStyle(
+          icon: Icon(
+            Icons.keyboard_arrow_down_rounded,
+            color: AppDesignTokens.textSecondary,
+          ),
+          dropdownColor: AppDesignTokens.appWhite,
+          style: TextStyle(
             fontSize: 13,
             fontWeight: FontWeight.w700,
-            color: Color(0xFF53625A),
+            color: AppDesignTokens.textPrimary,
           ),
           items: options
               .map((String item) {

@@ -17,6 +17,7 @@ import '../../player/domain/pronunciation_assessment.dart';
 import '../../reading/domain/reading_doc.dart';
 import '../../reading/presentation/reading_library_provider.dart';
 import '../../settings/presentation/settings_provider.dart';
+import '../../shared/presentation/pad/app_design_tokens.dart';
 import '../../sync/data/acquire_api_client.dart';
 import '../data/livekit_peer_client.dart';
 import '../data/oral_coach_pipeline_client.dart';
@@ -1252,7 +1253,7 @@ class _PeerOralPracticeScreenState
         _phase == _PeerPhase.diagnose ||
         _phase == _PeerPhase.resay;
     return Scaffold(
-      backgroundColor: const Color(0xFFF3F0FF),
+      backgroundColor: AppDesignTokens.softWhite,
       appBar: AppBar(
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -1324,7 +1325,7 @@ class _PeerOralPracticeScreenState
             if (inRoom &&
                 (_roomContent.hasTopic || _roomContent.hasMaterial))
               Material(
-                color: const Color(0xFFEDE7FF),
+                color: AppDesignTokens.purpleLight,
                 child: ListTile(
                   dense: true,
                   leading: Icon(
@@ -1462,7 +1463,7 @@ class _PeerOralPracticeScreenState
                   width: double.infinity,
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
-                    color: const Color(0xFFEDE7FF),
+                    color: AppDesignTokens.purpleLight,
                     borderRadius: BorderRadius.circular(14),
                   ),
                   child: Text(

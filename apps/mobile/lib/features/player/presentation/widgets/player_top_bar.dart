@@ -118,7 +118,7 @@ class PlayerTopBar extends StatelessWidget {
                         vertical: tiny ? 3 : 4,
                       ),
                       decoration: BoxDecoration(
-                        color: const Color(0xFFECFDF5),
+                        color: AppDesignTokens.selectedSurface,
                         borderRadius: BorderRadius.circular(999),
                       ),
                       child: Text(
@@ -126,7 +126,9 @@ class PlayerTopBar extends StatelessWidget {
                         style: TextStyle(
                           fontSize: tiny ? 10 : 11,
                           fontWeight: FontWeight.w800,
-                          color: const Color(0xFF047857),
+                          color: AppDesignTokens.isDark
+                              ? AppDesignTokens.brandGreen
+                              : const Color(0xFF047857),
                         ),
                       ),
                     ),

@@ -3,6 +3,7 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 
 import '../../../library/presentation/library_mock_data.dart';
+import '../../../shared/presentation/pad/app_design_tokens.dart';
 
 class PlayerEpisodeStrip extends StatefulWidget {
   const PlayerEpisodeStrip({
@@ -190,19 +191,17 @@ class _EpisodeCard extends StatelessWidget {
       width: 230,
       child: DecoratedBox(
         decoration: BoxDecoration(
-          color: isActive ? const Color(0xFFECFDF5) : Colors.white,
+          color: isActive
+              ? AppDesignTokens.selectedSurface
+              : AppDesignTokens.appWhite,
           borderRadius: BorderRadius.circular(18),
           border: Border.all(
-            color: isActive ? const Color(0xFF34D399) : const Color(0xFFE2E8F0),
+            color: isActive
+                ? AppDesignTokens.brandGreen
+                : AppDesignTokens.borderGray,
             width: isActive ? 2 : 1,
           ),
-          boxShadow: const <BoxShadow>[
-            BoxShadow(
-              color: Color(0x0F0F172A),
-              blurRadius: 12,
-              offset: Offset(0, 5),
-            ),
-          ],
+          boxShadow: AppDesignTokens.toyCardShadow,
         ),
         child: Row(
           children: <Widget>[
@@ -213,15 +212,17 @@ class _EpisodeCard extends StatelessWidget {
                 height: 38,
                 decoration: BoxDecoration(
                   color: isActive
-                      ? const Color(0xFF10B981)
-                      : const Color(0xFFF1F5F9),
+                      ? AppDesignTokens.brandGreen
+                      : AppDesignTokens.softGray,
                   borderRadius: BorderRadius.circular(14),
                 ),
                 child: Icon(
                   isActive
                       ? Icons.play_arrow_rounded
                       : Icons.menu_book_outlined,
-                  color: isActive ? Colors.white : const Color(0xFF475569),
+                  color: isActive
+                      ? AppDesignTokens.onAccent
+                      : AppDesignTokens.textSecondary,
                 ),
               ),
             ),
@@ -238,15 +239,17 @@ class _EpisodeCard extends StatelessWidget {
                         fontSize: 11,
                         fontWeight: FontWeight.w800,
                         color: isActive
-                            ? const Color(0xFF047857)
-                            : const Color(0xFF64748B),
+                            ? (AppDesignTokens.isDark
+                                  ? AppDesignTokens.brandGreen
+                                  : const Color(0xFF047857))
+                            : AppDesignTokens.textSecondary,
                       ),
                     ),
                     const SizedBox(height: 2),
                     Text(
                       episode.title,
-                      style: const TextStyle(
-                        color: Color(0xFF172033),
+                      style: TextStyle(
+                        color: AppDesignTokens.textPrimary,
                         fontSize: 15,
                         fontWeight: FontWeight.w800,
                         height: 1.2,
@@ -256,8 +259,8 @@ class _EpisodeCard extends StatelessWidget {
                     ),
                     Text(
                       '第${episode.numberStr}集 · ${episode.totalTimeStr ?? '${episode.durationMinutes}:00'} · 完成度 ${episode.progressPercent}%',
-                      style: const TextStyle(
-                        color: Color(0xFF94A3B8),
+                      style: TextStyle(
+                        color: AppDesignTokens.textSecondary,
                         fontSize: 10,
                         fontWeight: FontWeight.w700,
                       ),

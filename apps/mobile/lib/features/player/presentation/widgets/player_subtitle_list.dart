@@ -202,6 +202,10 @@ class _PlayerSubtitleListState extends State<PlayerSubtitleList> {
 
   bool get _showCurrentOnly => widget.showCurrentOnly;
 
+  /// App is dark-first; studyDarkStyle alone used to leave phone UI light.
+  bool get _darkShell =>
+      widget.studyDarkStyle || AppDesignTokens.isDark;
+
   bool _isChunkKindEnabled(SubtitleChunkKind kind) {
     final Set<SubtitleChunkKind>? enabled = widget.enabledChunkKinds;
     if (enabled == null) {
@@ -375,7 +379,7 @@ class _PlayerSubtitleListState extends State<PlayerSubtitleList> {
     required bool dark,
     required StudyShellColors shell,
   }) {
-    final Color fill = dark ? shell.card : Colors.white;
+    final Color fill = dark ? shell.card : AppDesignTokens.appWhite;
     final Color border = dark ? shell.border : const Color(0xFFE1E7E1);
     final Color label = dark
         ? shell.textSecondary
@@ -1067,7 +1071,7 @@ class _PlayerSubtitleListState extends State<PlayerSubtitleList> {
         previewText: emptyPreviewText,
         errorText: widget.aiSubtitleErrorText,
         onGenerateAiSubtitles: widget.onGenerateAiSubtitles,
-        studyDarkStyle: widget.studyDarkStyle,
+        studyDarkStyle: _darkShell,
       );
     }
 
@@ -1084,7 +1088,7 @@ class _PlayerSubtitleListState extends State<PlayerSubtitleList> {
         previewText: emptyPreviewText,
         errorText: widget.aiSubtitleErrorText,
         onGenerateAiSubtitles: widget.onGenerateAiSubtitles,
-        studyDarkStyle: widget.studyDarkStyle,
+        studyDarkStyle: _darkShell,
       );
     }
 
@@ -1158,7 +1162,7 @@ class _PlayerSubtitleListState extends State<PlayerSubtitleList> {
               final String? pronunciationUnavailableReason = widget
                   .pronunciationUnavailableReasonForLine
                   ?.call(originalIndex);
-              final bool dark = widget.studyDarkStyle;
+              final bool dark = _darkShell;
               final StudyShellColors shell = StudyShellColors.of(context);
               final bool blindMode =
                   widget.blindListening ||
@@ -1728,7 +1732,7 @@ class _PlayerSubtitleListState extends State<PlayerSubtitleList> {
                     key: const ValueKey<String>('subtitle-list-divider'),
                     height: 1,
                     thickness: 1,
-                    color: widget.studyDarkStyle
+                    color: _darkShell
                         ? Colors.transparent
                         : const Color(0xFFE6EBE7),
                   ),
@@ -1740,7 +1744,7 @@ class _PlayerSubtitleListState extends State<PlayerSubtitleList> {
         ),
       ),
     );
-    final Color toolbarColor = widget.studyDarkStyle
+    final Color toolbarColor = _darkShell
         ? StudyShellColors.of(context).textSecondary
         : AppDesignTokens.textSecondary;
     final StudyShellColors shell = StudyShellColors.of(context);
@@ -1760,7 +1764,7 @@ class _PlayerSubtitleListState extends State<PlayerSubtitleList> {
                   _ChunkKindToggleChip(
                     kind: kind,
                     selected: _isChunkKindEnabled(kind),
-                    onDarkVideo: widget.studyDarkStyle,
+                    onDarkVideo: _darkShell,
                     fallbackColor: toolbarColor,
                     onTap: widget.onToggleChunkKind == null
                         ? null
@@ -1788,12 +1792,12 @@ class _PlayerSubtitleListState extends State<PlayerSubtitleList> {
             padding: const EdgeInsets.fromLTRB(8, 0, 8, 6),
             child: DecoratedBox(
               decoration: BoxDecoration(
-                color: widget.studyDarkStyle
+                color: _darkShell
                     ? shell.chipIdle
                     : const Color(0xFFF2F6F3),
                 borderRadius: BorderRadius.circular(14),
                 border: Border.all(
-                  color: widget.studyDarkStyle
+                  color: _darkShell
                       ? shell.border
                       : const Color(0xFFE1E7E1),
                 ),
@@ -1811,7 +1815,7 @@ class _PlayerSubtitleListState extends State<PlayerSubtitleList> {
                         Icon(
                           Icons.subtitles_outlined,
                           size: 18,
-                          color: widget.studyDarkStyle
+                          color: _darkShell
                               ? shell.textSecondary
                               : AppDesignTokens.textSecondary,
                         ),
@@ -1827,7 +1831,7 @@ class _PlayerSubtitleListState extends State<PlayerSubtitleList> {
                             style: TextStyle(
                               fontSize: 13,
                               fontWeight: FontWeight.w700,
-                              color: widget.studyDarkStyle
+                              color: _darkShell
                                   ? shell.textPrimary
                                   : AppDesignTokens.textPrimary,
                             ),
@@ -1869,7 +1873,7 @@ class _PlayerSubtitleListState extends State<PlayerSubtitleList> {
                             onPressed: widget.onCancelBilingualPipeline,
                             icon: Icon(
                               Icons.close_rounded,
-                              color: widget.studyDarkStyle
+                              color: _darkShell
                                   ? shell.textMuted
                                   : AppDesignTokens.textSecondary,
                             ),
@@ -1891,7 +1895,7 @@ class _PlayerSubtitleListState extends State<PlayerSubtitleList> {
                           // null value = indeterminate while waiting for %.
                           value: widget.bilingualPipelineProgressValue,
                           minHeight: 4,
-                          backgroundColor: widget.studyDarkStyle
+                          backgroundColor: _darkShell
                               ? shell.progressTrack
                               : const Color(0xFFE1E7E1),
                           color: shell.accent,

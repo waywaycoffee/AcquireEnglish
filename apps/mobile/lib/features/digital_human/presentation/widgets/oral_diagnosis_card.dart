@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../../../shared/presentation/pad/app_design_tokens.dart';
 import '../../domain/oral_expression_diagnosis.dart';
 
 /// Live-style content diagnosis + idiomatic rewrite card.
@@ -25,7 +26,7 @@ class OralDiagnosisCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Material(
-      color: Colors.white,
+      color: AppDesignTokens.appWhite,
       elevation: 10,
       shadowColor: const Color(0x33000000),
       borderRadius: BorderRadius.circular(22),

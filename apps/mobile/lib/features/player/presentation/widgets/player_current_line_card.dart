@@ -155,16 +155,10 @@ class _PlayerCurrentLineCardState extends State<PlayerCurrentLineCard> {
     return Container(
       padding: const EdgeInsets.fromLTRB(24, 22, 24, 24),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: AppDesignTokens.appWhite,
         borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: const Color(0xFFE5E5E5), width: 2),
-        boxShadow: const <BoxShadow>[
-          BoxShadow(
-            color: Color(0x12000000),
-            blurRadius: 12,
-            offset: Offset(0, 6),
-          ),
-        ],
+        border: Border.all(color: AppDesignTokens.borderGray, width: 2),
+        boxShadow: AppDesignTokens.toyCardShadow,
       ),
       child: SingleChildScrollView(
         child: Column(
