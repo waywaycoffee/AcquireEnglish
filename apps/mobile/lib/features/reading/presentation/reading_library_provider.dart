@@ -190,10 +190,18 @@ class ReadingLibraryNotifier extends Notifier<ReadingLibraryState> {
 
   Future<void> _persistLibrary({bool scheduleSync = true}) async {
     if (!Hive.isBoxOpen('prefs')) return;
+    final Box<String> box = Hive.box<String>('prefs');
     final String payload = jsonEncode(
       state.userDocs.map((ReadingDoc d) => d.toJson()).toList(),
     );
-    await Hive.box<String>('prefs').put(_libraryKey, payload);
+    await box.put(_libraryKey, payload);
+    // Large novel JSON rewrites leave dead space; without compact prefs.hive
+    // can grow to GB and OOM on next cold start.
+    if (payload.length > 256 * 1024) {
+      try {
+        await box.compact();
+      } catch (_) {}
+    }
     if (scheduleSync) scheduleDeviceCloudSync(key: 'reading');
   }
 
