@@ -1067,6 +1067,13 @@ class PadPortraitPlayerScreenState
               .read(learningActivityProvider.notifier)
               .recordVideoWatched(videoKey: videoKey);
         }
+        if (widget.videoPlanActivity == 'coach') {
+          if (state.lines.any((line) => line.english.trim().isNotEmpty)) {
+            unawaited(_openOralCoach(resource, state.activeLine));
+          } else {
+            _showMessage('本集暂无可用于交流的英文字幕');
+          }
+        }
       });
     }
     // Empty / missing sides → import queue Whisper. Existing Chinese is kept.

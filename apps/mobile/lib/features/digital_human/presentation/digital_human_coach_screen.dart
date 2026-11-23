@@ -9,6 +9,7 @@ class DigitalHumanCoachScreen extends StatelessWidget {
     this.initialScenarioId,
     this.lessonTitle,
     this.guidedLesson = false,
+    this.openSceneMenu = false,
     this.lessonText,
     this.practiceRole,
     this.onConfirmedLearnerTurn,
@@ -16,6 +17,7 @@ class DigitalHumanCoachScreen extends StatelessWidget {
 
   final String? initialScenarioId;
   final bool guidedLesson;
+  final bool openSceneMenu;
   final String? lessonTitle, lessonText, practiceRole;
   final ValueChanged<String>? onConfirmedLearnerTurn;
 
@@ -47,6 +49,7 @@ class DigitalHumanCoachScreen extends StatelessWidget {
             hasTranscript: hasMaterial,
             standalone: true,
             guidedLesson: guidedLesson,
+            openSceneMenu: openSceneMenu,
             onConfirmedLearnerTurn: onConfirmedLearnerTurn,
             initialScenarioId: hasMaterial
                 ? 'video_line'

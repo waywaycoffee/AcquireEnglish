@@ -63,7 +63,7 @@ class VocabularyPlacement extends Notifier<PlacementRow> {
 
   Future<List<PlacementRow>> loadQuestions() => _fetch('placement');
 
-  Future<void> saveEstimate(int estimate) async {
+  Future<void> saveEstimate(int estimate, {bool requireRecommendations = true}) async {
     final String key = _key;
     final int safeEstimate = estimate.clamp(
       kPlacementEstimateMin,
@@ -73,11 +73,18 @@ class VocabularyPlacement extends Notifier<PlacementRow> {
       1,
       kPlacementEstimateMax - 1000,
     );
-    final List<PlacementRow> words = await _fetch(
-      'recommendations',
-      parameters: <String, dynamic>{'start': start},
-    );
-    if (words.isEmpty) throw StateError('推荐词库为空');
+    List<PlacementRow> words = const <PlacementRow>[];
+    if (requireRecommendations) {
+      words = await _fetch(
+        'recommendations',
+        parameters: <String, dynamic>{'start': start},
+      );
+      if (words.isEmpty) throw StateError('推荐词库为空');
+    } else {
+      words = (state['words'] as List<dynamic>? ?? const <dynamic>[])
+          .whereType<PlacementRow>()
+          .toList(growable: false);
+    }
     final PlacementRow result = <String, dynamic>{
       'estimate': safeEstimate,
       'testedAt': DateTime.now().toUtc().toIso8601String(),

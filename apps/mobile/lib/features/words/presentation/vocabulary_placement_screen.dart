@@ -7,7 +7,9 @@ import '../domain/vocabulary_placement_estimate.dart';
 import 'vocabulary_placement_provider.dart';
 
 class VocabularyPlacementScreen extends ConsumerStatefulWidget {
-  const VocabularyPlacementScreen({super.key});
+  const VocabularyPlacementScreen({super.key, this.forJourney = false});
+
+  final bool forJourney;
 
   @override
   ConsumerState<VocabularyPlacementScreen> createState() =>
@@ -62,13 +64,15 @@ class _VocabularyPlacementScreenState
     try {
       await ref
           .read(vocabularyPlacementProvider.notifier)
-          .saveEstimate(estimate);
+          .saveEstimate(estimate, requireRecommendations: !widget.forJourney);
       if (mounted) setState(() => _estimate = estimate);
     } catch (_) {
       if (mounted) {
         ScaffoldMessenger.of(
           context,
-        ).showSnackBar(const SnackBar(content: Text('推荐词库加载失败，请检查网络后重试。')));
+        ).showSnackBar(SnackBar(content: Text(widget.forJourney
+            ? '测试结果保存失败，请重试。'
+            : '推荐词库加载失败，请检查网络后重试。')));
       }
     } finally {
       if (mounted) setState(() => _saving = false);
@@ -88,10 +92,11 @@ class _VocabularyPlacementScreenState
     appBar: AppBar(
       title: const Text('英语词汇量测试'),
       actions: <Widget>[
-        TextButton(
-          onPressed: _saving ? null : _leave,
-          child: const Text('稍后测试'),
-        ),
+        if (!widget.forJourney)
+          TextButton(
+            onPressed: _saving ? null : _leave,
+            child: const Text('稍后测试'),
+          ),
       ],
     ),
     body: Center(
@@ -136,16 +141,18 @@ class _VocabularyPlacementScreenState
                           onPressed: _saving
                               ? null
                               : _estimate != null
-                              ? () => context.go(
-                                  '${SGRoute.home.route}?focus=vocab',
-                                )
+                              ? widget.forJourney
+                                  ? _leave
+                                  : () => context.go(
+                                      '${SGRoute.home.route}?focus=vocab',
+                                    )
                               : () => _save(estimate),
                           child: Text(
                             _saving
-                                ? '正在加载推荐词'
+                                ? (widget.forJourney ? '正在保存结果' : '正在加载推荐词')
                                 : _estimate == null
-                                ? '保存结果并生成推荐词库'
-                                : '前往背单词',
+                                ? (widget.forJourney ? '保存测试结果' : '保存结果并生成推荐词库')
+                                : (widget.forJourney ? '继续英语之旅' : '前往背单词'),
                           ),
                         ),
                       ],

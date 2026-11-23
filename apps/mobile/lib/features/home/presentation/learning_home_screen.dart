@@ -8,15 +8,13 @@ import '../../authentication/presentation/auth_session.dart';
 import '../../daily_path/presentation/today_path_card.dart';
 import '../../digital_human/presentation/digital_human_picker.dart';
 import '../../exam/domain/exam_profile.dart';
-import '../../exam/presentation/exam_profile_provider.dart';
 import '../../import_course/data/bilibili_cover_refresh.dart';
 import '../../library/presentation/library_catalog_provider.dart';
 import '../../library/presentation/library_mock_data.dart';
 import '../../membership/presentation/welcome_pro_claim_host.dart';
 import '../../navigation/presentation/navigation_destination.dart';
-import '../../onboarding/domain/learning_tracks.dart';
-import '../../onboarding/presentation/focus_recommendation.dart';
 import '../../onboarding/presentation/onboarding_provider.dart';
+import '../../onboarding/presentation/focus_recommendation.dart';
 import '../../player/presentation/learning_resume_provider.dart';
 import '../../reading/domain/reading_doc.dart';
 import '../../reading/presentation/reading_library_provider.dart';
@@ -29,6 +27,7 @@ import '../../words/presentation/estimated_vocabulary_provider.dart';
 import '../../words/presentation/learner_level_provider.dart';
 import '../../words/presentation/vocabulary_placement_provider.dart';
 import 'learning_dashboard_provider.dart';
+import 'widgets/today_activity_card.dart';
 import 'pad_home_screen.dart' show DailyRecommendSection, RecentCourses;
 import 'product_feedback_sheet.dart';
 import 'widgets/continue_learning_poster.dart';
@@ -116,7 +115,6 @@ class _LearningHomeScreenState extends ConsumerState<LearningHomeScreen> {
   @override
   Widget build(BuildContext context) {
     ref.watch(cloudCatalogSyncProvider);
-    final ExamProfile examProfile = ref.watch(examProfileProvider);
     ref.watch(bilibiliCoverRefreshProvider);
     final ContinueLearningTarget? video = ref.watch(
       continueLearningTargetProvider,
@@ -137,7 +135,6 @@ class _LearningHomeScreenState extends ConsumerState<LearningHomeScreen> {
       }
       return studied.take(8).toList(growable: false);
     }();
-    final FocusRecommendation? focusRec = ref.watch(focusRecommendationProvider);
     final AcquirePreferencesDto prefs = ref.watch(learningPreferencesProvider);
     final int? vocabulary = ref.watch(estimatedVocabularyProvider);
     final int? placementEstimate = ref.watch(
@@ -161,7 +158,6 @@ class _LearningHomeScreenState extends ConsumerState<LearningHomeScreen> {
       }
       return '测词汇量定水平';
     }();
-    final Set<String> tracks = selectedLearningTracks(prefs.tags);
     final readingLibrary = ref.watch(readingLibraryProvider);
     final FocusRecommendation reading = buildFocusRecommendation(
       profile: ref.watch(onboardingProvider).copyWith(focusId: 'reading'),
@@ -219,7 +215,6 @@ class _LearningHomeScreenState extends ConsumerState<LearningHomeScreen> {
           ),
         ];
 
-    final double videoProgress = (video?.episode.progressPercent ?? 0) / 100;
 
     return WelcomeProClaimHost(
       child: PadScaffold(
@@ -317,277 +312,16 @@ class _LearningHomeScreenState extends ConsumerState<LearningHomeScreen> {
                       ),
                     ),
                     const SizedBox(height: 24),
-                    text('计划适合你', 17, bold: true),
-                    const SizedBox(height: 6),
-                    text(
-                      '勾选每日路径：视频 / 词书收藏 / 阅读，可多选。系统按统一 FSRS 复习，'
-                      '新学按 i+1 推荐。',
-                      12,
-                      color: muted,
-                    ),
-                    const SizedBox(height: 10),
-                    Wrap(
-                      spacing: 8,
-                      runSpacing: 8,
-                      children: <Widget>[
-                        for (final ({String id, String label, String hint})
-                            track in kLearningTracks)
-                          FilterChip(
-                            label: Text(track.label),
-                            selected: tracks.contains(track.id),
-                            onSelected: (bool on) {
-                              final Set<String> next =
-                                  Set<String>.from(tracks);
-                              if (on) {
-                                next.add(track.id);
-                              } else {
-                                next.remove(track.id);
-                              }
-                              if (next.isEmpty) {
-                                next.add(track.id);
-                              }
-                              unawaited(
-                                ref
-                                    .read(learningPreferencesProvider.notifier)
-                                    .save(
-                                      prefs.copyWith(
-                                        tags: prefsTagsWithTracks(
-                                          keepTags: prefs.tags,
-                                          tracks: next,
-                                        ),
-                                      ),
-                                    ),
-                              );
-                            },
-                          ),
-                      ],
-                    ),
-                    const SizedBox(height: 12),
+                    const TodayActivityCard(),
+                    const SizedBox(height: 8),
                     KeyedSubtree(
                       key: _vocabKey,
-                      child: const TodayPathCard(),
+                      child: const ExpansionTile(
+                        title: Text('课程进度与复习'),
+                        children: <Widget>[TodayPathCard()],
+                      ),
                     ),
                     const SizedBox(height: 24),
-                    if (examProfile.hasExamTarget) ...<Widget>[
-                      text(
-                        '考试目标 · ${examProfile.family!.label}',
-                        17,
-                        bold: true,
-                      ),
-                      const SizedBox(height: 12),
-                      section(
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: <Widget>[
-                            text(
-                              examProfile.targetScore == null ||
-                                      examProfile.targetScore!.isEmpty
-                                  ? '目标 CEFR ${examProfile.resolvedCefr}'
-                                  : '目标 ${examProfile.targetScore}',
-                              17,
-                              bold: true,
-                            ),
-                            const SizedBox(height: 6),
-                            text(
-                              '专项训练 · 模考 · 错题回流复习 · 社区真题资料',
-                              12,
-                              color: muted,
-                            ),
-                            const SizedBox(height: 14),
-                            Row(
-                              children: <Widget>[
-                                Expanded(
-                                  child: FilledButton(
-                                    style: FilledButton.styleFrom(
-                                      backgroundColor: accent,
-                                      foregroundColor: dark
-                                          ? const Color(0xFF203A27)
-                                          : Colors.white,
-                                    ),
-                                    onPressed: () => context.push('/exam'),
-                                    child: const Text('打开考试备考'),
-                                  ),
-                                ),
-                                const SizedBox(width: 10),
-                                OutlinedButton(
-                                  onPressed: () =>
-                                      context.push('/exam/practice'),
-                                  child: const Text('专项'),
-                                ),
-                              ],
-                            ),
-                            Align(
-                              alignment: Alignment.centerRight,
-                              child: TextButton(
-                                onPressed: () =>
-                                    context.push('/exam/select'),
-                                child: const Text('更换考试目标'),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(height: 20),
-                    ] else if (focusRec != null) ...<Widget>[
-                      text('今日优先 · ${focusRec.focus.label}', 17, bold: true),
-                      const SizedBox(height: 12),
-                      section(
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: <Widget>[
-                            text(focusRec.title, 17, bold: true),
-                            const SizedBox(height: 6),
-                            text(focusRec.subtitle, 12, color: muted),
-                            const SizedBox(height: 14),
-                            FilledButton(
-                              style: FilledButton.styleFrom(
-                                backgroundColor: accent,
-                                foregroundColor: dark
-                                    ? const Color(0xFF203A27)
-                                    : Colors.white,
-                              ),
-                              onPressed: () =>
-                                  context.push(focusRec.route),
-                              child: Text(focusRec.startLabel),
-                            ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(height: 20),
-                    ],
-                    text('继续学习', 17, bold: true),
-                    const SizedBox(height: 12),
-                    section(
-                      Column(
-                        children: <Widget>[
-                          Row(
-                            children: <Widget>[
-                              SizedBox(
-                                width: 112,
-                                height: 84,
-                                child: video == null
-                                    ? Container(
-                                        decoration: BoxDecoration(
-                                          color: dark
-                                              ? const Color(0xFF333333)
-                                              : const Color(0xFFEEEEEE),
-                                          borderRadius: BorderRadius.circular(
-                                            13,
-                                          ),
-                                        ),
-                                        child: Icon(
-                                          Icons.play_circle_outline,
-                                          size: 36,
-                                          color: accent,
-                                        ),
-                                      )
-                                    : ContinueLearningPoster(
-                                        target: video,
-                                        borderRadius: BorderRadius.circular(13),
-                                      ),
-                              ),
-                              const SizedBox(width: 16),
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: <Widget>[
-                                    text('视频学习', 11, color: muted),
-                                    const SizedBox(height: 5),
-                                    text(
-                                      video == null
-                                          ? '挑一部视频开始'
-                                          : libraryCourseDisplayTitle(
-                                              video.course,
-                                              focusEpisode: video.episode,
-                                            ),
-                                      17,
-                                      bold: true,
-                                    ),
-                                    const SizedBox(height: 5),
-                                    text(
-                                      video == null
-                                          ? '从视频库继续精听'
-                                          : '已完成 ${(videoProgress * 100).round()}%',
-                                      11,
-                                      color: muted,
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 16),
-                          Row(
-                            children: <Widget>[
-                              Expanded(
-                                child: LinearProgressIndicator(
-                                  value: video == null
-                                      ? 0
-                                      : videoProgress.clamp(0, 1),
-                                  color: accent,
-                                  backgroundColor: dark
-                                      ? const Color(0xFF444444)
-                                      : const Color(0xFFE5E5E5),
-                                  borderRadius: BorderRadius.circular(4),
-                                ),
-                              ),
-                              const SizedBox(width: 20),
-                              FilledButton.icon(
-                                style: FilledButton.styleFrom(
-                                  backgroundColor: accent,
-                                  foregroundColor: dark
-                                      ? const Color(0xFF203A27)
-                                      : Colors.white,
-                                ),
-                                onPressed: () {
-                                  if (video != null) {
-                                    context.pushNamed(
-                                      'player',
-                                      pathParameters: <String, String>{
-                                        'episodeId': video.episode.id,
-                                      },
-                                      queryParameters: const <String, String>{
-                                        'autoplay': '1',
-                                      },
-                                    );
-                                  } else {
-                                    context.go('/library');
-                                  }
-                                },
-                                icon: Icon(
-                                  video != null
-                                      ? Icons.play_arrow
-                                      : Icons.video_library_outlined,
-                                  size: 18,
-                                ),
-                                label: Text(
-                                  video != null ? '继续播放' : '去视频库',
-                                ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 12),
-                          Align(
-                            alignment: Alignment.centerLeft,
-                            child: TextButton.icon(
-                              onPressed: () =>
-                                  context.go('/library?tab=drama'),
-                              icon: Icon(
-                                Icons.live_tv_outlined,
-                                color: accent,
-                                size: 18,
-                              ),
-                              label: text(
-                                '美剧 · 在视频库「美剧」Tab',
-                                13,
-                                color: accent,
-                                bold: true,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
                     const SizedBox(height: 20),
                     Row(
                       children: <Widget>[
@@ -754,32 +488,7 @@ class _LearningHomeScreenState extends ConsumerState<LearningHomeScreen> {
                         ),
                       ),
                     ),
-                    const SizedBox(height: 14),
-                    InkWell(
-                      onTap: () => context.push('/ear-grind'),
-                      child: section(
-                        Row(
-                          children: <Widget>[
-                            Icon(Icons.headphones, size: 28, color: accent),
-                            const SizedBox(width: 14),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: <Widget>[
-                                  text('磨耳朵', 16, bold: true),
-                                  text(
-                                    '导入音视频 · 息屏续播 · 循环',
-                                    11,
-                                    color: muted,
-                                  ),
-                                ],
-                              ),
-                            ),
-                            Icon(Icons.play_circle_outline, color: accent),
-                          ],
-                        ),
-                      ),
-                    ),
+
                   ],
                 ),
               ),

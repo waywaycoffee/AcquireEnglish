@@ -104,13 +104,14 @@ FocusRecommendation buildFocusRecommendation({
   required List<LibraryCourseData> courses,
   required List<ReadingDoc> readingDocs,
   required SyllabusBook? activeBook,
+  String? levelOverride,
 }) {
   final LearningFocus focus =
       focusById(profile.focusId ?? focusIdFromTags(prefs.tags) ?? '') ??
       kLearningFocuses.first;
-  final String level = profile.abilityId == null
+  final String level = levelOverride ?? (profile.abilityId == null
       ? prefs.level
-      : profile.resolvedLevel;
+      : profile.resolvedLevel);
   final List<String> interests = profile.interestIds.isNotEmpty
       ? profile.interestIds
       : prefs.tags;

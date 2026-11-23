@@ -527,7 +527,9 @@ GoRouter goRouter(Ref ref) {
     GoRoute(
       path: SGRoute.vocabularyPlacement.route,
       builder: (BuildContext context, GoRouterState state) =>
-          const VocabularyPlacementScreen(),
+          VocabularyPlacementScreen(
+            forJourney: state.uri.queryParameters['journey'] == '1',
+          ),
     ).fade(),
     GoRoute(
       path: SGRoute.reviewSession.route,
@@ -715,6 +717,7 @@ GoRouter goRouter(Ref ref) {
           currentDestination: AppNavDestination.oralCoach,
           showContinueLearning: false,
           body: DigitalHumanCoachScreen(
+            openSceneMenu: state.uri.queryParameters['sceneMenu'] == '1',
             initialScenarioId: (scenario == null || scenario.isEmpty)
                 ? null
                 : scenario,

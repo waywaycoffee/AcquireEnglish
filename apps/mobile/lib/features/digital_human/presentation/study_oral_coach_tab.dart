@@ -182,6 +182,7 @@ class StudyOralCoachTab extends ConsumerStatefulWidget {
     this.initialScenarioId,
     this.standalone = false,
     this.guidedLesson = false,
+    this.openSceneMenu = false,
     this.onConfirmedLearnerTurn,
     super.key,
   });
@@ -202,6 +203,7 @@ class StudyOralCoachTab extends ConsumerStatefulWidget {
   /// Opened outside the video player (module entry).
   final bool standalone;
   final bool guidedLesson;
+  final bool openSceneMenu;
   final ValueChanged<String>? onConfirmedLearnerTurn;
 
   @override
@@ -420,6 +422,7 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
       await _maybeShowColdStartQuest();
     }
     if (mounted) await _restoreHistoryAndStart();
+    if (mounted && widget.openSceneMenu) await _openSceneCapture();
   }
 
   Future<void> _maybeShowColdStartQuest() async {
