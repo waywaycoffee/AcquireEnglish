@@ -14,6 +14,7 @@ import '../player/presentation/manual_subtitle_guard.dart';
 import '../player/presentation/player_mock_state.dart';
 import '../player/presentation/subtitle_file_persist.dart';
 import '../player/presentation/subtitle_sentence_merge.dart';
+import 'cloud_subtitle_job_tracker.dart';
 import 'retranslate_episode_chinese.dart';
 import 'spoken_language.dart';
 import 'subtitle_completion_enqueue.dart';
@@ -310,10 +311,32 @@ Future<bool> resetEpisodeEnglishSubtitles({
   SubtitleCompletionQueue? queue,
   AsrSubtitleCache cache = const AsrSubtitleCache(),
   List<PlayerSubtitleLine>? fallbackChineseLines,
+  bool allowWhileBusy = false,
 }) async {
   final String episodeId = episode.id.trim();
   if (episodeId.isEmpty) {
     return false;
+  }
+  if (!allowWhileBusy) {
+    final SubtitleCompletionJob? active = await (queue ??
+            SubtitleCompletionQueue.shared)
+        .loadJobs()
+        .then(
+          (List<SubtitleCompletionJob> jobs) => jobs
+              .where(
+                (SubtitleCompletionJob j) =>
+                    j.episodeId == episodeId &&
+                    (j.status == SubtitleCompletionStatus.pending ||
+                        j.status == SubtitleCompletionStatus.running) &&
+                    j.needEnglish,
+              )
+              .firstOrNull,
+        );
+    if (active != null ||
+        CloudSubtitleJobTracker.instance.forEpisode(episodeId) != null) {
+      // Generation already in flight — do not wipe / restart.
+      return false;
+    }
   }
   final String? videoPath = episode.videoAsset?.trim();
   if (!isUsableLocalVideoPath(videoPath)) {

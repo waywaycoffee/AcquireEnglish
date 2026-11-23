@@ -410,8 +410,10 @@ bool bilibiliHardsubShouldIgnoreOfficialChinese({
 bool bilibiliMediaKeysAligned(String? a, String? b) {
   final String left = (a ?? '').trim();
   final String right = (b ?? '').trim();
+  // Empty keys cannot prove alignment — treating them as a match used to
+  // keep 合集串台 softsubs when one side lacked a BV fingerprint.
   if (left.isEmpty || right.isEmpty) {
-    return true;
+    return false;
   }
   final String aa = left.toUpperCase();
   final String bb = right.toUpperCase();

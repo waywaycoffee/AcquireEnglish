@@ -110,10 +110,10 @@ abstract final class SubtitleSourcePolicy {
     );
   }
 
-  /// After softsubs/ASR cues are loaded — decide fill needs only.
+  /// After softsubs/ASR cues are loaded — decide fill / drop.
   ///
-  /// Never auto-drop softsubs (duration mismatch, ZH-only, etc.). Wrong CC is
-  /// fixed by the user via「重新生成 / 重置字幕」, not by wiping on open.
+  /// Duration mismatch = classic 合集串台 (wrong episode's SRT under this BV).
+  /// Drop those automatically; do not ask the user to「清空/重新识别」.
   static SubtitleSourceDecision refineLoaded({
     required SubtitleSourceDecision base,
     required bool hasReliableEnglish,
@@ -121,7 +121,16 @@ abstract final class SubtitleSourcePolicy {
     required bool durationMismatch,
     required bool usingAsrSentences,
   }) {
-    // durationMismatch kept in the signature for callers; never triggers a wipe.
+    if (durationMismatch && !usingAsrSentences) {
+      return base.copyWith(
+        useOfficialEnglish: false,
+        forceAsr: true,
+        ignoreOfficialChinese: true,
+        ignoreAllOfficialSoftsubs: true,
+        dropLoadedSoftsubs: true,
+        reason: '字幕时长与视频不符（疑似串台），已丢弃并改走语音补全',
+      );
+    }
     if (hasReliableEnglish || usingAsrSentences) {
       return base.copyWith(
         useOfficialEnglish: hasReliableEnglish,
@@ -142,7 +151,7 @@ abstract final class SubtitleSourcePolicy {
         ignoreOfficialChinese: false,
         ignoreAllOfficialSoftsubs: false,
         dropLoadedSoftsubs: false,
-        reason: '仅有中文软字幕，英语走语音识别补全（不丢弃现有字幕）',
+        reason: '仅有中文软字幕，英语走语音识别补全（保留中文）',
       );
     }
 
@@ -151,9 +160,7 @@ abstract final class SubtitleSourcePolicy {
       forceAsr: true,
       ignoreAllOfficialSoftsubs: false,
       dropLoadedSoftsubs: false,
-      reason: durationMismatch
-          ? '字幕时长可能不准，仍保留；缺英文则语音补全（可手动重新生成）'
-          : '无可靠英文字幕，使用语音识别补全（不丢弃现有字幕）',
+      reason: '无可靠英文字幕，使用语音识别补全',
     );
   }
 

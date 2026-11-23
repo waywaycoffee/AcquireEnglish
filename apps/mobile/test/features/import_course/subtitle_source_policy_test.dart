@@ -59,7 +59,7 @@ void main() {
       );
     });
 
-    test('refineLoaded never drops duration-mismatched softsubs', () {
+    test('refineLoaded drops duration-mismatched 串台 softsubs', () {
       final SubtitleSourceDecision base = SubtitleSourcePolicy.decideEpisode(
         title: 'plain lecture',
       );
@@ -70,9 +70,10 @@ void main() {
         durationMismatch: true,
         usingAsrSentences: false,
       );
-      expect(refined.dropLoadedSoftsubs, isFalse);
-      expect(refined.forceAsr, isFalse);
-      expect(refined.useOfficialEnglish, isTrue);
+      expect(refined.dropLoadedSoftsubs, isTrue);
+      expect(refined.forceAsr, isTrue);
+      expect(refined.useOfficialEnglish, isFalse);
+      expect(refined.reason, contains('串台'));
     });
 
     test('refineLoaded keeps good hardsub ASR', () {
