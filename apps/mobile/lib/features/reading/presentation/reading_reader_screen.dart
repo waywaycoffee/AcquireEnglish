@@ -1626,7 +1626,7 @@ class _ReadingReaderScreenState extends ConsumerState<ReadingReaderScreen> {
                   unawaited(showReadingVocabListsSheet(context, ref));
                 case 'font':
                   setState(() {
-                    _fontSize = _fontSize >= 24 ? 18 : _fontSize + 2;
+                    _fontSize = _fontSize >= 28 ? 18 : _fontSize + 2;
                   });
                 case 'theme':
                   setState(() => _dark = !_dark);
