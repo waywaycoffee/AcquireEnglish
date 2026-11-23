@@ -3380,7 +3380,7 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
           )
         : null;
 
-    final Widget stage = widget.standalone
+    final Widget avatarStage = widget.standalone
         ? Padding(
             padding: const EdgeInsets.fromLTRB(10, 10, 10, 0),
             child: OralCallStage(
@@ -3448,16 +3448,6 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
                   ),
                 ),
               ),
-              if (widget.articleExcerpt.trim().isNotEmpty)
-                Positioned(
-                  right: 12,
-                  bottom: 28,
-                  child: ActionChip(
-                    avatar: Icon(_podcastPlaying ? Icons.pause : Icons.headphones),
-                    label: Text(_podcastPlaying ? '暂停播客' : '文章播客'),
-                    onPressed: () => unawaited(_openArticlePodcast()),
-                  ),
-                ),
               Positioned(
                 left: 12,
                 top: 12,
@@ -3544,6 +3534,24 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
                     ),
                   ),
                 ),
+            ],
+          );
+
+    final Widget stage = widget.articleExcerpt.trim().isEmpty
+        ? avatarStage
+        : Stack(
+            fit: StackFit.expand,
+            children: [
+              avatarStage,
+              Positioned(
+                right: 18,
+                top: 16,
+                child: ActionChip(
+                  avatar: Icon(_podcastPlaying ? Icons.pause : Icons.headphones),
+                  label: Text(_podcastPlaying ? '暂停播客' : '文章播客'),
+                  onPressed: () => unawaited(_openArticlePodcast()),
+                ),
+              ),
             ],
           );
 
