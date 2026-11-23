@@ -120,6 +120,36 @@ class _ReadingReaderScreenState extends ConsumerState<ReadingReaderScreen> {
     });
   }
 
+  Future<void> _chooseFontSize() async {
+    final double? size = await showModalBottomSheet<double>(
+      context: context,
+      builder: (BuildContext sheetContext) => SafeArea(
+        minimum: const EdgeInsets.all(20),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: <Widget>[
+            Text('阅读字号', style: Theme.of(sheetContext).textTheme.titleMedium),
+            const SizedBox(height: 12),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: <Widget>[
+                for (final double size in <double>[18, 20, 22, 24, 26, 28])
+                  ChoiceChip(
+                    label: Text(size.toInt().toString()),
+                    selected: _fontSize == size,
+                    onSelected: (_) => Navigator.of(sheetContext).pop(size),
+                  ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+    if (size != null && mounted) setState(() => _fontSize = size);
+  }
+
   void _ensurePages(ReadingDoc doc) {
     if (_pagedDocId == doc.id && _pages.isNotEmpty) return;
     _pagedDocId = doc.id;
@@ -1559,6 +1589,11 @@ class _ReadingReaderScreenState extends ConsumerState<ReadingReaderScreen> {
         leading: PadBackButton(onPressed: () => context.pop()),
         actions: <Widget>[
           IconButton(
+            tooltip: '阅读字号（当前 ${_fontSize.toInt()}）',
+            onPressed: _chooseFontSize,
+            icon: const Icon(Icons.format_size_rounded),
+          ),
+          IconButton(
             tooltip: '选择朗读音色（当前：${_ttsGender.labelCn}）',
             onPressed: () => unawaited(_toggleTtsGender()),
             icon: Icon(
@@ -1624,10 +1659,6 @@ class _ReadingReaderScreenState extends ConsumerState<ReadingReaderScreen> {
                   }
                 case 'lists':
                   unawaited(showReadingVocabListsSheet(context, ref));
-                case 'font':
-                  setState(() {
-                    _fontSize = _fontSize >= 28 ? 18 : _fontSize + 2;
-                  });
                 case 'theme':
                   setState(() => _dark = !_dark);
                 case 'episode':
@@ -1687,7 +1718,6 @@ class _ReadingReaderScreenState extends ConsumerState<ReadingReaderScreen> {
                   enabled: !_playingRemote,
                   child: Text(_playingRemote ? '朗读中…' : '服务器朗读'),
                 ),
-              const PopupMenuItem<String>(value: 'font', child: Text('字号')),
               PopupMenuItem<String>(
                 value: 'theme',
                 child: Text(_dark ? '浅色' : '深色'),
