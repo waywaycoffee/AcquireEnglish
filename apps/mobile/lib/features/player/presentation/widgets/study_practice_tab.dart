@@ -3,6 +3,7 @@ import 'dart:math';
 import 'package:flutter/material.dart';
 
 import '../player_mock_state.dart';
+import 'study_plan_bar.dart';
 import 'study_shell_tokens.dart';
 
 /// Practice: cloze blanks + multiple choice, with check + sentence audio nav.
@@ -14,6 +15,10 @@ class StudyPracticeTab extends StatefulWidget {
     this.onReplayLine,
     this.onGoToLine,
     this.questionCount = 6,
+    this.planCurrent,
+    this.planCompleted,
+    this.planStrict = false,
+    this.onPlanSelect,
     super.key,
   });
 
@@ -23,6 +28,12 @@ class StudyPracticeTab extends StatefulWidget {
   final VoidCallback? onReplayLine;
   final ValueChanged<int>? onGoToLine;
   final int questionCount;
+
+  /// Guided plan steps (看懂/精读/输出/复习); shown only inside this tab.
+  final StudyPlanStep? planCurrent;
+  final Set<StudyPlanStep>? planCompleted;
+  final bool planStrict;
+  final ValueChanged<StudyPlanStep>? onPlanSelect;
 
   @override
   State<StudyPracticeTab> createState() => _StudyPracticeTabState();
@@ -252,23 +263,52 @@ class _StudyPracticeTabState extends State<StudyPracticeTab> {
     widget.onGoToLine?.call(_session[next].lineIndex);
   }
 
+  Widget? _planBar() {
+    if (widget.planCurrent == null ||
+        widget.planCompleted == null ||
+        widget.onPlanSelect == null) {
+      return null;
+    }
+    return StudyPlanBar(
+      current: widget.planCurrent!,
+      completed: widget.planCompleted!,
+      strict: widget.planStrict,
+      onSelect: widget.onPlanSelect!,
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final StudyShellColors shell = StudyShellColors.of(context);
+    final Widget? planBar = _planBar();
     if (widget.lines.isEmpty || _session.isEmpty) {
-      return Center(
-        child: Text(
-          '暂无练习题。加载字幕后可自动出挖空/选择题。',
-          textAlign: TextAlign.center,
-          style: TextStyle(color: shell.textSecondary),
-        ),
+      return ListView(
+        padding: const EdgeInsets.fromLTRB(12, 8, 12, 24),
+        children: <Widget>[
+          if (planBar != null) ...<Widget>[
+            planBar,
+            const SizedBox(height: 12),
+          ],
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 48),
+            child: Text(
+              '暂无练习题。加载字幕后可自动出挖空/选择题。',
+              textAlign: TextAlign.center,
+              style: TextStyle(color: shell.textSecondary),
+            ),
+          ),
+        ],
       );
     }
 
     final _PracticeItem item = _item;
     return ListView(
-      padding: const EdgeInsets.fromLTRB(12, 12, 12, 24),
+      padding: const EdgeInsets.fromLTRB(12, 8, 12, 24),
       children: <Widget>[
+        if (planBar != null) ...<Widget>[
+          planBar,
+          const SizedBox(height: 12),
+        ],
         Text(
           '${item.kind == _PracticeKind.mcq ? '选择题' : '挖空'} · ${_index + 1}/${_session.length}',
           style: TextStyle(

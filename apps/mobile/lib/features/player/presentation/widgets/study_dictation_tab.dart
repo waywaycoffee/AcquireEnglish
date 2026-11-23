@@ -25,6 +25,7 @@ class StudyDictationTab extends StatefulWidget {
     this.hardsubMosaicEnabled = false,
     this.onToggleHardsubMosaic,
     this.onDictationResult,
+    this.onEpisodeTest,
     super.key,
   });
 
@@ -47,6 +48,9 @@ class StudyDictationTab extends StatefulWidget {
 
   /// Fired after submit with word-level diff (for FSRS / word-book enqueue).
   final void Function(DictationDiffResult result)? onDictationResult;
+
+  /// Episode-level output check: sample subtitle lines into the dictation queue.
+  final VoidCallback? onEpisodeTest;
 
   @override
   State<StudyDictationTab> createState() => _StudyDictationTabState();
@@ -137,6 +141,16 @@ class _StudyDictationTabState extends State<StudyDictationTab> {
     return ListView(
       padding: const EdgeInsets.fromLTRB(8, 8, 8, 24),
       children: <Widget>[
+        if (widget.onEpisodeTest != null)
+          Align(
+            alignment: Alignment.centerRight,
+            child: TextButton.icon(
+              key: const ValueKey<String>('dictation-episode-test'),
+              onPressed: widget.onEpisodeTest,
+              icon: const Icon(Icons.quiz_outlined, size: 16),
+              label: const Text('本集测试'),
+            ),
+          ),
         if (widget.onToggleHardsubMosaic != null) ...<Widget>[
           SwitchListTile(
             key: const ValueKey<String>('dictation-hardsub-mosaic'),

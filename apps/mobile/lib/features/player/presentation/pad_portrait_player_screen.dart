@@ -3287,46 +3287,6 @@ Future<void> _settleChineseFillIfAlreadyPresent() async {
                       ),
                     if (!bingeMode) ...<Widget>[
                       SizedBox(height: compactPlayer ? 4 : 8),
-                      StudyPlanBar(
-                        current: _studyPlanStep,
-                        completed: _studyPlanDone,
-                        strict: widget.dramaPlan,
-                        onSelect: (StudyPlanStep step) {
-                          setState(() {
-                            _studyPlanStep = step;
-                            switch (step) {
-                              case StudyPlanStep.watch:
-                              case StudyPlanStep.intensive:
-                                _studyTab = StudyModeTab.subtitles;
-                                break;
-                              case StudyPlanStep.output:
-                                _studyTab = StudyModeTab.dictation;
-                                _hardsubMosaicEnabled = true;
-                                break;
-                              case StudyPlanStep.review:
-                                _studyTab = StudyModeTab.wordCards;
-                                break;
-                            }
-                          });
-                          if (step == StudyPlanStep.watch) {
-                            unawaited(_markEpisodeWatched());
-                            _studyPlanDone.add(StudyPlanStep.watch);
-                          }
-                        },
-                      ),
-                      Padding(
-                        padding: const EdgeInsets.fromLTRB(16, 0, 16, 0),
-                        child: Align(
-                          alignment: Alignment.centerRight,
-                          child: TextButton.icon(
-                            onPressed: state.hasLines
-                                ? () => unawaited(_startEpisodeOutputTest())
-                                : null,
-                            icon: const Icon(Icons.quiz_outlined, size: 16),
-                            label: const Text('本集测试'),
-                          ),
-                        ),
-                      ),
                       StudyModeTabs(
                         value: _studyTab,
                         onChanged: (StudyModeTab tab) {
@@ -3810,6 +3770,9 @@ Future<void> _settleChineseFillIfAlreadyPresent() async {
           onDictationResult: (DictationDiffResult result) {
             _handleDictationResult(result, courseContext, dictationLine);
           },
+          onEpisodeTest: state.hasLines
+              ? () => unawaited(_startEpisodeOutputTest())
+              : null,
         );
       case StudyModeTab.practice:
         return StudyPracticeTab(
@@ -3820,6 +3783,31 @@ Future<void> _settleChineseFillIfAlreadyPresent() async {
           },
           onGoToLine: _goToLine,
           onReplayLine: _handleReplayLine,
+          planCurrent: _studyPlanStep,
+          planCompleted: _studyPlanDone,
+          planStrict: widget.dramaPlan,
+          onPlanSelect: (StudyPlanStep step) {
+            setState(() {
+              _studyPlanStep = step;
+              switch (step) {
+                case StudyPlanStep.watch:
+                case StudyPlanStep.intensive:
+                  _studyTab = StudyModeTab.subtitles;
+                  break;
+                case StudyPlanStep.output:
+                  _studyTab = StudyModeTab.dictation;
+                  _hardsubMosaicEnabled = true;
+                  break;
+                case StudyPlanStep.review:
+                  _studyTab = StudyModeTab.wordCards;
+                  break;
+              }
+            });
+            if (step == StudyPlanStep.watch) {
+              unawaited(_markEpisodeWatched());
+              _studyPlanDone.add(StudyPlanStep.watch);
+            }
+          },
         );
       case StudyModeTab.wordCards:
         final int learnThreshold =
