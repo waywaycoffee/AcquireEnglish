@@ -1,0 +1,1864 @@
+{
+  "version": "2.25",
+  "children": [
+    {
+      "type": "frame",
+      "id": "S2TkBw",
+      "x": 0,
+      "y": 0,
+      "name": "CD Ball / Idle",
+      "reusable": true,
+      "clip": true,
+      "width": 72,
+      "height": 72,
+      "fill": "$surfaceRaised",
+      "cornerRadius": 9999,
+      "stroke": "$border",
+      "strokeWidth": 1,
+      "effect": {
+        "type": "shadow",
+        "shadowType": "outer",
+        "color": "#00000066",
+        "offset": {
+          "x": 0,
+          "y": 8
+        },
+        "blur": 18
+      },
+      "layout": "none",
+      "children": [
+        {
+          "type": "frame",
+          "id": "bXpwI",
+          "x": 8,
+          "y": 8,
+          "name": "Disc",
+          "width": 56,
+          "height": 56,
+          "fill": {
+            "type": "gradient",
+            "gradientType": "angular",
+            "enabled": true,
+            "rotation": 0,
+            "size": {
+              "width": 1,
+              "height": 1
+            },
+            "colors": [
+              {
+                "color": "#5B6578",
+                "position": 0
+              },
+              {
+                "color": "#9AA3B5",
+                "position": 0.22
+              },
+              {
+                "color": "#3A4150",
+                "position": 0.45
+              },
+              {
+                "color": "#C8D0DE",
+                "position": 0.68
+              },
+              {
+                "color": "#4A5366",
+                "position": 1
+              }
+            ]
+          },
+          "cornerRadius": 9999,
+          "layout": "none",
+          "children": [
+            {
+              "type": "ellipse",
+              "id": "Ebc93",
+              "x": 6,
+              "y": 6,
+              "name": "Groove Ring",
+              "fill": "#00000000",
+              "width": 44,
+              "height": 44,
+              "stroke": "#FFFFFF22",
+              "strokeWidth": 1
+            },
+            {
+              "type": "ellipse",
+              "id": "rCvGZ",
+              "x": 16,
+              "y": 16,
+              "name": "Label Ring",
+              "fill": "$brandSoft",
+              "width": 24,
+              "height": 24,
+              "stroke": "$brand",
+              "strokeWidth": 1
+            },
+            {
+              "type": "ellipse",
+              "id": "ydNFz",
+              "x": 23,
+              "y": 23,
+              "name": "Spindle Hole",
+              "fill": "$discHole",
+              "width": 10,
+              "height": 10
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "frame",
+      "id": "ljofG",
+      "x": 120,
+      "y": 0,
+      "name": "CD Ball / Playing",
+      "reusable": true,
+      "clip": true,
+      "width": 72,
+      "height": 72,
+      "fill": "$surfaceRaised",
+      "cornerRadius": 9999,
+      "stroke": "$brand",
+      "strokeWidth": 2,
+      "effect": [
+        {
+          "type": "shadow",
+          "shadowType": "outer",
+          "color": "#6BCB2A33",
+          "blur": 16
+        },
+        {
+          "type": "shadow",
+          "shadowType": "outer",
+          "color": "#00000066",
+          "offset": {
+            "x": 0,
+            "y": 8
+          },
+          "blur": 18
+        }
+      ],
+      "layout": "none",
+      "children": [
+        {
+          "type": "frame",
+          "id": "c8ZcYm",
+          "x": 8,
+          "y": 8,
+          "name": "Disc Spinning",
+          "rotation": -18,
+          "width": 56,
+          "height": 56,
+          "fill": {
+            "type": "gradient",
+            "gradientType": "angular",
+            "enabled": true,
+            "rotation": 0,
+            "size": {
+              "width": 1,
+              "height": 1
+            },
+            "colors": [
+              {
+                "color": "#6BCB2A",
+                "position": 0
+              },
+              {
+                "color": "#C8D0DE",
+                "position": 0.2
+              },
+              {
+                "color": "#3A4150",
+                "position": 0.45
+              },
+              {
+                "color": "#9AA3B5",
+                "position": 0.7
+              },
+              {
+                "color": "#4A5366",
+                "position": 1
+              }
+            ]
+          },
+          "cornerRadius": 9999,
+          "layout": "none",
+          "children": [
+            {
+              "type": "ellipse",
+              "id": "RXzhm",
+              "x": 6,
+              "y": 6,
+              "name": "Groove Ring",
+              "fill": "#00000000",
+              "width": 44,
+              "height": 44,
+              "stroke": "#FFFFFF33",
+              "strokeWidth": 1
+            },
+            {
+              "type": "ellipse",
+              "id": "zvcVu",
+              "x": 16,
+              "y": 16,
+              "name": "Label Ring",
+              "fill": "$brandSoft",
+              "width": 24,
+              "height": 24,
+              "stroke": "$brand",
+              "strokeWidth": 1.5
+            },
+            {
+              "type": "ellipse",
+              "id": "bPVZZ",
+              "x": 23,
+              "y": 23,
+              "name": "Spindle Hole",
+              "fill": "$discHole",
+              "width": 10,
+              "height": 10
+            }
+          ]
+        },
+        {
+          "type": "ellipse",
+          "id": "nmzEM",
+          "x": 54,
+          "y": 6,
+          "name": "EQ Dot",
+          "fill": "$brand",
+          "width": 12,
+          "height": 12,
+          "stroke": "$bg",
+          "strokeWidth": 2
+        }
+      ]
+    },
+    {
+      "type": "frame",
+      "id": "x1Clk",
+      "x": 120,
+      "y": 100,
+      "name": "CD Ball / Paused",
+      "reusable": true,
+      "clip": true,
+      "width": 72,
+      "height": 72,
+      "fill": "$surfaceRaised",
+      "cornerRadius": 9999,
+      "stroke": "$border",
+      "strokeWidth": 1,
+      "effect": {
+        "type": "shadow",
+        "shadowType": "outer",
+        "color": "#00000066",
+        "offset": {
+          "x": 0,
+          "y": 8
+        },
+        "blur": 18
+      },
+      "layout": "none",
+      "children": [
+        {
+          "type": "frame",
+          "id": "xz5at",
+          "x": 8,
+          "y": 8,
+          "name": "Disc",
+          "width": 56,
+          "height": 56,
+          "fill": {
+            "type": "gradient",
+            "gradientType": "angular",
+            "enabled": true,
+            "rotation": 0,
+            "size": {
+              "width": 1,
+              "height": 1
+            },
+            "colors": [
+              {
+                "color": "#5B6578",
+                "position": 0
+              },
+              {
+                "color": "#9AA3B5",
+                "position": 0.22
+              },
+              {
+                "color": "#3A4150",
+                "position": 0.45
+              },
+              {
+                "color": "#C8D0DE",
+                "position": 0.68
+              },
+              {
+                "color": "#4A5366",
+                "position": 1
+              }
+            ]
+          },
+          "cornerRadius": 9999,
+          "layout": "none",
+          "children": [
+            {
+              "type": "ellipse",
+              "id": "PKH22",
+              "x": 6,
+              "y": 6,
+              "name": "Groove Ring",
+              "fill": "#00000000",
+              "width": 44,
+              "height": 44,
+              "stroke": "#FFFFFF22",
+              "strokeWidth": 1
+            },
+            {
+              "type": "ellipse",
+              "id": "NOuLP",
+              "x": 16,
+              "y": 16,
+              "name": "Label Ring",
+              "fill": "#2A303C",
+              "width": 24,
+              "height": 24,
+              "stroke": "$textMuted",
+              "strokeWidth": 1
+            },
+            {
+              "type": "ellipse",
+              "id": "uE9NA",
+              "x": 23,
+              "y": 23,
+              "name": "Spindle Hole",
+              "fill": "$discHole",
+              "width": 10,
+              "height": 10
+            }
+          ]
+        },
+        {
+          "type": "frame",
+          "id": "L1VqZW",
+          "x": 28,
+          "y": 28,
+          "name": "Pause Glyph",
+          "width": 16,
+          "height": 16,
+          "fill": "#00000055",
+          "cornerRadius": 9999,
+          "gap": 3,
+          "justifyContent": "center",
+          "alignItems": "center"
+        },
+        {
+          "type": "frame",
+          "id": "acwpg",
+          "x": 31,
+          "y": 30,
+          "name": "Pause Bars",
+          "width": 10,
+          "height": 12,
+          "gap": 3,
+          "justifyContent": "center",
+          "alignItems": "center",
+          "children": [
+            {
+              "type": "rectangle",
+              "cornerRadius": 1,
+              "id": "CC5Vr",
+              "name": "Bar L",
+              "fill": "$textPrimary",
+              "width": 3,
+              "height": 10
+            },
+            {
+              "type": "rectangle",
+              "cornerRadius": 1,
+              "id": "ulzap",
+              "name": "Bar R",
+              "fill": "$textPrimary",
+              "width": 3,
+              "height": 10
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "frame",
+      "id": "ge0Jo",
+      "x": 0,
+      "y": 236,
+      "name": "01 Video · CD磨耳朵球",
+      "clip": true,
+      "width": 390,
+      "height": 844,
+      "fill": "$bg",
+      "layout": "vertical",
+      "children": [
+        {
+          "type": "frame",
+          "id": "E77AW3",
+          "name": "Status Bar",
+          "width": "fill_container",
+          "height": 62,
+          "padding": [
+            0,
+            24
+          ],
+          "justifyContent": "space_between",
+          "alignItems": "center",
+          "children": [
+            {
+              "type": "text",
+              "id": "v7p7n",
+              "name": "Time",
+              "fill": "$textPrimary",
+              "content": "9:41",
+              "fontFamily": "$fontBody",
+              "fontSize": 15,
+              "fontWeight": "600"
+            },
+            {
+              "type": "frame",
+              "id": "rRoXQ",
+              "name": "Status Icons",
+              "gap": 6,
+              "alignItems": "center",
+              "children": [
+                {
+                  "type": "icon",
+                  "id": "rTIae",
+                  "name": "Signal",
+                  "width": 16,
+                  "height": 16,
+                  "icon": "signal",
+                  "library": "lucide",
+                  "fill": "$textPrimary"
+                },
+                {
+                  "type": "icon",
+                  "id": "vye9b",
+                  "name": "Wifi",
+                  "width": 16,
+                  "height": 16,
+                  "icon": "wifi",
+                  "library": "lucide",
+                  "fill": "$textPrimary"
+                },
+                {
+                  "type": "icon",
+                  "id": "upVGC",
+                  "name": "Battery",
+                  "width": 20,
+                  "height": 16,
+                  "icon": "battery-full",
+                  "library": "lucide",
+                  "fill": "$textPrimary"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "type": "frame",
+          "id": "rik7B",
+          "name": "Player Chrome",
+          "width": "fill_container",
+          "layout": "vertical",
+          "gap": 8,
+          "padding": [
+            8,
+            16,
+            12,
+            16
+          ],
+          "children": [
+            {
+              "type": "frame",
+              "id": "CRnmr",
+              "name": "Top Row",
+              "width": "fill_container",
+              "justifyContent": "space_between",
+              "alignItems": "center",
+              "children": [
+                {
+                  "type": "icon",
+                  "id": "ZUsTh",
+                  "name": "Back",
+                  "width": 22,
+                  "height": 22,
+                  "icon": "chevron-left",
+                  "library": "lucide",
+                  "fill": "$textPrimary"
+                },
+                {
+                  "type": "frame",
+                  "id": "Dz5a1",
+                  "name": "Title Col",
+                  "width": "fill_container",
+                  "layout": "vertical",
+                  "gap": 2,
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "e0LHE5",
+                      "name": "Kicker",
+                      "fill": "$brand",
+                      "content": "磨耳朵 · 后台播放",
+                      "fontFamily": "$fontBody",
+                      "fontSize": 11,
+                      "fontWeight": "normal"
+                    },
+                    {
+                      "type": "text",
+                      "id": "hezks",
+                      "name": "Course",
+                      "fill": "$textPrimary",
+                      "textGrowth": "fixed-width",
+                      "width": "fill_container",
+                      "content": "Friends S01E01 · The One…",
+                      "fontFamily": "$fontBody",
+                      "fontSize": 14,
+                      "fontWeight": "700"
+                    }
+                  ]
+                },
+                {
+                  "type": "icon",
+                  "id": "Rfbwo",
+                  "name": "More",
+                  "width": 20,
+                  "height": 20,
+                  "icon": "ellipsis",
+                  "library": "lucide",
+                  "fill": "$textSecondary"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "type": "frame",
+          "id": "AS4iK",
+          "name": "Video Stage",
+          "clip": true,
+          "width": "fill_container",
+          "height": 220,
+          "fill": "#050607",
+          "layout": "none",
+          "children": [
+            {
+              "type": "rectangle",
+              "id": "Ch3dX",
+              "x": 0,
+              "y": 0,
+              "name": "Poster Tint",
+              "fill": {
+                "type": "gradient",
+                "gradientType": "linear",
+                "enabled": true,
+                "rotation": 90,
+                "size": {
+                  "height": 1
+                },
+                "colors": [
+                  {
+                    "color": "#1A2433",
+                    "position": 0
+                  },
+                  {
+                    "color": "#0A0C10",
+                    "position": 1
+                  }
+                ]
+              },
+              "width": 390,
+              "height": 220
+            },
+            {
+              "type": "text",
+              "id": "dtdaY",
+              "x": 24,
+              "y": 92,
+              "name": "Now Playing Caption",
+              "fill": "$textSecondary",
+              "content": "音频磨耳朵中 · 画面可息屏",
+              "fontFamily": "$fontBody",
+              "fontSize": 13,
+              "fontWeight": "normal"
+            }
+          ]
+        },
+        {
+          "type": "frame",
+          "id": "nihbN",
+          "name": "Subtitle Body",
+          "width": "fill_container",
+          "height": "fill_container",
+          "fill": "$surface",
+          "layout": "vertical",
+          "gap": 12,
+          "padding": [
+            16,
+            16,
+            24,
+            16
+          ],
+          "children": [
+            {
+              "type": "text",
+              "id": "hkanw",
+              "name": "Section",
+              "fill": "$textMuted",
+              "content": "当前字幕",
+              "fontFamily": "$fontBody",
+              "fontSize": 12,
+              "fontWeight": "normal"
+            },
+            {
+              "type": "frame",
+              "id": "stHwP",
+              "name": "Line Card",
+              "width": "fill_container",
+              "fill": "$surfaceRaised",
+              "cornerRadius": 14,
+              "stroke": "$border",
+              "strokeWidth": 1,
+              "layout": "vertical",
+              "gap": 8,
+              "padding": 14,
+              "children": [
+                {
+                  "type": "text",
+                  "id": "crvB8",
+                  "name": "EN",
+                  "fill": "$textPrimary",
+                  "textGrowth": "fixed-width",
+                  "width": "fill_container",
+                  "content": "There's nothing to tell! He's just some guy I work with!",
+                  "lineHeight": 1.35,
+                  "fontFamily": "$fontBody",
+                  "fontSize": 16,
+                  "fontWeight": "600"
+                },
+                {
+                  "type": "text",
+                  "id": "PyeOG",
+                  "name": "CN",
+                  "fill": "$textSecondary",
+                  "textGrowth": "fixed-width",
+                  "width": "fill_container",
+                  "content": "没什么好说的！他只是我的同事！",
+                  "fontFamily": "$fontBody",
+                  "fontSize": 13,
+                  "fontWeight": "normal"
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "iBUJ2",
+              "name": "Hint",
+              "width": "fill_container",
+              "fill": "$brandSoft",
+              "cornerRadius": 12,
+              "gap": 8,
+              "padding": 12,
+              "alignItems": "center",
+              "children": [
+                {
+                  "type": "icon",
+                  "id": "m1cI4",
+                  "name": "Hint Icon",
+                  "width": 18,
+                  "height": 18,
+                  "icon": "disc-3",
+                  "library": "lucide",
+                  "fill": "$brand"
+                },
+                {
+                  "type": "text",
+                  "id": "QC4K4",
+                  "name": "Hint Text",
+                  "fill": "$brand",
+                  "textGrowth": "fixed-width",
+                  "width": "fill_container",
+                  "content": "右下角 CD 球持续旋转 = 磨耳朵进行中，点开可调速 / 循环 / 切换素材",
+                  "lineHeight": 1.4,
+                  "fontFamily": "$fontBody",
+                  "fontSize": 12,
+                  "fontWeight": "normal"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "rQJC0",
+          "type": "ref",
+          "ref": "ljofG",
+          "name": "Floating CD Ball",
+          "layoutPosition": "absolute",
+          "x": 298,
+          "y": 620
+        }
+      ]
+    },
+    {
+      "type": "frame",
+      "id": "Mt2aV",
+      "x": 454,
+      "y": 236,
+      "name": "02 点开 · CD机控制面板",
+      "clip": true,
+      "width": 390,
+      "height": 844,
+      "fill": "$bg",
+      "layout": "vertical",
+      "children": [
+        {
+          "type": "frame",
+          "id": "YhHFN",
+          "name": "Dimmed Player",
+          "opacity": 0.35,
+          "width": "fill_container",
+          "height": "fill_container",
+          "layout": "vertical",
+          "children": [
+            {
+              "type": "frame",
+              "id": "bhafj",
+              "name": "Fake Stage",
+              "width": "fill_container",
+              "height": 280,
+              "fill": "#050607"
+            },
+            {
+              "type": "frame",
+              "id": "sRWur",
+              "name": "Fake Body",
+              "width": "fill_container",
+              "height": "fill_container",
+              "fill": "$surface"
+            }
+          ]
+        },
+        {
+          "type": "frame",
+          "id": "r2GIm2",
+          "layoutPosition": "absolute",
+          "x": 0,
+          "y": 300,
+          "name": "CD Player Sheet",
+          "width": 390,
+          "height": 544,
+          "fill": "$surfaceRaised",
+          "cornerRadius": [
+            28,
+            28,
+            0,
+            0
+          ],
+          "effect": {
+            "type": "shadow",
+            "shadowType": "outer",
+            "color": "#00000088",
+            "offset": {
+              "x": 0,
+              "y": -8
+            },
+            "blur": 28
+          },
+          "layout": "vertical",
+          "gap": 18,
+          "padding": [
+            12,
+            20,
+            28,
+            20
+          ],
+          "alignItems": "center",
+          "children": [
+            {
+              "type": "rectangle",
+              "cornerRadius": 9999,
+              "id": "X1YuZb",
+              "name": "Grabber",
+              "fill": "$border",
+              "width": 42,
+              "height": 5
+            },
+            {
+              "type": "frame",
+              "id": "vMglC",
+              "name": "CD Hero",
+              "width": 148,
+              "height": 148,
+              "fill": "$surface",
+              "cornerRadius": 9999,
+              "stroke": "$brand",
+              "strokeWidth": 2,
+              "effect": {
+                "type": "shadow",
+                "shadowType": "outer",
+                "color": "#6BCB2A44",
+                "blur": 24
+              },
+              "layout": "none",
+              "children": [
+                {
+                  "type": "frame",
+                  "id": "R0eQ2",
+                  "x": 10,
+                  "y": 10,
+                  "name": "Big Disc",
+                  "width": 128,
+                  "height": 128,
+                  "fill": {
+                    "type": "gradient",
+                    "gradientType": "angular",
+                    "enabled": true,
+                    "rotation": 0,
+                    "size": {
+                      "width": 1,
+                      "height": 1
+                    },
+                    "colors": [
+                      {
+                        "color": "#6BCB2A",
+                        "position": 0
+                      },
+                      {
+                        "color": "#E8EEF7",
+                        "position": 0.18
+                      },
+                      {
+                        "color": "#3A4150",
+                        "position": 0.4
+                      },
+                      {
+                        "color": "#A8B2C4",
+                        "position": 0.62
+                      },
+                      {
+                        "color": "#2A303C",
+                        "position": 1
+                      }
+                    ]
+                  },
+                  "cornerRadius": 9999,
+                  "layout": "none",
+                  "children": [
+                    {
+                      "type": "ellipse",
+                      "id": "Sgnvo",
+                      "x": 14,
+                      "y": 14,
+                      "name": "Groove",
+                      "fill": "#00000000",
+                      "width": 100,
+                      "height": 100,
+                      "stroke": "#FFFFFF28",
+                      "strokeWidth": 1
+                    },
+                    {
+                      "type": "ellipse",
+                      "id": "HGJEd",
+                      "x": 42,
+                      "y": 42,
+                      "name": "Label",
+                      "fill": "$brandSoft",
+                      "width": 44,
+                      "height": 44,
+                      "stroke": "$brand",
+                      "strokeWidth": 2
+                    },
+                    {
+                      "type": "ellipse",
+                      "id": "GdU9H",
+                      "x": 56,
+                      "y": 56,
+                      "name": "Hole",
+                      "fill": "$discHole",
+                      "width": 16,
+                      "height": 16
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "v9BzV5",
+              "name": "Meta",
+              "width": "fill_container",
+              "layout": "vertical",
+              "gap": 4,
+              "alignItems": "center",
+              "children": [
+                {
+                  "type": "text",
+                  "id": "ajfck",
+                  "name": "Source Tag",
+                  "fill": "$brand",
+                  "content": "视频 · Friends S01E01",
+                  "fontFamily": "$fontBody",
+                  "fontSize": 12,
+                  "fontWeight": "normal"
+                },
+                {
+                  "type": "text",
+                  "id": "T0pq1",
+                  "name": "Track Title",
+                  "fill": "$textPrimary",
+                  "content": "磨耳朵 · 循环本集音频",
+                  "textAlign": "center",
+                  "fontFamily": "$fontDisplay",
+                  "fontSize": 22,
+                  "fontWeight": "600"
+                },
+                {
+                  "type": "text",
+                  "id": "AsJqx",
+                  "name": "Progress",
+                  "fill": "$textSecondary",
+                  "content": "12:48 / 22:10 · 0.9× · 单曲循环",
+                  "fontFamily": "$fontMono",
+                  "fontSize": 12,
+                  "fontWeight": "normal"
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "rAlRX",
+              "name": "Progress Track",
+              "width": "fill_container",
+              "height": 6,
+              "fill": "$border",
+              "cornerRadius": 9999,
+              "layout": "none",
+              "children": [
+                {
+                  "type": "rectangle",
+                  "cornerRadius": 9999,
+                  "id": "ymOf0",
+                  "x": 0,
+                  "y": 0,
+                  "name": "Progress Fill",
+                  "fill": "$brand",
+                  "width": 210,
+                  "height": 6
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "kg8JE",
+              "name": "Transport",
+              "width": "fill_container",
+              "padding": [
+                4,
+                12
+              ],
+              "justifyContent": "space_between",
+              "alignItems": "center",
+              "children": [
+                {
+                  "type": "icon",
+                  "id": "dIGNN",
+                  "name": "Prev",
+                  "width": 26,
+                  "height": 26,
+                  "icon": "skip-back",
+                  "library": "lucide",
+                  "fill": "$textPrimary"
+                },
+                {
+                  "type": "icon",
+                  "id": "ETb13",
+                  "name": "Rewind",
+                  "width": 24,
+                  "height": 24,
+                  "icon": "rotate-ccw",
+                  "library": "lucide",
+                  "fill": "$textSecondary"
+                },
+                {
+                  "type": "frame",
+                  "id": "U7CdM",
+                  "name": "Play Pause",
+                  "width": 64,
+                  "height": 64,
+                  "fill": "$brand",
+                  "cornerRadius": 9999,
+                  "effect": {
+                    "type": "shadow",
+                    "shadowType": "outer",
+                    "color": "#6BCB2A55",
+                    "offset": {
+                      "x": 0,
+                      "y": 4
+                    },
+                    "blur": 12
+                  },
+                  "justifyContent": "center",
+                  "alignItems": "center",
+                  "children": [
+                    {
+                      "type": "icon",
+                      "id": "feErY",
+                      "name": "Pause",
+                      "width": 28,
+                      "height": 28,
+                      "icon": "pause",
+                      "library": "lucide",
+                      "fill": "#0E1014"
+                    }
+                  ]
+                },
+                {
+                  "type": "icon",
+                  "id": "C1DrT",
+                  "name": "Forward",
+                  "width": 24,
+                  "height": 24,
+                  "icon": "rotate-cw",
+                  "library": "lucide",
+                  "fill": "$textSecondary"
+                },
+                {
+                  "type": "icon",
+                  "id": "E3b1I",
+                  "name": "Next",
+                  "width": 26,
+                  "height": 26,
+                  "icon": "skip-forward",
+                  "library": "lucide",
+                  "fill": "$textPrimary"
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "hGuwJ",
+              "name": "Mode Chips",
+              "width": "fill_container",
+              "gap": 8,
+              "justifyContent": "center",
+              "children": [
+                {
+                  "type": "frame",
+                  "id": "UAxh0",
+                  "name": "0.8×",
+                  "fill": "$surface",
+                  "cornerRadius": 9999,
+                  "stroke": "$border",
+                  "strokeWidth": 1,
+                  "padding": [
+                    8,
+                    12
+                  ],
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "G909WF",
+                      "name": "0.8× L",
+                      "fill": "$textSecondary",
+                      "content": "0.8×",
+                      "fontFamily": "$fontBody",
+                      "fontSize": 12,
+                      "fontWeight": "500"
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "vj5If",
+                  "name": "0.9×",
+                  "fill": "$brandSoft",
+                  "cornerRadius": 9999,
+                  "stroke": "$brand",
+                  "strokeWidth": 1,
+                  "padding": [
+                    8,
+                    12
+                  ],
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "VjwcN",
+                      "name": "0.9× L",
+                      "fill": "$brand",
+                      "content": "0.9×",
+                      "fontFamily": "$fontBody",
+                      "fontSize": 12,
+                      "fontWeight": "700"
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "eTHjz",
+                  "name": "1.0×",
+                  "fill": "$surface",
+                  "cornerRadius": 9999,
+                  "stroke": "$border",
+                  "strokeWidth": 1,
+                  "padding": [
+                    8,
+                    12
+                  ],
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "wcoBg",
+                      "name": "1.0× L",
+                      "fill": "$textSecondary",
+                      "content": "1.0×",
+                      "fontFamily": "$fontBody",
+                      "fontSize": 12,
+                      "fontWeight": "500"
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "q0G4o",
+                  "name": "循环",
+                  "fill": "$brandSoft",
+                  "cornerRadius": 9999,
+                  "stroke": "$brand",
+                  "strokeWidth": 1,
+                  "padding": [
+                    8,
+                    12
+                  ],
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "Ey5jJ",
+                      "name": "循环 L",
+                      "fill": "$brand",
+                      "content": "循环",
+                      "fontFamily": "$fontBody",
+                      "fontSize": 12,
+                      "fontWeight": "700"
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "vnYnC",
+                  "name": "只听英",
+                  "fill": "$surface",
+                  "cornerRadius": 9999,
+                  "stroke": "$border",
+                  "strokeWidth": 1,
+                  "padding": [
+                    8,
+                    12
+                  ],
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "XUHuX",
+                      "name": "只听英 L",
+                      "fill": "$textSecondary",
+                      "content": "只听英",
+                      "fontFamily": "$fontBody",
+                      "fontSize": 12,
+                      "fontWeight": "500"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "Fx6Ol",
+              "name": "Secondary Actions",
+              "width": "fill_container",
+              "gap": 10,
+              "children": [
+                {
+                  "type": "frame",
+                  "id": "IRoz0",
+                  "name": "切到图书",
+                  "width": "fill_container",
+                  "fill": "$surface",
+                  "cornerRadius": 14,
+                  "stroke": "$border",
+                  "strokeWidth": 1,
+                  "layout": "vertical",
+                  "gap": 6,
+                  "padding": 12,
+                  "alignItems": "center",
+                  "children": [
+                    {
+                      "type": "icon",
+                      "id": "GrAsX",
+                      "name": "切到图书 i",
+                      "width": 18,
+                      "height": 18,
+                      "icon": "book-open",
+                      "library": "lucide",
+                      "fill": "$textPrimary"
+                    },
+                    {
+                      "type": "text",
+                      "id": "q780N",
+                      "name": "切到图书 t",
+                      "fill": "$textSecondary",
+                      "content": "切到图书",
+                      "fontFamily": "$fontBody",
+                      "fontSize": 11,
+                      "fontWeight": "normal"
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "roTU9",
+                  "name": "边听边聊",
+                  "width": "fill_container",
+                  "fill": "$surface",
+                  "cornerRadius": 14,
+                  "stroke": "$border",
+                  "strokeWidth": 1,
+                  "layout": "vertical",
+                  "gap": 6,
+                  "padding": 12,
+                  "alignItems": "center",
+                  "children": [
+                    {
+                      "type": "icon",
+                      "id": "yDWqD",
+                      "name": "边听边聊 i",
+                      "width": 18,
+                      "height": 18,
+                      "icon": "mic",
+                      "library": "lucide",
+                      "fill": "$textPrimary"
+                    },
+                    {
+                      "type": "text",
+                      "id": "v4S4Cm",
+                      "name": "边听边聊 t",
+                      "fill": "$textSecondary",
+                      "content": "边听边聊",
+                      "fontFamily": "$fontBody",
+                      "fontSize": 11,
+                      "fontWeight": "normal"
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "S0leKI",
+                  "name": "结束磨耳朵",
+                  "width": "fill_container",
+                  "fill": "$surface",
+                  "cornerRadius": 14,
+                  "stroke": "$border",
+                  "strokeWidth": 1,
+                  "layout": "vertical",
+                  "gap": 6,
+                  "padding": 12,
+                  "alignItems": "center",
+                  "children": [
+                    {
+                      "type": "icon",
+                      "id": "e9QXxI",
+                      "name": "结束磨耳朵 i",
+                      "width": 18,
+                      "height": 18,
+                      "icon": "x",
+                      "library": "lucide",
+                      "fill": "$danger"
+                    },
+                    {
+                      "type": "text",
+                      "id": "Pqcvh",
+                      "name": "结束磨耳朵 t",
+                      "fill": "$danger",
+                      "content": "结束磨耳朵",
+                      "fontFamily": "$fontBody",
+                      "fontSize": 11,
+                      "fontWeight": "normal"
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "frame",
+      "id": "wO66A",
+      "x": 908,
+      "y": 236,
+      "name": "03 阅读 · CD磨耳朵球",
+      "clip": true,
+      "width": 390,
+      "height": 844,
+      "fill": "$bg",
+      "layout": "vertical",
+      "children": [
+        {
+          "type": "frame",
+          "id": "s8aw7Q",
+          "name": "Status Bar",
+          "width": "fill_container",
+          "height": 62,
+          "padding": [
+            0,
+            24
+          ],
+          "justifyContent": "space_between",
+          "alignItems": "center",
+          "children": [
+            {
+              "type": "text",
+              "id": "xdasK",
+              "name": "Time",
+              "fill": "$textPrimary",
+              "content": "9:41",
+              "fontFamily": "$fontBody",
+              "fontSize": 15,
+              "fontWeight": "600"
+            },
+            {
+              "type": "frame",
+              "id": "SbQz7",
+              "name": "Icons",
+              "gap": 6,
+              "alignItems": "center",
+              "children": [
+                {
+                  "type": "icon",
+                  "id": "bFEgQ",
+                  "name": "Signal",
+                  "width": 16,
+                  "height": 16,
+                  "icon": "signal",
+                  "library": "lucide",
+                  "fill": "$textPrimary"
+                },
+                {
+                  "type": "icon",
+                  "id": "aGeYW",
+                  "name": "Battery",
+                  "width": 20,
+                  "height": 16,
+                  "icon": "battery-full",
+                  "library": "lucide",
+                  "fill": "$textPrimary"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "type": "frame",
+          "id": "jNSRl",
+          "name": "Nav",
+          "width": "fill_container",
+          "padding": [
+            8,
+            16
+          ],
+          "justifyContent": "space_between",
+          "alignItems": "center",
+          "children": [
+            {
+              "type": "icon",
+              "id": "HljgA",
+              "name": "Back",
+              "width": 22,
+              "height": 22,
+              "icon": "chevron-left",
+              "library": "lucide",
+              "fill": "$textPrimary"
+            },
+            {
+              "type": "frame",
+              "id": "pmOGC",
+              "name": "Titles",
+              "width": "fill_container",
+              "layout": "vertical",
+              "gap": 2,
+              "children": [
+                {
+                  "type": "text",
+                  "id": "Ed3P0",
+                  "name": "Kicker",
+                  "fill": "$brand",
+                  "content": "图书朗读 · 磨耳朵",
+                  "fontFamily": "$fontBody",
+                  "fontSize": 11,
+                  "fontWeight": "normal"
+                },
+                {
+                  "type": "text",
+                  "id": "qU7uQ",
+                  "name": "Book",
+                  "fill": "$textPrimary",
+                  "textGrowth": "fixed-width",
+                  "width": "fill_container",
+                  "content": "The Wizard of Oz · Ch. 3",
+                  "fontFamily": "$fontBody",
+                  "fontSize": 14,
+                  "fontWeight": "700"
+                }
+              ]
+            },
+            {
+              "type": "icon",
+              "id": "BvXKJ",
+              "name": "List",
+              "width": 20,
+              "height": 20,
+              "icon": "list",
+              "library": "lucide",
+              "fill": "$textSecondary"
+            }
+          ]
+        },
+        {
+          "type": "frame",
+          "id": "pqBvr",
+          "name": "Reading Page",
+          "width": "fill_container",
+          "height": "fill_container",
+          "fill": "$surface",
+          "layout": "vertical",
+          "gap": 16,
+          "padding": [
+            8,
+            20,
+            28,
+            20
+          ],
+          "children": [
+            {
+              "type": "text",
+              "id": "W1nJX",
+              "name": "Chapter",
+              "fill": "$textPrimary",
+              "textGrowth": "fixed-width",
+              "width": "fill_container",
+              "content": "Chapter III · How Dorothy Saved the Scarecrow",
+              "lineHeight": 1.25,
+              "fontFamily": "$fontDisplay",
+              "fontSize": 20,
+              "fontWeight": "600"
+            },
+            {
+              "type": "text",
+              "id": "MnhBv",
+              "name": "Para",
+              "fill": "$textSecondary",
+              "textGrowth": "fixed-width",
+              "width": "fill_container",
+              "content": "When Dorothy was left alone she began to feel hungry. So she went to the cupboard and cut herself some bread, which she spread with butter.",
+              "lineHeight": 1.55,
+              "fontFamily": "$fontBody",
+              "fontSize": 16,
+              "fontWeight": "normal"
+            },
+            {
+              "type": "text",
+              "id": "LwRtf",
+              "name": "Para",
+              "fill": "$textSecondary",
+              "textGrowth": "fixed-width",
+              "width": "fill_container",
+              "content": "She saw a Scarecrow hanging upon a pole, and he winked at her in a friendly way.\"Good day,\" said the Scarecrow.\"How do you do?\"",
+              "lineHeight": 1.55,
+              "fontFamily": "$fontBody",
+              "fontSize": 16,
+              "fontWeight": "normal"
+            },
+            {
+              "type": "frame",
+              "id": "XnOaT",
+              "name": "Now Hearing",
+              "width": "fill_container",
+              "fill": "$brandSoft",
+              "cornerRadius": 14,
+              "gap": 10,
+              "padding": 12,
+              "alignItems": "center",
+              "children": [
+                {
+                  "type": "icon",
+                  "id": "OzMv5",
+                  "name": "Ear",
+                  "width": 18,
+                  "height": 18,
+                  "icon": "ear",
+                  "library": "lucide",
+                  "fill": "$brand"
+                },
+                {
+                  "type": "frame",
+                  "id": "MgfeI",
+                  "name": "Now Col",
+                  "width": "fill_container",
+                  "layout": "vertical",
+                  "gap": 2,
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "PJBB4",
+                      "name": "Now L1",
+                      "fill": "$brand",
+                      "content": "正在朗读当前段 · 可息屏继续",
+                      "fontFamily": "$fontBody",
+                      "fontSize": 12,
+                      "fontWeight": "700"
+                    },
+                    {
+                      "type": "text",
+                      "id": "LWHC4",
+                      "name": "Now L2",
+                      "fill": "$textSecondary",
+                      "content": "点 CD 球展开完整 CD 机面板",
+                      "fontFamily": "$fontBody",
+                      "fontSize": 11,
+                      "fontWeight": "normal"
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "AokLA",
+          "type": "ref",
+          "ref": "ljofG",
+          "name": "Floating CD Ball",
+          "layoutPosition": "absolute",
+          "x": 298,
+          "y": 640
+        }
+      ]
+    },
+    {
+      "type": "frame",
+      "id": "O3DBW",
+      "x": 1362,
+      "y": 100,
+      "name": "00 CD球状态 · 规格",
+      "width": 720,
+      "height": 420,
+      "fill": "$surface",
+      "cornerRadius": 24,
+      "stroke": "$border",
+      "strokeWidth": 1,
+      "layout": "vertical",
+      "gap": 20,
+      "padding": 28,
+      "children": [
+        {
+          "type": "text",
+          "id": "rRI68",
+          "name": "Title",
+          "fill": "$textPrimary",
+          "content": "磨耳朵 CD 悬浮球",
+          "fontFamily": "$fontDisplay",
+          "fontSize": 28,
+          "fontWeight": "600"
+        },
+        {
+          "type": "text",
+          "id": "WDNuS",
+          "name": "Sub",
+          "fill": "$textSecondary",
+          "textGrowth": "fixed-width",
+          "width": "fill_container",
+          "content": "像 CD 机碟片一样持续旋转；视频 / 图书共用。点开 = 迷你 CD 机面板（调速 · 循环 · 切素材 · 边听边聊）。",
+          "lineHeight": 1.45,
+          "fontFamily": "$fontBody",
+          "fontSize": 14,
+          "fontWeight": "normal"
+        },
+        {
+          "type": "frame",
+          "id": "OQPMc",
+          "name": "States Row",
+          "width": "fill_container",
+          "gap": 16,
+          "justifyContent": "space_between",
+          "children": [
+            {
+              "type": "frame",
+              "id": "r0Q9N",
+              "name": "Idle",
+              "width": "fill_container",
+              "fill": "$surfaceRaised",
+              "cornerRadius": 18,
+              "stroke": "$border",
+              "strokeWidth": 1,
+              "layout": "vertical",
+              "gap": 12,
+              "padding": 16,
+              "alignItems": "center",
+              "children": [
+                {
+                  "id": "TEh27",
+                  "type": "ref",
+                  "ref": "S2TkBw",
+                  "name": "Idle Ball"
+                },
+                {
+                  "type": "text",
+                  "id": "F2ck5",
+                  "name": "Idle T",
+                  "fill": "$textPrimary",
+                  "content": "Idle",
+                  "fontFamily": "$fontBody",
+                  "fontSize": 15,
+                  "fontWeight": "700"
+                },
+                {
+                  "type": "text",
+                  "id": "vBNss",
+                  "name": "Idle D",
+                  "fill": "$textSecondary",
+                  "textGrowth": "fixed-width",
+                  "width": "fill_container",
+                  "content": "未播放 · 碟片静止",
+                  "textAlign": "center",
+                  "fontFamily": "$fontBody",
+                  "fontSize": 12,
+                  "fontWeight": "normal"
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "G8x6t",
+              "name": "Playing",
+              "width": "fill_container",
+              "fill": "$surfaceRaised",
+              "cornerRadius": 18,
+              "stroke": "$border",
+              "strokeWidth": 1,
+              "layout": "vertical",
+              "gap": 12,
+              "padding": 16,
+              "alignItems": "center",
+              "children": [
+                {
+                  "id": "YONvh",
+                  "type": "ref",
+                  "ref": "ljofG",
+                  "name": "Playing Ball"
+                },
+                {
+                  "type": "text",
+                  "id": "hh9nW",
+                  "name": "Playing T",
+                  "fill": "$textPrimary",
+                  "content": "Playing",
+                  "fontFamily": "$fontBody",
+                  "fontSize": 15,
+                  "fontWeight": "700"
+                },
+                {
+                  "type": "text",
+                  "id": "AiZlM",
+                  "name": "Playing D",
+                  "fill": "$textSecondary",
+                  "textGrowth": "fixed-width",
+                  "width": "fill_container",
+                  "content": "磨耳朵中 · 碟片旋转 + 绿点",
+                  "textAlign": "center",
+                  "fontFamily": "$fontBody",
+                  "fontSize": 12,
+                  "fontWeight": "normal"
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "jzNql",
+              "name": "Paused",
+              "width": "fill_container",
+              "fill": "$surfaceRaised",
+              "cornerRadius": 18,
+              "stroke": "$border",
+              "strokeWidth": 1,
+              "layout": "vertical",
+              "gap": 12,
+              "padding": 16,
+              "alignItems": "center",
+              "children": [
+                {
+                  "id": "u3czA",
+                  "type": "ref",
+                  "ref": "x1Clk",
+                  "name": "Paused Ball"
+                },
+                {
+                  "type": "text",
+                  "id": "k6cvA",
+                  "name": "Paused T",
+                  "fill": "$textPrimary",
+                  "content": "Paused",
+                  "fontFamily": "$fontBody",
+                  "fontSize": 15,
+                  "fontWeight": "700"
+                },
+                {
+                  "type": "text",
+                  "id": "vomUZ",
+                  "name": "Paused D",
+                  "fill": "$textSecondary",
+                  "textGrowth": "fixed-width",
+                  "width": "fill_container",
+                  "content": "已暂停 · 显示暂停条",
+                  "textAlign": "center",
+                  "fontFamily": "$fontBody",
+                  "fontSize": 12,
+                  "fontWeight": "normal"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "type": "frame",
+          "id": "I2JYTZ",
+          "name": "Rules",
+          "width": "fill_container",
+          "fill": "$brandSoft",
+          "cornerRadius": 14,
+          "layout": "vertical",
+          "gap": 6,
+          "padding": 14,
+          "children": [
+            {
+              "type": "text",
+              "id": "y4es9",
+              "name": "R1",
+              "fill": "$brand",
+              "textGrowth": "fixed-width",
+              "width": "fill_container",
+              "content": "尺寸 72×72 · 右下可拖 · 避让底部导航",
+              "fontFamily": "$fontMono",
+              "fontSize": 12,
+              "fontWeight": "normal"
+            },
+            {
+              "type": "text",
+              "id": "fSCan",
+              "name": "R2",
+              "fill": "$brand",
+              "textGrowth": "fixed-width",
+              "width": "fill_container",
+              "content": "后台 / 息屏只播声音 · 与现有磨耳朵通道共用",
+              "fontFamily": "$fontMono",
+              "fontSize": 12,
+              "fontWeight": "normal"
+            },
+            {
+              "type": "text",
+              "id": "Lj7O2",
+              "name": "R3",
+              "fill": "$brand",
+              "textGrowth": "fixed-width",
+              "width": "fill_container",
+              "content": "与数字人球并存时：CD球偏右下，数字人球偏左下",
+              "fontFamily": "$fontMono",
+              "fontSize": 12,
+              "fontWeight": "normal"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "variables": {
+    "bg": {
+      "type": "color",
+      "value": "#0E1014"
+    },
+    "surface": {
+      "type": "color",
+      "value": "#16191F"
+    },
+    "surfaceRaised": {
+      "type": "color",
+      "value": "#1C2028"
+    },
+    "textPrimary": {
+      "type": "color",
+      "value": "#F2F4F7"
+    },
+    "textSecondary": {
+      "type": "color",
+      "value": "#9AA3B2"
+    },
+    "textMuted": {
+      "type": "color",
+      "value": "#6B7380"
+    },
+    "brand": {
+      "type": "color",
+      "value": "#6BCB2A"
+    },
+    "brandSoft": {
+      "type": "color",
+      "value": "#1F3A18"
+    },
+    "discRim": {
+      "type": "color",
+      "value": "#2A2F3A"
+    },
+    "discFace": {
+      "type": "color",
+      "value": "#3A4150"
+    },
+    "discShine": {
+      "type": "color",
+      "value": "#8A93A5"
+    },
+    "discHole": {
+      "type": "color",
+      "value": "#0E1014"
+    },
+    "border": {
+      "type": "color",
+      "value": "#2A303C"
+    },
+    "danger": {
+      "type": "color",
+      "value": "#FF6B6B"
+    },
+    "fontDisplay": {
+      "type": "string",
+      "value": "Fraunces"
+    },
+    "fontBody": {
+      "type": "string",
+      "value": "DM Sans"
+    },
+    "fontMono": {
+      "type": "string",
+      "value": "IBM Plex Mono"
+    }
+  },
+  "fileToken": "bd384a1d-6c78-4acd-b4a5-2496e600900a"
+}
