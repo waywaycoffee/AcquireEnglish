@@ -3338,7 +3338,8 @@ Future<void> _settleChineseFillIfAlreadyPresent() async {
                         videoPosition: _videoPosition,
                         videoErrorText: _videoErrorText,
                         showAiGenerateSubtitles: canGenerateAiSubtitles,
-                        onGenerateAiSubtitles: _generatingAiSubtitles
+                        onGenerateAiSubtitles:
+                            _isEnglishSubtitleGenerationBusy()
                             ? null
                             : _handleGenerateAiSubtitles,
                         ),
@@ -3444,7 +3445,7 @@ Future<void> _settleChineseFillIfAlreadyPresent() async {
                   _subtitleLocateEpoch += 1;
                 });
               },
-              onRerecognizeEnglish: !_generatingAiSubtitles
+              onRerecognizeEnglish: !_isEnglishSubtitleGenerationBusy()
                   ? () => unawaited(
                       _handleResetEpisodeSubtitles(SubtitleResetSide.english),
                     )
@@ -3576,7 +3577,7 @@ Future<void> _settleChineseFillIfAlreadyPresent() async {
             isPlaying: state.isPlaying,
             onTogglePlaying: _handleTogglePlaying,
             onPronounce: _stopVideo,
-            onRerecognizeEnglish: !_generatingAiSubtitles
+            onRerecognizeEnglish: !_isEnglishSubtitleGenerationBusy()
                 ? () => unawaited(
                     _handleResetEpisodeSubtitles(SubtitleResetSide.english),
                   )
@@ -3599,12 +3600,13 @@ Future<void> _settleChineseFillIfAlreadyPresent() async {
                 _blindListening ||
                 SubtitleDisplayMode.isBlind(state.subtitleMode),
             showAiGenerateSubtitles: canGenerateAiSubtitles,
-            generatingAiSubtitles: _generatingAiSubtitles,
+            generatingAiSubtitles:
+                _generatingAiSubtitles || _isEnglishSubtitleGenerationBusy(),
             aiSubtitleProgressValue: _aiSubtitleProgressValue,
             aiSubtitleProgressText: _aiSubtitleProgressText,
             aiSubtitlePreviewText: _aiSubtitlePreviewText,
             aiSubtitleErrorText: _aiSubtitleErrorText,
-            onGenerateAiSubtitles: _generatingAiSubtitles
+            onGenerateAiSubtitles: _isEnglishSubtitleGenerationBusy()
                 ? null
                 : _handleGenerateAiSubtitles,
             bilingualPipelineLabel: _bilingualPipelineLabel,
@@ -3623,7 +3625,9 @@ Future<void> _settleChineseFillIfAlreadyPresent() async {
             onDictionaryClosed: _handleDictionaryClosed,
           );
         }
-        if (canGenerateAiSubtitles || _generatingAiSubtitles) {
+        if (canGenerateAiSubtitles ||
+            _generatingAiSubtitles ||
+            _isEnglishSubtitleGenerationBusy()) {
           return PlayerSubtitleList(
             episodeId: widget.episodeId,
             lines: const <PlayerSubtitleLine>[],
@@ -3645,14 +3649,13 @@ Future<void> _settleChineseFillIfAlreadyPresent() async {
             onAiExplain: (_) {},
             onPronounce: _stopVideo,
             showAiGenerateSubtitles: true,
-            generatingAiSubtitles: _generatingAiSubtitles,
+            generatingAiSubtitles: true,
             aiSubtitleProgressValue: _aiSubtitleProgressValue,
-            aiSubtitleProgressText: _aiSubtitleProgressText,
+            aiSubtitleProgressText: _aiSubtitleProgressText ??
+                _bilingualPipelineLabel,
             aiSubtitlePreviewText: _aiSubtitlePreviewText,
             aiSubtitleErrorText: _aiSubtitleErrorText,
-            onGenerateAiSubtitles: _generatingAiSubtitles
-                ? null
-                : _handleGenerateAiSubtitles,
+            onGenerateAiSubtitles: null,
             bilingualPipelineLabel: _bilingualPipelineLabel,
             bilingualPipelineProgressValue: _bilingualPipelineProgress,
             showAiCompleteButton: _bilingualShowAiComplete,
@@ -4686,6 +4689,11 @@ Future<void> _settleChineseFillIfAlreadyPresent() async {
   }
 
   Future<void> _handleUserRegenerateSubtitles() async {
+    if (_isEnglishSubtitleGenerationBusy()) {
+      _showMessage(_englishGenerationBusyMessage());
+      _ensureEnglishGenerationProgressVisible();
+      return;
+    }
     final bool hasManual = await episodeHasManualSubtitleEdits(
       episodeId: widget.episodeId,
       englishLocks: _manualEnglishByStartMs,
@@ -4871,6 +4879,13 @@ Future<void> _settleChineseFillIfAlreadyPresent() async {
 
   Future<void> _handleResetEpisodeSubtitles(SubtitleResetSide side) async {
     if (!mounted) {
+      return;
+    }
+    // Generation already running — do not show「清空英文 / 重新 ASR」confirm.
+    if ((side == SubtitleResetSide.english || side == SubtitleResetSide.both) &&
+        _isEnglishSubtitleGenerationBusy()) {
+      _showMessage(_englishGenerationBusyMessage());
+      _ensureEnglishGenerationProgressVisible();
       return;
     }
 

@@ -2917,7 +2917,8 @@ Future<void> _settleChineseFillIfAlreadyPresent() async {
                               videoPosition: _videoPosition,
                               videoErrorText: _videoErrorText,
                               showAiGenerateSubtitles: canGenerateAiSubtitles,
-                              onGenerateAiSubtitles: _generatingAiSubtitles
+                              onGenerateAiSubtitles:
+                                  _isEnglishSubtitleGenerationBusy()
                                   ? null
                                   : _handleGenerateAiSubtitles,
                             ),
@@ -3014,7 +3015,7 @@ Future<void> _settleChineseFillIfAlreadyPresent() async {
                                       onTogglePlaying: _handleTogglePlaying,
                                       onPronounce: _stopVideo,
                                       onRerecognizeEnglish:
-                                              !_generatingAiSubtitles
+                                              !_isEnglishSubtitleGenerationBusy()
                                           ? () => unawaited(
                                               _handleUserRegenerateSubtitles(
                                                 SubtitleResetSide.english,
@@ -3083,16 +3084,21 @@ Future<void> _settleChineseFillIfAlreadyPresent() async {
                                       onPronounce: _stopVideo,
                                       showAiGenerateSubtitles: true,
                                       generatingAiSubtitles:
-                                          _generatingAiSubtitles,
+                                          _generatingAiSubtitles ||
+                                          _isEnglishSubtitleGenerationBusy(),
                                       aiSubtitleProgressValue:
-                                          _aiSubtitleProgressValue,
+                                          _aiSubtitleProgressValue ??
+                                          _bilingualPipelineProgress,
                                       aiSubtitleProgressText:
-                                          _aiSubtitleProgressText,
+                                          _aiSubtitleProgressText ??
+                                          _bilingualPipelineLabel,
                                       aiSubtitlePreviewText:
                                           _aiSubtitlePreviewText,
                                       aiSubtitleErrorText: _aiSubtitleErrorText,
                                       onGenerateAiSubtitles:
-                                          _handleGenerateAiSubtitles,
+                                          _isEnglishSubtitleGenerationBusy()
+                                          ? null
+                                          : _handleGenerateAiSubtitles,
                                       bilingualPipelineLabel:
                                           _bilingualPipelineLabel,
                                       bilingualPipelineProgressValue:
@@ -3529,6 +3535,12 @@ Future<void> _settleChineseFillIfAlreadyPresent() async {
 
   Future<void> _handleUserRegenerateSubtitles(SubtitleResetSide side) async {
     if (!mounted) {
+      return;
+    }
+    if ((side == SubtitleResetSide.english || side == SubtitleResetSide.both) &&
+        _isEnglishSubtitleGenerationBusy()) {
+      _showMessage(_englishGenerationBusyMessage());
+      _ensureEnglishGenerationProgressVisible();
       return;
     }
 

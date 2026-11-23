@@ -1680,6 +1680,27 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
     if (!mounted) {
       return;
     }
+    final SubtitleCompletionEpisodeUi? fill = ref
+        .read(subtitleCompletionStatusProvider)
+        .forEpisode(episode.id);
+    if (fill != null &&
+        fill.isActive &&
+        ((side == SubtitleResetSide.english && fill.needEnglish) ||
+            (side == SubtitleResetSide.both && fill.needEnglish) ||
+            (side == SubtitleResetSide.chinese && fill.needChinese) ||
+            (side == SubtitleResetSide.both && fill.needChinese))) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            fill.displayLabel.trim().isEmpty
+                ? '字幕正在生成中，请稍候（无需重复点击）'
+                : '生成中：${fill.displayLabel}',
+          ),
+        ),
+      );
+      SubtitleCompletionScheduler.instance.kick(delay: Duration.zero);
+      return;
+    }
     final bool alreadyHas = switch (side) {
       SubtitleResetSide.english => episode.hasEnglishSubtitles,
       SubtitleResetSide.chinese => episode.hasChineseSubtitles,
