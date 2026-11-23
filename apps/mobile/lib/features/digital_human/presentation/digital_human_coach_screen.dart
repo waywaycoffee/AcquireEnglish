@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 
 import 'study_oral_coach_tab.dart';
 
-/// Standalone AI 外教 entry (video-call lesson). Not AI 伴读 / 口语跟读.
+/// Digital human conversation, with a guided lesson when material is supplied.
 class DigitalHumanCoachScreen extends StatelessWidget {
   const DigitalHumanCoachScreen({
     super.key,
@@ -19,11 +19,16 @@ class DigitalHumanCoachScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final String title = lessonTitle?.trim() ?? '';
+    final bool hasMaterial = lessonText?.trim().isNotEmpty == true;
+    final String displayTitle = title.isNotEmpty
+        ? title
+        : (hasMaterial ? 'AI 外教课' : '数字人口语');
     return Scaffold(
       backgroundColor: const Color(0xFF14102A),
       extendBodyBehindAppBar: true,
       appBar: AppBar(
-        title: Text(lessonTitle ?? 'AI 外教'),
+        title: Text(displayTitle),
         backgroundColor: Colors.transparent,
         elevation: 0,
         foregroundColor: Colors.white,
@@ -34,17 +39,15 @@ class DigitalHumanCoachScreen extends StatelessWidget {
         child: Padding(
           padding: EdgeInsets.only(top: MediaQuery.paddingOf(context).top + 4),
           child: StudyOralCoachTab(
-            topicSummary: lessonTitle == null
-                ? '英语口语闲聊'
-                : 'Practise the scenario: $lessonTitle. The learner plays role $practiceRole. You play the other role. Use the example dialogue as context and provide helpful feedback.',
+            topicSummary: hasMaterial
+                ? 'Practise the scenario: $displayTitle. The learner plays role ${practiceRole ?? 'learner'}. You play the other role. Use the example dialogue as context and provide helpful feedback.'
+                : '英语口语闲聊',
             articleExcerpt: lessonText ?? '',
-            courseTitle: lessonTitle?.trim().isNotEmpty == true
-                ? lessonTitle!.trim()
-                : 'AI 外教课',
-            hasTranscript: lessonText?.isNotEmpty == true,
+            courseTitle: displayTitle,
+            hasTranscript: hasMaterial,
             standalone: true,
             onConfirmedLearnerTurn: onConfirmedLearnerTurn,
-            initialScenarioId: lessonText?.isNotEmpty == true
+            initialScenarioId: hasMaterial
                 ? 'video_line'
                 : initialScenarioId ?? 'freechat',
           ),
