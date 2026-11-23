@@ -18,22 +18,35 @@ Future<bool> requestCloudSubtitleGeneration({
   int page = 1,
   AcquireApiClient? api,
 }) async {
+  final SharedSubtitleGpuJob? job = await requestCloudSubtitleGenerationJob(
+    bvid: bvid,
+    page: page,
+    api: api,
+  );
+  return job != null;
+}
+
+/// Same as [requestCloudSubtitleGeneration] but returns the job for UI state.
+Future<SharedSubtitleGpuJob?> requestCloudSubtitleGenerationJob({
+  required String bvid,
+  int page = 1,
+  AcquireApiClient? api,
+}) async {
   final AcquireApiClient? client = resolveSharedBilibiliSubtitleApi(api);
   if (client == null) {
-    return false;
+    return null;
   }
   final String id = bvid.trim();
   if (id.isEmpty) {
-    return false;
+    return null;
   }
   try {
-    final SharedSubtitleGpuJob? job = await client.enqueueSharedSubtitleJob(
+    return await client.enqueueSharedSubtitleJob(
       bvid: id,
       page: page < 1 ? 1 : page,
     );
-    return job != null;
   } catch (_) {
-    return false;
+    return null;
   }
 }
 

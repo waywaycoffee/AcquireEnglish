@@ -243,9 +243,11 @@ class SubtitleCompletionQueue {
             (existing.lastError ?? '').contains(userStoppedError)) {
           return existing;
         }
-        if (existing.status == SubtitleCompletionStatus.running && !force) {
-          // Must persist path/flag refreshes — a bare return left disk stale and
-          // dropped newly discovered missing sides until the next cold start.
+        if (existing.status == SubtitleCompletionStatus.running) {
+          // Never demote running → pending (that restarts ASR mid-flight when
+          // the user re-taps 补英文 / 生成字幕). Merge paths/flags only.
+          // Callers that truly need a fresh run must cancel the scheduler
+          // token first, then enqueue after the job leaves `running`.
           final SubtitleCompletionJob next = existing.copyWith(
             videoPath: videoPath,
             zhPath: zhPath,

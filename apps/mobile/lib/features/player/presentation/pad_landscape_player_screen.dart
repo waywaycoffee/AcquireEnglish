@@ -197,15 +197,20 @@ class PadLandscapePlayerScreenState
               prevFill.status != SubtitleCompletionStatus.done) {
             unawaited(_reloadAsrSentencesAfterCompletion());
           }
-          if (_bilingualPipelineLabel != null ||
+          if (_englishFillInFlight ||
+              _bilingualPipelineLabel != null ||
               _bilingualPipelineProgress != null) {
             setState(() {
+              _englishFillInFlight = false;
               _bilingualPipelineLabel = null;
               _bilingualPipelineProgress = null;
               _bilingualPhase = BilingualPipelinePhase.completed;
             });
           }
           return;
+        }
+        if (fill.isFailed && _englishFillInFlight) {
+          setState(() => _englishFillInFlight = false);
         }
         if (fill.isActive || fill.isFailed) {
           final bool linesHaveChinese = state.lines.isNotEmpty &&
@@ -1790,6 +1795,64 @@ Future<void> _settleChineseFillIfAlreadyPresent() async {
     return BilingualSubtitlePipeline.shouldAutoStart(lines);
   }
 
+  bool _isEnglishSubtitleGenerationBusy() {
+    if (_generatingAiSubtitles || _englishFillInFlight) {
+      return true;
+    }
+    if (_bilingualPhase == BilingualPipelinePhase.asrProofreading ||
+        _bilingualPhase == BilingualPipelinePhase.ocrRunning) {
+      final String label = (_bilingualPipelineLabel ?? '').trim();
+      if (label.contains('英文') ||
+          label.contains('语音') ||
+          label.contains('云端') ||
+          label.contains('识别')) {
+        return true;
+      }
+    }
+    final SubtitleCompletionEpisodeUi? fill = ref
+        .read(subtitleCompletionStatusProvider)
+        .forEpisode(widget.episodeId);
+    return fill != null && fill.isActive && fill.needEnglish;
+  }
+
+  String _englishGenerationBusyMessage() {
+    final SubtitleCompletionEpisodeUi? fill = ref
+        .read(subtitleCompletionStatusProvider)
+        .forEpisode(widget.episodeId);
+    final String live = (fill?.displayLabel ?? _bilingualPipelineLabel ?? '')
+        .trim();
+    if (live.isNotEmpty) {
+      return '英文字幕生成中：$live';
+    }
+    return '英文字幕正在生成中，请稍候（无需重复点击）';
+  }
+
+  void _ensureEnglishGenerationProgressVisible() {
+    if (!mounted) {
+      return;
+    }
+    final SubtitleCompletionEpisodeUi? fill = ref
+        .read(subtitleCompletionStatusProvider)
+        .forEpisode(widget.episodeId);
+    final String label = (fill?.displayLabel ??
+            _bilingualPipelineLabel ??
+            '正在生成英文字幕…')
+        .trim();
+    final double? progress = fill?.progressFraction ??
+        _bilingualPipelineProgress ??
+        progressFractionFromSubtitleLabel(label);
+    if (_bilingualPipelineLabel == label &&
+        _bilingualPipelineProgress == progress) {
+      return;
+    }
+    setState(() {
+      _bilingualPhase = BilingualPipelinePhase.asrProofreading;
+      _bilingualPipelineLabel = label;
+      _bilingualPipelineProgress = progress;
+      _bilingualShowAiComplete = false;
+    });
+  }
+
   String? _episodeSourceKey([PlayerCourseLookupResult? resource]) {
     final PlayerCourseLookupResult resolved =
         resource ??
@@ -3209,6 +3272,11 @@ Future<void> _settleChineseFillIfAlreadyPresent() async {
     if (_generatingAiSubtitles) {
       return;
     }
+    if (!forceRegenerate && _isEnglishSubtitleGenerationBusy()) {
+      _showMessage(_englishGenerationBusyMessage());
+      _ensureEnglishGenerationProgressVisible();
+      return;
+    }
     final String? videoPath = _videoAsset;
     if (videoPath == null || videoPath.isEmpty) {
       _showMessage('当前视频不可用');
@@ -3722,80 +3790,42 @@ Future<void> _settleChineseFillIfAlreadyPresent() async {
     if (!mounted) {
       return;
     }
-    _englishFillCancellationToken?.cancel();
-    _englishFillInFlight = false;
-    await _bilingualPipeline?.cancel();
-    if (!mounted) {
+    if (_isEnglishSubtitleGenerationBusy()) {
+      _showMessage(_englishGenerationBusyMessage());
+      _ensureEnglishGenerationProgressVisible();
       return;
     }
-    await deletePersistedBilingualSubtitleFiles(episodeId: widget.episodeId);
-    _manualEnglishByStartMs.clear();
-    _manualChineseByStartMs.clear();
-    if (state.hasLines) {
-      final List<PlayerSubtitleLine> cleared = state.lines
-          .map((PlayerSubtitleLine line) {
-            if (!looksChinese(line.chinese)) {
-              return line;
-            }
-            return PlayerSubtitleLine(
-              startTime: line.startTime,
-              english: '',
-              chinese: line.chinese,
-              startMs: line.startMs,
-              endMs: line.endMs,
-            );
-          })
-          .toList(growable: false);
-      setState(() {
-        state.replaceLines(
-          cleared,
-          preferredSubtitleMode: SubtitleDisplayMode.bilingual,
-        );
-        _bilingualPhase = BilingualPipelinePhase.asrProofreading;
-        _bilingualPipelineLabel = '正在用语音对齐英文…';
-        _bilingualShowAiComplete = false;
-        _usingAiSubtitles = false;
-        _usingAsrSentences = false;
-        _asrFragmentsBySentenceStartMs =
-            const <int, List<PlayerSubtitleLine>>{};
-        _aiSubtitleErrorText = null;
-      });
-    } else {
-      setState(() {
-        _bilingualPhase = BilingualPipelinePhase.asrProofreading;
-        _bilingualPipelineLabel = '正在用语音对齐英文…';
-        _bilingualShowAiComplete = false;
-        _usingAiSubtitles = false;
-        _usingAsrSentences = false;
-        _asrFragmentsBySentenceStartMs =
-            const <int, List<PlayerSubtitleLine>>{};
-        _aiSubtitleErrorText = null;
-      });
-    }
+    setState(() {
+      _englishFillInFlight = true;
+      _bilingualPhase = BilingualPipelinePhase.asrProofreading;
+      _bilingualPipelineLabel = '正在生成英文字幕…';
+      _bilingualPipelineProgress = 0.12;
+      _bilingualShowAiComplete = false;
+      _aiSubtitleErrorText = null;
+    });
     final PlayerCourseLookupResult resource = resolvePlayerCourseForEpisode(
       courses: ref.read(libraryCatalogProvider),
       episodeId: widget.episodeId,
     );
-    unawaited(
-      enqueueSubtitleCompletionForEpisode(
-        episodeId: widget.episodeId,
-        videoPath: _videoAsset ?? resource.videoAsset,
-        zhSubtitlePath: resource.chineseSubtitleAsset,
-        enSubtitlePath: null,
-        sourceUrl: resource.episode?.sourceUrl,
-        course: resource.course,
-        episode: resource.episode,
-        force: true,
-      ),
+    await enqueueSubtitleCompletionForEpisode(
+      episodeId: widget.episodeId,
+      videoPath: _videoAsset ?? resource.videoAsset,
+      zhSubtitlePath: resource.chineseSubtitleAsset,
+      enSubtitlePath: resource.englishSubtitleAsset,
+      sourceUrl: resource.episode?.sourceUrl,
+      course: resource.course,
+      episode: resource.episode,
+      chip: SubtitleFillChip.english,
+      bilibiliCookieHeader: ref
+          .read(learningSettingsProvider)
+          .resolvedBilibiliCookieHeader,
     );
-    _showMessage('正在按语音重新生成字幕（与语音不一致时以 ASR 为准）');
+    if (!mounted) {
+      return;
+    }
+    _ensureEnglishGenerationProgressVisible();
+    _showMessage('正在生成英文字幕，完成后会自动刷新（无需重复点击）');
     SubtitleCompletionScheduler.instance.kick(delay: Duration.zero);
-    unawaited(() async {
-      await _maybeStartBilingualPipeline(forRegenerate: true);
-      try {
-        await _bilingualPipeline?.proofreadEnglishWithAsr(force: true);
-      } catch (_) {}
-    }());
   }
 
   Future<void> _handleRegenerateAiSubtitles() async {

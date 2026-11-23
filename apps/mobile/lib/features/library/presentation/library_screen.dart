@@ -2064,6 +2064,28 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
     }
     final bool wantEnglish = chip == SubtitleFillChip.english;
     final bool wantChinese = chip == SubtitleFillChip.chinese;
+    final SubtitleCompletionEpisodeUi? existing = ref
+        .read(subtitleCompletionStatusProvider)
+        .forEpisode(episode.id);
+    if (existing != null &&
+        existing.isActive &&
+        ((wantEnglish && existing.needEnglish) ||
+            (wantChinese && existing.needChinese))) {
+      if (!mounted) {
+        return;
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            existing.displayLabel.trim().isEmpty
+                ? '字幕正在生成中，请稍候（无需重复点击）'
+                : '生成中：${existing.displayLabel}',
+          ),
+        ),
+      );
+      SubtitleCompletionScheduler.instance.kick(delay: Duration.zero);
+      return;
+    }
     // Optimistic chip + bar update so progress shows on the list immediately.
     ref.read(subtitleCompletionStatusProvider.notifier).reportProgress(
       episode.id,

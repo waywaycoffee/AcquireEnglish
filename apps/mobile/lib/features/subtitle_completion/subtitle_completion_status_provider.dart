@@ -2,6 +2,11 @@ import 'dart:async';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../import_course/data/bilibili_episode_prepare.dart';
+import '../sync/data/acquire_api_client.dart';
+import 'cloud_subtitle_job_tracker.dart';
+import 'shared_bilibili_subtitle_sync.dart';
+import 'shared_subtitle_api.dart';
 import 'subtitle_completion_enqueue.dart';
 import 'subtitle_completion_queue.dart';
 import 'subtitle_completion_runtime.dart';
@@ -464,6 +469,7 @@ class SubtitleCompletionStatusNotifier
   }
 
   Future<void> refresh() async {
+    await _pollTrackedCloudJobs();
     final List<SubtitleCompletionJob> jobs = await SubtitleCompletionQueue
         .shared
         .loadJobs();
@@ -512,6 +518,83 @@ class SubtitleCompletionStatusNotifier
     state = state.copyWith(
       byEpisodeId: Map<String, SubtitleCompletionEpisodeUi>.unmodifiable(next),
     );
+  }
+
+  /// Refresh cloud-only EN jobs that never enter the local Whisper queue.
+  Future<void> _pollTrackedCloudJobs() async {
+    final List<CloudSubtitleJobTrack> tracks =
+        CloudSubtitleJobTracker.instance.activeTracks;
+    if (tracks.isEmpty) {
+      return;
+    }
+    final AcquireApiClient? api = resolveSharedBilibiliSubtitleApi();
+    if (api == null) {
+      return;
+    }
+    for (final CloudSubtitleJobTrack track in tracks) {
+      try {
+        SharedSubtitleGpuJob? job;
+        if (track.jobId.trim().isNotEmpty) {
+          job = await api.getSharedSubtitleJob(track.jobId);
+        }
+        job ??= await api.enqueueSharedSubtitleJob(
+          bvid: track.bvid,
+          page: track.page,
+        );
+        if (job == null) {
+          continue;
+        }
+        final String label = labelForGpuSubtitleJobState(job.state);
+        final String state = job.state.trim().toLowerCase();
+        if (state == 'failed') {
+          reportProgress(
+            track.episodeId,
+            label,
+            status: SubtitleCompletionStatus.failed,
+            needEnglish: track.needEnglish,
+            needChinese: track.needChinese,
+          );
+          CloudSubtitleJobTracker.instance.clear(track.episodeId);
+          continue;
+        }
+        if (state == 'completed') {
+          final ({String? enPath, String? zhPath})? shared =
+              await tryApplySharedBilibiliSubtitles(
+            api: api,
+            ids: BilibiliSharedSubtitleIds(
+              bvid: track.bvid,
+              page: track.page,
+            ),
+          );
+          if (shared != null &&
+              (isUsableSubtitlePath(shared.enPath) ||
+                  isUsableSubtitlePath(shared.zhPath))) {
+            SubtitleCompletionStatusHub.instance.reportSharedApplied(
+              episodeId: track.episodeId,
+              enPath: shared.enPath,
+              zhPath: shared.zhPath,
+            );
+            reportProgress(
+              track.episodeId,
+              kSubtitleSharedCacheReadyDetailLabel,
+              status: SubtitleCompletionStatus.done,
+              needEnglish: false,
+              needChinese: false,
+            );
+            CloudSubtitleJobTracker.instance.clear(track.episodeId);
+            SubtitleCompletionScheduler.instance.kick(delay: Duration.zero);
+            continue;
+          }
+        }
+        reportProgress(
+          track.episodeId,
+          label,
+          status: SubtitleCompletionStatus.running,
+          needEnglish: track.needEnglish,
+          needChinese: track.needChinese,
+        );
+      } catch (_) {}
+    }
   }
 
   void reportProgress(

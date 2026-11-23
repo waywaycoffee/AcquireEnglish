@@ -2785,6 +2785,38 @@ class AcquireApiClient {
     }
   }
 
+  /// Poll one durable ECS GPU subtitle job by id.
+  Future<SharedSubtitleGpuJob?> getSharedSubtitleJob(String jobId) async {
+    final String id = jobId.trim();
+    if (id.isEmpty) {
+      return null;
+    }
+    try {
+      final Response<dynamic> response = await _dio.get<Object?>(
+        Endpoints.sharedSubtitlesJob(id),
+        options: Options(
+          validateStatus: (int? status) =>
+              status != null && status >= 200 && status < 300,
+        ),
+      );
+      if (response.data is Map<String, dynamic>) {
+        return SharedSubtitleGpuJob.fromJson(
+          response.data as Map<String, dynamic>,
+        );
+      }
+      if (response.data is Map) {
+        return SharedSubtitleGpuJob.fromJson(
+          Map<String, dynamic>.from(response.data as Map),
+        );
+      }
+      return null;
+    } on DioException {
+      return null;
+    } catch (_) {
+      return null;
+    }
+  }
+
   /// Submit / reuse a durable ECS GPU subtitle job for one Bilibili page.
   ///
   /// Returns null when offline, unauthenticated, or the identity is invalid.

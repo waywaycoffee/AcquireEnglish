@@ -340,8 +340,22 @@ Future<({String? enPath, String? zhPath})?> requestSharedSubtitlesForDownload({
 Future<bool> tryRequestCloudSubtitleGeneration({
   required AcquireApiClient api,
   required BilibiliSharedSubtitleIds ids,
+}) async {
+  final SharedSubtitleGpuJob? job = await requestCloudSubtitleGenerationJob(
+    bvid: ids.bvid,
+    page: ids.page,
+    api: api,
+  );
+  return job != null;
+}
+
+/// Like [tryRequestCloudSubtitleGeneration] but returns the durable job row
+/// (state/attempts) so the UI can show cloud progress instead of a static tip.
+Future<SharedSubtitleGpuJob?> tryRequestCloudSubtitleGenerationJob({
+  required AcquireApiClient api,
+  required BilibiliSharedSubtitleIds ids,
 }) =>
-    requestCloudSubtitleGeneration(
+    requestCloudSubtitleGenerationJob(
       bvid: ids.bvid,
       page: ids.page,
       api: api,

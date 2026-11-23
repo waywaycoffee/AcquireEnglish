@@ -34,6 +34,21 @@ double progressFractionFromSubtitleLabel(String label) {
   if (isSubtitleSharedCacheReadyLabel(live)) {
     return 1.0;
   }
+  if (live.contains('云端正在翻译')) {
+    return 0.72;
+  }
+  if (live.contains('云端正在识别')) {
+    return 0.42;
+  }
+  if (live.contains('云端生成重试')) {
+    return 0.22;
+  }
+  if (live.contains('云端排队') || live.contains('推送云端') || live.contains('云端生成字幕')) {
+    return 0.15;
+  }
+  if (live.contains('云端字幕已完成')) {
+    return 0.95;
+  }
   final RegExpMatch? pct =
       RegExp(r'（(\d{1,3})%）').firstMatch(live) ??
       RegExp(r'(?<![0-9:])(\d{1,3})%').firstMatch(live);
@@ -73,11 +88,54 @@ const String kSubtitleSharedCachePartialLabel =
 const String kSubtitleSharedCacheLookupLabel = '正在检查校验字幕缓存…';
 
 /// Local still missing after shared lookup — durable ECS GPU job accepted.
-const String kSubtitleCloudGenerationQueuedLabel = '已推送云端生成字幕…';
+const String kSubtitleCloudGenerationQueuedLabel = '云端排队生成字幕中…';
+
+/// Map ECS GPU job `state` to a user-visible progress label.
+String labelForGpuSubtitleJobState(String? state) {
+  switch ((state ?? '').trim().toLowerCase()) {
+    case 'transcribing':
+      return '云端正在识别英文字幕…';
+    case 'translating':
+      return '云端正在翻译中文字幕…';
+    case 'retry':
+      return '云端生成重试中…';
+    case 'completed':
+      return '云端字幕已完成，正在同步…';
+    case 'failed':
+      return '云端字幕生成失败';
+    case 'queued':
+    default:
+      return kSubtitleCloudGenerationQueuedLabel;
+  }
+}
+
+/// Rough 0–1 progress for GPU job states (no percent from the worker yet).
+double progressFractionForGpuSubtitleJobState(String? state) {
+  switch ((state ?? '').trim().toLowerCase()) {
+    case 'transcribing':
+      return 0.42;
+    case 'translating':
+      return 0.72;
+    case 'completed':
+      return 0.95;
+    case 'retry':
+      return 0.22;
+    case 'failed':
+      return 0.0;
+    case 'queued':
+    default:
+      return 0.15;
+  }
+}
 
 bool isSubtitleCloudGenerationQueuedLabel(String? label) {
   final String live = (label ?? '').trim();
-  return live.contains('推送云端生成') || live.contains('云端生成字幕');
+  return live.contains('推送云端生成') ||
+      live.contains('云端排队生成') ||
+      live.contains('云端生成字幕') ||
+      live.contains('云端正在识别') ||
+      live.contains('云端正在翻译') ||
+      live.contains('云端生成重试');
 }
 
 bool isSubtitleSharedCacheReadyLabel(String? label) {

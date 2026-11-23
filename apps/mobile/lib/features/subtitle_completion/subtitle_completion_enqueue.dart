@@ -14,6 +14,7 @@ import '../player/presentation/player_subtitle_loader.dart';
 import '../player/presentation/subtitle_file_persist.dart';
 import '../player/presentation/subtitle_sentence_merge.dart';
 import '../sync/data/acquire_api_client.dart';
+import 'cloud_subtitle_job_tracker.dart';
 import 'shared_bilibili_subtitle_sync.dart';
 import 'spoken_language.dart';
 import 'subtitle_completion_background.dart';
@@ -487,10 +488,30 @@ Future<void> enqueueSubtitleCompletionForEpisode({
     );
     if (sharedIds != null) {
       if (needCloudAsr) {
-        cloudQueued = await tryRequestCloudSubtitleGeneration(
+        final SharedSubtitleGpuJob? gpuJob =
+            await tryRequestCloudSubtitleGenerationJob(
           api: sharedApi,
           ids: sharedIds,
         );
+        if (gpuJob != null) {
+          cloudQueued = true;
+          SubtitleCompletionStatusHub.instance.reportProgress(
+            episodeId,
+            labelForGpuSubtitleJobState(gpuJob.state),
+            status: SubtitleCompletionStatus.running,
+            needEnglish: plan.needEnglish,
+            needChinese: plan.needChinese,
+          );
+          SubtitleCompletionStatusHub.instance.notifyChanged();
+          CloudSubtitleJobTracker.instance.track(
+            episodeId: episodeId,
+            jobId: gpuJob.id,
+            bvid: sharedIds.bvid,
+            page: sharedIds.page,
+            needEnglish: plan.needEnglish,
+            needChinese: plan.needChinese,
+          );
+        }
       } else if (needCloudTranslate) {
         try {
           final String enSrt = await File(enPath!.trim()).readAsString();
@@ -503,18 +524,16 @@ Future<void> enqueueSubtitleCompletionForEpisode({
         } catch (_) {
           cloudQueued = false;
         }
-      }
-      if (cloudQueued) {
-        SubtitleCompletionStatusHub.instance.reportProgress(
-          episodeId,
-          needCloudAsr
-              ? kSubtitleCloudGenerationQueuedLabel
-              : '已排队云端中文翻译（GPU）',
-          status: SubtitleCompletionStatus.running,
-          needEnglish: plan.needEnglish,
-          needChinese: plan.needChinese,
-        );
-        SubtitleCompletionStatusHub.instance.notifyChanged();
+        if (cloudQueued) {
+          SubtitleCompletionStatusHub.instance.reportProgress(
+            episodeId,
+            '云端正在翻译中文字幕…',
+            status: SubtitleCompletionStatus.running,
+            needEnglish: plan.needEnglish,
+            needChinese: plan.needChinese,
+          );
+          SubtitleCompletionStatusHub.instance.notifyChanged();
+        }
       }
     }
   }
@@ -549,7 +568,9 @@ Future<void> enqueueSubtitleCompletionForEpisode({
     needEnglish: false,
     needChinese: plan.needChinese,
     asrPrimary: plan.asrPrimary.code,
-    force: force || chip != null,
+    // Chip taps revive failed jobs via requeueFailedJobs; do not force-reset
+    // a running job (that made re-taps restart generation from scratch).
+    force: force,
   );
   await scheduleSubtitleCompletionNudge();
   SubtitleCompletionStatusHub.instance.notifyChanged();

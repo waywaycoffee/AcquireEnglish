@@ -18,6 +18,7 @@ import '../player/presentation/subtitle_sentence_merge.dart';
 import '../settings/presentation/settings_provider.dart';
 import '../shared/data/word_lookup_service.dart';
 import '../sync/data/acquire_api_client.dart';
+import 'cloud_subtitle_job_tracker.dart';
 import 'external_subtitle_fill.dart';
 import 'shared_bilibili_subtitle_sync.dart';
 import 'subtitle_completion_queue.dart';
@@ -152,7 +153,33 @@ class SubtitleCompletionWorker {
         return true;
       }
       // Still missing EN: wait for cloud, but burn attempts so we eventually stop.
-      onProgress?.call(job.episodeId, kSubtitleCloudGenerationQueuedLabel);
+      String cloudLabel = kSubtitleCloudGenerationQueuedLabel;
+      try {
+        final AcquireApiClient? api = resolveSharedBilibiliSubtitleApi();
+        final BilibiliSharedSubtitleIds? ids = resolveBilibiliSharedSubtitleIds(
+          sourceKey: job.sourceKey,
+          videoAsset: job.videoPath,
+        );
+        if (api != null && ids != null) {
+          final SharedSubtitleGpuJob? gpu =
+              await tryRequestCloudSubtitleGenerationJob(
+            api: api,
+            ids: ids,
+          );
+          if (gpu != null) {
+            cloudLabel = labelForGpuSubtitleJobState(gpu.state);
+            CloudSubtitleJobTracker.instance.track(
+              episodeId: job.episodeId,
+              jobId: gpu.id,
+              bvid: ids.bvid,
+              page: ids.page,
+              needEnglish: true,
+              needChinese: stillNeed.needChinese,
+            );
+          }
+        }
+      } catch (_) {}
+      onProgress?.call(job.episodeId, cloudLabel);
       await queue.markIncompleteRetry(
         episodeId: job.episodeId,
         needEnglish: true,
