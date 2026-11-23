@@ -1,0 +1,1088 @@
+{
+  "version": "2.25",
+  "children": [
+    {
+      "type": "frame",
+      "id": "g9LAVh",
+      "x": 0,
+      "y": 0,
+      "name": "01 AI语法解析 · 就绪",
+      "clip": true,
+      "width": 390,
+      "fill": "$bg",
+      "layout": "vertical",
+      "padding": [
+        0,
+        0,
+        20,
+        0
+      ],
+      "alignItems": "center",
+      "children": [
+        {
+          "type": "frame",
+          "id": "HcthA",
+          "name": "Status Bar",
+          "width": "fill_container",
+          "height": 54,
+          "padding": [
+            14,
+            20,
+            8,
+            20
+          ],
+          "justifyContent": "space_between",
+          "alignItems": "center",
+          "children": [
+            {
+              "type": "text",
+              "id": "W6jJ07",
+              "name": "Time",
+              "fill": "$ink",
+              "content": "17:40",
+              "fontFamily": "Inter",
+              "fontSize": 15,
+              "fontWeight": "600"
+            },
+            {
+              "type": "text",
+              "id": "qUS4N",
+              "name": "SysIcons",
+              "fill": "$muted",
+              "content": "●●●  mid",
+              "fontFamily": "Inter",
+              "fontSize": 12,
+              "fontWeight": "normal"
+            }
+          ]
+        },
+        {
+          "type": "frame",
+          "id": "oGvu3",
+          "name": "Sheet",
+          "width": "fill_container",
+          "fill": "$surface",
+          "cornerRadius": [
+            28,
+            28,
+            0,
+            0
+          ],
+          "stroke": "$line",
+          "strokeWidth": 1,
+          "strokeAlignment": "inner",
+          "layout": "vertical",
+          "gap": 16,
+          "padding": [
+            12,
+            20,
+            24,
+            20
+          ],
+          "children": [
+            {
+              "type": "frame",
+              "id": "tYtky",
+              "name": "HandleWrap",
+              "width": "fill_container",
+              "height": 16,
+              "justifyContent": "center",
+              "alignItems": "center",
+              "children": [
+                {
+                  "type": "frame",
+                  "id": "LtZww",
+                  "name": "Handle",
+                  "width": 42,
+                  "height": 4,
+                  "fill": "$line",
+                  "cornerRadius": 99
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "qVizv",
+              "name": "Header",
+              "width": "fill_container",
+              "gap": 8,
+              "justifyContent": "space_between",
+              "alignItems": "center",
+              "children": [
+                {
+                  "type": "text",
+                  "id": "Y8fYj",
+                  "name": "Title",
+                  "fill": "$ink",
+                  "content": "AI 语法解析",
+                  "fontFamily": "Inter",
+                  "fontSize": 20,
+                  "fontWeight": "800"
+                },
+                {
+                  "type": "frame",
+                  "id": "hKLCE",
+                  "name": "Actions",
+                  "gap": 4,
+                  "alignItems": "center",
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "O6Oeb",
+                      "name": "Save",
+                      "fill": "$accent",
+                      "content": "存语法本",
+                      "fontFamily": "Inter",
+                      "fontSize": 13,
+                      "fontWeight": "600"
+                    },
+                    {
+                      "type": "text",
+                      "id": "LJecT",
+                      "name": "Close",
+                      "fill": "$muted",
+                      "content": "✕",
+                      "fontFamily": "Inter",
+                      "fontSize": 18,
+                      "fontWeight": "normal"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "ZJYae",
+              "name": "Sentence Card",
+              "width": "fill_container",
+              "fill": "$soft",
+              "cornerRadius": 16,
+              "stroke": "$line",
+              "strokeWidth": 1,
+              "strokeAlignment": "inner",
+              "layout": "vertical",
+              "gap": 10,
+              "padding": 14,
+              "children": [
+                {
+                  "type": "text",
+                  "id": "YhNhy",
+                  "name": "EN",
+                  "fill": "$ink",
+                  "textGrowth": "fixed-width",
+                  "width": "fill_container",
+                  "content": "I don't want her to go through what I went through with Carl.",
+                  "lineHeight": 1.4,
+                  "fontFamily": "Inter",
+                  "fontSize": 16,
+                  "fontWeight": "700"
+                },
+                {
+                  "type": "frame",
+                  "id": "bgdtS",
+                  "name": "Word Chips",
+                  "width": "fill_container",
+                  "gap": 6,
+                  "children": [
+                    {
+                      "type": "frame",
+                      "id": "trqZY",
+                      "name": "Chip I",
+                      "fill": "$chip",
+                      "cornerRadius": 8,
+                      "stroke": "$chipLine",
+                      "strokeWidth": 1,
+                      "strokeAlignment": "inner",
+                      "padding": [
+                        5,
+                        8
+                      ],
+                      "children": [
+                        {
+                          "type": "text",
+                          "id": "qWEU3",
+                          "name": "ChipText I",
+                          "fill": "$accent",
+                          "content": "I",
+                          "fontFamily": "Inter",
+                          "fontSize": 11,
+                          "fontWeight": "600"
+                        }
+                      ]
+                    },
+                    {
+                      "type": "frame",
+                      "id": "knLqu",
+                      "name": "Chip don't want",
+                      "fill": "$chip",
+                      "cornerRadius": 8,
+                      "stroke": "$chipLine",
+                      "strokeWidth": 1,
+                      "strokeAlignment": "inner",
+                      "padding": [
+                        5,
+                        8
+                      ],
+                      "children": [
+                        {
+                          "type": "text",
+                          "id": "oOROQ",
+                          "name": "ChipText don't want",
+                          "fill": "$accent",
+                          "content": "don't want",
+                          "fontFamily": "Inter",
+                          "fontSize": 11,
+                          "fontWeight": "600"
+                        }
+                      ]
+                    },
+                    {
+                      "type": "frame",
+                      "id": "R8Yn2T",
+                      "name": "Chip her",
+                      "fill": "$chip",
+                      "cornerRadius": 8,
+                      "stroke": "$chipLine",
+                      "strokeWidth": 1,
+                      "strokeAlignment": "inner",
+                      "padding": [
+                        5,
+                        8
+                      ],
+                      "children": [
+                        {
+                          "type": "text",
+                          "id": "Yy6wo",
+                          "name": "ChipText her",
+                          "fill": "$accent",
+                          "content": "her",
+                          "fontFamily": "Inter",
+                          "fontSize": 11,
+                          "fontWeight": "600"
+                        }
+                      ]
+                    },
+                    {
+                      "type": "frame",
+                      "id": "a9lnbH",
+                      "name": "Chip to go through",
+                      "fill": "$chip",
+                      "cornerRadius": 8,
+                      "stroke": "$chipLine",
+                      "strokeWidth": 1,
+                      "strokeAlignment": "inner",
+                      "padding": [
+                        5,
+                        8
+                      ],
+                      "children": [
+                        {
+                          "type": "text",
+                          "id": "k59cGT",
+                          "name": "ChipText to go through",
+                          "fill": "$accent",
+                          "content": "to go through",
+                          "fontFamily": "Inter",
+                          "fontSize": 11,
+                          "fontWeight": "600"
+                        }
+                      ]
+                    },
+                    {
+                      "type": "frame",
+                      "id": "fizEI",
+                      "name": "Chip what…",
+                      "fill": "$chip",
+                      "cornerRadius": 8,
+                      "stroke": "$chipLine",
+                      "strokeWidth": 1,
+                      "strokeAlignment": "inner",
+                      "padding": [
+                        5,
+                        8
+                      ],
+                      "children": [
+                        {
+                          "type": "text",
+                          "id": "qS8se",
+                          "name": "ChipText what…",
+                          "fill": "$accent",
+                          "content": "what…",
+                          "fontFamily": "Inter",
+                          "fontSize": 11,
+                          "fontWeight": "600"
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "q4wC9d",
+              "name": "Analysis Card",
+              "width": "fill_container",
+              "fill": "$surface",
+              "cornerRadius": 18,
+              "stroke": "$line",
+              "strokeWidth": 1,
+              "strokeAlignment": "inner",
+              "layout": "vertical",
+              "gap": 18,
+              "padding": 18,
+              "children": [
+                {
+                  "type": "frame",
+                  "id": "X4ceP",
+                  "name": "Section 1",
+                  "width": "fill_container",
+                  "layout": "vertical",
+                  "gap": 8,
+                  "children": [
+                    {
+                      "type": "frame",
+                      "id": "oPL5r",
+                      "name": "Head 1",
+                      "width": "fill_container",
+                      "gap": 8,
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "text",
+                          "id": "Ydfpc",
+                          "name": "Num 1",
+                          "fill": "$ink",
+                          "content": "1. 句子翻译",
+                          "fontFamily": "Inter",
+                          "fontSize": 15,
+                          "fontWeight": "800"
+                        }
+                      ]
+                    },
+                    {
+                      "type": "text",
+                      "id": "B7WB02",
+                      "name": "Body 1 我不希望她经历我和卡尔经",
+                      "fill": "$ink",
+                      "textGrowth": "fixed-width",
+                      "width": "fill_container",
+                      "content": "我不希望她经历我和卡尔经历过的那些事。",
+                      "lineHeight": 1.55,
+                      "fontFamily": "Inter",
+                      "fontSize": 14,
+                      "fontWeight": "600"
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "Y4JtG",
+                  "name": "Section 2",
+                  "width": "fill_container",
+                  "layout": "vertical",
+                  "gap": 8,
+                  "children": [
+                    {
+                      "type": "frame",
+                      "id": "j7UV8s",
+                      "name": "Head 2",
+                      "width": "fill_container",
+                      "gap": 8,
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "text",
+                          "id": "iM7OI",
+                          "name": "Num 2",
+                          "fill": "$ink",
+                          "content": "2. 句子结构",
+                          "fontFamily": "Inter",
+                          "fontSize": 15,
+                          "fontWeight": "800"
+                        }
+                      ]
+                    },
+                    {
+                      "type": "text",
+                      "id": "FVRlv",
+                      "name": "Body 2 主语 → I",
+                      "fill": "$ink",
+                      "textGrowth": "fixed-width",
+                      "width": "fill_container",
+                      "content": "主语 → I",
+                      "lineHeight": 1.55,
+                      "fontFamily": "Inter",
+                      "fontSize": 14,
+                      "fontWeight": "600"
+                    },
+                    {
+                      "type": "text",
+                      "id": "kIMBm",
+                      "name": "Body 2 谓语 → don't w",
+                      "fill": "$ink",
+                      "textGrowth": "fixed-width",
+                      "width": "fill_container",
+                      "content": "谓语 → don't want（一般现在时否定）",
+                      "lineHeight": 1.55,
+                      "fontFamily": "Inter",
+                      "fontSize": 14,
+                      "fontWeight": "600"
+                    },
+                    {
+                      "type": "text",
+                      "id": "W2CrVr",
+                      "name": "Body 2 宾语 → her",
+                      "fill": "$ink",
+                      "textGrowth": "fixed-width",
+                      "width": "fill_container",
+                      "content": "宾语 → her",
+                      "lineHeight": 1.55,
+                      "fontFamily": "Inter",
+                      "fontSize": 14,
+                      "fontWeight": "600"
+                    },
+                    {
+                      "type": "text",
+                      "id": "OisqC",
+                      "name": "Body 2 宾语补足语 → to g",
+                      "fill": "$ink",
+                      "textGrowth": "fixed-width",
+                      "width": "fill_container",
+                      "content": "宾语补足语 → to go through what I went through with Carl（不定式短语）",
+                      "lineHeight": 1.55,
+                      "fontFamily": "Inter",
+                      "fontSize": 14,
+                      "fontWeight": "600"
+                    },
+                    {
+                      "type": "text",
+                      "id": "D0xUEO",
+                      "name": "Body 2 · what 引导名词性",
+                      "fill": "$muted",
+                      "textGrowth": "fixed-width",
+                      "width": "fill_container",
+                      "content": "· what 引导名词性从句，作 go through 的宾语",
+                      "lineHeight": 1.55,
+                      "fontFamily": "Inter",
+                      "fontSize": 14,
+                      "fontWeight": "500"
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "XVOvG",
+                  "name": "Section 3",
+                  "width": "fill_container",
+                  "layout": "vertical",
+                  "gap": 8,
+                  "children": [
+                    {
+                      "type": "frame",
+                      "id": "KWWBr",
+                      "name": "Head 3",
+                      "width": "fill_container",
+                      "gap": 8,
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "text",
+                          "id": "Y0nAHV",
+                          "name": "Num 3",
+                          "fill": "$ink",
+                          "content": "3. 时态语态",
+                          "fontFamily": "Inter",
+                          "fontSize": 15,
+                          "fontWeight": "800"
+                        }
+                      ]
+                    },
+                    {
+                      "type": "text",
+                      "id": "NVjVN",
+                      "name": "Body 3 主句用一般现在时，表达当",
+                      "fill": "$ink",
+                      "textGrowth": "fixed-width",
+                      "width": "fill_container",
+                      "content": "主句用一般现在时，表达当前意愿；从句 went through 为一般过去时，指过去经历。",
+                      "lineHeight": 1.55,
+                      "fontFamily": "Inter",
+                      "fontSize": 14,
+                      "fontWeight": "600"
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "dCJgZ",
+                  "name": "Section 4",
+                  "width": "fill_container",
+                  "layout": "vertical",
+                  "gap": 8,
+                  "children": [
+                    {
+                      "type": "frame",
+                      "id": "dGcTO",
+                      "name": "Head 4",
+                      "width": "fill_container",
+                      "gap": 8,
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "text",
+                          "id": "QDfTc",
+                          "name": "Num 4",
+                          "fill": "$ink",
+                          "content": "4. 重点短语",
+                          "fontFamily": "Inter",
+                          "fontSize": 15,
+                          "fontWeight": "800"
+                        }
+                      ]
+                    },
+                    {
+                      "type": "text",
+                      "id": "EW2Fo",
+                      "name": "Body 4 go through：经",
+                      "fill": "$ink",
+                      "textGrowth": "fixed-width",
+                      "width": "fill_container",
+                      "content": "go through：经历、遭受",
+                      "lineHeight": 1.55,
+                      "fontFamily": "Inter",
+                      "fontSize": 14,
+                      "fontWeight": "600"
+                    },
+                    {
+                      "type": "text",
+                      "id": "JHhyC",
+                      "name": "Body 4 want somebod",
+                      "fill": "$ink",
+                      "textGrowth": "fixed-width",
+                      "width": "fill_container",
+                      "content": "want somebody to do something：想要某人做某事",
+                      "lineHeight": 1.55,
+                      "fontFamily": "Inter",
+                      "fontSize": 14,
+                      "fontWeight": "600"
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "N3q4XV",
+                  "name": "Section 5",
+                  "width": "fill_container",
+                  "layout": "vertical",
+                  "gap": 8,
+                  "children": [
+                    {
+                      "type": "frame",
+                      "id": "G3FtHk",
+                      "name": "Head 5",
+                      "width": "fill_container",
+                      "gap": 8,
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "text",
+                          "id": "JMuoZ",
+                          "name": "Num 5",
+                          "fill": "$ink",
+                          "content": "5. 语法要点",
+                          "fontFamily": "Inter",
+                          "fontSize": 15,
+                          "fontWeight": "800"
+                        }
+                      ]
+                    },
+                    {
+                      "type": "text",
+                      "id": "q1PPf",
+                      "name": "Body 5 不定式作宾补：want ",
+                      "fill": "$ink",
+                      "textGrowth": "fixed-width",
+                      "width": "fill_container",
+                      "content": "不定式作宾补：want + 宾语 + to do",
+                      "lineHeight": 1.55,
+                      "fontFamily": "Inter",
+                      "fontSize": 14,
+                      "fontWeight": "600"
+                    },
+                    {
+                      "type": "text",
+                      "id": "R9qFj6",
+                      "name": "Body 5 what 名词性从句作宾",
+                      "fill": "$ink",
+                      "textGrowth": "fixed-width",
+                      "width": "fill_container",
+                      "content": "what 名词性从句作宾语，承接前文经历",
+                      "lineHeight": 1.55,
+                      "fontFamily": "Inter",
+                      "fontSize": 14,
+                      "fontWeight": "600"
+                    },
+                    {
+                      "type": "text",
+                      "id": "Zp66m",
+                      "name": "Body 5 主从句时态对照：现在意愿",
+                      "fill": "$ink",
+                      "textGrowth": "fixed-width",
+                      "width": "fill_container",
+                      "content": "主从句时态对照：现在意愿 vs 过去经历",
+                      "lineHeight": 1.55,
+                      "fontFamily": "Inter",
+                      "fontSize": 14,
+                      "fontWeight": "600"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "text",
+              "id": "vWNNl",
+              "name": "Source",
+              "fill": "$muted",
+              "content": "来源：云端 DeepSeek · 已缓存",
+              "fontFamily": "Inter",
+              "fontSize": 12,
+              "fontWeight": "600"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "frame",
+      "id": "gm3fk",
+      "x": 438,
+      "y": 0,
+      "name": "02 AI语法解析 · 加载中",
+      "clip": true,
+      "width": 390,
+      "fill": "$bg",
+      "layout": "vertical",
+      "padding": [
+        0,
+        0,
+        20,
+        0
+      ],
+      "alignItems": "center",
+      "children": [
+        {
+          "type": "frame",
+          "id": "kt9Nr",
+          "name": "02 AI语法解析 · 加载中 Status",
+          "width": "fill_container",
+          "height": 54,
+          "padding": [
+            14,
+            20,
+            8,
+            20
+          ],
+          "justifyContent": "space_between",
+          "alignItems": "center",
+          "children": [
+            {
+              "type": "text",
+              "id": "K2JzFI",
+              "name": "02 AI语法解析 · 加载中 Time",
+              "fill": "$ink",
+              "content": "17:40",
+              "fontFamily": "Inter",
+              "fontSize": 15,
+              "fontWeight": "600"
+            },
+            {
+              "type": "text",
+              "id": "lzbRU",
+              "name": "02 AI语法解析 · 加载中 Sys",
+              "fill": "$muted",
+              "content": "●●●  mid",
+              "fontFamily": "Inter",
+              "fontSize": 12,
+              "fontWeight": "normal"
+            }
+          ]
+        },
+        {
+          "type": "frame",
+          "id": "Ld2uj",
+          "name": "02 AI语法解析 · 加载中 Sheet",
+          "width": "fill_container",
+          "fill": "$surface",
+          "cornerRadius": [
+            28,
+            28,
+            0,
+            0
+          ],
+          "stroke": "$line",
+          "strokeWidth": 1,
+          "strokeAlignment": "inner",
+          "layout": "vertical",
+          "gap": 16,
+          "padding": [
+            12,
+            20,
+            28,
+            20
+          ],
+          "children": [
+            {
+              "type": "frame",
+              "id": "P9Gjg",
+              "name": "02 AI语法解析 · 加载中 HandleWrap",
+              "width": "fill_container",
+              "height": 16,
+              "justifyContent": "center",
+              "alignItems": "center",
+              "children": [
+                {
+                  "type": "frame",
+                  "id": "v05prp",
+                  "name": "02 AI语法解析 · 加载中 Handle",
+                  "width": 42,
+                  "height": 4,
+                  "fill": "$line",
+                  "cornerRadius": 99
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "kSGtL",
+              "name": "02 AI语法解析 · 加载中 Header",
+              "width": "fill_container",
+              "justifyContent": "space_between",
+              "alignItems": "center",
+              "children": [
+                {
+                  "type": "text",
+                  "id": "NZlYc",
+                  "name": "02 AI语法解析 · 加载中 Title",
+                  "fill": "$ink",
+                  "content": "AI 语法解析",
+                  "fontFamily": "Inter",
+                  "fontSize": 20,
+                  "fontWeight": "800"
+                },
+                {
+                  "type": "text",
+                  "id": "NDcy1",
+                  "name": "02 AI语法解析 · 加载中 Close",
+                  "fill": "$muted",
+                  "content": "✕",
+                  "fontFamily": "Inter",
+                  "fontSize": 18,
+                  "fontWeight": "normal"
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "T6t7A5",
+              "name": "Loading Sentence",
+              "width": "fill_container",
+              "fill": "$soft",
+              "cornerRadius": 16,
+              "stroke": "$line",
+              "strokeWidth": 1,
+              "strokeAlignment": "inner",
+              "layout": "vertical",
+              "padding": 14,
+              "children": [
+                {
+                  "type": "text",
+                  "id": "gMLuJ",
+                  "name": "Loading EN",
+                  "fill": "$ink",
+                  "textGrowth": "fixed-width",
+                  "width": "fill_container",
+                  "content": "I don't want her to go through what I went through with Carl.",
+                  "lineHeight": 1.4,
+                  "fontFamily": "Inter",
+                  "fontSize": 16,
+                  "fontWeight": "700"
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "Z6ICbg",
+              "name": "Loading Body",
+              "width": "fill_container",
+              "height": 280,
+              "layout": "vertical",
+              "gap": 14,
+              "justifyContent": "center",
+              "alignItems": "center",
+              "children": [
+                {
+                  "type": "ellipse",
+                  "id": "BZGHF",
+                  "name": "Spinner",
+                  "fill": "#00000000",
+                  "width": 36,
+                  "height": 36,
+                  "stroke": "$accent",
+                  "strokeWidth": 3
+                },
+                {
+                  "type": "text",
+                  "id": "a3a0V",
+                  "name": "Loading Hint",
+                  "fill": "$muted",
+                  "content": "云端解析中…通常 2–5 秒",
+                  "fontFamily": "Inter",
+                  "fontSize": 14,
+                  "fontWeight": "700"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "frame",
+      "id": "PDmqq",
+      "x": 876,
+      "y": 0,
+      "name": "03 AI语法解析 · 失败",
+      "clip": true,
+      "width": 390,
+      "fill": "$bg",
+      "layout": "vertical",
+      "padding": [
+        0,
+        0,
+        20,
+        0
+      ],
+      "alignItems": "center",
+      "children": [
+        {
+          "type": "frame",
+          "id": "Z2h4y",
+          "name": "03 AI语法解析 · 失败 Status",
+          "width": "fill_container",
+          "height": 54,
+          "padding": [
+            14,
+            20,
+            8,
+            20
+          ],
+          "justifyContent": "space_between",
+          "alignItems": "center",
+          "children": [
+            {
+              "type": "text",
+              "id": "oq9jc",
+              "name": "03 AI语法解析 · 失败 Time",
+              "fill": "$ink",
+              "content": "17:40",
+              "fontFamily": "Inter",
+              "fontSize": 15,
+              "fontWeight": "600"
+            },
+            {
+              "type": "text",
+              "id": "G9iSD",
+              "name": "03 AI语法解析 · 失败 Sys",
+              "fill": "$muted",
+              "content": "●●●  mid",
+              "fontFamily": "Inter",
+              "fontSize": 12,
+              "fontWeight": "normal"
+            }
+          ]
+        },
+        {
+          "type": "frame",
+          "id": "U4p8wi",
+          "name": "03 AI语法解析 · 失败 Sheet",
+          "width": "fill_container",
+          "fill": "$surface",
+          "cornerRadius": [
+            28,
+            28,
+            0,
+            0
+          ],
+          "stroke": "$line",
+          "strokeWidth": 1,
+          "strokeAlignment": "inner",
+          "layout": "vertical",
+          "gap": 16,
+          "padding": [
+            12,
+            20,
+            28,
+            20
+          ],
+          "children": [
+            {
+              "type": "frame",
+              "id": "LP4XR",
+              "name": "03 AI语法解析 · 失败 HandleWrap",
+              "width": "fill_container",
+              "height": 16,
+              "justifyContent": "center",
+              "alignItems": "center",
+              "children": [
+                {
+                  "type": "frame",
+                  "id": "a2ys82",
+                  "name": "03 AI语法解析 · 失败 Handle",
+                  "width": 42,
+                  "height": 4,
+                  "fill": "$line",
+                  "cornerRadius": 99
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "U3PJen",
+              "name": "03 AI语法解析 · 失败 Header",
+              "width": "fill_container",
+              "justifyContent": "space_between",
+              "alignItems": "center",
+              "children": [
+                {
+                  "type": "text",
+                  "id": "ACyh2",
+                  "name": "03 AI语法解析 · 失败 Title",
+                  "fill": "$ink",
+                  "content": "AI 语法解析",
+                  "fontFamily": "Inter",
+                  "fontSize": 20,
+                  "fontWeight": "800"
+                },
+                {
+                  "type": "text",
+                  "id": "T1Mq5",
+                  "name": "03 AI语法解析 · 失败 Close",
+                  "fill": "$muted",
+                  "content": "✕",
+                  "fontFamily": "Inter",
+                  "fontSize": 18,
+                  "fontWeight": "normal"
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "njf6F",
+              "name": "Error Card",
+              "width": "fill_container",
+              "fill": "$soft",
+              "cornerRadius": 16,
+              "stroke": "$line",
+              "strokeWidth": 1,
+              "strokeAlignment": "inner",
+              "layout": "vertical",
+              "gap": 14,
+              "padding": 16,
+              "children": [
+                {
+                  "type": "text",
+                  "id": "q64CP",
+                  "name": "Error Msg",
+                  "fill": "$ink",
+                  "textGrowth": "fixed-width",
+                  "width": "fill_container",
+                  "content": "语法解析超时。已切换为云端 DeepSeek；请检查登录后重试。",
+                  "lineHeight": 1.5,
+                  "fontFamily": "Inter",
+                  "fontSize": 15,
+                  "fontWeight": "700"
+                },
+                {
+                  "type": "frame",
+                  "id": "r2hyTL",
+                  "name": "Retry Btn",
+                  "fill": "$accent",
+                  "cornerRadius": 12,
+                  "padding": [
+                    10,
+                    16
+                  ],
+                  "alignItems": "center",
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "jVuHv",
+                      "name": "Retry Text",
+                      "fill": "#FFFFFF",
+                      "content": "重试",
+                      "fontFamily": "Inter",
+                      "fontSize": 14,
+                      "fontWeight": "700"
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "note",
+      "id": "E1hWGJ",
+      "x": 0,
+      "y": 980,
+      "name": "Design Notes",
+      "width": 520,
+      "height": 180,
+      "content": "对照参考：影视英语精读式编号卡片（翻译/结构/时态/短语/要点）。\n提速：默认走 ECS DeepSeek + 句子缓存；本地 Ollama 仅作回退。\n确认此稿后再改 Flutter ai_grammar_analysis_sheet。",
+      "color": "#FEE484"
+    }
+  ],
+  "variables": {
+    "bg": {
+      "type": "color",
+      "value": "#F3F4F6"
+    },
+    "surface": {
+      "type": "color",
+      "value": "#FFFFFF"
+    },
+    "ink": {
+      "type": "color",
+      "value": "#111827"
+    },
+    "muted": {
+      "type": "color",
+      "value": "#6B7280"
+    },
+    "line": {
+      "type": "color",
+      "value": "#E5E7EB"
+    },
+    "accent": {
+      "type": "color",
+      "value": "#2563EB"
+    },
+    "chip": {
+      "type": "color",
+      "value": "#EEF2FF"
+    },
+    "chipLine": {
+      "type": "color",
+      "value": "#C7D2FE"
+    },
+    "soft": {
+      "type": "color",
+      "value": "#F9FAFB"
+    }
+  },
+  "fileToken": "1281d3b4-ba09-4054-a492-0200f7e43d03"
+}

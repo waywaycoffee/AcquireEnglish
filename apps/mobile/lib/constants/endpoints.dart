@@ -63,6 +63,7 @@ class Endpoints {
   static String communityPostTranscribe(int postId) =>
       'api/community/posts/$postId/transcribe';
   static const String writingGrade = 'api/writing/grade';
+  static const String grammarAnalyze = 'api/grammar/analyze';
   static const String usageEvents = 'api/usage/events';
   static const String examPacks = 'api/exam/packs';
   static const String cosmeticsBalance = 'api/cosmetics/balance';

@@ -3757,6 +3757,35 @@ class AcquireApiClient {
     );
   }
 
+  /// Cloud DeepSeek grammar analysis (ECS-cached). Null when offline / unpaid path fails.
+  Future<Map<String, dynamic>?> analyzeSentenceGrammar({
+    required String sentence,
+    String chinese = '',
+  }) async {
+    final String text = sentence.trim();
+    if (text.isEmpty) return null;
+    try {
+      final Response<dynamic> response = await _dio.post(
+        Endpoints.grammarAnalyze,
+        data: <String, dynamic>{
+          'sentence': text,
+          'chinese': chinese.trim(),
+        },
+        options: Options(
+          extra: _noCache.extra,
+          receiveTimeout: const Duration(seconds: 50),
+          sendTimeout: const Duration(seconds: 20),
+        ),
+      );
+      final Object? data = response.data;
+      if (data is Map<String, dynamic>) return data;
+      if (data is Map) return Map<String, dynamic>.from(data);
+      return null;
+    } catch (_) {
+      return null;
+    }
+  }
+
   Future<WritingGradeResult> gradeWriting({
     required String text,
     String prompt = '',

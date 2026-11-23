@@ -51,6 +51,7 @@ class SentenceGrammarAnalysis {
     required this.sentence,
     required this.translationCn,
     required this.structureCn,
+    this.tenseVoiceCn = '',
     this.partsOfSpeechCn = '',
     this.svoCn = '',
     this.predicateVerb = '',
@@ -75,6 +76,7 @@ class SentenceGrammarAnalysis {
         json['grammarPoints/keyPhrases'];
     final Object? phrasesRaw =
         json['keyPhrases'] ?? json['key_phrases'] ?? json['phrases'];
+    final String cachedSource = _asPlainText(json['source']);
     return SentenceGrammarAnalysis(
       sentence: _asPlainText(
         json['sentence'] ?? json['text'] ?? fallbackSentence,
@@ -85,6 +87,12 @@ class SentenceGrammarAnalysis {
       ),
       structureCn: _asStructureText(
         json['structureCn'] ?? json['structure'] ?? json['structure_cn'],
+      ),
+      tenseVoiceCn: _asPlainText(
+        json['tenseVoiceCn'] ??
+            json['tense'] ??
+            json['tense_voice'] ??
+            json['时态语态'],
       ),
       partsOfSpeechCn: _asPlainText(
         json['partsOfSpeechCn'] ??
@@ -112,7 +120,7 @@ class SentenceGrammarAnalysis {
       learningTipCn: _asPlainText(
         json['learningTipCn'] ?? json['tip'] ?? json['learningTip'],
       ),
-      sourceLabel: sourceLabel,
+      sourceLabel: cachedSource.isNotEmpty ? cachedSource : sourceLabel,
     );
   }
 
@@ -124,6 +132,7 @@ class SentenceGrammarAnalysis {
       sentence: sentence,
       translationCn: '',
       structureCn: '',
+      tenseVoiceCn: '',
       partsOfSpeechCn: '',
       svoCn: '',
       predicateVerb: '',
@@ -140,6 +149,7 @@ class SentenceGrammarAnalysis {
   final String sentence;
   final String translationCn;
   final String structureCn;
+  final String tenseVoiceCn;
   final String partsOfSpeechCn;
   final String svoCn;
   final String predicateVerb;
@@ -157,6 +167,7 @@ class SentenceGrammarAnalysis {
         'sentence': sentence,
         'translationCn': translationCn,
         'structureCn': structureCn,
+        'tenseVoiceCn': tenseVoiceCn,
         'partsOfSpeechCn': partsOfSpeechCn,
         'svoCn': svoCn,
         'predicateVerb': predicateVerb,
@@ -214,7 +225,10 @@ String _asStructureText(Object? value) {
               item['title'] ?? item['name'] ?? item['part'],
             );
             final String explanation = _asPlainText(
-              item['explanation'] ?? item['detail'] ?? item['desc'],
+              item['explanation'] ??
+                  item['detail'] ??
+                  item['desc'] ??
+                  item['text'],
             );
             if (title.isEmpty) {
               return explanation;
@@ -222,12 +236,12 @@ String _asStructureText(Object? value) {
             if (explanation.isEmpty) {
               return title;
             }
-            return '$title：$explanation';
+            return '$title → $explanation';
           }
           return _asPlainText(item);
         })
         .where((String item) => item.isNotEmpty)
-        .join('；');
+        .join('\n');
   }
   if (value is Map) {
     final String title = _asPlainText(
