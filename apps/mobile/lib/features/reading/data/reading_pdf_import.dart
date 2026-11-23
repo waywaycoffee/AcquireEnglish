@@ -22,6 +22,9 @@ class ReadingPdfImportResult {
 /// PDF import: embedded text → shared OCR library → on-device OCR (+ optional upload).
 ///
 /// [shareOcr] false：私人教材解构流不读/不写共享 OCR（默认阅读导入仍为 true）。
+/// Aligns with 口语入门探索版 / reading source 20MB ceiling.
+const int kReadingImportMaxBytes = 20 * 1024 * 1024;
+
 Future<ReadingPdfImportResult> importPdfForReading({
   required Uint8List bytes,
   required String filename,
@@ -29,7 +32,13 @@ Future<ReadingPdfImportResult> importPdfForReading({
   required bool isLoggedIn,
   ReadingPdfOcrProgress? onProgress,
   bool shareOcr = true,
+  int maxBytes = kReadingImportMaxBytes,
 }) async {
+  if (bytes.lengthInBytes > maxBytes) {
+    throw StateError(
+      '文档超过 ${maxBytes ~/ (1024 * 1024)}MB 上限，请压缩后再导入',
+    );
+  }
   final String sha = sha256HexOfBytes(bytes);
   final String embedded = parsePdfImport(bytes);
   if (!pdfNeedsOcr(embedded)) {

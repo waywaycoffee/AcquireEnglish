@@ -1881,6 +1881,19 @@ class AcquireApiClient {
     return response.data as Map<String, dynamic>;
   }
 
+  Future<Map<String, dynamic>> commerceQuota(
+    String metric, {
+    String? moduleCode,
+  }) async {
+    final Response<dynamic> response = await _dio.get(
+      Endpoints.commerceQuotaMetric(metric),
+      queryParameters: <String, dynamic>{
+        if (moduleCode != null && moduleCode.isNotEmpty) 'module_code': moduleCode,
+      },
+    );
+    return response.data as Map<String, dynamic>;
+  }
+
   Future<Map<String, dynamic>> commerceConsumeQuota({
     required String metric,
     int amount = 1,

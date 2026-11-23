@@ -136,7 +136,9 @@ async def commerce_module_access(
         seeds = (public_free_trial_seeds().get("modules") or {}).get(canonical) or []
     except Exception:
         seeds = []
-    return {
+    from app.services.commerce.catalog import module_features
+
+    out = {
         "module": canonical,
         "requested": code,
         "title": title,
@@ -147,7 +149,18 @@ async def commerce_module_access(
         "free_trial_seeds": seeds,
         "free_tier_promises": FREE_TIER_PROMISES,
         "bookshelf_free_stays_free": True,
+        "features": module_features(canonical),
     }
+    if canonical == "digital_human":
+        from app.services.commerce.quotas import PAID_MODULE_CAPS
+
+        caps = PAID_MODULE_CAPS.get("digital_human") or {}
+        out["quota"] = {
+            "duplex_minutes_day": int(caps.get("duplex_minutes_day") or 20),
+            "doc_libraries": int(caps.get("doc_libraries") or 5),
+            "doc_max_mb": int(caps.get("doc_max_mb") or 20),
+        }
+    return out
 
 
 @router.get("/entitlements")
@@ -155,12 +168,20 @@ async def commerce_entitlements(
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> dict:
+    from app.services.commerce.catalog import oral_explore_features_for_modules
+    from app.services.commerce.quotas import doc_library_limits_for_modules
+
     summary = await build_assets_summary(db, user)
     ents = summary["entitlements"]
+    unlocked = set(summary.get("unlocked_modules") or [])
+    if summary.get("active_membership") == "pro":
+        unlocked.add("pro")
     return {
         "active_membership": summary["active_membership"],
         "unlocked_modules": summary["unlocked_modules"],
         "wallet_credits": int(summary["wallet"].balance_credits or 0),
+        "features": oral_explore_features_for_modules(unlocked),
+        "doc_libraries": doc_library_limits_for_modules(unlocked),
         "entitlements": [
             {
                 "id": e.id,

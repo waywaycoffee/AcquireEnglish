@@ -79,6 +79,34 @@ class UserAssetsService {
     return snap.coachMinutes;
   }
 
+  /// Deduct full-duplex wall-clock minutes (daily explore-tier meter).
+  ///
+  /// Returns remaining duplex minutes for today. Throws on 402 exhausted.
+  Future<int> consumeDuplexMinutes({
+    int minutes = 1,
+    String moduleCode = 'digital_human',
+  }) async {
+    final Map<String, dynamic> status = await _ref
+        .read(acquireApiClientProvider)
+        .commerceConsumeQuota(
+          metric: 'duplex_minutes',
+          amount: minutes,
+          moduleCode: moduleCode,
+        );
+    return (status['remaining'] as num?)?.toInt() ?? 0;
+  }
+
+  Future<int?> duplexMinutesRemaining() async {
+    try {
+      final Map<String, dynamic> status = await _ref
+          .read(acquireApiClientProvider)
+          .commerceQuota('duplex_minutes', moduleCode: 'digital_human');
+      return (status['remaining'] as num?)?.toInt();
+    } catch (_) {
+      return null;
+    }
+  }
+
   /// Create an order and launch WeChat App payment.
   ///
   /// Requires server merchant credentials (`wechat_pay_configured=true`).

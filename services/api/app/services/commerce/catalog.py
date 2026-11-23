@@ -3,7 +3,7 @@
 Sellable surface:
   - Pro 全开 · 7 天卡
   - 阅读 / 视频 / 考试 · 年卡 only
-  - 数字人 · 月卡
+  - 口语入门探索版（原数字人模块）· 月卡 ¥25
   - 单词 / 词书 · 永久免费（无付费 SKU）
 """
 
@@ -90,17 +90,35 @@ MODULE_DEFS: list[dict] = [
     },
     {
         "code": "digital_human",
-        "title": "数字人模块",
+        "title": "口语入门探索版",
         "axis": "digital_human",
         "capability": "speaking",
-        "monthly_cents": 2000,
-        "list_cents": 2000,
+        "monthly_cents": 2500,
+        "list_cents": 2500,
         "yearly_cents": 0,
         "yearly_list_cents": 0,
         "sell": ["monthly"],
         "free": False,
-        "quota": {"coach_minutes": 120},
-        "blurb": "数字人外教陪练 · ¥20/月",
+        "quota": {
+            "duplex_minutes_day": 20,
+            "doc_libraries": 5,
+            "doc_max_mb": 20,
+            "coach_minutes": 120,
+        },
+        "features": {
+            "custom_digital_human": True,
+            "voice_clone": False,
+            "hd_export": False,
+            "team_collab": False,
+            "base_avatar": True,
+            "max_resolution": "720p",
+            "rag": True,
+            "podcast": True,
+        },
+        "blurb": (
+            "每天20分钟全双工 · 5个文档库（单文档20MB）· "
+            "基础数字人/720P/RAG/播客 · ¥25/月"
+        ),
     },
     # Course stays free (not on paid storefront); keeps legacy unlocks working.
     {
@@ -246,7 +264,11 @@ def _module_skus() -> list[dict]:
                 {
                     "sku_code": f"module.{code}.monthly",
                     "kind": "module",
-                    "title": f"{mod['title']} · 月卡",
+                    "title": (
+                        mod["title"]
+                        if code == "digital_human"
+                        else f"{mod['title']} · 月卡"
+                    ),
                     "ref_id": code,
                     "price_cents": int(mod["monthly_cents"]),
                     "duration_days": 30,
@@ -255,6 +277,7 @@ def _module_skus() -> list[dict]:
                             mod.get("list_cents") or mod["monthly_cents"]
                         ),
                         "quota": mod.get("quota") or {},
+                        "features": mod.get("features") or {},
                         "blurb": mod.get("blurb"),
                         "axis": mod.get("axis"),
                         "capability": mod.get("capability"),
@@ -365,6 +388,7 @@ def public_module_catalog() -> list[dict]:
             "list_cents": m["list_cents"],
             "yearly_cents": m["yearly_cents"],
             "quota": m["quota"],
+            "features": dict(m.get("features") or {}),
         }
         if "monthly" in sell:
             row["sku_monthly"] = f"module.{m['code']}.monthly"
@@ -405,6 +429,36 @@ def public_membership_catalog() -> list[dict]:
     ]
 
 
+def module_features(module_code: str | None) -> dict:
+    """Feature flags for a product module (empty when unknown / free)."""
+    code = normalize_module_code(module_code or "") or (module_code or "").strip()
+    for mod in MODULE_DEFS:
+        if mod["code"] == code:
+            return dict(mod.get("features") or {})
+    return {}
+
+
+def oral_explore_features_for_modules(unlocked: set[str] | list[str]) -> dict:
+    """Effective oral-tier flags. Explore SKU keeps custom avatars; blocks clone/HD/team."""
+    codes = {str(c).strip() for c in unlocked if str(c).strip()}
+    if "digital_human" not in codes and "pro" not in codes:
+        # No paid oral module — still expose defaults so App can hide premium CTAs.
+        return {
+            "custom_digital_human": True,
+            "voice_clone": False,
+            "hd_export": False,
+            "team_collab": False,
+            "base_avatar": True,
+            "max_resolution": "720p",
+            "rag": True,
+            "podcast": True,
+            "tier": "free",
+        }
+    feats = module_features("digital_human")
+    feats["tier"] = "explore"
+    return feats
+
+
 def public_commerce_catalog() -> dict:
     return {
         "modules": public_module_catalog(),
@@ -441,7 +495,7 @@ def public_commerce_catalog() -> dict:
         "pricing_notes": {
             "pro_card": "membership.pro.7d",
             "module_plans": "yearly_only_for_video_reading_exam",
-            "digital_human": "monthly",
+            "digital_human": "oral_explore_monthly_25",
             "vocab": "free",
         },
     }

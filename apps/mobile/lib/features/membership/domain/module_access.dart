@@ -17,7 +17,7 @@ const Map<String, String> kModuleTitlesZh = <String, String>{
   'reading': '阅读模块',
   'exam': '考试模块',
   'vocab': '单词 / 词书',
-  'digital_human': '数字人模块',
+  'digital_human': '口语入门探索版',
   'course': '课程板块',
   // Legacy content×capability codes (older clients / cached catalogs).
   'exam_reading': '考试模块',

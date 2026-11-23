@@ -250,6 +250,15 @@ class _DigitalHumanPickerState extends ConsumerState<DigitalHumanPicker> {
         ),
         const SizedBox(height: 6),
         Text(
+          '探索版支持自定义形象；声音复刻 / 高清导出 / 团队协作需更高档位',
+          style: TextStyle(
+            fontSize: 12,
+            fontWeight: FontWeight.w600,
+            color: AppDesignTokens.textSecondary,
+          ),
+        ),
+        const SizedBox(height: 6),
+        Text(
           '当前：${selected.displayName} · ${selected.tagline} · ${selected.voiceLabel}',
           style: TextStyle(
             fontSize: 13,

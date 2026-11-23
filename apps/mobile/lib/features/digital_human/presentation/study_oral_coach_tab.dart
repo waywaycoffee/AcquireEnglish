@@ -18,6 +18,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../authentication/presentation/auth_session.dart';
 import '../../daily_review/presentation/daily_review_provider.dart';
+import '../../membership/domain/oral_explore_entitlements.dart';
 import '../../phrases/presentation/phrase_book_provider.dart';
 import '../../player/data/pronunciation_providers.dart';
 import '../../player/domain/pronunciation_assessment.dart';
@@ -37,6 +38,7 @@ import '../data/livekit_oral_client.dart';
 import '../data/livetalking_client.dart';
 import '../data/oral_coach_pipeline_client.dart';
 import '../data/scene_word_recognizer.dart';
+import '../domain/coach_animation_timeline.dart';
 import '../domain/learning_scenario.dart';
 import '../domain/oral_expression_diagnosis.dart';
 import '../domain/scene_word_label.dart';
@@ -247,6 +249,10 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
   bool _duplexThinking = false;
   bool _coachEncouraging = false;
   Timer? _coachGestureTimer;
+  Timer? _duplexMeterTimer;
+  DateTime? _duplexMeterStartedAt;
+  int _duplexSecondsAccrued = 0;
+  int? _duplexMinutesLeftToday;
 
   void _encourageLearner() {
     if (!mounted || !_started || _coachEncouraging) return;
@@ -299,6 +305,12 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
   /// Bumped to cancel in-flight coach TTS when the learner barges in.
   int _speakGen = 0;
   final FlutterTts _cartoonTts = FlutterTts();
+
+  /// Local 数字人 cartoon mouth (atlas visemes). Never LiveTalking 真人 WebRTC.
+  CoachViseme _coachMouth = CoachViseme.closed;
+  CoachAnimationTimeline? _mouthTimeline;
+  DateTime? _mouthClockStart;
+  Timer? _mouthTicker;
 
   /// Default English. Flip only when the learner asks for Chinese.
   bool _preferChineseReply = false;
@@ -497,7 +509,9 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
 
   @override
   void dispose() {
+    _mouthTicker?.cancel();
     _coachGestureTimer?.cancel();
+    _duplexMeterTimer?.cancel();
     _idlePromptTimer?.cancel();
     _liveSceneTimer?.cancel();
     unawaited(_liveSceneCamera.stop());
@@ -511,6 +525,44 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
     _chatScroll.dispose();
     unawaited(_releaseMic());
     super.dispose();
+  }
+
+  /// Drive cartoon atlas lips from estimated phoneme cues (数字人唇形).
+  void _beginDigitalMouth(String text, {Duration? estimated}) {
+    final String speak = text.trim();
+    if (speak.isEmpty) return;
+    final Duration dur =
+        estimated ??
+        Duration(milliseconds: (speak.length * 55).clamp(800, 12000));
+    _mouthTimeline = CoachAnimationTimeline.estimate(speak, dur);
+    _mouthClockStart = DateTime.now();
+    _mouthTicker?.cancel();
+    _mouthTicker = Timer.periodic(const Duration(milliseconds: 50), (_) {
+      if (!mounted || _mouthTimeline == null || _mouthClockStart == null) {
+        return;
+      }
+      final CoachViseme next = _mouthTimeline!.mouthAt(
+        DateTime.now().difference(_mouthClockStart!),
+        playing: true,
+      );
+      if (next != _coachMouth) {
+        setState(() => _coachMouth = next);
+      }
+    });
+  }
+
+  void _endDigitalMouth() {
+    _mouthTicker?.cancel();
+    _mouthTicker = null;
+    _mouthTimeline = null;
+    _mouthClockStart = null;
+    if (!mounted) {
+      _coachMouth = CoachViseme.closed;
+      return;
+    }
+    if (_coachMouth != CoachViseme.closed) {
+      setState(() => _coachMouth = CoachViseme.closed);
+    }
   }
 
   Future<void> _restoreHistoryAndStart() async {
@@ -815,6 +867,94 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
         setState(() => _coachMinutesLeft = 0);
       }
     }
+  }
+
+  Future<bool> _duplexQuotaAllowsConnect() async {
+    if (!ref.read(authSessionProvider).isLoggedIn) return true;
+    try {
+      final OralExploreSnapshot snap =
+          await ref.read(oralExploreSnapshotProvider.future);
+      _duplexMinutesLeftToday = snap.duplexRemaining;
+      if (snap.duplexExhausted) {
+        if (mounted) {
+          setState(() {
+            _status = '今日全双工时长已用完，可按住麦克风继续半双工';
+            _liveKitStatus = '全双工日配额已用尽';
+          });
+        }
+        return false;
+      }
+      return true;
+    } catch (_) {
+      return true;
+    }
+  }
+
+  void _startDuplexMeter() {
+    _duplexMeterTimer?.cancel();
+    _duplexMeterStartedAt = DateTime.now();
+    _duplexSecondsAccrued = 0;
+    _duplexMeterTimer = Timer.periodic(const Duration(seconds: 30), (_) {
+      unawaited(_tickDuplexMeter());
+    });
+  }
+
+  Future<void> _tickDuplexMeter({bool flush = false}) async {
+    if (!_duplexLive || !ref.read(authSessionProvider).isLoggedIn) return;
+    final DateTime? started = _duplexMeterStartedAt;
+    if (started == null) return;
+    final int elapsed = DateTime.now().difference(started).inSeconds;
+    final int wholeMinutes = elapsed ~/ 60;
+    final int already = _duplexSecondsAccrued ~/ 60;
+    int due = wholeMinutes - already;
+    if (flush) {
+      // Charge a partial minute on hang-up if any time was used.
+      final int remSeconds = elapsed - already * 60;
+      if (remSeconds > 0) due = max(due, 1);
+    }
+    if (due <= 0) return;
+    try {
+      final int left = await ref
+          .read(userAssetsServiceProvider)
+          .consumeDuplexMinutes(minutes: due);
+      _duplexSecondsAccrued = wholeMinutes * 60;
+      if (!mounted) return;
+      setState(() {
+        _duplexMinutesLeftToday = left;
+        if (left <= 3) {
+          _status = '全双工剩余约 $left 分钟';
+        }
+      });
+      if (left <= 0) {
+        await _stopDuplexForQuota();
+      }
+    } catch (_) {
+      await _stopDuplexForQuota();
+    }
+  }
+
+  Future<void> _stopDuplexForQuota() async {
+    _duplexMeterTimer?.cancel();
+    _duplexMeterTimer = null;
+    _duplexMeterStartedAt = null;
+    if (!_duplexLive) return;
+    await _liveKit.disconnect();
+    if (!mounted) return;
+    setState(() {
+      _duplexLive = false;
+      _duplexMinutesLeftToday = 0;
+      _status = '今日全双工已用尽，可按住麦克风继续';
+      _liveKitStatus = '全双工日配额已用尽';
+    });
+  }
+
+  Future<void> _stopDuplexMeter({bool flush = true}) async {
+    _duplexMeterTimer?.cancel();
+    _duplexMeterTimer = null;
+    if (flush) {
+      await _tickDuplexMeter(flush: true);
+    }
+    _duplexMeterStartedAt = null;
   }
 
   Future<void> _createPipelineSession(
@@ -1191,6 +1331,7 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
 
   Future<void> _interruptCoachSpeech() async {
     _speakGen++;
+    _endDigitalMouth();
     final Player? player = _speechPlayer;
     _speechPlayer = null;
     try {
@@ -1219,6 +1360,7 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
     if (!mounted || !_started || speak.isEmpty) return;
     final int gen = ++_speakGen;
     if (mounted) setState(() => _coachSpeaking = true);
+    _beginDigitalMouth(speak);
     try {
       final bool usesCloudVoice = _usesCloudVoice(settings.selectedDigitalHuman);
       String? remote = ttsUrl;
@@ -1276,6 +1418,9 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
       await _cartoonTts.speak(speak).timeout(const Duration(seconds: 90));
     } catch (_) {
     } finally {
+      if (gen == _speakGen) {
+        _endDigitalMouth();
+      }
       if (mounted && gen == _speakGen) {
         setState(() => _coachSpeaking = false);
       }
@@ -1473,6 +1618,12 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
     LearningSettingsState settings, {
     String? openingToSpeak,
   }) async {
+    if (!await _duplexQuotaAllowsConnect()) {
+      if (openingToSpeak != null && openingToSpeak.trim().isNotEmpty) {
+        unawaited(_speakCoach(openingToSpeak, settings));
+      }
+      return;
+    }
     _liveKit
       ..onSpeakingChanged = (bool learner, bool agent) {
         if (!mounted) return;
@@ -1484,6 +1635,7 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
       }
       ..onUnavailable = () {
         if (!mounted || !_duplexLive) return;
+        unawaited(_stopDuplexMeter(flush: true));
         setState(() {
           _duplexLive = false;
           _liveKitStatus = '语音连接已中断';
@@ -1550,8 +1702,11 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
       }
       setState(() {
         _duplexLive = true;
-        _status = '全双工已接通 · 直接说，可打断外教';
+        _status = _duplexMinutesLeftToday == null
+            ? '全双工已接通 · 直接说，可打断外教'
+            : '全双工已接通 · 今日还可约 $_duplexMinutesLeftToday 分钟';
       });
+      _startDuplexMeter();
     } catch (error) {
       if (!mounted) return;
       setState(() {
@@ -3044,6 +3199,7 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
     _sessionTicker = null;
     _sessionStartedAt = null;
     _liveTalkingPreparation = null;
+    await _stopDuplexMeter(flush: true);
     await _liveTalking.disconnect();
     await _liveKit.disconnect();
     Map<String, dynamic>? closed;
@@ -3361,21 +3517,17 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
                                 : (_started ? '你可以开始说' : '点麦克风开始对话')))));
     final bool avatarSpeaking = _coachSpeaking || _duplexAgentSpeaking;
     final bool avatarListening = _recordingActive || _duplexLearnerSpeaking;
+    final bool useCartoonLips =
+        settings.cartoonDigitalHuman && persona.hasCartoonAtlas;
     final String stageLabel = avatarSpeaking
-        ? '外教在说…'
+        ? (useCartoonLips ? '数字人唇形…' : '外教在说…')
         : (avatarListening
               ? '外教在听…'
-              : (_liveConnected
-                    ? '${persona.displayName} · 唇形'
+              : (useCartoonLips
+                    ? '${persona.displayName} · 数字人唇形'
                     : persona.displayName));
-    final Widget? liveVideo =
-        _liveConnected && _liveRenderer != null
-        ? RTCVideoView(
-            _liveRenderer!,
-            objectFit: RTCVideoViewObjectFit.RTCVideoViewObjectFitCover,
-            mirror: false,
-          )
-        : null;
+    // Never attach LiveTalking 真人 WebRTC — 数字人 uses local cartoon atlas.
+    final Widget? liveVideo = null;
 
     final Widget avatarStage = Stack(
       fit: StackFit.expand,
@@ -3386,13 +3538,17 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
           listening: avatarListening,
           label: stageLabel,
           imageAsset: persona.assetPath,
-          spriteAsset: _started && persona.hasCartoonAtlas
+          spriteAsset: _started && useCartoonLips
               ? persona.cartoonAssetPath
               : null,
           encouraging: _coachEncouraging,
           thinking: _busy || (_duplexLive && _duplexThinking),
           displayName: persona.displayName,
           liveVideo: liveVideo,
+          // Timeline when TTS text known; null → pulse-based approx for duplex.
+          mouth: !avatarSpeaking
+              ? CoachViseme.closed
+              : (_mouthTimeline != null ? _coachMouth : null),
         ),
         const DecoratedBox(
           decoration: BoxDecoration(

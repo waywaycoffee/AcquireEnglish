@@ -10,7 +10,7 @@ Product modules (`video` / `reading` / `exam` / `vocab` / `digital_human`; `cour
 | 阅读模块 | ¥199 | 年卡 |
 | 视频模块 | ¥299 | 年卡 |
 | 考试模块 | ¥199 | 年卡 |
-| 数字人模块 | ¥20 | 月卡 |
+| 口语入门探索版（数字人） | ¥25 | 月卡（每天20分钟全双工 · 5文档库 · 基础数字人/720P/RAG/播客；含自定义数字人；不含声音复刻/高清导出/团队协作） |
 | 单词 / 词书 | **免费** | 永久 |
 | 课程板块 | **免费** | 永久 |
 
@@ -46,7 +46,7 @@ OpenMAIC is **out of scope** (separate track).
 | `video` | 视频模块 | yearly ¥299 |
 | `reading` | 阅读模块 | yearly ¥199 |
 | `exam` | 考试模块 | yearly ¥199 |
-| `digital_human` | 数字人模块 | monthly ¥20 |
+| `digital_human` | 口语入门探索版 | monthly ¥25 |
 | `vocab` | 单词 / 词书 | free |
 | `course` | 课程板块 | free (not on paid storefront) |
 

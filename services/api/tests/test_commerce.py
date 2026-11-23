@@ -71,8 +71,12 @@ async def test_commerce_catalog_public():
         assert by_code["video"]["yearly_cents"] == 29900
         assert by_code["exam"]["yearly_cents"] == 19900
         assert by_code["vocab"]["free"] is True
-        assert by_code["digital_human"]["monthly_cents"] == 2000
+        assert by_code["digital_human"]["monthly_cents"] == 2500
         assert by_code["digital_human"]["sell"] == ["monthly"]
+        assert by_code["digital_human"]["title"] == "口语入门探索版"
+        assert by_code["digital_human"]["quota"]["duplex_minutes_day"] == 20
+        assert by_code["digital_human"]["features"]["custom_digital_human"] is True
+        assert by_code["digital_human"]["features"]["voice_clone"] is False
         assert body.get("legacy_aliases", {}).get("acquire_listening") == ["video"]
         assert body.get("combos") == []
         membership = {m["sku_code"] for m in body.get("membership", [])}

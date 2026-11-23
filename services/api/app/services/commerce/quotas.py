@@ -8,7 +8,10 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models import UsageCounter
-from app.services.commerce.catalog import MODULE_DEFS
+from app.services.commerce.catalog import (
+    MODULE_DEFS,
+    oral_explore_features_for_modules,
+)
 from app.services.user_assets import list_active_entitlements, user_has_module_access
 
 # Free-tier (PRD Ch.6) — kept when user lacks paid module entitlement.
@@ -16,6 +19,8 @@ FREE_CAPS: dict[str, dict] = {
     "reading_article": {"period": "day", "limit": 1, "title": "精读篇数"},
     "ai_explain": {"period": "week", "limit": 2, "title": "AI 精讲"},
     "coach_minutes": {"period": "week", "limit": 10, "title": "外教对话分钟"},
+    # Soft free duplex try; paid explore tier uses MODULE_DEFS duplex_minutes_day.
+    "duplex_minutes": {"period": "day", "limit": 5, "title": "全双工分钟"},
     # Free users may keep ≥15 personal video + reading uploads; monthly cap ≥15.
     "upload": {"period": "day", "limit": 5, "title": "素材上传"},
     "upload_month": {"period": "month", "limit": 20, "title": "素材上传（月）"},
@@ -25,10 +30,17 @@ FREE_CAPS: dict[str, dict] = {
 
 # Soft stock caps for personal libraries (not period counters).
 FREE_PERSONAL_LIBRARY_SLOTS = 20
+# Oral explore default when digital_human quota is missing.
+DEFAULT_ORAL_DOC_LIBRARIES = 5
+DEFAULT_ORAL_DOC_MAX_MB = 20
 
-# Paid module monthly quotas — mirrored from MODULE_DEFS.
+# Paid module monthly quotas — mirrored from MODULE_DEFS (numeric keys only).
 PAID_MODULE_CAPS: dict[str, dict[str, int]] = {
-    m["code"]: {k: int(v) for k, v in (m.get("quota") or {}).items()}
+    m["code"]: {
+        k: int(v)
+        for k, v in (m.get("quota") or {}).items()
+        if isinstance(v, (int, float)) or str(v).isdigit()
+    }
     for m in MODULE_DEFS
 }
 
@@ -36,7 +48,8 @@ PAID_MODULE_CAPS: dict[str, dict[str, int]] = {
 METRIC_MODULE_HINT: dict[str, list[str]] = {
     "reading_article": ["reading", "exam"],
     "ai_explain": ["reading", "exam"],
-    "coach_minutes": ["video", "exam"],
+    "coach_minutes": ["video", "exam", "digital_human"],
+    "duplex_minutes": ["digital_human"],
     "video_lesson": ["video"],
     "arena_match": ["video", "reading", "exam", "course"],
     "upload": ["reading", "course"],
@@ -47,6 +60,7 @@ METRIC_TO_PAID_KEY: dict[str, str] = {
     "reading_article": "articles",
     "ai_explain": "ai_explain",
     "coach_minutes": "coach_minutes",
+    "duplex_minutes": "duplex_minutes_day",
     "video_lesson": "video_lessons",
     "arena_match": "arena",  # efficiency add-on; base free 3 / paid 10
 }
@@ -113,6 +127,14 @@ async def _arena_extra(db: AsyncSession, user_id: int) -> int:
     return total
 
 
+def _paid_period_for_metric(metric: str) -> str:
+    if metric in ("duplex_minutes", "arena_match", "upload"):
+        return "day"
+    if metric == "coach_minutes":
+        return "month"
+    return "month"
+
+
 async def resolve_limit(
     db: AsyncSession,
     user_id: int,
@@ -156,10 +178,14 @@ async def resolve_limit(
                 limit = max(limit, int(caps[paid_key]))
         if limit <= 0 and free:
             # Paid user but metric not in module quota → generous default
-            limit = int(free["limit"]) * 30 if free["period"] == "day" else int(free["limit"]) * 4
+            limit = (
+                int(free["limit"]) * 30
+                if free["period"] == "day"
+                else int(free["limit"]) * 4
+            )
         return {
             "metric": metric,
-            "period": "month" if metric != "coach_minutes" else "month",
+            "period": _paid_period_for_metric(metric),
             "limit": max(limit, 1),
             "tier": "paid",
             "modules": modules_hit,
@@ -227,6 +253,22 @@ async def consume_quota(
     return status
 
 
+def doc_library_limits_for_modules(paid_modules: set[str] | list[str]) -> dict:
+    codes = {str(c).strip() for c in paid_modules if str(c).strip()}
+    caps = PAID_MODULE_CAPS.get("digital_human") or {}
+    if "digital_human" in codes or "pro" in codes:
+        return {
+            "limit": int(caps.get("doc_libraries") or DEFAULT_ORAL_DOC_LIBRARIES),
+            "max_mb": int(caps.get("doc_max_mb") or DEFAULT_ORAL_DOC_MAX_MB),
+            "tier": "explore",
+        }
+    return {
+        "limit": FREE_PERSONAL_LIBRARY_SLOTS,
+        "max_mb": DEFAULT_ORAL_DOC_MAX_MB,
+        "tier": "free",
+    }
+
+
 async def quotas_snapshot(
     db: AsyncSession, user_id: int, *, module_code: str | None = None
 ) -> dict:
@@ -234,6 +276,7 @@ async def quotas_snapshot(
         "reading_article",
         "ai_explain",
         "coach_minutes",
+        "duplex_minutes",
         "upload",
         "upload_month",
         "arena_match",
@@ -247,9 +290,14 @@ async def quotas_snapshot(
             )
         except ValueError:
             continue
+    paid = await _active_paid_modules(db, user_id)
+    features = oral_explore_features_for_modules(paid)
+    docs = doc_library_limits_for_modules(paid)
     return {
         "module": module_code,
         "items": items,
         "personal_library_slots": FREE_PERSONAL_LIBRARY_SLOTS,
+        "doc_libraries": docs,
+        "features": features,
         "bookshelf_free_stays_free": True,
     }

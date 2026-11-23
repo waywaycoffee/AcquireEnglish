@@ -259,7 +259,7 @@ class _MembershipScreenState extends ConsumerState<MembershipScreen> {
         const SizedBox(height: 16),
         Text('权益套餐', style: Theme.of(context).textTheme.titleLarge),
         const Text(
-          'Pro 全开仅售 7 天卡；阅读 / 视频 / 考试售年卡；数字人售月卡；单词与词书免费。',
+          'Pro 全开仅售 7 天卡；阅读 / 视频 / 考试售年卡；口语入门探索版 ¥25/月；单词与词书免费。',
         ),
         for (final mod in _modules) ...[
           Card(
@@ -778,7 +778,7 @@ class _MembershipScreenState extends ConsumerState<MembershipScreen> {
                             style: Theme.of(context).textTheme.titleLarge,
                           ),
                           const Text(
-                            '含 Pro 7 天卡、模块年卡与数字人月卡；价格以当前列表为准。',
+                            '含 Pro 7 天卡、模块年卡与口语入门探索版月卡；价格以当前列表为准。',
                           ),
                           if (_loading) const LinearProgressIndicator(),
                           if (_error != null)

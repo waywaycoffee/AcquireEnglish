@@ -495,8 +495,8 @@ class SettingsScreen extends ConsumerWidget {
               _SelectRow(
                 title: '陪练引擎',
                 description:
-                    '视频陪练管线=主题对话 + 本地头像/固定动作（省 GPU，默认）；'
-                    'LiveTalking=真人唇形 WebRTC（占会话槽）；'
+                    '视频陪练管线=主题对话 + 数字人卡通口型（本地 atlas，默认，省 GPU）；'
+                    'LiveTalking=真人唇形 WebRTC（当前关闭，不接 glass_man）；'
                     '本地 TTS=仅语音无舞台。',
                 value: oralCoachBackendOptions.contains(settings.oralCoachBackend)
                     ? settings.oralCoachBackend

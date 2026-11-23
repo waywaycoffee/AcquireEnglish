@@ -17,6 +17,7 @@ class CoachAvatarStage extends StatelessWidget {
     this.thinking = false,
     this.displayName,
     this.liveVideo,
+    this.mouth,
     super.key,
   });
 
@@ -31,7 +32,12 @@ class CoachAvatarStage extends StatelessWidget {
   final String? displayName;
 
   /// LiveTalking WebRTC remote video (full-bleed). When set, replaces still/cartoon.
+  /// Prefer null for 数字人卡通口型 — local atlas lips, not 真人 wav2lip.
   final Widget? liveVideo;
+
+  /// Digital-human (cartoon atlas) mouth shape. When null and [speaking],
+  /// a pulse-based approximate viseme is used.
+  final CoachViseme? mouth;
 
   @override
   Widget build(BuildContext context) {
@@ -105,7 +111,10 @@ class CoachAvatarStage extends StatelessWidget {
                             dimension: 196,
                             child: CartoonCoachSprite(
                               asset: spriteAsset!,
-                              mouth: CoachViseme.closed,
+                              mouth: mouth ??
+                                  (speaking
+                                      ? _approxViseme(t)
+                                      : CoachViseme.closed),
                               phase: t,
                               transitionDuration: reduceMotion
                                   ? Duration.zero
@@ -153,6 +162,15 @@ class CoachAvatarStage extends StatelessWidget {
           : null,
     );
   }
+}
+
+CoachViseme _approxViseme(double phase) {
+  final double t = phase - phase.floorToDouble();
+  if (t < 0.22) return CoachViseme.open;
+  if (t < 0.44) return CoachViseme.wide;
+  if (t < 0.66) return CoachViseme.rounded;
+  if (t < 0.84) return CoachViseme.teeth;
+  return CoachViseme.closed;
 }
 
 class _AvatarDisc extends StatelessWidget {

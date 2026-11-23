@@ -154,6 +154,11 @@ class _ReadingHubScreenState extends ConsumerState<ReadingHubScreen> {
       final String lower = file.name.toLowerCase();
       final String text;
       String sourceNote = '';
+      if (bytes.lengthInBytes > kReadingImportMaxBytes) {
+        throw StateError(
+          '文档超过 ${kReadingImportMaxBytes ~/ (1024 * 1024)}MB 上限',
+        );
+      }
       if (lower.endsWith('.pdf')) {
         final ReadingPdfImportResult pdf = await importPdfForReading(
           bytes: bytes,

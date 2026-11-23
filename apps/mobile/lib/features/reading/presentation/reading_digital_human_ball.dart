@@ -9,6 +9,8 @@ import 'package:path_provider/path_provider.dart';
 
 import '../../digital_human/data/digital_human_catalog.dart';
 import '../../digital_human/data/oral_coach_pipeline_client.dart';
+import '../../membership/domain/oral_doc_library.dart';
+import '../../membership/domain/oral_explore_entitlements.dart';
 import '../../player/data/pronunciation_providers.dart';
 import '../../player/domain/pronunciation_assessment.dart';
 import '../../settings/presentation/settings_provider.dart';
@@ -54,6 +56,25 @@ class _ReadingDigitalHumanBallHostState
   Offset _offset = const Offset(18, 140);
 
   Future<void> _openSheet() async {
+    final OralExploreSnapshot explore =
+        await ref.read(oralExploreSnapshotProvider.future);
+    final bool allowed = await OralDocLibraryStore.registerDoc(
+      docId: widget.doc.id,
+      limits: explore.docLibraries,
+    );
+    if (!allowed) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            '口语文档库已达上限（${explore.docLibraries.limit} 个）。'
+            '探索版请先移除其他文档再挂载。',
+          ),
+        ),
+      );
+      return;
+    }
+    if (!mounted) return;
     final ReadingPageQuizBundle? bundle =
         await showModalBottomSheet<ReadingPageQuizBundle>(
       context: context,

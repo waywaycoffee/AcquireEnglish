@@ -193,7 +193,7 @@ async def test_pro_7d_and_digital_human_monthly_fulfill():
             },
         )
         assert dh.status_code == 201, dh.text
-        assert dh.json()["amount_cents"] == 2000
+        assert dh.json()["amount_cents"] == 2500
         paid_dh = await client.post(
             f"/api/assets/orders/{dh.json()['id']}/mark-paid", headers=headers
         )
@@ -203,6 +203,41 @@ async def test_pro_7d_and_digital_human_monthly_fulfill():
         )
         assert access.status_code == 200
         assert access.json()["allowed"] is True
+        assert access.json()["features"]["custom_digital_human"] is True
+        assert access.json()["features"]["voice_clone"] is False
+        assert access.json()["quota"]["duplex_minutes_day"] == 20
+
+        duplex = await client.get(
+            "/api/commerce/quotas/duplex_minutes",
+            headers=headers,
+            params={"module_code": "digital_human"},
+        )
+        assert duplex.status_code == 200, duplex.text
+        assert duplex.json()["limit"] == 20
+        assert duplex.json()["period"] == "day"
+        assert duplex.json()["remaining"] == 20
+
+        burn = await client.post(
+            "/api/commerce/quotas/consume",
+            headers=headers,
+            json={
+                "metric": "duplex_minutes",
+                "amount": 20,
+                "module_code": "digital_human",
+            },
+        )
+        assert burn.status_code == 200, burn.text
+        assert burn.json()["remaining"] == 0
+        over = await client.post(
+            "/api/commerce/quotas/consume",
+            headers=headers,
+            json={
+                "metric": "duplex_minutes",
+                "amount": 1,
+                "module_code": "digital_human",
+            },
+        )
+        assert over.status_code == 402, over.text
 
 
 @pytest.mark.asyncio
