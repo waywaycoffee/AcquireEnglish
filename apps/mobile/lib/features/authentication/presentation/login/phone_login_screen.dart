@@ -267,6 +267,12 @@ class _PhoneLoginScreenState extends ConsumerState<PhoneLoginScreen> {
                         child: OutlinedButton(
                           onPressed:
                               (_sendingSms || _smsCooldown > 0) ? null : _sendSms,
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: AppDesignTokens.brandGreen,
+                            side: BorderSide(
+                              color: AppDesignTokens.borderGray,
+                            ),
+                          ),
                           child: Text(
                             _smsCooldown > 0
                                 ? '${_smsCooldown}s'

@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../../import_course/domain/import_match.dart';
+import '../../../shared/presentation/pad/app_design_tokens.dart';
 import '../course_directory_relink.dart';
 import '../library_catalog_provider.dart';
 import '../library_mock_data.dart';
@@ -146,6 +147,9 @@ class _CourseResourceDirectoryDialogState
       actions: <Widget>[
         TextButton(
           onPressed: _busy ? null : () => Navigator.of(context).pop(false),
+          style: TextButton.styleFrom(
+            foregroundColor: AppDesignTokens.textSecondary,
+          ),
           child: Text(plan == null ? '关闭' : '取消'),
         ),
         if (plan != null) ...<Widget>[
@@ -156,6 +160,9 @@ class _CourseResourceDirectoryDialogState
                     _plan = null;
                     _error = null;
                   }),
+            style: TextButton.styleFrom(
+              foregroundColor: AppDesignTokens.brandGreen,
+            ),
             child: const Text('重新选择'),
           ),
           FilledButton(
@@ -166,6 +173,10 @@ class _CourseResourceDirectoryDialogState
                     (_selections.isEmpty && _additions.isEmpty)
                 ? null
                 : _save,
+            style: FilledButton.styleFrom(
+              backgroundColor: AppDesignTokens.brandGreen,
+              foregroundColor: AppDesignTokens.onAccent,
+            ),
             child: const Text('确认更新'),
           ),
         ],
@@ -191,19 +202,36 @@ class _CourseResourceDirectoryDialogState
         ].contains(defaultTargetPlatform);
     return ListView(
       children: <Widget>[
-        Text(course.title, style: Theme.of(context).textTheme.titleMedium),
+        Text(
+          course.title,
+          style: TextStyle(
+            color: AppDesignTokens.textPrimary,
+            fontSize: 16,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
         const SizedBox(height: 8),
-        const Text('移动文件夹后，可选择新目录重新关联。原有学习进度和生词会保留。'),
+        Text(
+          '移动文件夹后，可选择新目录重新关联。原有学习进度和生词会保留。',
+          style: TextStyle(color: AppDesignTokens.textSecondary),
+        ),
         if (course.episodes.any((LibraryEpisodeItem e) => e.videoMissing))
-          const Padding(
-            padding: EdgeInsets.only(top: 8),
-            child: Text('部分视频文件缺失，可重新关联原目录或新目录。'),
+          Padding(
+            padding: const EdgeInsets.only(top: 8),
+            child: Text(
+              '部分视频文件缺失，可重新关联原目录或新目录。',
+              style: TextStyle(color: AppDesignTokens.textSecondary),
+            ),
           ),
         for (final bool isSubtitle in <bool>[false, true]) ...<Widget>[
           const SizedBox(height: 20),
           Text(
             isSubtitle ? '字幕目录' : '视频目录',
-            style: Theme.of(context).textTheme.titleSmall,
+            style: TextStyle(
+              color: AppDesignTokens.textPrimary,
+              fontSize: 14,
+              fontWeight: FontWeight.w700,
+            ),
           ),
           if ((isSubtitle ? subtitles : videos).isEmpty)
             const Padding(
@@ -223,6 +251,9 @@ class _CourseResourceDirectoryDialogState
                       if (desktop)
                         TextButton.icon(
                           onPressed: _busy ? null : () => _openDirectory(path),
+                          style: TextButton.styleFrom(
+                            foregroundColor: AppDesignTokens.brandGreen,
+                          ),
                           icon: const Icon(Icons.folder_open_outlined),
                           label: Text(
                             defaultTargetPlatform == TargetPlatform.macOS
@@ -234,6 +265,9 @@ class _CourseResourceDirectoryDialogState
                         onPressed: _busy || !desktop
                             ? null
                             : () => _scan(course, path, isSubtitle),
+                        style: TextButton.styleFrom(
+                          foregroundColor: AppDesignTokens.brandGreen,
+                        ),
                         icon: const Icon(Icons.folder_copy_outlined),
                         label: const Text('重新关联目录'),
                       ),
@@ -297,7 +331,13 @@ class _CourseResourceDirectoryDialogState
                   DropdownButton<String>(
                     isExpanded: true,
                     value: _selections[file.oldPath] ?? '',
-                    hint: const Text('请选择匹配文件'),
+                    dropdownColor: AppDesignTokens.appWhite,
+                    style: TextStyle(color: AppDesignTokens.textPrimary),
+                    iconEnabledColor: AppDesignTokens.textSecondary,
+                    hint: Text(
+                      '请选择匹配文件',
+                      style: TextStyle(color: AppDesignTokens.textSecondary),
+                    ),
                     items: <DropdownMenuItem<String>>[
                       const DropdownMenuItem<String>(
                         value: '',

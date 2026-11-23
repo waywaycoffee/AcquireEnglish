@@ -423,6 +423,10 @@ class _BilibiliLoginPanelState extends ConsumerState<BilibiliLoginPanel> {
             Expanded(
               child: OutlinedButton(
                 onPressed: _busy ? null : _startSession,
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: StudyShellTokens.textPrimary,
+                  side: const BorderSide(color: StudyShellTokens.textSecondary),
+                ),
                 child: const Text('刷新二维码'),
               ),
             ),
@@ -430,6 +434,10 @@ class _BilibiliLoginPanelState extends ConsumerState<BilibiliLoginPanel> {
             Expanded(
               child: OutlinedButton.icon(
                 onPressed: canSaveQr ? _saveQrToAlbum : null,
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: StudyShellTokens.textPrimary,
+                  side: const BorderSide(color: StudyShellTokens.textSecondary),
+                ),
                 icon: const Icon(Icons.save_alt_rounded, size: 18),
                 label: const Text('保存到相册'),
               ),
@@ -442,6 +450,7 @@ class _BilibiliLoginPanelState extends ConsumerState<BilibiliLoginPanel> {
             onPressed: widget.onCancel,
             style: FilledButton.styleFrom(
               backgroundColor: const Color(0xFFFB7299),
+              foregroundColor: Colors.white,
             ),
             child: const Text('关闭'),
           ),
@@ -449,6 +458,9 @@ class _BilibiliLoginPanelState extends ConsumerState<BilibiliLoginPanel> {
         const SizedBox(height: 8),
         TextButton(
           onPressed: () => setState(() => _showManual = !_showManual),
+          style: TextButton.styleFrom(
+            foregroundColor: StudyShellTokens.textSecondary,
+          ),
           child: Text(_showManual ? '收起手动填写' : '手动填写 Cookie / SESSDATA'),
         ),
         if (_showManual) ...<Widget>[

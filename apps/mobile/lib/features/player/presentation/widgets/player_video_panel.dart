@@ -1399,7 +1399,7 @@ class _PlayerVideoPanelState extends State<PlayerVideoPanel> {
                       right: dockInset,
                       bottom: _showControls ? subtitleBottom : 18,
                       child: Material(
-                        color: const Color(0xFF0F7A43),
+                        color: AppDesignTokens.brandGreen,
                         shape: const CircleBorder(),
                         elevation: 6,
                         shadowColor: Colors.black54,
@@ -1418,7 +1418,7 @@ class _PlayerVideoPanelState extends State<PlayerVideoPanel> {
                             height: 52,
                             child: Icon(
                               Icons.mic_rounded,
-                              color: Colors.white,
+                              color: AppDesignTokens.onAccent,
                               size: 28,
                             ),
                           ),

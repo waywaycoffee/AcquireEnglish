@@ -3179,7 +3179,7 @@ class _LibraryDetailTopStatus extends StatelessWidget {
               fontWeight: FontWeight.w700,
               color: AppDesignTokens.isDark
                   ? AppDesignTokens.brandGreen
-                  : const Color(0xFF0F7A43),
+                  : AppDesignTokens.brandGreenDark,
             ),
           ),
           if (episodeName != null && episodeName!.isNotEmpty) ...<Widget>[

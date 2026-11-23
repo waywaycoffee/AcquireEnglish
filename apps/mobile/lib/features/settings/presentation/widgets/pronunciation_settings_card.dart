@@ -100,8 +100,8 @@ class _PronunciationSettingsCardState
                 FilledButton(
                   onPressed: _saving || credentials.isLoading ? null : _save,
                   style: FilledButton.styleFrom(
-                    backgroundColor: const Color(0xFF0F7A43),
-                    foregroundColor: Colors.white,
+                    backgroundColor: AppDesignTokens.brandGreen,
+                    foregroundColor: AppDesignTokens.onAccent,
                   ),
                   child: _saving
                       ? const SizedBox(

@@ -1689,7 +1689,11 @@ class _TtsVoiceRowState extends ConsumerState<_TtsVoiceRow> {
         size: 18,
       ),
       label: Text(_previewing ? '停止' : '试听'),
-      style: OutlinedButton.styleFrom(minimumSize: const Size(88, 48)),
+      style: OutlinedButton.styleFrom(
+        minimumSize: const Size(88, 48),
+        foregroundColor: AppDesignTokens.brandGreen,
+        side: BorderSide(color: AppDesignTokens.borderGray),
+      ),
     );
     return _SettingsRowFrame(
       child: LayoutBuilder(
@@ -2084,7 +2088,7 @@ class _SwitchRow extends StatelessWidget {
                 Set<WidgetState> states,
               ) {
                 if (states.contains(WidgetState.selected)) {
-                  return const Color(0xFF0F7A43);
+                  return AppDesignTokens.brandGreen;
                 }
                 return Colors.transparent;
               }),
@@ -2092,7 +2096,7 @@ class _SwitchRow extends StatelessWidget {
                 Set<WidgetState> states,
               ) {
                 if (states.contains(WidgetState.selected)) {
-                  return const Color(0xFF0F7A43);
+                  return AppDesignTokens.brandGreen;
                 }
                 return AppDesignTokens.isDark
                     ? AppDesignTokens.softGray
