@@ -1,5 +1,16 @@
 # 5060 Ti / GPU 工作站部署 LiveKit Agent
 
+## Qwen Audio Realtime 云端语音
+
+在 Agent 的环境文件中设置 ORAL_REALTIME_PROVIDER=qwen 和
+DASHSCOPE_API_KEY，然后重启 Agent。默认使用 qwen-audio-3.1-realtime-flash。
+QWEN_REALTIME_MODEL、QWEN_REALTIME_URL 和 QWEN_REALTIME_VOICE 可分别指定
+模型、工作空间 WebSocket 地址和兼容音色。密钥只存放在工作者。
+删除 ORAL_REALTIME_PROVIDER 后重启可恢复原链路。
+
+此模式由百炼 smart_turn_v2 判断有效发言及打断。原语音链路仍使用
+Silero VAD。App 通过同一 LiveKit 房间收发音频。
+
 生产 API 与 oral_coach 已在 ECS：
 
 - API：`https://acquireenglish.curlhairai.com`

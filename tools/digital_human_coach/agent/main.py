@@ -98,10 +98,11 @@ async def entrypoint(ctx) -> None:
     min_duration = float(os.getenv('INTERRUPTION_MIN_DURATION', '0.4'))
     false_timeout = float(os.getenv('FALSE_INTERRUPTION_TIMEOUT', '1.5'))
 
-    llm = build_llm()
-    tts = build_tts()
-    stt = build_stt()
-    if stt is None:
+    use_qwen = os.getenv('ORAL_REALTIME_PROVIDER', '').strip() == 'qwen'
+    llm = None if use_qwen else build_llm()
+    tts = None if use_qwen else build_tts()
+    stt = None if use_qwen else build_stt()
+    if stt is None and not use_qwen:
         raise RuntimeError('Oral coach requires a configured STT provider')
 
     logger = logging.getLogger(__name__)
@@ -241,14 +242,16 @@ async def entrypoint(ctx) -> None:
                     current_english=self._reference(''),
                 )
 
-    await ctx.connect(auto_subscribe=AutoSubscribe.AUDIO_ONLY)
-    await ctx.wait_for_participant()
     agent = OralCoachAgent()
     ready = False
+    participant = None
+    context_received = asyncio.Event()
 
     @ctx.room.on('data_received')
     def _on_data(packet):
-        if packet.topic != 'coach.context':
+        if packet.topic != 'coach.context' or (
+            participant is not None and packet.participant != participant
+        ):
             return
         try:
             payload = json.loads(packet.data)
@@ -256,8 +259,28 @@ async def entrypoint(ctx) -> None:
             return
         if isinstance(payload, dict):
             agent.update_context(payload)
+            context_received.set()
             if ready:
                 spawn(send('coach.ready', {'ready': True}))
+
+    await ctx.connect(auto_subscribe=AutoSubscribe.AUDIO_ONLY)
+    participant = await ctx.wait_for_participant()
+    if use_qwen:
+        from agent.qwen_realtime import relay
+
+        try:
+            await asyncio.wait_for(context_received.wait(), timeout=1.0)
+        except TimeoutError:
+            pass
+        await relay(
+            ctx, participant, INSTRUCTIONS, agent._context, send,
+            lambda text: spawn(agent._record_turn(
+                text, agent._reference(text),
+                str(agent._context.get('task_id') or 'livekit-oral'),
+            )),
+            lambda text: spawn(agent._persist_coach(text)),
+        )
+        return
 
     # Keep barge-in aggressive: short VAD threshold, do not discard learner
     # audio while the coach is mid-utterance (needed for true full-duplex).
