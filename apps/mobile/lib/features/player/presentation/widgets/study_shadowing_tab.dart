@@ -24,7 +24,6 @@ import '../../data/voice_practice_client.dart';
 import '../../domain/pronunciation_assessment.dart';
 import '../player_mock_state.dart';
 import 'comparison_waveform_painter.dart';
-import 'hardsub_mosaic_toggle.dart';
 import 'shadow_hundred_stats_card.dart';
 import 'shadowing_word_legend.dart';
 import 'study_shell_tokens.dart';
@@ -101,8 +100,6 @@ class StudyShadowingTab extends ConsumerStatefulWidget {
     this.onUpgradeToCoach,
     this.isSentenceBookmarked = false,
     this.onBookmarkSentence,
-    this.hardsubMosaicEnabled = false,
-    this.onToggleHardsubMosaic,
     super.key,
   });
 
@@ -127,8 +124,6 @@ class StudyShadowingTab extends ConsumerStatefulWidget {
   /// Favorite current sentence into the sentence library (pattern cards).
   final bool isSentenceBookmarked;
   final VoidCallback? onBookmarkSentence;
-  final bool hardsubMosaicEnabled;
-  final ValueChanged<bool>? onToggleHardsubMosaic;
 
   /// Called when recording starts. [pauseVideo] is false for shadow mode
   /// (play reference while recording) and true for look/hide modes.
@@ -1119,13 +1114,6 @@ class _StudyShadowingTabState extends ConsumerState<StudyShadowingTab> {
       return ListView(
         padding: const EdgeInsets.fromLTRB(12, 12, 12, 24),
         children: <Widget>[
-          if (widget.onToggleHardsubMosaic != null) ...<Widget>[
-            HardsubMosaicToggle(
-              enabled: widget.hardsubMosaicEnabled,
-              onChanged: widget.onToggleHardsubMosaic!,
-            ),
-            const SizedBox(height: 12),
-          ],
           Padding(
             padding: const EdgeInsets.all(24),
             child: Text(
@@ -1171,13 +1159,6 @@ class _StudyShadowingTabState extends ConsumerState<StudyShadowingTab> {
           child: ListView(
             padding: const EdgeInsets.fromLTRB(12, 12, 12, 8),
             children: <Widget>[
-              if (widget.onToggleHardsubMosaic != null) ...<Widget>[
-                HardsubMosaicToggle(
-                  enabled: widget.hardsubMosaicEnabled,
-                  onChanged: widget.onToggleHardsubMosaic!,
-                ),
-                const SizedBox(height: 8),
-              ],
               if ((widget.episodeId ?? '').trim().isNotEmpty) ...<Widget>[
                 ShadowHundredStatsCard(
                   episodeId: widget.episodeId!.trim(),

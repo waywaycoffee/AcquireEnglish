@@ -24,6 +24,9 @@ class StudyBottomControls extends StatelessWidget {
     this.onLocateCurrent,
     this.onRerecognizeEnglish,
     this.onRerecognizeChinese,
+    this.hardsubMosaicEnabled = false,
+    this.onToggleHardsubMosaic,
+    this.onEpisodeTest,
     super.key,
   });
 
@@ -46,6 +49,13 @@ class StudyBottomControls extends StatelessWidget {
   final VoidCallback? onLocateCurrent;
   final VoidCallback? onRerecognizeEnglish;
   final VoidCallback? onRerecognizeChinese;
+
+  /// Bottom「遮」toggle for burned-in subtitle mosaic (drag-resize stays on video).
+  final bool hardsubMosaicEnabled;
+  final ValueChanged<bool>? onToggleHardsubMosaic;
+
+  /// Bottom「测」: sample this episode into the dictation queue (output check).
+  final VoidCallback? onEpisodeTest;
 
   static String nextSpeed(String current) {
     const List<String> options = PlayerVideoPanel.kSpeedOptions;
@@ -288,40 +298,78 @@ class StudyBottomControls extends StatelessWidget {
             ),
             Row(
               children: <Widget>[
-                Flexible(
-                  child: SingleChildScrollView(
-                    scrollDirection: Axis.horizontal,
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: <Widget>[
-                        if (onLocateCurrent != null)
-                          _BottomTextAction(
-                            key: const ValueKey<String>(
-                              'study-chip-locate-current',
+                Expanded(
+                  child: Align(
+                    alignment: Alignment.centerLeft,
+                    child: SingleChildScrollView(
+                      scrollDirection: Axis.horizontal,
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: <Widget>[
+                          if (onLocateCurrent != null)
+                            IconButton(
+                              key: const ValueKey<String>(
+                                'study-chip-locate-current',
+                              ),
+                              tooltip: '定位当前',
+                              onPressed: onLocateCurrent,
+                              visualDensity: VisualDensity.compact,
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 4,
+                              ),
+                              constraints: const BoxConstraints(
+                                minWidth: 36,
+                                minHeight: 32,
+                              ),
+                              icon: Icon(
+                                Icons.my_location,
+                                size: 20,
+                                color: colors.textSecondary,
+                              ),
                             ),
-                            label: '定位当前',
-                            color: colors.textSecondary,
-                            onPressed: onLocateCurrent!,
-                          ),
-                        if (onRerecognizeEnglish != null)
-                          _BottomTextAction(
-                            key: const ValueKey<String>(
-                              'study-chip-rerecognize-en',
+                          if (onRerecognizeEnglish != null)
+                            _BottomTextAction(
+                              key: const ValueKey<String>(
+                                'study-chip-rerecognize-en',
+                              ),
+                              label: 'AI英文',
+                              color: colors.textSecondary,
+                              onPressed: onRerecognizeEnglish!,
                             ),
-                            label: '重新识别英文',
-                            color: colors.textSecondary,
-                            onPressed: onRerecognizeEnglish!,
-                          ),
-                        if (onRerecognizeChinese != null)
-                          _BottomTextAction(
-                            key: const ValueKey<String>(
-                              'study-chip-rerecognize-zh',
+                          if (onRerecognizeChinese != null)
+                            _BottomTextAction(
+                              key: const ValueKey<String>(
+                                'study-chip-rerecognize-zh',
+                              ),
+                              label: 'AI中文',
+                              color: colors.textSecondary,
+                              onPressed: onRerecognizeChinese!,
                             ),
-                            label: '重新识别中文',
-                            color: colors.textSecondary,
-                            onPressed: onRerecognizeChinese!,
-                          ),
-                      ],
+                          if (onToggleHardsubMosaic != null)
+                            _BottomTextAction(
+                              key: const ValueKey<String>(
+                                'study-chip-hardsub-mosaic',
+                              ),
+                              label: '遮',
+                              color: hardsubMosaicEnabled
+                                  ? colors.accent
+                                  : colors.textSecondary,
+                              onPressed: () => onToggleHardsubMosaic!(
+                                !hardsubMosaicEnabled,
+                              ),
+                            ),
+                          if (onEpisodeTest != null)
+                            _BottomTextAction(
+                              key: const ValueKey<String>(
+                                'study-chip-episode-test',
+                              ),
+                              label: '测',
+                              tooltip: '本集测试：抽最多约8句听写',
+                              color: colors.textSecondary,
+                              onPressed: onEpisodeTest!,
+                            ),
+                        ],
+                      ),
                     ),
                   ),
                 ),
@@ -347,16 +395,18 @@ class _BottomTextAction extends StatelessWidget {
     required this.label,
     required this.color,
     required this.onPressed,
+    this.tooltip,
     super.key,
   });
 
   final String label;
   final Color color;
   final VoidCallback onPressed;
+  final String? tooltip;
 
   @override
   Widget build(BuildContext context) {
-    return TextButton(
+    final Widget button = TextButton(
       onPressed: onPressed,
       style: TextButton.styleFrom(
         foregroundColor: color,
@@ -369,6 +419,10 @@ class _BottomTextAction extends StatelessWidget {
         style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
       ),
     );
+    if (tooltip == null || tooltip!.isEmpty) {
+      return button;
+    }
+    return Tooltip(message: tooltip!, child: button);
   }
 }
 

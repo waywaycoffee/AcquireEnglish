@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 import '../../data/dictation_queue_provider.dart';
 import '../../domain/dictation_diff.dart';
 import '../player_mock_state.dart';
-import 'hardsub_mosaic_toggle.dart';
 import 'study_shell_tokens.dart';
 
 /// Shadow Talk–style dictation: input, hint/submit, sentence audio + prev/next.
@@ -23,10 +22,7 @@ class StudyDictationTab extends StatefulWidget {
     this.onClearQueue,
     this.usingQueue = false,
     this.suggestedSpeed = '0.8×',
-    this.hardsubMosaicEnabled = false,
-    this.onToggleHardsubMosaic,
     this.onDictationResult,
-    this.onEpisodeTest,
     super.key,
   });
 
@@ -44,14 +40,9 @@ class StudyDictationTab extends StatefulWidget {
   final VoidCallback? onClearQueue;
   final bool usingQueue;
   final String suggestedSpeed;
-  final bool hardsubMosaicEnabled;
-  final ValueChanged<bool>? onToggleHardsubMosaic;
 
   /// Fired after submit with word-level diff (for FSRS / word-book enqueue).
   final void Function(DictationDiffResult result)? onDictationResult;
-
-  /// Episode-level output check: sample subtitle lines into the dictation queue.
-  final VoidCallback? onEpisodeTest;
 
   @override
   State<StudyDictationTab> createState() => _StudyDictationTabState();
@@ -133,14 +124,6 @@ class _StudyDictationTabState extends State<StudyDictationTab> {
       return ListView(
         padding: const EdgeInsets.fromLTRB(8, 8, 8, 24),
         children: <Widget>[
-          if (widget.onToggleHardsubMosaic != null) ...<Widget>[
-            HardsubMosaicToggle(
-              key: const ValueKey<String>('dictation-hardsub-mosaic'),
-              enabled: widget.hardsubMosaicEnabled,
-              onChanged: widget.onToggleHardsubMosaic!,
-            ),
-            const SizedBox(height: 12),
-          ],
           Padding(
             padding: const EdgeInsets.symmetric(vertical: 48),
             child: Text(
@@ -156,24 +139,6 @@ class _StudyDictationTabState extends State<StudyDictationTab> {
     return ListView(
       padding: const EdgeInsets.fromLTRB(8, 8, 8, 24),
       children: <Widget>[
-        if (widget.onEpisodeTest != null)
-          Align(
-            alignment: Alignment.centerRight,
-            child: TextButton.icon(
-              key: const ValueKey<String>('dictation-episode-test'),
-              onPressed: widget.onEpisodeTest,
-              icon: const Icon(Icons.quiz_outlined, size: 16),
-              label: const Text('本集测试'),
-            ),
-          ),
-        if (widget.onToggleHardsubMosaic != null) ...<Widget>[
-          HardsubMosaicToggle(
-            key: const ValueKey<String>('dictation-hardsub-mosaic'),
-            enabled: widget.hardsubMosaicEnabled,
-            onChanged: widget.onToggleHardsubMosaic!,
-          ),
-          const SizedBox(height: 8),
-        ],
         if (widget.queue.isNotEmpty) ...<Widget>[
           SizedBox(
             height: 36,

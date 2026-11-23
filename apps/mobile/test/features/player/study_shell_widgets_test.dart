@@ -68,6 +68,9 @@ void main() {
     int locateTaps = 0;
     int rerecognizeEnTaps = 0;
     int rerecognizeZhTaps = 0;
+    int mosaicTaps = 0;
+    int episodeTestTaps = 0;
+    bool mosaicEnabled = false;
 
     await tester.pumpWidget(
       MaterialApp(
@@ -87,6 +90,12 @@ void main() {
             onLocateCurrent: () => locateTaps += 1,
             onRerecognizeEnglish: () => rerecognizeEnTaps += 1,
             onRerecognizeChinese: () => rerecognizeZhTaps += 1,
+            hardsubMosaicEnabled: mosaicEnabled,
+            onToggleHardsubMosaic: (bool value) {
+              mosaicTaps += 1;
+              mosaicEnabled = value;
+            },
+            onEpisodeTest: () => episodeTestTaps += 1,
           ),
         ),
       ),
@@ -95,9 +104,12 @@ void main() {
     expect(find.text('00:05 / 01:36'), findsOneWidget);
     expect(find.text('双语'), findsWidgets);
     expect(find.text('英语口语'), findsOneWidget);
-    expect(find.text('定位当前'), findsOneWidget);
-    expect(find.text('重新识别英文'), findsOneWidget);
-    expect(find.text('重新识别中文'), findsOneWidget);
+    expect(find.text('AI英文'), findsOneWidget);
+    expect(find.text('AI中文'), findsOneWidget);
+    expect(find.text('遮'), findsOneWidget);
+    expect(find.text('测'), findsOneWidget);
+    expect(find.text('定位当前'), findsNothing);
+    expect(find.text('本集测试'), findsNothing);
     expect(find.text('倍速'), findsNothing);
     expect(find.text('超清'), findsNothing);
     expect(find.text('跟读'), findsNothing);
@@ -115,6 +127,12 @@ void main() {
     await tester.tap(
       find.byKey(const ValueKey<String>('study-chip-rerecognize-zh')),
     );
+    await tester.tap(
+      find.byKey(const ValueKey<String>('study-chip-hardsub-mosaic')),
+    );
+    await tester.tap(
+      find.byKey(const ValueKey<String>('study-chip-episode-test')),
+    );
     await tester.pump();
 
     expect(loopTaps, 1);
@@ -123,6 +141,9 @@ void main() {
     expect(locateTaps, 1);
     expect(rerecognizeEnTaps, 1);
     expect(rerecognizeZhTaps, 1);
+    expect(mosaicTaps, 1);
+    expect(mosaicEnabled, isTrue);
+    expect(episodeTestTaps, 1);
   });
 
   test('StudyBottomControls.nextSpeed cycles options', () {
