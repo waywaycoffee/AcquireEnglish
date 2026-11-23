@@ -30,14 +30,17 @@ class AuthSourceGuideScreen extends ConsumerStatefulWidget {
 
 class _AuthSourceGuideScreenState extends ConsumerState<AuthSourceGuideScreen>
     with TickerProviderStateMixin {
-  final PageController _pages = PageController();
-  int _index = 0;
+  /// Cold-start 启动页: pick one of the eight cinematic pages at random.
+  late final int _index;
+  late final PageController _pages;
   late final AnimationController _loop;
   late final AnimationController _enter;
 
   @override
   void initState() {
     super.initState();
+    _index = math.Random().nextInt(_pageCount);
+    _pages = PageController(initialPage: _index);
     _loop = AnimationController(
       vsync: this,
       duration: const Duration(seconds: 8),
@@ -55,18 +58,6 @@ class _AuthSourceGuideScreenState extends ConsumerState<AuthSourceGuideScreen>
     _loop.dispose();
     _enter.dispose();
     super.dispose();
-  }
-
-  Future<void> _go(int index) async {
-    setState(() => _index = index);
-    _enter
-      ..reset()
-      ..forward();
-    await _pages.animateToPage(
-      index,
-      duration: const Duration(milliseconds: 340),
-      curve: Curves.easeOutCubic,
-    );
   }
 
   Future<void> _finish({bool openSettings = false}) async {
@@ -102,8 +93,7 @@ class _AuthSourceGuideScreenState extends ConsumerState<AuthSourceGuideScreen>
 
   @override
   Widget build(BuildContext context) {
-    final bool onWhyAuth = _index == 6;
-    final bool onLast = _index == _pageCount - 1;
+    final bool onSources = _index == 7;
     return Scaffold(
       backgroundColor: _bg,
       body: AnimatedBuilder(
@@ -140,28 +130,16 @@ class _AuthSourceGuideScreenState extends ConsumerState<AuthSourceGuideScreen>
                       padding: const EdgeInsets.fromLTRB(22, 0, 22, 18),
                       child: Column(
                         children: <Widget>[
-                          _Dots(index: _index, count: _pageCount),
-                          const SizedBox(height: 14),
                           _PrimaryButton(
-                            label: onWhyAuth
-                                ? '我知道了，看授权指引'
-                                : onLast
-                                    ? '进入爱快英语'
-                                    : '下一步',
-                            onPressed: () {
-                              if (_index < _pageCount - 1) {
-                                _go(_index + 1);
-                              } else {
-                                _finish();
-                              }
-                            },
+                            label: '进入爱快英语',
+                            onPressed: _finish,
                           ),
-                          if (onWhyAuth) ...<Widget>[
+                          if (onSources) ...<Widget>[
                             const SizedBox(height: 10),
                             TextButton(
-                              onPressed: _finish,
+                              onPressed: () => _finish(openSettings: true),
                               child: const Text(
-                                '稍后再说',
+                                '管理授权来源',
                                 style: TextStyle(
                                   color: _muted,
                                   fontWeight: FontWeight.w600,

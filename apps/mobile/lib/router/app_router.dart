@@ -148,8 +148,8 @@ bool _isAuthOrLegalPath(String location) {
 GoRouter goRouter(Ref ref) {
   final bool signedIn = ref.watch(authSessionProvider).isLoggedIn;
   return GoRouter(
-  // Cold start: 8-page cinematic guide is the 启动页 until completed once.
-  initialLocation: !readAuthSourceGuideCompletedSync()
+  // Cold start: one random cinematic page, once per process.
+  initialLocation: !readSessionSplashDone()
       ? '/onboarding/auth-guide'
       : (!signedIn
           ? SGRoute.login.route
@@ -158,19 +158,18 @@ GoRouter goRouter(Ref ref) {
               : SGRoute.home.route)),
   redirect: (BuildContext context, GoRouterState state) {
     final bool done = readOnboardingCompletedSync();
-    final bool authGuideDone = readAuthSourceGuideCompletedSync();
+    final bool splashDone = readSessionSplashDone();
     final String loc = state.matchedLocation;
     final bool onOnboarding = loc == '/onboarding';
     final bool onAuthGuide = loc == '/onboarding/auth-guide';
-    // 启动页 first — before login / profile onboarding.
-    if (!authGuideDone && !onAuthGuide && !_isAuthOrLegalPath(loc)) {
+    if (!splashDone && !onAuthGuide && !_isAuthOrLegalPath(loc)) {
       return '/onboarding/auth-guide';
     }
     if (!signedIn && !onAuthGuide && !_isAuthOrLegalPath(loc)) {
       return SGRoute.login.route;
     }
     if (signedIn &&
-        authGuideDone &&
+        splashDone &&
         !done &&
         !onOnboarding &&
         !onAuthGuide &&
