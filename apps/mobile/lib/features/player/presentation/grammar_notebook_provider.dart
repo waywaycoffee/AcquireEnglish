@@ -7,9 +7,11 @@ import '../domain/grammar_notebook.dart';
 
 const String _kKey = 'grammar_notebook_v1';
 
-class GrammarNotebookNotifier extends StateNotifier<List<GrammarNote>> {
-  GrammarNotebookNotifier() : super(const <GrammarNote>[]) {
-    _load();
+class GrammarNotebookNotifier extends Notifier<List<GrammarNote>> {
+  @override
+  List<GrammarNote> build() {
+    Future<void>.microtask(_load);
+    return const <GrammarNote>[];
   }
 
   Future<void> _load() async {
@@ -55,7 +57,8 @@ class GrammarNotebookNotifier extends StateNotifier<List<GrammarNote>> {
   }
 }
 
-final grammarNotebookProvider =
-    StateNotifierProvider<GrammarNotebookNotifier, List<GrammarNote>>(
-  (Ref ref) => GrammarNotebookNotifier(),
+final NotifierProvider<GrammarNotebookNotifier, List<GrammarNote>>
+grammarNotebookProvider =
+    NotifierProvider<GrammarNotebookNotifier, List<GrammarNote>>(
+  GrammarNotebookNotifier.new,
 );

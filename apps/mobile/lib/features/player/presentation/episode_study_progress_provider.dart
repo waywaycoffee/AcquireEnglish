@@ -8,9 +8,11 @@ import '../domain/episode_study_progress.dart';
 const String _kStoreKey = 'episode_study_progress_v1';
 
 class EpisodeStudyProgressNotifier
-    extends StateNotifier<Map<String, EpisodeStudyProgress>> {
-  EpisodeStudyProgressNotifier() : super(const <String, EpisodeStudyProgress>{}) {
-    _load();
+    extends Notifier<Map<String, EpisodeStudyProgress>> {
+  @override
+  Map<String, EpisodeStudyProgress> build() {
+    Future<void>.microtask(_load);
+    return const <String, EpisodeStudyProgress>{};
   }
 
   Future<void> _load() async {
@@ -102,9 +104,11 @@ class EpisodeStudyProgressNotifier
   }
 }
 
-final episodeStudyProgressProvider = StateNotifierProvider<
+final NotifierProvider<
+    EpisodeStudyProgressNotifier, Map<String, EpisodeStudyProgress>>
+episodeStudyProgressProvider = NotifierProvider<
     EpisodeStudyProgressNotifier, Map<String, EpisodeStudyProgress>>(
-  (Ref ref) => EpisodeStudyProgressNotifier(),
+  EpisodeStudyProgressNotifier.new,
 );
 
 EpisodeStudyProgress episodeProgressOf(
