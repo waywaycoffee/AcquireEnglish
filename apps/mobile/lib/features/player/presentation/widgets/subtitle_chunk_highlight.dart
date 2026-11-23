@@ -1,69 +1,9 @@
 import 'package:flutter/material.dart';
 
 import '../../../words/presentation/word_book_provider.dart' show normalizeWord;
+import '../subtitle_mark.dart';
 
-/// Auto-detected multi-word teaching unit in a subtitle line.
-enum SubtitleChunkKind {
-  /// Lexical chunk / formulaic sequence.
-  chunk,
-
-  /// Phrasal verb / fixed phrase.
-  phrase,
-
-  /// Grammar / functional usage pattern.
-  usage,
-}
-
-extension SubtitleChunkKindLabel on SubtitleChunkKind {
-  String get labelCn => switch (this) {
-    SubtitleChunkKind.chunk => '语块',
-    SubtitleChunkKind.phrase => '词组',
-    SubtitleChunkKind.usage => '用法',
-  };
-
-  static SubtitleChunkKind fromName(String? raw) {
-    switch ((raw ?? '').trim().toLowerCase()) {
-      case 'phrase':
-      case 'phrasal':
-      case '词组':
-        return SubtitleChunkKind.phrase;
-      case 'usage':
-      case 'pattern':
-      case '用法':
-        return SubtitleChunkKind.usage;
-      default:
-        return SubtitleChunkKind.chunk;
-    }
-  }
-}
-
-class SubtitleChunkEntry {
-  const SubtitleChunkEntry({
-    required this.phrase,
-    required this.tokens,
-    required this.kind,
-  });
-
-  final String phrase;
-  final List<String> tokens;
-  final SubtitleChunkKind kind;
-}
-
-class SubtitleChunkSpan {
-  const SubtitleChunkSpan({
-    required this.start,
-    required this.endExclusive,
-    required this.kind,
-    required this.phrase,
-  });
-
-  final int start;
-  final int endExclusive;
-  final SubtitleChunkKind kind;
-  final String phrase;
-
-  bool contains(int index) => index >= start && index < endExclusive;
-}
+export '../subtitle_mark.dart';
 
 /// Longest-first, non-overlapping matcher for known chunks in a tokenized line.
 class SubtitleChunkHighlighter {
@@ -78,7 +18,12 @@ class SubtitleChunkHighlighter {
     final Map<int, List<SubtitleChunkEntry>> map =
         <int, List<SubtitleChunkEntry>>{};
     for (final SubtitleChunkEntry entry in entries) {
-      if (entry.tokens.length < 2) continue;
+      // 生词 are single-token word-book hits; multi-word lexicon is 语块/词组.
+      if (entry.kind == SubtitleChunkKind.vocab) {
+        if (entry.tokens.length != 1) continue;
+      } else if (entry.tokens.length < 2) {
+        continue;
+      }
       map
           .putIfAbsent(entry.tokens.length, () => <SubtitleChunkEntry>[])
           .add(entry);
@@ -104,7 +49,7 @@ class SubtitleChunkHighlighter {
   /// Returns per-token kind (null = not in a chunk).
   Map<int, SubtitleChunkSpan> matchLine(String line) {
     final List<String> rawTokens = tokenize(line);
-    if (rawTokens.length < 2 || _byLength.isEmpty) {
+    if (rawTokens.isEmpty || _byLength.isEmpty) {
       return const <int, SubtitleChunkSpan>{};
     }
     final List<String> norms = rawTokens
@@ -142,6 +87,7 @@ class SubtitleChunkHighlighter {
             endExclusive: i + len,
             kind: entry.kind,
             phrase: entry.phrase,
+            source: entry.source,
           );
           for (int j = 0; j < len; j++) {
             used[i + j] = true;
@@ -154,6 +100,74 @@ class SubtitleChunkHighlighter {
     return hits;
   }
 
+  /// Deduped span list for attaching onto [PlayerSubtitleLine.marks].
+  List<SubtitleLineMark> marksForLine(String line) {
+    final Map<int, SubtitleChunkSpan> hits = matchLine(line);
+    if (hits.isEmpty) return const <SubtitleLineMark>[];
+    final Set<String> seen = <String>{};
+    final List<SubtitleLineMark> out = <SubtitleLineMark>[];
+    for (final SubtitleChunkSpan span in hits.values) {
+      final String key = '${span.kind.name}:${span.start}:${span.endExclusive}';
+      if (!seen.add(key)) continue;
+      out.add(
+        SubtitleLineMark(
+          kind: span.kind,
+          phrase: span.phrase,
+          startToken: span.start,
+          endTokenExclusive: span.endExclusive,
+          source: span.source,
+        ),
+      );
+    }
+    out.sort(
+      (SubtitleLineMark a, SubtitleLineMark b) =>
+          a.startToken.compareTo(b.startToken),
+    );
+    return out;
+  }
+
+  /// Tag every line with lexicon hits (in-memory; SRT sidecar has no marks today).
+  static List<T> attachMarksToLines<T>({
+    required List<T> lines,
+    required String Function(T line) englishOf,
+    required T Function(T line, List<SubtitleLineMark> marks) copyWithMarks,
+    required SubtitleChunkHighlighter highlighter,
+    Set<String> savedVocabularyWords = const <String>{},
+  }) {
+    return lines
+        .map((T line) {
+          final List<SubtitleLineMark> marks = <SubtitleLineMark>[
+            ...highlighter.marksForLine(englishOf(line)),
+            ..._vocabMarksForLine(englishOf(line), savedVocabularyWords),
+          ];
+          return copyWithMarks(line, marks);
+        })
+        .toList(growable: false);
+  }
+
+  static List<SubtitleLineMark> _vocabMarksForLine(
+    String line,
+    Set<String> savedWords,
+  ) {
+    if (savedWords.isEmpty) return const <SubtitleLineMark>[];
+    final List<String> tokens = tokenize(line);
+    final List<SubtitleLineMark> out = <SubtitleLineMark>[];
+    for (int i = 0; i < tokens.length; i++) {
+      final String norm = normalizeToken(tokens[i]);
+      if (norm.isEmpty || !savedWords.contains(norm)) continue;
+      out.add(
+        SubtitleLineMark(
+          kind: SubtitleChunkKind.vocab,
+          phrase: norm,
+          startToken: i,
+          endTokenExclusive: i + 1,
+          source: 'word_book',
+        ),
+      );
+    }
+    return out;
+  }
+
   static Color fill(SubtitleChunkKind kind, {required bool onDarkVideo}) {
     return switch (kind) {
       SubtitleChunkKind.chunk => onDarkVideo
@@ -162,9 +176,9 @@ class SubtitleChunkHighlighter {
       SubtitleChunkKind.phrase => onDarkVideo
           ? const Color(0xFF0F4A4A)
           : const Color(0xFFD4F5F2),
-      SubtitleChunkKind.usage => onDarkVideo
-          ? const Color(0xFF5A3410)
-          : const Color(0xFFFFE2C8),
+      SubtitleChunkKind.vocab => onDarkVideo
+          ? const Color(0xFF624A10)
+          : const Color(0xFFFFEDAB),
     };
   }
 
@@ -180,11 +194,12 @@ class SubtitleChunkHighlighter {
       SubtitleChunkKind.phrase => onDarkVideo
           ? const Color(0xFF9EF0E8)
           : const Color(0xFF0F6B66),
-      SubtitleChunkKind.usage => onDarkVideo
-          ? const Color(0xFFFFC48A)
-          : const Color(0xFF8A4B12),
+      SubtitleChunkKind.vocab => onDarkVideo
+          ? const Color(0xFFFFDB72)
+          : const Color(0xFF765300),
     };
   }
 
-  static Color legendColor(SubtitleChunkKind kind) => fill(kind, onDarkVideo: false);
+  static Color legendColor(SubtitleChunkKind kind) =>
+      fill(kind, onDarkVideo: false);
 }

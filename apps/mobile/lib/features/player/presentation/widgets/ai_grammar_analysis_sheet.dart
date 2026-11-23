@@ -268,6 +268,34 @@ class _GrammarAnalysisBody extends StatelessWidget {
           const SizedBox(height: 8),
           _ContentCard(child: Text(analysis.structureCn, style: _bodyStyle)),
         ],
+        if (analysis.partsOfSpeechCn.isNotEmpty) ...<Widget>[
+          const SizedBox(height: 18),
+          const _SectionTitle(title: '词性'),
+          const SizedBox(height: 8),
+          _ContentCard(
+            child: Text(analysis.partsOfSpeechCn, style: _bodyStyle),
+          ),
+        ],
+        if (analysis.svoCn.isNotEmpty) ...<Widget>[
+          const SizedBox(height: 18),
+          const _SectionTitle(title: '主谓宾'),
+          const SizedBox(height: 8),
+          _ContentCard(child: Text(analysis.svoCn, style: _bodyStyle)),
+        ],
+        if (analysis.predicateVerb.isNotEmpty) ...<Widget>[
+          const SizedBox(height: 18),
+          const _SectionTitle(title: '谓语动词'),
+          const SizedBox(height: 8),
+          _ContentCard(
+            child: Text(analysis.predicateVerb, style: _bodyStyle),
+          ),
+        ],
+        if (analysis.clausesCn.isNotEmpty) ...<Widget>[
+          const SizedBox(height: 18),
+          const _SectionTitle(title: '主从句'),
+          const SizedBox(height: 8),
+          _ContentCard(child: Text(analysis.clausesCn, style: _bodyStyle)),
+        ],
         if (analysis.grammarPoints.isNotEmpty) ...<Widget>[
           const SizedBox(height: 18),
           const _SectionTitle(title: '语法要点'),

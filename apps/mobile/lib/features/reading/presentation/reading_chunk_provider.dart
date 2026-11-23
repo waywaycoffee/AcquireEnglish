@@ -36,9 +36,14 @@ Future<List<SubtitleChunkEntry>> _loadReadingBuiltinEntries() async {
       if (!_keepForReading(phrase: phrase, kind: kind, source: source)) {
         continue;
       }
+      final SubtitleChunkKind mapped =
+          SubtitleChunkKindLabel.fromName(kind) == SubtitleChunkKind.phrase
+          ? SubtitleChunkKind.phrase
+          : SubtitleChunkKind.chunk;
       final SubtitleChunkEntry? entry = _entryFromPhrase(
         phrase,
-        SubtitleChunkKindLabel.fromName(kind),
+        mapped,
+        source: source.trim().isEmpty ? 'lexicon' : source.trim(),
       );
       if (entry != null) out.add(entry);
     }
@@ -62,7 +67,11 @@ bool _keepForReading({
   if (tokens.length < 2 || tokens.length > 4) return false;
   final String k = kind.trim().toLowerCase();
   final String s = source.trim().toLowerCase();
-  if (k == 'phrase' || k == 'usage' || k == 'phrasal' || k == 'pattern') {
+  if (k == 'phrase' ||
+      k == 'usage' ||
+      k == 'phrasal' ||
+      k == 'pattern' ||
+      k == 'chunk') {
     return true;
   }
   if (s == 'curated' || s == 'daily_patterns') return true;
@@ -77,13 +86,18 @@ List<SubtitleChunkEntry> _entriesFromPhraseBook(List<PhraseEntry> phrases) {
     final SubtitleChunkEntry? entry = _entryFromPhrase(
       phrase.english,
       SubtitleChunkKind.phrase,
+      source: 'phrase_book',
     );
     if (entry != null) out.add(entry);
   }
   return out;
 }
 
-SubtitleChunkEntry? _entryFromPhrase(String raw, SubtitleChunkKind kind) {
+SubtitleChunkEntry? _entryFromPhrase(
+  String raw,
+  SubtitleChunkKind kind, {
+  String source = '',
+}) {
   final String cleaned = raw
       .trim()
       .toLowerCase()
@@ -100,14 +114,15 @@ SubtitleChunkEntry? _entryFromPhrase(String raw, SubtitleChunkKind kind) {
     phrase: tokens.join(' '),
     tokens: tokens,
     kind: kind,
+    source: source,
   );
 }
 
 List<SubtitleChunkEntry> _dedupe(List<SubtitleChunkEntry> entries) {
   const Map<SubtitleChunkKind, int> rank = <SubtitleChunkKind, int>{
     SubtitleChunkKind.phrase: 2,
-    SubtitleChunkKind.usage: 1,
-    SubtitleChunkKind.chunk: 0,
+    SubtitleChunkKind.chunk: 1,
+    SubtitleChunkKind.vocab: 0,
   };
   final Map<String, SubtitleChunkEntry> best = <String, SubtitleChunkEntry>{};
   for (final SubtitleChunkEntry entry in entries) {

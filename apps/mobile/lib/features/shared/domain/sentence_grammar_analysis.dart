@@ -51,6 +51,10 @@ class SentenceGrammarAnalysis {
     required this.sentence,
     required this.translationCn,
     required this.structureCn,
+    this.partsOfSpeechCn = '',
+    this.svoCn = '',
+    this.predicateVerb = '',
+    this.clausesCn = '',
     required this.grammarPoints,
     required this.keyPhrases,
     required this.paraphraseEn,
@@ -82,6 +86,24 @@ class SentenceGrammarAnalysis {
       structureCn: _asStructureText(
         json['structureCn'] ?? json['structure'] ?? json['structure_cn'],
       ),
+      partsOfSpeechCn: _asPlainText(
+        json['partsOfSpeechCn'] ??
+            json['partsOfSpeech'] ??
+            json['pos'] ??
+            json['词性'],
+      ),
+      svoCn: _asPlainText(
+        json['svoCn'] ?? json['svo'] ?? json['subjectVerbObject'] ?? json['主谓宾'],
+      ),
+      predicateVerb: _asPlainText(
+        json['predicateVerb'] ?? json['predicate'] ?? json['谓语动词'],
+      ),
+      clausesCn: _asPlainText(
+        json['clausesCn'] ??
+            json['clauses'] ??
+            json['mainSubordinate'] ??
+            json['主从句'],
+      ),
       grammarPoints: _parseGrammarPoints(pointsRaw),
       keyPhrases: _parseKeyPhrases(phrasesRaw),
       paraphraseEn: _asPlainText(
@@ -102,6 +124,10 @@ class SentenceGrammarAnalysis {
       sentence: sentence,
       translationCn: '',
       structureCn: '',
+      partsOfSpeechCn: '',
+      svoCn: '',
+      predicateVerb: '',
+      clausesCn: '',
       grammarPoints: const <SentenceGrammarPoint>[],
       keyPhrases: const <SentenceGrammarPhrase>[],
       paraphraseEn: '',
@@ -114,6 +140,10 @@ class SentenceGrammarAnalysis {
   final String sentence;
   final String translationCn;
   final String structureCn;
+  final String partsOfSpeechCn;
+  final String svoCn;
+  final String predicateVerb;
+  final String clausesCn;
   final List<SentenceGrammarPoint> grammarPoints;
   final List<SentenceGrammarPhrase> keyPhrases;
   final String paraphraseEn;
@@ -127,6 +157,10 @@ class SentenceGrammarAnalysis {
         'sentence': sentence,
         'translationCn': translationCn,
         'structureCn': structureCn,
+        'partsOfSpeechCn': partsOfSpeechCn,
+        'svoCn': svoCn,
+        'predicateVerb': predicateVerb,
+        'clausesCn': clausesCn,
         'grammarPoints': grammarPoints
             .map((SentenceGrammarPoint point) => point.toJson())
             .toList(growable: false),

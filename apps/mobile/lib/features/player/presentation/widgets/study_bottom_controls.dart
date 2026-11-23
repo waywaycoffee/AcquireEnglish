@@ -27,6 +27,7 @@ class StudyBottomControls extends StatelessWidget {
     this.hardsubMosaicEnabled = false,
     this.onToggleHardsubMosaic,
     this.onEpisodeTest,
+    this.onAiParse,
     super.key,
   });
 
@@ -56,6 +57,9 @@ class StudyBottomControls extends StatelessWidget {
 
   /// Bottom「测」: sample this episode into the dictation queue (output check).
   final VoidCallback? onEpisodeTest;
+
+  /// Bottom「AI解析」: grammar / structure analysis of the active subtitle line.
+  final VoidCallback? onAiParse;
 
   static String nextSpeed(String current) {
     const List<String> options = PlayerVideoPanel.kSpeedOptions;
@@ -367,6 +371,16 @@ class StudyBottomControls extends StatelessWidget {
                               tooltip: '本集测试：抽最多约8句听写',
                               color: colors.textSecondary,
                               onPressed: onEpisodeTest!,
+                            ),
+                          if (onAiParse != null)
+                            _BottomTextAction(
+                              key: const ValueKey<String>(
+                                'study-chip-ai-parse',
+                              ),
+                              label: 'AI解析',
+                              tooltip: '分析当前句：结构、词性、主谓宾、语法要点',
+                              color: colors.textSecondary,
+                              onPressed: onAiParse!,
                             ),
                         ],
                       ),

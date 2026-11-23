@@ -70,6 +70,7 @@ void main() {
     int rerecognizeZhTaps = 0;
     int mosaicTaps = 0;
     int episodeTestTaps = 0;
+    int aiParseTaps = 0;
     bool mosaicEnabled = false;
 
     await tester.pumpWidget(
@@ -96,6 +97,7 @@ void main() {
               mosaicEnabled = value;
             },
             onEpisodeTest: () => episodeTestTaps += 1,
+            onAiParse: () => aiParseTaps += 1,
           ),
         ),
       ),
@@ -108,6 +110,7 @@ void main() {
     expect(find.text('AI中文'), findsOneWidget);
     expect(find.text('遮'), findsOneWidget);
     expect(find.text('测'), findsOneWidget);
+    expect(find.text('AI解析'), findsOneWidget);
     expect(find.text('定位当前'), findsNothing);
     expect(find.text('本集测试'), findsNothing);
     expect(find.text('倍速'), findsNothing);
@@ -133,6 +136,9 @@ void main() {
     await tester.tap(
       find.byKey(const ValueKey<String>('study-chip-episode-test')),
     );
+    await tester.tap(
+      find.byKey(const ValueKey<String>('study-chip-ai-parse')),
+    );
     await tester.pump();
 
     expect(loopTaps, 1);
@@ -144,6 +150,7 @@ void main() {
     expect(mosaicTaps, 1);
     expect(mosaicEnabled, isTrue);
     expect(episodeTestTaps, 1);
+    expect(aiParseTaps, 1);
   });
 
   test('StudyBottomControls.nextSpeed cycles options', () {

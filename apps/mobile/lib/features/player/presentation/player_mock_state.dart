@@ -2,7 +2,10 @@ import 'dart:math';
 
 import 'subtitle_display_mode.dart';
 import 'subtitle_language_sanitize.dart';
+import 'subtitle_mark.dart';
 import 'subtitle_word_alignment.dart';
+
+export 'subtitle_mark.dart' show SubtitleChunkKind, SubtitleLineMark;
 
 class PlayerSubtitleWord {
   const PlayerSubtitleWord({
@@ -26,6 +29,7 @@ class PlayerSubtitleLine {
     required this.startMs,
     required this.endMs,
     this.words = const <PlayerSubtitleWord>[],
+    this.marks = const <SubtitleLineMark>[],
   });
 
   final String startTime;
@@ -34,6 +38,29 @@ class PlayerSubtitleLine {
   final int startMs;
   final int endMs;
   final List<PlayerSubtitleWord> words;
+
+  /// Lexicon / word-book hits for this English cue (in-memory; not in SRT).
+  final List<SubtitleLineMark> marks;
+
+  PlayerSubtitleLine copyWith({
+    String? startTime,
+    String? english,
+    String? chinese,
+    int? startMs,
+    int? endMs,
+    List<PlayerSubtitleWord>? words,
+    List<SubtitleLineMark>? marks,
+  }) {
+    return PlayerSubtitleLine(
+      startTime: startTime ?? this.startTime,
+      english: english ?? this.english,
+      chinese: chinese ?? this.chinese,
+      startMs: startMs ?? this.startMs,
+      endMs: endMs ?? this.endMs,
+      words: words ?? this.words,
+      marks: marks ?? this.marks,
+    );
+  }
 }
 
 class PlayerMockState {

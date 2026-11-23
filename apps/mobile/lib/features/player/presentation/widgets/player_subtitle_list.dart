@@ -1763,7 +1763,7 @@ class _PlayerSubtitleListState extends State<PlayerSubtitleList> {
                 ],
                 Expanded(
                   child: Text(
-                    '点标签开关高亮 · 语块/词组/用法',
+                    '点标签开关高亮 · 语块/词组/生词',
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: TextStyle(
@@ -2441,13 +2441,20 @@ class _PlayerSubtitleListState extends State<PlayerSubtitleList> {
                 index == phraseAnchor;
             final SubtitleChunkSpan? chunkSpan =
                 _visibleChunkSpan(chunkHits[index]);
+            // 「生词」chip gates word-book favorites (and highlighter vocab spans).
             final SubtitleVocabMark vocabMark =
-                SubtitleVocabularyHighlight.resolve(
-                  rawToken: token.value,
-                  savedWords: widget.savedVocabularyWords,
-                  learnedWords: widget.learnedVocabularyWords,
-                  keyWords: widget.keyVocabularyWords,
-                );
+                !_isChunkKindEnabled(SubtitleChunkKind.vocab)
+                ? SubtitleVocabMark.none
+                : SubtitleVocabularyHighlight.resolve(
+                    rawToken: token.value,
+                    savedWords: widget.savedVocabularyWords,
+                    learnedWords: widget.learnedVocabularyWords,
+                    keyWords: widget.keyVocabularyWords,
+                  );
+            final bool showMarkChip =
+                chunkSpan != null && index == chunkSpan.start;
+            final bool showVocabChip =
+                !showMarkChip && vocabMark == SubtitleVocabMark.saved;
             final Color baseWordColor =
                 shell?.textPrimary ?? AppDesignTokens.textPrimary;
             final Color vocabWordColor = SubtitleVocabularyHighlight.textColor(
@@ -2584,6 +2591,25 @@ class _PlayerSubtitleListState extends State<PlayerSubtitleList> {
                             height: 1.28,
                           ),
                         ),
+                        if (showMarkChip || showVocabChip)
+                          Positioned(
+                            left: 0,
+                            top: -9,
+                            child: IgnorePointer(
+                              child: _SubtitleMarkTag(
+                                label: showVocabChip
+                                    ? SubtitleChunkKind.vocab.labelCn
+                                    : chunkSpan!.kind.labelCn,
+                                color: SubtitleChunkHighlighter.textColor(
+                                  showVocabChip
+                                      ? SubtitleChunkKind.vocab
+                                      : chunkSpan!.kind,
+                                  fallback: wordColor,
+                                  onDarkVideo: false,
+                                ),
+                              ),
+                            ),
+                          ),
                         if (index != tokens.length - 1)
                           const Positioned(
                             right: -1,
@@ -2777,6 +2803,36 @@ class _SubtitlePlaceholder extends StatelessWidget {
               ),
             ],
           ],
+        ),
+      ),
+    );
+  }
+}
+
+class _SubtitleMarkTag extends StatelessWidget {
+  const _SubtitleMarkTag({
+    required this.label,
+    required this.color,
+  });
+
+  final String label;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 3, vertical: 0.5),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.14),
+        borderRadius: BorderRadius.circular(4),
+      ),
+      child: Text(
+        label,
+        style: TextStyle(
+          fontSize: 8,
+          height: 1.1,
+          fontWeight: FontWeight.w800,
+          color: color,
         ),
       ),
     );

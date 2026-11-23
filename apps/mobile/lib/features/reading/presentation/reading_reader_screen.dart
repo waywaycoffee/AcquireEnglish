@@ -1809,9 +1809,9 @@ class _ReadingReaderScreenState extends ConsumerState<ReadingReaderScreen> {
                             ),
                             _LegendChip(
                               color: SubtitleChunkHighlighter.legendColor(
-                                SubtitleChunkKind.usage,
+                                SubtitleChunkKind.vocab,
                               ),
-                              label: '用法',
+                              label: '生词',
                               dark: _dark,
                             ),
                           ],

@@ -140,7 +140,7 @@ class PlayerTranscriptPanel extends StatefulWidget {
 class _PlayerTranscriptPanelState extends State<PlayerTranscriptPanel> {
   bool _showCurrentOnly = false;
 
-  /// Which chunk/phrase/usage marks stay highlighted in the transcript list.
+  /// Which chunk/phrase/vocab marks stay highlighted in the transcript list.
   Set<SubtitleChunkKind> _enabledChunkKinds = Set<SubtitleChunkKind>.of(
     SubtitleChunkKind.values,
   );

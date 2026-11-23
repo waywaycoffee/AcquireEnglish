@@ -322,6 +322,18 @@ class PadPortraitPlayerScreenState
       ),
       (String? previous, String next) => _syncTranscriptReader(),
     );
+    ref.listenManual<AsyncValue<SubtitleChunkHighlighter>>(
+      subtitleChunkHighlighterProvider,
+      (
+        AsyncValue<SubtitleChunkHighlighter>? previous,
+        AsyncValue<SubtitleChunkHighlighter> next,
+      ) {
+        final SubtitleChunkHighlighter? highlighter = next.asData?.value;
+        if (highlighter != null) {
+          _retagSubtitleMarks(highlighter);
+        }
+      },
+    );
     ref.listenManual<SubtitleCompletionStatusState>(
       subtitleCompletionStatusProvider,
       (SubtitleCompletionStatusState? previous, SubtitleCompletionStatusState next) {
@@ -3400,6 +3412,9 @@ Future<void> _settleChineseFillIfAlreadyPresent() async {
               onEpisodeTest: state.hasLines
                   ? () => unawaited(_startEpisodeOutputTest())
                   : null,
+              onAiParse: state.hasLines
+                  ? () => _handleAiExplain(state.activeLineIndex)
+                  : null,
             ),
           ],
           ),
@@ -5503,6 +5518,28 @@ Future<void> _settleChineseFillIfAlreadyPresent() async {
         episodeId: widget.episodeId,
       ),
     );
+  }
+
+  /// Attach lexicon / word-book marks onto in-memory cue models (no SRT sidecar).
+  void _retagSubtitleMarks(SubtitleChunkHighlighter highlighter) {
+    if (!mounted || !state.hasLines) {
+      return;
+    }
+    final Set<String> saved = SubtitleVocabularyHighlight.savedWordsFromBook(
+      ref.read(wordBookProvider),
+    );
+    final List<PlayerSubtitleLine> tagged =
+        SubtitleChunkHighlighter.attachMarksToLines<PlayerSubtitleLine>(
+          lines: state.lines,
+          englishOf: (PlayerSubtitleLine line) => line.english,
+          copyWithMarks: (PlayerSubtitleLine line, List<SubtitleLineMark> marks) =>
+              line.copyWith(marks: marks),
+          highlighter: highlighter,
+          savedVocabularyWords: saved,
+        );
+    setState(() {
+      state.lines = tagged;
+    });
   }
 
   Future<void> _handleOpenFullscreen(List<LibraryEpisodeItem> episodes) async {
