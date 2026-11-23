@@ -547,6 +547,7 @@ GoRouter goRouter(Ref ref) {
           weakOnly: state.uri.queryParameters['weak'] == '1',
           sourceLabel: state.uri.queryParameters['source'],
           sourceEpisodeId: state.uri.queryParameters['sourceEpisode'],
+          todayTaskId: state.uri.queryParameters['todayTask'],
           practiceKind: ReviewKind.values
               .where((ReviewKind kind) => kind.name == kindName)
               .firstOrNull,

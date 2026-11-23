@@ -19,6 +19,7 @@ class StudyPracticeTab extends StatefulWidget {
     this.planCompleted,
     this.planStrict = false,
     this.onPlanSelect,
+    this.onSessionCompleted,
     super.key,
   });
 
@@ -28,6 +29,7 @@ class StudyPracticeTab extends StatefulWidget {
   final VoidCallback? onReplayLine;
   final ValueChanged<int>? onGoToLine;
   final int questionCount;
+  final Future<void> Function()? onSessionCompleted;
 
   /// Guided plan steps (看懂/精读/输出/复习); shown only inside this tab.
   final StudyPlanStep? planCurrent;
@@ -42,6 +44,8 @@ class StudyPracticeTab extends StatefulWidget {
 class _StudyPracticeTabState extends State<StudyPracticeTab> {
   late List<_PracticeItem> _session;
   int _index = 0;
+  final Set<int> _answered = <int>{};
+  bool _reportedCompletion = false;
   List<TextEditingController> _controllers = <TextEditingController>[];
   bool _checked = false;
   bool? _allCorrect;
@@ -57,10 +61,11 @@ class _StudyPracticeTabState extends State<StudyPracticeTab> {
   @override
   void didUpdateWidget(covariant StudyPracticeTab oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.activeIndex != widget.activeIndex ||
-        oldWidget.lines.length != widget.lines.length) {
+    if (oldWidget.lines.length != widget.lines.length) {
       _session = _buildSession();
       _index = 0;
+      _answered.clear();
+      _reportedCompletion = false;
       _checked = false;
       _allCorrect = null;
       _mcqSelected = null;
@@ -223,7 +228,7 @@ class _StudyPracticeTabState extends State<StudyPracticeTab> {
 
   _PracticeItem get _item => _session[_index];
 
-  void _check() {
+  Future<void> _check() async {
     final _PracticeItem item = _item;
     bool ok = true;
     if (item.kind == _PracticeKind.mcq) {
@@ -246,6 +251,28 @@ class _StudyPracticeTabState extends State<StudyPracticeTab> {
       _checked = true;
       _allCorrect = ok;
     });
+    if (item.kind == _PracticeKind.cloze &&
+        _controllers.any((controller) => controller.text.trim().isEmpty)) {
+      return;
+    }
+    _answered.add(_index);
+    final complete = widget.onSessionCompleted;
+    if (complete == null ||
+        _answered.length != _session.length ||
+        _reportedCompletion) {
+      return;
+    }
+    _reportedCompletion = true;
+    try {
+      await complete();
+    } catch (_) {
+      _reportedCompletion = false;
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('练习进度保存失败，请再点一次检查')),
+        );
+      }
+    }
   }
 
   void _go(int delta) {

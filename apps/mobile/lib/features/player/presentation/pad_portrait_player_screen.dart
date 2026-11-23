@@ -3334,19 +3334,6 @@ Future<void> _settleChineseFillIfAlreadyPresent() async {
                           });
                         },
                       ),
-                      if (widget.todayTaskId != null && state.hasLines &&
-                          ((widget.videoPlanActivity == 'words' &&
-                                  _studyTab == StudyModeTab.wordCards) ||
-                              (widget.videoPlanActivity == 'practice' &&
-                                  _studyTab == StudyModeTab.practice)))
-                        TextButton(
-                          onPressed: () async {
-                            await ref.read(todayPathProvider.notifier)
-                                .markDone(widget.todayTaskId!);
-                            if (mounted) context.pop();
-                          },
-                          child: const Text('完成本项并返回计划'),
-                        ),
                       Expanded(
                         child: Padding(
                           padding: const EdgeInsets.fromLTRB(12, 0, 12, 4),
@@ -3824,6 +3811,14 @@ Future<void> _settleChineseFillIfAlreadyPresent() async {
           },
           onGoToLine: _goToLine,
           onReplayLine: _handleReplayLine,
+          onSessionCompleted: widget.videoPlanActivity == 'practice' &&
+                  widget.todayTaskId != null
+              ? () async {
+                  await ref.read(todayPathProvider.notifier)
+                      .markDone(widget.todayTaskId!);
+                  if (mounted) _showMessage('本集练习已计入今日计划');
+                }
+              : null,
           planCurrent: _studyPlanStep,
           planCompleted: _studyPlanDone,
           planStrict: widget.dramaPlan,
@@ -3867,6 +3862,9 @@ Future<void> _settleChineseFillIfAlreadyPresent() async {
         return StudyWordCardsTab(
           cards: cards,
           episodeId: widget.episodeId,
+          todayTaskId: widget.videoPlanActivity == 'words'
+              ? widget.todayTaskId
+              : null,
           onJumpToCard: _handleJumpToWordCard,
           onFavorite: (EpisodeWordCard card) {
             _handleFavoriteWord(card.text);

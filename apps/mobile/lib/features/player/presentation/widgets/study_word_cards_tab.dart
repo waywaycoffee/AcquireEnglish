@@ -17,12 +17,14 @@ class StudyWordCardsTab extends ConsumerStatefulWidget {
     required this.onJumpToCard,
     this.onFavorite,
     this.onSpeak,
+    this.todayTaskId,
     this.episodeId,
     super.key,
   });
 
   final List<EpisodeWordCard> cards;
   final ValueChanged<EpisodeWordCard> onJumpToCard;
+  final String? todayTaskId;
   final ValueChanged<EpisodeWordCard>? onFavorite;
   final ValueChanged<EpisodeWordCard>? onSpeak;
 
@@ -148,9 +150,17 @@ class _StudyWordCardsTabState extends ConsumerState<StudyWordCardsTab> {
             onPressed: () {
               final String episode = (widget.episodeId ?? '').trim();
               if (episode.isNotEmpty) {
-                context.push(
-                  '${SGRoute.reviewSession.route}?sourceEpisode=${Uri.encodeComponent(episode)}',
+                final uri = Uri(
+                  path: SGRoute.reviewSession.route,
+                  queryParameters: <String, String>{
+                    'sourceEpisode': episode,
+                    if (widget.todayTaskId != null) ...{
+                      'kind': 'word',
+                      'todayTask': widget.todayTaskId!,
+                    },
+                  },
                 );
+                context.push(uri.toString());
                 return;
               }
               context.push('${SGRoute.reviewSession.route}?kind=word');

@@ -1,3 +1,4 @@
+import '../../daily_path/presentation/today_path_provider.dart';
 import 'dart:async';
 import 'dart:convert';
 
@@ -71,6 +72,7 @@ class DailyReviewScreen extends ConsumerStatefulWidget {
     this.weakOnly = false,
     this.sourceLabel,
     this.sourceEpisodeId,
+    this.todayTaskId,
     this.syllabusOnly = false,
     this.syllabusBookId,
   });
@@ -94,6 +96,7 @@ class DailyReviewScreen extends ConsumerStatefulWidget {
   final bool weakOnly;
   final String? sourceLabel;
   final String? sourceEpisodeId;
+  final String? todayTaskId;
 
   /// Only syllabus book cards (`syllabus:…` keys).
   final bool syllabusOnly;
@@ -128,6 +131,7 @@ class _DailyReviewScreenState extends ConsumerState<DailyReviewScreen>
   bool _phonicsOpen = false;
   bool _saving = false;
   ReviewKind? _overviewKind;
+  bool _reportedPlanProgress = false;
   final Map<String, fsrs.Rating> _sessionRatings = <String, fsrs.Rating>{};
   /// Per-card override: episodeId (preferred) or related source label.
   final Map<String, String> _contextPick = <String, String>{};
@@ -2788,6 +2792,23 @@ class _DailyReviewScreenState extends ConsumerState<DailyReviewScreen>
     if (passes != null) _setWordPasses(source.key, null);
     _stageRatings.remove(source.key);
     _advanceCard(source.key);
+    final String? episodeId = widget.sourceEpisodeId;
+    final String? taskId = widget.todayTaskId;
+    if (!_reportedPlanProgress &&
+        episodeId != null &&
+        source.kind == ReviewKind.word &&
+        taskId == 'video-words:$episodeId') {
+      try {
+        await ref.read(todayPathProvider.notifier).markDone(taskId!);
+        _reportedPlanProgress = true;
+      } catch (_) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('评分已保存，今日计划更新失败')),
+          );
+        }
+      }
+    }
   }
 
   void _restoreWordPasses(DateTime now) {
