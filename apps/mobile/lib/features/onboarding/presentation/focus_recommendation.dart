@@ -1,8 +1,8 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../import_course/data/bilibili_episode_prepare.dart';
 import '../../library/presentation/library_catalog_provider.dart';
 import '../../library/presentation/library_mock_data.dart';
+import '../../membership/domain/free_trial_seeds.dart';
 import '../../reading/domain/reading_doc.dart';
 import '../../reading/presentation/reading_library_provider.dart';
 import '../../sync/data/acquire_api_client.dart';
@@ -44,21 +44,45 @@ int _matchScore(
   String contentLevel,
   String level,
   List<String> interests, {
-  bool hasEnglishSoftsub = false,
+  bool englishSpoken = false,
+  bool chineseSpoken = false,
+  bool freeTrialSeed = false,
 }) {
   final String text = title.toLowerCase();
   final bool topicMatch = interests.any(
     (String interest) => _topicKeywords[interest]?.any(text.contains) ?? false,
   );
-  // Prefer bilingual / EN softsub so "游戏" interest does not land on
-  // Chinese-only AI硬字幕课（用户会感觉一句英文都没有）.
+  // Learners need audible English speech — EN softsubs alone are not enough
+  // (game uploads often have Chinese VO + translated EN captions).
   return (topicMatch ? 2 : 0) +
       (contentLevel.trim().toUpperCase() == level.toUpperCase() ? 3 : 0) +
-      (hasEnglishSoftsub ? 5 : 0);
+      (englishSpoken ? 10 : 0) +
+      (freeTrialSeed ? 8 : 0) +
+      (chineseSpoken && !englishSpoken ? -12 : 0);
 }
 
-bool _episodeHasEnglishSoftsub(LibraryEpisodeItem episode) {
-  return isUsableSubtitlePath(episode.enSubtitleAsset);
+bool _courseEnglishSpoken(LibraryCourseData course) {
+  final String spoken = course.spokenLanguage.trim().toLowerCase();
+  return spoken == 'en' || spoken.startsWith('en');
+}
+
+bool _courseChineseSpoken(LibraryCourseData course) {
+  final String spoken = course.spokenLanguage.trim().toLowerCase();
+  return spoken == 'zh' || spoken.startsWith('zh');
+}
+
+bool _looksLikeFreeTrialEnglishSeed(LibraryCourseData course, LibraryEpisodeItem episode) {
+  if (isFreeTrialCourseSeedId(course.id) || isFreeTrialSeedId(course.id)) {
+    return true;
+  }
+  final String blob = '${course.id} ${episode.id} ${episode.sourceUrl ?? ''}';
+  for (final FreeTrialSeedItem seed
+      in kDefaultFreeTrialSeeds['video'] ?? const <FreeTrialSeedItem>[]) {
+    final String bv = seed.bvid.trim();
+    if (bv.isEmpty) continue;
+    if (blob.toUpperCase().contains(bv.toUpperCase())) return true;
+  }
+  return false;
 }
 
 T? _bestMatch<T>(Iterable<T> items, int Function(T) score) {
@@ -115,21 +139,27 @@ FocusRecommendation buildFocusRecommendation({
 
   switch (focus.id) {
     case 'video':
-      // Rank (course, episode) pairs — not just course — so we can prefer a
-      // playable English softsub over the first episode of a keyword hit.
+      // Rank playable episodes. Prefer English *speech* (and free-trial seeds),
+      // not merely EN softsubs / title keywords like「游戏」.
       ({LibraryCourseData course, LibraryEpisodeItem episode})? best;
       int bestScore = -1;
       for (final LibraryCourseData course in courses) {
+        final bool englishSpoken = _courseEnglishSpoken(course);
+        final bool chineseSpoken = _courseChineseSpoken(course);
         for (final LibraryEpisodeItem episode in course.episodes) {
           if (episode.videoMissing) continue;
+          final bool seed = _looksLikeFreeTrialEnglishSeed(course, episode);
+          // Skip known Chinese-spoken library hits when we already have an
+          // English-spoken or seed candidate; still allow if nothing else.
           final int score = _matchScore(
             '${course.title} ${course.category} ${episode.title}',
             course.level,
             level,
             preferredTopics,
-            hasEnglishSoftsub: _episodeHasEnglishSoftsub(episode),
+            englishSpoken: englishSpoken,
+            chineseSpoken: chineseSpoken,
+            freeTrialSeed: seed,
           );
-          // Prefer unfinished when scores tie.
           final int tieBreak = episode.completed ? 0 : 1;
           final int ranked = score * 10 + tieBreak;
           if (ranked > bestScore) {
@@ -137,6 +167,18 @@ FocusRecommendation buildFocusRecommendation({
             best = (course: course, episode: episode);
           }
         }
+      }
+      // If the winner is Chinese-spoken and not a seed, fall back to library
+      // hub — better than sending the user into silent/Chinese game footage.
+      if (best != null &&
+          _courseChineseSpoken(best.course) &&
+          !_courseEnglishSpoken(best.course) &&
+          !_looksLikeFreeTrialEnglishSeed(best.course, best.episode)) {
+        return recommendation(
+          '选择一段有英语人声的视频',
+          '兴趣只作筛选；请选口播为英语的内容，不要只看有没有英文字幕。',
+          focus.route,
+        );
       }
       if (best == null) {
         return recommendation('选择一段视频', '从课程库选择或导入视频。', focus.route);

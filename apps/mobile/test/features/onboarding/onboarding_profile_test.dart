@@ -1,5 +1,3 @@
-import 'dart:io';
-
 import 'package:common_learn_english/features/library/presentation/library_mock_data.dart';
 import 'package:common_learn_english/features/onboarding/domain/onboarding_profile.dart';
 import 'package:common_learn_english/features/onboarding/presentation/focus_recommendation.dart';
@@ -86,33 +84,43 @@ void main() {
     expect(rec.title, contains('Robot'));
   });
 
-  test('video recommendation prefers episode with English softsub', () {
-    final Directory tmp = Directory.systemTemp.createTempSync('onboard_rec_');
-    addTearDown(() {
-      try {
-        tmp.deleteSync(recursive: true);
-      } catch (_) {}
-    });
-    final File enSrt = File('${tmp.path}/en.srt')
-      ..writeAsStringSync(
-        '1\n00:00:00,000 --> 00:00:01,000\nHello from Minecraft English.\n',
-      );
+  test('video recommendation prefers English speech over Chinese game footage', () {
     LibraryEpisodeItem ep({
       required String id,
       required String title,
-      String? enPath,
     }) => LibraryEpisodeItem(
       id: id,
       numberStr: '1',
       title: title,
       durationMinutes: 10,
       hasChineseSubtitles: true,
-      hasEnglishSubtitles: enPath != null,
+      hasEnglishSubtitles: true,
       completed: false,
       progressPercent: 0,
       coverImage: '',
-      videoAsset: '${tmp.path}/$id.mp4',
-      enSubtitleAsset: enPath,
+      videoAsset: '/tmp/$id.mp4',
+    );
+    LibraryCourseData course({
+      required String id,
+      required String title,
+      required String spokenLanguage,
+      required LibraryEpisodeItem episode,
+    }) => LibraryCourseData(
+      id: id,
+      title: title,
+      description: '',
+      sourceLabel: 'bilibili',
+      coverImage: '',
+      level: 'A2',
+      category: '游戏',
+      progressPercent: 0,
+      totalWords: 0,
+      completedEpisodes: 0,
+      totalEpisodes: 1,
+      lastStudiedStr: '',
+      rating: 0,
+      spokenLanguage: spokenLanguage,
+      episodes: <LibraryEpisodeItem>[episode],
     );
     final FocusRecommendation rec = buildFocusRecommendation(
       profile: const OnboardingProfile(
@@ -122,53 +130,24 @@ void main() {
       ),
       prefs: const AcquirePreferencesDto(level: 'A2'),
       courses: <LibraryCourseData>[
-        LibraryCourseData(
-          id: 'game-zh-only',
-          title: '游戏实况中文解说',
-          description: '',
-          sourceLabel: 'bilibili',
-          coverImage: '',
-          level: 'A2',
-          category: '游戏',
-          progressPercent: 0,
-          totalWords: 0,
-          completedEpisodes: 0,
-          totalEpisodes: 1,
-          lastStudiedStr: '',
-          rating: 0,
-          episodes: <LibraryEpisodeItem>[
-            ep(id: 'game-zh-only-01', title: '纯中文游戏实况'),
-          ],
+        course(
+          id: 'game-zh-vo',
+          title: '我的世界中文实况（带英文字幕）',
+          spokenLanguage: 'zh',
+          episode: ep(id: 'game-zh-vo-01', title: '全程中文解说'),
         ),
-        LibraryCourseData(
-          id: 'game-en',
-          title: 'Minecraft English',
-          description: '',
-          sourceLabel: 'bilibili',
-          coverImage: '',
-          level: 'A2',
-          category: '游戏',
-          progressPercent: 0,
-          totalWords: 0,
-          completedEpisodes: 0,
-          totalEpisodes: 1,
-          lastStudiedStr: '',
-          rating: 0,
-          episodes: <LibraryEpisodeItem>[
-            ep(
-              id: 'game-en-01',
-              title: 'Learn English with Minecraft',
-              enPath: enSrt.path,
-            ),
-          ],
+        course(
+          id: 'game-en-speech',
+          title: 'Learn English while gaming',
+          spokenLanguage: 'en',
+          episode: ep(id: 'game-en-speech-01', title: 'English spoken gameplay'),
         ),
       ],
       readingDocs: const <ReadingDoc>[],
       activeBook: null,
     );
     expect(rec.focus.id, 'video');
-    expect(rec.route, '/episodes/game-en-01');
-    expect(rec.title, contains('Minecraft'));
+    expect(rec.route, '/episodes/game-en-speech-01');
   });
 
   test(
