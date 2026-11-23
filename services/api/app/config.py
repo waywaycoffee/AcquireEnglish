@@ -75,6 +75,9 @@ class Settings(BaseSettings):
     livekit_url: str = ""
     livekit_api_key: str = ""
     livekit_api_secret: str = ""
+    # Shared secret for GPU LiveKit agent → /api/learning writes.
+    # Agent sends Authorization: Bearer <token> + X-Acquire-User-Email.
+    learning_service_token: str = ""
 
     # OpenList (AList fork) — personal Baidu / Quark mounts. Empty = netdisk import disabled.
     openlist_base_url: str = ""

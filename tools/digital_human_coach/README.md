@@ -39,8 +39,15 @@ App 侧：设置填同一 `wss://`；数字人画面仍可接 LiveTalking WebRTC
 
 ## 与 oral_coach 关系
 
-- **oral_coach**：`POST /turn` 回合制，适合无 GPU 先跑通 UI。
-- **本目录**：全双工 Agent + 学习闭环；能力层 import oral_coach providers，避免双份适配器。
+- **oral_coach**：`POST /turn` 回合制，适合无 GPU 先跑通 UI；另提供 `POST /api/score/text` 给全双工 Agent。
+- **本目录**：全双工 Agent + 学习闭环；发音经 HTTP 调 oral_coach，学习经 `LEARNING_API_BEARER` + `X-Acquire-User-Email` 写主 API。
+
+### 学习落库（GPU agent → ECS）
+
+1. API `.env`：`LEARNING_SERVICE_TOKEN=<shared secret>`
+2. Agent `.env`：`LEARNING_API_BEARER=<同一 secret>`
+3. App 在 `coach.context` 带 `user_email`（登录邮箱）
+4. Agent 回合后写 `/api/learning/sessions` + turns（用户句 + 外教回复）
 
 ## ChatterPal
 

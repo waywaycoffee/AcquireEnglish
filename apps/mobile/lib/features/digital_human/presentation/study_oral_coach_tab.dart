@@ -1281,6 +1281,7 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
 
   Map<String, dynamic> _liveKitContextPayload() {
     final LearningScenario? scenario = _activeScenario;
+    final String email = ref.read(authSessionProvider).email.trim();
     return <String, dynamic>{
       'task_id': scenario?.id ?? (widget.hasTranscript ? 'video_line' : 'freechat'),
       'scenario_title': scenario?.title ?? '',
@@ -1291,6 +1292,7 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
       'excerpt': widget.articleExcerpt,
       'course_title': widget.courseTitle,
       'difficulty': _difficulty,
+      if (email.isNotEmpty) 'user_email': email,
     };
   }
 

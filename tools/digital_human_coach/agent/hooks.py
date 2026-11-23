@@ -19,17 +19,23 @@ LEARNING_API_URL = os.getenv(
 LEARNING_BEARER = os.getenv('LEARNING_API_BEARER', '').strip()
 
 
+def _learning_headers(*, user_email: str = '') -> dict[str, str]:
+    headers: dict[str, str] = {'Content-Type': 'application/json'}
+    if LEARNING_BEARER:
+        headers['Authorization'] = f'Bearer {LEARNING_BEARER}'
+    email = (user_email or '').strip().lower()
+    if email:
+        headers['X-Acquire-User-Email'] = email
+    return headers
+
+
 async def score_pronunciation(
     *,
     transcript: str,
     reference_text: str,
     audio_path: str | None = None,
 ) -> dict[str, Any]:
-    """Best-effort: create oral_coach session draft for pronunciation scores.
-
-    When audio_path is missing, returns a lightweight heuristic score so the
-    agent still publishes feedback on the data channel.
-    """
+    """Prefer oral_coach draft (audio) or /api/score/text; else overlap heuristic."""
     if audio_path:
         try:
             async with httpx.AsyncClient(timeout=60.0) as client:
@@ -64,6 +70,27 @@ async def score_pronunciation(
                 'providers': {'fallback': 'error'},
             }
 
+    # Text-only path: oral_coach simple scorer (no GPU).
+    try:
+        async with httpx.AsyncClient(timeout=20.0) as client:
+            scored = await client.post(
+                f'{ORAL_COACH_URL}/api/score/text',
+                json={
+                    'transcript': transcript,
+                    'reference_text': reference_text,
+                },
+            )
+            if scored.status_code < 400:
+                body = scored.json()
+                return {
+                    'transcript': body.get('transcript') or transcript,
+                    'pronunciation': body.get('pronunciation') or {},
+                    'providers': body.get('providers')
+                    or {'pronunciation': 'oral_coach_text'},
+                }
+    except Exception:  # noqa: BLE001
+        pass
+
     words = [w for w in reference_text.lower().split() if w]
     hit = sum(1 for w in words if w in transcript.lower())
     overlap = (hit / len(words)) if words else 0.0
@@ -84,11 +111,16 @@ async def persist_learning_turn(
     coach_text: str,
     pronunciation: dict[str, Any] | None = None,
     task_id: str = 'livekit-oral',
+    user_email: str = '',
+    course_title: str = '',
+    current_english: str = '',
 ) -> str | None:
     """Append a turn to /api/learning; create a session when needed."""
-    headers: dict[str, str] = {'Content-Type': 'application/json'}
-    if LEARNING_BEARER:
-        headers['Authorization'] = f'Bearer {LEARNING_BEARER}'
+    if not LEARNING_BEARER or not (user_email or '').strip():
+        # Without service token + learner email, prod JWT endpoints reject us.
+        return learning_session_id
+
+    headers = _learning_headers(user_email=user_email)
     try:
         async with httpx.AsyncClient(timeout=30.0) as client:
             sid = learning_session_id
@@ -96,23 +128,28 @@ async def persist_learning_turn(
                 created = await client.post(
                     f'{LEARNING_API_URL}/sessions',
                     headers=headers,
-                    json={'task_id': task_id},
+                    json={
+                        'task_id': task_id,
+                        'course_title': course_title,
+                        'current_english': current_english,
+                    },
                 )
                 if created.status_code >= 400:
                     return None
                 sid = str(created.json().get('id') or '')
                 if not sid:
                     return None
-            await client.post(
-                f'{LEARNING_API_URL}/sessions/{sid}/turns',
-                headers=headers,
-                json={
-                    'role': 'user',
-                    'text': transcript,
-                    'confirmed': True,
-                    'scores': pronunciation or {},
-                },
-            )
+            if transcript.strip():
+                await client.post(
+                    f'{LEARNING_API_URL}/sessions/{sid}/turns',
+                    headers=headers,
+                    json={
+                        'role': 'user',
+                        'text': transcript,
+                        'confirmed': True,
+                        'scores': pronunciation or {},
+                    },
+                )
             if coach_text.strip():
                 await client.post(
                     f'{LEARNING_API_URL}/sessions/{sid}/turns',

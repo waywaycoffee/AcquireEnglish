@@ -188,6 +188,34 @@ def providers() -> dict[str, Any]:
     }
 
 
+class TextScoreIn(BaseModel):
+    transcript: str = ''
+    reference_text: str = ''
+
+
+@app.post('/api/score/text')
+async def score_text(body: TextScoreIn) -> dict[str, Any]:
+    """Duplex agent bridge: pronunciation from transcript vs reference (no audio)."""
+    from .providers.pronunciation import SimplePronunciation
+
+    result = await SimplePronunciation().score(
+        audio_path='',
+        reference_text=body.reference_text or '',
+        transcript=body.transcript or '',
+    )
+    return {
+        'transcript': body.transcript,
+        'pronunciation': {
+            'overall': result.overall,
+            'notes': result.notes,
+            'word_scores': result.word_scores,
+            'phonemes': result.phonemes,
+            'method': 'simple_text',
+        },
+        'providers': {'pronunciation': result.provider or 'simple'},
+    }
+
+
 @app.post('/api/sessions', status_code=201)
 def create_session(body: SessionCreate) -> dict[str, Any]:
     payload = body.model_dump()

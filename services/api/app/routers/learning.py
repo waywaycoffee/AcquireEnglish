@@ -8,7 +8,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
 from app.config import settings
-from app.deps import get_current_user
+from app.deps import get_current_user, get_learning_actor
 from app.learning import FeedbackItem, LearningStore
 from app.models import User
 
@@ -67,7 +67,9 @@ async def tasks() -> list[dict]:
 
 
 @router.post("/sessions")
-async def start_session(body: StartIn, user: User = Depends(get_current_user)) -> dict:
+async def start_session(
+    body: StartIn, user: User = Depends(get_learning_actor)
+) -> dict:
     try:
         session = get_store().start_session(
             body.task_id,
@@ -89,7 +91,7 @@ async def start_session(body: StartIn, user: User = Depends(get_current_user)) -
 async def append_turn(
     session_id: str,
     body: TurnIn,
-    user: User = Depends(get_current_user),
+    user: User = Depends(get_learning_actor),
 ) -> dict:
     try:
         get_store().append_turn(

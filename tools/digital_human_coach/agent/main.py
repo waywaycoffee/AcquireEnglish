@@ -191,6 +191,7 @@ async def entrypoint(ctx) -> None:
             await ctx.room.local_participant.publish_data(
                 score_payload_bytes(score), topic='score.partial',
             )
+            user_email = str(self._context.get('user_email') or '').strip()
             async with persist_lock:
                 self._learning_session_id = await persist_learning_turn(
                     learning_session_id=self._learning_session_id,
@@ -198,6 +199,27 @@ async def entrypoint(ctx) -> None:
                     coach_text='',
                     pronunciation=score.get('pronunciation') or {},
                     task_id=task_id,
+                    user_email=user_email,
+                    course_title=str(self._context.get('course_title') or ''),
+                    current_english=reference,
+                )
+
+        async def _persist_coach(self, coach_text: str) -> None:
+            text = (coach_text or '').strip()
+            if not text:
+                return
+            user_email = str(self._context.get('user_email') or '').strip()
+            task_id = str(self._context.get('task_id') or 'livekit-oral')
+            async with persist_lock:
+                self._learning_session_id = await persist_learning_turn(
+                    learning_session_id=self._learning_session_id,
+                    transcript='',
+                    coach_text=text,
+                    pronunciation={},
+                    task_id=task_id,
+                    user_email=user_email,
+                    course_title=str(self._context.get('course_title') or ''),
+                    current_english=self._reference(''),
                 )
 
     await ctx.connect(auto_subscribe=AutoSubscribe.AUDIO_ONLY)
@@ -239,6 +261,7 @@ async def entrypoint(ctx) -> None:
         item = event.item
         if item.role == 'assistant' and item.text_content:
             spawn(send('coach.text', {'text': item.text_content, 'turn': agent._turn}))
+            spawn(agent._persist_coach(item.text_content))
 
     await session.start(room=ctx.room, agent=agent)
     ready = True

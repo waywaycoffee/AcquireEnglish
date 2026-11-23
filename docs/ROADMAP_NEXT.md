@@ -14,7 +14,7 @@
 | 偏好 bilibili/asr key | Schema/DB 有，**路由未读写** |
 | oral_coach HTTP 回合 | 可用（默认 mock providers） |
 | ChatterPal 学习层 | 后端可用，**App/Agent 未接** |
-| LiveKit 全双工 | **骨架**，与 App 断开 |
+| LiveKit 全双工 | **已接线**：App token + agent 就绪门闩 + 分数/学习落库；唇形仍可选 |
 
 ## 优先级
 
