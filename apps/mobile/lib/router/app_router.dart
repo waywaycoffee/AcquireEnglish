@@ -542,6 +542,7 @@ GoRouter goRouter(Ref ref) {
           practice: state.uri.queryParameters['practice'] == '1',
           learnNewOnly: state.uri.queryParameters['learn'] == '1',
           dueOnly: state.uri.queryParameters['due'] == '1',
+          journeyReview: state.uri.queryParameters['journeyReview'] == '1',
           expressions: kindName == 'expressions',
           recommended: deck == 'recommended',
           missedOnly: deck == 'missed',

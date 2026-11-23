@@ -65,6 +65,7 @@ class DailyReviewScreen extends ConsumerStatefulWidget {
     this.practiceKind,
     this.learnNewOnly = false,
     this.dueOnly = false,
+    this.journeyReview = false,
     this.expressions = false,
     this.recommended = false,
     this.missedOnly = false,
@@ -87,6 +88,7 @@ class DailyReviewScreen extends ConsumerStatefulWidget {
 
   /// Due reviews only (复习 tab): skip introducing new book words.
   final bool dueOnly;
+  final bool journeyReview;
 
   /// Only cards currently in the missed-word book.
   final bool missedOnly;
@@ -454,6 +456,7 @@ class _DailyReviewScreenState extends ConsumerState<DailyReviewScreen>
       widget.syllabusBookId,
       widget.learnNewOnly,
       widget.dueOnly,
+      if (widget.journeyReview) true,
     ]),
   );
 
@@ -503,12 +506,12 @@ class _DailyReviewScreenState extends ConsumerState<DailyReviewScreen>
     },
   ).toString();
 
-  Future<void> _leaveSession() async {
+  Future<void> _leaveSession({bool journeyCompleted = false}) async {
     if (_saving) return;
     await _persistDraft();
     if (!mounted) return;
     if (context.canPop()) {
-      context.pop();
+      context.pop(journeyCompleted ? true : null);
     } else {
       // Deep-linked session has no stack; return to the review overview.
       context.go(SGRoute.review.route);
@@ -637,10 +640,14 @@ class _DailyReviewScreenState extends ConsumerState<DailyReviewScreen>
       return;
     }
 
-    final int reviewCap = ref
+    final int configuredCap = ref
         .read(wordReviewSettingsProvider)
         .dailyReviewLimit
         .clamp(0, 500);
+    final int reviewCap =
+        widget.journeyReview && (configuredCap == 0 || configuredCap > 5)
+        ? 5
+        : configuredCap;
     List<ReviewRecord> due = <ReviewRecord>[...plan.due];
     final List<String> missedPriority = missedBook.prioritize(activeKeys);
     if (missedPriority.isNotEmpty) {
@@ -854,6 +861,10 @@ class _DailyReviewScreenState extends ConsumerState<DailyReviewScreen>
                                 Text(
                                   widget.practice
                                       ? '这轮练习不会改变复习计划或新学额度，想巩固时可以随时再练。'
+                                      : widget.journeyReview
+                                      ? (keys.isEmpty
+                                            ? '可以直接开始学习新内容。'
+                                            : '接下来学习你感兴趣的新内容。')
                                       : sources.isEmpty
                                       ? '去词书架选择要学习的词书。'
                                       : '把一点点进步累积起来。剩下的交给时间。',
@@ -956,9 +967,13 @@ class _DailyReviewScreenState extends ConsumerState<DailyReviewScreen>
                                 ],
                                 const SizedBox(height: 24),
                                 FilledButton(
-                                  onPressed: _leaveSession,
+                                  onPressed: () => _leaveSession(
+                                    journeyCompleted: widget.journeyReview,
+                                  ),
                                   style: ReviewRecallTheme.primaryButton,
-                                  child: const Text('返回学习'),
+                                  child: Text(
+                                    widget.journeyReview ? '进入新学' : '返回学习',
+                                  ),
                                 ),
                                 if (widget.practice &&
                                     keys.any(_missedKeys.contains))

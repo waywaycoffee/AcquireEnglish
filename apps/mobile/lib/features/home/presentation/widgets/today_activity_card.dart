@@ -3,6 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../../router/app_router.dart';
+import '../../../authentication/presentation/account_storage.dart';
+import '../../../daily_path/data/today_journey_store.dart';
 import '../../../library/presentation/library_catalog_provider.dart';
 import '../../../library/presentation/library_mock_data.dart';
 import '../../../onboarding/domain/onboarding_profile.dart';
@@ -16,43 +18,162 @@ import '../../../words/presentation/learner_level_provider.dart';
 import '../../../words/presentation/vocabulary_placement_provider.dart';
 import '../learning_dashboard_provider.dart';
 
-class TodayActivityCard extends ConsumerWidget {
+class TodayActivityCard extends ConsumerStatefulWidget {
   const TodayActivityCard({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<TodayActivityCard> createState() => _TodayActivityCardState();
+}
+
+class _TodayActivityCardState extends ConsumerState<TodayActivityCard> {
+  bool _busy = false;
+
+  DateTime _nextDay(DateTime today) =>
+      DateTime(today.year, today.month, today.day + 1);
+
+  bool _assessed() {
+    final PlacementRow result = ref.read(vocabularyPlacementProvider);
+    return result['estimate'] is int && result['testedAt'] is String;
+  }
+
+  Future<JourneyActivity?> _pick({bool tomorrow = false}) =>
+      showModalBottomSheet<JourneyActivity>(
+        context: context,
+        isScrollControlled: true,
+        showDragHandle: true,
+        builder: (_) => _TodayActivityPicker(tomorrow: tomorrow),
+      );
+
+  Future<void> _runJourney({bool chooseAnother = false}) async {
+    if (_busy) return;
+    setState(() => _busy = true);
+    final DateTime today = DateTime.now();
+    final String account = ref.read(studyAccountProvider);
+    final TodayJourneyStore store = TodayJourneyStore(account, today);
+
+    bool active() =>
+        mounted &&
+        account == ref.read(studyAccountProvider) &&
+        DateUtils.isSameDay(today, DateTime.now());
+
+    try {
+      if (!_assessed()) {
+        await context.push('${SGRoute.vocabularyPlacement.route}?journey=1');
+        if (!active() || !_assessed()) return;
+      }
+
+      switch (store.stage) {
+        case JourneyStage.review:
+          final bool? completed = await context.push<bool>(
+            '${SGRoute.reviewSession.route}?due=1&journeyReview=1',
+          );
+          if (active() && completed == true) {
+            await store.saveStage(JourneyStage.learn);
+            if (active() && store.activity?.route.isNotEmpty != true) {
+              continue learn;
+            }
+          }
+        learn:
+        case JourneyStage.learn:
+          final JourneyActivity? planned = store.activity;
+          final JourneyActivity? activity =
+              chooseAnother || planned == null || planned.route.isEmpty
+              ? await _pick()
+              : planned;
+          if (!active() || activity == null) return;
+          await store.saveActivity(activity);
+          if (!active()) return;
+          await context.push(activity.route);
+          if (!active()) return;
+          final bool? completed = await showDialog<bool>(
+            context: context,
+            builder: (BuildContext dialogContext) => AlertDialog(
+              title: const Text('这关学完了吗？'),
+              content: Text(activity.title),
+              actions: <Widget>[
+                TextButton(
+                  onPressed: () => Navigator.of(dialogContext).pop(false),
+                  child: const Text('稍后继续'),
+                ),
+                FilledButton(
+                  onPressed: () => Navigator.of(dialogContext).pop(true),
+                  child: const Text('完成本关'),
+                ),
+              ],
+            ),
+          );
+          if (active() && completed == true) {
+            await store.saveStage(JourneyStage.tomorrow);
+            if (active()) continue chooseTomorrow;
+          }
+        chooseTomorrow:
+        case JourneyStage.tomorrow:
+        case JourneyStage.done:
+          final JourneyActivity? activity = await _pick(tomorrow: true);
+          if (!active() || activity == null) return;
+          await TodayJourneyStore(
+            account,
+            _nextDay(today),
+          ).saveActivity(activity);
+          if (active()) await store.saveStage(JourneyStage.done);
+      }
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final String account = ref.watch(studyAccountProvider);
+    final DateTime today = DateTime.now();
+    final TodayJourneyStore store = TodayJourneyStore(account, today);
+    final JourneyStage stage = store.stage;
+    final JourneyActivity? planned = store.activity;
+    final String title = switch (stage) {
+      JourneyStage.review => '今天的英语之旅',
+      JourneyStage.learn => '学习新内容',
+      JourneyStage.tomorrow => '选明天学什么',
+      JourneyStage.done => '更换明天的内容',
+    };
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: <Widget>[
-            FilledButton.icon(
-              icon: const Icon(Icons.play_arrow_rounded),
-              label: const Text('今天的英语之旅'),
-              onPressed: () async {
-                bool assessed() {
-                  final PlacementRow result = ref.read(
-                    vocabularyPlacementProvider,
-                  );
-                  return result['estimate'] is int &&
-                      result['testedAt'] is String;
-                }
-
-                if (!assessed()) {
-                  await context.push(
-                    '${SGRoute.vocabularyPlacement.route}?journey=1',
-                  );
-                  if (!context.mounted || !assessed()) return;
-                }
-                final String? route = await showModalBottomSheet<String>(
-                  context: context,
-                  isScrollControlled: true,
-                  showDragHandle: true,
-                  builder: (_) => const _TodayActivityPicker(),
-                );
-                if (context.mounted && route != null) await context.push(route);
-              },
+            if (stage != JourneyStage.review)
+              Text('今天的英语之旅', style: Theme.of(context).textTheme.titleMedium),
+            Text(switch (stage) {
+              JourneyStage.review => '第 1 关 · 今日复习',
+              JourneyStage.learn =>
+                '第 2 关 · ${planned?.route.isNotEmpty == true ? planned!.title : '按兴趣学新内容'}',
+              JourneyStage.tomorrow => '第 3 关 · 安排明天',
+              JourneyStage.done =>
+                '今日已完成 · 明天：${TodayJourneyStore(account, _nextDay(today)).activity?.title ?? '系统推荐'}',
+            }),
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 8,
+              runSpacing: 4,
+              children: <Widget>[
+                FilledButton.icon(
+                  icon: Icon(
+                    stage == JourneyStage.done
+                        ? Icons.edit_calendar_outlined
+                        : Icons.play_arrow_rounded,
+                  ),
+                  label: Text(title),
+                  onPressed: _busy ? null : () => _runJourney(),
+                ),
+                if (stage == JourneyStage.learn &&
+                    planned?.route.isNotEmpty == true)
+                  TextButton(
+                    onPressed: _busy
+                        ? null
+                        : () => _runJourney(chooseAnother: true),
+                    child: const Text('换一个'),
+                  ),
+              ],
             ),
           ],
         ),
@@ -62,7 +183,9 @@ class TodayActivityCard extends ConsumerWidget {
 }
 
 class _TodayActivityPicker extends ConsumerStatefulWidget {
-  const _TodayActivityPicker();
+  const _TodayActivityPicker({required this.tomorrow});
+
+  final bool tomorrow;
 
   @override
   ConsumerState<_TodayActivityPicker> createState() =>
@@ -131,7 +254,8 @@ class _TodayActivityPickerState extends ConsumerState<_TodayActivityPicker> {
     );
     final bool hasVideo = recommended.route.startsWith('/episodes/');
 
-    void open(String route) => Navigator.of(context).pop(route);
+    void open(String route, String title) =>
+        Navigator.of(context).pop((route: route, title: title));
 
     Widget activity(
       IconData icon,
@@ -143,14 +267,22 @@ class _TodayActivityPickerState extends ConsumerState<_TodayActivityPicker> {
       title: Text(title),
       subtitle: Text(subtitle),
       trailing: const Icon(Icons.chevron_right),
-      onTap: () => open(route),
+      onTap: () => open(
+        route,
+        route.startsWith('/episodes/') || route.startsWith('/reading/')
+            ? subtitle
+            : title,
+      ),
     );
 
     final Widget video = ListTile(
       leading: const Icon(Icons.ondemand_video_outlined),
       title: const Text('看一段推荐视频'),
       subtitle: Text(hasVideo ? recommended.title : '去视频库挑一段'),
-      onTap: () => open(hasVideo ? recommended.route : '/library'),
+      onTap: () => open(
+        hasVideo ? recommended.route : '/library',
+        hasVideo ? recommended.title : '挑一段视频',
+      ),
       trailing: hasVideo
           ? IconButton(
               tooltip: '跳过这条，换一段',
@@ -174,7 +306,7 @@ class _TodayActivityPickerState extends ConsumerState<_TodayActivityPicker> {
             Padding(
               padding: const EdgeInsets.fromLTRB(12, 0, 12, 8),
               child: Text(
-                '今天想做什么？',
+                widget.tomorrow ? '明天想学什么？' : '今天想做什么？',
                 style: Theme.of(context).textTheme.titleLarge,
               ),
             ),
@@ -216,7 +348,7 @@ class _TodayActivityPickerState extends ConsumerState<_TodayActivityPicker> {
               '可以直接描述，也可以在口语页主动拍照',
               '/digital-human?sceneMenu=1',
             ),
-            if (previousVideo != null)
+            if (!widget.tomorrow && previousVideo != null)
               activity(
                 Icons.forum_outlined,
                 '聊昨天的视频',
@@ -224,6 +356,8 @@ class _TodayActivityPickerState extends ConsumerState<_TodayActivityPicker> {
                 '${videoRoute(previousVideo)}?autoplay=0&activity=coach',
               ),
             activity(Icons.headphones, '磨耳朵', '听一段喜欢的音频', '/ear-grind'),
+            if (widget.tomorrow)
+              activity(Icons.auto_awesome, '交给系统推荐', '明天再看适合你的内容', ''),
           ],
         ),
       ),
