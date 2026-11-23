@@ -5,8 +5,15 @@ import 'package:go_router/go_router.dart';
 import '../../community/presentation/adventure_ui.dart';
 import '../../shared/presentation/pad/app_design_tokens.dart';
 import '../domain/onboarding_profile.dart';
+import 'auth_guide_keys.dart';
 import 'focus_recommendation.dart';
 import 'onboarding_provider.dart';
+
+String _shortRecommendTitle(String raw, {int maxChars = 36}) {
+  final String text = raw.trim().replaceAll(RegExp(r'\s+'), ' ');
+  if (text.length <= maxChars) return text;
+  return '${text.substring(0, maxChars).trimRight()}…';
+}
 
 class FirstOpenOnboardingScreen extends ConsumerStatefulWidget {
   const FirstOpenOnboardingScreen({super.key});
@@ -165,13 +172,24 @@ class _FirstOpenOnboardingScreenState
                   _ResultPage(
                     profile: profile,
                     onStart: (String route) {
-                      final String target = ref.read(focusRecommendationProvider)?.route ?? route;
+                      final String target =
+                          ref.read(focusRecommendationProvider)?.route ?? route;
+                      // Do not push a module route over auth-guide — that
+                      // skipped the post-register source guide in practice.
+                      if (!readAuthSourceGuideCompletedSync()) {
+                        context.go('/onboarding/auth-guide');
+                        return;
+                      }
                       context.go('/home');
                       context.push(target);
                     },
                     onHome: () => context.go('/home'),
                     recommendation: ref.watch(focusRecommendationProvider),
                     onMap: () {
+                      if (!readAuthSourceGuideCompletedSync()) {
+                        context.go('/onboarding/auth-guide');
+                        return;
+                      }
                       context.go('/discover');
                       context.push('/explore');
                     },
@@ -612,12 +630,38 @@ class _ResultPage extends StatelessWidget {
           ),
           const SizedBox(height: 6),
           Text(
-            recommendation?.title ?? focus.homeBlurb,
+            focus.homeBlurb,
             style: TextStyle(
               fontWeight: FontWeight.w600,
               color: AppDesignTokens.textSecondary,
             ),
           ),
+          if (recommendation != null &&
+              recommendation!.title.trim().isNotEmpty &&
+              recommendation!.title.trim() != focus.homeBlurb) ...<Widget>[
+            const SizedBox(height: 8),
+            Text(
+              '推荐起点 · ${_shortRecommendTitle(recommendation!.title)}',
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+                color: AppDesignTokens.textSecondary,
+                height: 1.35,
+              ),
+            ),
+            if (recommendation!.subtitle.trim().isNotEmpty)
+              Padding(
+                padding: const EdgeInsets.only(top: 2),
+                child: Text(
+                  _shortRecommendTitle(recommendation!.subtitle, maxChars: 48),
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w500,
+                    color: AppDesignTokens.textSecondary.withValues(alpha: 0.85),
+                  ),
+                ),
+              ),
+          ],
           const SizedBox(height: 14),
           HubChunkyButton(
             label: focus.startLabel,

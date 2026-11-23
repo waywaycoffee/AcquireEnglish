@@ -1337,6 +1337,10 @@ class LearningSettingsNotifier extends Notifier<LearningSettingsState> {
   /// Apply cloud learning settings while keeping this device's API / LAN URLs.
   Future<void> applyFromCloud(Map<String, dynamic> json) async {
     final LearningSettingsState defaults = LearningSettingsState.defaults();
+    // Cloud document backups often omit SESSDATA (or store ""). Starting from
+    // defaults would wipe a good local Cookie and trip BilibiliLoginGate.
+    final String? cloudBiliCookie = _stringOrNull(json['bilibiliSessdata']);
+    final String? cloudBiliUserId = _stringOrNull(json['bilibiliUserId']);
     final LearningSettingsState loaded = defaults.copyWith(
       subtitleMode: _normalizeSubtitleModeOrNull(json['subtitleMode']),
       subtitleLetterCase:
@@ -1387,8 +1391,14 @@ class LearningSettingsNotifier extends Notifier<LearningSettingsState> {
           : null,
       oralCoachPipelineUrl: _stringOrNull(json['oralCoachPipelineUrl']),
       liveKitUrl: _stringOrNull(json['liveKitUrl']),
-      bilibiliSessdata: _stringOrNull(json['bilibiliSessdata']),
-      bilibiliUserId: _stringOrNull(json['bilibiliUserId']),
+      bilibiliSessdata: cloudBiliCookie ??
+          (state.bilibiliSessdata.trim().isNotEmpty
+              ? state.bilibiliSessdata
+              : null),
+      bilibiliUserId: cloudBiliUserId ??
+          (state.bilibiliUserId.trim().isNotEmpty
+              ? state.bilibiliUserId
+              : null),
       cartoonDigitalHuman: json['cartoonDigitalHuman'] is bool
           ? json['cartoonDigitalHuman'] as bool
           : null,

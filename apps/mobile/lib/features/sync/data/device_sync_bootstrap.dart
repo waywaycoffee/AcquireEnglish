@@ -317,6 +317,8 @@ Future<void> _syncAppSettingsBackup(
   final LearningSettingsNotifier settingsNotifier =
       ref.read(learningSettingsProvider.notifier) as LearningSettingsNotifier;
   final Map<String, Object?> localSettings = settingsNotifier.toSyncJson();
+  final String localBiliCookie =
+      '${localSettings['bilibiliSessdata'] ?? ''}'.trim();
 
   if (remoteRev >= 0 && remoteRev == localRev && !pushLocal) return;
 
@@ -327,9 +329,14 @@ Future<void> _syncAppSettingsBackup(
     return;
   }
 
+  bool cloudMissingBiliCookie = false;
   if (cloud.state != null) {
     final Object? ls = cloud.state!['learningSettings'];
     if (ls is Map && ls.isNotEmpty) {
+      final String cloudCookie =
+          '${ls['bilibiliSessdata'] ?? ''}'.trim();
+      cloudMissingBiliCookie =
+          localBiliCookie.isNotEmpty && cloudCookie.isEmpty;
       await settingsNotifier.applyFromCloud(Map<String, dynamic>.from(ls));
     }
     final Object? wr = cloud.state!['wordReviewPrefs'];
@@ -391,8 +398,10 @@ Future<void> _syncAppSettingsBackup(
   };
 
   // If cloud was empty and local has data, or explicit push, upload.
+  // Also push when cloud settings omitted B 站 Cookie but this device has one.
   final bool shouldUpload = pushLocal ||
       cloud.state == null ||
+      cloudMissingBiliCookie ||
       ((localSettings.isNotEmpty) && cloud.revision == localRev);
   if (!shouldUpload && cloud.state != null) return;
 
