@@ -1,5 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../import_course/data/bilibili_episode_prepare.dart';
 import '../../library/presentation/library_catalog_provider.dart';
 import '../../library/presentation/library_mock_data.dart';
 import '../../reading/domain/reading_doc.dart';
@@ -42,14 +43,22 @@ int _matchScore(
   String title,
   String contentLevel,
   String level,
-  List<String> interests,
-) {
+  List<String> interests, {
+  bool hasEnglishSoftsub = false,
+}) {
   final String text = title.toLowerCase();
   final bool topicMatch = interests.any(
     (String interest) => _topicKeywords[interest]?.any(text.contains) ?? false,
   );
+  // Prefer bilingual / EN softsub so "游戏" interest does not land on
+  // Chinese-only AI硬字幕课（用户会感觉一句英文都没有）.
   return (topicMatch ? 2 : 0) +
-      (contentLevel.trim().toUpperCase() == level.toUpperCase() ? 3 : 0);
+      (contentLevel.trim().toUpperCase() == level.toUpperCase() ? 3 : 0) +
+      (hasEnglishSoftsub ? 5 : 0);
+}
+
+bool _episodeHasEnglishSoftsub(LibraryEpisodeItem episode) {
+  return isUsableSubtitlePath(episode.enSubtitleAsset);
 }
 
 T? _bestMatch<T>(Iterable<T> items, int Function(T) score) {
@@ -106,32 +115,36 @@ FocusRecommendation buildFocusRecommendation({
 
   switch (focus.id) {
     case 'video':
-      final LibraryCourseData? course = _bestMatch(
-        courses.where(
-          (LibraryCourseData item) => item.episodes.any(
-            (LibraryEpisodeItem episode) => !episode.videoMissing,
-          ),
-        ),
-        (LibraryCourseData item) => _matchScore(
-          '${item.title} ${item.category}',
-          item.level,
-          level,
-          preferredTopics,
-        ),
-      );
-      if (course == null) {
+      // Rank (course, episode) pairs — not just course — so we can prefer a
+      // playable English softsub over the first episode of a keyword hit.
+      ({LibraryCourseData course, LibraryEpisodeItem episode})? best;
+      int bestScore = -1;
+      for (final LibraryCourseData course in courses) {
+        for (final LibraryEpisodeItem episode in course.episodes) {
+          if (episode.videoMissing) continue;
+          final int score = _matchScore(
+            '${course.title} ${course.category} ${episode.title}',
+            course.level,
+            level,
+            preferredTopics,
+            hasEnglishSoftsub: _episodeHasEnglishSoftsub(episode),
+          );
+          // Prefer unfinished when scores tie.
+          final int tieBreak = episode.completed ? 0 : 1;
+          final int ranked = score * 10 + tieBreak;
+          if (ranked > bestScore) {
+            bestScore = ranked;
+            best = (course: course, episode: episode);
+          }
+        }
+      }
+      if (best == null) {
         return recommendation('选择一段视频', '从课程库选择或导入视频。', focus.route);
       }
-      final LibraryEpisodeItem episode = course.episodes.firstWhere(
-        (LibraryEpisodeItem item) => !item.completed && !item.videoMissing,
-        orElse: () => course.episodes.firstWhere(
-          (LibraryEpisodeItem item) => !item.videoMissing,
-        ),
-      );
       return recommendation(
-        episode.title,
-        course.title,
-        '/episodes/${Uri.encodeComponent(episode.id)}',
+        best.episode.title,
+        best.course.title,
+        '/episodes/${Uri.encodeComponent(best.episode.id)}',
       );
     case 'reading':
       final ReadingDoc? doc = _bestMatch(
