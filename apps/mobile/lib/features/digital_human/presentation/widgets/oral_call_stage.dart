@@ -17,6 +17,8 @@ class OralCallStage extends StatelessWidget {
     required this.onToggleMic,
     required this.onToggleSelfCam,
     this.imageAsset,
+    this.spriteAsset,
+    this.encouraging = false,
     this.liveVideo,
     this.selfPreview,
     this.selfCamOn = false,
@@ -32,6 +34,8 @@ class OralCallStage extends StatelessWidget {
   final String statusLabel;
   final String displayName;
   final String? imageAsset;
+  final String? spriteAsset;
+  final bool encouraging;
   final Widget? liveVideo;
   final Widget? selfPreview;
   final bool selfCamOn;
@@ -56,6 +60,8 @@ class OralCallStage extends StatelessWidget {
             listening: listening,
             label: '',
             imageAsset: imageAsset,
+            spriteAsset: spriteAsset,
+            encouraging: encouraging,
             displayName: displayName,
             liveVideo: liveVideo,
           ),
@@ -138,11 +144,7 @@ class OralCallStage extends StatelessWidget {
 }
 
 class _SelfPip extends StatelessWidget {
-  const _SelfPip({
-    required this.active,
-    this.preview,
-    this.onTap,
-  });
+  const _SelfPip({required this.active, this.preview, this.onTap});
 
   final Widget? preview;
   final bool active;
@@ -240,7 +242,9 @@ class _CallBar extends StatelessWidget {
         mainAxisAlignment: MainAxisAlignment.spaceEvenly,
         children: <Widget>[
           _CallBarButton(
-            icon: selfCamOn ? Icons.videocam_rounded : Icons.videocam_off_rounded,
+            icon: selfCamOn
+                ? Icons.videocam_rounded
+                : Icons.videocam_off_rounded,
             label: '视频',
             onTap: onToggleSelfCam,
           ),

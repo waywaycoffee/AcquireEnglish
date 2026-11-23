@@ -1,3 +1,4 @@
+import 'package:common_learn_english/features/digital_human/presentation/widgets/cartoon_coach_sprite.dart';
 import 'package:common_learn_english/features/digital_human/presentation/widgets/oral_call_stage.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -28,6 +29,8 @@ void main() {
               listening: true,
               statusLabel: '外教在听…',
               displayName: 'Emma',
+              spriteAsset: 'assets/img/digital_human/emma-cartoon.webp',
+              encouraging: true,
               onHangUp: () => hungUp = true,
               onSwapCoach: () {},
               onToggleMic: () {},
@@ -40,6 +43,10 @@ void main() {
     );
     await tester.pump();
 
+    expect(
+      tester.widget<CartoonCoachSprite>(find.byType(CartoonCoachSprite)).frame,
+      8,
+    );
     expect(find.textContaining('Emma'), findsWidgets);
     expect(find.text('挂断'), findsOneWidget);
     expect(find.text('换教练'), findsOneWidget);

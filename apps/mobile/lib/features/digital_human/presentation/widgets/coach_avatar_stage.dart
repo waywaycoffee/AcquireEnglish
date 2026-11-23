@@ -13,6 +13,7 @@ class CoachAvatarStage extends StatelessWidget {
     required this.label,
     this.imageAsset,
     this.spriteAsset,
+    this.encouraging = false,
     this.displayName,
     this.liveVideo,
     super.key,
@@ -23,6 +24,7 @@ class CoachAvatarStage extends StatelessWidget {
   final bool listening;
   final String label;
   final String? spriteAsset;
+  final bool encouraging;
   final String? imageAsset;
   final String? displayName;
 
@@ -93,7 +95,26 @@ class CoachAvatarStage extends StatelessWidget {
                 offset: Offset(0, bob),
                 child: Transform.rotate(
                   angle: tilt,
-                  child: Transform.scale(scale: scale, child: child),
+                  child: Transform.scale(
+                    scale: scale,
+                    child: spriteAsset == null
+                        ? child
+                        : SizedBox.square(
+                            dimension: 196,
+                            child: CartoonCoachSprite(
+                              asset: spriteAsset!,
+                              mouth: CoachViseme.closed,
+                              phase: t,
+                              motion: encouraging
+                                  ? CoachMotion.encouraging
+                                  : speaking
+                                  ? CoachMotion.speaking
+                                  : listening
+                                  ? CoachMotion.listening
+                                  : CoachMotion.idle,
+                            ),
+                          ),
+                  ),
                 ),
               ),
             ),
@@ -114,24 +135,15 @@ class CoachAvatarStage extends StatelessWidget {
           ],
         );
       },
-      child: spriteAsset != null
-          ? SizedBox(
-              width: 260,
-              height: 260,
-              child: CartoonCoachSprite(
-                asset: spriteAsset!,
-                mouth: CoachViseme.closed,
-                phase: 0,
-                motion: CoachMotion.idle,
-              ),
-            )
-          : _AvatarDisc(
+      child: spriteAsset == null
+          ? _AvatarDisc(
               speaking: speaking,
               listening: listening,
               pulse: pulse,
               imageAsset: imageAsset,
               displayName: displayName,
-            ),
+            )
+          : null,
     );
   }
 }
