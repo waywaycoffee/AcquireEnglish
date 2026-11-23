@@ -5,9 +5,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../library/presentation/library_catalog_provider.dart';
 import '../../library/presentation/library_mock_data.dart';
+import '../../membership/domain/module_access.dart';
 import '../../player/presentation/widgets/study_shell_tokens.dart';
 import '../../subtitle_completion/subtitle_completion_enqueue.dart';
 import '../../subtitle_completion/subtitle_completion_scheduler.dart';
+import '../../sync/presentation/user_assets_provider.dart';
 import '../data/bilibili_episode_prepare.dart';
 import '../data/youtube_import_service.dart';
 import '../domain/youtube_import.dart';
@@ -121,9 +123,13 @@ class _YoutubeImportFormState extends ConsumerState<_YoutubeImportForm> {
           ),
         ],
       );
+      try {
+        await ref.read(userAssetsProvider.notifier).refresh();
+      } catch (_) {}
+      final bool unlimited = await resolveModuleUnlocked(ref, 'video');
       final bool ok = await ref
           .read(libraryCatalogProvider.notifier)
-          .importCourse(course);
+          .importCourse(course, unlimitedPersonalLibrary: unlimited);
       final bool canLocalAsr = course.episodes.any(
         (LibraryEpisodeItem ep) => isUsableLocalVideoPath(ep.videoAsset),
       );

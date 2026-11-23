@@ -472,7 +472,11 @@ Future<int> _restorePersonalImportAssetsImpl(dynamic ref) async {
       final LibraryCourseData course = buildLibraryCourseFromBilibiliImport(
         resolved,
       );
-      final bool ok = await catalog.importCourse(course);
+      // Cloud restore of the user's own library should not hit free-tier caps.
+      final bool ok = await catalog.importCourse(
+        course,
+        unlimitedPersonalLibrary: true,
+      );
       if (ok) {
         restored += 1;
         if (hasLocalVideo) {

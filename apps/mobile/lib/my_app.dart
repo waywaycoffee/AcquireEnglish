@@ -33,6 +33,7 @@ import 'features/sync/data/acquire_api_client.dart';
 import 'features/sync/data/personal_import_sync.dart';
 import 'features/sync/presentation/cloud_catalog_sync.dart';
 import 'features/sync/presentation/daily_feed_lifecycle.dart';
+import 'features/sync/presentation/user_assets_provider.dart';
 import 'flavors/app_flavor.dart';
 import 'router/app_router.dart';
 
@@ -55,6 +56,9 @@ class _MyAppState extends ConsumerState<MyApp> with WidgetsBindingObserver {
       ensureDefaultPortraitOrientation();
       if (ref.read(authSessionProvider).isLoggedIn) {
         unawaited(syncCloudCatalogAndFeed(ref));
+        // Pull Pro / module entitlements early — import quota checks need this
+        // without forcing the user to open 会员中心 first.
+        unawaited(ref.read(userAssetsProvider.notifier).refresh());
       }
       // Prefetch ~3 default free-trial items per module into local cache.
       unawaited(ref.read(freeTrialSeedBootstrapProvider.future));

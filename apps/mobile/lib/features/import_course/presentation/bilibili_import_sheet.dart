@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../authentication/presentation/auth_session.dart';
 import '../../library/presentation/library_catalog_provider.dart';
 import '../../library/presentation/library_mock_data.dart';
+import '../../membership/domain/module_access.dart';
 import '../../player/presentation/widgets/study_shell_tokens.dart';
 import '../../settings/presentation/bilibili_login_sheet.dart';
 import '../../settings/presentation/settings_provider.dart';
@@ -13,6 +14,7 @@ import '../../subtitle_completion/subtitle_completion_enqueue.dart';
 import '../../subtitle_completion/subtitle_completion_scheduler.dart';
 import '../../sync/data/acquire_api_client.dart';
 import '../../sync/data/personal_import_sync.dart';
+import '../../sync/presentation/user_assets_provider.dart';
 import '../data/bilibili_course_builder.dart';
 import '../data/bilibili_import_service.dart';
 import '../domain/bilibili_import.dart';
@@ -132,9 +134,14 @@ class _BilibiliImportFormState extends ConsumerState<_BilibiliImportForm> {
       final LibraryEpisodeItem? importedEpisode = course.episodes
           .where((LibraryEpisodeItem episode) => !episode.videoMissing)
           .firstOrNull;
+      // Refresh entitlements so Pro is recognized without visiting 会员页 first.
+      try {
+        await ref.read(userAssetsProvider.notifier).refresh();
+      } catch (_) {}
+      final bool unlimited = await resolveModuleUnlocked(ref, 'video');
       final bool ok = await ref
           .read(libraryCatalogProvider.notifier)
-          .importCourse(course);
+          .importCourse(course, unlimitedPersonalLibrary: unlimited);
       if (!mounted) return;
       if (!ok || importedEpisode == null) {
         throw StateError('视频未能加入书库，请重试');

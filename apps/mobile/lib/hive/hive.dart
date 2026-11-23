@@ -26,8 +26,9 @@ Future<void> initHive() async {
       final File hiveFile = File(
         '${(await getApplicationSupportDirectory()).path}/prefs.hive',
       );
+      // Compact early — dead space from JSON rewrites is what grew prefs to GB.
       if (hiveFile.existsSync() &&
-          hiveFile.lengthSync() > 16 * 1024 * 1024) {
+          hiveFile.lengthSync() > 4 * 1024 * 1024) {
         await prefs.compact();
       }
     } catch (_) {}

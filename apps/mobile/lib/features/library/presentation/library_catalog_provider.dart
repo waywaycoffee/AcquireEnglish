@@ -185,7 +185,11 @@ class LibraryCatalogNotifier extends Notifier<List<LibraryCourseData>> {
     await _upsertOfficialCourse(oralCoreSeriesToLibraryCourse(series));
   }
 
-  Future<bool> importCourse(LibraryCourseData course) async {
+  Future<bool> importCourse(
+    LibraryCourseData course, {
+    /// Pro / video-module unlocks skip the free-tier personal slot cap.
+    bool unlimitedPersonalLibrary = false,
+  }) async {
     if (libraryCourses.any((LibraryCourseData item) => item.id == course.id)) {
       return false;
     }
@@ -194,12 +198,16 @@ class LibraryCatalogNotifier extends Notifier<List<LibraryCourseData>> {
     );
     // Free-tier personal video library: keep ≥15 slots (default 20 headroom).
     // Free-trial seeds do not consume personal slots; re-import refresh is OK.
-    if (existingIndex < 0 &&
+    // IMPORTANT: Pro users must pass [unlimitedPersonalLibrary] — otherwise the
+    // local cap still fires even when membership UI already shows Pro.
+    if (!unlimitedPersonalLibrary &&
+        existingIndex < 0 &&
         !_isFreeTrialCourse(course) &&
         personalVideoCourseCount >= kFreePersonalUploadSlotsMin + 5) {
       throw StateError(
         '个人视频课已达上限（${kFreePersonalUploadSlotsMin + 5}）；'
-        '开通视频模块可继续导入，已加入的免费体验课不会变为付费。',
+        '开通 Pro / 视频模块可无限导入，也可删除旧视频腾出导入位。'
+        '已加入的免费体验课不会变为付费。',
       );
     }
     if (existingIndex >= 0) {
@@ -1087,9 +1095,15 @@ class LibraryCatalogNotifier extends Notifier<List<LibraryCourseData>> {
       return;
     }
 
-    await Hive.box<String>(
-      'prefs',
-    ).put(_libraryCatalogStorageKey, jsonEncode(importedCourses));
+    final Box<String> box = Hive.box<String>('prefs');
+    final String payload = jsonEncode(importedCourses);
+    await box.put(_libraryCatalogStorageKey, payload);
+    // Catalog JSON rewrites leave dead space; compact when large.
+    if (payload.length > 256 * 1024) {
+      try {
+        await box.compact();
+      } catch (_) {}
+    }
   }
 
   Map<String, Object?> _serializeCourse(LibraryCourseData course) {
