@@ -150,6 +150,56 @@ class _ReadingReaderScreenState extends ConsumerState<ReadingReaderScreen> {
     if (size != null && mounted) setState(() => _fontSize = size);
   }
 
+  Widget _buildPageNavigation(ReadingDoc doc) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Row(
+        children: <Widget>[
+          TextButton(
+            onPressed: _pageIndex == 0 ? null : () => _openPage(doc, _pageIndex - 1),
+            child: const Text('上一节'),
+          ),
+          Expanded(
+            child: Text(
+              '第 ${_pageIndex + 1} / ${_pages.length} 节',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontWeight: FontWeight.w800,
+                color: _dark ? const Color(0xFF9A9AA2) : const Color(0xFF6B6B76),
+              ),
+            ),
+          ),
+          TextButton(
+            onPressed: _pageIndex >= _pages.length - 1
+                ? null
+                : () => _openPage(doc, _pageIndex + 1),
+            child: const Text('下一节'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _openPage(ReadingDoc doc, int index) {
+    setState(() {
+      _pageIndex = index;
+      _interactiveReady = false;
+      _interactivePage = -1;
+      _glossPageIndex = -1;
+      final cached = _glossByPage[index];
+      if (cached != null) _hardGlosses = cached;
+    });
+    if (_scroll.hasClients) _scroll.jumpTo(0);
+    unawaited(_prepareInteractivePage(doc));
+    unawaited(
+      ref.read(readingLibraryProvider.notifier).updateProgress(
+        docId: doc.id,
+        offsetChars: _pageBaseOffset,
+        percent: (index + 1) / _pages.length,
+      ),
+    );
+  }
+
   void _ensurePages(ReadingDoc doc) {
     if (_pagedDocId == doc.id && _pages.isNotEmpty) return;
     _pagedDocId = doc.id;
@@ -1833,90 +1883,7 @@ class _ReadingReaderScreenState extends ConsumerState<ReadingReaderScreen> {
                         ],
                       ),
                     ),
-                  if (_pages.length > 1)
-                    Padding(
-                      padding: const EdgeInsets.only(bottom: 12),
-                      child: Row(
-                        children: <Widget>[
-                          TextButton(
-                            onPressed: _pageIndex <= 0
-                                ? null
-                                : () {
-                                    setState(() {
-                                      _pageIndex -= 1;
-                                      _interactiveReady = false;
-                                      _interactivePage = -1;
-                                      _glossPageIndex = -1;
-                                      final Map<String, String>? cached =
-                                          _glossByPage[_pageIndex];
-                                      if (cached != null) {
-                                        _hardGlosses = cached;
-                                      }
-                                    });
-                                    if (_scroll.hasClients) {
-                                      _scroll.jumpTo(0);
-                                    }
-                                    unawaited(_prepareInteractivePage(doc));
-                                    unawaited(
-                                      ref
-                                          .read(readingLibraryProvider.notifier)
-                                          .updateProgress(
-                                            docId: doc.id,
-                                            offsetChars: _pageBaseOffset,
-                                            percent: (_pageIndex + 1) /
-                                                _pages.length,
-                                          ),
-                                    );
-                                  },
-                            child: const Text('上一节'),
-                          ),
-                          Expanded(
-                            child: Text(
-                              '第 ${_pageIndex + 1} / ${_pages.length} 节',
-                              textAlign: TextAlign.center,
-                              style: TextStyle(
-                                fontWeight: FontWeight.w800,
-                                color: _dark
-                                    ? const Color(0xFF9A9AA2)
-                                    : const Color(0xFF6B6B76),
-                              ),
-                            ),
-                          ),
-                          TextButton(
-                            onPressed: _pageIndex >= _pages.length - 1
-                                ? null
-                                : () {
-                                    setState(() {
-                                      _pageIndex += 1;
-                                      _interactiveReady = false;
-                                      _interactivePage = -1;
-                                      _glossPageIndex = -1;
-                                      final Map<String, String>? cached =
-                                          _glossByPage[_pageIndex];
-                                      if (cached != null) {
-                                        _hardGlosses = cached;
-                                      }
-                                    });
-                                    if (_scroll.hasClients) {
-                                      _scroll.jumpTo(0);
-                                    }
-                                    unawaited(_prepareInteractivePage(doc));
-                                    unawaited(
-                                      ref
-                                          .read(readingLibraryProvider.notifier)
-                                          .updateProgress(
-                                            docId: doc.id,
-                                            offsetChars: _pageBaseOffset,
-                                            percent: (_pageIndex + 1) /
-                                                _pages.length,
-                                          ),
-                                    );
-                                  },
-                            child: const Text('下一节'),
-                          ),
-                        ],
-                      ),
-                    ),
+                  if (_pages.length > 1) _buildPageNavigation(doc),
                   if (!useInteractive)
                     Text(
                       _pageText,
@@ -1993,6 +1960,11 @@ class _ReadingReaderScreenState extends ConsumerState<ReadingReaderScreen> {
                       ),
                     ),
                   ),
+                  if (_pages.length > 1)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 20),
+                      child: _buildPageNavigation(doc),
+                    ),
                 ],
               ),
             ),
