@@ -9,6 +9,7 @@ import 'package:path_provider/path_provider.dart';
 class LiveSceneCamera {
   CameraController? _controller;
   bool _busyShot = false;
+  int _request = 0;
 
   CameraController? get controller => _controller;
   bool get isReady =>
@@ -23,7 +24,9 @@ class LiveSceneCamera {
       if (current == prefer) return;
       await stop();
     }
+    final int request = ++_request;
     final List<CameraDescription> cameras = await availableCameras();
+    if (request != _request) return;
     if (cameras.isEmpty) {
       throw StateError('没有可用摄像头');
     }
@@ -37,7 +40,16 @@ class LiveSceneCamera {
       enableAudio: false,
       imageFormatGroup: ImageFormatGroup.jpeg,
     );
-    await next.initialize();
+    try {
+      await next.initialize();
+    } catch (_) {
+      await next.dispose();
+      rethrow;
+    }
+    if (request != _request) {
+      await next.dispose();
+      return;
+    }
     _controller = next;
   }
 
@@ -62,6 +74,7 @@ class LiveSceneCamera {
   }
 
   Future<void> stop() async {
+    _request++;
     final CameraController? cam = _controller;
     _controller = null;
     if (cam == null) return;

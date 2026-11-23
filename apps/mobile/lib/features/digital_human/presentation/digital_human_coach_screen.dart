@@ -28,7 +28,6 @@ class DigitalHumanCoachScreen extends StatelessWidget {
         : (guidedLesson && hasMaterial ? 'AI 外教课' : '数字人口语');
     return Scaffold(
       backgroundColor: const Color(0xFF14102A),
-      extendBodyBehindAppBar: true,
       appBar: AppBar(
         title: Text(displayTitle),
         backgroundColor: Colors.transparent,
@@ -37,9 +36,8 @@ class DigitalHumanCoachScreen extends StatelessWidget {
         iconTheme: const IconThemeData(color: Colors.white),
       ),
       body: SafeArea(
-        top: false,
         child: Padding(
-          padding: EdgeInsets.only(top: MediaQuery.paddingOf(context).top + 4),
+          padding: const EdgeInsets.only(top: 4),
           child: StudyOralCoachTab(
             topicSummary: hasMaterial
                 ? 'Practise the scenario: $displayTitle. The learner plays role ${practiceRole ?? 'learner'}. You play the other role. Use the example dialogue as context and provide helpful feedback.'
