@@ -296,6 +296,7 @@ class PadPortraitPlayerScreenState
   int _dictationQueueIndex = 0;
   bool _hardsubMosaicEnabled = false;
   HardsubMosaicBand _hardsubMosaicBand = const HardsubMosaicBand();
+  int _subtitleLocateEpoch = 0;
   bool _oralCoachOpen = false;
   bool _pausedForLookup = false;
   bool _blindListening = false;
@@ -3366,8 +3367,6 @@ Future<void> _settleChineseFillIfAlreadyPresent() async {
                 onSelectSubtitleMode: _handleSetSubtitleMode,
               onCycleSpeed: _handleCycleSpeed,
                 onSpeedSelected: _handleSpeedSelected,
-                onOpenSpeedSheet: _handleOpenSpeedSheet,
-                onOpenQualitySheet: _handleOpenQualitySheet,
               onTogglePlaying: _effectiveTogglePlaying,
                 onOpenLoopSheet: _handleOpenLoopSheet,
               onSeek: _handleSeek,
@@ -3376,6 +3375,24 @@ Future<void> _settleChineseFillIfAlreadyPresent() async {
               ),
               onOpenOralCoach: () =>
                   unawaited(_openOralCoach(courseContext, activeLine)),
+              onLocateCurrent: () {
+                setState(() {
+                  if (_studyTab != StudyModeTab.subtitles) {
+                    _studyTab = StudyModeTab.subtitles;
+                  }
+                  _subtitleLocateEpoch += 1;
+                });
+              },
+              onRerecognizeEnglish: !_generatingAiSubtitles
+                  ? () => unawaited(
+                      _handleResetEpisodeSubtitles(SubtitleResetSide.english),
+                    )
+                  : null,
+              onRerecognizeChinese: !_generatingAiSubtitles
+                  ? () => unawaited(
+                      _handleResetEpisodeSubtitles(SubtitleResetSide.chinese),
+                    )
+                  : null,
             ),
           ],
           ),
@@ -3452,6 +3469,7 @@ Future<void> _settleChineseFillIfAlreadyPresent() async {
             lines: state.lines,
             activeIndex: state.activeLineIndex,
             timelineFollowEpoch: state.timelineFollowEpoch,
+            locateEpoch: _subtitleLocateEpoch,
             subtitleMode: state.subtitleMode,
             currentWordIndex: state.currentWordIndex,
             fontScale: settings.fontScale,
@@ -4117,86 +4135,6 @@ Future<void> _settleChineseFillIfAlreadyPresent() async {
           lineKey: '${line.startMs}-${line.endMs}',
           episodeId: widget.episodeId,
         );
-  }
-
-  void _handleOpenSpeedSheet() {
-    final StudyShellColors colors = StudyShellColors.of(context);
-    showModalBottomSheet<void>(
-      context: context,
-      backgroundColor: colors.card,
-      builder: (BuildContext context) {
-        final StudyShellColors sheetColors = StudyShellColors.of(context);
-        return SafeArea(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: <Widget>[
-              ListTile(
-                title: Text(
-                  '选择倍速',
-                  style: TextStyle(
-                    color: sheetColors.textPrimary,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-              ),
-              for (final String option in PlayerVideoPanel.kSpeedOptions)
-                ListTile(
-                  title: Text(
-                    option,
-                    style: TextStyle(
-                      color: option == state.speed
-                          ? sheetColors.accent
-                          : sheetColors.textPrimary,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                  trailing: option == state.speed
-                      ? Icon(Icons.check_rounded, color: sheetColors.accent)
-                      : null,
-                  onTap: () {
-                    Navigator.of(context).pop();
-                    _handleSpeedSelected(option);
-                  },
-                ),
-            ],
-          ),
-        );
-      },
-    );
-  }
-
-  void _handleOpenQualitySheet() {
-    showModalBottomSheet<void>(
-      context: context,
-      backgroundColor: StudyShellColors.of(context).card,
-      builder: (BuildContext context) {
-        final StudyShellColors colors = StudyShellColors.of(context);
-        return SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: <Widget>[
-                Text(
-                  '画质',
-                  style: TextStyle(
-                    color: colors.textPrimary,
-                    fontSize: 16,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-                const SizedBox(height: 10),
-                Text(
-                  '本地视频按源文件清晰度播放，当前为「超清」。网络课程的多码率切换将在后续版本接入。',
-                  style: TextStyle(color: colors.textSecondary, height: 1.45),
-                ),
-              ],
-            ),
-          ),
-        );
-      },
-    );
   }
 
   Future<void> _handleAddDictationQueue(

@@ -10,6 +10,7 @@ class PlayerTranscriptPanel extends StatefulWidget {
     required this.lines,
     required this.activeIndex,
     this.timelineFollowEpoch = 0,
+    this.locateEpoch = 0,
     required this.subtitleMode,
     this.subtitleLetterCase = '保留原样',
     required this.currentWordIndex,
@@ -75,6 +76,9 @@ class PlayerTranscriptPanel extends StatefulWidget {
   final Map<int, List<PlayerSubtitleLine>> fragmentsBySentenceStartMs;
   final int activeIndex;
   final int timelineFollowEpoch;
+
+  /// Bumped by bottom「定位当前」to scroll the active cue into view.
+  final int locateEpoch;
   final String subtitleMode;
   final String subtitleLetterCase;
   final int currentWordIndex;
@@ -141,6 +145,23 @@ class PlayerTranscriptPanel extends StatefulWidget {
 class _PlayerTranscriptPanelState extends State<PlayerTranscriptPanel> {
   bool _showCurrentOnly = false;
 
+  /// Which chunk/phrase/usage marks stay highlighted in the transcript list.
+  Set<SubtitleChunkKind> _enabledChunkKinds = Set<SubtitleChunkKind>.of(
+    SubtitleChunkKind.values,
+  );
+
+  void _toggleChunkKind(SubtitleChunkKind kind) {
+    setState(() {
+      if (_enabledChunkKinds.contains(kind)) {
+        _enabledChunkKinds = Set<SubtitleChunkKind>.of(_enabledChunkKinds)
+          ..remove(kind);
+      } else {
+        _enabledChunkKinds = Set<SubtitleChunkKind>.of(_enabledChunkKinds)
+          ..add(kind);
+      }
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     final Widget list = PlayerSubtitleList(
@@ -148,6 +169,7 @@ class _PlayerTranscriptPanelState extends State<PlayerTranscriptPanel> {
       episodeId: widget.episodeId,
       activeIndex: widget.activeIndex,
       timelineFollowEpoch: widget.timelineFollowEpoch,
+      locateEpoch: widget.locateEpoch,
       subtitleMode: widget.subtitleMode,
       subtitleLetterCase: widget.subtitleLetterCase,
       showCurrentOnly: !widget.studyDarkStyle && _showCurrentOnly,
@@ -160,6 +182,10 @@ class _PlayerTranscriptPanelState extends State<PlayerTranscriptPanel> {
       learnedVocabularyWords: widget.learnedVocabularyWords,
       keyVocabularyWords: widget.keyVocabularyWords,
       chunkHighlighter: widget.chunkHighlighter,
+      enabledChunkKinds: _enabledChunkKinds,
+      onToggleChunkKind: _toggleChunkKind,
+      // Toolbar actions live on StudyBottomControls; keep mid-row empty.
+      showInlineToolbarActions: false,
       onCollectWord: widget.onCollectWord,
       onCollectWordAtTime: widget.onCollectWordAtTime,
       onFavoriteWord: widget.onFavoriteWord,

@@ -20,10 +20,10 @@ class StudyBottomControls extends StatelessWidget {
     required this.onOpenOralCoach,
     this.onSeek,
     this.onSpeedSelected,
-    this.onOpenSpeedSheet,
-    this.onOpenQualitySheet,
-    this.qualityLabel = '超清',
     this.onToggleFullscreen,
+    this.onLocateCurrent,
+    this.onRerecognizeEnglish,
+    this.onRerecognizeChinese,
     super.key,
   });
 
@@ -40,10 +40,12 @@ class StudyBottomControls extends StatelessWidget {
   final VoidCallback onOpenOralCoach;
   final ValueChanged<double>? onSeek;
   final ValueChanged<String>? onSpeedSelected;
-  final VoidCallback? onOpenSpeedSheet;
-  final VoidCallback? onOpenQualitySheet;
-  final String qualityLabel;
   final VoidCallback? onToggleFullscreen;
+
+  /// Replaces the old bottom-left「倍速 / 超清 / 双语」text cluster.
+  final VoidCallback? onLocateCurrent;
+  final VoidCallback? onRerecognizeEnglish;
+  final VoidCallback? onRerecognizeChinese;
 
   static String nextSpeed(String current) {
     const List<String> options = PlayerVideoPanel.kSpeedOptions;
@@ -286,57 +288,43 @@ class StudyBottomControls extends StatelessWidget {
             ),
             Row(
               children: <Widget>[
-                TextButton(
-                  onPressed: onOpenSpeedSheet ?? onCycleSpeed,
-                  style: TextButton.styleFrom(
-                    foregroundColor: colors.textSecondary,
-                    padding: const EdgeInsets.symmetric(horizontal: 8),
-                    minimumSize: const Size(0, 32),
-                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                  ),
-                  child: const Text(
-                    '倍速',
-                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
-                  ),
-                ),
-                TextButton(
-                  onPressed: onOpenQualitySheet,
-                  style: TextButton.styleFrom(
-                    foregroundColor: colors.textSecondary,
-                    padding: const EdgeInsets.symmetric(horizontal: 8),
-                    minimumSize: const Size(0, 32),
-                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                  ),
-                  child: Text(
-                    qualityLabel,
-                    style: const TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
+                Flexible(
+                  child: SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: <Widget>[
+                        if (onLocateCurrent != null)
+                          _BottomTextAction(
+                            key: const ValueKey<String>(
+                              'study-chip-locate-current',
+                            ),
+                            label: '定位当前',
+                            color: colors.textSecondary,
+                            onPressed: onLocateCurrent!,
+                          ),
+                        if (onRerecognizeEnglish != null)
+                          _BottomTextAction(
+                            key: const ValueKey<String>(
+                              'study-chip-rerecognize-en',
+                            ),
+                            label: '重新识别英文',
+                            color: colors.textSecondary,
+                            onPressed: onRerecognizeEnglish!,
+                          ),
+                        if (onRerecognizeChinese != null)
+                          _BottomTextAction(
+                            key: const ValueKey<String>(
+                              'study-chip-rerecognize-zh',
+                            ),
+                            label: '重新识别中文',
+                            color: colors.textSecondary,
+                            onPressed: onRerecognizeChinese!,
+                          ),
+                      ],
                     ),
                   ),
                 ),
-                TextButton(
-                  key: const ValueKey<String>('study-chip-subtitle-label'),
-                  onPressed: () {
-                    onSelectSubtitleMode(
-                      SubtitleDisplayMode.nextLearningMode(subtitleMode),
-                    );
-                  },
-                  style: TextButton.styleFrom(
-                    foregroundColor: colors.accent,
-                    padding: const EdgeInsets.symmetric(horizontal: 8),
-                    minimumSize: const Size(0, 32),
-                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                  ),
-                  child: Text(
-                    modeLabel,
-                    style: const TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                ),
-                const Spacer(),
                 IconButton(
                   tooltip: '全屏',
                   onPressed: onToggleFullscreen,
@@ -349,6 +337,36 @@ class StudyBottomControls extends StatelessWidget {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+class _BottomTextAction extends StatelessWidget {
+  const _BottomTextAction({
+    required this.label,
+    required this.color,
+    required this.onPressed,
+    super.key,
+  });
+
+  final String label;
+  final Color color;
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    return TextButton(
+      onPressed: onPressed,
+      style: TextButton.styleFrom(
+        foregroundColor: color,
+        padding: const EdgeInsets.symmetric(horizontal: 8),
+        minimumSize: const Size(0, 32),
+        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+      ),
+      child: Text(
+        label,
+        style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
       ),
     );
   }

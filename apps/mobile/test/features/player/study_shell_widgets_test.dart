@@ -62,12 +62,12 @@ void main() {
   testWidgets('StudyBottomControls fires subtitle mode loop and oral coach', (
     WidgetTester tester,
   ) async {
-    final List<String> selectedModes = <String>[];
     int loopTaps = 0;
     int oralCoachTaps = 0;
     int playTaps = 0;
-    int speedSelects = 0;
-    int qualityTaps = 0;
+    int locateTaps = 0;
+    int rerecognizeEnTaps = 0;
+    int rerecognizeZhTaps = 0;
 
     await tester.pumpWidget(
       MaterialApp(
@@ -79,13 +79,14 @@ void main() {
             isLooping: false,
             position: const Duration(seconds: 5),
             duration: const Duration(minutes: 1, seconds: 36),
-            onSelectSubtitleMode: selectedModes.add,
+            onSelectSubtitleMode: (_) {},
             onCycleSpeed: () {},
-            onSpeedSelected: (_) => speedSelects += 1,
-            onOpenQualitySheet: () => qualityTaps += 1,
             onTogglePlaying: () => playTaps += 1,
             onOpenLoopSheet: () => loopTaps += 1,
             onOpenOralCoach: () => oralCoachTaps += 1,
+            onLocateCurrent: () => locateTaps += 1,
+            onRerecognizeEnglish: () => rerecognizeEnTaps += 1,
+            onRerecognizeChinese: () => rerecognizeZhTaps += 1,
           ),
         ),
       ),
@@ -94,24 +95,34 @@ void main() {
     expect(find.text('00:05 / 01:36'), findsOneWidget);
     expect(find.text('双语'), findsWidgets);
     expect(find.text('英语口语'), findsOneWidget);
+    expect(find.text('定位当前'), findsOneWidget);
+    expect(find.text('重新识别英文'), findsOneWidget);
+    expect(find.text('重新识别中文'), findsOneWidget);
+    expect(find.text('倍速'), findsNothing);
+    expect(find.text('超清'), findsNothing);
     expect(find.text('跟读'), findsNothing);
     expect(find.text('背单词'), findsNothing);
 
-    await tester.tap(
-      find.byKey(const ValueKey<String>('study-chip-subtitle-label')),
-    );
     await tester.tap(find.byKey(const ValueKey<String>('study-chip-loop')));
     await tester.tap(find.byKey(const ValueKey<String>('study-chip-oral-coach')));
     await tester.tap(find.byKey(const ValueKey<String>('study-chip-play')));
-    await tester.tap(find.text('超清'));
+    await tester.tap(
+      find.byKey(const ValueKey<String>('study-chip-locate-current')),
+    );
+    await tester.tap(
+      find.byKey(const ValueKey<String>('study-chip-rerecognize-en')),
+    );
+    await tester.tap(
+      find.byKey(const ValueKey<String>('study-chip-rerecognize-zh')),
+    );
     await tester.pump();
 
-    expect(selectedModes, <String>['英文']);
     expect(loopTaps, 1);
     expect(oralCoachTaps, 1);
     expect(playTaps, 1);
-    expect(qualityTaps, 1);
-    expect(speedSelects, 0);
+    expect(locateTaps, 1);
+    expect(rerecognizeEnTaps, 1);
+    expect(rerecognizeZhTaps, 1);
   });
 
   test('StudyBottomControls.nextSpeed cycles options', () {

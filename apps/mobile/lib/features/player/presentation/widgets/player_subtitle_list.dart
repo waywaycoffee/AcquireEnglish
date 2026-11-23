@@ -30,6 +30,7 @@ class PlayerSubtitleList extends StatefulWidget {
     required this.lines,
     required this.activeIndex,
     this.timelineFollowEpoch = 0,
+    this.locateEpoch = 0,
     required this.subtitleMode,
     this.subtitleLetterCase = '保留原样',
     this.showCurrentOnly = false,
@@ -42,6 +43,9 @@ class PlayerSubtitleList extends StatefulWidget {
     this.learnedVocabularyWords = const <String>{},
     this.keyVocabularyWords = const <String>{},
     this.chunkHighlighter,
+    this.enabledChunkKinds,
+    this.onToggleChunkKind,
+    this.showInlineToolbarActions = true,
     required this.onTapLine,
     required this.onCollectWord,
     this.onCollectWordAtTime,
@@ -99,6 +103,9 @@ class PlayerSubtitleList extends StatefulWidget {
   /// Bumps when the video timeline is scrubbed, so the list jumps to that cue
   /// even if the user had scrolled the transcript away.
   final int timelineFollowEpoch;
+
+  /// Bumped by external「定位当前」(e.g. StudyBottomControls).
+  final int locateEpoch;
   final String subtitleMode;
   final String subtitleLetterCase;
   final bool showCurrentOnly;
@@ -111,6 +118,13 @@ class PlayerSubtitleList extends StatefulWidget {
   final Set<String> learnedVocabularyWords;
   final Set<String> keyVocabularyWords;
   final SubtitleChunkHighlighter? chunkHighlighter;
+
+  /// When null, all chunk kinds are highlighted. Empty set hides all marks.
+  final Set<SubtitleChunkKind>? enabledChunkKinds;
+  final ValueChanged<SubtitleChunkKind>? onToggleChunkKind;
+
+  /// Mid-row locate / re-ASR buttons. Prefer bottom chrome when false.
+  final bool showInlineToolbarActions;
   final ValueChanged<int> onTapLine;
   final ValueChanged<String> onCollectWord;
   final void Function(String word, String time)? onCollectWordAtTime;
@@ -188,6 +202,21 @@ class _PlayerSubtitleListState extends State<PlayerSubtitleList> {
 
   bool get _showCurrentOnly => widget.showCurrentOnly;
 
+  bool _isChunkKindEnabled(SubtitleChunkKind kind) {
+    final Set<SubtitleChunkKind>? enabled = widget.enabledChunkKinds;
+    if (enabled == null) {
+      return true;
+    }
+    return enabled.contains(kind);
+  }
+
+  SubtitleChunkSpan? _visibleChunkSpan(SubtitleChunkSpan? span) {
+    if (span == null || !_isChunkKindEnabled(span.kind)) {
+      return null;
+    }
+    return span;
+  }
+
   @override
   void initState() {
     super.initState();
@@ -206,7 +235,8 @@ class _PlayerSubtitleListState extends State<PlayerSubtitleList> {
     // when the user had parked follow by scrolling the transcript.
     final bool timelineSeeked =
         oldWidget.timelineFollowEpoch != widget.timelineFollowEpoch;
-    if (timelineSeeked) {
+    final bool locateRequested = oldWidget.locateEpoch != widget.locateEpoch;
+    if (timelineSeeked || locateRequested) {
       _autoFollowCurrentLine = true;
       _userDragPausedAt = null;
     }
@@ -237,17 +267,19 @@ class _PlayerSubtitleListState extends State<PlayerSubtitleList> {
         oldWidget.currentWordIndex != widget.currentWordIndex ||
         oldWidget.lines.length != widget.lines.length ||
         oldWidget.subtitleMode != widget.subtitleMode ||
-        oldWidget.showCurrentOnly != widget.showCurrentOnly;
+        oldWidget.showCurrentOnly != widget.showCurrentOnly ||
+        oldWidget.enabledChunkKinds != widget.enabledChunkKinds;
     final bool shouldFollowCurrentLine =
         _autoFollowCurrentLine &&
         (activeLineChanged ||
             oldWidget.currentWordIndex != widget.currentWordIndex ||
             timelineSeeked ||
+            locateRequested ||
             oldWidget.isPlaying != widget.isPlaying ||
             oldWidget.lines.length != widget.lines.length ||
             oldWidget.showCurrentOnly != widget.showCurrentOnly);
 
-    if (!listStateChanged && !shouldFollowCurrentLine) {
+    if (!listStateChanged && !shouldFollowCurrentLine && !locateRequested) {
       return;
     }
 
@@ -1718,36 +1750,20 @@ class _PlayerSubtitleListState extends State<PlayerSubtitleList> {
                 for (final SubtitleChunkKind kind in SubtitleChunkKind.values) ...<
                   Widget
                 >[
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 8,
-                      vertical: 3,
-                    ),
-                    decoration: BoxDecoration(
-                      color: SubtitleChunkHighlighter.fill(
-                        kind,
-                        onDarkVideo: widget.studyDarkStyle,
-                      ),
-                      borderRadius: BorderRadius.circular(999),
-                    ),
-                    child: Text(
-                      kind.labelCn,
-                      style: TextStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.w800,
-                        color: SubtitleChunkHighlighter.textColor(
-                          kind,
-                          fallback: toolbarColor,
-                          onDarkVideo: widget.studyDarkStyle,
-                        ),
-                      ),
-                    ),
+                  _ChunkKindToggleChip(
+                    kind: kind,
+                    selected: _isChunkKindEnabled(kind),
+                    onDarkVideo: widget.studyDarkStyle,
+                    fallbackColor: toolbarColor,
+                    onTap: widget.onToggleChunkKind == null
+                        ? null
+                        : () => widget.onToggleChunkKind!(kind),
                   ),
                   const SizedBox(width: 6),
                 ],
                 Expanded(
                   child: Text(
-                    '字幕自动标出常用语块/词组/用法',
+                    '点标签开关高亮 · 语块/词组/用法',
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: TextStyle(
@@ -1880,55 +1896,65 @@ class _PlayerSubtitleListState extends State<PlayerSubtitleList> {
               ),
             ),
           ),
-        Align(
-          alignment: Alignment.centerRight,
-          child: Wrap(
-            alignment: WrapAlignment.end,
-            spacing: 0,
-            runSpacing: 0,
-            children: <Widget>[
-              TextButton.icon(
-                onPressed: () {
-                  _autoFollowCurrentLine = true;
-                  _scheduleScrollToActiveLine();
-                },
-                icon: Icon(Icons.my_location_rounded, color: toolbarColor),
-                label: Text('定位当前', style: TextStyle(color: toolbarColor)),
-              ),
-              if (widget.onRerecognizeEnglish != null)
+        if (widget.showInlineToolbarActions)
+          Align(
+            alignment: Alignment.centerRight,
+            child: Wrap(
+              alignment: WrapAlignment.end,
+              spacing: 0,
+              runSpacing: 0,
+              children: <Widget>[
                 TextButton.icon(
-                  onPressed: widget.onRerecognizeEnglish,
-                  icon: Icon(
-                    Icons.record_voice_over_rounded,
-                    color: toolbarColor,
+                  onPressed: () {
+                    _autoFollowCurrentLine = true;
+                    _scheduleScrollToActiveLine();
+                  },
+                  icon: Icon(Icons.my_location_rounded, color: toolbarColor),
+                  label: Text('定位当前', style: TextStyle(color: toolbarColor)),
+                ),
+                if (widget.onRerecognizeEnglish != null)
+                  TextButton.icon(
+                    onPressed: widget.onRerecognizeEnglish,
+                    icon: Icon(
+                      Icons.record_voice_over_rounded,
+                      color: toolbarColor,
+                    ),
+                    label: Text(
+                      '重新识别英文',
+                      style: TextStyle(color: toolbarColor),
+                    ),
                   ),
-                  label: Text('重新识别英文', style: TextStyle(color: toolbarColor)),
-                ),
-              if (widget.onRerecognizeChinese != null)
-                TextButton.icon(
-                  onPressed: widget.onRerecognizeChinese,
-                  icon: Icon(Icons.translate_rounded, color: toolbarColor),
-                  label: Text('重新识别中文', style: TextStyle(color: toolbarColor)),
-                ),
-              if (widget.onRerecognizeEnglish == null &&
-                  widget.onRerecognizeChinese == null &&
-                  widget.onRegenerateAiSubtitles != null)
-                TextButton.icon(
-                  onPressed: widget.onRegenerateAiSubtitles,
-                  icon: Icon(Icons.refresh_rounded, color: toolbarColor),
-                  label: Text('重新识别', style: TextStyle(color: toolbarColor)),
-                ),
-              if (widget.onRerecognizeEnglish == null &&
-                  widget.onRerecognizeChinese == null &&
-                  widget.onResetEpisodeSubtitles != null)
-                TextButton.icon(
-                  onPressed: widget.onResetEpisodeSubtitles,
-                  icon: Icon(Icons.restart_alt_rounded, color: toolbarColor),
-                  label: Text('重新识别', style: TextStyle(color: toolbarColor)),
-                ),
-            ],
+                if (widget.onRerecognizeChinese != null)
+                  TextButton.icon(
+                    onPressed: widget.onRerecognizeChinese,
+                    icon: Icon(Icons.translate_rounded, color: toolbarColor),
+                    label: Text(
+                      '重新识别中文',
+                      style: TextStyle(color: toolbarColor),
+                    ),
+                  ),
+                if (widget.onRerecognizeEnglish == null &&
+                    widget.onRerecognizeChinese == null &&
+                    widget.onRegenerateAiSubtitles != null)
+                  TextButton.icon(
+                    onPressed: widget.onRegenerateAiSubtitles,
+                    icon: Icon(Icons.refresh_rounded, color: toolbarColor),
+                    label: Text('重新识别', style: TextStyle(color: toolbarColor)),
+                  ),
+                if (widget.onRerecognizeEnglish == null &&
+                    widget.onRerecognizeChinese == null &&
+                    widget.onResetEpisodeSubtitles != null)
+                  TextButton.icon(
+                    onPressed: widget.onResetEpisodeSubtitles,
+                    icon: Icon(
+                      Icons.restart_alt_rounded,
+                      color: toolbarColor,
+                    ),
+                    label: Text('重新识别', style: TextStyle(color: toolbarColor)),
+                  ),
+              ],
+            ),
           ),
-        ),
         Expanded(child: list),
       ],
     );
@@ -2344,8 +2370,9 @@ class _PlayerSubtitleListState extends State<PlayerSubtitleList> {
     }
     _clearPhraseSelection(notify: false);
     // Auto-detected chunk/phrase/usage → open whole span so favorite enters review.
-    final SubtitleChunkSpan? chunkSpan =
-        widget.chunkHighlighter?.matchLine(lineText)[index];
+    final SubtitleChunkSpan? chunkSpan = _visibleChunkSpan(
+      widget.chunkHighlighter?.matchLine(lineText)[index],
+    );
     if (chunkSpan != null &&
         chunkSpan.start >= 0 &&
         chunkSpan.endExclusive <= tokens.length &&
@@ -2412,7 +2439,8 @@ class _PlayerSubtitleListState extends State<PlayerSubtitleList> {
                 index == highlightIndex;
             final bool phraseSelected = phraseAnchor != null &&
                 index == phraseAnchor;
-            final SubtitleChunkSpan? chunkSpan = chunkHits[index];
+            final SubtitleChunkSpan? chunkSpan =
+                _visibleChunkSpan(chunkHits[index]);
             final SubtitleVocabMark vocabMark =
                 SubtitleVocabularyHighlight.resolve(
                   rawToken: token.value,
@@ -2749,6 +2777,71 @@ class _SubtitlePlaceholder extends StatelessWidget {
               ),
             ],
           ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ChunkKindToggleChip extends StatelessWidget {
+  const _ChunkKindToggleChip({
+    required this.kind,
+    required this.selected,
+    required this.onDarkVideo,
+    required this.fallbackColor,
+    this.onTap,
+  });
+
+  final SubtitleChunkKind kind;
+  final bool selected;
+  final bool onDarkVideo;
+  final Color fallbackColor;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final Color fill = SubtitleChunkHighlighter.fill(
+      kind,
+      onDarkVideo: onDarkVideo,
+    );
+    final Color ink = SubtitleChunkHighlighter.textColor(
+      kind,
+      fallback: fallbackColor,
+      onDarkVideo: onDarkVideo,
+    );
+    final StudyShellColors shell = StudyShellColors.of(context);
+    final BorderRadius radius = BorderRadius.circular(999);
+
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: radius,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 160),
+          curve: Curves.easeOut,
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+          decoration: BoxDecoration(
+            color: selected ? fill : Colors.transparent,
+            borderRadius: radius,
+            border: Border.all(
+              color: selected
+                  ? ink.withValues(alpha: 0.55)
+                  : (onDarkVideo ? shell.border : const Color(0xFFD0D5DD)),
+              width: 1.2,
+            ),
+          ),
+          child: Text(
+            kind.labelCn,
+            style: TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.w800,
+              color: selected
+                  ? ink
+                  : (onDarkVideo ? shell.textMuted : fallbackColor)
+                      .withValues(alpha: selected ? 1 : 0.72),
+            ),
+          ),
         ),
       ),
     );
