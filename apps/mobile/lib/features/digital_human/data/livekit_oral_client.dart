@@ -21,6 +21,8 @@ class LiveKitOralClient {
   Timer? _reconnectTimeout;
   int _connectionGeneration = 0;
   bool _learnerSpeaking = false;
+  bool _agentSpeaking = false;
+  void Function(bool learner, bool agent)? onSpeakingChanged;
   int _latestTurn = 0;
 
   void _expectReply() {
@@ -83,19 +85,21 @@ class LiveKitOralClient {
       })
       ..on<RoomReconnectedEvent>((_) {
         _reconnectTimeout?.cancel();
-        _learnerSpeaking = false;
+        _clearSpeaking();
         if (context != null) unawaited(publishContext(context));
         onStatus?.call('实时语音已恢复，可以继续说');
       })
       ..on<ActiveSpeakersChangedEvent>((event) {
         if (!_agentReady) return;
         final local = room.localParticipant;
-        final speaking = local != null && event.speakers.contains(local);
-        if (_learnerSpeaking && !speaking) _expectReply();
-        _learnerSpeaking = speaking;
-        if (speaking ||
-            event.speakers.any((p) => p.identity == _agentIdentity)) {
-          _replyTimeout?.cancel();
+        final learner = local != null && event.speakers.contains(local);
+        final agent = event.speakers.any((p) => p.identity == _agentIdentity);
+        if (_learnerSpeaking && !learner) _expectReply();
+        if (learner || agent) _replyTimeout?.cancel();
+        if (learner != _learnerSpeaking || agent != _agentSpeaking) {
+          _learnerSpeaking = learner;
+          _agentSpeaking = agent;
+          onSpeakingChanged?.call(learner, agent);
         }
       })
       ..on<ParticipantDisconnectedEvent>((event) {
@@ -190,11 +194,18 @@ class LiveKitOralClient {
     } catch (_) {}
   }
 
+  void _clearSpeaking() {
+    if (!_learnerSpeaking && !_agentSpeaking) return;
+    _learnerSpeaking = false;
+    _agentSpeaking = false;
+    onSpeakingChanged?.call(false, false);
+  }
+
   Future<void> disconnect() async {
     _connectionGeneration++;
     _replyTimeout?.cancel();
     _reconnectTimeout?.cancel();
-    _learnerSpeaking = false;
+    _clearSpeaking();
     _latestTurn = 0;
     _agentReady = false;
     _agentIdentity = null;

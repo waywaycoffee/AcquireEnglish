@@ -54,10 +54,11 @@ class CoachAvatarStage extends StatelessWidget {
         ],
       );
     }
+    final reduceMotion = MediaQuery.disableAnimationsOf(context);
     return AnimatedBuilder(
-      animation: pulse,
+      animation: reduceMotion ? const AlwaysStoppedAnimation<double>(0) : pulse,
       builder: (BuildContext context, Widget? child) {
-        final double t = pulse.value;
+        final double t = reduceMotion ? 0 : pulse.value;
         final double bob = speaking
             ? math.sin(t * math.pi * 2) * 6
             : listening
@@ -68,6 +69,9 @@ class CoachAvatarStage extends StatelessWidget {
             : listening
             ? 1.0 + math.sin(t * math.pi * 2) * 0.005
             : 1.0;
+        final double tilt = !reduceMotion && listening && !speaking
+            ? math.sin(t * math.pi * 2) * 0.018
+            : 0;
         return Stack(
           fit: StackFit.expand,
           children: <Widget>[
@@ -87,7 +91,10 @@ class CoachAvatarStage extends StatelessWidget {
             Center(
               child: Transform.translate(
                 offset: Offset(0, bob),
-                child: Transform.scale(scale: scale, child: child),
+                child: Transform.rotate(
+                  angle: tilt,
+                  child: Transform.scale(scale: scale, child: child),
+                ),
               ),
             ),
             Positioned(

@@ -241,6 +241,8 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
   int _lastRoundTurns = 0;
   List<String> _lastRoundExpressions = const <String>[];
   bool _duplexLive = false;
+  bool _duplexLearnerSpeaking = false;
+  bool _duplexAgentSpeaking = false;
   bool _podcastPlaying = false;
   bool _podcastSingleHost = true;
   bool _podcastPausedForQuestion = false;
@@ -492,6 +494,7 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
     unawaited(_cartoonTts.stop());
     unawaited(_speechPlayer?.stop());
     unawaited(_liveTalking.disconnect());
+    _liveKit.onSpeakingChanged = null;
     unawaited(_liveKit.disconnect());
     _orbPulse.dispose();
     _sessionTicker?.cancel();
@@ -1460,6 +1463,13 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
     String? openingToSpeak,
   }) async {
     _liveKit
+      ..onSpeakingChanged = (bool learner, bool agent) {
+        if (!mounted) return;
+        setState(() {
+          _duplexLearnerSpeaking = learner;
+          _duplexAgentSpeaking = agent;
+        });
+      }
       ..onUnavailable = () {
         if (!mounted || !_duplexLive) return;
         setState(() {
@@ -3364,9 +3374,11 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
                     : (_status.trim().isNotEmpty
                           ? _status
                           : (_started ? '你可以开始说' : '点麦克风开始对话'))));
-    final String stageLabel = _coachSpeaking
+    final bool avatarSpeaking = _coachSpeaking || _duplexAgentSpeaking;
+    final bool avatarListening = _recordingActive || _duplexLearnerSpeaking;
+    final String stageLabel = avatarSpeaking
         ? '外教在说…'
-        : (_recordingActive
+        : (avatarListening
               ? '外教在听…'
               : (_liveConnected
                     ? '${persona.displayName} · 唇形'
@@ -3385,8 +3397,8 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
             padding: const EdgeInsets.fromLTRB(10, 10, 10, 0),
             child: OralCallStage(
               pulse: _orbPulse,
-              speaking: _coachSpeaking,
-              listening: _recordingActive,
+              speaking: avatarSpeaking,
+              listening: avatarListening,
               statusLabel: stageLabel,
               displayName: persona.displayName,
               imageAsset: persona.assetPath,
@@ -3409,8 +3421,8 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
             children: <Widget>[
               CoachAvatarStage(
                 pulse: _orbPulse,
-                speaking: _coachSpeaking,
-                listening: _recordingActive,
+                speaking: avatarSpeaking,
+                listening: avatarListening,
                 label: stageLabel,
                 imageAsset: persona.assetPath,
                 displayName: persona.displayName,
