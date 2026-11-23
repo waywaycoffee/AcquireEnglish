@@ -39,6 +39,7 @@ class TodayPathNotifier extends Notifier<TodayPathState> {
   TodayPathState build() {
     ref.watch(coursePlanProvider);
     ref.watch(continueLearningTargetProvider);
+    ref.watch(lastLearningEpisodeProvider);
     ref.watch(dailyReviewProvider);
     ref.watch(memoryItemStoreProvider);
     ref.watch(wordReviewSettingsProvider);
@@ -215,29 +216,9 @@ class TodayPathNotifier extends Notifier<TodayPathState> {
         wantVideo ? _clipDueTasks(now, doneIds) : const <TodayTask>[];
     final List<TodayTask> examTasks = _examTasks(doneIds);
 
-    final ContinueLearningTarget? video =
-        wantVideo ? ref.read(continueLearningTargetProvider) : null;
-    final List<TodayTask> videoTasks = <TodayTask>[
-      if (video != null)
-        for (final String activity in <String>['words', 'practice'])
-          TodayTask(
-            id: 'video-$activity:${video.episode.id}',
-            kind: activity == 'words'
-                ? TodayTaskKind.videoWords
-                : TodayTaskKind.videoPractice,
-            title: activity == 'words' ? '视频 · 背单词' : '视频 · 练习',
-            subtitle: video.episode.title,
-            route: Uri(
-              pathSegments: <String>['', 'episodes', video.episode.id],
-              queryParameters: <String, String>{
-                'autoplay': '0',
-                'activity': activity,
-                'todayTask': 'video-$activity:${video.episode.id}',
-              },
-            ).toString(),
-            doneToday: doneIds.contains('video-$activity:${video.episode.id}'),
-          ),
-    ];
+    final List<TodayTask> videoTasks = wantVideo
+        ? _videoPracticeTasks(doneIds)
+        : const <TodayTask>[];
 
     final List<TodayTask> merged = <TodayTask>[
       ...overdue,
@@ -263,6 +244,40 @@ class TodayPathNotifier extends Notifier<TodayPathState> {
       hasActiveCourse: plan != null,
       status: status,
     );
+  }
+
+  List<TodayTask> _videoPracticeTasks(Set<String> doneIds) {
+    final ContinueLearningTarget? video = ref.read(continueLearningTargetProvider);
+    if (video == null || video.episode.videoMissing) return const <TodayTask>[];
+    final String episodeId = video.episode.id;
+    final bool hasStudyHistory =
+        ref.read(lastLearningEpisodeProvider) == episodeId ||
+        video.episode.progressPercent > 0;
+    if (!hasStudyHistory) return const <TodayTask>[];
+
+    TodayTask task(String activity, TodayTaskKind kind, String title) {
+      final String id = 'video-$activity:$episodeId';
+      return TodayTask(
+        id: id,
+        kind: kind,
+        title: title,
+        subtitle: video.episode.title,
+        route: Uri(
+          pathSegments: <String>['', 'episodes', episodeId],
+          queryParameters: <String, String>{
+            'autoplay': '0',
+            'activity': activity,
+            'todayTask': id,
+          },
+        ).toString(),
+        doneToday: doneIds.contains(id),
+      );
+    }
+
+    return <TodayTask>[
+      task('words', TodayTaskKind.videoWords, '视频 · 背单词'),
+      task('practice', TodayTaskKind.videoPractice, '视频 · 练习'),
+    ];
   }
 
   List<TodayTask> _examTasks(Set<String> doneIds) {
