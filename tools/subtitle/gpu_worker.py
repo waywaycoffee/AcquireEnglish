@@ -96,7 +96,8 @@ def translate_local(cues):
                         rows.extend(one)
                 if not rows: return None
                 out.extend(rows)
-    except httpx.HTTPError:
+    except httpx.HTTPError as exc:
+        print('local translate HTTP error', type(exc).__name__, str(exc)[:120], flush=True)
         return None
     return out
 
@@ -201,6 +202,11 @@ def main(once=False,model='small.en'):
     finisher=ThreadPoolExecutor(max_workers=1,thread_name_prefix='finalize')
     pending: Future | None=None
     while True:
+        # Whisper (float16) and the local Qwen shim share the 5060 Ti. Overlapping
+        # ASR with EN→ZH OOMs the translator and trips local_zh_missing on ECS.
+        if pending is not None:
+            pending.result()
+            pending = None
         try:
             job=rpc({'action':'claim'})
         except Exception as exc:
@@ -229,9 +235,6 @@ def main(once=False,model='small.en'):
             except Exception: pass
             if once: break
             continue
-        # Keep at most one job finalizing while the next one transcribes.
-        if pending is not None:
-            pending.result()
         pending=finisher.submit(finalize,job,cues,beat)
         if once: break
     if pending is not None:
