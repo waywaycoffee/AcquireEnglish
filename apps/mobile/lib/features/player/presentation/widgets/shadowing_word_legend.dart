@@ -87,8 +87,7 @@ class ShadowingWordChips extends StatelessWidget {
           children: <Widget>[
             for (final PronunciationWordResult word in words)
               Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                 decoration: BoxDecoration(
                   color: shadowingMatchColor(word).withValues(alpha: 0.14),
                   borderRadius: BorderRadius.circular(8),
@@ -110,5 +109,68 @@ class ShadowingWordChips extends StatelessWidget {
         ),
       ],
     );
+  }
+}
+
+/// Preserves the original sentence and styles only the words needing attention.
+class ShadowingMarkedSentence extends StatelessWidget {
+  const ShadowingMarkedSentence({
+    required this.reference,
+    required this.errors,
+    super.key,
+  });
+
+  final String reference;
+  final Map<int, int> errors;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text.rich(TextSpan(children: _spans(reference))),
+        if (errors.containsValue(3)) Text('读错：${_wordsWithTag(3).join('、')}'),
+        if (errors.containsValue(2)) Text('漏读：${_wordsWithTag(2).join('、')}'),
+      ],
+    );
+  }
+
+  static final _pattern = RegExp(r"[A-Za-z0-9]+(?:['’][A-Za-z0-9]+)?");
+
+  List<String> _wordsWithTag(int tag) {
+    final words = _pattern.allMatches(reference).toList();
+    return [
+      for (var i = 0; i < words.length; i++)
+        if (errors[i] == tag) words[i][0]!,
+    ];
+  }
+
+  List<TextSpan> _spans(String text) {
+    final spans = <TextSpan>[];
+    var index = 0;
+    var end = 0;
+    for (final match in _pattern.allMatches(text)) {
+      spans.add(TextSpan(text: text.substring(end, match.start)));
+      final tag = errors[index++];
+      spans.add(
+        TextSpan(
+          text: match[0],
+          style: tag == null
+              ? null
+              : TextStyle(
+                  color: tag == 2
+                      ? const Color(0xFFD08700)
+                      : const Color(0xFFE53935),
+                  fontWeight: FontWeight.bold,
+                  decoration: tag == 2
+                      ? TextDecoration.lineThrough
+                      : TextDecoration.underline,
+                ),
+        ),
+      );
+      end = match.end;
+    }
+    spans.add(TextSpan(text: text.substring(end)));
+    return spans;
   }
 }

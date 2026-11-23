@@ -17,7 +17,7 @@ import '../../../settings/data/pronunciation_credentials.dart';
 import '../../../settings/presentation/settings_provider.dart';
 import '../../../sync/data/acquire_api_client.dart';
 import '../../data/dub_session_store.dart';
-import '../../data/local_shadow_scorer.dart';
+import '../../domain/shadow_word_overlap.dart';
 import '../../data/pronunciation_audio_extractor.dart';
 import '../../data/pronunciation_providers.dart';
 import '../../data/voice_practice_client.dart';
@@ -187,7 +187,6 @@ class _StudyShadowingTabState extends ConsumerState<StudyShadowingTab> {
   Future<void> Function()? _cancelExtraction;
   String? _boundTargetKey;
   final VoicePracticeClient _voiceClient = VoicePracticeClient();
-  final LocalShadowScorer _localScorer = const LocalShadowScorer();
   bool _voiceBusy = false;
   bool _communityPublishBusy = false;
   VoiceShadowResult? _voiceResult;
@@ -830,6 +829,20 @@ class _StudyShadowingTabState extends ConsumerState<StudyShadowingTab> {
   }
 
   /// Cloud SOE → optional device keys → Voice sidecar → duration heuristic.
+  int? _transcriptScore(VoiceShadowResult? result, String reference) {
+    if (result == null || result.mock) return null;
+    final int count = ShadowWordOverlap.tokenize(
+      reference.replaceAll('’', "'"),
+    ).length;
+    if (count == 0) return null;
+    final errors = ShadowWordOverlap.referenceErrors(
+      reference,
+      result.transcript,
+    );
+    return (100 * result.overlap.score.clamp(0, 1 - errors.length / count))
+        .round();
+  }
+
   Future<void> _scoreAfterRecording({
     required String path,
     required Pcm16MonoAudio audio,
@@ -866,13 +879,10 @@ class _StudyShadowingTabState extends ConsumerState<StudyShadowingTab> {
         final PronunciationAssessmentResult? assessment =
             PronunciationAssessmentResult.tryParse(cloud);
         if (assessment != null) {
-          if (!mounted ||
-              _resourcesReleased ||
-              scoringKey != _boundTargetKey) {
+          if (!mounted || _resourcesReleased || scoringKey != _boundTargetKey) {
             return;
           }
-          final int? score =
-              (assessment.suggestedScore ?? assessment.accuracy)?.round();
+          final int? score = assessment.scoreForReference(reference);
           setState(() {
             _assessment = assessment;
             _message = score == null ? '发音评测完成' : '发音评分 $score 分';
@@ -898,19 +908,12 @@ class _StudyShadowingTabState extends ConsumerState<StudyShadowingTab> {
         try {
           final PronunciationAssessmentResult assessment = await ref
               .read(tencentPronunciationServiceProvider)
-              .evaluate(
-                credentials: credentials,
-                target: target,
-                audio: audio,
-              )
+              .evaluate(credentials: credentials, target: target, audio: audio)
               .timeout(const Duration(seconds: 20));
-          if (!mounted ||
-              _resourcesReleased ||
-              scoringKey != _boundTargetKey) {
+          if (!mounted || _resourcesReleased || scoringKey != _boundTargetKey) {
             return;
           }
-          final int? score =
-              (assessment.suggestedScore ?? assessment.accuracy)?.round();
+          final int? score = assessment.scoreForReference(reference);
           setState(() {
             _assessment = assessment;
             _message = score == null ? '发音评测完成' : '发音评分 $score 分';
@@ -944,28 +947,14 @@ class _StudyShadowingTabState extends ConsumerState<StudyShadowingTab> {
         }
       }
 
-      // 4) Always surface a score so 跟读 never ends blank.
-      result ??= _localScorer.durationHeuristic(
-        referenceText: reference,
-        referenceMs: _reference?.audio.durationMs ??
-            (widget.line.endMs - widget.line.startMs).clamp(500, 60000),
-        recordingMs: audio.durationMs,
-      );
-
-      if (!mounted || _resourcesReleased) {
+      if (!mounted || _resourcesReleased || scoringKey != _boundTargetKey)
         return;
-      }
-      if (scoringKey != _boundTargetKey) return;
+      final int? score = _transcriptScore(result, reference);
       setState(() {
-        _voiceResult = result;
-        final String scoreLabel = result!.scorePercentLabel;
-        if (result.mock) {
-          _message = '跟读完成 · 参考分 $scoreLabel';
-        } else {
-          _message = '跟读反馈 · $scoreLabel';
-        }
+        _voiceResult = score == null ? null : result;
+        _message = score == null ? '已保存录音，暂时无法评测，请稍后重试' : '跟读匹配 $score 分';
       });
-      widget.onScoreForReview?.call((result.overlap.score * 100).round());
+      if (score != null) widget.onScoreForReview?.call(score);
       unawaited(_persistDubTake(path));
     } finally {
       if (mounted && !_resourcesReleased) {
@@ -1021,15 +1010,15 @@ class _StudyShadowingTabState extends ConsumerState<StudyShadowingTab> {
           createdAt: _takeCreatedAt ??= DateTime.now(),
           professionalScore: _assessment != null,
           scorePercent: _assessment != null
-              ? (_assessment!.suggestedScore ?? _assessment!.accuracy)?.round()
+              ? _assessment!.scoreForReference(widget.line.english)
               : _voiceResult == null || _voiceResult!.mock
               ? null
-              : (_voiceResult!.overlap.score * 100).round(),
+              : _transcriptScore(_voiceResult, widget.line.english),
         ),
       );
-      ref.read(learningActivityProvider.notifier).recordShadowAttempt(
-            sentenceKey: '$episodeId|$lineId',
-          );
+      ref
+          .read(learningActivityProvider.notifier)
+          .recordShadowAttempt(sentenceKey: '$episodeId|$lineId');
       if (mounted && !_resourcesReleased) {
         setState(() {
           _dubTakeSaved = true;
@@ -1366,12 +1355,15 @@ class _StudyShadowingTabState extends ConsumerState<StudyShadowingTab> {
                 ),
               ],
               if (_assessment != null) ...<Widget>[
-                Text('发音评分：${_assessment!.suggestedScore?.round() ?? "—"}分'),
+                Text('发音评分：${_assessment!.scoreForReference(widget.line.english) ?? "—"}分'),
                 Text(
                   '准确度 ${_assessment!.accuracy?.round() ?? "—"} · 流利度 ${_assessment!.fluency?.round() ?? "—"} · 完整度 ${_assessment!.completion?.round() ?? "—"}',
                 ),
                 const SizedBox(height: 8),
-                ShadowingWordChips(words: _assessment!.words),
+                ShadowingMarkedSentence(
+                  reference: widget.line.english,
+                  errors: _assessment!.referenceErrors(widget.line.english),
+                ),
               ],
               if (_voiceResult != null) ...<Widget>[
                 const SizedBox(height: 12),
@@ -1387,8 +1379,7 @@ class _StudyShadowingTabState extends ConsumerState<StudyShadowingTab> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: <Widget>[
                       Text(
-                        '重叠 ${_voiceResult!.scorePercentLabel}'
-                        '${_voiceResult!.mock ? ' · 粗评' : ''}',
+                        '匹配 ${_transcriptScore(_voiceResult, widget.line.english)} 分',
                         style: TextStyle(
                           fontSize: 14,
                           fontWeight: FontWeight.w700,
@@ -1404,32 +1395,13 @@ class _StudyShadowingTabState extends ConsumerState<StudyShadowingTab> {
                           color: shell.textSecondary,
                         ),
                       ),
-                      if (_voiceResult!
-                          .overlap
-                          .missingWords
-                          .isNotEmpty) ...<Widget>[
-                        const SizedBox(height: 6),
-                        Text(
-                          '漏读：${_voiceResult!.overlap.missingWords.join(', ')}',
-                          style: const TextStyle(
-                            fontSize: 12,
-                            color: Colors.orangeAccent,
-                          ),
+                      ShadowingMarkedSentence(
+                        reference: widget.line.english,
+                        errors: ShadowWordOverlap.referenceErrors(
+                          widget.line.english,
+                          _voiceResult!.transcript,
                         ),
-                      ],
-                      if (_voiceResult!
-                          .overlap
-                          .extraWords
-                          .isNotEmpty) ...<Widget>[
-                        const SizedBox(height: 4),
-                        Text(
-                          '多读：${_voiceResult!.overlap.extraWords.join(', ')}',
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: shell.textMuted,
-                          ),
-                        ),
-                      ],
+                      ),
                     ],
                   ),
                 ),

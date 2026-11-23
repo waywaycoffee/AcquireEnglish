@@ -26,6 +26,45 @@ class ShadowWordOverlap {
         .toList(growable: false);
   }
 
+  /// Maps reference word positions to substitutions (3) and omissions (2).
+  static Map<int, int> referenceErrors(String reference, String hypothesis) {
+    final ref = tokenize(reference.replaceAll('’', "'"));
+    final hyp = tokenize(hypothesis.replaceAll('’', "'"));
+    final costs = List.generate(
+      ref.length + 1,
+      (_) => List.filled(hyp.length + 1, 0),
+    );
+    for (var i = 0; i <= ref.length; i++) {
+      for (var j = 0; j <= hyp.length; j++) {
+        costs[i][j] = i == 0
+            ? j
+            : j == 0
+            ? i
+            : _min(
+                costs[i - 1][j - 1] + (ref[i - 1] == hyp[j - 1] ? 0 : 1),
+                1 + _min(costs[i - 1][j], costs[i][j - 1]),
+              );
+      }
+    }
+    final errors = <int, int>{};
+    var i = ref.length;
+    var j = hyp.length;
+    while (i > 0) {
+      if (j > 0 && ref[i - 1] == hyp[j - 1]) {
+        i--;
+        j--;
+      } else if (j > 0 && costs[i][j] == costs[i - 1][j - 1] + 1) {
+        errors[--i] = 3;
+        j--;
+      } else if (costs[i][j] == costs[i - 1][j] + 1) {
+        errors[--i] = 2;
+      } else {
+        j--;
+      }
+    }
+    return errors;
+  }
+
   static ShadowWordOverlap compare(String reference, String hypothesis) {
     final List<String> ref = tokenize(reference);
     final List<String> hyp = tokenize(hypothesis);

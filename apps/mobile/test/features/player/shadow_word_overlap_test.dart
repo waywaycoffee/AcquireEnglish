@@ -2,11 +2,22 @@ import 'package:common_learn_english/features/player/domain/shadow_word_overlap.
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
-  test('tokenize lowers and strips punctuation', () {
+  test('marks the substituted and omitted reference positions', () {
     expect(
-      ShadowWordOverlap.tokenize("Hello, world's 123!"),
-      <String>['hello', "world's", '123'],
+      ShadowWordOverlap.referenceErrors(
+        "It's just some guy I work with.",
+        "It's jest some guy I work",
+      ),
+      <int, int>{1: 3, 6: 2},
     );
+  });
+
+  test('tokenize lowers and strips punctuation', () {
+    expect(ShadowWordOverlap.tokenize("Hello, world's 123!"), <String>[
+      'hello',
+      "world's",
+      '123',
+    ]);
   });
 
   test('perfect overlap scores 1', () {

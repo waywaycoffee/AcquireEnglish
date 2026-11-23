@@ -1,6 +1,8 @@
 import 'dart:math' as math;
 import 'dart:typed_data';
 
+import 'shadow_word_overlap.dart';
+
 class PronunciationAssessmentTarget {
   const PronunciationAssessmentTarget({
     required this.text,
@@ -100,6 +102,11 @@ class PronunciationWordResult {
     _ => accuracy != null && accuracy! < 60 ? '发音需练习' : '',
   };
   final double? accuracy;
+
+  bool get isShadowingError =>
+      matchTag == 2 ||
+      matchTag == 3 ||
+      (matchTag == 0 && accuracy != null && accuracy! < 60);
 }
 
 class PronunciationAssessmentResult {
@@ -117,11 +124,43 @@ class PronunciationAssessmentResult {
   final double? completion;
   final List<PronunciationWordResult> words;
 
-  int? get shadowingScore {
+  int? get shadowingScore => scoreForReference('');
+
+  int? scoreForReference(String reference) {
     final double? score = suggestedScore ?? accuracy;
     if (score == null) return null;
-    final double? coverage = completion;
-    return (coverage == null ? score : score.clamp(0, coverage * 100)).round();
+    final count = ShadowWordOverlap.tokenize(
+      reference.replaceAll('’', "'"),
+    ).length;
+    final coverage = count == 0
+        ? 1.0
+        : 1 - referenceErrors(reference).length / count;
+    return score.clamp(0, math.min(completion ?? 1, coverage) * 100).round();
+  }
+
+  Map<int, int> referenceErrors(String reference) {
+    final tokens = ShadowWordOverlap.tokenize(reference.replaceAll('’', "'"));
+    final errors = <int, int>{};
+    final aligned = words.where((word) => word.matchTag != 1).toList();
+    if (aligned.length == tokens.length) {
+      return {
+        for (var i = 0; i < aligned.length; i++)
+          if (aligned[i].isShadowingError) i: aligned[i].matchTag == 2 ? 2 : 3,
+      };
+    }
+    var next = 0;
+    for (final word in aligned) {
+      if (next >= tokens.length) break;
+      final expected = ShadowWordOverlap.tokenize(
+        word.referenceWord.replaceAll('’', "'"),
+      );
+      if (expected.length != 1) continue;
+      final index = tokens.indexOf(expected.single, next);
+      if (index < 0) continue;
+      if (word.isShadowingError) errors[index] = word.matchTag == 2 ? 2 : 3;
+      next = index + 1;
+    }
+    return errors;
   }
 
   static PronunciationAssessmentResult? tryParse(Object? raw) {
