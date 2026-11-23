@@ -3,7 +3,10 @@ import 'package:flutter_test/flutter_test.dart';
 
 void main() {
   test('K12 track label and entrance exams exist', () {
-    expect(examTrackLabel(ExamTrack.k12), contains('中高考'));
+    expect(examTrackLabel(ExamTrack.k12), contains('小学'));
+    expect(examTrackLabel(ExamTrack.cambridge), contains('KET'));
+    expect(examTrackByName('toefl'), ExamTrack.toefl);
+    expect(examTrackByName('ielts'), ExamTrack.ielts);
     expect(examFamilyById('zhongkao')?.label, '中考');
     expect(examFamilyById('gaokao')?.label, '高考');
     expect(kK12EntranceExamIds, containsAll(<String>['zhongkao', 'gaokao']));

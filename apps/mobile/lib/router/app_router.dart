@@ -6,6 +6,7 @@ import '../features/exam/presentation/exam_cloze_import_screen.dart';
 import '../features/exam/presentation/exam_cloze_session.dart';
 import '../features/exam/presentation/exam_errorbook_screen.dart';
 import '../features/exam/presentation/exam_grammar_hub_screen.dart';
+import '../features/exam/domain/exam_registry.dart';
 import '../features/exam/presentation/exam_home_screen.dart';
 import '../features/exam/presentation/exam_listening_screen.dart';
 import '../features/exam/presentation/exam_mock_screen.dart';
@@ -210,8 +211,14 @@ GoRouter goRouter(Ref ref) {
     ),
     GoRoute(
       path: '/exam/select',
-      builder: (BuildContext context, GoRouterState state) =>
-          const ExamSelectScreen(),
+      builder: (BuildContext context, GoRouterState state) {
+        final String? trackRaw = state.uri.queryParameters['track'];
+        final String? family = state.uri.queryParameters['family'];
+        return ExamSelectScreen(
+          initialTrack: examTrackByName(trackRaw),
+          initialFamilyId: family,
+        );
+      },
     ),
     GoRoute(
       path: '/exam/practice',

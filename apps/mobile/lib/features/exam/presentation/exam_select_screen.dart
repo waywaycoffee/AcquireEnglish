@@ -9,15 +9,22 @@ import 'exam_profile_provider.dart';
 const Color _kExamHeroDark = Color(0xFF1A2332);
 
 class ExamSelectScreen extends ConsumerStatefulWidget {
-  const ExamSelectScreen({super.key});
+  const ExamSelectScreen({
+    super.key,
+    this.initialTrack,
+    this.initialFamilyId,
+  });
+
+  final ExamTrack? initialTrack;
+  final String? initialFamilyId;
 
   @override
   ConsumerState<ExamSelectScreen> createState() => _ExamSelectScreenState();
 }
 
 class _ExamSelectScreenState extends ConsumerState<ExamSelectScreen> {
-  ExamTrack? _track = ExamTrack.k12;
-  String? _familyId;
+  late ExamTrack? _track = widget.initialTrack ?? ExamTrack.k12;
+  late String? _familyId = widget.initialFamilyId;
   String? _ieltsBand;
 
   @override

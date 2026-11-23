@@ -233,13 +233,32 @@ ExamFamily? examFamilyById(String? id) {
 }
 
 String examTrackLabel(ExamTrack track) => switch (track) {
-  ExamTrack.k12 => 'K12 / 中高考',
-  ExamTrack.cambridge => '剑桥英语',
+  ExamTrack.k12 => '小学/初高中',
+  ExamTrack.cambridge => 'KET / PET',
   ExamTrack.cet => '四六级',
   ExamTrack.postgraduate => '考研',
   ExamTrack.toefl => '托福',
   ExamTrack.ielts => '雅思',
 };
+
+ExamTrack? examTrackByName(String? raw) {
+  final String name = (raw ?? '').trim().toLowerCase();
+  if (name.isEmpty) return null;
+  for (final ExamTrack track in ExamTrack.values) {
+    if (track.name == name) return track;
+  }
+  // Friendly aliases used by deep links / home chips.
+  return switch (name) {
+    'primary' || 'junior' || 'senior' || 'k12' || 'zhongkao' || 'gaokao' =>
+      ExamTrack.k12,
+    'cet' || 'cet4' || 'cet6' || '四六级' => ExamTrack.cet,
+    'kaoyan' || 'pg' || '考研' => ExamTrack.postgraduate,
+    'toefl' || '托福' => ExamTrack.toefl,
+    'ielts' || '雅思' => ExamTrack.ielts,
+    'ket' || 'pet' || 'cambridge' || '剑桥' => ExamTrack.cambridge,
+    _ => null,
+  };
+}
 
 /// Research / extended datasets — hide from main K12 grade chips.
 bool examFamilyIsResearch(ExamFamily f) =>

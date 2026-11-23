@@ -203,29 +203,46 @@ class _EmptyTargetBody extends StatelessWidget {
         const SizedBox(height: 20),
         _SectionTitle('更多目标'),
         const SizedBox(height: 10),
-        Row(
-          children: <Widget>[
-            Expanded(
-              child: _MoreTargetChip(
-                label: '小学',
-                onTap: () => context.push('/exam/select'),
+        LayoutBuilder(
+          builder: (BuildContext context, BoxConstraints constraints) {
+            const double gap = 10;
+            final double chipWidth = (constraints.maxWidth - gap * 2) / 3;
+            const List<({String label, String route})> items =
+                <({String label, String route})>[
+              (label: '小学', route: '/exam/select?track=k12'),
+              (label: '初中', route: '/exam/select?track=k12'),
+              (label: '高中', route: '/exam/select?track=k12'),
+              (label: '四六级', route: '/exam/select?track=cet'),
+              (
+                label: '考研',
+                route: '/exam/select?track=postgraduate&family=kaoyan',
               ),
-            ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: _MoreTargetChip(
-                label: '四六级',
-                onTap: () => context.push('/exam/select'),
+              (label: '托福', route: '/exam/select?track=toefl&family=toefl'),
+              (label: '雅思', route: '/exam/select?track=ielts'),
+              (
+                label: 'KET',
+                route: '/exam/select?track=cambridge&family=ket',
               ),
-            ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: _MoreTargetChip(
-                label: '考研+',
-                onTap: () => context.push('/exam/select'),
+              (
+                label: 'PET',
+                route: '/exam/select?track=cambridge&family=pet',
               ),
-            ),
-          ],
+            ];
+            return Wrap(
+              spacing: gap,
+              runSpacing: gap,
+              children: <Widget>[
+                for (final ({String label, String route}) item in items)
+                  SizedBox(
+                    width: chipWidth,
+                    child: _MoreTargetChip(
+                      label: item.label,
+                      onTap: () => context.push(item.route),
+                    ),
+                  ),
+              ],
+            );
+          },
         ),
         const SizedBox(height: 20),
         SizedBox(
