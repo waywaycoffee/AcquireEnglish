@@ -105,11 +105,60 @@ class SubtitleCompletionWorker {
     }
 
     // On-device Whisper removed: English ASR jobs wait on cloud generation.
+    // But official/local EN may already be on disk — settle instead of looping
+    // markDeferred forever (notification stuck at 已完成3/4).
     if (job.needEnglish) {
+      final ({bool needEnglish, bool needChinese})? stillNeed =
+          await _remainingNeedAfterJob(job);
+      if (stillNeed == null) {
+        final String? enPath = isUsableSubtitlePath(job.enPath)
+            ? job.enPath
+            : await existingOfficialBilibiliSubtitle(
+                idKey: job.sourceKey,
+                fileName: 'en.srt',
+              );
+        final String? zhPath = isUsableSubtitlePath(job.zhPath)
+            ? job.zhPath
+            : await existingOfficialBilibiliSubtitle(
+                idKey: job.sourceKey,
+                fileName: 'zh.srt',
+              );
+        if (onPersisted != null &&
+            isUsableSubtitlePath(enPath) &&
+            isUsableSubtitlePath(zhPath)) {
+          await onPersisted!(
+            episodeId: job.episodeId,
+            englishPath: enPath!,
+            chinesePath: zhPath!,
+          );
+        }
+        await queue.markDone(job.episodeId);
+        onProgress?.call(job.episodeId, '字幕已补全');
+        return true;
+      }
+      if (!stillNeed.needEnglish) {
+        await queue.enqueue(
+          episodeId: job.episodeId,
+          videoPath: job.videoPath,
+          enPath: job.enPath,
+          zhPath: job.zhPath,
+          sourceKey: job.sourceKey,
+          needEnglish: false,
+          needChinese: stillNeed.needChinese,
+          asrPrimary: job.asrPrimary,
+          force: true,
+        );
+        onProgress?.call(job.episodeId, '英文已就绪，继续补中文…');
+        return true;
+      }
+      // Still missing EN: wait for cloud, but burn attempts so we eventually stop.
       onProgress?.call(job.episodeId, kSubtitleCloudGenerationQueuedLabel);
-      await queue.markDeferred(
-        job.episodeId,
-        '正在等待云端生成字幕',
+      await queue.markIncompleteRetry(
+        episodeId: job.episodeId,
+        needEnglish: true,
+        needChinese: stillNeed.needChinese,
+        error: '正在等待云端生成字幕',
+        asrPrimary: job.asrPrimary,
       );
       return true;
     }

@@ -305,15 +305,18 @@ class SubtitleCompletionQueue {
     SubtitleCompletionJob? cooling;
     for (final SubtitleCompletionJob job in jobs) {
       if (job.status == SubtitleCompletionStatus.pending) {
-        // Soft defer after free-API rate limits — skip for ~45s so other
-        // episodes can drain instead of hot-looping one stuck Chinese fill.
+        // Soft defer after free-API rate limits / cloud-wait — skip briefly so
+        // we do not hot-loop one stuck episode (notification stuck at 3/4).
         final String err = (job.lastError ?? '').toLowerCase();
         final bool rateLimited =
             err.contains('稍后继续') ||
             err.contains('限流') ||
             err.contains('已保留已译');
+        final bool waitingCloud =
+            err.contains('等待云端') || err.contains('云端生成');
         final int updated = job.updatedAtMs ?? 0;
-        if (rateLimited && now - updated < 45000) {
+        final int coolMs = waitingCloud ? 180000 : 45000;
+        if ((rateLimited || waitingCloud) && now - updated < coolMs) {
           cooling ??= job;
           continue;
         }
