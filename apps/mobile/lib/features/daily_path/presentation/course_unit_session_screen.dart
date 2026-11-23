@@ -11,7 +11,7 @@ import '../domain/oral_core_series.dart';
 import 'course_plan_provider.dart';
 import 'course_unit_quiz_screen.dart';
 import 'daily_path_runner.dart';
-import 'source_coach_lesson_preview.dart';
+import '../../digital_human/presentation/digital_human_coach_screen.dart';
 
 String _formatClock(int ms) {
   final int totalSec = (ms / 1000).floor().clamp(0, 24 * 3600);
@@ -313,13 +313,18 @@ class _CourseUnitSessionScreenState
                   ...resolvedUnit.shadowLines,
                   ...resolvedUnit.sentences,
                 ].where((String s) => s.trim().isNotEmpty).toList();
+                if (sourceLines.isEmpty) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('本节暂无可用于交流的原文')),
+                  );
+                  return;
+                }
                 Navigator.of(context).push(
                   MaterialPageRoute<void>(
-                    builder: (_) => SourceCoachLessonPreview(
-                      sourceTitle: resolvedPlan.title,
-                      topic: resolvedUnit.topic,
-                      sourceLines: sourceLines,
-                      isVideo: isVideo,
+                    builder: (_) => DigitalHumanCoachScreen(
+                      lessonTitle: resolvedUnit.topic,
+                      lessonText: sourceLines.join('\n'),
+                      practiceRole: 'learner',
                       onConfirmedLearnerTurn: (String text) async {
                         if (!RegExp(r'[A-Za-z]').hasMatch(text)) return;
                         final CourseUnitProgress current = await CourseUnitProgress.load(
@@ -333,7 +338,7 @@ class _CourseUnitSessionScreenState
                 );
               },
               icon: const Icon(Icons.record_voice_over_outlined),
-              label: const Text('生成外教课'),
+              label: const Text('和数字人聊本节素材'),
             ),
           ],
           const SizedBox(height: 28),

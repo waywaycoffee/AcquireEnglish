@@ -8,12 +8,14 @@ class DigitalHumanCoachScreen extends StatelessWidget {
     super.key,
     this.initialScenarioId,
     this.lessonTitle,
+    this.guidedLesson = false,
     this.lessonText,
     this.practiceRole,
     this.onConfirmedLearnerTurn,
   });
 
   final String? initialScenarioId;
+  final bool guidedLesson;
   final String? lessonTitle, lessonText, practiceRole;
   final ValueChanged<String>? onConfirmedLearnerTurn;
 
@@ -23,7 +25,7 @@ class DigitalHumanCoachScreen extends StatelessWidget {
     final bool hasMaterial = lessonText?.trim().isNotEmpty == true;
     final String displayTitle = title.isNotEmpty
         ? title
-        : (hasMaterial ? 'AI 外教课' : '数字人口语');
+        : (guidedLesson && hasMaterial ? 'AI 外教课' : '数字人口语');
     return Scaffold(
       backgroundColor: const Color(0xFF14102A),
       extendBodyBehindAppBar: true,
@@ -46,6 +48,7 @@ class DigitalHumanCoachScreen extends StatelessWidget {
             courseTitle: displayTitle,
             hasTranscript: hasMaterial,
             standalone: true,
+            guidedLesson: guidedLesson,
             onConfirmedLearnerTurn: onConfirmedLearnerTurn,
             initialScenarioId: hasMaterial
                 ? 'video_line'

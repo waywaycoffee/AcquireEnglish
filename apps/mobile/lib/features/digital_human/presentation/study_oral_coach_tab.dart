@@ -180,6 +180,7 @@ class StudyOralCoachTab extends ConsumerStatefulWidget {
     this.episodeId,
     this.initialScenarioId,
     this.standalone = false,
+    this.guidedLesson = false,
     this.onConfirmedLearnerTurn,
     super.key,
   });
@@ -199,6 +200,7 @@ class StudyOralCoachTab extends ConsumerStatefulWidget {
 
   /// Opened outside the video player (module entry).
   final bool standalone;
+  final bool guidedLesson;
   final ValueChanged<String>? onConfirmedLearnerTurn;
 
   @override
@@ -327,7 +329,7 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
   final LiveSceneCamera _liveSceneCamera = LiveSceneCamera();
 
   bool get _hasTutorMaterial =>
-      widget.standalone && widget.articleExcerpt.trim().isNotEmpty;
+      widget.guidedLesson && widget.articleExcerpt.trim().isNotEmpty;
 
   bool get _isGuidedTutorLesson =>
       _hasTutorMaterial && !_podcastPausedForQuestion && !_podcastPlaying;
@@ -359,11 +361,6 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
     _historyAccount = ref.read(authSessionProvider).email.trim().toLowerCase();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) unawaited(_bootstrapScenariosAndStart());
-      if (mounted &&
-          widget.standalone &&
-          widget.articleExcerpt.trim().isNotEmpty) {
-        unawaited(_ensureSelfCallCamera());
-      }
     });
   }
 
@@ -612,6 +609,13 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
   List<String> _localHeuristicTalkTopics() {
     final String excerpt = widget.articleExcerpt.trim();
     final String topic = _topicLabel;
+    if (excerpt.isEmpty && !widget.hasTranscript) {
+      return const <String>[
+        'How was your day?',
+        'What do you enjoy doing in your free time?',
+        'What are your plans for this weekend?',
+      ];
+    }
     if (excerpt.isEmpty) {
       return <String>[
         'What is the main idea of “$topic”?',
@@ -1409,9 +1413,6 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
       if (_usesVoicePipeline(settings)) {
         unawaited(_ensurePipelineSession(settings).catchError((Object _) {}));
       }
-      if (widget.standalone) {
-        unawaited(_ensureSelfCallCamera());
-      }
       unawaited(_runTutorStep());
       return;
     }
@@ -1441,9 +1442,6 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
     }
     if (_wantsLiveTalking(settings)) {
       unawaited(_ensureLiveTalking(settings).catchError((Object _) {}));
-    }
-    if (widget.standalone) {
-      unawaited(_ensureSelfCallCamera());
     }
     if (settings.usesLiveKit && !_podcastPausedForQuestion && !_podcastPlaying) {
       unawaited(
@@ -2790,9 +2788,6 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
       _liveSceneOn = false;
       _status = _sceneDescription.isEmpty ? '你可以开始说' : '场景直播已关闭';
     });
-    if (widget.standalone) {
-      unawaited(_ensureSelfCallCamera());
-    }
   }
 
   Future<List<SceneWordLabel>> _filterSceneLabels(

@@ -6,7 +6,6 @@ import 'package:go_router/go_router.dart';
 
 import '../../authentication/presentation/auth_session.dart';
 import '../../daily_path/presentation/today_path_card.dart';
-import 'widgets/home_coach_course_card.dart';
 import '../../digital_human/presentation/digital_human_picker.dart';
 import '../../exam/domain/exam_profile.dart';
 import '../../exam/presentation/exam_profile_provider.dart';
@@ -368,8 +367,6 @@ class _LearningHomeScreenState extends ConsumerState<LearningHomeScreen> {
                       key: _vocabKey,
                       child: const TodayPathCard(),
                     ),
-                    const SizedBox(height: 16),
-                    const HomeCoachCourseCard(),
                     const SizedBox(height: 24),
                     if (examProfile.hasExamTarget) ...<Widget>[
                       text(

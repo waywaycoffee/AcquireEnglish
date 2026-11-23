@@ -89,6 +89,7 @@ class SourceCoachLessonPreview extends StatelessWidget {
                       : () => Navigator.of(context).push(
                             MaterialPageRoute<void>(
                               builder: (_) => DigitalHumanCoachScreen(
+                                guidedLesson: true,
                                 lessonTitle: topic,
                                 lessonText: lines.join('\n'),
                                 practiceRole: 'learner',
