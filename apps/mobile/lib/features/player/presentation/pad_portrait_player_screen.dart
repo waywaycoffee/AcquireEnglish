@@ -94,6 +94,7 @@ import 'transcript_reader_session.dart';
 import 'widgets/ai_grammar_analysis_sheet.dart';
 import 'widgets/ai_subtitle_generation_progress_dialog.dart';
 import 'widgets/hardsub_mosaic_cover.dart';
+import 'widgets/hardsub_mosaic_toggle.dart';
 import 'widgets/player_subtitle_list.dart';
 import 'subtitle_chunk_lexicon_provider.dart';
 import 'widgets/player_transcript_panel.dart';
@@ -3304,8 +3305,11 @@ Future<void> _settleChineseFillIfAlreadyPresent() async {
                           }
                           setState(() {
                             _studyTab = tab;
-                            _hardsubMosaicEnabled =
-                                tab == StudyModeTab.dictation;
+                            // Dictation still auto-enables mosaic; other tabs
+                            // keep the user's current choice.
+                            if (tab == StudyModeTab.dictation) {
+                              _hardsubMosaicEnabled = true;
+                            }
                             if (tab == StudyModeTab.subtitles) {
                               _studyPlanStep = StudyPlanStep.intensive;
                             } else if (tab == StudyModeTab.dictation ||
@@ -3527,64 +3531,86 @@ Future<void> _settleChineseFillIfAlreadyPresent() async {
                 : null,
             onDictionaryOpened: _handleDictionaryOpened,
             onDictionaryClosed: _handleDictionaryClosed,
+            hardsubMosaicEnabled: _hardsubMosaicEnabled,
+            onToggleHardsubMosaic: _setHardsubMosaicEnabled,
           );
         }
         if (canGenerateAiSubtitles || _generatingAiSubtitles) {
-          return PlayerSubtitleList(
-            episodeId: widget.episodeId,
-            lines: const <PlayerSubtitleLine>[],
-            activeIndex: 0,
-            subtitleMode: '双语',
-            currentWordIndex: 0,
-            fontScale: settings.fontScale,
-            highlightWords: settings.highlightWords,
-            subtitleLetterCase: settings.subtitleLetterCase,
-            savedVocabularyWords: savedVocabularyWords,
-            learnedVocabularyWords: learnedVocabularyWords,
-            keyVocabularyWords: keyVocabularyWords,
-            chunkHighlighter: chunkHighlighter,
-            onTapLine: (_) {},
-            onCollectWord: (_) {},
-            onBookmarkLine: (_) {},
-            onLoopFromLine: (_) {},
-            onDictationLine: (_) {},
-            onAiExplain: (_) {},
-            onPronounce: _stopVideo,
-            showAiGenerateSubtitles: true,
-            generatingAiSubtitles: _generatingAiSubtitles,
-            aiSubtitleProgressValue: _aiSubtitleProgressValue,
-            aiSubtitleProgressText: _aiSubtitleProgressText,
-            aiSubtitlePreviewText: _aiSubtitlePreviewText,
-            aiSubtitleErrorText: _aiSubtitleErrorText,
-            onGenerateAiSubtitles: _generatingAiSubtitles
-                ? null
-                : _handleGenerateAiSubtitles,
-            bilingualPipelineLabel: _bilingualPipelineLabel,
-            bilingualPipelineProgressValue: _bilingualPipelineProgress,
-            showAiCompleteButton: _bilingualShowAiComplete,
-            onAiComplete: _bilingualShowAiComplete
-                ? _handleAiCompleteSubtitles
-                : null,
-            onCancelBilingualPipeline:
-                _bilingualPhase == BilingualPipelinePhase.asrProofreading ||
-                    _bilingualPhase == BilingualPipelinePhase.ocrRunning ||
-                    _bilingualPhase == BilingualPipelinePhase.ocrSlow
-                ? _handleCancelBilingualPipeline
-                : null,
-            studyDarkStyle: true,
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: <Widget>[
+              HardsubMosaicToggle(
+                enabled: _hardsubMosaicEnabled,
+                onChanged: _setHardsubMosaicEnabled,
+              ),
+              Expanded(
+                child: PlayerSubtitleList(
+                  episodeId: widget.episodeId,
+                  lines: const <PlayerSubtitleLine>[],
+                  activeIndex: 0,
+                  subtitleMode: '双语',
+                  currentWordIndex: 0,
+                  fontScale: settings.fontScale,
+                  highlightWords: settings.highlightWords,
+                  subtitleLetterCase: settings.subtitleLetterCase,
+                  savedVocabularyWords: savedVocabularyWords,
+                  learnedVocabularyWords: learnedVocabularyWords,
+                  keyVocabularyWords: keyVocabularyWords,
+                  chunkHighlighter: chunkHighlighter,
+                  onTapLine: (_) {},
+                  onCollectWord: (_) {},
+                  onBookmarkLine: (_) {},
+                  onLoopFromLine: (_) {},
+                  onDictationLine: (_) {},
+                  onAiExplain: (_) {},
+                  onPronounce: _stopVideo,
+                  showAiGenerateSubtitles: true,
+                  generatingAiSubtitles: _generatingAiSubtitles,
+                  aiSubtitleProgressValue: _aiSubtitleProgressValue,
+                  aiSubtitleProgressText: _aiSubtitleProgressText,
+                  aiSubtitlePreviewText: _aiSubtitlePreviewText,
+                  aiSubtitleErrorText: _aiSubtitleErrorText,
+                  onGenerateAiSubtitles: _generatingAiSubtitles
+                      ? null
+                      : _handleGenerateAiSubtitles,
+                  bilingualPipelineLabel: _bilingualPipelineLabel,
+                  bilingualPipelineProgressValue: _bilingualPipelineProgress,
+                  showAiCompleteButton: _bilingualShowAiComplete,
+                  onAiComplete: _bilingualShowAiComplete
+                      ? _handleAiCompleteSubtitles
+                      : null,
+                  onCancelBilingualPipeline:
+                      _bilingualPhase ==
+                              BilingualPipelinePhase.asrProofreading ||
+                          _bilingualPhase == BilingualPipelinePhase.ocrRunning ||
+                          _bilingualPhase == BilingualPipelinePhase.ocrSlow
+                      ? _handleCancelBilingualPipeline
+                      : null,
+                  studyDarkStyle: true,
+                ),
+              ),
+            ],
           );
         }
-        return const Center(
-          child: Text(
-            '当前剧集没有可用字幕或视频\n导入本地视频后可用语音识别生成字幕',
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              fontSize: 15,
-              fontWeight: FontWeight.w700,
-              height: 1.5,
-              color: StudyShellTokens.textSecondary,
+        return ListView(
+          padding: const EdgeInsets.fromLTRB(0, 8, 0, 24),
+          children: <Widget>[
+            HardsubMosaicToggle(
+              enabled: _hardsubMosaicEnabled,
+              onChanged: _setHardsubMosaicEnabled,
             ),
-          ),
+            const SizedBox(height: 24),
+            const Text(
+              '当前剧集没有可用字幕或视频\n导入本地视频后可用语音识别生成字幕',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 15,
+                fontWeight: FontWeight.w700,
+                height: 1.5,
+                color: StudyShellTokens.textSecondary,
+              ),
+            ),
+          ],
         );
       case StudyModeTab.shadowing:
         // Use active-line target (not on-screen subtitle mode), so 中文/隐藏字幕
@@ -3621,6 +3647,8 @@ Future<void> _settleChineseFillIfAlreadyPresent() async {
           onBookmarkSentence: state.hasLines
               ? () => _handleBookmarkLine(state.activeLineIndex, courseContext)
               : null,
+          hardsubMosaicEnabled: _hardsubMosaicEnabled,
+          onToggleHardsubMosaic: _setHardsubMosaicEnabled,
           episodeId: widget.episodeId,
           videoSource: _localPlayableVideoPath(),
           onRecordingStarted: ({required bool pauseVideo}) {
@@ -3711,9 +3739,7 @@ Future<void> _settleChineseFillIfAlreadyPresent() async {
           hasLine: usingQueue || state.hasLines,
           isPlaying: state.isPlaying,
           hardsubMosaicEnabled: _hardsubMosaicEnabled,
-          onToggleHardsubMosaic: (bool enabled) {
-            setState(() => _hardsubMosaicEnabled = enabled);
-          },
+          onToggleHardsubMosaic: _setHardsubMosaicEnabled,
           queue: queue,
           queueIndex: usingQueue
               ? _dictationQueueIndex.clamp(0, queue.length - 1)
@@ -3783,6 +3809,8 @@ Future<void> _settleChineseFillIfAlreadyPresent() async {
           },
           onGoToLine: _goToLine,
           onReplayLine: _handleReplayLine,
+          hardsubMosaicEnabled: _hardsubMosaicEnabled,
+          onToggleHardsubMosaic: _setHardsubMosaicEnabled,
           planCurrent: _studyPlanStep,
           planCompleted: _studyPlanDone,
           planStrict: widget.dramaPlan,
@@ -3826,6 +3854,8 @@ Future<void> _settleChineseFillIfAlreadyPresent() async {
         return StudyWordCardsTab(
           cards: cards,
           episodeId: widget.episodeId,
+          hardsubMosaicEnabled: _hardsubMosaicEnabled,
+          onToggleHardsubMosaic: _setHardsubMosaicEnabled,
           onJumpToCard: _handleJumpToWordCard,
           onFavorite: (EpisodeWordCard card) {
             _handleFavoriteWord(card.text);
@@ -4036,8 +4066,11 @@ Future<void> _settleChineseFillIfAlreadyPresent() async {
         state.togglePauseAtSentenceEnd();
       }
       _studyTab = StudyModeTab.shadowing;
-      _hardsubMosaicEnabled = false;
     });
+  }
+
+  void _setHardsubMosaicEnabled(bool enabled) {
+    setState(() => _hardsubMosaicEnabled = enabled);
   }
 
   void _handleToggleShadowing() {

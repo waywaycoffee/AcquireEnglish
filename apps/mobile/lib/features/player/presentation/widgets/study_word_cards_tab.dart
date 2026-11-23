@@ -8,6 +8,7 @@ import '../../../shared/data/word_lookup_service.dart';
 import '../../../shared/domain/word_lookup_entry.dart';
 import '../../../words/data/offline_word_dictionary.dart';
 import '../../domain/episode_word_cards.dart';
+import 'hardsub_mosaic_toggle.dart';
 import 'study_shell_tokens.dart';
 
 /// Episode vocabulary deck + entry to the daily 背单词 plan.
@@ -18,6 +19,8 @@ class StudyWordCardsTab extends ConsumerStatefulWidget {
     this.onFavorite,
     this.onSpeak,
     this.episodeId,
+    this.hardsubMosaicEnabled = false,
+    this.onToggleHardsubMosaic,
     super.key,
   });
 
@@ -28,6 +31,8 @@ class StudyWordCardsTab extends ConsumerStatefulWidget {
 
   /// When set, "今日背单词" opens an episode-scoped review session.
   final String? episodeId;
+  final bool hardsubMosaicEnabled;
+  final ValueChanged<bool>? onToggleHardsubMosaic;
 
   @override
   ConsumerState<StudyWordCardsTab> createState() => _StudyWordCardsTabState();
@@ -142,6 +147,13 @@ class _StudyWordCardsTabState extends ConsumerState<StudyWordCardsTab> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: <Widget>[
+        if (widget.onToggleHardsubMosaic != null) ...<Widget>[
+          HardsubMosaicToggle(
+            enabled: widget.hardsubMosaicEnabled,
+            onChanged: widget.onToggleHardsubMosaic!,
+          ),
+          const SizedBox(height: 4),
+        ],
         Padding(
           padding: const EdgeInsets.fromLTRB(2, 0, 2, 10),
           child: FilledButton.icon(

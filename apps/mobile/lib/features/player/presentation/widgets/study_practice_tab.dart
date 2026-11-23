@@ -3,6 +3,7 @@ import 'dart:math';
 import 'package:flutter/material.dart';
 
 import '../player_mock_state.dart';
+import 'hardsub_mosaic_toggle.dart';
 import 'study_plan_bar.dart';
 import 'study_shell_tokens.dart';
 
@@ -19,6 +20,8 @@ class StudyPracticeTab extends StatefulWidget {
     this.planCompleted,
     this.planStrict = false,
     this.onPlanSelect,
+    this.hardsubMosaicEnabled = false,
+    this.onToggleHardsubMosaic,
     super.key,
   });
 
@@ -34,6 +37,8 @@ class StudyPracticeTab extends StatefulWidget {
   final Set<StudyPlanStep>? planCompleted;
   final bool planStrict;
   final ValueChanged<StudyPlanStep>? onPlanSelect;
+  final bool hardsubMosaicEnabled;
+  final ValueChanged<bool>? onToggleHardsubMosaic;
 
   @override
   State<StudyPracticeTab> createState() => _StudyPracticeTabState();
@@ -281,10 +286,21 @@ class _StudyPracticeTabState extends State<StudyPracticeTab> {
   Widget build(BuildContext context) {
     final StudyShellColors shell = StudyShellColors.of(context);
     final Widget? planBar = _planBar();
+    final Widget? mosaicToggle = widget.onToggleHardsubMosaic == null
+        ? null
+        : HardsubMosaicToggle(
+            enabled: widget.hardsubMosaicEnabled,
+            onChanged: widget.onToggleHardsubMosaic!,
+          );
+
     if (widget.lines.isEmpty || _session.isEmpty) {
       return ListView(
         padding: const EdgeInsets.fromLTRB(12, 8, 12, 24),
         children: <Widget>[
+          if (mosaicToggle != null) ...<Widget>[
+            mosaicToggle,
+            const SizedBox(height: 8),
+          ],
           if (planBar != null) ...<Widget>[
             planBar,
             const SizedBox(height: 12),
@@ -305,6 +321,10 @@ class _StudyPracticeTabState extends State<StudyPracticeTab> {
     return ListView(
       padding: const EdgeInsets.fromLTRB(12, 8, 12, 24),
       children: <Widget>[
+        if (mosaicToggle != null) ...<Widget>[
+          mosaicToggle,
+          const SizedBox(height: 8),
+        ],
         if (planBar != null) ...<Widget>[
           planBar,
           const SizedBox(height: 12),

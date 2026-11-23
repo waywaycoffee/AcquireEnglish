@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../data/dictation_queue_provider.dart';
 import '../../domain/dictation_diff.dart';
 import '../player_mock_state.dart';
+import 'hardsub_mosaic_toggle.dart';
 import 'study_shell_tokens.dart';
 
 /// Shadow Talk–style dictation: input, hint/submit, sentence audio + prev/next.
@@ -129,12 +130,26 @@ class _StudyDictationTabState extends State<StudyDictationTab> {
   Widget build(BuildContext context) {
     final StudyShellColors shell = StudyShellColors.of(context);
     if (!widget.hasLine) {
-      return Center(
-        child: Text(
-          '没有可听写的句子。请先加载字幕或语音识别生成字幕。',
-          textAlign: TextAlign.center,
-          style: TextStyle(color: shell.textSecondary),
-        ),
+      return ListView(
+        padding: const EdgeInsets.fromLTRB(8, 8, 8, 24),
+        children: <Widget>[
+          if (widget.onToggleHardsubMosaic != null) ...<Widget>[
+            HardsubMosaicToggle(
+              key: const ValueKey<String>('dictation-hardsub-mosaic'),
+              enabled: widget.hardsubMosaicEnabled,
+              onChanged: widget.onToggleHardsubMosaic!,
+            ),
+            const SizedBox(height: 12),
+          ],
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 48),
+            child: Text(
+              '没有可听写的句子。请先加载字幕或语音识别生成字幕。',
+              textAlign: TextAlign.center,
+              style: TextStyle(color: shell.textSecondary),
+            ),
+          ),
+        ],
       );
     }
 
@@ -152,23 +167,10 @@ class _StudyDictationTabState extends State<StudyDictationTab> {
             ),
           ),
         if (widget.onToggleHardsubMosaic != null) ...<Widget>[
-          SwitchListTile(
+          HardsubMosaicToggle(
             key: const ValueKey<String>('dictation-hardsub-mosaic'),
-            contentPadding: EdgeInsets.zero,
-            title: Text(
-              '遮挡硬字幕',
-              style: TextStyle(
-                color: shell.textPrimary,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-            subtitle: Text(
-              '拉出马赛克框盖住视频里的字幕',
-              style: TextStyle(color: shell.textSecondary, fontSize: 12),
-            ),
-            value: widget.hardsubMosaicEnabled,
-            activeThumbColor: shell.accent,
-            onChanged: widget.onToggleHardsubMosaic,
+            enabled: widget.hardsubMosaicEnabled,
+            onChanged: widget.onToggleHardsubMosaic!,
           ),
           const SizedBox(height: 8),
         ],

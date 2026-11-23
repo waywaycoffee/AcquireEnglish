@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../player_mock_state.dart';
+import 'hardsub_mosaic_toggle.dart';
 import 'player_subtitle_list.dart';
 import 'subtitle_chunk_highlight.dart';
 
@@ -65,6 +66,8 @@ class PlayerTranscriptPanel extends StatefulWidget {
     this.onDictionaryOpened,
     this.onDictionaryClosed,
     this.fragmentsBySentenceStartMs = const <int, List<PlayerSubtitleLine>>{},
+    this.hardsubMosaicEnabled = false,
+    this.onToggleHardsubMosaic,
     super.key,
   });
 
@@ -128,6 +131,8 @@ class PlayerTranscriptPanel extends StatefulWidget {
   final VoidCallback? onCancelBilingualPipeline;
   final VoidCallback? onDictionaryOpened;
   final VoidCallback? onDictionaryClosed;
+  final bool hardsubMosaicEnabled;
+  final ValueChanged<bool>? onToggleHardsubMosaic;
 
   @override
   State<PlayerTranscriptPanel> createState() => _PlayerTranscriptPanelState();
@@ -202,13 +207,33 @@ class _PlayerTranscriptPanelState extends State<PlayerTranscriptPanel> {
       fragmentsBySentenceStartMs: widget.fragmentsBySentenceStartMs,
     );
 
+    final Widget? mosaicToggle = widget.onToggleHardsubMosaic == null
+        ? null
+        : HardsubMosaicToggle(
+            enabled: widget.hardsubMosaicEnabled,
+            onChanged: widget.onToggleHardsubMosaic!,
+          );
+
     if (widget.studyDarkStyle) {
-      return list;
+      if (mosaicToggle == null) {
+        return list;
+      }
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: <Widget>[
+          mosaicToggle,
+          Expanded(child: list),
+        ],
+      );
     }
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: <Widget>[
+        if (mosaicToggle != null) ...<Widget>[
+          mosaicToggle,
+          const SizedBox(height: 8),
+        ],
         _PanelHeader(
           showCurrentOnly: _showCurrentOnly,
           onViewChanged: (bool showCurrentOnly) {
