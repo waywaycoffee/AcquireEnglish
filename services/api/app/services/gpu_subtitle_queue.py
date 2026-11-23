@@ -230,9 +230,13 @@ def claim():
         db.execute('BEGIN IMMEDIATE')
         db.execute("UPDATE jobs SET state='failed',error='Retry limit reached' WHERE attempts>=4 AND (state='retry' OR (state IN ('transcribing','translating') AND deadline<?))",(time.time(),))
         # Translate-only jobs take seconds on the GPU; run them ahead of ASR.
+        # Prefer translate, then fresh queued rows, then retries — so a burst of
+        # Audio-unavailable retries cannot starve healthy queued work.
         row=db.execute("""SELECT * FROM jobs WHERE
           (state IN ('queued','retry') OR (state IN ('transcribing','translating') AND deadline<?))
-          AND attempts<4 ORDER BY (kind='translate') DESC, updated LIMIT 1""",(time.time(),)).fetchone()
+          AND attempts<4
+          ORDER BY (kind='translate') DESC, (state='queued') DESC, updated
+          LIMIT 1""",(time.time(),)).fetchone()
         if row is None: return None
         lease=uuid.uuid4().hex
         state='translating' if row['kind']=='translate' else 'transcribing'

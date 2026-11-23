@@ -204,9 +204,11 @@ def main(once=False,model='small.en'):
         try:
             job=rpc({'action':'claim'})
         except Exception as exc:
-            print('Queue unavailable',type(exc).__name__,flush=True)
+            # claim() may return {"error": ...} after parking a bad row in retry;
+            # keep polling quickly so healthy queued jobs are not delayed 15s.
+            print('Claim skipped', type(exc).__name__, str(exc)[:80], flush=True)
             if once: raise
-            time.sleep(15)
+            time.sleep(2)
             continue
         if not job:
             if once: break

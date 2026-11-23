@@ -34,14 +34,41 @@ async def run(command):
             part=str(page.get('part') or '').strip()
             if part and part not in title:
                 title=f'{title} · {part}'
+            # Prefer DASH audio; some episodes only expose progressive mp4 (durl)
+            # with muxed A/V — Whisper still accepts that URL as source.
             play=(await client.get('https://api.bilibili.com/x/player/playurl',
               params={'bvid':job['bvid'],'cid':page['cid'],'fnval':16,'qn':16})).json()
-            tracks=(((play.get('data') or {}).get('dash') or {}).get('audio') or [])
-            if not tracks:
+            data=(play.get('data') or {})
+            tracks=(((data.get('dash') or {}).get('audio')) or [])
+            url=None
+            if tracks:
+                track=min(tracks,key=lambda x:x.get('bandwidth',0))
+                url=track.get('baseUrl') or track.get('base_url')
+            if not url:
+                durl=(data.get('durl') or [])
+                if durl:
+                    url=durl[0].get('url') or durl[0].get('backup_url')
+                    if isinstance(url,list):
+                        url=next((u for u in url if u),None)
+            if not url:
+                # Retry once with a richer fnval before giving up.
+                play2=(await client.get('https://api.bilibili.com/x/player/playurl',
+                  params={'bvid':job['bvid'],'cid':page['cid'],'fnval':4048,'qn':16})).json()
+                data2=(play2.get('data') or {})
+                tracks2=(((data2.get('dash') or {}).get('audio')) or [])
+                if tracks2:
+                    track=min(tracks2,key=lambda x:x.get('bandwidth',0))
+                    url=track.get('baseUrl') or track.get('base_url')
+                if not url:
+                    durl2=(data2.get('durl') or [])
+                    if durl2:
+                        url=durl2[0].get('url') or durl2[0].get('backup_url')
+                        if isinstance(url,list):
+                            url=next((u for u in url if u),None)
+            if not url:
                 queue.update(job,'retry','Audio unavailable')
                 return {'error':'Audio unavailable'}
-            track=min(tracks,key=lambda x:x.get('bandwidth',0))
-            return {**job,'url':track.get('baseUrl') or track.get('base_url'),
+            return {**job,'url':url,
               'cid':page['cid'],'duration':page['duration'],'title':title}
     job=command['job']
     if action=='heartbeat':
