@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -6,9 +8,12 @@ import '../../library/presentation/library_catalog_provider.dart';
 import '../../library/presentation/library_mock_data.dart';
 import '../../membership/domain/free_trial_seeds.dart';
 import '../../membership/domain/module_access.dart';
+import '../../settings/presentation/settings_provider.dart';
 import '../../../router/app_router.dart';
 import '../domain/bilibili_import.dart';
 import '../presentation/bilibili_import_sheet.dart';
+import 'bilibili_collection_download.dart';
+import 'bilibili_import_service.dart';
 
 /// Match an already-imported library episode for a Bilibili watch URL / BV.
 ({LibraryCourseData course, LibraryEpisodeItem episode})?
@@ -148,10 +153,95 @@ Future<String?> openBilibiliLearningOrImport(
   if (!context.mounted) {
     return null;
   }
-  return showBilibiliImportSheet(
+  final String? episodeId = await showBilibiliImportSheet(
     context,
     ref,
     initialUrl: url,
     startImmediately: startImportImmediately,
+  );
+  if (episodeId != null &&
+      episodeId.isNotEmpty &&
+      pushPlayer &&
+      context.mounted) {
+    context.pushNamed(
+      SGRoute.player.name,
+      pathParameters: <String, String>{'episodeId': episodeId},
+    );
+  }
+  return episodeId;
+}
+
+/// Ensure the course exists (current ep only), then download remaining 合集 eps.
+Future<void> downloadBilibiliCollectionForWatchUrl(
+  BuildContext context,
+  WidgetRef ref, {
+  required String watchUrl,
+}) async {
+  final String url = watchUrl.trim();
+  if (url.isEmpty) {
+    return;
+  }
+  final String? episodeId = await openBilibiliLearningOrImport(
+    context,
+    ref,
+    watchUrl: url,
+    startImportImmediately: true,
+    pushPlayer: false,
+  );
+  if (!context.mounted) {
+    return;
+  }
+  final List<LibraryCourseData> courses = ref.read(libraryCatalogProvider);
+  LibraryCourseData? course;
+  if (episodeId != null && episodeId.isNotEmpty) {
+    for (final LibraryCourseData c in courses) {
+      if (c.episodes.any((LibraryEpisodeItem e) => e.id == episodeId)) {
+        course = c;
+        break;
+      }
+    }
+  }
+  course ??= findLibraryEpisodeForBilibiliInput(courses, url)?.course;
+  if (course == null) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('请先导入本集，再下载整部合集')),
+    );
+    return;
+  }
+  final int pending = course.episodes
+      .where(
+        (LibraryEpisodeItem e) =>
+            e.videoMissing || (e.videoAsset ?? '').startsWith('http'),
+      )
+      .length;
+  if (pending <= 0) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('合集视频已全部在本地')),
+    );
+    return;
+  }
+  if (isBilibiliCollectionDownloadInFlight(course.id)) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('合集正在下载中…')),
+    );
+    return;
+  }
+  final String cookie =
+      ref.read(learningSettingsProvider).resolvedBilibiliCookieHeader;
+  final ProviderContainer container = ProviderScope.containerOf(context);
+  final String courseId = course.id;
+  unawaited(
+    downloadRemainingBilibiliEpisodes(
+      catalog: container.read(libraryCatalogProvider.notifier),
+      readCourses: () => container.read(libraryCatalogProvider),
+      courseId: courseId,
+      service: BilibiliImportService.withCookie(cookie),
+      progressNotifier: container.read(
+        bilibiliCollectionDownloadProgressProvider.notifier,
+      ),
+    ),
+  );
+  ScaffoldMessenger.of(context).showSnackBar(
+    SnackBar(content: Text('开始下载合集剩余 $pending 集…')),
   );
 }

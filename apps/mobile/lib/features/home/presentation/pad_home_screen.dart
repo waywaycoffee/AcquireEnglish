@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -311,13 +313,32 @@ class DailyRecommendSection extends ConsumerWidget {
                     overflow: TextOverflow.ellipsis,
                     style: const TextStyle(fontWeight: FontWeight.w800),
                   ),
-                  subtitle: Text(subtitle),
-                  trailing: const Icon(Icons.download_rounded),
+                  subtitle: Text(
+                    subtitle.isEmpty
+                        ? '点此试看本集 · 右侧下载合集'
+                        : '$subtitle · 点此试看本集',
+                  ),
+                  trailing: IconButton(
+                    tooltip: '下载合集全部视频',
+                    icon: const Icon(Icons.download_rounded),
+                    onPressed: () {
+                      unawaited(
+                        downloadBilibiliCollectionForWatchUrl(
+                          context,
+                          ref,
+                          watchUrl: item.watchUrl,
+                        ),
+                      );
+                    },
+                  ),
                   onTap: () {
-                    openBilibiliLearningOrImport(
-                      context,
-                      ref,
-                      watchUrl: item.watchUrl,
+                    unawaited(
+                      openBilibiliLearningOrImport(
+                        context,
+                        ref,
+                        watchUrl: item.watchUrl,
+                        startImportImmediately: true,
+                      ),
                     );
                   },
                 ),

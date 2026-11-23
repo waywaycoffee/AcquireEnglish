@@ -5,15 +5,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../utils/url_utils.dart';
 import '../../authentication/presentation/auth_session.dart';
-import '../../library/presentation/library_catalog_provider.dart';
-import '../../library/presentation/library_mock_data.dart';
 import '../../settings/presentation/settings_provider.dart';
 import '../../shared/presentation/media/cover_image.dart';
 import '../../shared/presentation/pad/app_design_tokens.dart';
 import '../../sync/data/acquire_api_client.dart';
 import '../../sync/presentation/daily_feed_provider.dart';
-import '../data/bilibili_collection_download.dart';
-import '../data/bilibili_import_service.dart';
 import '../data/bilibili_open_or_import.dart';
 import 'recommended_bilibili_provider.dart';
 
@@ -130,69 +126,10 @@ class _CreatorCardState extends ConsumerState<_CreatorCard> {
     }
     setState(() => _busy = true);
     try {
-      // Ensure the course exists with at least the tapped episode downloaded.
-      final String? episodeId = await openBilibiliLearningOrImport(
+      await downloadBilibiliCollectionForWatchUrl(
         context,
         ref,
         watchUrl: watchUrl,
-        startImportImmediately: true,
-        pushPlayer: false,
-      );
-      if (!mounted) {
-        return;
-      }
-      final List<LibraryCourseData> courses = ref.read(libraryCatalogProvider);
-      LibraryCourseData? course;
-      if (episodeId != null && episodeId.isNotEmpty) {
-        for (final LibraryCourseData c in courses) {
-          if (c.episodes.any((LibraryEpisodeItem e) => e.id == episodeId)) {
-            course = c;
-            break;
-          }
-        }
-      }
-      course ??= findLibraryEpisodeForBilibiliInput(courses, watchUrl)?.course;
-      if (course == null) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('请先导入本集，再下载整部合集')),
-        );
-        return;
-      }
-      final int pending = course.episodes
-          .where(
-            (LibraryEpisodeItem e) =>
-                e.videoMissing ||
-                (e.videoAsset ?? '').startsWith('http'),
-          )
-          .length;
-      if (pending <= 0) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('合集视频已全部在本地')),
-        );
-        return;
-      }
-      if (isBilibiliCollectionDownloadInFlight(course.id)) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('合集正在下载中…')),
-        );
-        return;
-      }
-      final String cookie =
-          ref.read(learningSettingsProvider).resolvedBilibiliCookieHeader;
-      final ProviderContainer container = ProviderScope.containerOf(context);
-      unawaited(
-        downloadRemainingBilibiliEpisodes(
-          catalog: container.read(libraryCatalogProvider.notifier),
-          readCourses: () => container.read(libraryCatalogProvider),
-          courseId: course.id,
-          service: BilibiliImportService.withCookie(cookie),
-          progressNotifier: container.read(
-            bilibiliCollectionDownloadProgressProvider.notifier,
-          ),
-        ),
-      );
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('开始下载合集剩余 $pending 集…')),
       );
     } finally {
       if (mounted) {
