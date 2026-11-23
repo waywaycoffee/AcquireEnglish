@@ -101,19 +101,8 @@ class _ReadingHubScreenState extends ConsumerState<ReadingHubScreen> {
   }
 
   Future<void> _openBook(BuildContext context, ReadingDoc doc) async {
-    if (readingDocNeedsCloudPrep(doc)) {
-      final ReadingBookPrepStatus prep =
-          await ref.read(readingBookPrepProvider(doc.id).future);
-      if (!context.mounted) return;
-      if (!prep.ready) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('长篇需等云端 AI 处理完才能打开：${prep.progressLabel}'),
-          ),
-        );
-        return;
-      }
-    }
+    // Always open the reader on first tap. Long-novel TTS prep continues
+    // inside the reader; awaiting it here freezes Oz when the API is slow.
     if (!context.mounted) return;
     unawaited(context.push('/reading/${Uri.encodeComponent(doc.id)}'));
   }

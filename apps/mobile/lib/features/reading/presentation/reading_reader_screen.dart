@@ -441,6 +441,23 @@ class _ReadingReaderScreenState extends ConsumerState<ReadingReaderScreen> {
       await _stopContinuous();
       return;
     }
+    if (readingDocNeedsCloudPrep(doc)) {
+      final ReadingBookPrepStatus? prep =
+          ref.read(readingBookPrepProvider(doc.id)).asData?.value;
+      if (prep == null || !prep.ready) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              prep == null
+                  ? '云端 AI 朗读还在确认中，可先阅读正文'
+                  : '朗读预处理中：${prep.progressLabel}（可先阅读）',
+            ),
+          ),
+        );
+        return;
+      }
+    }
     final int generation = ++_continuousGeneration;
     // Never tokenize / synth the whole novel — page-scoped only (crash fix).
     _ensurePages(doc);
@@ -1484,55 +1501,10 @@ class _ReadingReaderScreenState extends ConsumerState<ReadingReaderScreen> {
         body: const Center(child: Text('找不到这篇读物')),
       );
     }
+    // Keep watching long-novel TTS prep so continuous read can use it when
+    // ready — but never block the first paint of the book text.
     if (readingDocNeedsCloudPrep(doc)) {
-      final AsyncValue<ReadingBookPrepStatus> prepAsync =
-          ref.watch(readingBookPrepProvider(doc.id));
-      final ReadingBookPrepStatus? prep = prepAsync.asData?.value;
-      if (prep == null || !prep.ready) {
-        final String label = prep?.progressLabel ?? '正在确认 AI 朗读状态…';
-        final double? bar = prep == null ? null : prep.percent / 100.0;
-        return Scaffold(
-          appBar: AppBar(
-            title: Text(doc.displayTitle),
-            leading: IconButton(
-              icon: const Icon(Icons.arrow_back),
-              onPressed: () => context.pop(),
-            ),
-          ),
-          body: Padding(
-            padding: const EdgeInsets.all(24),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: <Widget>[
-                const Icon(Icons.cloud_sync_rounded, size: 48),
-                const SizedBox(height: 16),
-                Text(
-                  prep == null
-                      ? '正在打开长篇…'
-                      : '长篇小说需先在云端完成 AI 朗读预处理',
-                  textAlign: TextAlign.center,
-                  style: Theme.of(context).textTheme.titleMedium,
-                ),
-                const SizedBox(height: 8),
-                Text(label, textAlign: TextAlign.center),
-                const SizedBox(height: 16),
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(99),
-                  child: LinearProgressIndicator(
-                    value: bar,
-                    minHeight: 6,
-                  ),
-                ),
-                const SizedBox(height: 24),
-                TextButton(
-                  onPressed: () => context.pop(),
-                  child: const Text('返回书架查看进度'),
-                ),
-              ],
-            ),
-          ),
-        );
-      }
+      ref.watch(readingBookPrepProvider(doc.id));
     }
     _ensurePages(doc);
     if (!_opened) {
