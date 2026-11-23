@@ -189,6 +189,52 @@ Future<({String? enPath, String? zhPath})> localSharedBilibiliSubtitlePaths({
   );
 }
 
+int? _cuesEndSec(List<({int startMs, int endMs, String body})> cues) {
+  if (cues.isEmpty) {
+    return null;
+  }
+  int endMs = 0;
+  for (final ({int startMs, int endMs, String body}) cue in cues) {
+    if (cue.endMs > endMs) {
+      endMs = cue.endMs;
+    }
+  }
+  return endMs <= 0 ? null : (endMs / 1000).ceil();
+}
+
+int? _srtTextEndSec(String? srt) {
+  if (srt == null || srt.trim().isEmpty) {
+    return null;
+  }
+  return _cuesEndSec(parseSrtCues(srt));
+}
+
+int? _srtFileEndSec(String? path) {
+  if (!isUsableSubtitlePath(path)) {
+    return null;
+  }
+  try {
+    return _srtTextEndSec(File(path!).readAsStringSync());
+  } catch (_) {
+    return null;
+  }
+}
+
+bool _durationMismatchesExpected({
+  required int? expectedDurationSec,
+  int? candidateDurationSec,
+}) {
+  final int? expected = expectedDurationSec;
+  final int? candidate = candidateDurationSec;
+  if (expected == null || expected <= 0 || candidate == null || candidate <= 0) {
+    return false;
+  }
+  return subtitleTimelineMismatchesMedia(
+    subtitleEndMs: candidate * 1000,
+    mediaDurationMs: expected * 1000,
+  );
+}
+
 /// Lookup shared pack and apply locally. Returns paths written, or null on miss.
 ///
 /// Skips the network round-trip when a bilingual pack is already on disk.
@@ -217,6 +263,14 @@ Future<({String? enPath, String? zhPath})?> tryApplySharedBilibiliSubtitles({
     final bool localZh = isUsableSubtitlePath(local.zhPath);
     String? en = existingEnPath ?? (localEn ? local.enPath : null);
     String? zh = existingZhPath ?? (localZh ? local.zhPath : null);
+    // Drop local/cached tracks that clearly belong to another 分P.
+    if (_durationMismatchesExpected(
+      expectedDurationSec: expectedDurationSec,
+      candidateDurationSec: _srtFileEndSec(en) ?? _srtFileEndSec(zh),
+    )) {
+      en = null;
+      zh = null;
+    }
     if (en != null && zh != null) return (enPath: en, zhPath: zh);
 
     Future<String?> saveTrack(String lang, String? srt) async {
@@ -264,16 +318,12 @@ Future<({String? enPath, String? zhPath})?> tryApplySharedBilibiliSubtitles({
           bvid: ids.bvid, page: ids.page, cid: ids.cid,
         );
         if (pack != null) {
-          final int? expected = expectedDurationSec;
-          final int? packDur = pack.durationSec;
-          if (expected != null &&
-              expected > 0 &&
-              packDur != null &&
-              packDur > 0 &&
-              subtitleTimelineMismatchesMedia(
-                subtitleEndMs: packDur * 1000,
-                mediaDurationMs: expected * 1000,
-              )) {
+          final int? packDur =
+              pack.durationSec ?? _srtTextEndSec(pack.subtitleEnSrt);
+          if (_durationMismatchesExpected(
+            expectedDurationSec: expectedDurationSec,
+            candidateDurationSec: packDur,
+          )) {
             // Wrong-page / 合集串台 pack — do not write under this BV folder.
             return null;
           }
@@ -303,6 +353,7 @@ Future<({String? enPath, String? zhPath})?> requestSharedSubtitlesForDownload({
   String? idKey,
   Future<Directory> Function()? documentsDirectory,
   AcquireApiClient? api,
+  int? expectedDurationSec,
 }) async {
   final AcquireApiClient? client = resolveSharedBilibiliSubtitleApi(api);
   if (client == null) {
@@ -335,6 +386,7 @@ Future<({String? enPath, String? zhPath})?> requestSharedSubtitlesForDownload({
             idKey: folder,
           ),
           documentsDirectory: documentsDirectory,
+          expectedDurationSec: expectedDurationSec,
         );
     if (applied != null) {
       return applied;

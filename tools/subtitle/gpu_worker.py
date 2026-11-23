@@ -176,7 +176,18 @@ def transcribe(recognizer, job, beat=None):
         if beat is not None:
             beat.mark('transcribing', pct=0.38, message='云端正在识别英文字幕…')
         segments,_=recognizer.transcribe(str(audio),language='en',vad_filter=True,beam_size=5)
-        cues=[dict(start=s.start,end=s.end,text=s.text.strip()) for s in segments if s.text.strip()]
+        cues=[]
+        last_mark=0.0
+        for index, segment in enumerate(segments, start=1):
+            text=(segment.text or '').strip()
+            if not text:
+                continue
+            cues.append(dict(start=segment.start,end=segment.end,text=text))
+            if beat is not None and (index == 1 or index % 8 == 0 or time.time()-last_mark > 12):
+                # Whisper segment iterator has no total; climb 0.38→0.60 while streaming.
+                pct=min(0.60, 0.38 + min(index, 80) * 0.0025)
+                beat.mark('transcribing', pct=pct, message=f'语音识别 {index} 句…')
+                last_mark=time.time()
     if not cues: raise ValueError('Empty transcription')
     if beat is not None:
         beat.mark('transcribing', pct=0.62, message=f'识别完成 {len(cues)} 句，准备翻译…')

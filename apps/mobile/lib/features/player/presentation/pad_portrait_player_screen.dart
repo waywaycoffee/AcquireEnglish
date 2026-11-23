@@ -606,6 +606,10 @@ class PadPortraitPlayerScreenState
           ids: ids,
           existingEnPath: enSub,
           existingZhPath: zhSub,
+          expectedDurationSec: () {
+            final int minutes = resource.episode?.durationMinutes ?? 0;
+            return minutes > 0 ? minutes * 60 : null;
+          }(),
         ).timeout(const Duration(seconds: 5), onTimeout: () => null);
         if (!mounted) return;
         enSub ??= recoveredSubtitles?.enPath;
