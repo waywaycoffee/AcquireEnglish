@@ -478,13 +478,15 @@ class SubtitleCompletionStatusNotifier
     for (final SubtitleCompletionJob job in jobs) {
       final SubtitleCompletionEpisodeUi? previous =
           state.byEpisodeId[job.episodeId];
+      final CloudSubtitleJobTrack? cloud =
+          CloudSubtitleJobTracker.instance.forEpisode(job.episodeId);
       final bool jobActive =
           job.status == SubtitleCompletionStatus.pending ||
           job.status == SubtitleCompletionStatus.running;
       // Keep live worker labels across 2s polls; only clear when job leaves
       // the active states (done / failed without retry).
       String? label;
-      if (jobActive) {
+      if (jobActive || cloud != null) {
         if (state.activeEpisodeId == job.episodeId &&
             (state.activeLabel ?? '').trim().isNotEmpty) {
           label = state.activeLabel;
@@ -492,11 +494,18 @@ class SubtitleCompletionStatusNotifier
           label = previous!.label;
         }
       }
+      // Chinese-only local queue rows must not wipe cloud EN needEnglish.
       next[job.episodeId] = SubtitleCompletionEpisodeUi(
         episodeId: job.episodeId,
-        status: job.status,
-        needEnglish: job.needEnglish,
-        needChinese: job.needChinese,
+        status: jobActive
+            ? job.status
+            : (cloud != null
+                  ? SubtitleCompletionStatus.running
+                  : job.status),
+        needEnglish: job.needEnglish ||
+            (cloud?.needEnglish ?? false) ||
+            ((previous?.needEnglish ?? false) && cloud != null),
+        needChinese: job.needChinese || (cloud?.needChinese ?? false),
         label: label,
         lastError: job.lastError,
         attempts: job.attempts,

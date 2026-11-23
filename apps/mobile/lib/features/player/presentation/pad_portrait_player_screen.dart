@@ -387,9 +387,11 @@ class PadPortraitPlayerScreenState
             }
           }
           final SubtitleFillProgressSummary? summary = next.activeFillProgress;
+          // Prefer episode detailLabel — compactLabel like「已完成3（7%）/16」
+          // wipes 英文/云端 keywords and made AI英文 think generation was idle.
           final String label = fill.isFailed
               ? fill.displayLabel
-              : (summary?.compactLabel ?? fill.displayLabel);
+              : (summary?.detailLabel ?? fill.displayLabel);
           final double? progress = fill.isFailed
               ? null
               : (summary?.overallProgress ??
@@ -2059,6 +2061,7 @@ Future<void> _settleChineseFillIfAlreadyPresent() async {
         _bilingualPhase = BilingualPipelinePhase.asrProofreading;
         _bilingualShowAiComplete = false;
         _bilingualPipelineProgress = 0;
+        _englishFillInFlight = need.needEnglish || need.needProofread;
         // Speech owns English — never advertise ZH→EN on open.
         _bilingualPipelineLabel = need.needProofread && !need.needEnglish
             ? '导入后台语音校对英文中…'
@@ -2281,7 +2284,9 @@ Future<void> _settleChineseFillIfAlreadyPresent() async {
     if (lines.isEmpty) {
       return true;
     }
-    return BilingualSubtitlePipeline.shouldAutoStart(lines);
+    final MissingSubtitleSide missing = detectMissingSubtitleSide(lines);
+    return missing == MissingSubtitleSide.english ||
+        missing == MissingSubtitleSide.both;
   }
 
   bool _isEnglishSubtitleGenerationBusy() {
@@ -2291,18 +2296,14 @@ Future<void> _settleChineseFillIfAlreadyPresent() async {
     if (CloudSubtitleJobTracker.instance.forEpisode(widget.episodeId) != null) {
       return true;
     }
-    final String label = (_bilingualPipelineLabel ?? '').trim();
-    if (label.isNotEmpty &&
-        (label.contains('英文') ||
-            label.contains('语音') ||
-            label.contains('云端') ||
-            label.contains('识别') ||
-            label.contains('生成') ||
-            label.contains('补全') ||
-            label.contains('排队') ||
-            label.contains('串台') ||
-            label.contains('%') ||
-            label.contains('已完成'))) {
+    final bool phaseBusy =
+        _bilingualPhase == BilingualPipelinePhase.asrProofreading ||
+        _bilingualPhase == BilingualPipelinePhase.ocrRunning ||
+        _bilingualPhase == BilingualPipelinePhase.ocrSlow ||
+        _bilingualPhase == BilingualPipelinePhase.translating;
+    if (phaseBusy &&
+        (_bilingualPipelineProgress != null ||
+            (_bilingualPipelineLabel ?? '').trim().isNotEmpty)) {
       return true;
     }
     final SubtitleCompletionEpisodeUi? fill = ref
@@ -2311,10 +2312,24 @@ Future<void> _settleChineseFillIfAlreadyPresent() async {
     if (fill == null) {
       return false;
     }
+    final String fillLabel = (fill.label ?? fill.displayLabel).trim();
+    final bool englishishLabel = fillLabel.contains('英文') ||
+        fillLabel.contains('语音') ||
+        fillLabel.contains('云端') ||
+        fillLabel.contains('识别') ||
+        fillLabel.contains('ASR');
+    if (fill.isFailed &&
+        (englishishLabel ||
+            (fill.lastError ?? '').contains('云端') ||
+            (fill.lastError ?? '').contains('等待云端'))) {
+      return true;
+    }
     if (!fill.isActive) {
       return false;
     }
-    return fill.needEnglish || _linesMissingEnglish(state.lines);
+    return fill.needEnglish ||
+        englishishLabel ||
+        _linesMissingEnglish(state.lines);
   }
 
   /// Bottom「AI英文」: show progress / fill gaps — never clear while busy.
@@ -2322,7 +2337,9 @@ Future<void> _settleChineseFillIfAlreadyPresent() async {
     if (!mounted) {
       return;
     }
-    if (_isEnglishSubtitleGenerationBusy()) {
+    if (_isEnglishSubtitleGenerationBusy() ||
+        _bilingualPipelineProgress != null ||
+        CloudSubtitleJobTracker.instance.forEpisode(widget.episodeId) != null) {
       _showMessage(_englishGenerationBusyMessage());
       _ensureEnglishGenerationProgressVisible();
       return;

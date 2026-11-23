@@ -37,6 +37,7 @@ import '../../shared/presentation/pad/pad_compact.dart';
 import '../../shared/presentation/pad/pad_scaffold.dart';
 import '../../shared/presentation/pad/pad_top_bar.dart';
 import '../../import_course/data/bilibili_episode_prepare.dart';
+import '../../subtitle_completion/cloud_subtitle_job_tracker.dart';
 import '../../subtitle_completion/reset_episode_subtitles.dart';
 import '../../subtitle_completion/subtitle_completion_enqueue.dart';
 import '../../subtitle_completion/subtitle_completion_queue.dart';
@@ -1683,18 +1684,24 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
     final SubtitleCompletionEpisodeUi? fill = ref
         .read(subtitleCompletionStatusProvider)
         .forEpisode(episode.id);
-    if (fill != null &&
-        fill.isActive &&
-        ((side == SubtitleResetSide.english && fill.needEnglish) ||
-            (side == SubtitleResetSide.both && fill.needEnglish) ||
-            (side == SubtitleResetSide.chinese && fill.needChinese) ||
-            (side == SubtitleResetSide.both && fill.needChinese))) {
+    final CloudSubtitleJobTrack? cloudTrack =
+        CloudSubtitleJobTracker.instance.forEpisode(episode.id);
+    final bool englishBusy = (fill != null &&
+            fill.isActive &&
+            fill.needEnglish) ||
+        (cloudTrack != null && cloudTrack.needEnglish);
+    final bool chineseBusy =
+        fill != null && fill.isActive && fill.needChinese;
+    if ((side == SubtitleResetSide.english && englishBusy) ||
+        (side == SubtitleResetSide.both && (englishBusy || chineseBusy)) ||
+        (side == SubtitleResetSide.chinese && chineseBusy)) {
+      final String live = (fill?.displayLabel ?? '').trim();
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
-            fill.displayLabel.trim().isEmpty
+            live.isEmpty
                 ? '字幕正在生成中，请稍候（无需重复点击）'
-                : '生成中：${fill.displayLabel}',
+                : '生成中：$live',
           ),
         ),
       );
