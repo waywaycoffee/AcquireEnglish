@@ -16,6 +16,9 @@ Env:
 
 from __future__ import annotations
 
+import asyncio
+import json
+import logging
 import os
 import sys
 from typing import Any
@@ -78,6 +81,37 @@ async def entrypoint(ctx) -> None:
     llm = build_llm()
     tts = build_tts()
     stt = build_stt()
+    if stt is None:
+        raise RuntimeError('Oral coach requires a configured STT provider')
+
+    logger = logging.getLogger(__name__)
+    turn_tasks: set[asyncio.Task] = set()
+    persist_lock = asyncio.Lock()
+
+    async def send(topic: str, payload: dict) -> None:
+        await ctx.room.local_participant.publish_data(
+            json.dumps(payload, ensure_ascii=False).encode(),
+            reliable=True,
+            topic=topic,
+        )
+
+    def spawn(coro) -> None:
+        task = asyncio.create_task(coro)
+        turn_tasks.add(task)
+        def finish(done):
+            turn_tasks.discard(done)
+            if not done.cancelled() and done.exception() is not None:
+                logger.warning('Oral coach background operation failed: %s',
+                               type(done.exception()).__name__)
+        task.add_done_callback(finish)
+
+    async def shutdown() -> None:
+        tasks = list(turn_tasks)
+        for task in tasks:
+            task.cancel()
+        await asyncio.gather(*tasks, return_exceptions=True)
+
+    ctx.add_shutdown_callback(shutdown)
 
     class OralCoachAgent(Agent):
         def __init__(self) -> None:
@@ -86,7 +120,7 @@ async def entrypoint(ctx) -> None:
                 kwargs['stt'] = stt
             super().__init__(**kwargs)
             self._learning_session_id: str | None = None
-            self._room = None
+            self._turn = 0
             self._context: dict[str, Any] = {}
 
         def update_context(self, payload: dict[str, Any]) -> None:
@@ -123,73 +157,49 @@ async def entrypoint(ctx) -> None:
                 text = str(getattr(new_message, 'content', '') or '').strip()
             if not text:
                 return
-            score = await score_pronunciation(
-                transcript=text,
-                reference_text=self._reference(text),
-            )
-            room = self._room
-            tip = ''
-            overall = (score.get('pronunciation') or {}).get('overall')
-            if isinstance(overall, (int, float)) and overall < 0.7:
-                tip = f'Pronunciation tip: aim a bit clearer (score {overall:.0%}).'
-            if room is not None:
-                try:
-                    await room.local_participant.publish_data(
-                        score_payload_bytes(score),
-                        topic='score.partial',
-                    )
-                except Exception:  # noqa: BLE001
-                    pass
-                if tip:
-                    try:
-                        import json as _json
-
-                        await room.local_participant.publish_data(
-                            _json.dumps(
-                                {'coach_text': tip, 'kind': 'pron_tip'},
-                                ensure_ascii=False,
-                            ).encode('utf-8'),
-                            topic='coach.text',
-                        )
-                    except Exception:  # noqa: BLE001
-                        pass
-            self._learning_session_id = await persist_learning_turn(
-                learning_session_id=self._learning_session_id,
-                transcript=text,
-                coach_text=tip,
-                pronunciation=score.get('pronunciation') or {},
-                task_id=str(self._context.get('task_id') or 'livekit-oral'),
-            )
-            ctx_bits = []
+            self._turn += 1
+            turn = self._turn
+            logger.info('Oral turn accepted room=%s turn=%s', ctx.room.name, turn)
+            spawn(send('coach.turn', {'turn': turn, 'text': text}))
+            reference = self._reference(text)
+            task_id = str(self._context.get('task_id') or 'livekit-oral')
+            spawn(self._record_turn(text, reference, task_id))
             if self._context.get('current_english'):
-                ctx_bits.append(
+                turn_ctx.add_instructions(
                     f'Stay on video line: "{str(self._context["current_english"])[:160]}".'
                 )
-            if tip:
-                ctx_bits.append(tip)
-            if ctx_bits:
-                turn_ctx.add_instructions(
-                    f'The learner just said: "{text}". ' + ' '.join(ctx_bits)
-                    + ' Keep coaching gently.'
+
+        async def _record_turn(self, text, reference, task_id):
+            score = await score_pronunciation(transcript=text, reference_text=reference)
+            await ctx.room.local_participant.publish_data(
+                score_payload_bytes(score), topic='score.partial',
+            )
+            async with persist_lock:
+                self._learning_session_id = await persist_learning_turn(
+                    learning_session_id=self._learning_session_id,
+                    transcript=text,
+                    coach_text='',
+                    pronunciation=score.get('pronunciation') or {},
+                    task_id=task_id,
                 )
 
     await ctx.connect(auto_subscribe=AutoSubscribe.AUDIO_ONLY)
     await ctx.wait_for_participant()
     agent = OralCoachAgent()
-    agent._room = ctx.room
+    ready = False
 
     @ctx.room.on('data_received')
-    def _on_data(data: bytes, participant=None, kind=None, topic: str | None = None):  # noqa: ANN001
-        if topic not in (None, 'coach.context'):
+    def _on_data(packet):
+        if packet.topic != 'coach.context':
             return
         try:
-            import json as _json
-
-            payload = _json.loads(data.decode('utf-8'))
-            if isinstance(payload, dict):
-                agent.update_context(payload)
-        except Exception:  # noqa: BLE001
-            pass
+            payload = json.loads(packet.data)
+        except (ValueError, TypeError):
+            return
+        if isinstance(payload, dict):
+            agent.update_context(payload)
+            if ready:
+                spawn(send('coach.ready', {'ready': True}))
 
     session_kwargs: dict = {
         'vad': silero.VAD.load(),
@@ -208,7 +218,15 @@ async def entrypoint(ctx) -> None:
     if stt is not None:
         session_kwargs['stt'] = stt
     session = AgentSession(**session_kwargs)
+    @session.on('conversation_item_added')
+    def _on_message(event):
+        item = event.item
+        if item.role == 'assistant' and item.text_content:
+            spawn(send('coach.text', {'text': item.text_content, 'turn': agent._turn}))
+
     await session.start(room=ctx.room, agent=agent)
+    ready = True
+    await send('coach.ready', {'ready': True})
 
 
 def run() -> None:

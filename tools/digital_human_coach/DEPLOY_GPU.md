@@ -10,6 +10,19 @@
 ECS oral_coach 的 `LIVETALKING_URL` 应设为 `http://100.115.252.55:8010`（ECS 已在同一 tailnet）。  
 App「LiveTalking / 数字人地址」填同一地址；手机也需登录 Tailscale。
 
+## 语音优先上线
+
+先更新 Agent，再分发新版 App。新版 App 等待 Agent 的 `coach.ready`，
+旧 Agent 缺少此消息时会回到按住说话。用 `coach.turn` 确认识别已提交，
+用 `coach.text` 显示回复。本轮评分和学习记录写入在后台执行。
+
+先在关闭 GPU 数字人、口型和后台生成任务的情况下测实时语音。
+用 `nvidia-smi --query-gpu=name,memory.total,memory.used,utilization.gpu --format=csv`
+记录实际显存版本、空闲显存和峰值负载。测试单路语音、语音叠加字幕生成、
+两路语音三个场景，记录首段音频延迟、响应超时和显存峰值。
+语音稳定后才评估本地全双工模型，先以单路测试。播客脚本和检索可独立在
+CPU 或云端执行，音频产物按项目规则通过 ECS 提供。
+
 ## 1. 拉取仓库
 
 ```bash

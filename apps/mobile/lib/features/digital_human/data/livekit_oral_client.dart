@@ -15,6 +15,11 @@ typedef LiveKitAgentTextHandler = void Function(String text);
 /// can hear the learner. HTTP hold-to-talk must be paused while duplex is on.
 class LiveKitOralClient {
   Room? _room;
+  bool _agentReady = false;
+  String? _agentIdentity;
+  Timer? _replyTimeout;
+  void Function()? onUnavailable;
+  LiveKitAgentTextHandler? onUserText;
   EventsListener<RoomEvent>? _listener;
   LiveKitScoreHandler? onScore;
   LiveKitStatusHandler? onStatus;
@@ -43,32 +48,18 @@ class LiveKitOralClient {
       throw StateError('LiveKit 未配置或 token 无效。');
     }
     final Room room = Room(
-      roomOptions: const RoomOptions(
-        adaptiveStream: true,
-        dynacast: true,
-      ),
+      roomOptions: const RoomOptions(adaptiveStream: true, dynacast: true),
     );
-    await room.connect(url, creds.token);
-    try {
-      await room.localParticipant?.setMicrophoneEnabled(enableMicrophone);
-    } catch (_) {}
-
+    onStatus?.call('正在连接实时语音…');
     _room = room;
-    if (context != null && context.isNotEmpty) {
-      await publishContext(context);
-    }
-
     final EventsListener<RoomEvent> listener = room.createListener();
     _listener = listener;
     listener
-      ..on<ParticipantConnectedEvent>((ParticipantConnectedEvent event) {
-        onStatus?.call('外教 Agent 已进房：${event.participant.identity}');
-      })
-      ..on<TrackSubscribedEvent>((TrackSubscribedEvent event) {
-        onStatus?.call(
-          '已订阅 Agent ${event.track.kind.name}'
-          '（${event.participant.identity}）',
-        );
+      ..on<RoomDisconnectedEvent>((_) => onUnavailable?.call())
+      ..on<ParticipantDisconnectedEvent>((event) {
+        if (event.participant.identity == _agentIdentity) {
+          onUnavailable?.call();
+        }
       })
       ..on<DataReceivedEvent>((DataReceivedEvent event) {
         final String? topic = event.topic;
@@ -77,75 +68,66 @@ class LiveKitOralClient {
           final Object? decoded = jsonDecode(raw);
           final Map<String, dynamic>? map = decoded is Map<String, dynamic>
               ? decoded
-              : (decoded is Map
-                  ? Map<String, dynamic>.from(decoded)
-                  : null);
+              : (decoded is Map ? Map<String, dynamic>.from(decoded) : null);
           if (map == null) return;
-          if (topic == null ||
-              topic == 'score.partial' ||
-              topic == 'score') {
+          final participant = event.participant;
+          if (participant == null) return;
+          if (topic == 'coach.ready' && map['ready'] == true) {
+            _agentReady = true;
+            _agentIdentity = participant.identity;
+            return;
+          }
+          if (participant.identity != _agentIdentity) return;
+          if (topic == 'coach.turn') {
+            _replyTimeout?.cancel();
+            _replyTimeout = Timer(const Duration(seconds: 15), () {
+              onUnavailable?.call();
+            });
+            final text = map['text'];
+            if (text is String && text.trim().isNotEmpty)
+              onUserText?.call(text);
+            return;
+          }
+
+          if (topic == null || topic == 'score.partial' || topic == 'score') {
             onScore?.call(map);
           }
           if (topic == 'coach.text' || map['coach_text'] is String) {
-            final String text = '${map['coach_text'] ?? map['text'] ?? ''}'.trim();
+            _replyTimeout?.cancel();
+            final String text = '${map['coach_text'] ?? map['text'] ?? ''}'
+                .trim();
             if (text.isNotEmpty) onAgentText?.call(text);
           }
         } catch (_) {}
       });
 
-    onStatus?.call(
-      enableMicrophone
-          ? '全双工已接通 · ${creds.room}'
-          : '已加入 LiveKit 房间 ${creds.room}（仅听）',
-    );
-    return room;
-  }
-
-  bool get hasRemoteParticipant {
-    final Room? room = _room;
-    if (room == null) return false;
-    return room.remoteParticipants.isNotEmpty;
-  }
-
-  /// Wait until a remote agent joins, or [timeout] elapses.
-  Future<bool> awaitRemoteParticipant({
-    Duration timeout = const Duration(seconds: 8),
-  }) async {
-    final Room? room = _room;
-    if (room == null) return false;
-    if (room.remoteParticipants.isNotEmpty) return true;
-
-    final Completer<bool> done = Completer<bool>();
-    Timer? timer;
-    EventsListener<RoomEvent>? waitListener;
-    void finish(bool value) {
-      if (done.isCompleted) return;
-      done.complete(value);
-      timer?.cancel();
-      final EventsListener<RoomEvent>? toDispose = waitListener;
-      waitListener = null;
-      if (toDispose != null) {
-        unawaited(
-          () async {
-            try {
-              await toDispose.dispose();
-            } catch (_) {}
-          }(),
+    try {
+      await room.connect(url, creds.token).timeout(const Duration(seconds: 15));
+      if (_room != room) throw StateError('语音连接已取消');
+      if (enableMicrophone) {
+        final publication = await room.localParticipant?.setMicrophoneEnabled(
+          true,
         );
+        if (publication == null) throw StateError('麦克风未发布');
       }
+      if (context != null) await publishContext(context);
+      return room;
+    } catch (_) {
+      if (_room == room) await disconnect();
+      rethrow;
     }
+  }
 
-    waitListener = room.createListener()
-      ..on<ParticipantConnectedEvent>((_) => finish(true))
-      ..on<TrackSubscribedEvent>((_) => finish(true));
-    // Cover the race where the agent joined between the emptiness check and
-    // listener attachment.
-    if (room.remoteParticipants.isNotEmpty) {
-      finish(true);
-    } else {
-      timer = Timer(timeout, () => finish(false));
+  Future<bool> awaitAgentReady(Map<String, dynamic> context) async {
+    final Room? room = _room;
+    final Stopwatch elapsed = Stopwatch()..start();
+    while (room != null && identical(room, _room) && isConnected) {
+      if (_agentReady) return true;
+      if (elapsed.elapsed >= const Duration(seconds: 8)) break;
+      await publishContext(context);
+      await Future<void>.delayed(const Duration(milliseconds: 500));
     }
-    return done.future;
+    return false;
   }
 
   Future<void> setMicrophoneEnabled(bool enabled) async {
@@ -159,22 +141,21 @@ class LiveKitOralClient {
     if (local == null) return;
     try {
       final List<int> bytes = utf8.encode(jsonEncode(context));
-      await local.publishData(
-        bytes,
-        reliable: true,
-        topic: 'coach.context',
-      );
+      await local.publishData(bytes, reliable: true, topic: 'coach.context');
     } catch (_) {}
   }
 
   Future<void> disconnect() async {
+    _replyTimeout?.cancel();
+    _agentReady = false;
+    _agentIdentity = null;
+    final Room? room = _room;
+    _room = null;
     final EventsListener<RoomEvent>? listener = _listener;
     _listener = null;
     try {
       await listener?.dispose();
     } catch (_) {}
-    final Room? room = _room;
-    _room = null;
     if (room == null) {
       return;
     }

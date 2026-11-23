@@ -1299,6 +1299,23 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
     String? openingToSpeak,
   }) async {
     _liveKit
+      ..onUnavailable = () {
+        if (!mounted || !_duplexLive) return;
+        setState(() {
+          _duplexLive = false;
+          _liveKitStatus = '语音连接已中断';
+          _status = '实时语音暂无回应，请按住麦克风继续';
+        });
+        unawaited(_liveKit.disconnect());
+      }
+      ..onUserText = (String text) {
+        if (!mounted) return;
+        setState(() {
+          _bubbles.add(_ChatBubble(role: 'user', text: text));
+          _status = '外教正在回答…';
+        });
+        _scrollChatToEnd();
+      }
       ..onStatus = (String status) {
         if (!mounted) return;
         setState(() {
@@ -1327,8 +1344,8 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
       if (!mounted) return;
       // Room join alone is not enough — without the GPU oral agent, duplex
       // would mute hold-to-talk and leave the learner unable to converse.
-      final bool agentPresent = await _liveKit.awaitRemoteParticipant(
-        timeout: const Duration(seconds: 8),
+      final bool agentPresent = await _liveKit.awaitAgentReady(
+        _liveKitContextPayload(),
       );
       if (!mounted) return;
       if (!agentPresent) {
@@ -1336,7 +1353,7 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
         if (!mounted) return;
         setState(() {
           _duplexLive = false;
-          _liveKitStatus = '外教 Agent 未进房';
+          _liveKitStatus = '外教语音服务未就绪';
           _status = '全双工暂不可用，请按住麦克风说话';
         });
         if (openingToSpeak != null && openingToSpeak.trim().isNotEmpty) {
