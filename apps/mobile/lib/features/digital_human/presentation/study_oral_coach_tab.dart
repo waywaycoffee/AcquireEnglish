@@ -242,17 +242,6 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
   int _lastRoundTurns = 0;
   List<String> _lastRoundExpressions = const <String>[];
   bool _duplexLive = false;
-  bool _showCoachGestures = false;
-  bool _coachEncouraging = false;
-  Timer? _coachGestureTimer;
-
-  void _encourageLearner() {
-    if (!mounted || !_showCoachGestures || _coachEncouraging) return;
-    setState(() => _coachEncouraging = true);
-    _coachGestureTimer = Timer(const Duration(milliseconds: 1300), () {
-      if (mounted) setState(() => _coachEncouraging = false);
-    });
-  }
   bool _duplexLearnerSpeaking = false;
   bool _duplexAgentSpeaking = false;
   bool _podcastPlaying = false;
@@ -496,7 +485,6 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
 
   @override
   void dispose() {
-    _coachGestureTimer?.cancel();
     _idlePromptTimer?.cancel();
     _liveSceneTimer?.cancel();
     unawaited(_liveSceneCamera.stop());
@@ -1495,7 +1483,6 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
           _bubbles.add(_ChatBubble(role: 'user', text: text));
           _status = '外教正在回答…';
         });
-        _encourageLearner();
         _scrollChatToEnd();
       }
       ..onStatus = (String status) {
@@ -2001,7 +1988,6 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
     );
     if (!mounted || !identical(_session, session)) return;
     widget.onConfirmedLearnerTurn?.call(confirmed);
-    _encourageLearner();
     _difficulty = turn.difficulty;
     final OralExpressionDiagnosis? diagnosis =
         turn.diagnosis ??
@@ -3347,9 +3333,6 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
           )
         : null;
 
-    final String? spriteAsset = persona.hasCartoonAtlas && _showCoachGestures
-        ? persona.cartoonAssetPath
-        : null;
     final Widget avatarStage = Stack(
       fit: StackFit.expand,
       children: <Widget>[
@@ -3359,8 +3342,6 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
           listening: avatarListening,
           label: stageLabel,
           imageAsset: persona.assetPath,
-        spriteAsset: spriteAsset,
-        encouraging: _coachEncouraging,
           displayName: persona.displayName,
           liveVideo: liveVideo,
         ),
@@ -3485,26 +3466,12 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
       ],
     );
 
-    final Widget stage = widget.articleExcerpt.trim().isEmpty &&
-        !persona.hasCartoonAtlas
+    final Widget stage = widget.articleExcerpt.trim().isEmpty
         ? avatarStage
         : Stack(
             fit: StackFit.expand,
             children: [
               avatarStage,
-              if (persona.hasCartoonAtlas)
-                Positioned(
-                  left: 18,
-                  bottom: 38,
-                  child: ActionChip(
-                    avatar: const Icon(Icons.front_hand_outlined),
-                    label: Text(_showCoachGestures ? '手势已开启' : '开启手势'),
-                    onPressed: () {
-                      setState(() => _showCoachGestures = !_showCoachGestures);
-                      _encourageLearner();
-                    },
-                  ),
-                ),
               if (widget.articleExcerpt.trim().isNotEmpty)
                 Positioned(
                   right: 18,
