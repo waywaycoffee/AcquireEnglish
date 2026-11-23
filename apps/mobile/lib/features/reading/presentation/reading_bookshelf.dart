@@ -2,9 +2,11 @@ import 'dart:math' as math;
 import 'dart:ui' show PathMetric;
 
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../domain/reading_doc.dart';
 import 'reading_book_cover.dart';
+import 'reading_book_prep_provider.dart';
 import 'reading_bookshelf_theme.dart';
 import 'reading_stats_row.dart';
 
@@ -631,19 +633,13 @@ class _ShelfRow extends StatelessWidget {
           bottom: 0,
           width: colW,
           height: h,
-          child: GestureDetector(
-            behavior: HitTestBehavior.opaque,
-            onTap: () => onOpenBook(doc),
+          child: _ShelfStandingBook(
+            doc: doc,
+            paletteIndex: rowIndex * columns + i,
+            subtitle: _subtitleFor(doc),
+            onOpen: () => onOpenBook(doc),
             onLongPress:
                 onLongPressBook == null ? null : () => onLongPressBook!(doc),
-            child: ReadingBookCover(
-              title: doc.displayTitle,
-              level: doc.level,
-              subtitle: _subtitleFor(doc),
-              standing: true,
-              paletteIndex: rowIndex * columns + i,
-              coverUrl: doc.coverUrl,
-            ),
           ),
         ),
       );
@@ -716,6 +712,108 @@ class _ShelfRow extends StatelessWidget {
     if (course.isNotEmpty && course != doc.title.trim()) return course;
     final String level = doc.level.trim();
     return level.isEmpty ? '' : 'Level $level';
+  }
+}
+
+/// Standing hardcover + AI prep caption along the bottom edge when unfinished.
+class _ShelfStandingBook extends ConsumerWidget {
+  const _ShelfStandingBook({
+    required this.doc,
+    required this.paletteIndex,
+    required this.subtitle,
+    required this.onOpen,
+    this.onLongPress,
+  });
+
+  final ReadingDoc doc;
+  final int paletteIndex;
+  final String subtitle;
+  final VoidCallback onOpen;
+  final VoidCallback? onLongPress;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final bool needsPrep = readingDocNeedsCloudPrep(doc);
+    final ReadingBookPrepStatus? prep = needsPrep
+        ? ref.watch(readingBookPrepProvider(doc.id)).asData?.value
+        : null;
+    final bool checking = needsPrep && prep == null;
+    final bool pending = needsPrep && prep != null && !prep.ready;
+    final String? caption = !needsPrep
+        ? null
+        : pending
+            ? (prep!.pagesTotal > 0
+                ? 'AI ${prep.percent}%'
+                : 'AI 配音中')
+            : checking
+                ? '确认配音…'
+                : null;
+
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: onOpen,
+      onLongPress: onLongPress,
+      child: Stack(
+        fit: StackFit.expand,
+        children: <Widget>[
+          ReadingBookCover(
+            title: doc.displayTitle,
+            level: doc.level,
+            subtitle: subtitle,
+            standing: true,
+            paletteIndex: paletteIndex,
+            coverUrl: doc.coverUrl,
+          ),
+          if (caption != null)
+            Positioned(
+              left: 4,
+              right: 4,
+              bottom: 4,
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  color: const Color(0xE8FFF8EF),
+                  borderRadius: BorderRadius.circular(6),
+                  border: Border.all(color: const Color(0x662563EB)),
+                ),
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(5, 4, 5, 5),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    mainAxisSize: MainAxisSize.min,
+                    children: <Widget>[
+                      Text(
+                        caption,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(
+                          fontFamily: _serif,
+                          fontSize: 10,
+                          height: 1.1,
+                          fontWeight: FontWeight.w700,
+                          color: Color(0xFF1D4ED8),
+                        ),
+                      ),
+                      const SizedBox(height: 3),
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(99),
+                        child: LinearProgressIndicator(
+                          value: checking
+                              ? null
+                              : (prep!.percent / 100.0).clamp(0.0, 1.0),
+                          minHeight: 3,
+                          backgroundColor: const Color(0x332563EB),
+                          color: const Color(0xFF2563EB),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
   }
 }
 

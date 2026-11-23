@@ -558,6 +558,96 @@ def _page_ready(*, doc_id: str, voice: str, page_index: int) -> bool:
 BOOK_PACK_VOICES = frozenset({"longanfengyue", "longze_v3.1"})
 
 
+def _find_ready_book_donor(
+    *, text_hash: str, voice: str, exclude_doc: str = ""
+) -> sqlite3.Row | None:
+    """Another doc_id that already finished the same novel+voice packs."""
+    digest = (text_hash or "").strip()
+    voice_id = (voice or "").strip()
+    if not digest or not voice_id:
+        return None
+    with connection() as db:
+        row = db.execute(
+            "SELECT doc_id, pages_total, text_hash FROM book_jobs "
+            "WHERE text_hash=? AND voice=? AND state='ready' AND doc_id!=? "
+            "ORDER BY updated DESC LIMIT 1",
+            (digest, voice_id, (exclude_doc or "").strip()),
+        ).fetchone()
+    if row is None:
+        return None
+    pages_total = int(row["pages_total"] or 0)
+    if pages_total <= 0:
+        return None
+    donor = str(row["doc_id"])
+    # Require the shared pack files to actually exist.
+    ready_pages = sum(
+        1
+        for idx in range(pages_total)
+        if _page_ready(doc_id=donor, voice=voice_id, page_index=idx)
+    )
+    if ready_pages < pages_total:
+        return None
+    return row
+
+
+def adopt_ready_book_packs(
+    *,
+    doc_id: str,
+    voice: str,
+    donor_doc_id: str,
+    pages_total: int,
+    text_hash: str,
+) -> dict:
+    """Copy finished packs under a new doc_id so shelf/status share one novel."""
+    import shutil
+
+    doc = (doc_id or "").strip()
+    donor = (donor_doc_id or "").strip()
+    voice_id = (voice or "").strip() or "longanfengyue"
+    total = int(pages_total)
+    if not doc or not donor or total <= 0:
+        raise ValueError("adopt_ready_book_packs requires doc, donor, pages")
+    src_dir = (
+        cm.namespace_root("reading")
+        / f"packs/{doc_segment(donor)}/{rsc.voice_segment(voice_id)}"
+    )
+    dst_dir = (
+        cm.namespace_root("reading")
+        / f"packs/{doc_segment(doc)}/{rsc.voice_segment(voice_id)}"
+    )
+    dst_dir.mkdir(parents=True, exist_ok=True)
+    for idx in range(total):
+        src = src_dir / f"page-{idx}.json"
+        if not src.is_file():
+            continue
+        dst = dst_dir / f"page-{idx}.json"
+        if dst.is_file():
+            continue
+        try:
+            pack = json.loads(src.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            shutil.copy2(src, dst)
+            continue
+        if isinstance(pack, dict):
+            pack = {**pack, "doc_id": doc, "adopted_from": donor}
+            dst.write_text(
+                json.dumps(pack, ensure_ascii=False, indent=2), encoding="utf-8"
+            )
+        else:
+            shutil.copy2(src, dst)
+    now = time.time()
+    with connection() as db:
+        db.execute(
+            "INSERT INTO book_jobs(doc_id,voice,pages_total,text_hash,state,error,updated) "
+            "VALUES(?,?,?,?,?,?,?) "
+            "ON CONFLICT(doc_id,voice) DO UPDATE SET "
+            "pages_total=excluded.pages_total, text_hash=excluded.text_hash, "
+            "state='ready', error=NULL, updated=excluded.updated",
+            (doc, voice_id, total, text_hash, "ready", None, now),
+        )
+    return book_status(doc_id=doc, voice=voice_id)
+
+
 def enqueue_book(
     *,
     doc_id: str,
@@ -578,6 +668,34 @@ def enqueue_book(
     if not pages or (len(pages) == 1 and not pages[0].strip()):
         raise ValueError("empty book text")
     text_hash = rsc.speech_hash(text[:8000], voice=voice_id, language="en")
+
+    # Same novel under another doc_id (catalog_* vs se:… / re-import) — reuse packs.
+    donor = _find_ready_book_donor(
+        text_hash=text_hash, voice=voice_id, exclude_doc=doc
+    )
+    if donor is not None:
+        return adopt_ready_book_packs(
+            doc_id=doc,
+            voice=voice_id,
+            donor_doc_id=str(donor["doc_id"]),
+            pages_total=int(donor["pages_total"]),
+            text_hash=text_hash,
+        )
+
+    # Already finished for this doc_id — do not reset to queued / re-upload.
+    existing = book_status(doc_id=doc, voice=voice_id)
+    if existing.get("ready") and int(existing.get("pages_total") or 0) >= len(pages):
+        with connection() as db:
+            db.execute(
+                "INSERT INTO book_jobs(doc_id,voice,pages_total,text_hash,state,error,updated) "
+                "VALUES(?,?,?,?,?,?,?) "
+                "ON CONFLICT(doc_id,voice) DO UPDATE SET "
+                "pages_total=excluded.pages_total, text_hash=excluded.text_hash, "
+                "state='ready', error=NULL, updated=excluded.updated",
+                (doc, voice_id, len(pages), text_hash, "ready", None, time.time()),
+            )
+        return {**existing, "text_hash": text_hash, "message": "already_ready"}
+
     job_ids: list[str] = []
     for index, page in enumerate(pages):
         job = enqueue(
@@ -595,7 +713,8 @@ def enqueue_book(
             "VALUES(?,?,?,?,?,?,?) "
             "ON CONFLICT(doc_id,voice) DO UPDATE SET "
             "pages_total=excluded.pages_total, text_hash=excluded.text_hash, "
-            "state='queued', error=NULL, updated=excluded.updated",
+            "state=CASE WHEN book_jobs.state='ready' THEN 'ready' ELSE 'queued' END, "
+            "error=NULL, updated=excluded.updated",
             (doc, voice_id, len(pages), text_hash, "queued", None, now),
         )
     return book_status(doc_id=doc, voice=voice_id)

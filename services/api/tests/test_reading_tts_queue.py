@@ -108,6 +108,65 @@ def test_split_sentences_caps(tmp_path: Path, monkeypatch) -> None:
     assert len(parts) <= rtq.MAX_SENTENCES
 
 
+def test_enqueue_book_adopts_ready_packs_by_text_hash(
+    tmp_path: Path, monkeypatch
+) -> None:
+    monkeypatch.setenv("MEDIA_CACHE_DIR", str(tmp_path))
+    from app.config import settings
+
+    settings.media_cache_dir = str(tmp_path)
+    text = (
+        "Dorothy lived in the midst of the great Kansas prairies with Uncle Henry. "
+        * 400
+    )
+    # Seed enough words to pass long-novel gate callers; enqueue_book itself
+    # does not check word count, only pages.
+    first = rtq.enqueue_book(
+        doc_id="catalog_wizard_a",
+        voice="longanfengyue",
+        text=text,
+        user_id=1,
+    )
+    assert first["pages_total"] >= 1
+    # Mark every page ready by writing packs + book_jobs.
+    pages_total = int(first["pages_total"])
+    for idx in range(pages_total):
+        rtq.write_packs(
+            doc_id="catalog_wizard_a",
+            voice="longanfengyue",
+            page_index=idx,
+            payload={
+                "sentences": [
+                    {
+                        "text": f"page {idx}",
+                        "hash": f"h{idx}",
+                        "audio_url": f"https://example/{idx}.mp3",
+                        "ready": True,
+                    }
+                ]
+            },
+            user_ids=[1],
+        )
+    status_a = rtq.book_status(doc_id="catalog_wizard_a", voice="longanfengyue")
+    assert status_a["ready"] is True
+
+    adopted = rtq.enqueue_book(
+        doc_id="se:l-frank-baum/the-wonderful-wizard-of-oz",
+        voice="longanfengyue",
+        text=text,
+        user_id=2,
+    )
+    assert adopted["ready"] is True
+    assert adopted["doc_id"] == "se:l-frank-baum/the-wonderful-wizard-of-oz"
+    pack = rtq.load_shared_pack(
+        doc_id="se:l-frank-baum/the-wonderful-wizard-of-oz",
+        voice="longanfengyue",
+        page_index=0,
+    )
+    assert pack is not None
+    assert pack.get("adopted_from") == "catalog_wizard_a"
+
+
 def test_requeue_stale_working_frees_abandoned_leases(
     tmp_path: Path, monkeypatch
 ) -> None:

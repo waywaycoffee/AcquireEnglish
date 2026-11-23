@@ -95,13 +95,20 @@ final readingBookPrepProvider = StreamProvider.autoDispose
   final AcquireApiClient api = ref.read(acquireApiClientProvider);
   final String voice = loadReadingTtsGender().aliyunVoiceId;
 
-  // Kick cloud queue + ECS CosyVoice drain (5060 Ti worker may also claim).
-  Map<String, dynamic>? latest = await api.enqueueReadingBookPregen(
-    docId: doc.id,
-    text: doc.plainText,
-    voice: voice,
-    processOnEcs: true,
-  );
+  // Prefer a cheap status GET first. Re-POSTing the full novel on every shelf
+  // watch used to time out and make ready Oz look "missing".
+  Map<String, dynamic>? latest =
+      await api.readingBookPregenStatus(docId: doc.id, voice: voice);
+  final bool alreadyReady = latest != null && latest['ready'] == true;
+  if (!alreadyReady) {
+    latest = await api.enqueueReadingBookPregen(
+          docId: doc.id,
+          text: doc.plainText,
+          voice: voice,
+          processOnEcs: true,
+        ) ??
+        latest;
+  }
   DateTime progressAnchor = DateTime.now();
   DateTime lastFallbackAt = DateTime.fromMillisecondsSinceEpoch(0);
   int lastPercent = -1;
