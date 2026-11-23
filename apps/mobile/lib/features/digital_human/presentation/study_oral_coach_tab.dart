@@ -326,8 +326,11 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
   bool _tutorFsrsWritten = false;
   final LiveSceneCamera _liveSceneCamera = LiveSceneCamera();
 
+  bool get _hasTutorMaterial =>
+      widget.standalone && widget.articleExcerpt.trim().isNotEmpty;
+
   bool get _isGuidedTutorLesson =>
-      !_podcastPausedForQuestion && !_podcastPlaying && widget.standalone && widget.articleExcerpt.trim().isNotEmpty;
+      _hasTutorMaterial && !_podcastPausedForQuestion && !_podcastPlaying;
 
   List<String> get _tutorLines => tutorSourceLines(widget.articleExcerpt);
   Timer? _liveSceneTimer;
@@ -3624,7 +3627,7 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
             ],
           ),
         ),
-        child: widget.standalone
+        child: _hasTutorMaterial
             ? LayoutBuilder(
                 builder: (BuildContext context, BoxConstraints constraints) {
                   return _buildTutorClassroomLayout(
