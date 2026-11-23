@@ -14,6 +14,7 @@ class CoachAvatarStage extends StatelessWidget {
     this.imageAsset,
     this.spriteAsset,
     this.encouraging = false,
+    this.thinking = false,
     this.displayName,
     this.liveVideo,
     super.key,
@@ -25,6 +26,7 @@ class CoachAvatarStage extends StatelessWidget {
   final String label;
   final String? spriteAsset;
   final bool encouraging;
+  final bool thinking;
   final String? imageAsset;
   final String? displayName;
 
@@ -105,12 +107,17 @@ class CoachAvatarStage extends StatelessWidget {
                               asset: spriteAsset!,
                               mouth: CoachViseme.closed,
                               phase: t,
+                              transitionDuration: reduceMotion
+                                  ? Duration.zero
+                                  : const Duration(milliseconds: 90),
                               motion: encouraging
                                   ? CoachMotion.encouraging
                                   : speaking
                                   ? CoachMotion.speaking
                                   : listening
                                   ? CoachMotion.listening
+                                  : thinking
+                                  ? CoachMotion.thinking
                                   : CoachMotion.idle,
                             ),
                           ),

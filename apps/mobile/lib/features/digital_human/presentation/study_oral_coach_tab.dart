@@ -244,6 +244,18 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
   bool _duplexLive = false;
   bool _duplexLearnerSpeaking = false;
   bool _duplexAgentSpeaking = false;
+  bool _duplexThinking = false;
+  bool _coachEncouraging = false;
+  Timer? _coachGestureTimer;
+
+  void _encourageLearner() {
+    if (!mounted || !_started || _coachEncouraging) return;
+    setState(() => _coachEncouraging = true);
+    _coachGestureTimer = Timer(const Duration(milliseconds: 1300), () {
+      if (mounted) setState(() => _coachEncouraging = false);
+    });
+  }
+
   bool _podcastPlaying = false;
   bool _podcastSingleHost = true;
   bool _podcastPausedForQuestion = false;
@@ -485,6 +497,7 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
 
   @override
   void dispose() {
+    _coachGestureTimer?.cancel();
     _idlePromptTimer?.cancel();
     _liveSceneTimer?.cancel();
     unawaited(_liveSceneCamera.stop());
@@ -1466,6 +1479,7 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
         setState(() {
           _duplexLearnerSpeaking = learner;
           _duplexAgentSpeaking = agent;
+          if (agent || learner) _duplexThinking = false;
         });
       }
       ..onUnavailable = () {
@@ -1473,6 +1487,7 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
         setState(() {
           _duplexLive = false;
           _liveKitStatus = '语音连接已中断';
+          _duplexThinking = false;
           _status = '实时语音暂无回应，请按住麦克风继续';
         });
         unawaited(_liveKit.disconnect());
@@ -1482,7 +1497,9 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
         setState(() {
           _bubbles.add(_ChatBubble(role: 'user', text: text));
           _status = '外教正在回答…';
+          _duplexThinking = true;
         });
+        _encourageLearner();
         _scrollChatToEnd();
       }
       ..onStatus = (String status) {
@@ -1500,6 +1517,7 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
         setState(() {
           _bubbles.add(_ChatBubble(role: 'coach', text: text.trim()));
           _status = '外教实时回复中';
+          _duplexThinking = false;
         });
         _scrollChatToEnd();
       };
@@ -1988,6 +2006,7 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
     );
     if (!mounted || !identical(_session, session)) return;
     widget.onConfirmedLearnerTurn?.call(confirmed);
+    _encourageLearner();
     _difficulty = turn.difficulty;
     final OralExpressionDiagnosis? diagnosis =
         turn.diagnosis ??
@@ -3342,6 +3361,11 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
           listening: avatarListening,
           label: stageLabel,
           imageAsset: persona.assetPath,
+          spriteAsset: _started && persona.hasCartoonAtlas
+              ? persona.cartoonAssetPath
+              : null,
+          encouraging: _coachEncouraging,
+          thinking: _busy || (_duplexLive && _duplexThinking),
           displayName: persona.displayName,
           liveVideo: liveVideo,
         ),

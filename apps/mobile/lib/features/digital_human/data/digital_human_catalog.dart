@@ -133,7 +133,6 @@ const List<DigitalHumanPersona> digitalHumanCatalog = <DigitalHumanPersona>[
     voiceLabel: '龙安风悦 · 中英双语',
     voiceGender: 'female',
     recommendedVoiceId: 'longanfengyue',
-    hasCartoonAtlas: false,
     isAsianAppearance: true,
   ),
   DigitalHumanPersona(
@@ -147,7 +146,6 @@ const List<DigitalHumanPersona> digitalHumanCatalog = <DigitalHumanPersona>[
     voiceLabel: '龙安小昕 · 中英双语',
     voiceGender: 'female',
     recommendedVoiceId: 'longanxiaoxin',
-    hasCartoonAtlas: false,
     isAsianAppearance: true,
   ),
   DigitalHumanPersona(
@@ -161,7 +159,6 @@ const List<DigitalHumanPersona> digitalHumanCatalog = <DigitalHumanPersona>[
     voiceLabel: '龙安灵希 · 中英双语',
     voiceGender: 'female',
     recommendedVoiceId: 'longanlingxi',
-    hasCartoonAtlas: false,
     isAsianAppearance: true,
   ),
   DigitalHumanPersona(
@@ -175,7 +172,6 @@ const List<DigitalHumanPersona> digitalHumanCatalog = <DigitalHumanPersona>[
     voiceLabel: '龙安欢 · 中英双语',
     voiceGender: 'female',
     recommendedVoiceId: 'longanhuan_v3.6',
-    hasCartoonAtlas: false,
     isAsianAppearance: true,
   ),
   DigitalHumanPersona(
@@ -189,7 +185,6 @@ const List<DigitalHumanPersona> digitalHumanCatalog = <DigitalHumanPersona>[
     voiceLabel: '龙小诚 · 中英双语',
     voiceGender: 'male',
     recommendedVoiceId: 'longxiaocheng_v3.1',
-    hasCartoonAtlas: false,
     isAsianAppearance: true,
   ),
   DigitalHumanPersona(
@@ -203,7 +198,6 @@ const List<DigitalHumanPersona> digitalHumanCatalog = <DigitalHumanPersona>[
     voiceLabel: '龙三叔 · 中英双语',
     voiceGender: 'male',
     recommendedVoiceId: 'longsanshu_v3.1',
-    hasCartoonAtlas: false,
     isAsianAppearance: true,
   ),
   DigitalHumanPersona(
@@ -217,7 +211,6 @@ const List<DigitalHumanPersona> digitalHumanCatalog = <DigitalHumanPersona>[
     voiceLabel: '李白 · 中英双语',
     voiceGender: 'male',
     recommendedVoiceId: 'libai_v3.1',
-    hasCartoonAtlas: false,
     isAsianAppearance: true,
   ),
   DigitalHumanPersona(
@@ -231,7 +224,6 @@ const List<DigitalHumanPersona> digitalHumanCatalog = <DigitalHumanPersona>[
     voiceLabel: '龙泽 · 中英双语',
     voiceGender: 'male',
     recommendedVoiceId: 'longze_v3.1',
-    hasCartoonAtlas: false,
     isAsianAppearance: true,
   ),
   DigitalHumanPersona(
@@ -245,7 +237,6 @@ const List<DigitalHumanPersona> digitalHumanCatalog = <DigitalHumanPersona>[
     voiceLabel: '龙杰力豆 · 中英双语',
     voiceGender: 'male',
     recommendedVoiceId: 'longjielidou_v3.6',
-    hasCartoonAtlas: false,
     isChild: true,
     isAsianAppearance: true,
   ),
@@ -260,7 +251,6 @@ const List<DigitalHumanPersona> digitalHumanCatalog = <DigitalHumanPersona>[
     voiceLabel: '龙火火 · 中英双语',
     voiceGender: 'male',
     recommendedVoiceId: 'longhuohuo_v3.6',
-    hasCartoonAtlas: false,
     isChild: true,
     isAsianAppearance: true,
   ),
@@ -275,7 +265,6 @@ const List<DigitalHumanPersona> digitalHumanCatalog = <DigitalHumanPersona>[
     voiceLabel: '龙安小昕 · 中英双语',
     voiceGender: 'female',
     recommendedVoiceId: 'longanxiaoxin',
-    hasCartoonAtlas: false,
     isChild: true,
     isAsianAppearance: true,
   ),
@@ -290,7 +279,6 @@ const List<DigitalHumanPersona> digitalHumanCatalog = <DigitalHumanPersona>[
     voiceLabel: '龙安灵希 · 中英双语',
     voiceGender: 'female',
     recommendedVoiceId: 'longanlingxi',
-    hasCartoonAtlas: false,
     isChild: true,
     isAsianAppearance: true,
   ),

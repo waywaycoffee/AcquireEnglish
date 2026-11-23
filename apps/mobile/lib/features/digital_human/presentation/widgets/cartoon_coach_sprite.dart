@@ -9,16 +9,19 @@ class CartoonCoachSprite extends StatelessWidget {
     required this.motion,
     required this.mouth,
     required this.phase,
+    this.transitionDuration = Duration.zero,
   });
   const CartoonCoachSprite.portrait({super.key, required this.asset})
     : motion = CoachMotion.idle,
       mouth = CoachViseme.closed,
-      phase = 0;
+      phase = 0,
+      transitionDuration = Duration.zero;
 
   final String asset;
   final CoachMotion motion;
   final CoachViseme mouth;
   final double phase;
+  final Duration transitionDuration;
   int get frame {
     if (motion == CoachMotion.speaking) return mouth.index;
     if (motion == CoachMotion.thinking) return 7;
@@ -32,26 +35,30 @@ class CartoonCoachSprite extends StatelessWidget {
     builder: (BuildContext context, BoxConstraints constraints) {
       final double side = constraints.biggest.shortestSide;
       final int index = frame;
-      return Center(
-        child: SizedBox(
-          width: side,
-          height: side,
-          child: ClipRect(
-            child: OverflowBox(
-              alignment: Alignment((index % 3) - 1.0, (index ~/ 3) - 1.0),
-              minWidth: side * 3,
-              maxWidth: side * 3,
-              minHeight: side * 3,
-              maxHeight: side * 3,
-              child: Image.asset(
-                asset,
-                width: side * 3,
-                height: side * 3,
-                fit: BoxFit.fill,
-              ),
+      final cell = SizedBox(
+        key: ValueKey<int>(index),
+        width: side,
+        height: side,
+        child: ClipRect(
+          child: OverflowBox(
+            alignment: Alignment((index % 3) - 1.0, (index ~/ 3) - 1.0),
+            minWidth: side * 3,
+            maxWidth: side * 3,
+            minHeight: side * 3,
+            maxHeight: side * 3,
+            child: Image.asset(
+              asset,
+              width: side * 3,
+              height: side * 3,
+              fit: BoxFit.fill,
             ),
           ),
         ),
+      );
+      return Center(
+        child: transitionDuration == Duration.zero
+            ? cell
+            : AnimatedSwitcher(duration: transitionDuration, child: cell),
       );
     },
   );

@@ -1,10 +1,32 @@
+import 'package:flutter/services.dart';
+import '../../../lib/features/digital_human/data/digital_human_catalog.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import '../../../lib/features/digital_human/domain/coach_animation_timeline.dart';
 import '../../../lib/features/digital_human/presentation/widgets/cartoon_coach_sprite.dart';
+
 void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
+
+  test('every selectable coach has a bundled gesture atlas', () async {
+    for (final persona in digitalHumanCatalog) {
+      expect(persona.hasCartoonAtlas, isTrue, reason: persona.id);
+      final asset = await rootBundle.load(persona.cartoonAssetPath);
+      expect(asset.lengthInBytes, greaterThan(0), reason: persona.id);
+    }
+  });
+
   test('fixed actions and visemes select matching atlas cells', () {
-    CartoonCoachSprite sprite(CoachMotion motion, CoachViseme mouth, double phase) => CartoonCoachSprite(asset: '', motion: motion, mouth: mouth, phase: phase);
+    CartoonCoachSprite sprite(
+      CoachMotion motion,
+      CoachViseme mouth,
+      double phase,
+    ) => CartoonCoachSprite(
+      asset: '',
+      motion: motion,
+      mouth: mouth,
+      phase: phase,
+    );
     expect(sprite(CoachMotion.idle, CoachViseme.open, 0).frame, 0);
     expect(sprite(CoachMotion.idle, CoachViseme.closed, .98).frame, 5);
     expect(sprite(CoachMotion.listening, CoachViseme.closed, 0).frame, 6);
@@ -15,8 +37,22 @@ void main() {
     }
   });
   testWidgets('atlas renders one bounded cell', (WidgetTester tester) async {
-    await tester.pumpWidget(const MaterialApp(home: Center(child: SizedBox(width: 240, height: 240,
-      child: CartoonCoachSprite(asset: 'assets/img/digital_human/mia-cartoon.webp', motion: CoachMotion.idle, mouth: CoachViseme.closed, phase: 0)))));
+    await tester.pumpWidget(
+      const MaterialApp(
+        home: Center(
+          child: SizedBox(
+            width: 240,
+            height: 240,
+            child: CartoonCoachSprite(
+              asset: 'assets/img/digital_human/mia-cartoon.webp',
+              motion: CoachMotion.idle,
+              mouth: CoachViseme.closed,
+              phase: 0,
+            ),
+          ),
+        ),
+      ),
+    );
     await tester.pumpAndSettle();
     expect(tester.takeException(), isNull);
     expect(tester.getSize(find.byType(ClipRect)), const Size(240, 240));

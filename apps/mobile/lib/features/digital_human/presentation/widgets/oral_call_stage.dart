@@ -19,6 +19,7 @@ class OralCallStage extends StatelessWidget {
     this.imageAsset,
     this.spriteAsset,
     this.encouraging = false,
+    this.thinking = false,
     this.liveVideo,
     this.selfPreview,
     this.selfCamOn = false,
@@ -36,6 +37,7 @@ class OralCallStage extends StatelessWidget {
   final String? imageAsset;
   final String? spriteAsset;
   final bool encouraging;
+  final bool thinking;
   final Widget? liveVideo;
   final Widget? selfPreview;
   final bool selfCamOn;
@@ -62,6 +64,7 @@ class OralCallStage extends StatelessWidget {
             imageAsset: imageAsset,
             spriteAsset: spriteAsset,
             encouraging: encouraging,
+            thinking: thinking,
             displayName: displayName,
             liveVideo: liveVideo,
           ),
