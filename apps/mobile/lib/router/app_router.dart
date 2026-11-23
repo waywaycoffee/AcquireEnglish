@@ -77,6 +77,9 @@ import 'fade_extension.dart';
 import '../features/membership/presentation/membership_screen.dart';
 import '../features/membership/presentation/module_gate.dart';
 import '../features/membership/domain/module_access.dart';
+import '../features/onboarding/presentation/auth_guide_keys.dart';
+import '../features/onboarding/presentation/auth_source_guide_screen.dart';
+import '../features/onboarding/presentation/auth_sources_settings_screen.dart';
 import '../features/onboarding/presentation/first_open_onboarding_screen.dart';
 import '../features/onboarding/presentation/onboarding_provider.dart';
 import '../features/navigation/presentation/battle_hub_screen.dart';
@@ -147,16 +150,29 @@ GoRouter goRouter(Ref ref) {
   return GoRouter(
   initialLocation: !signedIn
       ? SGRoute.login.route
-      : (readOnboardingCompletedSync() ? SGRoute.home.route : '/onboarding'),
+      : (!readOnboardingCompletedSync()
+          ? '/onboarding'
+          : (readAuthSourceGuideCompletedSync()
+              ? SGRoute.home.route
+              : '/onboarding/auth-guide')),
   redirect: (BuildContext context, GoRouterState state) {
     final bool done = readOnboardingCompletedSync();
+    final bool authGuideDone = readAuthSourceGuideCompletedSync();
     final String loc = state.matchedLocation;
     if (!signedIn && !_isAuthOrLegalPath(loc)) {
       return SGRoute.login.route;
     }
     final bool onOnboarding = loc == '/onboarding';
+    final bool onAuthGuide = loc == '/onboarding/auth-guide';
     if (!done && !onOnboarding && !_isAuthOrLegalPath(loc)) {
       return '/onboarding';
+    }
+    if (done &&
+        !authGuideDone &&
+        !onAuthGuide &&
+        !onOnboarding &&
+        !_isAuthOrLegalPath(loc)) {
+      return '/onboarding/auth-guide';
     }
     return null;
   },
@@ -165,6 +181,16 @@ GoRouter goRouter(Ref ref) {
       path: '/onboarding',
       builder: (BuildContext context, GoRouterState state) =>
           const FirstOpenOnboardingScreen(),
+    ).fade(),
+    GoRoute(
+      path: '/onboarding/auth-guide',
+      builder: (BuildContext context, GoRouterState state) =>
+          const AuthSourceGuideScreen(),
+    ).fade(),
+    GoRoute(
+      path: AuthSourcesSettingsScreen.route,
+      builder: (BuildContext context, GoRouterState state) =>
+          const AuthSourcesSettingsScreen(),
     ).fade(),
     GoRoute(
       path: '/ear-grind',

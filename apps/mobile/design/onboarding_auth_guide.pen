@@ -1,0 +1,3054 @@
+{
+  "version": "2.25",
+  "children": [
+    {
+      "type": "frame",
+      "id": "ob-welcome",
+      "x": 0,
+      "y": 0,
+      "name": "01 欢迎 · 功能介绍",
+      "clip": true,
+      "width": 390,
+      "height": 844,
+      "fill": "#07090D",
+      "cornerRadius": 28,
+      "layout": "none",
+      "children": [
+        {
+          "type": "frame",
+          "id": "z6ppUv",
+          "x": 0,
+          "y": 0,
+          "name": "极光背景",
+          "width": 390,
+          "height": 844,
+          "fill": {
+            "type": "shader",
+            "enabled": true,
+            "url": "shaders/onboarding_aurora.glsl",
+            "uniforms": {
+              "u_glow": "#22C55E",
+              "u_speed": 0.32
+            }
+          }
+        },
+        {
+          "type": "frame",
+          "id": "lnRJF",
+          "x": 0,
+          "y": 0,
+          "name": "内容",
+          "width": 390,
+          "height": 844,
+          "layout": "vertical",
+          "gap": 14,
+          "padding": [
+            36,
+            22,
+            22,
+            22
+          ],
+          "justifyContent": "space_between",
+          "children": [
+            {
+              "type": "frame",
+              "id": "EGp4p",
+              "name": "上半",
+              "width": "fill_container",
+              "layout": "vertical",
+              "gap": 14,
+              "children": [
+                {
+                  "type": "frame",
+                  "id": "HliJs",
+                  "name": "顶栏",
+                  "width": "fill_container",
+                  "justifyContent": "space_between",
+                  "alignItems": "center",
+                  "children": [
+                    {
+                      "type": "frame",
+                      "id": "pBvkc",
+                      "name": "品牌",
+                      "gap": 8,
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "ellipse",
+                          "id": "xJeO7",
+                          "name": "品牌点",
+                          "fill": "#22C55E",
+                          "width": 8,
+                          "height": 8
+                        },
+                        {
+                          "type": "text",
+                          "id": "Cdhyq",
+                          "name": "品牌字",
+                          "fill": "#22C55E",
+                          "content": "ACQUIRE",
+                          "fontFamily": "Inter",
+                          "fontSize": 12,
+                          "fontWeight": "700",
+                          "letterSpacing": 1.4
+                        }
+                      ]
+                    },
+                    {
+                      "type": "text",
+                      "id": "r76Mi",
+                      "name": "步数",
+                      "fill": "#8B93A7",
+                      "content": "01 / 08",
+                      "fontFamily": "Inter",
+                      "fontSize": 12,
+                      "fontWeight": "600"
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "id": "fM2xr",
+                  "name": "标题",
+                  "fill": "#F4F7FB",
+                  "textGrowth": "fixed-width",
+                  "width": "fill_container",
+                  "content": "欢迎来到爱快英语",
+                  "fontFamily": "Noto Sans SC",
+                  "fontSize": 30,
+                  "fontWeight": "700"
+                },
+                {
+                  "type": "text",
+                  "id": "dcx9p",
+                  "name": "副标题",
+                  "fill": "#A7B0C0",
+                  "textGrowth": "fixed-width",
+                  "width": "fill_container",
+                  "content": "首页、跟读、复习，都是现在手机里的真实界面。",
+                  "lineHeight": 1.45,
+                  "fontFamily": "Noto Sans SC",
+                  "fontSize": 14,
+                  "fontWeight": "500"
+                },
+                {
+                  "type": "frame",
+                  "id": "EPJTm",
+                  "name": "舞台",
+                  "width": "fill_container",
+                  "height": 468,
+                  "layout": "none",
+                  "children": [
+                    {
+                      "type": "ellipse",
+                      "id": "rBWqE",
+                      "x": 48,
+                      "y": 70,
+                      "name": "呼吸光晕",
+                      "fill": {
+                        "type": "shader",
+                        "enabled": true,
+                        "url": "shaders/onboarding_pulse.glsl",
+                        "uniforms": {
+                          "u_color": "#22C55E"
+                        }
+                      },
+                      "width": 250,
+                      "height": 250
+                    },
+                    {
+                      "id": "ZY33v",
+                      "type": "ref",
+                      "ref": "i7HaU7",
+                      "name": "背后的学习页",
+                      "x": 168,
+                      "y": 40,
+                      "width": 168,
+                      "height": 346,
+                      "rotation": -6.000000000000001,
+                      "opacity": 0.92,
+                      "descendants": {
+                        "ZIYqn": {
+                          "fill": {
+                            "type": "shader",
+                            "enabled": true,
+                            "url": "shaders/onboarding_drift.glsl",
+                            "uniforms": {
+                              "u_shot": "../pic/学习主界面.jpg"
+                            }
+                          }
+                        }
+                      }
+                    },
+                    {
+                      "id": "hZKKo",
+                      "type": "ref",
+                      "ref": "i7HaU7",
+                      "name": "前面的首页",
+                      "x": 28,
+                      "y": 22,
+                      "width": 196,
+                      "height": 404,
+                      "rotation": 2,
+                      "descendants": {
+                        "ZIYqn": {
+                          "fill": {
+                            "type": "shader",
+                            "enabled": true,
+                            "url": "shaders/onboarding_drift.glsl",
+                            "uniforms": {
+                              "u_shot": "../pic/首页.jpg"
+                            }
+                          }
+                        }
+                      }
+                    },
+                    {
+                      "type": "frame",
+                      "id": "UjqG2",
+                      "x": 18,
+                      "y": 408,
+                      "name": "浮动标签",
+                      "fill": "#121820E6",
+                      "cornerRadius": 999,
+                      "stroke": "#FFFFFF22",
+                      "strokeWidth": 1,
+                      "effect": {
+                        "type": "background_blur",
+                        "radius": 16
+                      },
+                      "gap": 8,
+                      "padding": [
+                        8,
+                        12
+                      ],
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "icon",
+                          "id": "vv9c8",
+                          "name": "播放图标",
+                          "width": 14,
+                          "height": 14,
+                          "icon": "play",
+                          "library": "lucide",
+                          "fill": "#22C55E"
+                        },
+                        {
+                          "type": "text",
+                          "id": "X1Y4Rm",
+                          "name": "标签文字",
+                          "fill": "#F4F7FB",
+                          "content": "上次学到 0:03 · 继续播放",
+                          "fontFamily": "Noto Sans SC",
+                          "fontSize": 12,
+                          "fontWeight": "600"
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "nqDHL",
+              "name": "底栏",
+              "width": "fill_container",
+              "layout": "vertical",
+              "gap": 14,
+              "alignItems": "center",
+              "children": [
+                {
+                  "type": "frame",
+                  "id": "KqgXR",
+                  "name": "进度点",
+                  "gap": 6,
+                  "alignItems": "center",
+                  "children": [
+                    {
+                      "type": "ellipse",
+                      "id": "UpMzq",
+                      "name": "当前页",
+                      "fill": "#22C55E",
+                      "width": 18,
+                      "height": 6
+                    },
+                    {
+                      "type": "ellipse",
+                      "id": "dGtiB",
+                      "name": "第二页",
+                      "fill": "#3A4252",
+                      "width": 6,
+                      "height": 6
+                    },
+                    {
+                      "type": "ellipse",
+                      "id": "nZCYa",
+                      "name": "第三页",
+                      "fill": "#3A4252",
+                      "width": 6,
+                      "height": 6
+                    },
+                    {
+                      "type": "ellipse",
+                      "id": "rfaAg",
+                      "name": "第四页",
+                      "fill": "#3A4252",
+                      "width": 6,
+                      "height": 6
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "vRqtK",
+                  "name": "下一步",
+                  "width": "fill_container",
+                  "height": 54,
+                  "fill": "#22C55E",
+                  "cornerRadius": 16,
+                  "effect": {
+                    "type": "shadow",
+                    "shadowType": "outer",
+                    "color": "#22C55E55",
+                    "offset": {
+                      "x": 0,
+                      "y": 8
+                    },
+                    "blur": 18
+                  },
+                  "gap": 8,
+                  "justifyContent": "center",
+                  "alignItems": "center",
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "hwFZF",
+                      "name": "按钮文字",
+                      "fill": "#FFFFFF",
+                      "content": "下一步",
+                      "fontFamily": "Noto Sans SC",
+                      "fontSize": 16,
+                      "fontWeight": "700"
+                    },
+                    {
+                      "type": "icon",
+                      "id": "M8fPX",
+                      "name": "箭头",
+                      "width": 18,
+                      "height": 18,
+                      "icon": "arrow-right",
+                      "library": "lucide",
+                      "fill": "#FFFFFF"
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "frame",
+      "id": "ob-sources",
+      "x": 430,
+      "y": 0,
+      "name": "02 真实界面",
+      "clip": true,
+      "width": 390,
+      "height": 844,
+      "fill": "#07090D",
+      "cornerRadius": 28,
+      "layout": "none",
+      "children": [
+        {
+          "type": "frame",
+          "id": "R3u3u",
+          "x": 0,
+          "y": 0,
+          "name": "极光背景",
+          "width": 390,
+          "height": 844,
+          "fill": {
+            "type": "shader",
+            "enabled": true,
+            "url": "shaders/onboarding_aurora.glsl",
+            "uniforms": {
+              "u_glow": "#3B82F6",
+              "u_speed": 0.22
+            }
+          }
+        },
+        {
+          "type": "frame",
+          "id": "vod5h",
+          "x": 0,
+          "y": 0,
+          "name": "内容",
+          "width": 390,
+          "height": 844,
+          "layout": "vertical",
+          "gap": 16,
+          "padding": [
+            36,
+            22,
+            22,
+            22
+          ],
+          "children": [
+            {
+              "type": "frame",
+              "id": "wqjEK",
+              "name": "顶栏",
+              "width": "fill_container",
+              "justifyContent": "space_between",
+              "alignItems": "center",
+              "children": [
+                {
+                  "type": "frame",
+                  "id": "Xjn3I",
+                  "name": "品牌",
+                  "gap": 8,
+                  "alignItems": "center",
+                  "children": [
+                    {
+                      "type": "ellipse",
+                      "id": "XxN4i",
+                      "name": "品牌点",
+                      "fill": "#22C55E",
+                      "width": 8,
+                      "height": 8
+                    },
+                    {
+                      "type": "text",
+                      "id": "Uo8Ee",
+                      "name": "品牌字",
+                      "fill": "#22C55E",
+                      "content": "ACQUIRE",
+                      "fontFamily": "Inter",
+                      "fontSize": 12,
+                      "fontWeight": "700",
+                      "letterSpacing": 1.4
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "id": "seBqG",
+                  "name": "步数",
+                  "fill": "#8B93A7",
+                  "content": "02 / 08",
+                  "fontFamily": "Inter",
+                  "fontSize": 12,
+                  "fontWeight": "600"
+                }
+              ]
+            },
+            {
+              "type": "text",
+              "id": "G6FbNL",
+              "name": "标题",
+              "fill": "#F4F7FB",
+              "textGrowth": "fixed-width",
+              "width": "fill_container",
+              "content": "学习就在这些画面里",
+              "fontFamily": "Noto Sans SC",
+              "fontSize": 30,
+              "fontWeight": "700"
+            },
+            {
+              "type": "text",
+              "id": "UyjOL",
+              "name": "副标题",
+              "fill": "#A7B0C0",
+              "textGrowth": "fixed-width",
+              "width": "fill_container",
+              "content": "每一屏都是现在 App 里的截图。视频来自哔哩哔哩、YouTube 和网盘，第一次要你授权。",
+              "lineHeight": 1.45,
+              "fontFamily": "Noto Sans SC",
+              "fontSize": 14,
+              "fontWeight": "500"
+            },
+            {
+              "type": "frame",
+              "id": "kOUgW",
+              "name": "界面列表",
+              "width": "fill_container",
+              "layout": "vertical",
+              "gap": 12,
+              "children": [
+                {
+                  "type": "frame",
+                  "id": "nxWzJ",
+                  "name": "接着上次的视频",
+                  "width": "fill_container",
+                  "fill": "#121820",
+                  "cornerRadius": 22,
+                  "stroke": "#FFFFFF14",
+                  "strokeWidth": 1,
+                  "gap": 14,
+                  "padding": 10,
+                  "alignItems": "center",
+                  "children": [
+                    {
+                      "type": "frame",
+                      "id": "hT1PJ",
+                      "name": "截图",
+                      "clip": true,
+                      "width": 92,
+                      "height": 156,
+                      "fill": {
+                        "type": "shader",
+                        "enabled": true,
+                        "url": "shaders/onboarding_drift.glsl",
+                        "uniforms": {
+                          "u_shot": "../pic/首页.jpg"
+                        }
+                      },
+                      "cornerRadius": 16,
+                      "stroke": "#FFFFFF18",
+                      "strokeWidth": 1
+                    },
+                    {
+                      "type": "frame",
+                      "id": "xYtcH",
+                      "name": "文案",
+                      "width": "fill_container",
+                      "layout": "vertical",
+                      "gap": 4,
+                      "children": [
+                        {
+                          "type": "text",
+                          "id": "vodAn",
+                          "name": "眉标",
+                          "fill": "#22C55E",
+                          "content": "首页",
+                          "fontFamily": "Noto Sans SC",
+                          "fontSize": 12,
+                          "fontWeight": "700"
+                        },
+                        {
+                          "type": "text",
+                          "id": "mkPUX",
+                          "name": "行标题",
+                          "fill": "#F4F7FB",
+                          "textGrowth": "fixed-width",
+                          "width": "fill_container",
+                          "content": "接着上次的视频",
+                          "fontFamily": "Noto Sans SC",
+                          "fontSize": 18,
+                          "fontWeight": "700"
+                        },
+                        {
+                          "type": "text",
+                          "id": "B4LgT",
+                          "name": "行说明",
+                          "fill": "#A7B0C0",
+                          "textGrowth": "fixed-width",
+                          "width": "fill_container",
+                          "content": "打开就能继续播放，字幕停在上次的句子。",
+                          "lineHeight": 1.4,
+                          "fontFamily": "Noto Sans SC",
+                          "fontSize": 13,
+                          "fontWeight": "500"
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "jBXhS",
+                  "name": "一句一句开口",
+                  "width": "fill_container",
+                  "fill": "#121820",
+                  "cornerRadius": 22,
+                  "stroke": "#FFFFFF14",
+                  "strokeWidth": 1,
+                  "gap": 14,
+                  "padding": 10,
+                  "alignItems": "center",
+                  "children": [
+                    {
+                      "type": "frame",
+                      "id": "gvIxC",
+                      "name": "截图",
+                      "clip": true,
+                      "width": 92,
+                      "height": 156,
+                      "fill": {
+                        "type": "shader",
+                        "enabled": true,
+                        "url": "shaders/onboarding_drift.glsl",
+                        "uniforms": {
+                          "u_shot": "../pic/影子跟读.jpg"
+                        }
+                      },
+                      "cornerRadius": 16,
+                      "stroke": "#FFFFFF18",
+                      "strokeWidth": 1
+                    },
+                    {
+                      "type": "frame",
+                      "id": "YwplV",
+                      "name": "文案",
+                      "width": "fill_container",
+                      "layout": "vertical",
+                      "gap": 4,
+                      "children": [
+                        {
+                          "type": "text",
+                          "id": "QEeex",
+                          "name": "眉标",
+                          "fill": "#22C55E",
+                          "content": "跟读",
+                          "fontFamily": "Noto Sans SC",
+                          "fontSize": 12,
+                          "fontWeight": "700"
+                        },
+                        {
+                          "type": "text",
+                          "id": "c2kcWS",
+                          "name": "行标题",
+                          "fill": "#F4F7FB",
+                          "textGrowth": "fixed-width",
+                          "width": "fill_container",
+                          "content": "一句一句开口",
+                          "fontFamily": "Noto Sans SC",
+                          "fontSize": 18,
+                          "fontWeight": "700"
+                        },
+                        {
+                          "type": "text",
+                          "id": "XVfFT",
+                          "name": "行说明",
+                          "fill": "#A7B0C0",
+                          "textGrowth": "fixed-width",
+                          "width": "fill_container",
+                          "content": "原声、录音、双语字幕在同一条时间线上。",
+                          "lineHeight": 1.4,
+                          "fontFamily": "Noto Sans SC",
+                          "fontSize": 13,
+                          "fontWeight": "500"
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "QYChd",
+                  "name": "收藏的句子会回来",
+                  "width": "fill_container",
+                  "fill": "#121820",
+                  "cornerRadius": 22,
+                  "stroke": "#FFFFFF14",
+                  "strokeWidth": 1,
+                  "gap": 14,
+                  "padding": 10,
+                  "alignItems": "center",
+                  "children": [
+                    {
+                      "type": "frame",
+                      "id": "IxFqH",
+                      "name": "截图",
+                      "clip": true,
+                      "width": 92,
+                      "height": 156,
+                      "fill": {
+                        "type": "shader",
+                        "enabled": true,
+                        "url": "shaders/onboarding_drift.glsl",
+                        "uniforms": {
+                          "u_shot": "../pic/每日复习.jpg"
+                        }
+                      },
+                      "cornerRadius": 16,
+                      "stroke": "#FFFFFF18",
+                      "strokeWidth": 1
+                    },
+                    {
+                      "type": "frame",
+                      "id": "AmgE7",
+                      "name": "文案",
+                      "width": "fill_container",
+                      "layout": "vertical",
+                      "gap": 4,
+                      "children": [
+                        {
+                          "type": "text",
+                          "id": "JfOal",
+                          "name": "眉标",
+                          "fill": "#22C55E",
+                          "content": "复习",
+                          "fontFamily": "Noto Sans SC",
+                          "fontSize": 12,
+                          "fontWeight": "700"
+                        },
+                        {
+                          "type": "text",
+                          "id": "wB9Eh",
+                          "name": "行标题",
+                          "fill": "#F4F7FB",
+                          "textGrowth": "fixed-width",
+                          "width": "fill_container",
+                          "content": "收藏的句子会回来",
+                          "fontFamily": "Noto Sans SC",
+                          "fontSize": 18,
+                          "fontWeight": "700"
+                        },
+                        {
+                          "type": "text",
+                          "id": "P7GUG",
+                          "name": "行说明",
+                          "fill": "#A7B0C0",
+                          "textGrowth": "fixed-width",
+                          "width": "fill_container",
+                          "content": "单词和短语进入每日复习，不用另开一本词书。",
+                          "lineHeight": 1.4,
+                          "fontFamily": "Noto Sans SC",
+                          "fontSize": 13,
+                          "fontWeight": "500"
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "q9sF0h",
+              "name": "底栏",
+              "width": "fill_container",
+              "layout": "vertical",
+              "gap": 14,
+              "alignItems": "center",
+              "children": [
+                {
+                  "type": "frame",
+                  "id": "VinpX",
+                  "name": "进度点",
+                  "gap": 6,
+                  "alignItems": "center",
+                  "children": [
+                    {
+                      "type": "ellipse",
+                      "id": "e1zUuB",
+                      "name": "第一页",
+                      "fill": "#3A4252",
+                      "width": 6,
+                      "height": 6
+                    },
+                    {
+                      "type": "ellipse",
+                      "id": "bNics",
+                      "name": "当前页",
+                      "fill": "#22C55E",
+                      "width": 18,
+                      "height": 6
+                    },
+                    {
+                      "type": "ellipse",
+                      "id": "A6LV0W",
+                      "name": "第三页",
+                      "fill": "#3A4252",
+                      "width": 6,
+                      "height": 6
+                    },
+                    {
+                      "type": "ellipse",
+                      "id": "J6j2no",
+                      "name": "第四页",
+                      "fill": "#3A4252",
+                      "width": 6,
+                      "height": 6
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "oSx2R",
+                  "name": "下一步",
+                  "width": "fill_container",
+                  "height": 54,
+                  "fill": "#22C55E",
+                  "cornerRadius": 16,
+                  "gap": 8,
+                  "justifyContent": "center",
+                  "alignItems": "center",
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "B9vDM0",
+                      "name": "按钮文字",
+                      "fill": "#FFFFFF",
+                      "content": "下一步",
+                      "fontFamily": "Noto Sans SC",
+                      "fontSize": 16,
+                      "fontWeight": "700"
+                    },
+                    {
+                      "type": "icon",
+                      "id": "PzvMV",
+                      "name": "箭头",
+                      "width": 18,
+                      "height": 18,
+                      "icon": "arrow-right",
+                      "library": "lucide",
+                      "fill": "#FFFFFF"
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "frame",
+      "id": "ob-auth",
+      "x": 860,
+      "y": 0,
+      "name": "07 授权强调",
+      "clip": true,
+      "width": 390,
+      "height": 844,
+      "fill": "#07090D",
+      "cornerRadius": 28,
+      "layout": "none",
+      "children": [
+        {
+          "type": "frame",
+          "id": "LMcbR",
+          "x": 0,
+          "y": 0,
+          "name": "极光背景",
+          "width": 390,
+          "height": 844,
+          "fill": {
+            "type": "shader",
+            "enabled": true,
+            "url": "shaders/onboarding_aurora.glsl",
+            "uniforms": {
+              "u_glow": "#22C55E",
+              "u_speed": 0.18
+            }
+          }
+        },
+        {
+          "type": "frame",
+          "id": "aH85u",
+          "x": 0,
+          "y": 0,
+          "name": "内容",
+          "width": 390,
+          "height": 844,
+          "layout": "vertical",
+          "gap": 14,
+          "padding": [
+            36,
+            22,
+            22,
+            22
+          ],
+          "justifyContent": "space_between",
+          "children": [
+            {
+              "type": "frame",
+              "id": "p7E42R",
+              "name": "上半",
+              "width": "fill_container",
+              "layout": "vertical",
+              "gap": 12,
+              "children": [
+                {
+                  "type": "frame",
+                  "id": "IDCTD",
+                  "name": "顶栏",
+                  "width": "fill_container",
+                  "justifyContent": "space_between",
+                  "alignItems": "center",
+                  "children": [
+                    {
+                      "type": "frame",
+                      "id": "w5Aab",
+                      "name": "品牌",
+                      "gap": 8,
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "ellipse",
+                          "id": "R6uzx",
+                          "name": "品牌点",
+                          "fill": "#22C55E",
+                          "width": 8,
+                          "height": 8
+                        },
+                        {
+                          "type": "text",
+                          "id": "qgssE",
+                          "name": "品牌字",
+                          "fill": "#22C55E",
+                          "content": "ACQUIRE",
+                          "fontFamily": "Inter",
+                          "fontSize": 12,
+                          "fontWeight": "700",
+                          "letterSpacing": 1.4
+                        }
+                      ]
+                    },
+                    {
+                      "type": "text",
+                      "id": "iVwNg",
+                      "name": "步数",
+                      "fill": "#8B93A7",
+                      "content": "07 / 08",
+                      "fontFamily": "Inter",
+                      "fontSize": 12,
+                      "fontWeight": "600"
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "id": "C9toOX",
+                  "name": "标题",
+                  "fill": "#F4F7FB",
+                  "textGrowth": "fixed-width",
+                  "width": "fill_container",
+                  "content": "为什么要授权",
+                  "fontFamily": "Noto Sans SC",
+                  "fontSize": 30,
+                  "fontWeight": "700"
+                },
+                {
+                  "type": "text",
+                  "id": "xuCyJ",
+                  "name": "副标题",
+                  "fill": "#A7B0C0",
+                  "textGrowth": "fixed-width",
+                  "width": "fill_container",
+                  "content": "授权之后，课程和字幕才会出现在这样的学习页里。",
+                  "lineHeight": 1.45,
+                  "fontFamily": "Noto Sans SC",
+                  "fontSize": 14,
+                  "fontWeight": "500"
+                },
+                {
+                  "type": "frame",
+                  "id": "D6dnR",
+                  "name": "舞台",
+                  "width": "fill_container",
+                  "height": 336,
+                  "layout": "none",
+                  "children": [
+                    {
+                      "type": "ellipse",
+                      "id": "i2SeTC",
+                      "x": 70,
+                      "y": 40,
+                      "name": "呼吸光晕",
+                      "fill": {
+                        "type": "shader",
+                        "enabled": true,
+                        "url": "shaders/onboarding_pulse.glsl",
+                        "uniforms": {
+                          "u_color": "#3B82F6"
+                        }
+                      },
+                      "width": 210,
+                      "height": 210
+                    },
+                    {
+                      "id": "G0ZpQ",
+                      "type": "ref",
+                      "ref": "i7HaU7",
+                      "name": "学习页手机",
+                      "x": 78,
+                      "y": 0,
+                      "width": 168,
+                      "height": 336,
+                      "descendants": {
+                        "ZIYqn": {
+                          "fill": {
+                            "type": "shader",
+                            "enabled": true,
+                            "url": "shaders/onboarding_drift.glsl",
+                            "uniforms": {
+                              "u_shot": "../pic/学习主界面.jpg"
+                            }
+                          }
+                        }
+                      }
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "ia4Jc",
+                  "name": "说明卡",
+                  "width": "fill_container",
+                  "fill": "#141C28CC",
+                  "cornerRadius": 18,
+                  "stroke": "#F5C16C55",
+                  "strokeWidth": 1,
+                  "effect": {
+                    "type": "background_blur",
+                    "radius": 18
+                  },
+                  "layout": "vertical",
+                  "gap": 8,
+                  "padding": 16,
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "sY3IF",
+                      "name": "说明正文",
+                      "fill": "#F4E7C4",
+                      "textGrowth": "fixed-width",
+                      "width": "fill_container",
+                      "content": "打开 B 站、YouTube 或网盘时弹出的授权页是正常步骤，用来拉取课程、字幕和导入视频，不是广告。",
+                      "lineHeight": 1.45,
+                      "fontFamily": "Noto Sans SC",
+                      "fontSize": 14,
+                      "fontWeight": "500"
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "guwsD",
+                  "name": "要点",
+                  "width": "fill_container",
+                  "layout": "vertical",
+                  "gap": 8,
+                  "children": [
+                    {
+                      "type": "frame",
+                      "id": "sImzu",
+                      "name": "每次授权都由你确认",
+                      "gap": 8,
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "icon",
+                          "id": "gAMwG",
+                          "name": "勾",
+                          "width": 16,
+                          "height": 16,
+                          "icon": "check",
+                          "library": "lucide",
+                          "fill": "#22C55E"
+                        },
+                        {
+                          "type": "text",
+                          "id": "X98Fvb",
+                          "name": "要点文字",
+                          "fill": "#F4F7FB",
+                          "content": "每次授权都由你确认",
+                          "fontFamily": "Noto Sans SC",
+                          "fontSize": 14,
+                          "fontWeight": "600"
+                        }
+                      ]
+                    },
+                    {
+                      "type": "frame",
+                      "id": "qyoFF",
+                      "name": "可在设置里随时撤销",
+                      "gap": 8,
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "icon",
+                          "id": "X03MAc",
+                          "name": "勾",
+                          "width": 16,
+                          "height": 16,
+                          "icon": "check",
+                          "library": "lucide",
+                          "fill": "#22C55E"
+                        },
+                        {
+                          "type": "text",
+                          "id": "hmwnl",
+                          "name": "要点文字",
+                          "fill": "#F4F7FB",
+                          "content": "可在设置里随时撤销",
+                          "fontFamily": "Noto Sans SC",
+                          "fontSize": 14,
+                          "fontWeight": "600"
+                        }
+                      ]
+                    },
+                    {
+                      "type": "frame",
+                      "id": "M1imyi",
+                      "name": "未授权仍可学本地已有内容",
+                      "gap": 8,
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "icon",
+                          "id": "tqNMO",
+                          "name": "勾",
+                          "width": 16,
+                          "height": 16,
+                          "icon": "check",
+                          "library": "lucide",
+                          "fill": "#22C55E"
+                        },
+                        {
+                          "type": "text",
+                          "id": "GoFwN",
+                          "name": "要点文字",
+                          "fill": "#F4F7FB",
+                          "content": "未授权仍可学本地已有内容",
+                          "fontFamily": "Noto Sans SC",
+                          "fontSize": 14,
+                          "fontWeight": "600"
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "fIQ3e",
+              "name": "底栏",
+              "width": "fill_container",
+              "layout": "vertical",
+              "gap": 12,
+              "alignItems": "center",
+              "children": [
+                {
+                  "type": "frame",
+                  "id": "Lk7in",
+                  "name": "进度点",
+                  "gap": 6,
+                  "alignItems": "center",
+                  "children": [
+                    {
+                      "type": "ellipse",
+                      "id": "ceeae",
+                      "name": "第一页",
+                      "fill": "#3A4252",
+                      "width": 6,
+                      "height": 6
+                    },
+                    {
+                      "type": "ellipse",
+                      "id": "B8bF92",
+                      "name": "第二页",
+                      "fill": "#3A4252",
+                      "width": 6,
+                      "height": 6
+                    },
+                    {
+                      "type": "ellipse",
+                      "id": "U79I5",
+                      "name": "当前页",
+                      "fill": "#22C55E",
+                      "width": 18,
+                      "height": 6
+                    },
+                    {
+                      "type": "ellipse",
+                      "id": "y02M9U",
+                      "name": "第四页",
+                      "fill": "#3A4252",
+                      "width": 6,
+                      "height": 6
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "ZK1eh",
+                  "name": "主按钮",
+                  "width": "fill_container",
+                  "height": 54,
+                  "fill": "#22C55E",
+                  "cornerRadius": 16,
+                  "justifyContent": "center",
+                  "alignItems": "center",
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "Na6TV",
+                      "name": "按钮文字",
+                      "fill": "#FFFFFF",
+                      "content": "我知道了，看授权指引",
+                      "fontFamily": "Noto Sans SC",
+                      "fontSize": 16,
+                      "fontWeight": "700"
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "id": "i2dzG",
+                  "name": "稍后再说",
+                  "fill": "#8B93A7",
+                  "content": "稍后再说",
+                  "fontFamily": "Noto Sans SC",
+                  "fontSize": 14,
+                  "fontWeight": "600"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "frame",
+      "id": "set-auth",
+      "x": 1290,
+      "y": 0,
+      "name": "08 设置 · 授权指引",
+      "clip": true,
+      "width": 390,
+      "height": 844,
+      "fill": "#07090D",
+      "cornerRadius": 28,
+      "layout": "none",
+      "children": [
+        {
+          "type": "frame",
+          "id": "t6vLH",
+          "x": 0,
+          "y": 0,
+          "name": "极光背景",
+          "width": 390,
+          "height": 844,
+          "fill": {
+            "type": "shader",
+            "enabled": true,
+            "url": "shaders/onboarding_aurora.glsl",
+            "uniforms": {
+              "u_glow": "#22C55E",
+              "u_speed": 0.26
+            }
+          }
+        },
+        {
+          "type": "frame",
+          "id": "mKCLw",
+          "x": 0,
+          "y": 0,
+          "name": "内容",
+          "width": 390,
+          "height": 844,
+          "layout": "vertical",
+          "gap": 12,
+          "padding": [
+            36,
+            22,
+            22,
+            22
+          ],
+          "children": [
+            {
+              "type": "frame",
+              "id": "gnK3b",
+              "name": "顶栏",
+              "width": "fill_container",
+              "justifyContent": "space_between",
+              "alignItems": "center",
+              "children": [
+                {
+                  "type": "frame",
+                  "id": "BGWLN",
+                  "name": "品牌",
+                  "gap": 8,
+                  "alignItems": "center",
+                  "children": [
+                    {
+                      "type": "ellipse",
+                      "id": "tbGSD",
+                      "name": "品牌点",
+                      "fill": "#22C55E",
+                      "width": 8,
+                      "height": 8
+                    },
+                    {
+                      "type": "text",
+                      "id": "ievlf",
+                      "name": "品牌字",
+                      "fill": "#22C55E",
+                      "content": "ACQUIRE",
+                      "fontFamily": "Inter",
+                      "fontSize": 12,
+                      "fontWeight": "700",
+                      "letterSpacing": 1.4
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "id": "Y0b9b",
+                  "name": "步数",
+                  "fill": "#8B93A7",
+                  "content": "08 / 08",
+                  "fontFamily": "Inter",
+                  "fontSize": 12,
+                  "fontWeight": "600"
+                }
+              ]
+            },
+            {
+              "type": "text",
+              "id": "pUrCC",
+              "name": "标题",
+              "fill": "#F4F7FB",
+              "textGrowth": "fixed-width",
+              "width": "fill_container",
+              "content": "授权与素材来源",
+              "fontFamily": "Noto Sans SC",
+              "fontSize": 30,
+              "fontWeight": "700"
+            },
+            {
+              "type": "text",
+              "id": "Z5XeGi",
+              "name": "副标题",
+              "fill": "#A7B0C0",
+              "textGrowth": "fixed-width",
+              "width": "fill_container",
+              "content": "管好来源之后，这些真实画面里的课、字幕和复习才会同步。",
+              "lineHeight": 1.4,
+              "fontFamily": "Noto Sans SC",
+              "fontSize": 14,
+              "fontWeight": "500"
+            },
+            {
+              "type": "frame",
+              "id": "JSDNe",
+              "name": "画面拼贴",
+              "width": "fill_container",
+              "layout": "vertical",
+              "gap": 8,
+              "children": [
+                {
+                  "type": "frame",
+                  "id": "IoTVE",
+                  "name": "数字人画面",
+                  "clip": true,
+                  "width": "fill_container",
+                  "height": 196,
+                  "fill": {
+                    "type": "shader",
+                    "enabled": true,
+                    "url": "shaders/onboarding_drift.glsl",
+                    "uniforms": {
+                      "u_shot": "../pic/数字人口语练习.jpg",
+                      "u_cropY": 0.3,
+                      "u_cropH": 0.28
+                    }
+                  },
+                  "cornerRadius": 20,
+                  "stroke": "#FFFFFF18",
+                  "strokeWidth": 1,
+                  "layout": "vertical",
+                  "padding": 10,
+                  "justifyContent": "end",
+                  "children": [
+                    {
+                      "type": "frame",
+                      "id": "mXeJn",
+                      "name": "标注",
+                      "fill": "#07090DE0",
+                      "cornerRadius": 999,
+                      "padding": [
+                        5,
+                        8
+                      ],
+                      "children": [
+                        {
+                          "type": "text",
+                          "id": "e2syB",
+                          "name": "标注文字",
+                          "fill": "#F4F7FB",
+                          "content": "数字人开口",
+                          "fontFamily": "Noto Sans SC",
+                          "fontSize": 11,
+                          "fontWeight": "700"
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "P4HcNq",
+                  "name": "下排画面",
+                  "width": "fill_container",
+                  "gap": 8,
+                  "children": [
+                    {
+                      "type": "frame",
+                      "id": "XWtXd",
+                      "name": "单词库画面",
+                      "clip": true,
+                      "width": "fill_container",
+                      "height": 132,
+                      "fill": {
+                        "type": "shader",
+                        "enabled": true,
+                        "url": "shaders/onboarding_drift.glsl",
+                        "uniforms": {
+                          "u_shot": "../pic/单词库.jpg",
+                          "u_cropY": 0.4,
+                          "u_cropH": 0.3
+                        }
+                      },
+                      "cornerRadius": 16,
+                      "stroke": "#FFFFFF18",
+                      "strokeWidth": 1,
+                      "layout": "vertical",
+                      "padding": 8,
+                      "justifyContent": "end",
+                      "children": [
+                        {
+                          "type": "frame",
+                          "id": "tCjoL",
+                          "name": "标注",
+                          "fill": "#07090DE0",
+                          "cornerRadius": 999,
+                          "padding": [
+                            5,
+                            8
+                          ],
+                          "children": [
+                            {
+                              "type": "text",
+                              "id": "IFqbW",
+                              "name": "标注文字",
+                              "fill": "#F4F7FB",
+                              "content": "单词库",
+                              "fontFamily": "Noto Sans SC",
+                              "fontSize": 11,
+                              "fontWeight": "700"
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "type": "frame",
+                      "id": "hA0hW",
+                      "name": "成长之路画面",
+                      "clip": true,
+                      "width": "fill_container",
+                      "height": 132,
+                      "fill": {
+                        "type": "shader",
+                        "enabled": true,
+                        "url": "shaders/onboarding_drift.glsl",
+                        "uniforms": {
+                          "u_shot": "../pic/成长之路.jpg",
+                          "u_cropY": 0.12,
+                          "u_cropH": 0.32
+                        }
+                      },
+                      "cornerRadius": 16,
+                      "stroke": "#FFFFFF18",
+                      "strokeWidth": 1,
+                      "layout": "vertical",
+                      "padding": 8,
+                      "justifyContent": "end",
+                      "children": [
+                        {
+                          "type": "frame",
+                          "id": "Ng07f",
+                          "name": "标注",
+                          "fill": "#07090DE0",
+                          "cornerRadius": 999,
+                          "padding": [
+                            5,
+                            8
+                          ],
+                          "children": [
+                            {
+                              "type": "text",
+                              "id": "Tgny1",
+                              "name": "标注文字",
+                              "fill": "#F4F7FB",
+                              "content": "成长之路",
+                              "fontFamily": "Noto Sans SC",
+                              "fontSize": 11,
+                              "fontWeight": "700"
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "dqSJd",
+              "name": "来源列表",
+              "width": "fill_container",
+              "layout": "vertical",
+              "gap": 8,
+              "children": [
+                {
+                  "type": "frame",
+                  "id": "JLRV7",
+                  "name": "哔哩哔哩",
+                  "width": "fill_container",
+                  "fill": "#121820",
+                  "cornerRadius": 16,
+                  "gap": 12,
+                  "padding": [
+                    12,
+                    14
+                  ],
+                  "alignItems": "center",
+                  "children": [
+                    {
+                      "type": "ellipse",
+                      "id": "QjxPp",
+                      "name": "来源点",
+                      "fill": "#FB7299",
+                      "width": 10,
+                      "height": 10
+                    },
+                    {
+                      "type": "frame",
+                      "id": "WVcmb",
+                      "name": "文案",
+                      "width": "fill_container",
+                      "layout": "vertical",
+                      "gap": 2,
+                      "children": [
+                        {
+                          "type": "text",
+                          "id": "cPTfp",
+                          "name": "来源名",
+                          "fill": "#F4F7FB",
+                          "content": "哔哩哔哩",
+                          "fontFamily": "Noto Sans SC",
+                          "fontSize": 15,
+                          "fontWeight": "700"
+                        },
+                        {
+                          "type": "text",
+                          "id": "A2KTB",
+                          "name": "状态",
+                          "fill": "#8B93A7",
+                          "content": "未授权 · 扫码后同步课程",
+                          "fontFamily": "Noto Sans SC",
+                          "fontSize": 12,
+                          "fontWeight": "500"
+                        }
+                      ]
+                    },
+                    {
+                      "type": "text",
+                      "id": "gHElf",
+                      "name": "去授权",
+                      "fill": "#22C55E",
+                      "content": "去授权",
+                      "fontFamily": "Noto Sans SC",
+                      "fontSize": 13,
+                      "fontWeight": "700"
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "tRGPV",
+                  "name": "YouTube",
+                  "width": "fill_container",
+                  "fill": "#121820",
+                  "cornerRadius": 16,
+                  "gap": 12,
+                  "padding": [
+                    12,
+                    14
+                  ],
+                  "alignItems": "center",
+                  "children": [
+                    {
+                      "type": "ellipse",
+                      "id": "CGQUc",
+                      "name": "来源点",
+                      "fill": "#FF4E45",
+                      "width": 10,
+                      "height": 10
+                    },
+                    {
+                      "type": "frame",
+                      "id": "I9Ase3",
+                      "name": "文案",
+                      "width": "fill_container",
+                      "layout": "vertical",
+                      "gap": 2,
+                      "children": [
+                        {
+                          "type": "text",
+                          "id": "J4eRD",
+                          "name": "来源名",
+                          "fill": "#F4F7FB",
+                          "content": "YouTube",
+                          "fontFamily": "Noto Sans SC",
+                          "fontSize": 15,
+                          "fontWeight": "700"
+                        },
+                        {
+                          "type": "text",
+                          "id": "S9oaLT",
+                          "name": "状态",
+                          "fill": "#8B93A7",
+                          "content": "未授权 · 登录后导入视频",
+                          "fontFamily": "Noto Sans SC",
+                          "fontSize": 12,
+                          "fontWeight": "500"
+                        }
+                      ]
+                    },
+                    {
+                      "type": "text",
+                      "id": "LrQTt",
+                      "name": "去授权",
+                      "fill": "#22C55E",
+                      "content": "去授权",
+                      "fontFamily": "Noto Sans SC",
+                      "fontSize": 13,
+                      "fontWeight": "700"
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "eAUcC",
+                  "name": "网盘",
+                  "width": "fill_container",
+                  "fill": "#121820",
+                  "cornerRadius": 16,
+                  "gap": 12,
+                  "padding": [
+                    12,
+                    14
+                  ],
+                  "alignItems": "center",
+                  "children": [
+                    {
+                      "type": "ellipse",
+                      "id": "Fs9a5",
+                      "name": "来源点",
+                      "fill": "#3B82F6",
+                      "width": 10,
+                      "height": 10
+                    },
+                    {
+                      "type": "frame",
+                      "id": "alfMN",
+                      "name": "文案",
+                      "width": "fill_container",
+                      "layout": "vertical",
+                      "gap": 2,
+                      "children": [
+                        {
+                          "type": "text",
+                          "id": "d9CWMD",
+                          "name": "来源名",
+                          "fill": "#F4F7FB",
+                          "content": "网盘",
+                          "fontFamily": "Noto Sans SC",
+                          "fontSize": 15,
+                          "fontWeight": "700"
+                        },
+                        {
+                          "type": "text",
+                          "id": "mmKSS",
+                          "name": "状态",
+                          "fill": "#8B93A7",
+                          "content": "未连接 · 授权后导入课件",
+                          "fontFamily": "Noto Sans SC",
+                          "fontSize": 12,
+                          "fontWeight": "500"
+                        }
+                      ]
+                    },
+                    {
+                      "type": "text",
+                      "id": "bl5AY",
+                      "name": "去授权",
+                      "fill": "#22C55E",
+                      "content": "去授权",
+                      "fontFamily": "Noto Sans SC",
+                      "fontSize": 13,
+                      "fontWeight": "700"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "e1mdQq",
+              "name": "底栏",
+              "width": "fill_container",
+              "layout": "vertical",
+              "gap": 12,
+              "alignItems": "center",
+              "children": [
+                {
+                  "type": "frame",
+                  "id": "lDT4K",
+                  "name": "进度点",
+                  "gap": 6,
+                  "alignItems": "center",
+                  "children": [
+                    {
+                      "type": "ellipse",
+                      "id": "QKUzZ",
+                      "name": "第一页",
+                      "fill": "#3A4252",
+                      "width": 6,
+                      "height": 6
+                    },
+                    {
+                      "type": "ellipse",
+                      "id": "c9pgx",
+                      "name": "第二页",
+                      "fill": "#3A4252",
+                      "width": 6,
+                      "height": 6
+                    },
+                    {
+                      "type": "ellipse",
+                      "id": "wAAOm",
+                      "name": "第三页",
+                      "fill": "#3A4252",
+                      "width": 6,
+                      "height": 6
+                    },
+                    {
+                      "type": "ellipse",
+                      "id": "aAnvX",
+                      "name": "当前页",
+                      "fill": "#22C55E",
+                      "width": 18,
+                      "height": 6
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "q8b5Y",
+                  "name": "主按钮",
+                  "width": "fill_container",
+                  "height": 54,
+                  "fill": "#22C55E",
+                  "cornerRadius": 16,
+                  "justifyContent": "center",
+                  "alignItems": "center",
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "oA9G0",
+                      "name": "按钮文字",
+                      "fill": "#FFFFFF",
+                      "content": "进入爱快英语",
+                      "fontFamily": "Noto Sans SC",
+                      "fontSize": 16,
+                      "fontWeight": "700"
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "frame",
+      "id": "i7HaU7",
+      "x": 0,
+      "y": -518,
+      "name": "真实界面手机",
+      "reusable": true,
+      "clip": true,
+      "width": 210,
+      "height": 432,
+      "fill": "#0C1016",
+      "cornerRadius": 32,
+      "stroke": "#3A4252",
+      "strokeWidth": 2,
+      "effect": {
+        "type": "shadow",
+        "shadowType": "outer",
+        "color": "#00000099",
+        "offset": {
+          "x": 0,
+          "y": 16
+        },
+        "blur": 28
+      },
+      "layout": "vertical",
+      "padding": 7,
+      "children": [
+        {
+          "type": "frame",
+          "id": "ZIYqn",
+          "name": "屏幕",
+          "clip": true,
+          "width": "fill_container",
+          "height": "fill_container",
+          "fill": {
+            "type": "shader",
+            "enabled": true,
+            "url": "shaders/onboarding_drift.glsl",
+            "uniforms": {
+              "u_shot": "../pic/首页.jpg"
+            }
+          },
+          "cornerRadius": 26
+        }
+      ]
+    },
+    {
+      "type": "frame",
+      "id": "m9J2j",
+      "x": 1720,
+      "y": 0,
+      "name": "03 阅读 · 可理解输入",
+      "clip": true,
+      "width": 390,
+      "height": 844,
+      "fill": "#07090D",
+      "cornerRadius": 28,
+      "layout": "none",
+      "children": [
+        {
+          "type": "frame",
+          "id": "ZZ5Vm",
+          "x": 0,
+          "y": 0,
+          "name": "极光",
+          "width": 390,
+          "height": 844,
+          "fill": {
+            "type": "shader",
+            "enabled": true,
+            "url": "shaders/onboarding_aurora.glsl",
+            "uniforms": {
+              "u_glow": "#14B8A6",
+              "u_speed": 0.22
+            }
+          }
+        },
+        {
+          "type": "frame",
+          "id": "oZLms",
+          "x": 0,
+          "y": 0,
+          "name": "内容",
+          "width": 390,
+          "height": 844,
+          "layout": "vertical",
+          "gap": 12,
+          "padding": [
+            36,
+            22,
+            22,
+            22
+          ],
+          "children": [
+            {
+              "type": "frame",
+              "id": "NCzd8",
+              "name": "顶栏",
+              "width": "fill_container",
+              "justifyContent": "space_between",
+              "alignItems": "center",
+              "children": [
+                {
+                  "type": "frame",
+                  "id": "ECYng",
+                  "name": "品牌",
+                  "gap": 8,
+                  "alignItems": "center",
+                  "children": [
+                    {
+                      "type": "ellipse",
+                      "id": "pid4E",
+                      "name": "点",
+                      "fill": "#22C55E",
+                      "width": 8,
+                      "height": 8
+                    },
+                    {
+                      "type": "text",
+                      "id": "K9e9ks",
+                      "name": "字",
+                      "fill": "#22C55E",
+                      "content": "ACQUIRE",
+                      "fontFamily": "Inter",
+                      "fontSize": 12,
+                      "fontWeight": "700",
+                      "letterSpacing": 1.4
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "id": "mqzjA",
+                  "name": "步",
+                  "fill": "#8B93A7",
+                  "content": "03 / 08",
+                  "fontFamily": "Inter",
+                  "fontSize": 12,
+                  "fontWeight": "600"
+                }
+              ]
+            },
+            {
+              "type": "text",
+              "id": "k8hOrx",
+              "name": "标题",
+              "fill": "#F4F7FB",
+              "textGrowth": "fixed-width",
+              "width": "fill_container",
+              "content": "阅读：可理解输入",
+              "fontFamily": "Noto Sans SC",
+              "fontSize": 28,
+              "fontWeight": "700"
+            },
+            {
+              "type": "text",
+              "id": "LXXOI",
+              "name": "副标",
+              "fill": "#A7B0C0",
+              "textGrowth": "fixed-width",
+              "width": "fill_container",
+              "content": "不是硬背词表，而是读得懂、听得进的真实内容。材料按 i+1 对齐你当前水平。",
+              "lineHeight": 1.45,
+              "fontFamily": "Noto Sans SC",
+              "fontSize": 14,
+              "fontWeight": "500"
+            },
+            {
+              "type": "frame",
+              "id": "d0RH9",
+              "name": "舞台",
+              "width": "fill_container",
+              "height": 420,
+              "layout": "none",
+              "children": [
+                {
+                  "type": "frame",
+                  "id": "cK0Ct",
+                  "x": 12,
+                  "y": 24,
+                  "name": "手机",
+                  "rotation": -4,
+                  "clip": true,
+                  "width": 150,
+                  "height": 300,
+                  "fill": "#0C1016",
+                  "cornerRadius": 28,
+                  "stroke": "#3A4252",
+                  "strokeWidth": 2,
+                  "effect": {
+                    "type": "shadow",
+                    "shadowType": "outer",
+                    "color": "#00000088",
+                    "offset": {
+                      "x": 0,
+                      "y": 12
+                    },
+                    "blur": 22
+                  },
+                  "layout": "vertical",
+                  "padding": 6,
+                  "children": [
+                    {
+                      "type": "frame",
+                      "id": "yJj59",
+                      "name": "屏",
+                      "clip": true,
+                      "width": "fill_container",
+                      "height": "fill_container",
+                      "fill": {
+                        "type": "image",
+                        "enabled": true,
+                        "url": "exports/reading_bookshelf/shelf-dark.png",
+                        "mode": "cover"
+                      },
+                      "cornerRadius": 22
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "F4rzc",
+                  "x": 170,
+                  "y": 8,
+                  "name": "手机",
+                  "rotation": 3.0000000000000004,
+                  "clip": true,
+                  "width": 168,
+                  "height": 340,
+                  "fill": "#0C1016",
+                  "cornerRadius": 28,
+                  "stroke": "#3A4252",
+                  "strokeWidth": 2,
+                  "effect": {
+                    "type": "shadow",
+                    "shadowType": "outer",
+                    "color": "#00000088",
+                    "offset": {
+                      "x": 0,
+                      "y": 12
+                    },
+                    "blur": 22
+                  },
+                  "layout": "vertical",
+                  "padding": 6,
+                  "children": [
+                    {
+                      "type": "frame",
+                      "id": "omaZ4",
+                      "name": "屏",
+                      "clip": true,
+                      "width": "fill_container",
+                      "height": "fill_container",
+                      "fill": {
+                        "type": "image",
+                        "enabled": true,
+                        "url": "exports/reading/reading-preview.png",
+                        "mode": "cover"
+                      },
+                      "cornerRadius": 22
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "h6Ijmr",
+              "name": "标签行",
+              "width": "fill_container",
+              "gap": 8,
+              "children": [
+                {
+                  "type": "frame",
+                  "id": "rjKO3",
+                  "name": "可理解输入",
+                  "fill": "#22C55E33",
+                  "cornerRadius": 999,
+                  "stroke": "#22C55E55",
+                  "strokeWidth": 1,
+                  "padding": [
+                    6,
+                    10
+                  ],
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "AWYwJ",
+                      "name": "t",
+                      "fill": "#22C55E",
+                      "content": "可理解输入",
+                      "fontFamily": "Noto Sans SC",
+                      "fontSize": 12,
+                      "fontWeight": "700"
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "oTX2B",
+                  "name": "i+1 难度",
+                  "fill": "#22C55E33",
+                  "cornerRadius": 999,
+                  "stroke": "#22C55E55",
+                  "strokeWidth": 1,
+                  "padding": [
+                    6,
+                    10
+                  ],
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "L6GFqR",
+                      "name": "t",
+                      "fill": "#22C55E",
+                      "content": "i+1 难度",
+                      "fontFamily": "Noto Sans SC",
+                      "fontSize": 12,
+                      "fontWeight": "700"
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "O0VFcV",
+                  "name": "书架 · 分级阅读",
+                  "fill": "#22C55E33",
+                  "cornerRadius": 999,
+                  "stroke": "#22C55E55",
+                  "strokeWidth": 1,
+                  "padding": [
+                    6,
+                    10
+                  ],
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "xwHaC",
+                      "name": "t",
+                      "fill": "#22C55E",
+                      "content": "书架 · 分级阅读",
+                      "fontFamily": "Noto Sans SC",
+                      "fontSize": 12,
+                      "fontWeight": "700"
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "frame",
+      "id": "Z6yMT",
+      "x": 2150,
+      "y": 0,
+      "name": "04 FSRS 全量记忆",
+      "clip": true,
+      "width": 390,
+      "height": 844,
+      "fill": "#07090D",
+      "cornerRadius": 28,
+      "layout": "none",
+      "children": [
+        {
+          "type": "frame",
+          "id": "J66AS",
+          "x": 0,
+          "y": 0,
+          "name": "极光",
+          "width": 390,
+          "height": 844,
+          "fill": {
+            "type": "shader",
+            "enabled": true,
+            "url": "shaders/onboarding_aurora.glsl",
+            "uniforms": {
+              "u_glow": "#A78BFA",
+              "u_speed": 0.25
+            }
+          }
+        },
+        {
+          "type": "frame",
+          "id": "NkTqo",
+          "x": 0,
+          "y": 0,
+          "name": "内容",
+          "width": 390,
+          "height": 844,
+          "layout": "vertical",
+          "gap": 12,
+          "padding": [
+            36,
+            22,
+            22,
+            22
+          ],
+          "children": [
+            {
+              "type": "frame",
+              "id": "Nn6b2",
+              "name": "顶栏",
+              "width": "fill_container",
+              "justifyContent": "space_between",
+              "alignItems": "center",
+              "children": [
+                {
+                  "type": "frame",
+                  "id": "jTgIP",
+                  "name": "品牌",
+                  "gap": 8,
+                  "alignItems": "center",
+                  "children": [
+                    {
+                      "type": "ellipse",
+                      "id": "xrpL5",
+                      "name": "点",
+                      "fill": "#22C55E",
+                      "width": 8,
+                      "height": 8
+                    },
+                    {
+                      "type": "text",
+                      "id": "iHmVp",
+                      "name": "字",
+                      "fill": "#22C55E",
+                      "content": "ACQUIRE",
+                      "fontFamily": "Inter",
+                      "fontSize": 12,
+                      "fontWeight": "700",
+                      "letterSpacing": 1.4
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "id": "ns1zm",
+                  "name": "步",
+                  "fill": "#8B93A7",
+                  "content": "04 / 08",
+                  "fontFamily": "Inter",
+                  "fontSize": 12,
+                  "fontWeight": "600"
+                }
+              ]
+            },
+            {
+              "type": "text",
+              "id": "kZzsq",
+              "name": "标题",
+              "fill": "#F4F7FB",
+              "textGrowth": "fixed-width",
+              "width": "fill_container",
+              "content": "FSRS 记住一切该记的",
+              "fontFamily": "Noto Sans SC",
+              "fontSize": 28,
+              "fontWeight": "700"
+            },
+            {
+              "type": "text",
+              "id": "UncYZ",
+              "name": "副标",
+              "fill": "#A7B0C0",
+              "textGrowth": "fixed-width",
+              "width": "fill_container",
+              "content": "单词 / 短语 / 句子 / 语法，统一进入间隔复习。见过就要记得住。",
+              "lineHeight": 1.45,
+              "fontFamily": "Noto Sans SC",
+              "fontSize": 14,
+              "fontWeight": "500"
+            },
+            {
+              "type": "frame",
+              "id": "BHxz5",
+              "name": "舞台",
+              "width": "fill_container",
+              "height": 420,
+              "layout": "none",
+              "children": [
+                {
+                  "type": "frame",
+                  "id": "dkUTt",
+                  "x": 12,
+                  "y": 24,
+                  "name": "手机",
+                  "rotation": -4,
+                  "clip": true,
+                  "width": 150,
+                  "height": 300,
+                  "fill": "#0C1016",
+                  "cornerRadius": 28,
+                  "stroke": "#3A4252",
+                  "strokeWidth": 2,
+                  "effect": {
+                    "type": "shadow",
+                    "shadowType": "outer",
+                    "color": "#00000088",
+                    "offset": {
+                      "x": 0,
+                      "y": 12
+                    },
+                    "blur": 22
+                  },
+                  "layout": "vertical",
+                  "padding": 6,
+                  "children": [
+                    {
+                      "type": "frame",
+                      "id": "Kuwpx",
+                      "name": "屏",
+                      "clip": true,
+                      "width": "fill_container",
+                      "height": "fill_container",
+                      "fill": {
+                        "type": "image",
+                        "enabled": true,
+                        "url": "exports/review_home/01_today_plan.png",
+                        "mode": "cover"
+                      },
+                      "cornerRadius": 22
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "oH0ru",
+                  "x": 170,
+                  "y": 8,
+                  "name": "手机",
+                  "rotation": 3.0000000000000004,
+                  "clip": true,
+                  "width": 168,
+                  "height": 340,
+                  "fill": "#0C1016",
+                  "cornerRadius": 28,
+                  "stroke": "#3A4252",
+                  "strokeWidth": 2,
+                  "effect": {
+                    "type": "shadow",
+                    "shadowType": "outer",
+                    "color": "#00000088",
+                    "offset": {
+                      "x": 0,
+                      "y": 12
+                    },
+                    "blur": 22
+                  },
+                  "layout": "vertical",
+                  "padding": 6,
+                  "children": [
+                    {
+                      "type": "frame",
+                      "id": "i8W4y",
+                      "name": "屏",
+                      "clip": true,
+                      "width": "fill_container",
+                      "height": "fill_container",
+                      "fill": {
+                        "type": "image",
+                        "enabled": true,
+                        "url": "../pic/每日复习.jpg",
+                        "mode": "cover"
+                      },
+                      "cornerRadius": 22
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "tJBkh",
+              "name": "标签行",
+              "width": "fill_container",
+              "gap": 8,
+              "children": [
+                {
+                  "type": "frame",
+                  "id": "Tm8MR",
+                  "name": "单词",
+                  "fill": "#22C55E33",
+                  "cornerRadius": 999,
+                  "stroke": "#22C55E55",
+                  "strokeWidth": 1,
+                  "padding": [
+                    6,
+                    10
+                  ],
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "f7ZDln",
+                      "name": "t",
+                      "fill": "#22C55E",
+                      "content": "单词",
+                      "fontFamily": "Noto Sans SC",
+                      "fontSize": 12,
+                      "fontWeight": "700"
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "JWjP3",
+                  "name": "短语",
+                  "fill": "#22C55E33",
+                  "cornerRadius": 999,
+                  "stroke": "#22C55E55",
+                  "strokeWidth": 1,
+                  "padding": [
+                    6,
+                    10
+                  ],
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "UYt5L",
+                      "name": "t",
+                      "fill": "#22C55E",
+                      "content": "短语",
+                      "fontFamily": "Noto Sans SC",
+                      "fontSize": 12,
+                      "fontWeight": "700"
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "KhJ5S",
+                  "name": "句子",
+                  "fill": "#22C55E33",
+                  "cornerRadius": 999,
+                  "stroke": "#22C55E55",
+                  "strokeWidth": 1,
+                  "padding": [
+                    6,
+                    10
+                  ],
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "PlLGY",
+                      "name": "t",
+                      "fill": "#22C55E",
+                      "content": "句子",
+                      "fontFamily": "Noto Sans SC",
+                      "fontSize": 12,
+                      "fontWeight": "700"
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "FAxB9",
+                  "name": "语法",
+                  "fill": "#22C55E33",
+                  "cornerRadius": 999,
+                  "stroke": "#22C55E55",
+                  "strokeWidth": 1,
+                  "padding": [
+                    6,
+                    10
+                  ],
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "JRtjI",
+                      "name": "t",
+                      "fill": "#22C55E",
+                      "content": "语法",
+                      "fontFamily": "Noto Sans SC",
+                      "fontSize": 12,
+                      "fontWeight": "700"
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "frame",
+      "id": "AO0uk",
+      "x": 2580,
+      "y": 0,
+      "name": "05 进步看得见",
+      "clip": true,
+      "width": 390,
+      "height": 844,
+      "fill": "#07090D",
+      "cornerRadius": 28,
+      "layout": "none",
+      "children": [
+        {
+          "type": "frame",
+          "id": "e1kZcF",
+          "x": 0,
+          "y": 0,
+          "name": "极光",
+          "width": 390,
+          "height": 844,
+          "fill": {
+            "type": "shader",
+            "enabled": true,
+            "url": "shaders/onboarding_aurora.glsl",
+            "uniforms": {
+              "u_glow": "#F59E0B",
+              "u_speed": 0.28
+            }
+          }
+        },
+        {
+          "type": "frame",
+          "id": "sXiFA",
+          "x": 0,
+          "y": 0,
+          "name": "内容",
+          "width": 390,
+          "height": 844,
+          "layout": "vertical",
+          "gap": 12,
+          "padding": [
+            36,
+            22,
+            22,
+            22
+          ],
+          "children": [
+            {
+              "type": "frame",
+              "id": "G6UkS8",
+              "name": "顶栏",
+              "width": "fill_container",
+              "justifyContent": "space_between",
+              "alignItems": "center",
+              "children": [
+                {
+                  "type": "frame",
+                  "id": "p7aMSR",
+                  "name": "品牌",
+                  "gap": 8,
+                  "alignItems": "center",
+                  "children": [
+                    {
+                      "type": "ellipse",
+                      "id": "qkwOu",
+                      "name": "点",
+                      "fill": "#22C55E",
+                      "width": 8,
+                      "height": 8
+                    },
+                    {
+                      "type": "text",
+                      "id": "C6KFba",
+                      "name": "字",
+                      "fill": "#22C55E",
+                      "content": "ACQUIRE",
+                      "fontFamily": "Inter",
+                      "fontSize": 12,
+                      "fontWeight": "700",
+                      "letterSpacing": 1.4
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "id": "oTUFC",
+                  "name": "步",
+                  "fill": "#8B93A7",
+                  "content": "05 / 08",
+                  "fontFamily": "Inter",
+                  "fontSize": 12,
+                  "fontWeight": "600"
+                }
+              ]
+            },
+            {
+              "type": "text",
+              "id": "j0zZs",
+              "name": "标题",
+              "fill": "#F4F7FB",
+              "textGrowth": "fixed-width",
+              "width": "fill_container",
+              "content": "进步，全部看得见",
+              "fontFamily": "Noto Sans SC",
+              "fontSize": 28,
+              "fontWeight": "700"
+            },
+            {
+              "type": "text",
+              "id": "E8D2gY",
+              "name": "副标",
+              "fill": "#A7B0C0",
+              "textGrowth": "fixed-width",
+              "width": "fill_container",
+              "content": "掌握的词汇量会越来越接近你的真实水平。等级、XP、句子与表达，每一次痕迹都在成长页。",
+              "lineHeight": 1.45,
+              "fontFamily": "Noto Sans SC",
+              "fontSize": 14,
+              "fontWeight": "500"
+            },
+            {
+              "type": "frame",
+              "id": "l8HAx",
+              "name": "舞台",
+              "width": "fill_container",
+              "height": 420,
+              "layout": "none",
+              "children": [
+                {
+                  "type": "frame",
+                  "id": "F5ByE",
+                  "x": 12,
+                  "y": 24,
+                  "name": "手机",
+                  "rotation": -4,
+                  "clip": true,
+                  "width": 150,
+                  "height": 300,
+                  "fill": "#0C1016",
+                  "cornerRadius": 28,
+                  "stroke": "#3A4252",
+                  "strokeWidth": 2,
+                  "effect": {
+                    "type": "shadow",
+                    "shadowType": "outer",
+                    "color": "#00000088",
+                    "offset": {
+                      "x": 0,
+                      "y": 12
+                    },
+                    "blur": 22
+                  },
+                  "layout": "vertical",
+                  "padding": 6,
+                  "children": [
+                    {
+                      "type": "frame",
+                      "id": "Pv3vf",
+                      "name": "屏",
+                      "clip": true,
+                      "width": "fill_container",
+                      "height": "fill_container",
+                      "fill": {
+                        "type": "image",
+                        "enabled": true,
+                        "url": "../pic/成长之路.jpg",
+                        "mode": "cover"
+                      },
+                      "cornerRadius": 22
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "cETaF",
+                  "x": 170,
+                  "y": 8,
+                  "name": "手机",
+                  "rotation": 3.0000000000000004,
+                  "clip": true,
+                  "width": 168,
+                  "height": 340,
+                  "fill": "#0C1016",
+                  "cornerRadius": 28,
+                  "stroke": "#3A4252",
+                  "strokeWidth": 2,
+                  "effect": {
+                    "type": "shadow",
+                    "shadowType": "outer",
+                    "color": "#00000088",
+                    "offset": {
+                      "x": 0,
+                      "y": 12
+                    },
+                    "blur": 22
+                  },
+                  "layout": "vertical",
+                  "padding": 6,
+                  "children": [
+                    {
+                      "type": "frame",
+                      "id": "eIqnR",
+                      "name": "屏",
+                      "clip": true,
+                      "width": "fill_container",
+                      "height": "fill_container",
+                      "fill": {
+                        "type": "image",
+                        "enabled": true,
+                        "url": "../pic/课程与收藏.jpg",
+                        "mode": "cover"
+                      },
+                      "cornerRadius": 22
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "acXmb",
+              "name": "标签行",
+              "width": "fill_container",
+              "gap": 8,
+              "children": [
+                {
+                  "type": "frame",
+                  "id": "bPdvS",
+                  "name": "词汇量 → 真实水平",
+                  "fill": "#22C55E33",
+                  "cornerRadius": 999,
+                  "stroke": "#22C55E55",
+                  "strokeWidth": 1,
+                  "padding": [
+                    6,
+                    10
+                  ],
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "Usqik",
+                      "name": "t",
+                      "fill": "#22C55E",
+                      "content": "词汇量 → 真实水平",
+                      "fontFamily": "Noto Sans SC",
+                      "fontSize": 12,
+                      "fontWeight": "700"
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "QyQlg",
+                  "name": "XP · 连续天数",
+                  "fill": "#22C55E33",
+                  "cornerRadius": 999,
+                  "stroke": "#22C55E55",
+                  "strokeWidth": 1,
+                  "padding": [
+                    6,
+                    10
+                  ],
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "sPO8o",
+                      "name": "t",
+                      "fill": "#22C55E",
+                      "content": "XP · 连续天数",
+                      "fontFamily": "Noto Sans SC",
+                      "fontSize": 12,
+                      "fontWeight": "700"
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "frame",
+      "id": "ABB83",
+      "x": 3010,
+      "y": 0,
+      "name": "06 社区 · 学习搭子",
+      "clip": true,
+      "width": 390,
+      "height": 844,
+      "fill": "#07090D",
+      "cornerRadius": 28,
+      "layout": "none",
+      "children": [
+        {
+          "type": "frame",
+          "id": "e8UafO",
+          "x": 0,
+          "y": 0,
+          "name": "极光",
+          "width": 390,
+          "height": 844,
+          "fill": {
+            "type": "shader",
+            "enabled": true,
+            "url": "shaders/onboarding_aurora.glsl",
+            "uniforms": {
+              "u_glow": "#EC4899",
+              "u_speed": 0.31
+            }
+          }
+        },
+        {
+          "type": "frame",
+          "id": "XAK2R",
+          "x": 0,
+          "y": 0,
+          "name": "内容",
+          "width": 390,
+          "height": 844,
+          "layout": "vertical",
+          "gap": 12,
+          "padding": [
+            36,
+            22,
+            22,
+            22
+          ],
+          "children": [
+            {
+              "type": "frame",
+              "id": "wg9fP",
+              "name": "顶栏",
+              "width": "fill_container",
+              "justifyContent": "space_between",
+              "alignItems": "center",
+              "children": [
+                {
+                  "type": "frame",
+                  "id": "rDEMZ",
+                  "name": "品牌",
+                  "gap": 8,
+                  "alignItems": "center",
+                  "children": [
+                    {
+                      "type": "ellipse",
+                      "id": "FP2wu",
+                      "name": "点",
+                      "fill": "#22C55E",
+                      "width": 8,
+                      "height": 8
+                    },
+                    {
+                      "type": "text",
+                      "id": "n6oa1o",
+                      "name": "字",
+                      "fill": "#22C55E",
+                      "content": "ACQUIRE",
+                      "fontFamily": "Inter",
+                      "fontSize": 12,
+                      "fontWeight": "700",
+                      "letterSpacing": 1.4
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "id": "w68I5x",
+                  "name": "步",
+                  "fill": "#8B93A7",
+                  "content": "06 / 08",
+                  "fontFamily": "Inter",
+                  "fontSize": 12,
+                  "fontWeight": "600"
+                }
+              ]
+            },
+            {
+              "type": "text",
+              "id": "xhhRu",
+              "name": "标题",
+              "fill": "#F4F7FB",
+              "textGrowth": "fixed-width",
+              "width": "fill_container",
+              "content": "社区素材 · 学习搭子",
+              "fontFamily": "Noto Sans SC",
+              "fontSize": 28,
+              "fontWeight": "700"
+            },
+            {
+              "type": "text",
+              "id": "TK7xh",
+              "name": "副标",
+              "fill": "#A7B0C0",
+              "textGrowth": "fixed-width",
+              "width": "fill_container",
+              "content": "海量用户上传的学习素材可以拿来练；找学习搭子一起通关、互相鼓励。",
+              "lineHeight": 1.45,
+              "fontFamily": "Noto Sans SC",
+              "fontSize": 14,
+              "fontWeight": "500"
+            },
+            {
+              "type": "frame",
+              "id": "evhxB",
+              "name": "舞台",
+              "width": "fill_container",
+              "height": 420,
+              "layout": "none",
+              "children": [
+                {
+                  "type": "frame",
+                  "id": "cm0Xz",
+                  "x": 12,
+                  "y": 24,
+                  "name": "手机",
+                  "rotation": -4,
+                  "clip": true,
+                  "width": 150,
+                  "height": 300,
+                  "fill": "#0C1016",
+                  "cornerRadius": 28,
+                  "stroke": "#3A4252",
+                  "strokeWidth": 2,
+                  "effect": {
+                    "type": "shadow",
+                    "shadowType": "outer",
+                    "color": "#00000088",
+                    "offset": {
+                      "x": 0,
+                      "y": 12
+                    },
+                    "blur": 22
+                  },
+                  "layout": "vertical",
+                  "padding": 6,
+                  "children": [
+                    {
+                      "type": "frame",
+                      "id": "choyT",
+                      "name": "屏",
+                      "clip": true,
+                      "width": "fill_container",
+                      "height": "fill_container",
+                      "fill": {
+                        "type": "image",
+                        "enabled": true,
+                        "url": "exports/community-design/community-hub-adventure-v1.jpg",
+                        "mode": "cover"
+                      },
+                      "cornerRadius": 22
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "y6mEGF",
+                  "x": 170,
+                  "y": 8,
+                  "name": "手机",
+                  "rotation": 3.0000000000000004,
+                  "clip": true,
+                  "width": 168,
+                  "height": 340,
+                  "fill": "#0C1016",
+                  "cornerRadius": 28,
+                  "stroke": "#3A4252",
+                  "strokeWidth": 2,
+                  "effect": {
+                    "type": "shadow",
+                    "shadowType": "outer",
+                    "color": "#00000088",
+                    "offset": {
+                      "x": 0,
+                      "y": 12
+                    },
+                    "blur": 22
+                  },
+                  "layout": "vertical",
+                  "padding": 6,
+                  "children": [
+                    {
+                      "type": "frame",
+                      "id": "w5JCg",
+                      "name": "屏",
+                      "clip": true,
+                      "width": "fill_container",
+                      "height": "fill_container",
+                      "fill": {
+                        "type": "image",
+                        "enabled": true,
+                        "url": "exports/community-design/community-desk-coop-v1.jpg",
+                        "mode": "cover"
+                      },
+                      "cornerRadius": 22
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "Zuhtq",
+              "name": "标签行",
+              "width": "fill_container",
+              "gap": 8,
+              "children": [
+                {
+                  "type": "frame",
+                  "id": "Z3jAM",
+                  "name": "海量素材",
+                  "fill": "#22C55E33",
+                  "cornerRadius": 999,
+                  "stroke": "#22C55E55",
+                  "strokeWidth": 1,
+                  "padding": [
+                    6,
+                    10
+                  ],
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "HpJRT",
+                      "name": "t",
+                      "fill": "#22C55E",
+                      "content": "海量素材",
+                      "fontFamily": "Noto Sans SC",
+                      "fontSize": 12,
+                      "fontWeight": "700"
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "k7Rzg7",
+                  "name": "学习搭子",
+                  "fill": "#22C55E33",
+                  "cornerRadius": 999,
+                  "stroke": "#22C55E55",
+                  "strokeWidth": 1,
+                  "padding": [
+                    6,
+                    10
+                  ],
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "hwxUN",
+                      "name": "t",
+                      "fill": "#22C55E",
+                      "content": "学习搭子",
+                      "fontFamily": "Noto Sans SC",
+                      "fontSize": 12,
+                      "fontWeight": "700"
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "X9zKEn",
+                  "name": "同桌鼓励",
+                  "fill": "#22C55E33",
+                  "cornerRadius": 999,
+                  "stroke": "#22C55E55",
+                  "strokeWidth": 1,
+                  "padding": [
+                    6,
+                    10
+                  ],
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "g4qULd",
+                      "name": "t",
+                      "fill": "#22C55E",
+                      "content": "同桌鼓励",
+                      "fontFamily": "Noto Sans SC",
+                      "fontSize": 12,
+                      "fontWeight": "700"
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "fileToken": "bd384a1d-6c78-4acd-b4a5-2496e600900a"
+}

@@ -31,6 +31,7 @@ import 'app_update_provider.dart';
 import '../../home/presentation/widgets/theme_widget.dart';
 import 'bilibili_login_sheet.dart';
 import 'cloud_subtitle_library_screen.dart';
+import '../../onboarding/presentation/auth_sources_settings_screen.dart';
 import 'learning_preferences_screen.dart';
 import 'settings_provider.dart';
 import '../../sync/presentation/cloud_catalog_sync.dart';
@@ -279,6 +280,12 @@ class SettingsScreen extends ConsumerWidget {
                     ),
                   );
                 },
+              ),
+              _ActionRow(
+                title: '授权与素材来源',
+                description: '哔哩哔哩、YouTube、网盘授权与导入',
+                icon: Icons.link_rounded,
+                onTap: () => context.push(AuthSourcesSettingsScreen.route),
               ),
               _ActionRow(
                 title: '软件优化建议',
