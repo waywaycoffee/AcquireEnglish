@@ -37,7 +37,7 @@ class FsrsSdMeter extends StatelessWidget {
         vertical: compact ? 8 : 10,
       ),
       decoration: BoxDecoration(
-        color: const Color(0xFFF3F4F6),
+        color: AppDesignTokens.softGray,
         borderRadius: BorderRadius.circular(12),
       ),
       child: Column(
@@ -106,7 +106,7 @@ class _MeterRow extends StatelessWidget {
             child: LinearProgressIndicator(
               value: progress,
               minHeight: 8,
-              backgroundColor: Colors.white,
+              backgroundColor: AppDesignTokens.appWhite,
               color: color,
             ),
           ),

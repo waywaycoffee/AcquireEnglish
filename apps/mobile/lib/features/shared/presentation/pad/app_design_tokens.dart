@@ -44,6 +44,25 @@ class AppDesignTokens {
   static Color get textSecondary =>
       isDark ? const Color(0xFF9AA0AE) : const Color(0xFF667085);
 
+  /// Selected / in-progress card surface (never hardcode mint white in dark).
+  static Color get selectedSurface =>
+      isDark ? const Color(0xFF1E3A28) : const Color(0xFFEFFFF5);
+
+  /// Soft success chip behind green status.
+  static Color get successSoft =>
+      isDark ? const Color(0xFF1E3A28) : const Color(0xFFDDF7E8);
+
+  /// Soft info / “补字幕” chip.
+  static Color get infoSoft =>
+      isDark ? const Color(0xFF1C2A3A) : const Color(0xFFE8F1FF);
+
+  /// Soft danger / missing / delete chip.
+  static Color get dangerSoft =>
+      isDark ? const Color(0xFF3A2226) : const Color(0xFFFFE1E1);
+
+  static Color get dangerText =>
+      isDark ? const Color(0xFFFF8A80) : const Color(0xFFBA1A1A);
+
   static List<BoxShadow> get toyCardShadow => <BoxShadow>[
         BoxShadow(
           color: isDark ? const Color(0x66000000) : const Color(0x14000000),

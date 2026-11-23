@@ -3045,8 +3045,8 @@ class _LibraryEditToolbar extends StatelessWidget {
           _LibraryEditActionButton(
             label: '删除',
             icon: Icons.delete_outline_rounded,
-            color: const Color(0xFFC74A4A),
-            background: const Color(0xFFFFECEC),
+            color: AppDesignTokens.dangerText,
+            background: AppDesignTokens.dangerSoft,
             onTap: onDelete,
           ),
           const SizedBox(width: 8),
@@ -3125,32 +3125,38 @@ class _LibraryDetailTopStatus extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final double maxWidth = (MediaQuery.sizeOf(context).width * 0.42).clamp(
+      120.0,
+      220.0,
+    );
     return ConstrainedBox(
-      constraints: const BoxConstraints(maxWidth: 360),
+      constraints: BoxConstraints(maxWidth: maxWidth),
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         crossAxisAlignment: CrossAxisAlignment.end,
         children: <Widget>[
-        Text(
-          courseMeta,
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-          style: const TextStyle(
-            fontSize: 13,
-            fontWeight: FontWeight.w700,
-            color: Color(0xFF0F7A43),
+          Text(
+            courseMeta,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w700,
+              color: AppDesignTokens.isDark
+                  ? AppDesignTokens.brandGreen
+                  : const Color(0xFF0F7A43),
+            ),
           ),
-        ),
           if (episodeName != null && episodeName!.isNotEmpty) ...<Widget>[
             const SizedBox(height: 2),
             Text(
               episodeName!,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 13,
                 fontWeight: FontWeight.w600,
-                color: Color(0xFF191C1E),
+                color: AppDesignTokens.textSecondary,
               ),
             ),
           ],

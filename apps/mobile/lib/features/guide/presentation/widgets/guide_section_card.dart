@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../../shared/presentation/pad/app_design_tokens.dart';
 import '../../../shared/presentation/pad/pad_compact.dart';
 
 class GuideSectionCard extends StatelessWidget {
@@ -46,7 +47,7 @@ class GuideSectionCard extends StatelessWidget {
                       vertical: compact ? 5 : 6,
                     ),
                     decoration: BoxDecoration(
-                      color: const Color(0xFFEFFFF5),
+                      color: AppDesignTokens.selectedSurface,
                       borderRadius: BorderRadius.circular(10),
                     ),
                     child: Text(
@@ -54,7 +55,9 @@ class GuideSectionCard extends StatelessWidget {
                       style: TextStyle(
                         fontSize: compact ? 9 : 10,
                         fontWeight: FontWeight.w800,
-                        color: const Color(0xFF0F7A43),
+                        color: AppDesignTokens.isDark
+                            ? AppDesignTokens.brandGreen
+                            : const Color(0xFF0F7A43),
                       ),
                     ),
                   ),

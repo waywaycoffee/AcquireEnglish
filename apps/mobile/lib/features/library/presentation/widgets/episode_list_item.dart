@@ -122,9 +122,11 @@ class EpisodeListItem extends StatelessWidget {
                       : Icons.bolt_rounded,
                   label: statusText,
                   backgroundColor: selected
-                      ? const Color(0xFFDDF7E8)
+                      ? AppDesignTokens.successSoft
                       : AppDesignTokens.softWhite,
-                  textColor: AppDesignTokens.brandGreenDark,
+                  textColor: AppDesignTokens.isDark
+                      ? AppDesignTokens.brandGreen
+                      : AppDesignTokens.brandGreenDark,
                 ),
                 if (item.videoMissing)
                   _InfoChip(
@@ -133,11 +135,11 @@ class EpisodeListItem extends StatelessWidget {
                         : Icons.warning_amber_rounded,
                     label: _isPendingBilibiliDownload(item) ? '待下载' : '文件缺失',
                     backgroundColor: _isPendingBilibiliDownload(item)
-                        ? const Color(0xFFE8F1FF)
-                        : const Color(0xFFFFE1E1),
+                        ? AppDesignTokens.infoSoft
+                        : AppDesignTokens.dangerSoft,
                     textColor: _isPendingBilibiliDownload(item)
-                        ? AppDesignTokens.primaryBlueDark
-                        : const Color(0xFFBA1A1A),
+                        ? AppDesignTokens.primaryBlue
+                        : AppDesignTokens.dangerText,
                   ),
                 _InfoChip(
                   icon: englishFillFailed
@@ -155,18 +157,18 @@ class EpisodeListItem extends StatelessWidget {
                                         ? '补英文字幕'
                                         : '无英文字幕'))),
                   backgroundColor: englishFillFailed
-                      ? const Color(0xFFFFE1E1)
+                      ? AppDesignTokens.dangerSoft
                       : (!item.hasEnglishSubtitles &&
                                 ((englishFillLabel ?? '').trim().isNotEmpty ||
                                     onMissingEnglishTap != null)
-                            ? const Color(0xFFE8F1FF)
+                            ? AppDesignTokens.infoSoft
                             : null),
                   textColor: englishFillFailed
-                      ? const Color(0xFFBA1A1A)
+                      ? AppDesignTokens.dangerText
                       : (!item.hasEnglishSubtitles &&
                                 ((englishFillLabel ?? '').trim().isNotEmpty ||
                                     onMissingEnglishTap != null)
-                            ? AppDesignTokens.primaryBlueDark
+                            ? AppDesignTokens.primaryBlue
                             : null),
                   onTap: item.hasEnglishSubtitles ||
                           _isPendingBilibiliDownload(item)
@@ -195,21 +197,21 @@ class EpisodeListItem extends StatelessWidget {
                   backgroundColor: item.hasChineseSubtitles
                       ? AppDesignTokens.pinkLight
                       : (chineseFillFailed
-                            ? const Color(0xFFFFE1E1)
+                            ? AppDesignTokens.dangerSoft
                             : (_isPendingBilibiliDownload(item)
-                                  ? const Color(0xFFE8F1FF)
+                                  ? AppDesignTokens.infoSoft
                                   : ((chineseFillLabel ?? '').trim().isNotEmpty
-                                        ? const Color(0xFFE8F1FF)
-                                        : const Color(0xFFFFE1E1)))),
+                                        ? AppDesignTokens.infoSoft
+                                        : AppDesignTokens.dangerSoft))),
                   textColor: item.hasChineseSubtitles
                       ? AppDesignTokens.textPrimary
                       : (chineseFillFailed
-                            ? const Color(0xFFBA1A1A)
+                            ? AppDesignTokens.dangerText
                             : (_isPendingBilibiliDownload(item)
-                                  ? AppDesignTokens.primaryBlueDark
+                                  ? AppDesignTokens.primaryBlue
                                   : ((chineseFillLabel ?? '').trim().isNotEmpty
-                                        ? AppDesignTokens.primaryBlueDark
-                                        : const Color(0xFFBA1A1A)))),
+                                        ? AppDesignTokens.primaryBlue
+                                        : AppDesignTokens.dangerText))),
                   onTap: item.hasChineseSubtitles ||
                           _isPendingBilibiliDownload(item)
                       ? null
@@ -279,12 +281,20 @@ class EpisodeListItem extends StatelessWidget {
               ? AppDesignTokens.brandGreenDark
               : AppDesignTokens.primaryBlueDark,
         );
+        final ButtonStyle episodeActionStyle = OutlinedButton.styleFrom(
+          minimumSize: const Size(0, 40),
+          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+          visualDensity: VisualDensity.compact,
+          foregroundColor: AppDesignTokens.primaryBlue,
+          side: BorderSide(color: AppDesignTokens.borderGray),
+          backgroundColor: AppDesignTokens.softGray.withValues(alpha: 0.55),
+        );
         final Widget? transcriptButton = onViewTranscript == null
             ? null
             : OutlinedButton.icon(
                 key: ValueKey<String>('episode-view-transcript-${item.id}'),
                 onPressed: onViewTranscript,
-                style: OutlinedButton.styleFrom(minimumSize: const Size(0, 48)),
+                style: episodeActionStyle,
                 icon: const Icon(Icons.menu_book_rounded, size: 18),
                 label: const Text('查看全文'),
               );
@@ -295,7 +305,7 @@ class EpisodeListItem extends StatelessWidget {
                   'episode-rerecognize-english-${item.id}',
                 ),
                 onPressed: onRerecognizeEnglish,
-                style: OutlinedButton.styleFrom(minimumSize: const Size(0, 48)),
+                style: episodeActionStyle,
                 icon: const Icon(Icons.mic_none_rounded, size: 18),
                 label: const Text('重新识别英文'),
               );
@@ -306,7 +316,7 @@ class EpisodeListItem extends StatelessWidget {
                   'episode-rerecognize-chinese-${item.id}',
                 ),
                 onPressed: onRerecognizeChinese,
-                style: OutlinedButton.styleFrom(minimumSize: const Size(0, 48)),
+                style: episodeActionStyle,
                 icon: const Icon(Icons.translate_rounded, size: 18),
                 label: const Text('重新识别中文'),
               );
@@ -333,7 +343,7 @@ class EpisodeListItem extends StatelessWidget {
             padding: EdgeInsets.all(narrow ? 14 : 18),
             decoration: BoxDecoration(
               color: selected
-                  ? const Color(0xFFEFFFF5)
+                  ? AppDesignTokens.selectedSurface
                   : AppDesignTokens.appWhite,
               borderRadius: BorderRadius.circular(26),
               border: Border.all(

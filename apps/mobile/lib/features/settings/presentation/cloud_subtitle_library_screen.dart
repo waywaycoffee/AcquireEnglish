@@ -167,7 +167,7 @@ class _CloudSubtitleLibraryScreenState
               hintText: '搜索标题 / BVID / 中文预览',
               isDense: true,
               filled: true,
-              fillColor: Colors.white,
+              fillColor: AppDesignTokens.appWhite,
               prefixIcon: const Icon(Icons.search_rounded, size: 20),
               suffixIcon: IconButton(
                 tooltip: '搜索',
@@ -295,7 +295,7 @@ class _CloudSubtitleLibraryScreenState
           itemBuilder: (BuildContext context, int index) {
             final PersonalImportAsset asset = items[index];
             return Material(
-              color: Colors.white,
+              color: AppDesignTokens.appWhite,
               borderRadius: BorderRadius.circular(14),
               child: Padding(
                 padding: const EdgeInsets.all(14),
@@ -348,7 +348,7 @@ class _SharedCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final String preview = item.previewZh.trim();
     return Material(
-      color: Colors.white,
+      color: AppDesignTokens.appWhite,
       borderRadius: BorderRadius.circular(14),
       child: Padding(
         padding: const EdgeInsets.all(14),
@@ -357,9 +357,10 @@ class _SharedCard extends StatelessWidget {
           children: <Widget>[
             Text(
               item.displayTitle,
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 15,
                 fontWeight: FontWeight.w700,
+                color: AppDesignTokens.textPrimary,
               ),
             ),
             const SizedBox(height: 6),
@@ -377,10 +378,10 @@ class _SharedCard extends StatelessWidget {
                 preview,
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 13,
                   height: 1.35,
-                  color: Color(0xFF374151),
+                  color: AppDesignTokens.textSecondary,
                 ),
               ),
             ],
@@ -404,7 +405,7 @@ Widget _chip(String label, bool ok) {
   return Container(
     padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
     decoration: BoxDecoration(
-      color: ok ? const Color(0xFFDCFCE7) : const Color(0xFFF3F4F6),
+      color: ok ? AppDesignTokens.successSoft : AppDesignTokens.softGray,
       borderRadius: BorderRadius.circular(999),
     ),
     child: Text(
@@ -412,7 +413,11 @@ Widget _chip(String label, bool ok) {
       style: TextStyle(
         fontSize: 12,
         fontWeight: FontWeight.w600,
-        color: ok ? const Color(0xFF166534) : const Color(0xFF6B7280),
+        color: ok
+            ? (AppDesignTokens.isDark
+                  ? AppDesignTokens.brandGreen
+                  : const Color(0xFF166534))
+            : AppDesignTokens.textSecondary,
       ),
     ),
   );

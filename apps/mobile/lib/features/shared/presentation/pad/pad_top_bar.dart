@@ -134,7 +134,13 @@ class PadTopBar extends ConsumerWidget {
             ),
           if (actions.isNotEmpty) const SizedBox(width: 8),
           if (trailing != null)
-            trailing!
+            Flexible(
+              fit: FlexFit.loose,
+              child: Align(
+                alignment: Alignment.centerRight,
+                child: trailing!,
+              ),
+            )
           else
             Container(
               padding: EdgeInsets.symmetric(

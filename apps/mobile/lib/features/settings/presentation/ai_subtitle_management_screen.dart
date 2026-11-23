@@ -444,7 +444,9 @@ class _SubtitleCard extends StatelessWidget {
     return AnimatedContainer(
       duration: const Duration(milliseconds: 160),
       decoration: BoxDecoration(
-        color: selected ? const Color(0xFFF4FFEC) : AppDesignTokens.appWhite,
+        color: selected
+            ? AppDesignTokens.selectedSurface
+            : AppDesignTokens.appWhite,
         borderRadius: BorderRadius.circular(24),
         border: Border.all(
           color: selected
@@ -599,7 +601,7 @@ class _ManagementIntro extends StatelessWidget {
         padding: const EdgeInsets.all(20),
         decoration: BoxDecoration(
           color: selectionMode
-              ? const Color(0xFFF4FFEC)
+              ? AppDesignTokens.selectedSurface
               : AppDesignTokens.skyLight,
           borderRadius: BorderRadius.circular(24),
           border: Border.all(
@@ -722,7 +724,9 @@ class _CardAction extends StatelessWidget {
       style: OutlinedButton.styleFrom(
         minimumSize: const Size(48, 48),
         foregroundColor: color,
-        backgroundColor: prominent ? const Color(0xFFF4FFEC) : Colors.white,
+        backgroundColor: prominent
+            ? AppDesignTokens.selectedSurface
+            : AppDesignTokens.appWhite,
         side: BorderSide(
           color: prominent
               ? AppDesignTokens.brandGreen
@@ -1297,16 +1301,18 @@ class _EditorLineCard extends StatelessWidget {
                   width: 48,
                   height: 48,
                   decoration: BoxDecoration(
-                    color: const Color(0xFFF4FFEC),
+                    color: AppDesignTokens.selectedSurface,
                     borderRadius: BorderRadius.circular(16),
                     border: Border.all(
                       color: AppDesignTokens.brandGreen,
                       width: 2,
                     ),
                   ),
-                  child: const Icon(
+                  child: Icon(
                     Icons.edit_rounded,
-                    color: AppDesignTokens.brandGreenDark,
+                    color: AppDesignTokens.isDark
+                        ? AppDesignTokens.brandGreen
+                        : AppDesignTokens.brandGreenDark,
                   ),
                 ),
               ],

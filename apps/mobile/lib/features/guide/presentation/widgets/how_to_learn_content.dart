@@ -868,7 +868,7 @@ class _ExampleResult extends StatelessWidget {
   Widget build(BuildContext context) => Container(
     padding: const EdgeInsets.all(14),
     decoration: BoxDecoration(
-      color: const Color(0xFFEFFFF5),
+      color: AppDesignTokens.selectedSurface,
       borderRadius: BorderRadius.circular(16),
     ),
     child: const Row(
