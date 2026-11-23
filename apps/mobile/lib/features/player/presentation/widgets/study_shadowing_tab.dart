@@ -1694,48 +1694,60 @@ class _ShadowToolbarPortal extends StatefulWidget {
 
 class _ShadowToolbarPortalState extends State<_ShadowToolbarPortal> {
   OverlayEntry? _entry;
+  bool _overlaySyncScheduled = false;
 
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) => _ensureMounted());
+    _scheduleOverlaySync();
   }
 
   @override
   void didUpdateWidget(covariant _ShadowToolbarPortal oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (widget.link == null) {
-      _removeEntry();
-      return;
-    }
-    if (oldWidget.link == null) {
-      WidgetsBinding.instance.addPostFrameCallback((_) => _ensureMounted());
-    } else {
-      _entry?.markNeedsBuild();
-    }
+    // Never insert / remove / markNeedsBuild OverlayEntry during build —
+    // didUpdateWidget runs in the parent build pipeline and that is what
+    // caused the red "_OverlayEntryWidget … during build" crash on 跟读.
+    _scheduleOverlaySync();
   }
 
   @override
   void dispose() {
-    _removeEntry();
+    _entry?.remove();
+    _entry = null;
     super.dispose();
   }
 
-  void _removeEntry() {
-    _entry?.remove();
-    _entry = null;
+  void _scheduleOverlaySync() {
+    if (_overlaySyncScheduled) {
+      return;
+    }
+    _overlaySyncScheduled = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _overlaySyncScheduled = false;
+      if (!mounted) {
+        return;
+      }
+      _syncOverlay();
+    });
   }
 
-  void _ensureMounted() {
-    if (!mounted || widget.link == null || _entry != null) {
+  void _syncOverlay() {
+    if (widget.link == null) {
+      _entry?.remove();
+      _entry = null;
       return;
     }
-    final OverlayState? overlay = Overlay.maybeOf(context, rootOverlay: true);
-    if (overlay == null) {
+    if (_entry == null) {
+      final OverlayState? overlay = Overlay.maybeOf(context, rootOverlay: true);
+      if (overlay == null) {
+        return;
+      }
+      _entry = OverlayEntry(builder: _buildOverlay);
+      overlay.insert(_entry!);
       return;
     }
-    _entry = OverlayEntry(builder: _buildOverlay);
-    overlay.insert(_entry!);
+    _entry!.markNeedsBuild();
   }
 
   Widget _buildOverlay(BuildContext context) {
@@ -1790,17 +1802,8 @@ class _ShadowToolbarPortalState extends State<_ShadowToolbarPortal> {
     if (widget.link == null) {
       return widget.child;
     }
-    // Keep overlay in sync with recording / mode state on every rebuild.
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted) {
-        return;
-      }
-      if (_entry == null) {
-        _ensureMounted();
-      } else {
-        _entry!.markNeedsBuild();
-      }
-    });
+    // Child (mic row) may change on every rebuild — sync overlay after frame.
+    _scheduleOverlaySync();
     return const SizedBox.shrink();
   }
 }
