@@ -64,6 +64,7 @@ _deploy_stage/
 deploy/wheels/
 deploy/_openapi_prod.json
 third_party/LiveTalking/
+third_party/MuseTalk/
 deploy/gpu-box-ollama/models/
 deploy/gpu-box-ollama/wheels/
 deploy/gpu-box-ollama/*.log
