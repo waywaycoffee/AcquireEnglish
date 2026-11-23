@@ -39,6 +39,25 @@ def _missing_livekit() -> bool:
     return False
 
 
+def _preload_plugins() -> None:
+    """Register LiveKit plugins on the process main thread.
+
+    Job entrypoints may run off the main thread (Windows spawn); importing
+    silero/openai/deepgram for the first time there raises RuntimeError.
+    """
+    from livekit.plugins import deepgram as _lk_deepgram  # noqa: F401
+    from livekit.plugins import openai as _lk_openai  # noqa: F401
+    from livekit.plugins import silero as _lk_silero  # noqa: F401
+
+
+# Eager preload when the worker/job process imports this module.
+if not _missing_livekit():
+    try:
+        _preload_plugins()
+    except Exception:  # noqa: BLE001
+        pass
+
+
 def _print_checklist() -> None:
     print(
         """Acquire Digital Human Coach — LiveKit wiring checklist
@@ -65,7 +84,7 @@ See DEPLOY_GPU.md
 async def entrypoint(ctx) -> None:
     """Module-level entrypoint (must be picklable for LiveKit process pool)."""
     from livekit.agents import Agent, AgentSession, AutoSubscribe, TurnHandlingOptions
-    from livekit.plugins import silero
+    from livekit.plugins import silero  # already registered in _preload_plugins
 
     from agent.document_context import select_passages
     from agent.hooks import (
@@ -276,6 +295,7 @@ def run() -> None:
 
     from livekit.agents import WorkerOptions, cli
 
+    _preload_plugins()
     cli.run_app(
         WorkerOptions(
             entrypoint_fnc=entrypoint,
