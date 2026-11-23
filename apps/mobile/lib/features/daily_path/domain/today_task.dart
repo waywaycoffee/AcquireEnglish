@@ -6,6 +6,8 @@ enum TodayTaskKind {
   clipDue,
   examDue,
   examDrill,
+  videoWords,
+  videoPractice,
 }
 
 enum TodayPathStatus {

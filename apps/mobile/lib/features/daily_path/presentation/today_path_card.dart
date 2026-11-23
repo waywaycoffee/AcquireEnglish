@@ -258,7 +258,13 @@ class TodayPathCard extends ConsumerWidget {
     Color ink,
     Color muted,
   ) {
-    final List<TodayTask> show = path.tasks.take(4).toList(growable: false);
+    bool isVideoPractice(TodayTask task) =>
+        task.kind == TodayTaskKind.videoWords ||
+        task.kind == TodayTaskKind.videoPractice;
+    final List<TodayTask> show = <TodayTask>[
+      ...path.tasks.where(isVideoPractice),
+      ...path.tasks.where((TodayTask task) => !isVideoPractice(task)).take(4),
+    ];
     final int more = path.tasks.length - show.length;
     return Column(
       children: <Widget>[

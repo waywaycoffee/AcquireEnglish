@@ -1,3 +1,4 @@
+import '../../daily_path/presentation/today_path_provider.dart';
 import '../../words/presentation/vocabulary_placement_provider.dart';
 import 'dart:async';
 import 'dart:convert';
@@ -183,6 +184,8 @@ class PadPortraitPlayerScreen extends ConsumerStatefulWidget {
     this.autoPlay = true,
     this.autoOpenFullscreen = false,
     this.initialLoopSentence = false,
+    this.videoPlanActivity,
+    this.todayTaskId,
     this.dramaPlan = false,
     super.key,
   });
@@ -198,6 +201,8 @@ class PadPortraitPlayerScreen extends ConsumerStatefulWidget {
 
   /// When opened from review “原片”，auto-enable single-sentence loop.
   final bool initialLoopSentence;
+  final String? videoPlanActivity;
+  final String? todayTaskId;
 
   /// Drama hub: stricter study-plan guidance.
   final bool dramaPlan;
@@ -300,6 +305,11 @@ class PadPortraitPlayerScreenState
   @override
   void initState() {
     super.initState();
+    _studyTab = switch (widget.videoPlanActivity) {
+      'words' => StudyModeTab.wordCards,
+      'practice' => StudyModeTab.practice,
+      _ => StudyModeTab.subtitles,
+    };
     _releaseGraphicsCache = PlayerGraphicsCache.acquire();
     state = PlayerMockState(initialStartTime: widget.initialStartTime);
     // Intent to play as soon as the decoder is ready (avoids a paused first frame).
@@ -3043,7 +3053,7 @@ Future<void> _settleChineseFillIfAlreadyPresent() async {
     final LibraryCourseData? course = courseContext.course;
     final LibraryEpisodeItem? episode = courseContext.episode;
     final LearningSettingsState settings = ref.watch(learningSettingsProvider);
-    final bool bingeMode = settings.isBingeWatchMode;
+    final bool bingeMode = settings.isBingeWatchMode && widget.videoPlanActivity == null;
     final Set<String> savedVocabularyWords =
         SubtitleVocabularyHighlight.savedWordsFromBook(
           ref.watch(wordBookProvider),
@@ -3348,6 +3358,19 @@ Future<void> _settleChineseFillIfAlreadyPresent() async {
                           });
                         },
                       ),
+                      if (widget.todayTaskId != null && state.hasLines &&
+                          ((widget.videoPlanActivity == 'words' &&
+                                  _studyTab == StudyModeTab.wordCards) ||
+                              (widget.videoPlanActivity == 'practice' &&
+                                  _studyTab == StudyModeTab.practice)))
+                        TextButton(
+                          onPressed: () async {
+                            await ref.read(todayPathProvider.notifier)
+                                .markDone(widget.todayTaskId!);
+                            if (mounted) context.pop();
+                          },
+                          child: const Text('完成本项并返回计划'),
+                        ),
                       Expanded(
                         child: Padding(
                           padding: const EdgeInsets.fromLTRB(12, 0, 12, 4),

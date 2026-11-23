@@ -12,6 +12,7 @@ import '../../exam/domain/exam_weakness.dart';
 import '../../home/presentation/learning_dashboard_provider.dart';
 import '../../onboarding/domain/learning_tracks.dart';
 import '../../player/domain/episode_clip_due.dart';
+import '../../player/presentation/learning_resume_provider.dart';
 import '../../reading/data/reading_gloss.dart';
 import '../../reading/presentation/reading_library_provider.dart';
 import '../../sync/presentation/daily_feed_provider.dart';
@@ -37,6 +38,7 @@ class TodayPathNotifier extends Notifier<TodayPathState> {
   @override
   TodayPathState build() {
     ref.watch(coursePlanProvider);
+    ref.watch(continueLearningTargetProvider);
     ref.watch(dailyReviewProvider);
     ref.watch(memoryItemStoreProvider);
     ref.watch(wordReviewSettingsProvider);
@@ -213,6 +215,30 @@ class TodayPathNotifier extends Notifier<TodayPathState> {
         wantVideo ? _clipDueTasks(now, doneIds) : const <TodayTask>[];
     final List<TodayTask> examTasks = _examTasks(doneIds);
 
+    final ContinueLearningTarget? video =
+        wantVideo ? ref.read(continueLearningTargetProvider) : null;
+    final List<TodayTask> videoTasks = <TodayTask>[
+      if (video != null)
+        for (final String activity in <String>['words', 'practice'])
+          TodayTask(
+            id: 'video-$activity:${video.episode.id}',
+            kind: activity == 'words'
+                ? TodayTaskKind.videoWords
+                : TodayTaskKind.videoPractice,
+            title: activity == 'words' ? '视频 · 背单词' : '视频 · 练习',
+            subtitle: video.episode.title,
+            route: Uri(
+              pathSegments: <String>['', 'episodes', video.episode.id],
+              queryParameters: <String, String>{
+                'autoplay': '0',
+                'activity': activity,
+                'todayTask': 'video-$activity:${video.episode.id}',
+              },
+            ).toString(),
+            doneToday: doneIds.contains('video-$activity:${video.episode.id}'),
+          ),
+    ];
+
     final List<TodayTask> merged = <TodayTask>[
       ...overdue,
       ...dueReview,
@@ -220,6 +246,7 @@ class TodayPathNotifier extends Notifier<TodayPathState> {
       ...clipDue,
       ...vocab.where((TodayTask t) => t.kind == TodayTaskKind.vocabDue),
       ...courseNew,
+      ...videoTasks,
       ...vocab.where((TodayTask t) => t.kind == TodayTaskKind.vocabNew),
       ...reading,
     ];

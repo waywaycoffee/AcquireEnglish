@@ -15,6 +15,8 @@ class PlayerScreen extends StatelessWidget {
     this.autoPlay = true,
     this.autoOpenFullscreen = false,
     this.initialLoopSentence = false,
+    this.videoPlanActivity,
+    this.todayTaskId,
     this.dramaPlan = false,
     super.key,
   });
@@ -28,6 +30,8 @@ class PlayerScreen extends StatelessWidget {
   final bool autoPlay;
   final bool autoOpenFullscreen;
   final bool initialLoopSentence;
+  final String? videoPlanActivity;
+  final String? todayTaskId;
   final bool dramaPlan;
 
   @override
@@ -44,6 +48,8 @@ class PlayerScreen extends StatelessWidget {
       autoOpenFullscreen: autoOpenFullscreen,
       initialLoopSentence: initialLoopSentence,
       dramaPlan: dramaPlan,
+      videoPlanActivity: videoPlanActivity,
+      todayTaskId: todayTaskId,
     );
   }
 }

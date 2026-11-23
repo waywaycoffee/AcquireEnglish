@@ -735,6 +735,8 @@ GoRouter goRouter(Ref ref) {
           autoPlay: autoplayParam != '0',
           autoOpenFullscreen: state.uri.queryParameters['fullscreen'] == '1',
           initialLoopSentence: state.uri.queryParameters['loop'] == 'sentence',
+          videoPlanActivity: state.uri.queryParameters['activity'],
+          todayTaskId: state.uri.queryParameters['todayTask'],
           dramaPlan: state.uri.queryParameters['plan'] == 'drama',
         );
       },
