@@ -3212,27 +3212,6 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
           )
         : null;
 
-    if (widget.standalone && widget.articleExcerpt.trim().isEmpty) {
-      return ClipRRect(
-        borderRadius: BorderRadius.circular(22),
-        child: DecoratedBox(
-          decoration: const BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topCenter,
-              end: Alignment.bottomCenter,
-              colors: <Color>[
-                Color(0xFF14102A),
-                Color(0xFF2A1B4A),
-                Color(0xFF1A1240),
-                Color(0xFF0E0A22),
-              ],
-            ),
-          ),
-          child: _buildNeedMaterialGate(),
-        ),
-      );
-    }
-
     final Widget stage = widget.standalone
         ? Padding(
             padding: const EdgeInsets.fromLTRB(10, 10, 10, 0),
@@ -4295,50 +4274,6 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
                 color: Colors.white.withValues(alpha: 0.75),
                 letterSpacing: 0.3,
               ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildNeedMaterialGate() {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(28),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: <Widget>[
-            const Icon(Icons.video_library_outlined, color: Colors.white70, size: 42),
-            const SizedBox(height: 14),
-            const Text(
-              'AI 外教课需要选定素材',
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                color: Colors.white,
-                fontSize: 18,
-                fontWeight: FontWeight.w900,
-              ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              '请先从课程/视频/文章生成外教课，再按六步上课：开场 → 示范 → 跟读 → 替换 → 场景对话 → 小结。',
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                color: Colors.white.withValues(alpha: 0.75),
-                height: 1.4,
-              ),
-            ),
-            const SizedBox(height: 18),
-            FilledButton(
-              onPressed: () {
-                if (context.canPop()) {
-                  context.pop();
-                } else {
-                  context.go('/library');
-                }
-              },
-              child: const Text('去选择学习素材'),
             ),
           ],
         ),

@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
 
 import '../../../daily_path/domain/course_plan.dart';
 import '../../../daily_path/presentation/course_plan_provider.dart';
@@ -33,26 +32,26 @@ class HomeCoachCourseCard extends ConsumerWidget {
             const SizedBox(height: 8),
             Text(canStart
                 ? '用「${plan.title}」里的真实句子，完成六步口语课'
-                : '选一段有英文字幕的视频或一篇文章，生成你的外教课。'),
+                : '从一节自我介绍体验课开始，练习如何用英语介绍自己。'),
             const SizedBox(height: 12),
             FilledButton.icon(
               onPressed: () {
-                if (!canStart) {
-                  context.pushNamed('library');
-                  return;
-                }
                 Navigator.of(context).push(MaterialPageRoute<void>(
                   builder: (_) => SourceCoachLessonPreview(
-                    sourceTitle: plan.title,
-                    topic: unit.topic,
-                    sourceLines: lines,
-                    isVideo: plan.type == CoursePlanType.video ||
-                        plan.type == CoursePlanType.videoSeries,
+                    isSample: !canStart,
+                    sourceTitle: canStart ? plan.title : '内置口语体验课',
+                    topic: canStart ? unit.topic : '初次见面与自我介绍',
+                    sourceLines: canStart ? lines : const <String>[
+                      'Hi, I’m Alex. Nice to meet you!',
+                      'I live in Shanghai. How about you?',
+                    ],
+                    isVideo: canStart && (plan.type == CoursePlanType.video ||
+                        plan.type == CoursePlanType.videoSeries),
                   ),
                 ));
               },
               icon: const Icon(Icons.play_arrow_rounded),
-              label: Text(canStart ? '进入外教课' : '选择学习素材'),
+              label: Text(canStart ? '进入外教课' : '体验外教课'),
             ),
           ],
         ),

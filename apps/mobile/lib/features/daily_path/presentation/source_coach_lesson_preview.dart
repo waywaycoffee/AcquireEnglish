@@ -8,6 +8,7 @@ class SourceCoachLessonPreview extends StatelessWidget {
     required this.topic,
     required this.sourceLines,
     required this.isVideo,
+    this.isSample = false,
     this.onConfirmedLearnerTurn,
     super.key,
   });
@@ -16,6 +17,7 @@ class SourceCoachLessonPreview extends StatelessWidget {
   final String topic;
   final List<String> sourceLines;
   final bool isVideo;
+  final bool isSample;
   final ValueChanged<String>? onConfirmedLearnerTurn;
 
   @override
@@ -54,7 +56,7 @@ class SourceCoachLessonPreview extends StatelessWidget {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: <Widget>[
-                          Text(isVideo ? '视频原句' : '文章原句',
+                          Text(isSample ? '示范句' : (isVideo ? '视频原句' : '文章原句'),
                               style: Theme.of(context).textTheme.titleMedium),
                           const SizedBox(height: 8),
                           if (lines.isEmpty) const Text('当前单元尚无可用英文原句'),
