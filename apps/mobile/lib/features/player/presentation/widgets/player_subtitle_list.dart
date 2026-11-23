@@ -1033,6 +1033,9 @@ class _PlayerSubtitleListState extends State<PlayerSubtitleList> {
       if (pipelineLabel != null && pipelineLabel.isNotEmpty) {
         return pipelineLabel;
       }
+      if (emptyGenerating) {
+        return '云端正在生成字幕…';
+      }
       return widget.aiSubtitleProgressText;
     }();
     final double? emptyProgressValue =
@@ -1042,7 +1045,11 @@ class _PlayerSubtitleListState extends State<PlayerSubtitleList> {
       if (preview != null && preview.isNotEmpty) {
         return preview;
       }
-      if (pipelineBusy) {
+      if (pipelineBusy || emptyGenerating) {
+        final String live = (emptyProgressText ?? pipelineLabel ?? '').trim();
+        if (live.contains('云端') || live.contains('排队')) {
+          return '云端 5060 Ti 识别中，完成后会出现可跟读字幕';
+        }
         return '语音识别进行中，完成后会出现可跟读字幕列表';
       }
       return widget.aiSubtitlePreviewText;
@@ -2754,7 +2761,7 @@ class _SubtitlePlaceholder extends StatelessWidget {
                 ),
                 const SizedBox(height: 10),
                 Text(
-                  progressText ?? '正在准备音频...',
+                  progressText ?? '云端正在生成字幕…',
                   style: TextStyle(
                     fontSize: 13,
                     fontWeight: FontWeight.w700,
@@ -2768,7 +2775,7 @@ class _SubtitlePlaceholder extends StatelessWidget {
                   child: Text(
                     previewText?.isNotEmpty ?? false
                         ? previewText!
-                        : '等待识别文本...',
+                        : '排队识别中，完成后会出现可跟读字幕',
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
                     textAlign: TextAlign.center,

@@ -345,7 +345,24 @@ class PadPortraitPlayerScreenState
           return;
         }
         // Queue file may lag behind enqueue — keep local in-progress UI.
+        // Cloud-only EN jobs never write a local Whisper row; tracker still
+        // means busy, so never leave the empty-state ASR placeholder blank.
         if (fill == null) {
+          final CloudSubtitleJobTrack? cloud =
+              CloudSubtitleJobTracker.instance.forEpisode(widget.episodeId);
+          if (cloud != null &&
+              (_englishFillInFlight ||
+                  _bilingualPipelineLabel == null ||
+                  (_bilingualPipelineLabel ?? '').trim().isEmpty)) {
+            setState(() {
+              _englishFillInFlight = cloud.needEnglish;
+              _bilingualPhase = BilingualPipelinePhase.asrProofreading;
+              _bilingualPipelineLabel = kSubtitleCloudGenerationQueuedLabel;
+              _bilingualPipelineProgress =
+                  progressFractionForGpuSubtitleJobState('queued');
+              _bilingualShowAiComplete = false;
+            });
+          }
           return;
         }
         final SubtitleCompletionEpisodeUi? prevFill = previous?.forEpisode(
@@ -2364,28 +2381,60 @@ Future<void> _settleChineseFillIfAlreadyPresent() async {
     return '英文字幕正在生成中，请稍候（无需重复点击）';
   }
 
+  /// Progress chip for empty-list / busy English generation (cloud or local).
+  ({String text, double? value, String preview}) _englishGenerationProgressUi() {
+    final SubtitleCompletionEpisodeUi? fill = ref
+        .read(subtitleCompletionStatusProvider)
+        .forEpisode(widget.episodeId);
+    final CloudSubtitleJobTrack? cloud =
+        CloudSubtitleJobTracker.instance.forEpisode(widget.episodeId);
+    final String? ai = _aiSubtitleProgressText?.trim();
+    final String? pipe = _bilingualPipelineLabel?.trim();
+    final String? fillLabel = fill?.displayLabel.trim();
+    final String text;
+    if (ai != null &&
+        ai.isNotEmpty &&
+        !ai.contains('检查官方字幕') &&
+        !ai.contains('拉取 B 站官方')) {
+      text = ai;
+    } else if (pipe != null && pipe.isNotEmpty) {
+      text = pipe;
+    } else if (fillLabel != null && fillLabel.isNotEmpty) {
+      text = fillLabel;
+    } else if (cloud != null) {
+      text = kSubtitleCloudGenerationQueuedLabel;
+    } else {
+      text = '云端正在生成英文字幕…';
+    }
+    final double? value = _aiSubtitleProgressValue ??
+        _bilingualPipelineProgress ??
+        fill?.progressFraction ??
+        (cloud != null
+            ? progressFractionForGpuSubtitleJobState('queued')
+            : progressFractionFromSubtitleLabel(text));
+    final String? preview = _aiSubtitlePreviewText?.trim();
+    final String previewText = (preview != null && preview.isNotEmpty)
+        ? preview
+        : (isSubtitleCloudGenerationQueuedLabel(text) || cloud != null
+              ? '云端 5060 Ti 识别中，完成后会出现可跟读字幕'
+              : '语音识别进行中，完成后会出现可跟读字幕列表');
+    return (text: text, value: value, preview: previewText);
+  }
+
   void _ensureEnglishGenerationProgressVisible() {
     if (!mounted) {
       return;
     }
-    final SubtitleCompletionEpisodeUi? fill = ref
-        .read(subtitleCompletionStatusProvider)
-        .forEpisode(widget.episodeId);
-    final String label = (fill?.displayLabel ??
-            _bilingualPipelineLabel ??
-            '正在生成英文字幕…')
-        .trim();
-    final double? progress = fill?.progressFraction ??
-        _bilingualPipelineProgress ??
-        progressFractionFromSubtitleLabel(label);
-    if (_bilingualPipelineLabel == label &&
-        _bilingualPipelineProgress == progress) {
+    final ({String text, double? value, String preview}) ui =
+        _englishGenerationProgressUi();
+    if (_bilingualPipelineLabel == ui.text &&
+        _bilingualPipelineProgress == ui.value) {
       return;
     }
     setState(() {
       _bilingualPhase = BilingualPipelinePhase.asrProofreading;
-      _bilingualPipelineLabel = label;
-      _bilingualPipelineProgress = progress;
+      _bilingualPipelineLabel = ui.text;
+      _bilingualPipelineProgress = ui.value;
       _bilingualShowAiComplete = false;
     });
   }
@@ -3655,6 +3704,10 @@ Future<void> _settleChineseFillIfAlreadyPresent() async {
     required Set<String> keyVocabularyWords,
     SubtitleChunkHighlighter? chunkHighlighter,
   }) {
+    final bool englishGenBusy =
+        _generatingAiSubtitles || _isEnglishSubtitleGenerationBusy();
+    final ({String text, double? value, String preview})? englishGenUi =
+        englishGenBusy ? _englishGenerationProgressUi() : null;
     switch (_studyTab) {
       case StudyModeTab.subtitles:
         if (state.hasLines) {
@@ -3717,13 +3770,15 @@ Future<void> _settleChineseFillIfAlreadyPresent() async {
                 _blindListening ||
                 SubtitleDisplayMode.isBlind(state.subtitleMode),
             showAiGenerateSubtitles: canGenerateAiSubtitles,
-            generatingAiSubtitles:
-                _generatingAiSubtitles || _isEnglishSubtitleGenerationBusy(),
-            aiSubtitleProgressValue: _aiSubtitleProgressValue,
-            aiSubtitleProgressText: _aiSubtitleProgressText,
-            aiSubtitlePreviewText: _aiSubtitlePreviewText,
+            generatingAiSubtitles: englishGenBusy,
+            aiSubtitleProgressValue:
+                englishGenUi?.value ?? _aiSubtitleProgressValue,
+            aiSubtitleProgressText:
+                englishGenUi?.text ?? _aiSubtitleProgressText,
+            aiSubtitlePreviewText:
+                englishGenUi?.preview ?? _aiSubtitlePreviewText,
             aiSubtitleErrorText: _aiSubtitleErrorText,
-            onGenerateAiSubtitles: _isEnglishSubtitleGenerationBusy()
+            onGenerateAiSubtitles: englishGenBusy
                 ? null
                 : _handleGenerateAiSubtitles,
             bilingualPipelineLabel: _bilingualPipelineLabel,
@@ -3742,9 +3797,7 @@ Future<void> _settleChineseFillIfAlreadyPresent() async {
             onDictionaryClosed: _handleDictionaryClosed,
           );
         }
-        if (canGenerateAiSubtitles ||
-            _generatingAiSubtitles ||
-            _isEnglishSubtitleGenerationBusy()) {
+        if (canGenerateAiSubtitles || englishGenBusy) {
           return PlayerSubtitleList(
             episodeId: widget.episodeId,
             lines: const <PlayerSubtitleLine>[],
@@ -3767,10 +3820,19 @@ Future<void> _settleChineseFillIfAlreadyPresent() async {
             onPronounce: _stopVideo,
             showAiGenerateSubtitles: true,
             generatingAiSubtitles: true,
-            aiSubtitleProgressValue: _aiSubtitleProgressValue,
-            aiSubtitleProgressText: _aiSubtitleProgressText ??
-                _bilingualPipelineLabel,
-            aiSubtitlePreviewText: _aiSubtitlePreviewText,
+            aiSubtitleProgressValue:
+                englishGenUi?.value ??
+                _aiSubtitleProgressValue ??
+                _bilingualPipelineProgress,
+            aiSubtitleProgressText:
+                englishGenUi?.text ??
+                _aiSubtitleProgressText ??
+                _bilingualPipelineLabel ??
+                kSubtitleCloudGenerationQueuedLabel,
+            aiSubtitlePreviewText:
+                englishGenUi?.preview ??
+                _aiSubtitlePreviewText ??
+                '云端 5060 Ti 识别中，完成后会出现可跟读字幕',
             aiSubtitleErrorText: _aiSubtitleErrorText,
             onGenerateAiSubtitles: null,
             bilingualPipelineLabel: _bilingualPipelineLabel,

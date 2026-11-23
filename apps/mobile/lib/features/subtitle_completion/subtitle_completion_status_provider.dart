@@ -524,6 +524,39 @@ class SubtitleCompletionStatusNotifier
         next[entry.key] = entry.value;
       }
     }
+    // Cloud-only EN jobs never enter the local Whisper queue — keep tracker
+    // rows visible so the player does not fall back to「准备音频」placeholder.
+    for (final CloudSubtitleJobTrack track
+        in CloudSubtitleJobTracker.instance.activeTracks) {
+      final SubtitleCompletionEpisodeUi? existing = next[track.episodeId];
+      if (existing == null) {
+        next[track.episodeId] = SubtitleCompletionEpisodeUi(
+          episodeId: track.episodeId,
+          status: SubtitleCompletionStatus.running,
+          needEnglish: track.needEnglish,
+          needChinese: track.needChinese,
+          label: kSubtitleCloudGenerationQueuedLabel,
+        );
+        continue;
+      }
+      if ((track.needEnglish && !existing.needEnglish) ||
+          (track.needChinese && !existing.needChinese) ||
+          ((existing.label ?? '').trim().isEmpty)) {
+        next[track.episodeId] = SubtitleCompletionEpisodeUi(
+          episodeId: existing.episodeId,
+          status: existing.isActive
+              ? existing.status
+              : SubtitleCompletionStatus.running,
+          needEnglish: existing.needEnglish || track.needEnglish,
+          needChinese: existing.needChinese || track.needChinese,
+          label: (existing.label ?? '').trim().isNotEmpty
+              ? existing.label
+              : kSubtitleCloudGenerationQueuedLabel,
+          lastError: existing.lastError,
+          attempts: existing.attempts,
+        );
+      }
+    }
     state = state.copyWith(
       byEpisodeId: Map<String, SubtitleCompletionEpisodeUi>.unmodifiable(next),
     );
